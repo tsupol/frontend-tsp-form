@@ -1,0 +1,99 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "retry": "Retry",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "search": "Search",
+    "noData": "No data available",
+    "example": "Example"
+  },
+  "auth": {
+    "login": "Login",
+    "logout": "Logout",
+    "username": "Username",
+    "password": "Password",
+    "enterUsername": "Enter username",
+    "enterPassword": "Enter password",
+    "usernameRequired": "Username is required",
+    "passwordRequired": "Password is required",
+    "loggingIn": "Logging in...",
+    "loginFailed": "Login failed. Please try again.",
+    "invalidCredentials": "Invalid username or password"
+  },
+  "nav": {
+    "home": "Home",
+    "products": "Products",
+    "admin": "Admin",
+    "userDetails": "User Details",
+    "deviceValidation": "Device Validation",
+    "register": "Register Device"
+  },
+  "user": {
+    "id": "User ID",
+    "username": "Username",
+    "role": "Role"
+  },
+  "theme": {
+    "title": "Theme",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
+  "language": {
+    "title": "Language",
+    "en": "English",
+    "th": "ไทย"
+  },
+  "public": {
+    "welcome": "Welcome",
+    "viewProducts": "View Products",
+    "loginAsAdmin": "Login as Admin"
+  },
+  "products": {
+    "title": "Products",
+    "noProducts": "No products available"
+  },
+  "device": {
+    "title": "Device Validation",
+    "imei": "IMEI Number",
+    "serial": "Serial Number",
+    "imeiRequired": "IMEI is required",
+    "serialRequired": "Serial number is required",
+    "imeiFormat": "IMEI must be 15 digits",
+    "imeiValid": "Valid IMEI",
+    "serialValid": "Valid Serial Number",
+    "formatted": "Formatted",
+    "validate": "Validate Device",
+    "imeiHint": "15-digit number found in Settings > General > About or dial *#06#",
+    "serialHint": "11-12 characters found in Settings > General > About",
+    "howToFind": "How to find on iPhone",
+    "findImei": "Settings → General → About → IMEI, or dial *#06#",
+    "findSerial": "Settings → General → About → Serial Number"
+  },
+  "register": {
+    "title": "Device Registration",
+    "step": "Step {{current}} of {{total}}",
+    "deviceType": "Device Type",
+    "withSim": "With SIM Card",
+    "withoutSim": "Without SIM Card",
+    "next": "Next",
+    "back": "Back",
+    "scanTitle": "Scan QR Code",
+    "scanDescription": "Scan this QR code with the device to complete registration.",
+    "confirmScan": "Confirm Scan",
+    "processing": "Processing registration...",
+    "successTitle": "Registration Successful",
+    "successDescription": "Your device has been registered successfully.",
+    "failedTitle": "Registration Failed",
+    "failedDescription": "Unable to complete registration. Please try again.",
+    "backToHome": "Back to Home",
+    "newRegistration": "New Registration",
+    "imeiSearchPlaceholder": "Type 3+ digits to search IMEI...",
+    "imeiSearchHint": "Type at least 3 characters to search for registered IMEI"
+  }
+}

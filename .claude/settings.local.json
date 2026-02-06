@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs:*)",
+      "Bash(ls -la \"C:\\\\Users\\\\tonsu\\\\WebDev\\\\mkd-frontend\\\\src\"\" 2>/dev/null || echo \"Directory not found \")",
+      "Bash(npx vite build)",
+      "Bash(npx vite build:*)",
+      "Bash(node:*)",
+      "Bash(npx tsc:*)",
+      "Bash(echo:*)",
+      "WebFetch(domain:czynet.dyndns.org)",
+      "Bash(curl:*)",
+      "Bash(curl -k http://czynet.dyndns.org:3000/openapi.json)",
+      "Bash(dir \"C:\\\\Users\\\\tonsu\\\\WebDev\\\\frontend-tsp-form\\\\src\" /b)",
+      "Bash(npm update:*)",
+      "Bash(npm list:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm cache clean:*)",
+      "Bash(python3:*)",
+      "Bash(python -c:*)",
+      "Bash(npm show:*)"
+    ]
+  }
+}

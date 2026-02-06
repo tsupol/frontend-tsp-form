@@ -1,0 +1,99 @@
+{
+  "common": {
+    "loading": "กำลังโหลด...",
+    "error": "เกิดข้อผิดพลาด",
+    "retry": "ลองใหม่",
+    "save": "บันทึก",
+    "cancel": "ยกเลิก",
+    "delete": "ลบ",
+    "edit": "แก้ไข",
+    "create": "สร้าง",
+    "search": "ค้นหา",
+    "noData": "ไม่มีข้อมูล",
+    "example": "ตัวอย่าง"
+  },
+  "auth": {
+    "login": "เข้าสู่ระบบ",
+    "logout": "ออกจากระบบ",
+    "username": "ชื่อผู้ใช้",
+    "password": "รหัสผ่าน",
+    "enterUsername": "กรอกชื่อผู้ใช้",
+    "enterPassword": "กรอกรหัสผ่าน",
+    "usernameRequired": "กรุณากรอกชื่อผู้ใช้",
+    "passwordRequired": "กรุณากรอกรหัสผ่าน",
+    "loggingIn": "กำลังเข้าสู่ระบบ...",
+    "loginFailed": "เข้าสู่ระบบล้มเหลว กรุณาลองใหม่",
+    "invalidCredentials": "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง"
+  },
+  "nav": {
+    "home": "หน้าหลัก",
+    "products": "สินค้า",
+    "admin": "ผู้ดูแลระบบ",
+    "userDetails": "ข้อมูลผู้ใช้",
+    "deviceValidation": "ตรวจสอบอุปกรณ์",
+    "register": "ลงทะเบียนอุปกรณ์"
+  },
+  "user": {
+    "id": "รหัสผู้ใช้",
+    "username": "ชื่อผู้ใช้",
+    "role": "บทบาท"
+  },
+  "theme": {
+    "title": "ธีม",
+    "light": "สว่าง",
+    "dark": "มืด",
+    "system": "ตามระบบ"
+  },
+  "language": {
+    "title": "ภาษา",
+    "en": "English",
+    "th": "ไทย"
+  },
+  "public": {
+    "welcome": "ยินดีต้อนรับ",
+    "viewProducts": "ดูสินค้า",
+    "loginAsAdmin": "เข้าสู่ระบบผู้ดูแล"
+  },
+  "products": {
+    "title": "สินค้า",
+    "noProducts": "ไม่มีสินค้า"
+  },
+  "device": {
+    "title": "ตรวจสอบอุปกรณ์",
+    "imei": "หมายเลข IMEI",
+    "serial": "หมายเลขซีเรียล",
+    "imeiRequired": "กรุณากรอก IMEI",
+    "serialRequired": "กรุณากรอกหมายเลขซีเรียล",
+    "imeiFormat": "IMEI ต้องเป็นตัวเลข 15 หลัก",
+    "imeiValid": "IMEI ถูกต้อง",
+    "serialValid": "หมายเลขซีเรียลถูกต้อง",
+    "formatted": "รูปแบบ",
+    "validate": "ตรวจสอบอุปกรณ์",
+    "imeiHint": "ตัวเลข 15 หลัก ดูได้ที่ ตั้งค่า > ทั่วไป > เกี่ยวกับ หรือกด *#06#",
+    "serialHint": "ตัวอักษร 11-12 ตัว ดูได้ที่ ตั้งค่า > ทั่วไป > เกี่ยวกับ",
+    "howToFind": "วิธีค้นหาบน iPhone",
+    "findImei": "ตั้งค่า → ทั่วไป → เกี่ยวกับ → IMEI หรือกด *#06#",
+    "findSerial": "ตั้งค่า → ทั่วไป → เกี่ยวกับ → หมายเลขซีเรียล"
+  },
+  "register": {
+    "title": "ลงทะเบียนอุปกรณ์",
+    "step": "ขั้นตอนที่ {{current}} จาก {{total}}",
+    "deviceType": "ประเภทอุปกรณ์",
+    "withSim": "มีซิมการ์ด",
+    "withoutSim": "ไม่มีซิมการ์ด",
+    "next": "ถัดไป",
+    "back": "ย้อนกลับ",
+    "scanTitle": "สแกน QR Code",
+    "scanDescription": "สแกน QR Code นี้ด้วยอุปกรณ์เพื่อดำเนินการลงทะเบียน",
+    "confirmScan": "ยืนยันการสแกน",
+    "processing": "กำลังดำเนินการลงทะเบียน...",
+    "successTitle": "ลงทะเบียนสำเร็จ",
+    "successDescription": "อุปกรณ์ของคุณได้รับการลงทะเบียนเรียบร้อยแล้ว",
+    "failedTitle": "ลงทะเบียนล้มเหลว",
+    "failedDescription": "ไม่สามารถดำเนินการลงทะเบียนได้ กรุณาลองใหม่อีกครั้ง",
+    "backToHome": "กลับหน้าหลัก",
+    "newRegistration": "ลงทะเบียนใหม่",
+    "imeiSearchPlaceholder": "พิมพ์ 3 หลักขึ้นไปเพื่อค้นหา IMEI...",
+    "imeiSearchHint": "พิมพ์อย่างน้อย 3 ตัวอักษรเพื่อค้นหา IMEI ที่ลงทะเบียน"
+  }
+}
