@@ -40,7 +40,7 @@ export const AppSideNav = () => {
               className="flex justify-center items-center w-full cursor-pointer"
               style={{ visibility: collapsed ? 'hidden' : 'visible' }}
             >
-              <span className="font-semibold">{t('nav.admin')}</span>
+              <span className="font-semibold">{t('nav.userArea')}</span>
             </div>
           </div>
         )}

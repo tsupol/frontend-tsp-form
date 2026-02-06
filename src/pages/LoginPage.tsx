@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button, Input, FormControlError } from 'tsp-form';
 import { Eye, EyeOff } from 'lucide-react';
@@ -95,6 +95,12 @@ export function LoginPage() {
           <Button type="submit" variant="outline" disabled={isPending}>
             {isPending ? t('auth.loggingIn') : t('auth.login')}
           </Button>
+
+          <div className="text-center text-sm">
+            <Link to="/" className="text-primary hover:underline">
+              {t('nav.home')}
+            </Link>
+          </div>
         </form>
       </div>
     </div>

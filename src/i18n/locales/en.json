@@ -27,10 +27,8 @@
   },
   "nav": {
     "home": "Home",
-    "products": "Products",
-    "admin": "Admin",
+    "userArea": "User Area",
     "userDetails": "User Details",
-    "deviceValidation": "Device Validation",
     "register": "Register Device"
   },
   "user": {
@@ -51,12 +49,8 @@
   },
   "public": {
     "welcome": "Welcome",
-    "viewProducts": "View Products",
-    "loginAsAdmin": "Login as Admin"
-  },
-  "products": {
-    "title": "Products",
-    "noProducts": "No products available"
+    "title": "Device Registration System",
+    "description": "Register and manage your devices securely."
   },
   "device": {
     "title": "Device Validation",
