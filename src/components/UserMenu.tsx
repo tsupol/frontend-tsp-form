@@ -138,7 +138,7 @@ export function UserMenu({ collapsed }: UserMenuProps) {
       trigger={
         <button
           onClick={() => setMenuOpen(!menuOpen)}
-          className="flex items-center gap-2 py-2 px-1 rounded-lg transition-all text-item-fg hover:bg-item-hover-bg w-full"
+          className="flex items-center gap-2 py-2 px-1 rounded-lg transition-all text-item-fg hover:bg-item-hover-bg w-full cursor-pointer"
         >
           {/* Avatar with initials */}
           <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-contrast text-xs font-semibold shrink-0">

@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from 'tsp-form';
@@ -8,13 +7,6 @@ export function Step2Scan() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { data, setStatus } = useRegister();
-
-  // Mock: Generate a simple QR code placeholder
-  const qrData = JSON.stringify({
-    serial: data.serial,
-    imei: data.imei || undefined,
-    type: data.deviceType,
-  });
 
   const handleConfirmScan = () => {
     setStatus('pending');
