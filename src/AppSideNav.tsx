@@ -60,7 +60,7 @@ export const AppSideNav = () => {
                 ))}
               </div>
             </div>
-            <div className="border-t border-line p-2 pointer-events-auto">
+            <div className={clsx('border-t border-line py-2 pointer-events-auto', menuCollapsed ? 'px-0' : 'px-2')}>
               <UserMenu collapsed={menuCollapsed} />
             </div>
           </div>
