@@ -4,7 +4,7 @@ interface Config {
 
 function loadConfig(): Config {
   return {
-    apiUrl: getEnv('VITE_API_URL', 'http://czynet.dyndns.org:3000'),
+    apiUrl: getEnv('VITE_API_URL', 'https://czynet.dyndns.org'),
   };
 }
 

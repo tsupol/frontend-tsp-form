@@ -19,7 +19,10 @@
       "Bash(npm cache clean:*)",
       "Bash(python3:*)",
       "Bash(python -c:*)",
-      "Bash(npm show:*)"
+      "Bash(npm show:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ]
   }
 }

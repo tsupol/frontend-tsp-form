@@ -14,5 +14,5 @@ Reference file: `C:\Users\tonsu\PhpstormProjects\tsp-form\src\example\example.cs
 
 ## API
 
-- Base URL: `http://czynet.dyndns.org:3000`
+- Base URL: `https://czynet.dyndns.org/`
 - OpenAPI doc available at root endpoint
