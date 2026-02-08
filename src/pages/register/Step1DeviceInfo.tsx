@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Input, Button, FormControlError, RadioGroup } from 'tsp-form';
+import { Input, Button, FormErrorMessage, RadioGroup } from 'tsp-form';
 import { Check } from 'lucide-react';
 import { validateIMEI, validateiPhoneSerial, formatIMEI } from '../../lib/validators';
 import { useRegister } from './RegisterLayout';
@@ -107,36 +107,36 @@ export function Step1DeviceInfo() {
       <div className={`border border-line bg-surface p-6 rounded-lg ${!hasSim ? 'opacity-50' : ''}`}>
         <h2 className="font-semibold mb-4">{t('device.imei')}</h2>
 
-        <div className="grid gap-1">
-          <FormControlError error={hasSim ? errors.imei : undefined}>
-            <Controller
-              name="imei"
-              control={control}
-              rules={{
-                required: hasSim ? t('device.imeiRequired') : false,
-                validate: validateImeiField,
-              }}
-              render={({ field }) => (
-                <AutocompleteInput
-                  placeholder="353456789012348"
-                  maxLength={17}
-                  disabled={!hasSim}
-                  value={field.value}
-                  onChange={(value) => {
-                    field.onChange(value);
-                    // Trigger validation after selection
-                    setTimeout(() => trigger('imei'), 0);
-                  }}
-                  onBlur={field.onBlur}
-                  onSearch={handleImeiSearch}
-                  minSearchLength={3}
-                  debounceMs={300}
-                  noResultsText={t('common.noData')}
-                  endIcon={hasSim && imeiValid && !errors.imei ? <Check size={16} className="text-success" /> : undefined}
-                />
-              )}
-            />
-          </FormControlError>
+        <div className="flex flex-col">
+          <Controller
+            name="imei"
+            control={control}
+            rules={{
+              required: hasSim ? t('device.imeiRequired') : false,
+              validate: validateImeiField,
+            }}
+            render={({ field }) => (
+              <AutocompleteInput
+                placeholder="353456789012348"
+                maxLength={17}
+                disabled={!hasSim}
+                value={field.value}
+                onChange={(value) => {
+                  field.onChange(value);
+                  // Trigger validation after selection
+                  setTimeout(() => trigger('imei'), 0);
+                }}
+                onBlur={field.onBlur}
+                onSearch={handleImeiSearch}
+                minSearchLength={3}
+                debounceMs={300}
+                noResultsText={t('common.noData')}
+                error={hasSim && !!errors.imei}
+                endIcon={hasSim && imeiValid && !errors.imei ? <Check size={16} className="text-success" /> : undefined}
+              />
+            )}
+          />
+          <FormErrorMessage error={hasSim ? errors.imei : undefined} />
         </div>
 
         {hasSim && formattedImei && !errors.imei && (
@@ -157,18 +157,18 @@ export function Step1DeviceInfo() {
       <div className="border border-line bg-surface p-6 rounded-lg">
         <h2 className="font-semibold mb-4">{t('device.serial')}</h2>
 
-        <div className="grid gap-1">
-          <FormControlError error={errors.serial}>
-            <Input
-              placeholder="C39XXXXXXXXX"
-              maxLength={14}
-              endIcon={serialValid && !errors.serial ? <Check size={16} className="text-success" /> : undefined}
-              {...register('serial', {
-                required: t('device.serialRequired'),
-                validate: validateSerialField,
-              })}
-            />
-          </FormControlError>
+        <div className="flex flex-col">
+          <Input
+            placeholder="C39XXXXXXXXX"
+            maxLength={14}
+            error={!!errors.serial}
+            endIcon={serialValid && !errors.serial ? <Check size={16} className="text-success" /> : undefined}
+            {...register('serial', {
+              required: t('device.serialRequired'),
+              validate: validateSerialField,
+            })}
+          />
+          <FormErrorMessage error={errors.serial} />
         </div>
 
         <div className="text-xs text-control-label mt-3">

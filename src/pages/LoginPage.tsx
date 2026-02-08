@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button, Input, FormControlError } from 'tsp-form';
+import { Button, Input, FormErrorMessage } from 'tsp-form';
 import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { ApiError } from '../lib/api';
@@ -59,33 +59,33 @@ export function LoginPage() {
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4">
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium" htmlFor="username">
+          <div className="flex flex-col">
+            <label className="form-label" htmlFor="username">
               {t('auth.username')}
             </label>
-            <FormControlError error={errors.username}>
-              <Input
-                id="username"
-                placeholder={t('auth.enterUsername')}
-                {...register('username', { required: t('auth.usernameRequired') })}
-              />
-            </FormControlError>
+            <Input
+              id="username"
+              placeholder={t('auth.enterUsername')}
+              error={!!errors.username}
+              {...register('username', { required: t('auth.usernameRequired') })}
+            />
+            <FormErrorMessage error={errors.username} />
           </div>
 
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium" htmlFor="password">
+          <div className="flex flex-col">
+            <label className="form-label" htmlFor="password">
               {t('auth.password')}
             </label>
-            <FormControlError error={errors.password}>
-              <Input
-                id="password"
-                type={showPassword ? 'text' : 'password'}
-                placeholder={t('auth.enterPassword')}
-                endIcon={showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                onEndIconClick={() => setShowPassword(!showPassword)}
-                {...register('password', { required: t('auth.passwordRequired') })}
-              />
-            </FormControlError>
+            <Input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              placeholder={t('auth.enterPassword')}
+              error={!!errors.password}
+              endIcon={showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              onEndIconClick={() => setShowPassword(!showPassword)}
+              {...register('password', { required: t('auth.passwordRequired') })}
+            />
+            <FormErrorMessage error={errors.password} />
           </div>
 
           {errorMessage && (

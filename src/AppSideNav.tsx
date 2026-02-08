@@ -29,29 +29,29 @@ export const AppSideNav = () => {
         linkFn={(to) => navigate(to)}
         className="bg-surface-shallow border-r border-line"
         titleRenderer={(collapsed, handleToggle) => (
-          <div key="title" className="flex pointer-events-auto relative w-side-menu p-2" onClick={() => handleToggle()}>
+          <div key="title" className="flex items-center pointer-events-auto w-side-menu p-2 transition-all" style={{ transform: collapsed ? 'translateX(calc(-1 * var(--spacing-side-menu) + var(--spacing-side-menu-min)))' : 'translateX(0)' }}>
+            <div className="flex items-center flex-1 cursor-pointer pl-2"
+                 style={{ opacity: collapsed ? 0 : 1, transition: 'opacity 0.3s ease' }}
+                 onClick={() => handleToggle()}>
+              <span className="font-semibold">{t('nav.userArea')}</span>
+            </div>
             <button
               className="hover:bg-surface w-8 h-8 shrink-0 cursor-pointer rounded-lg transition-all flex justify-center items-center"
               aria-label={collapsed ? 'Expand menu' : 'Collapse menu'}
+              onClick={() => handleToggle()}
             >
               {collapsed ? <ArrowRightFromLine size={18} /> : <ArrowLeftFromLine size={18} />}
             </button>
-            <div
-              className="flex justify-center items-center w-full cursor-pointer"
-              style={{ visibility: collapsed ? 'hidden' : 'visible' }}
-            >
-              <span className="font-semibold">{t('nav.userArea')}</span>
-            </div>
           </div>
         )}
         items={
-          <div className="flex flex-col w-full h-full min-h-0">
+          <div className="flex flex-col w-full h-full min-h-0 pointer-events-auto">
             <div className="side-menu-content better-scroll flex-1">
               <div className={clsx('p-2 flex flex-col w-side-menu', menuCollapsed ? 'items-start' : '')}>
                 {menuItems.map((item, index) => (
                   <Link
                     key={index}
-                    className="flex py-1 rounded-lg transition-all text-item-fg hover:bg-item-hover-bg"
+                    className="flex py-1 rounded-lg transition-all text-item-fg hover:bg-item-hover-bg gap-2"
                     to={item.to}
                   >
                     <div className="flex justify-center items-center w-8 h-8">{item.icon}</div>
