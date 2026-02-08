@@ -23,7 +23,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex">
       <AppSideNav />
-      <div className="flex-grow overflow-auto h-screen">
+      <div className="flex-grow w-full">
         {children}
       </div>
     </div>

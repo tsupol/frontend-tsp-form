@@ -127,11 +127,24 @@ html {
     font-size: 16px;
 }
 
+/* iPad and iPhone - larger base font */
+@media only screen and (max-width: 1024px) and (-webkit-min-device-pixel-ratio: 2) {
+    html {
+        font-size: 18px;
+    }
+}
+
+@media only screen and (max-width: 430px) and (-webkit-min-device-pixel-ratio: 2) {
+    html {
+        font-size: 18px;
+    }
+}
+
 body {
     background: var(--color-bg);
     color: var(--color-fg);
     font-family: "Zalando Sans", "Roboto", "Inter", "Manrope", "DM Sans", sans-serif;
-    font-size: 16px;
+    font-size: inherit;
     width: 100vw;
     line-height: var(--text-base--line-height);
     overflow-x: hidden;
@@ -142,5 +155,5 @@ body {
 }
 
 .page-content {
-    padding: 2.5rem 1rem 0 1rem;
+    padding: 2.5rem .75rem 1rem .75rem;
 }

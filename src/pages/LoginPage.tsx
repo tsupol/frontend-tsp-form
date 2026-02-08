@@ -26,7 +26,7 @@ export function LoginPage() {
     handleSubmit,
     formState: { errors },
   } = useForm<LoginFormData>({
-    defaultValues: { username: '', password: '' },
+    defaultValues: { username: 'alice', password: 'alice123' },
   });
 
   const onSubmit = async (data: LoginFormData) => {
@@ -100,6 +100,13 @@ export function LoginPage() {
             <Link to="/" className="text-primary hover:underline">
               {t('nav.home')}
             </Link>
+          </div>
+
+          <div className="flex gap-4 items-center justify-center mt-4">
+            <span style={{ fontSize: '14px' }}>14px text</span>
+            <span style={{ fontSize: '16px' }}>16px text</span>
+            <div style={{ width: '14px', height: '14px', backgroundColor: '#0070f3' }} />
+            <div style={{ width: '16px', height: '16px', backgroundColor: '#0070f3' }} />
           </div>
         </form>
       </div>
