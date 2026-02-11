@@ -8,8 +8,16 @@ type DeviceType = 'ios-safari' | 'ios-other' | 'android' | 'other';
 
 function detectDevice(): DeviceType {
   const ua = navigator.userAgent;
-  const isIOS = /iPad|iPhone|iPod/.test(ua);
-  const isSafari = /Safari/.test(ua) && !/CriOS|FxiOS|OPiOS|EdgiOS/.test(ua);
+
+  // iPadOS 13+ reports as Macintosh, need to check touch support
+  const isIPhone = /iPhone|iPod/.test(ua);
+  const isIPad = /iPad/.test(ua) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ||
+    (/Macintosh/.test(ua) && 'ontouchend' in document);
+  const isIOS = isIPhone || isIPad;
+
+  // Safari check - exclude Chrome, Firefox, Opera, Edge on iOS
+  const isSafari = /Safari/.test(ua) && !/CriOS|FxiOS|OPiOS|EdgiOS|Chrome/.test(ua);
 
   if (isIOS && isSafari) return 'ios-safari';
   if (isIOS) return 'ios-other';
