@@ -167,17 +167,7 @@ function parseResponseData<T>(data: unknown): T {
     return data.data;
   }
 
-  // Array with single item (v1 RPC response) - unwrap
-  if (Array.isArray(data) && data.length === 1) {
-    return data[0] as T;
-  }
-
-  // Array with multiple items or empty (table query) - return as-is
-  if (Array.isArray(data)) {
-    return data as T;
-  }
-
-  // Plain object - return as-is
+  // Unexpected format - return as-is (for table queries that return arrays)
   return data as T;
 }
 

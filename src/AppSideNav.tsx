@@ -14,6 +14,8 @@ import {
   LogOut,
   ChevronRight,
   ChevronsUpDown,
+  Check,
+  Languages,
 } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
 import { useTheme } from './contexts/ThemeContext';
@@ -91,7 +93,7 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const { setTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
 
   const handleLogout = async () => {
     setOpen(false);
@@ -121,7 +123,7 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
           {!collapsed && (
             <>
               <div className="flex-1 text-left truncate">
-                <span className="text-sm">{user?.username ?? 'User'}</span>
+                <span className="text-sm font-medium capitalize">{user?.username ?? 'User'}</span>
               </div>
               <ChevronsUpDown size={14} className="opacity-50 shrink-0" />
             </>
@@ -131,11 +133,23 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
     >
       <div className="py-1 w-[260px]">
         <UserSubMenu icon={<Settings size={14} />} label={t('theme.title')}>
-          <UserMenuItem label={t('theme.light')} onClick={() => setTheme('light')} />
-          <UserMenuItem label={t('theme.dark')} onClick={() => setTheme('dark')} />
-          <UserMenuItem label={t('theme.system')} onClick={() => setTheme('system')} />
+          <UserMenuItem
+            icon={theme === 'light' ? <Check size={14} /> : undefined}
+            label={t('theme.light')}
+            onClick={() => setTheme('light')}
+          />
+          <UserMenuItem
+            icon={theme === 'dark' ? <Check size={14} /> : undefined}
+            label={t('theme.dark')}
+            onClick={() => setTheme('dark')}
+          />
+          <UserMenuItem
+            icon={theme === 'system' ? <Check size={14} /> : undefined}
+            label={t('theme.system')}
+            onClick={() => setTheme('system')}
+          />
         </UserSubMenu>
-        <UserSubMenu label={t('language.title')}>
+        <UserSubMenu icon={<Languages size={14} />} label={t('language.title')}>
           <UserMenuItem label={t('language.en')} onClick={() => i18n.changeLanguage('en')} />
           <UserMenuItem label={t('language.th')} onClick={() => i18n.changeLanguage('th')} />
         </UserSubMenu>
@@ -168,7 +182,7 @@ export const AppSideNav = () => {
   ];
 
   return (
-    <div className={clsx('h-screen flex-shrink-0', menuCollapsed ? 'md:w-side-menu-min' : 'md:w-side-menu')}>
+    <div className={clsx('h-dvh flex-shrink-0', menuCollapsed ? 'md:w-side-menu-min' : 'md:w-side-menu')}>
       <SideMenu
         isCollapsed={false}
         onToggleCollapse={(collapsed) => setMenuCollapsed(collapsed)}
@@ -205,7 +219,7 @@ export const AppSideNav = () => {
               <div className={clsx('p-2 flex flex-col w-side-menu', menuCollapsed ? 'items-start' : '')}>
                 {menuItems.map((item, index) => {
                   return (
-                    <Link key={index} className="flex py-1 rounded-lg transition-all text-item-fg hover:bg-item-hover-bg gap-2" to={item.to}>
+                    <Link key={index} className="flex py-1 rounded-lg transition-all text-item-fg hover:bg-item-hover-bg gap-2 font-medium" to={item.to}>
                       <div className="flex justify-center items-center w-8 h-8">
                         {item.icon}
                       </div>

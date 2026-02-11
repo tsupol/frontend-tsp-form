@@ -23,7 +23,8 @@
     "passwordRequired": "Password is required",
     "loggingIn": "Logging in...",
     "loginFailed": "Login failed. Please try again.",
-    "invalidCredentials": "Invalid username or password"
+    "invalidCredentials": "Invalid username or password",
+    "sessionExpired": "Your session has expired. Please login again."
   },
   "nav": {
     "home": "Home",
@@ -99,7 +100,8 @@
     "scanDescription": "Scan this QR code with the iOS device to enroll in MDM.",
     "expiresIn": "Expires in",
     "expired": "Expired",
-    "refresh": "Refresh"
+    "refresh": "Refresh",
+    "directLink": "Open direct link (for testing)"
   },
   "enrollRedirect": {
     "invalidLink": "Invalid Link",

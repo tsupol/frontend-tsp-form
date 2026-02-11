@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button, Input, FormErrorMessage } from 'tsp-form';
 import { Eye, EyeOff } from 'lucide-react';
@@ -17,9 +17,12 @@ export function LoginPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { login } = useAuth();
+  const [searchParams] = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  const reason = searchParams.get('reason');
 
   const {
     register,
@@ -57,6 +60,12 @@ export function LoginPage() {
           <h1 className="text-2xl font-bold">{t('auth.login')}</h1>
           <LanguageSwitcher />
         </div>
+
+        {reason === 'session_expired' && (
+          <div className="mb-4 p-3 bg-warning/10 border border-warning/30 rounded text-sm text-warning">
+            {t('auth.sessionExpired')}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4">
           <div className="flex flex-col">
@@ -100,13 +109,6 @@ export function LoginPage() {
             <Link to="/" className="text-primary hover:underline">
               {t('nav.home')}
             </Link>
-          </div>
-
-          <div className="flex gap-4 items-center justify-center mt-4">
-            <span style={{ fontSize: '14px' }}>14px text</span>
-            <span style={{ fontSize: '16px' }}>16px text</span>
-            <div style={{ width: '14px', height: '14px', backgroundColor: '#0070f3' }} />
-            <div style={{ width: '16px', height: '16px', backgroundColor: '#0070f3' }} />
           </div>
         </form>
       </div>

@@ -105,6 +105,10 @@
 
     --font-weight-button: 600;
 
+    /* default button */
+    --color-button-default-bg: #252525;
+    --color-button-default-border: #404040;
+
     /* added */
     --spacing-nav: 3rem;
 
@@ -123,6 +127,47 @@
     --color-item-active-bg: var(--color-primary);
     --color-item-active-fg: var(--color-primary-contrast);
     --color-item-active-border: var(--color-primary);
+}
+
+/* Light theme - Claude style warm cream */
+.light {
+    --color-fg: #1a1a1a;
+    --color-fg-contrast: #ffffff;
+    --color-bg: #FAF9F5;
+    --color-bg-contrast: #151515;
+
+    --color-line: rgba(0, 0, 0, 0.175);
+
+    --color-surface: #f5f4f3;
+    --color-surface-hover: #f0efe9;
+    --color-surface-shallow: #f5f4f3;
+    --color-surface-elevated: #ffffff;
+
+    --color-scrollbar-track: rgba(0, 0, 0, 0.05);
+    --color-scrollbar-thumb: rgba(0, 0, 0, 0.15);
+    --color-control-bg: #ffffff;
+    --color-control-placeholder: #777777;
+    --color-control-label: #666666;
+
+    /* default button */
+    --color-button-default-bg: #ffffff;
+    --color-button-default-border: rgba(0, 0, 0, 0.15);
+
+    /* side menu */
+    --color-item-bg: transparent;
+    --color-item-fg: #333333;
+    --color-item-border: transparent;
+
+    --color-item-hover-bg: #EDECE6;
+    --color-item-hover-fg: #1a1a1a;
+    --color-item-hover-border: #EDECE6;
+
+    --color-item-active-bg: #E5E4DE;
+    --color-item-active-fg: #333333;
+    --color-item-active-border: #E5E4DE;
+
+    /* skeleton */
+    --color-skeleton: #E0DFDA;
 }
 
 html {

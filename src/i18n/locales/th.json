@@ -23,7 +23,8 @@
     "passwordRequired": "กรุณากรอกรหัสผ่าน",
     "loggingIn": "กำลังเข้าสู่ระบบ...",
     "loginFailed": "เข้าสู่ระบบล้มเหลว กรุณาลองใหม่",
-    "invalidCredentials": "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง"
+    "invalidCredentials": "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง",
+    "sessionExpired": "เซสชันของคุณหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง"
   },
   "nav": {
     "home": "หน้าหลัก",
@@ -99,7 +100,8 @@
     "scanDescription": "สแกน QR Code นี้ด้วยอุปกรณ์ iOS เพื่อลงทะเบียน MDM",
     "expiresIn": "หมดอายุใน",
     "expired": "หมดอายุแล้ว",
-    "refresh": "รีเฟรช"
+    "refresh": "รีเฟรช",
+    "directLink": "เปิดลิงก์โดยตรง (สำหรับทดสอบ)"
   },
   "enrollRedirect": {
     "invalidLink": "ลิงก์ไม่ถูกต้อง",

@@ -5,7 +5,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Clock, RefreshCw, QrCode } from 'lucide-react';
 import { apiClient } from '../lib/api';
 
-const ENROLL_BASE_URL = 'https://frontend-tsp-form.ecap.space/enroll';
+const ENROLL_BASE_URL = `${window.location.origin}/enroll`;
 
 interface EnrollmentResult {
   enrollment_id: string;
@@ -25,7 +25,7 @@ export function EnrollmentPage() {
     setLoading(true);
     setError(null);
     try {
-      const result = await apiClient.rpc<EnrollmentResult>('mdm_enrollment_issue_v2', {});
+      const result = await apiClient.rpc<EnrollmentResult>('mdm_enrollment_issue', {});
       setEnrollment(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate enrollment');
@@ -123,6 +123,18 @@ export function EnrollmentPage() {
               <Clock size={16} className="text-control-label" />
               <span className="text-control-label">{t('enrollment.expiresIn')}:</span>
               <span className="font-mono font-semibold">{timeRemaining}</span>
+            </div>
+
+            {/* Direct link for testing */}
+            <div className="text-xs text-control-label mb-4">
+              <a
+                href={`${ENROLL_BASE_URL}?id=${enrollment.enrollment_id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-primary"
+              >
+                {t('enrollment.directLink')}
+              </a>
             </div>
 
             {/* Refresh */}

@@ -27,7 +27,9 @@
       "Bash(TOKEN=\"eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJleHAiOiAxNzcwNzk2ODE2LCAic2lkIjogImJkODU5NmYyLTJiZmEtNGRlZi1hMjA3LTMxODVmODI4OWY2MCIsICJyb2xlIjogIm5uZl91c2VyIiwgInVpX3JvbGUiOiAibWFuYWdlciIsICJ1c2VyX2lkIjogMSwgImJyYW5jaF9pZCI6IDEwMSwgInRlbmFudF9pZCI6IDJ9.Pmj62UgMzovaN9WdHYl5feNKXvXONtJk0k8j4HpLTRU\")",
       "WebFetch(domain:www.speakeasy.com)",
       "WebSearch",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(gh gist delete:*)",
+      "Bash(gh gist create:*)"
     ]
   }
 }

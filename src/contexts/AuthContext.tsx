@@ -28,8 +28,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     authService.clearTokens();
     setUser(null);
 
-    // Redirect to login
-    window.location.href = '/login';
+    // Redirect to login with reason
+    window.location.href = '/login?reason=session_expired';
   }, []);
 
   // Register auth error handler
