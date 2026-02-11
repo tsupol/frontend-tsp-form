@@ -10,6 +10,8 @@ import { RegisterLayout } from './pages/register/RegisterLayout';
 import { Step1DeviceInfo } from './pages/register/Step1DeviceInfo';
 import { Step2Scan } from './pages/register/Step2Scan';
 import { Step3Status } from './pages/register/Step3Status';
+import { EnrollmentPage } from './pages/EnrollmentPage';
+import { EnrollRedirectPage } from './pages/EnrollRedirectPage';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -47,6 +49,7 @@ function App() {
       {/* Public routes */}
       <Route path="/" element={<HomePage />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/enroll" element={<EnrollRedirectPage />} />
 
       {/* Admin routes */}
       <Route
@@ -75,6 +78,18 @@ function App() {
         <Route path="scan" element={<Step2Scan />} />
         <Route path="status" element={<Step3Status />} />
       </Route>
+
+      {/* Enrollment */}
+      <Route
+        path="/admin/enrollment"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <EnrollmentPage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
 
       {/* Catch-all redirect */}
       <Route path="*" element={<Navigate to="/" replace />} />

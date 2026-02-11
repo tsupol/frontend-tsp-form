@@ -29,7 +29,8 @@
     "home": "หน้าหลัก",
     "userArea": "พื้นที่ผู้ใช้",
     "userDetails": "ข้อมูลผู้ใช้",
-    "register": "ลงทะเบียนอุปกรณ์"
+    "register": "ลงทะเบียนอุปกรณ์",
+    "enrollment": "Enrollment"
   },
   "user": {
     "id": "รหัสผู้ใช้",
@@ -89,5 +90,36 @@
     "newRegistration": "ลงทะเบียนใหม่",
     "imeiSearchPlaceholder": "พิมพ์ 3 หลักขึ้นไปเพื่อค้นหา IMEI...",
     "imeiSearchHint": "พิมพ์อย่างน้อย 3 ตัวอักษรเพื่อค้นหา IMEI ที่ลงทะเบียน"
+  },
+  "enrollment": {
+    "title": "ลงทะเบียน MDM",
+    "selectContract": "เลือกสัญญา",
+    "searchPlaceholder": "ค้นหาด้วยรหัสสัญญาหรือชื่อลูกค้า...",
+    "searchHint": "พิมพ์อย่างน้อย 3 ตัวอักษรเพื่อค้นหา",
+    "contractCode": "สัญญา",
+    "customer": "ลูกค้า",
+    "generate": "สร้าง Enrollment",
+    "scanTitle": "สแกน QR Code",
+    "scanDescription": "สแกน QR Code นี้ด้วยอุปกรณ์เพื่อลงทะเบียน MDM",
+    "expiresIn": "หมดอายุใน",
+    "expired": "หมดอายุแล้ว",
+    "refresh": "รีเฟรช"
+  },
+  "enrollRedirect": {
+    "invalidLink": "ลิงก์ไม่ถูกต้อง",
+    "invalidLinkDesc": "ลิงก์ลงทะเบียนนี้ไม่ถูกต้องหรือหมดอายุแล้ว",
+    "readyToInstall": "พร้อมติดตั้ง",
+    "readyToInstallDesc": "แตะปุ่มด้านล่างเพื่อติดตั้งโปรไฟล์ MDM บนอุปกรณ์นี้",
+    "installProfile": "ติดตั้งโปรไฟล์",
+    "autoRedirect": "เปลี่ยนเส้นทางอัตโนมัติใน {{seconds}} วินาที...",
+    "safariRequired": "ต้องใช้ Safari",
+    "safariRequiredDesc": "โปรไฟล์ MDM สามารถติดตั้งได้จาก Safari เท่านั้น กรุณาเปิดหน้านี้ใน Safari",
+    "openInSafari": "เปิดใน Safari",
+    "manualSteps": "หรือทำเอง:",
+    "step1": "คัดลอก URL ของหน้านี้",
+    "step2": "เปิด Safari",
+    "step3": "วาง URL แล้วไป",
+    "iosOnly": "ต้องใช้อุปกรณ์ iOS",
+    "iosOnlyDesc": "การลงทะเบียน MDM ใช้ได้เฉพาะอุปกรณ์ iPhone และ iPad เท่านั้น"
   }
 }

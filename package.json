@@ -16,13 +16,14 @@
     "i18next": "^24.2.2",
     "i18next-browser-languagedetector": "^8.0.2",
     "lucide-react": "^0.545.0",
+    "qrcode.react": "^4.2.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-hook-form": "^7.65.0",
     "react-i18next": "^15.4.1",
     "react-router-dom": "^7.9.4",
     "tailwindcss": "^4.1.14",
-    "tsp-form": "^0.4.2"
+    "tsp-form": "^0.4.4"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",

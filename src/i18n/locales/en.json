@@ -27,9 +27,10 @@
   },
   "nav": {
     "home": "Home",
-    "userArea": "User Area",
+    "userArea": "MDM",
     "userDetails": "User Details",
-    "register": "Register Device"
+    "register": "Register Device",
+    "enrollment": "Enrollment"
   },
   "user": {
     "id": "User ID",
@@ -89,5 +90,36 @@
     "newRegistration": "New Registration",
     "imeiSearchPlaceholder": "Type 3+ digits to search IMEI...",
     "imeiSearchHint": "Type at least 3 characters to search for registered IMEI"
+  },
+  "enrollment": {
+    "title": "MDM Enrollment",
+    "selectContract": "Select Contract",
+    "searchPlaceholder": "Search by contract code or customer...",
+    "searchHint": "Type at least 3 characters to search",
+    "contractCode": "Contract",
+    "customer": "Customer",
+    "generate": "Generate Enrollment",
+    "scanTitle": "Scan QR Code",
+    "scanDescription": "Scan this QR code with the device to enroll in MDM.",
+    "expiresIn": "Expires in",
+    "expired": "Expired",
+    "refresh": "Refresh"
+  },
+  "enrollRedirect": {
+    "invalidLink": "Invalid Link",
+    "invalidLinkDesc": "This enrollment link is invalid or has expired.",
+    "readyToInstall": "Ready to Install",
+    "readyToInstallDesc": "Tap the button below to install the MDM profile on this device.",
+    "installProfile": "Install Profile",
+    "autoRedirect": "Auto-redirecting in {{seconds}}s...",
+    "safariRequired": "Safari Required",
+    "safariRequiredDesc": "MDM profiles can only be installed from Safari. Please open this page in Safari.",
+    "openInSafari": "Open in Safari",
+    "manualSteps": "Or manually:",
+    "step1": "Copy this page URL",
+    "step2": "Open Safari",
+    "step3": "Paste the URL and go",
+    "iosOnly": "iOS Device Required",
+    "iosOnlyDesc": "MDM enrollment is only available for iPhone and iPad devices."
   }
 }
