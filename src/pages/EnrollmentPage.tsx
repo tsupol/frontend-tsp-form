@@ -13,6 +13,15 @@ interface EnrollmentResult {
   provider_profile_id: number;
 }
 
+interface V2Response<T> {
+  ok: boolean;
+  data: T;
+  meta?: {
+    trace_id?: string;
+    server_time?: string;
+  };
+}
+
 export function EnrollmentPage() {
   const { t } = useTranslation();
 
@@ -25,8 +34,12 @@ export function EnrollmentPage() {
     setLoading(true);
     setError(null);
     try {
-      const result = await apiClient.rpc<EnrollmentResult[]>('mdm_enrollment_issue_v2', {});
-      setEnrollment(result[0]);
+      const result = await apiClient.rpc<V2Response<EnrollmentResult>>('mdm_enrollment_issue_v2', {});
+      if (result.ok && result.data) {
+        setEnrollment(result.data);
+      } else {
+        setError('Failed to generate enrollment');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate enrollment');
     } finally {
