@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from 'tsp-form';
-import { Smartphone, AlertCircle, CheckCircle, ExternalLink } from 'lucide-react';
+import { Smartphone, AlertCircle, CheckCircle, ExternalLink, Loader2 } from 'lucide-react';
+import { config } from '../config/config';
 
 type DeviceType = 'ios-safari' | 'ios-other' | 'android' | 'other';
 
@@ -25,42 +26,73 @@ function detectDevice(): DeviceType {
   return 'other';
 }
 
+async function fetchMobileconfig(enrollmentId: string): Promise<string> {
+  const response = await fetch(`${config.apiUrl}/rpc/mdm_enrollment_mobileconfig`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_enrollment_id: enrollmentId }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch mobileconfig');
+  }
+
+  const data = await response.json();
+  // API returns array with single object containing mobileconfig
+  const mobileconfig = Array.isArray(data) ? data[0]?.mobileconfig : data?.mobileconfig;
+  if (!mobileconfig) {
+    throw new Error('No mobileconfig in response');
+  }
+  return mobileconfig;
+}
+
+function downloadMobileconfig(xmlContent: string, filename: string) {
+  const blob = new Blob([xmlContent], { type: 'application/x-apple-aspen-config' });
+  const url = URL.createObjectURL(blob);
+
+  // Create a link and trigger download
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 export function EnrollRedirectPage() {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const [deviceType, setDeviceType] = useState<DeviceType>('other');
-  const [countdown, setCountdown] = useState(5);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [downloaded, setDownloaded] = useState(false);
 
   const enrollmentId = searchParams.get('id');
-  const profileUrl = enrollmentId
-    ? `https://czynet.dyndns.org/enroll/${enrollmentId}.mobileconfig`
-    : null;
 
   useEffect(() => {
     setDeviceType(detectDevice());
   }, []);
 
-  // Auto-redirect countdown for Safari
-  useEffect(() => {
-    if (deviceType !== 'ios-safari' || !profileUrl) return;
-
-    if (countdown > 0) {
-      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
-      return () => clearTimeout(timer);
-    } else {
-      window.location.href = profileUrl;
-    }
-  }, [deviceType, countdown, profileUrl]);
-
   const handleOpenInSafari = () => {
-    // Create Safari-specific URL scheme
     const currentUrl = window.location.href;
     window.location.href = `x-safari-${currentUrl}`;
   };
 
-  const handleDownloadProfile = () => {
-    if (profileUrl) {
-      window.location.href = profileUrl;
+  const handleDownloadProfile = async () => {
+    if (!enrollmentId) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const mobileconfig = await fetchMobileconfig(enrollmentId);
+      downloadMobileconfig(mobileconfig, `enroll-${enrollmentId.slice(0, 8)}.mobileconfig`);
+      setDownloaded(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -82,22 +114,43 @@ export function EnrollRedirectPage() {
     return (
       <div className="min-h-screen bg-bg flex items-center justify-center p-4">
         <div className="max-w-sm w-full text-center">
-          <CheckCircle size={64} className="text-success mx-auto mb-4" />
-          <h1 className="text-xl font-bold mb-2">{t('enrollRedirect.readyToInstall')}</h1>
-          <p className="text-control-label mb-6">{t('enrollRedirect.readyToInstallDesc')}</p>
-
-          <Button
-            variant="outline"
-            className="w-full mb-4"
-            onClick={handleDownloadProfile}
-          >
-            <Smartphone size={18} className="mr-2" />
-            {t('enrollRedirect.installProfile')}
-          </Button>
-
-          <p className="text-sm text-control-label">
-            {t('enrollRedirect.autoRedirect', { seconds: countdown })}
+          {downloaded ? (
+            <CheckCircle size={64} className="text-success mx-auto mb-4" />
+          ) : (
+            <Smartphone size={64} className="text-primary mx-auto mb-4" />
+          )}
+          <h1 className="text-xl font-bold mb-2">
+            {downloaded ? t('enrollRedirect.profileDownloaded') : t('enrollRedirect.readyToInstall')}
+          </h1>
+          <p className="text-control-label mb-6">
+            {downloaded ? t('enrollRedirect.profileDownloadedDesc') : t('enrollRedirect.readyToInstallDesc')}
           </p>
+
+          {!downloaded && (
+            <Button
+              variant="outline"
+              className="w-full mb-4"
+              onClick={handleDownloadProfile}
+              disabled={loading}
+            >
+              {loading ? (
+                <Loader2 size={18} className="mr-2 animate-spin" />
+              ) : (
+                <Smartphone size={18} className="mr-2" />
+              )}
+              {loading ? t('common.loading') : t('enrollRedirect.installProfile')}
+            </Button>
+          )}
+
+          {error && (
+            <p className="text-sm text-danger mb-4">{error}</p>
+          )}
+
+          {downloaded && (
+            <p className="text-sm text-control-label">
+              {t('enrollRedirect.goToSettings')}
+            </p>
+          )}
         </div>
       </div>
     );
