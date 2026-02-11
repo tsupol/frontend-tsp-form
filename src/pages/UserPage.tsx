@@ -204,7 +204,7 @@ function TokenDebugPanel() {
         )}
 
         <div className="flex gap-2 items-center pt-2 flex-wrap">
-          <Button variant="outline" size="compact" onClick={handleManualRefresh}>
+          <Button variant="outline" size="sm" onClick={handleManualRefresh}>
             Manual Refresh
           </Button>
           {refreshStatus && (

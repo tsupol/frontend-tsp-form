@@ -17,11 +17,11 @@ export function HomePage() {
             <LanguageSwitcher />
             {isAuthenticated ? (
               <Link to="/admin">
-                <Button variant="outline" size="compact">{t('nav.userArea')}</Button>
+                <Button variant="outline" size="sm">{t('nav.userArea')}</Button>
               </Link>
             ) : (
               <Link to="/login">
-                <Button variant="outline" size="compact">{t('auth.login')}</Button>
+                <Button variant="outline" size="sm">{t('auth.login')}</Button>
               </Link>
             )}
           </div>

@@ -105,8 +105,10 @@
 
     --font-weight-button: 600;
 
+    /* added */
     --spacing-nav: 3rem;
 
+    /* side menu */
     --spacing-side-menu: 280px;
     --spacing-side-menu-min: 3.075rem;
 
@@ -136,7 +138,7 @@ html {
 
 @media only screen and (max-width: 430px) and (-webkit-min-device-pixel-ratio: 2) {
     html {
-        font-size: 18px;
+        font-size: 20px;
     }
 }
 
@@ -144,7 +146,7 @@ body {
     background: var(--color-bg);
     color: var(--color-fg);
     font-family: "Zalando Sans", "Roboto", "Inter", "Manrope", "DM Sans", sans-serif;
-    font-size: inherit;
+    font-size: var(--text-base);
     width: 100vw;
     line-height: var(--text-base--line-height);
     overflow-x: hidden;
@@ -155,5 +157,11 @@ body {
 }
 
 .page-content {
-    padding: 2.5rem .75rem 1rem .75rem;
+    padding: 2rem 0 0 0;
+}
+
+@media (min-width: 768px) {
+    .page-content {
+        padding: 1rem 2rem;
+    }
 }
