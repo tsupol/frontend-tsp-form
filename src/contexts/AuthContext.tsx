@@ -1,6 +1,7 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { authService } from '../lib/auth';
+import { setAuthErrorHandler } from '../lib/api';
 import type { UserInfo } from '../lib/auth';
 
 interface AuthContextType {
@@ -16,6 +17,26 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const hasHandledAuthError = useRef(false);
+
+  // Handle auth errors from API - clear session and redirect to login
+  const handleAuthError = useCallback(() => {
+    // Prevent multiple redirects
+    if (hasHandledAuthError.current) return;
+    hasHandledAuthError.current = true;
+
+    authService.clearTokens();
+    setUser(null);
+
+    // Redirect to login
+    window.location.href = '/login';
+  }, []);
+
+  // Register auth error handler
+  useEffect(() => {
+    setAuthErrorHandler(handleAuthError);
+    return () => setAuthErrorHandler(null);
+  }, [handleAuthError]);
 
   useEffect(() => {
     const initAuth = async () => {
