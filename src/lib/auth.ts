@@ -68,13 +68,12 @@ const TOKEN_REFRESH_THRESHOLD_MS = 60 * 1000; // Refresh 1 minute before expiry
 
 export const authService = {
   async login(username: string, password: string): Promise<LoginResponse> {
-    const response = await apiClient.rpc<LoginResponse[]>('login', {
+    const result = await apiClient.rpc<LoginResponse>('login', {
       p_username: username,
       p_password: password,
       p_user_agent: navigator.userAgent,
     }, false);
 
-    const result = response[0];
     this.storeTokens(result);
     return result;
   },
@@ -85,12 +84,11 @@ export const authService = {
       throw new Error('No refresh token available');
     }
 
-    const response = await apiClient.rpc<RefreshResponse[]>('refresh', {
+    const result = await apiClient.rpc<RefreshResponse>('refresh', {
       p_refresh_token: refreshToken,
       p_user_agent: navigator.userAgent,
     }, false);
 
-    const result = response[0];
     this.storeTokens(result);
     return result;
   },
