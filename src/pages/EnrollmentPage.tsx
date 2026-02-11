@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from 'tsp-form';
+import { Button, Skeleton } from 'tsp-form';
 import { QRCodeSVG } from 'qrcode.react';
-import { Clock, RefreshCw } from 'lucide-react';
+import { Clock, RefreshCw, QrCode } from 'lucide-react';
 import { apiClient } from '../lib/api';
 
 const ENROLL_BASE_URL = 'https://frontend-tsp-form.ecap.space/enroll';
@@ -34,11 +34,6 @@ export function EnrollmentPage() {
     }
   };
 
-  // Fetch on mount
-  useEffect(() => {
-    fetchEnrollment();
-  }, []);
-
   // Countdown timer
   useEffect(() => {
     if (!enrollment) return;
@@ -68,58 +63,79 @@ export function EnrollmentPage() {
       <div className="max-w-lg mx-auto">
         <h1 className="text-xl font-bold mb-6">{t('enrollment.title')}</h1>
 
-        <div className="border border-line bg-surface p-6 rounded-lg text-center">
-          {loading && (
-            <div className="py-12">
-              <div className="text-control-label">{t('common.loading')}</div>
+        {/* Initial state - no enrollment yet */}
+        {!enrollment && !loading && !error && (
+          <div className="border border-line bg-surface p-6 rounded-lg text-center">
+            <QrCode size={64} className="text-control-label mx-auto mb-4" />
+            <h2 className="font-semibold mb-2">{t('enrollment.title')}</h2>
+            <p className="text-sm text-control-label mb-6">
+              {t('enrollment.description')}
+            </p>
+            <Button variant="outline" onClick={fetchEnrollment}>
+              <QrCode size={16} className="mr-2" />
+              {t('enrollment.generate')}
+            </Button>
+          </div>
+        )}
+
+        {/* Loading state */}
+        {loading && (
+          <div className="border border-line bg-surface p-6 rounded-lg text-center">
+            <h2 className="font-semibold mb-4">{t('enrollment.scanTitle')}</h2>
+            <div className="inline-flex items-center justify-center w-48 h-48 bg-white border-2 border-line rounded-lg mb-4 p-2">
+              <Skeleton variant="rectangular" width={176} height={176} />
             </div>
-          )}
+            <Skeleton variant="text" width="60%" height={20} className="mx-auto mb-4" />
+            <Skeleton variant="text" width="40%" height={16} className="mx-auto" />
+          </div>
+        )}
 
-          {error && (
-            <div className="py-12">
-              <div className="text-danger mb-4">{error}</div>
-              <Button variant="outline" onClick={fetchEnrollment}>
-                {t('common.retry')}
-              </Button>
+        {/* Error state */}
+        {error && !loading && (
+          <div className="border border-line bg-surface p-6 rounded-lg text-center">
+            <div className="text-danger mb-4">{error}</div>
+            <Button variant="outline" onClick={fetchEnrollment}>
+              {t('common.retry')}
+            </Button>
+          </div>
+        )}
+
+        {/* QR Code state */}
+        {enrollment && !loading && (
+          <div className="border border-line bg-surface p-6 rounded-lg text-center">
+            <h2 className="font-semibold mb-4">{t('enrollment.scanTitle')}</h2>
+
+            {/* QR Code */}
+            <div className="inline-flex items-center justify-center w-48 h-48 bg-white border-2 border-line rounded-lg mb-4 p-2">
+              <QRCodeSVG
+                value={`${ENROLL_BASE_URL}?id=${enrollment.enrollment_id}`}
+                size={176}
+                level="M"
+              />
             </div>
-          )}
 
-          {enrollment && !loading && (
-            <>
-              <h2 className="font-semibold mb-4">{t('enrollment.scanTitle')}</h2>
+            <p className="text-sm text-control-label mb-4">
+              {t('enrollment.scanDescription')}
+            </p>
 
-              {/* QR Code */}
-              <div className="inline-flex items-center justify-center w-48 h-48 bg-white border-2 border-line rounded-lg mb-4 p-2">
-                <QRCodeSVG
-                  value={`${ENROLL_BASE_URL}?id=${enrollment.enrollment_id}`}
-                  size={176}
-                  level="M"
-                />
-              </div>
+            {/* Timer */}
+            <div className="flex items-center justify-center gap-2 text-sm mb-4">
+              <Clock size={16} className="text-control-label" />
+              <span className="text-control-label">{t('enrollment.expiresIn')}:</span>
+              <span className="font-mono font-semibold">{timeRemaining}</span>
+            </div>
 
-              <p className="text-sm text-control-label mb-4">
-                {t('enrollment.scanDescription')}
-              </p>
-
-              {/* Timer */}
-              <div className="flex items-center justify-center gap-2 text-sm mb-4">
-                <Clock size={16} className="text-control-label" />
-                <span className="text-control-label">{t('enrollment.expiresIn')}:</span>
-                <span className="font-mono font-semibold">{timeRemaining}</span>
-              </div>
-
-              {/* Refresh */}
-              <Button
-                variant="outline"
-                onClick={fetchEnrollment}
-                disabled={loading}
-              >
-                <RefreshCw size={16} className="mr-2" />
-                {t('enrollment.refresh')}
-              </Button>
-            </>
-          )}
-        </div>
+            {/* Refresh */}
+            <Button
+              variant="outline"
+              onClick={fetchEnrollment}
+              disabled={loading}
+            >
+              <RefreshCw size={16} className="mr-2" />
+              {t('enrollment.refresh')}
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -93,14 +93,10 @@
   },
   "enrollment": {
     "title": "ลงทะเบียน MDM",
-    "selectContract": "เลือกสัญญา",
-    "searchPlaceholder": "ค้นหาด้วยรหัสสัญญาหรือชื่อลูกค้า...",
-    "searchHint": "พิมพ์อย่างน้อย 3 ตัวอักษรเพื่อค้นหา",
-    "contractCode": "สัญญา",
-    "customer": "ลูกค้า",
-    "generate": "สร้าง Enrollment",
+    "description": "สร้าง QR code สำหรับลงทะเบียนอุปกรณ์ สแกนด้วยอุปกรณ์ iOS เพื่อติดตั้งโปรไฟล์ MDM",
+    "generate": "สร้าง QR Code",
     "scanTitle": "สแกน QR Code",
-    "scanDescription": "สแกน QR Code นี้ด้วยอุปกรณ์เพื่อลงทะเบียน MDM",
+    "scanDescription": "สแกน QR Code นี้ด้วยอุปกรณ์ iOS เพื่อลงทะเบียน MDM",
     "expiresIn": "หมดอายุใน",
     "expired": "หมดอายุแล้ว",
     "refresh": "รีเฟรช"

@@ -93,14 +93,10 @@
   },
   "enrollment": {
     "title": "MDM Enrollment",
-    "selectContract": "Select Contract",
-    "searchPlaceholder": "Search by contract code or customer...",
-    "searchHint": "Type at least 3 characters to search",
-    "contractCode": "Contract",
-    "customer": "Customer",
-    "generate": "Generate Enrollment",
+    "description": "Generate a QR code for device enrollment. Scan with an iOS device to install the MDM profile.",
+    "generate": "Generate QR Code",
     "scanTitle": "Scan QR Code",
-    "scanDescription": "Scan this QR code with the device to enroll in MDM.",
+    "scanDescription": "Scan this QR code with the iOS device to enroll in MDM.",
     "expiresIn": "Expires in",
     "expired": "Expired",
     "refresh": "Refresh"
