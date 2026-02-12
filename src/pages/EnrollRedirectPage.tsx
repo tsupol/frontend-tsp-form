@@ -26,15 +26,20 @@ function detectDevice(): DeviceType {
   return 'other';
 }
 
+interface MobileconfigResponse {
+  plist_b64: string;
+  enrollment_id: string;
+}
+
 async function fetchMobileconfig(enrollmentId: string): Promise<string> {
-  const result = await apiClient.rpc<string>('mdm_enrollment_mobileconfig', {
+  const result = await apiClient.rpc<MobileconfigResponse>('mdm_enrollment_mobileconfig', {
     p_enrollment_id: enrollmentId,
   }, false);
 
-  if (!result) {
-    throw new Error('No mobileconfig in response');
+  if (!result?.plist_b64) {
+    throw new Error('No plist_b64 in response');
   }
-  return result;
+  return atob(result.plist_b64);
 }
 
 function downloadMobileconfig(xmlContent: string) {
