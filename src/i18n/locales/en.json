@@ -31,12 +31,27 @@
     "userArea": "MDM",
     "userDetails": "User Details",
     "register": "Register Device",
-    "enrollment": "Enrollment"
+    "enrollment": "Enrollment",
+    "users": "Users"
   },
   "user": {
     "id": "User ID",
     "username": "Username",
-    "role": "Role"
+    "role": "Role",
+    "holdingId": "Holding ID",
+    "companyId": "Company ID",
+    "branchId": "Branch ID",
+    "capabilities": "Capabilities"
+  },
+  "users": {
+    "title": "Users",
+    "username": "Username",
+    "role": "Role",
+    "scope": "Scope",
+    "company": "Company",
+    "branch": "Branch",
+    "active": "Active",
+    "empty": "No users found"
   },
   "theme": {
     "title": "Theme",
@@ -102,6 +117,11 @@
     "expired": "Expired",
     "refresh": "Refresh",
     "directLink": "Open direct link (for testing)"
+  },
+  "holding": {
+    "selectTitle": "Select Holding",
+    "selectDescription": "Choose a holding to continue",
+    "loading": "Loading holdings..."
   },
   "enrollRedirect": {
     "invalidLink": "Invalid Link",

@@ -31,12 +31,27 @@
     "userArea": "พื้นที่ผู้ใช้",
     "userDetails": "ข้อมูลผู้ใช้",
     "register": "ลงทะเบียนอุปกรณ์",
-    "enrollment": "Enrollment"
+    "enrollment": "Enrollment",
+    "users": "ผู้ใช้งาน"
   },
   "user": {
     "id": "รหัสผู้ใช้",
     "username": "ชื่อผู้ใช้",
-    "role": "บทบาท"
+    "role": "บทบาท",
+    "holdingId": "Holding ID",
+    "companyId": "Company ID",
+    "branchId": "Branch ID",
+    "capabilities": "สิทธิ์การใช้งาน"
+  },
+  "users": {
+    "title": "ผู้ใช้งาน",
+    "username": "ชื่อผู้ใช้",
+    "role": "บทบาท",
+    "scope": "ขอบเขต",
+    "company": "บริษัท",
+    "branch": "สาขา",
+    "active": "สถานะ",
+    "empty": "ไม่พบผู้ใช้งาน"
   },
   "theme": {
     "title": "ธีม",
@@ -102,6 +117,11 @@
     "expired": "หมดอายุแล้ว",
     "refresh": "รีเฟรช",
     "directLink": "เปิดลิงก์โดยตรง (สำหรับทดสอบ)"
+  },
+  "holding": {
+    "selectTitle": "เลือก Holding",
+    "selectDescription": "เลือก Holding เพื่อดำเนินการต่อ",
+    "loading": "กำลังโหลด..."
   },
   "enrollRedirect": {
     "invalidLink": "ลิงก์ไม่ถูกต้อง",

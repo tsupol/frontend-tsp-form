@@ -4,12 +4,18 @@ import { authService } from '../lib/auth';
 import { setAuthErrorHandler } from '../lib/api';
 import type { UserInfo } from '../lib/auth';
 
+interface LoginResult {
+  needsHoldingSelect: boolean;
+}
+
 interface AuthContextType {
   user: UserInfo | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  needsHoldingSelect: boolean;
+  login: (username: string, password: string) => Promise<LoginResult>;
   logout: () => Promise<void>;
+  switchHolding: (holdingId: number) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -17,6 +23,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [needsHoldingSelect, setNeedsHoldingSelect] = useState(false);
   const hasHandledAuthError = useRef(false);
 
   // Handle auth errors from API - clear session and redirect to login
@@ -42,20 +49,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const initAuth = async () => {
       const isValid = await authService.validateAndRefresh();
       if (isValid) {
-        const storedUser = authService.getStoredUser();
-        if (storedUser) {
-          setUser(storedUser);
-        } else {
-          // Try to get user from JWT token
-          const tokenUser = authService.getUserFromToken();
-          if (tokenUser) {
-            setUser(tokenUser);
-            localStorage.setItem('user', JSON.stringify(tokenUser));
-          } else {
-            // No valid user info
-            authService.clearTokens();
-            setUser(null);
-          }
+        try {
+          const userInfo = await authService.me();
+          setUser(userInfo);
+          setNeedsHoldingSelect(userInfo.holding_id === null);
+        } catch {
+          authService.clearTokens();
+          setUser(null);
         }
       } else {
         authService.clearTokens();
@@ -66,24 +66,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initAuth();
   }, []);
 
-  const login = useCallback(async (username: string, password: string) => {
+  const login = useCallback(async (username: string, password: string): Promise<LoginResult> => {
     const response = await authService.login(username, password);
-
-    // Get user info from JWT token, use login username
-    const tokenUser = authService.getUserFromToken();
-    const userInfo: UserInfo = {
-      id: response.user_id,
-      username: username, // Use the username they logged in with
-      role: tokenUser?.role || 'user',
-    };
-
-    localStorage.setItem('user', JSON.stringify(userInfo));
+    const userInfo = await authService.me();
     setUser(userInfo);
+
+    const holdingNeeded = response.holding_id === null;
+    setNeedsHoldingSelect(holdingNeeded);
+    return { needsHoldingSelect: holdingNeeded };
   }, []);
 
   const logout = useCallback(async () => {
     await authService.logout();
     setUser(null);
+    setNeedsHoldingSelect(false);
+  }, []);
+
+  const switchHolding = useCallback(async (holdingId: number) => {
+    await authService.switchHolding(holdingId);
+    const userInfo = await authService.me();
+    setUser(userInfo);
+    setNeedsHoldingSelect(false);
   }, []);
 
   return (
@@ -92,8 +95,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         isAuthenticated: !!user,
         isLoading,
+        needsHoldingSelect,
         login,
         logout,
+        switchHolding,
       }}
     >
       {children}

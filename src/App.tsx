@@ -12,6 +12,8 @@ import { Step2Scan } from './pages/register/Step2Scan';
 import { Step3Status } from './pages/register/Step3Status';
 import { EnrollmentPage } from './pages/EnrollmentPage';
 import { EnrollRedirectPage } from './pages/EnrollRedirectPage';
+import { HoldingSelectPage } from './pages/HoldingSelectPage';
+import { UsersPage } from './pages/UsersPage';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -51,6 +53,16 @@ function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/enroll" element={<EnrollRedirectPage />} />
 
+      {/* Holding selection (protected, no sidebar) */}
+      <Route
+        path="/admin/select-holding"
+        element={
+          <ProtectedRoute>
+            <HoldingSelectPage />
+          </ProtectedRoute>
+        }
+      />
+
       {/* Admin routes */}
       <Route
         path="/admin"
@@ -78,6 +90,18 @@ function App() {
         <Route path="scan" element={<Step2Scan />} />
         <Route path="status" element={<Step3Status />} />
       </Route>
+
+      {/* Users */}
+      <Route
+        path="/admin/users"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <UsersPage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
 
       {/* Enrollment */}
       <Route

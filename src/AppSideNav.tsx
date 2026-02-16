@@ -7,6 +7,7 @@ import {
   ArrowLeftFromLine,
   ArrowRightFromLine,
   User,
+  Users,
   ClipboardList,
   Smartphone,
   Settings,
@@ -101,7 +102,8 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
     navigate('/login');
   };
 
-  const initials = user?.username ? user.username.slice(0, 2).toUpperCase() : '??';
+  const displayName = user?.role_code ?? 'User';
+  const initials = displayName.slice(0, 2).toUpperCase();
 
   return (
     <PopOver
@@ -123,7 +125,7 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
           {!collapsed && (
             <>
               <div className="flex-1 text-left truncate">
-                <span className="text-sm font-medium capitalize">{user?.username ?? 'User'}</span>
+                <span className="text-sm font-medium capitalize">{displayName}</span>
               </div>
               <ChevronsUpDown size={14} className="opacity-50 shrink-0" />
             </>
@@ -177,6 +179,7 @@ export const AppSideNav = () => {
 
   const menuItems = [
     { icon: <User size="1rem" />, label: t('nav.userDetails'), to: '/admin' },
+    { icon: <Users size="1rem" />, label: t('nav.users'), to: '/admin/users' },
     { icon: <ClipboardList size="1rem" />, label: t('nav.register'), to: '/admin/register' },
     { icon: <Smartphone size="1rem" />, label: t('nav.enrollment'), to: '/admin/enrollment' },
   ];

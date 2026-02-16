@@ -15,8 +15,12 @@ Reference file: `C:\Users\tonsu\PhpstormProjects\tsp-form\src\example\example.cs
 ## API
 
 - Base URL: `https://czynet.dyndns.org/`
+- API List: `https://czynet.dyndns.org/api_list`
 - OpenAPI doc available at root endpoint
 - Backend is PostgREST (in development, may change)
+- Backend repo: `https://github.com/czynet/nnf`
+- **Views:** Read endpoints use `v_[table_name]` views (e.g. `/v_users`), returns plain arrays (no v2 envelope)
+- **Writes:** Update/insert against the base table directly (e.g. `PATCH /users`)
 
 ### API Client (`src/lib/api.ts`)
 
