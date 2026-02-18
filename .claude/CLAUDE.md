@@ -4,7 +4,8 @@
 
 - Use Bangkok time (UTC+7) when displaying times to the user
 - Theme uses `data-theme` attribute on `<html>` (`light` / `dark`), not CSS classes
-- CSS in `src/index.css` should match `tsp-form`'s `example.css` — copy directly when updating
+- **`src/index.css`** — tsp-form theme only (copy from `example.css`, change `@import` line to `@import "tailwindcss"`)
+- **`src/app.css`** — app-specific styles (`.page-content`, layout utilities, overrides)
 
 ## tsp-form Component Usage
 

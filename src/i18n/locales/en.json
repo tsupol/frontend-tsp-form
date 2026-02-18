@@ -56,7 +56,14 @@
     "status": "Status",
     "active": "Active",
     "inactive": "Inactive",
-    "empty": "No users found"
+    "activate": "Activate",
+    "deactivate": "Deactivate",
+    "resetPassword": "Reset Password",
+    "selectedCount": "{{count}} selected",
+    "clearSelection": "Clear",
+    "empty": "No users found",
+    "rowsPerPage": "Rows per page",
+    "rowInfo": "{{from}}-{{to}} of {{total}}"
   },
   "theme": {
     "title": "Theme",

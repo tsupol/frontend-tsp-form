@@ -56,7 +56,14 @@
     "status": "สถานะ",
     "active": "ใช้งาน",
     "inactive": "ไม่ใช้งาน",
-    "empty": "ไม่พบผู้ใช้งาน"
+    "activate": "เปิดใช้งาน",
+    "deactivate": "ปิดใช้งาน",
+    "resetPassword": "รีเซ็ตรหัสผ่าน",
+    "selectedCount": "เลือก {{count}} รายการ",
+    "clearSelection": "ล้าง",
+    "empty": "ไม่พบผู้ใช้งาน",
+    "rowsPerPage": "แถวต่อหน้า",
+    "rowInfo": "{{from}}-{{to}} จาก {{total}}"
   },
   "theme": {
     "title": "ธีม",

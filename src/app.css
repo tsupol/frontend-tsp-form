@@ -1,0 +1,13 @@
+/* App-specific styles */
+
+.page-content {
+    padding: 2rem 0 0 0;
+    max-width: 50rem;
+    margin: 0 auto;
+}
+
+@media (min-width: 768px) {
+    .page-content {
+        padding: 1rem 2rem;
+    }
+}
