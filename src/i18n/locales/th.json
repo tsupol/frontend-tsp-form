@@ -29,10 +29,13 @@
   "nav": {
     "home": "หน้าหลัก",
     "userArea": "พื้นที่ผู้ใช้",
+    "dashboard": "แดชบอร์ด",
+    "profile": "โปรไฟล์",
     "userDetails": "ข้อมูลผู้ใช้",
     "register": "ลงทะเบียนอุปกรณ์",
     "enrollment": "Enrollment",
-    "users": "ผู้ใช้งาน"
+    "users": "ผู้ใช้งาน",
+    "conceptDemo": "ทดลองแนวคิด"
   },
   "user": {
     "id": "รหัสผู้ใช้",
@@ -50,7 +53,9 @@
     "scope": "ขอบเขต",
     "company": "บริษัท",
     "branch": "สาขา",
-    "active": "สถานะ",
+    "status": "สถานะ",
+    "active": "ใช้งาน",
+    "inactive": "ไม่ใช้งาน",
     "empty": "ไม่พบผู้ใช้งาน"
   },
   "theme": {

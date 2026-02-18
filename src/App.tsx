@@ -5,6 +5,7 @@ import { useAuth } from './contexts/AuthContext';
 import type { ReactNode } from 'react';
 import { LoginPage } from './pages/LoginPage';
 import { HomePage } from './pages/HomePage';
+import { DashboardPage } from './pages/DashboardPage';
 import { UserPage } from './pages/UserPage';
 import { RegisterLayout } from './pages/register/RegisterLayout';
 import { Step1DeviceInfo } from './pages/register/Step1DeviceInfo';
@@ -25,9 +26,9 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
 
 function AdminLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="flex">
+    <div className="flex h-dvh">
       <AppSideNav />
-      <div className="flex-grow w-full">
+      <div className="flex-grow w-full better-scroll">
         {children}
       </div>
     </div>
@@ -63,13 +64,37 @@ function App() {
         }
       />
 
-      {/* Admin routes */}
+      {/* Dashboard */}
       <Route
         path="/admin"
         element={
           <ProtectedRoute>
             <AdminLayout>
+              <DashboardPage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* User profile */}
+      <Route
+        path="/admin/profile"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
               <UserPage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Users */}
+      <Route
+        path="/admin/users"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <UsersPage />
             </AdminLayout>
           </ProtectedRoute>
         }
@@ -90,18 +115,6 @@ function App() {
         <Route path="scan" element={<Step2Scan />} />
         <Route path="status" element={<Step3Status />} />
       </Route>
-
-      {/* Users */}
-      <Route
-        path="/admin/users"
-        element={
-          <ProtectedRoute>
-            <AdminLayout>
-              <UsersPage />
-            </AdminLayout>
-          </ProtectedRoute>
-        }
-      />
 
       {/* Enrollment */}
       <Route

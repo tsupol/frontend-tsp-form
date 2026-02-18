@@ -30,13 +30,14 @@
     --color-bg: #151515;
     --color-bg-contrast: #ffffff;
 
-    --color-line: rgba(222, 220, 209, 0.12);
+    --color-line: rgba(222, 220, 209, 0.13);
     --color-link: #0070f3;
 
     --color-surface: #1e1e1e;
     --color-surface-hover: #2a2a2a;
     --color-surface-shallow: #111111;
     --color-surface-elevated: #303030;
+    --color-select-highlight: #2a2a2a;
 
     --spacing-line: 1px;
 
@@ -107,7 +108,8 @@
 
     /* default button */
     --color-button-default-bg: #252525;
-    --color-button-default-border: #404040;
+    --color-button-default-border: #484848;
+    --color-button-outline-border: #484848;;
 
     /* added */
     --spacing-nav: 3rem;
@@ -115,8 +117,9 @@
     /* side menu */
     --spacing-side-menu: 280px;
     --spacing-side-menu-min: 3.075rem;
+    --color-side-menu-bg: #111111;
 
-    --color-item-bg: #1F1E1D;
+    --color-item-bg: transparent;
     --color-item-fg: #aaaaaa;
     --color-item-border: var(--color-item-bg);
 
@@ -124,13 +127,34 @@
     --color-item-hover-fg: var(--color-item-fg);
     --color-item-hover-border: var(--color-item-hover-bg);
 
-    --color-item-active-bg: var(--color-primary);
+    --color-item-active-bg: rgba(255, 255, 255, 0.1);
     --color-item-active-fg: var(--color-primary-contrast);
-    --color-item-active-border: var(--color-primary);
+    --color-item-active-border: transparent;
+
+    /* snackbar */
+    --color-snackbar-bg: var(--color-surface-elevated);
+    --color-snackbar-fg: var(--color-fg);
+    --radius-snackbar: 0.375rem;
+    --text-snackbar: 0.875rem;
+    --border-snackbar: 0 0 0 3px;
+    --color-snackbar-info-border: var(--color-info);
+    --color-snackbar-success-border: var(--color-success);
+    --color-snackbar-error-border: var(--color-danger);
+    --color-snackbar-warning-border: var(--color-warning);
+
+    /* pagination */
+    --color-pagination-border: transparent;
+    --color-pagination-bg: transparent;
+    --color-pagination-hover-bg: var(--color-surface-elevated);
+    --color-pagination-hover-border: transparent;
+    --color-pagination-active-bg: var(--color-button-default-bg);
+    --color-pagination-active-fg: var(--color-fg);
+    --color-pagination-active-border: var(--color-button-default-border);
+    --spacing-pagination-gap: 0.125rem;
 }
 
 /* Light theme - Claude style warm cream */
-.light {
+[data-theme="light"] {
     --color-fg: #1a1a1a;
     --color-fg-contrast: #ffffff;
     --color-bg: #FAF9F5;
@@ -142,6 +166,7 @@
     --color-surface-hover: #f0efe9;
     --color-surface-shallow: #f5f4f3;
     --color-surface-elevated: #ffffff;
+    --color-select-highlight: #f0efe9;
 
     --color-scrollbar-track: rgba(0, 0, 0, 0.05);
     --color-scrollbar-thumb: rgba(0, 0, 0, 0.15);
@@ -151,20 +176,31 @@
 
     /* default button */
     --color-button-default-bg: #ffffff;
-    --color-button-default-border: rgba(0, 0, 0, 0.15);
+    --color-button-default-border: rgba(0, 0, 0, 0.2);
+    --color-button-outline-border: rgba(0, 0, 0, 0.2);
 
     /* side menu */
+    --color-side-menu-bg: #f5f4f3;
+
     --color-item-bg: transparent;
-    --color-item-fg: #333333;
+    --color-item-fg: #555555;
     --color-item-border: transparent;
 
     --color-item-hover-bg: #EDECE6;
-    --color-item-hover-fg: #1a1a1a;
+    --color-item-hover-fg: #333333;
     --color-item-hover-border: #EDECE6;
 
     --color-item-active-bg: #E5E4DE;
     --color-item-active-fg: #333333;
     --color-item-active-border: #E5E4DE;
+
+    /* snackbar */
+    --color-snackbar-bg: #ffffff;
+    --color-snackbar-fg: #1a1a1a;
+    --color-snackbar-info-border: var(--color-info);
+    --color-snackbar-success-border: var(--color-success);
+    --color-snackbar-error-border: var(--color-danger);
+    --color-snackbar-warning-border: var(--color-warning);
 
     /* skeleton */
     --color-skeleton: #E0DFDA;
@@ -174,13 +210,14 @@ html {
     font-size: 16px;
 }
 
-/* iPad and iPhone - larger base font */
-@media only screen and (max-width: 1024px) and (-webkit-min-device-pixel-ratio: 2) {
+/* Tablet portrait - larger base font */
+@media only screen and (max-width: 1024px) and (orientation: portrait) and (-webkit-min-device-pixel-ratio: 2) {
     html {
         font-size: 18px;
     }
 }
 
+/* Phone */
 @media only screen and (max-width: 430px) and (-webkit-min-device-pixel-ratio: 2) {
     html {
         font-size: 20px;
@@ -203,6 +240,8 @@ body {
 
 .page-content {
     padding: 2rem 0 0 0;
+    max-width: 50rem;
+    margin: 0 auto;
 }
 
 @media (min-width: 768px) {

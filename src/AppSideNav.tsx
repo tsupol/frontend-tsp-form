@@ -1,11 +1,12 @@
-import { SideMenu, PopOver } from 'tsp-form';
-import { Link, useNavigate } from 'react-router-dom';
+import { SideMenu, SideMenuItems, type SideMenuItemData, PopOver, MenuItem, SubMenu, MenuSeparator, Checkmark } from 'tsp-form';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { clsx } from 'clsx';
 import {
   ArrowLeftFromLine,
   ArrowRightFromLine,
+  LayoutDashboard,
   User,
   Users,
   ClipboardList,
@@ -13,82 +14,21 @@ import {
   Settings,
   HelpCircle,
   LogOut,
-  ChevronRight,
   ChevronsUpDown,
-  Check,
   Languages,
 } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
 import { useTheme } from './contexts/ThemeContext';
 
-// Menu item component for user menu
-function UserMenuItem({ icon, label, onClick, shortcut, danger }: {
-  icon?: React.ReactNode;
-  label: string;
-  onClick?: () => void;
-  shortcut?: string;
-  danger?: boolean;
-}) {
-  return (
-    <button
-      className={clsx(
-        'w-full text-left px-3 py-1.5 text-sm hover:bg-surface-hover transition-colors cursor-pointer flex items-center gap-2',
-        danger ? 'text-danger' : ''
-      )}
-      onClick={onClick}
-    >
-      {icon && <span className="w-4 h-4 flex items-center justify-center opacity-70">{icon}</span>}
-      <span className="flex-1">{label}</span>
-      {shortcut && <span className="text-xs opacity-50">{shortcut}</span>}
-    </button>
-  );
-}
+// Flat list of all menu items with paths for active key lookup
+const menuItemsList = [
+  { key: 'dashboard', path: '/admin' },
+  { key: 'users', path: '/admin/users' },
+  { key: 'register', path: '/admin/register' },
+  { key: 'enrollment', path: '/admin/enrollment' },
+];
 
-// Submenu component with hover
-function UserSubMenu({ icon, label, children }: { icon?: React.ReactNode; label: string; children: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
-  const closeTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-
-  const scheduleClose = () => {
-    closeTimer.current = setTimeout(() => setOpen(false), 150);
-  };
-
-  const cancelClose = () => {
-    if (closeTimer.current) clearTimeout(closeTimer.current);
-  };
-
-  return (
-    <PopOver
-      isOpen={open}
-      onClose={() => setOpen(false)}
-      placement="right"
-      align="start"
-      offset={0}
-      openDelay={0}
-      trigger={
-        <button
-          className="w-full text-left px-3 py-1.5 text-sm hover:bg-surface-hover transition-colors cursor-pointer flex items-center gap-2"
-          onMouseEnter={() => { cancelClose(); setOpen(true); }}
-          onMouseLeave={() => scheduleClose()}
-        >
-          {icon && <span className="w-4 h-4 flex items-center justify-center opacity-70">{icon}</span>}
-          <span className="flex-1">{label}</span>
-          <ChevronRight size={14} className="opacity-50" />
-        </button>
-      }
-    >
-      <div
-        className="py-1 min-w-[180px]"
-        onMouseEnter={() => cancelClose()}
-        onMouseLeave={() => scheduleClose()}
-      >
-        {children}
-      </div>
-    </PopOver>
-  );
-}
-
-// User menu component (Claude Desktop style)
+// User menu component
 function UserMenu({ collapsed }: { collapsed: boolean }) {
   const [open, setOpen] = useState(false);
   const { t, i18n } = useTranslation();
@@ -110,7 +50,7 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
       isOpen={open}
       onClose={() => setOpen(false)}
       placement="top"
-      align="start"
+      align="center"
       offset={4}
       openDelay={0}
       triggerClassName="w-full"
@@ -133,35 +73,41 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
         </button>
       }
     >
-      <div className="py-1 w-[260px]">
-        <UserSubMenu icon={<Settings size={14} />} label={t('theme.title')}>
-          <UserMenuItem
-            icon={theme === 'light' ? <Check size={14} /> : undefined}
+      <div className="py-1 w-[calc(var(--spacing-side-menu)-1rem)]">
+        <MenuItem
+          icon={<User size={14} />}
+          label={t('nav.profile')}
+          onClick={() => { navigate('/admin/profile'); setOpen(false); }}
+        />
+        <MenuSeparator />
+        <SubMenu icon={<Settings size={14} />} label={t('theme.title')}>
+          <MenuItem
+            rightIcon={theme === 'light' ? <Checkmark width={14} height={14} /> : undefined}
             label={t('theme.light')}
-            onClick={() => setTheme('light')}
+            onClick={() => { setTheme('light'); setOpen(false); }}
           />
-          <UserMenuItem
-            icon={theme === 'dark' ? <Check size={14} /> : undefined}
+          <MenuItem
+            rightIcon={theme === 'dark' ? <Checkmark width={14} height={14} /> : undefined}
             label={t('theme.dark')}
-            onClick={() => setTheme('dark')}
+            onClick={() => { setTheme('dark'); setOpen(false); }}
           />
-          <UserMenuItem
-            icon={theme === 'system' ? <Check size={14} /> : undefined}
+          <MenuItem
+            rightIcon={theme === 'system' ? <Checkmark width={14} height={14} /> : undefined}
             label={t('theme.system')}
-            onClick={() => setTheme('system')}
+            onClick={() => { setTheme('system'); setOpen(false); }}
           />
-        </UserSubMenu>
-        <UserSubMenu icon={<Languages size={14} />} label={t('language.title')}>
-          <UserMenuItem label={t('language.en')} onClick={() => i18n.changeLanguage('en')} />
-          <UserMenuItem label={t('language.th')} onClick={() => i18n.changeLanguage('th')} />
-        </UserSubMenu>
-        <UserMenuItem
+        </SubMenu>
+        <SubMenu icon={<Languages size={14} />} label={t('language.title')}>
+          <MenuItem label={t('language.en')} onClick={() => { i18n.changeLanguage('en'); setOpen(false); }} />
+          <MenuItem label={t('language.th')} onClick={() => { i18n.changeLanguage('th'); setOpen(false); }} />
+        </SubMenu>
+        <MenuItem
           icon={<HelpCircle size={14} />}
           label="Help"
-          onClick={() => {}}
+          onClick={() => setOpen(false)}
         />
-        <hr className="border-line my-1" />
-        <UserMenuItem
+        <MenuSeparator />
+        <MenuItem
           icon={<LogOut size={14} />}
           label={t('auth.logout')}
           onClick={handleLogout}
@@ -174,23 +120,40 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
 
 export const AppSideNav = () => {
   const [menuCollapsed, setMenuCollapsed] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { t } = useTranslation();
 
-  const menuItems = [
-    { icon: <User size="1rem" />, label: t('nav.userDetails'), to: '/admin' },
-    { icon: <Users size="1rem" />, label: t('nav.users'), to: '/admin/users' },
-    { icon: <ClipboardList size="1rem" />, label: t('nav.register'), to: '/admin/register' },
-    { icon: <Smartphone size="1rem" />, label: t('nav.enrollment'), to: '/admin/enrollment' },
+  const activeKey = (() => {
+    const path = location.pathname;
+    const match = menuItemsList.find(i => i.path === path);
+    return match?.key ?? 'dashboard';
+  })();
+
+  const menuItems: SideMenuItemData[] = [
+    { key: 'dashboard', icon: <LayoutDashboard size="1rem" />, label: t('nav.dashboard'), path: '/admin' },
+    { key: 'users', icon: <Users size="1rem" />, label: t('nav.users'), path: '/admin/users' },
+    { type: 'group', key: 'grp-demo', label: t('nav.conceptDemo') },
+    { key: 'register', icon: <ClipboardList size="1rem" />, label: t('nav.register'), path: '/admin/register' },
+    { key: 'enrollment', icon: <Smartphone size="1rem" />, label: t('nav.enrollment'), path: '/admin/enrollment' },
   ];
+
+  const handleSelect = (_key: string, path?: string) => {
+    if (path) navigate(path);
+  };
+
+  const handleCloseMobile = () => {
+    setMenuCollapsed(true);
+  };
 
   return (
     <div className={clsx('h-dvh flex-shrink-0', menuCollapsed ? 'md:w-side-menu-min' : 'md:w-side-menu')}>
       <SideMenu
-        isCollapsed={false}
+        isCollapsed={menuCollapsed}
         onToggleCollapse={(collapsed) => setMenuCollapsed(collapsed)}
         linkFn={(to) => navigate(to)}
-        className="bg-surface-shallow border-r border-line"
+        autoCloseMobileOnClick={false}
         mobileToggleRenderer={(handleToggle) => (
           <button
             className="hover:bg-surface-hover w-8 h-8 shrink-0 cursor-pointer rounded-lg transition-all flex justify-center items-center"
@@ -200,41 +163,36 @@ export const AppSideNav = () => {
             <ArrowRightFromLine size={18} />
           </button>
         )}
-        titleRenderer={(collapsed, handleToggle, isMobile) => (
-          <div key="title" className="flex items-center pointer-events-auto w-side-menu p-2 transition-all" style={{ transform: collapsed && !isMobile ? 'translateX(calc(-1 * var(--spacing-side-menu) + var(--spacing-side-menu-min)))' : 'translateX(0)' }}>
-            <div className="flex items-center flex-1 cursor-pointer pl-2"
-                 style={{ opacity: collapsed ? 0 : 1, transition: 'opacity 0.3s ease' }}
-                 onClick={() => handleToggle()}>
-              <span className="font-semibold">{t('nav.userArea')}</span>
+        titleRenderer={(collapsed, handleToggle, mobile) => {
+          if (mobile !== isMobile) setTimeout(() => setIsMobile(mobile), 0);
+          return (
+            <div key="title" className="flex items-center pointer-events-auto w-side-menu p-2 transition-all" style={{ transform: collapsed && !mobile ? 'translateX(calc(-1 * var(--spacing-side-menu) + var(--spacing-side-menu-min)))' : 'translateX(0)' }}>
+              <div className="flex items-center flex-1 cursor-pointer pl-2"
+                   style={{ opacity: collapsed ? 0 : 1, transition: 'opacity 0.3s ease' }}
+                   onClick={() => handleToggle()}>
+                <span className="font-semibold">{t('nav.userArea')}</span>
+              </div>
+              <button
+                className="hover:bg-surface w-8 h-8 shrink-0 cursor-pointer rounded-lg transition-all flex justify-center items-center"
+                aria-label={collapsed ? "Expand menu" : "Collapse menu"}
+                onClick={() => handleToggle()}
+              >
+                {collapsed ? <ArrowRightFromLine size={18} /> : <ArrowLeftFromLine size={18} />}
+              </button>
             </div>
-            <button
-              className="hover:bg-surface w-8 h-8 shrink-0 cursor-pointer rounded-lg transition-all flex justify-center items-center"
-              aria-label={collapsed ? "Expand menu" : "Collapse menu"}
-              onClick={() => handleToggle()}
-            >
-              {collapsed ? <ArrowRightFromLine size={18} /> : <ArrowLeftFromLine size={18} />}
-            </button>
-          </div>
-        )}
+          );
+        }}
         items={(
           <div className="flex flex-col w-full h-full min-h-0 pointer-events-auto">
             <div className="side-menu-content better-scroll">
-              <div className={clsx('p-2 flex flex-col w-side-menu', menuCollapsed ? 'items-start' : '')}>
-                {menuItems.map((item, index) => {
-                  return (
-                    <Link key={index} className="flex py-1 rounded-lg transition-all text-item-fg hover:bg-item-hover-bg gap-2 font-medium" to={item.to}>
-                      <div className="flex justify-center items-center w-8 h-8">
-                        {item.icon}
-                      </div>
-                      {!menuCollapsed && (
-                        <div className="flex items-center">
-                          {item.label}
-                        </div>
-                      )}
-                    </Link>
-                  );
-                })}
-              </div>
+              <SideMenuItems
+                items={menuItems}
+                activeItem={activeKey}
+                collapsed={menuCollapsed}
+                isMobile={isMobile}
+                onSelect={handleSelect}
+                onCloseMobile={handleCloseMobile}
+              />
             </div>
             <div className={clsx('border-t border-line py-2 pointer-events-auto', menuCollapsed ? 'px-0' : 'px-2')}>
               <UserMenu collapsed={menuCollapsed} />

@@ -244,6 +244,46 @@ export class ApiClient {
     return this.request<T>(endpoint, { method: 'GET' }, includeAuth);
   }
 
+  // PostgREST paginated GET with Range headers and exact count
+  async getPaginated<T>(
+    endpoint: string,
+    { page = 1, pageSize = 15, includeAuth = true }: { page?: number; pageSize?: number; includeAuth?: boolean } = {}
+  ): Promise<{ data: T[]; totalCount: number }> {
+    const offset = (page - 1) * pageSize;
+    const rangeEnd = offset + pageSize - 1;
+
+    const url = `${API_BASE_URL}${endpoint}`;
+    const headers = {
+      ...this.getHeaders(includeAuth),
+      'Range-Unit': 'items',
+      'Range': `${offset}-${rangeEnd}`,
+      'Prefer': 'count=exact',
+    };
+
+    const response = await fetch(url, { method: 'GET', headers });
+
+    const text = await response.text();
+    const data = text ? JSON.parse(text) : null;
+
+    if (!response.ok) {
+      if (isPostgRESTError(data)) {
+        const isAuth = checkAuthError(data.code, data.message) || response.status === 401;
+        if (isAuth) triggerAuthError();
+        throw new ApiError({ code: data.code, message: data.message, details: data.details, hint: data.hint, isAuthError: isAuth });
+      }
+      const isAuth = response.status === 401;
+      if (isAuth) triggerAuthError();
+      throw new ApiError({ code: 'HTTP_ERROR', message: `Request failed with status ${response.status}`, isAuthError: isAuth });
+    }
+
+    // Parse Content-Range: 0-14/100
+    const contentRange = response.headers.get('Content-Range') ?? '';
+    const match = contentRange.match(/\/(\d+)/);
+    const totalCount = match ? parseInt(match[1], 10) : (Array.isArray(data) ? data.length : 0);
+
+    return { data: parseResponseData<T[]>(data), totalCount };
+  }
+
   async post<T>(endpoint: string, body?: unknown, includeAuth: boolean = true): Promise<T> {
     return this.request<T>(
       endpoint,

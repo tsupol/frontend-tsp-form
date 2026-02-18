@@ -29,10 +29,13 @@
   "nav": {
     "home": "Home",
     "userArea": "MDM",
+    "dashboard": "Dashboard",
+    "profile": "My Profile",
     "userDetails": "User Details",
     "register": "Register Device",
     "enrollment": "Enrollment",
-    "users": "Users"
+    "users": "Users",
+    "conceptDemo": "Concept Demo"
   },
   "user": {
     "id": "User ID",
@@ -50,7 +53,9 @@
     "scope": "Scope",
     "company": "Company",
     "branch": "Branch",
+    "status": "Status",
     "active": "Active",
+    "inactive": "Inactive",
     "empty": "No users found"
   },
   "theme": {

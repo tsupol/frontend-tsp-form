@@ -231,17 +231,40 @@ export function UserPage() {
           <div className="space-y-4">
             <div>
               <div className="text-sm text-control-label">{t('user.id')}</div>
-              <div className="mt-1">{user?.id ?? '-'}</div>
-            </div>
-
-            <div>
-              <div className="text-sm text-control-label">{t('user.username')}</div>
-              <div className="mt-1">{user?.username ?? '-'}</div>
+              <div className="mt-1">{user?.user_id ?? '-'}</div>
             </div>
 
             <div>
               <div className="text-sm text-control-label">{t('user.role')}</div>
-              <div className="mt-1">{user?.role ?? '-'}</div>
+              <div className="mt-1">{user?.role_code ?? '-'}</div>
+            </div>
+
+            <div>
+              <div className="text-sm text-control-label">{t('user.holdingId')}</div>
+              <div className="mt-1">{user?.holding_id ?? '-'}</div>
+            </div>
+
+            <div>
+              <div className="text-sm text-control-label">{t('user.companyId')}</div>
+              <div className="mt-1">{user?.company_id ?? '-'}</div>
+            </div>
+
+            <div>
+              <div className="text-sm text-control-label">{t('user.branchId')}</div>
+              <div className="mt-1">{user?.branch_id ?? '-'}</div>
+            </div>
+
+            <div>
+              <div className="text-sm text-control-label">{t('user.capabilities')}</div>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {user?.capabilities?.length
+                  ? user.capabilities.map((cap) => (
+                      <span key={cap.code} className="text-xs bg-surface-shallow px-2 py-1 rounded">
+                        {cap.code}
+                      </span>
+                    ))
+                  : '-'}
+              </div>
             </div>
           </div>
         </div>

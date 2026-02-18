@@ -1,6 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pagination, Skeleton } from 'tsp-form';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { DataTable, DataTableColumnHeader, Skeleton, Button, Pagination, Input } from 'tsp-form';
+import { type ColumnDef } from '@tanstack/react-table';
+import { Plus } from 'lucide-react';
 import { apiClient } from '../lib/api';
 
 interface VUser {
@@ -28,99 +31,139 @@ const PAGE_SIZE = 15;
 
 export function UsersPage() {
   const { t } = useTranslation();
-  const [users, setUsers] = useState<VUser[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
 
-  useEffect(() => {
-    const fetchUsers = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await apiClient.get<VUser[]>('/v_users');
-        setUsers(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : t('common.error'));
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchUsers();
-  }, [t]);
+  // Build PostgREST query string with filters
+  const buildEndpoint = () => {
+    const params: string[] = [];
+    if (search.trim()) {
+      params.push(`username=ilike.*${encodeURIComponent(search.trim())}*`);
+    }
+    const qs = params.length > 0 ? `?${params.join('&')}` : '';
+    return `/v_users${qs}`;
+  };
 
-  const totalPages = Math.ceil(users.length / PAGE_SIZE);
-  const paginatedUsers = users.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE
-  );
+  const { data, isLoading, isError, error, isFetching } = useQuery({
+    queryKey: ['users', page, search],
+    queryFn: () => apiClient.getPaginated<VUser>(buildEndpoint(), { page, pageSize: PAGE_SIZE }),
+    placeholderData: keepPreviousData,
+  });
+
+  const users = data?.data ?? [];
+  const totalCount = data?.totalCount ?? 0;
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+
+  const handleSearch = (value: string) => {
+    setSearch(value);
+    setPage(1); // reset to first page on filter change
+  };
+
+  const columns: ColumnDef<VUser, any>[] = [
+    {
+      accessorKey: 'username',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('users.username')} />,
+      cell: ({ row }) => <span className="font-medium">{row.getValue('username')}</span>,
+    },
+    {
+      accessorKey: 'role_code',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('users.role')} />,
+      cell: ({ row }) => <span className="capitalize">{row.getValue('role_code')}</span>,
+    },
+    {
+      accessorKey: 'role_scope',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('users.scope')} />,
+      cell: ({ row }) => <span className="capitalize">{row.getValue('role_scope')}</span>,
+    },
+    {
+      accessorKey: 'company_name',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('users.company')} />,
+      cell: ({ row }) => row.getValue('company_name') || '—',
+    },
+    {
+      accessorKey: 'branch_name',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('users.branch')} />,
+      cell: ({ row }) => row.getValue('branch_name') || '—',
+    },
+    {
+      accessorKey: 'is_active',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('users.status')} />,
+      cell: ({ row }) => {
+        const active = row.getValue('is_active') as boolean;
+        return (
+          <span className={`inline-flex items-center gap-1.5 ${active ? 'text-success' : 'text-danger'}`}>
+            <span className={`w-2 h-2 rounded-full ${active ? 'bg-success' : 'bg-danger'}`} />
+            {active ? t('users.active') : t('users.inactive')}
+          </span>
+        );
+      },
+    },
+  ];
 
   return (
-    <div className="page-content p-6 min-w-0">
-      <h1 className="text-xl font-bold mb-6">{t('users.title')}</h1>
-
-      {/* Loading state */}
-      {loading && (
-        <div className="border border-line bg-surface rounded-lg divide-y divide-line">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="px-4 py-3 flex items-center gap-3">
-              <Skeleton variant="text" width="30%" height={16} />
-              <Skeleton variant="text" width="20%" height={16} />
-            </div>
-          ))}
+    <div className="page-content flex flex-col h-full" style={{ maxWidth: '64rem' }}>
+      {/* Sticky header */}
+      <div className="sticky top-0 z-10 bg-bg px-6 pt-6 pb-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-bold">{t('users.title')}</h1>
+          <Button color="primary" size="sm" onClick={() => {}}>
+            <Plus size={16} />
+            {t('common.create')}
+          </Button>
         </div>
-      )}
+        <Input
+          placeholder={t('common.search')}
+          value={search}
+          onChange={(e) => handleSearch(e.target.value)}
+          size="sm"
+          style={{ maxWidth: '16rem' }}
+        />
+      </div>
 
-      {/* Error state */}
-      {error && !loading && (
-        <div className="border border-line bg-surface p-6 rounded-lg text-center">
-          <div className="text-danger mb-4">{error}</div>
-          <button
-            className="px-4 py-2 text-sm border border-line rounded-lg hover:bg-surface-hover transition-colors"
-            onClick={() => window.location.reload()}
-          >
-            {t('common.retry')}
-          </button>
-        </div>
-      )}
+      {/* Content */}
+      <div className="px-6 pb-6">
+        {isLoading && (
+          <div className="border border-line bg-surface rounded-lg divide-y divide-line">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="px-4 py-3 flex items-center gap-3">
+                <Skeleton variant="text" width="30%" height={16} />
+                <Skeleton variant="text" width="20%" height={16} />
+              </div>
+            ))}
+          </div>
+        )}
 
-      {/* User list */}
-      {!loading && !error && (
-        <>
-          {paginatedUsers.length === 0 ? (
-            <div className="border border-line bg-surface p-8 rounded-lg text-center text-control-label">
-              {t('users.empty')}
-            </div>
-          ) : (
-            <div className="border border-line bg-surface rounded-lg divide-y divide-line">
-              {paginatedUsers.map((user) => (
-                <div key={user.id} className="px-4 py-3 hover:bg-surface-hover transition-colors">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-medium truncate">{user.username}</span>
-                    <span className={`shrink-0 w-2 h-2 rounded-full ${user.is_active ? 'bg-success' : 'bg-danger'}`} />
-                  </div>
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-xs text-control-label">
-                    <span className="capitalize">{user.role_code}</span>
-                    <span className="capitalize">{user.role_scope}</span>
-                    {user.company_name && <span>{user.company_name}</span>}
-                    {user.branch_name && <span>{user.branch_name}</span>}
-                  </div>
+        {isError && !isLoading && (
+          <div className="border border-line bg-surface p-6 rounded-lg text-center">
+            <div className="text-danger mb-4">{error instanceof Error ? error.message : t('common.error')}</div>
+          </div>
+        )}
+
+        {!isLoading && !isError && (
+          <>
+            <DataTable
+              data={users}
+              columns={columns}
+              enableSorting
+              className={isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}
+              noResults={
+                <div className="p-8 text-center text-control-label">
+                  {t('users.empty')}
                 </div>
-              ))}
-            </div>
-          )}
-
-          {totalPages > 1 && (
-            <div className="mt-4 flex justify-center">
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={setCurrentPage}
-              />
-            </div>
-          )}
-        </>
-      )}
+              }
+            />
+            {totalPages > 1 && (
+              <div className="flex justify-center pt-4">
+                <Pagination
+                  currentPage={page}
+                  totalPages={totalPages}
+                  onPageChange={setPage}
+                />
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
