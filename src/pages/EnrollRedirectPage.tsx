@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from 'tsp-form';
 import { Smartphone, AlertCircle, CheckCircle, ExternalLink, Loader2 } from 'lucide-react';
-import { config } from '../config/config';
+import { apiClient } from '../lib/api';
 
 type DeviceType = 'ios-safari' | 'ios-other' | 'android' | 'other';
 
@@ -27,32 +27,19 @@ function detectDevice(): DeviceType {
 }
 
 interface MobileconfigResponse {
-  mobileconfig: string;
+  plist_b64: string;
+  enrollment_id: string;
 }
 
 async function fetchMobileconfig(enrollmentId: string): Promise<string> {
-  const response = await fetch(`${config.apiUrl}/rpc/mdm_enrollment_mobileconfig`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ p_enrollment_id: enrollmentId }),
-  });
+  const result = await apiClient.rpc<MobileconfigResponse>('mdm_enrollment_mobileconfig', {
+    p_enrollment_id: enrollmentId,
+  }, false);
 
-  if (!response.ok) {
-    throw new Error('Failed to fetch mobileconfig');
+  if (!result?.plist_b64) {
+    throw new Error('No plist_b64 in response');
   }
-
-  const data = await response.json();
-
-  // V2 envelope: {ok: true, data: {mobileconfig: "..."}}
-  if (data.ok === false) {
-    throw new Error(data.message || 'API error');
-  }
-
-  const result = data.data as MobileconfigResponse;
-  if (!result?.mobileconfig) {
-    throw new Error('No mobileconfig in response');
-  }
-  return result.mobileconfig;
+  return atob(result.plist_b64);
 }
 
 function downloadMobileconfig(xmlContent: string) {
