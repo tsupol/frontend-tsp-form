@@ -59,7 +59,7 @@ export function EnrollmentPage() {
   }, [enrollment, t]);
 
   return (
-    <div className="page-content p-6">
+    <div className="page-content p-6 h-full overflow-y-auto">
       <div className="max-w-lg mx-auto">
         <h1 className="text-xl font-bold mb-6">{t('enrollment.title')}</h1>
 

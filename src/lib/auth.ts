@@ -1,32 +1,18 @@
 import { apiClient } from './api';
 
-// Types - will be updated when server provides proper response types
+export interface Capability {
+  code: string;
+  description: string;
+}
+
 export interface UserInfo {
-  id: number;
-  username: string;
-  role: string;
-}
-
-interface JwtPayload {
-  exp: number;
-  sid: string;
-  role: string;
-  ui_role: string;
   user_id: number;
-  branch_id: number;
-  tenant_id: number;
-}
-
-function decodeJwt(token: string): JwtPayload | null {
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    const payload = parts[1];
-    const decoded = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
-    return JSON.parse(decoded);
-  } catch {
-    return null;
-  }
+  sid: string;
+  role_code: string;
+  holding_id: number | null;
+  company_id: number | null;
+  branch_id: number | null;
+  capabilities: Capability[];
 }
 
 export interface LoginRequest {
@@ -38,11 +24,26 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   user_id: number;
+  holding_id: number | null;
+  role_code: string;
   access_token: string;
   token_type: string;
   expires_at: string;
   refresh_token: string;
   refresh_expires_at: string;
+}
+
+export interface HoldingOption {
+  holding_id: number;
+  code: string;
+  name: string;
+}
+
+export interface SwitchHoldingResponse {
+  user_id: number;
+  access_token: string;
+  token_type: string;
+  expires_at: string;
 }
 
 export interface RefreshRequest {
@@ -111,20 +112,6 @@ export const authService = {
     return apiClient.rpc<UserInfo>('me', {});
   },
 
-  getUserFromToken(): UserInfo | null {
-    const token = this.getAccessToken();
-    if (!token) return null;
-
-    const payload = decodeJwt(token);
-    if (!payload) return null;
-
-    return {
-      id: payload.user_id,
-      username: `User ${payload.user_id}`, // Server doesn't provide username in JWT
-      role: payload.ui_role || payload.role,
-    };
-  },
-
   storeTokens(response: LoginResponse | RefreshResponse): void {
     localStorage.setItem('access_token', response.access_token);
     localStorage.setItem('refresh_token', response.refresh_token);
@@ -139,7 +126,6 @@ export const authService = {
     localStorage.removeItem('expires_at');
     localStorage.removeItem('refresh_expires_at');
     localStorage.removeItem('user_id');
-    localStorage.removeItem('user');
   },
 
   getAccessToken(): string | null {
@@ -165,16 +151,6 @@ export const authService = {
     if (!expiresAt) return null;
     try {
       return new Date(expiresAt);
-    } catch {
-      return null;
-    }
-  },
-
-  getStoredUser(): UserInfo | null {
-    const userStr = localStorage.getItem('user');
-    if (!userStr) return null;
-    try {
-      return JSON.parse(userStr);
     } catch {
       return null;
     }
@@ -214,6 +190,22 @@ export const authService = {
     const expiresAt = this.getRefreshExpiresAt();
     if (!expiresAt) return true;
     return new Date() >= expiresAt;
+  },
+
+  async listHoldingsForContext(): Promise<{ holdings: HoldingOption[] }> {
+    return apiClient.rpc<{ holdings: HoldingOption[] }>('list_holdings_for_context');
+  },
+
+  async switchHolding(holdingId: number): Promise<SwitchHoldingResponse> {
+    const result = await apiClient.rpc<SwitchHoldingResponse>('switch_holding', {
+      p_holding_id: holdingId,
+    });
+
+    // Update access_token and expires_at, keep existing refresh_token
+    localStorage.setItem('access_token', result.access_token);
+    localStorage.setItem('expires_at', result.expires_at);
+
+    return result;
   },
 
   async validateAndRefresh(): Promise<boolean> {

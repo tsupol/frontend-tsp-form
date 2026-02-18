@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -17,12 +17,19 @@ export function LoginPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { login } = useAuth();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const reason = searchParams.get('reason');
+  const reasonRef = useRef(searchParams.get('reason'));
+
+  useEffect(() => {
+    if (reasonRef.current) {
+      searchParams.delete('reason');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const {
     register,
@@ -36,8 +43,8 @@ export function LoginPage() {
     setIsPending(true);
     setErrorMessage('');
     try {
-      await login(data.username, data.password);
-      navigate('/admin');
+      const result = await login(data.username, data.password);
+      navigate(result.needsHoldingSelect ? '/admin/select-holding' : '/admin');
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.code === '28000' || err.message === 'invalid_login') {
@@ -61,7 +68,7 @@ export function LoginPage() {
           <LanguageSwitcher />
         </div>
 
-        {reason === 'session_expired' && (
+        {reasonRef.current === 'session_expired' && (
           <div className="mb-4 p-3 bg-warning/10 border border-warning/30 rounded text-sm text-warning">
             {t('auth.sessionExpired')}
           </div>
