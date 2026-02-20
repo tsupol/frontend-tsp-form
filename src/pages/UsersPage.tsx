@@ -1,10 +1,12 @@
 import { useState, useCallback, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { DataTable, DataTableColumnHeader, Skeleton, Button, Pagination, Input, Select, PopOver, MenuItem, MenuSeparator, Badge, createSelectColumn } from 'tsp-form';
+import { useForm } from 'react-hook-form';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { DataTable, DataTableColumnHeader, Skeleton, Button, Pagination, Input, Select, PopOver, MenuItem, MenuSeparator, Badge, Modal, createSelectColumn, useSnackbarContext } from 'tsp-form';
 import { type ColumnDef, type RowSelectionState } from '@tanstack/react-table';
-import { Plus, MoreHorizontal, Pencil, ShieldCheck, ShieldOff, KeyRound, Trash2, Ban, UserX } from 'lucide-react';
-import { apiClient } from '../lib/api';
+import { Plus, MoreHorizontal, Pencil, ShieldCheck, ShieldOff, KeyRound, Trash2, Ban, UserX, X } from 'lucide-react';
+import { apiClient, ApiError } from '../lib/api';
+import { FormErrorMessage } from 'tsp-form';
 
 interface VUser {
   id: number;
@@ -31,6 +33,23 @@ const PAGE_SIZE_OPTIONS = [
   { value: '10', label: '10' },
   { value: '25', label: '25' },
   { value: '50', label: '50' },
+];
+
+const ROLE_OPTIONS = [
+  { value: 'HOLDING_ADMIN', label: 'Holding Admin' },
+  { value: 'COMPANY_ADMIN', label: 'Company Admin' },
+  { value: 'BRANCH_MANAGER', label: 'Branch Manager' },
+  { value: 'BRANCH_SALE', label: 'Branch Sale' },
+  { value: 'BRANCH_COLLECTOR', label: 'Branch Collector' },
+];
+
+// Hardcoded for now — only one company/branch in dev
+const COMPANY_OPTIONS = [
+  { value: '1', label: 'Czynet Audio Solutions Co., Ltd.' },
+];
+
+const BRANCH_OPTIONS = [
+  { value: '1', label: 'Bangkok HQ' },
 ];
 
 // Row actions menu
@@ -83,12 +102,172 @@ function RowActions({ user }: { user: VUser }) {
   );
 }
 
+// Create user form
+interface CreateUserFormData {
+  username: string;
+  password: string;
+  role_code: string;
+  company_id: string;
+  branch_id: string;
+}
+
+function CreateUserModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const { addSnackbar } = useSnackbarContext();
+  const [isPending, setIsPending] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    reset,
+    formState: { errors },
+  } = useForm<CreateUserFormData>({
+    defaultValues: { username: '', password: '', role_code: '', company_id: '1', branch_id: '1' },
+  });
+
+  const roleCode = watch('role_code');
+
+  const needsCompany = roleCode !== 'HOLDING_ADMIN';
+  const needsBranch = ['BRANCH_MANAGER', 'BRANCH_SALE', 'BRANCH_COLLECTOR'].includes(roleCode);
+
+  const onSubmit = async (data: CreateUserFormData) => {
+    setIsPending(true);
+    setErrorMessage('');
+    try {
+      await apiClient.rpc('user_create', {
+        p_username: data.username,
+        p_password: data.password,
+        p_role_code: data.role_code,
+        p_company_id: needsCompany ? Number(data.company_id) : null,
+        p_branch_id: needsBranch ? Number(data.branch_id) : null,
+      });
+      addSnackbar({ message: t('users.createSuccess'), type: 'success', duration: 3000 });
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      reset();
+      onClose();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setErrorMessage(err.message);
+      } else {
+        setErrorMessage(t('common.error'));
+      }
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  const handleClose = () => {
+    reset();
+    setErrorMessage('');
+    onClose();
+  };
+
+  return (
+    <Modal open={open} onClose={handleClose} maxWidth="28rem" width="100%">
+      <div className="p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-bold">{t('users.createUser')}</h2>
+          <button onClick={handleClose} className="p-1 rounded hover:bg-surface-hover cursor-pointer">
+            <X size={18} className="opacity-50" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4">
+          <div className="flex flex-col">
+            <label className="form-label" htmlFor="cu-username">{t('users.username')}</label>
+            <Input
+              id="cu-username"
+              placeholder={t('auth.enterUsername')}
+              error={!!errors.username}
+              {...register('username', { required: t('auth.usernameRequired') })}
+            />
+            <FormErrorMessage error={errors.username} />
+          </div>
+
+          <div className="flex flex-col">
+            <label className="form-label" htmlFor="cu-password">{t('auth.password')}</label>
+            <Input
+              id="cu-password"
+              type="password"
+              placeholder={t('auth.enterPassword')}
+              error={!!errors.password}
+              {...register('password', { required: t('auth.passwordRequired') })}
+            />
+            <FormErrorMessage error={errors.password} />
+          </div>
+
+          <div className="flex flex-col">
+            <label className="form-label">{t('users.roleCode')}</label>
+            <Select
+              options={ROLE_OPTIONS}
+              value={roleCode}
+              onChange={(val) => setValue('role_code', val as string, { shouldValidate: true })}
+              placeholder={t('users.selectRole')}
+              searchable={false}
+              showChevron
+              error={!!errors.role_code}
+            />
+            <input type="hidden" {...register('role_code', { required: t('users.selectRole') })} />
+            <FormErrorMessage error={errors.role_code} />
+          </div>
+
+          {needsCompany && (
+            <div className="flex flex-col">
+              <label className="form-label">{t('users.companyId')}</label>
+              <Select
+                options={COMPANY_OPTIONS}
+                value={watch('company_id')}
+                onChange={(val) => setValue('company_id', val as string)}
+                placeholder={t('users.selectCompany')}
+                searchable={false}
+                showChevron
+              />
+            </div>
+          )}
+
+          {needsBranch && (
+            <div className="flex flex-col">
+              <label className="form-label">{t('users.branchId')}</label>
+              <Select
+                options={BRANCH_OPTIONS}
+                value={watch('branch_id')}
+                onChange={(val) => setValue('branch_id', val as string)}
+                placeholder={t('users.selectBranch')}
+                searchable={false}
+                showChevron
+              />
+            </div>
+          )}
+
+          {errorMessage && (
+            <div className="text-danger text-sm">{errorMessage}</div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="ghost" onClick={handleClose}>
+              {t('common.cancel')}
+            </Button>
+            <Button type="submit" color="primary" disabled={isPending}>
+              {isPending ? t('common.loading') : t('common.create')}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </Modal>
+  );
+}
+
 export function UsersPage() {
   const { t } = useTranslation();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState('');
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [createOpen, setCreateOpen] = useState(false);
 
   const buildEndpoint = useCallback(() => {
     const params: string[] = [];
@@ -187,7 +366,7 @@ export function UsersPage() {
       <div className="sticky top-0 z-10 bg-bg px-6 pt-6 pb-4 space-y-3">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold">{t('users.title')}</h1>
-          <Button color="primary" size="sm" onClick={() => {}}>
+          <Button color="primary" size="sm" onClick={() => setCreateOpen(true)}>
             <Plus size={16} />
             {t('common.create')}
           </Button>
@@ -289,6 +468,8 @@ export function UsersPage() {
           </>
         )}
       </div>
+
+      <CreateUserModal open={createOpen} onClose={() => setCreateOpen(false)} />
     </div>
   );
 }

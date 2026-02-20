@@ -27,16 +27,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hasHandledAuthError = useRef(false);
 
   // Handle auth errors from API - clear session and redirect to login
-  const handleAuthError = useCallback(() => {
+  const handleAuthError = useCallback((details: { code: string; message: string }) => {
     // Prevent multiple redirects
     if (hasHandledAuthError.current) return;
     hasHandledAuthError.current = true;
 
+    console.error('[Auth] Session error:', details.code, details.message);
     authService.clearTokens();
     setUser(null);
 
-    // Redirect to login with reason
-    window.location.href = '/login?reason=session_expired';
+    // Redirect to login with reason and error details
+    const params = new URLSearchParams({
+      reason: 'session_expired',
+      error_code: details.code,
+      error_msg: details.message,
+    });
+    window.location.href = `/login?${params.toString()}`;
   }, []);
 
   // Register auth error handler
@@ -51,13 +57,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (isValid) {
         try {
           const userInfo = await authService.me();
+          console.log('[Auth] User info:', userInfo.role_code, 'holding:', userInfo.holding_id);
           setUser(userInfo);
           setNeedsHoldingSelect(userInfo.holding_id === null);
-        } catch {
+        } catch (err) {
+          console.error('[Auth] Failed to fetch user info after token validation:', err);
           authService.clearTokens();
           setUser(null);
         }
       } else {
+        console.log('[Auth] Token validation failed, clearing session');
         authService.clearTokens();
         setUser(null);
       }

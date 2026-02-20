@@ -63,7 +63,15 @@
     "clearSelection": "Clear",
     "empty": "No users found",
     "rowsPerPage": "Rows per page",
-    "rowInfo": "{{from}}-{{to}} of {{total}}"
+    "rowInfo": "{{from}}-{{to}} of {{total}}",
+    "createUser": "Create User",
+    "createSuccess": "User created successfully",
+    "roleCode": "Role",
+    "companyId": "Company",
+    "branchId": "Branch",
+    "selectRole": "Select a role",
+    "selectCompany": "Select a company",
+    "selectBranch": "Select a branch"
   },
   "theme": {
     "title": "Theme",

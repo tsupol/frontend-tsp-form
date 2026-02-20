@@ -6,50 +6,34 @@ const API_BASE_URL = config.apiUrl;
 // Error Types
 // ============================================================================
 
-export interface ApiErrorDetails {
-  code: string;
-  message: string;
-  details?: string | null;
-  hint?: string | null;
-  messageKey?: string;
-  messageParams?: Record<string, unknown>;
-  isAuthError: boolean;
-}
-
 export class ApiError extends Error {
   public code: string;
-  public details: string | null;
-  public hint: string | null;
   public messageKey?: string;
   public messageParams?: Record<string, unknown>;
   public isAuthError: boolean;
 
-  constructor(error: ApiErrorDetails) {
-    super(error.message);
+  constructor(opts: {
+    code: string;
+    message: string;
+    messageKey?: string;
+    messageParams?: Record<string, unknown>;
+    isAuthError: boolean;
+  }) {
+    super(opts.message);
     this.name = 'ApiError';
-    this.code = error.code;
-    this.details = error.details ?? null;
-    this.hint = error.hint ?? null;
-    this.messageKey = error.messageKey;
-    this.messageParams = error.messageParams;
-    this.isAuthError = error.isAuthError;
+    this.code = opts.code;
+    this.messageKey = opts.messageKey;
+    this.messageParams = opts.messageParams;
+    this.isAuthError = opts.isAuthError;
   }
 }
 
 // ============================================================================
-// Response Type Detection
+// V2 Envelope Format
 // ============================================================================
 
-// PostgREST error: {code, message, details, hint}
-interface PostgRESTError {
-  code: string;
-  message: string;
-  details: string | null;
-  hint: string | null;
-}
-
-// V2 envelope success: {ok: true, data, meta}
-interface V2SuccessResponse<T> {
+// Success: {ok: true, data: T, meta?: {...}}
+interface V2Success<T> {
   ok: true;
   data: T;
   meta?: {
@@ -58,44 +42,37 @@ interface V2SuccessResponse<T> {
   };
 }
 
-// V2 envelope error: {ok: false, code, message, ...}
-interface V2ErrorResponse {
+// Error: {ok: false, error: {code, message, ...}}
+interface V2Error {
   ok: false;
-  code: string;
-  message: string;
-  message_key?: string;
-  params?: Record<string, unknown>;
-  trace_id?: string;
-  http_status?: number;
+  error: {
+    code: string;
+    message: string;
+    message_key?: string;
+    params?: Record<string, unknown>;
+    trace_id?: string;
+    http_status?: number;
+  };
 }
 
-function isPostgRESTError(data: unknown): data is PostgRESTError {
-  return (
-    typeof data === 'object' &&
-    data !== null &&
-    'code' in data &&
-    'message' in data &&
-    !('ok' in data) // not v2 format
-  );
-}
-
-function isV2Success<T>(data: unknown): data is V2SuccessResponse<T> {
+function isV2Success<T>(data: unknown): data is V2Success<T> {
   return (
     typeof data === 'object' &&
     data !== null &&
     'ok' in data &&
-    (data as V2SuccessResponse<T>).ok === true &&
+    (data as V2Success<T>).ok === true &&
     'data' in data
   );
 }
 
-function isV2Error(data: unknown): data is V2ErrorResponse {
+function isV2Error(data: unknown): data is V2Error {
   return (
     typeof data === 'object' &&
     data !== null &&
     'ok' in data &&
-    (data as V2ErrorResponse).ok === false &&
-    'code' in data
+    (data as V2Error).ok === false &&
+    'error' in data &&
+    typeof (data as V2Error).error === 'object'
   );
 }
 
@@ -117,12 +94,9 @@ const AUTH_ERROR_MESSAGES = [
   'JWT expired',
 ];
 
-function checkAuthError(code: string, message: string): boolean {
+function isAuthError(code: string, message: string): boolean {
   if (AUTH_ERROR_CODES.includes(code)) return true;
-  // P0001 is generic - check message content
-  if (code === 'P0001') {
-    return AUTH_ERROR_MESSAGES.some(msg => message.includes(msg));
-  }
+  if (AUTH_ERROR_MESSAGES.some(msg => message.includes(msg))) return true;
   return false;
 }
 
@@ -130,44 +104,53 @@ function checkAuthError(code: string, message: string): boolean {
 // Auth Error Handler
 // ============================================================================
 
-type AuthErrorCallback = () => void;
+type AuthErrorCallback = (details: { code: string; message: string }) => void;
 let onAuthError: AuthErrorCallback | null = null;
 
 export function setAuthErrorHandler(callback: AuthErrorCallback | null) {
   onAuthError = callback;
 }
 
-function triggerAuthError() {
+function triggerAuthError(code: string, message: string) {
+  console.error('[API] Auth error:', code, message);
   if (onAuthError) {
-    onAuthError();
+    onAuthError({ code, message });
   }
 }
 
 // ============================================================================
-// Response Parser - unwraps all formats to clean data
+// Response Handling
 // ============================================================================
 
-function parseResponseData<T>(data: unknown): T {
-  // V2 error in 200 response
-  if (isV2Error(data)) {
-    const isAuth = checkAuthError(data.code, data.message);
-    if (isAuth) triggerAuthError();
+function handleV2Error(err: V2Error['error'], httpStatus?: number): never {
+  const auth = isAuthError(err.code, err.message) || httpStatus === 401;
+  if (auth) triggerAuthError(err.code, err.message);
 
-    throw new ApiError({
-      code: data.code,
-      message: data.message,
-      messageKey: data.message_key,
-      messageParams: data.params,
-      isAuthError: isAuth,
-    });
+  throw new ApiError({
+    code: err.code,
+    message: err.message,
+    messageKey: err.message_key,
+    messageParams: err.params,
+    isAuthError: auth,
+  });
+}
+
+function parseResponse<T>(data: unknown, endpoint: string): T {
+  if (isV2Error(data)) {
+    handleV2Error(data.error);
   }
 
-  // V2 success - unwrap data
   if (isV2Success<T>(data)) {
     return data.data;
   }
 
-  // Unexpected format - return as-is (for table queries that return arrays)
+  // View/table queries return plain arrays — that's fine
+  if (Array.isArray(data)) {
+    return data as T;
+  }
+
+  // Anything else is non-v2 — log it
+  console.error(`[API] Non-v2 envelope from ${endpoint}. Expected {ok, data} or {ok, error}. Got:`, data);
   return data as T;
 }
 
@@ -191,6 +174,19 @@ export class ApiClient {
     return headers;
   }
 
+  private handleNonV2Error(data: unknown, endpoint: string, status: number): never {
+    console.error(`[API] Non-v2 error from ${endpoint} (HTTP ${status}). Expected {ok, error}. Got:`, data);
+
+    const auth = status === 401;
+    if (auth) triggerAuthError('HTTP_401', `HTTP ${status} from ${endpoint}`);
+
+    throw new ApiError({
+      code: `HTTP_${status}`,
+      message: `Request failed: ${endpoint} (HTTP ${status})`,
+      isAuthError: auth,
+    });
+  }
+
   async request<T>(
     endpoint: string,
     options: RequestInit = {},
@@ -207,44 +203,20 @@ export class ApiClient {
     const text = await response.text();
     const data = text ? JSON.parse(text) : null;
 
-    // HTTP error
     if (!response.ok) {
-      let error: ApiError;
-
-      if (isPostgRESTError(data)) {
-        const isAuth = checkAuthError(data.code, data.message) || response.status === 401;
-        if (isAuth) triggerAuthError();
-
-        error = new ApiError({
-          code: data.code,
-          message: data.message,
-          details: data.details,
-          hint: data.hint,
-          isAuthError: isAuth,
-        });
-      } else {
-        const isAuth = response.status === 401;
-        if (isAuth) triggerAuthError();
-
-        error = new ApiError({
-          code: 'HTTP_ERROR',
-          message: `Request failed with status ${response.status}`,
-          isAuthError: isAuth,
-        });
+      if (isV2Error(data)) {
+        handleV2Error(data.error, response.status);
       }
-
-      throw error;
+      this.handleNonV2Error(data, endpoint, response.status);
     }
 
-    // Success - parse and unwrap
-    return parseResponseData<T>(data);
+    return parseResponse<T>(data, endpoint);
   }
 
   async get<T>(endpoint: string, includeAuth: boolean = true): Promise<T> {
     return this.request<T>(endpoint, { method: 'GET' }, includeAuth);
   }
 
-  // PostgREST paginated GET with Range headers and exact count
   async getPaginated<T>(
     endpoint: string,
     { page = 1, pageSize = 15, includeAuth = true }: { page?: number; pageSize?: number; includeAuth?: boolean } = {}
@@ -266,14 +238,10 @@ export class ApiClient {
     const data = text ? JSON.parse(text) : null;
 
     if (!response.ok) {
-      if (isPostgRESTError(data)) {
-        const isAuth = checkAuthError(data.code, data.message) || response.status === 401;
-        if (isAuth) triggerAuthError();
-        throw new ApiError({ code: data.code, message: data.message, details: data.details, hint: data.hint, isAuthError: isAuth });
+      if (isV2Error(data)) {
+        handleV2Error(data.error, response.status);
       }
-      const isAuth = response.status === 401;
-      if (isAuth) triggerAuthError();
-      throw new ApiError({ code: 'HTTP_ERROR', message: `Request failed with status ${response.status}`, isAuthError: isAuth });
+      this.handleNonV2Error(data, endpoint, response.status);
     }
 
     // Parse Content-Range: 0-14/100
@@ -281,7 +249,7 @@ export class ApiClient {
     const match = contentRange.match(/\/(\d+)/);
     const totalCount = match ? parseInt(match[1], 10) : (Array.isArray(data) ? data.length : 0);
 
-    return { data: parseResponseData<T[]>(data), totalCount };
+    return { data: parseResponse<T[]>(data, endpoint), totalCount };
   }
 
   async post<T>(endpoint: string, body?: unknown, includeAuth: boolean = true): Promise<T> {
@@ -310,7 +278,6 @@ export class ApiClient {
     return this.request<T>(endpoint, { method: 'DELETE' }, includeAuth);
   }
 
-  // RPC call helper for PostgREST functions
   async rpc<T>(functionName: string, params?: unknown, includeAuth: boolean = true): Promise<T> {
     return this.post<T>(`/rpc/${functionName}`, params, includeAuth);
   }

@@ -63,7 +63,15 @@
     "clearSelection": "ล้าง",
     "empty": "ไม่พบผู้ใช้งาน",
     "rowsPerPage": "แถวต่อหน้า",
-    "rowInfo": "{{from}}-{{to}} จาก {{total}}"
+    "rowInfo": "{{from}}-{{to}} จาก {{total}}",
+    "createUser": "สร้างผู้ใช้",
+    "createSuccess": "สร้างผู้ใช้สำเร็จ",
+    "roleCode": "บทบาท",
+    "companyId": "บริษัท",
+    "branchId": "สาขา",
+    "selectRole": "เลือกบทบาท",
+    "selectCompany": "เลือกบริษัท",
+    "selectBranch": "เลือกสาขา"
   },
   "theme": {
     "title": "ธีม",

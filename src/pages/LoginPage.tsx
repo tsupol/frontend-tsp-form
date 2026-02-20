@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button, Input, FormErrorMessage } from 'tsp-form';
+import { Button, Input, FormErrorMessage, Select } from 'tsp-form';
 import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { ApiError } from '../lib/api';
@@ -12,6 +12,14 @@ interface LoginFormData {
   username: string;
   password: string;
 }
+
+const TEST_USERS = [
+  { label: 'alice (SYSTEM_DEV)', value: 'alice' },
+  { label: 'test_holding_admin (HOLDING_ADMIN)', value: 'test_holding_admin' },
+  { label: 'test_company_admin (COMPANY_ADMIN)', value: 'test_company_admin' },
+  { label: 'test_branch_manager (BRANCH_MANAGER)', value: 'test_branch_manager' },
+  { label: 'test_branch_sale (BRANCH_SALE)', value: 'test_branch_sale' },
+];
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -23,10 +31,14 @@ export function LoginPage() {
   const [errorMessage, setErrorMessage] = useState('');
 
   const reasonRef = useRef(searchParams.get('reason'));
+  const errorCodeRef = useRef(searchParams.get('error_code'));
+  const errorMsgRef = useRef(searchParams.get('error_msg'));
 
   useEffect(() => {
     if (reasonRef.current) {
       searchParams.delete('reason');
+      searchParams.delete('error_code');
+      searchParams.delete('error_msg');
       setSearchParams(searchParams, { replace: true });
     }
   }, [searchParams, setSearchParams]);
@@ -34,6 +46,7 @@ export function LoginPage() {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<LoginFormData>({
     defaultValues: { username: 'alice', password: 'alice123' },
@@ -70,9 +83,28 @@ export function LoginPage() {
 
         {reasonRef.current === 'session_expired' && (
           <div className="mb-4 p-3 bg-warning/10 border border-warning/30 rounded text-sm text-warning">
-            {t('auth.sessionExpired')}
+            <div>{t('auth.sessionExpired')}</div>
+            {errorCodeRef.current && (
+              <div className="mt-1 text-xs opacity-75">
+                [{errorCodeRef.current}] {errorMsgRef.current}
+              </div>
+            )}
           </div>
         )}
+
+        <div className="mb-4">
+          <label className="form-label">Quick login</label>
+          <Select
+            options={TEST_USERS}
+            value="alice"
+            onChange={(val) => {
+              setValue('username', val);
+              setValue('password', val === 'alice' ? 'alice123' : 'Test123456');
+            }}
+            searchable={false}
+            showChevron
+          />
+        </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4">
           <div className="flex flex-col">
