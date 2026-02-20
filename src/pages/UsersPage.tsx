@@ -1,7 +1,7 @@
 import { useState, useCallback, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { DataTable, DataTableColumnHeader, Skeleton, Button, Pagination, Input, Select, PopOver, MenuItem, MenuSeparator, createSelectColumn } from 'tsp-form';
+import { DataTable, DataTableColumnHeader, Skeleton, Button, Pagination, Input, Select, PopOver, MenuItem, MenuSeparator, Badge, createSelectColumn } from 'tsp-form';
 import { type ColumnDef, type RowSelectionState } from '@tanstack/react-table';
 import { Plus, MoreHorizontal, Pencil, ShieldCheck, ShieldOff, KeyRound, Trash2, Ban, UserX } from 'lucide-react';
 import { apiClient } from '../lib/api';
@@ -140,9 +140,9 @@ export function UsersPage() {
       accessorKey: 'role_scope',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('users.scope')} />,
       cell: ({ row }) => (
-        <span className="text-xs px-2 py-0.5 rounded-full bg-surface-elevated capitalize">
+        <Badge size="sm" className="capitalize">
           {row.getValue('role_scope')}
-        </span>
+        </Badge>
       ),
     },
     {
@@ -257,6 +257,15 @@ export function UsersPage() {
               }
             />
             <div className="flex items-center justify-between pt-4">
+              <div className="text-xs text-control-label">
+                {totalCount > 0
+                  ? t('users.rowInfo', {
+                      from: (page - 1) * pageSize + 1,
+                      to: Math.min(page * pageSize, totalCount),
+                      total: totalCount,
+                    })
+                  : null}
+              </div>
               <div className="flex items-center gap-2 text-xs text-control-label">
                 <span>{t('users.rowsPerPage')}</span>
                 <Select
@@ -267,15 +276,6 @@ export function UsersPage() {
                   searchable={false}
                   showChevron
                 />
-              </div>
-              <div className="text-xs text-control-label">
-                {totalCount > 0
-                  ? t('users.rowInfo', {
-                      from: (page - 1) * pageSize + 1,
-                      to: Math.min(page * pageSize, totalCount),
-                      total: totalCount,
-                    })
-                  : null}
               </div>
               {totalPages > 1 && (
                 <Pagination

@@ -1,56 +1,70 @@
 @import "tailwindcss";
 
 @theme static {
-    --color-danger: #d50303;
-    --color-danger-hover: #ff6363;
-    --color-danger-fade: #b23030;
+    /* ── Semantic colors (dark theme defaults — Radix-inspired) ─────── */
+
+    --color-danger: #f43f5e;
+    --color-danger-hover: #fb7185;
+    --color-danger-fade: #fda4af;
     --color-danger-contrast: #ffffff;
 
-    --color-success: #008000;
-    --color-success-hover: #66ff66;
-    --color-success-fade: #006600;
+    --color-success: #10b981;
+    --color-success-hover: #34d399;
+    --color-success-fade: #6ee7b7;
     --color-success-contrast: #ffffff;
 
-    --color-warning: #ff9900;
-    --color-warning-hover: #ffff66;
-    --color-warning-fade: #cc8000;
-    --color-warning-contrast: #000000;
+    --color-warning: #f59e0b;
+    --color-warning-hover: #fbbf24;
+    --color-warning-fade: #fcd34d;
+    --color-warning-contrast: #1a1a1a;
 
-    --color-info: #0070f3;
-    --color-info-hover: #66b3ff;
-    --color-info-fade: #005bb5;
+    --color-info: #06b6d4;
+    --color-info-hover: #22d3ee;
+    --color-info-fade: #67e8f9;
     --color-info-contrast: #ffffff;
+
+    /* ── Spacing ──────────────────────────────────────────────────────── */
 
     --spacing-main-sidebar: 10rem;
     --spacing-mini-sidebar: 2.5rem;
     --spacing-card: 1rem;
 
-    --color-fg: #cccccc;
-    --color-fg-contrast: #000000;
-    --color-bg: #151515;
-    --color-bg-contrast: #ffffff;
+    /* ── Core palette (dark) ──────────────────────────────────────────── */
 
-    --color-line: rgba(222, 220, 209, 0.13);
-    --color-link: #0070f3;
+    --color-fg: #edeef0;
+    --color-fg-contrast: #111113;
+    --color-bg: #111113;
+    --color-bg-contrast: #edeef0;
 
-    --color-surface: #1e1e1e;
-    --color-surface-hover: #2a2a2a;
-    --color-surface-shallow: #111111;
-    --color-surface-elevated: #303030;
-    --color-select-highlight: #2a2a2a;
+    --color-line: rgba(255, 255, 255, 0.1);
+    --color-link: #3b82f6;
+
+    --color-surface: #18191b;
+    --color-surface-hover: #272a2d;
+    --color-surface-shallow: #111113;
+    --color-surface-elevated: #2e3135;
+    --color-select-highlight: #272a2d;
 
     --spacing-line: 1px;
 
-    --color-primary: #0070f3;
-    --color-primary-hover: #005bb5;
-    --color-primary-active: #004c9b;
-    --color-primary-contrast: #ffffff;
-    --color-primary-light: rgba(0, 112, 243, 0.1);
+    /* ── Primary (Blue) ───────────────────────────────────────────────── */
 
-    --color-secondary: #8200ff;
-    --color-secondary-hover: #6800cc;
-    --color-secondary-active: #5300a8;
+    --color-primary: #2563eb;
+    --color-primary-hover: #3b82f6;
+    --color-primary-active: #1d4ed8;
+    --color-primary-fade: #60a5fa;
+    --color-primary-contrast: #ffffff;
+    --color-primary-light: rgba(37, 99, 235, 0.1);
+
+    /* ── Secondary (Teal) ─────────────────────────────────────────────── */
+
+    --color-secondary: #8b5cf6;
+    --color-secondary-hover: #a78bfa;
+    --color-secondary-active: #7c3aed;
+    --color-secondary-fade: #c4b5fd;
     --color-secondary-contrast: #ffffff;
+
+    /* ── Controls ─────────────────────────────────────────────────────── */
 
     --spacing-control-y: 0.375rem;
     --spacing-control-x: 1rem;
@@ -61,7 +75,7 @@
     --spacing-control-relaxed-x: 1.5rem;
     --radius-control: .5rem;
 
-    --text-base: 0.875rem; /* 14px */
+    --text-base: 0.875rem;
     --text-base--letter-spacing: 0em;
     --text-base--line-height: 1.5;
     --text-base--font-weight: 500;
@@ -80,21 +94,21 @@
     --text-option--line-height: 1.5;
 
     --space-scrollbar-track: .5rem;
-    --color-scrollbar-track: rgba(125, 125, 125, 0.1);
-    --color-scrollbar-thumb: rgba(125, 125, 125, 0.25);
-    --color-control-bg: rgba(125, 125, 125, 0.1);
-    --color-control-placeholder: #676767;
+    --color-scrollbar-track: rgba(255, 255, 255, 0.04);
+    --color-scrollbar-thumb: rgba(255, 255, 255, 0.15);
+    --color-control-bg: rgba(255, 255, 255, 0.06);
+    --color-control-placeholder: #696e77;
     --text-control-placeholder: 1rem;
     --text-control-placeholder--font-weight: 500;
     --text-control-placeholder--letter-spacing: 0em;
     --text-control-placeholder--line-height: 1.5;
     --text-control-placeholder--font-style: italic;
 
-    --color-control-label: #888888;
+    --color-control-label: #b0b4ba;
     --text-control-label: 0.875rem;
     --text-control-label--letter-spacing: 0em;
     --text-control-label--line-height: 1.5;
-    --text-control-label--font-weight: 600;
+    --text-control-label--font-weight: 500;
 
     --text-title: 1.25rem;
     --text-title--letter-spacing: -0.025em;
@@ -107,9 +121,9 @@
     --font-weight-button: 600;
 
     /* default button */
-    --color-button-default-bg: #252525;
-    --color-button-default-border: #484848;
-    --color-button-outline-border: #484848;;
+    --color-button-default-bg: #212225;
+    --color-button-default-border: #43484e;
+    --color-button-outline-border: #43484e;
 
     /* added */
     --spacing-nav: 3rem;
@@ -117,23 +131,23 @@
     /* side menu */
     --spacing-side-menu: 280px;
     --spacing-side-menu-min: 3.075rem;
-    --color-side-menu-bg: #111111;
+    --color-side-menu-bg: #111113;
 
     --color-item-bg: transparent;
-    --color-item-fg: #aaaaaa;
+    --color-item-fg: #b0b4ba;
     --color-item-border: var(--color-item-bg);
 
-    --color-item-hover-bg: #000000;
-    --color-item-hover-fg: var(--color-item-fg);
-    --color-item-hover-border: var(--color-item-hover-bg);
+    --color-item-hover-bg: #212225;
+    --color-item-hover-fg: #edeef0;
+    --color-item-hover-border: #212225;
 
-    --color-item-active-bg: rgba(255, 255, 255, 0.1);
-    --color-item-active-fg: var(--color-primary-contrast);
+    --color-item-active-bg: rgba(255, 255, 255, 0.08);
+    --color-item-active-fg: #ffffff;
     --color-item-active-border: transparent;
 
     /* snackbar */
-    --color-snackbar-bg: var(--color-surface-elevated);
-    --color-snackbar-fg: var(--color-fg);
+    --color-snackbar-bg: #2e3135;
+    --color-snackbar-fg: #edeef0;
     --radius-snackbar: 0.375rem;
     --text-snackbar: 0.875rem;
     --border-snackbar: 0 0 0 3px;
@@ -141,6 +155,36 @@
     --color-snackbar-success-border: var(--color-success);
     --color-snackbar-error-border: var(--color-danger);
     --color-snackbar-warning-border: var(--color-warning);
+
+    /* ── Typography scale ────────────────────────────────────────────── */
+
+    --text-h1: 1.5rem;
+    --text-h1--line-height: 1.25;
+    --text-h1--font-weight: 700;
+    --text-h1--letter-spacing: -0.025em;
+
+    --text-h2: 1.25rem;
+    --text-h2--line-height: 1.25;
+    --text-h2--font-weight: 600;
+    --text-h2--letter-spacing: -0.025em;
+
+    --text-h3: 1.125rem;
+    --text-h3--line-height: 1.3;
+    --text-h3--font-weight: 600;
+    --text-h3--letter-spacing: -0.015em;
+
+    --text-h4: 1rem;
+    --text-h4--line-height: 1.4;
+    --text-h4--font-weight: 600;
+
+    --text-small: 0.8125rem;
+    --text-small--line-height: 1.5;
+
+    /* Muted text — used by library components (slider, image-uploader) */
+    --color-fg-muted: #8b8d98;
+
+    /* Section spacing */
+    --spacing-section: 2rem;
 
     /* pagination */
     --color-pagination-border: transparent;
@@ -153,57 +197,77 @@
     --spacing-pagination-gap: 0.125rem;
 }
 
-/* Light theme - Claude style warm cream */
+/* ── Light theme ──────────────────────────────────────────────────── */
+
 [data-theme="light"] {
-    --color-fg: #1a1a1a;
+    --color-fg: #1c2024;
     --color-fg-contrast: #ffffff;
-    --color-bg: #FAF9F5;
-    --color-bg-contrast: #151515;
+    --color-bg: #fcfcfd;
+    --color-bg-contrast: #1c2024;
 
-    --color-line: rgba(0, 0, 0, 0.175);
+    --color-line: rgba(0, 0, 0, 0.12);
+    --color-link: #1d4ed8;
 
-    --color-surface: #f5f4f3;
-    --color-surface-hover: #f0efe9;
-    --color-surface-shallow: #f5f4f3;
+    --color-surface: #f9f9fb;
+    --color-surface-hover: #e8e8ec;
+    --color-surface-shallow: #f0f0f3;
     --color-surface-elevated: #ffffff;
-    --color-select-highlight: #f0efe9;
+    --color-select-highlight: #e8e8ec;
 
-    --color-scrollbar-track: rgba(0, 0, 0, 0.05);
-    --color-scrollbar-thumb: rgba(0, 0, 0, 0.15);
+    --color-primary-hover: #1d4ed8;
+    --color-primary-active: #1e40af;
+    --color-primary-fade: #1e40af;
+
+    --color-secondary-hover: #7c3aed;
+    --color-secondary-active: #6d28d9;
+    --color-secondary-fade: #6d28d9;
+
+    --color-danger-hover: #e11d48;
+    --color-danger-fade: #be123c;
+
+    --color-success-hover: #059669;
+    --color-success-fade: #047857;
+
+    --color-warning-hover: #d97706;
+    --color-warning-fade: #92400e;
+    --color-warning-contrast: #1a1a1a;
+
+    --color-info-hover: #0891b2;
+    --color-info-fade: #0e7490;
+
+    --color-scrollbar-track: rgba(0, 0, 0, 0.04);
+    --color-scrollbar-thumb: rgba(0, 0, 0, 0.12);
     --color-control-bg: #ffffff;
-    --color-control-placeholder: #777777;
-    --color-control-label: #666666;
+    --color-control-placeholder: #80838d;
+    --color-control-label: #60646c;
+    --color-fg-muted: #60646c;
 
     /* default button */
     --color-button-default-bg: #ffffff;
-    --color-button-default-border: rgba(0, 0, 0, 0.2);
-    --color-button-outline-border: rgba(0, 0, 0, 0.2);
+    --color-button-default-border: #cdced6;
+    --color-button-outline-border: #cdced6;
 
     /* side menu */
-    --color-side-menu-bg: #f5f4f3;
+    --color-side-menu-bg: #f0f0f3;
 
     --color-item-bg: transparent;
-    --color-item-fg: #555555;
+    --color-item-fg: #60646c;
     --color-item-border: transparent;
 
-    --color-item-hover-bg: #EDECE6;
-    --color-item-hover-fg: #333333;
-    --color-item-hover-border: #EDECE6;
+    --color-item-hover-bg: #e0e1e6;
+    --color-item-hover-fg: #1c2024;
+    --color-item-hover-border: #e0e1e6;
 
-    --color-item-active-bg: #E5E4DE;
-    --color-item-active-fg: #333333;
-    --color-item-active-border: #E5E4DE;
+    --color-item-active-bg: #d9d9e0;
+    --color-item-active-fg: #1c2024;
+    --color-item-active-border: #d9d9e0;
 
     /* snackbar */
     --color-snackbar-bg: #ffffff;
-    --color-snackbar-fg: #1a1a1a;
-    --color-snackbar-info-border: var(--color-info);
-    --color-snackbar-success-border: var(--color-success);
-    --color-snackbar-error-border: var(--color-danger);
-    --color-snackbar-warning-border: var(--color-warning);
+    --color-snackbar-fg: #1c2024;
 
     /* skeleton */
-    --color-skeleton: #E0DFDA;
+    --color-skeleton: #e0e1e6;
 }
 
 html {

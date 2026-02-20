@@ -119,7 +119,7 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
 }
 
 export const AppSideNav = () => {
-  const [menuCollapsed, setMenuCollapsed] = useState(false);
+  const [menuCollapsed, setMenuCollapsed] = useState(() => localStorage.getItem('sidebar-collapsed') === 'true');
   const [isMobile, setIsMobile] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -151,7 +151,7 @@ export const AppSideNav = () => {
     <div className={clsx('h-dvh flex-shrink-0', menuCollapsed ? 'md:w-side-menu-min' : 'md:w-side-menu')}>
       <SideMenu
         isCollapsed={menuCollapsed}
-        onToggleCollapse={(collapsed) => setMenuCollapsed(collapsed)}
+        onToggleCollapse={(collapsed) => { setMenuCollapsed(collapsed); localStorage.setItem('sidebar-collapsed', String(collapsed)); }}
         linkFn={(to) => navigate(to)}
         autoCloseMobileOnClick={false}
         mobileToggleRenderer={(handleToggle) => (
