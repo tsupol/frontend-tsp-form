@@ -1,0 +1,17 @@
+{
+  "user.invalid_current_password": "รหัสผ่านปัจจุบันไม่ถูกต้อง",
+  "user.password_same": "รหัสผ่านใหม่ต้องไม่ซ้ำกับรหัสผ่านเดิม",
+  "user.password_weak": "รหัสผ่านไม่ปลอดภัยเพียงพอ",
+  "user.password_required": "กรุณากรอกรหัสผ่าน",
+  "user.invalid_password": "รูปแบบรหัสผ่านไม่ถูกต้อง",
+  "user.missing_password": "กรุณากรอกรหัสผ่าน",
+  "user.disabled": "บัญชีผู้ใช้ถูกปิดใช้งาน",
+  "user.locked": "บัญชีผู้ใช้ถูกล็อก",
+  "user.not_found": "ไม่พบผู้ใช้",
+  "user.username_exists": "ชื่อผู้ใช้นี้มีอยู่แล้ว",
+  "user.username_taken": "ชื่อผู้ใช้นี้ถูกใช้งานแล้ว",
+  "auth.invalid_credentials": "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง",
+  "auth.session_expired": "เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง",
+  "auth.forbidden": "คุณไม่มีสิทธิ์ดำเนินการนี้",
+  "system.unexpected": "เกิดข้อผิดพลาดที่ไม่คาดคิด"
+}

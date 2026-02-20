@@ -60,7 +60,10 @@ export function LoginPage() {
       navigate(result.needsHoldingSelect ? '/admin/select-holding' : '/admin');
     } catch (err) {
       if (err instanceof ApiError) {
-        if (err.code === '28000' || err.message === 'invalid_login') {
+        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        if (translated) {
+          setErrorMessage(translated);
+        } else if (err.code === '28000' || err.message === 'invalid_login') {
           setErrorMessage(t('auth.invalidCredentials'));
         } else {
           setErrorMessage(err.message);
@@ -74,8 +77,8 @@ export function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-bg">
-      <div className="w-full max-w-md p-card">
+    <div className="flex min-h-screen items-center justify-center bg-bg sm:bg-surface">
+      <div className="w-full max-w-md p-6 sm:border sm:border-line sm:bg-bg sm:rounded-lg">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">{t('auth.login')}</h1>
           <LanguageSwitcher />
@@ -106,45 +109,47 @@ export function LoginPage() {
           />
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4">
-          <div className="flex flex-col">
-            <label className="form-label" htmlFor="username">
-              {t('auth.username')}
-            </label>
-            <Input
-              id="username"
-              placeholder={t('auth.enterUsername')}
-              error={!!errors.username}
-              {...register('username', { required: t('auth.usernameRequired') })}
-            />
-            <FormErrorMessage error={errors.username} />
+        <form onSubmit={handleSubmit(onSubmit)}>
+          <div className="grid gap-5 pb-8">
+            <div className="flex flex-col">
+              <label className="form-label" htmlFor="username">
+                {t('auth.username')}
+              </label>
+              <Input
+                id="username"
+                placeholder={t('auth.enterUsername')}
+                error={!!errors.username}
+                {...register('username', { required: t('auth.usernameRequired') })}
+              />
+              <FormErrorMessage error={errors.username} />
+            </div>
+
+            <div className="flex flex-col">
+              <label className="form-label" htmlFor="password">
+                {t('auth.password')}
+              </label>
+              <Input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder={t('auth.enterPassword')}
+                error={!!errors.password}
+                endIcon={showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                onEndIconClick={() => setShowPassword(!showPassword)}
+                {...register('password', { required: t('auth.passwordRequired') })}
+              />
+              <FormErrorMessage error={errors.password} />
+            </div>
+
+            {errorMessage && (
+              <div className="text-danger text-sm">{errorMessage}</div>
+            )}
           </div>
 
-          <div className="flex flex-col">
-            <label className="form-label" htmlFor="password">
-              {t('auth.password')}
-            </label>
-            <Input
-              id="password"
-              type={showPassword ? 'text' : 'password'}
-              placeholder={t('auth.enterPassword')}
-              error={!!errors.password}
-              endIcon={showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              onEndIconClick={() => setShowPassword(!showPassword)}
-              {...register('password', { required: t('auth.passwordRequired') })}
-            />
-            <FormErrorMessage error={errors.password} />
-          </div>
-
-          {errorMessage && (
-            <div className="text-danger text-sm">{errorMessage}</div>
-          )}
-
-          <Button type="submit" variant="outline" disabled={isPending}>
+          <Button type="submit" variant="outline" disabled={isPending} className="w-full">
             {isPending ? t('auth.loggingIn') : t('auth.login')}
           </Button>
 
-          <div className="text-center text-sm">
+          <div className="text-center text-sm mt-4">
             <Link to="/" className="text-primary hover:underline">
               {t('nav.home')}
             </Link>

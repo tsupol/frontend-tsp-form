@@ -73,6 +73,22 @@
     "selectCompany": "เลือกบริษัท",
     "selectBranch": "เลือกสาขา"
   },
+  "profile": {
+    "changePassword": "เปลี่ยนรหัสผ่าน",
+    "currentPassword": "รหัสผ่านปัจจุบัน",
+    "newPassword": "รหัสผ่านใหม่",
+    "confirmPassword": "ยืนยันรหัสผ่านใหม่",
+    "enterCurrentPassword": "กรอกรหัสผ่านปัจจุบัน",
+    "enterNewPassword": "กรอกรหัสผ่านใหม่",
+    "enterConfirmPassword": "กรอกรหัสผ่านใหม่อีกครั้ง",
+    "currentPasswordRequired": "กรุณากรอกรหัสผ่านปัจจุบัน",
+    "newPasswordRequired": "กรุณากรอกรหัสผ่านใหม่",
+    "confirmPasswordRequired": "กรุณายืนยันรหัสผ่านใหม่",
+    "passwordMinLength": "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร",
+    "passwordMismatch": "รหัสผ่านไม่ตรงกัน",
+    "passwordChanged": "เปลี่ยนรหัสผ่านสำเร็จ",
+    "changingPassword": "กำลังเปลี่ยน..."
+  },
   "theme": {
     "title": "ธีม",
     "light": "สว่าง",

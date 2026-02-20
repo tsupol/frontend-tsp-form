@@ -73,6 +73,22 @@
     "selectCompany": "Select a company",
     "selectBranch": "Select a branch"
   },
+  "profile": {
+    "changePassword": "Change Password",
+    "currentPassword": "Current Password",
+    "newPassword": "New Password",
+    "confirmPassword": "Confirm New Password",
+    "enterCurrentPassword": "Enter current password",
+    "enterNewPassword": "Enter new password",
+    "enterConfirmPassword": "Re-enter new password",
+    "currentPasswordRequired": "Current password is required",
+    "newPasswordRequired": "New password is required",
+    "confirmPasswordRequired": "Please confirm your new password",
+    "passwordMinLength": "Password must be at least 6 characters",
+    "passwordMismatch": "Passwords do not match",
+    "passwordChanged": "Password changed successfully",
+    "changingPassword": "Changing..."
+  },
   "theme": {
     "title": "Theme",
     "light": "Light",

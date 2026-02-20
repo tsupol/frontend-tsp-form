@@ -1,0 +1,17 @@
+{
+  "user.invalid_current_password": "Current password is incorrect",
+  "user.password_same": "New password must be different from the current one",
+  "user.password_weak": "Password is too weak",
+  "user.password_required": "Password is required",
+  "user.invalid_password": "Invalid password format",
+  "user.missing_password": "Password is required",
+  "user.disabled": "User account is disabled",
+  "user.locked": "User account is locked",
+  "user.not_found": "User not found",
+  "user.username_exists": "Username already exists",
+  "user.username_taken": "Username is already taken",
+  "auth.invalid_credentials": "Invalid username or password",
+  "auth.session_expired": "Session expired, please log in again",
+  "auth.forbidden": "You do not have permission to perform this action",
+  "system.unexpected": "An unexpected error occurred"
+}

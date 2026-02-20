@@ -11,9 +11,19 @@
 
 Always read source before writing code:
 
+- **CLAUDE.md:** `C:\Users\tonsu\PhpstormProjects\tsp-form\.claude\CLAUDE.md` — read this first for conventions
 - **Component source:** `C:\Users\tonsu\PhpstormProjects\tsp-form\src\components\`
 - **Context/hooks:** `C:\Users\tonsu\PhpstormProjects\tsp-form\src\context\`
 - **Example usage:** `C:\Users\tonsu\PhpstormProjects\tsp-form\src\example\`
+
+### Form Patterns (from tsp-form)
+
+- Form container: `grid gap-5` — the gap accommodates one-line errors without layout shift
+- Each field: `flex flex-col` (no gap) — label, input, and error message handle their own spacing
+- Labels: use `form-label` class (not manual `text-sm text-control-label`)
+- Error display: `FormErrorMessage` after each input
+- Fields wrapper: `div.grid.gap-5.pb-8` inside the `<form>` — buttons sit outside this div
+- Forms in modals: add `pb-7` to `.modal-content` to reserve space for error messages
 
 ## API
 
@@ -21,7 +31,7 @@ Always read source before writing code:
 - API List: `https://czynet.dyndns.org/api_list`
 - OpenAPI doc available at root endpoint
 - Backend is PostgREST (in development, may change)
-- Backend repo: `https://github.com/czynet/nnf`
+- Backend repo: `https://github.com/czynet/nnf` — cloned at `D:\dev\nnf` (pull before reading)
 - **Views:** Read endpoints use `v_[table_name]` views (e.g. `/v_users`), returns plain arrays (no v2 envelope)
 - **Writes:** Mutations use RPC functions (e.g. `/rpc/user_create`, `/rpc/user_update`)
 - **Pagination:** PostgREST `Range` / `Content-Range` headers with `Prefer: count=exact`
@@ -37,6 +47,20 @@ The `apiClient` handles response unwrapping and auth errors:
 - Use `apiClient.rpc<T>('function_name', params)` for RPC calls
 - Use `apiClient.get/post/patch/delete<T>()` for REST calls
 - Use `apiClient.getPaginated<T>(endpoint, { page, pageSize })` for paginated view queries
+
+### API Error Handling
+
+Backend returns `message_key` in error responses (from `core.error_codes` table in `D:\dev\nnf\database\DB_PART_001_AUTH_CORE\02_error_catalog.sql`).
+
+- **Error translations** are in separate files: `src/i18n/locales/errors.en.json` / `errors.th.json` (namespace: `apiErrors`)
+- **UI translations** stay in `en.json` / `th.json` (namespace: `translation`)
+- **Pattern for catch blocks:**
+  ```ts
+  if (err instanceof ApiError) {
+    const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+    setErrorMessage(translated || err.message);
+  }
+  ```
 
 ### Data Fetching
 

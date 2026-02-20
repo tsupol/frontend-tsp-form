@@ -35,22 +35,51 @@ const PAGE_SIZE_OPTIONS = [
   { value: '50', label: '50' },
 ];
 
-const ROLE_OPTIONS = [
-  { value: 'HOLDING_ADMIN', label: 'Holding Admin' },
-  { value: 'COMPANY_ADMIN', label: 'Company Admin' },
-  { value: 'BRANCH_MANAGER', label: 'Branch Manager' },
-  { value: 'BRANCH_SALE', label: 'Branch Sale' },
-  { value: 'BRANCH_COLLECTOR', label: 'Branch Collector' },
+// Roles not exposed via API — kept as constant (matches auth.roles seed)
+const ROLE_OPTIONS: { value: string; label: string; scope: string }[] = [
+  { value: 'HOLDING_ADMIN', label: 'Holding Admin', scope: 'HOLDING' },
+  { value: 'COMPANY_ADMIN', label: 'Company Admin', scope: 'COMPANY' },
+  { value: 'COMPANY_INVENTORY', label: 'Company Inventory', scope: 'COMPANY' },
+  { value: 'COMPANY_COLLECTOR', label: 'Company Collector', scope: 'COMPANY' },
+  { value: 'COMPANY_ACCOUNTANT', label: 'Company Accountant', scope: 'COMPANY' },
+  { value: 'BRANCH_MANAGER', label: 'Branch Manager', scope: 'BRANCH' },
+  { value: 'BRANCH_SALE', label: 'Branch Sale', scope: 'BRANCH' },
+  { value: 'BRANCH_COLLECTOR', label: 'Branch Collector', scope: 'BRANCH' },
 ];
 
-// Hardcoded for now — only one company/branch in dev
-const COMPANY_OPTIONS = [
-  { value: '1', label: 'Czynet Audio Solutions Co., Ltd.' },
-];
+interface VCompany {
+  id: number;
+  holding_id: number;
+  code: string;
+  name: string;
+  is_active: boolean;
+}
 
-const BRANCH_OPTIONS = [
-  { value: '1', label: 'Bangkok HQ' },
-];
+interface VBranch {
+  id: number;
+  holding_id: number;
+  company_id: number;
+  code: string;
+  name: string;
+  is_active: boolean;
+}
+
+function useCompanies() {
+  return useQuery({
+    queryKey: ['companies'],
+    queryFn: () => apiClient.get<VCompany[]>('/v_companies?is_active=is.true&order=name'),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+function useBranches(companyId: string | null) {
+  return useQuery({
+    queryKey: ['branches', companyId],
+    queryFn: () => apiClient.get<VBranch[]>(`/v_branches?is_active=is.true&company_id=eq.${companyId}&order=name`),
+    enabled: !!companyId,
+    staleTime: 5 * 60 * 1000,
+  });
+}
 
 // Row actions menu
 function RowActions({ user }: { user: VUser }) {
@@ -126,13 +155,20 @@ function CreateUserModal({ open, onClose }: { open: boolean; onClose: () => void
     reset,
     formState: { errors },
   } = useForm<CreateUserFormData>({
-    defaultValues: { username: '', password: '', role_code: '', company_id: '1', branch_id: '1' },
+    defaultValues: { username: '', password: '', role_code: '', company_id: '', branch_id: '' },
   });
 
   const roleCode = watch('role_code');
+  const companyId = watch('company_id');
+  const selectedRole = ROLE_OPTIONS.find((r) => r.value === roleCode);
+  const needsCompany = selectedRole ? ['COMPANY', 'BRANCH'].includes(selectedRole.scope) : false;
+  const needsBranch = selectedRole?.scope === 'BRANCH';
 
-  const needsCompany = roleCode !== 'HOLDING_ADMIN';
-  const needsBranch = ['BRANCH_MANAGER', 'BRANCH_SALE', 'BRANCH_COLLECTOR'].includes(roleCode);
+  const { data: companies = [], isLoading: companiesLoading } = useCompanies();
+  const { data: branches = [], isLoading: branchesLoading } = useBranches(needsBranch && companyId ? companyId : null);
+
+  const companyOptions = companies.map((c) => ({ value: String(c.id), label: c.name }));
+  const branchOptions = branches.map((b) => ({ value: String(b.id), label: b.name }));
 
   const onSubmit = async (data: CreateUserFormData) => {
     setIsPending(true);
@@ -151,7 +187,8 @@ function CreateUserModal({ open, onClose }: { open: boolean; onClose: () => void
       onClose();
     } catch (err) {
       if (err instanceof ApiError) {
-        setErrorMessage(err.message);
+        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        setErrorMessage(translated || err.message);
       } else {
         setErrorMessage(t('common.error'));
       }
@@ -176,78 +213,88 @@ function CreateUserModal({ open, onClose }: { open: boolean; onClose: () => void
           </button>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4">
-          <div className="flex flex-col">
-            <label className="form-label" htmlFor="cu-username">{t('users.username')}</label>
-            <Input
-              id="cu-username"
-              placeholder={t('auth.enterUsername')}
-              error={!!errors.username}
-              {...register('username', { required: t('auth.usernameRequired') })}
-            />
-            <FormErrorMessage error={errors.username} />
-          </div>
-
-          <div className="flex flex-col">
-            <label className="form-label" htmlFor="cu-password">{t('auth.password')}</label>
-            <Input
-              id="cu-password"
-              type="password"
-              placeholder={t('auth.enterPassword')}
-              error={!!errors.password}
-              {...register('password', { required: t('auth.passwordRequired') })}
-            />
-            <FormErrorMessage error={errors.password} />
-          </div>
-
-          <div className="flex flex-col">
-            <label className="form-label">{t('users.roleCode')}</label>
-            <Select
-              options={ROLE_OPTIONS}
-              value={roleCode}
-              onChange={(val) => setValue('role_code', val as string, { shouldValidate: true })}
-              placeholder={t('users.selectRole')}
-              searchable={false}
-              showChevron
-              error={!!errors.role_code}
-            />
-            <input type="hidden" {...register('role_code', { required: t('users.selectRole') })} />
-            <FormErrorMessage error={errors.role_code} />
-          </div>
-
-          {needsCompany && (
+        <form onSubmit={handleSubmit(onSubmit)}>
+          <div className="grid gap-5 pb-7">
             <div className="flex flex-col">
-              <label className="form-label">{t('users.companyId')}</label>
+              <label className="form-label" htmlFor="cu-username">{t('users.username')}</label>
+              <Input
+                id="cu-username"
+                placeholder={t('auth.enterUsername')}
+                error={!!errors.username}
+                {...register('username', { required: t('auth.usernameRequired') })}
+              />
+              <FormErrorMessage error={errors.username} />
+            </div>
+
+            <div className="flex flex-col">
+              <label className="form-label" htmlFor="cu-password">{t('auth.password')}</label>
+              <Input
+                id="cu-password"
+                type="password"
+                placeholder={t('auth.enterPassword')}
+                error={!!errors.password}
+                {...register('password', { required: t('auth.passwordRequired') })}
+              />
+              <FormErrorMessage error={errors.password} />
+            </div>
+
+            <div className="flex flex-col">
+              <label className="form-label">{t('users.roleCode')}</label>
               <Select
-                options={COMPANY_OPTIONS}
-                value={watch('company_id')}
-                onChange={(val) => setValue('company_id', val as string)}
-                placeholder={t('users.selectCompany')}
+                options={ROLE_OPTIONS}
+                value={roleCode}
+                onChange={(val) => {
+                  setValue('role_code', val as string, { shouldValidate: true });
+                  setValue('company_id', '');
+                  setValue('branch_id', '');
+                }}
+                placeholder={t('users.selectRole')}
                 searchable={false}
                 showChevron
+                error={!!errors.role_code}
               />
+              <input type="hidden" {...register('role_code', { required: t('users.selectRole') })} />
+              <FormErrorMessage error={errors.role_code} />
             </div>
-          )}
 
-          {needsBranch && (
-            <div className="flex flex-col">
-              <label className="form-label">{t('users.branchId')}</label>
-              <Select
-                options={BRANCH_OPTIONS}
-                value={watch('branch_id')}
-                onChange={(val) => setValue('branch_id', val as string)}
-                placeholder={t('users.selectBranch')}
-                searchable={false}
-                showChevron
-              />
-            </div>
-          )}
+            {needsCompany && (
+              <div className="flex flex-col">
+                <label className="form-label">{t('users.companyId')}</label>
+                <Select
+                  options={companyOptions}
+                  value={companyId}
+                  onChange={(val) => {
+                    setValue('company_id', val as string);
+                    setValue('branch_id', '');
+                  }}
+                  placeholder={t('users.selectCompany')}
+                  showChevron
+                  loading={companiesLoading}
+                />
+              </div>
+            )}
 
-          {errorMessage && (
-            <div className="text-danger text-sm">{errorMessage}</div>
-          )}
+            {needsBranch && (
+              <div className="flex flex-col">
+                <label className="form-label">{t('users.branchId')}</label>
+                <Select
+                  options={branchOptions}
+                  value={watch('branch_id')}
+                  onChange={(val) => setValue('branch_id', val as string)}
+                  placeholder={t('users.selectBranch')}
+                  showChevron
+                  loading={branchesLoading}
+                  disabled={!companyId}
+                />
+              </div>
+            )}
 
-          <div className="flex justify-end gap-2 pt-2">
+            {errorMessage && (
+              <div className="text-danger text-sm">{errorMessage}</div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" onClick={handleClose}>
               {t('common.cancel')}
             </Button>
