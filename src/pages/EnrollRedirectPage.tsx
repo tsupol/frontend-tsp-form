@@ -245,7 +245,7 @@ export function EnrollRedirectPage() {
       <div className="min-h-screen bg-bg flex items-center justify-center p-4">
         <div className="max-w-sm w-full text-center">
           <AlertCircle size={64} className="text-danger mx-auto mb-4" />
-          <h1 className="text-xl font-bold mb-2">{t('enrollRedirect.invalidLink')}</h1>
+          <h1 className="heading-2 mb-2">{t('enrollRedirect.invalidLink')}</h1>
           <p className="text-control-label">{t('enrollRedirect.invalidLinkDesc')}</p>
         </div>
       </div>
@@ -262,7 +262,7 @@ export function EnrollRedirectPage() {
           ) : (
             <Smartphone size={64} className="text-primary mx-auto mb-4" />
           )}
-          <h1 className="text-xl font-bold mb-2">
+          <h1 className="heading-2 mb-2">
             {downloaded ? t('enrollRedirect.profileDownloaded') : t('enrollRedirect.readyToInstall')}
           </h1>
           <p className="text-control-label mb-6">
@@ -339,7 +339,7 @@ export function EnrollRedirectPage() {
       <div className="min-h-screen bg-bg flex items-center justify-center p-4">
         <div className="max-w-sm w-full text-center">
           <AlertCircle size={64} className="text-warning mx-auto mb-4" />
-          <h1 className="text-xl font-bold mb-2">{t('enrollRedirect.safariRequired')}</h1>
+          <h1 className="heading-2 mb-2">{t('enrollRedirect.safariRequired')}</h1>
           <p className="text-control-label mb-6">{t('enrollRedirect.safariRequiredDesc')}</p>
 
           <Button
@@ -369,7 +369,7 @@ export function EnrollRedirectPage() {
     <div className="min-h-screen bg-bg flex items-center justify-center p-4">
       <div className="max-w-sm w-full text-center">
         <AlertCircle size={64} className="text-warning mx-auto mb-4" />
-        <h1 className="text-xl font-bold mb-2">{t('enrollRedirect.iosOnly')}</h1>
+        <h1 className="heading-2 mb-2">{t('enrollRedirect.iosOnly')}</h1>
         <p className="text-control-label">{t('enrollRedirect.iosOnlyDesc')}</p>
       </div>
     </div>

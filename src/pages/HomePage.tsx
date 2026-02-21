@@ -12,7 +12,7 @@ export function HomePage() {
     <div className="min-h-screen bg-bg">
       <header className="border-b border-line p-4">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
-          <h1 className="text-xl font-bold">{t('public.welcome')}</h1>
+          <h1 className="heading-2">{t('public.welcome')}</h1>
           <div className="flex gap-2 items-center">
             <LanguageSwitcher />
             {isAuthenticated ? (

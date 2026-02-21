@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, KeyRound } from 'lucide-react';
+import { Eye, EyeOff, KeyRound, CheckCircle, XCircle } from 'lucide-react';
 import { Button, Switch, Input, FormErrorMessage, useSnackbarContext } from 'tsp-form';
 import { useAuth } from '../contexts/AuthContext';
 import { authService } from '../lib/auth';
@@ -254,7 +254,16 @@ function ChangePasswordForm() {
         p_current_password: data.currentPassword,
         p_new_password: data.newPassword,
       });
-      addSnackbar({ message: t('profile.passwordChanged'), type: 'success', duration: 3000 });
+      addSnackbar({
+        message: (
+          <div className="alert alert-success">
+            <CheckCircle size={18} />
+            <div><div className="alert-title">{t('profile.passwordChanged')}</div></div>
+          </div>
+        ),
+        type: 'success',
+        duration: 3000,
+      });
       reset();
       setShowCurrent(false);
       setShowNew(false);
@@ -276,14 +285,14 @@ function ChangePasswordForm() {
         <h2 className="text-lg font-semibold">{t('profile.changePassword')}</h2>
       </div>
 
-      {apiError && (
-        <div className="mb-4 p-3 bg-danger/10 border border-danger rounded text-danger text-sm">
-          {apiError}
-        </div>
-      )}
-
       <form onSubmit={handleSubmit(onSubmit)}>
-        <div className="grid gap-5 pb-8">
+        <div className="form-grid">
+          {apiError && (
+            <div className="alert alert-danger">
+              <XCircle size={18} />
+              <div><div className="alert-description">{apiError}</div></div>
+            </div>
+          )}
           <div className="flex flex-col">
             <label className="form-label" htmlFor="currentPassword">
               {t('profile.currentPassword')}
@@ -355,7 +364,7 @@ export function UserPage() {
 
   return (
     <div className="page-content p-6">
-      <h1 className="text-xl font-bold mb-6">{t('nav.userDetails')}</h1>
+      <h1 className="heading-2 mb-6">{t('nav.userDetails')}</h1>
 
       <div className="space-y-6">
         <div className="border border-line bg-surface p-6 rounded-lg max-w-md">

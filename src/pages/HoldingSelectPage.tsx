@@ -46,7 +46,7 @@ export function HoldingSelectPage() {
       <div className="w-full max-w-md p-card">
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-2xl font-bold">{t('holding.selectTitle')}</h1>
+            <h1 className="heading-1">{t('holding.selectTitle')}</h1>
             <p className="text-sm text-fg/60 mt-1">{t('holding.selectDescription')}</p>
           </div>
           <LanguageSwitcher />

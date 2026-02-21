@@ -1,13 +1,20 @@
 /* App-specific styles */
 
-.page-content {
-    padding: 2rem 0 0 0;
-    max-width: 50rem;
-    margin: 0 auto;
+@layer components {
+    .card {
+        border: var(--spacing-line) solid var(--color-line);
+        background: var(--color-surface);
+        padding: var(--spacing-card);
+        border-radius: var(--radius-control);
+    }
 }
 
-@media (min-width: 768px) {
-    .page-content {
-        padding: 1rem 2rem;
-    }
+@keyframes pop-in {
+    0% { opacity: 0; transform: scale(0.95); }
+    50% { transform: scale(1.02); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
+.animate-pop-in {
+    animation: pop-in 200ms ease-out;
 }

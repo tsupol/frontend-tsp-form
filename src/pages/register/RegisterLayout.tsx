@@ -70,7 +70,7 @@ export function RegisterLayout() {
     <RegisterContext.Provider value={{ data, updateData, resetData, status, setStatus }}>
       <div className="page-content p-6 h-full overflow-y-auto">
         <div className="max-w-lg mx-auto">
-          <h1 className="text-xl font-bold mb-2">{t('register.title')}</h1>
+          <h1 className="heading-2 mb-2">{t('register.title')}</h1>
           <div className="text-sm text-control-label mb-4">
             {t('register.step', { current: currentStep, total: STEPS.length })}
           </div>

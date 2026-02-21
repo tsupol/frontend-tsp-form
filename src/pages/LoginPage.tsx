@@ -28,6 +28,7 @@ export function LoginPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
   const [isPending, setIsPending] = useState(false);
+  const [selectedUser, setSelectedUser] = useState('alice');
   const [errorMessage, setErrorMessage] = useState('');
 
   const reasonRef = useRef(searchParams.get('reason'));
@@ -49,7 +50,7 @@ export function LoginPage() {
     setValue,
     formState: { errors },
   } = useForm<LoginFormData>({
-    defaultValues: { username: 'alice', password: 'alice123' },
+    defaultValues: { username: 'alice', password: 'Test123456' },
   });
 
   const onSubmit = async (data: LoginFormData) => {
@@ -80,7 +81,7 @@ export function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-bg sm:bg-surface">
       <div className="w-full max-w-md p-6 sm:border sm:border-line sm:bg-bg sm:rounded-lg">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">{t('auth.login')}</h1>
+          <h1 className="heading-1">{t('auth.login')}</h1>
           <LanguageSwitcher />
         </div>
 
@@ -99,10 +100,11 @@ export function LoginPage() {
           <label className="form-label">Quick login</label>
           <Select
             options={TEST_USERS}
-            value="alice"
+            value={selectedUser}
             onChange={(val) => {
+              setSelectedUser(val);
               setValue('username', val);
-              setValue('password', val === 'alice' ? 'alice123' : 'Test123456');
+              setValue('password', 'Test123456');
             }}
             searchable={false}
             showChevron

@@ -61,7 +61,7 @@ export function EnrollmentPage() {
   return (
     <div className="page-content p-6 h-full overflow-y-auto">
       <div className="max-w-lg mx-auto">
-        <h1 className="text-xl font-bold mb-6">{t('enrollment.title')}</h1>
+        <h1 className="heading-2 mb-6">{t('enrollment.title')}</h1>
 
         {/* Initial state - no enrollment yet */}
         {!enrollment && !loading && !error && (
