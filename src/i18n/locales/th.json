@@ -98,7 +98,21 @@
     "confirmBulkActivate": "คุณแน่ใจหรือไม่ที่จะเปิดใช้งาน <strong>{{count}} ผู้ใช้</strong>?",
     "bulkDeactivateSuccess": "ปิดใช้งานสำเร็จ {{success}} จาก {{total}} ผู้ใช้",
     "bulkActivateSuccess": "เปิดใช้งานสำเร็จ {{success}} จาก {{total}} ผู้ใช้",
-    "bulkPartialError": "สำเร็จ {{success}} จาก {{total}}, ล้มเหลว {{failed}}"
+    "bulkPartialError": "สำเร็จ {{success}} จาก {{total}}, ล้มเหลว {{failed}}",
+    "passwordManage": "รหัสผ่าน",
+    "setPassword": "ตั้งรหัสผ่าน",
+    "confirmResetPassword": "สร้างรหัสผ่านชั่วคราวสำหรับ <strong>{{username}}</strong>? เซสชันจะถูกยกเลิกและต้องเปลี่ยนรหัสผ่านเมื่อเข้าสู่ระบบครั้งถัดไป",
+    "setPasswordSuccess": "ตั้งรหัสผ่านสำหรับ {{username}} สำเร็จ",
+    "resetPasswordSuccess": "รีเซ็ตรหัสผ่านสำหรับ {{username}} สำเร็จ",
+    "tempPasswordLabel": "รหัสผ่านชั่วคราว",
+    "tempPasswordCopied": "คัดลอกแล้ว",
+    "newPassword": "รหัสผ่านใหม่",
+    "confirmPassword": "ยืนยันรหัสผ่าน",
+    "enterNewPassword": "กรอกรหัสผ่านใหม่",
+    "enterConfirmPassword": "กรอกรหัสผ่านใหม่อีกครั้ง",
+    "passwordRequired": "กรุณากรอกรหัสผ่าน",
+    "passwordMinLength": "อย่างน้อย 6 ตัวอักษร",
+    "passwordMismatch": "รหัสผ่านไม่ตรงกัน"
   },
   "profile": {
     "changePassword": "เปลี่ยนรหัสผ่าน",

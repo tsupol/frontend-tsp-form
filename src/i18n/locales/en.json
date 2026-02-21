@@ -98,7 +98,21 @@
     "confirmBulkActivate": "Are you sure you want to activate <strong>{{count}} users</strong>?",
     "bulkDeactivateSuccess": "{{success}} of {{total}} users deactivated",
     "bulkActivateSuccess": "{{success}} of {{total}} users activated",
-    "bulkPartialError": "{{success}} of {{total}} succeeded, {{failed}} failed"
+    "bulkPartialError": "{{success}} of {{total}} succeeded, {{failed}} failed",
+    "passwordManage": "Password",
+    "setPassword": "Set Password",
+    "confirmResetPassword": "Generate a temporary password for <strong>{{username}}</strong>? Their sessions will be revoked and they must change password on next login.",
+    "setPasswordSuccess": "Password set for {{username}}",
+    "resetPasswordSuccess": "Password reset for {{username}}",
+    "tempPasswordLabel": "Temporary Password",
+    "tempPasswordCopied": "Copied to clipboard",
+    "newPassword": "New Password",
+    "confirmPassword": "Confirm Password",
+    "enterNewPassword": "Enter new password",
+    "enterConfirmPassword": "Re-enter new password",
+    "passwordRequired": "Password is required",
+    "passwordMinLength": "Minimum 6 characters",
+    "passwordMismatch": "Passwords do not match"
   },
   "profile": {
     "changePassword": "Change Password",

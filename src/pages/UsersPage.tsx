@@ -4,7 +4,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { DataTable, DataTableColumnHeader, Button, Input, Select, PopOver, MenuItem, MenuSeparator, Badge, Modal, Switch, createSelectColumn, useSnackbarContext } from 'tsp-form';
 import { type ColumnDef, type RowSelectionState, type SortingState } from '@tanstack/react-table';
-import { Plus, MoreHorizontal, Pencil, ShieldCheck, ShieldOff, KeyRound, Trash2, Ban, XCircle, CheckCircle, Eye, EyeOff } from 'lucide-react';
+import { Plus, MoreHorizontal, Pencil, ShieldCheck, ShieldOff, KeyRound, Trash2, Ban, XCircle, CheckCircle, Eye, EyeOff, Copy } from 'lucide-react';
 import { apiClient, ApiError } from '../lib/api';
 import { FormErrorMessage } from 'tsp-form';
 
@@ -95,7 +95,7 @@ function useBranches(companyId: string | null) {
 }
 
 // Row actions menu
-function RowActions({ user, onEdit, onToggleActive, onDelete }: { user: VUser; onEdit: (user: VUser) => void; onToggleActive: (user: VUser) => void; onDelete: (user: VUser) => void }) {
+function RowActions({ user, onEdit, onPasswordManage, onToggleActive, onDelete }: { user: VUser; onEdit: (user: VUser) => void; onPasswordManage: (user: VUser) => void; onToggleActive: (user: VUser) => void; onDelete: (user: VUser) => void }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
 
@@ -124,8 +124,8 @@ function RowActions({ user, onEdit, onToggleActive, onDelete }: { user: VUser; o
         />
         <MenuItem
           icon={<KeyRound size={14} />}
-          label={t('users.resetPassword')}
-          onClick={() => setOpen(false)}
+          label={t('users.passwordManage')}
+          onClick={() => { setOpen(false); onPasswordManage(user); }}
         />
         <MenuSeparator />
         <MenuItem
@@ -796,6 +796,269 @@ function EditUserModal({ user, open, onClose }: { user: VUser | null; open: bool
   );
 }
 
+// Password management modal (set password / reset password)
+interface SetPasswordFormData {
+  password: string;
+  confirmPassword: string;
+}
+
+function PasswordModal({ user, open, onClose }: { user: VUser | null; open: boolean; onClose: () => void }) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const { addSnackbar } = useSnackbarContext();
+  const [mode, setMode] = useState<'set' | 'reset'>('set');
+  const [isPending, setIsPending] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [errorKey, setErrorKey] = useState(0);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [tempPassword, setTempPassword] = useState<string | null>(null);
+
+  const {
+    register,
+    handleSubmit,
+    watch,
+    reset: resetForm,
+    formState: { errors },
+  } = useForm<SetPasswordFormData>({
+    defaultValues: { password: '', confirmPassword: '' },
+  });
+
+  const switchMode = (newMode: 'set' | 'reset') => {
+    setMode(newMode);
+    resetForm();
+    setErrorMessage('');
+    setShowPassword(false);
+    setShowConfirm(false);
+  };
+
+  const handleClose = () => {
+    setMode('set');
+    resetForm();
+    setErrorMessage('');
+    setShowPassword(false);
+    setShowConfirm(false);
+    setTempPassword(null);
+    onClose();
+  };
+
+  const onSetPassword = async (data: SetPasswordFormData) => {
+    if (!user) return;
+    setIsPending(true);
+    const start = Date.now();
+    try {
+      await apiClient.rpc('user_set_password', {
+        p_user_id: user.id,
+        p_new_password: data.password,
+      });
+      addSnackbar({
+        message: (
+          <div className="alert alert-success">
+            <CheckCircle size={18} />
+            <div><div className="alert-title">{t('users.setPasswordSuccess', { username: user.username })}</div></div>
+          </div>
+        ),
+        type: 'success',
+        duration: 3000,
+      });
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      handleClose();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        setErrorMessage(translated || err.message);
+      } else {
+        setErrorMessage(t('common.error'));
+      }
+      setErrorKey(k => k + 1);
+    } finally {
+      const elapsed = Date.now() - start;
+      if (elapsed < 300) await new Promise(r => setTimeout(r, 300 - elapsed));
+      setIsPending(false);
+    }
+  };
+
+  const onResetPassword = async () => {
+    if (!user) return;
+    setIsPending(true);
+    const start = Date.now();
+    try {
+      const result = await apiClient.rpc<{ temp_password: string }>('user_reset_password', {
+        p_user_id: user.id,
+      });
+      setTempPassword(result.temp_password);
+      addSnackbar({
+        message: (
+          <div className="alert alert-success">
+            <CheckCircle size={18} />
+            <div><div className="alert-title">{t('users.resetPasswordSuccess', { username: user.username })}</div></div>
+          </div>
+        ),
+        type: 'success',
+        duration: 3000,
+      });
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        setErrorMessage(translated || err.message);
+      } else {
+        setErrorMessage(t('common.error'));
+      }
+      setErrorKey(k => k + 1);
+    } finally {
+      const elapsed = Date.now() - start;
+      if (elapsed < 300) await new Promise(r => setTimeout(r, 300 - elapsed));
+      setIsPending(false);
+    }
+  };
+
+  const copyTempPassword = async () => {
+    if (!tempPassword) return;
+    await navigator.clipboard.writeText(tempPassword);
+    addSnackbar({
+      message: (
+        <div className="alert alert-success">
+          <CheckCircle size={18} />
+          <div><div className="alert-title">{t('users.tempPasswordCopied')}</div></div>
+        </div>
+      ),
+      type: 'success',
+      duration: 2000,
+    });
+  };
+
+  // After reset success: show temp password
+  if (tempPassword) {
+    return (
+      <Modal open={open} onClose={handleClose} maxWidth="28rem" width="100%">
+        <div className="flex flex-col overflow-hidden">
+          <div className="modal-header">
+            <h2 className="modal-title">{t('users.resetPassword')}</h2>
+            <button type="button" className="modal-close-btn" onClick={handleClose} aria-label="Close">×</button>
+          </div>
+          <div className="modal-content">
+            <div className="alert alert-success mb-4">
+              <CheckCircle size={18} />
+              <div><div className="alert-description">{t('users.resetPasswordSuccess', { username: user?.username })}</div></div>
+            </div>
+            <div className="flex flex-col">
+              <label className="form-label">{t('users.tempPasswordLabel')}</label>
+              <div className="flex gap-2">
+                <Input value={tempPassword} readOnly className="flex-1 font-mono" />
+                <Button type="button" variant="outline" onClick={copyTempPassword}>
+                  <Copy size={16} />
+                </Button>
+              </div>
+            </div>
+          </div>
+          <div className="modal-footer">
+            <Button type="button" variant="ghost" onClick={handleClose}>
+              {t('common.cancel')}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
+
+  const modeButtonClass = (active: boolean) =>
+    `flex-1 py-1.5 text-sm font-medium rounded transition-colors cursor-pointer ${
+      active
+        ? 'bg-primary text-on-primary'
+        : 'text-control-label hover:bg-surface-hover'
+    }`;
+
+  return (
+    <Modal open={open} onClose={handleClose} maxWidth="28rem" width="100%">
+      <div className="flex flex-col overflow-hidden">
+        <div className="modal-header">
+          <h2 className="modal-title">{t('users.passwordManage')}</h2>
+          <button type="button" className="modal-close-btn" onClick={handleClose} aria-label="Close">×</button>
+        </div>
+        <div className="modal-content">
+          {/* Mode toggle */}
+          <div className="flex gap-1 p-1 bg-surface-sunken rounded mb-4">
+            <button type="button" className={modeButtonClass(mode === 'set')} onClick={() => switchMode('set')}>
+              {t('users.setPassword')}
+            </button>
+            <button type="button" className={modeButtonClass(mode === 'reset')} onClick={() => switchMode('reset')}>
+              {t('users.resetPassword')}
+            </button>
+          </div>
+
+          {errorMessage && (
+            <div key={errorKey} className="alert alert-danger mb-4 animate-pop-in">
+              <XCircle size={18} />
+              <div><div className="alert-description">{errorMessage}</div></div>
+            </div>
+          )}
+
+          {mode === 'set' ? (
+            <form id="set-password-form" onSubmit={handleSubmit(onSetPassword)}>
+              <div className="form-grid">
+                <div className="flex flex-col">
+                  <label className="form-label" htmlFor="pm-password">{t('users.newPassword')}</label>
+                  <Input
+                    id="pm-password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder={t('users.enterNewPassword')}
+                    error={!!errors.password}
+                    endIcon={showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    onEndIconClick={() => setShowPassword(!showPassword)}
+                    {...register('password', {
+                      required: t('users.passwordRequired'),
+                      minLength: { value: 6, message: t('users.passwordMinLength') },
+                    })}
+                  />
+                  <FormErrorMessage error={errors.password} />
+                </div>
+                <div className="flex flex-col">
+                  <label className="form-label" htmlFor="pm-confirm">{t('users.confirmPassword')}</label>
+                  <Input
+                    id="pm-confirm"
+                    type={showConfirm ? 'text' : 'password'}
+                    placeholder={t('users.enterConfirmPassword')}
+                    error={!!errors.confirmPassword}
+                    endIcon={showConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
+                    onEndIconClick={() => setShowConfirm(!showConfirm)}
+                    {...register('confirmPassword', {
+                      required: t('users.passwordRequired'),
+                      validate: (v) => v === watch('password') || t('users.passwordMismatch'),
+                    })}
+                  />
+                  <FormErrorMessage error={errors.confirmPassword} />
+                </div>
+              </div>
+            </form>
+          ) : (
+            <p
+              className="text-sm"
+              dangerouslySetInnerHTML={{
+                __html: t('users.confirmResetPassword', { username: user?.username ?? '' }),
+              }}
+            />
+          )}
+        </div>
+        <div className="modal-footer">
+          <Button type="button" variant="ghost" onClick={handleClose}>
+            {t('common.cancel')}
+          </Button>
+          {mode === 'set' ? (
+            <Button type="submit" form="set-password-form" color="primary" disabled={isPending}>
+              {isPending ? t('common.loading') : t('users.setPassword')}
+            </Button>
+          ) : (
+            <Button type="button" color="primary" disabled={isPending} onClick={onResetPassword}>
+              {isPending ? t('common.loading') : t('users.resetPassword')}
+            </Button>
+          )}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 export function UsersPage() {
   const { t } = useTranslation();
   const [pageIndex, setPageIndex] = useState(0);
@@ -813,6 +1076,7 @@ export function UsersPage() {
   const [editUser, setEditUser] = useState<VUser | null>(null);
   const [toggleActiveUser, setToggleActiveUser] = useState<VUser | null>(null);
   const [deleteUser, setDeleteUser] = useState<VUser | null>(null);
+  const [passwordUser, setPasswordUser] = useState<VUser | null>(null);
   const [bulkAction, setBulkAction] = useState<{ action: 'deactivate' | 'activate'; users: VUser[] } | null>(null);
 
   // Filter dropdown data
@@ -921,7 +1185,7 @@ export function UsersPage() {
     {
       id: 'actions',
       header: () => null,
-      cell: ({ row }) => <RowActions user={row.original} onEdit={setEditUser} onToggleActive={setToggleActiveUser} onDelete={setDeleteUser} />,
+      cell: ({ row }) => <RowActions user={row.original} onEdit={setEditUser} onPasswordManage={setPasswordUser} onToggleActive={setToggleActiveUser} onDelete={setDeleteUser} />,
       enableSorting: false,
     },
   ];
@@ -1074,6 +1338,7 @@ export function UsersPage() {
       <EditUserModal user={editUser} open={!!editUser} onClose={() => setEditUser(null)} />
       <ToggleActiveModal user={toggleActiveUser} open={!!toggleActiveUser} onClose={() => setToggleActiveUser(null)} />
       <DeleteUserModal user={deleteUser} open={!!deleteUser} onClose={() => setDeleteUser(null)} />
+      <PasswordModal user={passwordUser} open={!!passwordUser} onClose={() => setPasswordUser(null)} />
       <BulkActionModal
         action={bulkAction?.action ?? 'deactivate'}
         users={bulkAction?.users ?? []}
