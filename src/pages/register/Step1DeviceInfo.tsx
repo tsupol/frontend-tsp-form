@@ -90,7 +90,7 @@ export function Step1DeviceInfo() {
   ];
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+    <form onSubmit={handleSubmit(onSubmit)} className="form-grid gap-6">
       {/* Device Type Selection */}
       <div className="border border-line bg-surface p-6 rounded-lg">
         <h2 className="font-semibold mb-4">{t('register.deviceType')}</h2>

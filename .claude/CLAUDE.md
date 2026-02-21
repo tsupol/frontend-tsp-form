@@ -18,12 +18,18 @@ Always read source before writing code:
 
 ### Form Patterns (from tsp-form)
 
-- Form container: `grid gap-5` — the gap accommodates one-line errors without layout shift
+- Form field container: use `.form-grid` class — provides `grid`, `gap-5`, and `pb-7`. Apply to the `<div>` wrapping form fields, not the `<form>` itself or buttons. Tailwind can override (e.g. `form-grid gap-3`).
 - Each field: `flex flex-col` (no gap) — label, input, and error message handle their own spacing
 - Labels: use `form-label` class (not manual `text-sm text-control-label`)
 - Error display: `FormErrorMessage` after each input
-- Fields wrapper: `div.grid.gap-5.pb-8` inside the `<form>` — buttons sit outside this div
-- Forms in modals: add `pb-7` to `.modal-content` to reserve space for error messages
+- Forms in modals: `form-grid` goes inside `modal-content`, never on the same element (e.g. `<div className="modal-content"><div className="form-grid">...fields...</div></div>`)
+
+### Alert & Snackbar
+
+- Alert is CSS-only: `<div className="alert alert-{variant}">` with optional icon, `alert-title`, `alert-description`
+- Variants: `alert-info`, `alert-success`, `alert-warning`, `alert-danger`
+- Use alert markup inside `addSnackbar({ message: <div className="alert alert-success">...</div> })` — CSS auto-strips padding/border inside `.snackbar-item`
+- Use `alert alert-danger` for API error display instead of manual `bg-danger/10 border border-danger` divs
 
 ## API
 

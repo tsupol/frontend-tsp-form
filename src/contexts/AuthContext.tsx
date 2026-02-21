@@ -25,9 +25,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [needsHoldingSelect, setNeedsHoldingSelect] = useState(false);
   const hasHandledAuthError = useRef(false);
+  const isLoginInProgress = useRef(false);
+  const suppressAuthRedirect = useRef(false);
 
   // Handle auth errors from API - clear session and redirect to login
   const handleAuthError = useCallback((details: { code: string; message: string }) => {
+    // Don't redirect during login or init — let the caller's catch block handle it
+    if (isLoginInProgress.current || suppressAuthRedirect.current) return;
+
     // Prevent multiple redirects
     if (hasHandledAuthError.current) return;
     hasHandledAuthError.current = true;
@@ -53,9 +58,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const initAuth = async () => {
+      // Skip /me call if login is in progress (tokens are being set up)
+      if (isLoginInProgress.current) {
+        setIsLoading(false);
+        return;
+      }
+
       const isValid = await authService.validateAndRefresh();
       if (isValid) {
         try {
+          suppressAuthRedirect.current = true;
           const userInfo = await authService.me();
           console.log('[Auth] User info:', userInfo.role_code, 'holding:', userInfo.holding_id);
           setUser(userInfo);
@@ -64,6 +76,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           console.error('[Auth] Failed to fetch user info after token validation:', err);
           authService.clearTokens();
           setUser(null);
+        } finally {
+          suppressAuthRedirect.current = false;
         }
       } else {
         console.log('[Auth] Token validation failed, clearing session');
@@ -76,13 +90,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(async (username: string, password: string): Promise<LoginResult> => {
-    const response = await authService.login(username, password);
-    const userInfo = await authService.me();
-    setUser(userInfo);
+    isLoginInProgress.current = true;
+    try {
+      const response = await authService.login(username, password);
 
-    const holdingNeeded = response.holding_id === null;
-    setNeedsHoldingSelect(holdingNeeded);
-    return { needsHoldingSelect: holdingNeeded };
+      // Use holding_id from login response to determine redirect
+      // Don't call /me here — system admins without holding context would get 401
+      const holdingNeeded = response.holding_id === null;
+      setUser({
+        user_id: response.user_id,
+        sid: '',
+        role_code: response.role_code,
+        holding_id: response.holding_id,
+        company_id: null,
+        branch_id: null,
+        capabilities: [],
+      });
+      setNeedsHoldingSelect(holdingNeeded);
+
+      // For users with holding context, fetch full /me in background for capabilities
+      if (!holdingNeeded) {
+        authService.me().then(setUser).catch(() => {/* keep minimal user info */});
+      }
+
+      return { needsHoldingSelect: holdingNeeded };
+    } finally {
+      isLoginInProgress.current = false;
+    }
   }, []);
 
   const logout = useCallback(async () => {
