@@ -238,7 +238,7 @@ function ToggleActiveModal({ user, open, onClose }: { user: VUser | null; open: 
 }
 
 // Delete user placeholder modal
-function DeleteUserModal({ user, open, onClose }: { user: VUser | null; open: boolean; onClose: () => void }) {
+function DeleteUserModal({ open, onClose }: { user: VUser | null; open: boolean; onClose: () => void }) {
   const { t } = useTranslation();
 
   return (
@@ -803,7 +803,7 @@ export function UsersPage() {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>();
+  const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [filterHolding, setFilterHolding] = useState('');
   const [filterCompany, setFilterCompany] = useState('');
   const [filterBranch, setFilterBranch] = useState('');

@@ -102,8 +102,8 @@ export function LoginPage() {
             options={TEST_USERS}
             value={selectedUser}
             onChange={(val) => {
-              setSelectedUser(val);
-              setValue('username', val);
+              setSelectedUser((val as string) ?? '');
+              setValue('username', (val as string) ?? '');
               setValue('password', 'Test123456');
             }}
             searchable={false}
