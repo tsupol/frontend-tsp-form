@@ -112,7 +112,9 @@
     "enterConfirmPassword": "กรอกรหัสผ่านใหม่อีกครั้ง",
     "passwordRequired": "กรุณากรอกรหัสผ่าน",
     "passwordMinLength": "อย่างน้อย 6 ตัวอักษร",
-    "passwordMismatch": "รหัสผ่านไม่ตรงกัน"
+    "passwordMismatch": "รหัสผ่านไม่ตรงกัน",
+    "changeRole": "เปลี่ยนบทบาท",
+    "changeRoleSuccess": "เปลี่ยนบทบาทสำหรับ {{username}} สำเร็จ"
   },
   "profile": {
     "changePassword": "เปลี่ยนรหัสผ่าน",

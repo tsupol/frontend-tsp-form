@@ -161,12 +161,12 @@
     --text-h1: 1.5rem;
     --text-h1--line-height: 1.25;
     --text-h1--font-weight: 600;
-    --text-h1--letter-spacing: 0.25em;
+    --text-h1--letter-spacing: 0;
 
     --text-h2: 1.25rem;
     --text-h2--line-height: 1.25;
     --text-h2--font-weight: 600;
-    --text-h2--letter-spacing: 0em;
+    --text-h2--letter-spacing: 0;
 
     --text-h3: 1.125rem;
     --text-h3--line-height: 1.3;

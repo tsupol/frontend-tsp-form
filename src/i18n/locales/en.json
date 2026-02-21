@@ -112,7 +112,9 @@
     "enterConfirmPassword": "Re-enter new password",
     "passwordRequired": "Password is required",
     "passwordMinLength": "Minimum 6 characters",
-    "passwordMismatch": "Passwords do not match"
+    "passwordMismatch": "Passwords do not match",
+    "changeRole": "Change Role",
+    "changeRoleSuccess": "Role updated for {{username}}"
   },
   "profile": {
     "changePassword": "Change Password",

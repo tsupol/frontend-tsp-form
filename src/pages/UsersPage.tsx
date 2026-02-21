@@ -95,7 +95,7 @@ function useBranches(companyId: string | null) {
 }
 
 // Row actions menu
-function RowActions({ user, onEdit, onPasswordManage, onToggleActive, onDelete }: { user: VUser; onEdit: (user: VUser) => void; onPasswordManage: (user: VUser) => void; onToggleActive: (user: VUser) => void; onDelete: (user: VUser) => void }) {
+function RowActions({ user, onEdit, onChangeRole, onPasswordManage, onToggleActive, onDelete }: { user: VUser; onEdit: (user: VUser) => void; onChangeRole: (user: VUser) => void; onPasswordManage: (user: VUser) => void; onToggleActive: (user: VUser) => void; onDelete: (user: VUser) => void }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
 
@@ -126,6 +126,11 @@ function RowActions({ user, onEdit, onPasswordManage, onToggleActive, onDelete }
           icon={<KeyRound size={14} />}
           label={t('users.passwordManage')}
           onClick={() => { setOpen(false); onPasswordManage(user); }}
+        />
+        <MenuItem
+          icon={<ShieldCheck size={14} />}
+          label={t('users.changeRole')}
+          onClick={() => { setOpen(false); onChangeRole(user); }}
         />
         <MenuSeparator />
         <MenuItem
@@ -1059,6 +1064,131 @@ function PasswordModal({ user, open, onClose }: { user: VUser | null; open: bool
   );
 }
 
+// Change role modal
+interface ChangeRoleFormData {
+  role_code: string;
+}
+
+function ChangeRoleModal({ user, open, onClose }: { user: VUser | null; open: boolean; onClose: () => void }) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const { addSnackbar } = useSnackbarContext();
+  const [isPending, setIsPending] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [errorKey, setErrorKey] = useState(0);
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    reset,
+    formState: { errors },
+  } = useForm<ChangeRoleFormData>({
+    defaultValues: { role_code: '' },
+  });
+
+  useEffect(() => {
+    if (user && open) {
+      reset({ role_code: user.role_code });
+      setErrorMessage('');
+    }
+  }, [user, open, reset]);
+
+  const roleCode = watch('role_code');
+
+  const { data: roles = [], isLoading: rolesLoading } = useRoles();
+  const roleOptions = roles.map((r) => ({ value: r.code, label: r.name }));
+
+  const onSubmit = async (data: ChangeRoleFormData) => {
+    if (!user) return;
+    setIsPending(true);
+    const start = Date.now();
+    try {
+      await apiClient.rpc('user_change_role', {
+        p_user_id: user.id,
+        p_new_role_code: data.role_code,
+      });
+      addSnackbar({
+        message: (
+          <div className="alert alert-success">
+            <CheckCircle size={18} />
+            <div><div className="alert-title">{t('users.changeRoleSuccess', { username: user.username })}</div></div>
+          </div>
+        ),
+        type: 'success',
+        duration: 3000,
+      });
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      onClose();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        setErrorMessage(translated || err.message);
+      } else {
+        setErrorMessage(t('common.error'));
+      }
+      setErrorKey(k => k + 1);
+    } finally {
+      const elapsed = Date.now() - start;
+      if (elapsed < 300) await new Promise(r => setTimeout(r, 300 - elapsed));
+      setIsPending(false);
+    }
+  };
+
+  const handleClose = () => {
+    setErrorMessage('');
+    onClose();
+  };
+
+  return (
+    <Modal open={open} onClose={handleClose} maxWidth="28rem" width="100%">
+      <form className="flex flex-col overflow-hidden" onSubmit={handleSubmit(onSubmit)}>
+        <div className="modal-header">
+          <h2 className="modal-title">{t('users.changeRole')}</h2>
+          <button type="button" className="modal-close-btn" onClick={handleClose} aria-label="Close">×</button>
+        </div>
+        <div className="modal-content">
+          {errorMessage && (
+            <div key={errorKey} className="alert alert-danger mb-4 animate-pop-in">
+              <XCircle size={18} />
+              <div>
+                <div className="alert-description">{errorMessage}</div>
+              </div>
+            </div>
+          )}
+
+          <div className="form-grid">
+            <div className="flex flex-col">
+              <label className="form-label">{t('users.roleCode')}</label>
+              <Select
+                options={roleOptions}
+                value={roleCode}
+                onChange={(val) => setValue('role_code', val as string, { shouldValidate: true })}
+                placeholder={t('users.selectRole')}
+                searchable={false}
+                showChevron
+                loading={rolesLoading}
+                error={!!errors.role_code}
+              />
+              <input type="hidden" {...register('role_code', { required: t('users.selectRole') })} />
+              <FormErrorMessage error={errors.role_code} />
+            </div>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <Button type="button" variant="ghost" onClick={handleClose}>
+            {t('common.cancel')}
+          </Button>
+          <Button type="submit" color="primary" disabled={isPending}>
+            {isPending ? t('common.loading') : t('common.save')}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 export function UsersPage() {
   const { t } = useTranslation();
   const [pageIndex, setPageIndex] = useState(0);
@@ -1077,6 +1207,7 @@ export function UsersPage() {
   const [toggleActiveUser, setToggleActiveUser] = useState<VUser | null>(null);
   const [deleteUser, setDeleteUser] = useState<VUser | null>(null);
   const [passwordUser, setPasswordUser] = useState<VUser | null>(null);
+  const [changeRoleUser, setChangeRoleUser] = useState<VUser | null>(null);
   const [bulkAction, setBulkAction] = useState<{ action: 'deactivate' | 'activate'; users: VUser[] } | null>(null);
 
   // Filter dropdown data
@@ -1185,7 +1316,7 @@ export function UsersPage() {
     {
       id: 'actions',
       header: () => null,
-      cell: ({ row }) => <RowActions user={row.original} onEdit={setEditUser} onPasswordManage={setPasswordUser} onToggleActive={setToggleActiveUser} onDelete={setDeleteUser} />,
+      cell: ({ row }) => <RowActions user={row.original} onEdit={setEditUser} onChangeRole={setChangeRoleUser} onPasswordManage={setPasswordUser} onToggleActive={setToggleActiveUser} onDelete={setDeleteUser} />,
       enableSorting: false,
     },
   ];
@@ -1339,6 +1470,7 @@ export function UsersPage() {
       <ToggleActiveModal user={toggleActiveUser} open={!!toggleActiveUser} onClose={() => setToggleActiveUser(null)} />
       <DeleteUserModal user={deleteUser} open={!!deleteUser} onClose={() => setDeleteUser(null)} />
       <PasswordModal user={passwordUser} open={!!passwordUser} onClose={() => setPasswordUser(null)} />
+      <ChangeRoleModal user={changeRoleUser} open={!!changeRoleUser} onClose={() => setChangeRoleUser(null)} />
       <BulkActionModal
         action={bulkAction?.action ?? 'deactivate'}
         users={bulkAction?.users ?? []}
