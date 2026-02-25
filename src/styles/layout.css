@@ -12,7 +12,7 @@ html {
 /* Phone */
 @media only screen and (max-width: 430px) and (-webkit-min-device-pixel-ratio: 2) {
     html {
-        font-size: 20px;
+        font-size: 18px;
     }
 }
 
@@ -31,7 +31,7 @@ body {
 }
 
 .page-content {
-    padding: 2rem 0 0 0;
+    padding: 3rem 1rem 1rem;
     max-width: 50rem;
     margin: 0 auto;
 }

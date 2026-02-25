@@ -69,7 +69,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           suppressAuthRedirect.current = true;
           const userInfo = await authService.me();
-          console.log('[Auth] User info:', userInfo.role_code, 'holding:', userInfo.holding_id);
           setUser(userInfo);
           setNeedsHoldingSelect(userInfo.holding_id === null);
         } catch (err) {

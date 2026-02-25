@@ -2,9 +2,8 @@ import { useState, useEffect, useRef, useCallback, type MouseEvent } from 'react
 import { useTranslation } from 'react-i18next';
 import { useForm, Controller } from 'react-hook-form';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { DataTable, DataTableColumnHeader, Button, Input, Select, PopOver, MenuItem, MenuSeparator, Badge, Modal, Switch, createSelectColumn, useSnackbarContext } from 'tsp-form';
-import { type ColumnDef, type RowSelectionState, type SortingState } from '@tanstack/react-table';
-import { Plus, MoreHorizontal, Pencil, ShieldCheck, ShieldOff, KeyRound, Trash2, Ban, XCircle, CheckCircle, Eye, EyeOff, Copy } from 'lucide-react';
+import { DataTable, DataTableColumnHeader, Button, Input, Select, PopOver, MenuItem, MenuSeparator, Badge, Modal, Switch, createSelectColumn, useSnackbarContext, type ColumnDef, type RowSelectionState, type SortingState } from 'tsp-form';
+import { Plus, MoreHorizontal, Pencil, ShieldCheck, ShieldOff, KeyRound, Trash2, Ban, XCircle, CheckCircle, Eye, EyeOff, Copy, SlidersHorizontal } from 'lucide-react';
 import { apiClient, ApiError } from '../lib/api';
 import { FormErrorMessage } from 'tsp-form';
 
@@ -1209,6 +1208,9 @@ export function UsersPage() {
   const [passwordUser, setPasswordUser] = useState<VUser | null>(null);
   const [changeRoleUser, setChangeRoleUser] = useState<VUser | null>(null);
   const [bulkAction, setBulkAction] = useState<{ action: 'deactivate' | 'activate'; users: VUser[] } | null>(null);
+  const [filterOpen, setFilterOpen] = useState(false);
+
+  const activeFilterCount = [filterRole, filterHolding, filterCompany, filterBranch].filter(Boolean).length;
 
   // Filter dropdown data
   const { data: holdings = [], isLoading: holdingsLoading } = useHoldings();
@@ -1265,7 +1267,7 @@ export function UsersPage() {
     setRowSelection({});
   };
 
-  const columns: ColumnDef<VUser, any>[] = [
+  const columns: ColumnDef<VUser>[] = [
     createSelectColumn<VUser>(),
     {
       accessorKey: 'username',
@@ -1341,67 +1343,151 @@ export function UsersPage() {
             className="shrink-0"
             style={{ width: '14rem' }}
           />
-          <Select
-            options={roleFilterOptions}
-            value={filterRole || null}
-            onChange={(val) => {
-              setFilterRole((val as string) ?? '');
-              resetFilters();
-            }}
-            placeholder={t('users.allRoles')}
-            size="sm"
-            showChevron
-            clearable
-            searchable={false}
-            loading={rolesLoading}
-            className="flex-1 min-w-0"
-          />
-          <Select
-            options={holdingOptions}
-            value={filterHolding || null}
-            onChange={(val) => {
-              setFilterHolding((val as string) ?? '');
-              setFilterCompany('');
-              setFilterBranch('');
-              resetFilters();
-            }}
-            placeholder={t('users.allHoldings')}
-            size="sm"
-            showChevron
-            clearable
-            loading={holdingsLoading}
-            className="flex-1 min-w-0"
-          />
-          <Select
-            options={companyFilterOptions}
-            value={filterCompany || null}
-            onChange={(val) => {
-              setFilterCompany((val as string) ?? '');
-              setFilterBranch('');
-              resetFilters();
-            }}
-            placeholder={t('users.allCompanies')}
-            size="sm"
-            showChevron
-            clearable
-            loading={filterCompaniesLoading}
-            className="flex-1 min-w-0"
-          />
-          <Select
-            options={branchFilterOptions}
-            value={filterBranch || null}
-            onChange={(val) => {
-              setFilterBranch((val as string) ?? '');
-              resetFilters();
-            }}
-            placeholder={t('users.allBranches')}
-            size="sm"
-            showChevron
-            clearable
-            loading={filterBranchesLoading}
-            disabled={!filterCompany}
-            className="flex-1 min-w-0"
-          />
+          {/* Desktop: inline filters */}
+          <div className="hidden md:contents">
+            <Select
+              options={roleFilterOptions}
+              value={filterRole || null}
+              onChange={(val) => {
+                setFilterRole((val as string) ?? '');
+                resetFilters();
+              }}
+              placeholder={t('users.allRoles')}
+              size="sm"
+              showChevron
+              clearable
+              searchable={false}
+              loading={rolesLoading}
+              className="flex-1 min-w-0"
+            />
+            <Select
+              options={holdingOptions}
+              value={filterHolding || null}
+              onChange={(val) => {
+                setFilterHolding((val as string) ?? '');
+                setFilterCompany('');
+                setFilterBranch('');
+                resetFilters();
+              }}
+              placeholder={t('users.allHoldings')}
+              size="sm"
+              showChevron
+              clearable
+              loading={holdingsLoading}
+              className="flex-1 min-w-0"
+            />
+            <Select
+              options={companyFilterOptions}
+              value={filterCompany || null}
+              onChange={(val) => {
+                setFilterCompany((val as string) ?? '');
+                setFilterBranch('');
+                resetFilters();
+              }}
+              placeholder={t('users.allCompanies')}
+              size="sm"
+              showChevron
+              clearable
+              loading={filterCompaniesLoading}
+              className="flex-1 min-w-0"
+            />
+            <Select
+              options={branchFilterOptions}
+              value={filterBranch || null}
+              onChange={(val) => {
+                setFilterBranch((val as string) ?? '');
+                resetFilters();
+              }}
+              placeholder={t('users.allBranches')}
+              size="sm"
+              showChevron
+              clearable
+              loading={filterBranchesLoading}
+              disabled={!filterCompany}
+              className="flex-1 min-w-0"
+            />
+          </div>
+          {/* Mobile: filter icon button with popover */}
+          <div className="md:hidden">
+            <PopOver
+              isOpen={filterOpen}
+              onClose={() => setFilterOpen(false)}
+              placement="bottom"
+              align="end"
+              maxWidth="300px"
+              maxHeight="400px"
+              trigger={
+                <Button variant="outline" size="sm" className="btn-icon-sm relative" onClick={() => setFilterOpen(!filterOpen)}>
+                  <SlidersHorizontal />
+                  {activeFilterCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary text-primary-contrast text-[10px] flex items-center justify-center leading-none">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </Button>
+              }
+            >
+              <div className="flex flex-col gap-3 p-3">
+                <Select
+                  options={roleFilterOptions}
+                  value={filterRole || null}
+                  onChange={(val) => {
+                    setFilterRole((val as string) ?? '');
+                    resetFilters();
+                  }}
+                  placeholder={t('users.allRoles')}
+                  size="sm"
+                  showChevron
+                  clearable
+                  searchable={false}
+                  loading={rolesLoading}
+                />
+                <Select
+                  options={holdingOptions}
+                  value={filterHolding || null}
+                  onChange={(val) => {
+                    setFilterHolding((val as string) ?? '');
+                    setFilterCompany('');
+                    setFilterBranch('');
+                    resetFilters();
+                  }}
+                  placeholder={t('users.allHoldings')}
+                  size="sm"
+                  showChevron
+                  clearable
+                  loading={holdingsLoading}
+                />
+                <Select
+                  options={companyFilterOptions}
+                  value={filterCompany || null}
+                  onChange={(val) => {
+                    setFilterCompany((val as string) ?? '');
+                    setFilterBranch('');
+                    resetFilters();
+                  }}
+                  placeholder={t('users.allCompanies')}
+                  size="sm"
+                  showChevron
+                  clearable
+                  loading={filterCompaniesLoading}
+                />
+                <Select
+                  options={branchFilterOptions}
+                  value={filterBranch || null}
+                  onChange={(val) => {
+                    setFilterBranch((val as string) ?? '');
+                    resetFilters();
+                  }}
+                  placeholder={t('users.allBranches')}
+                  size="sm"
+                  showChevron
+                  clearable
+                  loading={filterBranchesLoading}
+                  disabled={!filterCompany}
+                />
+              </div>
+            </PopOver>
+          </div>
         </div>
         {selectedCount > 0 && (
           <div className="flex items-center gap-2">

@@ -39,6 +39,7 @@
     "register": "ลงทะเบียนอุปกรณ์",
     "enrollment": "Enrollment",
     "users": "ผู้ใช้งาน",
+    "pricing": "ราคาสินค้า",
     "conceptDemo": "ทดลองแนวคิด"
   },
   "user": {
@@ -201,6 +202,26 @@
     "selectTitle": "เลือก Holding",
     "selectDescription": "เลือก Holding เพื่อดำเนินการต่อ",
     "loading": "กำลังโหลด..."
+  },
+  "pricing": {
+    "title": "ราคาสินค้า",
+    "search": "ค้นหาสินค้า...",
+    "allCategories": "ทุกหมวดหมู่",
+    "saveChanges": "บันทึกการเปลี่ยนแปลง",
+    "saving": "กำลังบันทึก...",
+    "saveSuccess": "อัปเดตราคาสำเร็จ",
+    "savePayloadLogged": "บันทึก payload ไปที่ console (backend RPC ยังไม่พร้อม)",
+    "dirtyCount": "{{count}} รายการที่ยังไม่บันทึก",
+    "product": "สินค้า / รุ่น",
+    "retail": "ราคาขาย",
+    "costAvg": "ต้นทุนเฉลี่ย",
+    "profitTerm": "FIN2 {{months}}ด.",
+    "inherited": "สืบทอด",
+    "noProducts": "ไม่พบสินค้า",
+    "expandAll": "ขยายทั้งหมด",
+    "collapseAll": "ยุบทั้งหมด",
+    "clearOverride": "ล้างเพื่อลบค่าที่กำหนดเอง",
+    "needsPriceSetup": "ยังไม่ได้ตั้งค่าราคา"
   },
   "enrollRedirect": {
     "invalidLink": "ลิงก์ไม่ถูกต้อง",

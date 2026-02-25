@@ -24,6 +24,11 @@ Always read source before writing code:
 - Error display: `FormErrorMessage` after each input
 - Forms in modals: `form-grid` goes inside `modal-content`, never on the same element (e.g. `<div className="modal-content"><div className="form-grid">...fields...</div></div>`)
 
+### PopOver & Icon Buttons
+
+- **PopOver**: `import { PopOver } from 'tsp-form'` — portal-based, auto-flips. Props: `isOpen`, `onClose`, `trigger`, `placement`, `align`, `maxWidth`, `maxHeight`, `offset`
+- **Icon button**: Use `Button` with `className="btn-icon-sm"` (or `btn-icon`, `btn-icon-xs`, `btn-icon-lg`) — square button sized to match control height, SVG auto-sized via CSS
+
 ### Alert & Snackbar
 
 - Alert is CSS-only: `<div className="alert alert-{variant}">` with optional icon, `alert-title`, `alert-description`

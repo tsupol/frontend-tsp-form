@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   User,
   Users,
+  DollarSign,
   ClipboardList,
   Smartphone,
   Settings,
@@ -24,6 +25,7 @@ import { useTheme } from './contexts/ThemeContext';
 const menuItemsList = [
   { key: 'dashboard', path: '/admin' },
   { key: 'users', path: '/admin/users' },
+  { key: 'pricing', path: '/admin/pricing' },
   { key: 'register', path: '/admin/register' },
   { key: 'enrollment', path: '/admin/enrollment' },
 ];
@@ -134,6 +136,7 @@ export const AppSideNav = () => {
   const menuItems: SideMenuItemData[] = [
     { key: 'dashboard', icon: <LayoutDashboard size="1rem" />, label: t('nav.dashboard'), path: '/admin' },
     { key: 'users', icon: <Users size="1rem" />, label: t('nav.users'), path: '/admin/users' },
+    { key: 'pricing', icon: <DollarSign size="1rem" />, label: t('nav.pricing'), path: '/admin/pricing' },
     { type: 'group', key: 'grp-demo', label: t('nav.conceptDemo') },
     { key: 'register', icon: <ClipboardList size="1rem" />, label: t('nav.register'), path: '/admin/register' },
     { key: 'enrollment', icon: <Smartphone size="1rem" />, label: t('nav.enrollment'), path: '/admin/enrollment' },

@@ -39,6 +39,7 @@
     "register": "Register Device",
     "enrollment": "Enrollment",
     "users": "Users",
+    "pricing": "Pricing",
     "conceptDemo": "Concept Demo"
   },
   "user": {
@@ -201,6 +202,26 @@
     "selectTitle": "Select Holding",
     "selectDescription": "Choose a holding to continue",
     "loading": "Loading holdings..."
+  },
+  "pricing": {
+    "title": "Product Pricing",
+    "search": "Search products...",
+    "allCategories": "All Categories",
+    "saveChanges": "Save Changes",
+    "saving": "Saving...",
+    "saveSuccess": "Prices updated successfully",
+    "savePayloadLogged": "Save payload logged to console (backend RPC not ready)",
+    "dirtyCount": "{{count}} unsaved changes",
+    "product": "Product / Variant",
+    "retail": "Retail",
+    "costAvg": "Cost Avg",
+    "profitTerm": "FIN2 {{months}}m",
+    "inherited": "inherited",
+    "noProducts": "No products found",
+    "expandAll": "Expand All",
+    "collapseAll": "Collapse All",
+    "clearOverride": "Clear to remove override",
+    "needsPriceSetup": "Missing pricing data"
   },
   "enrollRedirect": {
     "invalidLink": "Invalid Link",

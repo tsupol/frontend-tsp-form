@@ -15,6 +15,7 @@ import { EnrollmentPage } from './pages/EnrollmentPage';
 import { EnrollRedirectPage } from './pages/EnrollRedirectPage';
 import { HoldingSelectPage } from './pages/HoldingSelectPage';
 import { UsersPage } from './pages/UsersPage';
+import { PricingPage } from './pages/PricingPage';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -95,6 +96,18 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <UsersPage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Pricing */}
+      <Route
+        path="/admin/pricing"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <PricingPage />
             </AdminLayout>
           </ProtectedRoute>
         }

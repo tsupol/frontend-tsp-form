@@ -77,7 +77,6 @@ export const authService = {
 
     console.log('[Auth] Login response:', JSON.stringify(result, null, 2));
     this.storeTokens(result);
-    console.log('[Auth] Stored access_token:', localStorage.getItem('access_token')?.substring(0, 20) + '...');
     return result;
   },
 
