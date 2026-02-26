@@ -75,7 +75,6 @@ export const authService = {
       p_user_agent: navigator.userAgent,
     }, false);
 
-    console.log('[Auth] Login response:', JSON.stringify(result, null, 2));
     this.storeTokens(result);
     return result;
   },

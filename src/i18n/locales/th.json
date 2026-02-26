@@ -10,7 +10,8 @@
     "create": "สร้าง",
     "search": "ค้นหา",
     "noData": "ไม่มีข้อมูล",
-    "example": "ตัวอย่าง"
+    "example": "ตัวอย่าง",
+    "appName": "NNF System"
   },
   "auth": {
     "login": "เข้าสู่ระบบ",
@@ -32,7 +33,7 @@
   },
   "nav": {
     "home": "หน้าหลัก",
-    "userArea": "พื้นที่ผู้ใช้",
+    "userArea": "NNF System",
     "dashboard": "แดชบอร์ด",
     "profile": "โปรไฟล์",
     "userDetails": "ข้อมูลผู้ใช้",
@@ -131,7 +132,16 @@
     "passwordMinLength": "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร",
     "passwordMismatch": "รหัสผ่านไม่ตรงกัน",
     "passwordChanged": "เปลี่ยนรหัสผ่านสำเร็จ",
-    "changingPassword": "กำลังเปลี่ยน..."
+    "changingPassword": "กำลังเปลี่ยน...",
+    "firstname": "ชื่อ",
+    "lastname": "นามสกุล",
+    "nickname": "ชื่อเล่น",
+    "tel": "โทรศัพท์",
+    "profileImage": "รูปโปรไฟล์",
+    "uploadImage": "อัปโหลดรูป",
+    "uploading": "กำลังอัปโหลด...",
+    "uploadSuccess": "อัปเดตรูปโปรไฟล์สำเร็จ",
+    "uploadFailed": "อัปโหลดรูปไม่สำเร็จ"
   },
   "theme": {
     "title": "ธีม",
@@ -146,8 +156,8 @@
   },
   "public": {
     "welcome": "ยินดีต้อนรับ",
-    "title": "ระบบลงทะเบียนอุปกรณ์",
-    "description": "ลงทะเบียนและจัดการอุปกรณ์ของคุณอย่างปลอดภัย"
+    "title": "NNF System",
+    "description": "ระบบจัดการองค์กร"
   },
   "device": {
     "title": "ตรวจสอบอุปกรณ์",

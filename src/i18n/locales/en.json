@@ -10,7 +10,8 @@
     "create": "Create",
     "search": "Search",
     "noData": "No data available",
-    "example": "Example"
+    "example": "Example",
+    "appName": "NNF System"
   },
   "auth": {
     "login": "Login",
@@ -32,7 +33,7 @@
   },
   "nav": {
     "home": "Home",
-    "userArea": "MDM",
+    "userArea": "NNF System",
     "dashboard": "Dashboard",
     "profile": "My Profile",
     "userDetails": "User Details",
@@ -131,7 +132,16 @@
     "passwordMinLength": "Password must be at least 6 characters",
     "passwordMismatch": "Passwords do not match",
     "passwordChanged": "Password changed successfully",
-    "changingPassword": "Changing..."
+    "changingPassword": "Changing...",
+    "firstname": "First Name",
+    "lastname": "Last Name",
+    "nickname": "Nickname",
+    "tel": "Phone",
+    "profileImage": "Profile Image",
+    "uploadImage": "Upload Image",
+    "uploading": "Uploading...",
+    "uploadSuccess": "Profile image updated",
+    "uploadFailed": "Failed to upload image"
   },
   "theme": {
     "title": "Theme",
@@ -146,8 +156,8 @@
   },
   "public": {
     "welcome": "Welcome",
-    "title": "Device Registration System",
-    "description": "Register and manage your devices securely."
+    "title": "NNF System",
+    "description": "Enterprise management platform"
   },
   "device": {
     "title": "Device Validation",
