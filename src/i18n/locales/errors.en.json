@@ -13,5 +13,17 @@
   "auth.invalid_credentials": "Invalid username or password",
   "auth.session_expired": "Session expired, please log in again",
   "auth.forbidden": "You do not have permission to perform this action",
-  "system.unexpected": "An unexpected error occurred"
+  "system.unexpected": "An unexpected error occurred",
+  "product.validation.brand_code_required": "Brand code is required",
+  "product.validation.brand_code_invalid": "Brand code format is invalid",
+  "product.validation.brand_name_required": "Brand name is required",
+  "product.conflict.brand_code_exists": "A brand with this code already exists",
+  "product.validation.family_code_required": "Family code is required",
+  "product.validation.family_code_invalid": "Family code format is invalid",
+  "product.validation.family_name_required": "Family name is required",
+  "product.validation.family_brand_mismatch": "Family does not match the selected brand",
+  "product.conflict.family_code_exists": "A model family with this code already exists",
+  "product.not_found.brand_not_found": "Brand not found",
+  "product.not_found.family_not_found": "Model family not found",
+  "product.auth.missing_permission": "You do not have permission for this action"
 }

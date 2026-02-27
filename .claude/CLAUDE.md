@@ -9,12 +9,12 @@
 
 ## tsp-form Component Usage
 
-Always read source before writing code:
+When using tsp-form components, follow this lookup order:
 
-- **CLAUDE.md:** `C:\Users\tonsu\PhpstormProjects\tsp-form\.claude\CLAUDE.md` — read this first for conventions
-- **Component source:** `C:\Users\tonsu\PhpstormProjects\tsp-form\src\components\`
-- **Context/hooks:** `C:\Users\tonsu\PhpstormProjects\tsp-form\src\context\`
-- **Example usage:** `C:\Users\tonsu\PhpstormProjects\tsp-form\src\example\`
+1. **Examples first:** `C:\Users\tonsu\PhpstormProjects\tsp-form\src\example\` — always check here first for usage patterns
+2. **Component source:** `C:\Users\tonsu\PhpstormProjects\tsp-form\src\components\` — only if examples don't clarify enough
+3. **Context/hooks:** `C:\Users\tonsu\PhpstormProjects\tsp-form\src\context\`
+4. **CLAUDE.md:** `C:\Users\tonsu\PhpstormProjects\tsp-form\.claude\CLAUDE.md` — for conventions
 
 ### Form Patterns (from tsp-form)
 
@@ -72,6 +72,12 @@ Backend returns `message_key` in error responses (from `core.error_codes` table 
     setErrorMessage(translated || err.message);
   }
   ```
+
+### Authorization
+
+- `role_code` from `useAuth().user` is used only for UI visibility (hiding pages/nav items, hiding specific actions)
+- **Never** gate data fetching on `role_code` or `holding_id` — the backend handles all permission checks
+- Don't add `enabled: !!holdingId` or similar guards on queries — just let them fire and let the backend return errors if unauthorized
 
 ### Data Fetching
 

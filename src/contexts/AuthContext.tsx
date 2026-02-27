@@ -100,8 +100,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (isValid) {
         try {
           suppressAuthRedirect.current = true;
-          const res = await authService.meProfile();
-          const userInfo = authService.profileToUserInfo(res);
+          let res = await authService.meProfile();
+          let userInfo = authService.profileToUserInfo(res);
+
+          // If profile has no holding (e.g. SYSTEM_DEV), restore from localStorage
+          if (userInfo.holding_id === null) {
+            const savedHoldingId = localStorage.getItem('selected_holding_id');
+            if (savedHoldingId) {
+              userInfo = { ...userInfo, holding_id: Number(savedHoldingId) };
+            }
+          }
+
           setUser(userInfo);
           setNeedsHoldingSelect(userInfo.holding_id === null);
           scheduleRefresh();
@@ -128,9 +137,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await authService.login(username, password);
       const holdingNeeded = response.holding_id === null;
 
-      // me_profile_get works for all roles (including SYSTEM_DEV without holding)
       const res = await authService.meProfile();
-      setUser(authService.profileToUserInfo(res));
+      const userInfo = authService.profileToUserInfo(res);
+
+      if (response.holding_id !== null) {
+        // Role has a fixed holding — use it
+        userInfo.holding_id = response.holding_id;
+      } else {
+        // Role needs to select — clear any stale holding from previous login
+        localStorage.removeItem('selected_holding_id');
+      }
+
+      setUser(userInfo);
       setNeedsHoldingSelect(holdingNeeded);
 
       scheduleRefresh();
@@ -146,14 +164,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refreshTimerRef.current = null;
     }
     await authService.logout();
+    localStorage.removeItem('selected_holding_id');
     setUser(null);
     setNeedsHoldingSelect(false);
   }, []);
 
   const switchHolding = useCallback(async (holdingId: number) => {
-    await authService.switchHolding(holdingId);
-    const res = await authService.meProfile();
-    setUser(authService.profileToUserInfo(res));
+    const result = await authService.switchHolding(holdingId);
+    // Use holding_id from server response as single source of truth
+    setUser(prev => prev ? { ...prev, holding_id: result.holding_id } : prev);
     setNeedsHoldingSelect(false);
     scheduleRefresh();
   }, [scheduleRefresh]);

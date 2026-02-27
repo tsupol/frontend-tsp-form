@@ -63,6 +63,10 @@ export interface HoldingOption {
 
 export interface SwitchHoldingResponse {
   user_id: number;
+  holding_id: number;
+  role_code: string;
+  company_id: number | null;
+  branch_id: number | null;
   access_token: string;
   token_type: string;
   expires_at: string;
@@ -166,6 +170,7 @@ export const authService = {
     localStorage.removeItem('expires_at');
     localStorage.removeItem('refresh_expires_at');
     localStorage.removeItem('user_id');
+    localStorage.removeItem('selected_holding_id');
   },
 
   getAccessToken(): string | null {
@@ -249,9 +254,10 @@ export const authService = {
       p_holding_id: holdingId,
     });
 
-    // Update access_token and expires_at, keep existing refresh_token
+    // Update access_token with new holding context
     localStorage.setItem('access_token', result.access_token);
     localStorage.setItem('expires_at', result.expires_at);
+    localStorage.setItem('selected_holding_id', String(result.holding_id));
 
     return result;
   },

@@ -1,21 +1,27 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
+import { Modal } from 'tsp-form';
 import { useAuth } from '../contexts/AuthContext';
 import { authService } from '../lib/auth';
 import type { HoldingOption } from '../lib/auth';
-import { LanguageSwitcher } from '../components/LanguageSwitcher';
 
-export function HoldingSelectPage() {
-  const navigate = useNavigate();
+interface HoldingSelectModalProps {
+  open: boolean;
+}
+
+export function HoldingSelectModal({ open }: HoldingSelectModalProps) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { switchHolding } = useAuth();
   const [holdings, setHoldings] = useState<HoldingOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
-  const [switching, setSwitching] = useState<number | null>(null);
 
   useEffect(() => {
+    if (!open) return;
+    setIsLoading(true);
+    setError('');
     const fetchHoldings = async () => {
       try {
         const result = await authService.listHoldingsForContext();
@@ -27,35 +33,27 @@ export function HoldingSelectPage() {
       }
     };
     fetchHoldings();
-  }, [t]);
+  }, [open, t]);
 
   const handleSelect = async (holdingId: number) => {
-    setSwitching(holdingId);
-    setError('');
     try {
       await switchHolding(holdingId);
       navigate('/admin');
     } catch {
       setError(t('common.error'));
-      setSwitching(null);
     }
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-bg">
-      <div className="w-full max-w-md p-card">
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className="heading-1">{t('holding.selectTitle')}</h1>
-            <p className="text-sm text-fg/60 mt-1">{t('holding.selectDescription')}</p>
-          </div>
-          <LanguageSwitcher />
-        </div>
+    <Modal open={open} maxWidth="400px" ariaLabel={t('holding.selectTitle')}>
+      <div className="modal-header">
+        <h2 className="modal-title">{t('holding.selectTitle')}</h2>
+      </div>
+      <div className="modal-content">
+        <p className="text-sm text-fg/60 mb-4">{t('holding.selectDescription')}</p>
 
         {error && (
-          <div className="mb-4 p-3 bg-danger/10 border border-danger/30 rounded text-sm text-danger">
-            {error}
-          </div>
+          <div className="alert alert-danger mb-4">{error}</div>
         )}
 
         {isLoading ? (
@@ -66,8 +64,7 @@ export function HoldingSelectPage() {
               <button
                 key={holding.holding_id}
                 onClick={() => handleSelect(holding.holding_id)}
-                disabled={switching !== null}
-                className="w-full text-left p-4 rounded border border-border hover:border-primary hover:bg-primary/5 transition-colors disabled:opacity-50 cursor-pointer"
+                className="w-full text-left p-4 rounded border border-border hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer"
               >
                 <div className="font-medium">{holding.name}</div>
                 <div className="text-sm text-fg/60">{holding.code}</div>
@@ -76,6 +73,6 @@ export function HoldingSelectPage() {
           </div>
         )}
       </div>
-    </div>
+    </Modal>
   );
 }

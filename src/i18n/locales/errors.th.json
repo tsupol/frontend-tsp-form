@@ -13,5 +13,17 @@
   "auth.invalid_credentials": "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง",
   "auth.session_expired": "เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง",
   "auth.forbidden": "คุณไม่มีสิทธิ์ดำเนินการนี้",
-  "system.unexpected": "เกิดข้อผิดพลาดที่ไม่คาดคิด"
+  "system.unexpected": "เกิดข้อผิดพลาดที่ไม่คาดคิด",
+  "product.validation.brand_code_required": "กรุณากรอกรหัสแบรนด์",
+  "product.validation.brand_code_invalid": "รูปแบบรหัสแบรนด์ไม่ถูกต้อง",
+  "product.validation.brand_name_required": "กรุณากรอกชื่อแบรนด์",
+  "product.conflict.brand_code_exists": "รหัสแบรนด์นี้มีอยู่แล้ว",
+  "product.validation.family_code_required": "กรุณากรอกรหัสกลุ่มรุ่น",
+  "product.validation.family_code_invalid": "รูปแบบรหัสกลุ่มรุ่นไม่ถูกต้อง",
+  "product.validation.family_name_required": "กรุณากรอกชื่อกลุ่มรุ่น",
+  "product.validation.family_brand_mismatch": "กลุ่มรุ่นไม่ตรงกับแบรนด์ที่เลือก",
+  "product.conflict.family_code_exists": "รหัสกลุ่มรุ่นนี้มีอยู่แล้ว",
+  "product.not_found.brand_not_found": "ไม่พบแบรนด์",
+  "product.not_found.family_not_found": "ไม่พบกลุ่มรุ่นสินค้า",
+  "product.auth.missing_permission": "คุณไม่มีสิทธิ์ดำเนินการนี้"
 }

@@ -13,19 +13,19 @@ import { Step2Scan } from './pages/register/Step2Scan';
 import { Step3Status } from './pages/register/Step3Status';
 import { EnrollmentPage } from './pages/EnrollmentPage';
 import { EnrollRedirectPage } from './pages/EnrollRedirectPage';
-import { HoldingSelectPage } from './pages/HoldingSelectPage';
+import { HoldingSelectModal } from './components/HoldingSelectModal';
 import { UsersPage } from './pages/UsersPage';
-import { PricingPage } from './pages/PricingPage';
+import { BrandsModelsPage } from './pages/BrandsModelsPage';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
 
 function AdminLayout({ children }: { children: ReactNode }) {
+  const { needsHoldingSelect } = useAuth();
+  if (needsHoldingSelect) return null;
   return (
     <div className="flex h-dvh">
       <AppSideNav />
@@ -38,7 +38,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
 
 function App() {
   const { t } = useTranslation();
-  const { isLoading } = useAuth();
+  const { isLoading, needsHoldingSelect, isAuthenticated } = useAuth();
 
   if (isLoading) {
     return (
@@ -49,21 +49,13 @@ function App() {
   }
 
   return (
+    <>
+    <HoldingSelectModal open={isAuthenticated && needsHoldingSelect} />
     <Routes>
       {/* Public routes */}
       <Route path="/" element={<HomePage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/enroll" element={<EnrollRedirectPage />} />
-
-      {/* Holding selection (protected, no sidebar) */}
-      <Route
-        path="/admin/select-holding"
-        element={
-          <ProtectedRoute>
-            <HoldingSelectPage />
-          </ProtectedRoute>
-        }
-      />
 
       {/* Dashboard */}
       <Route
@@ -101,13 +93,13 @@ function App() {
         }
       />
 
-      {/* Pricing */}
+      {/* Brands & Models */}
       <Route
-        path="/admin/pricing"
+        path="/admin/brands-models"
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <PricingPage />
+              <BrandsModelsPage />
             </AdminLayout>
           </ProtectedRoute>
         }
@@ -144,6 +136,7 @@ function App() {
       {/* Catch-all redirect */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </>
   );
 }
 

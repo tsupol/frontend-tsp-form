@@ -37,7 +37,17 @@
       "WebFetch(domain:api.github.com)",
       "Bash(git clone:*)",
       "Bash(git pull:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(timeout 15 npm run dev:*)",
+      "WebFetch(domain:)",
+      "Bash(timeout 10 npm run dev:*)",
+      "Bash(aws s3api create-bucket:*)",
+      "Bash(git -C /d/dev/nnf pull)",
+      "Bash(git -C /d/dev/nnf log --oneline -20)",
+      "Bash(git -C /d/dev/nnf diff HEAD~5 --name-only)",
+      "Bash(git -C /d/dev/nnf log --oneline -10)",
+      "Bash(git -C /d/dev/nnf diff HEAD~3 --name-only)"
     ]
   }
 }

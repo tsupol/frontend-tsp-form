@@ -58,7 +58,10 @@ export function LoginPage() {
     setErrorMessage('');
     try {
       const result = await login(data.username, data.password);
-      navigate(result.needsHoldingSelect ? '/admin/select-holding' : '/admin');
+      if (!result.needsHoldingSelect) {
+        navigate('/admin');
+      }
+      // If holding selection is needed, the modal in App handles it
     } catch (err) {
       if (err instanceof ApiError) {
         const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
