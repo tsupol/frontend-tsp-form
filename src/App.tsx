@@ -15,7 +15,11 @@ import { EnrollmentPage } from './pages/EnrollmentPage';
 import { EnrollRedirectPage } from './pages/EnrollRedirectPage';
 import { HoldingSelectModal } from './components/HoldingSelectModal';
 import { UsersPage } from './pages/UsersPage';
-import { BrandsModelsPage } from './pages/BrandsModelsPage';
+import { BrandsPage } from './pages/products/BrandsPage';
+import { FamiliesPage } from './pages/products/FamiliesPage';
+import { AttributesPage } from './pages/products/AttributesPage';
+import { ModelsPage } from './pages/products/ModelsPage';
+import { ProductsLayout } from './pages/products/ProductsLayout';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -93,13 +97,43 @@ function App() {
         }
       />
 
-      {/* Brands & Models */}
+      {/* Products */}
       <Route
-        path="/admin/brands-models"
+        path="/admin/products/brands"
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <BrandsModelsPage />
+              <ProductsLayout><BrandsPage /></ProductsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/products/families"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <ProductsLayout><FamiliesPage /></ProductsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/products/attributes"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <ProductsLayout><AttributesPage /></ProductsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/products/models"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <ProductsLayout><ModelsPage /></ProductsLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

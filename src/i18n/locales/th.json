@@ -41,6 +41,11 @@
     "enrollment": "Enrollment",
     "users": "ผู้ใช้งาน",
     "brandsModels": "แบรนด์และรุ่น",
+    "products": "สินค้า",
+    "brands": "แบรนด์",
+    "families": "กลุ่มรุ่นสินค้า",
+    "attributes": "คุณสมบัติ",
+    "models": "รุ่นสินค้า",
     "conceptDemo": "ทดลองแนวคิด"
   },
   "user": {
@@ -238,6 +243,37 @@
     "noBrands": "ไม่พบแบรนด์",
     "active": "ใช้งาน",
     "inactive": "ไม่ใช้งาน"
+  },
+  "attributes": {
+    "title": "คุณสมบัติสินค้า",
+    "attributeCode": "รหัส",
+    "attributeName": "ชื่อ",
+    "dataType": "ประเภทข้อมูล",
+    "unit": "หน่วย",
+    "sortOrder": "ลำดับ",
+    "addAttribute": "เพิ่มคุณสมบัติ",
+    "editAttribute": "แก้ไขคุณสมบัติ",
+    "attributeCreateSuccess": "สร้างคุณสมบัติสำเร็จ",
+    "attributeUpdateSuccess": "อัปเดตคุณสมบัติสำเร็จ",
+    "noAttributes": "ไม่พบคุณสมบัติ",
+    "active": "ใช้งาน",
+    "inactive": "ไม่ใช้งาน",
+    "options": "ตัวเลือกคุณสมบัติ",
+    "selectAttribute": "เลือกคุณสมบัติเพื่อจัดการตัวเลือก",
+    "optionCode": "รหัส",
+    "optionLabel": "ป้ายกำกับ",
+    "optionValue": "ค่า",
+    "isDefault": "ค่าเริ่มต้น",
+    "addOption": "เพิ่มตัวเลือก",
+    "editOption": "แก้ไขตัวเลือก",
+    "optionCreateSuccess": "สร้างตัวเลือกสำเร็จ",
+    "optionUpdateSuccess": "อัปเดตตัวเลือกสำเร็จ",
+    "noOptions": "ไม่พบตัวเลือก",
+    "manageOptions": "จัดการตัวเลือก"
+  },
+  "models": {
+    "title": "รุ่นสินค้า",
+    "comingSoon": "การจัดการรุ่นสินค้า — เร็วๆ นี้"
   },
   "enrollRedirect": {
     "invalidLink": "ลิงก์ไม่ถูกต้อง",

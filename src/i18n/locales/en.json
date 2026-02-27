@@ -41,6 +41,11 @@
     "enrollment": "Enrollment",
     "users": "Users",
     "brandsModels": "Brands & Models",
+    "products": "Products",
+    "brands": "Brands",
+    "families": "Model Families",
+    "attributes": "Attributes",
+    "models": "Models",
     "conceptDemo": "Concept Demo"
   },
   "user": {
@@ -238,6 +243,37 @@
     "noBrands": "No brands found",
     "active": "Active",
     "inactive": "Inactive"
+  },
+  "attributes": {
+    "title": "Product Attributes",
+    "attributeCode": "Code",
+    "attributeName": "Name",
+    "dataType": "Data Type",
+    "unit": "Unit",
+    "sortOrder": "Sort Order",
+    "addAttribute": "Add Attribute",
+    "editAttribute": "Edit Attribute",
+    "attributeCreateSuccess": "Attribute created",
+    "attributeUpdateSuccess": "Attribute updated",
+    "noAttributes": "No attributes found",
+    "active": "Active",
+    "inactive": "Inactive",
+    "options": "Attribute Options",
+    "selectAttribute": "Select an attribute to manage options",
+    "optionCode": "Code",
+    "optionLabel": "Label",
+    "optionValue": "Value",
+    "isDefault": "Default",
+    "addOption": "Add Option",
+    "editOption": "Edit Option",
+    "optionCreateSuccess": "Option created",
+    "optionUpdateSuccess": "Option updated",
+    "noOptions": "No options found",
+    "manageOptions": "Manage Options"
+  },
+  "models": {
+    "title": "Product Models",
+    "comingSoon": "Product models management — coming soon"
   },
   "enrollRedirect": {
     "invalidLink": "Invalid Link",

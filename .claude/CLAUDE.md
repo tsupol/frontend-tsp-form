@@ -23,6 +23,7 @@ When using tsp-form components, follow this lookup order:
 - Labels: use `form-label` class (not manual `text-sm text-control-label`)
 - Error display: `FormErrorMessage` after each input
 - Forms in modals: `form-grid` goes inside `modal-content`, never on the same element (e.g. `<div className="modal-content"><div className="form-grid">...fields...</div></div>`)
+- **Select in flex rows:** Wrap `Select` in a `<div>` with fixed width when placing inline with other controls — without a container the Select width is buggy
 
 ### PopOver & Icon Buttons
 

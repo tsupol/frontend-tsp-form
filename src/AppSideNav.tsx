@@ -25,7 +25,10 @@ import { useTheme } from './contexts/ThemeContext';
 const menuItemsList = [
   { key: 'dashboard', path: '/admin' },
   { key: 'users', path: '/admin/users' },
-  { key: 'brands-models', path: '/admin/brands-models' },
+  { key: 'brands', path: '/admin/products/brands' },
+  { key: 'families', path: '/admin/products/families' },
+  { key: 'attributes', path: '/admin/products/attributes' },
+  { key: 'models', path: '/admin/products/models' },
   { key: 'register', path: '/admin/register' },
   { key: 'enrollment', path: '/admin/enrollment' },
 ];
@@ -136,7 +139,15 @@ export const AppSideNav = () => {
   const menuItems: SideMenuItemData[] = [
     { key: 'dashboard', icon: <LayoutDashboard size="1rem" />, label: t('nav.dashboard'), path: '/admin' },
     { key: 'users', icon: <Users size="1rem" />, label: t('nav.users'), path: '/admin/users' },
-    { key: 'brands-models', icon: <Package size="1rem" />, label: t('nav.brandsModels'), path: '/admin/brands-models' },
+    {
+      key: 'products', icon: <Package size="1rem" />, label: t('nav.products'),
+      children: [
+        { key: 'brands', label: t('nav.brands'), path: '/admin/products/brands' },
+        { key: 'families', label: t('nav.families'), path: '/admin/products/families' },
+        { key: 'attributes', label: t('nav.attributes'), path: '/admin/products/attributes' },
+        { key: 'models', label: t('nav.models'), path: '/admin/products/models' },
+      ],
+    },
     { type: 'group', key: 'grp-demo', label: t('nav.conceptDemo') },
     { key: 'register', icon: <ClipboardList size="1rem" />, label: t('nav.register'), path: '/admin/register' },
     { key: 'enrollment', icon: <Smartphone size="1rem" />, label: t('nav.enrollment'), path: '/admin/enrollment' },
