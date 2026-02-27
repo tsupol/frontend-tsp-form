@@ -27,6 +27,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hasHandledAuthError = useRef(false);
   const isLoginInProgress = useRef(false);
   const suppressAuthRedirect = useRef(false);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Schedule a background token refresh before expiry
+  const scheduleRefresh = useCallback(() => {
+    // Clear any existing timer
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = null;
+    }
+
+    const delay = authService.getBackgroundRefreshDelay();
+    if (delay === null) return;
+
+    console.log(`[Auth] Background refresh scheduled in ${Math.round(delay / 1000)}s`);
+    refreshTimerRef.current = setTimeout(async () => {
+      try {
+        await authService.refresh();
+        console.log('[Auth] Background token refresh succeeded');
+        scheduleRefresh(); // Schedule next refresh with new expiry
+      } catch {
+        console.error('[Auth] Background token refresh failed');
+        // Don't clear tokens here — let the next API call trigger the auth error flow
+      }
+    }, delay);
+  }, []);
 
   // Handle auth errors from API - clear session and redirect to login
   const handleAuthError = useCallback((details: { code: string; message: string }) => {
@@ -56,6 +81,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => setAuthErrorHandler(null);
   }, [handleAuthError]);
 
+  // Cleanup refresh timer on unmount
+  useEffect(() => {
+    return () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    };
+  }, []);
+
   useEffect(() => {
     const initAuth = async () => {
       // Skip /me call if login is in progress (tokens are being set up)
@@ -68,9 +100,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (isValid) {
         try {
           suppressAuthRedirect.current = true;
-          const userInfo = await authService.me();
+          const res = await authService.meProfile();
+          const userInfo = authService.profileToUserInfo(res);
           setUser(userInfo);
           setNeedsHoldingSelect(userInfo.holding_id === null);
+          scheduleRefresh();
         } catch (err) {
           console.error('[Auth] Failed to fetch user info after token validation:', err);
           authService.clearTokens();
@@ -92,26 +126,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isLoginInProgress.current = true;
     try {
       const response = await authService.login(username, password);
-
-      // Use holding_id from login response to determine redirect
-      // Don't call /me here — system admins without holding context would get 401
       const holdingNeeded = response.holding_id === null;
-      setUser({
-        user_id: response.user_id,
-        sid: '',
-        role_code: response.role_code,
-        holding_id: response.holding_id,
-        company_id: null,
-        branch_id: null,
-        capabilities: [],
-      });
+
+      // me_profile_get works for all roles (including SYSTEM_DEV without holding)
+      const res = await authService.meProfile();
+      setUser(authService.profileToUserInfo(res));
       setNeedsHoldingSelect(holdingNeeded);
 
-      // For users with holding context, fetch full /me in background for capabilities
-      if (!holdingNeeded) {
-        authService.me().then(setUser).catch(() => {/* keep minimal user info */});
-      }
-
+      scheduleRefresh();
       return { needsHoldingSelect: holdingNeeded };
     } finally {
       isLoginInProgress.current = false;
@@ -119,6 +141,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = null;
+    }
     await authService.logout();
     setUser(null);
     setNeedsHoldingSelect(false);
@@ -126,10 +152,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const switchHolding = useCallback(async (holdingId: number) => {
     await authService.switchHolding(holdingId);
-    const userInfo = await authService.me();
-    setUser(userInfo);
+    const res = await authService.meProfile();
+    setUser(authService.profileToUserInfo(res));
     setNeedsHoldingSelect(false);
-  }, []);
+    scheduleRefresh();
+  }, [scheduleRefresh]);
 
   return (
     <AuthContext.Provider

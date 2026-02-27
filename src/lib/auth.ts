@@ -1,18 +1,40 @@
 import { apiClient } from './api';
 
-export interface Capability {
-  code: string;
-  description: string;
-}
-
-export interface UserInfo {
+export interface UserProfile {
   user_id: number;
-  sid: string;
+  username: string;
   role_code: string;
   holding_id: number | null;
   company_id: number | null;
   branch_id: number | null;
-  capabilities: Capability[];
+  firstname: string | null;
+  lastname: string | null;
+  nickname: string | null;
+  tel: string | null;
+  address: string | null;
+  date_of_birth: string | null;
+  profile_image: Record<string, string> | null;
+  images: Record<string, string>[] | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MeProfileResponse {
+  profile: UserProfile;
+  idcard: Record<string, unknown>;
+}
+
+export interface UserInfo {
+  user_id: number;
+  username: string;
+  role_code: string;
+  holding_id: number | null;
+  company_id: number | null;
+  branch_id: number | null;
+  firstname: string | null;
+  lastname: string | null;
+  nickname: string | null;
+  profile_image: Record<string, string> | null;
 }
 
 export interface LoginRequest {
@@ -65,7 +87,8 @@ export interface LogoutRequest {
   p_refresh_token: string;
 }
 
-const TOKEN_REFRESH_THRESHOLD_MS = 60 * 1000; // Refresh 1 minute before expiry
+const STARTUP_REFRESH_THRESHOLD_MS = 5 * 60 * 1000; // On startup, refresh if < 5 min left
+const BACKGROUND_REFRESH_THRESHOLD_MS = 60 * 1000;  // Background timer fires 1 min before expiry
 
 export const authService = {
   async login(username: string, password: string): Promise<LoginResponse> {
@@ -108,8 +131,25 @@ export const authService = {
     this.clearTokens();
   },
 
-  async me(): Promise<UserInfo> {
-    return apiClient.rpc<UserInfo>('me', {});
+  async meProfile(): Promise<MeProfileResponse> {
+    return apiClient.rpc<MeProfileResponse>('me_profile_get');
+  },
+
+  /** Convert me_profile_get response to UserInfo for auth context */
+  profileToUserInfo(res: MeProfileResponse): UserInfo {
+    const p = res.profile;
+    return {
+      user_id: p.user_id,
+      username: p.username,
+      role_code: p.role_code,
+      holding_id: p.holding_id,
+      company_id: p.company_id,
+      branch_id: p.branch_id,
+      firstname: p.firstname,
+      lastname: p.lastname,
+      nickname: p.nickname,
+      profile_image: p.profile_image,
+    };
   },
 
   storeTokens(response: LoginResponse | RefreshResponse): void {
@@ -167,7 +207,15 @@ export const authService = {
     if (!expiresAt) return false;
     const now = new Date();
     const timeUntilExpiry = expiresAt.getTime() - now.getTime();
-    return timeUntilExpiry <= TOKEN_REFRESH_THRESHOLD_MS;
+    return timeUntilExpiry <= STARTUP_REFRESH_THRESHOLD_MS;
+  },
+
+  /** Returns ms until the background timer should fire, or null if not schedulable. */
+  getBackgroundRefreshDelay(): number | null {
+    const expiresAt = this.getExpiresAt();
+    if (!expiresAt) return null;
+    const delay = expiresAt.getTime() - Date.now() - BACKGROUND_REFRESH_THRESHOLD_MS;
+    return delay > 0 ? delay : 0;
   },
 
   isAuthenticated(): boolean {

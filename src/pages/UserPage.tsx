@@ -7,34 +7,11 @@ import { Button, Switch, Input, FormErrorMessage, ImageUploader, useSnackbarCont
 import type { UploadedImage } from 'tsp-form';
 import { useAuth } from '../contexts/AuthContext';
 import { authService } from '../lib/auth';
+import type { UserProfile, MeProfileResponse } from '../lib/auth';
 import { apiClient, ApiError } from '../lib/api';
 import { config, imageConfig } from '../config/config';
 
 const EXPIRED_GRACE_PERIOD_MS = 5000;
-
-// ── types ────────────────────────────────────────────────────────────
-
-interface UserProfile {
-  user_id: number;
-  username: string;
-  role_code: string;
-  holding_id: number | null;
-  company_id: number | null;
-  branch_id: number | null;
-  firstname: string | null;
-  lastname: string | null;
-  nickname: string | null;
-  tel: string | null;
-  address: string | null;
-  date_of_birth: string | null;
-  profile_image: Record<string, string> | null;
-  images: Record<string, string>[] | null;
-}
-
-interface MeProfileResponse {
-  profile: UserProfile;
-  idcard: Record<string, unknown>;
-}
 
 // ── helpers ──────────────────────────────────────────────────────────
 
@@ -205,18 +182,6 @@ function ProfileCard() {
           </div>
         ))}
 
-        <div>
-          <div className="text-sm text-control-label">{t('user.capabilities')}</div>
-          <div className="mt-1 flex flex-wrap gap-1">
-            {user?.capabilities?.length
-              ? user.capabilities.map((cap) => (
-                  <span key={cap.code} className="text-xs bg-surface-shallow px-2 py-1 rounded">
-                    {cap.code}
-                  </span>
-                ))
-              : '-'}
-          </div>
-        </div>
       </div>
     </div>
   );
