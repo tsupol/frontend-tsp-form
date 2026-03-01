@@ -10,6 +10,7 @@ import {
   User,
   Users,
   Package,
+  Headset,
   ClipboardList,
   Smartphone,
   Settings,
@@ -29,6 +30,7 @@ const menuItemsList = [
   { key: 'families', path: '/admin/products/families' },
   { key: 'attributes', path: '/admin/products/attributes' },
   { key: 'models', path: '/admin/products/models' },
+  { key: 'ticket-queue', path: '/admin/call-center/queue' },
   { key: 'register', path: '/admin/register' },
   { key: 'enrollment', path: '/admin/enrollment' },
 ];
@@ -147,6 +149,13 @@ export const AppSideNav = () => {
         { key: 'families', label: t('nav.families'), path: '/admin/products/families' },
         { key: 'attributes', label: t('nav.attributes'), path: '/admin/products/attributes' },
         { key: 'models', label: t('nav.models'), path: '/admin/products/models' },
+      ],
+    },
+    {
+      key: 'call-center', icon: <Headset size="1rem" />, label: t('nav.callCenter'),
+      path: '/admin/call-center/queue',
+      children: [
+        { key: 'ticket-queue', label: t('nav.ticketQueue'), path: '/admin/call-center/queue' },
       ],
     },
     { type: 'group', key: 'grp-demo', label: t('nav.conceptDemo') },

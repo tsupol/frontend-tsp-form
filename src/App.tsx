@@ -20,6 +20,9 @@ import { FamiliesPage } from './pages/products/FamiliesPage';
 import { AttributesPage } from './pages/products/AttributesPage';
 import { ModelsPage } from './pages/products/ModelsPage';
 import { ProductsLayout } from './pages/products/ProductsLayout';
+import { CallCenterLayout } from './pages/call-center/CallCenterLayout';
+import { TicketQueuePage } from './pages/call-center/TicketQueuePage';
+import { TicketDetailPage } from './pages/call-center/TicketDetailPage';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -134,6 +137,28 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <ProductsLayout><ModelsPage /></ProductsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Call Center */}
+      <Route
+        path="/admin/call-center/queue"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <CallCenterLayout><TicketQueuePage /></CallCenterLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/call-center/ticket/:id"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <CallCenterLayout><TicketDetailPage /></CallCenterLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
