@@ -141,6 +141,7 @@ export const AppSideNav = () => {
     { key: 'users', icon: <Users size="1rem" />, label: t('nav.users'), path: '/admin/users' },
     {
       key: 'products', icon: <Package size="1rem" />, label: t('nav.products'),
+      path: '/admin/products/models',
       children: [
         { key: 'brands', label: t('nav.brands'), path: '/admin/products/brands' },
         { key: 'families', label: t('nav.families'), path: '/admin/products/families' },

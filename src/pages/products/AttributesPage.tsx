@@ -1,14 +1,14 @@
-import { useState, useEffect, useRef, type MouseEvent } from 'react';
+import { useState, useEffect, useRef, useCallback, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm, Controller } from 'react-hook-form';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
   DataTable, DataTableColumnHeader, Button, Input, Select, PopOver, MenuItem,
-  MenuSeparator, Badge, Modal, Switch, useSnackbarContext, FormErrorMessage,
-  type ColumnDef,
+  MenuSeparator, Badge, Modal, Switch, NumberSpinner, useSnackbarContext, FormErrorMessage,
+  type ColumnDef, type SortingState,
 } from 'tsp-form';
 import {
-  Plus, MoreHorizontal, Pencil, ShieldCheck, ShieldOff, XCircle, CheckCircle, RefreshCw, List,
+  Plus, MoreHorizontal, Pencil, ShieldCheck, ShieldOff, XCircle, CheckCircle, List,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -32,60 +32,27 @@ interface AttributeOption {
   id: number;
   holding_id: number;
   attribute_id: number;
+  attribute_code: string;
+  attribute_name: string;
+  axis_sort_order: number;
   option_code: string;
   option_label: string;
   option_value: string | null;
-  sort_order: number;
+  option_sort_order: number;
   is_default: boolean;
   is_active: boolean;
   created_at: string;
   updated_at: string;
 }
 
-interface ListResult<T> {
-  items: T[];
-  total: number;
-  limit: number;
-  offset: number;
-}
-
-const DATA_TYPE_OPTIONS = [
-  { value: 'TEXT', label: 'Text' },
-  { value: 'INTEGER', label: 'Integer' },
-  { value: 'DECIMAL', label: 'Decimal' },
-  { value: 'BOOLEAN', label: 'Boolean' },
-];
-
-// ── Hooks ────────────────────────────────────────────────────────────────────
-
-function useAttributeList(holdingId: number | null, search: string, page: number, pageSize: number) {
-  return useQuery({
-    queryKey: ['product-attributes', holdingId, search, page, pageSize],
-    queryFn: () => apiClient.rpc<ListResult<ProductAttribute>>('product_attribute_list', {
-      p_holding_id: holdingId,
-      p_q: search || null,
-      p_is_active: null,
-      p_limit: pageSize,
-      p_offset: page * pageSize,
-    }),
-    staleTime: 5 * 60 * 1000,
-  });
-}
-
-function useAttributeOptionList(holdingId: number | null, attributeId: number | null, search: string, page: number, pageSize: number) {
-  return useQuery({
-    queryKey: ['product-attribute-options', holdingId, attributeId, search, page, pageSize],
-    queryFn: () => apiClient.rpc<ListResult<AttributeOption>>('product_attribute_option_list', {
-      p_holding_id: holdingId,
-      p_attribute_id: attributeId,
-      p_q: search || null,
-      p_is_active: null,
-      p_limit: pageSize,
-      p_offset: page * pageSize,
-    }),
-    enabled: !!attributeId,
-    staleTime: 5 * 60 * 1000,
-  });
+function useDataTypeOptions() {
+  const { t } = useTranslation();
+  return [
+    { value: 'TEXT', label: t('attributes.dataTypeText') },
+    { value: 'INTEGER', label: t('attributes.dataTypeInteger') },
+    { value: 'DECIMAL', label: t('attributes.dataTypeDecimal') },
+    { value: 'BOOLEAN', label: t('attributes.dataTypeBoolean') },
+  ];
 }
 
 // ── Attribute Row Actions ────────────────────────────────────────────────────
@@ -189,19 +156,20 @@ interface AttributeFormData {
   attribute_name: string;
   data_type: string;
   unit: string;
-  sort_order: string;
+  sort_order: number | '';
 }
 
 function CreateAttributeModal({ open, onClose, holdingId }: { open: boolean; onClose: () => void; holdingId: number | null }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
+  const dataTypeOptions = useDataTypeOptions();
   const [isPending, setIsPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [errorKey, setErrorKey] = useState(0);
 
-  const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<AttributeFormData>({
-    defaultValues: { attribute_code: '', attribute_name: '', data_type: 'TEXT', unit: '', sort_order: '0' },
+  const { register, handleSubmit, control, setValue, watch, reset, formState: { errors } } = useForm<AttributeFormData>({
+    defaultValues: { attribute_code: '', attribute_name: '', data_type: 'TEXT', unit: '', sort_order: 0 },
   });
 
   const dataType = watch('data_type');
@@ -216,7 +184,7 @@ function CreateAttributeModal({ open, onClose, holdingId }: { open: boolean; onC
         p_attribute_name: data.attribute_name,
         p_data_type: data.data_type,
         p_unit: data.unit || null,
-        p_sort_order: Number(data.sort_order) || 0,
+        p_sort_order: data.sort_order === '' ? 0 : Number(data.sort_order),
       });
       addSnackbar({
         message: (
@@ -288,7 +256,7 @@ function CreateAttributeModal({ open, onClose, holdingId }: { open: boolean; onC
             <div className="flex flex-col">
               <label className="form-label">{t('attributes.dataType')}</label>
               <Select
-                options={DATA_TYPE_OPTIONS}
+                options={dataTypeOptions}
                 value={dataType}
                 onChange={(val) => setValue('data_type', (val as string) ?? 'TEXT')}
                 showChevron
@@ -300,8 +268,14 @@ function CreateAttributeModal({ open, onClose, holdingId }: { open: boolean; onC
               <Input id="ca-unit" {...register('unit')} />
             </div>
             <div className="flex flex-col">
-              <label className="form-label" htmlFor="ca-sort">{t('attributes.sortOrder')}</label>
-              <Input id="ca-sort" type="number" {...register('sort_order')} />
+              <label className="form-label">{t('attributes.sortOrder')}</label>
+              <Controller
+                name="sort_order"
+                control={control}
+                render={({ field: { onChange, value, ref } }) => (
+                  <NumberSpinner ref={ref} value={value} onChange={onChange} min={0} scale="sm" />
+                )}
+              />
             </div>
           </div>
         </div>
@@ -323,12 +297,13 @@ interface EditAttributeFormData {
   attribute_name: string;
   data_type: string;
   unit: string;
-  sort_order: string;
+  sort_order: number | '';
   is_active: boolean;
 }
 
 function EditAttributeModal({ attribute, open, onClose }: { attribute: ProductAttribute | null; open: boolean; onClose: () => void }) {
   const { t } = useTranslation();
+  const dataTypeOptions = useDataTypeOptions();
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
   const [isPending, setIsPending] = useState(false);
@@ -336,7 +311,7 @@ function EditAttributeModal({ attribute, open, onClose }: { attribute: ProductAt
   const [errorKey, setErrorKey] = useState(0);
 
   const { register, handleSubmit, control, setValue, watch, reset, formState: { errors } } = useForm<EditAttributeFormData>({
-    defaultValues: { attribute_code: '', attribute_name: '', data_type: 'TEXT', unit: '', sort_order: '0', is_active: true },
+    defaultValues: { attribute_code: '', attribute_name: '', data_type: 'TEXT', unit: '', sort_order: 0, is_active: true },
   });
 
   const dataType = watch('data_type');
@@ -348,7 +323,7 @@ function EditAttributeModal({ attribute, open, onClose }: { attribute: ProductAt
         attribute_name: attribute.attribute_name,
         data_type: attribute.data_type,
         unit: attribute.unit ?? '',
-        sort_order: String(attribute.sort_order),
+        sort_order: attribute.sort_order,
         is_active: attribute.is_active,
       });
       setErrorMessage('');
@@ -366,7 +341,7 @@ function EditAttributeModal({ attribute, open, onClose }: { attribute: ProductAt
         p_attribute_name: data.attribute_name,
         p_data_type: data.data_type,
         p_unit: data.unit || null,
-        p_sort_order: Number(data.sort_order) || 0,
+        p_sort_order: data.sort_order === '' ? 0 : Number(data.sort_order),
         p_is_active: data.is_active,
       });
       addSnackbar({
@@ -437,7 +412,7 @@ function EditAttributeModal({ attribute, open, onClose }: { attribute: ProductAt
             <div className="flex flex-col">
               <label className="form-label">{t('attributes.dataType')}</label>
               <Select
-                options={DATA_TYPE_OPTIONS}
+                options={dataTypeOptions}
                 value={dataType}
                 onChange={(val) => setValue('data_type', (val as string) ?? 'TEXT')}
                 showChevron
@@ -449,8 +424,14 @@ function EditAttributeModal({ attribute, open, onClose }: { attribute: ProductAt
               <Input id="ea-unit" {...register('unit')} />
             </div>
             <div className="flex flex-col">
-              <label className="form-label" htmlFor="ea-sort">{t('attributes.sortOrder')}</label>
-              <Input id="ea-sort" type="number" {...register('sort_order')} />
+              <label className="form-label">{t('attributes.sortOrder')}</label>
+              <Controller
+                name="sort_order"
+                control={control}
+                render={({ field: { onChange, value, ref } }) => (
+                  <NumberSpinner ref={ref} value={value} onChange={onChange} min={0} scale="sm" />
+                )}
+              />
             </div>
             <div className="flex items-center justify-between">
               <label className="form-label mb-0" htmlFor="ea-active">{t('attributes.active')}</label>
@@ -481,7 +462,7 @@ interface OptionFormData {
   option_code: string;
   option_label: string;
   option_value: string;
-  sort_order: string;
+  sort_order: number | '';
   is_default: boolean;
 }
 
@@ -499,7 +480,7 @@ function CreateOptionModal({ open, onClose, holdingId, attributeId }: {
   const [errorKey, setErrorKey] = useState(0);
 
   const { register, handleSubmit, control, reset, formState: { errors } } = useForm<OptionFormData>({
-    defaultValues: { option_code: '', option_label: '', option_value: '', sort_order: '0', is_default: false },
+    defaultValues: { option_code: '', option_label: '', option_value: '', sort_order: 0, is_default: false },
   });
 
   const onSubmit = async (data: OptionFormData) => {
@@ -513,7 +494,7 @@ function CreateOptionModal({ open, onClose, holdingId, attributeId }: {
         p_option_code: data.option_code,
         p_option_label: data.option_label,
         p_option_value: data.option_value || null,
-        p_sort_order: Number(data.sort_order) || 0,
+        p_sort_order: data.sort_order === '' ? 0 : Number(data.sort_order),
         p_is_default: data.is_default,
       });
       addSnackbar({
@@ -588,8 +569,14 @@ function CreateOptionModal({ open, onClose, holdingId, attributeId }: {
               <Input id="co-value" {...register('option_value')} />
             </div>
             <div className="flex flex-col">
-              <label className="form-label" htmlFor="co-sort">{t('attributes.sortOrder')}</label>
-              <Input id="co-sort" type="number" {...register('sort_order')} />
+              <label className="form-label">{t('attributes.sortOrder')}</label>
+              <Controller
+                name="sort_order"
+                control={control}
+                render={({ field: { onChange, value, ref } }) => (
+                  <NumberSpinner ref={ref} value={value} onChange={onChange} min={0} scale="sm" />
+                )}
+              />
             </div>
             <div className="flex items-center justify-between">
               <label className="form-label mb-0" htmlFor="co-default">{t('attributes.isDefault')}</label>
@@ -620,7 +607,7 @@ interface EditOptionFormData {
   option_code: string;
   option_label: string;
   option_value: string;
-  sort_order: string;
+  sort_order: number | '';
   is_default: boolean;
   is_active: boolean;
 }
@@ -634,7 +621,7 @@ function EditOptionModal({ option, open, onClose }: { option: AttributeOption | 
   const [errorKey, setErrorKey] = useState(0);
 
   const { register, handleSubmit, control, reset, formState: { errors } } = useForm<EditOptionFormData>({
-    defaultValues: { option_code: '', option_label: '', option_value: '', sort_order: '0', is_default: false, is_active: true },
+    defaultValues: { option_code: '', option_label: '', option_value: '', sort_order: 0, is_default: false, is_active: true },
   });
 
   useEffect(() => {
@@ -643,7 +630,7 @@ function EditOptionModal({ option, open, onClose }: { option: AttributeOption | 
         option_code: option.option_code,
         option_label: option.option_label,
         option_value: option.option_value ?? '',
-        sort_order: String(option.sort_order),
+        sort_order: option.option_sort_order,
         is_default: option.is_default,
         is_active: option.is_active,
       });
@@ -661,7 +648,7 @@ function EditOptionModal({ option, open, onClose }: { option: AttributeOption | 
         p_option_code: data.option_code,
         p_option_label: data.option_label,
         p_option_value: data.option_value || null,
-        p_sort_order: Number(data.sort_order) || 0,
+        p_sort_order: data.sort_order === '' ? 0 : Number(data.sort_order),
         p_is_default: data.is_default,
         p_is_active: data.is_active,
       });
@@ -735,8 +722,14 @@ function EditOptionModal({ option, open, onClose }: { option: AttributeOption | 
               <Input id="eo-value" {...register('option_value')} />
             </div>
             <div className="flex flex-col">
-              <label className="form-label" htmlFor="eo-sort">{t('attributes.sortOrder')}</label>
-              <Input id="eo-sort" type="number" {...register('sort_order')} />
+              <label className="form-label">{t('attributes.sortOrder')}</label>
+              <Controller
+                name="sort_order"
+                control={control}
+                render={({ field: { onChange, value, ref } }) => (
+                  <NumberSpinner ref={ref} value={value} onChange={onChange} min={0} scale="sm" />
+                )}
+              />
             </div>
             <div className="flex items-center justify-between">
               <label className="form-label mb-0" htmlFor="eo-default">{t('attributes.isDefault')}</label>
@@ -788,12 +781,37 @@ function ManageOptionsModal({ attribute, open, onClose, holdingId }: {
   const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
+  const [optSorting, setOptSorting] = useState<SortingState>([]);
   const [createOptOpen, setCreateOptOpen] = useState(false);
   const [editOpt, setEditOpt] = useState<AttributeOption | null>(null);
 
-  const { data: optData, isFetching } = useAttributeOptionList(holdingId, attribute?.id ?? null, search, page, pageSize);
-  const options = optData?.items ?? [];
-  const total = optData?.total ?? 0;
+  const buildOptEndpoint = useCallback(() => {
+    const params: string[] = [];
+    if (holdingId) params.push(`holding_id=eq.${holdingId}`);
+    if (attribute) params.push(`attribute_id=eq.${attribute.id}`);
+    if (search.trim()) {
+      const term = encodeURIComponent(search.trim());
+      params.push(`or=(option_code.ilike.*${term}*,option_label.ilike.*${term}*)`);
+    }
+    if (optSorting.length > 0) {
+      const order = optSorting.map(s => `${s.id}.${s.desc ? 'desc' : 'asc'}`).join(',');
+      params.push(`order=${order}`);
+    } else {
+      params.push('order=option_sort_order');
+    }
+    const qs = params.length > 0 ? `?${params.join('&')}` : '';
+    return `/v_product_attribute_option_list${qs}`;
+  }, [holdingId, attribute, search, optSorting]);
+
+  const { data: optData, isFetching } = useQuery({
+    queryKey: ['product-attribute-options', holdingId, attribute?.id, search, page, pageSize, optSorting],
+    queryFn: () => apiClient.getPaginated<AttributeOption>(buildOptEndpoint(), { page: page + 1, pageSize }),
+    enabled: !!attribute,
+    placeholderData: keepPreviousData,
+  });
+
+  const options = optData?.data ?? [];
+  const total = optData?.totalCount ?? 0;
 
   const handleSearch = (value: string) => {
     setSearchInput(value);
@@ -846,6 +864,7 @@ function ManageOptionsModal({ attribute, open, onClose, holdingId }: {
     setSearchInput('');
     setSearch('');
     setPage(0);
+    setOptSorting([]);
     onClose();
   };
 
@@ -931,6 +950,14 @@ function ManageOptionsModal({ attribute, open, onClose, holdingId }: {
             <DataTable
               data={options}
               columns={columns}
+              enableSorting
+              manualSorting
+              sorting={optSorting}
+              onSortingChange={(updater) => {
+                const next = typeof updater === 'function' ? updater(optSorting) : updater;
+                setOptSorting(next);
+                setPage(0);
+              }}
               enablePagination
               pageIndex={page}
               pageSize={pageSize}
@@ -965,27 +992,48 @@ export function AttributesPage() {
   const { addSnackbar } = useSnackbarContext();
   const holdingId = user?.holding_id ?? null;
 
-  // Attribute state
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
+  const [sorting, setSorting] = useState<SortingState>([]);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(10);
   const [createAttrOpen, setCreateAttrOpen] = useState(false);
   const [editAttr, setEditAttr] = useState<ProductAttribute | null>(null);
   const [manageOptionsAttr, setManageOptionsAttr] = useState<ProductAttribute | null>(null);
 
-  // Data
-  const { data: attrData, isFetching } = useAttributeList(holdingId, search, page, pageSize);
-  const attributes = attrData?.items ?? [];
-  const total = attrData?.total ?? 0;
+  const buildEndpoint = useCallback(() => {
+    const params: string[] = [];
+    if (holdingId) params.push(`holding_id=eq.${holdingId}`);
+    if (search.trim()) {
+      const term = encodeURIComponent(search.trim());
+      params.push(`or=(attribute_code.ilike.*${term}*,attribute_name.ilike.*${term}*)`);
+    }
+    if (sorting.length > 0) {
+      const order = sorting.map(s => `${s.id}.${s.desc ? 'desc' : 'asc'}`).join(',');
+      params.push(`order=${order}`);
+    } else {
+      params.push('order=sort_order');
+    }
+    const qs = params.length > 0 ? `?${params.join('&')}` : '';
+    return `/v_product_attribute_list${qs}`;
+  }, [holdingId, search, sorting]);
+
+  const { data, isError, error, isFetching } = useQuery({
+    queryKey: ['product-attributes', pageIndex, pageSize, search, holdingId, sorting],
+    queryFn: () => apiClient.getPaginated<ProductAttribute>(buildEndpoint(), { page: pageIndex + 1, pageSize }),
+    placeholderData: keepPreviousData,
+  });
+
+  const attributes = data?.data ?? [];
+  const totalCount = data?.totalCount ?? 0;
 
   const handleSearch = (value: string) => {
     setSearchInput(value);
     clearTimeout(searchTimer.current);
     searchTimer.current = setTimeout(() => {
       setSearch(value);
-      setPage(0);
+      setPageIndex(0);
     }, 300);
   };
 
@@ -1041,7 +1089,11 @@ export function AttributesPage() {
     {
       accessorKey: 'data_type',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('attributes.dataType')} />,
-      cell: ({ row }) => <Badge size="sm">{row.getValue('data_type')}</Badge>,
+      cell: ({ row }) => {
+        const dt = row.getValue('data_type') as string;
+        const label: Record<string, string> = { TEXT: t('attributes.dataTypeText'), INTEGER: t('attributes.dataTypeInteger'), DECIMAL: t('attributes.dataTypeDecimal'), BOOLEAN: t('attributes.dataTypeBoolean') };
+        return <Badge size="sm">{label[dt] ?? dt}</Badge>;
+      },
     },
     {
       accessorKey: 'unit',
@@ -1076,58 +1128,65 @@ export function AttributesPage() {
   ];
 
   return (
-    <div className="page-content max-w-[64rem] flex flex-col gap-6 pb-8">
-      <h1 className="heading-2">{t('attributes.title')}</h1>
+    <div className="page-content h-dvh max-h-dvh max-w-[64rem] flex flex-col overflow-hidden">
+      <div className="flex-none pb-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h1 className="heading-2">{t('attributes.title')}</h1>
+          <Button color="primary" onClick={() => setCreateAttrOpen(true)}>
+            <Plus />
+            {t('attributes.addAttribute')}
+          </Button>
+        </div>
+        <div className="flex items-center gap-3">
+          <Input
+            placeholder={t('common.search')}
+            value={searchInput}
+            onChange={(e) => handleSearch(e.target.value)}
+            size="sm"
+            className="shrink-0"
+            style={{ width: '14rem' }}
+          />
+        </div>
+      </div>
 
-      <section>
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Input
-              placeholder={t('common.search')}
-              value={searchInput}
-              onChange={(e) => handleSearch(e.target.value)}
-              size="sm"
-              style={{ width: '14rem' }}
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="btn-icon-sm"
-              onClick={() => queryClient.invalidateQueries({ queryKey: ['product-attributes'] })}
-            >
-              <RefreshCw size={16} />
-            </Button>
-            <Button color="primary" size="sm" onClick={() => setCreateAttrOpen(true)}>
-              <Plus />
-              {t('attributes.addAttribute')}
-            </Button>
+      {isError && (
+        <div className="px-6">
+          <div className="border border-line bg-surface p-6 rounded-lg text-center">
+            <div className="text-danger mb-4">{error instanceof Error ? error.message : t('common.error')}</div>
           </div>
         </div>
+      )}
 
+      {!isError && (
         <DataTable
           data={attributes}
           columns={columns}
+          enableSorting
+          manualSorting
+          sorting={sorting}
+          onSortingChange={(updater) => {
+            const next = typeof updater === 'function' ? updater(sorting) : updater;
+            setSorting(next);
+            setPageIndex(0);
+          }}
           enablePagination
-          pageIndex={page}
+          pageIndex={pageIndex}
           pageSize={pageSize}
           pageSizeOptions={[10, 25, 50]}
-          rowCount={total}
+          rowCount={totalCount}
           onPageChange={({ pageIndex: pi, pageSize: ps }) => {
-            setPage(pi);
+            setPageIndex(pi);
             setPageSize(ps);
           }}
-          className={isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}
+          className={`flex-1 min-h-0 ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
           noResults={
             <div className="p-8 text-center text-control-label">
               {t('attributes.noAttributes')}
             </div>
           }
         />
-      </section>
+      )}
 
-      {/* Modals */}
       <CreateAttributeModal open={createAttrOpen} onClose={() => setCreateAttrOpen(false)} holdingId={holdingId} />
       <EditAttributeModal attribute={editAttr} open={!!editAttr} onClose={() => setEditAttr(null)} />
       <ManageOptionsModal attribute={manageOptionsAttr} open={!!manageOptionsAttr} onClose={() => setManageOptionsAttr(null)} holdingId={holdingId} />

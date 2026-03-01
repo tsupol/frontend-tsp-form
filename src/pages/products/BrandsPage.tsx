@@ -1,52 +1,30 @@
-import { useState, useRef, type MouseEvent } from 'react';
+import { useState, useEffect, useRef, useCallback, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm, Controller } from 'react-hook-form';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
   DataTable, DataTableColumnHeader, Button, Input, PopOver, MenuItem,
   MenuSeparator, Badge, Modal, Switch, useSnackbarContext, FormErrorMessage,
-  type ColumnDef,
+  type ColumnDef, type SortingState,
 } from 'tsp-form';
 import {
-  Plus, MoreHorizontal, Pencil, ShieldCheck, ShieldOff, XCircle, CheckCircle, RefreshCw,
+  Plus, MoreHorizontal, Pencil, ShieldCheck, ShieldOff, XCircle, CheckCircle,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
-import { useEffect } from 'react';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 interface Brand {
   id: number;
   holding_id: number;
+  company_id: number | null;
+  company_scope_id: number | null;
   code: string;
   name: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;
-}
-
-interface ListResult<T> {
-  items: T[];
-  total: number;
-  limit: number;
-  offset: number;
-}
-
-// ── Hooks ────────────────────────────────────────────────────────────────────
-
-function useBrandList(holdingId: number | null, search: string, page: number, pageSize: number) {
-  return useQuery({
-    queryKey: ['brands', holdingId, search, page, pageSize],
-    queryFn: () => apiClient.rpc<ListResult<Brand>>('ref_brand_list', {
-      p_holding_id: holdingId,
-      p_q: search || null,
-      p_is_active: null,
-      p_limit: pageSize,
-      p_offset: page * pageSize,
-    }),
-    staleTime: 5 * 60 * 1000,
-  });
 }
 
 // ── Brand Row Actions ────────────────────────────────────────────────────────
@@ -336,24 +314,45 @@ export function BrandsPage() {
   const { addSnackbar } = useSnackbarContext();
   const holdingId = user?.holding_id ?? null;
 
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
+  const [sorting, setSorting] = useState<SortingState>([]);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(10);
   const [createOpen, setCreateOpen] = useState(false);
   const [editBrand, setEditBrand] = useState<Brand | null>(null);
 
-  const { data: brandData, isFetching } = useBrandList(holdingId, search, page, pageSize);
-  const brands = brandData?.items ?? [];
-  const total = brandData?.total ?? 0;
+  const buildEndpoint = useCallback(() => {
+    const params: string[] = [];
+    if (holdingId) params.push(`holding_id=eq.${holdingId}`);
+    if (search.trim()) {
+      const term = encodeURIComponent(search.trim());
+      params.push(`or=(code.ilike.*${term}*,name.ilike.*${term}*)`);
+    }
+    if (sorting.length > 0) {
+      const order = sorting.map(s => `${s.id}.${s.desc ? 'desc' : 'asc'}`).join(',');
+      params.push(`order=${order}`);
+    }
+    const qs = params.length > 0 ? `?${params.join('&')}` : '';
+    return `/v_ref_brand_list${qs}`;
+  }, [holdingId, search, sorting]);
+
+  const { data, isError, error, isFetching } = useQuery({
+    queryKey: ['brands', pageIndex, pageSize, search, holdingId, sorting],
+    queryFn: () => apiClient.getPaginated<Brand>(buildEndpoint(), { page: pageIndex + 1, pageSize }),
+    placeholderData: keepPreviousData,
+  });
+
+  const brands = data?.data ?? [];
+  const totalCount = data?.totalCount ?? 0;
 
   const handleSearch = (value: string) => {
     setSearchInput(value);
     clearTimeout(searchTimer.current);
     searchTimer.current = setTimeout(() => {
       setSearch(value);
-      setPage(0);
+      setPageIndex(0);
     }, 300);
   };
 
@@ -433,56 +432,64 @@ export function BrandsPage() {
   ];
 
   return (
-    <div className="page-content max-w-[64rem] flex flex-col gap-6 pb-8">
-      <h1 className="heading-2">{t('brandsModels.brands')}</h1>
+    <div className="page-content h-dvh max-h-dvh max-w-[64rem] flex flex-col overflow-hidden">
+      <div className="flex-none pb-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h1 className="heading-2">{t('brandsModels.brands')}</h1>
+          <Button color="primary" onClick={() => setCreateOpen(true)}>
+            <Plus />
+            {t('brandsModels.addBrand')}
+          </Button>
+        </div>
+        <div className="flex items-center gap-3">
+          <Input
+            placeholder={t('common.search')}
+            value={searchInput}
+            onChange={(e) => handleSearch(e.target.value)}
+            size="sm"
+            className="shrink-0"
+            style={{ width: '14rem' }}
+          />
+        </div>
+      </div>
 
-      <section>
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Input
-              placeholder={t('common.search')}
-              value={searchInput}
-              onChange={(e) => handleSearch(e.target.value)}
-              size="sm"
-              style={{ width: '14rem' }}
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="btn-icon-sm"
-              onClick={() => queryClient.invalidateQueries({ queryKey: ['brands'] })}
-            >
-              <RefreshCw size={16} />
-            </Button>
-            <Button color="primary" size="sm" onClick={() => setCreateOpen(true)}>
-              <Plus />
-              {t('brandsModels.addBrand')}
-            </Button>
+      {isError && (
+        <div className="px-6">
+          <div className="border border-line bg-surface p-6 rounded-lg text-center">
+            <div className="text-danger mb-4">{error instanceof Error ? error.message : t('common.error')}</div>
           </div>
         </div>
+      )}
 
+      {!isError && (
         <DataTable
           data={brands}
           columns={columns}
+          enableSorting
+          manualSorting
+          sorting={sorting}
+          onSortingChange={(updater) => {
+            const next = typeof updater === 'function' ? updater(sorting) : updater;
+            setSorting(next);
+            setPageIndex(0);
+          }}
           enablePagination
-          pageIndex={page}
+          pageIndex={pageIndex}
           pageSize={pageSize}
           pageSizeOptions={[10, 25, 50]}
-          rowCount={total}
+          rowCount={totalCount}
           onPageChange={({ pageIndex: pi, pageSize: ps }) => {
-            setPage(pi);
+            setPageIndex(pi);
             setPageSize(ps);
           }}
-          className={isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}
+          className={`flex-1 min-h-0 ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
           noResults={
             <div className="p-8 text-center text-control-label">
               {t('brandsModels.noBrands')}
             </div>
           }
         />
-      </section>
+      )}
 
       <CreateBrandModal open={createOpen} onClose={() => setCreateOpen(false)} holdingId={holdingId} />
       <EditBrandModal brand={editBrand} open={!!editBrand} onClose={() => setEditBrand(null)} />

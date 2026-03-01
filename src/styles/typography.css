@@ -1,3 +1,7 @@
+:root {
+    --text-shift-y: .075em;
+}
+
 @layer components {
     .heading-1 {
         font-size: var(--text-h1);
