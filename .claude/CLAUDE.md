@@ -2,6 +2,7 @@
 
 ## General
 
+- **Never start the dev server** (`npm run dev` / `npx vite`) — the user already has it running. Only use `npm run build` or `npx tsc --noEmit` to check for errors.
 - Use Bangkok time (UTC+7) when displaying times to the user
 - Theme uses `data-theme` attribute on `<html>` (`light` / `dark`), not CSS classes
 - **`src/index.css`** — tsp-form theme only (copy from `example.css`, change `@import` line to `@import "tailwindcss"`)
@@ -86,3 +87,16 @@ Backend returns `message_key` in error responses (from `core.error_codes` table 
 - Use `useQuery` for data fetching pages (e.g. UsersPage), not manual `useEffect` + `useState`
 - `queryClient` config: 5 min stale time, no retry on auth errors
 - Login/logout/auth stays in `AuthContext` — not React Query
+
+### MCP Server for API Debugging (`nnf-api`)
+
+MCP server at `D:\dev\mcp-nnf` — registered globally as `nnf-api`. Auto-logs in on startup using `.env` credentials. Tools:
+
+- `api_login` — login (defaults to .env creds), auto-selects holding for system_dev
+- `api_get` — GET views with PostgREST params, e.g. `api_get({ path: "/v_ref_product_models?order=code" })`
+- `api_rpc` — call RPC functions, e.g. `api_rpc({ function_name: "ref_brand_list" })`
+- `api_switch_holding` — switch tenant context
+- `api_list_holdings` — list available holdings
+- `api_schema` — fetch OpenAPI schema
+
+Use these tools to inspect live API data when debugging frontend issues.
