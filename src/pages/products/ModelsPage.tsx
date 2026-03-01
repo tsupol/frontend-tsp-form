@@ -1,9 +1,10 @@
 import { useState, useRef, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { DataTable, Badge, Input, Select } from 'tsp-form';
-import { ChevronRight, ChevronDown, ChevronsUpDown } from 'lucide-react';
-import { apiClient } from '../../lib/api';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { DataTable, Badge, Input, Select, Button, Modal, Switch, useSnackbarContext, FormErrorMessage } from 'tsp-form';
+import { ChevronRight, ChevronDown, ChevronsUpDown, Plus, XCircle, CheckCircle, Info } from 'lucide-react';
+import { useForm, Controller } from 'react-hook-form';
+import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -46,6 +47,342 @@ interface BrandLookup {
 interface FamilyLookup {
   id: number;
   display_name: string;
+}
+
+interface AxisOption {
+  option_id: number;
+  option_code: string;
+  option_label: string;
+  option_value: string;
+  sort_order: number;
+  is_default: boolean;
+}
+
+interface Axis {
+  attribute_id: number;
+  attribute_code: string;
+  attribute_name: string;
+  data_type: string;
+  unit: string | null;
+  required: boolean;
+  allow_custom: boolean;
+  use_in_model_name: boolean;
+  use_in_model_code: boolean;
+  name_order: number;
+  code_order: number;
+  options: AxisOption[];
+}
+
+interface FamilyAttributeConfig {
+  family_id: number;
+  holding_id: number;
+  company_id: number | null;
+  brand_code: string;
+  brand_name: string;
+  family_code: string;
+  family_name: string;
+  default_model_name: string | null;
+  axes: Axis[];
+}
+
+interface PreviewData {
+  generated_model_code: string;
+  generated_model_name: string;
+}
+
+interface CreateModelForm {
+  family_id: string;
+  model_name: string;
+  [key: `axis_${string}`]: string;
+  is_contractable: boolean;
+  is_sellable: boolean;
+  is_giftable: boolean;
+}
+
+// ── CreateModelModal ─────────────────────────────────────────────────────────
+
+function CreateModelModal({ open, onClose, holdingId, families }: {
+  open: boolean;
+  onClose: () => void;
+  holdingId: number | null;
+  families: FamilyLookup[];
+}) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const { addSnackbar } = useSnackbarContext();
+  const [isPending, setIsPending] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [errorKey, setErrorKey] = useState(0);
+  const [preview, setPreview] = useState<PreviewData | null>(null);
+
+  const { register, handleSubmit, reset, watch, setValue, control, formState: { errors } } = useForm<CreateModelForm>({
+    defaultValues: { family_id: '', model_name: '', is_contractable: false, is_sellable: true, is_giftable: false },
+  });
+
+  const selectedFamilyId = watch('family_id');
+
+  // Fetch attribute config when family is selected
+  const { data: familyConfig, isFetching: configLoading } = useQuery({
+    queryKey: ['family-attr-config', selectedFamilyId],
+    queryFn: () => apiClient.get<FamilyAttributeConfig[]>(
+      `/v_family_model_attribute_config?family_id=eq.${selectedFamilyId}&holding_id=eq.${holdingId}`
+    ),
+    enabled: !!selectedFamilyId && !!holdingId,
+    staleTime: 5 * 60 * 1000,
+    select: (data) => data[0] ?? null,
+  });
+
+  // Set defaults when config loads
+  const lastConfigRef = useRef<number | null>(null);
+  if (familyConfig && familyConfig.family_id !== lastConfigRef.current) {
+    lastConfigRef.current = familyConfig.family_id;
+    if (familyConfig.default_model_name) {
+      setValue('model_name', familyConfig.default_model_name);
+    }
+    for (const axis of familyConfig.axes) {
+      const defaultOpt = axis.options.find(o => o.is_default);
+      if (defaultOpt) {
+        setValue(`axis_${axis.attribute_code}` as keyof CreateModelForm, defaultOpt.option_code);
+      }
+    }
+  }
+
+  const axes = familyConfig?.axes ?? [];
+  const familyOptions = families.map(f => ({ value: String(f.id), label: f.display_name }));
+
+  const buildPayload = (data: CreateModelForm) => {
+    const optionSet: Record<string, string> = {};
+    for (const axis of axes) {
+      const val = data[`axis_${axis.attribute_code}` as keyof CreateModelForm] as string;
+      if (val) optionSet[axis.attribute_code] = val;
+    }
+    return {
+      p_holding_id: holdingId,
+      p_company_id: null,
+      p_family_id: Number(data.family_id),
+      p_requested_model_name: data.model_name,
+      p_model_option_set: optionSet,
+      p_is_contractable: data.is_contractable,
+      p_is_sellable: data.is_sellable,
+      p_is_giftable: data.is_giftable,
+      p_variants: [],
+    };
+  };
+
+  const onPreview = async (data: CreateModelForm) => {
+    setIsPending(true);
+    setErrorMessage('');
+    setPreview(null);
+    const start = Date.now();
+    try {
+      const result = await apiClient.rpc<PreviewData>('product_create_validate', buildPayload(data));
+      setPreview(result);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        setErrorMessage(translated || err.message);
+      } else {
+        setErrorMessage(t('common.error'));
+      }
+      setErrorKey(k => k + 1);
+    } finally {
+      const elapsed = Date.now() - start;
+      if (elapsed < 300) await new Promise(r => setTimeout(r, 300 - elapsed));
+      setIsPending(false);
+    }
+  };
+
+  const onConfirmCreate = async () => {
+    setIsCreating(true);
+    setErrorMessage('');
+    const start = Date.now();
+    try {
+      const data = watch();
+      await apiClient.rpc('product_create', buildPayload(data));
+      addSnackbar({
+        message: (
+          <div className="alert alert-success">
+            <CheckCircle size={18} />
+            <div><div className="alert-title">{t('models.createSuccess')}</div></div>
+          </div>
+        ),
+        type: 'success',
+        duration: 3000,
+      });
+      queryClient.invalidateQueries({ queryKey: ['models'] });
+      handleClose();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        setErrorMessage(translated || err.message);
+      } else {
+        setErrorMessage(t('common.error'));
+      }
+      setErrorKey(k => k + 1);
+    } finally {
+      const elapsed = Date.now() - start;
+      if (elapsed < 300) await new Promise(r => setTimeout(r, 300 - elapsed));
+      setIsCreating(false);
+    }
+  };
+
+  const handleClose = () => {
+    reset();
+    setErrorMessage('');
+    setPreview(null);
+    lastConfigRef.current = null;
+    onClose();
+  };
+
+  return (
+    <Modal open={open} onClose={handleClose} maxWidth="32rem" width="100%">
+      <form className="flex flex-col overflow-hidden" onSubmit={handleSubmit(onPreview)}>
+        <div className="modal-header">
+          <h2 className="modal-title">{t('models.addModel')}</h2>
+          <button type="button" className="modal-close-btn" onClick={handleClose} aria-label="Close">&times;</button>
+        </div>
+        <div className="modal-content">
+          {errorMessage && (
+            <div key={errorKey} className="alert alert-danger mb-4 animate-pop-in">
+              <XCircle size={18} />
+              <div><div className="alert-description">{errorMessage}</div></div>
+            </div>
+          )}
+
+          {preview && (
+            <div className="alert alert-info mb-4">
+              <Info size={18} />
+              <div>
+                <div className="alert-title">{t('models.previewCode')}: {preview.generated_model_code}</div>
+                <div className="alert-description">{t('models.previewName')}: {preview.generated_model_name}</div>
+              </div>
+            </div>
+          )}
+
+          <div className="form-grid">
+            {/* Family select */}
+            <div className="flex flex-col">
+              <label className="form-label">{t('models.family')}</label>
+              <div>
+                <Select
+                  options={familyOptions}
+                  value={selectedFamilyId || null}
+                  onChange={(val) => {
+                    setValue('family_id', (val as string) ?? '', { shouldValidate: true });
+                    setPreview(null);
+                    // Reset axis values when family changes
+                    lastConfigRef.current = null;
+                  }}
+                  placeholder={t('models.selectFamily')}
+                  showChevron
+                  error={!!errors.family_id}
+                />
+              </div>
+              <input type="hidden" {...register('family_id', { required: t('models.selectFamily') })} />
+              <FormErrorMessage error={errors.family_id} />
+            </div>
+
+            {/* Hint when no family selected */}
+            {!selectedFamilyId && (
+              <div className="text-xs text-control-label">{t('models.selectFamilyFirst')}</div>
+            )}
+
+            {/* Loading config */}
+            {selectedFamilyId && configLoading && (
+              <div className="text-xs text-control-label">{t('common.loading')}</div>
+            )}
+
+            {/* Model name */}
+            {selectedFamilyId && familyConfig && (
+              <>
+                <div className="flex flex-col">
+                  <label className="form-label" htmlFor="cm-name">{t('models.modelName')}</label>
+                  <Input
+                    id="cm-name"
+                    error={!!errors.model_name}
+                    {...register('model_name', { required: t('models.modelName') + ' is required' })}
+                    onChange={(e) => {
+                      register('model_name').onChange(e);
+                      setPreview(null);
+                    }}
+                  />
+                  <FormErrorMessage error={errors.model_name} />
+                </div>
+
+                {/* Axes hint or selects */}
+                {axes.length === 0 && (
+                  <div className="text-xs text-control-label">{t('models.noAxesHint')}</div>
+                )}
+
+                {axes.map((axis) => {
+                  const fieldName = `axis_${axis.attribute_code}` as keyof CreateModelForm;
+                  const axisOptions = axis.options
+                    .sort((a, b) => a.sort_order - b.sort_order)
+                    .map(o => ({ value: o.option_code, label: o.option_label }));
+                  return (
+                    <div key={axis.attribute_id} className="flex flex-col">
+                      <label className="form-label">
+                        {axis.attribute_name}
+                        {axis.unit ? ` (${axis.unit})` : ''}
+                      </label>
+                      <div>
+                        <Select
+                          options={axisOptions}
+                          value={watch(fieldName) as string || null}
+                          onChange={(val) => {
+                            setValue(fieldName, (val as string) ?? '', { shouldValidate: true });
+                            setPreview(null);
+                          }}
+                          placeholder={t('models.selectOption')}
+                          showChevron
+                          error={!!errors[fieldName]}
+                        />
+                      </div>
+                      <input type="hidden" {...register(fieldName, { required: axis.required ? t('models.requiredField') : false })} />
+                      <FormErrorMessage error={errors[fieldName]} />
+                    </div>
+                  );
+                })}
+
+                {/* Flags */}
+                <div className="flex items-center justify-between">
+                  <label className="form-label mb-0">{t('models.isSellable')}</label>
+                  <Controller name="is_sellable" control={control} render={({ field: { onChange, value, ref } }) => (
+                    <Switch ref={ref} checked={value} onChange={(e) => onChange(e.target.checked)} />
+                  )} />
+                </div>
+                <div className="flex items-center justify-between">
+                  <label className="form-label mb-0">{t('models.isContractable')}</label>
+                  <Controller name="is_contractable" control={control} render={({ field: { onChange, value, ref } }) => (
+                    <Switch ref={ref} checked={value} onChange={(e) => onChange(e.target.checked)} />
+                  )} />
+                </div>
+                <div className="flex items-center justify-between">
+                  <label className="form-label mb-0">{t('models.isGiftable')}</label>
+                  <Controller name="is_giftable" control={control} render={({ field: { onChange, value, ref } }) => (
+                    <Switch ref={ref} checked={value} onChange={(e) => onChange(e.target.checked)} />
+                  )} />
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+        <div className="modal-footer">
+          <Button type="button" variant="ghost" onClick={handleClose}>{t('common.cancel')}</Button>
+          {preview ? (
+            <Button type="button" color="primary" disabled={isCreating} onClick={onConfirmCreate}>
+              {isCreating ? t('models.creating') : t('models.confirmCreate')}
+            </Button>
+          ) : (
+            <Button type="submit" color="primary" disabled={isPending || !selectedFamilyId}>
+              {isPending ? t('models.previewing') : t('models.preview')}
+            </Button>
+          )}
+        </div>
+      </form>
+    </Modal>
+  );
 }
 
 // ── VariantSubRow ────────────────────────────────────────────────────────────
@@ -130,6 +467,9 @@ export function ModelsPage() {
   const [filterBrand, setFilterBrand] = useState<string>('');
   const [filterFamily, setFilterFamily] = useState<string>('');
   const [sortBy, setSortBy] = useState<string>('code.asc');
+
+  // Create modal
+  const [createOpen, setCreateOpen] = useState(false);
 
   // Expand state
   const [expandedModels, setExpandedModels] = useState<Set<number>>(new Set());
@@ -225,7 +565,13 @@ export function ModelsPage() {
     <div className="page-content h-dvh max-h-dvh max-w-[64rem] flex flex-col overflow-hidden">
       {/* Header */}
       <div className="flex-none pb-4 space-y-3">
-        <h1 className="heading-2">{t('models.title')}</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="heading-2">{t('models.title')}</h1>
+          <Button color="primary" onClick={() => setCreateOpen(true)}>
+            <Plus />
+            {t('models.addModel')}
+          </Button>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
           <Input
             placeholder={t('common.search')}
@@ -342,6 +688,13 @@ export function ModelsPage() {
           }
         />
       )}
+
+      <CreateModelModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        holdingId={holdingId}
+        families={families}
+      />
     </div>
   );
 }

@@ -47,7 +47,13 @@
       "Bash(git -C /d/dev/nnf log --oneline -20)",
       "Bash(git -C /d/dev/nnf diff HEAD~5 --name-only)",
       "Bash(git -C /d/dev/nnf log --oneline -10)",
-      "Bash(git -C /d/dev/nnf diff HEAD~3 --name-only)"
+      "Bash(git -C /d/dev/nnf diff HEAD~3 --name-only)",
+      "Bash(git log:*)",
+      "Bash(gh auth status:*)",
+      "Bash(head:*)",
+      "Bash(cd:*)",
+      "Bash(claude mcp:*)",
+      "mcp__nnf-api__*"
     ]
   }
 }
