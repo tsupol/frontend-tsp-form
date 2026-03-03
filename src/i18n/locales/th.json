@@ -9,6 +9,8 @@
     "edit": "แก้ไข",
     "create": "สร้าง",
     "search": "ค้นหา",
+    "filters": "ตัวกรอง",
+    "sortBy": "เรียงตาม",
     "noData": "ไม่มีข้อมูล",
     "example": "ตัวอย่าง",
     "appName": "NNF System"
@@ -315,6 +317,7 @@
     "publishDraft": "เผยแพร่",
     "family": "กลุ่มรุ่น",
     "selectFamily": "เลือกกลุ่มรุ่น",
+    "selectBaseModel": "รุ่นหลัก",
     "modelName": "ชื่อรุ่น",
     "modelCode": "รหัสรุ่น",
     "status": "สถานะ",

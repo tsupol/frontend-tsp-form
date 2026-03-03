@@ -1,8 +1,8 @@
-import { useState, useRef, useCallback, useMemo } from 'react';
+import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { DataTable, Badge, Input, Select, Button, Modal, Switch, useSnackbarContext, FormErrorMessage } from 'tsp-form';
-import { ChevronRight, ChevronDown, ChevronsUpDown, Plus, XCircle, CheckCircle, Info } from 'lucide-react';
+import { DataTable, Badge, Input, Select, Button, Modal, Switch, Drawer, useSnackbarContext, FormErrorMessage } from 'tsp-form';
+import { ChevronRight, ChevronDown, ChevronsUpDown, Plus, XCircle, CheckCircle, Info, Search, SlidersHorizontal } from 'lucide-react';
 import { useForm, Controller } from 'react-hook-form';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -46,6 +46,7 @@ interface BrandLookup {
 
 interface FamilyLookup {
   id: number;
+  brand_id: number;
   display_name: string;
 }
 
@@ -466,7 +467,11 @@ export function ModelsPage() {
   // Filters & sort
   const [filterBrand, setFilterBrand] = useState<string>('');
   const [filterFamily, setFilterFamily] = useState<string>('');
+  const [filterBaseModel, setFilterBaseModel] = useState<string>('');
   const [sortBy, setSortBy] = useState<string>('code.asc');
+
+  // Filter drawer (small screens)
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
 
   // Create modal
   const [createOpen, setCreateOpen] = useState(false);
@@ -511,6 +516,39 @@ export function ModelsPage() {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Base model lookup (depends on selected family)
+  const { data: baseModels = [] } = useQuery({
+    queryKey: ['base-model-lookup', holdingId, filterFamily],
+    queryFn: async () => {
+      const rows = await apiClient.get<{ base_model_name: string }[]>(
+        `/v_ref_product_models?holding_id=eq.${holdingId}&family_id=eq.${filterFamily}&select=base_model_name&order=base_model_name`
+      );
+      const unique = [...new Set(rows.map(r => r.base_model_name))];
+      return unique;
+    },
+    enabled: !!filterFamily && !!holdingId,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Clear family when brand changes and selected family doesn't belong to new brand
+  useEffect(() => {
+    if (!filterBrand) return;
+    if (!filterFamily) return;
+    const family = families.find(f => String(f.id) === filterFamily);
+    if (family && String(family.brand_id) !== filterBrand) {
+      setFilterFamily('');
+    }
+  }, [filterBrand, filterFamily, families]);
+
+  // Clear base model filter when family changes and it's no longer valid
+  useEffect(() => {
+    if (!filterFamily) {
+      setFilterBaseModel('');
+    } else if (filterBaseModel && baseModels.length > 0 && !baseModels.includes(filterBaseModel)) {
+      setFilterBaseModel('');
+    }
+  }, [filterFamily, baseModels, filterBaseModel]);
+
   // Lookup maps
   const brandMap = useMemo(() => {
     const map = new Map<number, string>();
@@ -526,7 +564,10 @@ export function ModelsPage() {
 
   // Filter & sort options
   const brandOptions = brands.map((b) => ({ value: String(b.id), label: b.name }));
-  const familyOptions = families.map((f) => ({ value: String(f.id), label: f.display_name }));
+  const filteredFamilies = filterBrand ? families.filter(f => String(f.brand_id) === filterBrand) : families;
+  const familyOptions = filteredFamilies.map((f) => ({ value: String(f.id), label: f.display_name }));
+  const baseModelOptions = baseModels.map((name) => ({ value: name, label: name }));
+  const activeFilterCount = [filterBrand, filterFamily, filterBaseModel].filter(Boolean).length;
   const sortOptions = [
     { value: 'code.asc', label: `${t('models.modelCode')} A→Z` },
     { value: 'code.desc', label: `${t('models.modelCode')} Z→A` },
@@ -546,14 +587,15 @@ export function ModelsPage() {
     }
     if (filterBrand) params.push(`brand_id=eq.${filterBrand}`);
     if (filterFamily) params.push(`family_id=eq.${filterFamily}`);
+    if (filterBaseModel) params.push(`base_model_name=eq.${encodeURIComponent(filterBaseModel)}`);
     params.push(`order=${sortBy}`);
     const qs = params.length > 0 ? `?${params.join('&')}` : '';
     return `/v_ref_product_models${qs}`;
-  }, [holdingId, search, filterBrand, filterFamily, sortBy]);
+  }, [holdingId, search, filterBrand, filterFamily, filterBaseModel, sortBy]);
 
   // Fetch models
   const { data, isError, error, isFetching } = useQuery({
-    queryKey: ['models', pageIndex, pageSize, holdingId, search, filterBrand, filterFamily, sortBy],
+    queryKey: ['models', pageIndex, pageSize, holdingId, search, filterBrand, filterFamily, filterBaseModel, sortBy],
     queryFn: () => apiClient.getPaginated<Model>(buildEndpoint(), { page: pageIndex + 1, pageSize }),
     placeholderData: keepPreviousData,
   });
@@ -572,14 +614,18 @@ export function ModelsPage() {
             {t('models.addModel')}
           </Button>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-          <Input
-            placeholder={t('common.search')}
-            value={searchInput}
-            onChange={(e) => handleSearch(e.target.value)}
-            size="sm"
-          />
-          <div>
+        {/* Desktop: all controls in one row */}
+        <div className="hidden lg:flex items-center gap-2">
+          <div className="flex-1 min-w-0">
+            <Input
+              placeholder={t('common.search')}
+              value={searchInput}
+              onChange={(e) => handleSearch(e.target.value)}
+              size="sm"
+              startIcon={<Search size={14} />}
+            />
+          </div>
+          <div className="flex-1 min-w-0" style={{ maxWidth: '10rem' }}>
             <Select
               options={brandOptions}
               value={filterBrand || null}
@@ -593,7 +639,7 @@ export function ModelsPage() {
               clearable
             />
           </div>
-          <div>
+          <div className="flex-1 min-w-0" style={{ maxWidth: '10rem' }}>
             <Select
               options={familyOptions}
               value={filterFamily || null}
@@ -607,7 +653,22 @@ export function ModelsPage() {
               clearable
             />
           </div>
-          <div className="flex items-center gap-1.5 text-control-label">
+          <div className="flex-1 min-w-0" style={{ maxWidth: '10rem' }}>
+            <Select
+              options={baseModelOptions}
+              value={filterBaseModel || null}
+              onChange={(val) => {
+                setFilterBaseModel((val as string) ?? '');
+                setPageIndex(0);
+              }}
+              placeholder={t('models.selectBaseModel')}
+              size="sm"
+              showChevron
+              clearable
+              disabled={!filterFamily}
+            />
+          </div>
+          <div className="flex items-center gap-1.5 text-control-label flex-1 min-w-0" style={{ maxWidth: '12rem' }}>
             <ChevronsUpDown size={14} className="shrink-0" />
             <div className="flex-1">
               <Select
@@ -623,6 +684,117 @@ export function ModelsPage() {
             </div>
           </div>
         </div>
+
+        {/* Mobile/Tablet: search + filter button */}
+        <div className="flex lg:hidden gap-2">
+          <div className="flex-1">
+            <Input
+              placeholder={t('common.search')}
+              value={searchInput}
+              onChange={(e) => handleSearch(e.target.value)}
+              size="sm"
+              startIcon={<Search size={14} />}
+            />
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setFilterDrawerOpen(true)}
+          >
+            <SlidersHorizontal size={14} />
+            {t('common.filters')}
+            {activeFilterCount > 0 && (
+              <Badge size="sm" color="primary">{activeFilterCount}</Badge>
+            )}
+          </Button>
+        </div>
+
+        {/* Filter drawer for small screens */}
+        <Drawer
+          open={filterDrawerOpen}
+          onClose={() => setFilterDrawerOpen(false)}
+          side="right"
+          ariaLabel={t('common.filters')}
+        >
+          <div className="drawer-header">
+            <h2 className="drawer-title">{t('common.filters')}</h2>
+            <button className="drawer-close-btn" onClick={() => setFilterDrawerOpen(false)}>&times;</button>
+          </div>
+          <div className="drawer-content">
+            <div className="form-grid">
+              <div className="flex flex-col">
+                <label className="form-label">{t('brandsModels.selectBrand')}</label>
+                <div>
+                  <Select
+                    options={brandOptions}
+                    value={filterBrand || null}
+                    onChange={(val) => {
+                      setFilterBrand((val as string) ?? '');
+                      setPageIndex(0);
+                    }}
+                    placeholder={t('brandsModels.selectBrand')}
+                    size="sm"
+                    showChevron
+                    clearable
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col">
+                <label className="form-label">{t('models.selectFamily')}</label>
+                <div>
+                  <Select
+                    options={familyOptions}
+                    value={filterFamily || null}
+                    onChange={(val) => {
+                      setFilterFamily((val as string) ?? '');
+                      setPageIndex(0);
+                    }}
+                    placeholder={t('models.selectFamily')}
+                    size="sm"
+                    showChevron
+                    clearable
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col">
+                <label className="form-label">{t('models.selectBaseModel')}</label>
+                <div>
+                  <Select
+                    options={baseModelOptions}
+                    value={filterBaseModel || null}
+                    onChange={(val) => {
+                      setFilterBaseModel((val as string) ?? '');
+                      setPageIndex(0);
+                    }}
+                    placeholder={t('models.selectBaseModel')}
+                    size="sm"
+                    showChevron
+                    clearable
+                    disabled={!filterFamily}
+                  />
+                </div>
+              </div>
+            </div>
+            <hr className="border-line my-2" />
+            <div className="form-grid">
+              <div className="flex flex-col">
+                <label className="form-label">{t('common.sortBy')}</label>
+                <div>
+                  <Select
+                    options={sortOptions}
+                    value={sortBy}
+                    onChange={(val) => {
+                      setSortBy((val as string) ?? 'code.asc');
+                      setPageIndex(0);
+                    }}
+                    size="sm"
+                    showChevron
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </Drawer>
       </div>
 
       {isError && (

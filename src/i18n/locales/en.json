@@ -9,6 +9,8 @@
     "edit": "Edit",
     "create": "Create",
     "search": "Search",
+    "filters": "Filters",
+    "sortBy": "Sort by",
     "noData": "No data available",
     "example": "Example",
     "appName": "NNF System"
@@ -315,6 +317,7 @@
     "publishDraft": "Publish",
     "family": "Family",
     "selectFamily": "Select family",
+    "selectBaseModel": "Base model",
     "modelName": "Model Name",
     "modelCode": "Model Code",
     "status": "Status",
