@@ -256,7 +256,7 @@ export function Fin1RatesPage() {
       // Fetch all active rate cards by creating a synthetic list from workbench
       // We need to map workbench data to rate-card-like rows
       const rows = await apiClient.get<WorkbenchFin1Row[]>(
-        `/v_pricing_user_workbench_branch?finance_model=eq.FIN1&select=category_id,category_code,category_name,term_months,down_percent,interest_percent_total,rounding_unit,max_discount_percent,missing_fin1_rate_card&order=category_code,term_months,down_percent`
+        `/v_pricing_user_workbench?finance_model=eq.FIN1&select=category_id,category_code,category_name,term_months,down_percent,interest_percent_total,rounding_unit,max_discount_percent,missing_fin1_rate_card&order=category_code,term_months,down_percent`
       );
       const seen = new Set<string>();
       const cards: Array<{
@@ -367,7 +367,7 @@ export function Fin1RatesPage() {
     <div className="page-content">
       <div className="flex items-center justify-between pb-4">
         <h1 className="heading-2">{t('fin1.title')}</h1>
-        <Button color="primary" size="sm" startIcon={<Plus size={14} />} onClick={handleCreate}>
+        <Button color="primary" startIcon={<Plus size={16} />} onClick={handleCreate}>
           {t('fin1.addRateCard')}
         </Button>
       </div>
