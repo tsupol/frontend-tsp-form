@@ -27,6 +27,7 @@ import { PricingLayout } from './pages/pricing/PricingLayout';
 import { PricebookPage } from './pages/pricing/PricebookPage';
 import { Fin1RatesPage } from './pages/pricing/Fin1RatesPage';
 import { Fin2RatesPage } from './pages/pricing/Fin2RatesPage';
+import { DiscountsPage } from './pages/pricing/DiscountsPage';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -204,7 +205,7 @@ function App() {
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <PricingLayout><div className="page-content"><h1 className="heading-2">Discounts</h1><p className="text-control-label mt-2">Coming soon</p></div></PricingLayout>
+              <PricingLayout><DiscountsPage /></PricingLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

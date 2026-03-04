@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { DataTable, Badge, Input, Select, Button, Switch, Drawer, Tooltip, useSnackbarContext } from 'tsp-form';
-import { Search, SlidersHorizontal, ChevronsUpDown, AlertTriangle, CheckCircle, XCircle, Pencil, Loader2, MousePointerClick } from 'lucide-react';
+import { Search, SlidersHorizontal, ChevronsUpDown, AlertTriangle, CheckCircle, XCircle, Pencil, Loader2, MousePointerClick, Plus, X } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -19,6 +19,9 @@ interface PricebookRow {
   needs_price_setup: boolean;
   missing_cost_price: boolean;
   missing_retail_price: boolean;
+  finance_model: string;
+  term_months: number | null;
+  fin2_profit_amount: number | null;
 }
 
 interface ModelRow {
@@ -105,6 +108,15 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix }: 
   const [fin2Profits, setFin2Profits] = useState<Record<number, string>>({});
   const [isSavingFin2, setIsSavingFin2] = useState<number | null>(null);
 
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'fin2' | 'fin1'>('fin2');
+
+  // Add term state
+  const [newTermMonths, setNewTermMonths] = useState('');
+  const [newTermProfit, setNewTermProfit] = useState('');
+  const [isAddingTerm, setIsAddingTerm] = useState(false);
+  const [isRemovingTerm, setIsRemovingTerm] = useState<number | null>(null);
+
   // Track which model we've initialized for
   const initializedForRef = useRef<number | null>(null);
 
@@ -112,7 +124,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix }: 
   const { data: workbenchRows = [], isLoading } = useQuery({
     queryKey: ['price-editor-workbench', modelId],
     queryFn: () => apiClient.get<WorkbenchRow[]>(
-      `/v_pricing_user_workbench_branch?model_id=eq.${modelId}&order=finance_model,variant_id,term_months`
+      `/v_pricing_user_workbench?model_id=eq.${modelId}&order=finance_model,variant_id,term_months`
     ),
     enabled: !!modelId,
     staleTime: 30 * 1000,
@@ -141,6 +153,9 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix }: 
 
     initializedForRef.current = modelId;
     setErrorMessage('');
+    setActiveTab('fin2');
+    setNewTermMonths('');
+    setNewTermProfit('');
 
     const first = workbenchRows[0];
     setRetailPrice(first?.retail_price !== null ? String(first.retail_price) : '');
@@ -154,6 +169,24 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix }: 
     }
     setFin2Profits(profits);
   }, [modelId, workbenchRows, isLoading]);
+
+  // Sync FIN2 profits when workbench data refreshes (e.g. after adding a term)
+  useEffect(() => {
+    if (!modelId || initializedForRef.current !== modelId) return;
+    const serverProfits: Record<number, string> = {};
+    for (const row of workbenchRows) {
+      if (row.finance_model === 'FIN2' && row.term_months !== null && row.fin2_profit_amount !== null) {
+        serverProfits[row.term_months] = String(row.fin2_profit_amount);
+      }
+    }
+    setFin2Profits(prev => {
+      const next = { ...prev };
+      for (const [term, val] of Object.entries(serverProfits)) {
+        if (!(term in next)) next[Number(term)] = val;
+      }
+      return next;
+    });
+  }, [modelId, workbenchRows]);
 
   // FIN1 rows (deduplicated)
   const fin1Rows = useMemo(() => {
@@ -264,6 +297,94 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix }: 
     }
   };
 
+  const handleAddTerm = async () => {
+    if (!modelId) return;
+    const months = parseInt(newTermMonths);
+    const profitVal = newTermProfit.trim() ? parseFloat(newTermProfit) : null;
+    if (!months || months <= 0 || profitVal === null || profitVal < 0) return;
+    setIsAddingTerm(true);
+    setErrorMessage('');
+    const start = Date.now();
+    try {
+      await apiClient.rpc('fin2_term_upsert', {
+        p_model_id: modelId,
+        p_term_months: months,
+        p_max_discount_percent: 5,
+      });
+      await apiClient.rpc('price_rate_upsert', {
+        p_program_code: 'FIN2',
+        p_rate_type: 'PROFIT_AMOUNT',
+        p_model_id: modelId,
+        p_value: profitVal,
+        p_term_months: months,
+      });
+      addSnackbar({
+        message: (
+          <div className="alert alert-success">
+            <CheckCircle size={18} />
+            <div><div className="alert-title">{t('pricing.termAdded')}</div></div>
+          </div>
+        ),
+        type: 'success',
+        duration: 3000,
+      });
+      setNewTermMonths('');
+      setNewTermProfit('');
+      invalidateAll();
+    } catch (err) {
+      handleError(err);
+    } finally {
+      const elapsed = Date.now() - start;
+      if (elapsed < 300) await new Promise(r => setTimeout(r, 300 - elapsed));
+      setIsAddingTerm(false);
+    }
+  };
+
+  const handleRemoveTerm = async (termMonths: number) => {
+    if (!modelId) return;
+    setIsRemovingTerm(termMonths);
+    setErrorMessage('');
+    const start = Date.now();
+    try {
+      // Find active price_rate for this model + term to close it
+      const rates = await apiClient.get<{ price_rate_id: number }[]>(
+        `/v_price_rates_lookup?model_id=eq.${modelId}&program_code=eq.FIN2&rate_type=eq.PROFIT_AMOUNT&term_months=eq.${termMonths}&effective_to=is.null`
+      );
+      // Close all active rates for this term + deactivate the fin2_term config
+      await Promise.all([
+        ...rates.map(r => apiClient.rpc('price_rate_close', { p_rate_id: r.price_rate_id })),
+        apiClient.rpc('fin2_term_set_active', {
+          p_model_id: modelId,
+          p_term_months: termMonths,
+          p_is_active: false,
+        }),
+      ]);
+      addSnackbar({
+        message: (
+          <div className="alert alert-success">
+            <CheckCircle size={18} />
+            <div><div className="alert-title">{t('pricing.termRemoved')}</div></div>
+          </div>
+        ),
+        type: 'success',
+        duration: 3000,
+      });
+      // Remove from local state immediately
+      setFin2Profits(prev => {
+        const next = { ...prev };
+        delete next[termMonths];
+        return next;
+      });
+      invalidateAll();
+    } catch (err) {
+      handleError(err);
+    } finally {
+      const elapsed = Date.now() - start;
+      if (elapsed < 300) await new Promise(r => setTimeout(r, 300 - elapsed));
+      setIsRemovingTerm(null);
+    }
+  };
+
   const busy = isLoading || isSaving;
 
   return (
@@ -368,35 +489,25 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix }: 
               </div>
             </div>
 
-            {/* FIN1 Preview */}
-            {fin1Rows.length > 0 && (
-              <div>
-                <h3 className="text-xs font-semibold text-control-label uppercase tracking-wider mb-3">{t('pricing.fin1Preview')}</h3>
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-line">
-                      <th className="py-1.5 text-left font-medium text-control-label">{t('pricing.termMonths', { months: '' }).replace(' ', '')}</th>
-                      <th className="py-1.5 text-right font-medium text-control-label">{t('pricing.downPercent')}</th>
-                      <th className="py-1.5 text-right font-medium text-control-label">{t('pricing.installment')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {fin1Rows.map((row, idx) => (
-                      <tr key={idx} className="border-b border-line last:border-b-0">
-                        <td className="py-1.5">{t('pricing.termMonths', { months: row.term_months })}</td>
-                        <td className="py-1.5 text-right tabular-nums">{row.down_percent !== null ? `${row.down_percent}%` : '—'}</td>
-                        <td className="py-1.5 text-right tabular-nums">{formatTHB(row.cal_installment)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+            {/* Tab bar */}
+            <div className="flex border-b border-line">
+              <button
+                className={`px-3 py-1.5 text-xs font-medium cursor-pointer transition-colors ${activeTab === 'fin1' ? 'border-b-2 border-primary text-primary' : 'text-control-label hover:text-fg'}`}
+                onClick={() => setActiveTab('fin1')}
+              >
+                FIN1
+              </button>
+              <button
+                className={`px-3 py-1.5 text-xs font-medium cursor-pointer transition-colors ${activeTab === 'fin2' ? 'border-b-2 border-primary text-primary' : 'text-control-label hover:text-fg'}`}
+                onClick={() => setActiveTab('fin2')}
+              >
+                FIN2
+              </button>
+            </div>
 
-            {/* FIN2 Profit */}
-            {fin2Rows.length > 0 && (
+            {/* FIN2 tab */}
+            {activeTab === 'fin2' && (
               <div>
-                <h3 className="text-xs font-semibold text-control-label uppercase tracking-wider mb-3">{t('pricing.fin2Profit')}</h3>
                 <div className="space-y-2">
                   {fin2Rows.map((row) => {
                     const term = row.term_months!;
@@ -424,11 +535,89 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix }: 
                           >
                             {isSavingFin2 === term ? t('pricing.saving') : t('common.save')}
                           </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="btn-icon-sm text-control-label hover:text-danger"
+                            disabled={busy || isRemovingTerm === term}
+                            onClick={() => handleRemoveTerm(term)}
+                          >
+                            {isRemovingTerm === term ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
+                          </Button>
                         </div>
                       </div>
                     );
                   })}
                 </div>
+                {/* Add term */}
+                <div className="mt-3 pt-3 border-t border-line space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="flex flex-col">
+                      <label className="form-label">{t('pricing.enterMonths')}</label>
+                      <Input
+                        type="number"
+                        min={1}
+                        step="1"
+                        value={newTermMonths}
+                        onChange={(e) => setNewTermMonths(e.target.value)}
+                        placeholder="12"
+                        size="sm"
+                        disabled={busy || isAddingTerm}
+                      />
+                    </div>
+                    <div className="flex flex-col">
+                      <label className="form-label">{t('pricing.profitAmount')}</label>
+                      <Input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={newTermProfit}
+                        onChange={(e) => setNewTermProfit(e.target.value)}
+                        placeholder="0.00"
+                        size="sm"
+                        disabled={busy || isAddingTerm}
+                      />
+                    </div>
+                  </div>
+                  <Button
+                    color="primary"
+                    size="sm"
+                    className="w-full"
+                    disabled={busy || isAddingTerm || !newTermMonths.trim() || parseInt(newTermMonths) <= 0 || !newTermProfit.trim()}
+                    onClick={handleAddTerm}
+                    startIcon={isAddingTerm ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                  >
+                    {t('pricing.addTerm')}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* FIN1 tab */}
+            {activeTab === 'fin1' && (
+              <div>
+                {fin1Rows.length > 0 ? (
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-line">
+                        <th className="py-1.5 text-left font-medium text-control-label">{t('pricing.termMonths', { months: '' }).replace(' ', '')}</th>
+                        <th className="py-1.5 text-right font-medium text-control-label">{t('pricing.downPercent')}</th>
+                        <th className="py-1.5 text-right font-medium text-control-label">{t('pricing.installment')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {fin1Rows.map((row, idx) => (
+                        <tr key={idx} className="border-b border-line last:border-b-0">
+                          <td className="py-1.5">{t('pricing.termMonths', { months: row.term_months })}</td>
+                          <td className="py-1.5 text-right tabular-nums">{row.down_percent !== null ? `${row.down_percent}%` : '—'}</td>
+                          <td className="py-1.5 text-right tabular-nums">{formatTHB(row.cal_installment)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="text-xs text-control-label py-3">{t('pricing.noRateCard')}</div>
+                )}
               </div>
             )}
           </div>
@@ -583,7 +772,7 @@ export function PricebookPage() {
       if (modelIds.length === 0) return [];
       const idsFilter = `model_id=in.(${modelIds.join(',')})`;
       return apiClient.get<PricebookRow[]>(
-        `/v_pricing_user_workbench_branch?${idsFilter}&order=model_code`
+        `/v_pricing_user_workbench?${idsFilter}&order=model_code`
       );
     },
     enabled: modelIds.length > 0,
@@ -599,6 +788,7 @@ export function PricebookPage() {
       missing_retail: boolean;
       missing_cost: boolean;
       category_code: string;
+      fin2_terms: { term_months: number; profit: number | null }[];
     }>();
     for (const row of pricingRows) {
       const existing = map.get(row.model_id);
@@ -610,6 +800,7 @@ export function PricebookPage() {
           missing_retail: row.missing_retail_price,
           missing_cost: row.missing_cost_price,
           category_code: row.category_code,
+          fin2_terms: [],
         });
       } else {
         if (row.retail_price !== null && existing.retail_price === null) {
@@ -622,6 +813,17 @@ export function PricebookPage() {
           existing.needs_price_setup = true;
         }
       }
+      // Collect FIN2 terms (deduplicated by term_months)
+      if (row.finance_model === 'FIN2' && row.term_months !== null) {
+        const entry = map.get(row.model_id)!;
+        if (!entry.fin2_terms.some(t => t.term_months === row.term_months)) {
+          entry.fin2_terms.push({ term_months: row.term_months, profit: row.fin2_profit_amount });
+        }
+      }
+    }
+    // Sort FIN2 terms by term_months
+    for (const entry of map.values()) {
+      entry.fin2_terms.sort((a, b) => a.term_months - b.term_months);
     }
     return map;
   }, [pricingRows]);
@@ -913,6 +1115,7 @@ export function PricebookPage() {
                 const rp = pricing?.retail_price ?? null;
                 const cp = pricing?.cost_price ?? null;
                 const needsSetup = pricing?.needs_price_setup ?? true;
+                const fin2Terms = pricing?.fin2_terms ?? [];
                 const isSelected = model.id === selectedModelId;
 
                 return (
@@ -940,26 +1143,44 @@ export function PricebookPage() {
                       <div className="text-[11px] text-control-label truncate opacity-60">{model.code}</div>
                     </div>
 
-                    <div className="shrink-0 w-24 text-right hidden sm:block">
+                    <div className="shrink-0 w-16 xl:w-24 text-right hidden sm:block">
                       <div className={`text-sm tabular-nums ${rp === null ? 'text-control-label' : ''}`}>
                         {formatTHB(rp)}
                       </div>
                       <div className="text-[10px] text-control-label">{t('pricing.retailPrice')}</div>
                     </div>
 
-                    <div className="shrink-0 w-24 text-right hidden sm:block">
+                    <div className="shrink-0 w-16 xl:w-24 text-right hidden sm:block">
                       <div className={`text-sm tabular-nums ${cp === null ? 'text-control-label' : ''}`}>
                         {formatTHB(cp)}
                       </div>
                       <div className="text-[10px] text-control-label">{t('pricing.costPrice')}</div>
                     </div>
 
-                    <div className="shrink-0 w-16 text-right hidden lg:block">
+                    <div className="shrink-0 w-14 xl:w-18 text-right hidden lg:block">
                       <div className="text-sm tabular-nums text-control-label">
                         {calcMargin(rp, cp)}
                       </div>
                       <div className="text-[10px] text-control-label">{t('pricing.margin')}</div>
                     </div>
+
+                    {fin2Terms.length > 0 && (
+                      <div className="shrink-0 w-16 xl:w-24 text-right hidden lg:block">
+                        <div className="flex flex-col gap-0.5 items-end">
+                          {fin2Terms.map(ft => {
+                            const hasProfit = ft.profit !== null;
+                            return (
+                              <div key={ft.term_months} className="flex items-center gap-1">
+                                <span className={`text-[10px] tabular-nums px-1.5 py-0.5 rounded ${hasProfit ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>{ft.term_months}m</span>
+                                <span className={`text-[11px] tabular-nums ${hasProfit ? '' : 'text-control-label'}`}>
+                                  {hasProfit ? formatTHB(ft.profit) : '—'}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
 
                     <div className="shrink-0 w-6 flex justify-end">
                       {needsSetup ? (
