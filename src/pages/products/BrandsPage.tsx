@@ -436,8 +436,7 @@ export function BrandsPage() {
       <div className="flex-none pb-4 space-y-3">
         <div className="flex items-center justify-between">
           <h1 className="heading-2">{t('brandsModels.brands')}</h1>
-          <Button color="primary" onClick={() => setCreateOpen(true)}>
-            <Plus />
+          <Button color="primary" startIcon={<Plus />} onClick={() => setCreateOpen(true)}>
             {t('brandsModels.addBrand')}
           </Button>
         </div>

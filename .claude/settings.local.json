@@ -53,7 +53,8 @@
       "Bash(head:*)",
       "Bash(cd:*)",
       "Bash(claude mcp:*)",
-      "mcp__nnf-api__*"
+      "mcp__nnf-api__*",
+      "Bash(done)"
     ]
   }
 }

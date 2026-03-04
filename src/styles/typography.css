@@ -1,5 +1,6 @@
 :root {
-    --text-shift-y: .05em;
+    --text-shift-y: .08em;
+    --text-shift-y-input: .05em;
 }
 
 @layer components {

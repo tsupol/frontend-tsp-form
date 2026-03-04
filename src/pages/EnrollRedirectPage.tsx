@@ -276,12 +276,8 @@ export function EnrollRedirectPage() {
                 className="w-full"
                 onClick={handleDownloadProfile}
                 disabled={loading}
+                startIcon={loading ? <Loader2 size={18} className="animate-spin" /> : <Smartphone size={18} />}
               >
-                {loading ? (
-                  <Loader2 size={18} className="mr-2 animate-spin" />
-                ) : (
-                  <Smartphone size={18} className="mr-2" />
-                )}
                 {loading ? t('common.loading') : t('enrollRedirect.installProfile')}
               </Button>
               <Button
@@ -346,8 +342,8 @@ export function EnrollRedirectPage() {
             variant="outline"
             className="w-full mb-4"
             onClick={handleOpenInSafari}
+            startIcon={<ExternalLink size={18} />}
           >
-            <ExternalLink size={18} className="mr-2" />
             {t('enrollRedirect.openInSafari')}
           </Button>
 

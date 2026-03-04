@@ -950,9 +950,7 @@ function PasswordModal({ user, open, onClose }: { user: VUser | null; open: bool
               <label className="form-label">{t('users.tempPasswordLabel')}</label>
               <div className="flex gap-2">
                 <Input value={tempPassword} readOnly className="flex-1 font-mono" />
-                <Button type="button" variant="outline" onClick={copyTempPassword}>
-                  <Copy size={16} />
-                </Button>
+                <Button type="button" variant="outline" startIcon={<Copy size={16} />} onClick={copyTempPassword} />
               </div>
             </div>
           </div>
@@ -1329,8 +1327,7 @@ export function UsersPage() {
       <div className="flex-none pb-4 space-y-3">
         <div className="flex items-center justify-between">
           <h1 className="heading-2">{t('users.title')}</h1>
-          <Button color="primary" onClick={() => setCreateOpen(true)}>
-            <Plus  />
+          <Button color="primary" startIcon={<Plus />} onClick={() => setCreateOpen(true)}>
             {t('common.create')}
           </Button>
         </div>
@@ -1417,8 +1414,7 @@ export function UsersPage() {
               maxWidth="300px"
               maxHeight="400px"
               trigger={
-                <Button variant="outline" size="sm" className="btn-icon-sm relative" onClick={() => setFilterOpen(!filterOpen)}>
-                  <SlidersHorizontal />
+                <Button variant="outline" size="sm" startIcon={<SlidersHorizontal />} className="relative" onClick={() => setFilterOpen(!filterOpen)}>
                   {activeFilterCount > 0 && (
                     <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary text-primary-contrast text-[10px] flex items-center justify-center leading-none">
                       {activeFilterCount}
@@ -1494,12 +1490,10 @@ export function UsersPage() {
             <span className="text-xs text-control-label">
               {t('users.selectedCount', { count: selectedCount })}
             </span>
-            <Button variant="outline" size="sm" onClick={() => setBulkAction({ action: 'deactivate', users: getSelectedUsers() })}>
-              <Ban size={14} />
+            <Button variant="outline" size="sm" startIcon={<Ban size={14} />} onClick={() => setBulkAction({ action: 'deactivate', users: getSelectedUsers() })}>
               {t('users.deactivate')}
             </Button>
-            <Button variant="outline" size="sm" color="danger" onClick={() => setBulkAction({ action: 'activate', users: getSelectedUsers() })}>
-              <ShieldCheck size={14} />
+            <Button variant="outline" size="sm" color="danger" startIcon={<ShieldCheck size={14} />} onClick={() => setBulkAction({ action: 'activate', users: getSelectedUsers() })}>
               {t('users.activate')}
             </Button>
             <Button variant="ghost" size="sm" onClick={() => setRowSelection({})}>

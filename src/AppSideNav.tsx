@@ -11,6 +11,7 @@ import {
   Users,
   Package,
   Headset,
+  DollarSign,
   ClipboardList,
   Smartphone,
   Settings,
@@ -31,6 +32,10 @@ const menuItemsList = [
   { key: 'attributes', path: '/admin/products/attributes' },
   { key: 'models', path: '/admin/products/models' },
   { key: 'ticket-queue', path: '/admin/call-center/queue' },
+  { key: 'pricebook', path: '/admin/pricing/pricebook' },
+  { key: 'fin1-rates', path: '/admin/pricing/fin1-rates' },
+  { key: 'fin2-rates', path: '/admin/pricing/fin2-rates' },
+  { key: 'discounts', path: '/admin/pricing/discounts' },
   { key: 'register', path: '/admin/register' },
   { key: 'enrollment', path: '/admin/enrollment' },
 ];
@@ -149,6 +154,16 @@ export const AppSideNav = () => {
         { key: 'families', label: t('nav.families'), path: '/admin/products/families' },
         { key: 'attributes', label: t('nav.attributes'), path: '/admin/products/attributes' },
         { key: 'models', label: t('nav.models'), path: '/admin/products/models' },
+      ],
+    },
+    {
+      key: 'pricing', icon: <DollarSign size="1rem" />, label: t('nav.pricing'),
+      path: '/admin/pricing/pricebook',
+      children: [
+        { key: 'pricebook', label: t('nav.pricebook'), path: '/admin/pricing/pricebook' },
+        { key: 'fin1-rates', label: t('nav.fin1Rates'), path: '/admin/pricing/fin1-rates' },
+        { key: 'fin2-rates', label: t('nav.fin2Rates'), path: '/admin/pricing/fin2-rates' },
+        { key: 'discounts', label: t('nav.discounts'), path: '/admin/pricing/discounts' },
       ],
     },
     {

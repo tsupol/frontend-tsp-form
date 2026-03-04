@@ -19,6 +19,8 @@ interface Model {
   family_id: number;
   code: string;
   name: string;
+  base_model_name: string;
+  model_name_suffix: string;
   attributes: Record<string, unknown> | null;
   is_contractable: boolean;
   is_sellable: boolean;
@@ -550,12 +552,6 @@ export function ModelsPage() {
   }, [filterFamily, baseModels, filterBaseModel]);
 
   // Lookup maps
-  const brandMap = useMemo(() => {
-    const map = new Map<number, string>();
-    for (const b of brands) map.set(b.id, b.name);
-    return map;
-  }, [brands]);
-
   const familyMap = useMemo(() => {
     const map = new Map<number, string>();
     for (const f of families) map.set(f.id, f.display_name);
@@ -609,8 +605,7 @@ export function ModelsPage() {
       <div className="flex-none pb-4 space-y-3">
         <div className="flex items-center justify-between">
           <h1 className="heading-2">{t('models.title')}</h1>
-          <Button color="primary" onClick={() => setCreateOpen(true)}>
-            <Plus />
+          <Button color="primary" startIcon={<Plus />} onClick={() => setCreateOpen(true)}>
             {t('models.addModel')}
           </Button>
         </div>
@@ -700,8 +695,8 @@ export function ModelsPage() {
             variant="outline"
             size="sm"
             onClick={() => setFilterDrawerOpen(true)}
+            startIcon={<SlidersHorizontal size={14} />}
           >
-            <SlidersHorizontal size={14} />
             {t('common.filters')}
             {activeFilterCount > 0 && (
               <Badge size="sm" color="primary">{activeFilterCount}</Badge>
@@ -821,13 +816,14 @@ export function ModelsPage() {
                     {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate">{model.code}</div>
-                    <div className="text-xs text-control-label truncate">
-                      {brandMap.get(model.brand_id) ?? '—'} / {familyMap.get(model.family_id) ?? '—'}
+                    <div className="flex items-baseline gap-1.5 min-w-0">
+                      <span className="text-sm truncate">{familyMap.get(model.family_id) ?? '—'}</span>
+                      <span className="text-sm font-medium text-info truncate">{model.base_model_name}</span>
+                      {model.model_name_suffix && (
+                        <span className="text-sm font-semibold truncate">{model.model_name_suffix}</span>
+                      )}
                     </div>
-                  </div>
-                  <div className="shrink-0 text-xs text-control-label hidden sm:block">
-                    {model.name}
+                    <div className="text-[11px] text-control-label truncate opacity-60">{model.code}</div>
                   </div>
                   <div className="shrink-0">
                     <Badge size="sm" color={model.is_active ? 'success' : 'danger'}>

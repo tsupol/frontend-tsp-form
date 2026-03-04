@@ -30,12 +30,6 @@ body {
     width: 100vw;
 }
 
-.page-content {
-    padding: 3rem 1rem 1rem;
-    max-width: 70rem;
-    margin: 0 auto;
-}
-
 @media (min-width: 768px) {
     .page-content {
         padding: 1rem 2rem;
@@ -54,4 +48,11 @@ body {
         border-top: var(--spacing-line) solid var(--color-line);
         margin: 1rem 0;
     }
+
+    .page-content {
+        padding: 3rem 1rem 1rem;
+        max-width: 70rem;
+        margin: 0 auto;
+    }
+
 }

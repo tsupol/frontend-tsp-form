@@ -942,8 +942,7 @@ function ManageOptionsModal({ attribute, open, onClose, holdingId }: {
                 size="sm"
                 style={{ width: '14rem' }}
               />
-              <Button color="primary" size="sm" onClick={() => setCreateOptOpen(true)}>
-                <Plus />
+              <Button color="primary" size="sm" startIcon={<Plus />} onClick={() => setCreateOptOpen(true)}>
                 {t('attributes.addOption')}
               </Button>
             </div>
@@ -1132,8 +1131,7 @@ export function AttributesPage() {
       <div className="flex-none pb-4 space-y-3">
         <div className="flex items-center justify-between">
           <h1 className="heading-2">{t('attributes.title')}</h1>
-          <Button color="primary" onClick={() => setCreateAttrOpen(true)}>
-            <Plus />
+          <Button color="primary" startIcon={<Plus />} onClick={() => setCreateAttrOpen(true)}>
             {t('attributes.addAttribute')}
           </Button>
         </div>

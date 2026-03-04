@@ -71,8 +71,7 @@ export function EnrollmentPage() {
             <p className="text-sm text-control-label mb-6">
               {t('enrollment.description')}
             </p>
-            <Button variant="outline" onClick={fetchEnrollment}>
-              <QrCode size={16} className="mr-2" />
+            <Button variant="outline" startIcon={<QrCode size={16} />} onClick={fetchEnrollment}>
               {t('enrollment.generate')}
             </Button>
           </div>
@@ -142,8 +141,8 @@ export function EnrollmentPage() {
               variant="outline"
               onClick={fetchEnrollment}
               disabled={loading}
+              startIcon={<RefreshCw size={16} />}
             >
-              <RefreshCw size={16} className="mr-2" />
               {t('enrollment.refresh')}
             </Button>
           </div>

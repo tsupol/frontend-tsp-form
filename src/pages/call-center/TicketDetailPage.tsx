@@ -249,8 +249,7 @@ export function TicketDetailPage() {
       <div className="page-content max-w-[56rem]">
         <div className="border border-line bg-surface p-6 rounded-lg text-center">
           <div className="text-danger mb-4">{error instanceof Error ? error.message : t('common.error')}</div>
-          <Button variant="ghost" onClick={() => navigate('/admin/call-center/queue')}>
-            <ArrowLeft size={16} />
+          <Button variant="ghost" startIcon={<ArrowLeft size={16} />} onClick={() => navigate('/admin/call-center/queue')}>
             {t('callCenter.backToQueue')}
           </Button>
         </div>
@@ -262,9 +261,7 @@ export function TicketDetailPage() {
     <div className="page-content max-w-[56rem] space-y-6">
       {/* Back button + title */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" className="btn-icon-sm" onClick={() => navigate('/admin/call-center/queue')}>
-          <ArrowLeft size={16} />
-        </Button>
+        <Button variant="ghost" size="sm" startIcon={<ArrowLeft size={16} />} onClick={() => navigate('/admin/call-center/queue')} />
         <h1 className="heading-2">{ticket.ticket_code}</h1>
       </div>
 
@@ -343,8 +340,8 @@ export function TicketDetailPage() {
               color="primary"
               disabled={!!actionPending}
               onClick={handleTake}
+              startIcon={<Phone size={16} />}
             >
-              <Phone size={16} />
               {actionPending === 'take' ? t('callCenter.taking') : t('callCenter.take')}
             </Button>
           )}
@@ -358,24 +355,24 @@ export function TicketDetailPage() {
                   color="success"
                   disabled={!!actionPending}
                   onClick={() => handleSetResult('CALL_SUCCESS')}
+                  startIcon={<PhoneCall size={16} />}
                 >
-                  <PhoneCall size={16} />
                   {t('callCenter.callSuccess')}
                 </Button>
                 <Button
                   color="warning"
                   disabled={!!actionPending}
                   onClick={() => handleSetResult('CALL_NO_ANSWER')}
+                  startIcon={<PhoneOff size={16} />}
                 >
-                  <PhoneOff size={16} />
                   {t('callCenter.callNoAnswer')}
                 </Button>
                 <Button
                   color="danger"
                   disabled={!!actionPending}
                   onClick={() => handleSetResult('CALL_UNREACHABLE')}
+                  startIcon={<PhoneOff size={16} />}
                 >
-                  <PhoneOff size={16} />
                   {t('callCenter.callUnreachable')}
                 </Button>
               </div>
@@ -399,8 +396,8 @@ export function TicketDetailPage() {
                   color="warning"
                   disabled={!!actionPending}
                   onClick={handleRevert}
+                  startIcon={<Undo2 size={16} />}
                 >
-                  <Undo2 size={16} />
                   {actionPending === 'revert' ? t('callCenter.reverting') : t('callCenter.revert')}
                 </Button>
               </div>
@@ -423,8 +420,8 @@ export function TicketDetailPage() {
                 color="primary"
                 disabled={!!actionPending || !noteText.trim()}
                 onClick={handleAddNote}
+                startIcon={<MessageSquarePlus size={16} />}
               >
-                <MessageSquarePlus size={16} />
                 {t('callCenter.addNote')}
               </Button>
             </div>

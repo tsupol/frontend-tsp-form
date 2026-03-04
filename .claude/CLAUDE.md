@@ -12,10 +12,11 @@
 
 When using tsp-form components, follow this lookup order:
 
-1. **Examples first:** `C:\Users\tonsu\PhpstormProjects\tsp-form\src\example\` — always check here first for usage patterns
-2. **Component source:** `C:\Users\tonsu\PhpstormProjects\tsp-form\src\components\` — only if examples don't clarify enough
-3. **Context/hooks:** `C:\Users\tonsu\PhpstormProjects\tsp-form\src\context\`
-4. **CLAUDE.md:** `C:\Users\tonsu\PhpstormProjects\tsp-form\.claude\CLAUDE.md` — for conventions
+1. **This project first:** Check existing usage in `src/` — reuse the same patterns for consistency
+2. **Examples:** `C:\Users\tonsu\PhpstormProjects\tsp-form\src\example\` — check here for usage patterns if no existing usage in this project
+3. **Component source:** `C:\Users\tonsu\PhpstormProjects\tsp-form\src\components\` — only if examples don't clarify enough
+4. **Context/hooks:** `C:\Users\tonsu\PhpstormProjects\tsp-form\src\context\`
+5. **CLAUDE.md:** `C:\Users\tonsu\PhpstormProjects\tsp-form\.claude\CLAUDE.md` — for conventions
 
 ### Form Patterns (from tsp-form)
 

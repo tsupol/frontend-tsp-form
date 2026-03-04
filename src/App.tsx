@@ -23,6 +23,10 @@ import { ProductsLayout } from './pages/products/ProductsLayout';
 import { CallCenterLayout } from './pages/call-center/CallCenterLayout';
 import { TicketQueuePage } from './pages/call-center/TicketQueuePage';
 import { TicketDetailPage } from './pages/call-center/TicketDetailPage';
+import { PricingLayout } from './pages/pricing/PricingLayout';
+import { PricebookPage } from './pages/pricing/PricebookPage';
+import { Fin1RatesPage } from './pages/pricing/Fin1RatesPage';
+import { Fin2RatesPage } from './pages/pricing/Fin2RatesPage';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -159,6 +163,48 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <CallCenterLayout><TicketDetailPage /></CallCenterLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Pricing */}
+      <Route
+        path="/admin/pricing/pricebook"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <PricingLayout><PricebookPage /></PricingLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/pricing/fin1-rates"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <PricingLayout><Fin1RatesPage /></PricingLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/pricing/fin2-rates"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <PricingLayout><Fin2RatesPage /></PricingLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/pricing/discounts"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <PricingLayout><div className="page-content"><h1 className="heading-2">Discounts</h1><p className="text-control-label mt-2">Coming soon</p></div></PricingLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
