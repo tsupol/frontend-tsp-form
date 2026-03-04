@@ -487,7 +487,7 @@
     "empty": "ไม่พบบัตรอัตรา FIN1"
   },
   "fin2": {
-    "title": "เงื่อนไข FIN2",
+    "title": "อัตรากำไร FIN2",
     "addTerm": "เพิ่มเงื่อนไข",
     "editTerm": "แก้ไขเงื่อนไข",
     "model": "รุ่น",
@@ -501,7 +501,24 @@
     "maxDiscountRequired": "กรุณากรอกส่วนลดสูงสุด",
     "saveSuccess": "บันทึกเงื่อนไขสำเร็จ",
     "missingProfit": "ยังไม่ได้ตั้งกำไร",
-    "empty": "ไม่พบเงื่อนไข FIN2"
+    "empty": "ไม่พบเงื่อนไข FIN2",
+    "activeRates": "ใช้งาน",
+    "closedRates": "ปิดแล้ว",
+    "futureRates": "ในอนาคต",
+    "allRates": "ทั้งหมด",
+    "effectiveFrom": "มีผลตั้งแต่",
+    "effectiveTo": "มีผลถึง",
+    "active": "ใช้งาน",
+    "closed": "ปิดแล้ว",
+    "future": "ในอนาคต",
+    "noActiveRates": "ไม่มีอัตราที่ใช้งาน",
+    "editProfit": "แก้ไขกำไร",
+    "selectToEdit": "เลือกรุ่นเพื่อแก้ไข",
+    "profitUpdated": "อัปเดตกำไรสำเร็จ",
+    "term": "ระยะเวลา",
+    "value": "มูลค่า",
+    "status": "สถานะ",
+    "now": "ตอนนี้ (มีผลทันที)"
   },
   "discount": {
     "title": "ส่วนลด",

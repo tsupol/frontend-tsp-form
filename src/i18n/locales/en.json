@@ -487,7 +487,7 @@
     "empty": "No FIN1 rate cards found"
   },
   "fin2": {
-    "title": "FIN2 Terms",
+    "title": "FIN2 Profit Rates",
     "addTerm": "Add Term",
     "editTerm": "Edit Term",
     "model": "Model",
@@ -501,7 +501,24 @@
     "maxDiscountRequired": "Max discount is required",
     "saveSuccess": "Term saved",
     "missingProfit": "No profit set",
-    "empty": "No FIN2 terms found"
+    "empty": "No FIN2 terms found",
+    "activeRates": "Active",
+    "closedRates": "Closed",
+    "futureRates": "Future",
+    "allRates": "All",
+    "effectiveFrom": "Effective From",
+    "effectiveTo": "Effective To",
+    "active": "Active",
+    "closed": "Closed",
+    "future": "Future",
+    "noActiveRates": "No active rates",
+    "editProfit": "Edit Profit",
+    "selectToEdit": "Select a model to edit",
+    "profitUpdated": "Profit updated",
+    "term": "Term",
+    "value": "Value",
+    "status": "Status",
+    "now": "Now (immediate)"
   },
   "discount": {
     "title": "Discounts",
