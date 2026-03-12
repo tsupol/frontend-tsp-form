@@ -27,6 +27,9 @@ interface BranchAssetSummary {
   current_bucket: string;
   model_id: number;
   model_name: string;
+  base_model_name: string;
+  family_name: string;
+  brand_name: string;
   is_contractable: boolean;
   is_sellable: boolean;
   variant_id: number;
@@ -43,6 +46,9 @@ interface BranchLotSummary {
   current_bucket: string;
   model_id: number;
   model_name: string;
+  base_model_name: string;
+  family_name: string;
+  brand_name: string;
   variant_id: number;
   variant_sku_code: string;
   variant_name: string;
@@ -361,7 +367,10 @@ function DetailPanel({
                 <tbody>
                   {assets.map(a => (
                     <tr key={`${a.model_id}-${a.variant_id}`} className="border-t border-line">
-                      <td className="px-3 py-1">{a.variant_name || a.model_name}</td>
+                      <td className="px-3 py-1">
+                        <div className="font-medium">{a.brand_name} {a.family_name}</div>
+                        <div className="text-xs text-control-label">{a.variant_name}</div>
+                      </td>
                       <td className="px-3 py-1 text-right tabular-nums">{fmtNum(a.asset_count)}</td>
                       <td className="px-3 py-1 text-right tabular-nums">{fmtCurrency(a.total_value)}</td>
                       <td className="px-3 py-1 text-right tabular-nums">{fmtCurrency(a.avg_value)}</td>
@@ -391,7 +400,10 @@ function DetailPanel({
                 <tbody>
                   {lots.map(l => (
                     <tr key={`${l.model_id}-${l.variant_id}`} className="border-t border-line">
-                      <td className="px-3 py-1">{l.variant_name || l.model_name}</td>
+                      <td className="px-3 py-1">
+                        <div className="font-medium">{l.brand_name} {l.family_name}</div>
+                        <div className="text-xs text-control-label">{l.variant_name}</div>
+                      </td>
                       <td className="px-3 py-1 text-right tabular-nums">{fmtNum(l.total_qty)}</td>
                       <td className="px-3 py-1 text-right tabular-nums">{fmtCurrency(l.total_value)}</td>
                     </tr>
