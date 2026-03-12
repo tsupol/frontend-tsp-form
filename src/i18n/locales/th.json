@@ -55,7 +55,9 @@
     "pricebook": "ตารางราคา",
     "fin1Rates": "อัตรา FIN1",
     "fin2Rates": "อัตรา FIN2",
-    "discounts": "ส่วนลด"
+    "discounts": "ส่วนลด",
+    "inventory": "คลังสินค้า",
+    "stock": "ภาพรวมสต็อก"
   },
   "user": {
     "id": "รหัสผู้ใช้",
@@ -577,6 +579,34 @@
     "rejected": "ปฏิเสธคำขอแล้ว",
     "noRequests": "ไม่พบคำขออนุมัติ",
     "expired": "หมดอายุ"
+  },
+  "inventory": {
+    "title": "ภาพรวมสต็อก",
+    "available": "พร้อมขาย",
+    "quarantine": "กักกัน",
+    "inRepair": "ซ่อม",
+    "inTransit": "ระหว่างขนส่ง",
+    "inTransitIn": "ขนส่งเข้า",
+    "inTransitOut": "ขนส่งออก",
+    "reserved": "จอง",
+    "sold": "ขายแล้ว",
+    "writtenOff": "ตัดจำหน่าย",
+    "branch": "สาขา",
+    "bucket": "สถานะ",
+    "assets": "สินทรัพย์",
+    "assetValue": "มูลค่าสินทรัพย์",
+    "lots": "ล็อต",
+    "lotQty": "จำนวนล็อต",
+    "lotValue": "มูลค่าล็อต",
+    "totalItems": "รวมรายการ",
+    "totalValue": "มูลค่ารวม",
+    "product": "สินค้า",
+    "model": "รุ่น",
+    "variant": "ตัวเลือก",
+    "count": "จำนวน",
+    "avgValue": "มูลค่าเฉลี่ย",
+    "noStockData": "ไม่มีข้อมูลสต็อก",
+    "selectToView": "เลือกสถานะสาขาเพื่อดูรายละเอียด"
   },
   "enrollRedirect": {
     "invalidLink": "ลิงก์ไม่ถูกต้อง",

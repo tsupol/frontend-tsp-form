@@ -55,7 +55,9 @@
     "pricebook": "Pricebook",
     "fin1Rates": "FIN1 Rates",
     "fin2Rates": "FIN2 Rates",
-    "discounts": "Discounts"
+    "discounts": "Discounts",
+    "inventory": "Inventory",
+    "stock": "Stock Dashboard"
   },
   "user": {
     "id": "User ID",
@@ -577,6 +579,34 @@
     "rejected": "Request rejected",
     "noRequests": "No approval requests found",
     "expired": "Expired"
+  },
+  "inventory": {
+    "title": "Stock Dashboard",
+    "available": "Available",
+    "quarantine": "Quarantine",
+    "inRepair": "In Repair",
+    "inTransit": "In Transit",
+    "inTransitIn": "In Transit (In)",
+    "inTransitOut": "In Transit (Out)",
+    "reserved": "Reserved",
+    "sold": "Sold",
+    "writtenOff": "Written Off",
+    "branch": "Branch",
+    "bucket": "Status",
+    "assets": "Assets",
+    "assetValue": "Asset Value",
+    "lots": "Lots",
+    "lotQty": "Lot Qty",
+    "lotValue": "Lot Value",
+    "totalItems": "Total Items",
+    "totalValue": "Total Value",
+    "product": "Product",
+    "model": "Model",
+    "variant": "Variant",
+    "count": "Count",
+    "avgValue": "Avg Value",
+    "noStockData": "No stock data available",
+    "selectToView": "Select a branch status to view details"
   },
   "enrollRedirect": {
     "invalidLink": "Invalid Link",

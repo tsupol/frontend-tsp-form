@@ -17,8 +17,12 @@ const TEST_USERS = [
   { label: 'alice (SYSTEM_DEV)', value: 'alice' },
   { label: 'test_holding_admin (HOLDING_ADMIN)', value: 'test_holding_admin' },
   { label: 'test_company_admin (COMPANY_ADMIN)', value: 'test_company_admin' },
+  { label: 'test_company_accountant (COMPANY_ACCOUNTANT)', value: 'test_company_accountant' },
+  { label: 'test_company_inventory (COMPANY_INVENTORY)', value: 'test_company_inventory' },
+  { label: 'test_company_collector (COMPANY_COLLECTOR)', value: 'test_company_collector' },
+  { label: 'test_company_repo (COMPANY_REPO)', value: 'test_company_repo' },
   { label: 'test_branch_manager (BRANCH_MANAGER)', value: 'test_branch_manager' },
-  { label: 'test_branch_sale (BRANCH_SALE)', value: 'test_branch_sale' },
+  { label: 'test_branch_staff (BRANCH_STAFF)', value: 'test_branch_staff' },
 ];
 
 export function LoginPage() {

@@ -12,6 +12,7 @@ import {
   Package,
   Headset,
   DollarSign,
+  Warehouse,
   ClipboardList,
   Smartphone,
   Settings,
@@ -36,6 +37,7 @@ const menuItemsList = [
   { key: 'fin1-rates', path: '/admin/pricing/fin1-rates' },
   { key: 'fin2-rates', path: '/admin/pricing/fin2-rates' },
   { key: 'discounts', path: '/admin/pricing/discounts' },
+  { key: 'stock', path: '/admin/inventory/stock' },
   { key: 'register', path: '/admin/register' },
   { key: 'enrollment', path: '/admin/enrollment' },
 ];
@@ -164,6 +166,13 @@ export const AppSideNav = () => {
         { key: 'fin1-rates', label: t('nav.fin1Rates'), path: '/admin/pricing/fin1-rates' },
         { key: 'fin2-rates', label: t('nav.fin2Rates'), path: '/admin/pricing/fin2-rates' },
         { key: 'discounts', label: t('nav.discounts'), path: '/admin/pricing/discounts' },
+      ],
+    },
+    {
+      key: 'inventory', icon: <Warehouse size="1rem" />, label: t('nav.inventory'),
+      path: '/admin/inventory/stock',
+      children: [
+        { key: 'stock', label: t('nav.stock'), path: '/admin/inventory/stock' },
       ],
     },
     {
