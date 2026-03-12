@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
+import { PageNav, PageNavPanel, Badge, Skeleton } from 'tsp-form';
 import { apiClient } from '../../lib/api';
-import { Package, ShieldAlert, Wrench, Truck, ArrowLeft } from 'lucide-react';
+import { Package, ShieldAlert, Wrench, Truck, ArrowRightFromLine } from 'lucide-react';
 
 // ============================================================================
 // Types
@@ -62,13 +63,31 @@ interface BranchLotSummary {
 // ============================================================================
 
 const BUCKET_CONFIG: Record<string, { labelKey: string; color: string }> = {
+  // Inbound
+  INBOUND_PENDING_COMPANY_APPROVAL: { labelKey: 'inventory.inboundPendingApproval', color: 'bg-warning/15 text-warning' },
+  INBOUND_APPROVED_AWAITING_BRANCH_CONFIRM: { labelKey: 'inventory.inboundAwaitingConfirm', color: 'bg-warning/15 text-warning' },
+  INBOUND_RECEIVED_UNREGISTERED: { labelKey: 'inventory.inboundUnregistered', color: 'bg-warning/15 text-warning' },
+  // On hand
+  ON_HAND_PENDING_READY: { labelKey: 'inventory.pendingReady', color: 'bg-info/15 text-info' },
   ON_HAND_AVAILABLE: { labelKey: 'inventory.available', color: 'bg-success/15 text-success' },
+  IN_USE_INTERNAL: { labelKey: 'inventory.inUseInternal', color: 'bg-primary/15 text-primary' },
+  // Transit
+  IN_TRANSIT_OUTBOUND: { labelKey: 'inventory.inTransitOut', color: 'bg-info/15 text-info' },
+  IN_TRANSIT_INBOUND: { labelKey: 'inventory.inTransitIn', color: 'bg-info/15 text-info' },
+  // Hold
   QUARANTINED: { labelKey: 'inventory.quarantine', color: 'bg-warning/15 text-warning' },
   IN_REPAIR: { labelKey: 'inventory.inRepair', color: 'bg-danger/15 text-danger' },
-  IN_TRANSIT_INBOUND: { labelKey: 'inventory.inTransitIn', color: 'bg-info/15 text-info' },
-  IN_TRANSIT_OUTBOUND: { labelKey: 'inventory.inTransitOut', color: 'bg-info/15 text-info' },
-  RESERVED: { labelKey: 'inventory.reserved', color: 'bg-primary/15 text-primary' },
-  SOLD: { labelKey: 'inventory.sold', color: 'bg-fg/10 text-fg/60' },
+  OUT_REPAIR: { labelKey: 'inventory.outRepair', color: 'bg-danger/15 text-danger' },
+  DAMAGED_SCRAP_PENDING: { labelKey: 'inventory.damagedScrap', color: 'bg-danger/15 text-danger' },
+  // Customer
+  WITH_CUSTOMER_ACTIVE: { labelKey: 'inventory.withCustomer', color: 'bg-primary/15 text-primary' },
+  REPOSSESSED_PENDING_CLEARANCE: { labelKey: 'inventory.repossessed', color: 'bg-warning/15 text-warning' },
+  LOANED_OUT: { labelKey: 'inventory.loanedOut', color: 'bg-info/15 text-info' },
+  // Exit
+  OWNERSHIP_TRANSFERRED: { labelKey: 'inventory.ownershipTransferred', color: 'bg-fg/10 text-fg/60' },
+  DISPOSED_SOLD_SCRAP: { labelKey: 'inventory.disposedScrap', color: 'bg-fg/10 text-fg/60' },
+  SOLD_B2B_EXTERNAL: { labelKey: 'inventory.soldB2B', color: 'bg-fg/10 text-fg/60' },
+  SOLD_B2C_EXTERNAL: { labelKey: 'inventory.soldB2C', color: 'bg-fg/10 text-fg/60' },
   WRITTEN_OFF: { labelKey: 'inventory.writtenOff', color: 'bg-fg/10 text-fg/60' },
 };
 
@@ -113,22 +132,40 @@ function selKey(s: Selection): string {
 export function StockDashboardPage() {
   const { t } = useTranslation();
   const [selected, setSelected] = useState<Selection | null>(null);
-  const [showMobileDetail, setShowMobileDetail] = useState(false);
 
-  // Data fetching
+  // Summary (all branches) — always loaded
   const { data: stockData, isLoading, error } = useQuery({
     queryKey: ['branch-stock-summary'],
     queryFn: () => apiClient.get<BranchStockSummary[]>('/v_branch_stock_summary?order=branch_name,current_bucket'),
   });
 
-  const { data: assetData } = useQuery({
-    queryKey: ['branch-asset-summary'],
-    queryFn: () => apiClient.get<BranchAssetSummary[]>('/v_branch_asset_summary?order=branch_name,current_bucket'),
+  // Drill-down — fetched on demand when a row is selected (300ms min to avoid flash)
+  const { data: assetData, isLoading: assetsLoading } = useQuery({
+    queryKey: ['branch-asset-summary', selected?.branchId, selected?.bucket],
+    queryFn: async () => {
+      const [data] = await Promise.all([
+        apiClient.get<BranchAssetSummary[]>(
+          `/v_branch_asset_summary?branch_id=eq.${selected!.branchId}&current_bucket=eq.${selected!.bucket}&order=brand_name,family_name`
+        ),
+        new Promise(r => setTimeout(r, 300)),
+      ]);
+      return data;
+    },
+    enabled: !!selected,
   });
 
-  const { data: lotData } = useQuery({
-    queryKey: ['branch-lot-summary'],
-    queryFn: () => apiClient.get<BranchLotSummary[]>('/v_branch_lot_summary?order=branch_name,current_bucket'),
+  const { data: lotData, isLoading: lotsLoading } = useQuery({
+    queryKey: ['branch-lot-summary', selected?.branchId, selected?.bucket],
+    queryFn: async () => {
+      const [data] = await Promise.all([
+        apiClient.get<BranchLotSummary[]>(
+          `/v_branch_lot_summary?branch_id=eq.${selected!.branchId}&current_bucket=eq.${selected!.bucket}&order=brand_name,family_name`
+        ),
+        new Promise(r => setTimeout(r, 300)),
+      ]);
+      return data;
+    },
+    enabled: !!selected,
   });
 
   // Aggregate summary cards
@@ -167,127 +204,138 @@ export function StockDashboardPage() {
     ? stockData?.find(r => r.branch_id === selected.branchId && r.current_bucket === selected.bucket)
     : null;
 
-  const selectedAssets = selected
-    ? assetData?.filter(a => a.branch_id === selected.branchId && a.current_bucket === selected.bucket) ?? []
-    : [];
-
-  const selectedLots = selected
-    ? lotData?.filter(l => l.branch_id === selected.branchId && l.current_bucket === selected.bucket) ?? []
-    : [];
-
-  const handleSelect = (branchId: number, bucket: string) => {
-    setSelected({ branchId, bucket });
-    setShowMobileDetail(true);
-  };
+  const detailTitle = selectedRow
+    ? `${selectedRow.branch_name} — ${getBucketLabel(selectedRow.current_bucket, t)}`
+    : '';
 
   return (
-    <div className="page-content !p-0 !pt-[3rem] lg:!pt-0 !max-w-none h-full flex flex-col overflow-hidden">
-      {/* Header with summary cards */}
-      <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
-        <h1 className="heading-2 shrink-0">{t('inventory.title')}</h1>
-        {/* Desktop: label + count */}
-        <div className="hidden md:flex gap-2 flex-1 min-w-0">
-          {summaryCards.map(card => (
-            <div key={card.key} className="border border-line bg-surface rounded px-2.5 py-1.5 flex items-center gap-2 min-w-0">
-              <card.icon size={14} className={`${card.color} shrink-0`} />
-              <span className="text-xs text-control-label truncate">{t(`inventory.${card.key}`)}</span>
-              <span className="font-semibold text-sm tabular-nums">{fmtNum(card.count)}</span>
-            </div>
-          ))}
-        </div>
-        {/* Mobile: icon with badge */}
-        <div className="flex md:hidden gap-3 flex-1 justify-end">
-          {summaryCards.map(card => (
-            <div key={card.key} className="relative" title={t(`inventory.${card.key}`)}>
-              <card.icon size={20} className={card.color} />
-              {card.count > 0 && (
-                <span className="absolute -top-2 -right-2.5 min-w-4 h-4 px-1 flex items-center justify-center rounded-full bg-danger text-danger-contrast text-[10px] font-bold leading-none">
-                  {card.count > 99 ? '99+' : card.count}
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Split panels */}
-      <div className="flex-1 min-h-0 flex">
-        {/* Left: branch/bucket list */}
-        <div className={`w-full lg:w-1/2 xl:w-5/12 flex flex-col min-h-0 border-r border-line ${showMobileDetail ? 'hidden lg:flex' : 'flex'}`}>
-          <div className="flex-1 overflow-auto better-scroll">
-            {isLoading && (
-              <div className="text-center text-control-label py-8">{t('common.loading')}</div>
-            )}
-
-            {error && (
-              <div className="p-4"><div className="alert alert-danger">{t('common.error')}</div></div>
-            )}
-
-            {!isLoading && !error && branchGroups.length === 0 && (
-              <div className="text-center text-control-label py-8">{t('inventory.noStockData')}</div>
-            )}
-
-            {branchGroups.map(group => (
-              <div key={group.branch_id}>
-                {/* Branch header */}
-                <div className="px-4 py-2 bg-surface text-xs font-semibold text-control-label uppercase tracking-wider sticky top-0 border-b border-line">
-                  {group.branch_name}
-                </div>
-                {/* Bucket rows */}
-                {group.rows.map(row => {
-                  const key = selKey({ branchId: row.branch_id, bucket: row.current_bucket });
-                  const isSelected = selected && selKey(selected) === key;
-                  return (
-                    <button
-                      key={key}
-                      className={`w-full text-left px-4 py-2.5 border-b border-line flex items-center gap-3 transition-colors cursor-pointer ${
-                        isSelected
-                          ? 'bg-primary/10'
-                          : 'hover:bg-surface-hover'
-                      }`}
-                      onClick={() => handleSelect(row.branch_id, row.current_bucket)}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${getBucketColor(row.current_bucket)}`}>
-                            {getBucketLabel(row.current_bucket, t)}
-                          </span>
-                        </div>
-                        <div className="flex gap-4 text-xs text-control-label">
-                          <span>{t('inventory.assets')}: {fmtNum(row.asset_count)}</span>
-                          <span>{t('inventory.lotQty')}: {fmtNum(row.lot_total_qty)}</span>
-                        </div>
+    <PageNav panels={['list', 'detail']} className="h-full">
+      {({ isMobile, isRoot, goTo, Header }) => (
+        <>
+          {isMobile && (
+            <Header
+              title={isRoot ? t('inventory.title') : detailTitle}
+              startContent={
+                isRoot ? (
+                  <button
+                    className="flex items-center justify-center w-12 h-12 cursor-pointer hover:bg-surface-hover transition-colors"
+                    onClick={() => window.dispatchEvent(new CustomEvent('sidemenu:open'))}
+                  >
+                    <ArrowRightFromLine size={18} />
+                  </button>
+                ) : undefined
+              }
+              endContent={
+                isRoot ? (
+                  <div className="flex gap-3 pl-3 pr-3">
+                    {summaryCards.map(card => (
+                      <div key={card.key} className="relative" title={t(`inventory.${card.key}`)}>
+                        <card.icon size={20} className={card.color} />
+                        {card.count > 0 && (
+                          <Badge color="danger" size="xs" className="absolute -top-1.5 -right-2">
+                            {card.count > 99 ? '99+' : card.count}
+                          </Badge>
+                        )}
                       </div>
-                      <div className="text-right shrink-0">
-                        <div className="text-sm font-medium tabular-nums">{fmtNum(row.combined_item_count)}</div>
-                        <div className="text-xs text-control-label tabular-nums">{fmtCurrency(row.combined_total_value)}</div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Right: detail panel */}
-        <div className={`w-full lg:w-1/2 xl:w-7/12 flex flex-col min-h-0 ${showMobileDetail ? 'flex' : 'hidden lg:flex'}`}>
-          {selectedRow ? (
-            <DetailPanel
-              row={selectedRow}
-              assets={selectedAssets}
-              lots={selectedLots}
-              onBack={() => setShowMobileDetail(false)}
-              t={t}
+                    ))}
+                  </div>
+                ) : undefined
+              }
             />
-          ) : (
-            <div className="flex-1 flex items-center justify-center text-control-label">
-              {t('inventory.selectToView')}
+          )}
+
+          {/* Desktop header with summary cards */}
+          {!isMobile && (
+            <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
+              <h1 className="heading-2 shrink-0">{t('inventory.title')}</h1>
+              <div className="flex gap-2 flex-1 min-w-0 justify-end">
+                {summaryCards.map(card => (
+                  <div key={card.key} className="border border-line bg-surface rounded px-2.5 py-1.5 flex items-center gap-2 min-w-0">
+                    <card.icon size={14} className={`${card.color} shrink-0`} />
+                    <span className="text-xs text-control-label truncate">{t(`inventory.${card.key}`)}</span>
+                    <span className="font-semibold text-sm tabular-nums">{fmtNum(card.count)}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
-        </div>
-      </div>
-    </div>
+
+          <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
+            <PageNavPanel id="list" className="w-1/2 xl:w-5/12 border-r border-line overflow-y-auto better-scroll">
+              {isLoading && (
+                <div className="text-center text-control-label py-8">{t('common.loading')}</div>
+              )}
+
+              {error && (
+                <div className="p-4"><div className="alert alert-danger">{t('common.error')}</div></div>
+              )}
+
+              {!isLoading && !error && branchGroups.length === 0 && (
+                <div className="text-center text-control-label py-8">{t('inventory.noStockData')}</div>
+              )}
+
+              {branchGroups.map(group => (
+                <div key={group.branch_id}>
+                  <div className="px-4 py-2 bg-surface text-xs font-semibold text-control-label uppercase tracking-wider sticky top-0 border-b border-line">
+                    {group.branch_name}
+                  </div>
+                  {group.rows.map(row => {
+                    const key = selKey({ branchId: row.branch_id, bucket: row.current_bucket });
+                    const isSelected = selected && selKey(selected) === key;
+                    return (
+                      <button
+                        key={key}
+                        className={`w-full text-left px-4 py-2.5 border-b border-line flex items-center gap-3 transition-colors cursor-pointer ${
+                          isSelected
+                            ? 'bg-primary/10'
+                            : 'hover:bg-surface-hover'
+                        }`}
+                        onClick={() => {
+                          setSelected({ branchId: row.branch_id, bucket: row.current_bucket });
+                          if (isMobile) goTo('detail');
+                        }}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge size="xs" className={getBucketColor(row.current_bucket)}>
+                              {getBucketLabel(row.current_bucket, t)}
+                            </Badge>
+                          </div>
+                          <div className="flex gap-4 text-xs text-control-label">
+                            <span>{t('inventory.assets')}: {fmtNum(row.asset_count)}</span>
+                            <span>{t('inventory.lotQty')}: {fmtNum(row.lot_total_qty)}</span>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className="text-sm font-medium tabular-nums">{fmtNum(row.combined_item_count)}</div>
+                          <div className="text-xs text-control-label tabular-nums">{fmtCurrency(row.combined_total_value)}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+            </PageNavPanel>
+
+            <PageNavPanel id="detail" className="flex-1 overflow-y-auto better-scroll">
+              {selectedRow ? (
+                <DetailPanel
+                  row={selectedRow}
+                  assets={assetData ?? []}
+                  lots={lotData ?? []}
+                  loading={assetsLoading || lotsLoading}
+                  t={t}
+                />
+              ) : (
+                <div className="flex-1 h-full flex items-center justify-center text-control-label">
+                  {t('inventory.selectToView')}
+                </div>
+              )}
+            </PageNavPanel>
+          </div>
+        </>
+      )}
+    </PageNav>
   );
 }
 
@@ -299,30 +347,17 @@ function DetailPanel({
   row,
   assets,
   lots,
-  onBack,
+  loading,
   t,
 }: {
   row: BranchStockSummary;
   assets: BranchAssetSummary[];
   lots: BranchLotSummary[];
-  onBack: () => void;
+  loading: boolean;
   t: (key: string) => string;
 }) {
   return (
     <div className="flex flex-col h-full">
-      {/* Detail header */}
-      <div className="flex-none flex items-center gap-3 px-4 py-3 border-b border-line">
-        <button className="p-1 rounded hover:bg-surface-hover cursor-pointer lg:hidden" onClick={onBack}>
-          <ArrowLeft size={18} />
-        </button>
-        <div className="flex-1 min-w-0">
-          <h2 className="font-semibold truncate">{row.branch_name}</h2>
-          <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium mt-0.5 ${getBucketColor(row.current_bucket)}`}>
-            {getBucketLabel(row.current_bucket, t)}
-          </span>
-        </div>
-      </div>
-
       {/* Summary stats */}
       <div className="flex-none grid grid-cols-3 gap-3 px-4 py-3 border-b border-line bg-surface">
         <div>
@@ -344,12 +379,19 @@ function DetailPanel({
 
       {/* Scrollable detail content */}
       <div className="flex-1 overflow-auto better-scroll p-4 flex flex-col gap-5">
-        {assets.length === 0 && lots.length === 0 && (
+        {loading && (
+          <div className="space-y-2 animate-fade-in">
+            <Skeleton variant="text" width="25%" height="0.75rem" />
+            <Skeleton variant="rectangular" width="100%" height="4.5rem" />
+          </div>
+        )}
+
+        {!loading && assets.length === 0 && lots.length === 0 && (
           <div className="text-center text-control-label py-8">{t('inventory.noStockData')}</div>
         )}
 
         {/* Asset breakdown */}
-        {assets.length > 0 && (
+        {!loading && assets.length > 0 && (
           <div>
             <h3 className="text-xs font-semibold text-control-label uppercase tracking-wider mb-2">
               {t('inventory.assets')} ({assets.length})
@@ -357,7 +399,7 @@ function DetailPanel({
             <div className="border border-line rounded-md overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-surface border-b border-line">
+                  <tr className="bg-surface border-b border-line text-xs">
                     <th className="text-left px-3 py-1.5 font-medium">{t('inventory.product')}</th>
                     <th className="text-right px-3 py-1.5 font-medium">{t('inventory.count')}</th>
                     <th className="text-right px-3 py-1.5 font-medium">{t('inventory.totalValue')}</th>
@@ -366,10 +408,10 @@ function DetailPanel({
                 </thead>
                 <tbody>
                   {assets.map(a => (
-                    <tr key={`${a.model_id}-${a.variant_id}`} className="border-t border-line">
-                      <td className="px-3 py-1">
+                    <tr key={`${a.model_id}-${a.variant_id}`} className="border-t border-line text-xs">
+                      <td className="px-3 py-2">
                         <div className="font-medium">{a.brand_name} {a.family_name}</div>
-                        <div className="text-xs text-control-label">{a.variant_name}</div>
+                        <div className="text-control-label">{a.variant_name}</div>
                       </td>
                       <td className="px-3 py-1 text-right tabular-nums">{fmtNum(a.asset_count)}</td>
                       <td className="px-3 py-1 text-right tabular-nums">{fmtCurrency(a.total_value)}</td>
@@ -383,7 +425,7 @@ function DetailPanel({
         )}
 
         {/* Lot breakdown */}
-        {lots.length > 0 && (
+        {!loading && lots.length > 0 && (
           <div>
             <h3 className="text-xs font-semibold text-control-label uppercase tracking-wider mb-2">
               {t('inventory.lots')} ({lots.length})
@@ -391,7 +433,7 @@ function DetailPanel({
             <div className="border border-line rounded-md overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-surface border-b border-line">
+                  <tr className="bg-surface border-b border-line text-xs">
                     <th className="text-left px-3 py-1.5 font-medium">{t('inventory.product')}</th>
                     <th className="text-right px-3 py-1.5 font-medium">{t('inventory.lotQty')}</th>
                     <th className="text-right px-3 py-1.5 font-medium">{t('inventory.totalValue')}</th>
@@ -399,10 +441,10 @@ function DetailPanel({
                 </thead>
                 <tbody>
                   {lots.map(l => (
-                    <tr key={`${l.model_id}-${l.variant_id}`} className="border-t border-line">
-                      <td className="px-3 py-1">
+                    <tr key={`${l.model_id}-${l.variant_id}`} className="border-t border-line text-xs">
+                      <td className="px-3 py-2">
                         <div className="font-medium">{l.brand_name} {l.family_name}</div>
-                        <div className="text-xs text-control-label">{l.variant_name}</div>
+                        <div className="text-control-label">{l.variant_name}</div>
                       </td>
                       <td className="px-3 py-1 text-right tabular-nums">{fmtNum(l.total_qty)}</td>
                       <td className="px-3 py-1 text-right tabular-nums">{fmtCurrency(l.total_value)}</td>
@@ -417,3 +459,4 @@ function DetailPanel({
     </div>
   );
 }
+
