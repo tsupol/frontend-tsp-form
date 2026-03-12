@@ -620,7 +620,9 @@
     "count": "จำนวน",
     "avgValue": "มูลค่าเฉลี่ย",
     "noStockData": "ไม่มีข้อมูลสต็อก",
-    "selectToView": "เลือกสถานะสาขาเพื่อดูรายละเอียด"
+    "selectToView": "เลือกสถานะสาขาเพื่อดูรายละเอียด",
+    "allBranches": "สาขาทั้งหมด",
+    "allStatuses": "สถานะทั้งหมด"
   },
   "enrollRedirect": {
     "invalidLink": "ลิงก์ไม่ถูกต้อง",

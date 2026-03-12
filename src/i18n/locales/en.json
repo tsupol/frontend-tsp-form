@@ -620,7 +620,9 @@
     "count": "Count",
     "avgValue": "Avg Value",
     "noStockData": "No stock data available",
-    "selectToView": "Select a branch status to view details"
+    "selectToView": "Select a branch status to view details",
+    "allBranches": "All branches",
+    "allStatuses": "All statuses"
   },
   "enrollRedirect": {
     "invalidLink": "Invalid Link",

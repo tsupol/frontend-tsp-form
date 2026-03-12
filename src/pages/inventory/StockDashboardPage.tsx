@@ -1,7 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, Badge, Skeleton } from 'tsp-form';
+import { PageNav, PageNavPanel, Badge, Skeleton, Select } from 'tsp-form';
 import { apiClient } from '../../lib/api';
 import { Package, ShieldAlert, Wrench, Truck, ArrowRightFromLine } from 'lucide-react';
 
@@ -56,6 +56,12 @@ interface BranchLotSummary {
   lot_count: number;
   total_qty: number;
   total_value: number;
+}
+
+interface Branch {
+  branch_id: number;
+  branch_name: string;
+  branch_code: string;
 }
 
 // ============================================================================
@@ -132,6 +138,14 @@ function selKey(s: Selection): string {
 export function StockDashboardPage() {
   const { t } = useTranslation();
   const [selected, setSelected] = useState<Selection | null>(null);
+  const [filterBranchId, setFilterBranchId] = useState<number | null>(null);
+  const [filterBucket, setFilterBucket] = useState<string | null>(null);
+
+  // Branch list for filter
+  const { data: branches } = useQuery({
+    queryKey: ['transfer-destination-branches'],
+    queryFn: () => apiClient.get<Branch[]>('/v_transfer_destination_branches?order=branch_name&is_active=is.true'),
+  });
 
   // Summary (all branches) — always loaded
   const { data: stockData, isLoading, error } = useQuery({
@@ -168,11 +182,22 @@ export function StockDashboardPage() {
     enabled: !!selected,
   });
 
-  // Aggregate summary cards
-  const summaryCards = useMemo(() => {
+  // Filter stock data
+  const filteredStockData = useMemo(() => {
     if (!stockData) return [];
+    return stockData.filter(r => {
+      if (filterBranchId !== null && r.branch_id !== filterBranchId) return false;
+      if (filterBucket !== null && r.current_bucket !== filterBucket) return false;
+      return true;
+    });
+  }, [stockData, filterBranchId, filterBucket]);
+
+  // Aggregate summary cards (from filtered data)
+  const summaryCards = useMemo(() => {
+    if (!filteredStockData.length && !stockData) return [];
+    const source = filteredStockData;
     const aggregate = (buckets: string[]) => {
-      const rows = stockData.filter(r => buckets.includes(r.current_bucket));
+      const rows = source.filter(r => buckets.includes(r.current_bucket));
       return {
         count: rows.reduce((sum, r) => sum + r.combined_item_count, 0),
         value: rows.reduce((sum, r) => sum + r.combined_total_value, 0),
@@ -184,20 +209,42 @@ export function StockDashboardPage() {
       { key: 'inRepair', ...aggregate(['IN_REPAIR']), icon: Wrench, color: 'text-danger' },
       { key: 'inTransit', ...aggregate(['IN_TRANSIT_INBOUND', 'IN_TRANSIT_OUTBOUND']), icon: Truck, color: 'text-info' },
     ];
-  }, [stockData]);
+  }, [filteredStockData, stockData]);
 
-  // Group by branch
+  // Group by branch (from filtered data)
   const branchGroups = useMemo(() => {
-    if (!stockData) return [];
+    if (!filteredStockData.length) return [];
     const map = new Map<number, { branch_id: number; branch_name: string; rows: BranchStockSummary[] }>();
-    for (const row of stockData) {
+    for (const row of filteredStockData) {
       if (!map.has(row.branch_id)) {
         map.set(row.branch_id, { branch_id: row.branch_id, branch_name: row.branch_name, rows: [] });
       }
       map.get(row.branch_id)!.rows.push(row);
     }
     return Array.from(map.values());
-  }, [stockData]);
+  }, [filteredStockData]);
+
+  // Bucket options for filter (from all stockData, not filtered)
+  const bucketOptions = useMemo(() => {
+    if (!stockData) return [];
+    const distinct = [...new Set(stockData.map(r => r.current_bucket))];
+    return distinct.map(b => ({ value: b, label: getBucketLabel(b, t) }));
+  }, [stockData, t]);
+
+  // Branch options for filter
+  const branchOptions = useMemo(() => {
+    if (!branches) return [];
+    return branches.map(b => ({ value: String(b.branch_id), label: b.branch_name }));
+  }, [branches]);
+
+  // Clear selection when it no longer matches filters
+  useEffect(() => {
+    if (!selected) return;
+    const stillVisible = filteredStockData.some(
+      r => r.branch_id === selected.branchId && r.current_bucket === selected.bucket
+    );
+    if (!stillVisible) setSelected(null);
+  }, [filteredStockData, selected]);
 
   // Selected row data
   const selectedRow = selected
@@ -262,6 +309,32 @@ export function StockDashboardPage() {
 
           <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
             <PageNavPanel id="list" className="w-1/2 xl:w-5/12 border-r border-line overflow-y-auto better-scroll">
+              {/* Filter bar */}
+              <div className="sticky top-0 z-10 bg-surface border-b border-line px-4 py-2 flex gap-2">
+                <div style={{ width: '12rem' }}>
+                  <Select
+                    options={branchOptions}
+                    value={filterBranchId !== null ? String(filterBranchId) : null}
+                    onChange={(val) => setFilterBranchId(val ? Number(val) : null)}
+                    placeholder={t('inventory.allBranches')}
+                    size="sm"
+                    showChevron
+                    clearable
+                  />
+                </div>
+                <div style={{ width: '12rem' }}>
+                  <Select
+                    options={bucketOptions}
+                    value={filterBucket}
+                    onChange={(val) => setFilterBucket((val as string) ?? null)}
+                    placeholder={t('inventory.allStatuses')}
+                    size="sm"
+                    showChevron
+                    clearable
+                  />
+                </div>
+              </div>
+
               {isLoading && (
                 <div className="text-center text-control-label py-8">{t('common.loading')}</div>
               )}
@@ -276,7 +349,7 @@ export function StockDashboardPage() {
 
               {branchGroups.map(group => (
                 <div key={group.branch_id}>
-                  <div className="px-4 py-2 bg-surface text-xs font-semibold text-control-label uppercase tracking-wider sticky top-0 border-b border-line">
+                  <div className="px-4 py-2 bg-surface text-xs font-semibold text-control-label uppercase tracking-wider border-b border-line">
                     {group.branch_name}
                   </div>
                   {group.rows.map(row => {
@@ -324,6 +397,7 @@ export function StockDashboardPage() {
                   assets={assetData ?? []}
                   lots={lotData ?? []}
                   loading={assetsLoading || lotsLoading}
+                  isMobile={isMobile}
                   t={t}
                 />
               ) : (
@@ -348,16 +422,28 @@ function DetailPanel({
   assets,
   lots,
   loading,
+  isMobile,
   t,
 }: {
   row: BranchStockSummary;
   assets: BranchAssetSummary[];
   lots: BranchLotSummary[];
   loading: boolean;
+  isMobile: boolean;
   t: (key: string) => string;
 }) {
   return (
     <div className="flex flex-col h-full">
+      {/* Desktop detail header */}
+      {!isMobile && (
+        <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-2">
+          <span className="font-semibold">{row.branch_name}</span>
+          <Badge size="xs" className={getBucketColor(row.current_bucket)}>
+            {getBucketLabel(row.current_bucket, t)}
+          </Badge>
+        </div>
+      )}
+
       {/* Summary stats */}
       <div className="flex-none grid grid-cols-3 gap-3 px-4 py-3 border-b border-line bg-surface">
         <div>
