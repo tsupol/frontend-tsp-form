@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, Badge, Select, Button, Input, Modal, useSnackbarContext } from 'tsp-form';
 import { ArrowRightFromLine, CheckCircle, XCircle, Package, PackagePlus } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
@@ -133,24 +133,28 @@ export function ReceivingPage() {
   const selectedLine = poLines?.find(l => l.po_line_id === selectedLineId) ?? null;
 
   // Lot for the selected PO line (match by po_id + variant_id)
-  const { data: lots } = useQuery({
+  const { data: lots, isPlaceholderData: lotsStale } = useQuery({
     queryKey: ['lots-for-line', selectedLine?.po_id, selectedLine?.variant_id],
     queryFn: () => apiClient.get<StockLot[]>(
       `/v_stock_lots?po_id=eq.${selectedLine!.po_id}&variant_id=eq.${selectedLine!.variant_id}&order=lot_id.desc`
     ),
     enabled: !!selectedLine,
+    placeholderData: keepPreviousData,
   });
 
   const lot = lots?.[0] ?? null;
 
   // Assets from lot
-  const { data: lotAssets } = useQuery({
+  const { data: lotAssets, isPlaceholderData: assetsStale } = useQuery({
     queryKey: ['lot-assets', lot?.lot_id],
     queryFn: () => apiClient.get<Asset[]>(
       `/v_assets?source_lot_id=eq.${lot!.lot_id}&order=asset_id.desc`
     ),
     enabled: !!lot,
+    placeholderData: keepPreviousData,
   });
+
+  const detailLoading = lotsStale || assetsStale;
 
   // ── Mutations ────────────────────────────────────────────────────────────
 
@@ -292,7 +296,7 @@ export function ReceivingPage() {
             {/* ── Left Panel: PO Line List ── */}
             <PageNavPanel id="list" className="w-1/2 xl:w-5/12 border-r border-line overflow-y-auto better-scroll">
               {/* Filter bar */}
-              <div className="panel-header sticky top-0 z-10 bg-surface flex gap-2">
+              <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line sticky top-0 z-10 bg-surface gap-2">
                 <div style={{ width: '100%' }}>
                   <Select
                     options={poOptions}
@@ -356,6 +360,7 @@ export function ReceivingPage() {
                   line={selectedLine}
                   lot={lot}
                   lotAssets={lotAssets ?? []}
+                  loading={detailLoading}
                   receiveError={receiveError}
                   lotCode={lotCode}
                   setLotCode={setLotCode}
@@ -453,6 +458,7 @@ function DetailPanel({
   line,
   lot,
   lotAssets,
+  loading,
   receiveError,
   lotCode,
   setLotCode,
@@ -467,6 +473,7 @@ function DetailPanel({
   line: PoLine;
   lot: StockLot | null;
   lotAssets: Asset[];
+  loading: boolean;
   receiveError: string;
   lotCode: string;
   setLotCode: (v: string) => void;
@@ -479,10 +486,15 @@ function DetailPanel({
   t: (key: string) => string;
 }) {
   return (
-    <div className="flex flex-col h-full">
+    <div className="relative flex flex-col h-full">
+      {loading && (
+        <div className="absolute inset-0 bg-bg/50 z-10 flex items-center justify-center animate-fade-in">
+          <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
       {/* Desktop detail header */}
       {!isMobile && (
-        <div className="panel-header gap-2">
+        <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
           <span className="font-semibold">{line.variant_name}</span>
           <Badge size="xs" className={STATUS_BADGE[line.asset_intake_status] ?? 'bg-fg/10 text-fg/60'}>
             {line.asset_intake_status}

@@ -1,8 +1,8 @@
 /* App-specific Tailwind theme tokens — NOT part of tsp-form theme copy */
 
 @theme static {
-    /* Panel header height (used by .panel-header in app.css) */
-    --height-panel-header: 2.5rem;
+    /* Panel header height */
+    --spacing-panel-header-h: 2.5rem;
 
     /* Text colors for non-form data display */
     --color-subtle: #999999;       /* labels, secondary text */

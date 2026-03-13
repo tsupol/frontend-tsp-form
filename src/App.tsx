@@ -31,6 +31,7 @@ import { DiscountsPage } from './pages/pricing/DiscountsPage';
 import { InventoryLayout } from './pages/inventory/InventoryLayout';
 import { StockDashboardPage } from './pages/inventory/StockDashboardPage';
 import { ReceivingPage } from './pages/inventory/ReceivingPage';
+import { SalePage } from './pages/inventory/SalePage';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -231,6 +232,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <InventoryLayout><ReceivingPage /></InventoryLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/inventory/sale"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <InventoryLayout><SalePage /></InventoryLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

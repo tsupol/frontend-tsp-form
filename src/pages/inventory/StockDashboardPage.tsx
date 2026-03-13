@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, Badge, Skeleton, Select } from 'tsp-form';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { PageNav, PageNavPanel, Badge, Select } from 'tsp-form';
 import { apiClient } from '../../lib/api';
 import { Package, ShieldAlert, Wrench, Truck, ArrowRightFromLine } from 'lucide-react';
 
@@ -153,34 +153,26 @@ export function StockDashboardPage() {
     queryFn: () => apiClient.get<BranchStockSummary[]>('/v_branch_stock_summary?order=branch_name,current_bucket'),
   });
 
-  // Drill-down — fetched on demand when a row is selected (300ms min to avoid flash)
-  const { data: assetData, isLoading: assetsLoading } = useQuery({
+  // Drill-down — fetched on demand, keeps previous data visible while loading
+  const { data: assetData, isPlaceholderData: assetsStale } = useQuery({
     queryKey: ['branch-asset-summary', selected?.branchId, selected?.bucket],
-    queryFn: async () => {
-      const [data] = await Promise.all([
-        apiClient.get<BranchAssetSummary[]>(
-          `/v_branch_asset_summary?branch_id=eq.${selected!.branchId}&current_bucket=eq.${selected!.bucket}&order=brand_name,family_name`
-        ),
-        new Promise(r => setTimeout(r, 300)),
-      ]);
-      return data;
-    },
+    queryFn: () => apiClient.get<BranchAssetSummary[]>(
+      `/v_branch_asset_summary?branch_id=eq.${selected!.branchId}&current_bucket=eq.${selected!.bucket}&order=brand_name,family_name`
+    ),
     enabled: !!selected,
+    placeholderData: keepPreviousData,
   });
 
-  const { data: lotData, isLoading: lotsLoading } = useQuery({
+  const { data: lotData, isPlaceholderData: lotsStale } = useQuery({
     queryKey: ['branch-lot-summary', selected?.branchId, selected?.bucket],
-    queryFn: async () => {
-      const [data] = await Promise.all([
-        apiClient.get<BranchLotSummary[]>(
-          `/v_branch_lot_summary?branch_id=eq.${selected!.branchId}&current_bucket=eq.${selected!.bucket}&order=brand_name,family_name`
-        ),
-        new Promise(r => setTimeout(r, 300)),
-      ]);
-      return data;
-    },
+    queryFn: () => apiClient.get<BranchLotSummary[]>(
+      `/v_branch_lot_summary?branch_id=eq.${selected!.branchId}&current_bucket=eq.${selected!.bucket}&order=brand_name,family_name`
+    ),
     enabled: !!selected,
+    placeholderData: keepPreviousData,
   });
+
+  const detailLoading = assetsStale || lotsStale;
 
   // Filter stock data
   const filteredStockData = useMemo(() => {
@@ -256,7 +248,7 @@ export function StockDashboardPage() {
     : '';
 
   return (
-    <PageNav panels={['list', 'detail']} className="h-full">
+    <PageNav panels={['list', 'detail']} className="h-dvh">
       {({ isMobile, isRoot, goTo, Header }) => (
         <>
           {isMobile && (
@@ -310,7 +302,7 @@ export function StockDashboardPage() {
           <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
             <PageNavPanel id="list" className="w-1/2 xl:w-5/12 border-r border-line overflow-y-auto better-scroll">
               {/* Filter bar */}
-              <div className="panel-header sticky top-0 z-10 bg-surface gap-2">
+              <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line sticky top-0 z-10 bg-surface gap-2">
                 <div style={{ width: '12rem' }}>
                   <Select
                     options={branchOptions}
@@ -396,7 +388,7 @@ export function StockDashboardPage() {
                   row={selectedRow}
                   assets={assetData ?? []}
                   lots={lotData ?? []}
-                  loading={assetsLoading || lotsLoading}
+                  loading={detailLoading}
                   isMobile={isMobile}
                   t={t}
                 />
@@ -433,10 +425,15 @@ function DetailPanel({
   t: (key: string) => string;
 }) {
   return (
-    <div className="flex flex-col h-full">
+    <div className="relative flex flex-col h-full">
+      {loading && (
+        <div className="absolute inset-0 bg-bg/50 z-10 flex items-center justify-center animate-fade-in">
+          <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
       {/* Desktop detail header */}
       {!isMobile && (
-        <div className="panel-header gap-2">
+        <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
           <span className="font-semibold">{row.branch_name}</span>
           <Badge size="xs" className={getBucketColor(row.current_bucket)}>
             {getBucketLabel(row.current_bucket, t)}
@@ -465,19 +462,12 @@ function DetailPanel({
 
       {/* Scrollable detail content */}
       <div className="flex-1 overflow-auto better-scroll p-4 flex flex-col gap-5">
-        {loading && (
-          <div className="space-y-2 animate-fade-in">
-            <Skeleton variant="text" width="25%" height="0.75rem" />
-            <Skeleton variant="rectangular" width="100%" height="4.5rem" />
-          </div>
-        )}
-
-        {!loading && assets.length === 0 && lots.length === 0 && (
+        {assets.length === 0 && lots.length === 0 && !loading && (
           <div className="text-center text-subtler py-8">{t('inventory.noStockData')}</div>
         )}
 
         {/* Asset breakdown */}
-        {!loading && assets.length > 0 && (
+        {assets.length > 0 && (
           <div>
             <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-2">
               {t('inventory.assets')} ({assets.length})
@@ -511,7 +501,7 @@ function DetailPanel({
         )}
 
         {/* Lot breakdown */}
-        {!loading && lots.length > 0 && (
+        {lots.length > 0 && (
           <div>
             <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-2">
               {t('inventory.lots')} ({lots.length})

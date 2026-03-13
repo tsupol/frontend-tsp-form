@@ -150,6 +150,7 @@ export const AppSideNav = () => {
       children: [
         { key: 'stock', label: t('nav.stock'), path: '/admin/inventory/stock' },
         { key: 'receiving', label: t('nav.receiving'), path: '/admin/inventory/receiving' },
+        { key: 'sale', label: t('nav.sale'), path: '/admin/inventory/sale' },
       ],
     },
     {

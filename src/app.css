@@ -6,13 +6,9 @@
         border-radius: var(--radius-control);
     }
 
-    .panel-header {
-        flex: none;
-        display: flex;
-        align-items: center;
-        height: var(--height-panel-header);
+    .panel-datatable .data-table-footer {
         padding-inline: 1rem;
-        border-bottom: var(--spacing-line) solid var(--color-line);
+        padding-bottom: .5rem;
     }
 }
 
