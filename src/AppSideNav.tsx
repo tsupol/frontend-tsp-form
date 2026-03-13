@@ -24,24 +24,6 @@ import {
 import { useAuth } from './contexts/AuthContext';
 import { useTheme } from './contexts/ThemeContext';
 
-// Flat list of all menu items with paths for active key lookup
-const menuItemsList = [
-  { key: 'dashboard', path: '/admin' },
-  { key: 'users', path: '/admin/users' },
-  { key: 'brands', path: '/admin/products/brands' },
-  { key: 'families', path: '/admin/products/families' },
-  { key: 'attributes', path: '/admin/products/attributes' },
-  { key: 'models', path: '/admin/products/models' },
-  { key: 'ticket-queue', path: '/admin/call-center/queue' },
-  { key: 'pricebook', path: '/admin/pricing/pricebook' },
-  { key: 'fin1-rates', path: '/admin/pricing/fin1-rates' },
-  { key: 'fin2-rates', path: '/admin/pricing/fin2-rates' },
-  { key: 'discounts', path: '/admin/pricing/discounts' },
-  { key: 'stock', path: '/admin/inventory/stock' },
-  { key: 'register', path: '/admin/register' },
-  { key: 'enrollment', path: '/admin/enrollment' },
-];
-
 // User menu component
 function UserMenu({ collapsed }: { collapsed: boolean }) {
   const [open, setOpen] = useState(false);
@@ -139,12 +121,6 @@ export const AppSideNav = () => {
   const location = useLocation();
   const { t } = useTranslation();
 
-  const activeKey = (() => {
-    const path = location.pathname;
-    const match = menuItemsList.find(i => i.path === path);
-    return match?.key ?? 'dashboard';
-  })();
-
   const menuItems: SideMenuItemData[] = [
     { key: 'dashboard', icon: <LayoutDashboard size="1rem" />, label: t('nav.dashboard'), path: '/admin' },
     { key: 'users', icon: <Users size="1rem" />, label: t('nav.users'), path: '/admin/users' },
@@ -173,6 +149,7 @@ export const AppSideNav = () => {
       path: '/admin/inventory/stock',
       children: [
         { key: 'stock', label: t('nav.stock'), path: '/admin/inventory/stock' },
+        { key: 'receiving', label: t('nav.receiving'), path: '/admin/inventory/receiving' },
       ],
     },
     {
@@ -235,7 +212,7 @@ export const AppSideNav = () => {
             <div className="side-menu-content better-scroll">
               <SideMenuItems
                 items={menuItems}
-                activeItem={activeKey}
+                activePath={location.pathname}
                 collapsed={menuCollapsed}
                 isMobile={isMobile}
                 onSelect={handleSelect}

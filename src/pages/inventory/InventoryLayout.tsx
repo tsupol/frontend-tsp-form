@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { BarChart3 } from 'lucide-react';
+import { BarChart3, PackagePlus } from 'lucide-react';
 
 const navItems = [
   { path: '/admin/inventory/stock', labelKey: 'nav.stock', icon: BarChart3 },
+  { path: '/admin/inventory/receiving', labelKey: 'nav.receiving', icon: PackagePlus },
 ];
 
 export function InventoryLayout({ children }: { children: ReactNode }) {

@@ -1,11 +1,24 @@
 /* App-specific styles */
 
+:root {
+    --height-panel-header: 2.5rem;
+}
+
 @layer components {
     .card {
         border: var(--spacing-line) solid var(--color-line);
         background: var(--color-surface);
         padding: var(--spacing-card);
         border-radius: var(--radius-control);
+    }
+
+    .panel-header {
+        flex: none;
+        display: flex;
+        align-items: center;
+        height: var(--height-panel-header);
+        padding-inline: 1rem;
+        border-bottom: var(--spacing-line) solid var(--color-line);
     }
 }
 

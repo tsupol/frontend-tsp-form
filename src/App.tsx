@@ -30,6 +30,7 @@ import { Fin2RatesPage } from './pages/pricing/Fin2RatesPage';
 import { DiscountsPage } from './pages/pricing/DiscountsPage';
 import { InventoryLayout } from './pages/inventory/InventoryLayout';
 import { StockDashboardPage } from './pages/inventory/StockDashboardPage';
+import { ReceivingPage } from './pages/inventory/ReceivingPage';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -220,6 +221,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <InventoryLayout><StockDashboardPage /></InventoryLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/inventory/receiving"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <InventoryLayout><ReceivingPage /></InventoryLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

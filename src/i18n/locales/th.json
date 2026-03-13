@@ -57,7 +57,8 @@
     "fin2Rates": "อัตรา FIN2",
     "discounts": "ส่วนลด",
     "inventory": "คลังสินค้า",
-    "stock": "ภาพรวมสต็อก"
+    "stock": "ภาพรวมสต็อก",
+    "receiving": "รับสินค้า"
   },
   "user": {
     "id": "รหัสผู้ใช้",
@@ -623,6 +624,35 @@
     "selectToView": "เลือกสถานะสาขาเพื่อดูรายละเอียด",
     "allBranches": "สาขาทั้งหมด",
     "allStatuses": "สถานะทั้งหมด"
+  },
+  "receiving": {
+    "title": "รับสินค้า",
+    "selectPo": "เลือกใบสั่งซื้อ",
+    "allPos": "ใบสั่งซื้อทั้งหมด",
+    "poLine": "รายการสั่งซื้อ",
+    "lotCode": "รหัสล็อต",
+    "intakeCondition": "สภาพ",
+    "receiveLot": "รับล็อต",
+    "registerAsset": "ลงทะเบียนสินทรัพย์",
+    "serialNumber": "หมายเลขซีเรียล",
+    "serialRequired": "กรุณากรอกหมายเลขซีเรียล",
+    "imei": "IMEI",
+    "qtyReceived": "จำนวนรับ",
+    "qtyOnHand": "คงเหลือ",
+    "qtyConverted": "แปลงแล้ว",
+    "lotReceived": "รับล็อตสำเร็จ",
+    "assetRegistered": "ลงทะเบียนสินทรัพย์สำเร็จ",
+    "lotDepleted": "แปลงล็อตครบแล้ว",
+    "pending": "รอดำเนินการ",
+    "received": "รับแล้ว",
+    "depleted": "หมดแล้ว",
+    "noSelection": "เลือกรายการสั่งซื้อเพื่อเริ่มรับสินค้า",
+    "convertTitle": "ลงทะเบียนสินทรัพย์จากล็อต",
+    "lotInfo": "ข้อมูลล็อต",
+    "registeredAssets": "สินทรัพย์ที่ลงทะเบียนแล้ว",
+    "enterLotCode": "กรอกรหัสล็อต",
+    "enterSerial": "กรอกหมายเลขซีเรียล",
+    "enterImei": "กรอก IMEI (ไม่บังคับ)"
   },
   "enrollRedirect": {
     "invalidLink": "ลิงก์ไม่ถูกต้อง",

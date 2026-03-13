@@ -57,7 +57,8 @@
     "fin2Rates": "FIN2 Rates",
     "discounts": "Discounts",
     "inventory": "Inventory",
-    "stock": "Stock Dashboard"
+    "stock": "Stock Dashboard",
+    "receiving": "Receiving"
   },
   "user": {
     "id": "User ID",
@@ -623,6 +624,35 @@
     "selectToView": "Select a branch status to view details",
     "allBranches": "All branches",
     "allStatuses": "All statuses"
+  },
+  "receiving": {
+    "title": "Receiving",
+    "selectPo": "Select PO",
+    "allPos": "All POs",
+    "poLine": "PO Line",
+    "lotCode": "Lot Code",
+    "intakeCondition": "Condition",
+    "receiveLot": "Receive Lot",
+    "registerAsset": "Register Asset",
+    "serialNumber": "Serial Number",
+    "serialRequired": "Serial number is required",
+    "imei": "IMEI",
+    "qtyReceived": "Qty Received",
+    "qtyOnHand": "On Hand",
+    "qtyConverted": "Converted",
+    "lotReceived": "Lot received successfully",
+    "assetRegistered": "Asset registered successfully",
+    "lotDepleted": "Lot fully converted",
+    "pending": "Pending",
+    "received": "Received",
+    "depleted": "Depleted",
+    "noSelection": "Select a PO line to begin receiving",
+    "convertTitle": "Register Asset from Lot",
+    "lotInfo": "Lot Information",
+    "registeredAssets": "Registered Assets",
+    "enterLotCode": "Enter lot code",
+    "enterSerial": "Enter serial number",
+    "enterImei": "Enter IMEI (optional)"
   },
   "enrollRedirect": {
     "invalidLink": "Invalid Link",

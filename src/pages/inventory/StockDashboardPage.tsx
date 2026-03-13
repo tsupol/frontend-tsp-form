@@ -297,7 +297,7 @@ export function StockDashboardPage() {
               <h1 className="heading-2 shrink-0">{t('inventory.title')}</h1>
               <div className="flex gap-2 flex-1 min-w-0 justify-end">
                 {summaryCards.map(card => (
-                  <div key={card.key} className="border border-line bg-surface rounded px-2.5 py-1.5 flex items-center gap-2 min-w-0">
+                  <div key={card.key} className="border border-line bg-surface rounded px-2 py-0.5 flex items-center gap-2 min-w-0">
                     <card.icon size={14} className={`${card.color} shrink-0`} />
                     <span className="text-xs text-control-label truncate">{t(`inventory.${card.key}`)}</span>
                     <span className="font-semibold text-sm tabular-nums">{fmtNum(card.count)}</span>
@@ -310,7 +310,7 @@ export function StockDashboardPage() {
           <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
             <PageNavPanel id="list" className="w-1/2 xl:w-5/12 border-r border-line overflow-y-auto better-scroll">
               {/* Filter bar */}
-              <div className="sticky top-0 z-10 bg-surface border-b border-line px-4 py-2 flex gap-2">
+              <div className="panel-header sticky top-0 z-10 bg-surface gap-2">
                 <div style={{ width: '12rem' }}>
                   <Select
                     options={branchOptions}
@@ -436,7 +436,7 @@ function DetailPanel({
     <div className="flex flex-col h-full">
       {/* Desktop detail header */}
       {!isMobile && (
-        <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-2">
+        <div className="panel-header gap-2">
           <span className="font-semibold">{row.branch_name}</span>
           <Badge size="xs" className={getBucketColor(row.current_bucket)}>
             {getBucketLabel(row.current_bucket, t)}
