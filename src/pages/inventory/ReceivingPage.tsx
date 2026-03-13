@@ -310,11 +310,11 @@ export function ReceivingPage() {
               </div>
 
               {linesLoading && (
-                <div className="text-center text-control-label py-8">{t('common.loading')}</div>
+                <div className="text-center text-subtler py-8">{t('common.loading')}</div>
               )}
 
               {!linesLoading && (!poLines || poLines.length === 0) && (
-                <div className="text-center text-control-label py-8">{t('common.noData')}</div>
+                <div className="text-center text-subtler py-8">{t('common.noData')}</div>
               )}
 
               {poLines?.map(line => {
@@ -333,7 +333,7 @@ export function ReceivingPage() {
                   >
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm truncate">{line.variant_name}</div>
-                      <div className="text-xs text-control-label truncate">{line.po_no}</div>
+                      <div className="text-xs text-subtle truncate">{line.po_no}</div>
                       <div className="flex items-center gap-2 mt-1">
                         <Badge size="xs" className={STATUS_BADGE[line.asset_intake_status] ?? 'bg-fg/10 text-fg/60'}>
                           {line.asset_intake_status}
@@ -341,8 +341,8 @@ export function ReceivingPage() {
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <div className="text-sm font-medium tabular-nums">{fmtNum(line.qty)} pcs</div>
-                      <div className="text-xs text-control-label tabular-nums">{fmtCurrency(line.unit_cost)}</div>
+                      <div className="text-sm font-medium text-qty tabular-nums">{fmtNum(line.qty)} pcs</div>
+                      <div className="text-xs text-figure tabular-nums">{fmtCurrency(line.unit_cost)}</div>
                     </div>
                   </button>
                 );
@@ -374,7 +374,7 @@ export function ReceivingPage() {
                   t={t}
                 />
               ) : (
-                <div className="flex-1 h-full flex items-center justify-center text-control-label">
+                <div className="flex-1 h-full flex items-center justify-center text-subtler">
                   {t('receiving.noSelection')}
                 </div>
               )}
@@ -430,7 +430,7 @@ export function ReceivingPage() {
                   {t('common.cancel')}
                 </Button>
                 <Button
-                  variant="primary"
+                  color="primary"
                   onClick={handleConvertAsset}
                   disabled={!serialNumber.trim() || convertAssetMutation.isPending}
                 >
@@ -493,18 +493,18 @@ function DetailPanel({
       {/* PO Line info */}
       <div className="flex-none grid grid-cols-3 gap-3 px-4 py-3 border-b border-line bg-surface">
         <div>
-          <div className="text-xs text-control-label">{t('receiving.poLine')}</div>
+          <div className="text-xs text-subtle">{t('receiving.poLine')}</div>
           <div className="font-semibold text-sm">{line.po_no}</div>
-          <div className="text-xs text-control-label">{line.model_name}</div>
+          <div className="text-xs text-subtle">{line.model_name}</div>
         </div>
         <div>
-          <div className="text-xs text-control-label">{t('receiving.qtyReceived')}</div>
-          <div className="font-semibold tabular-nums">{fmtNum(line.qty)}</div>
-          <div className="text-xs text-control-label tabular-nums">@ {fmtCurrency(line.unit_cost)}</div>
+          <div className="text-xs text-subtle">{t('receiving.qtyReceived')}</div>
+          <div className="font-semibold text-qty tabular-nums">{fmtNum(line.qty)}</div>
+          <div className="text-xs text-figure tabular-nums">@ {fmtCurrency(line.unit_cost)}</div>
         </div>
         <div>
-          <div className="text-xs text-control-label">{t('inventory.totalValue')}</div>
-          <div className="font-semibold tabular-nums">{fmtCurrency(line.qty * line.unit_cost)}</div>
+          <div className="text-xs text-subtle">{t('inventory.totalValue')}</div>
+          <div className="font-semibold text-figure tabular-nums">{fmtCurrency(line.qty * line.unit_cost)}</div>
         </div>
       </div>
 
@@ -513,7 +513,7 @@ function DetailPanel({
         {/* Section A: Receive Lot (no lot yet for this line) */}
         {!lot && (
           <div>
-            <h3 className="text-xs font-semibold text-control-label uppercase tracking-wider mb-3">
+            <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-3">
               <Package size={14} className="inline mr-1" />
               {t('receiving.receiveLot')}
             </h3>
@@ -548,7 +548,7 @@ function DetailPanel({
               </div>
               <div>
                 <Button
-                  variant="primary"
+                  color="primary"
                   onClick={onReceiveLot}
                   disabled={!lotCode.trim() || receiving}
                 >
@@ -563,7 +563,7 @@ function DetailPanel({
         {lot && (
           <>
             <div>
-              <h3 className="text-xs font-semibold text-control-label uppercase tracking-wider mb-3">
+              <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-3">
                 <Package size={14} className="inline mr-1" />
                 {t('receiving.lotInfo')}
               </h3>
@@ -577,9 +577,9 @@ function DetailPanel({
 
                 {/* Progress bar */}
                 <div className="mb-2">
-                  <div className="flex justify-between text-xs text-control-label mb-1">
-                    <span>{t('receiving.qtyConverted')}: {fmtNum(lot.qty_consumed)}</span>
-                    <span>{t('receiving.qtyReceived')}: {fmtNum(lot.qty_received)}</span>
+                  <div className="flex justify-between text-xs text-subtle mb-1">
+                    <span>{t('receiving.qtyConverted')}: <span className="text-qty">{fmtNum(lot.qty_consumed)}</span></span>
+                    <span>{t('receiving.qtyReceived')}: <span className="text-qty">{fmtNum(lot.qty_received)}</span></span>
                   </div>
                   <div className="w-full h-2 bg-fg/10 rounded-full overflow-hidden">
                     <div
@@ -591,23 +591,23 @@ function DetailPanel({
 
                 <div className="grid grid-cols-3 gap-2 text-xs">
                   <div>
-                    <span className="text-control-label">{t('receiving.qtyReceived')}</span>
-                    <div className="font-semibold tabular-nums">{fmtNum(lot.qty_received)}</div>
+                    <span className="text-subtle">{t('receiving.qtyReceived')}</span>
+                    <div className="font-semibold text-qty tabular-nums">{fmtNum(lot.qty_received)}</div>
                   </div>
                   <div>
-                    <span className="text-control-label">{t('receiving.qtyOnHand')}</span>
-                    <div className="font-semibold tabular-nums">{fmtNum(lot.qty_on_hand)}</div>
+                    <span className="text-subtle">{t('receiving.qtyOnHand')}</span>
+                    <div className="font-semibold text-qty tabular-nums">{fmtNum(lot.qty_on_hand)}</div>
                   </div>
                   <div>
-                    <span className="text-control-label">{t('receiving.qtyConverted')}</span>
-                    <div className="font-semibold tabular-nums">{fmtNum(lot.qty_consumed)}</div>
+                    <span className="text-subtle">{t('receiving.qtyConverted')}</span>
+                    <div className="font-semibold text-qty tabular-nums">{fmtNum(lot.qty_consumed)}</div>
                   </div>
                 </div>
               </div>
 
               {lot.qty_on_hand > 0 && (
                 <div className="mt-3">
-                  <Button variant="primary" startIcon={<PackagePlus size={16} />} onClick={onOpenConvert}>
+                  <Button color="primary" startIcon={<PackagePlus size={16} />} onClick={onOpenConvert}>
                     {t('receiving.registerAsset')}
                   </Button>
                 </div>
@@ -617,7 +617,7 @@ function DetailPanel({
             {/* Registered assets list */}
             {lotAssets.length > 0 && (
               <div>
-                <h3 className="text-xs font-semibold text-control-label uppercase tracking-wider mb-2">
+                <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-2">
                   {t('receiving.registeredAssets')} ({lotAssets.length})
                 </h3>
                 <div className="border border-line rounded-md overflow-hidden">

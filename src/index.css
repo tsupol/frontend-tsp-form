@@ -1,5 +1,6 @@
 @layer theme, base, components, utilities;
 @import "tailwindcss";
+@import "./app-theme.css";
 
 @theme static {
     /* ── Semantic colors (dark theme defaults — Radix-inspired) ─────── */
@@ -294,5 +295,6 @@
 
     /* skeleton */
     --color-skeleton: #e0e1e6;
+
 }
 

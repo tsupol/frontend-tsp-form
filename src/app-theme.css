@@ -1,0 +1,19 @@
+/* App-specific Tailwind theme tokens — NOT part of tsp-form theme copy */
+
+@theme static {
+    /* Panel header height (used by .panel-header in app.css) */
+    --height-panel-header: 2.5rem;
+
+    /* Text colors for non-form data display */
+    --color-subtle: #999999;       /* labels, secondary text */
+    --color-subtler: #70737c;      /* empty states, placeholders */
+    --color-figure: #aabde8;       /* money / currency values */
+    --color-qty: #c2c7d7;          /* quantity / count values */
+}
+
+[data-theme="light"] {
+    --color-subtle: #70737c;
+    --color-subtler: #a0a3ab;
+    --color-figure: #4a4d55;
+    --color-qty: #555960;
+}

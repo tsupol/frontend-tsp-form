@@ -1,9 +1,3 @@
-/* App-specific styles */
-
-:root {
-    --height-panel-header: 2.5rem;
-}
-
 @layer components {
     .card {
         border: var(--spacing-line) solid var(--color-line);
@@ -28,6 +22,7 @@ input[type="number"]::-webkit-outer-spin-button {
     -webkit-appearance: none;
     margin: 0;
 }
+
 input[type="number"] {
     -moz-appearance: textfield;
 }

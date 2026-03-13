@@ -299,8 +299,8 @@ export function StockDashboardPage() {
                 {summaryCards.map(card => (
                   <div key={card.key} className="border border-line bg-surface rounded px-2 py-0.5 flex items-center gap-2 min-w-0">
                     <card.icon size={14} className={`${card.color} shrink-0`} />
-                    <span className="text-xs text-control-label truncate">{t(`inventory.${card.key}`)}</span>
-                    <span className="font-semibold text-sm tabular-nums">{fmtNum(card.count)}</span>
+                    <span className="text-xs text-subtle truncate">{t(`inventory.${card.key}`)}</span>
+                    <span className="font-semibold text-sm text-qty tabular-nums">{fmtNum(card.count)}</span>
                   </div>
                 ))}
               </div>
@@ -336,7 +336,7 @@ export function StockDashboardPage() {
               </div>
 
               {isLoading && (
-                <div className="text-center text-control-label py-8">{t('common.loading')}</div>
+                <div className="text-center text-subtler py-8">{t('common.loading')}</div>
               )}
 
               {error && (
@@ -344,12 +344,12 @@ export function StockDashboardPage() {
               )}
 
               {!isLoading && !error && branchGroups.length === 0 && (
-                <div className="text-center text-control-label py-8">{t('inventory.noStockData')}</div>
+                <div className="text-center text-subtler py-8">{t('inventory.noStockData')}</div>
               )}
 
               {branchGroups.map(group => (
                 <div key={group.branch_id}>
-                  <div className="px-4 py-2 bg-surface text-xs font-semibold text-control-label uppercase tracking-wider border-b border-line">
+                  <div className="px-4 py-2 bg-surface text-xs font-semibold text-subtle uppercase tracking-wider border-b border-line">
                     {group.branch_name}
                   </div>
                   {group.rows.map(row => {
@@ -374,14 +374,14 @@ export function StockDashboardPage() {
                               {getBucketLabel(row.current_bucket, t)}
                             </Badge>
                           </div>
-                          <div className="flex gap-4 text-xs text-control-label">
-                            <span>{t('inventory.assets')}: {fmtNum(row.asset_count)}</span>
-                            <span>{t('inventory.lotQty')}: {fmtNum(row.lot_total_qty)}</span>
+                          <div className="flex gap-4 text-xs text-subtle">
+                            <span>{t('inventory.assets')}: <span className="text-qty">{fmtNum(row.asset_count)}</span></span>
+                            <span>{t('inventory.lotQty')}: <span className="text-qty">{fmtNum(row.lot_total_qty)}</span></span>
                           </div>
                         </div>
                         <div className="text-right shrink-0">
-                          <div className="text-sm font-medium tabular-nums">{fmtNum(row.combined_item_count)}</div>
-                          <div className="text-xs text-control-label tabular-nums">{fmtCurrency(row.combined_total_value)}</div>
+                          <div className="text-sm font-medium text-qty tabular-nums">{fmtNum(row.combined_item_count)}</div>
+                          <div className="text-xs text-figure tabular-nums">{fmtCurrency(row.combined_total_value)}</div>
                         </div>
                       </button>
                     );
@@ -401,7 +401,7 @@ export function StockDashboardPage() {
                   t={t}
                 />
               ) : (
-                <div className="flex-1 h-full flex items-center justify-center text-control-label">
+                <div className="flex-1 h-full flex items-center justify-center text-subtler">
                   {t('inventory.selectToView')}
                 </div>
               )}
@@ -447,19 +447,19 @@ function DetailPanel({
       {/* Summary stats */}
       <div className="flex-none grid grid-cols-3 gap-3 px-4 py-3 border-b border-line bg-surface">
         <div>
-          <div className="text-xs text-control-label">{t('inventory.assets')}</div>
-          <div className="font-semibold tabular-nums">{fmtNum(row.asset_count)}</div>
-          <div className="text-xs text-control-label tabular-nums">{fmtCurrency(row.asset_total_value)}</div>
+          <div className="text-xs text-subtle">{t('inventory.assets')}</div>
+          <div className="font-semibold text-qty tabular-nums">{fmtNum(row.asset_count)}</div>
+          <div className="text-xs text-figure tabular-nums">{fmtCurrency(row.asset_total_value)}</div>
         </div>
         <div>
-          <div className="text-xs text-control-label">{t('inventory.lotQty')}</div>
-          <div className="font-semibold tabular-nums">{fmtNum(row.lot_total_qty)}</div>
-          <div className="text-xs text-control-label tabular-nums">{fmtCurrency(row.lot_total_value)}</div>
+          <div className="text-xs text-subtle">{t('inventory.lotQty')}</div>
+          <div className="font-semibold text-qty tabular-nums">{fmtNum(row.lot_total_qty)}</div>
+          <div className="text-xs text-figure tabular-nums">{fmtCurrency(row.lot_total_value)}</div>
         </div>
         <div>
-          <div className="text-xs text-control-label">{t('inventory.totalItems')}</div>
-          <div className="font-semibold tabular-nums">{fmtNum(row.combined_item_count)}</div>
-          <div className="text-xs text-control-label tabular-nums">{fmtCurrency(row.combined_total_value)}</div>
+          <div className="text-xs text-subtle">{t('inventory.totalItems')}</div>
+          <div className="font-semibold text-qty tabular-nums">{fmtNum(row.combined_item_count)}</div>
+          <div className="text-xs text-figure tabular-nums">{fmtCurrency(row.combined_total_value)}</div>
         </div>
       </div>
 
@@ -473,13 +473,13 @@ function DetailPanel({
         )}
 
         {!loading && assets.length === 0 && lots.length === 0 && (
-          <div className="text-center text-control-label py-8">{t('inventory.noStockData')}</div>
+          <div className="text-center text-subtler py-8">{t('inventory.noStockData')}</div>
         )}
 
         {/* Asset breakdown */}
         {!loading && assets.length > 0 && (
           <div>
-            <h3 className="text-xs font-semibold text-control-label uppercase tracking-wider mb-2">
+            <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-2">
               {t('inventory.assets')} ({assets.length})
             </h3>
             <div className="border border-line rounded-md overflow-hidden">
@@ -497,11 +497,11 @@ function DetailPanel({
                     <tr key={`${a.model_id}-${a.variant_id}`} className="border-t border-line text-xs">
                       <td className="px-3 py-2">
                         <div className="font-medium">{a.brand_name} {a.family_name}</div>
-                        <div className="text-control-label">{a.variant_name}</div>
+                        <div className="text-subtle">{a.variant_name}</div>
                       </td>
-                      <td className="px-3 py-1 text-right tabular-nums">{fmtNum(a.asset_count)}</td>
-                      <td className="px-3 py-1 text-right tabular-nums">{fmtCurrency(a.total_value)}</td>
-                      <td className="px-3 py-1 text-right tabular-nums">{fmtCurrency(a.avg_value)}</td>
+                      <td className="px-3 py-1 text-right text-qty tabular-nums">{fmtNum(a.asset_count)}</td>
+                      <td className="px-3 py-1 text-right text-figure tabular-nums">{fmtCurrency(a.total_value)}</td>
+                      <td className="px-3 py-1 text-right text-figure tabular-nums">{fmtCurrency(a.avg_value)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -513,7 +513,7 @@ function DetailPanel({
         {/* Lot breakdown */}
         {!loading && lots.length > 0 && (
           <div>
-            <h3 className="text-xs font-semibold text-control-label uppercase tracking-wider mb-2">
+            <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-2">
               {t('inventory.lots')} ({lots.length})
             </h3>
             <div className="border border-line rounded-md overflow-hidden">
@@ -530,10 +530,10 @@ function DetailPanel({
                     <tr key={`${l.model_id}-${l.variant_id}`} className="border-t border-line text-xs">
                       <td className="px-3 py-2">
                         <div className="font-medium">{l.brand_name} {l.family_name}</div>
-                        <div className="text-control-label">{l.variant_name}</div>
+                        <div className="text-subtle">{l.variant_name}</div>
                       </td>
-                      <td className="px-3 py-1 text-right tabular-nums">{fmtNum(l.total_qty)}</td>
-                      <td className="px-3 py-1 text-right tabular-nums">{fmtCurrency(l.total_value)}</td>
+                      <td className="px-3 py-1 text-right text-qty tabular-nums">{fmtNum(l.total_qty)}</td>
+                      <td className="px-3 py-1 text-right text-figure tabular-nums">{fmtCurrency(l.total_value)}</td>
                     </tr>
                   ))}
                 </tbody>
