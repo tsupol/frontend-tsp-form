@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { ListTodo } from 'lucide-react';
 
 const navItems = [
-  { path: '/admin/call-center/queue', labelKey: 'nav.ticketQueue', icon: ListTodo },
+  { path: '/admin/call-center', labelKey: 'nav.ticketQueue', icon: ListTodo },
 ];
 
 export function CallCenterLayout({ children }: { children: ReactNode }) {

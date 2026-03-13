@@ -152,7 +152,7 @@ function App() {
 
       {/* Call Center */}
       <Route
-        path="/admin/call-center/queue"
+        path="/admin/call-center"
         element={
           <ProtectedRoute>
             <AdminLayout>

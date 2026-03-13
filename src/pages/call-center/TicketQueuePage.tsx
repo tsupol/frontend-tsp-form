@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { DataTable, Badge, Input, Select } from 'tsp-form';
-import { ChevronsUpDown } from 'lucide-react';
+import { ChevronsUpDown, XCircle } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -169,9 +169,10 @@ export function TicketQueuePage() {
       </div>
 
       {isError && (
-        <div className="px-6">
-          <div className="border border-line bg-surface p-6 rounded-lg text-center">
-            <div className="text-danger mb-4">{error instanceof Error ? error.message : t('common.error')}</div>
+        <div className="flex-none">
+          <div className="alert alert-danger">
+            <XCircle size={18} />
+            <div><div className="alert-description">{error instanceof Error ? error.message : t('common.error')}</div></div>
           </div>
         </div>
       )}

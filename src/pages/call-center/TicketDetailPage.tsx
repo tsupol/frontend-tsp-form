@@ -37,7 +37,6 @@ interface TicketDetail {
   stage: string;
   severity: number;
   status: string;
-  status_label: string;
   assigned_to_user_id: number | null;
   assigned_at: string | null;
   next_attempt_after: string | null;
@@ -67,6 +66,21 @@ interface TicketGetResponse {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+const STATUS_LABELS: Record<string, string> = {
+  QUEUED: 'Queued',
+  IN_PROGRESS: 'In Progress',
+  CALL_NO_ANSWER: 'No Answer',
+  CALL_UNREACHABLE: 'Unreachable',
+  CLOSED_CALL_SUCCESS: 'Call Success',
+  CLOSED_RESOLVED_BY_PAYMENT: 'Resolved by Payment',
+  CLOSED_SUPERSEDED: 'Superseded',
+  CLOSED_CANCELED_OR_CLOSED: 'Canceled / Closed',
+};
+
+function statusLabel(status: string): string {
+  return STATUS_LABELS[status] ?? status;
+}
 
 function statusColor(status: string): 'info' | 'warning' | 'success' | 'danger' | undefined {
   if (status === 'QUEUED') return 'info';
@@ -133,7 +147,7 @@ export function TicketDetailPage() {
   // Fetch ticket detail
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['ticket', ticketId],
-    queryFn: () => apiClient.rpc<TicketGetResponse>('ops_call_ticket_get', { ticket_id: ticketId }),
+    queryFn: () => apiClient.rpc<TicketGetResponse>('ops_call_ticket_get', { p_ticket_id: ticketId }),
   });
 
   const ticket = data?.ticket;
@@ -164,7 +178,7 @@ export function TicketDetailPage() {
   };
 
   const handleTake = () => runAction('take', async () => {
-    await apiClient.rpc('ops_call_ticket_take', { ticket_id: ticketId });
+    await apiClient.rpc('ops_call_ticket_take', { p_ticket_id: ticketId });
     addSnackbar({
       message: (
         <div className="alert alert-success">
@@ -178,7 +192,7 @@ export function TicketDetailPage() {
   });
 
   const handleSetResult = (result: string) => runAction('result', async () => {
-    await apiClient.rpc('ops_call_ticket_set_result', { ticket_id: ticketId, result, note: null });
+    await apiClient.rpc('ops_call_ticket_set_result', { p_ticket_id: ticketId, p_result: result, p_note: null });
     addSnackbar({
       message: (
         <div className="alert alert-success">
@@ -192,7 +206,7 @@ export function TicketDetailPage() {
   });
 
   const handleRevert = () => runAction('revert', async () => {
-    await apiClient.rpc('ops_call_ticket_revert_result', { ticket_id: ticketId, note: revertNote || null });
+    await apiClient.rpc('ops_call_ticket_revert_result', { p_ticket_id: ticketId, p_note: revertNote || null });
     setRevertNote('');
     addSnackbar({
       message: (
@@ -207,7 +221,7 @@ export function TicketDetailPage() {
   });
 
   const handleAddNote = () => runAction('note', async () => {
-    await apiClient.rpc('ops_call_ticket_add_note', { ticket_id: ticketId, note: noteText.trim() });
+    await apiClient.rpc('ops_call_ticket_add_note', { p_ticket_id: ticketId, p_note: noteText.trim() });
     setNoteText('');
     addSnackbar({
       message: (
@@ -238,7 +252,7 @@ export function TicketDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="page-content max-w-[56rem]">
+      <div className="page-content max-w-[64rem]">
         <div className="text-control-label">{t('common.loading')}</div>
       </div>
     );
@@ -246,196 +260,200 @@ export function TicketDetailPage() {
 
   if (isError || !ticket) {
     return (
-      <div className="page-content max-w-[56rem]">
-        <div className="border border-line bg-surface p-6 rounded-lg text-center">
-          <div className="text-danger mb-4">{error instanceof Error ? error.message : t('common.error')}</div>
-          <Button variant="ghost" startIcon={<ArrowLeft size={16} />} onClick={() => navigate('/admin/call-center/queue')}>
-            {t('callCenter.backToQueue')}
-          </Button>
+      <div className="page-content max-w-[64rem] space-y-4">
+        <div className="alert alert-danger">
+          <XCircle size={18} />
+          <div><div className="alert-description">{error instanceof Error ? error.message : t('common.error')}</div></div>
         </div>
+        <Button variant="ghost" startIcon={<ArrowLeft size={16} />} onClick={() => navigate('/admin/call-center')}>
+          {t('callCenter.backToQueue')}
+        </Button>
       </div>
     );
   }
 
   return (
-    <div className="page-content max-w-[56rem] space-y-6">
-      {/* Back button + title */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" startIcon={<ArrowLeft size={16} />} onClick={() => navigate('/admin/call-center/queue')} />
-        <h1 className="heading-2">{ticket.ticket_code}</h1>
-      </div>
-
-      {/* Error alert */}
-      {errorMessage && (
-        <div key={errorKey} className="alert alert-danger animate-pop-in">
-          <XCircle size={18} />
-          <div><div className="alert-description">{errorMessage}</div></div>
+    <div className="page-content h-dvh max-h-dvh max-w-[64rem] flex flex-col overflow-hidden">
+      {/* ── Fixed zone ── */}
+      <div className="flex-none space-y-4 pb-4">
+        {/* Back button + title */}
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" startIcon={<ArrowLeft size={16} />} onClick={() => navigate('/admin/call-center')} />
+          <h1 className="heading-2">{ticket.ticket_code}</h1>
         </div>
-      )}
 
-      {/* Info card */}
-      <div className="border border-line bg-surface rounded-lg p-5">
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 text-sm">
-          <div>
-            <div className="text-xs text-control-label">{t('callCenter.ticketCode')}</div>
-            <div className="font-medium">{ticket.ticket_code}</div>
+        {/* Error alert */}
+        {errorMessage && (
+          <div key={errorKey} className="alert alert-danger animate-pop-in">
+            <XCircle size={18} />
+            <div><div className="alert-description">{errorMessage}</div></div>
           </div>
-          <div>
-            <div className="text-xs text-control-label">{t('callCenter.contractCode')}</div>
-            <div className="font-medium">{ticket.ref_contract_code ?? '—'}</div>
-          </div>
-          <div>
-            <div className="text-xs text-control-label">{t('callCenter.contractSource')}</div>
-            <div>{ticket.ref_contract_source ?? '—'}</div>
-          </div>
-          <div>
-            <div className="text-xs text-control-label">{t('callCenter.status')}</div>
-            <Badge size="sm" color={statusColor(ticket.status)}>{ticket.status_label}</Badge>
-          </div>
-          <div>
-            <div className="text-xs text-control-label">{t('callCenter.stage')}</div>
-            <Badge size="sm" color={severityColor(ticket.severity)}>
-              {ticket.stage} ({ticket.severity})
-            </Badge>
-          </div>
-          <div>
-            <div className="text-xs text-control-label">{t('callCenter.assignedTo')}</div>
-            <div>{ticket.assigned_to_user_id ? `#${ticket.assigned_to_user_id}` : '—'}</div>
-          </div>
-          <div>
-            <div className="text-xs text-control-label">{t('callCenter.assignedAt')}</div>
-            <div>{formatDateTime(ticket.assigned_at)}</div>
-          </div>
-          <div>
-            <div className="text-xs text-control-label">{t('callCenter.createdAt')}</div>
-            <div>{formatDateTime(ticket.created_at)}</div>
-          </div>
-          {ticket.closed_at && (
+        )}
+
+        {/* Info card */}
+        <div className="border border-line bg-surface rounded-lg p-5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 text-sm">
             <div>
-              <div className="text-xs text-control-label">{t('callCenter.closedAt')}</div>
-              <div>{formatDateTime(ticket.closed_at)}</div>
+              <div className="text-xs text-control-label">{t('callCenter.ticketCode')}</div>
+              <div className="font-medium">{ticket.ticket_code}</div>
             </div>
-          )}
-          {ticket.closed_reason && (
-            <div className="col-span-2">
-              <div className="text-xs text-control-label">{t('callCenter.closedReason')}</div>
-              <div>{ticket.closed_reason}</div>
-            </div>
-          )}
-          {ticket.next_attempt_after && OPEN_STATUSES.includes(ticket.status) && (
             <div>
-              <div className="text-xs text-control-label">{t('callCenter.nextAttempt')}</div>
-              <div>{formatDateTime(ticket.next_attempt_after)}</div>
+              <div className="text-xs text-control-label">{t('callCenter.contractCode')}</div>
+              <div className="font-medium">{ticket.ref_contract_code ?? '—'}</div>
             </div>
-          )}
-        </div>
-      </div>
-
-      {/* Action buttons */}
-      {OPEN_STATUSES.includes(ticket.status) && (
-        <div className="border border-line bg-surface rounded-lg p-5 space-y-4">
-          {/* Take */}
-          {canTake && (
-            <Button
-              color="primary"
-              disabled={!!actionPending}
-              onClick={handleTake}
-              startIcon={<Phone size={16} />}
-            >
-              {actionPending === 'take' ? t('callCenter.taking') : t('callCenter.take')}
-            </Button>
-          )}
-
-          {/* Set Result */}
-          {canSetResult && (
-            <div className="space-y-2">
-              <div className="text-sm font-medium">{t('callCenter.setResult')}</div>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  color="success"
-                  disabled={!!actionPending}
-                  onClick={() => handleSetResult('CALL_SUCCESS')}
-                  startIcon={<PhoneCall size={16} />}
-                >
-                  {t('callCenter.callSuccess')}
-                </Button>
-                <Button
-                  color="warning"
-                  disabled={!!actionPending}
-                  onClick={() => handleSetResult('CALL_NO_ANSWER')}
-                  startIcon={<PhoneOff size={16} />}
-                >
-                  {t('callCenter.callNoAnswer')}
-                </Button>
-                <Button
-                  color="danger"
-                  disabled={!!actionPending}
-                  onClick={() => handleSetResult('CALL_UNREACHABLE')}
-                  startIcon={<PhoneOff size={16} />}
-                >
-                  {t('callCenter.callUnreachable')}
-                </Button>
+            <div>
+              <div className="text-xs text-control-label">{t('callCenter.contractSource')}</div>
+              <div>{ticket.ref_contract_source ?? '—'}</div>
+            </div>
+            <div>
+              <div className="text-xs text-control-label">{t('callCenter.status')}</div>
+              <Badge size="sm" color={statusColor(ticket.status)}>{statusLabel(ticket.status)}</Badge>
+            </div>
+            <div>
+              <div className="text-xs text-control-label">{t('callCenter.stage')}</div>
+              <Badge size="sm" color={severityColor(ticket.severity)}>
+                {ticket.stage} ({ticket.severity})
+              </Badge>
+            </div>
+            <div>
+              <div className="text-xs text-control-label">{t('callCenter.assignedTo')}</div>
+              <div>{ticket.assigned_to_user_id ? `#${ticket.assigned_to_user_id}` : '—'}</div>
+            </div>
+            <div>
+              <div className="text-xs text-control-label">{t('callCenter.assignedAt')}</div>
+              <div>{formatDateTime(ticket.assigned_at)}</div>
+            </div>
+            <div>
+              <div className="text-xs text-control-label">{t('callCenter.createdAt')}</div>
+              <div>{formatDateTime(ticket.created_at)}</div>
+            </div>
+            {ticket.closed_at && (
+              <div>
+                <div className="text-xs text-control-label">{t('callCenter.closedAt')}</div>
+                <div>{formatDateTime(ticket.closed_at)}</div>
               </div>
-            </div>
-          )}
+            )}
+            {ticket.closed_reason && (
+              <div className="col-span-2">
+                <div className="text-xs text-control-label">{t('callCenter.closedReason')}</div>
+                <div>{ticket.closed_reason}</div>
+              </div>
+            )}
+            {ticket.next_attempt_after && OPEN_STATUSES.includes(ticket.status) && (
+              <div>
+                <div className="text-xs text-control-label">{t('callCenter.nextAttempt')}</div>
+                <div>{formatDateTime(ticket.next_attempt_after)}</div>
+              </div>
+            )}
+          </div>
+        </div>
 
-          {/* Revert */}
-          {canRevert && (
+        {/* Action buttons */}
+        {OPEN_STATUSES.includes(ticket.status) && (
+          <div className="border border-line bg-surface rounded-lg p-5 space-y-4">
+            {/* Take */}
+            {canTake && (
+              <Button
+                color="primary"
+                disabled={!!actionPending}
+                onClick={handleTake}
+                startIcon={<Phone size={16} />}
+              >
+                {actionPending === 'take' ? t('callCenter.taking') : t('callCenter.take')}
+              </Button>
+            )}
+
+            {/* Set Result */}
+            {canSetResult && (
+              <div className="space-y-2">
+                <div className="text-sm font-medium">{t('callCenter.setResult')}</div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    color="success"
+                    disabled={!!actionPending}
+                    onClick={() => handleSetResult('CALL_SUCCESS')}
+                    startIcon={<PhoneCall size={16} />}
+                  >
+                    {t('callCenter.callSuccess')}
+                  </Button>
+                  <Button
+                    color="warning"
+                    disabled={!!actionPending}
+                    onClick={() => handleSetResult('CALL_NO_ANSWER')}
+                    startIcon={<PhoneOff size={16} />}
+                  >
+                    {t('callCenter.callNoAnswer')}
+                  </Button>
+                  <Button
+                    color="danger"
+                    disabled={!!actionPending}
+                    onClick={() => handleSetResult('CALL_UNREACHABLE')}
+                    startIcon={<PhoneOff size={16} />}
+                  >
+                    {t('callCenter.callUnreachable')}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Revert */}
+            {canRevert && (
+              <div className="space-y-2">
+                <div className="text-sm font-medium">{t('callCenter.revert')}</div>
+                <div className="flex items-end gap-2">
+                  <div className="flex-1">
+                    <Input
+                      size="sm"
+                      placeholder={t('callCenter.revertNote')}
+                      value={revertNote}
+                      onChange={(e) => setRevertNote(e.target.value)}
+                    />
+                  </div>
+                  <Button
+                    color="warning"
+                    disabled={!!actionPending}
+                    onClick={handleRevert}
+                    startIcon={<Undo2 size={16} />}
+                  >
+                    {actionPending === 'revert' ? t('callCenter.reverting') : t('callCenter.revert')}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Add Note */}
             <div className="space-y-2">
-              <div className="text-sm font-medium">{t('callCenter.revert')}</div>
+              <div className="text-sm font-medium">{t('callCenter.addNote')}</div>
               <div className="flex items-end gap-2">
                 <div className="flex-1">
                   <Input
                     size="sm"
-                    placeholder={t('callCenter.revertNote')}
-                    value={revertNote}
-                    onChange={(e) => setRevertNote(e.target.value)}
+                    placeholder={t('callCenter.notePlaceholder')}
+                    value={noteText}
+                    onChange={(e) => setNoteText(e.target.value)}
                   />
                 </div>
                 <Button
-                  color="warning"
-                  disabled={!!actionPending}
-                  onClick={handleRevert}
-                  startIcon={<Undo2 size={16} />}
+                  color="primary"
+                  disabled={!!actionPending || !noteText.trim()}
+                  onClick={handleAddNote}
+                  startIcon={<MessageSquarePlus size={16} />}
                 >
-                  {actionPending === 'revert' ? t('callCenter.reverting') : t('callCenter.revert')}
+                  {t('callCenter.addNote')}
                 </Button>
               </div>
             </div>
-          )}
-
-          {/* Add Note */}
-          <div className="space-y-2">
-            <div className="text-sm font-medium">{t('callCenter.addNote')}</div>
-            <div className="flex items-end gap-2">
-              <div className="flex-1">
-                <Input
-                  size="sm"
-                  placeholder={t('callCenter.notePlaceholder')}
-                  value={noteText}
-                  onChange={(e) => setNoteText(e.target.value)}
-                />
-              </div>
-              <Button
-                color="primary"
-                disabled={!!actionPending || !noteText.trim()}
-                onClick={handleAddNote}
-                startIcon={<MessageSquarePlus size={16} />}
-              >
-                {t('callCenter.addNote')}
-              </Button>
-            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Event timeline */}
-      <div className="space-y-3">
-        <h2 className="text-sm font-semibold">{t('callCenter.timeline')}</h2>
+      {/* ── Scrollable zone: timeline ── */}
+      <div className="flex-1 min-h-0 flex flex-col">
+        <h2 className="flex-none text-sm font-semibold pb-3">{t('callCenter.timeline')}</h2>
         {events.length === 0 ? (
           <div className="text-sm text-control-label">{t('common.noData')}</div>
         ) : (
-          <div className="border border-line rounded-lg divide-y divide-line">
+          <div className="flex-1 min-h-0 overflow-y-auto border border-line rounded-lg divide-y divide-line">
             {events.map((evt) => (
               <div key={evt.id} className="flex gap-3 px-4 py-3">
                 <div className="shrink-0 pt-0.5">{eventIcon(evt.event_type)}</div>
@@ -452,7 +470,7 @@ export function TicketDetailPage() {
                     )}
                   </div>
                   {evt.note && (
-                    <div className="text-sm text-fg/80 mt-1">{evt.note}</div>
+                    <div className="text-sm text-control-label mt-1">{evt.note}</div>
                   )}
                   <div className="text-xs text-control-label mt-1">
                     {formatDateTime(evt.created_at)}

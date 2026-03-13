@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { DataTable, Badge, Input, Select, Button, Modal, Switch, Drawer, useSnackbarContext, FormErrorMessage } from 'tsp-form';
@@ -9,36 +9,37 @@ import { useAuth } from '../../contexts/AuthContext';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
+interface ModelVariant {
+  variant_id: number;
+  sku_code: string;
+  name: string;
+  attributes: Record<string, unknown> | null;
+  is_active: boolean;
+}
+
 interface Model {
-  id: number;
+  model_id: number;
   holding_id: number;
   company_id: number | null;
-  company_scope_id: number | null;
-  category_id: number;
-  brand_id: number;
-  family_id: number;
-  code: string;
-  name: string;
+  model_code: string;
   base_model_name: string;
   model_name_suffix: string;
-  attributes: Record<string, unknown> | null;
-  is_contractable: boolean;
-  is_sellable: boolean;
-  is_giftable: boolean;
+  model_name: string;
+  model_attributes: Record<string, unknown> | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
-}
-
-interface Variant {
-  id: number;
-  sku_code: string;
-  name: string;
-  manufacturer_color: string | null;
-  master_color_code: string | null;
-  color_group: string | null;
-  attributes: Record<string, unknown> | null;
-  is_active: boolean;
+  family_id: number;
+  family_code: string;
+  family_name: string;
+  brand_id: number;
+  brand_code: string;
+  brand_name: string;
+  category_id: number;
+  category_code: string;
+  category_name: string;
+  variant_count: number;
+  variants: ModelVariant[];
 }
 
 interface BrandLookup {
@@ -390,23 +391,8 @@ function CreateModelModal({ open, onClose, holdingId, families }: {
 
 // ── VariantSubRow ────────────────────────────────────────────────────────────
 
-function VariantSubRow({ modelId, holdingId }: { modelId: number; holdingId: number }) {
+function VariantSubRow({ variants }: { variants: ModelVariant[] }) {
   const { t } = useTranslation();
-  const { data: variants = [], isLoading } = useQuery({
-    queryKey: ['model-variants', modelId],
-    queryFn: () => apiClient.get<Variant[]>(
-      `/v_ref_product_variants?model_id=eq.${modelId}&holding_id=eq.${holdingId}&order=sku_code`
-    ),
-    staleTime: 5 * 60 * 1000,
-  });
-
-  if (isLoading) {
-    return (
-      <div className="px-6 py-4 text-center text-control-label text-xs">
-        {t('common.loading')}
-      </div>
-    );
-  }
 
   if (variants.length === 0) {
     return (
@@ -423,22 +409,14 @@ function VariantSubRow({ modelId, holdingId }: { modelId: number; holdingId: num
           <tr className="border-b border-line">
             <th className="px-2 py-1.5 text-left font-medium text-control-label">{t('models.skuCode')}</th>
             <th className="px-2 py-1.5 text-left font-medium text-control-label">{t('models.variantName')}</th>
-            <th className="px-2 py-1.5 text-left font-medium text-control-label">{t('models.colorGroup')}</th>
             <th className="px-2 py-1.5 text-left font-medium text-control-label">{t('users.status')}</th>
           </tr>
         </thead>
         <tbody>
           {variants.map((v) => (
-            <tr key={v.id} className="border-b border-line last:border-b-0">
+            <tr key={v.variant_id} className="border-b border-line last:border-b-0">
               <td className="px-2 py-1.5 font-medium">{v.sku_code}</td>
               <td className="px-2 py-1.5">{v.name}</td>
-              <td className="px-2 py-1.5">
-                {v.color_group ? (
-                  <Badge size="sm" color={v.color_group === 'SPC' ? 'warning' : undefined}>
-                    {v.color_group}
-                  </Badge>
-                ) : '—'}
-              </td>
               <td className="px-2 py-1.5">
                 <Badge size="sm" color={v.is_active ? 'success' : 'danger'}>
                   {v.is_active ? t('brandsModels.active') : t('brandsModels.inactive')}
@@ -470,7 +448,7 @@ export function ModelsPage() {
   const [filterBrand, setFilterBrand] = useState<string>('');
   const [filterFamily, setFilterFamily] = useState<string>('');
   const [filterBaseModel, setFilterBaseModel] = useState<string>('');
-  const [sortBy, setSortBy] = useState<string>('code.asc');
+  const [sortBy, setSortBy] = useState<string>('model_code.asc');
 
   // Filter drawer (small screens)
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
@@ -500,7 +478,7 @@ export function ModelsPage() {
     }, 300);
   };
 
-  // Brand lookup
+  // Brand lookup (still needed for filter dropdown — all brands, not just current page)
   const { data: brands = [] } = useQuery({
     queryKey: ['brand-lookup', holdingId],
     queryFn: () => apiClient.get<BrandLookup[]>(
@@ -509,7 +487,7 @@ export function ModelsPage() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Family lookup
+  // Family lookup (still needed for filter dropdown + create modal)
   const { data: families = [] } = useQuery({
     queryKey: ['family-lookup', holdingId],
     queryFn: () => apiClient.get<FamilyLookup[]>(
@@ -523,7 +501,7 @@ export function ModelsPage() {
     queryKey: ['base-model-lookup', holdingId, filterFamily],
     queryFn: async () => {
       const rows = await apiClient.get<{ base_model_name: string }[]>(
-        `/v_ref_product_models?holding_id=eq.${holdingId}&family_id=eq.${filterFamily}&select=base_model_name&order=base_model_name`
+        `/v_product_model_list?holding_id=eq.${holdingId}&family_id=eq.${filterFamily}&select=base_model_name&order=base_model_name`
       );
       const unique = [...new Set(rows.map(r => r.base_model_name))];
       return unique;
@@ -551,13 +529,6 @@ export function ModelsPage() {
     }
   }, [filterFamily, baseModels, filterBaseModel]);
 
-  // Lookup maps
-  const familyMap = useMemo(() => {
-    const map = new Map<number, string>();
-    for (const f of families) map.set(f.id, f.display_name);
-    return map;
-  }, [families]);
-
   // Filter & sort options
   const brandOptions = brands.map((b) => ({ value: String(b.id), label: b.name }));
   const filteredFamilies = filterBrand ? families.filter(f => String(f.brand_id) === filterBrand) : families;
@@ -565,12 +536,12 @@ export function ModelsPage() {
   const baseModelOptions = baseModels.map((name) => ({ value: name, label: name }));
   const activeFilterCount = [filterBrand, filterFamily, filterBaseModel].filter(Boolean).length;
   const sortOptions = [
-    { value: 'code.asc', label: `${t('models.modelCode')} A→Z` },
-    { value: 'code.desc', label: `${t('models.modelCode')} Z→A` },
-    { value: 'name.asc', label: `${t('models.modelName')} A→Z` },
-    { value: 'name.desc', label: `${t('models.modelName')} Z→A` },
-    { value: 'id.desc', label: t('models.newestFirst') },
-    { value: 'id.asc', label: t('models.oldestFirst') },
+    { value: 'model_code.asc', label: `${t('models.modelCode')} A→Z` },
+    { value: 'model_code.desc', label: `${t('models.modelCode')} Z→A` },
+    { value: 'model_name.asc', label: `${t('models.modelName')} A→Z` },
+    { value: 'model_name.desc', label: `${t('models.modelName')} Z→A` },
+    { value: 'model_id.desc', label: t('models.newestFirst') },
+    { value: 'model_id.asc', label: t('models.oldestFirst') },
     { value: 'updated_at.desc', label: t('models.recentlyUpdated') },
   ];
 
@@ -579,14 +550,14 @@ export function ModelsPage() {
     const params: string[] = [];
     if (holdingId) params.push(`holding_id=eq.${holdingId}`);
     if (search.trim()) {
-      params.push(`or=(code.ilike.*${encodeURIComponent(search.trim())}*,name.ilike.*${encodeURIComponent(search.trim())}*)`);
+      params.push(`or=(model_code.ilike.*${encodeURIComponent(search.trim())}*,model_name.ilike.*${encodeURIComponent(search.trim())}*,family_name.ilike.*${encodeURIComponent(search.trim())}*,brand_name.ilike.*${encodeURIComponent(search.trim())}*)`);
     }
     if (filterBrand) params.push(`brand_id=eq.${filterBrand}`);
     if (filterFamily) params.push(`family_id=eq.${filterFamily}`);
     if (filterBaseModel) params.push(`base_model_name=eq.${encodeURIComponent(filterBaseModel)}`);
     params.push(`order=${sortBy}`);
     const qs = params.length > 0 ? `?${params.join('&')}` : '';
-    return `/v_ref_product_models${qs}`;
+    return `/v_product_model_list${qs}`;
   }, [holdingId, search, filterBrand, filterFamily, filterBaseModel, sortBy]);
 
   // Fetch models
@@ -670,7 +641,7 @@ export function ModelsPage() {
                 options={sortOptions}
                 value={sortBy}
                 onChange={(val) => {
-                  setSortBy((val as string) ?? 'code.asc');
+                  setSortBy((val as string) ?? 'model_code.asc');
                   setPageIndex(0);
                 }}
                 size="sm"
@@ -779,7 +750,7 @@ export function ModelsPage() {
                     options={sortOptions}
                     value={sortBy}
                     onChange={(val) => {
-                      setSortBy((val as string) ?? 'code.asc');
+                      setSortBy((val as string) ?? 'model_code.asc');
                       setPageIndex(0);
                     }}
                     size="sm"
@@ -805,25 +776,28 @@ export function ModelsPage() {
           data={models}
           renderRow={(row) => {
             const model = row.original;
-            const isExpanded = expandedModels.has(model.id);
+            const isExpanded = expandedModels.has(model.model_id);
             return (
               <>
                 <div
                   className="flex items-center gap-3 px-3 py-2 border-b border-line hover:bg-surface-hover transition-colors cursor-pointer"
-                  onClick={() => toggleExpand(model.id)}
+                  onClick={() => toggleExpand(model.model_id)}
                 >
                   <div className="shrink-0 w-5">
                     {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline gap-1.5 min-w-0">
-                      <span className="text-sm truncate">{familyMap.get(model.family_id) ?? '—'}</span>
+                      <span className="text-sm truncate">{model.family_name}</span>
                       <span className="text-sm font-medium text-info truncate">{model.base_model_name}</span>
                       {model.model_name_suffix && (
                         <span className="text-sm font-semibold truncate">{model.model_name_suffix}</span>
                       )}
                     </div>
-                    <div className="text-[11px] text-control-label truncate opacity-60">{model.code}</div>
+                    <div className="text-[11px] text-control-label truncate opacity-60">{model.brand_name}</div>
+                  </div>
+                  <div className="shrink-0 text-xs text-control-label">
+                    {model.variant_count > 0 && `${model.variant_count} ${t('models.variants').toLowerCase()}`}
                   </div>
                   <div className="shrink-0">
                     <Badge size="sm" color={model.is_active ? 'success' : 'danger'}>
@@ -831,9 +805,9 @@ export function ModelsPage() {
                     </Badge>
                   </div>
                 </div>
-                {isExpanded && holdingId && (
+                {isExpanded && (
                   <div className="bg-surface border-b border-line">
-                    <VariantSubRow modelId={model.id} holdingId={holdingId} />
+                    <VariantSubRow variants={model.variants} />
                   </div>
                 )}
               </>

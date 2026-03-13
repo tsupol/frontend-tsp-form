@@ -154,9 +154,9 @@ export const AppSideNav = () => {
     },
     {
       key: 'call-center', icon: <Headset size="1rem" />, label: t('nav.callCenter'),
-      path: '/admin/call-center/queue',
+      path: '/admin/call-center',
       children: [
-        { key: 'ticket-queue', label: t('nav.ticketQueue'), path: '/admin/call-center/queue' },
+        { key: 'ticket-queue', label: t('nav.ticketQueue'), path: '/admin/call-center' },
       ],
     },
     { type: 'group', key: 'grp-demo', label: t('nav.conceptDemo') },
