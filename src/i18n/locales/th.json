@@ -390,6 +390,12 @@
     "contractCode": "สัญญา",
     "contractSource": "แหล่งที่มา",
     "stage": "ขั้นตอน",
+    "stageNone": "ไม่ระบุ",
+    "stageDueIn3": "ครบกำหนดใน 3 วัน",
+    "stageOverdue1": "เกินกำหนด 1 วัน",
+    "stageOverdue8": "เกินกำหนด 1 สัปดาห์",
+    "stageOverdue16": "เกินกำหนด 2 สัปดาห์",
+    "stageOverdue31": "เกินกำหนด 1 เดือน",
     "severity": "ความรุนแรง",
     "status": "สถานะ",
     "queueFlag": "สถานะคิว",
@@ -425,7 +431,8 @@
     "filterClosed": "ปิดแล้ว",
     "highestSeverity": "ความรุนแรงสูงสุด",
     "newestFirst": "ใหม่สุด",
-    "oldestFirst": "เก่าสุด"
+    "oldestFirst": "เก่าสุด",
+    "recentlyUpdated": "อัปเดตล่าสุด"
   },
   "pricing": {
     "title": "ตารางราคา",

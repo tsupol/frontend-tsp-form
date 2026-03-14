@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Badge, Button, Input, useSnackbarContext } from 'tsp-form';
+import { Badge, Button, Input, Tooltip, useSnackbarContext } from 'tsp-form';
 import {
   ArrowLeft,
   CheckCircle,
@@ -82,6 +82,15 @@ function statusLabel(status: string): string {
   return STATUS_LABELS[status] ?? status;
 }
 
+const STAGE_KEYS: Record<string, string> = {
+  NONE: 'callCenter.stageNone',
+  CALL_DUE_IN_3: 'callCenter.stageDueIn3',
+  CALL_OVERDUE_1: 'callCenter.stageOverdue1',
+  CALL_OVERDUE_8: 'callCenter.stageOverdue8',
+  CALL_OVERDUE_16: 'callCenter.stageOverdue16',
+  CALL_OVERDUE_31: 'callCenter.stageOverdue31',
+};
+
 function statusColor(status: string): 'info' | 'warning' | 'success' | 'danger' | undefined {
   if (status === 'QUEUED') return 'info';
   if (status === 'IN_PROGRESS') return 'warning';
@@ -100,15 +109,15 @@ function severityColor(severity: number): 'danger' | 'warning' | 'info' | undefi
 
 function eventIcon(eventType: string) {
   switch (eventType) {
-    case 'CREATED': return <CirclePlus size={16} className="text-control-label" />;
+    case 'CREATED': return <CirclePlus size={16} className="text-subtle" />;
     case 'TAKEN': return <UserPlus size={16} className="text-info" />;
     case 'TAKEN_OVER': return <UserPlus size={16} className="text-warning" />;
     case 'RESULT_SET': return <PhoneCall size={16} className="text-success" />;
-    case 'NOTE_ADDED': return <StickyNote size={16} className="text-control-label" />;
+    case 'NOTE_ADDED': return <StickyNote size={16} className="text-subtle" />;
     case 'REVERTED': return <Undo2 size={16} className="text-warning" />;
-    case 'AUTO_CLOSED': return <Zap size={16} className="text-control-label" />;
+    case 'AUTO_CLOSED': return <Zap size={16} className="text-subtle" />;
     case 'STAGE_CHANGED': return <GitBranchPlus size={16} className="text-info" />;
-    default: return <Clock size={16} className="text-control-label" />;
+    default: return <Clock size={16} className="text-subtle" />;
   }
 }
 
@@ -253,7 +262,7 @@ export function TicketDetailPage() {
   if (isLoading) {
     return (
       <div className="page-content max-w-[64rem]">
-        <div className="text-control-label">{t('common.loading')}</div>
+        <div className="text-subtle">{t('common.loading')}</div>
       </div>
     );
   }
@@ -294,54 +303,59 @@ export function TicketDetailPage() {
         <div className="border border-line bg-surface rounded-lg p-5">
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 text-sm">
             <div>
-              <div className="text-xs text-control-label">{t('callCenter.ticketCode')}</div>
+              <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.ticketCode')}</div>
               <div className="font-medium">{ticket.ticket_code}</div>
             </div>
             <div>
-              <div className="text-xs text-control-label">{t('callCenter.contractCode')}</div>
+              <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.contractCode')}</div>
               <div className="font-medium">{ticket.ref_contract_code ?? '—'}</div>
             </div>
             <div>
-              <div className="text-xs text-control-label">{t('callCenter.contractSource')}</div>
+              <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.contractSource')}</div>
               <div>{ticket.ref_contract_source ?? '—'}</div>
             </div>
             <div>
-              <div className="text-xs text-control-label">{t('callCenter.status')}</div>
+              <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.status')}</div>
               <Badge size="sm" color={statusColor(ticket.status)}>{statusLabel(ticket.status)}</Badge>
             </div>
             <div>
-              <div className="text-xs text-control-label">{t('callCenter.stage')}</div>
-              <Badge size="sm" color={severityColor(ticket.severity)}>
-                {ticket.stage} ({ticket.severity})
-              </Badge>
+              <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.stage')}</div>
+              <div className="flex items-center gap-1.5">
+                <Badge size="sm">{STAGE_KEYS[ticket.stage] ? t(STAGE_KEYS[ticket.stage]) : ticket.stage}</Badge>
+                <Tooltip content={t('callCenter.severity')}>
+                  <Badge size="sm" color={severityColor(ticket.severity)}>
+                    {ticket.severity}
+                  </Badge>
+                </Tooltip>
+              </div>
             </div>
             <div>
-              <div className="text-xs text-control-label">{t('callCenter.assignedTo')}</div>
+              <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.assignedTo')}</div>
               <div>{ticket.assigned_to_user_id ? `#${ticket.assigned_to_user_id}` : '—'}</div>
             </div>
             <div>
-              <div className="text-xs text-control-label">{t('callCenter.assignedAt')}</div>
+              <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.assignedAt')}</div>
               <div>{formatDateTime(ticket.assigned_at)}</div>
             </div>
             <div>
-              <div className="text-xs text-control-label">{t('callCenter.createdAt')}</div>
+              <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.createdAt')}</div>
               <div>{formatDateTime(ticket.created_at)}</div>
             </div>
             {ticket.closed_at && (
               <div>
-                <div className="text-xs text-control-label">{t('callCenter.closedAt')}</div>
+                <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.closedAt')}</div>
                 <div>{formatDateTime(ticket.closed_at)}</div>
               </div>
             )}
             {ticket.closed_reason && (
               <div className="col-span-2">
-                <div className="text-xs text-control-label">{t('callCenter.closedReason')}</div>
+                <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.closedReason')}</div>
                 <div>{ticket.closed_reason}</div>
               </div>
             )}
             {ticket.next_attempt_after && OPEN_STATUSES.includes(ticket.status) && (
               <div>
-                <div className="text-xs text-control-label">{t('callCenter.nextAttempt')}</div>
+                <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.nextAttempt')}</div>
                 <div>{formatDateTime(ticket.next_attempt_after)}</div>
               </div>
             )}
@@ -403,7 +417,6 @@ export function TicketDetailPage() {
                 <div className="flex items-end gap-2">
                   <div className="flex-1">
                     <Input
-                      size="sm"
                       placeholder={t('callCenter.revertNote')}
                       value={revertNote}
                       onChange={(e) => setRevertNote(e.target.value)}
@@ -427,7 +440,6 @@ export function TicketDetailPage() {
               <div className="flex items-end gap-2">
                 <div className="flex-1">
                   <Input
-                    size="sm"
                     placeholder={t('callCenter.notePlaceholder')}
                     value={noteText}
                     onChange={(e) => setNoteText(e.target.value)}
@@ -451,7 +463,7 @@ export function TicketDetailPage() {
       <div className="flex-1 min-h-0 flex flex-col">
         <h2 className="flex-none text-sm font-semibold pb-3">{t('callCenter.timeline')}</h2>
         {events.length === 0 ? (
-          <div className="text-sm text-control-label">{t('common.noData')}</div>
+          <div className="text-sm text-subtler">{t('common.noData')}</div>
         ) : (
           <div className="flex-1 min-h-0 overflow-y-auto border border-line rounded-lg divide-y divide-line">
             {events.map((evt) => (
@@ -466,13 +478,13 @@ export function TicketDetailPage() {
                       </Badge>
                     )}
                     {evt.actor_user_id && (
-                      <span className="text-xs text-control-label">#{evt.actor_user_id}</span>
+                      <span className="text-xs text-subtle">#{evt.actor_user_id}</span>
                     )}
                   </div>
                   {evt.note && (
-                    <div className="text-sm text-control-label mt-1">{evt.note}</div>
+                    <div className="text-sm text-subtle mt-1">{evt.note}</div>
                   )}
-                  <div className="text-xs text-control-label mt-1">
+                  <div className="text-xs text-subtle mt-1">
                     {formatDateTime(evt.created_at)}
                   </div>
                 </div>

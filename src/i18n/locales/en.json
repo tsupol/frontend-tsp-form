@@ -390,6 +390,12 @@
     "contractCode": "Contract",
     "contractSource": "Source",
     "stage": "Stage",
+    "stageNone": "None",
+    "stageDueIn3": "Due in 3 days",
+    "stageOverdue1": "Overdue 1 day",
+    "stageOverdue8": "Overdue 1 week",
+    "stageOverdue16": "Overdue 2 weeks",
+    "stageOverdue31": "Overdue 1 month",
     "severity": "Severity",
     "status": "Status",
     "queueFlag": "Queue Status",
@@ -425,7 +431,8 @@
     "filterClosed": "Closed",
     "highestSeverity": "Highest severity",
     "newestFirst": "Newest",
-    "oldestFirst": "Oldest"
+    "oldestFirst": "Oldest",
+    "recentlyUpdated": "Recently updated"
   },
   "pricing": {
     "title": "Pricebook",

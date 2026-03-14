@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { DataTable, Badge, Input, Select } from 'tsp-form';
+import { DataTable, Badge, Input, Select, Tooltip } from 'tsp-form';
 import { ChevronsUpDown, XCircle } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 
@@ -41,6 +41,23 @@ function severityColor(severity: number): 'danger' | 'warning' | 'info' | undefi
   if (severity >= 2) return 'info';
   return undefined;
 }
+
+const QUEUE_FLAG_KEYS: Record<string, string> = {
+  NEW: 'callCenter.filterNew',
+  IN_PROCESS: 'callCenter.filterInProcess',
+  WAIT_FOR_REOPEN: 'callCenter.filterWaiting',
+  BACKING_OFF: 'callCenter.filterBackingOff',
+  CLOSED: 'callCenter.filterClosed',
+};
+
+const STAGE_KEYS: Record<string, string> = {
+  NONE: 'callCenter.stageNone',
+  CALL_DUE_IN_3: 'callCenter.stageDueIn3',
+  CALL_OVERDUE_1: 'callCenter.stageOverdue1',
+  CALL_OVERDUE_8: 'callCenter.stageOverdue8',
+  CALL_OVERDUE_16: 'callCenter.stageOverdue16',
+  CALL_OVERDUE_31: 'callCenter.stageOverdue31',
+};
 
 function queueFlagColor(flag: string): 'info' | 'warning' | 'success' | undefined {
   switch (flag) {
@@ -90,6 +107,7 @@ export function TicketQueuePage() {
     { value: 'severity.desc', label: t('callCenter.highestSeverity') },
     { value: 'created_at.desc', label: t('callCenter.newestFirst') },
     { value: 'created_at.asc', label: t('callCenter.oldestFirst') },
+    { value: 'updated_at.desc', label: t('callCenter.recentlyUpdated') },
   ];
 
   // Search debounce
@@ -150,7 +168,7 @@ export function TicketQueuePage() {
               clearable
             />
           </div>
-          <div className="flex items-center gap-1.5 text-control-label">
+          <div className="flex items-center gap-1.5 text-subtle">
             <ChevronsUpDown size={14} className="shrink-0" />
             <div className="flex-1">
               <Select
@@ -189,30 +207,33 @@ export function TicketQueuePage() {
               >
                 {/* Ticket code + contract */}
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate">{ticket.ticket_code}</div>
-                  <div className="text-xs text-control-label truncate">
+                  <div className="font-medium text-sm truncate">{ticket.ticket_code}</div>
+                  <div className="text-xs text-subtle truncate">
                     {ticket.ref_contract_code ?? '—'}
                     {ticket.ref_contract_source ? ` · ${ticket.ref_contract_source}` : ''}
                   </div>
                 </div>
 
                 {/* Stage + severity */}
-                <div className="shrink-0 hidden sm:block">
-                  <Badge size="sm" color={severityColor(ticket.severity)}>
-                    {ticket.stage} ({ticket.severity})
-                  </Badge>
+                <div className="shrink-0 hidden sm:flex items-center gap-1.5">
+                  <Badge size="sm">{STAGE_KEYS[ticket.stage] ? t(STAGE_KEYS[ticket.stage]) : ticket.stage}</Badge>
+                  <Tooltip content={t('callCenter.severity')}>
+                    <Badge size="sm" color={severityColor(ticket.severity)}>
+                      {ticket.severity}
+                    </Badge>
+                  </Tooltip>
                 </div>
 
                 {/* Queue flag */}
                 <div className="shrink-0">
                   <Badge size="sm" color={queueFlagColor(ticket.queue_flag)}>
-                    {ticket.queue_flag}
+                    {QUEUE_FLAG_KEYS[ticket.queue_flag] ? t(QUEUE_FLAG_KEYS[ticket.queue_flag]) : ticket.queue_flag}
                   </Badge>
                 </div>
 
                 {/* Next attempt */}
                 {ticket.next_attempt_after && ticket.queue_flag === 'BACKING_OFF' && (
-                  <div className="shrink-0 text-xs text-control-label hidden md:block">
+                  <div className="shrink-0 text-xs text-subtle hidden md:block">
                     {relativeTime(ticket.next_attempt_after)}
                   </div>
                 )}
@@ -230,7 +251,7 @@ export function TicketQueuePage() {
           }}
           className={`flex-1 min-h-0 ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
           noResults={
-            <div className="p-8 text-center text-control-label">
+            <div className="p-8 text-center text-subtler">
               {t('callCenter.noTickets')}
             </div>
           }
