@@ -30,6 +30,8 @@ interface PoLine {
   model_id: number;
   variant_name: string;
   model_name: string;
+  family_name: string;
+  brand_name: string;
   variant_sku_code: string;
   qty: number;
   unit_cost: number;
@@ -51,6 +53,8 @@ interface StockLot {
   model_id: number;
   variant_name: string;
   model_name: string;
+  family_name: string;
+  brand_name: string;
   po_id: number;
   branch_id: number;
   created_at: string;
@@ -263,7 +267,7 @@ export function ReceivingPage() {
   // ── Detail title ─────────────────────────────────────────────────────────
 
   const detailTitle = selectedLine
-    ? `${selectedLine.variant_name}`
+    ? `${selectedLine.brand_name} ${selectedLine.family_name}`
     : '';
 
   return (
@@ -336,8 +340,8 @@ export function ReceivingPage() {
                     }}
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm truncate">{line.variant_name}</div>
-                      <div className="text-xs text-subtle truncate">{line.po_no}</div>
+                      <div className="font-medium text-sm truncate">{line.brand_name} {line.family_name}</div>
+                      <div className="text-xs text-subtle truncate">{line.variant_name} · {line.po_no}</div>
                       <div className="flex items-center gap-2 mt-1">
                         <Badge size="xs" className={STATUS_BADGE[line.asset_intake_status] ?? 'bg-fg/10 text-fg/60'}>
                           {line.asset_intake_status}
@@ -495,7 +499,7 @@ function DetailPanel({
       {/* Desktop detail header */}
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
-          <span className="font-semibold">{line.variant_name}</span>
+          <span className="font-semibold">{line.brand_name} {line.family_name}</span>
           <Badge size="xs" className={STATUS_BADGE[line.asset_intake_status] ?? 'bg-fg/10 text-fg/60'}>
             {line.asset_intake_status}
           </Badge>
@@ -507,7 +511,7 @@ function DetailPanel({
         <div>
           <div className="text-xs text-subtle">{t('receiving.poLine')}</div>
           <div className="font-semibold text-sm">{line.po_no}</div>
-          <div className="text-xs text-subtle">{line.model_name}</div>
+          <div className="text-xs text-subtle">{line.variant_name}</div>
         </div>
         <div>
           <div className="text-xs text-subtle">{t('receiving.qtyReceived')}</div>

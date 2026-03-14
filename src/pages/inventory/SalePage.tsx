@@ -91,6 +91,26 @@ function getBucketColor(bucket: string): string {
 }
 
 // ============================================================================
+// Condition display config
+// ============================================================================
+
+const CONDITION_CONFIG: Record<string, { labelKey: string; textColor: string }> = {
+  NEW: { labelKey: 'inventory.conditionNEW', textColor: 'text-success' },
+  REFURBISHED: { labelKey: 'inventory.conditionREFURBISHED', textColor: 'text-info' },
+  USED_A: { labelKey: 'inventory.conditionUSED_A', textColor: 'text-warning' },
+  USED_B: { labelKey: 'inventory.conditionUSED_B', textColor: 'text-fg/60' },
+};
+
+function getConditionLabel(condition: string, t: (key: string) => string): string {
+  const cfg = CONDITION_CONFIG[condition];
+  return cfg ? t(cfg.labelKey) : condition;
+}
+
+function getConditionTextColor(condition: string): string {
+  return CONDITION_CONFIG[condition]?.textColor ?? 'text-fg/60';
+}
+
+// ============================================================================
 // Helpers
 // ============================================================================
 
@@ -110,6 +130,7 @@ export function SalePage() {
   const { addSnackbar } = useSnackbarContext();
   const { user } = useAuth();
   const canSell = user?.role_code === 'BRANCH_STAFF' || user?.role_code === 'BRANCH_MANAGER';
+  const userBranchId = user?.branch_id ?? null;
 
   // Filters
   const [filterBranchId, setFilterBranchId] = useState<number | null>(null);
@@ -172,6 +193,11 @@ export function SalePage() {
     return branches.map(b => ({ value: String(b.id), label: b.name }));
   }, [branches]);
 
+  const branchNameMap = useMemo(() => {
+    if (!branches) return new Map<number, string>();
+    return new Map(branches.map(b => [b.id, b.name]));
+  }, [branches]);
+
   const bucketOptions = useMemo(() => [
     { value: 'ON_HAND_AVAILABLE', label: t('inventory.available') },
     { value: 'QUARANTINED', label: t('inventory.quarantine') },
@@ -207,7 +233,7 @@ export function SalePage() {
 
   const extraFilterCount = [filterBrand, filterFamily].filter(Boolean).length;
 
-  const { data: searchData, isLoading: searchLoading, isFetching } = useQuery({
+  const { data: searchData, isFetching } = useQuery({
     queryKey: ['asset-search', debouncedTerm, filterBranchId, filterBucket, filterBrand, filterFamily, pageIndex, pageSize],
     queryFn: () => {
       let url = '/v_assets?order=asset_id.desc';
@@ -403,6 +429,11 @@ export function SalePage() {
                       size="sm"
                       showChevron
                       clearable
+                      renderOption={(option) => (
+                        <span className={Number(option.value) === userBranchId ? 'text-primary font-medium' : ''}>
+                          {option.label}
+                        </span>
+                      )}
                     />
                   </div>
                   <div className="flex-[1] min-w-0">
@@ -468,11 +499,12 @@ export function SalePage() {
                 renderRow={(row) => {
                   const asset = row.original;
                   const isSelected = selectedAssetId === asset.asset_id;
+                  const isOwnBranch = userBranchId === asset.branch_id;
                   return (
                     <div
                       className={`flex items-center gap-3 px-4 py-2.5 border-b border-line cursor-pointer transition-colors ${
                         isSelected ? 'bg-primary/10' : 'hover:bg-surface-hover'
-                      }`}
+                      } ${!isOwnBranch ? 'opacity-50' : ''}`}
                       onClick={() => {
                         setSelectedAssetId(asset.asset_id);
                         if (isMobile) goTo('detail');
@@ -485,10 +517,15 @@ export function SalePage() {
                         <div className="text-xs text-subtle truncate font-mono">
                           {asset.serial_no ?? '—'}
                         </div>
-                        <div className="mt-1">
+                        <div className="flex items-center gap-1.5 mt-1">
                           <Badge size="xs" className={getBucketColor(asset.current_bucket)}>
                             {getBucketLabel(asset.current_bucket, t)}
                           </Badge>
+                          {!isOwnBranch && (
+                            <span className="text-[10px] text-subtle truncate">
+                              {branchNameMap.get(asset.branch_id) ?? `#${asset.branch_id}`}
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div className="text-right shrink-0">
@@ -532,29 +569,40 @@ export function SalePage() {
                   {/* Asset info card */}
                   <div className="flex-none grid grid-cols-2 sm:grid-cols-4 gap-3 px-4 py-3 border-b border-line bg-surface">
                     <div>
-                      <div className="text-xs text-subtle">{t('sale.serialNo')}</div>
+                      <div className="text-[10px] text-subtle uppercase tracking-wider">{t('sale.condition')}</div>
+                      <div className={`font-semibold text-sm ${getConditionTextColor(selectedAsset.intake_condition)}`}>
+                        {getConditionLabel(selectedAsset.intake_condition, t)}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-subtle uppercase tracking-wider">{t('sale.cost')}</div>
+                      <div className="font-semibold text-sm text-figure tabular-nums">{fmtCurrency(selectedAsset.current_cost_basis)}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-subtle uppercase tracking-wider">{t('sale.serialNo')}</div>
                       <div className="font-semibold text-sm font-mono">{selectedAsset.serial_no ?? '—'}</div>
                     </div>
                     <div>
-                      <div className="text-xs text-subtle">{t('sale.imei')}</div>
-                      <div className="font-semibold text-sm font-mono">{selectedAsset.imei ?? '—'}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-subtle">{t('sale.condition')}</div>
-                      <div className="font-semibold text-sm">{selectedAsset.intake_condition}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-subtle">{t('sale.cost')}</div>
-                      <div className="font-semibold text-sm text-figure tabular-nums">{fmtCurrency(selectedAsset.current_cost_basis)}</div>
+                      <div className="text-[10px] text-subtle uppercase tracking-wider">{t('sale.imei')}</div>
+                      <div className="text-sm font-mono">{selectedAsset.imei ?? '—'}</div>
                     </div>
                   </div>
 
                   {/* Action area */}
                   <div className="flex-1 overflow-auto better-scroll p-4 flex flex-col gap-5">
-                    {canSell ? (
+                    {!canSell ? (
+                      <div className="alert alert-info">
+                        <span>{t('sale.viewOnly')}</span>
+                      </div>
+                    ) : userBranchId !== selectedAsset.branch_id ? (
+                      <div className="alert alert-warning">
+                        <span>{t('sale.otherBranchAsset')}: {branchNameMap.get(selectedAsset.branch_id) ?? `#${selectedAsset.branch_id}`}</span>
+                      </div>
+                    ) : (
                       <>
-                        {/* ON_HAND_AVAILABLE → Sell form */}
-                        {selectedAsset.current_bucket === 'ON_HAND_AVAILABLE' && (
+                        {/* ON_HAND_AVAILABLE or QUARANTINED → Sell form */}
+                        {(selectedAsset.current_bucket === 'ON_HAND_AVAILABLE' ||
+                          selectedAsset.current_bucket === 'QUARANTINED') && (
                           <SellForm
                             saleType={saleType}
                             setSaleType={setSaleType}
@@ -569,26 +617,6 @@ export function SalePage() {
                             isPending={isMutating}
                             canConfirm={!!canConfirmSale}
                             t={t}
-                          />
-                        )}
-
-                        {/* QUARANTINED → External sell only */}
-                        {selectedAsset.current_bucket === 'QUARANTINED' && (
-                          <SellForm
-                            saleType={saleType === 'RETAIL' ? 'B2B' : saleType}
-                            setSaleType={(v) => { if (v !== 'RETAIL') setSaleType(v); }}
-                            note={note}
-                            setNote={setNote}
-                            buyerName={buyerName}
-                            setBuyerName={setBuyerName}
-                            buyerRef={buyerRef}
-                            setBuyerRef={setBuyerRef}
-                            error={saleError}
-                            onConfirm={handleConfirmSale}
-                            isPending={isMutating}
-                            canConfirm={!!canConfirmSale}
-                            t={t}
-                            externalOnly
                           />
                         )}
 
@@ -613,41 +641,42 @@ export function SalePage() {
                           </div>
                         )}
                       </>
-                    ) : (
-                      <div className="alert alert-info">
-                        <span>{t('sale.viewOnly')}</span>
-                      </div>
                     )}
 
                     {/* Recent transactions */}
                     {assetTxns && assetTxns.length > 0 && (
-                      <div>
+                      <div className="border-t border-line pt-5">
                         <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-2">
                           {t('sale.recentTxns')}
                         </h3>
-                        <div className="border border-line rounded-md overflow-hidden">
-                          <table className="w-full text-sm">
-                            <thead>
-                              <tr className="bg-surface border-b border-line text-xs">
-                                <th className="text-left px-3 py-1.5 font-medium">{t('sale.txnType')}</th>
-                                <th className="text-left px-3 py-1.5 font-medium">{t('sale.bucketFrom')}</th>
-                                <th className="text-left px-3 py-1.5 font-medium">{t('sale.bucketTo')}</th>
-                                <th className="text-left px-3 py-1.5 font-medium">{t('sale.date')}</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {assetTxns.map(txn => (
-                                <tr key={txn.txn_id} className="border-t border-line text-xs">
-                                  <td className="px-3 py-2">{txn.txn_type}</td>
-                                  <td className="px-3 py-2">{txn.bucket_from ? getBucketLabel(txn.bucket_from, t) : '—'}</td>
-                                  <td className="px-3 py-2">{txn.bucket_to ? getBucketLabel(txn.bucket_to, t) : '—'}</td>
-                                  <td className="px-3 py-2 tabular-nums">
-                                    {new Date(txn.performed_at).toLocaleString('en-GB', { timeZone: 'Asia/Bangkok', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                        <div className="flex flex-col gap-2">
+                          {assetTxns.map(txn => (
+                            <div key={txn.txn_id} className="border border-line rounded-md px-3 py-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium">{t(`inventory.txn${txn.txn_type}`, { defaultValue: txn.txn_type })}</span>
+                                <span className="text-xs text-subtle tabular-nums">
+                                  {new Date(txn.performed_at).toLocaleString('en-GB', { timeZone: 'Asia/Bangkok', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              </div>
+                              {(txn.bucket_from || txn.bucket_to) && (
+                                <div className="flex items-center gap-1.5 mt-1">
+                                  {txn.bucket_from && (
+                                    <Badge size="xs" className={getBucketColor(txn.bucket_from)}>
+                                      {getBucketLabel(txn.bucket_from, t)}
+                                    </Badge>
+                                  )}
+                                  {txn.bucket_from && txn.bucket_to && (
+                                    <span className="text-xs text-subtle">→</span>
+                                  )}
+                                  {txn.bucket_to && (
+                                    <Badge size="xs" className={getBucketColor(txn.bucket_to)}>
+                                      {getBucketLabel(txn.bucket_to, t)}
+                                    </Badge>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          ))}
                         </div>
                       </div>
                     )}
@@ -699,7 +728,6 @@ function SellForm({
   isPending: boolean;
   canConfirm: boolean;
   t: (key: string) => string;
-  externalOnly?: boolean;
 }) {
   return (
     <div>
@@ -709,25 +737,23 @@ function SellForm({
       </h3>
 
       {error && (
-        <div className="alert alert-danger mb-3">
+        <div className="alert alert-danger mb-4">
           <XCircle size={16} />
           <span>{error}</span>
         </div>
       )}
 
-      <div className="form-grid gap-3">
+      <div className="form-grid pb-0">
         {/* Sale type toggle */}
         <div className="flex gap-2">
-          {!externalOnly && (
-            <Button
-              variant="outline"
-              size="sm"
-              color={saleType === 'RETAIL' ? 'primary' : undefined}
-              onClick={() => setSaleType('RETAIL')}
-            >
-              {t('sale.retail')}
-            </Button>
-          )}
+          <Button
+            variant="outline"
+            size="sm"
+            color={saleType === 'RETAIL' ? 'primary' : undefined}
+            onClick={() => setSaleType('RETAIL')}
+          >
+            {t('sale.retail')}
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -833,18 +859,18 @@ function VoidForm({
         {t('sale.voidSale')}
       </h3>
 
-      <div className="alert alert-warning mb-3">
+      <div className="alert alert-warning mb-4">
         <span>{t('sale.voidWarning')}</span>
       </div>
 
       {error && (
-        <div className="alert alert-danger mb-3">
+        <div className="alert alert-danger mb-4">
           <XCircle size={16} />
           <span>{error}</span>
         </div>
       )}
 
-      <div className="form-grid gap-3">
+      <div className="form-grid pb-0">
         <div className="flex flex-col">
           <label className="form-label">{t('sale.note')}</label>
           <Input
