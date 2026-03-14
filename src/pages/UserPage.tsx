@@ -179,7 +179,7 @@ function ProfileCard() {
         {infoFields.map(({ label, value }) => (
           <div key={label}>
             <div className="text-sm text-control-label">{label}</div>
-            <div className="mt-0.5">{value ?? '-'}</div>
+            <div className="mt-0.5 text-base">{value ?? '-'}</div>
           </div>
         ))}
 

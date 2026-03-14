@@ -35,10 +35,21 @@ interface Ticket {
   holding_id: number | null;
   company_id: number | null;
   branch_id: number | null;
+  current_bucket_code: string | null;
+  first_overdue_due_date: string | null;
+  overdue_amount: number | null;
+  overdue_installment_count: number | null;
+  overdue_streak_count: number | null;
+  overdue_streak_start_due_date: string | null;
+  overdue_streak_latest_due_date: string | null;
+  overdue_streak_amount: number | null;
+  ref_branch_id: number | null;
+  next_due_date: string | null;
+  next_due_amount: number | null;
+  next_due_outstanding: number | null;
   stage: string;
   severity: number;
   status: string;
-  status_label: string;
   assigned_to_user_id: number | null;
   assigned_at: string | null;
   next_attempt_after: string | null;
@@ -89,6 +100,26 @@ interface TicketEvent {
 interface TicketGetResponse {
   ticket: TicketDetail;
   events: TicketEvent[];
+}
+
+interface TicketCustomer {
+  call_ticket_id: number;
+  ref_contract_id: number;
+  contract_code: string | null;
+  customer_id: number | null;
+  cus_firstname: string | null;
+  cus_lastname: string | null;
+  cus_tel: string | null;
+  cus_address: string | null;
+  cus_facebook: string | null;
+  ref1_firstname: string | null;
+  ref1_lastname: string | null;
+  ref1_tel: string | null;
+  ref1_relationship: string | null;
+  ref2_firstname: string | null;
+  ref2_lastname: string | null;
+  ref2_tel: string | null;
+  ref2_relationship: string | null;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -152,14 +183,56 @@ function queueFlagColor(flag: string): 'info' | 'warning' | 'success' | undefine
   }
 }
 
-function relativeTime(dateStr: string): string {
-  const diff = new Date(dateStr).getTime() - Date.now();
-  if (diff <= 0) return '—';
-  const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ${mins % 60}m`;
-  return `${Math.floor(hrs / 24)}d ${hrs % 24}h`;
+/** Calendar-aware diff between two dates → { months, days } */
+function dateDiff(from: Date, to: Date): { months: number; days: number } {
+  let months = (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth());
+  // walk back a month if the day hasn't been reached yet
+  const tempDate = new Date(from);
+  tempDate.setMonth(tempDate.getMonth() + months);
+  if (tempDate > to) {
+    months--;
+    tempDate.setMonth(tempDate.getMonth() - 1);
+  }
+  const days = Math.round((to.getTime() - tempDate.getTime()) / 86400000);
+  return { months, days };
+}
+
+function formatDuration(months: number, days: number): string {
+  if (months > 0 && days > 0) return `${months}m ${days}d`;
+  if (months > 0) return `${months}m`;
+  return `${days}d`;
+}
+
+function overdueDuration(firstOverdueDateStr: string | null): { months: number; days: number } | null {
+  if (!firstOverdueDateStr) return null;
+  const from = new Date(firstOverdueDateStr);
+  const to = new Date();
+  if (to < from) return null;
+  return dateDiff(from, to);
+}
+
+function dueInDuration(nextDueDateStr: string | null): { months: number; days: number } | null {
+  if (!nextDueDateStr) return null;
+  const from = new Date();
+  const to = new Date(nextDueDateStr);
+  if (to < from) return null;
+  return dateDiff(from, to);
+}
+
+function totalDays(d: { months: number; days: number }): number {
+  return d.months * 30 + d.days;
+}
+
+function formatAmount(amount: number | null): string {
+  if (amount == null) return '—';
+  return amount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+
+function formatTel(tel: string): string {
+  const d = tel.replace(/\D/g, '');
+  if (d.length === 10) return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6)}`;
+  if (d.length === 9) return `${d.slice(0, 2)} ${d.slice(2, 5)} ${d.slice(5)}`;
+  return tel;
 }
 
 function eventIcon(eventType: string) {
@@ -180,9 +253,11 @@ function eventIcon(eventType: string) {
 
 function TicketDetailContent({
   ticketId,
+  listTicket,
   isMobile,
 }: {
   ticketId: number;
+  listTicket: Ticket | null;
   isMobile: boolean;
 }) {
   const { t } = useTranslation();
@@ -209,8 +284,17 @@ function TicketDetailContent({
     queryFn: () => apiClient.rpc<TicketGetResponse>('ops_call_ticket_get', { p_ticket_id: ticketId }),
   });
 
+  const { data: customerData } = useQuery({
+    queryKey: ['ticket-customer', ticketId],
+    queryFn: async () => {
+      const res = await apiClient.get<TicketCustomer[]>(`/v_ops_call_ticket_customer?call_ticket_id=eq.${ticketId}`);
+      return res[0] ?? null;
+    },
+  });
+
   const ticket = data?.ticket;
   const events = data?.events ?? [];
+  const customer = customerData ?? null;
 
   // ── Action helpers ─────────────────────────────────────────────────────────
 
@@ -352,11 +436,11 @@ function TicketDetailContent({
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 text-sm">
             <div>
               <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.ticketCode')}</div>
-              <div className="font-medium">{ticket.ticket_code}</div>
+              <div className="font-medium text-xs">{ticket.ticket_code}</div>
             </div>
             <div>
               <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.contractCode')}</div>
-              <div className="font-medium">{ticket.ref_contract_code ?? '—'}</div>
+              <div className="font-medium text-xs">{ticket.ref_contract_code ?? '—'}</div>
             </div>
             <div>
               <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.contractSource')}</div>
@@ -366,6 +450,42 @@ function TicketDetailContent({
               <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.status')}</div>
               <Badge size="sm" color={statusColor(ticket.status)}>{statusLabel(ticket.status)}</Badge>
             </div>
+            {(() => {
+              if (!listTicket) return null;
+              const overdue = overdueDuration(listTicket.first_overdue_due_date);
+              if (overdue) {
+                return (
+                  <div>
+                    <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.overdue')}</div>
+                    <div className="flex items-center gap-1.5">
+                      <Badge size="sm" color={totalDays(overdue) >= 30 ? 'danger' : totalDays(overdue) >= 7 ? 'warning' : 'info'}>
+                        {formatDuration(overdue.months, overdue.days)}
+                      </Badge>
+                      {listTicket.overdue_amount != null && (
+                        <span className="font-medium text-figure">฿{formatAmount(listTicket.overdue_amount)}</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
+              const dueIn = dueInDuration(listTicket.next_due_date);
+              if (dueIn) {
+                return (
+                  <div>
+                    <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.nextDue')}</div>
+                    <div className="flex items-center gap-1.5">
+                      <Badge size="sm" color="success">
+                        {formatDuration(dueIn.months, dueIn.days)}
+                      </Badge>
+                      {listTicket.next_due_amount != null && (
+                        <span className="text-subtle">฿{formatAmount(listTicket.next_due_amount)}</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
             <div>
               <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.stage')}</div>
               <div className="flex items-center gap-1.5">
@@ -377,17 +497,18 @@ function TicketDetailContent({
                 </Tooltip>
               </div>
             </div>
-            <div>
-              <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.assignedTo')}</div>
-              <div>{ticket.assigned_to_user_id ? `#${ticket.assigned_to_user_id}` : '—'}</div>
-            </div>
-            <div>
-              <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.assignedAt')}</div>
-              <DateTime value={ticket.assigned_at} />
-            </div>
+            {(() => {
+              const lastCall = events.find(e => e.event_type === 'RESULT_SET');
+              return lastCall ? (
+                <div>
+                  <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.lastCallAt')}</div>
+                  <DateTime value={lastCall.created_at} />
+                </div>
+              ) : null;
+            })()}
             <div>
               <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.createdAt')}</div>
-              <DateTime value={ticket.created_at} />
+              <DateTime value={ticket.created_at} className="text-xs" />
             </div>
             {ticket.closed_at && (
               <div>
@@ -415,7 +536,7 @@ function TicketDetailContent({
           <>
             {/* Take */}
             {canTake && (
-              <div className="px-4 py-4 border-b border-line">
+              <div className="px-4 py-4 border-b border-line flex items-center gap-3">
                 <Button
                   color="primary"
                   disabled={!!actionPending}
@@ -424,6 +545,11 @@ function TicketDetailContent({
                 >
                   {actionPending === 'take' ? t('callCenter.taking') : t('callCenter.take')}
                 </Button>
+                {customer?.cus_tel && (
+                  <a href={`tel:${customer.cus_tel}`} className="text-sm font-medium text-primary hover:underline">
+                    {formatTel(customer.cus_tel)}
+                  </a>
+                )}
               </div>
             )}
 
@@ -557,7 +683,7 @@ export function TicketQueuePage() {
 
   // Filters & sort
   const [filterQueueFlag, setFilterQueueFlag] = useState<string>('READY_TO_CALL');
-  const [sortBy, setSortBy] = useState<string>('severity.desc');
+  const [sortBy, setSortBy] = useState<string>('is_takeable.desc,severity.desc,overdue_amount.desc.nullslast,created_at.asc');
   const [filtersExpanded, setFiltersExpanded] = useState(false);
 
   // Selection
@@ -573,10 +699,13 @@ export function TicketQueuePage() {
   ];
 
   const sortOptions = [
+    { value: 'is_takeable.desc,severity.desc,overdue_amount.desc.nullslast,created_at.asc', label: t('callCenter.sortRecommended') },
     { value: 'severity.desc', label: t('callCenter.highestSeverity') },
+    { value: 'overdue_streak_count.desc.nullslast', label: t('callCenter.sortMostStreak') },
+    { value: 'first_overdue_due_date.asc.nullslast', label: t('callCenter.sortLongestOverdue') },
+    { value: 'overdue_amount.desc.nullslast', label: t('callCenter.sortHighestDebt') },
     { value: 'created_at.desc', label: t('callCenter.newestFirst') },
     { value: 'created_at.asc', label: t('callCenter.oldestFirst') },
-    { value: 'updated_at.desc', label: t('callCenter.recentlyUpdated') },
   ];
 
   // Search debounce
@@ -622,8 +751,9 @@ export function TicketQueuePage() {
     <PageNav panels={['list', 'detail']} className="h-dvh">
       {({ isMobile, isRoot, goTo, Header }) => (
         <>
-          {isMobile && (
+          {isMobile ? (
             <Header
+              key="header"
               title={isRoot ? t('callCenter.ticketQueue') : (selectedTicket?.ticket_code ?? t('callCenter.ticketDetail'))}
               startContent={
                 isRoot ? (
@@ -636,21 +766,18 @@ export function TicketQueuePage() {
                 ) : undefined
               }
             />
-          )}
-
-          {!isMobile && (
-            <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
+          ) : (
+            <div key="header" className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
               <h1 className="heading-2 shrink-0">{t('callCenter.ticketQueue')}</h1>
             </div>
           )}
 
-          <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
+          <div key="panels" className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
             {/* ── Left Panel: Ticket Queue ── */}
             <PageNavPanel id="list" className="w-1/2 xl:w-5/12 border-r border-line flex flex-col" mobileClassName="flex flex-col overflow-hidden">
-              <div className="flex-none flex flex-col gap-2 px-4 py-2 border-b border-line">
-                {/* Row 1: Search + Status + Expand */}
-                <div className="flex gap-2 w-full">
-                  <div className="flex-[2] min-w-0">
+              <div className="flex-none @container px-4 py-2 border-b border-line">
+                <div className="flex flex-wrap gap-2 w-full">
+                  <div className="flex-[2] min-w-0 basis-24">
                     <Input
                       className="w-full"
                       placeholder={t('common.search')}
@@ -659,7 +786,7 @@ export function TicketQueuePage() {
                       size="sm"
                     />
                   </div>
-                  <div className="flex-[2] min-w-0">
+                  <div className="flex-[2] min-w-0 basis-24">
                     <Select
                       options={queueFlagOptions}
                       value={filterQueueFlag || null}
@@ -673,31 +800,28 @@ export function TicketQueuePage() {
                       clearable
                     />
                   </div>
+                  {/* Expand button: hidden when container is wide */}
                   <Button
                     variant="ghost"
                     size="sm"
-                    className={`btn-icon-sm shrink-0 ${filtersExpanded ? 'text-primary' : ''}`}
+                    className={`btn-icon-sm shrink-0 @[28rem]:hidden ${filtersExpanded ? 'text-primary' : ''}`}
                     startIcon={<SlidersHorizontal size={14} />}
                     onClick={() => setFiltersExpanded(!filtersExpanded)}
                   />
-                </div>
-                {/* Row 2: Sort (expanded) */}
-                {filtersExpanded && (
-                  <div className="flex gap-2 w-full">
-                    <div className="min-w-0" style={{ width: '14rem' }}>
-                      <Select
-                        options={sortOptions}
-                        value={sortBy}
-                        onChange={(val) => {
-                          setSortBy((val as string) ?? 'severity.desc');
-                          setPageIndex(0);
-                        }}
-                        size="sm"
-                        showChevron
-                      />
-                    </div>
+                  {/* Sort: always visible when wide, expandable when narrow */}
+                  <div className={`min-w-0 basis-24 flex-[2] ${filtersExpanded ? '' : 'hidden'} @[28rem]:block`}>
+                    <Select
+                      options={sortOptions}
+                      value={sortBy}
+                      onChange={(val) => {
+                        setSortBy((val as string) ?? 'severity.desc');
+                        setPageIndex(0);
+                      }}
+                      size="sm"
+                      showChevron
+                    />
                   </div>
-                )}
+                </div>
               </div>
 
               {isError && (
@@ -715,9 +839,11 @@ export function TicketQueuePage() {
                   renderRow={(row) => {
                     const ticket = row.original;
                     const isSelected = selectedTicketId === ticket.id;
+                    const overdue = overdueDuration(ticket.first_overdue_due_date);
+                    const dueIn = !overdue ? dueInDuration(ticket.next_due_date) : null;
                     return (
                       <div
-                        className={`flex items-center gap-3 px-3 py-2 border-b border-line transition-colors cursor-pointer ${
+                        className={`px-3 py-2 border-b border-line transition-colors cursor-pointer ${
                           isSelected ? 'bg-primary/10' : 'hover:bg-surface-hover'
                         }`}
                         onClick={() => {
@@ -725,38 +851,47 @@ export function TicketQueuePage() {
                           if (isMobile) goTo('detail');
                         }}
                       >
-                        {/* Ticket code + contract */}
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm truncate">{ticket.ticket_code}</div>
-                          <div className="text-xs text-subtle truncate">
-                            {ticket.ref_contract_code ?? '—'}
-                            {ticket.ref_contract_source ? ` · ${ticket.ref_contract_source}` : ''}
-                          </div>
+                        {/* Row 1: contract code + amount */}
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-xs truncate">{ticket.ref_contract_code ?? ticket.ticket_code}</span>
+                          {ticket.overdue_amount != null && ticket.overdue_amount > 0 ? (
+                            <span className="ml-auto shrink-0 text-sm font-medium text-figure">
+                              ฿{formatAmount(ticket.overdue_amount)}
+                            </span>
+                          ) : ticket.next_due_amount != null && (
+                            <span className="ml-auto shrink-0 text-sm text-subtle">
+                              ฿{formatAmount(ticket.next_due_amount)}
+                            </span>
+                          )}
                         </div>
-
-                        {/* Stage + severity */}
-                        <div className="shrink-0 hidden sm:flex items-center gap-1.5">
-                          <Badge size="sm">{STAGE_KEYS[ticket.stage] ? t(STAGE_KEYS[ticket.stage]) : ticket.stage}</Badge>
-                          <Tooltip content={t('callCenter.severity')}>
-                            <Badge size="sm" color={severityColor(ticket.severity)}>
-                              {ticket.severity}
+                        {/* Row 2: overdue/due info + badges */}
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          {overdue ? (
+                            <>
+                              <Badge size="sm" color={totalDays(overdue) >= 30 ? 'danger' : totalDays(overdue) >= 7 ? 'warning' : 'info'}>
+                                {t('callCenter.overdueFor', { duration: formatDuration(overdue.months, overdue.days) })}
+                              </Badge>
+                              {ticket.overdue_streak_count != null && ticket.overdue_streak_count > 1 && (
+                                <span className="text-xs text-subtle leading-none">
+                                  {t('callCenter.missedCount', { count: ticket.overdue_streak_count })}
+                                </span>
+                              )}
+                            </>
+                          ) : dueIn ? (
+                            <Badge size="sm" color="success">
+                              {t('callCenter.dueInDays', { duration: formatDuration(dueIn.months, dueIn.days) })}
                             </Badge>
-                          </Tooltip>
+                          ) : (
+                            <Badge size="sm">
+                              {STAGE_KEYS[ticket.stage] ? t(STAGE_KEYS[ticket.stage]) : ticket.stage}
+                            </Badge>
+                          )}
+                          <span className="ml-auto shrink-0">
+                            <Badge size="sm" color={queueFlagColor(ticket.queue_flag)}>
+                              {QUEUE_FLAG_KEYS[ticket.queue_flag] ? t(QUEUE_FLAG_KEYS[ticket.queue_flag]) : ticket.queue_flag}
+                            </Badge>
+                          </span>
                         </div>
-
-                        {/* Queue flag */}
-                        <div className="shrink-0">
-                          <Badge size="sm" color={queueFlagColor(ticket.queue_flag)}>
-                            {QUEUE_FLAG_KEYS[ticket.queue_flag] ? t(QUEUE_FLAG_KEYS[ticket.queue_flag]) : ticket.queue_flag}
-                          </Badge>
-                        </div>
-
-                        {/* Next attempt */}
-                        {ticket.next_attempt_after && ticket.queue_flag === 'BACKING_OFF' && (
-                          <div className="shrink-0 text-xs text-subtle hidden md:block">
-                            {relativeTime(ticket.next_attempt_after)}
-                          </div>
-                        )}
                       </div>
                     );
                   }}
@@ -782,7 +917,7 @@ export function TicketQueuePage() {
             {/* ── Right Panel: Ticket Detail ── */}
             <PageNavPanel id="detail" className="flex-1 overflow-y-auto better-scroll">
               {selectedTicketId ? (
-                <TicketDetailContent ticketId={selectedTicketId} isMobile={isMobile} />
+                <TicketDetailContent ticketId={selectedTicketId} listTicket={tickets.find(t => t.id === selectedTicketId) ?? null} isMobile={isMobile} />
               ) : (
                 <div className="flex-1 h-full flex items-center justify-center text-subtler">
                   {t('callCenter.noSelection')}

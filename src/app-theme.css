@@ -2,7 +2,7 @@
 
 @theme static {
     /* Panel header height */
-    --spacing-panel-header-h: 2.5rem;
+    --spacing-panel-header-h: 2.792rem;
 
     /* Text colors for non-form data display */
     --color-subtle: #999999;       /* labels, secondary text */
