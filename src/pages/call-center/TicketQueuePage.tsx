@@ -170,6 +170,13 @@ const EVENT_TYPE_KEYS: Record<string, string> = {
   STAGE_CHANGED: 'callCenter.eventStageChanged',
 };
 
+const CLOSED_REASON_KEYS: Record<string, string> = {
+  CALL_SUCCESS: 'callCenter.statusCallSuccess',
+  SUPERSEDED: 'callCenter.statusSuperseded',
+  RESOLVED_BY_PAYMENT: 'callCenter.statusResolvedByPayment',
+  CANCELED_OR_CLOSED: 'callCenter.statusCanceled',
+};
+
 const OPEN_STATUSES = ['QUEUED', 'IN_PROGRESS', 'CALL_NO_ANSWER', 'CALL_UNREACHABLE'];
 
 function statusColor(status: string): 'info' | 'warning' | 'success' | 'danger' | undefined {
@@ -517,30 +524,30 @@ function TicketDetailContent({
               return lastCall ? (
                 <div>
                   <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.lastCallAt')}</div>
-                  <DateTime value={lastCall.created_at} />
+                  <DateTime value={lastCall.created_at} className="text-sm" />
                 </div>
               ) : null;
             })()}
             <div>
               <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.createdAt')}</div>
-              <DateTime value={ticket.created_at} className="text-xs" />
+              <DateTime value={ticket.created_at} className="text-sm" />
             </div>
             {ticket.closed_at && (
               <div>
                 <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.closedAt')}</div>
-                <DateTime value={ticket.closed_at} />
+                <DateTime value={ticket.closed_at} className="text-sm" />
               </div>
             )}
             {ticket.closed_reason && (
               <div className="col-span-2">
                 <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.closedReason')}</div>
-                <div>{ticket.closed_reason}</div>
+                <div>{ticket.closed_reason && CLOSED_REASON_KEYS[ticket.closed_reason] ? t(CLOSED_REASON_KEYS[ticket.closed_reason]) : ticket.closed_reason}</div>
               </div>
             )}
             {ticket.next_attempt_after && OPEN_STATUSES.includes(ticket.status) && (
               <div>
                 <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.nextAttempt')}</div>
-                <DateTime value={ticket.next_attempt_after} />
+                <DateTime value={ticket.next_attempt_after} className="text-sm" />
               </div>
             )}
           </div>
