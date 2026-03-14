@@ -4,6 +4,7 @@ import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-quer
 import { DataTable, Badge, Input, Select, Button, Drawer, Tooltip, useSnackbarContext } from 'tsp-form';
 import { Search, SlidersHorizontal, ChevronsUpDown, CheckCircle, XCircle, Pencil, Loader2, MousePointerClick, Plus, X, ChevronRight, ChevronDown } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import { DateTime } from '../../components/DateTime';
 import { useAuth } from '../../contexts/AuthContext';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -87,10 +88,6 @@ const formatTHB = (value: number | null): string => {
   return new Intl.NumberFormat('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(value);
 };
 
-const formatDate = (iso: string): string => {
-  const d = new Date(iso);
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-};
 
 // ── Editor Panel ─────────────────────────────────────────────────────────────
 
@@ -1034,7 +1031,7 @@ export function Fin2RatesPage() {
                                   <tr key={`${term.term_months}-active`} className="border-b border-line last:border-b-0">
                                     <td className="py-1.5 px-3 font-medium">{t('pricing.termMonths', { months: term.term_months })}</td>
                                     <td className="py-1.5 px-3 text-right tabular-nums">{formatTHB(term.activeRate.value)}</td>
-                                    <td className="py-1.5 px-3">{formatDate(term.activeRate.effective_from)}</td>
+                                    <td className="py-1.5 px-3"><DateTime value={term.activeRate.effective_from} showTime={false} /></td>
                                     <td className="py-1.5 px-3 text-control-label">—</td>
                                     <td className="py-1.5 px-3"><Badge size="xs" color="success">{t('fin2.active')}</Badge></td>
                                   </tr>
@@ -1046,8 +1043,8 @@ export function Fin2RatesPage() {
                                   <tr key={`${term.term_months}-${hist.price_rate_id}`} className="border-b border-line last:border-b-0 opacity-60">
                                     <td className="py-1.5 px-3"></td>
                                     <td className="py-1.5 px-3 text-right tabular-nums">{formatTHB(hist.value)}</td>
-                                    <td className="py-1.5 px-3">{formatDate(hist.effective_from)}</td>
-                                    <td className="py-1.5 px-3">{formatDate(hist.effective_to)}</td>
+                                    <td className="py-1.5 px-3"><DateTime value={hist.effective_from} showTime={false} /></td>
+                                    <td className="py-1.5 px-3"><DateTime value={hist.effective_to} showTime={false} /></td>
                                     <td className="py-1.5 px-3"><Badge size="xs">{t('fin2.closed')}</Badge></td>
                                   </tr>
                                 );

@@ -6,6 +6,7 @@ import { Eye, EyeOff, KeyRound, CheckCircle, XCircle, Camera } from 'lucide-reac
 import { Button, Switch, Input, FormErrorMessage, ImageUploader, useSnackbarContext } from 'tsp-form';
 import type { UploadedImage } from 'tsp-form';
 import { useAuth } from '../contexts/AuthContext';
+import { DateTime } from '../components/DateTime';
 import { authService } from '../lib/auth';
 import type { UserProfile, MeProfileResponse } from '../lib/auth';
 import { apiClient, ApiError } from '../lib/api';
@@ -486,7 +487,7 @@ function TokenDebugPanel() {
           <div className="text-control-label">Expires At (parsed)</div>
           <div className="mt-1">
             {tokenInfo.expiresAt && !isNaN(tokenInfo.expiresAt.getTime())
-              ? tokenInfo.expiresAt.toLocaleString()
+              ? <DateTime value={tokenInfo.expiresAt.toISOString()} />
               : 'Invalid'}
           </div>
         </div>

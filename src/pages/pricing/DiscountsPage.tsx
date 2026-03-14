@@ -3,10 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
   DataTable, Badge, Input, Select, Button, Switch, Drawer,
-  useSnackbarContext,
+  InputDatePicker, useSnackbarContext,
 } from 'tsp-form';
-import { CheckCircle, XCircle, Settings2, ClipboardList } from 'lucide-react';
+import { CheckCircle, XCircle, Settings2, ClipboardList, Calendar } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import { DateTime } from '../../components/DateTime';
+import { formatDateTime } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -71,13 +73,6 @@ const formatNumber = (value: number | null): string => {
   return new Intl.NumberFormat('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(value);
 };
 
-const formatDate = (value: string | null): string => {
-  if (!value) return '—';
-  return new Date(value).toLocaleDateString('th-TH', {
-    year: 'numeric', month: 'short', day: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  });
-};
 
 const statusColor = (status: string): 'warning' | 'success' | 'danger' | 'default' => {
   switch (status) {
@@ -100,7 +95,7 @@ const policyTypeColor = (type: string): 'info' | 'warning' | 'success' => {
 // ── Policy Tab ───────────────────────────────────────────────────────────────
 
 function PolicyTab() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { addSnackbar } = useSnackbarContext();
   const { user } = useAuth();
 
@@ -123,8 +118,8 @@ function PolicyTab() {
   const [retailMax, setRetailMax] = useState('');
   const [fin1Max, setFin1Max] = useState('');
   const [fin2Max, setFin2Max] = useState('');
-  const [effectiveFrom, setEffectiveFrom] = useState('');
-  const [effectiveTo, setEffectiveTo] = useState('');
+  const [effectiveFrom, setEffectiveFrom] = useState<Date | null>(null);
+  const [effectiveTo, setEffectiveTo] = useState<Date | null>(null);
   const [isActive, setIsActive] = useState(true);
   const [policyId, setPolicyId] = useState<number | null>(null);
 
@@ -165,8 +160,8 @@ function PolicyTab() {
     setRetailMax('0');
     setFin1Max('5');
     setFin2Max('5');
-    setEffectiveFrom('');
-    setEffectiveTo('');
+    setEffectiveFrom(null);
+    setEffectiveTo(null);
     setIsActive(true);
     setErrorMessage('');
   }, [effectiveCompanyId, effectiveBranchId]);
@@ -191,8 +186,8 @@ function PolicyTab() {
         p_retail_max_discount_percent: retailMax ? parseFloat(retailMax) : 0,
         p_fin1_max_discount_percent: fin1Max ? parseFloat(fin1Max) : 5,
         p_fin2_max_discount_percent: fin2Max ? parseFloat(fin2Max) : 5,
-        p_effective_from: effectiveFrom || undefined,
-        p_effective_to: effectiveTo || undefined,
+        p_effective_from: effectiveFrom ? effectiveFrom.toISOString() : undefined,
+        p_effective_to: effectiveTo ? effectiveTo.toISOString() : undefined,
         p_is_active: isActive,
       });
       // After first save, track the policy ID for subsequent updates
@@ -235,7 +230,6 @@ function PolicyTab() {
                   value={selectedCompanyId || null}
                   onChange={(val) => setSelectedCompanyId((val as string) ?? '')}
                   placeholder={t('users.allCompanies')}
-                  size="sm"
                   showChevron
                   clearable
                 />
@@ -251,7 +245,6 @@ function PolicyTab() {
                   value={selectedBranchId || null}
                   onChange={(val) => setSelectedBranchId((val as string) ?? '')}
                   placeholder={t('users.allBranches')}
-                  size="sm"
                   showChevron
                   clearable
                 />
@@ -279,7 +272,7 @@ function PolicyTab() {
           <div className="flex flex-col">
             <label className="form-label">{t('discount.retailMaxDiscount')}</label>
             <Input
-              type="number" min={0} max={100} step="0.1" size="sm"
+              type="number" min={0} max={100} step="0.1"
               value={retailMax}
               onChange={(e) => setRetailMax(e.target.value)}
             />
@@ -288,7 +281,7 @@ function PolicyTab() {
             <div className="flex flex-col">
               <label className="form-label">{t('discount.fin1MaxDiscount')}</label>
               <Input
-                type="number" min={0} max={100} step="0.1" size="sm"
+                type="number" min={0} max={100} step="0.1"
                 value={fin1Max}
                 onChange={(e) => setFin1Max(e.target.value)}
               />
@@ -296,7 +289,7 @@ function PolicyTab() {
             <div className="flex flex-col">
               <label className="form-label">{t('discount.fin2MaxDiscount')}</label>
               <Input
-                type="number" min={0} max={100} step="0.1" size="sm"
+                type="number" min={0} max={100} step="0.1"
                 value={fin2Max}
                 onChange={(e) => setFin2Max(e.target.value)}
               />
@@ -305,18 +298,28 @@ function PolicyTab() {
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col">
               <label className="form-label">{t('discount.effectiveFrom')}</label>
-              <Input
-                type="datetime-local" size="sm"
+              <InputDatePicker
                 value={effectiveFrom}
-                onChange={(e) => setEffectiveFrom(e.target.value)}
+                onChange={setEffectiveFrom}
+                placeholder={t('discount.effectiveFrom')}
+                endIcon={<Calendar size={18} />}
+                locale={i18n.language}
+                calendar="gregorian"
+                dateFormat={(d) => d ? formatDateTime(d.toISOString(), i18n.language) : ''}
+                datePickerProps={{ showTime: true, timeFormat: '24h' }}
               />
             </div>
             <div className="flex flex-col">
               <label className="form-label">{t('discount.effectiveTo')}</label>
-              <Input
-                type="datetime-local" size="sm"
+              <InputDatePicker
                 value={effectiveTo}
-                onChange={(e) => setEffectiveTo(e.target.value)}
+                onChange={setEffectiveTo}
+                placeholder={t('discount.effectiveTo')}
+                endIcon={<Calendar size={18} />}
+                locale={i18n.language}
+                calendar="gregorian"
+                dateFormat={(d) => d ? formatDateTime(d.toISOString(), i18n.language) : ''}
+                datePickerProps={{ showTime: true, timeFormat: '24h' }}
               />
             </div>
           </div>
@@ -325,13 +328,12 @@ function PolicyTab() {
             <Switch
               checked={isActive}
               onChange={(e) => setIsActive(e.target.checked)}
-              size="sm"
             />
           </div>
         </div>
 
         <Button
-          color="primary" size="sm" className="w-full"
+          color="primary" className="w-full"
           disabled={isSaving}
           onClick={handleSave}
         >
@@ -444,13 +446,13 @@ function ReviewDrawer({ request, open, onClose }: {
               <DetailRow label={t('discount.excessPercent')} value={request.excess_discount_percent !== null ? `${request.excess_discount_percent}%` : '—'} mono />
               <hr className="border-line" />
               <DetailRow label={t('discount.requestedReason')} value={request.requested_reason ?? '—'} />
-              <DetailRow label={t('discount.requestedAt')} value={formatDate(request.requested_at)} />
-              <DetailRow label={t('discount.expiresAt')} value={formatDate(request.expires_at)} />
+              <DetailRow label={t('discount.requestedAt')}><DateTime value={request.requested_at} /></DetailRow>
+              <DetailRow label={t('discount.expiresAt')}><DateTime value={request.expires_at} /></DetailRow>
               {request.decision_at && (
                 <>
                   <hr className="border-line" />
                   <DetailRow label={t('discount.decisionReason')} value={request.decision_reason ?? '—'} />
-                  <DetailRow label={t('discount.decisionAt')} value={formatDate(request.decision_at)} />
+                  <DetailRow label={t('discount.decisionAt')}><DateTime value={request.decision_at} /></DetailRow>
                 </>
               )}
             </div>
@@ -621,7 +623,7 @@ function ApprovalsTab() {
                 )}
               </div>
               <div className="shrink-0 w-28 text-right hidden lg:block">
-                <span className="text-sm text-control-label">{formatDate(req.requested_at)}</span>
+                <DateTime value={req.requested_at} className="text-sm text-control-label" />
               </div>
             </div>
           );

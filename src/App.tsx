@@ -22,7 +22,6 @@ import { ModelsPage } from './pages/products/ModelsPage';
 import { ProductsLayout } from './pages/products/ProductsLayout';
 import { CallCenterLayout } from './pages/call-center/CallCenterLayout';
 import { TicketQueuePage } from './pages/call-center/TicketQueuePage';
-import { TicketDetailPage } from './pages/call-center/TicketDetailPage';
 import { PricingLayout } from './pages/pricing/PricingLayout';
 import { PricebookPage } from './pages/pricing/PricebookPage';
 import { Fin1RatesPage } from './pages/pricing/Fin1RatesPage';
@@ -158,16 +157,6 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <CallCenterLayout><TicketQueuePage /></CallCenterLayout>
-            </AdminLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin/call-center/ticket/:id"
-        element={
-          <ProtectedRoute>
-            <AdminLayout>
-              <CallCenterLayout><TicketDetailPage /></CallCenterLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

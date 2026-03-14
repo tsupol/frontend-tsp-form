@@ -5,6 +5,7 @@ import { PageNav, PageNavPanel, Badge, Input, Button, Select, DataTable, useSnac
 import { ArrowRightFromLine, CheckCircle, XCircle, ShoppingCart, RotateCcw, Search, SlidersHorizontal } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { DateTime } from '../../components/DateTime';
 
 // ============================================================================
 // Types
@@ -654,9 +655,7 @@ export function SalePage() {
                             <div key={txn.txn_id} className="border border-line rounded-md px-3 py-2">
                               <div className="flex items-center justify-between">
                                 <span className="text-sm font-medium">{t(`inventory.txn${txn.txn_type}`, { defaultValue: txn.txn_type })}</span>
-                                <span className="text-xs text-subtle tabular-nums">
-                                  {new Date(txn.performed_at).toLocaleString('en-GB', { timeZone: 'Asia/Bangkok', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                                </span>
+                                <DateTime value={txn.performed_at} className="text-xs text-subtle tabular-nums" />
                               </div>
                               {(txn.bucket_from || txn.bucket_to) && (
                                 <div className="flex items-center gap-1.5 mt-1">
@@ -713,7 +712,6 @@ function SellForm({
   isPending,
   canConfirm,
   t,
-  externalOnly = false,
 }: {
   saleType: SaleType;
   setSaleType: (v: SaleType) => void;
