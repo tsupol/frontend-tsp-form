@@ -148,22 +148,29 @@ const STAGE_KEYS: Record<string, string> = {
   CALL_OVERDUE_31: 'callCenter.stageOverdue31',
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  QUEUED: 'Queued',
-  IN_PROGRESS: 'In Progress',
-  CALL_NO_ANSWER: 'No Answer',
-  CALL_UNREACHABLE: 'Unreachable',
-  CLOSED_CALL_SUCCESS: 'Call Success',
-  CLOSED_RESOLVED_BY_PAYMENT: 'Resolved by Payment',
-  CLOSED_SUPERSEDED: 'Superseded',
-  CLOSED_CANCELED_OR_CLOSED: 'Canceled / Closed',
+const STATUS_KEYS: Record<string, string> = {
+  QUEUED: 'callCenter.statusQueued',
+  IN_PROGRESS: 'callCenter.statusInProgress',
+  CALL_NO_ANSWER: 'callCenter.statusNoAnswer',
+  CALL_UNREACHABLE: 'callCenter.statusUnreachable',
+  CLOSED_CALL_SUCCESS: 'callCenter.statusCallSuccess',
+  CLOSED_RESOLVED_BY_PAYMENT: 'callCenter.statusResolvedByPayment',
+  CLOSED_SUPERSEDED: 'callCenter.statusSuperseded',
+  CLOSED_CANCELED_OR_CLOSED: 'callCenter.statusCanceled',
+};
+
+const EVENT_TYPE_KEYS: Record<string, string> = {
+  CREATED: 'callCenter.eventCreated',
+  TAKEN: 'callCenter.eventTaken',
+  TAKEN_OVER: 'callCenter.eventTakenOver',
+  RESULT_SET: 'callCenter.eventResultSet',
+  NOTE_ADDED: 'callCenter.eventNoteAdded',
+  REVERTED: 'callCenter.eventReverted',
+  AUTO_CLOSED: 'callCenter.eventAutoClosed',
+  STAGE_CHANGED: 'callCenter.eventStageChanged',
 };
 
 const OPEN_STATUSES = ['QUEUED', 'IN_PROGRESS', 'CALL_NO_ANSWER', 'CALL_UNREACHABLE'];
-
-function statusLabel(status: string): string {
-  return STATUS_LABELS[status] ?? status;
-}
 
 function statusColor(status: string): 'info' | 'warning' | 'success' | 'danger' | undefined {
   if (status === 'QUEUED') return 'info';
@@ -415,7 +422,7 @@ function TicketDetailContent({
       {!isMobile && (
         <div className="flex-none flex items-center gap-2 h-panel-header-h px-4 border-b border-line">
           <span className="font-semibold truncate">{ticket.ticket_code}</span>
-          <Badge size="sm" color={statusColor(ticket.status)}>{statusLabel(ticket.status)}</Badge>
+          <Badge size="sm" color={statusColor(ticket.status)}>{STATUS_KEYS[ticket.status] ? t(STATUS_KEYS[ticket.status]) : ticket.status}</Badge>
         </div>
       )}
 
@@ -447,9 +454,17 @@ function TicketDetailContent({
               <div>{ticket.ref_contract_source ?? '—'}</div>
             </div>
             <div>
-              <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.status')}</div>
-              <Badge size="sm" color={statusColor(ticket.status)}>{statusLabel(ticket.status)}</Badge>
+              <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.lastResult')}</div>
+              <Badge size="sm" color={statusColor(ticket.status)}>{STATUS_KEYS[ticket.status] ? t(STATUS_KEYS[ticket.status]) : ticket.status}</Badge>
             </div>
+            {listTicket && (
+              <div>
+                <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.queueStatus')}</div>
+                <Badge size="sm" color={queueFlagColor(listTicket.queue_flag)}>
+                  {QUEUE_FLAG_KEYS[listTicket.queue_flag] ? t(QUEUE_FLAG_KEYS[listTicket.queue_flag]) : listTicket.queue_flag}
+                </Badge>
+              </div>
+            )}
             {(() => {
               if (!listTicket) return null;
               const overdue = overdueDuration(listTicket.first_overdue_due_date);
@@ -592,6 +607,7 @@ function TicketDetailContent({
                 <div className="text-sm font-medium">{t('callCenter.revert')}</div>
                 <div className="input-group">
                   <Input
+                    className="flex-1"
                     placeholder={t('callCenter.revertNote')}
                     value={revertNote}
                     onChange={(e) => setRevertNote(e.target.value)}
@@ -642,10 +658,10 @@ function TicketDetailContent({
                   <div className="shrink-0 pt-0.5">{eventIcon(evt.event_type)}</div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-medium">{evt.event_type}</span>
+                      <span className="text-sm font-medium">{EVENT_TYPE_KEYS[evt.event_type] ? t(EVENT_TYPE_KEYS[evt.event_type]) : evt.event_type}</span>
                       {evt.new_status && (
                         <Badge size="sm" color={statusColor(evt.new_status)}>
-                          {evt.new_status}
+                          {STATUS_KEYS[evt.new_status] ? t(STATUS_KEYS[evt.new_status]) : evt.new_status}
                         </Badge>
                       )}
                       {evt.actor_user_id && (
