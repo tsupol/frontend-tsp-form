@@ -518,7 +518,7 @@ export function SalePage() {
                         <div className="text-xs text-subtle truncate font-mono">
                           {asset.serial_no ?? '—'}
                         </div>
-                        <div className="flex items-center gap-1.5 mt-1">
+                        <div className="flex items-center gap-1.5 mt-1 -ml-0.5">
                           <Badge size="xs" className={getBucketColor(asset.current_bucket)}>
                             {getBucketLabel(asset.current_bucket, t)}
                           </Badge>

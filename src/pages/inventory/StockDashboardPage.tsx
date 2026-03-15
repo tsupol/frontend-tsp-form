@@ -253,6 +253,7 @@ export function StockDashboardPage() {
         <>
           {isMobile && (
             <Header
+              key="header"
               title={isRoot ? t('inventory.title') : detailTitle}
               startContent={
                 isRoot ? (
@@ -285,7 +286,7 @@ export function StockDashboardPage() {
 
           {/* Desktop header with summary cards */}
           {!isMobile && (
-            <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
+            <div key="header" className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
               <h1 className="heading-2 shrink-0">{t('inventory.title')}</h1>
               <div className="flex gap-2 flex-1 min-w-0 justify-end">
                 {summaryCards.map(card => (
@@ -299,7 +300,7 @@ export function StockDashboardPage() {
             </div>
           )}
 
-          <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
+          <div key="panels" className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
             <PageNavPanel id="list" className="w-1/2 xl:w-5/12 border-r border-line overflow-y-auto better-scroll">
               {/* Filter bar */}
               <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line sticky top-0 z-10 bg-surface gap-2">
@@ -361,7 +362,7 @@ export function StockDashboardPage() {
                         }}
                       >
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
+                          <div className="flex items-center gap-2 mb-1 -ml-0.5">
                             <Badge size="xs" className={getBucketColor(row.current_bucket)}>
                               {getBucketLabel(row.current_bucket, t)}
                             </Badge>

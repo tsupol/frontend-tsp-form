@@ -450,26 +450,30 @@ function TicketDetailContent({
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 text-sm">
             <div>
               <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.ticketCode')}</div>
-              <div className="font-medium text-xs">{ticket.ticket_code}</div>
+              <div className="min-h-info-content-h flex items-center font-medium text-xs">{ticket.ticket_code}</div>
             </div>
             <div>
               <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.contractCode')}</div>
-              <div className="font-medium text-xs">{ticket.ref_contract_code ?? '—'}</div>
+              <div className="min-h-info-content-h flex items-center font-medium text-xs">{ticket.ref_contract_code ?? '—'}</div>
             </div>
             <div>
               <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.contractSource')}</div>
-              <div>{ticket.ref_contract_source ?? '—'}</div>
+              <div className="min-h-info-content-h flex items-center">{ticket.ref_contract_source ?? '—'}</div>
             </div>
             <div>
               <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.lastResult')}</div>
-              <Badge size="sm" color={statusColor(ticket.status)}>{STATUS_KEYS[ticket.status] ? t(STATUS_KEYS[ticket.status]) : ticket.status}</Badge>
+              <div className="min-h-info-content-h flex items-center">
+                <Badge size="sm" color={statusColor(ticket.status)}>{STATUS_KEYS[ticket.status] ? t(STATUS_KEYS[ticket.status]) : ticket.status}</Badge>
+              </div>
             </div>
             {listTicket && (
               <div>
                 <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.queueStatus')}</div>
-                <Badge size="sm" color={queueFlagColor(listTicket.queue_flag)}>
-                  {QUEUE_FLAG_KEYS[listTicket.queue_flag] ? t(QUEUE_FLAG_KEYS[listTicket.queue_flag]) : listTicket.queue_flag}
-                </Badge>
+                <div className="min-h-info-content-h flex items-center">
+                  <Badge size="sm" color={queueFlagColor(listTicket.queue_flag)}>
+                    {QUEUE_FLAG_KEYS[listTicket.queue_flag] ? t(QUEUE_FLAG_KEYS[listTicket.queue_flag]) : listTicket.queue_flag}
+                  </Badge>
+                </div>
               </div>
             )}
             {(() => {
@@ -479,7 +483,7 @@ function TicketDetailContent({
                 return (
                   <div>
                     <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.overdue')}</div>
-                    <div className="flex items-center gap-1.5">
+                    <div className="min-h-info-content-h flex items-center gap-1.5">
                       <Badge size="sm" color={totalDays(overdue) >= 30 ? 'danger' : totalDays(overdue) >= 7 ? 'warning' : 'info'}>
                         {formatDuration(overdue.months, overdue.days)}
                       </Badge>
@@ -495,7 +499,7 @@ function TicketDetailContent({
                 return (
                   <div>
                     <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.nextDue')}</div>
-                    <div className="flex items-center gap-1.5">
+                    <div className="min-h-info-content-h flex items-center gap-1.5">
                       <Badge size="sm" color="success">
                         {formatDuration(dueIn.months, dueIn.days)}
                       </Badge>
@@ -510,7 +514,7 @@ function TicketDetailContent({
             })()}
             <div>
               <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.stage')}</div>
-              <div className="flex items-center gap-1.5">
+              <div className="min-h-info-content-h flex items-center gap-1.5">
                 <Badge size="sm">{STAGE_KEYS[ticket.stage] ? t(STAGE_KEYS[ticket.stage]) : ticket.stage}</Badge>
                 <Tooltip content={t('callCenter.severity')}>
                   <Badge size="sm" color={severityColor(ticket.severity)}>
@@ -524,30 +528,38 @@ function TicketDetailContent({
               return lastCall ? (
                 <div>
                   <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.lastCallAt')}</div>
-                  <DateTime value={lastCall.created_at} className="text-sm" />
+                  <div className="min-h-info-content-h flex items-center">
+                    <DateTime value={lastCall.created_at} className="text-sm" />
+                  </div>
                 </div>
               ) : null;
             })()}
             <div>
               <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.createdAt')}</div>
-              <DateTime value={ticket.created_at} className="text-sm" />
+              <div className="min-h-info-content-h flex items-center">
+                <DateTime value={ticket.created_at} className="text-sm" />
+              </div>
             </div>
             {ticket.closed_at && (
               <div>
                 <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.closedAt')}</div>
-                <DateTime value={ticket.closed_at} className="text-sm" />
+                <div className="min-h-info-content-h flex items-center">
+                  <DateTime value={ticket.closed_at} className="text-sm" />
+                </div>
               </div>
             )}
             {ticket.closed_reason && (
               <div className="col-span-2">
                 <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.closedReason')}</div>
-                <div>{ticket.closed_reason && CLOSED_REASON_KEYS[ticket.closed_reason] ? t(CLOSED_REASON_KEYS[ticket.closed_reason]) : ticket.closed_reason}</div>
+                <div className="min-h-info-content-h flex items-center">{ticket.closed_reason && CLOSED_REASON_KEYS[ticket.closed_reason] ? t(CLOSED_REASON_KEYS[ticket.closed_reason]) : ticket.closed_reason}</div>
               </div>
             )}
             {ticket.next_attempt_after && OPEN_STATUSES.includes(ticket.status) && (
               <div>
                 <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.nextAttempt')}</div>
-                <DateTime value={ticket.next_attempt_after} className="text-sm" />
+                <div className="min-h-info-content-h flex items-center">
+                  <DateTime value={ticket.next_attempt_after} className="text-sm" />
+                </div>
               </div>
             )}
           </div>
@@ -866,7 +878,7 @@ export function TicketQueuePage() {
                     const dueIn = !overdue ? dueInDuration(ticket.next_due_date) : null;
                     return (
                       <div
-                        className={`px-3 py-2 border-b border-line transition-colors cursor-pointer ${
+                        className={`px-4 py-2 border-b border-line transition-colors cursor-pointer ${
                           isSelected ? 'bg-primary/10' : 'hover:bg-surface-hover'
                         }`}
                         onClick={() => {
@@ -888,7 +900,7 @@ export function TicketQueuePage() {
                           )}
                         </div>
                         {/* Row 2: overdue/due info + badges */}
-                        <div className="flex items-center gap-1.5 mt-0.5">
+                        <div className="flex items-center gap-1.5 mt-0.5 -ml-0.5">
                           {overdue ? (
                             <>
                               <Badge size="sm" color={totalDays(overdue) >= 30 ? 'danger' : totalDays(overdue) >= 7 ? 'warning' : 'info'}>

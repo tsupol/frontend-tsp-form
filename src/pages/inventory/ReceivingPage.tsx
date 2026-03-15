@@ -342,7 +342,7 @@ export function ReceivingPage() {
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm truncate">{line.brand_name} {line.family_name}</div>
                       <div className="text-xs text-subtle truncate">{line.variant_name} · {line.po_no}</div>
-                      <div className="flex items-center gap-2 mt-1">
+                      <div className="flex items-center gap-2 mt-1 -ml-0.5">
                         <Badge size="xs" className={STATUS_BADGE[line.asset_intake_status] ?? 'bg-fg/10 text-fg/60'}>
                           {line.asset_intake_status}
                         </Badge>

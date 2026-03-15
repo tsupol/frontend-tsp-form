@@ -4,6 +4,9 @@
     /* Panel header height */
     --spacing-panel-header-h: 2.792rem;
 
+    /* Info section content row height */
+    --spacing-info-content-h: 1.708rem;
+
     /* Text colors for non-form data display */
     --color-subtle: #999999;       /* labels, secondary text */
     --color-subtler: #70737c;      /* empty states, placeholders */

@@ -218,6 +218,7 @@ export const AppSideNav = () => {
                 isMobile={isMobile}
                 onSelect={handleSelect}
                 onCloseMobile={handleCloseMobile}
+                disableFlyoutOnActive
               />
             </div>
             <div className={clsx('border-t border-line py-2 pointer-events-auto', menuCollapsed ? 'px-0' : 'px-2')}>
