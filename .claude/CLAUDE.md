@@ -89,15 +89,15 @@ Backend returns `message_key` in error responses (from `core.error_codes` table 
 - `queryClient` config: 5 min stale time, no retry on auth errors
 - Login/logout/auth stays in `AuthContext` — not React Query
 
-### MCP Server for API Debugging (`nnf-api`)
+### MCP Server for API Debugging (`dev-api`)
 
-MCP server at `D:\dev\mcp-nnf` — registered globally as `nnf-api`. Auto-logs in on startup using `.env` credentials. Tools:
+Generic MCP server at `D:\dev\dev-mcp` — registered globally as `dev-api`. Supports multiple projects (nnf, course-proto). Tools:
 
-- `api_login` — login (defaults to .env creds), auto-selects holding for system_dev
-- `api_get` — GET views with PostgREST params, e.g. `api_get({ path: "/v_ref_product_models?order=code" })`
-- `api_rpc` — call RPC functions, e.g. `api_rpc({ function_name: "ref_brand_list" })`
-- `api_switch_holding` — switch tenant context
-- `api_list_holdings` — list available holdings
-- `api_schema` — fetch OpenAPI schema
+- `list_projects` — list configured projects
+- `project_info` — get project config, auth_notes, users, paths
+- `api_request` — free-form HTTP request with auto Bearer injection
+- `set_token` — store auth token after login
+- `sync_users` — persist user list
+- `whoami` — show token status
 
-Use these tools to inspect live API data when debugging frontend issues.
+Workflow: `project_info("nnf")` → read auth_notes → `api_request` to login → `set_token` → `api_request` for everything else.

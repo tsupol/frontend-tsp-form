@@ -886,9 +886,9 @@ export function TicketQueuePage() {
                           if (isMobile) goTo('detail');
                         }}
                       >
-                        {/* Row 1: contract code + amount */}
+                        {/* Row 1: ticket code + amount */}
                         <div className="flex items-center gap-2">
-                          <span className="font-medium text-xs truncate">{ticket.ref_contract_code ?? ticket.ticket_code}</span>
+                          <span className="font-medium text-xs truncate">{ticket.ticket_code}</span>
                           {ticket.overdue_amount != null && ticket.overdue_amount > 0 ? (
                             <span className="ml-auto shrink-0 text-sm font-medium text-figure">
                               ฿{formatAmount(ticket.overdue_amount)}

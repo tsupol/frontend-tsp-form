@@ -368,8 +368,8 @@ export function StockDashboardPage() {
                             </Badge>
                           </div>
                           <div className="flex gap-4 text-xs text-subtle">
-                            <span>{t('inventory.assets')}: <span className="text-qty">{fmtNum(row.asset_count)}</span></span>
-                            <span>{t('inventory.lotQty')}: <span className="text-qty">{fmtNum(row.lot_total_qty)}</span></span>
+                            <span>{t('inventory.assets')}: <span className="text-sm text-qty">{fmtNum(row.asset_count)}</span></span>
+                            <span>{t('inventory.lots')}: <span className="text-sm text-qty">{fmtNum(row.lot_total_qty)}</span></span>
                           </div>
                         </div>
                         <div className="text-right shrink-0">
@@ -450,7 +450,7 @@ function DetailPanel({
           <div className="text-xs text-figure tabular-nums">{fmtCurrency(row.asset_total_value)}</div>
         </div>
         <div>
-          <div className="text-xs text-subtle">{t('inventory.lotQty')}</div>
+          <div className="text-xs text-subtle">{t('inventory.lots')}</div>
           <div className="font-semibold text-qty tabular-nums">{fmtNum(row.lot_total_qty)}</div>
           <div className="text-xs text-figure tabular-nums">{fmtCurrency(row.lot_total_value)}</div>
         </div>
