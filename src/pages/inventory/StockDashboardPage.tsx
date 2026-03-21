@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, Badge, Select } from 'tsp-form';
+import { PageNav, PageNavPanel, MobileHeader, Badge, Select } from 'tsp-form';
 import { apiClient } from '../../lib/api';
-import { Package, ShieldAlert, Wrench, Truck, ArrowRightFromLine } from 'lucide-react';
+import { Package, ShieldAlert, Wrench, Truck, ArrowLeft, ArrowRightFromLine } from 'lucide-react';
 
 // ============================================================================
 // Types
@@ -249,24 +249,29 @@ export function StockDashboardPage() {
 
   return (
     <PageNav panels={['list', 'detail']} className="h-dvh">
-      {({ isMobile, isRoot, goTo, Header }) => (
+      {({ isMobile, isRoot, goTo, goBack }) => (
         <>
           {isMobile && (
-            <Header
-              key="header"
-              title={isRoot ? t('inventory.title') : detailTitle}
-              startContent={
-                isRoot ? (
+            <MobileHeader className="mobile-header-bordered">
+              <div className="mobile-header-start">
+                {isRoot ? (
                   <button
-                    className="flex items-center justify-center w-12 h-12 cursor-pointer hover:bg-surface-hover transition-colors"
+                    className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
                     onClick={() => window.dispatchEvent(new CustomEvent('sidemenu:open'))}
                   >
                     <ArrowRightFromLine size={18} />
                   </button>
-                ) : undefined
-              }
-              endContent={
-                isRoot ? (
+                ) : (
+                  <button className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current" onClick={goBack}>
+                    <ArrowLeft size={20} />
+                  </button>
+                )}
+              </div>
+              <div className="mobile-header-title mobile-header-title-truncate">
+                {isRoot ? t('inventory.title') : detailTitle}
+              </div>
+              {isRoot ? (
+                <div className="mobile-header-end">
                   <div className="flex gap-3 pl-3 pr-3">
                     {summaryCards.map(card => (
                       <div key={card.key} className="relative" title={t(`inventory.${card.key}`)}>
@@ -279,9 +284,11 @@ export function StockDashboardPage() {
                       </div>
                     ))}
                   </div>
-                ) : undefined
-              }
-            />
+                </div>
+              ) : (
+                <div className="mobile-header-end w-12" />
+              )}
+            </MobileHeader>
           )}
 
           {/* Desktop header with summary cards */}

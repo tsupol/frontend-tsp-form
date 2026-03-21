@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, DataTable, Badge, Input, Select, Button, Tooltip, useSnackbarContext } from 'tsp-form';
+import { PageNav, PageNavPanel, MobileHeader, DataTable, Badge, Input, Select, Button, Tooltip, useSnackbarContext } from 'tsp-form';
 import {
+  ArrowLeft,
   ArrowRightFromLine,
   XCircle,
   SlidersHorizontal,
@@ -784,23 +785,36 @@ export function TicketQueuePage() {
 
   return (
     <PageNav panels={['list', 'detail']} className="h-dvh">
-      {({ isMobile, isRoot, goTo, Header }) => (
+      {({ isMobile, isRoot, goTo, goBack }) => (
         <>
           {isMobile ? (
-            <Header
-              key="header"
-              title={isRoot ? t('callCenter.ticketQueue') : (selectedTicket?.ticket_code ?? t('callCenter.ticketDetail'))}
-              startContent={
-                isRoot ? (
+            <MobileHeader className="mobile-header-bordered">
+              <div className="mobile-header-start">
+                {isRoot ? (
                   <button
-                    className="flex items-center justify-center w-12 h-12 cursor-pointer hover:bg-surface-hover transition-colors"
+                    className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
                     onClick={() => window.dispatchEvent(new CustomEvent('sidemenu:open'))}
                   >
                     <ArrowRightFromLine size={18} />
                   </button>
-                ) : undefined
-              }
-            />
+                ) : (
+                  <button className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current" onClick={goBack}>
+                    <ArrowLeft size={20} />
+                  </button>
+                )}
+              </div>
+              {isRoot && (
+                <>
+                  <div className="mobile-header-title mobile-header-title-truncate">{t('callCenter.ticketQueue')}</div>
+                  <div className="mobile-header-end w-12" />
+                </>
+              )}
+              {!isRoot && (
+                <div className="mobile-header-title mobile-header-title-truncate">
+                  {selectedTicket?.ticket_code ?? t('callCenter.ticketDetail')}
+                </div>
+              )}
+            </MobileHeader>
           ) : (
             <div key="header" className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
               <h1 className="heading-2 shrink-0">{t('callCenter.ticketQueue')}</h1>

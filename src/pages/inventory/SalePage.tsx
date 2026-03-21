@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, Badge, Input, Button, Select, DataTable, useSnackbarContext } from 'tsp-form';
-import { ArrowRightFromLine, CheckCircle, XCircle, ShoppingCart, RotateCcw, Search, SlidersHorizontal } from 'lucide-react';
+import { PageNav, PageNavPanel, MobileHeader, Badge, Input, Button, Select, DataTable, useSnackbarContext } from 'tsp-form';
+import { ArrowLeft, ArrowRightFromLine, CheckCircle, XCircle, ShoppingCart, RotateCcw, Search, SlidersHorizontal } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { DateTime } from '../../components/DateTime';
@@ -378,22 +378,29 @@ export function SalePage() {
 
   return (
     <PageNav panels={['list', 'detail']} className="h-dvh">
-      {({ isMobile, isRoot, goTo, Header }) => (
+      {({ isMobile, isRoot, goTo, goBack }) => (
         <>
           {isMobile && (
-            <Header
-              title={isRoot ? t('sale.title') : detailTitle}
-              startContent={
-                isRoot ? (
+            <MobileHeader className="mobile-header-bordered">
+              <div className="mobile-header-start">
+                {isRoot ? (
                   <button
-                    className="flex items-center justify-center w-12 h-12 cursor-pointer hover:bg-surface-hover transition-colors"
+                    className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
                     onClick={() => window.dispatchEvent(new CustomEvent('sidemenu:open'))}
                   >
                     <ArrowRightFromLine size={18} />
                   </button>
-                ) : undefined
-              }
-            />
+                ) : (
+                  <button className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current" onClick={goBack}>
+                    <ArrowLeft size={20} />
+                  </button>
+                )}
+              </div>
+              <div className="mobile-header-title mobile-header-title-truncate">
+                {isRoot ? t('sale.title') : detailTitle}
+              </div>
+              <div className="mobile-header-end w-12" />
+            </MobileHeader>
           )}
 
           {!isMobile && (
