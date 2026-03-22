@@ -5,10 +5,12 @@ import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-quer
 import {
   DataTable, DataTableColumnHeader, Button, Input, Select, PopOver, MenuItem,
   MenuSeparator, Badge, Modal, Switch, NumberSpinner, RadioGroup, useSnackbarContext, FormErrorMessage,
+  MobileHeader, Pagination,
   type ColumnDef, type SortingState,
 } from 'tsp-form';
 import {
   Plus, MoreHorizontal, Pencil, ShieldCheck, ShieldOff, XCircle, CheckCircle, Layers,
+  ArrowRightFromLine, SlidersHorizontal,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -1222,6 +1224,7 @@ function ManageFamilyAttributesModal({ family, open, onClose, holdingId }: {
         />
       ),
       enableSorting: false,
+      className: 'w-10',
     },
   ];
 
@@ -1419,85 +1422,244 @@ export function FamiliesPage() {
         />
       ),
       enableSorting: false,
+      className: 'w-10',
     },
   ];
 
+  const [filterOpen, setFilterOpen] = useState(false);
+  const activeFilterCount = (brandFilter ? 1 : 0) + (sorting.length > 0 ? 1 : 0);
+
   return (
-    <div className="page-content h-dvh max-h-dvh max-w-[64rem] flex flex-col overflow-hidden">
-      <div className="flex-none pb-4 space-y-3">
-        <div className="flex items-center justify-between">
+    <>
+      {/* Mobile header */}
+      <MobileHeader className="mobile-header-bordered md:hidden">
+        <div className="mobile-header-start">
+          <button
+            className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
+            aria-label="Open menu"
+            onClick={() => window.dispatchEvent(new CustomEvent('sidemenu:open'))}
+          >
+            <ArrowRightFromLine size={18} />
+          </button>
+        </div>
+        <div className="mobile-header-title mobile-header-title-truncate">
+          {t('brandsModels.models')}
+        </div>
+        <div className="mobile-header-end px-2">
+          <button
+            className="flex items-center justify-center w-8 h-8 rounded hover:bg-surface-hover cursor-pointer text-current"
+            aria-label={t('brandsModels.addFamily')}
+            onClick={() => setCreateOpen(true)}
+          >
+            <Plus size={18} />
+          </button>
+        </div>
+      </MobileHeader>
+
+      <div className="page-content responsive-dvh-mobile-header max-w-[64rem]">
+        {/* Desktop header */}
+        <div className="flex items-center justify-between mb-4 flex-none max-md:hidden">
           <h1 className="heading-2">{t('brandsModels.models')}</h1>
-          <Button color="primary" startIcon={<Plus />} onClick={() => setCreateOpen(true)}>
+          <Button color="primary" startIcon={<Plus size={16} />} onClick={() => setCreateOpen(true)}>
             {t('brandsModels.addFamily')}
           </Button>
         </div>
-        <div className="flex items-center gap-3">
-          <Input
-            placeholder={t('common.search')}
-            value={searchInput}
-            onChange={(e) => handleSearch(e.target.value)}
-            size="sm"
-            className="shrink-0"
-            style={{ width: '14rem' }}
-          />
-          <div style={{ width: '14rem' }}>
-            <Select
-              options={brandFilterOptions}
-              value={brandFilter ? String(brandFilter) : null}
-              onChange={(val) => {
-                setBrandFilter(val ? Number(val) : null);
-                setPageIndex(0);
-              }}
-              placeholder={t('brandsModels.selectBrand')}
-              size="sm"
-              showChevron
-              clearable
-            />
-          </div>
-        </div>
-      </div>
 
-      {isError && (
-        <div className="px-6">
-          <div className="border border-line bg-surface p-6 rounded-lg text-center">
-            <div className="text-danger mb-4">{error instanceof Error ? error.message : t('common.error')}</div>
-          </div>
-        </div>
-      )}
-
-      {!isError && (
-        <DataTable
-          data={families}
-          columns={columns}
-          enableSorting
-          manualSorting
-          sorting={sorting}
-          onSortingChange={(updater) => {
-            const next = typeof updater === 'function' ? updater(sorting) : updater;
-            setSorting(next);
-            setPageIndex(0);
-          }}
-          enablePagination
-          pageIndex={pageIndex}
-          pageSize={pageSize}
-          pageSizeOptions={[10, 25, 50]}
-          rowCount={totalCount}
-          onPageChange={({ pageIndex: pi, pageSize: ps }) => {
-            setPageIndex(pi);
-            setPageSize(ps);
-          }}
-          className={`flex-1 min-h-0 ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
-          noResults={
-            <div className="p-8 text-center text-control-label">
-              {t('brandsModels.noFamilies')}
+        {/* Filters bar */}
+        <div className="flex-none pb-4">
+          <div className="flex items-center gap-3">
+            <div className="flex-1 min-w-0 md:max-w-56">
+              <Input
+                placeholder={t('common.search')}
+                value={searchInput}
+                onChange={(e) => handleSearch(e.target.value)}
+                size="sm"
+                className="w-full"
+              />
             </div>
-          }
-        />
-      )}
+            {/* Brand filter — visible ≥sm */}
+            <div className="hidden sm:block flex-1 min-w-0 md:max-w-56">
+              <Select
+                options={brandFilterOptions}
+                value={brandFilter ? String(brandFilter) : null}
+                onChange={(val) => {
+                  setBrandFilter(val ? Number(val) : null);
+                  setPageIndex(0);
+                }}
+                placeholder={t('brandsModels.selectBrand')}
+                size="sm"
+                showChevron
+                clearable
+              />
+            </div>
+            {/* Popover — visible <sm always, sm–md for sort only */}
+            <div className="md:hidden shrink-0">
+              <PopOver
+                isOpen={filterOpen}
+                onClose={() => setFilterOpen(false)}
+                placement="bottom"
+                align="end"
+                maxWidth="300px"
+                trigger={
+                  <Button variant="outline" size="sm" className="relative btn-icon-sm" onClick={() => setFilterOpen(!filterOpen)}>
+                    <SlidersHorizontal size={16} />
+                    {activeFilterCount > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 bg-primary text-white text-xs rounded-full w-4 h-4 flex items-center justify-center leading-none">
+                        {activeFilterCount}
+                      </span>
+                    )}
+                  </Button>
+                }
+              >
+                <div className="flex flex-col gap-3 p-3">
+                  <div className="text-xs font-medium text-muted uppercase tracking-wide">{t('common.filters')}</div>
+                  <Select
+                    options={brandFilterOptions}
+                    value={brandFilter ? String(brandFilter) : null}
+                    onChange={(val) => {
+                      setBrandFilter(val ? Number(val) : null);
+                      setPageIndex(0);
+                    }}
+                    placeholder={t('brandsModels.selectBrand')}
+                    size="sm"
+                    showChevron
+                    clearable
+                  />
+                  <div className="text-xs font-medium text-muted uppercase tracking-wide mt-1">{t('common.sortBy')}</div>
+                  <Select
+                    options={[
+                      { value: 'family_code', label: t('brandsModels.familyCode') },
+                      { value: 'display_name', label: t('brandsModels.displayName') },
+                      { value: 'brand_name', label: t('brandsModels.brand') },
+                      { value: 'category_name', label: t('brandsModels.category') },
+                      { value: 'is_active', label: t('users.status') },
+                    ]}
+                    value={sorting[0]?.id ?? null}
+                    onChange={(val) => {
+                      if (val) setSorting([{ id: val as string, desc: sorting[0]?.desc ?? false }]);
+                      else setSorting([]);
+                      setPageIndex(0);
+                    }}
+                    placeholder={t('common.sortBy')}
+                    size="sm"
+                    showChevron
+                    clearable
+                    searchable={false}
+                  />
+                  {sorting.length > 0 && (
+                    <Select
+                      options={[
+                        { value: 'asc', label: t('common.ascending') },
+                        { value: 'desc', label: t('common.descending') },
+                      ]}
+                      value={sorting[0]?.desc ? 'desc' : 'asc'}
+                      onChange={(val) => {
+                        setSorting([{ id: sorting[0].id, desc: (val as string) === 'desc' }]);
+                        setPageIndex(0);
+                      }}
+                      size="sm"
+                      showChevron
+                      searchable={false}
+                    />
+                  )}
+                </div>
+              </PopOver>
+            </div>
+          </div>
+        </div>
+
+        {isError && (
+          <div className="px-6">
+            <div className="border border-line bg-surface p-6 rounded-lg text-center">
+              <div className="text-danger mb-4">{error instanceof Error ? error.message : t('common.error')}</div>
+            </div>
+          </div>
+        )}
+
+        {/* Desktop: DataTable */}
+        {!isError && (
+          <DataTable
+            data={families}
+            columns={columns}
+            enableSorting
+            manualSorting
+            sorting={sorting}
+            onSortingChange={(updater) => {
+              const next = typeof updater === 'function' ? updater(sorting) : updater;
+              setSorting(next);
+              setPageIndex(0);
+            }}
+            enablePagination
+            pageIndex={pageIndex}
+            pageSize={pageSize}
+            pageSizeOptions={[10, 25, 50]}
+            rowCount={totalCount}
+            onPageChange={({ pageIndex: pi, pageSize: ps }) => {
+              setPageIndex(pi);
+              setPageSize(ps);
+            }}
+            className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
+            noResults={
+              <div className="p-8 text-center text-control-label">
+                {t('brandsModels.noFamilies')}
+              </div>
+            }
+          />
+        )}
+
+        {/* Mobile: Card list */}
+        {!isError && (
+          <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
+            <div className="flex-1 overflow-auto better-scroll">
+              {families.length === 0 ? (
+                <div className="p-8 text-center text-control-label">
+                  {t('brandsModels.noFamilies')}
+                </div>
+              ) : (
+                <div className="flex flex-col divide-y divide-line">
+                  {families.map((family) => (
+                    <div key={family.id} className="flex items-center gap-3 px-1 py-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">{family.family_code}</div>
+                        <div className="text-sm text-control-label truncate">{family.display_name}</div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge size="sm" className="capitalize">{family.brand_name}</Badge>
+                          <span className="text-xs text-control-label truncate">{family.category_name}</span>
+                        </div>
+                      </div>
+                      <div className="shrink-0">
+                        <Badge size="sm" color={family.is_active ? 'success' : 'danger'}>
+                          {family.is_active ? t('brandsModels.active') : t('brandsModels.inactive')}
+                        </Badge>
+                      </div>
+                      <FamilyRowActions
+                        family={family}
+                        onEdit={setEditFamily}
+                        onToggle={handleToggle}
+                        onManageAttributes={setManageAttrsFamily}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {totalCount > pageSize && (
+              <div className="flex-none py-2 flex justify-center">
+                <Pagination
+                  size="sm"
+                  currentPage={pageIndex + 1}
+                  totalPages={Math.ceil(totalCount / pageSize)}
+                  onPageChange={(p) => setPageIndex(p - 1)}
+                />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       <CreateFamilyModal open={createOpen} onClose={() => setCreateOpen(false)} holdingId={holdingId} brands={allBrands} />
       <EditFamilyModal family={editFamily} open={!!editFamily} onClose={() => setEditFamily(null)} brands={allBrands} />
       <ManageFamilyAttributesModal family={manageAttrsFamily} open={!!manageAttrsFamily} onClose={() => setManageAttrsFamily(null)} holdingId={holdingId} />
-    </div>
+    </>
   );
 }

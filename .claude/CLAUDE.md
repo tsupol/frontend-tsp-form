@@ -7,6 +7,7 @@
 - Theme uses `data-theme` attribute on `<html>` (`light` / `dark`), not CSS classes
 - **`src/index.css`** — tsp-form theme only (copy from `example.css`, change `@import` line to `@import "tailwindcss"`)
 - **`src/app.css`** — app-specific styles (`.page-content`, layout utilities, overrides)
+- **Responsive page pattern** — see `.claude/responsive-page-pattern.md` for the standard dual mobile/desktop table page structure
 
 ## tsp-form Component Usage
 

@@ -5,10 +5,12 @@ import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-quer
 import {
   DataTable, DataTableColumnHeader, Button, Input, Select, PopOver, MenuItem,
   MenuSeparator, Badge, Modal, Switch, NumberSpinner, useSnackbarContext, FormErrorMessage,
+  MobileHeader, Pagination,
   type ColumnDef, type SortingState,
 } from 'tsp-form';
 import {
   Plus, MoreHorizontal, Pencil, ShieldCheck, ShieldOff, XCircle, CheckCircle, List,
+  ArrowRightFromLine, SlidersHorizontal,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -915,6 +917,7 @@ function ManageOptionsModal({ attribute, open, onClose, holdingId }: {
         />
       ),
       enableSorting: false,
+      className: 'w-10',
     },
   ];
 
@@ -1000,6 +1003,8 @@ export function AttributesPage() {
   const [createAttrOpen, setCreateAttrOpen] = useState(false);
   const [editAttr, setEditAttr] = useState<ProductAttribute | null>(null);
   const [manageOptionsAttr, setManageOptionsAttr] = useState<ProductAttribute | null>(null);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const activeFilterCount = sorting.length > 0 ? 1 : 0;
 
   const buildEndpoint = useCallback(() => {
     const params: string[] = [];
@@ -1123,71 +1128,209 @@ export function AttributesPage() {
         />
       ),
       enableSorting: false,
+      className: 'w-10',
     },
   ];
 
   return (
-    <div className="page-content h-dvh max-h-dvh max-w-[64rem] flex flex-col overflow-hidden">
-      <div className="flex-none pb-4 space-y-3">
-        <div className="flex items-center justify-between">
+    <>
+      <MobileHeader className="mobile-header-bordered md:hidden">
+        <div className="mobile-header-start">
+          <button
+            className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
+            aria-label="Open menu"
+            onClick={() => window.dispatchEvent(new CustomEvent('sidemenu:open'))}
+          >
+            <ArrowRightFromLine size={18} />
+          </button>
+        </div>
+        <div className="mobile-header-title mobile-header-title-truncate">
+          {t('attributes.title')}
+        </div>
+        <div className="mobile-header-end px-2">
+          <button
+            className="flex items-center justify-center w-8 h-8 rounded hover:bg-surface-hover cursor-pointer text-current"
+            aria-label={t('attributes.addAttribute')}
+            onClick={() => setCreateAttrOpen(true)}
+          >
+            <Plus size={18} />
+          </button>
+        </div>
+      </MobileHeader>
+
+      <div className="page-content responsive-dvh-mobile-header max-w-[64rem]">
+        <div className="flex items-center justify-between mb-4 flex-none max-md:hidden">
           <h1 className="heading-2">{t('attributes.title')}</h1>
           <Button color="primary" startIcon={<Plus />} onClick={() => setCreateAttrOpen(true)}>
             {t('attributes.addAttribute')}
           </Button>
         </div>
-        <div className="flex items-center gap-3">
-          <Input
-            placeholder={t('common.search')}
-            value={searchInput}
-            onChange={(e) => handleSearch(e.target.value)}
-            size="sm"
-            className="shrink-0"
-            style={{ width: '14rem' }}
-          />
-        </div>
-      </div>
 
-      {isError && (
-        <div className="px-6">
-          <div className="border border-line bg-surface p-6 rounded-lg text-center">
-            <div className="text-danger mb-4">{error instanceof Error ? error.message : t('common.error')}</div>
+        <div className="flex-none pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-full max-w-56 min-w-0">
+              <Input
+                placeholder={t('common.search')}
+                value={searchInput}
+                onChange={(e) => handleSearch(e.target.value)}
+                size="sm"
+                className="w-full"
+              />
+            </div>
+            <div className="flex-1 md:hidden" />
+            <div className="md:hidden shrink-0">
+              <PopOver
+                isOpen={filterOpen}
+                onClose={() => setFilterOpen(false)}
+                placement="bottom"
+                align="end"
+                maxWidth="300px"
+                trigger={
+                  <Button variant="outline" size="sm" className="relative btn-icon-sm" onClick={() => setFilterOpen(!filterOpen)}>
+                    <SlidersHorizontal size={16} />
+                    {activeFilterCount > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 bg-primary text-white text-xs rounded-full w-4 h-4 flex items-center justify-center leading-none">
+                        {activeFilterCount}
+                      </span>
+                    )}
+                  </Button>
+                }
+              >
+                <div className="flex flex-col gap-3 p-3">
+                  <div className="text-xs font-medium text-muted uppercase tracking-wide">{t('common.sortBy')}</div>
+                  <Select
+                    options={[
+                      { value: 'attribute_code', label: t('attributes.attributeCode') },
+                      { value: 'attribute_name', label: t('attributes.attributeName') },
+                      { value: 'data_type', label: t('attributes.dataType') },
+                      { value: 'is_active', label: t('users.status') },
+                    ]}
+                    value={sorting[0]?.id ?? null}
+                    onChange={(val) => {
+                      if (val) setSorting([{ id: val as string, desc: sorting[0]?.desc ?? false }]);
+                      else setSorting([]);
+                      setPageIndex(0);
+                    }}
+                    placeholder={t('common.sortBy')}
+                    size="sm"
+                    showChevron
+                    clearable
+                    searchable={false}
+                  />
+                  {sorting.length > 0 && (
+                    <Select
+                      options={[
+                        { value: 'asc', label: t('common.ascending') },
+                        { value: 'desc', label: t('common.descending') },
+                      ]}
+                      value={sorting[0]?.desc ? 'desc' : 'asc'}
+                      onChange={(val) => {
+                        setSorting([{ id: sorting[0].id, desc: (val as string) === 'desc' }]);
+                        setPageIndex(0);
+                      }}
+                      size="sm"
+                      showChevron
+                      searchable={false}
+                    />
+                  )}
+                </div>
+              </PopOver>
+            </div>
           </div>
         </div>
-      )}
 
-      {!isError && (
-        <DataTable
-          data={attributes}
-          columns={columns}
-          enableSorting
-          manualSorting
-          sorting={sorting}
-          onSortingChange={(updater) => {
-            const next = typeof updater === 'function' ? updater(sorting) : updater;
-            setSorting(next);
-            setPageIndex(0);
-          }}
-          enablePagination
-          pageIndex={pageIndex}
-          pageSize={pageSize}
-          pageSizeOptions={[10, 25, 50]}
-          rowCount={totalCount}
-          onPageChange={({ pageIndex: pi, pageSize: ps }) => {
-            setPageIndex(pi);
-            setPageSize(ps);
-          }}
-          className={`flex-1 min-h-0 ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
-          noResults={
-            <div className="p-8 text-center text-control-label">
-              {t('attributes.noAttributes')}
+        {isError && (
+          <div className="px-6">
+            <div className="border border-line bg-surface p-6 rounded-lg text-center">
+              <div className="text-danger mb-4">{error instanceof Error ? error.message : t('common.error')}</div>
             </div>
-          }
-        />
-      )}
+          </div>
+        )}
+
+        {!isError && (
+          <DataTable
+            data={attributes}
+            columns={columns}
+            enableSorting
+            manualSorting
+            sorting={sorting}
+            onSortingChange={(updater) => {
+              const next = typeof updater === 'function' ? updater(sorting) : updater;
+              setSorting(next);
+              setPageIndex(0);
+            }}
+            enablePagination
+            pageIndex={pageIndex}
+            pageSize={pageSize}
+            pageSizeOptions={[10, 25, 50]}
+            rowCount={totalCount}
+            onPageChange={({ pageIndex: pi, pageSize: ps }) => {
+              setPageIndex(pi);
+              setPageSize(ps);
+            }}
+            className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
+            noResults={
+              <div className="p-8 text-center text-control-label">
+                {t('attributes.noAttributes')}
+              </div>
+            }
+          />
+        )}
+
+        {!isError && (
+          <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
+            <div className="flex-1 overflow-auto better-scroll">
+              {attributes.length === 0 ? (
+                <div className="p-8 text-center text-control-label">
+                  {t('attributes.noAttributes')}
+                </div>
+              ) : (
+                <div className="flex flex-col divide-y divide-line">
+                  {attributes.map((attr) => (
+                    <div key={attr.id} className="flex items-center gap-3 px-1 py-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">{attr.attribute_code}</div>
+                        <div className="text-sm text-control-label truncate">{attr.attribute_name}</div>
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <Badge size="sm">{
+                            { TEXT: t('attributes.dataTypeText'), INTEGER: t('attributes.dataTypeInteger'), DECIMAL: t('attributes.dataTypeDecimal'), BOOLEAN: t('attributes.dataTypeBoolean') }[attr.data_type] ?? attr.data_type
+                          }</Badge>
+                          {attr.unit && <span className="text-xs text-control-label">{attr.unit}</span>}
+                        </div>
+                      </div>
+                      <div className="shrink-0">
+                        <Badge size="sm" color={attr.is_active ? 'success' : 'danger'}>
+                          {attr.is_active ? t('attributes.active') : t('attributes.inactive')}
+                        </Badge>
+                      </div>
+                      <AttributeRowActions
+                        attribute={attr}
+                        onEdit={setEditAttr}
+                        onToggle={handleToggleAttribute}
+                        onManageOptions={setManageOptionsAttr}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {totalCount > pageSize && (
+              <div className="flex-none py-2 flex justify-center">
+                <Pagination
+                  size="sm"
+                  currentPage={pageIndex + 1}
+                  totalPages={Math.ceil(totalCount / pageSize)}
+                  onPageChange={(p) => setPageIndex(p - 1)}
+                />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       <CreateAttributeModal open={createAttrOpen} onClose={() => setCreateAttrOpen(false)} holdingId={holdingId} />
       <EditAttributeModal attribute={editAttr} open={!!editAttr} onClose={() => setEditAttr(null)} />
       <ManageOptionsModal attribute={manageOptionsAttr} open={!!manageOptionsAttr} onClose={() => setManageOptionsAttr(null)} holdingId={holdingId} />
-    </div>
+    </>
   );
 }

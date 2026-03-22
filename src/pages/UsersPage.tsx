@@ -1318,6 +1318,7 @@ export function UsersPage() {
       header: () => null,
       cell: ({ row }) => <RowActions user={row.original} onEdit={setEditUser} onChangeRole={setChangeRoleUser} onPasswordManage={setPasswordUser} onToggleActive={setToggleActiveUser} onDelete={setDeleteUser} />,
       enableSorting: false,
+      className: 'w-10',
     },
   ];
 

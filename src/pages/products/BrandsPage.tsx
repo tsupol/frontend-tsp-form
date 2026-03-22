@@ -3,12 +3,14 @@ import { useTranslation } from 'react-i18next';
 import { useForm, Controller } from 'react-hook-form';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
-  DataTable, DataTableColumnHeader, Button, Input, PopOver, MenuItem,
+  DataTable, DataTableColumnHeader, Button, Input, PopOver, MenuItem, Select,
   MenuSeparator, Badge, Modal, Switch, useSnackbarContext, FormErrorMessage,
+  MobileHeader, Pagination,
   type ColumnDef, type SortingState,
 } from 'tsp-form';
 import {
   Plus, MoreHorizontal, Pencil, ShieldCheck, ShieldOff, XCircle, CheckCircle,
+  ArrowRightFromLine, SlidersHorizontal,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -428,70 +430,209 @@ export function BrandsPage() {
         />
       ),
       enableSorting: false,
+      className: 'w-10',
     },
   ];
 
+  const [filterOpen, setFilterOpen] = useState(false);
+  const activeFilterCount = sorting.length > 0 ? 1 : 0;
+
   return (
-    <div className="page-content h-dvh max-h-dvh max-w-[64rem] flex flex-col overflow-hidden">
-      <div className="flex-none pb-4 space-y-3">
-        <div className="flex items-center justify-between">
+    <>
+      {/* Mobile header */}
+      <MobileHeader className="mobile-header-bordered md:hidden">
+        <div className="mobile-header-start">
+          <button
+            className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
+            aria-label="Open menu"
+            onClick={() => window.dispatchEvent(new CustomEvent('sidemenu:open'))}
+          >
+            <ArrowRightFromLine size={18} />
+          </button>
+        </div>
+        <div className="mobile-header-title mobile-header-title-truncate">
+          {t('brandsModels.brands')}
+        </div>
+        <div className="mobile-header-end px-2">
+          <button
+            className="flex items-center justify-center w-8 h-8 rounded hover:bg-surface-hover cursor-pointer text-current"
+            aria-label={t('brandsModels.addBrand')}
+            onClick={() => setCreateOpen(true)}
+          >
+            <Plus size={18} />
+          </button>
+        </div>
+      </MobileHeader>
+
+      <div className="page-content responsive-dvh-mobile-header max-w-[64rem]">
+        {/* Desktop header */}
+        <div className="flex items-center justify-between mb-4 flex-none max-md:hidden">
           <h1 className="heading-2">{t('brandsModels.brands')}</h1>
-          <Button color="primary" startIcon={<Plus />} onClick={() => setCreateOpen(true)}>
+          <Button color="primary" startIcon={<Plus size={16} />} onClick={() => setCreateOpen(true)}>
             {t('brandsModels.addBrand')}
           </Button>
         </div>
-        <div className="flex items-center gap-3">
-          <Input
-            placeholder={t('common.search')}
-            value={searchInput}
-            onChange={(e) => handleSearch(e.target.value)}
-            size="sm"
-            className="shrink-0"
-            style={{ width: '14rem' }}
-          />
-        </div>
-      </div>
 
-      {isError && (
-        <div className="px-6">
-          <div className="border border-line bg-surface p-6 rounded-lg text-center">
-            <div className="text-danger mb-4">{error instanceof Error ? error.message : t('common.error')}</div>
+        {/* Filters bar */}
+        <div className="flex-none pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-full max-w-56 min-w-0">
+              <Input
+                placeholder={t('common.search')}
+                value={searchInput}
+                onChange={(e) => handleSearch(e.target.value)}
+                size="sm"
+                className="w-full"
+              />
+            </div>
+            <div className="flex-1 md:hidden" />
+            {/* Sort popover — visible <md (no column headers on mobile) */}
+            <div className="md:hidden shrink-0">
+              <PopOver
+                isOpen={filterOpen}
+                onClose={() => setFilterOpen(false)}
+                placement="bottom"
+                align="end"
+                maxWidth="300px"
+                trigger={
+                  <Button variant="outline" size="sm" className="relative btn-icon-sm" onClick={() => setFilterOpen(!filterOpen)}>
+                    <SlidersHorizontal size={16} />
+                    {activeFilterCount > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 bg-primary text-white text-xs rounded-full w-4 h-4 flex items-center justify-center leading-none">
+                        {activeFilterCount}
+                      </span>
+                    )}
+                  </Button>
+                }
+              >
+                <div className="flex flex-col gap-3 p-3">
+                  <div className="text-xs font-medium text-muted uppercase tracking-wide">{t('common.sortBy')}</div>
+                  <Select
+                    options={[
+                      { value: 'code', label: t('brandsModels.brandCode') },
+                      { value: 'name', label: t('brandsModels.brandName') },
+                      { value: 'is_active', label: t('users.status') },
+                    ]}
+                    value={sorting[0]?.id ?? null}
+                    onChange={(val) => {
+                      if (val) setSorting([{ id: val as string, desc: sorting[0]?.desc ?? false }]);
+                      else setSorting([]);
+                      setPageIndex(0);
+                    }}
+                    placeholder={t('common.sortBy')}
+                    size="sm"
+                    showChevron
+                    clearable
+                    searchable={false}
+                  />
+                  {sorting.length > 0 && (
+                    <Select
+                      options={[
+                        { value: 'asc', label: t('common.ascending') },
+                        { value: 'desc', label: t('common.descending') },
+                      ]}
+                      value={sorting[0]?.desc ? 'desc' : 'asc'}
+                      onChange={(val) => {
+                        setSorting([{ id: sorting[0].id, desc: (val as string) === 'desc' }]);
+                        setPageIndex(0);
+                      }}
+                      size="sm"
+                      showChevron
+                      searchable={false}
+                    />
+                  )}
+                </div>
+              </PopOver>
+            </div>
           </div>
         </div>
-      )}
 
-      {!isError && (
-        <DataTable
-          data={brands}
-          columns={columns}
-          enableSorting
-          manualSorting
-          sorting={sorting}
-          onSortingChange={(updater) => {
-            const next = typeof updater === 'function' ? updater(sorting) : updater;
-            setSorting(next);
-            setPageIndex(0);
-          }}
-          enablePagination
-          pageIndex={pageIndex}
-          pageSize={pageSize}
-          pageSizeOptions={[10, 25, 50]}
-          rowCount={totalCount}
-          onPageChange={({ pageIndex: pi, pageSize: ps }) => {
-            setPageIndex(pi);
-            setPageSize(ps);
-          }}
-          className={`flex-1 min-h-0 ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
-          noResults={
-            <div className="p-8 text-center text-control-label">
-              {t('brandsModels.noBrands')}
+        {isError && (
+          <div className="px-6">
+            <div className="border border-line bg-surface p-6 rounded-lg text-center">
+              <div className="text-danger mb-4">{error instanceof Error ? error.message : t('common.error')}</div>
             </div>
-          }
-        />
-      )}
+          </div>
+        )}
+
+        {/* Desktop: DataTable */}
+        {!isError && (
+          <DataTable
+            data={brands}
+            columns={columns}
+            enableSorting
+            manualSorting
+            sorting={sorting}
+            onSortingChange={(updater) => {
+              const next = typeof updater === 'function' ? updater(sorting) : updater;
+              setSorting(next);
+              setPageIndex(0);
+            }}
+            enablePagination
+            pageIndex={pageIndex}
+            pageSize={pageSize}
+            pageSizeOptions={[10, 25, 50]}
+            rowCount={totalCount}
+            onPageChange={({ pageIndex: pi, pageSize: ps }) => {
+              setPageIndex(pi);
+              setPageSize(ps);
+            }}
+            className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
+            noResults={
+              <div className="p-8 text-center text-control-label">
+                {t('brandsModels.noBrands')}
+              </div>
+            }
+          />
+        )}
+
+        {/* Mobile: Card list */}
+        {!isError && (
+          <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
+            <div className="flex-1 overflow-auto better-scroll">
+              {brands.length === 0 ? (
+                <div className="p-8 text-center text-control-label">
+                  {t('brandsModels.noBrands')}
+                </div>
+              ) : (
+                <div className="flex flex-col divide-y divide-line">
+                  {brands.map((brand) => (
+                    <div key={brand.id} className="flex items-center gap-3 px-1 py-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">{brand.code}</div>
+                        <div className="text-sm text-control-label truncate">{brand.name}</div>
+                      </div>
+                      <div className="shrink-0">
+                        <Badge size="sm" color={brand.is_active ? 'success' : 'danger'}>
+                          {brand.is_active ? t('brandsModels.active') : t('brandsModels.inactive')}
+                        </Badge>
+                      </div>
+                      <BrandRowActions
+                        brand={brand}
+                        onEdit={setEditBrand}
+                        onToggle={handleToggle}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {totalCount > pageSize && (
+              <div className="flex-none py-2 flex justify-center">
+                <Pagination
+                  size="sm"
+                  currentPage={pageIndex + 1}
+                  totalPages={Math.ceil(totalCount / pageSize)}
+                  onPageChange={(p) => setPageIndex(p - 1)}
+                />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       <CreateBrandModal open={createOpen} onClose={() => setCreateOpen(false)} holdingId={holdingId} />
       <EditBrandModal brand={editBrand} open={!!editBrand} onClose={() => setEditBrand(null)} />
-    </div>
+    </>
   );
 }

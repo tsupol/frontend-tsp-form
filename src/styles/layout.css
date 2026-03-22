@@ -45,7 +45,7 @@ body {
 
     .divider-sm {
         border: none;
-        border-top: var(--spacing-line) solid var(--color-line);
+        border-top: var(--spacig-line) solid var(--color-line);
         margin: 1rem 0;
     }
 
