@@ -2,8 +2,8 @@ import { useState, useEffect, useRef, useCallback, type MouseEvent } from 'react
 import { useTranslation } from 'react-i18next';
 import { useForm, Controller } from 'react-hook-form';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { DataTable, DataTableColumnHeader, Button, Input, Select, PopOver, MenuItem, MenuSeparator, Badge, Modal, Switch, createSelectColumn, useSnackbarContext, type ColumnDef, type RowSelectionState, type SortingState } from 'tsp-form';
-import { Plus, MoreHorizontal, Pencil, ShieldCheck, ShieldOff, KeyRound, Trash2, Ban, XCircle, CheckCircle, Eye, EyeOff, Copy, SlidersHorizontal } from 'lucide-react';
+import { DataTable, DataTableColumnHeader, Button, Input, Select, PopOver, MenuItem, MenuSeparator, Badge, Modal, Switch, createSelectColumn, useSnackbarContext, MobileHeader, Pagination, type ColumnDef, type RowSelectionState, type SortingState } from 'tsp-form';
+import { Plus, MoreHorizontal, Pencil, ShieldCheck, ShieldOff, KeyRound, Trash2, Ban, XCircle, CheckCircle, Eye, EyeOff, Copy, SlidersHorizontal, ArrowRightFromLine } from 'lucide-react';
 import { apiClient, ApiError } from '../lib/api';
 import { FormErrorMessage } from 'tsp-form';
 
@@ -1208,7 +1208,7 @@ export function UsersPage() {
   const [bulkAction, setBulkAction] = useState<{ action: 'deactivate' | 'activate'; users: VUser[] } | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
 
-  const activeFilterCount = [filterRole, filterHolding, filterCompany, filterBranch].filter(Boolean).length;
+  const activeFilterCount = [filterRole, filterHolding, filterCompany, filterBranch].filter(Boolean).length + (sorting.length > 0 ? 1 : 0);
 
   // Filter dropdown data
   const { data: holdings = [], isLoading: holdingsLoading } = useHoldings();
@@ -1322,228 +1322,362 @@ export function UsersPage() {
   ];
 
   return (
-    <div className="page-content h-dvh max-h-dvh max-w-[64rem] flex flex-col overflow-hidden">
-      {/* Header */}
-      <div className="flex-none pb-4 space-y-3">
-        <div className="flex items-center justify-between">
+    <>
+      {/* Mobile header */}
+      <MobileHeader className="mobile-header-bordered md:hidden">
+        <div className="mobile-header-start">
+          <button
+            className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
+            aria-label="Open menu"
+            onClick={() => window.dispatchEvent(new CustomEvent('sidemenu:open'))}
+          >
+            <ArrowRightFromLine size={18} />
+          </button>
+        </div>
+        <div className="mobile-header-title mobile-header-title-truncate">
+          {t('users.title')}
+        </div>
+        <div className="mobile-header-end px-2">
+          <button
+            className="flex items-center justify-center w-8 h-8 rounded hover:bg-surface-hover cursor-pointer text-current"
+            aria-label={t('common.create')}
+            onClick={() => setCreateOpen(true)}
+          >
+            <Plus size={18} />
+          </button>
+        </div>
+      </MobileHeader>
+
+      <div className="page-content responsive-dvh-mobile-header max-w-[64rem]">
+        {/* Desktop header */}
+        <div className="flex items-center justify-between mb-4 flex-none max-md:hidden">
           <h1 className="heading-2">{t('users.title')}</h1>
-          <Button color="primary" startIcon={<Plus />} onClick={() => setCreateOpen(true)}>
+          <Button color="primary" startIcon={<Plus size={16} />} onClick={() => setCreateOpen(true)}>
             {t('common.create')}
           </Button>
         </div>
-        <div className="flex items-center gap-3">
-          <Input
-            placeholder={t('common.search')}
-            value={searchInput}
-            onChange={(e) => handleSearch(e.target.value)}
-            size="sm"
-            className="shrink-0"
-            style={{ width: '14rem' }}
-          />
-          {/* Desktop: inline filters */}
-          <div className="hidden md:contents">
-            <Select
-              options={roleFilterOptions}
-              value={filterRole || null}
-              onChange={(val) => {
-                setFilterRole((val as string) ?? '');
-                resetFilters();
-              }}
-              placeholder={t('users.allRoles')}
-              size="sm"
-              showChevron
-              clearable
-              searchable={false}
-              loading={rolesLoading}
-              className="flex-1 min-w-0"
-            />
-            <Select
-              options={holdingOptions}
-              value={filterHolding || null}
-              onChange={(val) => {
-                setFilterHolding((val as string) ?? '');
-                setFilterCompany('');
-                setFilterBranch('');
-                resetFilters();
-              }}
-              placeholder={t('users.allHoldings')}
-              size="sm"
-              showChevron
-              clearable
-              loading={holdingsLoading}
-              className="flex-1 min-w-0"
-            />
-            <Select
-              options={companyFilterOptions}
-              value={filterCompany || null}
-              onChange={(val) => {
-                setFilterCompany((val as string) ?? '');
-                setFilterBranch('');
-                resetFilters();
-              }}
-              placeholder={t('users.allCompanies')}
-              size="sm"
-              showChevron
-              clearable
-              loading={filterCompaniesLoading}
-              className="flex-1 min-w-0"
-            />
-            <Select
-              options={branchFilterOptions}
-              value={filterBranch || null}
-              onChange={(val) => {
-                setFilterBranch((val as string) ?? '');
-                resetFilters();
-              }}
-              placeholder={t('users.allBranches')}
-              size="sm"
-              showChevron
-              clearable
-              loading={filterBranchesLoading}
-              disabled={!filterCompany}
-              className="flex-1 min-w-0"
-            />
-          </div>
-          {/* Mobile: filter icon button with popover */}
-          <div className="md:hidden">
-            <PopOver
-              isOpen={filterOpen}
-              onClose={() => setFilterOpen(false)}
-              placement="bottom"
-              align="end"
-              maxWidth="300px"
-              maxHeight="400px"
-              trigger={
-                <Button variant="outline" size="sm" startIcon={<SlidersHorizontal />} className="relative" onClick={() => setFilterOpen(!filterOpen)}>
-                  {activeFilterCount > 0 && (
-                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary text-primary-contrast text-[10px] flex items-center justify-center leading-none">
-                      {activeFilterCount}
-                    </span>
+
+        {/* Filters bar */}
+        <div className="flex-none pb-4 space-y-3">
+          <div className="flex items-center gap-3">
+            {/* Search — always visible */}
+            <div className="flex-1 min-w-0">
+              <Input
+                placeholder={t('common.search')}
+                value={searchInput}
+                onChange={(e) => handleSearch(e.target.value)}
+                size="sm"
+                className="w-full"
+              />
+            </div>
+            {/* Role — visible ≥sm */}
+            <div className="hidden sm:block flex-1 min-w-0">
+              <Select
+                options={roleFilterOptions}
+                value={filterRole || null}
+                onChange={(val) => {
+                  setFilterRole((val as string) ?? '');
+                  resetFilters();
+                }}
+                placeholder={t('users.allRoles')}
+                size="sm"
+                showChevron
+                clearable
+                searchable={false}
+                loading={rolesLoading}
+              />
+            </div>
+            {/* Holding — visible ≥md */}
+            <div className="hidden md:block flex-1 min-w-0">
+              <Select
+                options={holdingOptions}
+                value={filterHolding || null}
+                onChange={(val) => {
+                  setFilterHolding((val as string) ?? '');
+                  setFilterCompany('');
+                  setFilterBranch('');
+                  resetFilters();
+                }}
+                placeholder={t('users.allHoldings')}
+                size="sm"
+                showChevron
+                clearable
+                loading={holdingsLoading}
+              />
+            </div>
+            {/* Company — visible ≥lg */}
+            <div className="hidden lg:block flex-1 min-w-0">
+              <Select
+                options={companyFilterOptions}
+                value={filterCompany || null}
+                onChange={(val) => {
+                  setFilterCompany((val as string) ?? '');
+                  setFilterBranch('');
+                  resetFilters();
+                }}
+                placeholder={t('users.allCompanies')}
+                size="sm"
+                showChevron
+                clearable
+                loading={filterCompaniesLoading}
+              />
+            </div>
+            {/* Branch — visible ≥xl */}
+            <div className="hidden xl:block flex-1 min-w-0">
+              <Select
+                options={branchFilterOptions}
+                value={filterBranch || null}
+                onChange={(val) => {
+                  setFilterBranch((val as string) ?? '');
+                  resetFilters();
+                }}
+                placeholder={t('users.allBranches')}
+                size="sm"
+                showChevron
+                clearable
+                loading={filterBranchesLoading}
+                disabled={!filterCompany}
+              />
+            </div>
+            {/* Filter popover — visible <xl (when not all filters are inline) */}
+            <div className="xl:hidden shrink-0">
+              <PopOver
+                isOpen={filterOpen}
+                onClose={() => setFilterOpen(false)}
+                placement="bottom"
+                align="end"
+                maxWidth="300px"
+                maxHeight="400px"
+                trigger={
+                  <Button variant="outline" size="sm" className="relative btn-icon-sm" onClick={() => setFilterOpen(!filterOpen)}>
+                    <SlidersHorizontal size={16} />
+                    {activeFilterCount > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 bg-primary text-white text-xs rounded-full w-4 h-4 flex items-center justify-center leading-none">
+                        {activeFilterCount}
+                      </span>
+                    )}
+                  </Button>
+                }
+              >
+                <div className="flex flex-col gap-3 p-3">
+                  <div className="text-xs font-medium text-muted uppercase tracking-wide">{t('common.filters')}</div>
+                  {/* Only show filters that are hidden at current breakpoint — but since
+                      we can't detect breakpoint in JS, show all filters in the popover.
+                      Duplicate state is fine since they share the same state variables. */}
+                  <Select
+                    options={roleFilterOptions}
+                    value={filterRole || null}
+                    onChange={(val) => {
+                      setFilterRole((val as string) ?? '');
+                      resetFilters();
+                    }}
+                    placeholder={t('users.allRoles')}
+                    size="sm"
+                    showChevron
+                    clearable
+                    searchable={false}
+                    loading={rolesLoading}
+                  />
+                  <Select
+                    options={holdingOptions}
+                    value={filterHolding || null}
+                    onChange={(val) => {
+                      setFilterHolding((val as string) ?? '');
+                      setFilterCompany('');
+                      setFilterBranch('');
+                      resetFilters();
+                    }}
+                    placeholder={t('users.allHoldings')}
+                    size="sm"
+                    showChevron
+                    clearable
+                    loading={holdingsLoading}
+                  />
+                  <Select
+                    options={companyFilterOptions}
+                    value={filterCompany || null}
+                    onChange={(val) => {
+                      setFilterCompany((val as string) ?? '');
+                      setFilterBranch('');
+                      resetFilters();
+                    }}
+                    placeholder={t('users.allCompanies')}
+                    size="sm"
+                    showChevron
+                    clearable
+                    loading={filterCompaniesLoading}
+                  />
+                  <Select
+                    options={branchFilterOptions}
+                    value={filterBranch || null}
+                    onChange={(val) => {
+                      setFilterBranch((val as string) ?? '');
+                      resetFilters();
+                    }}
+                    placeholder={t('users.allBranches')}
+                    size="sm"
+                    showChevron
+                    clearable
+                    loading={filterBranchesLoading}
+                    disabled={!filterCompany}
+                  />
+                  <div className="text-xs font-medium text-muted uppercase tracking-wide mt-1">{t('common.sortBy')}</div>
+                  <Select
+                    options={[
+                      { value: 'username', label: t('users.username') },
+                      { value: 'role_scope', label: t('users.scope') },
+                      { value: 'company_name', label: t('users.company') },
+                      { value: 'is_active', label: t('users.status') },
+                    ]}
+                    value={sorting[0]?.id ?? null}
+                    onChange={(val) => {
+                      if (val) setSorting([{ id: val as string, desc: sorting[0]?.desc ?? false }]);
+                      else setSorting([]);
+                      setPageIndex(0);
+                    }}
+                    placeholder={t('common.sortBy')}
+                    size="sm"
+                    showChevron
+                    clearable
+                    searchable={false}
+                  />
+                  {sorting.length > 0 && (
+                    <Select
+                      options={[
+                        { value: 'asc', label: t('common.ascending') },
+                        { value: 'desc', label: t('common.descending') },
+                      ]}
+                      value={sorting[0]?.desc ? 'desc' : 'asc'}
+                      onChange={(val) => {
+                        setSorting([{ id: sorting[0].id, desc: (val as string) === 'desc' }]);
+                        setPageIndex(0);
+                      }}
+                      size="sm"
+                      showChevron
+                      searchable={false}
+                    />
                   )}
-                </Button>
-              }
-            >
-              <div className="flex flex-col gap-3 p-3">
-                <Select
-                  options={roleFilterOptions}
-                  value={filterRole || null}
-                  onChange={(val) => {
-                    setFilterRole((val as string) ?? '');
-                    resetFilters();
-                  }}
-                  placeholder={t('users.allRoles')}
+                </div>
+              </PopOver>
+            </div>
+          </div>
+          {selectedCount > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-control-label">
+                {t('users.selectedCount', { count: selectedCount })}
+              </span>
+              <Button variant="outline" size="sm" startIcon={<Ban size={14} />} onClick={() => setBulkAction({ action: 'deactivate', users: getSelectedUsers() })}>
+                {t('users.deactivate')}
+              </Button>
+              <Button variant="outline" size="sm" color="danger" startIcon={<ShieldCheck size={14} />} onClick={() => setBulkAction({ action: 'activate', users: getSelectedUsers() })}>
+                {t('users.activate')}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setRowSelection({})}>
+                {t('users.clearSelection')}
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {isError && (
+          <div className="px-6">
+            <div className="border border-line bg-surface p-6 rounded-lg text-center">
+              <div className="text-danger mb-4">{error instanceof Error ? error.message : t('common.error')}</div>
+            </div>
+          </div>
+        )}
+
+        {/* Desktop: DataTable */}
+        {!isError && (
+          <DataTable
+            data={users}
+            columns={columns}
+            enableSorting
+            manualSorting
+            sorting={sorting}
+            onSortingChange={(updater) => {
+              const next = typeof updater === 'function' ? updater(sorting) : updater;
+              setSorting(next);
+              setPageIndex(0);
+            }}
+            enablePagination
+            pageIndex={pageIndex}
+            pageSize={pageSize}
+            pageSizeOptions={[10, 25, 50]}
+            rowCount={totalCount}
+            onPageChange={({ pageIndex: pi, pageSize: ps }) => {
+              setPageIndex(pi);
+              setPageSize(ps);
+              setRowSelection({});
+            }}
+            enableRowSelection
+            rowSelection={rowSelection}
+            onRowSelectionChange={setRowSelection}
+            className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
+            noResults={
+              <div className="p-8 text-center text-control-label">
+                {t('users.empty')}
+              </div>
+            }
+          />
+        )}
+
+        {/* Mobile: Card list */}
+        {!isError && (
+          <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
+            <div className="flex-1 overflow-auto better-scroll">
+              {users.length === 0 ? (
+                <div className="p-8 text-center text-control-label">
+                  {t('users.empty')}
+                </div>
+              ) : (
+                <div className="flex flex-col divide-y divide-line">
+                  {users.map((user) => (
+                    <div key={user.id} className="flex items-center gap-3 px-1 py-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">{user.username}</div>
+                        <div className="text-sm text-control-label capitalize truncate">{user.role_code}</div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge size="sm" className="capitalize">{user.role_scope}</Badge>
+                          {user.company_name && (
+                            <span className="text-xs text-control-label truncate">{user.company_name}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="shrink-0">
+                        <Badge size="sm" color={user.is_active ? 'success' : 'danger'}>
+                          {user.is_active ? t('users.active') : t('users.inactive')}
+                        </Badge>
+                      </div>
+                      <RowActions
+                        user={user}
+                        onEdit={setEditUser}
+                        onChangeRole={setChangeRoleUser}
+                        onPasswordManage={setPasswordUser}
+                        onToggleActive={setToggleActiveUser}
+                        onDelete={setDeleteUser}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {totalCount > pageSize && (
+              <div className="flex-none py-2 flex justify-center">
+                <Pagination
                   size="sm"
-                  showChevron
-                  clearable
-                  searchable={false}
-                  loading={rolesLoading}
-                />
-                <Select
-                  options={holdingOptions}
-                  value={filterHolding || null}
-                  onChange={(val) => {
-                    setFilterHolding((val as string) ?? '');
-                    setFilterCompany('');
-                    setFilterBranch('');
-                    resetFilters();
+                  currentPage={pageIndex + 1}
+                  totalPages={Math.ceil(totalCount / pageSize)}
+                  onPageChange={(p) => {
+                    setPageIndex(p - 1);
+                    setRowSelection({});
                   }}
-                  placeholder={t('users.allHoldings')}
-                  size="sm"
-                  showChevron
-                  clearable
-                  loading={holdingsLoading}
-                />
-                <Select
-                  options={companyFilterOptions}
-                  value={filterCompany || null}
-                  onChange={(val) => {
-                    setFilterCompany((val as string) ?? '');
-                    setFilterBranch('');
-                    resetFilters();
-                  }}
-                  placeholder={t('users.allCompanies')}
-                  size="sm"
-                  showChevron
-                  clearable
-                  loading={filterCompaniesLoading}
-                />
-                <Select
-                  options={branchFilterOptions}
-                  value={filterBranch || null}
-                  onChange={(val) => {
-                    setFilterBranch((val as string) ?? '');
-                    resetFilters();
-                  }}
-                  placeholder={t('users.allBranches')}
-                  size="sm"
-                  showChevron
-                  clearable
-                  loading={filterBranchesLoading}
-                  disabled={!filterCompany}
                 />
               </div>
-            </PopOver>
-          </div>
-        </div>
-        {selectedCount > 0 && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-control-label">
-              {t('users.selectedCount', { count: selectedCount })}
-            </span>
-            <Button variant="outline" size="sm" startIcon={<Ban size={14} />} onClick={() => setBulkAction({ action: 'deactivate', users: getSelectedUsers() })}>
-              {t('users.deactivate')}
-            </Button>
-            <Button variant="outline" size="sm" color="danger" startIcon={<ShieldCheck size={14} />} onClick={() => setBulkAction({ action: 'activate', users: getSelectedUsers() })}>
-              {t('users.activate')}
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setRowSelection({})}>
-              {t('users.clearSelection')}
-            </Button>
+            )}
           </div>
         )}
       </div>
-
-      {isError && (
-        <div className="px-6">
-          <div className="border border-line bg-surface p-6 rounded-lg text-center">
-            <div className="text-danger mb-4">{error instanceof Error ? error.message : t('common.error')}</div>
-          </div>
-        </div>
-      )}
-
-      {!isError && (
-        <DataTable
-          data={users}
-          columns={columns}
-          enableSorting
-          manualSorting
-          sorting={sorting}
-          onSortingChange={(updater) => {
-            const next = typeof updater === 'function' ? updater(sorting) : updater;
-            setSorting(next);
-            setPageIndex(0);
-          }}
-          enablePagination
-          pageIndex={pageIndex}
-          pageSize={pageSize}
-          pageSizeOptions={[10, 25, 50]}
-          rowCount={totalCount}
-          onPageChange={({ pageIndex: pi, pageSize: ps }) => {
-            setPageIndex(pi);
-            setPageSize(ps);
-            setRowSelection({});
-          }}
-          enableRowSelection
-          rowSelection={rowSelection}
-          onRowSelectionChange={setRowSelection}
-          className={`flex-1 min-h-0 ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
-          noResults={
-            <div className="p-8 text-center text-control-label">
-              {t('users.empty')}
-            </div>
-          }
-        />
-      )}
 
       <CreateUserModal open={createOpen} onClose={() => setCreateOpen(false)} />
       <EditUserModal user={editUser} open={!!editUser} onClose={() => setEditUser(null)} />
@@ -1557,6 +1691,6 @@ export function UsersPage() {
         open={!!bulkAction}
         onClose={() => { setBulkAction(null); setRowSelection({}); }}
       />
-    </div>
+    </>
   );
 }

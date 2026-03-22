@@ -11,6 +11,8 @@
     "search": "Search",
     "filters": "Filters",
     "sortBy": "Sort by",
+    "ascending": "Ascending",
+    "descending": "Descending",
     "noData": "No data available",
     "example": "Example",
     "appName": "NNF System"

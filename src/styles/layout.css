@@ -50,9 +50,24 @@ body {
     }
 
     .page-content {
-        padding: 3rem 1rem 1rem;
+        padding: 1rem 1rem 1rem;
         max-width: 70rem;
         margin: 0 auto;
+    }
+
+    .responsive-dvh-mobile-header {
+        height: 100dvh;
+        max-height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    @media (max-width: 767px) {
+        .responsive-dvh-mobile-header {
+            height: calc(100dvh - var(--spacing-nav, 3rem));
+            max-height: calc(100dvh - var(--spacing-nav, 3rem));
+        }
     }
 
     .mobile-header.mobile-header-bordered {

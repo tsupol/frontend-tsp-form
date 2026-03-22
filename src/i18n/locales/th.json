@@ -11,6 +11,8 @@
     "search": "ค้นหา",
     "filters": "ตัวกรอง",
     "sortBy": "เรียงตาม",
+    "ascending": "น้อยไปมาก",
+    "descending": "มากไปน้อย",
     "noData": "ไม่มีข้อมูล",
     "example": "ตัวอย่าง",
     "appName": "NNF System"
