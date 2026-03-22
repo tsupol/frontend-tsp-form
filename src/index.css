@@ -153,6 +153,7 @@
 
     /* added */
     --spacing-nav: 3rem;
+    --color-mobile-header-bg: var(--color-bg);
 
     /* side menu */
     --spacing-side-menu: 280px;

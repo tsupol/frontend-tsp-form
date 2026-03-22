@@ -55,4 +55,15 @@ body {
         margin: 0 auto;
     }
 
+    .mobile-header.mobile-header-bordered {
+        border-bottom: var(--spacing-line) solid var(--color-line);
+    }
+
+    .mobile-header.mobile-header-scrolled {
+        border-bottom-color: var(--color-line);
+    }
+
+    .mobile-header.mobile-header-scrolled-shadow {
+        background: linear-gradient(to bottom, var(--color-mobile-header-bg, var(--color-surface)) 80%, transparent) !important;
+    }
 }
