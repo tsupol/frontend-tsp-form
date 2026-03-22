@@ -756,7 +756,7 @@ export function ModelsPage() {
                       {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                     </div>
                     <div className="flex-1 min-w-0 space-y-1">
-                      <div className="text-xs truncate">
+                      <div className="text-xs sm:text-sm truncate">
                         <span>{model.family_name}</span>
                         {' '}
                         <span className="font-medium text-info">{model.base_model_name}</span>
@@ -764,8 +764,8 @@ export function ModelsPage() {
                           <> <span className="font-semibold">{model.model_name_suffix}</span></>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 text-[11px] text-control-label opacity-60">
-                        <span className="truncate">{model.brand_name}</span>
+                      <div className="flex items-center gap-2 text-[11px] text-control-label">
+                        <span className="truncate opacity-60">{model.brand_name}</span>
                         <span className="flex-1" />
                         {model.variant_count > 0 && (
                           <span className="shrink-0">{model.variant_count} {t('models.variants').toLowerCase()}</span>

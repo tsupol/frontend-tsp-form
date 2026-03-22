@@ -5,7 +5,7 @@ import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-quer
 import {
   DataTable, DataTableColumnHeader, Button, Input, Select, PopOver, MenuItem,
   MenuSeparator, Badge, Modal, Switch, NumberSpinner, RadioGroup, useSnackbarContext, FormErrorMessage,
-  MobileHeader, Pagination,
+  MobileHeader, DataTableFooter,
   type ColumnDef, type SortingState,
 } from 'tsp-form';
 import {
@@ -1610,7 +1610,7 @@ export function FamiliesPage() {
         {/* Mobile: Card list */}
         {!isError && (
           <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
-            <div className="flex-1 overflow-auto better-scroll">
+            <div className="flex-1 overflow-auto better-scroll pb-8">
               {families.length === 0 ? (
                 <div className="p-8 text-center text-control-label">
                   {t('brandsModels.noFamilies')}
@@ -1643,16 +1643,15 @@ export function FamiliesPage() {
                 </div>
               )}
             </div>
-            {totalCount > pageSize && (
-              <div className="flex-none py-2 flex justify-center">
-                <Pagination
-                  size="sm"
-                  currentPage={pageIndex + 1}
-                  totalPages={Math.ceil(totalCount / pageSize)}
-                  onPageChange={(p) => setPageIndex(p - 1)}
-                />
-              </div>
-            )}
+            <DataTableFooter
+              currentPage={pageIndex + 1}
+              totalPages={Math.ceil(totalCount / pageSize)}
+              onPageChange={(p) => setPageIndex(p - 1)}
+              pageSize={pageSize}
+              pageSizeOptions={[10, 25, 50]}
+              onPageSizeChange={(ps) => { setPageSize(ps); setPageIndex(0); }}
+              totalRows={totalCount}
+            />
           </div>
         )}
       </div>

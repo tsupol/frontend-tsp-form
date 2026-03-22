@@ -5,7 +5,7 @@ import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-quer
 import {
   DataTable, DataTableColumnHeader, Button, Input, Select, PopOver, MenuItem,
   MenuSeparator, Badge, Modal, Switch, NumberSpinner, useSnackbarContext, FormErrorMessage,
-  MobileHeader, Pagination,
+  MobileHeader, DataTableFooter,
   type ColumnDef, type SortingState,
 } from 'tsp-form';
 import {
@@ -1168,7 +1168,7 @@ export function AttributesPage() {
 
         <div className="flex-none pb-4">
           <div className="flex items-center gap-3">
-            <div className="w-full max-w-56 min-w-0">
+            <div className="flex-1 min-w-0 md:max-w-56">
               <Input
                 placeholder={t('common.search')}
                 value={searchInput}
@@ -1177,7 +1177,6 @@ export function AttributesPage() {
                 className="w-full"
               />
             </div>
-            <div className="flex-1 md:hidden" />
             <div className="md:hidden shrink-0">
               <PopOver
                 isOpen={filterOpen}
@@ -1279,7 +1278,7 @@ export function AttributesPage() {
 
         {!isError && (
           <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
-            <div className="flex-1 overflow-auto better-scroll">
+            <div className="flex-1 overflow-auto better-scroll pb-8">
               {attributes.length === 0 ? (
                 <div className="p-8 text-center text-control-label">
                   {t('attributes.noAttributes')}
@@ -1314,16 +1313,15 @@ export function AttributesPage() {
                 </div>
               )}
             </div>
-            {totalCount > pageSize && (
-              <div className="flex-none py-2 flex justify-center">
-                <Pagination
-                  size="sm"
-                  currentPage={pageIndex + 1}
-                  totalPages={Math.ceil(totalCount / pageSize)}
-                  onPageChange={(p) => setPageIndex(p - 1)}
-                />
-              </div>
-            )}
+            <DataTableFooter
+              currentPage={pageIndex + 1}
+              totalPages={Math.ceil(totalCount / pageSize)}
+              onPageChange={(p) => setPageIndex(p - 1)}
+              pageSize={pageSize}
+              pageSizeOptions={[10, 25, 50]}
+              onPageSizeChange={(ps) => { setPageSize(ps); setPageIndex(0); }}
+              totalRows={totalCount}
+            />
           </div>
         )}
       </div>
