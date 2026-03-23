@@ -15,7 +15,10 @@
     "descending": "มากไปน้อย",
     "noData": "ไม่มีข้อมูล",
     "example": "ตัวอย่าง",
-    "appName": "NNF System"
+    "appName": "NNF System",
+    "unsavedChanges": "มีการเปลี่ยนแปลงที่ยังไม่บันทึก",
+    "unsavedChangesMessage": "คุณมีการเปลี่ยนแปลงที่ยังไม่บันทึก ต้องการละทิ้งหรือไม่?",
+    "discard": "ละทิ้ง"
   },
   "auth": {
     "login": "เข้าสู่ระบบ",

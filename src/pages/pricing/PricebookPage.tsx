@@ -1,10 +1,12 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { DataTable, Badge, Input, Select, Button, Switch, Drawer, Tooltip, useSnackbarContext } from 'tsp-form';
-import { Search, SlidersHorizontal, ChevronsUpDown, AlertTriangle, CheckCircle, XCircle, Pencil, Loader2, MousePointerClick, Plus, X } from 'lucide-react';
+import { PageNav, PageNavPanel, MobileHeader, DataTable, Badge, Input, Select, Button, Switch, PopOver, Tooltip, Modal, useSnackbarContext } from 'tsp-form';
+import { ArrowRightFromLine, ArrowLeft, SlidersHorizontal, ChevronsUpDown, AlertTriangle, CheckCircle, XCircle, Pencil, Loader2, MousePointerClick, Plus, X } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNavGuard } from '../../contexts/NavGuardContext';
+import { useFormSnapshot } from '../../hooks/useFormSnapshot';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -87,12 +89,13 @@ const calcMargin = (retail: number | null, cost: number | null): string => {
 // Always mounted — accepts modelId which can be null (shows placeholder).
 // Handles model switches internally without remounting.
 
-function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix }: {
+function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, isDirtyRef }: {
   modelId: number | null;
   modelCode: string;
   familyName: string;
   baseModelName: string;
   suffix: string;
+  isDirtyRef?: React.MutableRefObject<boolean>;
 }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -119,6 +122,9 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix }: 
 
   // Track which model we've initialized for
   const initializedForRef = useRef<number | null>(null);
+
+  // Dirty tracking via snapshot
+  const snapshot = useFormSnapshot({ retailPrice, costPrice, fin2Profits });
 
   // Fetch workbench for selected model
   const { data: workbenchRows = [], isLoading } = useQuery({
@@ -158,8 +164,10 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix }: 
     setNewTermProfit('');
 
     const first = workbenchRows[0];
-    setRetailPrice(first?.retail_price !== null ? String(first.retail_price) : '');
-    setCostPrice(first?.cost_price !== null ? String(first.cost_price) : '');
+    const initRetail = first?.retail_price !== null ? String(first.retail_price) : '';
+    const initCost = first?.cost_price !== null ? String(first.cost_price) : '';
+    setRetailPrice(initRetail);
+    setCostPrice(initCost);
 
     const profits: Record<number, string> = {};
     for (const row of workbenchRows) {
@@ -168,6 +176,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix }: 
       }
     }
     setFin2Profits(profits);
+    snapshot.resetNext();
   }, [modelId, workbenchRows, isLoading]);
 
   // Sync FIN2 profits when workbench data refreshes (e.g. after adding a term)
@@ -187,6 +196,21 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix }: 
       return next;
     });
   }, [modelId, workbenchRows]);
+
+  // Sync dirty state to parent ref
+  useEffect(() => {
+    if (isDirtyRef) isDirtyRef.current = snapshot.isDirty;
+  }, [snapshot.isDirty, isDirtyRef]);
+
+  // Warn on browser/tab close with unsaved changes
+  useEffect(() => {
+    if (!isDirtyRef) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      if (isDirtyRef.current) e.preventDefault();
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirtyRef]);
 
   // FIN1 rows (deduplicated)
   const fin1Rows = useMemo(() => {
@@ -263,6 +287,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix }: 
       }
       if (promises.length === 0) return;
       await Promise.all(promises);
+      snapshot.reset();
       showSuccess();
       invalidateAll();
     } catch (err) {
@@ -286,6 +311,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix }: 
         p_program_code: 'FIN2', p_rate_type: 'PROFIT_AMOUNT',
         p_model_id: modelId, p_value: val, p_term_months: termMonths,
       });
+      snapshot.reset();
       showSuccess();
       invalidateAll();
     } catch (err) {
@@ -633,6 +659,7 @@ export function PricebookPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const holdingId = user?.holding_id ?? null;
+  const navGuard = useNavGuard();
 
   // Table state
   const [pageIndex, setPageIndex] = useState(0);
@@ -648,14 +675,34 @@ export function PricebookPage() {
   const [filterNeedsSetup, setFilterNeedsSetup] = useState(false);
   const [sortBy, setSortBy] = useState<string>('code.asc');
 
-  // Filter drawer (small screens)
-  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
+  // Filter popover (small screens)
+  const [filterOpen, setFilterOpen] = useState(false);
 
   // Selected model for editing
   const [selectedModelId, setSelectedModelId] = useState<number | null>(null);
 
-  // Editor drawer (small screens)
-  const [editorDrawerOpen, setEditorDrawerOpen] = useState(false);
+  // Unsaved changes guard
+  const editorDirtyRef = useRef(false);
+  useEffect(() => { navGuard?.setDirtyRef(editorDirtyRef); }, [navGuard]);
+  const goToRef = useRef<((id: string) => void) | undefined>(undefined);
+  const isMobileRef = useRef(false);
+  const [pendingNav, setPendingNav] = useState<
+    | { type: 'model'; modelId: number }
+    | { type: 'back'; goBack: () => void }
+    | null
+  >(null);
+
+  const confirmDiscard = () => {
+    if (!pendingNav) return;
+    editorDirtyRef.current = false;
+    if (pendingNav.type === 'model') {
+      setSelectedModelId(pendingNav.modelId);
+      if (isMobileRef.current) goToRef.current?.('detail');
+    } else if (pendingNav.type === 'back') {
+      pendingNav.goBack();
+    }
+    setPendingNav(null);
+  };
 
   // Search debounce
   const handleSearch = (value: string) => {
@@ -730,7 +777,7 @@ export function PricebookPage() {
   const filteredFamilies = filterBrand ? families.filter(f => String(f.brand_id) === filterBrand) : families;
   const familyOptions = filteredFamilies.map((f) => ({ value: String(f.id), label: f.display_name }));
   const baseModelOptions = baseModels.map((name) => ({ value: name, label: name }));
-  const activeFilterCount = [filterBrand, filterFamily, filterBaseModel, filterNeedsSetup].filter(Boolean).length;
+  const activeFilterCount = [filterBrand, filterFamily, filterBaseModel, filterNeedsSetup].filter(Boolean).length + (sortBy !== 'code.asc' ? 1 : 0);
   const sortOptions = [
     { value: 'code.asc', label: `${t('pricing.modelCode')} A→Z` },
     { value: 'code.desc', label: `${t('pricing.modelCode')} Z→A` },
@@ -839,382 +886,366 @@ export function PricebookPage() {
 
   // Selected model object (for passing info to editor)
   const selectedModel = selectedModelId ? models.find(m => m.id === selectedModelId) ?? null : null;
-
-  // Double-click/double-tap handler
-  const handleRowDoubleClick = (modelId: number) => {
-    const isAlreadySelected = modelId === selectedModelId;
-    setSelectedModelId(isAlreadySelected ? null : modelId);
-    // On small screens, open the editor drawer
-    if (!isAlreadySelected && window.innerWidth < 1024) {
-      setEditorDrawerOpen(true);
-    }
-  };
+  const detailTitle = selectedModel
+    ? `${selectedModel.base_model_name}${selectedModel.model_name_suffix ? ' ' + selectedModel.model_name_suffix : ''}`
+    : t('pricing.editPrice');
 
   return (
-    <div className="page-content max-w-[90rem] h-dvh max-h-dvh flex flex-col overflow-hidden">
-      {/* Header */}
-      <div className="flex-none pb-4 space-y-3">
-        <h1 className="heading-2">{t('pricing.title')}</h1>
+    <PageNav panels={['list', 'detail']} className="h-dvh">
+      {({ isMobile, isRoot, goTo, goBack }) => {
+        goToRef.current = goTo;
+        isMobileRef.current = isMobile;
 
-        {/* Desktop: all controls in one row */}
-        <div className="hidden lg:flex items-center gap-2">
-          <div className="flex-1 min-w-0">
-            <Input
-              placeholder={t('common.search')}
-              value={searchInput}
-              onChange={(e) => handleSearch(e.target.value)}
-              size="sm"
-              startIcon={<Search size={14} />}
-            />
-          </div>
-          <div className="flex-1 min-w-0" style={{ maxWidth: '10rem' }}>
-            <Select
-              options={brandOptions}
-              value={filterBrand || null}
-              onChange={(val) => {
-                setFilterBrand((val as string) ?? '');
-                setPageIndex(0);
-              }}
-              placeholder={t('pricing.brand')}
-              size="sm"
-              showChevron
-              clearable
-            />
-          </div>
-          <div className="flex-1 min-w-0" style={{ maxWidth: '10rem' }}>
-            <Select
-              options={familyOptions}
-              value={filterFamily || null}
-              onChange={(val) => {
-                setFilterFamily((val as string) ?? '');
-                setPageIndex(0);
-              }}
-              placeholder={t('pricing.family')}
-              size="sm"
-              showChevron
-              clearable
-            />
-          </div>
-          <div className="flex-1 min-w-0" style={{ maxWidth: '10rem' }}>
-            <Select
-              options={baseModelOptions}
-              value={filterBaseModel || null}
-              onChange={(val) => {
-                setFilterBaseModel((val as string) ?? '');
-                setPageIndex(0);
-              }}
-              placeholder={t('models.selectBaseModel')}
-              size="sm"
-              showChevron
-              clearable
-              disabled={!filterFamily}
-            />
-          </div>
-          <label className="flex items-center gap-1.5 text-xs text-control-label cursor-pointer shrink-0">
-            <Switch
-              checked={filterNeedsSetup}
-              onChange={(e) => {
-                setFilterNeedsSetup(e.target.checked);
-                setPageIndex(0);
-              }}
-              size="sm"
-            />
-            {t('pricing.filterNeedsSetup')}
-          </label>
-          <div className="flex items-center gap-1.5 text-control-label flex-1 min-w-0" style={{ maxWidth: '12rem' }}>
-            <ChevronsUpDown size={14} className="shrink-0" />
-            <div className="flex-1">
-              <Select
-                options={sortOptions}
-                value={sortBy}
-                onChange={(val) => {
-                  setSortBy((val as string) ?? 'code.asc');
-                  setPageIndex(0);
-                }}
-                size="sm"
-                showChevron
-              />
-            </div>
-          </div>
-        </div>
+        // Row select handler — on mobile navigates to detail panel
+        const handleRowSelect = (modelId: number) => {
+          if (modelId === selectedModelId) return;
+          if (editorDirtyRef.current) {
+            setPendingNav({ type: 'model', modelId });
+            return;
+          }
+          setSelectedModelId(modelId);
+          if (isMobile) goTo('detail');
+        };
 
-        {/* Mobile/Tablet: search + filter button */}
-        <div className="flex lg:hidden gap-2">
-          <div className="flex-1">
-            <Input
-              placeholder={t('common.search')}
-              value={searchInput}
-              onChange={(e) => handleSearch(e.target.value)}
-              size="sm"
-              startIcon={<Search size={14} />}
-            />
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setFilterDrawerOpen(true)}
-            startIcon={<SlidersHorizontal size={14} />}
-          >
-            {t('common.filters')}
-            {activeFilterCount > 0 && (
-              <Badge size="sm" color="primary">{activeFilterCount}</Badge>
+        return (
+          <>
+            {/* ── Mobile Header ── */}
+            {isMobile && (
+              <MobileHeader className="mobile-header-bordered">
+                <div className="mobile-header-start">
+                  {isRoot ? (
+                    <button
+                      className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
+                      onClick={() => window.dispatchEvent(new CustomEvent('sidemenu:open'))}
+                    >
+                      <ArrowRightFromLine size={18} />
+                    </button>
+                  ) : (
+                    <button
+                      className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
+                      onClick={() => {
+                        if (editorDirtyRef.current) {
+                          setPendingNav({ type: 'back', goBack });
+                          return;
+                        }
+                        goBack();
+                      }}
+                    >
+                      <ArrowLeft size={20} />
+                    </button>
+                  )}
+                </div>
+                <div className="mobile-header-title mobile-header-title-truncate">
+                  {isRoot ? t('pricing.title') : detailTitle}
+                </div>
+                <div className="mobile-header-end w-12" />
+              </MobileHeader>
             )}
-          </Button>
-        </div>
 
-        {/* Filter drawer for small screens */}
-        <Drawer
-          open={filterDrawerOpen}
-          onClose={() => setFilterDrawerOpen(false)}
-          side="right"
-          ariaLabel={t('common.filters')}
-        >
-          <div className="drawer-header">
-            <h2 className="drawer-title">{t('common.filters')}</h2>
-            <button className="drawer-close-btn" onClick={() => setFilterDrawerOpen(false)}>&times;</button>
-          </div>
-          <div className="drawer-content">
-            <div className="form-grid">
-              <div className="flex flex-col">
-                <label className="form-label">{t('pricing.brand')}</label>
-                <div>
-                  <Select
-                    options={brandOptions}
-                    value={filterBrand || null}
-                    onChange={(val) => {
-                      setFilterBrand((val as string) ?? '');
-                      setPageIndex(0);
-                    }}
-                    placeholder={t('pricing.brand')}
-                    size="sm"
-                    showChevron
-                    clearable
-                  />
-                </div>
+            {/* ── Desktop Header ── */}
+            {!isMobile && (
+              <div className="flex-none px-4 py-2.5 border-b border-line">
+                <h1 className="heading-2">{t('pricing.title')}</h1>
               </div>
-              <div className="flex flex-col">
-                <label className="form-label">{t('pricing.family')}</label>
-                <div>
-                  <Select
-                    options={familyOptions}
-                    value={filterFamily || null}
-                    onChange={(val) => {
-                      setFilterFamily((val as string) ?? '');
-                      setPageIndex(0);
-                    }}
-                    placeholder={t('pricing.family')}
-                    size="sm"
-                    showChevron
-                    clearable
-                  />
-                </div>
-              </div>
-              <div className="flex flex-col">
-                <label className="form-label">{t('models.selectBaseModel')}</label>
-                <div>
-                  <Select
-                    options={baseModelOptions}
-                    value={filterBaseModel || null}
-                    onChange={(val) => {
-                      setFilterBaseModel((val as string) ?? '');
-                      setPageIndex(0);
-                    }}
-                    placeholder={t('models.selectBaseModel')}
-                    size="sm"
-                    showChevron
-                    clearable
-                    disabled={!filterFamily}
-                  />
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <label className="form-label mb-0">{t('pricing.filterNeedsSetup')}</label>
-                <Switch
-                  checked={filterNeedsSetup}
-                  onChange={(e) => {
-                    setFilterNeedsSetup(e.target.checked);
-                    setPageIndex(0);
-                  }}
-                  size="sm"
-                />
-              </div>
-            </div>
-            <hr className="border-line my-2" />
-            <div className="form-grid">
-              <div className="flex flex-col">
-                <label className="form-label">{t('common.sortBy')}</label>
-                <div>
-                  <Select
-                    options={sortOptions}
-                    value={sortBy}
-                    onChange={(val) => {
-                      setSortBy((val as string) ?? 'code.asc');
-                      setPageIndex(0);
-                    }}
-                    size="sm"
-                    showChevron
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </Drawer>
-      </div>
+            )}
 
-      {isError && (
-        <div className="px-6">
-          <div className="border border-line bg-surface p-6 rounded-lg text-center">
-            <div className="text-danger mb-4">{error instanceof Error ? error.message : t('common.error')}</div>
-          </div>
-        </div>
-      )}
-
-      {/* Editor drawer for small screens */}
-      <Drawer
-        open={editorDrawerOpen}
-        onClose={() => setEditorDrawerOpen(false)}
-        side="right"
-        ariaLabel={t('pricing.editPrice')}
-      >
-        <div className="drawer-header">
-          <h2 className="drawer-title">{t('pricing.editPrice')}</h2>
-          <button className="drawer-close-btn" onClick={() => setEditorDrawerOpen(false)}>&times;</button>
-        </div>
-        <div className="drawer-content">
-          <EditorPanel
-            modelId={selectedModelId}
-            modelCode={selectedModel?.code ?? ''}
-            familyName={selectedModel ? familyMap.get(selectedModel.family_id) ?? '' : ''}
-            baseModelName={selectedModel?.base_model_name ?? ''}
-            suffix={selectedModel?.model_name_suffix ?? ''}
-          />
-        </div>
-      </Drawer>
-
-      {/* ── Main area: Editor (left, always visible on lg) + Table (right) ── */}
-      {!isError && (
-        <div className="flex-1 min-h-0 flex">
-          {/* Editor panel — always rendered, fixed width, self-sizing height */}
-          <div className="hidden lg:block w-72 shrink-0 self-start border border-line rounded-lg p-4 mr-4 max-h-full overflow-y-auto better-scroll">
-            <EditorPanel
-              modelId={selectedModelId}
-              modelCode={selectedModel?.code ?? ''}
-              familyName={selectedModel ? familyMap.get(selectedModel.family_id) ?? '' : ''}
-              baseModelName={selectedModel?.base_model_name ?? ''}
-              suffix={selectedModel?.model_name_suffix ?? ''}
-            />
-          </div>
-
-          {/* Table */}
-          <div className="flex-1 min-w-0">
-            <DataTable<ModelRow>
-              data={displayModels}
-              renderRow={(row) => {
-                const model = row.original;
-                const pricing = pricingMap.get(model.id);
-                const rp = pricing?.retail_price ?? null;
-                const cp = pricing?.cost_price ?? null;
-                const needsSetup = pricing?.needs_price_setup ?? true;
-                const fin2Terms = pricing?.fin2_terms ?? [];
-                const isSelected = model.id === selectedModelId;
-
-                return (
-                  <div
-                    className={`flex items-center gap-3 px-3 py-2.5 border-b border-line hover:bg-surface-hover transition-colors select-none ${isSelected ? 'bg-primary/5' : ''}`}
-                    onDoubleClick={() => handleRowDoubleClick(model.id)}
-                  >
-                    <Tooltip content={t('pricing.editPrice')}>
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        startIcon={<Pencil size={14} />}
-                        className={`shrink-0 ${isSelected ? 'text-primary' : 'text-control-label hover:text-fg'}`}
-                        onClick={(e) => { e.stopPropagation(); handleRowDoubleClick(model.id); }}
+            {/* ── Filter bar — above panels, always visible on list view ── */}
+            {(isRoot || !isMobile) && (
+              <div className="flex-none px-4 py-2 border-b border-line">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <Input
+                      placeholder={t('common.search')}
+                      value={searchInput}
+                      onChange={(e) => handleSearch(e.target.value)}
+                      size="sm"
+                      className="w-full"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0 hidden sm:block">
+                    <Select
+                      options={brandOptions}
+                      value={filterBrand || null}
+                      onChange={(val) => { setFilterBrand((val as string) ?? ''); setPageIndex(0); }}
+                      placeholder={t('pricing.brand')}
+                      size="sm"
+                      showChevron
+                      clearable
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0 hidden md:block">
+                    <Select
+                      options={familyOptions}
+                      value={filterFamily || null}
+                      onChange={(val) => { setFilterFamily((val as string) ?? ''); setPageIndex(0); }}
+                      placeholder={t('pricing.family')}
+                      size="sm"
+                      showChevron
+                      clearable
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0 hidden lg:block">
+                    <Select
+                      options={baseModelOptions}
+                      value={filterBaseModel || null}
+                      onChange={(val) => { setFilterBaseModel((val as string) ?? ''); setPageIndex(0); }}
+                      placeholder={t('models.selectBaseModel')}
+                      size="sm"
+                      showChevron
+                      clearable
+                      disabled={!filterFamily}
+                    />
+                  </div>
+                  <label className="hidden xl:flex items-center gap-1.5 text-xs text-control-label cursor-pointer shrink-0">
+                    <Switch
+                      checked={filterNeedsSetup}
+                      onChange={(e) => { setFilterNeedsSetup(e.target.checked); setPageIndex(0); }}
+                      size="sm"
+                    />
+                    {t('pricing.filterNeedsSetup')}
+                  </label>
+                  <div className="hidden xl:flex items-center gap-1.5 text-control-label flex-1 min-w-0" style={{ maxWidth: '12rem' }}>
+                    <ChevronsUpDown size={14} className="shrink-0" />
+                    <div className="flex-1">
+                      <Select
+                        options={sortOptions}
+                        value={sortBy}
+                        onChange={(val) => { setSortBy((val as string) ?? 'code.asc'); setPageIndex(0); }}
+                        size="sm"
+                        showChevron
+                        searchable={false}
                       />
-                    </Tooltip>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline gap-1.5 min-w-0">
-                        <span className="text-sm truncate">{familyMap.get(model.family_id) ?? '—'}</span>
-                        <span className="text-sm font-medium text-info truncate">{model.base_model_name}</span>
-                        {model.model_name_suffix && (
-                          <span className="text-sm font-semibold truncate">{model.model_name_suffix}</span>
-                        )}
-                      </div>
-                      <div className="text-[11px] text-control-label truncate opacity-60">{model.code}</div>
-                    </div>
-
-                    <div className="shrink-0 w-16 xl:w-24 text-right hidden sm:block">
-                      <div className={`text-sm tabular-nums ${rp === null ? 'text-control-label' : ''}`}>
-                        {formatTHB(rp)}
-                      </div>
-                      <div className="text-[10px] text-control-label">{t('pricing.retailPrice')}</div>
-                    </div>
-
-                    <div className="shrink-0 w-16 xl:w-24 text-right hidden sm:block">
-                      <div className={`text-sm tabular-nums ${cp === null ? 'text-control-label' : ''}`}>
-                        {formatTHB(cp)}
-                      </div>
-                      <div className="text-[10px] text-control-label">{t('pricing.costPrice')}</div>
-                    </div>
-
-                    <div className="shrink-0 w-14 xl:w-18 text-right hidden lg:block">
-                      <div className="text-sm tabular-nums text-control-label">
-                        {calcMargin(rp, cp)}
-                      </div>
-                      <div className="text-[10px] text-control-label">{t('pricing.margin')}</div>
-                    </div>
-
-                    {fin2Terms.length > 0 && (
-                      <div className="shrink-0 w-16 xl:w-24 text-right hidden lg:block">
-                        <div className="flex flex-col gap-0.5 items-end">
-                          {fin2Terms.map(ft => {
-                            const hasProfit = ft.profit !== null;
-                            return (
-                              <div key={ft.term_months} className="flex items-center gap-1">
-                                <span className={`text-[10px] tabular-nums px-1.5 py-0.5 rounded ${hasProfit ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>{ft.term_months}m</span>
-                                <span className={`text-[11px] tabular-nums ${hasProfit ? '' : 'text-control-label'}`}>
-                                  {hasProfit ? formatTHB(ft.profit) : '—'}
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="shrink-0 w-6 flex justify-end">
-                      {needsSetup ? (
-                        <Tooltip content={t('pricing.needsSetup')}>
-                          <Badge size="xs" color="warning" startIcon={<AlertTriangle />} />
-                        </Tooltip>
-                      ) : (
-                        <Tooltip content={t('pricing.allPriced')}>
-                          <Badge size="xs" color="success" startIcon={<CheckCircle />} />
-                        </Tooltip>
-                      )}
                     </div>
                   </div>
-                );
-              }}
-              enablePagination
-              pageIndex={pageIndex}
-              pageSize={pageSize}
-              pageSizeOptions={[10, 25, 50]}
-              rowCount={filterNeedsSetup ? displayModels.length : totalCount}
-              onPageChange={({ pageIndex: pi, pageSize: ps }) => {
-                setPageIndex(pi);
-                setPageSize(ps);
-              }}
-              className={`h-full ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
-              noResults={
-                <div className="p-8 text-center text-control-label">
-                  {t('pricing.empty')}
+                  <div className="xl:hidden shrink-0">
+                    <PopOver
+                      isOpen={filterOpen}
+                      onClose={() => setFilterOpen(false)}
+                      placement="bottom"
+                      align="end"
+                      maxWidth="300px"
+                      trigger={
+                        <Button variant="outline" size="sm" className="relative btn-icon-sm" onClick={() => setFilterOpen(!filterOpen)}>
+                          <SlidersHorizontal size={16} />
+                          {activeFilterCount > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 bg-primary text-white text-xs rounded-full w-4 h-4 flex items-center justify-center leading-none">
+                              {activeFilterCount}
+                            </span>
+                          )}
+                        </Button>
+                      }
+                    >
+                      <div className="flex flex-col gap-3 p-3">
+                        <div className="text-xs font-medium text-muted uppercase tracking-wide">{t('common.filters')}</div>
+                        <Select
+                          options={brandOptions}
+                          value={filterBrand || null}
+                          onChange={(val) => { setFilterBrand((val as string) ?? ''); setPageIndex(0); }}
+                          placeholder={t('pricing.brand')}
+                          size="sm"
+                          showChevron
+                          clearable
+                        />
+                        <Select
+                          options={familyOptions}
+                          value={filterFamily || null}
+                          onChange={(val) => { setFilterFamily((val as string) ?? ''); setPageIndex(0); }}
+                          placeholder={t('pricing.family')}
+                          size="sm"
+                          showChevron
+                          clearable
+                        />
+                        <Select
+                          options={baseModelOptions}
+                          value={filterBaseModel || null}
+                          onChange={(val) => { setFilterBaseModel((val as string) ?? ''); setPageIndex(0); }}
+                          placeholder={t('models.selectBaseModel')}
+                          size="sm"
+                          showChevron
+                          clearable
+                          disabled={!filterFamily}
+                        />
+                        <label className="flex items-center gap-1.5 text-xs text-control-label cursor-pointer">
+                          <Switch
+                            checked={filterNeedsSetup}
+                            onChange={(e) => { setFilterNeedsSetup(e.target.checked); setPageIndex(0); }}
+                            size="sm"
+                          />
+                          {t('pricing.filterNeedsSetup')}
+                        </label>
+                        <hr className="border-line" />
+                        <div className="text-xs font-medium text-muted uppercase tracking-wide">{t('common.sortBy')}</div>
+                        <Select
+                          options={sortOptions}
+                          value={sortBy}
+                          onChange={(val) => { setSortBy((val as string) ?? 'code.asc'); setPageIndex(0); }}
+                          size="sm"
+                          showChevron
+                          searchable={false}
+                        />
+                      </div>
+                    </PopOver>
+                  </div>
                 </div>
-              }
-            />
-          </div>
-        </div>
-      )}
-    </div>
+              </div>
+            )}
+
+            {/* ── Error display ── */}
+            {isError && (
+              <div className="px-6 py-4">
+                <div className="border border-line bg-surface p-6 rounded-lg text-center">
+                  <div className="text-danger">{error instanceof Error ? error.message : t('common.error')}</div>
+                </div>
+              </div>
+            )}
+
+            {/* ── Panels ── */}
+            {!isError && (
+              <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
+                {/* Left panel: Model list */}
+                <PageNavPanel id="list" className="flex-1 max-w-3xl border-r border-line" mobileClassName="flex flex-col overflow-hidden">
+                  <DataTable<ModelRow>
+                    data={displayModels}
+                    renderRow={(row) => {
+                      const model = row.original;
+                      const pricing = pricingMap.get(model.id);
+                      const rp = pricing?.retail_price ?? null;
+                      const cp = pricing?.cost_price ?? null;
+                      const needsSetup = pricing?.needs_price_setup ?? true;
+                      const fin2Terms = pricing?.fin2_terms ?? [];
+                      const isSelected = model.id === selectedModelId;
+
+                      return (
+                        <div
+                          className={`flex items-center gap-3 px-3 py-2.5 border-b border-line hover:bg-surface-hover transition-colors select-none cursor-pointer ${isSelected ? 'bg-primary/5' : ''}`}
+                          onClick={() => { if (isMobile) handleRowSelect(model.id); }}
+                          onDoubleClick={() => { if (!isMobile) handleRowSelect(model.id); }}
+                        >
+                          {!isMobile && (
+                            <Tooltip content={t('pricing.editPrice')}>
+                              <Button
+                                variant="ghost"
+                                size="xs"
+                                startIcon={<Pencil size={14} />}
+                                className={`shrink-0 ${isSelected ? 'text-primary' : 'text-control-label hover:text-fg'}`}
+                                onClick={(e) => { e.stopPropagation(); handleRowSelect(model.id); }}
+                              />
+                            </Tooltip>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-baseline gap-1.5 min-w-0">
+                              <span className="text-sm truncate">{familyMap.get(model.family_id) ?? '—'}</span>
+                              <span className="text-sm font-medium text-info truncate">{model.base_model_name}</span>
+                              {model.model_name_suffix && (
+                                <span className="text-sm font-semibold truncate">{model.model_name_suffix}</span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-control-label truncate opacity-60">{model.code}</div>
+                          </div>
+
+                          <div className="shrink-0 w-16 xl:w-24 text-right hidden sm:block">
+                            <div className={`text-sm tabular-nums ${rp === null ? 'text-control-label' : ''}`}>
+                              {formatTHB(rp)}
+                            </div>
+                            <div className="text-[10px] text-control-label">{t('pricing.retailPrice')}</div>
+                          </div>
+
+                          <div className="shrink-0 w-16 xl:w-24 text-right hidden sm:block">
+                            <div className={`text-sm tabular-nums ${cp === null ? 'text-control-label' : ''}`}>
+                              {formatTHB(cp)}
+                            </div>
+                            <div className="text-[10px] text-control-label">{t('pricing.costPrice')}</div>
+                          </div>
+
+                          <div className="shrink-0 w-14 xl:w-18 text-right hidden lg:block">
+                            <div className="text-sm tabular-nums text-control-label">
+                              {calcMargin(rp, cp)}
+                            </div>
+                            <div className="text-[10px] text-control-label">{t('pricing.margin')}</div>
+                          </div>
+
+                          {fin2Terms.length > 0 && (
+                            <div className="shrink-0 w-16 xl:w-24 text-right hidden lg:block">
+                              <div className="flex flex-col gap-0.5 items-end">
+                                {fin2Terms.map(ft => {
+                                  const hasProfit = ft.profit !== null;
+                                  return (
+                                    <div key={ft.term_months} className="flex items-center gap-1">
+                                      <span className={`text-[10px] tabular-nums px-1.5 py-0.5 rounded ${hasProfit ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>{ft.term_months}m</span>
+                                      <span className={`text-[11px] tabular-nums ${hasProfit ? '' : 'text-control-label'}`}>
+                                        {hasProfit ? formatTHB(ft.profit) : '—'}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="shrink-0 w-6 flex justify-end">
+                            {needsSetup ? (
+                              <Tooltip content={t('pricing.needsSetup')}>
+                                <Badge size="xs" color="warning" startIcon={<AlertTriangle />} />
+                              </Tooltip>
+                            ) : (
+                              <Tooltip content={t('pricing.allPriced')}>
+                                <Badge size="xs" color="success" startIcon={<CheckCircle />} />
+                              </Tooltip>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }}
+                    enablePagination
+                    pageIndex={pageIndex}
+                    pageSize={pageSize}
+                    pageSizeOptions={[10, 25, 50]}
+                    rowCount={filterNeedsSetup ? displayModels.length : totalCount}
+                    onPageChange={({ pageIndex: pi, pageSize: ps }) => {
+                      setPageIndex(pi);
+                      setPageSize(ps);
+                    }}
+                    className={`flex-1 min-h-0 panel-datatable ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
+                    noResults={
+                      <div className="p-8 text-center text-control-label">
+                        {t('pricing.empty')}
+                      </div>
+                    }
+                  />
+                </PageNavPanel>
+
+                {/* Right panel: Editor */}
+                <PageNavPanel id="detail" className="w-full max-w-lg overflow-y-auto better-scroll">
+                  <div className="p-4">
+                    <EditorPanel
+                      modelId={selectedModelId}
+                      modelCode={selectedModel?.code ?? ''}
+                      familyName={selectedModel ? familyMap.get(selectedModel.family_id) ?? '' : ''}
+                      baseModelName={selectedModel?.base_model_name ?? ''}
+                      suffix={selectedModel?.model_name_suffix ?? ''}
+                      isDirtyRef={editorDirtyRef}
+                    />
+                  </div>
+                </PageNavPanel>
+              </div>
+            )}
+            {/* ── Unsaved changes confirm ── */}
+            <Modal open={!!pendingNav} onClose={() => setPendingNav(null)} maxWidth="400px" ariaLabel={t('common.unsavedChanges')}>
+              <div className="modal-header">
+                <h2 className="modal-title">{t('common.unsavedChanges')}</h2>
+                <button type="button" className="modal-close-btn" onClick={() => setPendingNav(null)} aria-label="Close">&times;</button>
+              </div>
+              <div className="modal-content">
+                <p>{t('common.unsavedChangesMessage')}</p>
+              </div>
+              <div className="modal-footer">
+                <Button variant="ghost" onClick={() => setPendingNav(null)}>{t('common.cancel')}</Button>
+                <Button variant="danger" onClick={confirmDiscard}>{t('common.discard')}</Button>
+              </div>
+            </Modal>
+          </>
+        );
+      }}
+    </PageNav>
   );
 }

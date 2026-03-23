@@ -5,6 +5,7 @@ import { ModalProvider, SnackbarProvider } from 'tsp-form';
 import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { NavGuardProvider } from './contexts/NavGuardContext';
 import { queryClient } from './lib/queryClient';
 import App from './App';
 import './i18n/config';
@@ -21,7 +22,9 @@ createRoot(document.getElementById('root')!).render(
           <SnackbarProvider>
             <ModalProvider>
               <BrowserRouter>
-                <App />
+                <NavGuardProvider>
+                  <App />
+                </NavGuardProvider>
               </BrowserRouter>
             </ModalProvider>
           </SnackbarProvider>

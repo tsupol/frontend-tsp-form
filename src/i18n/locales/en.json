@@ -15,7 +15,10 @@
     "descending": "Descending",
     "noData": "No data available",
     "example": "Example",
-    "appName": "NNF System"
+    "appName": "NNF System",
+    "unsavedChanges": "Unsaved Changes",
+    "unsavedChangesMessage": "You have unsaved changes. Are you sure you want to discard them?",
+    "discard": "Discard"
   },
   "auth": {
     "login": "Login",

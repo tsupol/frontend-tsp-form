@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
-import { NavLink } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { DollarSign, Calculator, TrendingUp, Percent } from 'lucide-react';
+import { useNavGuard } from '../../contexts/NavGuardContext';
 
 const navItems = [
   { path: '/admin/pricing/pricebook', labelKey: 'nav.pricebook', icon: DollarSign },
@@ -12,29 +13,36 @@ const navItems = [
 
 export function PricingLayout({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
+  const { pathname } = useLocation();
+  const navGuard = useNavGuard();
 
   return (
     <div className="flex min-h-full">
-      <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-48 border-r border-line p-4 pt-8 sticky top-0 h-dvh">
+      <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-48 border-r border-line p-4 pt-7.5 sticky top-0 h-dvh">
         <span className="text-xs font-semibold text-control-label uppercase tracking-wider mb-2 px-2">
           {t('nav.pricing')}
         </span>
-        {navItems.map(({ path, labelKey, icon: Icon }) => (
-          <NavLink
-            key={path}
-            to={path}
-            className={({ isActive }) =>
-              `flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors ${
+        {navItems.map(({ path, labelKey, icon: Icon }) => {
+          const isActive = pathname === path;
+          return (
+            <a
+              key={path}
+              href={path}
+              onClick={(e) => {
+                e.preventDefault();
+                if (!isActive) navGuard?.guardedNavigate(path);
+              }}
+              className={`flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors ${
                 isActive
                   ? 'bg-primary/10 text-primary font-medium'
                   : 'text-fg/70 hover:bg-surface-hover hover:text-fg'
-              }`
-            }
-          >
-            <Icon size={15} />
-            {t(labelKey)}
-          </NavLink>
-        ))}
+              }`}
+            >
+              <Icon size={15} />
+              {t(labelKey)}
+            </a>
+          );
+        })}
       </nav>
       <div className="flex-1 min-w-0">
         {children}

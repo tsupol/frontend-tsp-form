@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
 import { useTheme } from './contexts/ThemeContext';
+import { useNavGuard } from './contexts/NavGuardContext';
 
 // User menu component
 function UserMenu({ collapsed }: { collapsed: boolean }) {
@@ -120,6 +121,7 @@ export const AppSideNav = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useTranslation();
+  const navGuard = useNavGuard();
 
   const menuItems: SideMenuItemData[] = [
     { key: 'dashboard', icon: <LayoutDashboard size="1rem" />, label: t('nav.dashboard'), path: '/admin' },
@@ -166,7 +168,7 @@ export const AppSideNav = () => {
   ];
 
   const handleSelect = (_key: string, path?: string) => {
-    if (path) navigate(path);
+    if (path) navGuard ? navGuard.guardedNavigate(path) : navigate(path);
   };
 
   const handleCloseMobile = () => {
@@ -178,7 +180,7 @@ export const AppSideNav = () => {
       <SideMenu
         isCollapsed={menuCollapsed}
         onToggleCollapse={(collapsed) => { setMenuCollapsed(collapsed); localStorage.setItem('sidebar-collapsed', String(collapsed)); }}
-        linkFn={(to) => navigate(to)}
+        linkFn={(to) => navGuard ? navGuard.guardedNavigate(to) : navigate(to)}
         autoCloseMobileOnClick={false}
         mobileToggleRenderer={(handleToggle) => (
           <button

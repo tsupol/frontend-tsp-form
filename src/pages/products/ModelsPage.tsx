@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { DataTable, DataTableFooter, Badge, Input, Select, Button, Modal, Switch, MobileHeader, PopOver, useSnackbarContext, FormErrorMessage } from 'tsp-form';
+import { DataTable, Badge, Input, Select, Button, Modal, Switch, MobileHeader, PopOver, useSnackbarContext, FormErrorMessage } from 'tsp-form';
 import { ChevronRight, ChevronDown, Plus, XCircle, CheckCircle, Info, SlidersHorizontal, ArrowRightFromLine } from 'lucide-react';
 import { useForm, Controller } from 'react-hook-form';
 import { apiClient, ApiError } from '../../lib/api';
@@ -120,7 +120,8 @@ function CreateModelModal({ open, onClose, holdingId, families }: {
   const [errorKey, setErrorKey] = useState(0);
   const [preview, setPreview] = useState<PreviewData | null>(null);
 
-  const { register, handleSubmit, reset, watch, setValue, control, formState: { errors } } = useForm<CreateModelForm>({
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+  const { register, handleSubmit, reset, watch, setValue, control, formState: { errors, isDirty } } = useForm<CreateModelForm>({
     defaultValues: { family_id: '', model_name: '', is_contractable: false, is_sellable: true, is_giftable: false },
   });
 
@@ -232,14 +233,24 @@ function CreateModelModal({ open, onClose, holdingId, families }: {
   };
 
   const handleClose = () => {
+    if (isDirty) {
+      setConfirmCloseOpen(true);
+      return;
+    }
+    forceClose();
+  };
+
+  const forceClose = () => {
     reset();
     setErrorMessage('');
     setPreview(null);
     lastConfigRef.current = null;
+    setConfirmCloseOpen(false);
     onClose();
   };
 
   return (
+    <>
     <Modal open={open} onClose={handleClose} maxWidth="32rem" width="100%">
       <form className="flex flex-col overflow-hidden" onSubmit={handleSubmit(onPreview)}>
         <div className="modal-header">
@@ -386,6 +397,21 @@ function CreateModelModal({ open, onClose, holdingId, families }: {
         </div>
       </form>
     </Modal>
+
+    {/* Unsaved changes confirm */}
+    <Modal open={confirmCloseOpen} onClose={() => setConfirmCloseOpen(false)} maxWidth="24rem" width="100%">
+      <div className="modal-header">
+        <h2 className="modal-title">{t('common.unsavedChanges')}</h2>
+      </div>
+      <div className="modal-content">
+        <p>{t('common.unsavedChangesMessage')}</p>
+      </div>
+      <div className="modal-footer">
+        <Button type="button" variant="ghost" onClick={() => setConfirmCloseOpen(false)}>{t('common.cancel')}</Button>
+        <Button type="button" color="danger" onClick={forceClose}>{t('common.discard')}</Button>
+      </div>
+    </Modal>
+    </>
   );
 }
 
@@ -664,6 +690,16 @@ export function ModelsPage() {
                 showChevron
                 clearable
                 disabled={!filterFamily}
+              />
+            </div>
+            <div className="flex-1 min-w-0 hidden lg:block">
+              <Select
+                options={sortOptions}
+                value={sortBy}
+                onChange={(val) => { setSortBy((val as string) ?? 'model_code.asc'); setPageIndex(0); }}
+                size="sm"
+                showChevron
+                searchable={false}
               />
             </div>
             <div className="lg:hidden shrink-0">

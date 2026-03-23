@@ -8,6 +8,7 @@
 - **`src/index.css`** — tsp-form theme only (copy from `example.css`, change `@import` line to `@import "tailwindcss"`)
 - **`src/app.css`** — app-specific styles (`.page-content`, layout utilities, overrides)
 - **Responsive page pattern** — see `.claude/responsive-page-pattern.md` for the standard dual mobile/desktop table page structure
+- **Navigation guard pattern** — see `.claude/nav-guard-pattern.md` for protecting unsaved changes on editor pages
 
 ## tsp-form Component Usage
 

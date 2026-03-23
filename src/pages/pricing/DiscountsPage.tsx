@@ -2,10 +2,10 @@ import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
-  DataTable, Badge, Input, Select, Button, Switch, Drawer,
+  DataTable, DataTableFooter, MobileHeader, Badge, Input, Select, Button, Switch, Drawer,
   InputDatePicker, useSnackbarContext,
 } from 'tsp-form';
-import { CheckCircle, XCircle, Settings2, ClipboardList, Calendar } from 'lucide-react';
+import { ArrowRightFromLine, CheckCircle, XCircle, Settings2, ClipboardList, Calendar } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { formatDateTime } from '../../lib/format';
@@ -569,7 +569,7 @@ function ApprovalsTab() {
 
   return (
     <>
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-4 flex-none">
         <div style={{ width: '12rem' }}>
           <Select
             options={statusOptions}
@@ -581,6 +581,7 @@ function ApprovalsTab() {
         </div>
       </div>
 
+      {/* Desktop: DataTable with renderRow */}
       <DataTable<ApprovalRequest>
         data={requests}
         renderRow={(row) => {
@@ -637,13 +638,67 @@ function ApprovalsTab() {
           setPageIndex(pi);
           setPageSize(ps);
         }}
-        className={isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}
+        className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
         noResults={
           <div className="p-8 text-center text-control-label">
             {t('discount.noRequests')}
           </div>
         }
       />
+
+      {/* Mobile: Card list */}
+      <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
+        <div className="flex-1 overflow-auto better-scroll pb-8">
+          {requests.length === 0 ? (
+            <div className="p-8 text-center text-control-label">
+              {t('discount.noRequests')}
+            </div>
+          ) : (
+            <div className="flex flex-col divide-y divide-line">
+              {requests.map((req) => (
+                <div
+                  key={req.request_id}
+                  className="px-1 py-3 cursor-pointer active:bg-surface-hover"
+                  onClick={() => handleRowClick(req)}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm tabular-nums text-control-label">#{req.request_id}</span>
+                      <Badge size="sm" color={policyTypeColor(req.policy_type)}>{req.policy_type}</Badge>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Badge size="sm" color={statusColor(req.status)}>
+                        {t(`discount.status${req.status.charAt(0) + req.status.slice(1).toLowerCase()}`)}
+                      </Badge>
+                      {req.is_expired_now && req.status === 'PENDING' && (
+                        <Badge size="sm" color="danger">{t('discount.expired')}</Badge>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between mt-1">
+                    <div className="text-sm">{req.source_type}</div>
+                    <div className="text-sm tabular-nums">{formatNumber(req.discount_amount)}</div>
+                  </div>
+                  {req.source_ref && (
+                    <div className="text-[11px] text-control-label truncate">{req.source_ref}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        {totalCount > 0 && (
+          <DataTableFooter
+            currentPage={pageIndex + 1}
+            totalPages={Math.ceil(totalCount / pageSize)}
+            onPageChange={(p) => setPageIndex(p - 1)}
+            pageSize={pageSize}
+            pageSizeOptions={[15, 25, 50]}
+            onPageSizeChange={(ps) => { setPageSize(ps); setPageIndex(0); }}
+            totalRows={totalCount}
+          />
+        )}
+      </div>
 
       <ReviewDrawer
         request={selectedRequest}
@@ -661,37 +716,59 @@ export function DiscountsPage() {
   const [activeTab, setActiveTab] = useState<'policies' | 'approvals'>('policies');
 
   return (
-    <div className="page-content">
-      <h1 className="heading-2 pb-4">{t('discount.title')}</h1>
+    <>
+      {/* Mobile header */}
+      <MobileHeader className="mobile-header-scrolled-shadow md:hidden">
+        <div className="mobile-header-start">
+          <button
+            className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
+            aria-label="Open menu"
+            onClick={() => window.dispatchEvent(new CustomEvent('sidemenu:open'))}
+          >
+            <ArrowRightFromLine size={18} />
+          </button>
+        </div>
+        <div className="mobile-header-title mobile-header-title-truncate">
+          {t('discount.title')}
+        </div>
+        <div className="mobile-header-end w-12" />
+      </MobileHeader>
 
-      {/* Tab bar */}
-      <div className="flex border-b border-line mb-6">
-        <button
-          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium cursor-pointer transition-colors ${
-            activeTab === 'policies'
-              ? 'border-b-2 border-primary text-primary'
-              : 'text-control-label hover:text-fg'
-          }`}
-          onClick={() => setActiveTab('policies')}
-        >
-          <Settings2 size={14} />
-          {t('discount.policies')}
-        </button>
-        <button
-          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium cursor-pointer transition-colors ${
-            activeTab === 'approvals'
-              ? 'border-b-2 border-primary text-primary'
-              : 'text-control-label hover:text-fg'
-          }`}
-          onClick={() => setActiveTab('approvals')}
-        >
-          <ClipboardList size={14} />
-          {t('discount.approvals')}
-        </button>
+      <div className="page-content responsive-dvh-mobile-header">
+        {/* Desktop header */}
+        <div className="mb-4 flex-none max-md:hidden">
+          <h1 className="heading-2">{t('discount.title')}</h1>
+        </div>
+
+        {/* Tab bar */}
+        <div className="flex border-b border-line mb-6 flex-none">
+          <button
+            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium cursor-pointer transition-colors ${
+              activeTab === 'policies'
+                ? 'border-b-2 border-primary text-primary'
+                : 'text-control-label hover:text-fg'
+            }`}
+            onClick={() => setActiveTab('policies')}
+          >
+            <Settings2 size={14} />
+            {t('discount.policies')}
+          </button>
+          <button
+            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium cursor-pointer transition-colors ${
+              activeTab === 'approvals'
+                ? 'border-b-2 border-primary text-primary'
+                : 'text-control-label hover:text-fg'
+            }`}
+            onClick={() => setActiveTab('approvals')}
+          >
+            <ClipboardList size={14} />
+            {t('discount.approvals')}
+          </button>
+        </div>
+
+        {activeTab === 'policies' && <PolicyTab />}
+        {activeTab === 'approvals' && <ApprovalsTab />}
       </div>
-
-      {activeTab === 'policies' && <PolicyTab />}
-      {activeTab === 'approvals' && <ApprovalsTab />}
-    </div>
+    </>
   );
 }

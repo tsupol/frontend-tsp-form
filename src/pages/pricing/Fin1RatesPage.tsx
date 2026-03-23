@@ -3,11 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { useForm, Controller } from 'react-hook-form';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  DataTable, DataTableColumnHeader, Button, Input, Select, Modal,
+  DataTable, DataTableColumnHeader, DataTableFooter, MobileHeader,
+  Button, Input, Select, Modal, Badge,
   useSnackbarContext, FormErrorMessage,
   type ColumnDef, type SortingState,
 } from 'tsp-form';
-import { Plus, XCircle, CheckCircle } from 'lucide-react';
+import { ArrowRightFromLine, Plus, XCircle, CheckCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -241,6 +242,8 @@ export function Fin1RatesPage() {
 
   const [sorting, setSorting] = useState<SortingState>([]);
   const [modalOpen, setModalOpen] = useState(false);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
 
   // Category lookup
   const { data: categories = [] } = useQuery({
@@ -253,8 +256,6 @@ export function Fin1RatesPage() {
   const { data: rateCards = [], isFetching } = useQuery({
     queryKey: ['fin1-rate-cards', holdingId],
     queryFn: async () => {
-      // Fetch all active rate cards by creating a synthetic list from workbench
-      // We need to map workbench data to rate-card-like rows
       const rows = await apiClient.get<WorkbenchFin1Row[]>(
         `/v_pricing_user_workbench?finance_model=eq.FIN1&select=category_id,category_code,category_name,term_months,down_percent,interest_percent_total,rounding_unit,max_discount_percent,missing_fin1_rate_card&order=category_code,term_months,down_percent`
       );
@@ -291,6 +292,10 @@ export function Fin1RatesPage() {
   });
 
   type RateCardRow = typeof rateCards[number];
+
+  // Client-side pagination
+  const totalCount = rateCards.length;
+  const paginatedCards = rateCards.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize);
 
   const showSuccess = (msgKey: string) => {
     addSnackbar({
@@ -364,26 +369,120 @@ export function Fin1RatesPage() {
   ];
 
   return (
-    <div className="page-content">
-      <div className="flex items-center justify-between pb-4">
-        <h1 className="heading-2">{t('fin1.title')}</h1>
-        <Button color="primary" startIcon={<Plus size={16} />} onClick={handleCreate}>
-          {t('fin1.addRateCard')}
-        </Button>
-      </div>
+    <>
+      {/* Mobile header */}
+      <MobileHeader className="mobile-header-bordered md:hidden">
+        <div className="mobile-header-start">
+          <button
+            className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
+            aria-label="Open menu"
+            onClick={() => window.dispatchEvent(new CustomEvent('sidemenu:open'))}
+          >
+            <ArrowRightFromLine size={18} />
+          </button>
+        </div>
+        <div className="mobile-header-title mobile-header-title-truncate">
+          {t('fin1.title')}
+        </div>
+        <div className="mobile-header-end px-2">
+          <button
+            className="flex items-center justify-center w-8 h-8 rounded hover:bg-surface-hover cursor-pointer text-current"
+            aria-label={t('fin1.addRateCard')}
+            onClick={handleCreate}
+          >
+            <Plus size={18} />
+          </button>
+        </div>
+      </MobileHeader>
 
-      <DataTable<RateCardRow>
-        data={rateCards}
-        columns={columns}
-        sorting={sorting}
-        onSortingChange={setSorting}
-        className={isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}
-        noResults={
-          <div className="p-8 text-center text-control-label">
-            {t('fin1.empty')}
+      <div className="page-content responsive-dvh-mobile-header max-w-[64rem]">
+        {/* Desktop header */}
+        <div className="flex items-center justify-between mb-4 flex-none max-md:hidden">
+          <h1 className="heading-2">{t('fin1.title')}</h1>
+          <Button color="primary" startIcon={<Plus size={16} />} onClick={handleCreate}>
+            {t('fin1.addRateCard')}
+          </Button>
+        </div>
+
+        {/* Desktop: DataTable with columns */}
+        <DataTable<RateCardRow>
+          data={paginatedCards}
+          columns={columns}
+          sorting={sorting}
+          onSortingChange={setSorting}
+          enablePagination
+          pageIndex={pageIndex}
+          pageSize={pageSize}
+          pageSizeOptions={[10, 25, 50]}
+          rowCount={totalCount}
+          onPageChange={({ pageIndex: pi, pageSize: ps }) => {
+            setPageIndex(pi);
+            setPageSize(ps);
+          }}
+          className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
+          noResults={
+            <div className="p-8 text-center text-control-label">
+              {t('fin1.empty')}
+            </div>
+          }
+        />
+
+        {/* Mobile: Card list */}
+        <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
+          <div className="flex-1 overflow-auto better-scroll pb-8">
+            {rateCards.length === 0 ? (
+              <div className="p-8 text-center text-control-label">
+                {t('fin1.empty')}
+              </div>
+            ) : (
+              <div className="flex flex-col divide-y divide-line">
+                {paginatedCards.map((card) => (
+                  <div key={`${card.category_id}-${card.term_months}-${card.down_percent}`} className="px-1 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">{card.category_name}</div>
+                        <div className="text-xs text-control-label">{card.category_code}</div>
+                      </div>
+                      <Badge size="sm" color="info">
+                        {t('pricing.termMonths', { months: card.term_months })}
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-control-label">{t('fin1.downPercent')}</span>
+                        <span className="tabular-nums">{card.down_percent}%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-control-label">{t('fin1.interestPercent')}</span>
+                        <span className="tabular-nums">{card.interest_percent_total}%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-control-label">{t('fin1.roundingUnit')}</span>
+                        <span className="tabular-nums">{card.rounding_unit}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-control-label">{t('fin1.maxDiscount')}</span>
+                        <span className="tabular-nums">{card.max_discount_percent}%</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        }
-      />
+          {totalCount > 0 && (
+            <DataTableFooter
+              currentPage={pageIndex + 1}
+              totalPages={Math.ceil(totalCount / pageSize)}
+              onPageChange={(p) => setPageIndex(p - 1)}
+              pageSize={pageSize}
+              pageSizeOptions={[10, 25, 50]}
+              onPageSizeChange={(ps) => { setPageSize(ps); setPageIndex(0); }}
+              totalRows={totalCount}
+            />
+          )}
+        </div>
+      </div>
 
       <Fin1Modal
         open={modalOpen}
@@ -391,6 +490,6 @@ export function Fin1RatesPage() {
         categories={categories}
         onSuccess={handleSuccess}
       />
-    </div>
+    </>
   );
 }

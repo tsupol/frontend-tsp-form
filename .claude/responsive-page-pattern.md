@@ -6,13 +6,34 @@ Standard pattern for admin table pages with dual mobile/desktop views.
 
 1. **MobileHeader** (`md:hidden`) — sticky header with menu toggle, page title, action button
 2. **Desktop header** (`max-md:hidden`) — title + action button
-3. **Container** — `page-content responsive-dvh-mobile-header`
+3. **Container** — depends on page type (see MobileHeader variants below)
 4. **Progressive filter collapse** — filters drop right-to-left as viewport narrows, popover appears with all filters + sort (with "Filters" / "Sort by" section headers)
 5. **Desktop DataTable** (`hidden md:flex`) — sortable columns, pagination built-in
 6. **Mobile card list** (`md:hidden`) — divide-y list with `DataTableFooter` at bottom
    - Scroll container: `flex-1 overflow-auto better-scroll pb-8` — `pb-8` prevents content from sitting flush against the footer
    - `DataTableFooter` is a standalone component from tsp-form — provides pagination, page size selector, and row count with responsive mobile popover
 7. **Action column** — `className: 'w-10'` to keep it tight
+
+## MobileHeader variants
+
+Choose the header style based on what sits directly below the header:
+
+### `mobile-header-bordered` — for DataTable pages
+- Use when the page has a filter bar or DataTable directly below the header
+- The bottom border visually separates header from structured content
+- Pair with `page-content responsive-dvh-mobile-header` container (full viewport height)
+- Examples: BrandsPage, ModelsPage, Fin1RatesPage, UsersPage
+
+### `mobile-header-scrolled-shadow` — for content pages
+- Use when the page has freely scrollable content (forms, cards, text)
+- Shows a subtle shadow when the user scrolls, no border at rest
+- Pair with `page-content` container (no dvh, natural height)
+- Also appropriate for tabbed pages where the tab bar provides visual separation
+- Examples: DashboardPage, DiscountsPage
+
+### When in doubt
+- Does the page fill the full viewport with a DataTable? → `bordered` + `responsive-dvh-mobile-header`
+- Is it scrollable content without a full-height table? → `scrolled-shadow` + plain `page-content`
 
 ## Filter bar variants
 
