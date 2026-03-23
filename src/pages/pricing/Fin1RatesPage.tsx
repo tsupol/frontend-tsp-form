@@ -61,12 +61,13 @@ function Fin1Modal({ open, onClose, categories, onSuccess }: {
     max_discount_percent: '5',
   };
 
-  const { register, handleSubmit, control, formState: { errors }, reset } = useForm<Fin1FormData>({
+  const { register, handleSubmit, control, formState: { errors, isDirty }, reset } = useForm<Fin1FormData>({
     defaultValues: defaults,
   });
 
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -104,17 +105,30 @@ function Fin1Modal({ open, onClose, categories, onSuccess }: {
     }
   };
 
+  const handleClose = () => {
+    if (isDirty) { setConfirmCloseOpen(true); return; }
+    forceClose();
+  };
+
+  const forceClose = () => {
+    reset(defaults);
+    setErrorMessage('');
+    setConfirmCloseOpen(false);
+    onClose();
+  };
+
   return (
+    <>
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={handleClose}
       maxWidth="24rem"
       width="100%"
     >
       <form className="flex flex-col overflow-hidden" onSubmit={handleSubmit(onSubmit)}>
         <div className="modal-header">
           <h2 className="modal-title">{t('fin1.addRateCard')}</h2>
-          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+          <button type="button" className="modal-close-btn" onClick={handleClose} aria-label="Close">&times;</button>
         </div>
         <div className="modal-content">
           <div className="form-grid">
@@ -219,7 +233,7 @@ function Fin1Modal({ open, onClose, categories, onSuccess }: {
           </div>
         </div>
         <div className="modal-footer">
-          <Button variant="outline" size="sm" onClick={onClose} type="button">
+          <Button variant="outline" size="sm" onClick={handleClose} type="button">
             {t('common.cancel')}
           </Button>
           <Button color="primary" size="sm" type="submit" disabled={isSaving}>
@@ -228,6 +242,16 @@ function Fin1Modal({ open, onClose, categories, onSuccess }: {
         </div>
       </form>
     </Modal>
+
+    <Modal open={confirmCloseOpen} onClose={() => setConfirmCloseOpen(false)} maxWidth="24rem" width="100%">
+      <div className="modal-header"><h2 className="modal-title">{t('common.unsavedChanges')}</h2></div>
+      <div className="modal-content"><p>{t('common.unsavedChangesMessage')}</p></div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={() => setConfirmCloseOpen(false)}>{t('common.cancel')}</Button>
+        <Button color="danger" onClick={forceClose}>{t('common.discard')}</Button>
+      </div>
+    </Modal>
+    </>
   );
 }
 

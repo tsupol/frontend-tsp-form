@@ -232,7 +232,9 @@ function CreateFamilyModal({ open, onClose, holdingId, brands }: {
   const brandOptions = brands.filter(b => b.is_active).map(b => ({ value: String(b.id), label: b.name }));
   const categoryOptions = categories.map(c => ({ value: String(c.id), label: c.name }));
 
-  const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<FamilyFormData>({
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+
+  const { register, handleSubmit, setValue, watch, reset, formState: { errors, isDirty } } = useForm<FamilyFormData>({
     defaultValues: { brand_id: '', category_id: '', family_code: '', display_name: '', default_model_name: '' },
   });
 
@@ -280,12 +282,19 @@ function CreateFamilyModal({ open, onClose, holdingId, brands }: {
   };
 
   const handleClose = () => {
+    if (isDirty) { setConfirmCloseOpen(true); return; }
+    forceClose();
+  };
+
+  const forceClose = () => {
     reset();
     setErrorMessage('');
+    setConfirmCloseOpen(false);
     onClose();
   };
 
   return (
+    <>
     <Modal open={open} onClose={handleClose} maxWidth="28rem" width="100%">
       <form className="flex flex-col overflow-hidden" onSubmit={handleSubmit(onSubmit)}>
         <div className="modal-header">
@@ -361,6 +370,16 @@ function CreateFamilyModal({ open, onClose, holdingId, brands }: {
         </div>
       </form>
     </Modal>
+
+    <Modal open={confirmCloseOpen} onClose={() => setConfirmCloseOpen(false)} maxWidth="24rem" width="100%">
+      <div className="modal-header"><h2 className="modal-title">{t('common.unsavedChanges')}</h2></div>
+      <div className="modal-content"><p>{t('common.unsavedChangesMessage')}</p></div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={() => setConfirmCloseOpen(false)}>{t('common.cancel')}</Button>
+        <Button color="danger" onClick={forceClose}>{t('common.discard')}</Button>
+      </div>
+    </Modal>
+    </>
   );
 }
 
@@ -392,7 +411,9 @@ function EditFamilyModal({ family, open, onClose, brands }: {
   const brandOptions = brands.filter(b => b.is_active).map(b => ({ value: String(b.id), label: b.name }));
   const categoryOptions = categories.map(c => ({ value: String(c.id), label: c.name }));
 
-  const { register, handleSubmit, control, setValue, watch, reset, formState: { errors } } = useForm<EditFamilyFormData>({
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+
+  const { register, handleSubmit, control, setValue, watch, reset, formState: { errors, isDirty } } = useForm<EditFamilyFormData>({
     defaultValues: { brand_id: '', category_id: '', family_code: '', display_name: '', default_model_name: '', is_active: true },
   });
 
@@ -455,11 +476,18 @@ function EditFamilyModal({ family, open, onClose, brands }: {
   };
 
   const handleClose = () => {
+    if (isDirty) { setConfirmCloseOpen(true); return; }
+    forceClose();
+  };
+
+  const forceClose = () => {
     setErrorMessage('');
+    setConfirmCloseOpen(false);
     onClose();
   };
 
   return (
+    <>
     <Modal open={open} onClose={handleClose} maxWidth="28rem" width="100%">
       <form className="flex flex-col overflow-hidden" onSubmit={handleSubmit(onSubmit)}>
         <div className="modal-header">
@@ -545,6 +573,16 @@ function EditFamilyModal({ family, open, onClose, brands }: {
         </div>
       </form>
     </Modal>
+
+    <Modal open={confirmCloseOpen} onClose={() => setConfirmCloseOpen(false)} maxWidth="24rem" width="100%">
+      <div className="modal-header"><h2 className="modal-title">{t('common.unsavedChanges')}</h2></div>
+      <div className="modal-content"><p>{t('common.unsavedChangesMessage')}</p></div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={() => setConfirmCloseOpen(false)}>{t('common.cancel')}</Button>
+        <Button color="danger" onClick={forceClose}>{t('common.discard')}</Button>
+      </div>
+    </Modal>
+    </>
   );
 }
 
@@ -625,7 +663,9 @@ function CreateFamilyAttrModal({ open, onClose, holdingId, familyId, attributes 
     { value: 'variant', label: t('familyAttributes.levelVariant') },
   ];
 
-  const { register, handleSubmit, control, setValue, watch, reset, formState: { errors } } = useForm<CreateAttrFormData>({
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+
+  const { register, handleSubmit, control, setValue, watch, reset, formState: { errors, isDirty } } = useForm<CreateAttrFormData>({
     defaultValues: { attribute_id: '', level: 'model', is_required: false, allow_custom: false, use_in_name: false, use_in_code: false, name_order: 0, code_order: 0 },
   });
 
@@ -696,8 +736,14 @@ function CreateFamilyAttrModal({ open, onClose, holdingId, familyId, attributes 
   };
 
   const handleClose = () => {
+    if (isDirty) { setConfirmCloseOpen(true); return; }
+    forceClose();
+  };
+
+  const forceClose = () => {
     reset();
     setErrorMessage('');
+    setConfirmCloseOpen(false);
     onClose();
   };
 
@@ -705,6 +751,7 @@ function CreateFamilyAttrModal({ open, onClose, holdingId, familyId, attributes 
   const codeLabel = level === 'model' ? t('familyAttributes.useInModelCode') : t('familyAttributes.useInSkuCode');
 
   return (
+    <>
     <Modal open={open} onClose={handleClose} maxWidth="28rem" width="100%">
       <form className="flex flex-col overflow-hidden" onSubmit={handleSubmit(onSubmit)}>
         <div className="modal-header">
@@ -819,6 +866,16 @@ function CreateFamilyAttrModal({ open, onClose, holdingId, familyId, attributes 
         </div>
       </form>
     </Modal>
+
+    <Modal open={confirmCloseOpen} onClose={() => setConfirmCloseOpen(false)} maxWidth="24rem" width="100%">
+      <div className="modal-header"><h2 className="modal-title">{t('common.unsavedChanges')}</h2></div>
+      <div className="modal-content"><p>{t('common.unsavedChangesMessage')}</p></div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={() => setConfirmCloseOpen(false)}>{t('common.cancel')}</Button>
+        <Button color="danger" onClick={forceClose}>{t('common.discard')}</Button>
+      </div>
+    </Modal>
+    </>
   );
 }
 
@@ -847,7 +904,9 @@ function EditFamilyAttrModal({ rule, attrName, open, onClose }: {
   const [errorMessage, setErrorMessage] = useState('');
   const [errorKey, setErrorKey] = useState(0);
 
-  const { handleSubmit, control, reset } = useForm<EditAttrFormData>({
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+
+  const { handleSubmit, control, reset, formState: { isDirty } } = useForm<EditAttrFormData>({
     defaultValues: { is_required: false, allow_custom: false, use_in_name: false, use_in_code: false, name_order: 0, code_order: 0, is_active: true },
   });
 
@@ -925,7 +984,13 @@ function EditFamilyAttrModal({ rule, attrName, open, onClose }: {
   };
 
   const handleClose = () => {
+    if (isDirty) { setConfirmCloseOpen(true); return; }
+    forceClose();
+  };
+
+  const forceClose = () => {
     setErrorMessage('');
+    setConfirmCloseOpen(false);
     onClose();
   };
 
@@ -933,6 +998,7 @@ function EditFamilyAttrModal({ rule, attrName, open, onClose }: {
   const codeLabel = rule?.level === 'model' ? t('familyAttributes.useInModelCode') : t('familyAttributes.useInSkuCode');
 
   return (
+    <>
     <Modal open={open} onClose={handleClose} maxWidth="28rem" width="100%">
       <form className="flex flex-col overflow-hidden" onSubmit={handleSubmit(onSubmit)}>
         <div className="modal-header">
@@ -1040,6 +1106,16 @@ function EditFamilyAttrModal({ rule, attrName, open, onClose }: {
         </div>
       </form>
     </Modal>
+
+    <Modal open={confirmCloseOpen} onClose={() => setConfirmCloseOpen(false)} maxWidth="24rem" width="100%">
+      <div className="modal-header"><h2 className="modal-title">{t('common.unsavedChanges')}</h2></div>
+      <div className="modal-content"><p>{t('common.unsavedChangesMessage')}</p></div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={() => setConfirmCloseOpen(false)}>{t('common.cancel')}</Button>
+        <Button color="danger" onClick={forceClose}>{t('common.discard')}</Button>
+      </div>
+    </Modal>
+    </>
   );
 }
 

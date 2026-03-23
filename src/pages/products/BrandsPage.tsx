@@ -88,7 +88,9 @@ function CreateBrandModal({ open, onClose, holdingId }: { open: boolean; onClose
   const [errorMessage, setErrorMessage] = useState('');
   const [errorKey, setErrorKey] = useState(0);
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<BrandFormData>({
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+
+  const { register, handleSubmit, reset, formState: { errors, isDirty } } = useForm<BrandFormData>({
     defaultValues: { code: '', name: '' },
   });
 
@@ -130,12 +132,19 @@ function CreateBrandModal({ open, onClose, holdingId }: { open: boolean; onClose
   };
 
   const handleClose = () => {
+    if (isDirty) { setConfirmCloseOpen(true); return; }
+    forceClose();
+  };
+
+  const forceClose = () => {
     reset();
     setErrorMessage('');
+    setConfirmCloseOpen(false);
     onClose();
   };
 
   return (
+    <>
     <Modal open={open} onClose={handleClose} maxWidth="24rem" width="100%">
       <form className="flex flex-col overflow-hidden" onSubmit={handleSubmit(onSubmit)}>
         <div className="modal-header">
@@ -178,6 +187,16 @@ function CreateBrandModal({ open, onClose, holdingId }: { open: boolean; onClose
         </div>
       </form>
     </Modal>
+
+    <Modal open={confirmCloseOpen} onClose={() => setConfirmCloseOpen(false)} maxWidth="24rem" width="100%">
+      <div className="modal-header"><h2 className="modal-title">{t('common.unsavedChanges')}</h2></div>
+      <div className="modal-content"><p>{t('common.unsavedChangesMessage')}</p></div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={() => setConfirmCloseOpen(false)}>{t('common.cancel')}</Button>
+        <Button color="danger" onClick={forceClose}>{t('common.discard')}</Button>
+      </div>
+    </Modal>
+    </>
   );
 }
 
@@ -197,7 +216,9 @@ function EditBrandModal({ brand, open, onClose }: { brand: Brand | null; open: b
   const [errorMessage, setErrorMessage] = useState('');
   const [errorKey, setErrorKey] = useState(0);
 
-  const { register, handleSubmit, control, reset, formState: { errors } } = useForm<EditBrandFormData>({
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+
+  const { register, handleSubmit, control, reset, formState: { errors, isDirty } } = useForm<EditBrandFormData>({
     defaultValues: { code: '', name: '', is_active: true },
   });
 
@@ -247,11 +268,18 @@ function EditBrandModal({ brand, open, onClose }: { brand: Brand | null; open: b
   };
 
   const handleClose = () => {
+    if (isDirty) { setConfirmCloseOpen(true); return; }
+    forceClose();
+  };
+
+  const forceClose = () => {
     setErrorMessage('');
+    setConfirmCloseOpen(false);
     onClose();
   };
 
   return (
+    <>
     <Modal open={open} onClose={handleClose} maxWidth="24rem" width="100%">
       <form className="flex flex-col overflow-hidden" onSubmit={handleSubmit(onSubmit)}>
         <div className="modal-header">
@@ -304,6 +332,16 @@ function EditBrandModal({ brand, open, onClose }: { brand: Brand | null; open: b
         </div>
       </form>
     </Modal>
+
+    <Modal open={confirmCloseOpen} onClose={() => setConfirmCloseOpen(false)} maxWidth="24rem" width="100%">
+      <div className="modal-header"><h2 className="modal-title">{t('common.unsavedChanges')}</h2></div>
+      <div className="modal-content"><p>{t('common.unsavedChangesMessage')}</p></div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={() => setConfirmCloseOpen(false)}>{t('common.cancel')}</Button>
+        <Button color="danger" onClick={forceClose}>{t('common.discard')}</Button>
+      </div>
+    </Modal>
+    </>
   );
 }
 

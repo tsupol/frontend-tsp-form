@@ -28,6 +28,7 @@ When using tsp-form components, follow this lookup order:
 - Error display: `FormErrorMessage` after each input
 - Forms in modals: `form-grid` goes inside `modal-content`, never on the same element (e.g. `<div className="modal-content"><div className="form-grid">...fields...</div></div>`)
 - **Select in flex rows:** Wrap `Select` in a `<div>` with fixed width when placing inline with other controls — without a container the Select width is buggy
+- **Input width:** `Input` does NOT auto-fill remaining width like `Select` — add `className="w-full"` when inside flex/input-group containers
 
 ### PopOver & Icon Buttons
 

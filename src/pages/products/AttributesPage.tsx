@@ -170,7 +170,9 @@ function CreateAttributeModal({ open, onClose, holdingId }: { open: boolean; onC
   const [errorMessage, setErrorMessage] = useState('');
   const [errorKey, setErrorKey] = useState(0);
 
-  const { register, handleSubmit, control, setValue, watch, reset, formState: { errors } } = useForm<AttributeFormData>({
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+
+  const { register, handleSubmit, control, setValue, watch, reset, formState: { errors, isDirty } } = useForm<AttributeFormData>({
     defaultValues: { attribute_code: '', attribute_name: '', data_type: 'TEXT', unit: '', sort_order: 0 },
   });
 
@@ -217,12 +219,19 @@ function CreateAttributeModal({ open, onClose, holdingId }: { open: boolean; onC
   };
 
   const handleClose = () => {
+    if (isDirty) { setConfirmCloseOpen(true); return; }
+    forceClose();
+  };
+
+  const forceClose = () => {
     reset();
     setErrorMessage('');
+    setConfirmCloseOpen(false);
     onClose();
   };
 
   return (
+    <>
     <Modal open={open} onClose={handleClose} maxWidth="28rem" width="100%">
       <form className="flex flex-col overflow-hidden" onSubmit={handleSubmit(onSubmit)}>
         <div className="modal-header">
@@ -289,6 +298,16 @@ function CreateAttributeModal({ open, onClose, holdingId }: { open: boolean; onC
         </div>
       </form>
     </Modal>
+
+    <Modal open={confirmCloseOpen} onClose={() => setConfirmCloseOpen(false)} maxWidth="24rem" width="100%">
+      <div className="modal-header"><h2 className="modal-title">{t('common.unsavedChanges')}</h2></div>
+      <div className="modal-content"><p>{t('common.unsavedChangesMessage')}</p></div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={() => setConfirmCloseOpen(false)}>{t('common.cancel')}</Button>
+        <Button color="danger" onClick={forceClose}>{t('common.discard')}</Button>
+      </div>
+    </Modal>
+    </>
   );
 }
 
@@ -312,7 +331,9 @@ function EditAttributeModal({ attribute, open, onClose }: { attribute: ProductAt
   const [errorMessage, setErrorMessage] = useState('');
   const [errorKey, setErrorKey] = useState(0);
 
-  const { register, handleSubmit, control, setValue, watch, reset, formState: { errors } } = useForm<EditAttributeFormData>({
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+
+  const { register, handleSubmit, control, setValue, watch, reset, formState: { errors, isDirty } } = useForm<EditAttributeFormData>({
     defaultValues: { attribute_code: '', attribute_name: '', data_type: 'TEXT', unit: '', sort_order: 0, is_active: true },
   });
 
@@ -374,11 +395,18 @@ function EditAttributeModal({ attribute, open, onClose }: { attribute: ProductAt
   };
 
   const handleClose = () => {
+    if (isDirty) { setConfirmCloseOpen(true); return; }
+    forceClose();
+  };
+
+  const forceClose = () => {
     setErrorMessage('');
+    setConfirmCloseOpen(false);
     onClose();
   };
 
   return (
+    <>
     <Modal open={open} onClose={handleClose} maxWidth="28rem" width="100%">
       <form className="flex flex-col overflow-hidden" onSubmit={handleSubmit(onSubmit)}>
         <div className="modal-header">
@@ -455,6 +483,16 @@ function EditAttributeModal({ attribute, open, onClose }: { attribute: ProductAt
         </div>
       </form>
     </Modal>
+
+    <Modal open={confirmCloseOpen} onClose={() => setConfirmCloseOpen(false)} maxWidth="24rem" width="100%">
+      <div className="modal-header"><h2 className="modal-title">{t('common.unsavedChanges')}</h2></div>
+      <div className="modal-content"><p>{t('common.unsavedChangesMessage')}</p></div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={() => setConfirmCloseOpen(false)}>{t('common.cancel')}</Button>
+        <Button color="danger" onClick={forceClose}>{t('common.discard')}</Button>
+      </div>
+    </Modal>
+    </>
   );
 }
 
@@ -481,7 +519,9 @@ function CreateOptionModal({ open, onClose, holdingId, attributeId }: {
   const [errorMessage, setErrorMessage] = useState('');
   const [errorKey, setErrorKey] = useState(0);
 
-  const { register, handleSubmit, control, reset, formState: { errors } } = useForm<OptionFormData>({
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+
+  const { register, handleSubmit, control, reset, formState: { errors, isDirty } } = useForm<OptionFormData>({
     defaultValues: { option_code: '', option_label: '', option_value: '', sort_order: 0, is_default: false },
   });
 
@@ -528,12 +568,19 @@ function CreateOptionModal({ open, onClose, holdingId, attributeId }: {
   };
 
   const handleClose = () => {
+    if (isDirty) { setConfirmCloseOpen(true); return; }
+    forceClose();
+  };
+
+  const forceClose = () => {
     reset();
     setErrorMessage('');
+    setConfirmCloseOpen(false);
     onClose();
   };
 
   return (
+    <>
     <Modal open={open} onClose={handleClose} maxWidth="28rem" width="100%">
       <form className="flex flex-col overflow-hidden" onSubmit={handleSubmit(onSubmit)}>
         <div className="modal-header">
@@ -600,6 +647,16 @@ function CreateOptionModal({ open, onClose, holdingId, attributeId }: {
         </div>
       </form>
     </Modal>
+
+    <Modal open={confirmCloseOpen} onClose={() => setConfirmCloseOpen(false)} maxWidth="24rem" width="100%">
+      <div className="modal-header"><h2 className="modal-title">{t('common.unsavedChanges')}</h2></div>
+      <div className="modal-content"><p>{t('common.unsavedChangesMessage')}</p></div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={() => setConfirmCloseOpen(false)}>{t('common.cancel')}</Button>
+        <Button color="danger" onClick={forceClose}>{t('common.discard')}</Button>
+      </div>
+    </Modal>
+    </>
   );
 }
 
@@ -622,7 +679,9 @@ function EditOptionModal({ option, open, onClose }: { option: AttributeOption | 
   const [errorMessage, setErrorMessage] = useState('');
   const [errorKey, setErrorKey] = useState(0);
 
-  const { register, handleSubmit, control, reset, formState: { errors } } = useForm<EditOptionFormData>({
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+
+  const { register, handleSubmit, control, reset, formState: { errors, isDirty } } = useForm<EditOptionFormData>({
     defaultValues: { option_code: '', option_label: '', option_value: '', sort_order: 0, is_default: false, is_active: true },
   });
 
@@ -682,11 +741,18 @@ function EditOptionModal({ option, open, onClose }: { option: AttributeOption | 
   };
 
   const handleClose = () => {
+    if (isDirty) { setConfirmCloseOpen(true); return; }
+    forceClose();
+  };
+
+  const forceClose = () => {
     setErrorMessage('');
+    setConfirmCloseOpen(false);
     onClose();
   };
 
   return (
+    <>
     <Modal open={open} onClose={handleClose} maxWidth="28rem" width="100%">
       <form className="flex flex-col overflow-hidden" onSubmit={handleSubmit(onSubmit)}>
         <div className="modal-header">
@@ -763,6 +829,16 @@ function EditOptionModal({ option, open, onClose }: { option: AttributeOption | 
         </div>
       </form>
     </Modal>
+
+    <Modal open={confirmCloseOpen} onClose={() => setConfirmCloseOpen(false)} maxWidth="24rem" width="100%">
+      <div className="modal-header"><h2 className="modal-title">{t('common.unsavedChanges')}</h2></div>
+      <div className="modal-content"><p>{t('common.unsavedChangesMessage')}</p></div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={() => setConfirmCloseOpen(false)}>{t('common.cancel')}</Button>
+        <Button color="danger" onClick={forceClose}>{t('common.discard')}</Button>
+      </div>
+    </Modal>
+    </>
   );
 }
 

@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, DataTable, Badge, Input, Select, Button, Switch, PopOver, Tooltip, Modal, useSnackbarContext } from 'tsp-form';
+import { PageNav, PageNavPanel, MobileHeader, DataTable, Badge, Input, Select, Button, Switch, PopOver, Tooltip, Modal, NumberSpinner, useSnackbarContext } from 'tsp-form';
 import { ArrowRightFromLine, ArrowLeft, SlidersHorizontal, ChevronsUpDown, AlertTriangle, CheckCircle, XCircle, Pencil, Loader2, MousePointerClick, Plus, X } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -31,10 +31,8 @@ interface ModelRow {
   code: string;
   name: string;
   base_model_name: string;
-  model_name_suffix: string;
-  brand_id: number;
-  family_id: number;
-  category_id: number;
+  brand_name: string;
+  family_name: string;
   is_active: boolean;
 }
 
@@ -115,7 +113,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
   const [activeTab, setActiveTab] = useState<'fin2' | 'fin1'>('fin2');
 
   // Add term state
-  const [newTermMonths, setNewTermMonths] = useState('');
+  const [newTermMonths, setNewTermMonths] = useState<number | ''>('');
   const [newTermProfit, setNewTermProfit] = useState('');
   const [isAddingTerm, setIsAddingTerm] = useState(false);
   const [isRemovingTerm, setIsRemovingTerm] = useState<number | null>(null);
@@ -325,9 +323,10 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
 
   const handleAddTerm = async () => {
     if (!modelId) return;
-    const months = parseInt(newTermMonths);
+    if (newTermMonths === '' || newTermMonths <= 0) return;
+    const months = newTermMonths;
     const profitVal = newTermProfit.trim() ? parseFloat(newTermProfit) : null;
-    if (!months || months <= 0 || profitVal === null || profitVal < 0) return;
+    if (profitVal === null || profitVal < 0) return;
     setIsAddingTerm(true);
     setErrorMessage('');
     const start = Date.now();
@@ -356,6 +355,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
       });
       setNewTermMonths('');
       setNewTermProfit('');
+
       invalidateAll();
     } catch (err) {
       handleError(err);
@@ -541,8 +541,9 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                       <div key={term}>
                         <label className="form-label">{t('pricing.termMonths', { months: term })}</label>
                         <div className="flex items-center gap-2">
-                          <div className="flex-1">
+                          <div className="input-group flex-1">
                             <Input
+                              className="w-full"
                               type="number"
                               min={0}
                               step="0.01"
@@ -552,15 +553,16 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                               size="sm"
                               disabled={busy}
                             />
+                            <Button
+                              className="flex-shrink-0"
+                              color="primary"
+                              size="sm"
+                              disabled={busy || isSavingFin2 === term || !fin2Profits[term]?.trim()}
+                              onClick={() => handleSaveFin2Profit(term)}
+                            >
+                              {isSavingFin2 === term ? t('pricing.saving') : t('common.save')}
+                            </Button>
                           </div>
-                          <Button
-                            color="primary"
-                            size="sm"
-                            disabled={busy || isSavingFin2 === term || !fin2Profits[term]?.trim()}
-                            onClick={() => handleSaveFin2Profit(term)}
-                          >
-                            {isSavingFin2 === term ? t('pricing.saving') : t('common.save')}
-                          </Button>
                           <Button
                             variant="ghost"
                             size="sm"
@@ -577,23 +579,24 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                 </div>
                 {/* Add term */}
                 <div className="mt-3 pt-3 border-t border-line space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="flex flex-col">
+                  <div className="flex gap-2">
+                    <div className="flex flex-col shrink-0">
                       <label className="form-label">{t('pricing.enterMonths')}</label>
-                      <Input
-                        type="number"
+                      <NumberSpinner
+                        className="w-32"
                         min={1}
-                        step="1"
+                        max={120}
                         value={newTermMonths}
-                        onChange={(e) => setNewTermMonths(e.target.value)}
-                        placeholder="12"
-                        size="sm"
+                        onChange={setNewTermMonths}
+                        scale="sm"
                         disabled={busy || isAddingTerm}
+                        placeholder="12"
                       />
                     </div>
-                    <div className="flex flex-col">
+                    <div className="flex flex-col flex-1 min-w-0">
                       <label className="form-label">{t('pricing.profitAmount')}</label>
                       <Input
+                        className="w-full"
                         type="number"
                         min={0}
                         step="0.01"
@@ -609,7 +612,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                     color="primary"
                     size="sm"
                     className="w-full"
-                    disabled={busy || isAddingTerm || !newTermMonths.trim() || parseInt(newTermMonths) <= 0 || !newTermProfit.trim()}
+                    disabled={busy || isAddingTerm || newTermMonths === '' || newTermMonths <= 0 || !newTermProfit.trim()}
                     onClick={handleAddTerm}
                     startIcon={isAddingTerm ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
                   >
@@ -765,13 +768,6 @@ export function PricebookPage() {
     }
   }, [filterFamily, baseModels, filterBaseModel]);
 
-  // Lookup maps
-  const familyMap = useMemo(() => {
-    const map = new Map<number, string>();
-    for (const f of families) map.set(f.id, f.display_name);
-    return map;
-  }, [families]);
-
   // Filter options
   const brandOptions = brands.map((b) => ({ value: String(b.id), label: b.name }));
   const filteredFamilies = filterBrand ? families.filter(f => String(f.brand_id) === filterBrand) : families;
@@ -887,7 +883,7 @@ export function PricebookPage() {
   // Selected model object (for passing info to editor)
   const selectedModel = selectedModelId ? models.find(m => m.id === selectedModelId) ?? null : null;
   const detailTitle = selectedModel
-    ? `${selectedModel.base_model_name}${selectedModel.model_name_suffix ? ' ' + selectedModel.model_name_suffix : ''}`
+    ? selectedModel.name
     : t('pricing.editPrice');
 
   return (
@@ -1103,7 +1099,7 @@ export function PricebookPage() {
             {!isError && (
               <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
                 {/* Left panel: Model list */}
-                <PageNavPanel id="list" className="flex-1 max-w-3xl border-r border-line" mobileClassName="flex flex-col overflow-hidden">
+                <PageNavPanel id="list" className="flex-1 min-w-0 border-r border-line" mobileClassName="flex flex-col overflow-hidden">
                   <DataTable<ModelRow>
                     data={displayModels}
                     renderRow={(row) => {
@@ -1133,11 +1129,18 @@ export function PricebookPage() {
                             </Tooltip>
                           )}
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-baseline gap-1.5 min-w-0">
-                              <span className="text-sm truncate">{familyMap.get(model.family_id) ?? '—'}</span>
-                              <span className="text-sm font-medium text-info truncate">{model.base_model_name}</span>
-                              {model.model_name_suffix && (
-                                <span className="text-sm font-semibold truncate">{model.model_name_suffix}</span>
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="text-sm truncate">{model.brand_name}</span>
+                              <span className="text-sm font-medium text-info truncate">{model.family_name}</span>
+                              <span className="text-sm truncate">{model.name}</span>
+                              {needsSetup ? (
+                                <Tooltip content={t('pricing.needsSetup')}>
+                                  <Badge size="xs" color="warning" startIcon={<AlertTriangle />} />
+                                </Tooltip>
+                              ) : (
+                                <Tooltip content={t('pricing.allPriced')}>
+                                  <Badge size="xs" color="success" startIcon={<CheckCircle />} />
+                                </Tooltip>
                               )}
                             </div>
                             <div className="text-[11px] text-control-label truncate opacity-60">{model.code}</div>
@@ -1171,28 +1174,16 @@ export function PricebookPage() {
                                   const hasProfit = ft.profit !== null;
                                   return (
                                     <div key={ft.term_months} className="flex items-center gap-1">
-                                      <span className={`text-[10px] tabular-nums px-1.5 py-0.5 rounded ${hasProfit ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>{ft.term_months}m</span>
                                       <span className={`text-[11px] tabular-nums ${hasProfit ? '' : 'text-control-label'}`}>
                                         {hasProfit ? formatTHB(ft.profit) : '—'}
                                       </span>
+                                      <span className={`text-[10px] tabular-nums px-1.5 py-0.5 rounded ${hasProfit ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>{ft.term_months}m</span>
                                     </div>
                                   );
                                 })}
                               </div>
                             </div>
                           )}
-
-                          <div className="shrink-0 w-6 flex justify-end">
-                            {needsSetup ? (
-                              <Tooltip content={t('pricing.needsSetup')}>
-                                <Badge size="xs" color="warning" startIcon={<AlertTriangle />} />
-                              </Tooltip>
-                            ) : (
-                              <Tooltip content={t('pricing.allPriced')}>
-                                <Badge size="xs" color="success" startIcon={<CheckCircle />} />
-                              </Tooltip>
-                            )}
-                          </div>
                         </div>
                       );
                     }}
@@ -1215,14 +1206,14 @@ export function PricebookPage() {
                 </PageNavPanel>
 
                 {/* Right panel: Editor */}
-                <PageNavPanel id="detail" className="w-full max-w-lg overflow-y-auto better-scroll">
+                <PageNavPanel id="detail" className="w-xs xl:w-sm min-w-xs shrink overflow-y-auto better-scroll">
                   <div className="p-4">
                     <EditorPanel
                       modelId={selectedModelId}
                       modelCode={selectedModel?.code ?? ''}
-                      familyName={selectedModel ? familyMap.get(selectedModel.family_id) ?? '' : ''}
+                      familyName={selectedModel?.family_name ?? ''}
                       baseModelName={selectedModel?.base_model_name ?? ''}
-                      suffix={selectedModel?.model_name_suffix ?? ''}
+                      suffix={''}
                       isDirtyRef={editorDirtyRef}
                     />
                   </div>

@@ -397,6 +397,7 @@ function CreateUserModal({ open, onClose }: { open: boolean; onClose: () => void
   const [errorMessage, setErrorMessage] = useState('');
   const [errorKey, setErrorKey] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
 
   const {
     register,
@@ -404,7 +405,7 @@ function CreateUserModal({ open, onClose }: { open: boolean; onClose: () => void
     setValue,
     watch,
     reset,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<CreateUserFormData>({
     defaultValues: { username: '', password: '', role_code: '', company_id: '', branch_id: '' },
   });
@@ -464,13 +465,20 @@ function CreateUserModal({ open, onClose }: { open: boolean; onClose: () => void
   };
 
   const handleClose = () => {
+    if (isDirty) { setConfirmCloseOpen(true); return; }
+    forceClose();
+  };
+
+  const forceClose = () => {
     reset();
     setErrorMessage('');
     setShowPassword(false);
+    setConfirmCloseOpen(false);
     onClose();
   };
 
   return (
+    <>
     <Modal open={open} onClose={handleClose} maxWidth="28rem" width="100%">
       <form className="flex flex-col overflow-hidden" onSubmit={handleSubmit(onSubmit)}>
         <div className="modal-header">
@@ -584,6 +592,16 @@ function CreateUserModal({ open, onClose }: { open: boolean; onClose: () => void
         </div>
       </form>
     </Modal>
+
+    <Modal open={confirmCloseOpen} onClose={() => setConfirmCloseOpen(false)} maxWidth="24rem" width="100%">
+      <div className="modal-header"><h2 className="modal-title">{t('common.unsavedChanges')}</h2></div>
+      <div className="modal-content"><p>{t('common.unsavedChangesMessage')}</p></div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={() => setConfirmCloseOpen(false)}>{t('common.cancel')}</Button>
+        <Button color="danger" onClick={forceClose}>{t('common.discard')}</Button>
+      </div>
+    </Modal>
+    </>
   );
 }
 
@@ -603,6 +621,7 @@ function EditUserModal({ user, open, onClose }: { user: VUser | null; open: bool
   const [isPending, setIsPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [errorKey, setErrorKey] = useState(0);
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
 
   const {
     register,
@@ -611,7 +630,7 @@ function EditUserModal({ user, open, onClose }: { user: VUser | null; open: bool
     setValue,
     watch,
     reset,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<EditUserFormData>({
     defaultValues: { username: '', role_code: '', company_id: '', branch_id: '', is_active: true },
   });
@@ -685,11 +704,18 @@ function EditUserModal({ user, open, onClose }: { user: VUser | null; open: bool
   };
 
   const handleClose = () => {
+    if (isDirty) { setConfirmCloseOpen(true); return; }
+    forceClose();
+  };
+
+  const forceClose = () => {
     setErrorMessage('');
+    setConfirmCloseOpen(false);
     onClose();
   };
 
   return (
+    <>
     <Modal open={open} onClose={handleClose} maxWidth="28rem" width="100%">
       <form className="flex flex-col overflow-hidden" onSubmit={handleSubmit(onSubmit)}>
         <div className="modal-header">
@@ -797,6 +823,16 @@ function EditUserModal({ user, open, onClose }: { user: VUser | null; open: bool
         </div>
       </form>
     </Modal>
+
+    <Modal open={confirmCloseOpen} onClose={() => setConfirmCloseOpen(false)} maxWidth="24rem" width="100%">
+      <div className="modal-header"><h2 className="modal-title">{t('common.unsavedChanges')}</h2></div>
+      <div className="modal-content"><p>{t('common.unsavedChangesMessage')}</p></div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={() => setConfirmCloseOpen(false)}>{t('common.cancel')}</Button>
+        <Button color="danger" onClick={forceClose}>{t('common.discard')}</Button>
+      </div>
+    </Modal>
+    </>
   );
 }
 
@@ -1074,13 +1110,15 @@ function ChangeRoleModal({ user, open, onClose }: { user: VUser | null; open: bo
   const [errorMessage, setErrorMessage] = useState('');
   const [errorKey, setErrorKey] = useState(0);
 
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+
   const {
     register,
     handleSubmit,
     setValue,
     watch,
     reset,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<ChangeRoleFormData>({
     defaultValues: { role_code: '' },
   });
@@ -1134,11 +1172,18 @@ function ChangeRoleModal({ user, open, onClose }: { user: VUser | null; open: bo
   };
 
   const handleClose = () => {
+    if (isDirty) { setConfirmCloseOpen(true); return; }
+    forceClose();
+  };
+
+  const forceClose = () => {
     setErrorMessage('');
+    setConfirmCloseOpen(false);
     onClose();
   };
 
   return (
+    <>
     <Modal open={open} onClose={handleClose} maxWidth="28rem" width="100%">
       <form className="flex flex-col overflow-hidden" onSubmit={handleSubmit(onSubmit)}>
         <div className="modal-header">
@@ -1183,6 +1228,16 @@ function ChangeRoleModal({ user, open, onClose }: { user: VUser | null; open: bo
         </div>
       </form>
     </Modal>
+
+    <Modal open={confirmCloseOpen} onClose={() => setConfirmCloseOpen(false)} maxWidth="24rem" width="100%">
+      <div className="modal-header"><h2 className="modal-title">{t('common.unsavedChanges')}</h2></div>
+      <div className="modal-content"><p>{t('common.unsavedChangesMessage')}</p></div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={() => setConfirmCloseOpen(false)}>{t('common.cancel')}</Button>
+        <Button color="danger" onClick={forceClose}>{t('common.discard')}</Button>
+      </div>
+    </Modal>
+    </>
   );
 }
 
