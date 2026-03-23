@@ -27,6 +27,7 @@ import { PricebookPage } from './pages/pricing/PricebookPage';
 import { Fin1RatesPage } from './pages/pricing/Fin1RatesPage';
 import { Fin2RatesPage } from './pages/pricing/Fin2RatesPage';
 import { DiscountsPage } from './pages/pricing/DiscountsPage';
+import { DealPartnerRatesPage } from './pages/pricing/DealPartnerRatesPage';
 import { InventoryLayout } from './pages/inventory/InventoryLayout';
 import { StockDashboardPage } from './pages/inventory/StockDashboardPage';
 import { ReceivingPage } from './pages/inventory/ReceivingPage';
@@ -199,6 +200,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <PricingLayout><DiscountsPage /></PricingLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/pricing/deal-partner-rates"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <PricingLayout><DealPartnerRatesPage /></PricingLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
