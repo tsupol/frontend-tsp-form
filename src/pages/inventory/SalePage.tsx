@@ -6,6 +6,7 @@ import { ArrowLeft, ArrowRightFromLine, CheckCircle, XCircle, ShoppingCart, Rota
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { DateTime } from '../../components/DateTime';
+import { ModelName } from '../../components/ModelName';
 
 // ============================================================================
 // Types
@@ -512,15 +513,15 @@ export function SalePage() {
                     <div
                       className={`flex items-center gap-3 px-4 py-2.5 border-b border-line cursor-pointer transition-colors ${
                         isSelected ? 'bg-primary/10' : 'hover:bg-surface-hover'
-                      } ${!isOwnBranch ? 'opacity-50' : ''}`}
+                      }`}
                       onClick={() => {
                         setSelectedAssetId(asset.asset_id);
                         if (isMobile) goTo('detail');
                       }}
                     >
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm truncate">
-                          {asset.brand_name} {asset.family_name} {asset.variant_name}
+                        <div className={`flex items-baseline gap-1.5 min-w-0 ${!isOwnBranch ? 'opacity-50' : ''}`}>
+                          <ModelName brand={asset.brand_name} family={asset.family_name} model={asset.variant_name} />
                         </div>
                         <div className="text-xs text-subtle truncate font-mono">
                           {asset.serial_no ?? '—'}
@@ -537,7 +538,7 @@ export function SalePage() {
                         </div>
                       </div>
                       <div className="text-right shrink-0">
-                        <div className="text-sm text-figure tabular-nums">{fmtCurrency(asset.current_cost_basis)}</div>
+                        <div className={`text-sm text-figure tabular-nums ${!isOwnBranch ? 'opacity-50' : ''}`}>{fmtCurrency(asset.current_cost_basis)}</div>
                       </div>
                     </div>
                   );

@@ -311,7 +311,7 @@ export function StockDashboardPage() {
             <PageNavPanel id="list" className="w-1/2 xl:w-5/12 border-r border-line overflow-y-auto better-scroll">
               {/* Filter bar */}
               <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line sticky top-0 z-10 bg-surface gap-2">
-                <div style={{ width: '12rem' }}>
+                <div className="flex-1 min-w-0">
                   <Select
                     options={branchOptions}
                     value={filterBranchId !== null ? String(filterBranchId) : null}
@@ -322,7 +322,7 @@ export function StockDashboardPage() {
                     clearable
                   />
                 </div>
-                <div style={{ width: '12rem' }}>
+                <div className="flex-1 min-w-0">
                   <Select
                     options={bucketOptions}
                     value={filterBucket}

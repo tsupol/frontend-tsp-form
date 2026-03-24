@@ -4,6 +4,7 @@ import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tansta
 import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Input, Modal, useSnackbarContext } from 'tsp-form';
 import { ArrowLeft, ArrowRightFromLine, CheckCircle, XCircle, Package, PackagePlus } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import { ModelName } from '../../components/ModelName';
 
 // ============================================================================
 // Types
@@ -347,7 +348,9 @@ export function ReceivingPage() {
                     }}
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm truncate">{line.brand_name} {line.family_name}</div>
+                      <div className="flex items-baseline gap-1.5 min-w-0">
+                        <ModelName brand={line.brand_name} family={line.family_name} />
+                      </div>
                       <div className="text-xs text-subtle truncate">{line.variant_name} · {line.po_no}</div>
                       <div className="flex items-center gap-2 mt-1 -ml-0.5">
                         <Badge size="xs" className={STATUS_BADGE[line.asset_intake_status] ?? 'bg-fg/10 text-fg/60'}>
@@ -506,7 +509,7 @@ function DetailPanel({
       {/* Desktop detail header */}
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
-          <span className="font-semibold">{line.brand_name} {line.family_name}</span>
+          <ModelName brand={line.brand_name} family={line.family_name} />
           <Badge size="xs" className={STATUS_BADGE[line.asset_intake_status] ?? 'bg-fg/10 text-fg/60'}>
             {line.asset_intake_status}
           </Badge>
@@ -555,6 +558,7 @@ function DetailPanel({
                   value={lotCode}
                   onChange={(e) => setLotCode(e.target.value)}
                   placeholder={t('receiving.enterLotCode')}
+                  size="sm"
                 />
               </div>
               <div className="flex flex-col">
@@ -569,9 +573,10 @@ function DetailPanel({
                   />
                 </div>
               </div>
-              <div>
+              <div className="pt-2">
                 <Button
                   color="primary"
+                  size="sm"
                   onClick={onReceiveLot}
                   disabled={!lotCode.trim() || receiving}
                 >

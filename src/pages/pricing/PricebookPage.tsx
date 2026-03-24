@@ -7,6 +7,7 @@ import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useFormSnapshot } from '../../hooks/useFormSnapshot';
+import { ModelName } from '../../components/ModelName';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -442,7 +443,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
           {/* Header */}
           <div className="pb-4 border-b border-line mb-4">
             <div className="flex items-baseline gap-1.5 flex-wrap">
-              <span className="text-sm truncate">{familyName}</span>
+              <span className="text-xs truncate">{familyName}</span>
               <span className="text-sm font-medium text-info truncate">{baseModelName}</span>
               {suffix && <span className="text-sm font-semibold truncate">{suffix}</span>}
             </div>
@@ -1128,10 +1129,8 @@ export function PricebookPage() {
                             </Tooltip>
                           )}
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5 min-w-0">
-                              <span className="text-sm truncate">{model.brand_name}</span>
-                              <span className="text-sm font-medium text-info truncate">{model.family_name}</span>
-                              <span className="text-sm truncate">{model.name}</span>
+                            <div className="flex items-baseline gap-1.5 min-w-0">
+                              <ModelName brand={model.brand_name} family={model.family_name} model={model.name} />
                               {needsSetup ? (
                                 <Tooltip content={t('pricing.needsSetup')}>
                                   <Badge size="xs" color="warning" startIcon={<AlertTriangle />} />

@@ -2,13 +2,13 @@ import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, DataTable, Badge, Input, Select, Button, PopOver, Tooltip, Modal, NumberSpinner, InputDatePicker, useSnackbarContext } from 'tsp-form';
-import { ArrowRightFromLine, ArrowLeft, SlidersHorizontal, ChevronsUpDown, CheckCircle, XCircle, Pencil, Loader2, MousePointerClick, Plus, X, ChevronRight, ChevronDown, Calendar } from 'lucide-react';
+import { ArrowRightFromLine, ArrowLeft, SlidersHorizontal, ChevronsUpDown, CheckCircle, XCircle, Pencil, Loader2, MousePointerClick, Plus, X, Calendar } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { formatDateTime } from '../../lib/format';
-import { DateTime } from '../../components/DateTime';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useFormSnapshot } from '../../hooks/useFormSnapshot';
+import { ModelName } from '../../components/ModelName';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -546,8 +546,6 @@ export function Fin2RatesPage() {
   // Selected model for editing
   const [selectedModelId, setSelectedModelId] = useState<number | null>(null);
 
-  // Expanded models
-  const [expandedModels, setExpandedModels] = useState<Set<number>>(new Set());
 
   // Unsaved changes guard
   const editorDirtyRef = useRef(false);
@@ -736,16 +734,6 @@ export function Fin2RatesPage() {
     }
     return map;
   }, [rateLookupRows]);
-
-  // Toggle expand
-  const toggleExpand = (modelId: number) => {
-    setExpandedModels(prev => {
-      const next = new Set(prev);
-      if (next.has(modelId)) next.delete(modelId);
-      else next.add(modelId);
-      return next;
-    });
-  };
 
   // Selected model object
   const selectedModel = selectedModelId ? models.find(m => m.id === selectedModelId) ?? null : null;
@@ -973,7 +961,6 @@ export function Fin2RatesPage() {
                       const rateSummary = rateSummaryMap.get(model.id);
                       const terms = rateSummary?.terms ?? [];
                       const isSelected = model.id === selectedModelId;
-                      const isExpanded = expandedModels.has(model.id);
 
                       return (
                         <div>
@@ -995,20 +982,9 @@ export function Fin2RatesPage() {
                               </Tooltip>
                             )}
 
-                            <Button
-                              variant="ghost"
-                              size="xs"
-                              className="shrink-0 text-control-label hover:text-fg"
-                              onClick={(e) => { e.stopPropagation(); toggleExpand(model.id); }}
-                            >
-                              {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                            </Button>
-
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-1.5 min-w-0">
-                                <span className="text-sm truncate">{model.brand_name}</span>
-                                <span className="text-sm font-medium text-info truncate">{model.family_name}</span>
-                                <span className="text-sm truncate">{model.name}</span>
+                              <div className="flex items-baseline gap-1.5 min-w-0">
+                                <ModelName brand={model.brand_name} family={model.family_name} model={model.name} />
                               </div>
                               <div className="text-[11px] text-control-label truncate opacity-60">{model.code}</div>
                             </div>
@@ -1037,58 +1013,6 @@ export function Fin2RatesPage() {
                             )}
                           </div>
 
-                          {/* Expanded section */}
-                          {isExpanded && terms.length > 0 && (
-                            <div className="bg-surface-hover/50 border-b border-line">
-                              <table className="w-full text-xs">
-                                <thead>
-                                  <tr className="border-b border-line">
-                                    <th className="py-1.5 px-3 text-left font-medium text-control-label">{t('fin2.term')}</th>
-                                    <th className="py-1.5 px-3 text-right font-medium text-control-label">{t('fin2.value')}</th>
-                                    <th className="py-1.5 px-3 text-left font-medium text-control-label">{t('fin2.effectiveFrom')}</th>
-                                    <th className="py-1.5 px-3 text-left font-medium text-control-label">{t('fin2.effectiveTo')}</th>
-                                    <th className="py-1.5 px-3 text-left font-medium text-control-label">{t('fin2.status')}</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {terms.flatMap(term => {
-                                    const rows: React.ReactElement[] = [];
-                                    // Active rate row
-                                    if (term.activeRate) {
-                                      rows.push(
-                                        <tr key={`${term.term_months}-active`} className="border-b border-line last:border-b-0">
-                                          <td className="py-1.5 px-3 font-medium">{t('pricing.termMonths', { months: term.term_months })}</td>
-                                          <td className="py-1.5 px-3 text-right tabular-nums">{formatTHB(term.activeRate.value)}</td>
-                                          <td className="py-1.5 px-3"><DateTime value={term.activeRate.effective_from} showTime={false} /></td>
-                                          <td className="py-1.5 px-3 text-control-label">—</td>
-                                          <td className="py-1.5 px-3"><Badge size="xs" color="success">{t('fin2.active')}</Badge></td>
-                                        </tr>
-                                      );
-                                    }
-                                    // History rows
-                                    for (const hist of term.history) {
-                                      rows.push(
-                                        <tr key={`${term.term_months}-${hist.price_rate_id}`} className="border-b border-line last:border-b-0 opacity-60">
-                                          <td className="py-1.5 px-3"></td>
-                                          <td className="py-1.5 px-3 text-right tabular-nums">{formatTHB(hist.value)}</td>
-                                          <td className="py-1.5 px-3"><DateTime value={hist.effective_from} showTime={false} /></td>
-                                          <td className="py-1.5 px-3"><DateTime value={hist.effective_to} showTime={false} /></td>
-                                          <td className="py-1.5 px-3"><Badge size="xs">{t('fin2.closed')}</Badge></td>
-                                        </tr>
-                                      );
-                                    }
-                                    return rows;
-                                  })}
-                                </tbody>
-                              </table>
-                            </div>
-                          )}
-
-                          {isExpanded && terms.length === 0 && (
-                            <div className="bg-surface-hover/50 border-b border-line py-3 px-3 text-xs text-control-label">
-                              {t('fin2.noActiveRates')}
-                            </div>
-                          )}
                         </div>
                       );
                     }}
