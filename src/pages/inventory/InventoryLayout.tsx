@@ -1,11 +1,16 @@
 import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { BarChart3, PackagePlus, ShoppingCart } from 'lucide-react';
+import { BarChart3, Box, ClipboardList, PackagePlus, ArrowLeftRight, Wrench, RotateCcw, ShoppingCart } from 'lucide-react';
 
 const navItems = [
   { path: '/admin/inventory/stock', labelKey: 'nav.stock', icon: BarChart3 },
+  { path: '/admin/inventory/assets', labelKey: 'nav.assets', icon: Box },
+  { path: '/admin/inventory/po', labelKey: 'nav.purchaseOrders', icon: ClipboardList },
   { path: '/admin/inventory/receiving', labelKey: 'nav.receiving', icon: PackagePlus },
+  { path: '/admin/inventory/transfers', labelKey: 'nav.transfers', icon: ArrowLeftRight },
+  { path: '/admin/inventory/repairs', labelKey: 'nav.repairs', icon: Wrench },
+  { path: '/admin/inventory/buyback', labelKey: 'nav.buyback', icon: RotateCcw },
   { path: '/admin/inventory/sale', labelKey: 'nav.sale', icon: ShoppingCart },
 ];
 

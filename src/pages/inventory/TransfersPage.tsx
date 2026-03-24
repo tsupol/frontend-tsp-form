@@ -2,69 +2,65 @@ import { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Badge, Select, DataTable } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, PackagePlus } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, ArrowLeftRight } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
-import { fmtNum, fmtCurrency } from './inventoryUtils';
+import { fmtNum } from './inventoryUtils';
 
 // ============================================================================
 // Types (verified against live API 2026-03-24)
 // ============================================================================
 
-interface Receipt {
+interface TransferOrder {
   id: number;
-  receipt_no: string;
   holding_id: number;
   company_id: number;
-  branch_id: number;
-  branch_name: string;
-  po_id: number;
-  po_no: string;
-  supplier_name: string;
+  from_branch_id: number;
+  from_branch_name: string;
+  to_branch_id: number;
+  to_branch_name: string | null;
+  transfer_no: string;
+  code_display: string | null;
+  transfer_mode: string;
   status: string;
-  posted_at: string | null;
   notes: string | null;
-  line_count: number;
-  total_qty: number;
-  total_amount: number;
-  created_by: number;
+  dispute_note: string | null;
+  c_total_lines: number;
+  c_received_lines: number;
+  approved_at: string | null;
+  approved_by: number | null;
+  dispatched_at: string | null;
+  completed_at: string | null;
+  created_by: number | null;
   created_at: string;
+  updated_at: string;
 }
 
-interface ReceiptDetail {
-  receipt_id: number;
-  receipt_no: string;
-  holding_id: number;
-  company_id: number;
-  branch_id: number;
-  branch_name: string;
-  po_id: number;
-  po_no: string;
-  supplier_name: string;
-  ownership: string;
-  status: string;
-  posted_at: string | null;
-  notes: string | null;
-  created_by: number;
-  created_at: string;
-  lines: ReceiptLine[];
-}
-
-interface ReceiptLine {
-  receipt_line_id: number;
-  po_line_id: number;
-  model_id: number;
-  variant_id: number;
-  sku_code: string;
-  variant_name: string;
-  model_name: string;
-  family_name: string;
-  brand_name: string;
-  qty_received: number;
-  unit_cost: number;
-  line_total: number;
+interface TransferLine {
+  id: number;
+  transfer_order_id: number;
+  line_type: string;
+  asset_id: number | null;
   stock_lot_id: number | null;
-  is_unmatched: boolean;
+  asset_code: string | null;
+  serial_no: string | null;
+  variant_id: number | null;
+  variant_name: string | null;
+  sku_code: string | null;
+  model_name: string | null;
+  model_code: string | null;
+  qty_requested: number | null;
+  qty_shipped: number | null;
+  qty_received: number | null;
+  status: string;
+  condition_ok: boolean | null;
+  receive_note: string | null;
+  from_branch_id: number;
+  from_branch_name: string;
+  to_branch_id: number;
+  to_branch_name: string | null;
+  created_at: string;
+  holding_id: number;
 }
 
 interface Branch {
@@ -76,15 +72,27 @@ interface Branch {
 // Status display
 // ============================================================================
 
-const RECEIPT_STATUS_COLOR: Record<string, string> = {
+const TRANSFER_STATUS_COLOR: Record<string, string> = {
   DRAFT: 'bg-fg/10 text-fg/60',
-  CONFIRMED: 'bg-success/15 text-success',
+  APPROVED: 'bg-success/15 text-success',
+  DISPATCHED: 'bg-info/15 text-info',
+  COMPLETED: 'bg-fg/10 text-fg/60',
   CANCELLED: 'bg-danger/15 text-danger',
+  DISPUTED: 'bg-warning/15 text-warning',
 };
 
-const RECEIPT_STATUS_OPTIONS = [
+const LINE_STATUS_COLOR: Record<string, string> = {
+  PENDING: 'bg-warning/15 text-warning',
+  SHIPPED: 'bg-info/15 text-info',
+  RECEIVED: 'bg-success/15 text-success',
+  RECEIVED_DAMAGED: 'bg-danger/15 text-danger',
+};
+
+const TRANSFER_STATUS_OPTIONS = [
   { value: 'DRAFT', label: 'Draft' },
-  { value: 'CONFIRMED', label: 'Confirmed' },
+  { value: 'APPROVED', label: 'Approved' },
+  { value: 'DISPATCHED', label: 'Dispatched' },
+  { value: 'COMPLETED', label: 'Completed' },
   { value: 'CANCELLED', label: 'Cancelled' },
 ];
 
@@ -92,7 +100,7 @@ const RECEIPT_STATUS_OPTIONS = [
 // Component
 // ============================================================================
 
-export function ReceivingPage() {
+export function TransfersPage() {
   const { t } = useTranslation();
 
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
@@ -112,12 +120,12 @@ export function ReceivingPage() {
   }, [branches]);
 
   const { data: listData, isFetching } = useQuery({
-    queryKey: ['receipts', filterStatus, filterBranchId, pageIndex, pageSize],
+    queryKey: ['transfer-orders', filterStatus, filterBranchId, pageIndex, pageSize],
     queryFn: () => {
-      let url = '/v_receipts?order=created_at.desc';
+      let url = '/v_transfer_orders?order=created_at.desc';
       if (filterStatus) url += `&status=eq.${filterStatus}`;
-      if (filterBranchId) url += `&branch_id=eq.${filterBranchId}`;
-      return apiClient.getPaginated<Receipt>(url, { page: pageIndex + 1, pageSize });
+      if (filterBranchId) url += `&from_branch_id=eq.${filterBranchId}`;
+      return apiClient.getPaginated<TransferOrder>(url, { page: pageIndex + 1, pageSize });
     },
     placeholderData: keepPreviousData,
   });
@@ -125,9 +133,9 @@ export function ReceivingPage() {
   const list = listData?.data ?? [];
   const totalCount = listData?.totalCount ?? 0;
 
-  const { data: detail, isFetching: detailFetching } = useQuery({
-    queryKey: ['receipt-detail', selectedId],
-    queryFn: () => apiClient.get<ReceiptDetail[]>(`/v_receipt_detail?receipt_id=eq.${selectedId}`).then(rows => rows[0] ?? null),
+  const { data: lines, isFetching: linesFetching } = useQuery({
+    queryKey: ['transfer-lines', selectedId],
+    queryFn: () => apiClient.get<TransferLine[]>(`/v_transfer_lines?transfer_order_id=eq.${selectedId}&order=id`),
     enabled: !!selectedId,
     placeholderData: keepPreviousData,
   });
@@ -135,12 +143,12 @@ export function ReceivingPage() {
   useEffect(() => { setPageIndex(0); }, [filterStatus, filterBranchId]);
 
   useEffect(() => {
-    if (selectedId && list.length > 0 && !list.find(r => r.id === selectedId)) {
+    if (selectedId && list.length > 0 && !list.find(o => o.id === selectedId)) {
       setSelectedId(null);
     }
   }, [list, selectedId]);
 
-  const selectedReceipt = list.find(r => r.id === selectedId) ?? null;
+  const selectedOrder = list.find(o => o.id === selectedId) ?? null;
 
   return (
     <PageNav panels={['list', 'detail']} className="h-dvh">
@@ -160,7 +168,7 @@ export function ReceivingPage() {
                 )}
               </div>
               <div className="mobile-header-title mobile-header-title-truncate">
-                {isRoot ? t('nav.receiving') : selectedReceipt?.receipt_no ?? ''}
+                {isRoot ? t('nav.transfers') : selectedOrder?.transfer_no ?? ''}
               </div>
               <div className="mobile-header-end w-12" />
             </MobileHeader>
@@ -168,7 +176,7 @@ export function ReceivingPage() {
 
           {!isMobile && (
             <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
-              <h1 className="heading-2 shrink-0">{t('nav.receiving')}</h1>
+              <h1 className="heading-2 shrink-0">{t('nav.transfers')}</h1>
             </div>
           )}
 
@@ -178,10 +186,10 @@ export function ReceivingPage() {
                 <div className="flex gap-2 w-full">
                   <div className="flex-[2] min-w-0">
                     <Select
-                      options={RECEIPT_STATUS_OPTIONS}
+                      options={TRANSFER_STATUS_OPTIONS}
                       value={filterStatus}
                       onChange={(val) => setFilterStatus((val as string) || null)}
-                      placeholder={t('receiving.allStatuses')}
+                      placeholder={t('transfer.allStatuses')}
                       size="sm"
                       showChevron
                       clearable
@@ -201,37 +209,35 @@ export function ReceivingPage() {
                 </div>
               </div>
 
-              <DataTable<Receipt>
+              <DataTable<TransferOrder>
                 data={list}
                 renderRow={(row) => {
-                  const receipt = row.original;
-                  const isSelected = receipt.id === selectedId;
+                  const order = row.original;
+                  const isSelected = order.id === selectedId;
                   return (
                     <button
-                      key={receipt.id}
+                      key={order.id}
                       className={`w-full text-left px-4 py-2.5 border-b border-line flex items-center gap-3 transition-colors cursor-pointer ${
                         isSelected ? 'bg-primary/10' : 'hover:bg-surface-hover'
                       }`}
-                      onClick={() => { setSelectedId(receipt.id); if (isMobile) goTo('detail'); }}
+                      onClick={() => { setSelectedId(order.id); if (isMobile) goTo('detail'); }}
                     >
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline gap-1.5 min-w-0">
-                          <span className="font-medium text-sm truncate">{receipt.receipt_no}</span>
-                          <span className="text-xs text-subtle truncate">· {receipt.po_no}</span>
+                        <div className="font-medium text-sm truncate">{order.transfer_no}</div>
+                        <div className="text-xs text-subtle truncate">
+                          {order.from_branch_name} → {order.to_branch_name ?? `Branch #${order.to_branch_id}`}
                         </div>
-                        <div className="text-xs text-subtle truncate">{receipt.supplier_name} · {receipt.branch_name}</div>
                         <div className="flex items-center gap-2 mt-1 -ml-0.5">
-                          <Badge size="xs" className={RECEIPT_STATUS_COLOR[receipt.status] ?? 'bg-fg/10 text-fg/60'}>
-                            {t(`receiving.status_${receipt.status}`, receipt.status)}
+                          <Badge size="xs" className={TRANSFER_STATUS_COLOR[order.status] ?? 'bg-fg/10 text-fg/60'}>
+                            {t(`transfer.status_${order.status}`, order.status)}
                           </Badge>
                           <span className="text-xs text-subtle">
-                            {receipt.line_count} {t('receiving.lines')} · {fmtNum(receipt.total_qty)} pcs
+                            {order.c_total_lines} {t('transfer.lines')}
                           </span>
                         </div>
                       </div>
-                      <div className="text-right shrink-0">
-                        <div className="text-sm font-medium tabular-nums">{fmtCurrency(receipt.total_amount)}</div>
-                        <div className="text-xs text-subtle"><DateTime value={receipt.created_at} /></div>
+                      <div className="text-right shrink-0 text-xs text-subtle">
+                        <DateTime value={order.created_at} />
                       </div>
                     </button>
                   );
@@ -248,13 +254,13 @@ export function ReceivingPage() {
             </PageNavPanel>
 
             <PageNavPanel id="detail" className={isMobile ? '' : 'flex-1 flex flex-col'}>
-              {detail ? (
-                <ReceiptDetailPanel detail={detail} loading={detailFetching} isMobile={isMobile} t={t} />
+              {selectedOrder ? (
+                <TransferDetailPanel order={selectedOrder} lines={lines ?? []} loading={linesFetching} isMobile={isMobile} t={t} />
               ) : (
                 <div className="flex-1 h-full flex items-center justify-center text-subtler">
                   <div className="text-center">
-                    <PackagePlus size={32} className="mx-auto mb-2 opacity-40" />
-                    {t('receiving.selectToView')}
+                    <ArrowLeftRight size={32} className="mx-auto mb-2 opacity-40" />
+                    {t('transfer.selectToView')}
                   </div>
                 </div>
               )}
@@ -270,13 +276,15 @@ export function ReceivingPage() {
 // Detail panel
 // ============================================================================
 
-function ReceiptDetailPanel({
-  detail,
+function TransferDetailPanel({
+  order,
+  lines,
   loading,
   isMobile,
   t,
 }: {
-  detail: ReceiptDetail;
+  order: TransferOrder;
+  lines: TransferLine[];
   loading: boolean;
   isMobile: boolean;
   t: (key: string, fallback?: string) => string;
@@ -291,67 +299,87 @@ function ReceiptDetailPanel({
 
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
-          <span className="font-semibold">{detail.receipt_no}</span>
-          <Badge size="xs" className={RECEIPT_STATUS_COLOR[detail.status] ?? 'bg-fg/10 text-fg/60'}>
-            {t(`receiving.status_${detail.status}`, detail.status)}
+          <span className="font-semibold">{order.transfer_no}</span>
+          <Badge size="xs" className={TRANSFER_STATUS_COLOR[order.status] ?? 'bg-fg/10 text-fg/60'}>
+            {t(`transfer.status_${order.status}`, order.status)}
           </Badge>
         </div>
       )}
 
       <div className="flex-none grid grid-cols-3 gap-3 px-4 py-3 border-b border-line bg-surface">
         <div>
-          <div className="text-xs text-subtle">{t('receiving.poRef')}</div>
-          <div className="font-semibold text-sm">{detail.po_no}</div>
-          <div className="text-xs text-subtle">{detail.supplier_name}</div>
+          <div className="text-xs text-subtle">{t('transfer.from')}</div>
+          <div className="font-semibold text-sm truncate">{order.from_branch_name}</div>
         </div>
         <div>
-          <div className="text-xs text-subtle">{t('receiving.branch')}</div>
-          <div className="font-semibold text-sm truncate">{detail.branch_name}</div>
+          <div className="text-xs text-subtle">{t('transfer.to')}</div>
+          <div className="font-semibold text-sm truncate">{order.to_branch_name ?? `Branch #${order.to_branch_id}`}</div>
         </div>
         <div>
-          <div className="text-xs text-subtle">{t('receiving.totalAmount')}</div>
-          <div className="font-semibold text-sm tabular-nums">
-            {fmtCurrency(detail.lines.reduce((sum, l) => sum + l.line_total, 0))}
-          </div>
+          <div className="text-xs text-subtle">{t('transfer.mode')}</div>
+          <div className="font-semibold text-sm">{order.transfer_mode.replace(/_/g, ' ')}</div>
         </div>
       </div>
+
+      {/* Progress */}
+      {order.status !== 'DRAFT' && order.status !== 'CANCELLED' && order.c_total_lines > 0 && (
+        <div className="flex-none px-4 py-2.5 border-b border-line">
+          <div className="flex items-center justify-between text-xs mb-1">
+            <span className="text-subtle">{t('transfer.receivingProgress')}</span>
+            <span className="tabular-nums font-medium">
+              {fmtNum(order.c_received_lines)} / {fmtNum(order.c_total_lines)}
+            </span>
+          </div>
+          <div className="h-1.5 bg-fg/10 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-primary rounded-full transition-all"
+              style={{ width: `${order.c_total_lines > 0 ? (order.c_received_lines / order.c_total_lines) * 100 : 0}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Timestamps */}
       <div className="flex-none px-4 py-2 border-b border-line flex flex-wrap gap-x-6 gap-y-1 text-xs text-subtle">
-        <span>{t('receiving.created')}: <DateTime value={detail.created_at} /></span>
-        {detail.posted_at && <span>{t('receiving.posted')}: <DateTime value={detail.posted_at} /></span>}
+        <span>{t('transfer.created')}: <DateTime value={order.created_at} /></span>
+        {order.approved_at && <span>{t('transfer.approved')}: <DateTime value={order.approved_at} /></span>}
+        {order.dispatched_at && <span>{t('transfer.dispatched')}: <DateTime value={order.dispatched_at} /></span>}
+        {order.completed_at && <span>{t('transfer.completed')}: <DateTime value={order.completed_at} /></span>}
       </div>
 
-      {detail.notes && (
-        <div className="flex-none px-4 py-2 border-b border-line text-xs text-fg/70 italic">{detail.notes}</div>
+      {order.notes && (
+        <div className="flex-none px-4 py-2 border-b border-line text-xs text-fg/70 italic">{order.notes}</div>
       )}
 
       {/* Lines */}
       <div className="flex-1 overflow-auto better-scroll">
         <div className="px-4 pt-3 pb-1">
           <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider">
-            {t('receiving.lines')} ({detail.lines.length})
+            {t('transfer.lines')} ({lines.length})
           </h3>
         </div>
-        {detail.lines.length === 0 && (
+        {lines.length === 0 && !loading && (
           <div className="p-8 text-center text-subtler">{t('common.noData')}</div>
         )}
-        {detail.lines.map((line) => (
-          <div key={line.receipt_line_id} className="px-4 py-2.5 border-b border-line flex items-center gap-3">
+        {lines.map((line) => (
+          <div key={line.id} className="px-4 py-2.5 border-b border-line flex items-center gap-3">
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium truncate">{line.model_name}</div>
-              <div className="text-xs text-subtle truncate">
-                {line.variant_name} · {line.sku_code}
+              <div className="text-sm font-medium truncate">
+                {line.line_type === 'ASSET' ? (line.asset_code ?? `Asset #${line.asset_id}`) : `Lot #${line.stock_lot_id}`}
               </div>
-              <div className="text-xs text-subtle">{line.brand_name} · {line.family_name}</div>
-              {line.is_unmatched && (
-                <Badge size="xs" className="bg-warning/15 text-warning mt-1">{t('receiving.unmatched')}</Badge>
-              )}
+              <div className="text-xs text-subtle truncate">
+                {line.model_name && `${line.model_name} · `}{line.variant_name ?? line.sku_code ?? ''}
+              </div>
+              {line.serial_no && <div className="text-xs text-fg/50 font-mono">{line.serial_no}</div>}
+              {line.receive_note && <div className="text-xs text-fg/50 mt-0.5 italic">{line.receive_note}</div>}
             </div>
-            <div className="text-right shrink-0">
-              <div className="text-sm font-medium tabular-nums">{fmtNum(line.qty_received)} pcs</div>
-              <div className="text-xs text-subtle tabular-nums">@ {fmtCurrency(line.unit_cost)}</div>
-              <div className="text-xs font-medium tabular-nums">{fmtCurrency(line.line_total)}</div>
+            <div className="shrink-0 flex flex-col items-end gap-1">
+              <Badge size="xs" className={LINE_STATUS_COLOR[line.status] ?? 'bg-fg/10 text-fg/60'}>
+                {line.status}
+              </Badge>
+              {line.line_type === 'LOT' && line.qty_requested !== null && (
+                <span className="text-xs tabular-nums text-subtle">{line.qty_requested} pcs</span>
+              )}
             </div>
           </div>
         ))}

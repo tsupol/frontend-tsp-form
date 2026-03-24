@@ -2,69 +2,39 @@ import { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Badge, Select, DataTable } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, PackagePlus } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, Wrench } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
-import { fmtNum, fmtCurrency } from './inventoryUtils';
 
 // ============================================================================
 // Types (verified against live API 2026-03-24)
 // ============================================================================
 
-interface Receipt {
+interface RepairOrder {
   id: number;
-  receipt_no: string;
   holding_id: number;
-  company_id: number;
   branch_id: number;
   branch_name: string;
-  po_id: number;
-  po_no: string;
-  supplier_name: string;
-  status: string;
-  posted_at: string | null;
-  notes: string | null;
-  line_count: number;
-  total_qty: number;
-  total_amount: number;
-  created_by: number;
-  created_at: string;
-}
-
-interface ReceiptDetail {
-  receipt_id: number;
-  receipt_no: string;
-  holding_id: number;
-  company_id: number;
-  branch_id: number;
-  branch_name: string;
-  po_id: number;
-  po_no: string;
-  supplier_name: string;
-  ownership: string;
-  status: string;
-  posted_at: string | null;
-  notes: string | null;
-  created_by: number;
-  created_at: string;
-  lines: ReceiptLine[];
-}
-
-interface ReceiptLine {
-  receipt_line_id: number;
-  po_line_id: number;
-  model_id: number;
+  asset_id: number;
+  asset_code: string;
+  serial_no: string | null;
   variant_id: number;
-  sku_code: string;
   variant_name: string;
+  sku_code: string;
   model_name: string;
-  family_name: string;
-  brand_name: string;
-  qty_received: number;
-  unit_cost: number;
-  line_total: number;
-  stock_lot_id: number | null;
-  is_unmatched: boolean;
+  loaner_asset_id: number | null;
+  loaner_asset_code: string | null;
+  loaner_serial_no: string | null;
+  repair_no: string;
+  status: string;
+  result: string | null;
+  route_decision: string | null;
+  repair_note: string | null;
+  route_note: string | null;
+  contract_id: number | null;
+  created_by: number | null;
+  created_at: string;
+  completed_at: string | null;
 }
 
 interface Branch {
@@ -76,23 +46,23 @@ interface Branch {
 // Status display
 // ============================================================================
 
-const RECEIPT_STATUS_COLOR: Record<string, string> = {
-  DRAFT: 'bg-fg/10 text-fg/60',
-  CONFIRMED: 'bg-success/15 text-success',
-  CANCELLED: 'bg-danger/15 text-danger',
+const REPAIR_STATUS_COLOR: Record<string, string> = {
+  OPEN: 'bg-warning/15 text-warning',
+  ROUTED: 'bg-info/15 text-info',
+  CLOSED: 'bg-fg/10 text-fg/60',
 };
 
-const RECEIPT_STATUS_OPTIONS = [
-  { value: 'DRAFT', label: 'Draft' },
-  { value: 'CONFIRMED', label: 'Confirmed' },
-  { value: 'CANCELLED', label: 'Cancelled' },
+const REPAIR_STATUS_OPTIONS = [
+  { value: 'OPEN', label: 'Open' },
+  { value: 'ROUTED', label: 'Routed' },
+  { value: 'CLOSED', label: 'Closed' },
 ];
 
 // ============================================================================
 // Component
 // ============================================================================
 
-export function ReceivingPage() {
+export function RepairsPage() {
   const { t } = useTranslation();
 
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
@@ -112,12 +82,12 @@ export function ReceivingPage() {
   }, [branches]);
 
   const { data: listData, isFetching } = useQuery({
-    queryKey: ['receipts', filterStatus, filterBranchId, pageIndex, pageSize],
+    queryKey: ['repair-orders', filterStatus, filterBranchId, pageIndex, pageSize],
     queryFn: () => {
-      let url = '/v_receipts?order=created_at.desc';
+      let url = '/v_repair_orders?order=created_at.desc';
       if (filterStatus) url += `&status=eq.${filterStatus}`;
       if (filterBranchId) url += `&branch_id=eq.${filterBranchId}`;
-      return apiClient.getPaginated<Receipt>(url, { page: pageIndex + 1, pageSize });
+      return apiClient.getPaginated<RepairOrder>(url, { page: pageIndex + 1, pageSize });
     },
     placeholderData: keepPreviousData,
   });
@@ -125,22 +95,15 @@ export function ReceivingPage() {
   const list = listData?.data ?? [];
   const totalCount = listData?.totalCount ?? 0;
 
-  const { data: detail, isFetching: detailFetching } = useQuery({
-    queryKey: ['receipt-detail', selectedId],
-    queryFn: () => apiClient.get<ReceiptDetail[]>(`/v_receipt_detail?receipt_id=eq.${selectedId}`).then(rows => rows[0] ?? null),
-    enabled: !!selectedId,
-    placeholderData: keepPreviousData,
-  });
-
   useEffect(() => { setPageIndex(0); }, [filterStatus, filterBranchId]);
 
   useEffect(() => {
-    if (selectedId && list.length > 0 && !list.find(r => r.id === selectedId)) {
+    if (selectedId && list.length > 0 && !list.find(o => o.id === selectedId)) {
       setSelectedId(null);
     }
   }, [list, selectedId]);
 
-  const selectedReceipt = list.find(r => r.id === selectedId) ?? null;
+  const selectedOrder = list.find(o => o.id === selectedId) ?? null;
 
   return (
     <PageNav panels={['list', 'detail']} className="h-dvh">
@@ -160,7 +123,7 @@ export function ReceivingPage() {
                 )}
               </div>
               <div className="mobile-header-title mobile-header-title-truncate">
-                {isRoot ? t('nav.receiving') : selectedReceipt?.receipt_no ?? ''}
+                {isRoot ? t('nav.repairs') : selectedOrder?.repair_no ?? ''}
               </div>
               <div className="mobile-header-end w-12" />
             </MobileHeader>
@@ -168,7 +131,7 @@ export function ReceivingPage() {
 
           {!isMobile && (
             <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
-              <h1 className="heading-2 shrink-0">{t('nav.receiving')}</h1>
+              <h1 className="heading-2 shrink-0">{t('nav.repairs')}</h1>
             </div>
           )}
 
@@ -178,10 +141,10 @@ export function ReceivingPage() {
                 <div className="flex gap-2 w-full">
                   <div className="flex-[2] min-w-0">
                     <Select
-                      options={RECEIPT_STATUS_OPTIONS}
+                      options={REPAIR_STATUS_OPTIONS}
                       value={filterStatus}
                       onChange={(val) => setFilterStatus((val as string) || null)}
-                      placeholder={t('receiving.allStatuses')}
+                      placeholder={t('repair.allStatuses')}
                       size="sm"
                       showChevron
                       clearable
@@ -201,37 +164,35 @@ export function ReceivingPage() {
                 </div>
               </div>
 
-              <DataTable<Receipt>
+              <DataTable<RepairOrder>
                 data={list}
                 renderRow={(row) => {
-                  const receipt = row.original;
-                  const isSelected = receipt.id === selectedId;
+                  const order = row.original;
+                  const isSelected = order.id === selectedId;
                   return (
                     <button
-                      key={receipt.id}
+                      key={order.id}
                       className={`w-full text-left px-4 py-2.5 border-b border-line flex items-center gap-3 transition-colors cursor-pointer ${
                         isSelected ? 'bg-primary/10' : 'hover:bg-surface-hover'
                       }`}
-                      onClick={() => { setSelectedId(receipt.id); if (isMobile) goTo('detail'); }}
+                      onClick={() => { setSelectedId(order.id); if (isMobile) goTo('detail'); }}
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-baseline gap-1.5 min-w-0">
-                          <span className="font-medium text-sm truncate">{receipt.receipt_no}</span>
-                          <span className="text-xs text-subtle truncate">· {receipt.po_no}</span>
+                          <span className="font-medium text-sm truncate">{order.repair_no}</span>
                         </div>
-                        <div className="text-xs text-subtle truncate">{receipt.supplier_name} · {receipt.branch_name}</div>
+                        <div className="text-xs text-subtle truncate">
+                          {order.model_name} · {order.asset_code}
+                        </div>
                         <div className="flex items-center gap-2 mt-1 -ml-0.5">
-                          <Badge size="xs" className={RECEIPT_STATUS_COLOR[receipt.status] ?? 'bg-fg/10 text-fg/60'}>
-                            {t(`receiving.status_${receipt.status}`, receipt.status)}
+                          <Badge size="xs" className={REPAIR_STATUS_COLOR[order.status] ?? 'bg-fg/10 text-fg/60'}>
+                            {t(`repair.status_${order.status}`, order.status)}
                           </Badge>
-                          <span className="text-xs text-subtle">
-                            {receipt.line_count} {t('receiving.lines')} · {fmtNum(receipt.total_qty)} pcs
-                          </span>
+                          <span className="text-xs text-subtle">{order.branch_name}</span>
                         </div>
                       </div>
-                      <div className="text-right shrink-0">
-                        <div className="text-sm font-medium tabular-nums">{fmtCurrency(receipt.total_amount)}</div>
-                        <div className="text-xs text-subtle"><DateTime value={receipt.created_at} /></div>
+                      <div className="text-right shrink-0 text-xs text-subtle">
+                        <DateTime value={order.created_at} />
                       </div>
                     </button>
                   );
@@ -248,13 +209,13 @@ export function ReceivingPage() {
             </PageNavPanel>
 
             <PageNavPanel id="detail" className={isMobile ? '' : 'flex-1 flex flex-col'}>
-              {detail ? (
-                <ReceiptDetailPanel detail={detail} loading={detailFetching} isMobile={isMobile} t={t} />
+              {selectedOrder ? (
+                <RepairDetailPanel order={selectedOrder} isMobile={isMobile} t={t} />
               ) : (
                 <div className="flex-1 h-full flex items-center justify-center text-subtler">
                   <div className="text-center">
-                    <PackagePlus size={32} className="mx-auto mb-2 opacity-40" />
-                    {t('receiving.selectToView')}
+                    <Wrench size={32} className="mx-auto mb-2 opacity-40" />
+                    {t('repair.selectToView')}
                   </div>
                 </div>
               )}
@@ -270,91 +231,79 @@ export function ReceivingPage() {
 // Detail panel
 // ============================================================================
 
-function ReceiptDetailPanel({
-  detail,
-  loading,
+function RepairDetailPanel({
+  order,
   isMobile,
   t,
 }: {
-  detail: ReceiptDetail;
-  loading: boolean;
+  order: RepairOrder;
   isMobile: boolean;
   t: (key: string, fallback?: string) => string;
 }) {
   return (
     <div className="relative flex flex-col h-full">
-      {loading && (
-        <div className="absolute inset-0 bg-bg/50 z-10 flex items-center justify-center animate-fade-in">
-          <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-        </div>
-      )}
-
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
-          <span className="font-semibold">{detail.receipt_no}</span>
-          <Badge size="xs" className={RECEIPT_STATUS_COLOR[detail.status] ?? 'bg-fg/10 text-fg/60'}>
-            {t(`receiving.status_${detail.status}`, detail.status)}
+          <span className="font-semibold">{order.repair_no}</span>
+          <Badge size="xs" className={REPAIR_STATUS_COLOR[order.status] ?? 'bg-fg/10 text-fg/60'}>
+            {t(`repair.status_${order.status}`, order.status)}
           </Badge>
         </div>
       )}
 
-      <div className="flex-none grid grid-cols-3 gap-3 px-4 py-3 border-b border-line bg-surface">
+      <div className="flex-none grid grid-cols-2 gap-3 px-4 py-3 border-b border-line bg-surface">
         <div>
-          <div className="text-xs text-subtle">{t('receiving.poRef')}</div>
-          <div className="font-semibold text-sm">{detail.po_no}</div>
-          <div className="text-xs text-subtle">{detail.supplier_name}</div>
+          <div className="text-xs text-subtle">{t('repair.asset')}</div>
+          <div className="font-semibold text-sm">{order.asset_code}</div>
+          <div className="text-xs text-subtle">{order.model_name} · {order.variant_name}</div>
+          {order.serial_no && <div className="text-xs text-fg/50 font-mono mt-0.5">{order.serial_no}</div>}
         </div>
         <div>
-          <div className="text-xs text-subtle">{t('receiving.branch')}</div>
-          <div className="font-semibold text-sm truncate">{detail.branch_name}</div>
-        </div>
-        <div>
-          <div className="text-xs text-subtle">{t('receiving.totalAmount')}</div>
-          <div className="font-semibold text-sm tabular-nums">
-            {fmtCurrency(detail.lines.reduce((sum, l) => sum + l.line_total, 0))}
-          </div>
+          <div className="text-xs text-subtle">{t('repair.branch')}</div>
+          <div className="font-semibold text-sm">{order.branch_name}</div>
         </div>
       </div>
+
+      {/* Loaner info */}
+      {order.loaner_asset_id && (
+        <div className="flex-none px-4 py-2.5 border-b border-line">
+          <div className="text-xs text-subtle mb-0.5">{t('repair.loaner')}</div>
+          <div className="text-sm font-medium">{order.loaner_asset_code}</div>
+          {order.loaner_serial_no && <div className="text-xs text-fg/50 font-mono">{order.loaner_serial_no}</div>}
+        </div>
+      )}
 
       {/* Timestamps */}
       <div className="flex-none px-4 py-2 border-b border-line flex flex-wrap gap-x-6 gap-y-1 text-xs text-subtle">
-        <span>{t('receiving.created')}: <DateTime value={detail.created_at} /></span>
-        {detail.posted_at && <span>{t('receiving.posted')}: <DateTime value={detail.posted_at} /></span>}
+        <span>{t('repair.created')}: <DateTime value={order.created_at} /></span>
+        {order.completed_at && <span>{t('repair.completed')}: <DateTime value={order.completed_at} /></span>}
       </div>
 
-      {detail.notes && (
-        <div className="flex-none px-4 py-2 border-b border-line text-xs text-fg/70 italic">{detail.notes}</div>
-      )}
-
-      {/* Lines */}
-      <div className="flex-1 overflow-auto better-scroll">
-        <div className="px-4 pt-3 pb-1">
-          <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider">
-            {t('receiving.lines')} ({detail.lines.length})
-          </h3>
-        </div>
-        {detail.lines.length === 0 && (
-          <div className="p-8 text-center text-subtler">{t('common.noData')}</div>
-        )}
-        {detail.lines.map((line) => (
-          <div key={line.receipt_line_id} className="px-4 py-2.5 border-b border-line flex items-center gap-3">
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium truncate">{line.model_name}</div>
-              <div className="text-xs text-subtle truncate">
-                {line.variant_name} · {line.sku_code}
-              </div>
-              <div className="text-xs text-subtle">{line.brand_name} · {line.family_name}</div>
-              {line.is_unmatched && (
-                <Badge size="xs" className="bg-warning/15 text-warning mt-1">{t('receiving.unmatched')}</Badge>
-              )}
-            </div>
-            <div className="text-right shrink-0">
-              <div className="text-sm font-medium tabular-nums">{fmtNum(line.qty_received)} pcs</div>
-              <div className="text-xs text-subtle tabular-nums">@ {fmtCurrency(line.unit_cost)}</div>
-              <div className="text-xs font-medium tabular-nums">{fmtCurrency(line.line_total)}</div>
-            </div>
+      {/* Notes & result */}
+      <div className="flex-1 overflow-auto better-scroll p-4 flex flex-col gap-4">
+        {order.repair_note && (
+          <div>
+            <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-1">{t('repair.note')}</h3>
+            <p className="text-sm text-fg/80">{order.repair_note}</p>
           </div>
-        ))}
+        )}
+
+        {order.route_decision && (
+          <div>
+            <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-1">{t('repair.routeDecision')}</h3>
+            <Badge size="xs" className="bg-info/15 text-info">{order.route_decision.replace(/_/g, ' ')}</Badge>
+            {order.route_note && <p className="text-sm text-fg/80 mt-1">{order.route_note}</p>}
+          </div>
+        )}
+
+        {order.result && (
+          <div>
+            <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-1">{t('repair.result')}</h3>
+            <Badge size="xs" className={order.result === 'REPAIRED' ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'}>
+              {order.result.replace(/_/g, ' ')}
+            </Badge>
+          </div>
+        )}
       </div>
     </div>
   );

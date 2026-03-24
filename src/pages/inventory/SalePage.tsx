@@ -7,6 +7,7 @@ import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { DateTime } from '../../components/DateTime';
 import { ModelName } from '../../components/ModelName';
+import { getBucketLabel, getBucketColor, getConditionLabel, getConditionTextColor, fmtCurrency } from './inventoryUtils';
 
 // ============================================================================
 // Types
@@ -57,68 +58,8 @@ interface FamilyLookup {
 }
 
 // ============================================================================
-// Bucket display config (shared with StockDashboardPage)
-// ============================================================================
-
-const BUCKET_CONFIG: Record<string, { labelKey: string; color: string }> = {
-  INBOUND_PENDING_COMPANY_APPROVAL: { labelKey: 'inventory.inboundPendingApproval', color: 'bg-warning/15 text-warning' },
-  INBOUND_APPROVED_AWAITING_BRANCH_CONFIRM: { labelKey: 'inventory.inboundAwaitingConfirm', color: 'bg-warning/15 text-warning' },
-  INBOUND_RECEIVED_UNREGISTERED: { labelKey: 'inventory.inboundUnregistered', color: 'bg-warning/15 text-warning' },
-  ON_HAND_PENDING_READY: { labelKey: 'inventory.pendingReady', color: 'bg-info/15 text-info' },
-  ON_HAND_AVAILABLE: { labelKey: 'inventory.available', color: 'bg-success/15 text-success' },
-  IN_USE_INTERNAL: { labelKey: 'inventory.inUseInternal', color: 'bg-primary/15 text-primary' },
-  IN_TRANSIT_OUTBOUND: { labelKey: 'inventory.inTransitOut', color: 'bg-info/15 text-info' },
-  IN_TRANSIT_INBOUND: { labelKey: 'inventory.inTransitIn', color: 'bg-info/15 text-info' },
-  QUARANTINED: { labelKey: 'inventory.quarantine', color: 'bg-warning/15 text-warning' },
-  IN_REPAIR: { labelKey: 'inventory.inRepair', color: 'bg-danger/15 text-danger' },
-  OUT_REPAIR: { labelKey: 'inventory.outRepair', color: 'bg-danger/15 text-danger' },
-  DAMAGED_SCRAP_PENDING: { labelKey: 'inventory.damagedScrap', color: 'bg-danger/15 text-danger' },
-  WITH_CUSTOMER_ACTIVE: { labelKey: 'inventory.withCustomer', color: 'bg-primary/15 text-primary' },
-  REPOSSESSED_PENDING_CLEARANCE: { labelKey: 'inventory.repossessed', color: 'bg-warning/15 text-warning' },
-  LOANED_OUT: { labelKey: 'inventory.loanedOut', color: 'bg-info/15 text-info' },
-  OWNERSHIP_TRANSFERRED: { labelKey: 'inventory.ownershipTransferred', color: 'bg-fg/10 text-fg/60' },
-  DISPOSED_SOLD_SCRAP: { labelKey: 'inventory.disposedScrap', color: 'bg-fg/10 text-fg/60' },
-  SOLD_B2B_EXTERNAL: { labelKey: 'inventory.soldB2B', color: 'bg-fg/10 text-fg/60' },
-  SOLD_B2C_EXTERNAL: { labelKey: 'inventory.soldB2C', color: 'bg-fg/10 text-fg/60' },
-  WRITTEN_OFF: { labelKey: 'inventory.writtenOff', color: 'bg-fg/10 text-fg/60' },
-};
-
-function getBucketLabel(bucket: string, t: (key: string) => string): string {
-  const cfg = BUCKET_CONFIG[bucket];
-  return cfg ? t(cfg.labelKey) : bucket.replace(/_/g, ' ');
-}
-
-function getBucketColor(bucket: string): string {
-  return BUCKET_CONFIG[bucket]?.color ?? 'bg-fg/10 text-fg/60';
-}
-
-// ============================================================================
-// Condition display config
-// ============================================================================
-
-const CONDITION_CONFIG: Record<string, { labelKey: string; textColor: string }> = {
-  NEW: { labelKey: 'inventory.conditionNEW', textColor: 'text-success' },
-  REFURBISHED: { labelKey: 'inventory.conditionREFURBISHED', textColor: 'text-info' },
-  USED_A: { labelKey: 'inventory.conditionUSED_A', textColor: 'text-warning' },
-  USED_B: { labelKey: 'inventory.conditionUSED_B', textColor: 'text-fg/60' },
-};
-
-function getConditionLabel(condition: string, t: (key: string) => string): string {
-  const cfg = CONDITION_CONFIG[condition];
-  return cfg ? t(cfg.labelKey) : condition;
-}
-
-function getConditionTextColor(condition: string): string {
-  return CONDITION_CONFIG[condition]?.textColor ?? 'text-fg/60';
-}
-
-// ============================================================================
 // Helpers
 // ============================================================================
-
-function fmtCurrency(n: number): string {
-  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
 
 type SaleType = 'RETAIL' | 'B2B' | 'B2C';
 
@@ -439,7 +380,7 @@ export function SalePage() {
                       showChevron
                       clearable
                       renderOption={(option) => (
-                        <span className={Number(option.value) === userBranchId ? 'text-primary font-medium' : ''}>
+                        <span key={option.value} className={Number(option.value) === userBranchId ? 'text-primary font-medium' : ''}>
                           {option.label}
                         </span>
                       )}

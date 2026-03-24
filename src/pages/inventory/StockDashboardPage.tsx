@@ -4,6 +4,7 @@ import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Badge, Select } from 'tsp-form';
 import { apiClient } from '../../lib/api';
 import { Package, ShieldAlert, Wrench, Truck, ArrowLeft, ArrowRightFromLine } from 'lucide-react';
+import { getBucketLabel, getBucketColor, fmtNum, fmtCurrency } from './inventoryUtils';
 
 // ============================================================================
 // Types
@@ -59,63 +60,8 @@ interface BranchLotSummary {
 }
 
 interface Branch {
-  branch_id: number;
-  branch_name: string;
-  branch_code: string;
-}
-
-// ============================================================================
-// Bucket display config
-// ============================================================================
-
-const BUCKET_CONFIG: Record<string, { labelKey: string; color: string }> = {
-  // Inbound
-  INBOUND_PENDING_COMPANY_APPROVAL: { labelKey: 'inventory.inboundPendingApproval', color: 'bg-warning/15 text-warning' },
-  INBOUND_APPROVED_AWAITING_BRANCH_CONFIRM: { labelKey: 'inventory.inboundAwaitingConfirm', color: 'bg-warning/15 text-warning' },
-  INBOUND_RECEIVED_UNREGISTERED: { labelKey: 'inventory.inboundUnregistered', color: 'bg-warning/15 text-warning' },
-  // On hand
-  ON_HAND_PENDING_READY: { labelKey: 'inventory.pendingReady', color: 'bg-info/15 text-info' },
-  ON_HAND_AVAILABLE: { labelKey: 'inventory.available', color: 'bg-success/15 text-success' },
-  IN_USE_INTERNAL: { labelKey: 'inventory.inUseInternal', color: 'bg-primary/15 text-primary' },
-  // Transit
-  IN_TRANSIT_OUTBOUND: { labelKey: 'inventory.inTransitOut', color: 'bg-info/15 text-info' },
-  IN_TRANSIT_INBOUND: { labelKey: 'inventory.inTransitIn', color: 'bg-info/15 text-info' },
-  // Hold
-  QUARANTINED: { labelKey: 'inventory.quarantine', color: 'bg-warning/15 text-warning' },
-  IN_REPAIR: { labelKey: 'inventory.inRepair', color: 'bg-danger/15 text-danger' },
-  OUT_REPAIR: { labelKey: 'inventory.outRepair', color: 'bg-danger/15 text-danger' },
-  DAMAGED_SCRAP_PENDING: { labelKey: 'inventory.damagedScrap', color: 'bg-danger/15 text-danger' },
-  // Customer
-  WITH_CUSTOMER_ACTIVE: { labelKey: 'inventory.withCustomer', color: 'bg-primary/15 text-primary' },
-  REPOSSESSED_PENDING_CLEARANCE: { labelKey: 'inventory.repossessed', color: 'bg-warning/15 text-warning' },
-  LOANED_OUT: { labelKey: 'inventory.loanedOut', color: 'bg-info/15 text-info' },
-  // Exit
-  OWNERSHIP_TRANSFERRED: { labelKey: 'inventory.ownershipTransferred', color: 'bg-fg/10 text-fg/60' },
-  DISPOSED_SOLD_SCRAP: { labelKey: 'inventory.disposedScrap', color: 'bg-fg/10 text-fg/60' },
-  SOLD_B2B_EXTERNAL: { labelKey: 'inventory.soldB2B', color: 'bg-fg/10 text-fg/60' },
-  SOLD_B2C_EXTERNAL: { labelKey: 'inventory.soldB2C', color: 'bg-fg/10 text-fg/60' },
-  WRITTEN_OFF: { labelKey: 'inventory.writtenOff', color: 'bg-fg/10 text-fg/60' },
-};
-
-function getBucketLabel(bucket: string, t: (key: string) => string): string {
-  const cfg = BUCKET_CONFIG[bucket];
-  return cfg ? t(cfg.labelKey) : bucket.replace(/_/g, ' ');
-}
-
-function getBucketColor(bucket: string): string {
-  return BUCKET_CONFIG[bucket]?.color ?? 'bg-fg/10 text-fg/60';
-}
-
-// ============================================================================
-// Formatting
-// ============================================================================
-
-function fmtNum(n: number): string {
-  return n.toLocaleString();
-}
-
-function fmtCurrency(n: number): string {
-  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  id: number;
+  name: string;
 }
 
 // ============================================================================
@@ -143,8 +89,8 @@ export function StockDashboardPage() {
 
   // Branch list for filter
   const { data: branches } = useQuery({
-    queryKey: ['transfer-destination-branches'],
-    queryFn: () => apiClient.get<Branch[]>('/v_transfer_destination_branches?order=branch_name&is_active=is.true'),
+    queryKey: ['branches'],
+    queryFn: () => apiClient.get<Branch[]>('/v_branches?order=name&is_active=is.true'),
   });
 
   // Summary (all branches) — always loaded
@@ -226,7 +172,7 @@ export function StockDashboardPage() {
   // Branch options for filter
   const branchOptions = useMemo(() => {
     if (!branches) return [];
-    return branches.map(b => ({ value: String(b.branch_id), label: b.branch_name }));
+    return branches.map(b => ({ value: String(b.id), label: b.name }));
   }, [branches]);
 
   // Clear selection when it no longer matches filters

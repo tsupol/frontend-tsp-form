@@ -152,7 +152,12 @@ export const AppSideNav = () => {
       path: '/admin/inventory/stock',
       children: [
         { key: 'stock', label: t('nav.stock'), path: '/admin/inventory/stock' },
+        { key: 'assets', label: t('nav.assets'), path: '/admin/inventory/assets' },
+        { key: 'po', label: t('nav.purchaseOrders'), path: '/admin/inventory/po' },
         { key: 'receiving', label: t('nav.receiving'), path: '/admin/inventory/receiving' },
+        { key: 'transfers', label: t('nav.transfers'), path: '/admin/inventory/transfers' },
+        { key: 'repairs', label: t('nav.repairs'), path: '/admin/inventory/repairs' },
+        { key: 'buyback', label: t('nav.buyback'), path: '/admin/inventory/buyback' },
         { key: 'sale', label: t('nav.sale'), path: '/admin/inventory/sale' },
       ],
     },

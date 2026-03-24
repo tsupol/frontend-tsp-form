@@ -32,6 +32,11 @@ import { InventoryLayout } from './pages/inventory/InventoryLayout';
 import { StockDashboardPage } from './pages/inventory/StockDashboardPage';
 import { ReceivingPage } from './pages/inventory/ReceivingPage';
 import { SalePage } from './pages/inventory/SalePage';
+import { AssetsPage } from './pages/inventory/AssetsPage';
+import { PurchaseOrdersPage } from './pages/inventory/PurchaseOrdersPage';
+import { TransfersPage } from './pages/inventory/TransfersPage';
+import { RepairsPage } from './pages/inventory/RepairsPage';
+import { BuybackPage } from './pages/inventory/BuybackPage';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -227,11 +232,61 @@ function App() {
         }
       />
       <Route
+        path="/admin/inventory/assets"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <InventoryLayout><AssetsPage /></InventoryLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/inventory/po"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <InventoryLayout><PurchaseOrdersPage /></InventoryLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/admin/inventory/receiving"
         element={
           <ProtectedRoute>
             <AdminLayout>
               <InventoryLayout><ReceivingPage /></InventoryLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/inventory/transfers"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <InventoryLayout><TransfersPage /></InventoryLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/inventory/repairs"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <InventoryLayout><RepairsPage /></InventoryLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/inventory/buyback"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <InventoryLayout><BuybackPage /></InventoryLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
