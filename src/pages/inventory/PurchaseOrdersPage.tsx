@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, Badge, Select, DataTable } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, ClipboardList } from 'lucide-react';
-import { apiClient } from '../../lib/api';
+import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
+import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Modal, TextArea, DataTable, useSnackbarContext } from 'tsp-form';
+import { ArrowLeft, ArrowRightFromLine, ClipboardList, CheckCircle, XCircle } from 'lucide-react';
+import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { fmtNum, fmtCurrency } from './inventoryUtils';
 
@@ -83,6 +83,7 @@ const PO_STATUS_COLOR: Record<string, string> = {
   APPROVED: 'bg-success/15 text-success',
   REJECTED: 'bg-danger/15 text-danger',
   CLOSED: 'bg-fg/10 text-fg/60',
+  COMPLETED: 'bg-fg/10 text-fg/60',
   CANCELLED: 'bg-danger/15 text-danger',
 };
 
@@ -101,6 +102,8 @@ const PO_STATUS_OPTIONS = [
 
 export function PurchaseOrdersPage() {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const { addSnackbar } = useSnackbarContext();
 
   // Filters
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
@@ -160,6 +163,11 @@ export function PurchaseOrdersPage() {
   }, [poList, selectedPoId]);
 
   const selectedPo = poList.find(p => p.id === selectedPoId) ?? null;
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+    queryClient.invalidateQueries({ queryKey: ['po-lines'] });
+  };
 
   return (
     <PageNav panels={['list', 'detail']} className="h-dvh">
@@ -291,7 +299,15 @@ export function PurchaseOrdersPage() {
             {/* Detail panel */}
             <PageNavPanel id="detail" className={isMobile ? '' : 'flex-1 flex flex-col'}>
               {selectedPo ? (
-                <PoDetailPanel po={selectedPo} lines={poLines ?? []} loading={linesFetching} isMobile={isMobile} t={t} />
+                <PoDetailPanel
+                  po={selectedPo}
+                  lines={poLines ?? []}
+                  loading={linesFetching}
+                  isMobile={isMobile}
+                  t={t}
+                  onRefresh={invalidate}
+                  addSnackbar={addSnackbar}
+                />
               ) : (
                 <div className="flex-1 h-full flex items-center justify-center text-subtler">
                   <div className="text-center">
@@ -318,13 +334,41 @@ function PoDetailPanel({
   loading,
   isMobile,
   t,
+  onRefresh,
+  addSnackbar,
 }: {
   po: PurchaseOrder;
   lines: PoLine[];
   loading: boolean;
   isMobile: boolean;
   t: ReturnType<typeof useTranslation>['t'];
+  onRefresh: () => void;
+  addSnackbar: (opts: { message: React.ReactNode }) => void;
 }) {
+  const [actionModal, setActionModal] = useState<string | null>(null);
+
+  const canSubmit = po.status === 'DRAFT';
+  const canApprove = po.status === 'SUBMITTED';
+  const canReject = po.status === 'SUBMITTED';
+  const canRevert = po.status === 'SUBMITTED';
+  const canClose = po.status === 'APPROVED' && po.ready_to_close;
+  const canCancel = po.status === 'DRAFT' || po.status === 'SUBMITTED' || po.status === 'APPROVED';
+
+  const hasActions = canSubmit || canApprove || canReject || canRevert || canClose || canCancel;
+
+  const handleSuccess = (messageKey: string) => {
+    setActionModal(null);
+    onRefresh();
+    addSnackbar({
+      message: (
+        <div className="alert alert-success">
+          <CheckCircle size={16} />
+          <span>{t(messageKey)}</span>
+        </div>
+      ),
+    });
+  };
+
   return (
     <div className="relative flex flex-col h-full">
       {loading && (
@@ -422,6 +466,240 @@ function PoDetailPanel({
           </div>
         ))}
       </div>
+
+      {/* Action buttons */}
+      {hasActions && (
+        <div className="flex-none px-4 py-3 border-t border-line flex flex-wrap gap-2">
+          {canSubmit && (
+            <Button color="primary" className="flex-1" onClick={() => setActionModal('submit')}>
+              {t('po.submit')}
+            </Button>
+          )}
+          {canApprove && (
+            <Button color="primary" className="flex-1" onClick={() => setActionModal('approve')}>
+              {t('po.approve')}
+            </Button>
+          )}
+          {canReject && (
+            <Button color="danger" className="flex-1" onClick={() => setActionModal('reject')}>
+              {t('po.reject')}
+            </Button>
+          )}
+          {canRevert && (
+            <Button className="flex-1" onClick={() => setActionModal('revert')}>
+              {t('po.revertDraft')}
+            </Button>
+          )}
+          {canClose && (
+            <Button color="primary" className="flex-1" onClick={() => setActionModal('close')}>
+              {t('po.close')}
+            </Button>
+          )}
+          {canCancel && (
+            <Button color="danger" onClick={() => setActionModal('cancel')}>
+              {t('po.cancel')}
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Action modals */}
+      <PoActionModal
+        open={actionModal === 'submit'}
+        onClose={() => setActionModal(null)}
+        action="submit"
+        po={po}
+        t={t}
+        rpcFn="fn_po_submit"
+        rpcParams={{ p_po_id: po.id }}
+        onSuccess={() => handleSuccess('po.submitSuccess')}
+      />
+      <PoActionModal
+        open={actionModal === 'approve'}
+        onClose={() => setActionModal(null)}
+        action="approve"
+        po={po}
+        t={t}
+        rpcFn="fn_po_approve"
+        rpcParams={{ p_po_id: po.id }}
+        onSuccess={() => handleSuccess('po.approveSuccess')}
+      />
+      <PoActionModal
+        open={actionModal === 'reject'}
+        onClose={() => setActionModal(null)}
+        action="reject"
+        po={po}
+        t={t}
+        rpcFn="fn_po_reject"
+        rpcParams={{ p_po_id: po.id }}
+        hasNote
+        noteRequired
+        onSuccess={() => handleSuccess('po.rejectSuccess')}
+      />
+      <PoActionModal
+        open={actionModal === 'revert'}
+        onClose={() => setActionModal(null)}
+        action="revert"
+        po={po}
+        t={t}
+        rpcFn="fn_po_revert_to_draft"
+        rpcParams={{ p_po_id: po.id }}
+        onSuccess={() => handleSuccess('po.revertSuccess')}
+      />
+      <PoActionModal
+        open={actionModal === 'close'}
+        onClose={() => setActionModal(null)}
+        action="close"
+        po={po}
+        t={t}
+        rpcFn="fn_po_close"
+        rpcParams={{ p_po_id: po.id }}
+        onSuccess={() => handleSuccess('po.closeSuccess')}
+      />
+      <PoActionModal
+        open={actionModal === 'cancel'}
+        onClose={() => setActionModal(null)}
+        action="cancel"
+        po={po}
+        t={t}
+        rpcFn="fn_po_cancel"
+        rpcParams={{ p_po_id: po.id }}
+        hasNote
+        onSuccess={() => handleSuccess('po.cancelSuccess')}
+      />
     </div>
+  );
+}
+
+// ============================================================================
+// Reusable PO Action Modal
+// ============================================================================
+
+const ACTION_TITLES: Record<string, string> = {
+  submit: 'po.submit',
+  approve: 'po.approve',
+  reject: 'po.reject',
+  revert: 'po.revertDraft',
+  close: 'po.close',
+  cancel: 'po.cancel',
+};
+
+const ACTION_CONFIRM: Record<string, string> = {
+  submit: 'po.confirmSubmit',
+  approve: 'po.confirmApprove',
+  reject: 'po.confirmReject',
+  revert: 'po.confirmRevert',
+  close: 'po.confirmClose',
+  cancel: 'po.confirmCancel',
+};
+
+function PoActionModal({
+  open,
+  onClose,
+  action,
+  po,
+  t,
+  rpcFn,
+  rpcParams,
+  hasNote,
+  noteRequired,
+  onSuccess,
+}: {
+  open: boolean;
+  onClose: () => void;
+  action: string;
+  po: PurchaseOrder;
+  t: ReturnType<typeof useTranslation>['t'];
+  rpcFn: string;
+  rpcParams: Record<string, unknown>;
+  hasNote?: boolean;
+  noteRequired?: boolean;
+  onSuccess: () => void;
+}) {
+  const [note, setNote] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (open) { setNote(''); setError(''); }
+  }, [open]);
+
+  const mutation = useMutation({
+    mutationFn: () => {
+      const params = { ...rpcParams };
+      if (hasNote && note.trim()) {
+        // reject uses p_reason_code, others use p_note
+        if (action === 'reject') {
+          params.p_reason_code = note.trim();
+        } else {
+          params.p_note = note.trim();
+        }
+      }
+      return apiClient.rpc(rpcFn, params);
+    },
+    onSuccess,
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        setError(translated || err.message);
+      } else {
+        setError(String(err));
+      }
+    },
+  });
+
+  const isDanger = action === 'reject' || action === 'cancel';
+  const canConfirm = !mutation.isPending && (!noteRequired || note.trim().length > 0);
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
+      <div className="flex flex-col overflow-hidden">
+        <div className="modal-header">
+          <h2 className="modal-title">{t(ACTION_TITLES[action] ?? action)}</h2>
+          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+        </div>
+        <div className="modal-content">
+          {error && (
+            <div className="alert alert-danger mb-4 animate-pop-in">
+              <XCircle size={16} />
+              <span>{error}</span>
+            </div>
+          )}
+          <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
+            <div className="font-medium text-sm">{po.po_no}</div>
+            <div className="text-xs text-subtle">{po.supplier_name}</div>
+            <div className="text-xs text-subtle">
+              {po.c_total_lines} {t('po.lines')} · {fmtNum(po.c_total_qty)} pcs · {fmtCurrency(po.c_total_amount)}
+            </div>
+          </div>
+          <p className="text-sm text-subtle mb-4">{t(ACTION_CONFIRM[action] ?? '')}</p>
+          {hasNote && (
+            <div className="form-grid gap-4">
+              <div className="flex flex-col">
+                <label className="form-label">
+                  {action === 'reject' ? t('po.rejectReason') : t('po.note')}
+                  {noteRequired && ' *'}
+                </label>
+                <TextArea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder={action === 'reject' ? t('po.rejectReasonPlaceholder') : t('po.notePlaceholder')}
+                  rows={3}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="modal-footer">
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button
+            color={isDanger ? 'danger' : 'primary'}
+            onClick={() => mutation.mutate()}
+            disabled={!canConfirm}
+          >
+            {mutation.isPending ? t('common.loading') : t(ACTION_TITLES[action] ?? action)}
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 }

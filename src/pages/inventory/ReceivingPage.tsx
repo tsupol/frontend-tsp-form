@@ -1,19 +1,20 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, Badge, Select, DataTable } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, PackagePlus } from 'lucide-react';
-import { apiClient } from '../../lib/api';
+import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
+import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Modal, DataTable, useSnackbarContext } from 'tsp-form';
+import { ArrowLeft, ArrowRightFromLine, PackagePlus, CheckCircle, XCircle } from 'lucide-react';
+import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { fmtNum, fmtCurrency } from './inventoryUtils';
 
 // ============================================================================
-// Types (verified against live API 2026-03-24)
+// Types (verified against live API 2026-03-25)
 // ============================================================================
 
 interface Receipt {
   id: number;
   receipt_no: string;
+  code_display: string | null;
   holding_id: number;
   company_id: number;
   branch_id: number;
@@ -34,6 +35,7 @@ interface Receipt {
 interface ReceiptDetail {
   receipt_id: number;
   receipt_no: string;
+  code_display: string | null;
   holding_id: number;
   company_id: number;
   branch_id: number;
@@ -94,6 +96,8 @@ const RECEIPT_STATUS_OPTIONS = [
 
 export function ReceivingPage() {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const { addSnackbar } = useSnackbarContext();
 
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
   const [filterBranchId, setFilterBranchId] = useState<number | null>(null);
@@ -141,6 +145,12 @@ export function ReceivingPage() {
   }, [list, selectedId]);
 
   const selectedReceipt = list.find(r => r.id === selectedId) ?? null;
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['receipts'] });
+    queryClient.invalidateQueries({ queryKey: ['receipt-detail'] });
+    queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+  };
 
   return (
     <PageNav panels={['list', 'detail']} className="h-dvh">
@@ -249,7 +259,14 @@ export function ReceivingPage() {
 
             <PageNavPanel id="detail" className={isMobile ? '' : 'flex-1 flex flex-col'}>
               {detail ? (
-                <ReceiptDetailPanel detail={detail} loading={detailFetching} isMobile={isMobile} t={t} />
+                <ReceiptDetailPanel
+                  detail={detail}
+                  loading={detailFetching}
+                  isMobile={isMobile}
+                  t={t}
+                  onRefresh={invalidate}
+                  addSnackbar={addSnackbar}
+                />
               ) : (
                 <div className="flex-1 h-full flex items-center justify-center text-subtler">
                   <div className="text-center">
@@ -275,12 +292,22 @@ function ReceiptDetailPanel({
   loading,
   isMobile,
   t,
+  onRefresh,
+  addSnackbar,
 }: {
   detail: ReceiptDetail;
   loading: boolean;
   isMobile: boolean;
   t: ReturnType<typeof useTranslation>['t'];
+  onRefresh: () => void;
+  addSnackbar: (opts: { message: React.ReactNode }) => void;
 }) {
+  const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+
+  const isDraft = detail.status === 'DRAFT';
+  const hasLines = detail.lines.length > 0;
+
   return (
     <div className="relative flex flex-col h-full">
       {loading && (
@@ -356,6 +383,215 @@ function ReceiptDetailPanel({
           </div>
         ))}
       </div>
+
+      {/* Action buttons for DRAFT receipts */}
+      {isDraft && (
+        <div className="flex-none px-4 py-3 border-t border-line flex gap-2">
+          <Button color="danger" onClick={() => setCancelModalOpen(true)}>
+            {t('receiving.cancelReceipt')}
+          </Button>
+          <Button
+            color="primary"
+            className="flex-1"
+            onClick={() => setConfirmModalOpen(true)}
+            disabled={!hasLines}
+          >
+            {t('receiving.confirmReceipt')}
+          </Button>
+        </div>
+      )}
+
+      {/* Confirm Receipt Modal */}
+      <ConfirmReceiptModal
+        open={confirmModalOpen}
+        onClose={() => setConfirmModalOpen(false)}
+        detail={detail}
+        t={t}
+        onSuccess={() => {
+          setConfirmModalOpen(false);
+          onRefresh();
+          addSnackbar({
+            message: (
+              <div className="alert alert-success">
+                <CheckCircle size={16} />
+                <span>{t('receiving.confirmSuccess')}</span>
+              </div>
+            ),
+          });
+        }}
+      />
+
+      {/* Cancel Receipt Modal */}
+      <CancelReceiptModal
+        open={cancelModalOpen}
+        onClose={() => setCancelModalOpen(false)}
+        detail={detail}
+        t={t}
+        onSuccess={() => {
+          setCancelModalOpen(false);
+          onRefresh();
+          addSnackbar({
+            message: (
+              <div className="alert alert-success">
+                <CheckCircle size={16} />
+                <span>{t('receiving.cancelSuccess')}</span>
+              </div>
+            ),
+          });
+        }}
+      />
     </div>
+  );
+}
+
+// ============================================================================
+// Confirm Receipt Modal
+// ============================================================================
+
+function ConfirmReceiptModal({
+  open,
+  onClose,
+  detail,
+  t,
+  onSuccess,
+}: {
+  open: boolean;
+  onClose: () => void;
+  detail: ReceiptDetail;
+  t: ReturnType<typeof useTranslation>['t'];
+  onSuccess: () => void;
+}) {
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (open) setError('');
+  }, [open]);
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      apiClient.rpc('fn_receipt_confirm', { p_receipt_id: detail.receipt_id }),
+    onSuccess,
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        setError(translated || err.message);
+      } else {
+        setError(String(err));
+      }
+    },
+  });
+
+  const totalQty = detail.lines.reduce((sum, l) => sum + l.qty_received, 0);
+  const totalAmount = detail.lines.reduce((sum, l) => sum + l.line_total, 0);
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
+      <div className="flex flex-col overflow-hidden">
+        <div className="modal-header">
+          <h2 className="modal-title">{t('receiving.confirmReceipt')}</h2>
+          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+        </div>
+        <div className="modal-content">
+          {error && (
+            <div className="alert alert-danger mb-4 animate-pop-in">
+              <XCircle size={16} />
+              <span>{error}</span>
+            </div>
+          )}
+          <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
+            <div className="font-medium text-sm">{detail.receipt_no}</div>
+            <div className="text-xs text-subtle">{t('receiving.poRef')}: {detail.po_no}</div>
+            <div className="text-xs text-subtle">{detail.branch_name} · {detail.supplier_name}</div>
+            <div className="text-xs text-subtle mt-1">
+              {detail.lines.length} {t('receiving.lines')} · {fmtNum(totalQty)} pcs · {fmtCurrency(totalAmount)}
+            </div>
+          </div>
+          <p className="text-sm text-subtle">{t('receiving.confirmReceiptMessage')}</p>
+        </div>
+        <div className="modal-footer">
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button
+            color="primary"
+            onClick={() => mutation.mutate()}
+            disabled={mutation.isPending}
+          >
+            {mutation.isPending ? t('common.loading') : t('receiving.confirmReceipt')}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ============================================================================
+// Cancel Receipt Modal
+// ============================================================================
+
+function CancelReceiptModal({
+  open,
+  onClose,
+  detail,
+  t,
+  onSuccess,
+}: {
+  open: boolean;
+  onClose: () => void;
+  detail: ReceiptDetail;
+  t: ReturnType<typeof useTranslation>['t'];
+  onSuccess: () => void;
+}) {
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (open) setError('');
+  }, [open]);
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      apiClient.rpc('fn_receipt_cancel', { p_receipt_id: detail.receipt_id }),
+    onSuccess,
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        setError(translated || err.message);
+      } else {
+        setError(String(err));
+      }
+    },
+  });
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
+      <div className="flex flex-col overflow-hidden">
+        <div className="modal-header">
+          <h2 className="modal-title">{t('receiving.cancelReceipt')}</h2>
+          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+        </div>
+        <div className="modal-content">
+          {error && (
+            <div className="alert alert-danger mb-4 animate-pop-in">
+              <XCircle size={16} />
+              <span>{error}</span>
+            </div>
+          )}
+          <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
+            <div className="font-medium text-sm">{detail.receipt_no}</div>
+            <div className="text-xs text-subtle">{t('receiving.poRef')}: {detail.po_no}</div>
+            <div className="text-xs text-subtle">{detail.branch_name}</div>
+          </div>
+          <p className="text-sm text-subtle">{t('receiving.cancelReceiptMessage')}</p>
+        </div>
+        <div className="modal-footer">
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button
+            color="danger"
+            onClick={() => mutation.mutate()}
+            disabled={mutation.isPending}
+          >
+            {mutation.isPending ? t('common.loading') : t('receiving.cancelReceipt')}
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 }
