@@ -648,7 +648,7 @@ export function ModelsPage() {
 
         {/* Filter bar — progressive collapse */}
         <div className="flex-none pb-4">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <div className="flex-1 min-w-0">
               <Input
                 placeholder={t('common.search')}
@@ -750,7 +750,6 @@ export function ModelsPage() {
                     clearable
                     disabled={!filterFamily}
                   />
-                  <hr className="border-line" />
                   <div className="text-xs font-medium text-muted uppercase tracking-wide">{t('common.sortBy')}</div>
                   <Select
                     options={sortOptions}

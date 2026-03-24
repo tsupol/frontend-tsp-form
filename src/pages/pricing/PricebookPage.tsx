@@ -463,7 +463,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
               <h3 className="text-xs font-semibold text-control-label uppercase tracking-wider mb-3">{t('pricing.pricebookSection')}</h3>
               <div className="space-y-3">
                 <div className="flex flex-col">
-                  <label className="form-label" htmlFor="ed-retail">{t('pricing.retailPrice')}</label>
+                  <label className="form-label text-xs" htmlFor="ed-retail">{t('pricing.retailPrice')}</label>
                   <Input
                     id="ed-retail"
                     type="number"
@@ -477,7 +477,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                   />
                 </div>
                 <div className="flex flex-col">
-                  <label className="form-label" htmlFor="ed-cost">{t('pricing.costPrice')}</label>
+                  <label className="form-label text-xs" htmlFor="ed-cost">{t('pricing.costPrice')}</label>
                   <Input
                     id="ed-cost"
                     type="number"
@@ -539,7 +539,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                     const term = row.term_months!;
                     return (
                       <div key={term}>
-                        <label className="form-label">{t('pricing.termMonths', { months: term })}</label>
+                        <label className="form-label text-xs">{t('pricing.termMonths', { months: term })}</label>
                         <div className="flex items-center gap-2">
                           <div className="input-group flex-1">
                             <Input
@@ -581,7 +581,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                 <div className="mt-3 pt-3 border-t border-line space-y-2">
                   <div className="flex gap-2">
                     <div className="flex flex-col shrink-0">
-                      <label className="form-label">{t('pricing.enterMonths')}</label>
+                      <label className="form-label text-xs">{t('pricing.enterMonths')}</label>
                       <NumberSpinner
                         className="w-32"
                         min={1}
@@ -594,7 +594,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                       />
                     </div>
                     <div className="flex flex-col flex-1 min-w-0">
-                      <label className="form-label">{t('pricing.profitAmount')}</label>
+                      <label className="form-label text-xs">{t('pricing.profitAmount')}</label>
                       <Input
                         className="w-full"
                         type="number"
@@ -1069,7 +1069,6 @@ export function PricebookPage() {
                           />
                           {t('pricing.filterNeedsSetup')}
                         </label>
-                        <hr className="border-line" />
                         <div className="text-xs font-medium text-muted uppercase tracking-wide">{t('common.sortBy')}</div>
                         <Select
                           options={sortOptions}

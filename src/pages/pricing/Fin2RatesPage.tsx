@@ -397,7 +397,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                 const term = row.term_months!;
                 return (
                   <div key={term} className="space-y-1.5">
-                    <label className="form-label">{t('pricing.termMonths', { months: term })}</label>
+                    <label className="form-label text-xs">{t('pricing.termMonths', { months: term })}</label>
                     <div className="flex items-center gap-2">
                       <div className="input-group flex-1">
                         <Input
@@ -454,8 +454,9 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
             <div className="mt-3 pt-3 border-t border-line space-y-2">
               <div className="flex gap-2">
                 <div className="flex flex-col shrink-0">
-                  <label className="form-label">{t('pricing.enterMonths')}</label>
+                  <span className="form-label text-xs" id="fin2-enter-months-label">{t('pricing.enterMonths')}</span>
                   <NumberSpinner
+                    aria-labelledby="fin2-enter-months-label"
                     className="w-32"
                     min={1}
                     max={120}
@@ -467,7 +468,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                   />
                 </div>
                 <div className="flex flex-col flex-1 min-w-0">
-                  <label className="form-label">{t('pricing.profitAmount')}</label>
+                  <label className="form-label text-xs">{t('pricing.profitAmount')}</label>
                   <Input
                     className="w-full"
                     type="number"
@@ -482,7 +483,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                 </div>
               </div>
               <div className="flex flex-col">
-                <label className="form-label">{t('fin2.effectiveFrom')}</label>
+                <label className="form-label text-xs">{t('fin2.effectiveFrom')}</label>
                 <InputDatePicker
                   value={newTermEffective}
                   onChange={setNewTermEffective}
@@ -935,7 +936,6 @@ export function Fin2RatesPage() {
                           size="sm"
                           showChevron
                         />
-                        <hr className="border-line" />
                         <div className="text-xs font-medium text-muted uppercase tracking-wide">{t('common.sortBy')}</div>
                         <Select
                           options={sortOptions}

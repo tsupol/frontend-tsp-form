@@ -550,7 +550,7 @@ function DetailPanel({
 
             <div className="form-grid gap-3">
               <div className="flex flex-col">
-                <label className="form-label">{t('receiving.lotCode')}</label>
+                <label className="form-label text-xs">{t('receiving.lotCode')}</label>
                 <Input
                   value={lotCode}
                   onChange={(e) => setLotCode(e.target.value)}
@@ -558,7 +558,7 @@ function DetailPanel({
                 />
               </div>
               <div className="flex flex-col">
-                <label className="form-label">{t('receiving.intakeCondition')}</label>
+                <label className="form-label text-xs">{t('receiving.intakeCondition')}</label>
                 <div>
                   <Select
                     options={CONDITION_OPTIONS}
