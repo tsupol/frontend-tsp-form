@@ -11,6 +11,7 @@ export class ApiError extends Error {
   public messageKey?: string;
   public messageParams?: Record<string, unknown>;
   public isAuthError: boolean;
+  public httpStatus?: number;
 
   constructor(opts: {
     code: string;
@@ -18,6 +19,7 @@ export class ApiError extends Error {
     messageKey?: string;
     messageParams?: Record<string, unknown>;
     isAuthError: boolean;
+    httpStatus?: number;
   }) {
     super(opts.message);
     this.name = 'ApiError';
@@ -25,6 +27,7 @@ export class ApiError extends Error {
     this.messageKey = opts.messageKey;
     this.messageParams = opts.messageParams;
     this.isAuthError = opts.isAuthError;
+    this.httpStatus = opts.httpStatus;
   }
 }
 
@@ -123,7 +126,8 @@ function triggerAuthError(code: string, message: string) {
 // ============================================================================
 
 function handleV2Error(err: V2Error['error'], httpStatus?: number): never {
-  const auth = isAuthError(err.code, err.message) || httpStatus === 401;
+  const status = httpStatus ?? err.http_status;
+  const auth = isAuthError(err.code, err.message) || status === 401;
   if (auth) triggerAuthError(err.code, err.message);
 
   throw new ApiError({
@@ -132,6 +136,7 @@ function handleV2Error(err: V2Error['error'], httpStatus?: number): never {
     messageKey: err.message_key,
     messageParams: err.params,
     isAuthError: auth,
+    httpStatus: status,
   });
 }
 
@@ -177,13 +182,23 @@ export class ApiClient {
   private handleNonV2Error(data: unknown, endpoint: string, status: number): never {
     console.error(`[API] Non-v2 error from ${endpoint} (HTTP ${status}). Expected {ok, error}. Got:`, data);
 
-    const auth = status === 401;
+    // PostgREST returns 401 + code "42501" for permission denied — treat as 403, not auth error
+    const pgCode = typeof data === 'object' && data !== null && 'code' in data ? (data as { code: string }).code : '';
+    const isPermissionDenied = pgCode === '42501';
+
+    const auth = status === 401 && !isPermissionDenied;
     if (auth) triggerAuthError('HTTP_401', `HTTP ${status} from ${endpoint}`);
 
+    const errorCode = isPermissionDenied ? 'PERMISSION_DENIED' : `HTTP_${status}`;
+    const errorMessage = isPermissionDenied
+      ? `Permission denied: ${endpoint}`
+      : `Request failed: ${endpoint} (HTTP ${status})`;
+
     throw new ApiError({
-      code: `HTTP_${status}`,
-      message: `Request failed: ${endpoint} (HTTP ${status})`,
+      code: errorCode,
+      message: errorMessage,
       isAuthError: auth,
+      httpStatus: isPermissionDenied ? 403 : status,
     });
   }
 

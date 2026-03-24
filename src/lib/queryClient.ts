@@ -1,4 +1,5 @@
 import { QueryClient } from '@tanstack/react-query';
+import { ApiError } from './api';
 import { authService } from './auth';
 
 export const queryClient = new QueryClient({
@@ -6,9 +7,11 @@ export const queryClient = new QueryClient({
     queries: {
       staleTime: 5 * 60 * 1000, // 5 minutes
       retry: (failureCount, error) => {
-        // Don't retry on auth errors
-        if (error instanceof Error && error.message === 'invalid_login') {
-          return false;
+        if (error instanceof Error && error.message === 'invalid_login') return false;
+        if (error instanceof ApiError) {
+          if (error.isAuthError) return false;
+          // Don't retry 4xx client errors (permission denied, not found, bad request, etc.)
+          if (error.httpStatus && error.httpStatus >= 400 && error.httpStatus < 500) return false;
         }
         return failureCount < 3;
       },
