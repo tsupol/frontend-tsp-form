@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, DataTable, Badge, Input, Select, Button, PopOver, Tooltip, Modal, NumberSpinner, InputDatePicker, useSnackbarContext } from 'tsp-form';
+import { PageNav, PageNavPanel, MobileHeader, DataTable, Input, Select, Button, PopOver, Tooltip, Modal, NumberSpinner, InputDatePicker, useSnackbarContext } from 'tsp-form';
 import { ArrowRightFromLine, ArrowLeft, SlidersHorizontal, ChevronsUpDown, CheckCircle, XCircle, Pencil, Loader2, MousePointerClick, Plus, X, Calendar } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { formatDateTime } from '../../lib/format';
@@ -169,7 +169,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
     setErrorMessage('');
     setNewTermMonths('');
     setNewTermProfit('');
-    setNewTermEffective('');
+    setNewTermEffective(null);
     setFin2EffectiveDates({});
 
     const profits: Record<number, string> = {};

@@ -316,7 +316,7 @@ function TransferDetailPanel({
   lines: TransferLine[];
   loading: boolean;
   isMobile: boolean;
-  t: (key: string, fallback?: string) => string;
+  t: ReturnType<typeof useTranslation>['t'];
   onRefresh: () => void;
   addSnackbar: (opts: { message: React.ReactNode }) => void;
 }) {
@@ -325,7 +325,6 @@ function TransferDetailPanel({
 
   const canApprove = order.status === 'DRAFT';
   const canReceive = order.status === 'IN_TRANSIT' || order.status === 'DISPUTED';
-  const pendingLines = lines.filter(l => l.status === 'PENDING' || l.status === 'SHIPPED');
 
   return (
     <div className="relative flex flex-col h-full">
@@ -504,7 +503,7 @@ function ApproveTransferModal({
   open: boolean;
   onClose: () => void;
   order: TransferOrder;
-  t: (key: string, fallback?: string) => string;
+  t: ReturnType<typeof useTranslation>['t'];
   onSuccess: () => void;
 }) {
   const [note, setNote] = useState('');
@@ -591,7 +590,7 @@ function ReceiveLineModal({
   open: boolean;
   onClose: () => void;
   line: TransferLine | null;
-  t: (key: string, fallback?: string) => string;
+  t: ReturnType<typeof useTranslation>['t'];
   onSuccess: () => void;
 }) {
   const [action, setAction] = useState<string | null>(null);

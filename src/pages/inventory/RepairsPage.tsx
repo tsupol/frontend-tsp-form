@@ -280,7 +280,7 @@ function RepairDetailPanel({
 }: {
   order: RepairOrder;
   isMobile: boolean;
-  t: (key: string, fallback?: string) => string;
+  t: ReturnType<typeof useTranslation>['t'];
   onRefresh: () => void;
   addSnackbar: (opts: { message: React.ReactNode }) => void;
 }) {
@@ -435,7 +435,7 @@ function CloseRepairModal({
   open: boolean;
   onClose: () => void;
   order: RepairOrder;
-  t: (key: string, fallback?: string) => string;
+  t: ReturnType<typeof useTranslation>['t'];
   onSuccess: () => void;
 }) {
   const [result, setResult] = useState<string | null>(null);
@@ -537,7 +537,7 @@ function RouteRepairModal({
   open: boolean;
   onClose: () => void;
   order: RepairOrder;
-  t: (key: string, fallback?: string) => string;
+  t: ReturnType<typeof useTranslation>['t'];
   onSuccess: () => void;
 }) {
   const [destination, setDestination] = useState<string | null>(null);

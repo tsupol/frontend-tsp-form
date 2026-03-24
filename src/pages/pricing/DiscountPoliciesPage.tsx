@@ -384,7 +384,7 @@ function PolicyModal({ open, onClose, editPolicy, onSuccess }: {
 // ── Main Page ────────────────────────────────────────────────────────────────
 
 export function DiscountPoliciesPage() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { addSnackbar } = useSnackbarContext();
   const queryClient = useQueryClient();
 
@@ -453,47 +453,6 @@ export function DiscountPoliciesPage() {
     setModalOpen(true);
   };
 
-  const handleToggleActive = async (policy: DiscountPolicy) => {
-    try {
-      await apiClient.rpc('discount_policy_upsert', {
-        p_policy_id: policy.id,
-        p_retail_max_discount_percent: policy.retail_max_discount_percent,
-        p_fin1_max_discount_percent: policy.fin1_max_discount_percent,
-        p_fin2_max_discount_percent: policy.fin2_max_discount_percent,
-        p_effective_from: policy.effective_from || undefined,
-        p_effective_to: policy.effective_to || undefined,
-        p_is_active: !policy.is_active,
-      });
-      queryClient.invalidateQueries({ queryKey: ['discount-policies'] });
-      addSnackbar({
-        message: (
-          <div className="alert alert-success">
-            <CheckCircle size={18} />
-            <div><div className="alert-title">
-              {t(policy.is_active ? 'discount.policyDeactivated' : 'discount.policyActivated')}
-            </div></div>
-          </div>
-        ),
-        type: 'success',
-        duration: 3000,
-      });
-    } catch (err) {
-      const msg = err instanceof ApiError
-        ? (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') || err.message
-        : t('common.error');
-      addSnackbar({
-        message: (
-          <div className="alert alert-danger">
-            <XCircle size={18} />
-            <div><div className="alert-title">{msg}</div></div>
-          </div>
-        ),
-        type: 'error',
-        duration: 5000,
-      });
-    }
-  };
-
   const handleSuccess = () => {
     addSnackbar({
       message: (
@@ -527,7 +486,6 @@ export function DiscountPoliciesPage() {
     {
       id: 'scope',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('discount.scope')} />,
-      accessorFn: (row) => getScopeLabel(row),
       cell: ({ row }) => {
         const scope = getScopeLabel(row.original);
         return <Badge size="sm" color={scopeBadgeColor(scope)}>{t(`discount.scope${scope}`)}</Badge>;
@@ -582,7 +540,7 @@ export function DiscountPoliciesPage() {
     },
     {
       id: 'effective_period',
-      accessorFn: (row) => row.effective_from ?? '',
+      accessorKey: 'effective_from',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('discount.effectivePeriod')} />,
       cell: ({ row }) => {
         const p = row.original;

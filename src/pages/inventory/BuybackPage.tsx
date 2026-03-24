@@ -305,7 +305,7 @@ function BuybackDetailPanel({
   lines: BuybackLine[];
   loading: boolean;
   isMobile: boolean;
-  t: (key: string, fallback?: string) => string;
+  t: ReturnType<typeof useTranslation>['t'];
   onRefresh: () => void;
   addSnackbar: (opts: { message: React.ReactNode }) => void;
 }) {
@@ -505,7 +505,7 @@ function BuybackActionModal({
   action: 'submit' | 'revert' | 'approve' | 'reject' | null;
   onClose: () => void;
   order: BuybackOrder;
-  t: (key: string, fallback?: string) => string;
+  t: ReturnType<typeof useTranslation>['t'];
   onSuccess: () => void;
 }) {
   const [note, setNote] = useState('');

@@ -347,7 +347,7 @@ export function DiscountApprovalsPage() {
   };
 
   // Intercept row expansion as a row-click handler → open drawer instead of expanding
-  const handleRowExpansionChange = (updater: (prev: RowExpansionState) => RowExpansionState) => {
+  const handleRowExpansionChange = (updater: RowExpansionState | ((prev: RowExpansionState) => RowExpansionState)) => {
     const next = typeof updater === 'function' ? updater({}) : updater;
     const clickedId = Object.keys(next).find(k => next[k]);
     if (clickedId) {

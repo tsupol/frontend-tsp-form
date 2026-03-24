@@ -323,7 +323,7 @@ function PoDetailPanel({
   lines: PoLine[];
   loading: boolean;
   isMobile: boolean;
-  t: (key: string, fallback?: string) => string;
+  t: ReturnType<typeof useTranslation>['t'];
 }) {
   return (
     <div className="relative flex flex-col h-full">

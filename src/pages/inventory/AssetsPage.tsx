@@ -424,7 +424,7 @@ function AssetDetailPanel({
 }: {
   asset: Asset;
   isMobile: boolean;
-  t: (key: string, fallback?: string) => string;
+  t: ReturnType<typeof useTranslation>['t'];
   onRefresh: () => void;
   addSnackbar: (opts: { message: React.ReactNode }) => void;
 }) {
@@ -697,7 +697,7 @@ function AssetActionModal({
   action: ActionType | null;
   onClose: () => void;
   asset: Asset;
-  t: (key: string, fallback?: string) => string;
+  t: ReturnType<typeof useTranslation>['t'];
   onSuccess: (msgKey: string) => void;
 }) {
   const [reason, setReason] = useState<string | null>(null);
