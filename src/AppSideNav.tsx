@@ -1,7 +1,7 @@
 import { SideMenu, SideMenuItems, type SideMenuItemData, PopOver, MenuItem, SubMenu, MenuSeparator, Checkmark } from 'tsp-form';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { clsx } from 'clsx';
 import {
   ArrowLeftFromLine,
@@ -24,6 +24,10 @@ import {
 import { useAuth } from './contexts/AuthContext';
 import { useTheme } from './contexts/ThemeContext';
 import { useNavGuard } from './contexts/NavGuardContext';
+
+const lgQuery = window.matchMedia('(min-width: 1024px)');
+const subscribeLg = (cb: () => void) => { lgQuery.addEventListener('change', cb); return () => lgQuery.removeEventListener('change', cb); };
+const getIsLg = () => lgQuery.matches;
 
 // User menu component
 function UserMenu({ collapsed }: { collapsed: boolean }) {
@@ -118,6 +122,7 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
 export const AppSideNav = () => {
   const [menuCollapsed, setMenuCollapsed] = useState(() => localStorage.getItem('sidebar-collapsed') === 'true');
   const [isMobile, setIsMobile] = useState(false);
+  const isLg = useSyncExternalStore(subscribeLg, getIsLg);
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useTranslation();
@@ -143,7 +148,8 @@ export const AppSideNav = () => {
         { key: 'pricebook', label: t('nav.pricebook'), path: '/admin/pricing/pricebook' },
         { key: 'fin1-rates', label: t('nav.fin1Rates'), path: '/admin/pricing/fin1-rates' },
         { key: 'fin2-rates', label: t('nav.fin2Rates'), path: '/admin/pricing/fin2-rates' },
-        { key: 'discounts', label: t('nav.discounts'), path: '/admin/pricing/discounts' },
+        { key: 'discount-policies', label: t('nav.discountPolicies'), path: '/admin/pricing/discount-policies' },
+        { key: 'discount-approvals', label: t('nav.discountApprovals'), path: '/admin/pricing/discount-approvals' },
         { key: 'deal-partner-rates', label: t('nav.dealPartnerRates'), path: '/admin/pricing/deal-partner-rates' },
       ],
     },
@@ -226,7 +232,7 @@ export const AppSideNav = () => {
                 isMobile={isMobile}
                 onSelect={handleSelect}
                 onCloseMobile={handleCloseMobile}
-                disableFlyoutOnActive
+                disableFlyoutOnActive={isLg}
               />
             </div>
             <div className={clsx('border-t border-line py-2 pointer-events-auto', menuCollapsed ? 'px-0' : 'px-2')}>

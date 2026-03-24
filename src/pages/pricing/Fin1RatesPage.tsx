@@ -10,7 +10,6 @@ import {
 } from 'tsp-form';
 import { ArrowRightFromLine, Plus, XCircle, CheckCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
-import { useAuth } from '../../contexts/AuthContext';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -20,17 +19,26 @@ interface CategoryLookup {
   name: string;
 }
 
-// Workbench row (used to extract unique FIN1 rate card info)
-interface WorkbenchFin1Row {
+interface Fin1RateCard {
+  id: number;
+  holding_id: number;
   category_id: number;
   category_code: string;
   category_name: string;
-  term_months: number | null;
-  down_percent: number | null;
-  interest_percent_total: number | null;
-  rounding_unit: number | null;
-  max_discount_percent: number | null;
-  missing_fin1_rate_card: boolean;
+  model_id: number | null;
+  model_code: string | null;
+  model_name: string | null;
+  model_scope_id: number | null;
+  term_months: number;
+  down_percent: number;
+  interest_percent_total: number;
+  rounding_unit: number;
+  max_discount_percent: number;
+  is_active: boolean;
+  effective_from: string | null;
+  effective_to: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 // ── Create/Edit Modal ────────────────────────────────────────────────────────
@@ -259,10 +267,8 @@ function Fin1Modal({ open, onClose, categories, onSuccess }: {
 
 export function Fin1RatesPage() {
   const { t } = useTranslation();
-  const { user } = useAuth();
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
-  const holdingId = user?.holding_id ?? null;
 
   const [sorting, setSorting] = useState<SortingState>([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -276,46 +282,16 @@ export function Fin1RatesPage() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // FIN1 rate cards from workbench (deduplicated)
+  // FIN1 rate cards from dedicated view
   const { data: rateCards = [], isFetching } = useQuery({
-    queryKey: ['fin1-rate-cards', holdingId],
-    queryFn: async () => {
-      const rows = await apiClient.get<WorkbenchFin1Row[]>(
-        `/v_pricing_user_workbench?finance_model=eq.FIN1&select=category_id,category_code,category_name,term_months,down_percent,interest_percent_total,rounding_unit,max_discount_percent,missing_fin1_rate_card&order=category_code,term_months,down_percent`
-      );
-      const seen = new Set<string>();
-      const cards: Array<{
-        category_id: number;
-        category_code: string;
-        category_name: string;
-        term_months: number;
-        down_percent: number;
-        interest_percent_total: number;
-        rounding_unit: number;
-        max_discount_percent: number;
-      }> = [];
-      for (const r of rows) {
-        if (r.term_months === null || r.down_percent === null) continue;
-        const key = `${r.category_id}-${r.term_months}-${r.down_percent}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        cards.push({
-          category_id: r.category_id,
-          category_code: r.category_code,
-          category_name: r.category_name,
-          term_months: r.term_months,
-          down_percent: r.down_percent,
-          interest_percent_total: r.interest_percent_total ?? 0,
-          rounding_unit: r.rounding_unit ?? 10,
-          max_discount_percent: r.max_discount_percent ?? 5,
-        });
-      }
-      return cards;
-    },
+    queryKey: ['fin1-rate-cards'],
+    queryFn: () => apiClient.get<Fin1RateCard[]>(
+      '/v_fin1_rate_cards?order=category_code,term_months,down_percent'
+    ),
     staleTime: 30 * 1000,
   });
 
-  type RateCardRow = typeof rateCards[number];
+  type RateCardRow = Fin1RateCard;
 
   // Client-side pagination
   const totalCount = rateCards.length;
@@ -356,6 +332,15 @@ export function Fin1RatesPage() {
       ),
     },
     {
+      accessorKey: 'model_name',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('fin1.model')} />,
+      cell: ({ row }) => (
+        <span className="text-sm">
+          {row.original.model_name ?? <span className="text-control-label">{t('fin1.categoryDefault')}</span>}
+        </span>
+      ),
+    },
+    {
       accessorKey: 'term_months',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('fin1.termMonths')} />,
       cell: ({ row }) => (
@@ -390,6 +375,15 @@ export function Fin1RatesPage() {
         <span className="text-sm tabular-nums">{row.original.max_discount_percent}%</span>
       ),
     },
+    {
+      accessorKey: 'is_active',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('fin1.status')} />,
+      cell: ({ row }) => (
+        <Badge size="sm" color={row.original.is_active ? 'success' : 'default'}>
+          {row.original.is_active ? t('fin1.statusActive') : t('fin1.statusInactive')}
+        </Badge>
+      ),
+    },
   ];
 
   return (
@@ -419,7 +413,7 @@ export function Fin1RatesPage() {
         </div>
       </MobileHeader>
 
-      <div className="page-content responsive-dvh-mobile-header max-w-[64rem]">
+      <div className="page-content responsive-dvh-mobile-header">
         {/* Desktop header */}
         <div className="flex items-center justify-between mb-4 flex-none max-md:hidden">
           <h1 className="heading-2">{t('fin1.title')}</h1>
@@ -461,15 +455,23 @@ export function Fin1RatesPage() {
             ) : (
               <div className="flex flex-col divide-y divide-line">
                 {paginatedCards.map((card) => (
-                  <div key={`${card.category_id}-${card.term_months}-${card.down_percent}`} className="px-1 py-3">
+                  <div key={card.id} className="px-1 py-3">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="font-medium truncate">{card.category_name}</div>
-                        <div className="text-xs text-control-label">{card.category_code}</div>
+                        <div className="text-xs text-control-label">
+                          {card.category_code}
+                          {card.model_name && <span> &middot; {card.model_name}</span>}
+                        </div>
                       </div>
-                      <Badge size="sm" color="info">
-                        {t('pricing.termMonths', { months: card.term_months })}
-                      </Badge>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Badge size="sm" color="info">
+                          {t('pricing.termMonths', { months: card.term_months })}
+                        </Badge>
+                        <Badge size="sm" color={card.is_active ? 'success' : 'default'}>
+                          {card.is_active ? t('fin1.statusActive') : t('fin1.statusInactive')}
+                        </Badge>
+                      </div>
                     </div>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-sm">
                       <div className="flex justify-between">

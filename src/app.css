@@ -47,3 +47,8 @@ input[type="number"
 [data-theme="dark"] {
     --color-skeleton: #1c1c1e;
 }
+
+.page-header {
+    height: 2.25rem;
+    align-items: center;
+}

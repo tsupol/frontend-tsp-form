@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, Badge, Select, DataTable } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, RotateCcw } from 'lucide-react';
-import { apiClient } from '../../lib/api';
+import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
+import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Modal, TextArea, DataTable, useSnackbarContext } from 'tsp-form';
+import { ArrowLeft, ArrowRightFromLine, RotateCcw, CheckCircle, XCircle } from 'lucide-react';
+import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { fmtNum, fmtCurrency } from './inventoryUtils';
 
@@ -80,19 +80,19 @@ interface Branch {
 
 const BUYBACK_STATUS_COLOR: Record<string, string> = {
   DRAFT: 'bg-fg/10 text-fg/60',
-  SUBMITTED: 'bg-warning/15 text-warning',
+  PENDING_APPROVAL: 'bg-warning/15 text-warning',
   APPROVED: 'bg-success/15 text-success',
   REJECTED: 'bg-danger/15 text-danger',
-  CLOSED: 'bg-fg/10 text-fg/60',
+  COMPLETED: 'bg-fg/10 text-fg/60',
   CANCELLED: 'bg-danger/15 text-danger',
 };
 
 const BUYBACK_STATUS_OPTIONS = [
   { value: 'DRAFT', label: 'Draft' },
-  { value: 'SUBMITTED', label: 'Submitted' },
+  { value: 'PENDING_APPROVAL', label: 'Pending Approval' },
   { value: 'APPROVED', label: 'Approved' },
   { value: 'REJECTED', label: 'Rejected' },
-  { value: 'CLOSED', label: 'Closed' },
+  { value: 'COMPLETED', label: 'Completed' },
   { value: 'CANCELLED', label: 'Cancelled' },
 ];
 
@@ -102,6 +102,8 @@ const BUYBACK_STATUS_OPTIONS = [
 
 export function BuybackPage() {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const { addSnackbar } = useSnackbarContext();
 
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
   const [filterBranchId, setFilterBranchId] = useState<number | null>(null);
@@ -149,6 +151,11 @@ export function BuybackPage() {
   }, [list, selectedId]);
 
   const selectedOrder = list.find(o => o.id === selectedId) ?? null;
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['buyback-orders'] });
+    queryClient.invalidateQueries({ queryKey: ['buyback-lines'] });
+  };
 
   return (
     <PageNav panels={['list', 'detail']} className="h-dvh">
@@ -256,7 +263,15 @@ export function BuybackPage() {
 
             <PageNavPanel id="detail" className={isMobile ? '' : 'flex-1 flex flex-col'}>
               {selectedOrder ? (
-                <BuybackDetailPanel order={selectedOrder} lines={lines ?? []} loading={linesFetching} isMobile={isMobile} t={t} />
+                <BuybackDetailPanel
+                  order={selectedOrder}
+                  lines={lines ?? []}
+                  loading={linesFetching}
+                  isMobile={isMobile}
+                  t={t}
+                  onRefresh={invalidate}
+                  addSnackbar={addSnackbar}
+                />
               ) : (
                 <div className="flex-1 h-full flex items-center justify-center text-subtler">
                   <div className="text-center">
@@ -283,13 +298,52 @@ function BuybackDetailPanel({
   loading,
   isMobile,
   t,
+  onRefresh,
+  addSnackbar,
 }: {
   order: BuybackOrder;
   lines: BuybackLine[];
   loading: boolean;
   isMobile: boolean;
   t: (key: string, fallback?: string) => string;
+  onRefresh: () => void;
+  addSnackbar: (opts: { message: React.ReactNode }) => void;
 }) {
+  const [actionModal, setActionModal] = useState<'submit' | 'revert' | 'approve' | 'reject' | null>(null);
+  const [intakeError, setIntakeError] = useState('');
+
+  const canSubmit = order.status === 'DRAFT';
+  const canRevert = order.status === 'PENDING_APPROVAL';
+  const canDecide = order.status === 'PENDING_APPROVAL';
+  const canIntake = order.status === 'APPROVED';
+
+  const intakeMutation = useMutation({
+    mutationFn: () =>
+      apiClient.rpc('fn_inv_buyback_confirm_intake', {
+        p_po_id: order.id,
+        p_lines: lines.map(l => ({ po_line_id: l.po_line_id })),
+      }),
+    onSuccess: () => {
+      onRefresh();
+      addSnackbar({
+        message: (
+          <div className="alert alert-success">
+            <CheckCircle size={16} />
+            <span>{t('buyback.intakeSuccess')}</span>
+          </div>
+        ),
+      });
+    },
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        setIntakeError(translated || err.message);
+      } else {
+        setIntakeError(String(err));
+      }
+    },
+  });
+
   return (
     <div className="relative flex flex-col h-full">
       {loading && (
@@ -329,6 +383,15 @@ function BuybackDetailPanel({
         {order.approved_at && <span>{t('buyback.approved')}: <DateTime value={order.approved_at} /></span>}
       </div>
 
+      {intakeError && (
+        <div className="flex-none px-4 py-2">
+          <div className="alert alert-danger animate-pop-in">
+            <XCircle size={16} />
+            <span>{intakeError}</span>
+          </div>
+        </div>
+      )}
+
       {/* Lines */}
       <div className="flex-1 overflow-auto better-scroll">
         <div className="px-4 pt-3 pb-1">
@@ -342,7 +405,9 @@ function BuybackDetailPanel({
         {lines.map((line) => (
           <div key={line.po_line_id} className="px-4 py-2.5 border-b border-line flex items-center gap-3">
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium truncate">{line.model_name}</div>
+              <div className="text-sm font-medium truncate">
+                {[line.brand_name, line.model_name].filter(Boolean).join(' ')}
+              </div>
               <div className="text-xs text-subtle truncate">
                 {line.variant_name} · {line.variant_sku_code}
               </div>
@@ -360,6 +425,178 @@ function BuybackDetailPanel({
           </div>
         ))}
       </div>
+
+      {/* Action buttons */}
+      {(canSubmit || canRevert || canDecide || canIntake) && (
+        <div className="flex-none px-4 py-3 border-t border-line flex gap-2">
+          {canSubmit && (
+            <Button color="primary" className="flex-1" onClick={() => setActionModal('submit')}>
+              {t('buyback.submit')}
+            </Button>
+          )}
+          {canRevert && (
+            <Button className="flex-1" onClick={() => setActionModal('revert')}>
+              {t('buyback.revertDraft')}
+            </Button>
+          )}
+          {canDecide && (
+            <>
+              <Button color="primary" className="flex-1" onClick={() => setActionModal('approve')}>
+                {t('buyback.approve')}
+              </Button>
+              <Button className="flex-1" onClick={() => setActionModal('reject')}>
+                {t('buyback.reject')}
+              </Button>
+            </>
+          )}
+          {canIntake && (
+            <Button
+              color="primary"
+              className="flex-1"
+              onClick={() => intakeMutation.mutate()}
+              disabled={intakeMutation.isPending}
+            >
+              {intakeMutation.isPending ? t('common.loading') : t('buyback.confirmIntake')}
+            </Button>
+          )}
+        </div>
+      )}
+
+      <BuybackActionModal
+        open={!!actionModal}
+        action={actionModal}
+        onClose={() => setActionModal(null)}
+        order={order}
+        t={t}
+        onSuccess={() => {
+          const msg = actionModal === 'submit' ? t('buyback.submitSuccess')
+            : actionModal === 'approve' ? t('buyback.approveSuccess')
+            : actionModal === 'reject' ? t('buyback.rejectSuccess')
+            : t('buyback.revertSuccess');
+          setActionModal(null);
+          onRefresh();
+          addSnackbar({
+            message: (
+              <div className="alert alert-success">
+                <CheckCircle size={16} />
+                <span>{msg}</span>
+              </div>
+            ),
+          });
+        }}
+      />
     </div>
+  );
+}
+
+// ============================================================================
+// Action Modal (submit, revert, approve, reject)
+// ============================================================================
+
+function BuybackActionModal({
+  open,
+  action,
+  onClose,
+  order,
+  t,
+  onSuccess,
+}: {
+  open: boolean;
+  action: 'submit' | 'revert' | 'approve' | 'reject' | null;
+  onClose: () => void;
+  order: BuybackOrder;
+  t: (key: string, fallback?: string) => string;
+  onSuccess: () => void;
+}) {
+  const [note, setNote] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (open) { setNote(''); setError(''); }
+  }, [open]);
+
+  const rpcMap: Record<string, string> = {
+    submit: 'fn_inv_buyback_submit',
+    revert: 'fn_inv_buyback_revert_draft',
+    approve: 'fn_inv_buyback_approve',
+    reject: 'fn_inv_buyback_reject',
+  };
+
+  const titleMap: Record<string, string> = {
+    submit: t('buyback.submit'),
+    revert: t('buyback.revertDraft'),
+    approve: t('buyback.approve'),
+    reject: t('buyback.reject'),
+  };
+
+  const mutation = useMutation({
+    mutationFn: () => {
+      if (!action) return Promise.reject(new Error('No action'));
+      const params: Record<string, unknown> = { p_po_id: order.id };
+      if (action !== 'submit') {
+        params.p_note = note || null;
+      }
+      return apiClient.rpc(rpcMap[action], params);
+    },
+    onSuccess,
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        setError(translated || err.message);
+      } else {
+        setError(String(err));
+      }
+    },
+  });
+
+  if (!action) return null;
+
+  const showNote = action !== 'submit';
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
+      <div className="flex flex-col overflow-hidden">
+        <div className="modal-header">
+          <h2 className="modal-title">{titleMap[action]}</h2>
+          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+        </div>
+        <div className="modal-content">
+          {error && (
+            <div className="alert alert-danger mb-4 animate-pop-in">
+              <XCircle size={16} />
+              <span>{error}</span>
+            </div>
+          )}
+          <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
+            <div className="font-medium text-sm">{order.po_no}</div>
+            <div className="text-xs text-subtle">{order.supplier_name}</div>
+            <div className="text-xs text-subtle">{order.c_total_lines} {t('buyback.items')} · {fmtCurrency(order.c_total_amount)}</div>
+          </div>
+          {showNote && (
+            <div className="form-grid gap-4">
+              <div className="flex flex-col">
+                <label className="form-label">{t('buyback.note')}</label>
+                <TextArea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder={t('buyback.notePlaceholder')}
+                  rows={3}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="modal-footer">
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button
+            color={action === 'reject' ? undefined : 'primary'}
+            onClick={() => mutation.mutate()}
+            disabled={mutation.isPending}
+          >
+            {mutation.isPending ? t('common.loading') : titleMap[action]}
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 }

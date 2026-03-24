@@ -502,7 +502,7 @@ export function BrandsPage() {
         </div>
       </MobileHeader>
 
-      <div className="page-content responsive-dvh-mobile-header max-w-[64rem]">
+      <div className="page-content responsive-dvh-mobile-header">
         {/* Desktop header */}
         <div className="flex items-center justify-between mb-4 flex-none max-md:hidden">
           <h1 className="heading-2">{t('brandsModels.brands')}</h1>

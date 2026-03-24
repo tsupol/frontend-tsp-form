@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, Badge, Select, DataTable } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, Wrench } from 'lucide-react';
-import { apiClient } from '../../lib/api';
+import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
+import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Modal, TextArea, DataTable, useSnackbarContext } from 'tsp-form';
+import { ArrowLeft, ArrowRightFromLine, Wrench, CheckCircle, XCircle } from 'lucide-react';
+import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 
 // ============================================================================
@@ -22,6 +22,8 @@ interface RepairOrder {
   variant_name: string;
   sku_code: string;
   model_name: string;
+  family_name: string | null;
+  brand_name: string | null;
   loaner_asset_id: number | null;
   loaner_asset_code: string | null;
   loaner_serial_no: string | null;
@@ -48,14 +50,35 @@ interface Branch {
 
 const REPAIR_STATUS_COLOR: Record<string, string> = {
   OPEN: 'bg-warning/15 text-warning',
-  ROUTED: 'bg-info/15 text-info',
-  CLOSED: 'bg-fg/10 text-fg/60',
+  COMPLETED: 'bg-success/15 text-success',
+  CANCELLED: 'bg-fg/10 text-fg/60',
 };
 
 const REPAIR_STATUS_OPTIONS = [
   { value: 'OPEN', label: 'Open' },
-  { value: 'ROUTED', label: 'Routed' },
-  { value: 'CLOSED', label: 'Closed' },
+  { value: 'COMPLETED', label: 'Completed' },
+  { value: 'CANCELLED', label: 'Cancelled' },
+];
+
+const RESULT_OPTIONS = [
+  { value: 'FIXED', label: 'Fixed' },
+  { value: 'UNFIXABLE', label: 'Unfixable' },
+];
+
+const ROUTE_FIXED_OPTIONS = [
+  { value: 'RETURN_TO_CUSTOMER', label: 'Return to Customer' },
+  { value: 'RETURN_TO_STOCK', label: 'Return to Stock' },
+  { value: 'QUARANTINE', label: 'Quarantine' },
+];
+
+const ROUTE_UNFIXABLE_OPTIONS = [
+  { value: 'DISPOSE', label: 'Dispose' },
+  { value: 'QUARANTINE', label: 'Quarantine' },
+];
+
+const LOANER_ACTION_OPTIONS = [
+  { value: 'RETURN', label: 'Return loaner' },
+  { value: 'SWAP', label: 'Swap (customer keeps loaner)' },
 ];
 
 // ============================================================================
@@ -64,6 +87,8 @@ const REPAIR_STATUS_OPTIONS = [
 
 export function RepairsPage() {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const { addSnackbar } = useSnackbarContext();
 
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
   const [filterBranchId, setFilterBranchId] = useState<number | null>(null);
@@ -104,6 +129,10 @@ export function RepairsPage() {
   }, [list, selectedId]);
 
   const selectedOrder = list.find(o => o.id === selectedId) ?? null;
+
+  const invalidateList = () => {
+    queryClient.invalidateQueries({ queryKey: ['repair-orders'] });
+  };
 
   return (
     <PageNav panels={['list', 'detail']} className="h-dvh">
@@ -182,12 +211,17 @@ export function RepairsPage() {
                           <span className="font-medium text-sm truncate">{order.repair_no}</span>
                         </div>
                         <div className="text-xs text-subtle truncate">
-                          {order.model_name} · {order.asset_code}
+                          {[order.brand_name, order.model_name].filter(Boolean).join(' ')} · {order.asset_code}
                         </div>
                         <div className="flex items-center gap-2 mt-1 -ml-0.5">
                           <Badge size="xs" className={REPAIR_STATUS_COLOR[order.status] ?? 'bg-fg/10 text-fg/60'}>
                             {t(`repair.status_${order.status}`, order.status)}
                           </Badge>
+                          {order.result && (
+                            <Badge size="xs" className={order.result === 'FIXED' ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'}>
+                              {t(`repair.result_${order.result}`, order.result)}
+                            </Badge>
+                          )}
                           <span className="text-xs text-subtle">{order.branch_name}</span>
                         </div>
                       </div>
@@ -210,7 +244,13 @@ export function RepairsPage() {
 
             <PageNavPanel id="detail" className={isMobile ? '' : 'flex-1 flex flex-col'}>
               {selectedOrder ? (
-                <RepairDetailPanel order={selectedOrder} isMobile={isMobile} t={t} />
+                <RepairDetailPanel
+                  order={selectedOrder}
+                  isMobile={isMobile}
+                  t={t}
+                  onRefresh={invalidateList}
+                  addSnackbar={addSnackbar}
+                />
               ) : (
                 <div className="flex-1 h-full flex items-center justify-center text-subtler">
                   <div className="text-center">
@@ -235,11 +275,22 @@ function RepairDetailPanel({
   order,
   isMobile,
   t,
+  onRefresh,
+  addSnackbar,
 }: {
   order: RepairOrder;
   isMobile: boolean;
   t: (key: string, fallback?: string) => string;
+  onRefresh: () => void;
+  addSnackbar: (opts: { message: React.ReactNode }) => void;
 }) {
+  const [closeModalOpen, setCloseModalOpen] = useState(false);
+  const [routeModalOpen, setRouteModalOpen] = useState(false);
+
+  const needsClose = order.status === 'OPEN';
+  const needsRoute = order.status === 'COMPLETED' && !order.route_decision;
+  const isFullyDone = order.status === 'COMPLETED' && !!order.route_decision;
+
   return (
     <div className="relative flex flex-col h-full">
       {!isMobile && (
@@ -248,6 +299,11 @@ function RepairDetailPanel({
           <Badge size="xs" className={REPAIR_STATUS_COLOR[order.status] ?? 'bg-fg/10 text-fg/60'}>
             {t(`repair.status_${order.status}`, order.status)}
           </Badge>
+          {order.result && (
+            <Badge size="xs" className={order.result === 'FIXED' ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'}>
+              {t(`repair.result_${order.result}`, order.result)}
+            </Badge>
+          )}
         </div>
       )}
 
@@ -255,7 +311,10 @@ function RepairDetailPanel({
         <div>
           <div className="text-xs text-subtle">{t('repair.asset')}</div>
           <div className="font-semibold text-sm">{order.asset_code}</div>
-          <div className="text-xs text-subtle">{order.model_name} · {order.variant_name}</div>
+          <div className="text-xs text-subtle">
+            {[order.brand_name, order.family_name, order.model_name].filter(Boolean).join(' > ')}
+          </div>
+          <div className="text-xs text-subtle">{order.variant_name} · {order.sku_code}</div>
           {order.serial_no && <div className="text-xs text-fg/50 font-mono mt-0.5">{order.serial_no}</div>}
         </div>
         <div>
@@ -284,27 +343,309 @@ function RepairDetailPanel({
         {order.repair_note && (
           <div>
             <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-1">{t('repair.note')}</h3>
-            <p className="text-sm text-fg/80">{order.repair_note}</p>
+            <p className="text-sm text-fg/80 whitespace-pre-wrap">{order.repair_note}</p>
           </div>
         )}
 
         {order.route_decision && (
           <div>
             <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-1">{t('repair.routeDecision')}</h3>
-            <Badge size="xs" className="bg-info/15 text-info">{order.route_decision.replace(/_/g, ' ')}</Badge>
-            {order.route_note && <p className="text-sm text-fg/80 mt-1">{order.route_note}</p>}
-          </div>
-        )}
-
-        {order.result && (
-          <div>
-            <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-1">{t('repair.result')}</h3>
-            <Badge size="xs" className={order.result === 'REPAIRED' ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'}>
-              {order.result.replace(/_/g, ' ')}
+            <Badge size="xs" className="bg-info/15 text-info">
+              {t(`repair.route_${order.route_decision}`, order.route_decision.replace(/_/g, ' '))}
             </Badge>
+            {order.route_note && <p className="text-sm text-fg/80 mt-1 whitespace-pre-wrap">{order.route_note}</p>}
           </div>
         )}
       </div>
+
+      {/* Action buttons */}
+      {(needsClose || needsRoute) && (
+        <div className="flex-none px-4 py-3 border-t border-line flex gap-2">
+          {needsClose && (
+            <Button color="primary" className="flex-1" onClick={() => setCloseModalOpen(true)}>
+              {t('repair.closeRepair')}
+            </Button>
+          )}
+          {needsRoute && (
+            <Button color="primary" className="flex-1" onClick={() => setRouteModalOpen(true)}>
+              {t('repair.routeDevice')}
+            </Button>
+          )}
+        </div>
+      )}
+
+      {isFullyDone && (
+        <div className="flex-none px-4 py-3 border-t border-line">
+          <div className="text-xs text-subtle text-center">{t('repair.fullyCompleted')}</div>
+        </div>
+      )}
+
+      <CloseRepairModal
+        open={closeModalOpen}
+        onClose={() => setCloseModalOpen(false)}
+        order={order}
+        t={t}
+        onSuccess={() => {
+          setCloseModalOpen(false);
+          onRefresh();
+          addSnackbar({
+            message: (
+              <div className="alert alert-success">
+                <CheckCircle size={16} />
+                <span>{t('repair.closeSuccess')}</span>
+              </div>
+            ),
+          });
+        }}
+      />
+
+      <RouteRepairModal
+        open={routeModalOpen}
+        onClose={() => setRouteModalOpen(false)}
+        order={order}
+        t={t}
+        onSuccess={() => {
+          setRouteModalOpen(false);
+          onRefresh();
+          addSnackbar({
+            message: (
+              <div className="alert alert-success">
+                <CheckCircle size={16} />
+                <span>{t('repair.routeSuccess')}</span>
+              </div>
+            ),
+          });
+        }}
+      />
     </div>
+  );
+}
+
+// ============================================================================
+// Close Repair Modal
+// ============================================================================
+
+function CloseRepairModal({
+  open,
+  onClose,
+  order,
+  t,
+  onSuccess,
+}: {
+  open: boolean;
+  onClose: () => void;
+  order: RepairOrder;
+  t: (key: string, fallback?: string) => string;
+  onSuccess: () => void;
+}) {
+  const [result, setResult] = useState<string | null>(null);
+  const [note, setNote] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (open) { setResult(null); setNote(''); setError(''); }
+  }, [open]);
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      apiClient.rpc('fn_inv_repair_close', {
+        p_repair_order_id: order.id,
+        p_result: result,
+        p_note: note || null,
+      }),
+    onSuccess,
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        setError(translated || err.message);
+      } else {
+        setError(String(err));
+      }
+    },
+  });
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
+      <div className="flex flex-col overflow-hidden">
+        <div className="modal-header">
+          <h2 className="modal-title">{t('repair.closeRepair')}</h2>
+          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+        </div>
+        <div className="modal-content">
+          {error && (
+            <div className="alert alert-danger mb-4 animate-pop-in">
+              <XCircle size={16} />
+              <span>{error}</span>
+            </div>
+          )}
+          <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
+            <div className="font-medium text-sm">{order.asset_code}</div>
+            <div className="text-xs text-subtle">
+              {[order.brand_name, order.family_name, order.model_name].filter(Boolean).join(' > ')}
+            </div>
+            <div className="text-xs text-subtle">{order.variant_name} · {order.sku_code}</div>
+            {order.serial_no && <div className="text-xs text-fg/50 font-mono mt-0.5">{order.serial_no}</div>}
+          </div>
+          <div className="form-grid gap-4">
+            <div className="flex flex-col">
+              <label className="form-label">{t('repair.result')}</label>
+              <Select
+                options={RESULT_OPTIONS}
+                value={result}
+                onChange={(val) => setResult((val as string) || null)}
+                placeholder={t('repair.selectResult')}
+                showChevron
+              />
+            </div>
+            <div className="flex flex-col">
+              <label className="form-label">{t('repair.note')}</label>
+              <TextArea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder={t('repair.notePlaceholder')}
+                rows={3}
+              />
+            </div>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button
+            color="primary"
+            onClick={() => mutation.mutate()}
+            disabled={!result || mutation.isPending}
+          >
+            {mutation.isPending ? t('common.loading') : t('repair.closeRepair')}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ============================================================================
+// Route Repair Modal
+// ============================================================================
+
+function RouteRepairModal({
+  open,
+  onClose,
+  order,
+  t,
+  onSuccess,
+}: {
+  open: boolean;
+  onClose: () => void;
+  order: RepairOrder;
+  t: (key: string, fallback?: string) => string;
+  onSuccess: () => void;
+}) {
+  const [destination, setDestination] = useState<string | null>(null);
+  const [loanerAction, setLoanerAction] = useState<string | null>(null);
+  const [note, setNote] = useState('');
+  const [error, setError] = useState('');
+
+  const routeOptions = order.result === 'FIXED' ? ROUTE_FIXED_OPTIONS : ROUTE_UNFIXABLE_OPTIONS;
+  const hasLoaner = !!order.loaner_asset_id;
+
+  useEffect(() => {
+    if (open) { setDestination(null); setLoanerAction(null); setNote(''); setError(''); }
+  }, [open]);
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      apiClient.rpc('fn_inv_repair_route', {
+        p_repair_order_id: order.id,
+        p_destination: destination,
+        p_loaner_action: hasLoaner ? loanerAction : null,
+        p_note: note || null,
+      }),
+    onSuccess,
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        setError(translated || err.message);
+      } else {
+        setError(String(err));
+      }
+    },
+  });
+
+  const canSubmit = !!destination && (!hasLoaner || !!loanerAction);
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
+      <div className="flex flex-col overflow-hidden">
+        <div className="modal-header">
+          <h2 className="modal-title">{t('repair.routeDevice')}</h2>
+          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+        </div>
+        <div className="modal-content">
+          {error && (
+            <div className="alert alert-danger mb-4 animate-pop-in">
+              <XCircle size={16} />
+              <span>{error}</span>
+            </div>
+          )}
+          <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line flex items-center justify-between">
+            <div>
+              <div className="font-medium text-sm">{order.asset_code}</div>
+              <div className="text-xs text-subtle">
+                {[order.brand_name, order.family_name, order.model_name].filter(Boolean).join(' > ')}
+              </div>
+              <div className="text-xs text-subtle">{order.variant_name} · {order.sku_code}</div>
+              {order.serial_no && <div className="text-xs text-fg/50 font-mono mt-0.5">{order.serial_no}</div>}
+            </div>
+            <Badge size="xs" className={order.result === 'FIXED' ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'}>
+              {t(`repair.result_${order.result}`, order.result ?? '')}
+            </Badge>
+          </div>
+          <div className="form-grid gap-4">
+            <div className="flex flex-col">
+              <label className="form-label">{t('repair.destination')}</label>
+              <Select
+                options={routeOptions}
+                value={destination}
+                onChange={(val) => setDestination((val as string) || null)}
+                placeholder={t('repair.selectDestination')}
+                showChevron
+              />
+            </div>
+            {hasLoaner && (
+              <div className="flex flex-col">
+                <label className="form-label">{t('repair.loanerAction')}</label>
+                <div className="text-xs text-subtle mb-1">{order.loaner_asset_code}</div>
+                <Select
+                  options={LOANER_ACTION_OPTIONS}
+                  value={loanerAction}
+                  onChange={(val) => setLoanerAction((val as string) || null)}
+                  placeholder={t('repair.selectLoanerAction')}
+                  showChevron
+                />
+              </div>
+            )}
+            <div className="flex flex-col">
+              <label className="form-label">{t('repair.routeNote')}</label>
+              <TextArea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder={t('repair.notePlaceholder')}
+                rows={3}
+              />
+            </div>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button
+            color="primary"
+            onClick={() => mutation.mutate()}
+            disabled={!canSubmit || mutation.isPending}
+          >
+            {mutation.isPending ? t('common.loading') : t('repair.routeDevice')}
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 }

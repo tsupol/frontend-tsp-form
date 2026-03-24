@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, Badge, Select, DataTable } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, ArrowLeftRight } from 'lucide-react';
-import { apiClient } from '../../lib/api';
+import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
+import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Modal, TextArea, DataTable, useSnackbarContext } from 'tsp-form';
+import { ArrowLeft, ArrowRightFromLine, ArrowLeftRight, CheckCircle, XCircle } from 'lucide-react';
+import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { fmtNum } from './inventoryUtils';
 
@@ -31,6 +31,8 @@ interface TransferOrder {
   approved_by: number | null;
   dispatched_at: string | null;
   completed_at: string | null;
+  approved_by_name: string | null;
+  created_by_name: string | null;
   created_by: number | null;
   created_at: string;
   updated_at: string;
@@ -49,6 +51,8 @@ interface TransferLine {
   sku_code: string | null;
   model_name: string | null;
   model_code: string | null;
+  family_name: string | null;
+  brand_name: string | null;
   qty_requested: number | null;
   qty_shipped: number | null;
   qty_received: number | null;
@@ -75,7 +79,7 @@ interface Branch {
 const TRANSFER_STATUS_COLOR: Record<string, string> = {
   DRAFT: 'bg-fg/10 text-fg/60',
   APPROVED: 'bg-success/15 text-success',
-  DISPATCHED: 'bg-info/15 text-info',
+  IN_TRANSIT: 'bg-info/15 text-info',
   COMPLETED: 'bg-fg/10 text-fg/60',
   CANCELLED: 'bg-danger/15 text-danger',
   DISPUTED: 'bg-warning/15 text-warning',
@@ -86,14 +90,22 @@ const LINE_STATUS_COLOR: Record<string, string> = {
   SHIPPED: 'bg-info/15 text-info',
   RECEIVED: 'bg-success/15 text-success',
   RECEIVED_DAMAGED: 'bg-danger/15 text-danger',
+  NOT_RECEIVED: 'bg-danger/15 text-danger',
 };
 
 const TRANSFER_STATUS_OPTIONS = [
   { value: 'DRAFT', label: 'Draft' },
   { value: 'APPROVED', label: 'Approved' },
-  { value: 'DISPATCHED', label: 'Dispatched' },
+  { value: 'IN_TRANSIT', label: 'In Transit' },
   { value: 'COMPLETED', label: 'Completed' },
+  { value: 'DISPUTED', label: 'Disputed' },
   { value: 'CANCELLED', label: 'Cancelled' },
+];
+
+const RECEIVE_ACTION_OPTIONS = [
+  { value: 'RECEIVED', label: 'Received' },
+  { value: 'RECEIVED_DAMAGED', label: 'Received (Damaged)' },
+  { value: 'NOT_RECEIVED', label: 'Not Received' },
 ];
 
 // ============================================================================
@@ -102,6 +114,8 @@ const TRANSFER_STATUS_OPTIONS = [
 
 export function TransfersPage() {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const { addSnackbar } = useSnackbarContext();
 
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
   const [filterBranchId, setFilterBranchId] = useState<number | null>(null);
@@ -149,6 +163,11 @@ export function TransfersPage() {
   }, [list, selectedId]);
 
   const selectedOrder = list.find(o => o.id === selectedId) ?? null;
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['transfer-orders'] });
+    queryClient.invalidateQueries({ queryKey: ['transfer-lines'] });
+  };
 
   return (
     <PageNav panels={['list', 'detail']} className="h-dvh">
@@ -255,7 +274,15 @@ export function TransfersPage() {
 
             <PageNavPanel id="detail" className={isMobile ? '' : 'flex-1 flex flex-col'}>
               {selectedOrder ? (
-                <TransferDetailPanel order={selectedOrder} lines={lines ?? []} loading={linesFetching} isMobile={isMobile} t={t} />
+                <TransferDetailPanel
+                  order={selectedOrder}
+                  lines={lines ?? []}
+                  loading={linesFetching}
+                  isMobile={isMobile}
+                  t={t}
+                  onRefresh={invalidate}
+                  addSnackbar={addSnackbar}
+                />
               ) : (
                 <div className="flex-1 h-full flex items-center justify-center text-subtler">
                   <div className="text-center">
@@ -282,13 +309,24 @@ function TransferDetailPanel({
   loading,
   isMobile,
   t,
+  onRefresh,
+  addSnackbar,
 }: {
   order: TransferOrder;
   lines: TransferLine[];
   loading: boolean;
   isMobile: boolean;
   t: (key: string, fallback?: string) => string;
+  onRefresh: () => void;
+  addSnackbar: (opts: { message: React.ReactNode }) => void;
 }) {
+  const [approveModalOpen, setApproveModalOpen] = useState(false);
+  const [receiveLine, setReceiveLine] = useState<TransferLine | null>(null);
+
+  const canApprove = order.status === 'DRAFT';
+  const canReceive = order.status === 'IN_TRANSIT' || order.status === 'DISPUTED';
+  const pendingLines = lines.filter(l => l.status === 'PENDING' || l.status === 'SHIPPED');
+
   return (
     <div className="relative flex flex-col h-full">
       {loading && (
@@ -341,14 +379,23 @@ function TransferDetailPanel({
 
       {/* Timestamps */}
       <div className="flex-none px-4 py-2 border-b border-line flex flex-wrap gap-x-6 gap-y-1 text-xs text-subtle">
-        <span>{t('transfer.created')}: <DateTime value={order.created_at} /></span>
-        {order.approved_at && <span>{t('transfer.approved')}: <DateTime value={order.approved_at} /></span>}
+        <span>{t('transfer.created')}: <DateTime value={order.created_at} />{order.created_by_name && ` · ${order.created_by_name}`}</span>
+        {order.approved_at && <span>{t('transfer.approved')}: <DateTime value={order.approved_at} />{order.approved_by_name && ` · ${order.approved_by_name}`}</span>}
         {order.dispatched_at && <span>{t('transfer.dispatched')}: <DateTime value={order.dispatched_at} /></span>}
         {order.completed_at && <span>{t('transfer.completed')}: <DateTime value={order.completed_at} /></span>}
       </div>
 
       {order.notes && (
         <div className="flex-none px-4 py-2 border-b border-line text-xs text-fg/70 italic">{order.notes}</div>
+      )}
+
+      {order.dispute_note && (
+        <div className="flex-none px-4 py-2 border-b border-line">
+          <div className="alert alert-warning">
+            <XCircle size={14} />
+            <span className="text-xs">{order.dispute_note}</span>
+          </div>
+        </div>
       )}
 
       {/* Lines */}
@@ -361,29 +408,284 @@ function TransferDetailPanel({
         {lines.length === 0 && !loading && (
           <div className="p-8 text-center text-subtler">{t('common.noData')}</div>
         )}
-        {lines.map((line) => (
-          <div key={line.id} className="px-4 py-2.5 border-b border-line flex items-center gap-3">
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium truncate">
-                {line.line_type === 'ASSET' ? (line.asset_code ?? `Asset #${line.asset_id}`) : `Lot #${line.stock_lot_id}`}
+        {lines.map((line) => {
+          const isPending = line.status === 'PENDING' || line.status === 'SHIPPED';
+          return (
+            <div key={line.id} className="px-4 py-2.5 border-b border-line flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium truncate">
+                  {line.line_type === 'ASSET' ? (line.asset_code ?? `Asset #${line.asset_id}`) : `Lot #${line.stock_lot_id}`}
+                </div>
+                <div className="text-xs text-subtle truncate">
+                  {[line.brand_name, line.model_name].filter(Boolean).join(' ')} · {line.variant_name ?? line.sku_code ?? ''}
+                </div>
+                {line.serial_no && <div className="text-xs text-fg/50 font-mono">{line.serial_no}</div>}
+                {line.receive_note && <div className="text-xs text-fg/50 mt-0.5 italic">{line.receive_note}</div>}
               </div>
-              <div className="text-xs text-subtle truncate">
-                {line.model_name && `${line.model_name} · `}{line.variant_name ?? line.sku_code ?? ''}
+              <div className="shrink-0 flex flex-col items-end gap-1">
+                <Badge size="xs" className={LINE_STATUS_COLOR[line.status] ?? 'bg-fg/10 text-fg/60'}>
+                  {t(`transfer.lineStatus_${line.status}`, line.status)}
+                </Badge>
+                {line.line_type === 'LOT' && line.qty_requested !== null && (
+                  <span className="text-xs tabular-nums text-subtle">{line.qty_requested} pcs</span>
+                )}
+                {canReceive && isPending && (
+                  <Button size="sm" color="primary" onClick={() => setReceiveLine(line)}>
+                    {t('transfer.receive')}
+                  </Button>
+                )}
               </div>
-              {line.serial_no && <div className="text-xs text-fg/50 font-mono">{line.serial_no}</div>}
-              {line.receive_note && <div className="text-xs text-fg/50 mt-0.5 italic">{line.receive_note}</div>}
             </div>
-            <div className="shrink-0 flex flex-col items-end gap-1">
-              <Badge size="xs" className={LINE_STATUS_COLOR[line.status] ?? 'bg-fg/10 text-fg/60'}>
-                {line.status}
-              </Badge>
-              {line.line_type === 'LOT' && line.qty_requested !== null && (
-                <span className="text-xs tabular-nums text-subtle">{line.qty_requested} pcs</span>
-              )}
+          );
+        })}
+      </div>
+
+      {/* Action buttons */}
+      {canApprove && (
+        <div className="flex-none px-4 py-3 border-t border-line">
+          <Button color="primary" className="w-full" onClick={() => setApproveModalOpen(true)}>
+            {t('transfer.approveTransfer')}
+          </Button>
+        </div>
+      )}
+
+      <ApproveTransferModal
+        open={approveModalOpen}
+        onClose={() => setApproveModalOpen(false)}
+        order={order}
+        t={t}
+        onSuccess={() => {
+          setApproveModalOpen(false);
+          onRefresh();
+          addSnackbar({
+            message: (
+              <div className="alert alert-success">
+                <CheckCircle size={16} />
+                <span>{t('transfer.approveSuccess')}</span>
+              </div>
+            ),
+          });
+        }}
+      />
+
+      <ReceiveLineModal
+        open={!!receiveLine}
+        onClose={() => setReceiveLine(null)}
+        line={receiveLine}
+        t={t}
+        onSuccess={() => {
+          setReceiveLine(null);
+          onRefresh();
+          addSnackbar({
+            message: (
+              <div className="alert alert-success">
+                <CheckCircle size={16} />
+                <span>{t('transfer.receiveSuccess')}</span>
+              </div>
+            ),
+          });
+        }}
+      />
+    </div>
+  );
+}
+
+// ============================================================================
+// Approve Transfer Modal
+// ============================================================================
+
+function ApproveTransferModal({
+  open,
+  onClose,
+  order,
+  t,
+  onSuccess,
+}: {
+  open: boolean;
+  onClose: () => void;
+  order: TransferOrder;
+  t: (key: string, fallback?: string) => string;
+  onSuccess: () => void;
+}) {
+  const [note, setNote] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (open) { setNote(''); setError(''); }
+  }, [open]);
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      apiClient.rpc('fn_inv_transfer_approve', {
+        p_transfer_order_id: order.id,
+        p_note: note || null,
+      }),
+    onSuccess,
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        setError(translated || err.message);
+      } else {
+        setError(String(err));
+      }
+    },
+  });
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
+      <div className="flex flex-col overflow-hidden">
+        <div className="modal-header">
+          <h2 className="modal-title">{t('transfer.approveTransfer')}</h2>
+          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+        </div>
+        <div className="modal-content">
+          {error && (
+            <div className="alert alert-danger mb-4 animate-pop-in">
+              <XCircle size={16} />
+              <span>{error}</span>
+            </div>
+          )}
+          <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
+            <div className="font-medium text-sm">{order.transfer_no}</div>
+            <div className="text-xs text-subtle">{order.from_branch_name} → {order.to_branch_name}</div>
+            <div className="text-xs text-subtle">{order.c_total_lines} {t('transfer.lines')}</div>
+          </div>
+          <div className="form-grid gap-4">
+            <div className="flex flex-col">
+              <label className="form-label">{t('transfer.note')}</label>
+              <TextArea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder={t('transfer.notePlaceholder')}
+                rows={3}
+              />
             </div>
           </div>
-        ))}
+        </div>
+        <div className="modal-footer">
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button
+            color="primary"
+            onClick={() => mutation.mutate()}
+            disabled={mutation.isPending}
+          >
+            {mutation.isPending ? t('common.loading') : t('transfer.approveTransfer')}
+          </Button>
+        </div>
       </div>
-    </div>
+    </Modal>
+  );
+}
+
+// ============================================================================
+// Receive Line Modal
+// ============================================================================
+
+function ReceiveLineModal({
+  open,
+  onClose,
+  line,
+  t,
+  onSuccess,
+}: {
+  open: boolean;
+  onClose: () => void;
+  line: TransferLine | null;
+  t: (key: string, fallback?: string) => string;
+  onSuccess: () => void;
+}) {
+  const [action, setAction] = useState<string | null>(null);
+  const [note, setNote] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (open) { setAction(null); setNote(''); setError(''); }
+  }, [open]);
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      apiClient.rpc('fn_inv_transfer_confirm_receive', {
+        p_transfer_line_id: line!.id,
+        p_action: action,
+        p_note: note || null,
+        p_dedupe_key: `recv-${line!.id}-${Date.now()}`,
+      }),
+    onSuccess,
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        setError(translated || err.message);
+      } else {
+        setError(String(err));
+      }
+    },
+  });
+
+  if (!line) return null;
+
+  const needsNote = action === 'RECEIVED_DAMAGED' || action === 'NOT_RECEIVED';
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
+      <div className="flex flex-col overflow-hidden">
+        <div className="modal-header">
+          <h2 className="modal-title">{t('transfer.receiveLine')}</h2>
+          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+        </div>
+        <div className="modal-content">
+          {error && (
+            <div className="alert alert-danger mb-4 animate-pop-in">
+              <XCircle size={16} />
+              <span>{error}</span>
+            </div>
+          )}
+          <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
+            <div className="font-medium text-sm">
+              {line.line_type === 'ASSET' ? line.asset_code : `Lot #${line.stock_lot_id}`}
+            </div>
+            <div className="text-xs text-subtle">
+              {[line.brand_name, line.model_name].filter(Boolean).join(' ')} · {line.variant_name ?? line.sku_code ?? ''}
+            </div>
+            {line.serial_no && <div className="text-xs text-fg/50 font-mono mt-0.5">{line.serial_no}</div>}
+            {line.line_type === 'LOT' && line.qty_requested !== null && (
+              <div className="text-xs text-subtle mt-0.5">{line.qty_requested} pcs</div>
+            )}
+          </div>
+          <div className="form-grid gap-4">
+            <div className="flex flex-col">
+              <label className="form-label">{t('transfer.receiveAction')}</label>
+              <Select
+                options={RECEIVE_ACTION_OPTIONS}
+                value={action}
+                onChange={(val) => setAction((val as string) || null)}
+                placeholder={t('transfer.selectAction')}
+                showChevron
+              />
+            </div>
+            <div className="flex flex-col">
+              <label className="form-label">
+                {t('transfer.note')}{needsNote && ' *'}
+              </label>
+              <TextArea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder={t('transfer.notePlaceholder')}
+                rows={3}
+              />
+            </div>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button
+            color="primary"
+            onClick={() => mutation.mutate()}
+            disabled={!action || (needsNote && !note.trim()) || mutation.isPending}
+          >
+            {mutation.isPending ? t('common.loading') : t('transfer.confirmReceive')}
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 }

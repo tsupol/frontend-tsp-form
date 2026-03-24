@@ -26,7 +26,8 @@ import { PricingLayout } from './pages/pricing/PricingLayout';
 import { PricebookPage } from './pages/pricing/PricebookPage';
 import { Fin1RatesPage } from './pages/pricing/Fin1RatesPage';
 import { Fin2RatesPage } from './pages/pricing/Fin2RatesPage';
-import { DiscountsPage } from './pages/pricing/DiscountsPage';
+import { DiscountPoliciesPage } from './pages/pricing/DiscountPoliciesPage';
+import { DiscountApprovalsPage } from './pages/pricing/DiscountApprovalsPage';
 import { DealPartnerRatesPage } from './pages/pricing/DealPartnerRatesPage';
 import { InventoryLayout } from './pages/inventory/InventoryLayout';
 import { StockDashboardPage } from './pages/inventory/StockDashboardPage';
@@ -200,11 +201,21 @@ function App() {
         }
       />
       <Route
-        path="/admin/pricing/discounts"
+        path="/admin/pricing/discount-policies"
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <PricingLayout><DiscountsPage /></PricingLayout>
+              <PricingLayout><DiscountPoliciesPage /></PricingLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/pricing/discount-approvals"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <PricingLayout><DiscountApprovalsPage /></PricingLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

@@ -1,0 +1,813 @@
+import { useState, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useForm, Controller } from 'react-hook-form';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  DataTable, DataTableColumnHeader, DataTableFooter, MobileHeader, Modal,
+  Badge, Input, Select, Button, Switch, PopOver,
+  InputDateRangePicker, useSnackbarContext,
+  type ColumnDef, type SortingState,
+} from 'tsp-form';
+import { ArrowRightFromLine, Plus, Pencil, CheckCircle, XCircle, Calendar, SlidersHorizontal } from 'lucide-react';
+import { apiClient, ApiError } from '../../lib/api';
+import { DateTime } from '../../components/DateTime';
+import { useAuth } from '../../contexts/AuthContext';
+
+// ── Types ────────────────────────────────────────────────────────────────────
+
+interface DiscountPolicy {
+  id: number;
+  holding_id: number;
+  company_id: number | null;
+  company_name: string | null;
+  branch_id: number | null;
+  branch_name: string | null;
+  retail_max_discount_percent: number;
+  fin1_max_discount_percent: number;
+  fin2_max_discount_percent: number;
+  effective_from: string | null;
+  effective_to: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+interface CompanyLookup {
+  id: number;
+  name: string;
+}
+
+interface BranchLookup {
+  id: number;
+  company_id: number;
+  name: string;
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+const getScopeLabel = (p: DiscountPolicy): 'Holding' | 'Company' | 'Branch' => {
+  if (p.branch_id) return 'Branch';
+  if (p.company_id) return 'Company';
+  return 'Holding';
+};
+
+const scopeBadgeColor = (scope: string): 'info' | 'warning' | 'success' => {
+  switch (scope) {
+    case 'Holding': return 'info';
+    case 'Company': return 'warning';
+    case 'Branch': return 'success';
+    default: return 'info';
+  }
+};
+
+// ── Policy Modal ─────────────────────────────────────────────────────────────
+
+interface PolicyFormData {
+  company_id: string;
+  branch_id: string;
+  retail_max_discount_percent: string;
+  fin1_max_discount_percent: string;
+  fin2_max_discount_percent: string;
+  effective_from: Date | null;
+  effective_to: Date | null;
+  is_active: boolean;
+}
+
+function PolicyModal({ open, onClose, editPolicy, onSuccess }: {
+  open: boolean;
+  onClose: () => void;
+  editPolicy: DiscountPolicy | null;
+  onSuccess: () => void;
+}) {
+  const { t, i18n } = useTranslation();
+  const { user } = useAuth();
+
+  const userCompanyId = user?.company_id ?? null;
+  const userBranchId = user?.branch_id ?? null;
+  const isHoldingLevel = !userCompanyId && !userBranchId;
+  const isCompanyLevel = !!userCompanyId && !userBranchId;
+
+  const { register, handleSubmit, control, watch, setValue, formState: { isDirty }, reset } = useForm<PolicyFormData>({
+    defaultValues: {
+      company_id: '',
+      branch_id: '',
+      retail_max_discount_percent: '0',
+      fin1_max_discount_percent: '5',
+      fin2_max_discount_percent: '5',
+      effective_from: null,
+      effective_to: null,
+      is_active: true,
+    },
+  });
+
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+
+  const selectedCompanyId = watch('company_id');
+
+  // Lookups for ADD modal scope selectors
+  const { data: companies = [] } = useQuery({
+    queryKey: ['discount-companies'],
+    queryFn: () => apiClient.get<CompanyLookup[]>('/v_companies?is_active=is.true&order=name'),
+    staleTime: 5 * 60 * 1000,
+    enabled: isHoldingLevel && !editPolicy,
+  });
+
+  const branchQueryCompanyId = isHoldingLevel ? selectedCompanyId : String(userCompanyId ?? '');
+  const { data: branches = [] } = useQuery({
+    queryKey: ['discount-branches', branchQueryCompanyId],
+    queryFn: () => apiClient.get<BranchLookup[]>(
+      `/v_branches?is_active=is.true&company_id=eq.${branchQueryCompanyId}&order=name`
+    ),
+    enabled: !!branchQueryCompanyId && !userBranchId && !editPolicy,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const companyOptions = companies.map(c => ({ value: String(c.id), label: c.name }));
+  const branchOptions = branches.map(b => ({ value: String(b.id), label: b.name }));
+
+  // Clear branch when company changes in add mode
+  useEffect(() => {
+    if (!editPolicy && isHoldingLevel) {
+      setValue('branch_id', '');
+    }
+  }, [selectedCompanyId, editPolicy, isHoldingLevel, setValue]);
+
+  // Reset form when modal opens
+  useEffect(() => {
+    if (open) {
+      if (editPolicy) {
+        reset({
+          company_id: editPolicy.company_id ? String(editPolicy.company_id) : '',
+          branch_id: editPolicy.branch_id ? String(editPolicy.branch_id) : '',
+          retail_max_discount_percent: String(editPolicy.retail_max_discount_percent),
+          fin1_max_discount_percent: String(editPolicy.fin1_max_discount_percent),
+          fin2_max_discount_percent: String(editPolicy.fin2_max_discount_percent),
+          effective_from: editPolicy.effective_from ? new Date(editPolicy.effective_from) : null,
+          effective_to: editPolicy.effective_to ? new Date(editPolicy.effective_to) : null,
+          is_active: editPolicy.is_active,
+        });
+      } else {
+        reset({
+          company_id: '',
+          branch_id: '',
+          retail_max_discount_percent: '0',
+          fin1_max_discount_percent: '5',
+          fin2_max_discount_percent: '5',
+          effective_from: null,
+          effective_to: null,
+          is_active: true,
+        });
+      }
+      setErrorMessage('');
+    }
+  }, [open, editPolicy, reset]);
+
+  const onSubmit = async (data: PolicyFormData) => {
+    setIsSaving(true);
+    setErrorMessage('');
+    const start = Date.now();
+    try {
+      const cid = data.company_id ? parseInt(data.company_id) : null;
+      const bid = data.branch_id ? parseInt(data.branch_id) : null;
+
+      await apiClient.rpc<DiscountPolicy>('discount_policy_upsert', {
+        p_policy_id: editPolicy?.id || undefined,
+        p_company_id: editPolicy ? undefined : cid,
+        p_branch_id: editPolicy ? undefined : bid,
+        p_retail_max_discount_percent: data.retail_max_discount_percent ? parseFloat(data.retail_max_discount_percent) : 0,
+        p_fin1_max_discount_percent: data.fin1_max_discount_percent ? parseFloat(data.fin1_max_discount_percent) : 5,
+        p_fin2_max_discount_percent: data.fin2_max_discount_percent ? parseFloat(data.fin2_max_discount_percent) : 5,
+        p_effective_from: data.effective_from ? data.effective_from.toISOString() : undefined,
+        p_effective_to: data.effective_to ? data.effective_to.toISOString() : undefined,
+        p_is_active: data.is_active,
+      });
+      onSuccess();
+      onClose();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        setErrorMessage(translated || err.message);
+      } else {
+        setErrorMessage(t('common.error'));
+      }
+    } finally {
+      const elapsed = Date.now() - start;
+      if (elapsed < 300) await new Promise(r => setTimeout(r, 300 - elapsed));
+      setIsSaving(false);
+    }
+  };
+
+  const handleClose = () => {
+    if (isDirty) { setConfirmCloseOpen(true); return; }
+    forceClose();
+  };
+
+  const forceClose = () => {
+    reset();
+    setErrorMessage('');
+    setConfirmCloseOpen(false);
+    onClose();
+  };
+
+  return (
+    <>
+    <Modal open={open} onClose={handleClose} maxWidth="28rem" width="100%">
+      <form className="flex flex-col overflow-hidden" onSubmit={handleSubmit(onSubmit)}>
+        <div className="modal-header">
+          <h2 className="modal-title">
+            {editPolicy ? t('discount.editPolicy') : t('discount.addPolicy')}
+          </h2>
+          <button type="button" className="modal-close-btn" onClick={handleClose} aria-label="Close">&times;</button>
+        </div>
+        <div className="modal-content">
+          <div className="form-grid">
+            {errorMessage && (
+              <div className="alert alert-danger">
+                <XCircle size={16} />
+                <div><div className="alert-description text-xs">{errorMessage}</div></div>
+              </div>
+            )}
+
+            {/* Scope selectors — only in add mode, only what user can choose */}
+            {!editPolicy && (isHoldingLevel || isCompanyLevel) && (
+              <>
+                {isHoldingLevel && (
+                  <div className="flex flex-col">
+                    <label className="form-label">{t('discount.company')}</label>
+                    <Controller
+                      control={control}
+                      name="company_id"
+                      render={({ field }) => (
+                        <div>
+                          <Select
+                            options={companyOptions}
+                            value={field.value || null}
+                            onChange={(val) => field.onChange((val as string) ?? '')}
+                            placeholder={t('discount.allCompanies')}
+                            showChevron
+                            clearable
+                          />
+                        </div>
+                      )}
+                    />
+                  </div>
+                )}
+                {(isHoldingLevel ? !!selectedCompanyId : true) && (
+                  <div className="flex flex-col">
+                    <label className="form-label">{t('discount.branch')}</label>
+                    <Controller
+                      control={control}
+                      name="branch_id"
+                      render={({ field }) => (
+                        <div>
+                          <Select
+                            options={branchOptions}
+                            value={field.value || null}
+                            onChange={(val) => field.onChange((val as string) ?? '')}
+                            placeholder={t('discount.allBranches')}
+                            showChevron
+                            clearable
+                          />
+                        </div>
+                      )}
+                    />
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Scope indicator in edit mode */}
+            {editPolicy && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-control-label">{t('discount.scope')}:</span>
+                <Badge size="sm" color={scopeBadgeColor(getScopeLabel(editPolicy))}>
+                  {t(`discount.scope${getScopeLabel(editPolicy)}`)}
+                </Badge>
+                {editPolicy.company_name && (
+                  <span className="text-sm">{editPolicy.company_name}</span>
+                )}
+                {editPolicy.branch_name && (
+                  <span className="text-sm text-control-label">/ {editPolicy.branch_name}</span>
+                )}
+              </div>
+            )}
+
+            <div className="flex flex-col">
+              <label className="form-label">{t('discount.retailMaxDiscount')}</label>
+              <Input
+                type="number" min={0} max={100} step="0.1"
+                {...register('retail_max_discount_percent')}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col">
+                <label className="form-label">{t('discount.fin1MaxDiscount')}</label>
+                <Input
+                  type="number" min={0} max={100} step="0.1"
+                  {...register('fin1_max_discount_percent')}
+                />
+              </div>
+              <div className="flex flex-col">
+                <label className="form-label">{t('discount.fin2MaxDiscount')}</label>
+                <Input
+                  type="number" min={0} max={100} step="0.1"
+                  {...register('fin2_max_discount_percent')}
+                />
+              </div>
+            </div>
+            <div className="flex flex-col">
+              <label className="form-label">{t('discount.effectivePeriod')}</label>
+              <Controller
+                control={control}
+                name="effective_from"
+                render={({ field: { onChange: onFromChange, value: fromDate } }) => (
+                  <Controller
+                    control={control}
+                    name="effective_to"
+                    render={({ field: { onChange: onToChange, value: toDate } }) => (
+                      <InputDateRangePicker
+                        fromDate={fromDate}
+                        toDate={toDate}
+                        onFromDateChange={onFromChange}
+                        onToDateChange={onToChange}
+                        placeholder={t('discount.effectivePeriod')}
+                        endIcon={<Calendar size={18} />}
+                        locale={i18n.language}
+                        calendar="gregorian"
+                        datePickerProps={{ showTime: true, timeFormat: '24h' }}
+                      />
+                    )}
+                  />
+                )}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Controller
+                control={control}
+                name="is_active"
+                render={({ field }) => (
+                  <Switch
+                    checked={field.value}
+                    onChange={(e) => field.onChange(e.target.checked)}
+                  />
+                )}
+              />
+              <label className="form-label mb-0">{t('discount.active')}</label>
+            </div>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <Button variant="outline" onClick={handleClose} type="button">
+            {t('common.cancel')}
+          </Button>
+          <Button color="primary" type="submit" disabled={isSaving}>
+            {isSaving ? t('discount.saving') : t('discount.savePolicy')}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+
+    <Modal open={confirmCloseOpen} onClose={() => setConfirmCloseOpen(false)} maxWidth="24rem" width="100%">
+      <div className="modal-header"><h2 className="modal-title">{t('common.unsavedChanges')}</h2></div>
+      <div className="modal-content"><p>{t('common.unsavedChangesMessage')}</p></div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={() => setConfirmCloseOpen(false)}>{t('common.cancel')}</Button>
+        <Button color="danger" onClick={forceClose}>{t('common.discard')}</Button>
+      </div>
+    </Modal>
+    </>
+  );
+}
+
+// ── Main Page ────────────────────────────────────────────────────────────────
+
+export function DiscountPoliciesPage() {
+  const { t, i18n } = useTranslation();
+  const { addSnackbar } = useSnackbarContext();
+  const queryClient = useQueryClient();
+
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editPolicy, setEditPolicy] = useState<DiscountPolicy | null>(null);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Filters
+  const [filterScope, setFilterScope] = useState('');
+  const [filterActive, setFilterActive] = useState('');
+  const [filterOpen, setFilterOpen] = useState(false);
+
+  const scopeOptions = [
+    { value: '', label: t('discount.allScopes') },
+    { value: 'Holding', label: t('discount.scopeHolding') },
+    { value: 'Company', label: t('discount.scopeCompany') },
+    { value: 'Branch', label: t('discount.scopeBranch') },
+  ];
+
+  const activeOptions = [
+    { value: '', label: t('discount.allStatuses') },
+    { value: 'active', label: t('discount.activeOnly') },
+    { value: 'inactive', label: t('discount.inactiveOnly') },
+  ];
+
+  // Fetch policies from the view
+  const { data: policies = [], isFetching } = useQuery({
+    queryKey: ['discount-policies'],
+    queryFn: () => apiClient.get<DiscountPolicy[]>(
+      '/v_discount_policies?order=company_id.nullsfirst,branch_id.nullsfirst'
+    ),
+    staleTime: 30 * 1000,
+  });
+
+  // Client-side filtering
+  const filteredPolicies = useMemo(() => {
+    let result = policies;
+    if (filterScope) {
+      result = result.filter(p => getScopeLabel(p) === filterScope);
+    }
+    if (filterActive === 'active') {
+      result = result.filter(p => p.is_active);
+    } else if (filterActive === 'inactive') {
+      result = result.filter(p => !p.is_active);
+    }
+    return result;
+  }, [policies, filterScope, filterActive]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPageIndex(0);
+  }, [filterScope, filterActive]);
+
+  const totalCount = filteredPolicies.length;
+  const paginatedPolicies = filteredPolicies.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize);
+
+  const handleCreate = () => {
+    setEditPolicy(null);
+    setModalOpen(true);
+  };
+
+  const handleEdit = (policy: DiscountPolicy) => {
+    setEditPolicy(policy);
+    setModalOpen(true);
+  };
+
+  const handleToggleActive = async (policy: DiscountPolicy) => {
+    try {
+      await apiClient.rpc('discount_policy_upsert', {
+        p_policy_id: policy.id,
+        p_retail_max_discount_percent: policy.retail_max_discount_percent,
+        p_fin1_max_discount_percent: policy.fin1_max_discount_percent,
+        p_fin2_max_discount_percent: policy.fin2_max_discount_percent,
+        p_effective_from: policy.effective_from || undefined,
+        p_effective_to: policy.effective_to || undefined,
+        p_is_active: !policy.is_active,
+      });
+      queryClient.invalidateQueries({ queryKey: ['discount-policies'] });
+      addSnackbar({
+        message: (
+          <div className="alert alert-success">
+            <CheckCircle size={18} />
+            <div><div className="alert-title">
+              {t(policy.is_active ? 'discount.policyDeactivated' : 'discount.policyActivated')}
+            </div></div>
+          </div>
+        ),
+        type: 'success',
+        duration: 3000,
+      });
+    } catch (err) {
+      const msg = err instanceof ApiError
+        ? (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') || err.message
+        : t('common.error');
+      addSnackbar({
+        message: (
+          <div className="alert alert-danger">
+            <XCircle size={18} />
+            <div><div className="alert-title">{msg}</div></div>
+          </div>
+        ),
+        type: 'error',
+        duration: 5000,
+      });
+    }
+  };
+
+  const handleSuccess = () => {
+    addSnackbar({
+      message: (
+        <div className="alert alert-success">
+          <CheckCircle size={18} />
+          <div><div className="alert-title">{t('discount.policySaved')}</div></div>
+        </div>
+      ),
+      type: 'success',
+      duration: 3000,
+    });
+    queryClient.invalidateQueries({ queryKey: ['discount-policies'] });
+  };
+
+  const columns: ColumnDef<DiscountPolicy>[] = [
+    {
+      id: 'actions',
+      header: () => null,
+      cell: ({ row }) => (
+        <button
+          className="flex items-center justify-center w-8 h-8 rounded hover:bg-surface-hover cursor-pointer text-control-label hover:text-fg"
+          onClick={() => handleEdit(row.original)}
+          aria-label={t('common.edit')}
+        >
+          <Pencil size={14} />
+        </button>
+      ),
+      enableSorting: false,
+      className: 'w-10',
+    },
+    {
+      id: 'scope',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('discount.scope')} />,
+      accessorFn: (row) => getScopeLabel(row),
+      cell: ({ row }) => {
+        const scope = getScopeLabel(row.original);
+        return <Badge size="sm" color={scopeBadgeColor(scope)}>{t(`discount.scope${scope}`)}</Badge>;
+      },
+      className: 'w-24',
+    },
+    {
+      accessorKey: 'company_name',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('discount.company')} />,
+      cell: ({ row }) => (
+        <span className="text-sm">{row.original.company_name ?? '—'}</span>
+      ),
+    },
+    {
+      accessorKey: 'branch_name',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('discount.branch')} />,
+      cell: ({ row }) => (
+        <span className="text-sm">{row.original.branch_name ?? '—'}</span>
+      ),
+    },
+    {
+      accessorKey: 'retail_max_discount_percent',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('discount.retailMaxDiscount')} />,
+      cell: ({ row }) => (
+        <span className="text-sm tabular-nums">{row.original.retail_max_discount_percent}%</span>
+      ),
+      className: 'w-28',
+    },
+    {
+      accessorKey: 'fin1_max_discount_percent',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('discount.fin1MaxDiscount')} />,
+      cell: ({ row }) => (
+        <span className="text-sm tabular-nums">{row.original.fin1_max_discount_percent}%</span>
+      ),
+      className: 'w-24',
+    },
+    {
+      accessorKey: 'fin2_max_discount_percent',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('discount.fin2MaxDiscount')} />,
+      cell: ({ row }) => (
+        <span className="text-sm tabular-nums">{row.original.fin2_max_discount_percent}%</span>
+      ),
+      className: 'w-24',
+    },
+    {
+      accessorKey: 'is_active',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('discount.active')} />,
+      cell: ({ row }) => row.original.is_active
+        ? <Badge size="sm" color="success" startIcon={<CheckCircle />} />
+        : <Badge size="sm" color="default" startIcon={<XCircle />} />,
+      className: 'w-16',
+    },
+    {
+      id: 'effective_period',
+      accessorFn: (row) => row.effective_from ?? '',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('discount.effectivePeriod')} />,
+      cell: ({ row }) => {
+        const p = row.original;
+        if (!p.effective_from && !p.effective_to) return <span className="text-sm text-control-label">—</span>;
+        return (
+          <div className="text-xs text-control-label">
+            {p.effective_from && <DateTime value={p.effective_from} />}
+            {p.effective_from && p.effective_to && <span> — </span>}
+            {p.effective_to && <DateTime value={p.effective_to} />}
+          </div>
+        );
+      },
+    },
+  ];
+
+  return (
+    <>
+      {/* Mobile header */}
+      <MobileHeader className="mobile-header-bordered md:hidden">
+        <div className="mobile-header-start">
+          <button
+            className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
+            aria-label="Open menu"
+            onClick={() => window.dispatchEvent(new CustomEvent('sidemenu:open'))}
+          >
+            <ArrowRightFromLine size={18} />
+          </button>
+        </div>
+        <div className="mobile-header-title mobile-header-title-truncate">
+          {t('discount.policies')}
+        </div>
+        <div className="mobile-header-end px-2">
+          <button
+            className="flex items-center justify-center w-8 h-8 rounded hover:bg-surface-hover cursor-pointer text-current"
+            aria-label={t('discount.addPolicy')}
+            onClick={handleCreate}
+          >
+            <Plus size={18} />
+          </button>
+        </div>
+      </MobileHeader>
+
+      <div className="page-content responsive-dvh-mobile-header">
+        {/* Desktop header */}
+        <div className="flex items-center justify-between mb-4 flex-none max-md:hidden">
+          <h1 className="heading-2">{t('discount.policies')}</h1>
+          <Button color="primary" startIcon={<Plus size={16} />} onClick={handleCreate}>
+            {t('discount.addPolicy')}
+          </Button>
+        </div>
+
+        {/* Filters — scope always visible, active ≥sm, popover <sm */}
+        <div className="flex items-center gap-2 pb-4 flex-none">
+          <div className="flex-1 min-w-0 md:max-w-56">
+            <Select
+              options={scopeOptions}
+              value={filterScope}
+              onChange={(val) => setFilterScope((val as string) ?? '')}
+              size="sm"
+              showChevron
+            />
+          </div>
+          <div className="hidden sm:block flex-1 min-w-0 md:max-w-56">
+            <Select
+              options={activeOptions}
+              value={filterActive}
+              onChange={(val) => setFilterActive((val as string) ?? '')}
+              size="sm"
+              showChevron
+            />
+          </div>
+          <div className="sm:hidden shrink-0">
+            <PopOver
+              isOpen={filterOpen}
+              onClose={() => setFilterOpen(false)}
+              placement="bottom"
+              align="end"
+              maxWidth="300px"
+              maxHeight="400px"
+              trigger={
+                <Button variant="outline" size="sm" className="relative btn-icon-sm" onClick={() => setFilterOpen(!filterOpen)}>
+                  <SlidersHorizontal size={16} />
+                  {(filterActive) && (
+                    <span className="absolute -top-1.5 -right-1.5 bg-primary text-white text-xs rounded-full w-4 h-4 flex items-center justify-center leading-none">1</span>
+                  )}
+                </Button>
+              }
+            >
+              <div className="flex flex-col gap-3 p-3">
+                <div className="text-xs font-medium text-muted uppercase tracking-wide">{t('common.filters')}</div>
+                <Select
+                  options={activeOptions}
+                  value={filterActive}
+                  onChange={(val) => setFilterActive((val as string) ?? '')}
+                  size="sm"
+                  showChevron
+                />
+                <div className="text-xs font-medium text-muted uppercase tracking-wide mt-1">{t('common.sortBy')}</div>
+                <Select
+                  options={[
+                    { value: 'scope', label: t('discount.scope') },
+                    { value: 'company_name', label: t('discount.company') },
+                    { value: 'is_active', label: t('discount.active') },
+                    { value: 'effective_period', label: t('discount.effectivePeriod') },
+                  ]}
+                  value={sorting[0]?.id ?? null}
+                  onChange={(val) => {
+                    if (val) setSorting([{ id: val as string, desc: sorting[0]?.desc ?? false }]);
+                    else setSorting([]);
+                  }}
+                  placeholder={t('common.sortBy')}
+                  size="sm"
+                  showChevron
+                  clearable
+                  searchable={false}
+                />
+              </div>
+            </PopOver>
+          </div>
+        </div>
+
+        {/* Desktop: DataTable */}
+        <DataTable<DiscountPolicy>
+          data={paginatedPolicies}
+          columns={columns}
+          sorting={sorting}
+          onSortingChange={setSorting}
+          enablePagination
+          pageIndex={pageIndex}
+          pageSize={pageSize}
+          pageSizeOptions={[10, 25, 50]}
+          rowCount={totalCount}
+          onPageChange={({ pageIndex: pi, pageSize: ps }) => {
+            setPageIndex(pi);
+            setPageSize(ps);
+          }}
+          className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
+          noResults={
+            <div className="p-8 text-center text-control-label">
+              {t('discount.noPolicies')}
+            </div>
+          }
+        />
+
+        {/* Mobile: Card list */}
+        <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
+          <div className="flex-1 overflow-auto better-scroll pb-8">
+            {filteredPolicies.length === 0 ? (
+              <div className="p-8 text-center text-control-label">
+                {t('discount.noPolicies')}
+              </div>
+            ) : (
+              <div className="flex flex-col divide-y divide-line">
+                {paginatedPolicies.map((policy) => {
+                  const scope = getScopeLabel(policy);
+                  return (
+                    <div
+                      key={policy.id}
+                      className="px-1 py-3 cursor-pointer active:bg-surface-hover"
+                      onClick={() => handleEdit(policy)}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 -ml-1">
+                          <Badge size="sm" color={scopeBadgeColor(scope)}>
+                            {t(`discount.scope${scope}`)}
+                          </Badge>
+                          {policy.company_name && (
+                            <span className="text-sm font-medium truncate">{policy.company_name}</span>
+                          )}
+                        </div>
+                        {policy.is_active
+                          ? <Badge size="sm" color="success" startIcon={<CheckCircle />} />
+                          : <Badge size="sm" color="default" startIcon={<XCircle />} />
+                        }
+                      </div>
+                      {policy.branch_name && (
+                        <div className="text-xs text-control-label mt-0.5 ml-1">{policy.branch_name}</div>
+                      )}
+                      <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
+                        <div>
+                          <div className="text-[10px] text-control-label">Retail</div>
+                          <div className="tabular-nums font-medium">{policy.retail_max_discount_percent}%</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-control-label">FIN1</div>
+                          <div className="tabular-nums font-medium">{policy.fin1_max_discount_percent}%</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-control-label">FIN2</div>
+                          <div className="tabular-nums font-medium">{policy.fin2_max_discount_percent}%</div>
+                        </div>
+                      </div>
+                      {(policy.effective_from || policy.effective_to) && (
+                        <div className="text-[11px] text-control-label mt-1">
+                          {policy.effective_from && <DateTime value={policy.effective_from} />}
+                          {policy.effective_from && policy.effective_to && ' — '}
+                          {policy.effective_to && <DateTime value={policy.effective_to} />}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          {totalCount > 0 && (
+            <DataTableFooter
+              currentPage={pageIndex + 1}
+              totalPages={Math.ceil(totalCount / pageSize)}
+              onPageChange={(p) => setPageIndex(p - 1)}
+              pageSize={pageSize}
+              pageSizeOptions={[10, 25, 50]}
+              onPageSizeChange={(ps) => { setPageSize(ps); setPageIndex(0); }}
+              totalRows={totalCount}
+            />
+          )}
+        </div>
+      </div>
+
+      <PolicyModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        editPolicy={editPolicy}
+        onSuccess={handleSuccess}
+      />
+    </>
+  );
+}

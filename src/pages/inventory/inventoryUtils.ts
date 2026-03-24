@@ -76,10 +76,12 @@ export const CONDITION_OPTIONS = [
 // Formatting
 // ============================================================================
 
-export function fmtNum(n: number): string {
+export function fmtNum(n: number | null | undefined): string {
+  if (n == null) return '0';
   return n.toLocaleString();
 }
 
-export function fmtCurrency(n: number): string {
+export function fmtCurrency(n: number | null | undefined): string {
+  if (n == null) return '0.00';
   return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
