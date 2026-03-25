@@ -15,7 +15,7 @@ export function ProductsLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-full">
-      <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-48 border-r border-line p-4 pt-7.5 sticky top-0 h-dvh">
+      <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-50 border-r border-line p-4 pt-7.5 sticky top-0 h-dvh">
         <span className="text-xs font-semibold text-control-label uppercase tracking-wider mb-2 px-2">
           {t('nav.products')}
         </span>

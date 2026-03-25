@@ -16,6 +16,8 @@
     "noData": "No data available",
     "example": "Example",
     "appName": "NNF System",
+    "saving": "Saving...",
+    "comingSoon": "Coming soon",
     "unsavedChanges": "Unsaved Changes",
     "unsavedChangesMessage": "You have unsaved changes. Are you sure you want to discard them?",
     "discard": "Discard"
@@ -71,7 +73,15 @@
     "transfers": "Transfers",
     "repairs": "Repairs",
     "buyback": "Buyback",
-    "sale": "Sales"
+    "sale": "Sales",
+    "company": "Company",
+    "companyConfig": "Company Config",
+    "bankAccounts": "Bank Accounts",
+    "holidays": "Holidays",
+    "dunning": "Dunning",
+    "blacklist": "Blacklist",
+    "icloud": "iCloud Pool",
+    "branchPin": "Branch PIN"
   },
   "user": {
     "id": "User ID",
@@ -1012,5 +1022,60 @@
     "step3": "Paste the URL and go",
     "iosOnly": "iOS Device Required",
     "iosOnlyDesc": "MDM enrollment is only available for iPhone and iPad devices."
+  },
+  "settings": {
+    "config": {
+      "title": "Company Configuration",
+      "description": "Contract settings, late fees, commission rules, and pause options per company.",
+      "companyName": "Company",
+      "draftExpiryDays": "Draft Expiry",
+      "draftExpiryWarnDays": "Draft Expiry Warning",
+      "gracePeriodDays": "Grace Period",
+      "lateFeePerDay": "Late Fee/Day",
+      "lateFeeSplitHolding": "Holding Split %",
+      "lateFeeSplitCompany": "Company Split %",
+      "lateFeeSplit": "Fee Split (H/C)",
+      "commMinActiveDays": "Min Active Days",
+      "commMinPaidInstallments": "Min Paid Installments",
+      "commRequireNoOverdue": "Require No Overdue",
+      "pauseEnabled": "Pause Enabled",
+      "pauseMaxDeferred": "Max Deferred",
+      "repoFeePerCase": "Repo Fee/Case",
+      "maxGuarantors": "Max Guarantors",
+      "depositMaxDays": "Max Deposit Days",
+      "days": "days",
+      "editTitle": "Edit — {{company}}",
+      "groupContract": "Contract",
+      "groupLateFee": "Late Fee",
+      "groupCommission": "Commission",
+      "groupPause": "Pause",
+      "groupLegal": "Legal",
+      "saved": "Configuration saved",
+      "empty": "No company configurations found"
+    },
+    "bankAccounts": {
+      "title": "Bank Accounts",
+      "description": "Manage branch bank accounts for payment collection."
+    },
+    "holidays": {
+      "title": "Holidays",
+      "description": "Company holidays that affect due date and late fee calculations."
+    },
+    "dunning": {
+      "title": "Dunning Configuration",
+      "description": "Configure overdue collection levels and actions."
+    },
+    "blacklist": {
+      "title": "Blacklist",
+      "description": "Manage blacklisted customers."
+    },
+    "icloud": {
+      "title": "iCloud Pool",
+      "description": "Manage iCloud accounts for device lock management."
+    },
+    "pin": {
+      "title": "Branch PIN",
+      "description": "Set and manage branch PIN codes for sensitive actions."
+    }
   }
 }

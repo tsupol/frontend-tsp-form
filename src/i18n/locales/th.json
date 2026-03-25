@@ -16,6 +16,8 @@
     "noData": "ไม่มีข้อมูล",
     "example": "ตัวอย่าง",
     "appName": "NNF System",
+    "saving": "กำลังบันทึก...",
+    "comingSoon": "เร็วๆ นี้",
     "unsavedChanges": "มีการเปลี่ยนแปลงที่ยังไม่บันทึก",
     "unsavedChangesMessage": "คุณมีการเปลี่ยนแปลงที่ยังไม่บันทึก ต้องการละทิ้งหรือไม่?",
     "discard": "ละทิ้ง"
@@ -71,7 +73,15 @@
     "transfers": "โอนสินค้า",
     "repairs": "ซ่อม",
     "buyback": "รับซื้อคืน",
-    "sale": "ขายสินค้า"
+    "sale": "ขายสินค้า",
+    "company": "บริษัท",
+    "companyConfig": "ตั้งค่าบริษัท",
+    "bankAccounts": "บัญชีธนาคาร",
+    "holidays": "วันหยุด",
+    "dunning": "ทวงถาม",
+    "blacklist": "บัญชีดำ",
+    "icloud": "iCloud Pool",
+    "branchPin": "PIN สาขา"
   },
   "user": {
     "id": "รหัสผู้ใช้",
@@ -1012,5 +1022,60 @@
     "step3": "วาง URL แล้วไป",
     "iosOnly": "ต้องใช้อุปกรณ์ iOS",
     "iosOnlyDesc": "การลงทะเบียน MDM ใช้ได้เฉพาะอุปกรณ์ iPhone และ iPad เท่านั้น"
+  },
+  "settings": {
+    "config": {
+      "title": "ตั้งค่าบริษัท",
+      "description": "ตั้งค่าสัญญา ค่าปรับ คอมมิชชั่น และการพักงวดตามบริษัท",
+      "companyName": "บริษัท",
+      "draftExpiryDays": "วันหมดอายุ Draft",
+      "draftExpiryWarnDays": "เตือนก่อนหมดอายุ Draft",
+      "gracePeriodDays": "ผ่อนผัน",
+      "lateFeePerDay": "ค่าปรับ/วัน",
+      "lateFeeSplitHolding": "ส่วนแบ่ง Holding %",
+      "lateFeeSplitCompany": "ส่วนแบ่งบริษัท %",
+      "lateFeeSplit": "แบ่งค่าปรับ (H/C)",
+      "commMinActiveDays": "วัน Active ขั้นต่ำ",
+      "commMinPaidInstallments": "งวดชำระขั้นต่ำ",
+      "commRequireNoOverdue": "ต้องไม่ค้างชำระ",
+      "pauseEnabled": "เปิดพักงวด",
+      "pauseMaxDeferred": "พักได้สูงสุด",
+      "repoFeePerCase": "ค่ายึดเครื่อง/เคส",
+      "maxGuarantors": "ผู้ค้ำสูงสุด",
+      "depositMaxDays": "วันฝากสูงสุด",
+      "days": "วัน",
+      "editTitle": "แก้ไข — {{company}}",
+      "groupContract": "สัญญา",
+      "groupLateFee": "ค่าปรับ",
+      "groupCommission": "คอมมิชชั่น",
+      "groupPause": "พักงวด",
+      "groupLegal": "กฎหมาย",
+      "saved": "บันทึกการตั้งค่าแล้ว",
+      "empty": "ไม่พบการตั้งค่าบริษัท"
+    },
+    "bankAccounts": {
+      "title": "บัญชีธนาคาร",
+      "description": "จัดการบัญชีธนาคารสาขาสำหรับรับชำระ"
+    },
+    "holidays": {
+      "title": "วันหยุด",
+      "description": "วันหยุดบริษัทที่มีผลต่อวันครบกำหนดและค่าปรับ"
+    },
+    "dunning": {
+      "title": "ตั้งค่าทวงถาม",
+      "description": "ตั้งค่าระดับและการดำเนินการทวงถาม"
+    },
+    "blacklist": {
+      "title": "บัญชีดำ",
+      "description": "จัดการลูกค้าที่ถูกขึ้นบัญชีดำ"
+    },
+    "icloud": {
+      "title": "iCloud Pool",
+      "description": "จัดการบัญชี iCloud สำหรับล็อคอุปกรณ์"
+    },
+    "pin": {
+      "title": "PIN สาขา",
+      "description": "ตั้งค่าและจัดการรหัส PIN สาขาสำหรับการดำเนินการที่ต้องยืนยัน"
+    }
   }
 }

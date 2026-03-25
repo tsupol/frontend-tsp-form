@@ -1,28 +1,29 @@
 import type { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { DollarSign, Calculator, TrendingUp, Percent, ClipboardCheck, Handshake } from 'lucide-react';
+import { Building2, Landmark, CalendarDays, AlertTriangle, ShieldBan, Cloud, KeyRound } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 
 const navItems = [
-  { path: '/admin/pricing/pricebook', labelKey: 'nav.pricebook', icon: DollarSign },
-  { path: '/admin/pricing/fin1-rates', labelKey: 'nav.fin1Rates', icon: Calculator },
-  { path: '/admin/pricing/fin2-rates', labelKey: 'nav.fin2Rates', icon: TrendingUp },
-  { path: '/admin/pricing/discount-policies', labelKey: 'nav.discountPolicies', icon: Percent },
-  { path: '/admin/pricing/discount-approvals', labelKey: 'nav.discountApprovals', icon: ClipboardCheck },
-  { path: '/admin/pricing/deal-partner-rates', labelKey: 'nav.dealPartnerRates', icon: Handshake },
+  { path: '/admin/company/config', labelKey: 'nav.companyConfig', icon: Building2 },
+  { path: '/admin/company/bank-accounts', labelKey: 'nav.bankAccounts', icon: Landmark },
+  { path: '/admin/company/holidays', labelKey: 'nav.holidays', icon: CalendarDays },
+  { path: '/admin/company/dunning', labelKey: 'nav.dunning', icon: AlertTriangle },
+  { path: '/admin/company/blacklist', labelKey: 'nav.blacklist', icon: ShieldBan },
+  { path: '/admin/company/icloud', labelKey: 'nav.icloud', icon: Cloud },
+  { path: '/admin/company/pin', labelKey: 'nav.branchPin', icon: KeyRound },
 ];
 
-export function PricingLayout({ children }: { children: ReactNode }) {
+export function CompanyLayout({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
   const navGuard = useNavGuard();
 
   return (
     <div className="flex min-h-full">
-      <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-50 border-r border-line p-4 pt-7.5 sticky top-0 h-dvh">
+      <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-48 border-r border-line p-4 pt-7.5 sticky top-0 h-dvh">
         <span className="text-xs font-semibold text-control-label uppercase tracking-wider mb-2 px-2">
-          {t('nav.pricing')}
+          {t('nav.company')}
         </span>
         {navItems.map(({ path, labelKey, icon: Icon }) => {
           const isActive = pathname === path;

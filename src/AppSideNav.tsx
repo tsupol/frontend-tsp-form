@@ -13,6 +13,7 @@ import {
   Headset,
   DollarSign,
   Warehouse,
+  Building2,
   ClipboardList,
   Smartphone,
   Settings,
@@ -165,6 +166,19 @@ export const AppSideNav = () => {
         { key: 'repairs', label: t('nav.repairs'), path: '/admin/inventory/repairs' },
         { key: 'buyback', label: t('nav.buyback'), path: '/admin/inventory/buyback' },
         { key: 'sale', label: t('nav.sale'), path: '/admin/inventory/sale' },
+      ],
+    },
+    {
+      key: 'company', icon: <Building2 size="1rem" />, label: t('nav.company'),
+      path: '/admin/company/config',
+      children: [
+        { key: 'company-config', label: t('nav.companyConfig'), path: '/admin/company/config' },
+        { key: 'bank-accounts', label: t('nav.bankAccounts'), path: '/admin/company/bank-accounts' },
+        { key: 'holidays', label: t('nav.holidays'), path: '/admin/company/holidays' },
+        { key: 'dunning', label: t('nav.dunning'), path: '/admin/company/dunning' },
+        { key: 'blacklist', label: t('nav.blacklist'), path: '/admin/company/blacklist' },
+        { key: 'icloud', label: t('nav.icloud'), path: '/admin/company/icloud' },
+        { key: 'pin', label: t('nav.branchPin'), path: '/admin/company/pin' },
       ],
     },
     {

@@ -38,6 +38,14 @@ import { PurchaseOrdersPage } from './pages/inventory/PurchaseOrdersPage';
 import { TransfersPage } from './pages/inventory/TransfersPage';
 import { RepairsPage } from './pages/inventory/RepairsPage';
 import { BuybackPage } from './pages/inventory/BuybackPage';
+import { CompanyLayout } from './pages/company/CompanyLayout';
+import { CompanyConfigPage } from './pages/company/CompanyConfigPage';
+import { BankAccountsPage } from './pages/company/BankAccountsPage';
+import { HolidaysPage } from './pages/company/HolidaysPage';
+import { DunningConfigPage } from './pages/company/DunningConfigPage';
+import { BlacklistPage } from './pages/company/BlacklistPage';
+import { ICloudPoolPage } from './pages/company/ICloudPoolPage';
+import { BranchPinPage } from './pages/company/BranchPinPage';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -308,6 +316,78 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <InventoryLayout><SalePage /></InventoryLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Company */}
+      <Route
+        path="/admin/company/config"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <CompanyLayout><CompanyConfigPage /></CompanyLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/company/bank-accounts"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <CompanyLayout><BankAccountsPage /></CompanyLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/company/holidays"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <CompanyLayout><HolidaysPage /></CompanyLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/company/dunning"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <CompanyLayout><DunningConfigPage /></CompanyLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/company/blacklist"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <CompanyLayout><BlacklistPage /></CompanyLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/company/icloud"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <CompanyLayout><ICloudPoolPage /></CompanyLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/company/pin"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <CompanyLayout><BranchPinPage /></CompanyLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
