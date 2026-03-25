@@ -18,6 +18,7 @@
     "appName": "NNF System",
     "saving": "Saving...",
     "comingSoon": "Coming soon",
+    "disabled": "Disabled",
     "unsavedChanges": "Unsaved Changes",
     "unsavedChangesMessage": "You have unsaved changes. Are you sure you want to discard them?",
     "discard": "Discard"
@@ -1050,8 +1051,15 @@
       "groupCommission": "Commission",
       "groupPause": "Pause",
       "groupLegal": "Legal",
+      "colExpiry": "Expiry",
+      "colLateFee": "Late Fee",
+      "colPause": "Pause",
+      "grace": "Grace",
+      "draft": "Draft",
+      "maxDeferred": "Max",
       "saved": "Configuration saved",
-      "empty": "No company configurations found"
+      "empty": "No company configurations found",
+      "selectToEdit": "Select a company to edit"
     },
     "bankAccounts": {
       "title": "Bank Accounts",

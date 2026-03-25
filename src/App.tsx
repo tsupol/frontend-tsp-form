@@ -39,7 +39,7 @@ import { TransfersPage } from './pages/inventory/TransfersPage';
 import { RepairsPage } from './pages/inventory/RepairsPage';
 import { BuybackPage } from './pages/inventory/BuybackPage';
 import { CompanyLayout } from './pages/company/CompanyLayout';
-import { CompanyConfigPage } from './pages/company/CompanyConfigPage';
+import { CompanyConfigRoot } from './pages/company/CompanyConfigRoot';
 import { BankAccountsPage } from './pages/company/BankAccountsPage';
 import { HolidaysPage } from './pages/company/HolidaysPage';
 import { DunningConfigPage } from './pages/company/DunningConfigPage';
@@ -323,11 +323,11 @@ function App() {
 
       {/* Company */}
       <Route
-        path="/admin/company/config"
+        path="/admin/company/config/*"
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <CompanyLayout><CompanyConfigPage /></CompanyLayout>
+              <CompanyLayout><CompanyConfigRoot /></CompanyLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

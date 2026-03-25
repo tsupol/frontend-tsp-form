@@ -18,6 +18,7 @@
     "appName": "NNF System",
     "saving": "กำลังบันทึก...",
     "comingSoon": "เร็วๆ นี้",
+    "disabled": "ปิดใช้งาน",
     "unsavedChanges": "มีการเปลี่ยนแปลงที่ยังไม่บันทึก",
     "unsavedChangesMessage": "คุณมีการเปลี่ยนแปลงที่ยังไม่บันทึก ต้องการละทิ้งหรือไม่?",
     "discard": "ละทิ้ง"
@@ -1050,8 +1051,15 @@
       "groupCommission": "คอมมิชชั่น",
       "groupPause": "พักงวด",
       "groupLegal": "กฎหมาย",
+      "colExpiry": "วันหมดอายุ",
+      "colLateFee": "ค่าปรับ",
+      "colPause": "พักงวด",
+      "grace": "ผ่อนผัน",
+      "draft": "ร่าง",
+      "maxDeferred": "สูงสุด",
       "saved": "บันทึกการตั้งค่าแล้ว",
-      "empty": "ไม่พบการตั้งค่าบริษัท"
+      "empty": "ไม่พบการตั้งค่าบริษัท",
+      "selectToEdit": "เลือกบริษัทเพื่อแก้ไข"
     },
     "bankAccounts": {
       "title": "บัญชีธนาคาร",
