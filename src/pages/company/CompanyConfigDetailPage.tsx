@@ -204,13 +204,14 @@ export function CompanyConfigDetailPage() {
           </div>
         )}
 
-        <div className="flex flex-col gap-6">
-          {groups.map(group => {
+        <div className="flex flex-col">
+          {groups.map((group, i) => {
             const groupFields = fields.filter(f => f.group === group.key);
             return (
               <div key={group.key}>
-                <h4 className="text-xs font-semibold text-control-label uppercase tracking-wider mb-3">{group.label}</h4>
-                <div className="form-grid gap-3">
+                {i > 0 && <hr className="border-line mt-0 mb-6" />}
+                <h4 className="text-sm font-semibold text-fg uppercase tracking-wider mb-3">{group.label}</h4>
+                <div className="form-grid">
                   {groupFields.map(field => (
                     <div key={field.key} className="flex flex-col">
                       <label className="form-label">{field.label}</label>
@@ -236,7 +237,7 @@ export function CompanyConfigDetailPage() {
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 flex items-center justify-end gap-2 py-3 bg-bg border-t border-line">
+        <div className="sticky bottom-0 flex items-center justify-end gap-2 py-3 bg-bg border-t border-line md:border-t-0">
           <Button onClick={handleReset} disabled={saving || !isDirty}>{t('common.cancel')}</Button>
           <Button color="primary" startIcon={<Save size={16} />} onClick={handleSave} disabled={saving || !isDirty}>
             {saving ? t('common.saving') : t('common.save')}
