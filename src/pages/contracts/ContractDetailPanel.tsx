@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Badge } from 'tsp-form';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { getStateColor, getStateLabel, fmtCurrency } from './contractUtils';
+import { ContractActionButtons } from './ContractActions';
 import { config } from '../../config/config';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -178,6 +179,7 @@ const TABS: DetailTab[] = ['overview', 'installments', 'txns', 'customers', 'not
 
 export function ContractDetailPanel({ contractId, isMobile }: { contractId: number; isMobile: boolean }) {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<DetailTab>('overview');
 
   const { data: contract, isLoading } = useQuery({
@@ -241,6 +243,19 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
         {activeTab === 'notes' && <NotesTab contractId={contractId} t={t} />}
         {activeTab === 'payments' && <PaymentsTab contractId={contractId} t={t} />}
       </div>
+
+      {/* Contract actions */}
+      <ContractActionButtons
+        contract={contract}
+        onRefresh={() => {
+          queryClient.invalidateQueries({ queryKey: ['contract-detail', contractId] });
+          queryClient.invalidateQueries({ queryKey: ['contract-search'] });
+          queryClient.invalidateQueries({ queryKey: ['saving-contracts'] });
+          queryClient.invalidateQueries({ queryKey: ['contract-installments', contractId] });
+          queryClient.invalidateQueries({ queryKey: ['contract-txns', contractId] });
+          queryClient.invalidateQueries({ queryKey: ['contract-payments', contractId] });
+        }}
+      />
     </div>
   );
 }
