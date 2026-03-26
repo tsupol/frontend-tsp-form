@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   MobileHeader, Button, Input, Switch, useSnackbarContext,
@@ -9,14 +9,13 @@ import { ArrowLeft, CheckCircle, XCircle, Save } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import type { CompanyConfig, EditableField } from './companyConfigTypes';
-import { useTransitionNavigate } from './CompanyConfigRoot';
 
 // ── Detail Page ──────────────────────────────────────────────────────────────
 
 export function CompanyConfigDetailPage() {
   const { t } = useTranslation();
   const { companyId } = useParams<{ companyId: string }>();
-  const { back } = useTransitionNavigate();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { addSnackbar } = useSnackbarContext();
@@ -25,12 +24,13 @@ export function CompanyConfigDetailPage() {
   const [errorMessage, setErrorMessage] = useState('');
   const [formValues, setFormValues] = useState<Record<string, number | boolean>>({});
 
-  const { data: configs = [] } = useQuery({
-    queryKey: ['company-config'],
-    queryFn: () => apiClient.get<CompanyConfig[]>('/v_company_config?order=company_name'),
+  const { data: config, isLoading } = useQuery({
+    queryKey: ['company-config-detail', companyId],
+    queryFn: async () => {
+      const rows = await apiClient.get<CompanyConfig[]>(`/v_company_config?company_id=eq.${companyId}`);
+      return rows[0] ?? null;
+    },
   });
-
-  const config = configs.find(c => c.company_id === Number(companyId));
 
   const fields: EditableField[] = [
     { key: 'draft_expiry_days', label: t('settings.config.draftExpiryDays'), type: 'number', group: 'contract' },
@@ -113,7 +113,8 @@ export function CompanyConfigDetailPage() {
           </div>
         ),
       });
-      queryClient.invalidateQueries({ queryKey: ['company-config'] });
+      queryClient.invalidateQueries({ queryKey: ['company-config-detail', companyId] });
+      queryClient.invalidateQueries({ queryKey: ['company-config-list'] });
     } catch (err) {
       if (err instanceof ApiError) {
         const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
@@ -136,9 +137,9 @@ export function CompanyConfigDetailPage() {
     setErrorMessage('');
   };
 
-  const goBack = () => back('/admin/company/config');
+  const goBack = () => navigate('/admin/company/config');
 
-  if (!config) {
+  if (isLoading || !config) {
     return (
       <>
         <MobileHeader className="mobile-header-bordered md:hidden">
@@ -155,7 +156,9 @@ export function CompanyConfigDetailPage() {
           <div className="mobile-header-end" />
         </MobileHeader>
         <div className="page-content">
-          <div className="p-8 text-center text-control-label">{t('settings.config.empty')}</div>
+          <div className="p-8 text-center text-control-label">
+            {isLoading ? t('common.loading') : t('settings.config.empty')}
+          </div>
         </div>
       </>
     );
@@ -180,9 +183,9 @@ export function CompanyConfigDetailPage() {
         <div className="mobile-header-end w-nav" />
       </MobileHeader>
 
-      <div className="page-content responsive-dvh-mobile-header flex flex-col">
+      <div className="page-content max-w-lg mx-auto pb-0">
         {/* Desktop header */}
-        <div className="flex items-center gap-3 mb-6 flex-none max-md:hidden max-w-lg mx-auto w-full">
+        <div className="flex items-center gap-3 mb-6 max-md:hidden">
           <button
             className="flex items-center gap-1 text-sm text-fg/60 hover:text-fg transition-colors cursor-pointer"
             onClick={goBack}
@@ -194,48 +197,46 @@ export function CompanyConfigDetailPage() {
           <h1 className="heading-2">{config.company_name}</h1>
         </div>
 
-        {/* Scrollable form */}
-        <div className="flex-1 overflow-y-auto better-scroll">
-          {errorMessage && (
-            <div className="alert alert-danger mb-4">
-              <XCircle size={16} />
-              <div><div className="alert-description text-xs">{errorMessage}</div></div>
-            </div>
-          )}
-          <div className="flex flex-col gap-6 max-w-lg mx-auto w-full">
-            {groups.map(group => {
-              const groupFields = fields.filter(f => f.group === group.key);
-              return (
-                <div key={group.key}>
-                  <h4 className="text-xs font-semibold text-control-label uppercase tracking-wider mb-3">{group.label}</h4>
-                  <div className="form-grid gap-3">
-                    {groupFields.map(field => (
-                      <div key={field.key} className="flex flex-col">
-                        <label className="form-label">{field.label}</label>
-                        {field.type === 'boolean' ? (
-                          <Switch
-                            checked={getValue(field.key) as boolean}
-                            onChange={(e) => setValue(field.key, (e.target as HTMLInputElement).checked)}
-                          />
-                        ) : (
-                          <Input
-                            type="number"
-                            className="w-full"
-                            value={String(getValue(field.key) ?? '')}
-                            onChange={(e) => setValue(field.key, Number(e.target.value))}
-                          />
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
+        {errorMessage && (
+          <div className="alert alert-danger mb-4">
+            <XCircle size={16} />
+            <div><div className="alert-description text-xs">{errorMessage}</div></div>
           </div>
+        )}
+
+        <div className="flex flex-col gap-6">
+          {groups.map(group => {
+            const groupFields = fields.filter(f => f.group === group.key);
+            return (
+              <div key={group.key}>
+                <h4 className="text-xs font-semibold text-control-label uppercase tracking-wider mb-3">{group.label}</h4>
+                <div className="form-grid gap-3">
+                  {groupFields.map(field => (
+                    <div key={field.key} className="flex flex-col">
+                      <label className="form-label">{field.label}</label>
+                      {field.type === 'boolean' ? (
+                        <Switch
+                          checked={getValue(field.key) as boolean}
+                          onChange={(e) => setValue(field.key, (e.target as HTMLInputElement).checked)}
+                        />
+                      ) : (
+                        <Input
+                          type="number"
+                          className="w-full"
+                          value={String(getValue(field.key) ?? '')}
+                          onChange={(e) => setValue(field.key, Number(e.target.value))}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 pt-4 flex-none max-w-lg mx-auto w-full">
+        <div className="sticky bottom-0 flex items-center justify-end gap-2 py-3 bg-bg border-t border-line">
           <Button onClick={handleReset} disabled={saving || !isDirty}>{t('common.cancel')}</Button>
           <Button color="primary" startIcon={<Save size={16} />} onClick={handleSave} disabled={saving || !isDirty}>
             {saving ? t('common.saving') : t('common.save')}

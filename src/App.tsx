@@ -40,6 +40,7 @@ import { RepairsPage } from './pages/inventory/RepairsPage';
 import { BuybackPage } from './pages/inventory/BuybackPage';
 import { CompanyLayout } from './pages/company/CompanyLayout';
 import { CompanyConfigRoot } from './pages/company/CompanyConfigRoot';
+import { CompanyConfigDetailPage } from './pages/company/CompanyConfigDetailPage';
 import { BankAccountsPage } from './pages/company/BankAccountsPage';
 import { HolidaysPage } from './pages/company/HolidaysPage';
 import { DunningConfigPage } from './pages/company/DunningConfigPage';
@@ -323,7 +324,7 @@ function App() {
 
       {/* Company */}
       <Route
-        path="/admin/company/config/*"
+        path="/admin/company/config"
         element={
           <ProtectedRoute>
             <AdminLayout>
@@ -331,7 +332,9 @@ function App() {
             </AdminLayout>
           </ProtectedRoute>
         }
-      />
+      >
+        <Route path=":companyId" element={<CompanyConfigDetailPage />} />
+      </Route>
       <Route
         path="/admin/company/bank-accounts"
         element={

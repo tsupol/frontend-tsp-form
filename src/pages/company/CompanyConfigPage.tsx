@@ -1,5 +1,6 @@
 import { useState, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   DataTable, DataTableColumnHeader, DataTableFooter, MobileHeader,
@@ -9,13 +10,12 @@ import {
 import { ArrowRightFromLine, Pencil } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import type { CompanyConfig } from './companyConfigTypes';
-import { useTransitionNavigate } from './CompanyConfigRoot';
 
 // ── Main Page ────────────────────────────────────────────────────────────────
 
 export function CompanyConfigPage() {
   const { t } = useTranslation();
-  const { forward } = useTransitionNavigate();
+  const navigate = useNavigate();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(25);
@@ -23,8 +23,8 @@ export function CompanyConfigPage() {
   const [search, setSearch] = useState('');
   const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  const { data: configs = [], isFetching } = useQuery({
-    queryKey: ['company-config'],
+  const { data: configs = [], isFetching, isLoading } = useQuery({
+    queryKey: ['company-config-list'],
     queryFn: () => apiClient.get<CompanyConfig[]>('/v_company_config?order=company_name'),
   });
 
@@ -47,7 +47,7 @@ export function CompanyConfigPage() {
   };
 
   const handleRowClick = (config: CompanyConfig) => {
-    forward(`/admin/company/config/${config.company_id}`);
+    navigate(`/admin/company/config/${config.company_id}`);
   };
 
   const columns: ColumnDef<CompanyConfig>[] = [
@@ -91,7 +91,7 @@ export function CompanyConfigPage() {
       cell: ({ row }) => (
         <button
           className="p-1 rounded hover:bg-surface-hover transition-colors cursor-pointer"
-          onClick={(e: React.MouseEvent) => { e.stopPropagation(); forward(`/admin/company/config/${row.original.company_id}`); }}
+          onClick={(e: React.MouseEvent) => { e.stopPropagation(); navigate(`/admin/company/config/${row.original.company_id}`); }}
           aria-label={t('common.edit')}
         >
           <Pencil size={14} className="opacity-50" />
@@ -163,7 +163,7 @@ export function CompanyConfigPage() {
           className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
           noResults={
             <div className="p-8 text-center text-control-label">
-              {t('settings.config.empty')}
+              {isLoading ? t('common.loading') : t('settings.config.empty')}
             </div>
           }
         />
@@ -173,7 +173,7 @@ export function CompanyConfigPage() {
           <div className="flex-1 overflow-auto better-scroll pb-8">
             {filtered.length === 0 ? (
               <div className="p-8 text-center text-control-label">
-                {t('settings.config.empty')}
+                {isLoading ? t('common.loading') : t('settings.config.empty')}
               </div>
             ) : (
               <div className="flex flex-col divide-y divide-line">

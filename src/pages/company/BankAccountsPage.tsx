@@ -19,7 +19,7 @@ export function BankAccountsPage() {
         <div className="mobile-header-title mobile-header-title-truncate">
           {t('settings.bankAccounts.title')}
         </div>
-        <div className="mobile-header-end" />
+        <div className="mobile-header-end w-nav" />
       </MobileHeader>
       <div className="page-content">
         <div className="hidden lg:block mb-6">
