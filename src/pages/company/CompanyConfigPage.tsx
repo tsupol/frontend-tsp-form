@@ -72,7 +72,7 @@ export function CompanyConfigPage() {
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('settings.config.colLateFee')} />,
       cell: ({ row }) => (
         <span className="tabular-nums text-sm">
-          ฿{row.original.late_fee_per_day.toLocaleString()} ({row.original.late_fee_split_holding}/{row.original.late_fee_split_company})
+          ฿{(row.original.late_fee_per_day ?? 0).toLocaleString()} ({row.original.late_fee_split_holding ?? 0}/{row.original.late_fee_split_company ?? 0})
         </span>
       ),
       className: 'w-[22%] min-w-36',

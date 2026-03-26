@@ -67,5 +67,7 @@
   "product.state.axis_inactive": "คุณสมบัติไม่ได้ใช้งาน",
   "product.state.draft_not_ready": "แบบร่างยังไม่พร้อมเผยแพร่",
   "product.state.draft_already_published": "แบบร่างถูกเผยแพร่แล้ว",
-  "product.state.draft_locked": "แบบร่างไม่สามารถแก้ไขได้ในสถานะปัจจุบัน"
+  "product.state.draft_locked": "แบบร่างไม่สามารถแก้ไขได้ในสถานะปัจจุบัน",
+  "CORE.VALIDATION.CANNOT_DEACTIVATE_DEFAULT": "ไม่สามารถปิดบัญชีหลักได้ กรุณาตั้งบัญชีอื่นเป็นบัญชีหลักก่อน",
+  "CORE.VALIDATION.PIN_MUST_BE_6_DIGITS": "PIN ต้องเป็นตัวเลข 6 หลักเท่านั้น"
 }

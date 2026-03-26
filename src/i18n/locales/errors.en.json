@@ -67,5 +67,7 @@
   "product.state.axis_inactive": "Attribute is inactive",
   "product.state.draft_not_ready": "Draft is not ready to publish",
   "product.state.draft_already_published": "Draft has already been published",
-  "product.state.draft_locked": "Draft cannot be modified in its current state"
+  "product.state.draft_locked": "Draft cannot be modified in its current state",
+  "CORE.VALIDATION.CANNOT_DEACTIVATE_DEFAULT": "Cannot deactivate the default account. Set another account as default first.",
+  "CORE.VALIDATION.PIN_MUST_BE_6_DIGITS": "PIN must be exactly 6 digits"
 }

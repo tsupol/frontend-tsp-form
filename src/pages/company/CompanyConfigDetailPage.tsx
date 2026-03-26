@@ -112,12 +112,13 @@ export function CompanyConfigDetailPage() {
             <span className="alert-description">{t('settings.config.saved')}</span>
           </div>
         ),
+        type: 'success',
       });
       queryClient.invalidateQueries({ queryKey: ['company-config-detail', companyId] });
       queryClient.invalidateQueries({ queryKey: ['company-config-list'] });
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
         setErrorMessage(translated || err.message);
       }
     } finally {
