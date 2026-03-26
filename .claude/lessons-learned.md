@@ -19,3 +19,11 @@ When hitting a gap, the honest response is: "here's what's missing, here's what'
 ## 5. Study existing patterns before writing code
 
 Read existing pages in the project to learn how things are done: column definitions, snackbar types, modal patterns, component props. Don't guess or assume — the codebase is the source of truth. Follow the patterns exactly.
+
+## 6. Follow the spec — don't invent
+
+When the spec says what to build (tabs, views, fields), build exactly that. Don't make up your own structure and ignore what the documentation already specifies. The spec exists for a reason — it reflects decisions already made about what the backend provides and what the UI should show.
+
+## 7. Verify against the spec before guessing at the API
+
+When an API call 404s, go back to the spec docs first — the correct view/RPC names are usually documented there. Don't guess naming conventions, and don't conclude something doesn't exist after trying one name. The spec is the primary source; MCP discovery is for confirming, not replacing it.

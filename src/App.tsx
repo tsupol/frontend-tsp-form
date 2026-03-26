@@ -38,6 +38,9 @@ import { PurchaseOrdersPage } from './pages/inventory/PurchaseOrdersPage';
 import { TransfersPage } from './pages/inventory/TransfersPage';
 import { RepairsPage } from './pages/inventory/RepairsPage';
 import { BuybackPage } from './pages/inventory/BuybackPage';
+import { ContractsLayout } from './pages/contracts/ContractsLayout';
+import { ContractSearchPage } from './pages/contracts/ContractSearchPage';
+import { SavingContractsPage } from './pages/contracts/SavingContractsPage';
 import { CompanyLayout } from './pages/company/CompanyLayout';
 import { CompanyConfigRoot } from './pages/company/CompanyConfigRoot';
 import { CompanyConfigDetailPage } from './pages/company/CompanyConfigDetailPage';
@@ -317,6 +320,28 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <InventoryLayout><SalePage /></InventoryLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Contracts */}
+      <Route
+        path="/admin/contracts/search"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <ContractsLayout><ContractSearchPage /></ContractsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/contracts/saving"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <ContractsLayout><SavingContractsPage /></ContractsLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

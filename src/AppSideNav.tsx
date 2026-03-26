@@ -14,6 +14,7 @@ import {
   DollarSign,
   Warehouse,
   Building2,
+  FileText,
   ClipboardList,
   Smartphone,
   Settings,
@@ -179,6 +180,14 @@ export const AppSideNav = () => {
         { key: 'blacklist', label: t('nav.blacklist'), path: '/admin/company/blacklist' },
         { key: 'icloud', label: t('nav.icloud'), path: '/admin/company/icloud' },
         { key: 'pin', label: t('nav.branchPin'), path: '/admin/company/pin' },
+      ],
+    },
+    {
+      key: 'contracts', icon: <FileText size="1rem" />, label: t('nav.contracts'),
+      path: '/admin/contracts/search',
+      children: [
+        { key: 'contract-search', label: t('nav.contractSearch'), path: '/admin/contracts/search' },
+        { key: 'saving-contracts', label: t('nav.savingContracts'), path: '/admin/contracts/saving' },
       ],
     },
     {
