@@ -1328,6 +1328,19 @@
     "cancelSaving_selectChannel": "Select channel",
     "cancelSaving_stepFee": "Deducting fee...",
     "cancelSaving_stepRefund": "Processing refund...",
-    "cancelSaving_stepCancel": "Cancelling contract..."
+    "cancelSaving_stepCancel": "Cancelling contract...",
+    "action_early_payoff": "Early Payoff",
+    "action_early_payoff_success": "Contract completed (early payoff)",
+    "earlyPayoff_title": "Early Payoff",
+    "earlyPayoff_outstanding": "Outstanding Amount",
+    "earlyPayoff_amount": "Payoff Amount",
+    "earlyPayoff_discount": "Discount",
+    "earlyPayoff_channel": "Payment Channel",
+    "earlyPayoff_stepPayment": "Recording payment...",
+    "earlyPayoff_stepComplete": "Completing contract...",
+    "action_transfer_accept": "Accept Transfer",
+    "action_transfer_accept_success": "Transfer accepted",
+    "action_transfer_cancel": "Cancel Transfer",
+    "action_transfer_cancel_success": "Transfer cancelled"
   }
 }

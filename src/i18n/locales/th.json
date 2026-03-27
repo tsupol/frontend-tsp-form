@@ -1328,6 +1328,19 @@
     "cancelSaving_selectChannel": "เลือกช่องทาง",
     "cancelSaving_stepFee": "กำลังหักค่าธรรมเนียม...",
     "cancelSaving_stepRefund": "กำลังคืนเงิน...",
-    "cancelSaving_stepCancel": "กำลังยกเลิกสัญญา..."
+    "cancelSaving_stepCancel": "กำลังยกเลิกสัญญา...",
+    "action_early_payoff": "ซื้อขาด",
+    "action_early_payoff_success": "ปิดสัญญาสำเร็จ (ซื้อขาด)",
+    "earlyPayoff_title": "ซื้อขาด",
+    "earlyPayoff_outstanding": "ยอดค้างชำระ",
+    "earlyPayoff_amount": "ยอดซื้อขาด",
+    "earlyPayoff_discount": "ส่วนลด",
+    "earlyPayoff_channel": "ช่องทางชำระ",
+    "earlyPayoff_stepPayment": "กำลังบันทึกการชำระ...",
+    "earlyPayoff_stepComplete": "กำลังปิดสัญญา...",
+    "action_transfer_accept": "รับโอน",
+    "action_transfer_accept_success": "รับโอนสำเร็จ",
+    "action_transfer_cancel": "ยกเลิกโอน",
+    "action_transfer_cancel_success": "ยกเลิกการโอนสำเร็จ"
   }
 }

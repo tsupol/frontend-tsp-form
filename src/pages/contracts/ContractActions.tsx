@@ -14,6 +14,7 @@ interface ContractForActions {
   code_display: string | null;
   state: string;
   commercial_model: string | null;
+  branch_id: number;
   device_id: number | null;
   outstanding_amount: number | null;
   late_fee_balance: number | null;
@@ -21,10 +22,12 @@ interface ContractForActions {
   insurance_balance: number | null;
   is_paused: boolean;
   saving_balance: number | null;
+  transfer_to_branch_id: number | null;
 }
 
 type ContractAction =
   | 'complete'
+  | 'early_payoff'
   | 'terminate'
   | 'cancel'
   | 'void'
@@ -34,6 +37,8 @@ type ContractAction =
   | 'unbind_device'
   | 'bind_device'
   | 'transfer_branch'
+  | 'transfer_accept'
+  | 'transfer_cancel'
   | 'detach_customer'
   | 'settlement_refund'
   | 'change_draft_owner';
@@ -52,6 +57,10 @@ function getAvailableActions(contract: ContractForActions): ContractAction[] {
       && (insurance_balance ?? 0) === 0;
     if (canComplete) actions.push('complete');
 
+    // Early payoff: has outstanding, no late fees
+    const canEarlyPayoff = (outstanding_amount ?? 0) > 0 && (late_fee_balance ?? 0) === 0;
+    if (canEarlyPayoff) actions.push('early_payoff');
+
     actions.push('settlement_refund');
     actions.push('terminate');
     if (!is_paused) actions.push('pause');
@@ -65,7 +74,13 @@ function getAvailableActions(contract: ContractForActions): ContractAction[] {
       actions.push('bind_device');
     }
 
-    actions.push('transfer_branch');
+    // Transfer actions
+    if (contract.transfer_to_branch_id) {
+      actions.push('transfer_accept');
+      actions.push('transfer_cancel');
+    } else {
+      actions.push('transfer_branch');
+    }
     actions.push('detach_customer');
     actions.push('void');
   }
@@ -269,6 +284,45 @@ const ACTION_CONFIGS: Record<ContractAction, ActionConfig> = {
     needsNewOwner: true,
     successKey: 'contract.action_change_draft_owner_success',
   },
+  early_payoff: {
+    rpc: '', // multi-step, handled by EarlyPayoffModal
+    color: 'primary',
+    needsPin: true,
+    needsNote: true,
+    needsReason: false,
+    needsBranch: false,
+    needsDevice: false,
+    needsAmount: false,
+    needsCloseReason: false,
+    needsNewOwner: false,
+    successKey: 'contract.action_early_payoff_success',
+  },
+  transfer_accept: {
+    rpc: 'fn_contract_transfer_accept',
+    color: 'primary',
+    needsPin: true,
+    needsNote: false,
+    needsReason: false,
+    needsBranch: false,
+    needsDevice: false,
+    needsAmount: false,
+    needsCloseReason: false,
+    needsNewOwner: false,
+    successKey: 'contract.action_transfer_accept_success',
+  },
+  transfer_cancel: {
+    rpc: 'fn_contract_transfer_cancel',
+    color: 'danger',
+    needsPin: false,
+    needsNote: false,
+    needsReason: true,
+    needsBranch: false,
+    needsDevice: false,
+    needsAmount: false,
+    needsCloseReason: false,
+    needsNewOwner: false,
+    successKey: 'contract.action_transfer_cancel_success',
+  },
 };
 
 const CLOSE_REASON_OPTIONS: Record<string, { value: string; label: string }[]> = {
@@ -310,6 +364,7 @@ export function ContractActionButtons({ contract, onRefresh }: {
   if (actions.length === 0) return null;
 
   const isCancelSaving = activeAction === 'cancel' && contract.state === 'SAVING';
+  const isEarlyPayoff = activeAction === 'early_payoff';
 
   const handleSuccess = (msgKey: string) => {
     setActiveAction(null);
@@ -345,6 +400,13 @@ export function ContractActionButtons({ contract, onRefresh }: {
 
       {isCancelSaving ? (
         <CancelSavingModal
+          open
+          contract={contract}
+          onClose={() => setActiveAction(null)}
+          onSuccess={handleSuccess}
+        />
+      ) : isEarlyPayoff ? (
+        <EarlyPayoffModal
           open
           contract={contract}
           onClose={() => setActiveAction(null)}
@@ -900,6 +962,189 @@ function CancelSavingModal({ open, contract, onClose, onSuccess }: {
             disabled={!canSubmit || mutation.isPending}
           >
             {mutation.isPending ? stepLabel || t('common.loading') : t('contract.action_cancel')}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ── Early Payoff Modal ────────────────────────────────────────────────────
+
+function EarlyPayoffModal({ open, contract, onClose, onSuccess }: {
+  open: boolean;
+  contract: ContractForActions;
+  onClose: () => void;
+  onSuccess: (msgKey: string) => void;
+}) {
+  const { t } = useTranslation();
+  const outstanding = contract.outstanding_amount ?? 0;
+
+  const [payoffAmount, setPayoffAmount] = useState('');
+  const [channel, setChannel] = useState<string | null>(null);
+  const [note, setNote] = useState('');
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState('');
+  const [errorKey, setErrorKey] = useState(0);
+  const [step, setStep] = useState('');
+
+  // Reset form on open
+  useEffect(() => {
+    if (open) {
+      setPayoffAmount(String(outstanding));
+      setChannel(null);
+      setNote('');
+      setPin('');
+      setError('');
+      setStep('');
+    }
+  }, [open, outstanding]);
+
+  const amount = Number(payoffAmount) || 0;
+  const discount = outstanding - amount;
+
+  const canSubmit = (() => {
+    if (!pin) return false;
+    if (!channel) return false;
+    if (amount <= 0 || amount > outstanding) return false;
+    return true;
+  })();
+
+  const setApiError = (err: unknown) => {
+    if (err instanceof ApiError) {
+      const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+        || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+      setError(translated || err.message);
+    } else {
+      setError(String(err));
+    }
+    setErrorKey(k => k + 1);
+  };
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      // Step 1: Record early payoff payment
+      setStep('payment');
+      await apiClient.rpc('fn_payment_record', {
+        p_contract_id: contract.id,
+        p_amount: amount,
+        p_payment_type: 'EARLY_PAYOFF',
+        p_channel: channel,
+        p_branch_id: contract.branch_id,
+        p_note: note.trim() || undefined,
+      });
+
+      // Step 2: Complete contract
+      setStep('complete');
+      await apiClient.rpc('fn_contract_complete', {
+        p_contract_id: contract.id,
+        p_close_reason: 'EARLY_PAYOFF',
+        p_note: note.trim() || undefined,
+        p_pin: pin,
+      });
+    },
+    onSuccess: () => onSuccess('contract.action_early_payoff_success'),
+    onError: setApiError,
+  });
+
+  const stepLabel = step === 'payment' ? t('contract.earlyPayoff_stepPayment')
+    : step === 'complete' ? t('contract.earlyPayoff_stepComplete')
+    : '';
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
+      <div className="flex flex-col overflow-hidden">
+        <div className="modal-header">
+          <h2 className="modal-title">{t('contract.earlyPayoff_title')}</h2>
+          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+        </div>
+        <div className="modal-content">
+          {error && (
+            <div key={errorKey} className="alert alert-danger mb-4 animate-pop-in">
+              <XCircle size={16} />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {/* Contract info summary */}
+          <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
+            <div className="font-medium text-sm">{contract.code_display ?? contract.code}</div>
+            <div className="text-xs text-subtle">{contract.state} · {contract.commercial_model ?? ''}</div>
+          </div>
+
+          {/* Outstanding amount display */}
+          <div className="mb-4 px-3 py-2.5 rounded-md bg-warning/10 border border-warning/20">
+            <div className="text-xs text-subtle">{t('contract.earlyPayoff_outstanding')}</div>
+            <div className="text-lg font-semibold tabular-nums">{fmtCurrency(outstanding)}</div>
+          </div>
+
+          <div className="form-grid gap-4">
+            {/* Payoff amount */}
+            <div className="flex flex-col">
+              <label className="form-label">{t('contract.earlyPayoff_amount')} *</label>
+              <Input
+                type="number"
+                value={payoffAmount}
+                onChange={(e) => setPayoffAmount(e.target.value)}
+                placeholder="0.00"
+                className="w-full"
+                min="0"
+                max={outstanding}
+                step="0.01"
+              />
+              {discount > 0 && amount > 0 && (
+                <div className="text-xs text-success mt-1">
+                  {t('contract.earlyPayoff_discount')}: <span className="font-medium tabular-nums">{fmtCurrency(discount)}</span>
+                  {' '}({((discount / outstanding) * 100).toFixed(1)}%)
+                </div>
+              )}
+            </div>
+
+            {/* Payment channel */}
+            <div className="flex flex-col">
+              <label className="form-label">{t('contract.earlyPayoff_channel')} *</label>
+              <Select
+                options={REFUND_CHANNEL_OPTIONS}
+                value={channel}
+                onChange={(val) => setChannel((val as string) || null)}
+                placeholder={t('contract.cancelSaving_selectChannel')}
+                showChevron
+              />
+            </div>
+
+            {/* Note */}
+            <div className="flex flex-col">
+              <label className="form-label">{t('contract.note')}</label>
+              <TextArea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder={t('contract.notePlaceholder')}
+                rows={3}
+              />
+            </div>
+
+            {/* PIN */}
+            <div className="flex flex-col">
+              <label className="form-label">{t('contract.pin')} *</label>
+              <Input
+                type="password"
+                value={pin}
+                onChange={(e) => setPin(e.target.value)}
+                placeholder={t('contract.pinPlaceholder')}
+                maxLength={6}
+                className="w-full"
+              />
+            </div>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button
+            color="primary"
+            onClick={() => mutation.mutate()}
+            disabled={!canSubmit || mutation.isPending}
+          >
+            {mutation.isPending ? stepLabel || t('common.loading') : t('contract.action_early_payoff')}
           </Button>
         </div>
       </div>

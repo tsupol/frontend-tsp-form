@@ -86,6 +86,7 @@ interface ContractDetail {
   current_step: string | null;
   step_data: unknown;
   draft_age_days: number | null;
+  transfer_to_branch_id: number | null;
 }
 
 interface Installment {
