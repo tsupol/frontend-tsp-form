@@ -99,7 +99,7 @@ export function DunningTargetsPage() {
   const { data: pageData, isFetching } = useQuery({
     queryKey: ['dunning-targets', filterBucket, debouncedSearch, pageIndex, pageSize],
     queryFn: () => {
-      let url = '/v_dunning_targets?order=overdue_amount.desc';
+      let url = '/v_dunning_targets?order=first_overdue_due_date.asc.nullslast';
       if (filterBucket) url += `&bucket_code=eq.${filterBucket}`;
       else url += `&bucket_code=neq.CURRENT`;
       if (debouncedSearch) {
@@ -160,9 +160,16 @@ export function DunningTargetsPage() {
       accessorKey: 'first_overdue_due_date',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('legal.since')} />,
       cell: ({ row }) => {
-        const dur = overdueDuration(row.original.first_overdue_due_date);
+        const dateStr = row.original.first_overdue_due_date;
+        if (!dateStr) return <span className="text-subtle">—</span>;
+        const date = new Date(dateStr);
+        const formatted = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Bangkok' });
+        const dur = overdueDuration(dateStr);
         return (
-          <span className="text-sm tabular-nums">{dur}</span>
+          <div>
+            <div className="text-xs tabular-nums">{formatted}</div>
+            <div className="text-xs text-subtle">({dur})</div>
+          </div>
         );
       },
       className: 'max-md:hidden',
