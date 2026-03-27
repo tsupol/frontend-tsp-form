@@ -315,7 +315,7 @@ export function DunningTargetsPage() {
                     options={SORT_OPTIONS}
                     value={sorting[0]?.id ?? null}
                     onChange={(val) => {
-                      if (val) setSorting([{ id: val as string, desc: sorting[0]?.desc ?? false }]);
+                      if (val) setSorting([{ id: val as string, desc: false }]);
                       else setSorting([{ id: 'first_overdue_due_date', desc: false }]);
                       setPageIndex(0);
                     }}
@@ -325,22 +325,6 @@ export function DunningTargetsPage() {
                     clearable
                     searchable={false}
                   />
-                  {sorting.length > 0 && (
-                    <Select
-                      options={[
-                        { value: 'asc', label: t('common.ascending') },
-                        { value: 'desc', label: t('common.descending') },
-                      ]}
-                      value={sorting[0]?.desc ? 'desc' : 'asc'}
-                      onChange={(val) => {
-                        setSorting([{ id: sorting[0].id, desc: (val as string) === 'desc' }]);
-                        setPageIndex(0);
-                      }}
-                      size="sm"
-                      showChevron
-                      searchable={false}
-                    />
-                  )}
                 </div>
               </PopOver>
             </div>
