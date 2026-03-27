@@ -132,8 +132,7 @@ export function PriceCheckPage() {
   const handleSelectModel = useCallback((model: RecentModel, goTo?: (id: string) => void) => {
     setSelectedModelId(model.model_id);
     setSelectedModelInfo(model);
-    addRecentModel(model);
-    setRecentModels(getRecentModels());
+    addRecentModel(model); // persist to localStorage, but don't re-sort the list yet
     setSearch('');
     setDebouncedSearch('');
     if (goTo) goTo('detail');
@@ -145,8 +144,11 @@ export function PriceCheckPage() {
     setRecentModels(getRecentModels());
   }, []);
 
-  // Items to show in list: search results or recent
+  // Refresh recent list from localStorage when search clears (recent list becomes visible)
   const isSearching = debouncedSearch.length >= 2;
+  useEffect(() => {
+    if (!isSearching) setRecentModels(getRecentModels());
+  }, [isSearching]);
   const listItems = isSearching ? (models ?? []) : [];
 
   return (
@@ -346,7 +348,7 @@ function PricingDetail({ model, quoteData, loading, t }: {
 
   return (
     <div className="flex-1 overflow-auto better-scroll">
-      <div className="px-4 md:px-6 py-4">
+      <div className="px-4 md:px-6 py-4 max-w-2xl">
         {/* Model header */}
         <div className="mb-5 flex items-baseline gap-2 flex-wrap">
           <h2 className="text-lg font-semibold">{model.family_name} {model.model_name}</h2>
