@@ -113,21 +113,35 @@ function overdueDuration(dateStr: string | null): string {
 
 const STATUS_OPTIONS = [
   { value: 'QUEUED', label: 'Queued' },
-  { value: 'STAGE_1', label: 'Stage 1' },
-  { value: 'STAGE_2', label: 'Stage 2' },
-  { value: 'STAGE_3', label: 'Stage 3' },
-  { value: 'STAGE_4', label: 'Stage 4 (Court)' },
-  { value: 'CLOSED', label: 'Closed' },
+  { value: 'IN_PROGRESS', label: 'In Progress' },
+  { value: 'FIRST_LEGAL_NOTICE', label: '1st Notice' },
+  { value: 'SECOND_LEGAL_NOTICE', label: '2nd Notice' },
+  { value: 'COURT_PROCESS', label: 'Court' },
+  { value: 'CLOSED_REPOSSESSED', label: 'Closed (Repossessed)' },
+  { value: 'CLOSED_RESOLVED_BY_PAYMENT', label: 'Closed (Paid)' },
 ];
 
 const getStatusColor = (status: string) => {
   if (status === 'QUEUED') return 'default';
-  if (status === 'STAGE_1') return 'info';
-  if (status === 'STAGE_2') return 'warning';
-  if (status === 'STAGE_3') return 'warning';
-  if (status === 'STAGE_4') return 'danger';
-  if (status === 'CLOSED') return 'success';
+  if (status === 'IN_PROGRESS') return 'info';
+  if (status === 'FIRST_LEGAL_NOTICE') return 'warning';
+  if (status === 'SECOND_LEGAL_NOTICE') return 'warning';
+  if (status === 'COURT_PROCESS') return 'danger';
+  if (status.startsWith('CLOSED')) return 'success';
   return 'default' as const;
+};
+
+const getStatusLabel = (status: string) => {
+  switch (status) {
+    case 'QUEUED': return 'Queued';
+    case 'IN_PROGRESS': return 'In Progress';
+    case 'FIRST_LEGAL_NOTICE': return '1st Notice';
+    case 'SECOND_LEGAL_NOTICE': return '2nd Notice';
+    case 'COURT_PROCESS': return 'Court';
+    case 'CLOSED_REPOSSESSED': return 'Repossessed';
+    case 'CLOSED_RESOLVED_BY_PAYMENT': return 'Resolved';
+    default: return status;
+  }
 };
 
 const getEventLabel = (type: string) => {
@@ -266,16 +280,16 @@ export function LegalCasesPage() {
     if (!caseStatus) return [];
     const list: { key: string; label: string; color: 'primary' | 'danger' | undefined }[] = [];
     if (caseStatus === 'QUEUED') list.push({ key: 'take', label: t('legal.actionTake'), color: 'primary' });
-    if (['STAGE_1', 'STAGE_2', 'STAGE_3'].includes(caseStatus)) {
+    if (['IN_PROGRESS', 'FIRST_LEGAL_NOTICE', 'SECOND_LEGAL_NOTICE'].includes(caseStatus)) {
       list.push({ key: 'advance', label: t('legal.actionAdvance'), color: 'primary' });
       list.push({ key: 'revert', label: t('legal.actionRevert'), color: undefined });
       list.push({ key: 'release', label: t('legal.actionRelease'), color: undefined });
     }
-    if (caseStatus === 'STAGE_4') {
+    if (caseStatus === 'COURT_PROCESS') {
       list.push({ key: 'close', label: t('legal.actionClose'), color: 'danger' });
       list.push({ key: 'revert', label: t('legal.actionRevert'), color: undefined });
     }
-    if (caseStatus !== 'CLOSED') list.push({ key: 'note', label: t('legal.actionNote'), color: undefined });
+    if (!caseStatus.startsWith('CLOSED')) list.push({ key: 'note', label: t('legal.actionNote'), color: undefined });
     return list;
   }, [caseStatus, t]);
 
@@ -365,7 +379,7 @@ export function LegalCasesPage() {
                       >
                         <div className="flex items-center justify-between mb-1">
                           <span className="font-medium text-sm">{c.case_code}</span>
-                          <Badge size="xs" color={getStatusColor(c.status)}>{c.status}</Badge>
+                          <Badge size="xs" color={getStatusColor(c.status)}>{getStatusLabel(c.status)}</Badge>
                         </div>
                         <div className="text-xs text-subtle">{c.ref_contract_code}</div>
                         <div className="flex items-center justify-between mt-1 text-xs">
@@ -405,7 +419,7 @@ export function LegalCasesPage() {
                     {/* Case header */}
                     <div className="flex items-center gap-3 mb-4">
                       <h2 className="text-lg font-semibold">{caseDetail.case.case_code}</h2>
-                      <Badge size="sm" color={getStatusColor(caseDetail.case.status)}>{caseDetail.case.status}</Badge>
+                      <Badge size="sm" color={getStatusColor(caseDetail.case.status)}>{getStatusLabel(caseDetail.case.status)}</Badge>
                     </div>
 
                     {/* Overdue summary */}
