@@ -19,6 +19,7 @@ import {
   Smartphone,
   Calculator,
   Coins,
+  Scale,
   Settings,
   HelpCircle,
   LogOut,
@@ -199,6 +200,14 @@ export const AppSideNav = () => {
       children: [
         { key: 'staff-commission', label: t('nav.staffCommission'), path: '/admin/commission/staff' },
         { key: 'partner-commission', label: t('nav.partnerCommission'), path: '/admin/commission/partner' },
+      ],
+    },
+    {
+      key: 'legal', icon: <Scale size="1rem" />, label: t('nav.legal'),
+      path: '/admin/legal/dunning',
+      children: [
+        { key: 'dunning-targets', label: t('nav.dunningTargets'), path: '/admin/legal/dunning' },
+        { key: 'legal-cases', label: t('nav.legalCases'), path: '/admin/legal/cases' },
       ],
     },
     {

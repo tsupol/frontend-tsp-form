@@ -39,6 +39,9 @@ import { TransfersPage } from './pages/inventory/TransfersPage';
 import { RepairsPage } from './pages/inventory/RepairsPage';
 import { BuybackPage } from './pages/inventory/BuybackPage';
 import { PriceCheckPage } from './pages/PriceCheckPage';
+import { LegalLayout } from './pages/legal/LegalLayout';
+import { DunningTargetsPage } from './pages/legal/DunningTargetsPage';
+import { LegalCasesPage } from './pages/legal/LegalCasesPage';
 import { CommissionLayout } from './pages/commission/CommissionLayout';
 import { StaffCommissionPage } from './pages/commission/StaffCommissionPage';
 import { PartnerCommissionPage } from './pages/commission/PartnerCommissionPage';
@@ -380,6 +383,28 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <CommissionLayout><PartnerCommissionPage /></CommissionLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Legal */}
+      <Route
+        path="/admin/legal/dunning"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <LegalLayout><DunningTargetsPage /></LegalLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/legal/cases"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <LegalLayout><LegalCasesPage /></LegalLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

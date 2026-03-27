@@ -111,5 +111,14 @@
   "CONTRACT_NOT_FOUND": "Contract not found",
   "INVALID_CANCEL_REASON": "Invalid cancel reason",
   "INVALID_COMPLETE_REASON": "Invalid completion reason",
-  "INVALID_STATE_FOR_PAYMENT": "Contract state does not allow this payment"
+  "INVALID_STATE_FOR_PAYMENT": "Contract state does not allow this payment",
+  "LEGAL.NOT_FOUND.CASE_NOT_FOUND": "Legal case not found",
+  "LEGAL.AUTH.MISSING_PERMISSION": "You do not have permission for this action",
+  "LEGAL.CONFLICT.ALREADY_IN_PROGRESS": "Case is already in progress by another user",
+  "LEGAL.STATE.CASE_CLOSED": "Case is already closed",
+  "LEGAL.STATE.INVALID_STATUS_TRANSITION": "Invalid case status transition",
+  "LEGAL.STATE.NOT_ASSIGNEE": "Only the assigned agent may perform this action",
+  "LEGAL.STATE.REVERT_WINDOW_EXPIRED": "Revert window (1 hour) has expired",
+  "LEGAL.VALIDATION.INVALID_PAYLOAD": "Invalid payload",
+  "legal.not_found.case_not_found": "Legal case not found"
 }

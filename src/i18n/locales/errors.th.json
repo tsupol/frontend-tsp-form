@@ -111,5 +111,14 @@
   "CONTRACT_NOT_FOUND": "ไม่พบสัญญา",
   "INVALID_CANCEL_REASON": "เหตุผลการยกเลิกไม่ถูกต้อง",
   "INVALID_COMPLETE_REASON": "เหตุผลการปิดสัญญาไม่ถูกต้อง",
-  "INVALID_STATE_FOR_PAYMENT": "สถานะสัญญาไม่อนุญาตให้ชำระ"
+  "INVALID_STATE_FOR_PAYMENT": "สถานะสัญญาไม่อนุญาตให้ชำระ",
+  "LEGAL.NOT_FOUND.CASE_NOT_FOUND": "ไม่พบคดี",
+  "LEGAL.AUTH.MISSING_PERMISSION": "คุณไม่มีสิทธิ์ดำเนินการนี้",
+  "LEGAL.CONFLICT.ALREADY_IN_PROGRESS": "คดีกำลังถูกดำเนินการโดยผู้อื่น",
+  "LEGAL.STATE.CASE_CLOSED": "คดีปิดแล้ว",
+  "LEGAL.STATE.INVALID_STATUS_TRANSITION": "ไม่สามารถเปลี่ยนสถานะได้",
+  "LEGAL.STATE.NOT_ASSIGNEE": "เฉพาะเจ้าหน้าที่ที่รับเรื่องเท่านั้น",
+  "LEGAL.STATE.REVERT_WINDOW_EXPIRED": "หมดเวลาย้อนกลับ (1 ชั่วโมง)",
+  "LEGAL.VALIDATION.INVALID_PAYLOAD": "ข้อมูลไม่ถูกต้อง",
+  "legal.not_found.case_not_found": "ไม่พบคดี"
 }
