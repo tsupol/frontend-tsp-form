@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import {
@@ -46,12 +46,8 @@ const BUCKET_OPTIONS = [
 
 const getBucketColor = (bucket: string) => {
   if (bucket === 'CURRENT') return 'success';
-  if (bucket === 'OVERDUE_1_7') return 'warning';
-  if (bucket === 'OVERDUE_8_15') return 'warning';
-  if (bucket === 'OVERDUE_16_30') return 'danger';
-  if (bucket === 'OVERDUE_31_45') return 'danger';
-  if (bucket === 'OVERDUE_46_PLUS') return 'danger';
-  return 'default' as const;
+  if (bucket.includes('1_7') || bucket.includes('8_15')) return 'warning';
+  return 'danger' as const;
 };
 
 const getBucketLabel = (bucket: string) => {
@@ -66,6 +62,20 @@ const getBucketLabel = (bucket: string) => {
   }
 };
 
+function overdueDuration(dateStr: string | null): string {
+  if (!dateStr) return '—';
+  const from = new Date(dateStr);
+  const to = new Date();
+  if (to < from) return '—';
+  const diffMs = to.getTime() - from.getTime();
+  const days = Math.round(diffMs / 86400000);
+  if (days < 30) return `${days}d`;
+  const months = Math.floor(days / 30);
+  const remainDays = days - months * 30;
+  if (remainDays > 0) return `${months}m ${remainDays}d`;
+  return `${months}m`;
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function DunningTargetsPage() {
@@ -76,34 +86,34 @@ export function DunningTargetsPage() {
   const [pageSize, setPageSize] = useState(15);
   const [filterBucket, setFilterBucket] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
-  const { data: allData, isFetching } = useQuery({
-    queryKey: ['dunning-targets', filterBucket],
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => { setPageIndex(0); }, [filterBucket, debouncedSearch]);
+
+  // Server-side paginated query
+  const { data: pageData, isFetching } = useQuery({
+    queryKey: ['dunning-targets', filterBucket, debouncedSearch, pageIndex, pageSize],
     queryFn: () => {
       let url = '/v_dunning_targets?order=overdue_amount.desc';
       if (filterBucket) url += `&bucket_code=eq.${filterBucket}`;
-      else url += `&bucket_code=neq.CURRENT`; // exclude current by default
-      return apiClient.get<DunningTarget[]>(url);
+      else url += `&bucket_code=neq.CURRENT`;
+      if (debouncedSearch) {
+        url += `&or=(contract_code.ilike.*${encodeURIComponent(debouncedSearch)}*,customer_name.ilike.*${encodeURIComponent(debouncedSearch)}*,branch_name.ilike.*${encodeURIComponent(debouncedSearch)}*)`;
+      }
+      return apiClient.getPaginated<DunningTarget>(url, { page: pageIndex + 1, pageSize });
     },
     staleTime: 60 * 1000,
     placeholderData: keepPreviousData,
   });
 
-  const filtered = useMemo(() => {
-    let list = allData ?? [];
-    if (search.trim()) {
-      const term = search.trim().toLowerCase();
-      list = list.filter(d =>
-        d.contract_code.toLowerCase().includes(term)
-        || (d.contract_code_display ?? '').toLowerCase().includes(term)
-        || (d.customer_name ?? '').toLowerCase().includes(term)
-        || d.branch_name.toLowerCase().includes(term)
-      );
-    }
-    return list;
-  }, [allData, search]);
-
-  const paged = filtered.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize);
+  const list = pageData?.data ?? [];
+  const totalCount = pageData?.totalCount ?? 0;
+  const totalPages = Math.ceil(totalCount / pageSize);
 
   const columns: ColumnDef<DunningTarget>[] = useMemo(() => [
     {
@@ -138,7 +148,7 @@ export function DunningTargetsPage() {
     {
       accessorKey: 'overdue_installment_count',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('legal.overdueCount')} />,
-      cell: ({ row }) => <span className="tabular-nums">{row.original.overdue_installment_count}</span>,
+      cell: ({ row }) => <span className="tabular-nums">{row.original.overdue_installment_count} {t('legal.installments')}</span>,
       className: 'max-sm:hidden',
     },
     {
@@ -149,7 +159,12 @@ export function DunningTargetsPage() {
     {
       accessorKey: 'first_overdue_due_date',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('legal.since')} />,
-      cell: ({ row }) => <span className="text-sm">{row.original.first_overdue_due_date ?? '—'}</span>,
+      cell: ({ row }) => {
+        const dur = overdueDuration(row.original.first_overdue_due_date);
+        return (
+          <span className="text-sm tabular-nums">{dur}</span>
+        );
+      },
       className: 'max-md:hidden',
     },
   ], [t]);
@@ -176,7 +191,7 @@ export function DunningTargetsPage() {
           <div className="flex-1 min-w-0 md:max-w-56">
             <Input
               value={search}
-              onChange={(e) => { setSearch(e.target.value); setPageIndex(0); }}
+              onChange={(e) => setSearch(e.target.value)}
               placeholder={t('legal.searchPlaceholder')}
               size="sm"
               startIcon={<Search size={16} />}
@@ -187,7 +202,7 @@ export function DunningTargetsPage() {
             <Select
               options={BUCKET_OPTIONS}
               value={filterBucket}
-              onChange={(val) => { setFilterBucket((val as string) || null); setPageIndex(0); }}
+              onChange={(val) => setFilterBucket((val as string) || null)}
               placeholder={t('legal.allBuckets')}
               size="sm"
               showChevron
@@ -197,24 +212,24 @@ export function DunningTargetsPage() {
         </div>
 
         {/* Table */}
-        <div className={`flex-1 flex flex-col min-h-0 ${isFetching ? 'opacity-60' : ''}`}>
+        <div className={`flex-1 flex flex-col min-h-0 ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
           <div className="flex-1 overflow-auto">
             <DataTable
               columns={columns}
-              data={paged}
+              data={list}
               sorting={sorting}
               onSortingChange={setSorting}
             />
           </div>
-          {filtered.length > 0 && (
+          {totalCount > 0 && (
             <DataTableFooter
               currentPage={pageIndex + 1}
-              totalPages={Math.ceil(filtered.length / pageSize)}
+              totalPages={totalPages || 1}
               onPageChange={(p) => setPageIndex(p - 1)}
               pageSize={pageSize}
               pageSizeOptions={[15, 25, 50]}
               onPageSizeChange={(ps) => { setPageSize(ps); setPageIndex(0); }}
-              totalRows={filtered.length}
+              totalRows={totalCount}
             />
           )}
         </div>

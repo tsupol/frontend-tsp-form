@@ -97,6 +97,20 @@ interface LegalCaseCustomer {
 
 const fmt = (n: number) => n.toLocaleString('en-US');
 
+function overdueDuration(dateStr: string | null): string {
+  if (!dateStr) return '—';
+  const from = new Date(dateStr);
+  const to = new Date();
+  if (to < from) return '—';
+  const diffMs = to.getTime() - from.getTime();
+  const days = Math.round(diffMs / 86400000);
+  if (days < 30) return `${days}d`;
+  const months = Math.floor(days / 30);
+  const remainDays = days - months * 30;
+  if (remainDays > 0) return `${months}m ${remainDays}d`;
+  return `${months}m`;
+}
+
 const STATUS_OPTIONS = [
   { value: 'QUEUED', label: 'Queued' },
   { value: 'STAGE_1', label: 'Stage 1' },
@@ -406,7 +420,7 @@ export function LegalCasesPage() {
                       </div>
                       <div className="flex justify-between text-xs mt-1">
                         <span className="text-subtle">{t('legal.since')}</span>
-                        <span>{caseDetail.case.first_overdue_due_date ?? '—'}</span>
+                        <span>{overdueDuration(caseDetail.case.first_overdue_due_date)}</span>
                       </div>
                     </div>
 
