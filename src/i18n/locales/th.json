@@ -1421,6 +1421,8 @@
     "dunningTitle": "ทวงถาม",
     "casesTitle": "คดีกฎหมาย",
     "searchPlaceholder": "ค้นหาสัญญา, สาขา...",
+    "searchContract": "ค้นหาสัญญา, ลูกค้า...",
+    "allBranches": "ทุกสาขา",
     "searchCases": "ค้นหาคดี, สัญญา...",
     "allBuckets": "ทุกระดับ",
     "allStatuses": "ทุกสถานะ",

@@ -8,6 +8,11 @@ import {
 import { ArrowRightFromLine, Search } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 
+interface Branch {
+  id: number;
+  name: string;
+}
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 interface DunningTarget {
@@ -85,6 +90,7 @@ export function DunningTargetsPage() {
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
   const [filterBucket, setFilterBucket] = useState<string | null>(null);
+  const [filterBranchId, setFilterBranchId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
@@ -93,17 +99,30 @@ export function DunningTargetsPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  useEffect(() => { setPageIndex(0); }, [filterBucket, debouncedSearch]);
+  useEffect(() => { setPageIndex(0); }, [filterBucket, filterBranchId, debouncedSearch]);
+
+  // Branch lookup
+  const { data: branches } = useQuery({
+    queryKey: ['branches'],
+    queryFn: () => apiClient.get<Branch[]>('/v_branches?order=name&is_active=is.true'),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const branchOptions = useMemo(() => {
+    if (!branches) return [];
+    return branches.map(b => ({ value: String(b.id), label: b.name }));
+  }, [branches]);
 
   // Server-side paginated query
   const { data: pageData, isFetching } = useQuery({
-    queryKey: ['dunning-targets', filterBucket, debouncedSearch, pageIndex, pageSize],
+    queryKey: ['dunning-targets', filterBucket, filterBranchId, debouncedSearch, pageIndex, pageSize],
     queryFn: () => {
       let url = '/v_dunning_targets?order=first_overdue_due_date.asc.nullslast';
       if (filterBucket) url += `&bucket_code=eq.${filterBucket}`;
       else url += `&bucket_code=neq.CURRENT`;
+      if (filterBranchId) url += `&branch_id=eq.${filterBranchId}`;
       if (debouncedSearch) {
-        url += `&or=(contract_code.ilike.*${encodeURIComponent(debouncedSearch)}*,customer_name.ilike.*${encodeURIComponent(debouncedSearch)}*,branch_name.ilike.*${encodeURIComponent(debouncedSearch)}*)`;
+        url += `&or=(contract_code.ilike.*${encodeURIComponent(debouncedSearch)}*,customer_name.ilike.*${encodeURIComponent(debouncedSearch)}*)`;
       }
       return apiClient.getPaginated<DunningTarget>(url, { page: pageIndex + 1, pageSize });
     },
@@ -194,18 +213,30 @@ export function DunningTargetsPage() {
         </div>
 
         {/* Filters */}
-        <div className="flex-none flex gap-2 mb-4">
+        <div className="flex-none flex gap-2 mb-4 flex-wrap">
           <div className="flex-1 min-w-0 md:max-w-56">
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder={t('legal.searchPlaceholder')}
+              placeholder={t('legal.searchContract')}
               size="sm"
               startIcon={<Search size={16} />}
               className="w-full"
             />
           </div>
           <div style={{ width: '10rem' }}>
+            <Select
+              options={branchOptions}
+              value={filterBranchId}
+              onChange={(val) => setFilterBranchId((val as string) || null)}
+              placeholder={t('legal.allBranches')}
+              size="sm"
+              showChevron
+              clearable
+              searchable
+            />
+          </div>
+          <div style={{ width: '9rem' }}>
             <Select
               options={BUCKET_OPTIONS}
               value={filterBucket}

@@ -1421,6 +1421,8 @@
     "dunningTitle": "Dunning Targets",
     "casesTitle": "Legal Cases",
     "searchPlaceholder": "Search contract, branch...",
+    "searchContract": "Search contract, customer...",
+    "allBranches": "All Branches",
     "searchCases": "Search case, contract...",
     "allBuckets": "All Buckets",
     "allStatuses": "All Statuses",
