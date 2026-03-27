@@ -87,6 +87,13 @@ function formatDate(dateStr: string | null): string {
   return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Bangkok' });
 }
 
+function toLocalDateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 const SORT_OPTIONS = [
   { value: 'first_overdue_due_date', label: 'Since (oldest)' },
   { value: 'overdue_amount', label: 'Amount' },
@@ -134,14 +141,14 @@ export function DunningTargetsPage() {
   const sortDir = sorting[0]?.desc ? 'desc' : 'asc';
 
   const { data: pageData, isFetching } = useQuery({
-    queryKey: ['dunning-targets', filterBucket, filterBranchId, debouncedSearch, dateFrom?.toISOString(), dateTo?.toISOString(), pageIndex, pageSize, sortCol, sortDir],
+    queryKey: ['dunning-targets', filterBucket, filterBranchId, debouncedSearch, dateFrom ? toLocalDateStr(dateFrom) : null, dateTo ? toLocalDateStr(dateTo) : null, pageIndex, pageSize, sortCol, sortDir],
     queryFn: () => {
       let url = `/v_dunning_targets?order=${sortCol}.${sortDir}.nullslast`;
       if (filterBucket) url += `&bucket_code=eq.${filterBucket}`;
       else url += `&bucket_code=neq.CURRENT`;
       if (filterBranchId) url += `&branch_id=eq.${filterBranchId}`;
-      if (dateFrom) url += `&first_overdue_due_date=gte.${dateFrom.toISOString().slice(0, 10)}`;
-      if (dateTo) url += `&first_overdue_due_date=lte.${dateTo.toISOString().slice(0, 10)}`;
+      if (dateFrom) url += `&first_overdue_due_date=gte.${toLocalDateStr(dateFrom)}`;
+      if (dateTo) url += `&first_overdue_due_date=lte.${toLocalDateStr(dateTo)}`;
       if (debouncedSearch) {
         url += `&or=(contract_code.ilike.*${encodeURIComponent(debouncedSearch)}*,customer_name.ilike.*${encodeURIComponent(debouncedSearch)}*)`;
       }
