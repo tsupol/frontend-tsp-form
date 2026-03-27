@@ -348,6 +348,7 @@ export function DunningTargetsPage() {
           pageSize={pageSize}
           pageSizeOptions={[15, 25, 50]}
           rowCount={totalCount}
+          siblingCount={1}
           onPageChange={({ pageIndex: pi, pageSize: ps }) => {
             setPageIndex(pi);
             setPageSize(ps);
@@ -400,6 +401,7 @@ export function DunningTargetsPage() {
               pageSizeOptions={[15, 25, 50]}
               onPageSizeChange={(ps) => { setPageSize(ps); setPageIndex(0); }}
               totalRows={totalCount}
+              siblingCount={1}
             />
           )}
         </div>
