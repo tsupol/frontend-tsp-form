@@ -1,8 +1,8 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Input, Badge } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, Search, Calculator, Clock, X } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, Search, Calculator, Clock, Trash2 } from 'lucide-react';
 import { apiClient } from '../lib/api';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -138,8 +138,7 @@ export function PriceCheckPage() {
     if (goTo) goTo('detail');
   }, []);
 
-  const handleRemoveRecent = useCallback((e: React.MouseEvent, modelId: number) => {
-    e.stopPropagation();
+  const handleRemoveRecent = useCallback((modelId: number) => {
     removeRecentModel(modelId);
     setRecentModels(getRecentModels());
   }, []);
@@ -232,7 +231,7 @@ export function PriceCheckPage() {
                           model={model}
                           isSelected={model.model_id === selectedModelId}
                           onClick={() => handleSelectModel(model, isMobile ? goTo : undefined)}
-                          onRemove={(e) => handleRemoveRecent(e, model.model_id)}
+                          onRemove={() => handleRemoveRecent(model.model_id)}
                         />
                       ))}
                     </div>
@@ -274,35 +273,107 @@ export function PriceCheckPage() {
   );
 }
 
-// ── Model List Item ──────────────────────────────────────────────────────────
+// ── Model List Item (swipe-to-delete for recent items) ───────────────────────
+
+const SWIPE_THRESHOLD = 50;
+const REVEAL_WIDTH = 56;
 
 function ModelItem({ model, isSelected, onClick, onRemove }: {
   model: RecentModel | ProductModel;
   isSelected: boolean;
   onClick: () => void;
-  onRemove?: (e: React.MouseEvent) => void;
+  onRemove?: () => void;
 }) {
+  const [offsetX, setOffsetX] = useState(0);
+  const [revealed, setRevealed] = useState(false);
+  const touchRef = useRef<{ startX: number; startY: number; swiping: boolean } | null>(null);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (!onRemove) return;
+    const touch = e.touches[0];
+    touchRef.current = { startX: touch.clientX, startY: touch.clientY, swiping: false };
+  }, [onRemove]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!touchRef.current || !onRemove) return;
+    const touch = e.touches[0];
+    const dx = touch.clientX - touchRef.current.startX;
+    const dy = touch.clientY - touchRef.current.startY;
+
+    // Determine if horizontal swipe (only on first significant move)
+    if (!touchRef.current.swiping && Math.abs(dx) > 10) {
+      if (Math.abs(dy) > Math.abs(dx)) { touchRef.current = null; return; } // vertical scroll, abort
+      touchRef.current.swiping = true;
+    }
+
+    if (touchRef.current.swiping) {
+      e.preventDefault();
+      const base = revealed ? -REVEAL_WIDTH : 0;
+      const raw = base + dx;
+      setOffsetX(Math.max(-REVEAL_WIDTH, Math.min(0, raw)));
+    }
+  }, [onRemove, revealed]);
+
+  const handleTouchEnd = useCallback(() => {
+    if (!touchRef.current || !onRemove) return;
+    const wasSwiping = touchRef.current.swiping;
+    touchRef.current = null;
+
+    if (!wasSwiping) return;
+
+    if (offsetX < -SWIPE_THRESHOLD) {
+      setOffsetX(-REVEAL_WIDTH);
+      setRevealed(true);
+    } else {
+      setOffsetX(0);
+      setRevealed(false);
+    }
+  }, [onRemove, offsetX]);
+
+  const handleDelete = useCallback(() => {
+    if (onRemove) onRemove();
+  }, [onRemove]);
+
+  // Close revealed state on click elsewhere
+  const handleClick = useCallback(() => {
+    if (revealed) { setOffsetX(0); setRevealed(false); return; }
+    onClick();
+  }, [revealed, onClick]);
+
   return (
-    <button
-      className={`w-full text-left px-4 py-2.5 flex items-center gap-3 transition-colors cursor-pointer group ${
-        isSelected ? 'bg-primary/10' : 'hover:bg-surface-hover'
-      }`}
-      onClick={onClick}
-    >
-      <div className="flex-1 min-w-0">
-        <div className="font-medium text-sm truncate">{model.family_name} {model.model_name}</div>
-        <div className="text-xs text-subtle">{model.brand_name}</div>
-      </div>
+    <div className="relative overflow-hidden">
+      {/* Delete button behind */}
       {onRemove && (
         <button
-          className="shrink-0 opacity-0 group-hover:opacity-60 hover:!opacity-100 cursor-pointer bg-transparent border-none text-current p-1"
-          onClick={onRemove}
-          aria-label="Remove"
+          className="absolute right-0 top-0 bottom-0 flex items-center justify-center bg-danger text-white cursor-pointer border-none"
+          style={{ width: REVEAL_WIDTH }}
+          onClick={handleDelete}
+          aria-label="Delete"
         >
-          <X size={12} />
+          <Trash2 size={16} />
         </button>
       )}
-    </button>
+
+      {/* Sliding content */}
+      <button
+        className={`w-full text-left px-4 py-2.5 flex items-center gap-3 cursor-pointer relative bg-surface ${
+          isSelected ? 'bg-primary/10' : 'hover:bg-surface-hover'
+        }`}
+        style={{
+          transform: `translateX(${offsetX}px)`,
+          transition: touchRef.current?.swiping ? 'none' : 'transform 0.2s ease-out',
+        }}
+        onClick={handleClick}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        <div className="flex-1 min-w-0">
+          <div className="font-medium text-sm truncate">{model.family_name} {model.model_name}</div>
+          <div className="text-xs text-subtle">{model.brand_name}</div>
+        </div>
+      </button>
+    </div>
   );
 }
 
