@@ -3,10 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import {
   DataTable, DataTableColumnHeader, DataTableFooter, Input, Select, Badge, Button,
-  PopOver, MobileHeader,
+  PopOver, MobileHeader, InputDatePicker,
   type ColumnDef, type SortingState,
 } from 'tsp-form';
-import { ArrowRightFromLine, Search, SlidersHorizontal } from 'lucide-react';
+import { ArrowRightFromLine, Search, SlidersHorizontal, Calendar } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -104,6 +104,8 @@ export function DunningTargetsPage() {
   const [pageSize, setPageSize] = useState(15);
   const [filterBucket, setFilterBucket] = useState<string | null>(null);
   const [filterBranchId, setFilterBranchId] = useState<string | null>(null);
+  const [dateFrom, setDateFrom] = useState<Date | null>(null);
+  const [dateTo, setDateTo] = useState<Date | null>(null);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterOpen, setFilterOpen] = useState(false);
@@ -113,7 +115,7 @@ export function DunningTargetsPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  useEffect(() => { setPageIndex(0); }, [filterBucket, filterBranchId, debouncedSearch]);
+  useEffect(() => { setPageIndex(0); }, [filterBucket, filterBranchId, debouncedSearch, dateFrom, dateTo]);
 
   // Branch lookup
   const { data: branches } = useQuery({
@@ -132,12 +134,14 @@ export function DunningTargetsPage() {
   const sortDir = sorting[0]?.desc ? 'desc' : 'asc';
 
   const { data: pageData, isFetching } = useQuery({
-    queryKey: ['dunning-targets', filterBucket, filterBranchId, debouncedSearch, pageIndex, pageSize, sortCol, sortDir],
+    queryKey: ['dunning-targets', filterBucket, filterBranchId, debouncedSearch, dateFrom?.toISOString(), dateTo?.toISOString(), pageIndex, pageSize, sortCol, sortDir],
     queryFn: () => {
       let url = `/v_dunning_targets?order=${sortCol}.${sortDir}.nullslast`;
       if (filterBucket) url += `&bucket_code=eq.${filterBucket}`;
       else url += `&bucket_code=neq.CURRENT`;
       if (filterBranchId) url += `&branch_id=eq.${filterBranchId}`;
+      if (dateFrom) url += `&first_overdue_due_date=gte.${dateFrom.toISOString().slice(0, 10)}`;
+      if (dateTo) url += `&first_overdue_due_date=lte.${dateTo.toISOString().slice(0, 10)}`;
       if (debouncedSearch) {
         url += `&or=(contract_code.ilike.*${encodeURIComponent(debouncedSearch)}*,customer_name.ilike.*${encodeURIComponent(debouncedSearch)}*)`;
       }
@@ -150,7 +154,7 @@ export function DunningTargetsPage() {
   const list = pageData?.data ?? [];
   const totalCount = pageData?.totalCount ?? 0;
 
-  const activeFilterCount = [filterBucket, filterBranchId].filter(Boolean).length + (sorting[0]?.id !== 'first_overdue_due_date' || sorting[0]?.desc ? 1 : 0);
+  const activeFilterCount = [filterBucket, filterBranchId, dateFrom, dateTo].filter(Boolean).length + (sorting[0]?.id !== 'first_overdue_due_date' || sorting[0]?.desc ? 1 : 0);
 
   // ── Desktop columns ──
   const columns: ColumnDef<DunningTarget>[] = useMemo(() => [
@@ -270,8 +274,28 @@ export function DunningTargetsPage() {
                 clearable
               />
             </div>
-            {/* Popover — visible <md */}
-            <div className="md:hidden shrink-0">
+            {/* Date from — visible ≥lg */}
+            <div className="hidden lg:block" style={{ width: '9rem' }}>
+              <InputDatePicker
+                value={dateFrom}
+                onChange={(d) => { setDateFrom(d); setPageIndex(0); }}
+                placeholder={t('legal.dateFrom')}
+                size="sm"
+                endIcon={<Calendar size={14} />}
+              />
+            </div>
+            {/* Date to — visible ≥lg */}
+            <div className="hidden lg:block" style={{ width: '9rem' }}>
+              <InputDatePicker
+                value={dateTo}
+                onChange={(d) => { setDateTo(d); setPageIndex(0); }}
+                placeholder={t('legal.dateTo')}
+                size="sm"
+                endIcon={<Calendar size={14} />}
+              />
+            </div>
+            {/* Popover — visible <lg */}
+            <div className="lg:hidden shrink-0">
               <PopOver
                 isOpen={filterOpen}
                 onClose={() => setFilterOpen(false)}
@@ -309,6 +333,21 @@ export function DunningTargetsPage() {
                     size="sm"
                     showChevron
                     clearable
+                  />
+                  <div className="text-xs font-medium text-muted uppercase tracking-wide mt-1">{t('legal.dateRange')}</div>
+                  <InputDatePicker
+                    value={dateFrom}
+                    onChange={(d) => { setDateFrom(d); setPageIndex(0); }}
+                    placeholder={t('legal.dateFrom')}
+                    size="sm"
+                    endIcon={<Calendar size={14} />}
+                  />
+                  <InputDatePicker
+                    value={dateTo}
+                    onChange={(d) => { setDateTo(d); setPageIndex(0); }}
+                    placeholder={t('legal.dateTo')}
+                    size="sm"
+                    endIcon={<Calendar size={14} />}
                   />
                   <div className="text-xs font-medium text-muted uppercase tracking-wide mt-1">{t('common.sortBy')}</div>
                   <Select
@@ -348,7 +387,7 @@ export function DunningTargetsPage() {
           pageSize={pageSize}
           pageSizeOptions={[15, 25, 50]}
           rowCount={totalCount}
-          siblingCount={1}
+          siblingCount={2}
           onPageChange={({ pageIndex: pi, pageSize: ps }) => {
             setPageIndex(pi);
             setPageSize(ps);
@@ -401,7 +440,7 @@ export function DunningTargetsPage() {
               pageSizeOptions={[15, 25, 50]}
               onPageSizeChange={(ps) => { setPageSize(ps); setPageIndex(0); }}
               totalRows={totalCount}
-              siblingCount={1}
+              siblingCount={2}
             />
           )}
         </div>
