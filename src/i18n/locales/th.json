@@ -1319,6 +1319,15 @@
     "action_change_draft_owner": "เปลี่ยนเจ้าของ",
     "action_change_draft_owner_success": "เปลี่ยนเจ้าของสำเร็จ",
     "newOwner": "เจ้าของใหม่",
-    "selectNewOwner": "เลือกพนักงาน"
+    "selectNewOwner": "เลือกพนักงาน",
+    "cancelSaving_title": "ยกเลิกสัญญาออม",
+    "cancelSaving_balance": "ยอดเงินออมปัจจุบัน",
+    "cancelSaving_feeAmount": "ค่าธรรมเนียมยกเลิก",
+    "cancelSaving_refundAmount": "คืนเงินลูกค้า",
+    "cancelSaving_refundChannel": "ช่องทางคืนเงิน",
+    "cancelSaving_selectChannel": "เลือกช่องทาง",
+    "cancelSaving_stepFee": "กำลังหักค่าธรรมเนียม...",
+    "cancelSaving_stepRefund": "กำลังคืนเงิน...",
+    "cancelSaving_stepCancel": "กำลังยกเลิกสัญญา..."
   }
 }

@@ -1319,6 +1319,15 @@
     "action_change_draft_owner": "Change Owner",
     "action_change_draft_owner_success": "Owner changed",
     "newOwner": "New Owner",
-    "selectNewOwner": "Select staff member"
+    "selectNewOwner": "Select staff member",
+    "cancelSaving_title": "Cancel Saving Contract",
+    "cancelSaving_balance": "Current Saving Balance",
+    "cancelSaving_feeAmount": "Cancellation Fee",
+    "cancelSaving_refundAmount": "Refund to customer",
+    "cancelSaving_refundChannel": "Refund Channel",
+    "cancelSaving_selectChannel": "Select channel",
+    "cancelSaving_stepFee": "Deducting fee...",
+    "cancelSaving_stepRefund": "Processing refund...",
+    "cancelSaving_stepCancel": "Cancelling contract..."
   }
 }

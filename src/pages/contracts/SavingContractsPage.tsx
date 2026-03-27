@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, Input, Select, Button } from 'tsp-form';
+import { PageNav, PageNavPanel, MobileHeader, Input, Select, Button, DataTableFooter } from 'tsp-form';
 import { ArrowLeft, ArrowRightFromLine, Search, PiggyBank, SlidersHorizontal } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { fmtCurrency } from './contractUtils';
@@ -52,7 +52,7 @@ export function SavingContractsPage() {
   const [filterBranchId, setFilterBranchId] = useState<number | null>(null);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [pageIndex, setPageIndex] = useState(0);
-  const [pageSize] = useState(25);
+  const [pageSize, setPageSize] = useState(15);
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
   // Debounce search
@@ -224,13 +224,16 @@ export function SavingContractsPage() {
 
               {/* Pagination */}
               {totalCount > 0 && (
-                <div className="flex-none border-t border-line px-4 py-2 flex items-center justify-between text-sm">
-                  <span className="text-subtle">{t('contract.showingCount', { count: totalCount })}</span>
-                  <div className="flex items-center gap-1">
-                    <Button size="sm" variant="ghost" disabled={pageIndex <= 0} onClick={() => setPageIndex(p => p - 1)}>‹</Button>
-                    <span className="text-xs tabular-nums px-2">{pageIndex + 1} / {totalPages || 1}</span>
-                    <Button size="sm" variant="ghost" disabled={(pageIndex + 1) >= totalPages} onClick={() => setPageIndex(p => p + 1)}>›</Button>
-                  </div>
+                <div className="flex-none border-t border-line px-2 py-1">
+                  <DataTableFooter
+                    currentPage={pageIndex + 1}
+                    totalPages={totalPages || 1}
+                    onPageChange={(p) => setPageIndex(p - 1)}
+                    pageSize={pageSize}
+                    pageSizeOptions={[15, 25, 50]}
+                    onPageSizeChange={(ps) => { setPageSize(ps); setPageIndex(0); }}
+                    totalRows={totalCount}
+                  />
                 </div>
               )}
             </PageNavPanel>

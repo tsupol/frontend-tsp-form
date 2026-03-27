@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, type MouseEvent } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm, Controller } from 'react-hook-form';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
@@ -1273,6 +1273,7 @@ export function UsersPage() {
 
   const holdingOptions = holdings.map((h) => ({ value: String(h.id), label: h.name }));
   const roleFilterOptions = roles.map((r) => ({ value: r.code, label: r.name }));
+  const roleMap = useMemo(() => new Map(roles.map(r => [r.code, r.name])), [roles]);
   const companyFilterOptions = filterCompanies.map((c) => ({ value: String(c.id), label: c.name }));
   const branchFilterOptions = filterBranches.map((b) => ({ value: String(b.id), label: b.name }));
 
@@ -1328,7 +1329,7 @@ export function UsersPage() {
       cell: ({ row }) => (
         <div>
           <div className="text-xs font-medium">{row.getValue('username')}</div>
-          <div className="text-[11px] opacity-50 capitalize">{row.original.role_code}</div>
+          <div className="text-[11px] opacity-50">{roleMap.get(row.original.role_code) ?? row.original.role_code}</div>
         </div>
       ),
     },
@@ -1692,7 +1693,7 @@ export function UsersPage() {
                     <div key={user.id} className="flex items-center gap-3 px-1 py-3">
                       <div className="flex-1 min-w-0">
                         <div className="font-medium truncate">{user.username}</div>
-                        <div className="text-sm text-control-label capitalize truncate">{user.role_code}</div>
+                        <div className="text-sm text-control-label truncate">{roleMap.get(user.role_code) ?? user.role_code}</div>
                         <div className="flex items-center gap-2 mt-1">
                           <Badge size="sm" className="capitalize">{user.role_scope}</Badge>
                           {user.company_name && (

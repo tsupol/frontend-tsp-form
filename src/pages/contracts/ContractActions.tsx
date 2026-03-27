@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { Button, Modal, Input, Select, TextArea, useSnackbarContext } from 'tsp-form';
+import { Button, Modal, Input, Select, TextArea, Badge, useSnackbarContext } from 'tsp-form';
 import { CheckCircle, XCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import { fmtCurrency } from './contractUtils';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -19,6 +20,7 @@ interface ContractForActions {
   credit_balance: number | null;
   insurance_balance: number | null;
   is_paused: boolean;
+  saving_balance: number | null;
 }
 
 type ContractAction =
@@ -269,12 +271,28 @@ const ACTION_CONFIGS: Record<ContractAction, ActionConfig> = {
   },
 };
 
-const CLOSE_REASON_OPTIONS = [
-  { value: 'NORMAL', label: 'Normal' },
-  { value: 'EARLY_PAYOFF', label: 'Early Payoff' },
-  { value: 'TERMINATED', label: 'Terminated' },
-  { value: 'VOIDED', label: 'Voided' },
-  { value: 'CANCELLED', label: 'Cancelled' },
+const CLOSE_REASON_OPTIONS: Record<string, { value: string; label: string }[]> = {
+  complete: [
+    { value: 'NORMAL', label: 'Normal' },
+    { value: 'EARLY_PAYOFF', label: 'Early Payoff' },
+  ],
+  terminate: [
+    { value: 'TERMINATED', label: 'Terminated' },
+  ],
+  cancel: [
+    { value: 'CUSTOMER_CANCEL', label: 'Customer Cancel' },
+    { value: 'STAFF_CANCEL', label: 'Staff Cancel' },
+  ],
+  void: [
+    { value: 'VOIDED', label: 'Voided' },
+  ],
+};
+
+const CANCEL_CLOSE_REASON_OPTIONS = CLOSE_REASON_OPTIONS.cancel;
+
+const REFUND_CHANNEL_OPTIONS = [
+  { value: 'CASH', label: 'Cash' },
+  { value: 'TRANSFER', label: 'Transfer' },
 ];
 
 // ── Action Buttons ───────────────────────────────────────────────────────────
@@ -290,6 +308,21 @@ export function ContractActionButtons({ contract, onRefresh }: {
   const actions = getAvailableActions(contract);
 
   if (actions.length === 0) return null;
+
+  const isCancelSaving = activeAction === 'cancel' && contract.state === 'SAVING';
+
+  const handleSuccess = (msgKey: string) => {
+    setActiveAction(null);
+    onRefresh();
+    addSnackbar({
+      message: (
+        <div className="alert alert-success">
+          <CheckCircle size={16} />
+          <span>{t(msgKey)}</span>
+        </div>
+      ),
+    });
+  };
 
   return (
     <>
@@ -310,24 +343,22 @@ export function ContractActionButtons({ contract, onRefresh }: {
         })}
       </div>
 
-      <ContractActionModal
-        open={!!activeAction}
-        action={activeAction}
-        contract={contract}
-        onClose={() => setActiveAction(null)}
-        onSuccess={(msgKey) => {
-          setActiveAction(null);
-          onRefresh();
-          addSnackbar({
-            message: (
-              <div className="alert alert-success">
-                <CheckCircle size={16} />
-                <span>{t(msgKey)}</span>
-              </div>
-            ),
-          });
-        }}
-      />
+      {isCancelSaving ? (
+        <CancelSavingModal
+          open
+          contract={contract}
+          onClose={() => setActiveAction(null)}
+          onSuccess={handleSuccess}
+        />
+      ) : (
+        <ContractActionModal
+          open={!!activeAction}
+          action={activeAction}
+          contract={contract}
+          onClose={() => setActiveAction(null)}
+          onSuccess={handleSuccess}
+        />
+      )}
     </>
   );
 }
@@ -351,6 +382,11 @@ interface StaffUser {
   username: string;
   role_code: string;
   branch_name: string | null;
+}
+
+interface VRole {
+  code: string;
+  name: string;
 }
 
 function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
@@ -424,9 +460,23 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
     enabled: !!config?.needsNewOwner,
   });
 
+  const { data: roles } = useQuery({
+    queryKey: ['roles'],
+    queryFn: () => apiClient.get<VRole[]>('/v_roles?order=code'),
+    staleTime: 5 * 60 * 1000,
+    enabled: !!config?.needsNewOwner,
+  });
+
+  const roleMap = useMemo(() => new Map((roles ?? []).map(r => [r.code, r.name])), [roles]);
+
+  const staffMap = useMemo(() => {
+    if (!staffUsers) return new Map<string, StaffUser>();
+    return new Map(staffUsers.map(u => [String(u.id), u]));
+  }, [staffUsers]);
+
   const staffOptions = useMemo(() => {
     if (!staffUsers) return [];
-    return staffUsers.map(u => ({ value: String(u.id), label: `${u.username} (${u.role_code})${u.branch_name ? ` — ${u.branch_name}` : ''}` }));
+    return staffUsers.map(u => ({ value: String(u.id), label: u.username }));
   }, [staffUsers]);
 
   const mutation = useMutation({
@@ -500,7 +550,7 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
                 <div className="flex flex-col">
                   <label className="form-label">{t('contract.closeReason')} *</label>
                   <Select
-                    options={CLOSE_REASON_OPTIONS}
+                    options={CLOSE_REASON_OPTIONS[action!] ?? []}
                     value={closeReason}
                     onChange={(val) => setCloseReason((val as string) || null)}
                     placeholder={t('contract.selectCloseReason')}
@@ -561,6 +611,27 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
                     placeholder={t('contract.selectNewOwner')}
                     showChevron
                     searchable
+                    renderOption={(option) => {
+                      const staff = staffMap.get(option.value);
+                      const roleBadgeColor = staff?.role_code.startsWith('SYSTEM') ? 'danger'
+                        : staff?.role_code.startsWith('HOLDING') ? 'warning'
+                        : staff?.role_code.startsWith('COMPANY') ? 'info'
+                        : staff?.role_code.startsWith('BRANCH') ? 'success'
+                        : 'default' as const;
+                      return (
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="truncate">{option.label}</span>
+                            {staff?.branch_name && staff && <Badge size="xs" color={roleBadgeColor}>{roleMap.get(staff.role_code) ?? staff.role_code}</Badge>}
+                          </div>
+                          {staff?.branch_name ? (
+                            <div className="text-xs text-subtle truncate">{staff.branch_name}</div>
+                          ) : staff && (
+                            <div><Badge size="xs" color={roleBadgeColor}>{roleMap.get(staff.role_code) ?? staff.role_code}</Badge></div>
+                          )}
+                        </div>
+                      );
+                    }}
                   />
                 </div>
               )}
@@ -616,6 +687,222 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
           </div>
         </div>
       )}
+    </Modal>
+  );
+}
+
+// ── Cancel Saving Modal ───────────────────────────────────────────────────
+
+function CancelSavingModal({ open, contract, onClose, onSuccess }: {
+  open: boolean;
+  contract: ContractForActions;
+  onClose: () => void;
+  onSuccess: (msgKey: string) => void;
+}) {
+  const { t } = useTranslation();
+  const savingBalance = contract.saving_balance ?? 0;
+
+  const [feeAmount, setFeeAmount] = useState('');
+  const [refundChannel, setRefundChannel] = useState<string | null>(null);
+  const [closeReason, setCloseReason] = useState<string | null>(null);
+  const [note, setNote] = useState('');
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState('');
+  const [errorKey, setErrorKey] = useState(0);
+  const [step, setStep] = useState('');
+
+  // Reset form on open
+  useEffect(() => {
+    if (open) {
+      setFeeAmount('');
+      setRefundChannel(null);
+      setCloseReason(null);
+      setNote('');
+      setPin('');
+      setError('');
+      setStep('');
+    }
+  }, [open]);
+
+  const fee = Number(feeAmount) || 0;
+  const refund = savingBalance - fee;
+  const needsRefund = refund > 0;
+  const needsFee = fee > 0;
+
+  const canSubmit = (() => {
+    if (!pin) return false;
+    if (!closeReason) return false;
+    if (fee < 0 || fee > savingBalance) return false;
+    if (needsRefund && !refundChannel) return false;
+    return true;
+  })();
+
+  const setApiError = (err: unknown) => {
+    if (err instanceof ApiError) {
+      const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+        || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+      setError(translated || err.message);
+    } else {
+      setError(String(err));
+    }
+    setErrorKey(k => k + 1);
+  };
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      // Step 1: Deduct fee (if any)
+      if (needsFee) {
+        setStep('fee');
+        await apiClient.rpc('fn_saving_deduct_fee', {
+          p_contract_id: contract.id,
+          p_amount: fee,
+          p_note: note.trim() || undefined,
+          p_pin: pin,
+        });
+      }
+
+      // Step 2: Refund remaining balance (if any)
+      if (needsRefund) {
+        setStep('refund');
+        await apiClient.rpc('fn_saving_refund', {
+          p_contract_id: contract.id,
+          p_amount: refund,
+          p_channel: refundChannel,
+          p_note: note.trim() || undefined,
+          p_pin: pin,
+        });
+      }
+
+      // Step 3: Cancel contract
+      setStep('cancel');
+      await apiClient.rpc('fn_contract_cancel', {
+        p_contract_id: contract.id,
+        p_close_reason: closeReason,
+        p_note: note.trim() || undefined,
+        p_pin: pin,
+      });
+    },
+    onSuccess: () => onSuccess('contract.action_cancel_success'),
+    onError: setApiError,
+  });
+
+  const stepLabel = step === 'fee' ? t('contract.cancelSaving_stepFee')
+    : step === 'refund' ? t('contract.cancelSaving_stepRefund')
+    : step === 'cancel' ? t('contract.cancelSaving_stepCancel')
+    : '';
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
+      <div className="flex flex-col overflow-hidden">
+        <div className="modal-header">
+          <h2 className="modal-title">{t('contract.cancelSaving_title')}</h2>
+          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+        </div>
+        <div className="modal-content">
+          {error && (
+            <div key={errorKey} className="alert alert-danger mb-4 animate-pop-in">
+              <XCircle size={16} />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {/* Contract info summary */}
+          <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
+            <div className="font-medium text-sm">{contract.code_display ?? contract.code}</div>
+            <div className="text-xs text-subtle">{contract.state} · {contract.commercial_model ?? ''}</div>
+          </div>
+
+          {/* Saving balance display */}
+          <div className="mb-4 px-3 py-2.5 rounded-md bg-info/10 border border-info/20">
+            <div className="text-xs text-subtle">{t('contract.cancelSaving_balance')}</div>
+            <div className="text-lg font-semibold tabular-nums">{fmtCurrency(savingBalance)}</div>
+          </div>
+
+          <div className="form-grid gap-4">
+            {/* Fee deduction */}
+            {savingBalance > 0 && (
+              <div className="flex flex-col">
+                <label className="form-label">{t('contract.cancelSaving_feeAmount')}</label>
+                <Input
+                  type="number"
+                  value={feeAmount}
+                  onChange={(e) => setFeeAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full"
+                  min="0"
+                  max={savingBalance}
+                  step="0.01"
+                />
+                {refund >= 0 && (
+                  <div className="text-xs text-subtle mt-1">
+                    {t('contract.cancelSaving_refundAmount')}: <span className="font-medium tabular-nums">{fmtCurrency(refund)}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Refund channel */}
+            {needsRefund && (
+              <div className="flex flex-col">
+                <label className="form-label">{t('contract.cancelSaving_refundChannel')} *</label>
+                <Select
+                  options={REFUND_CHANNEL_OPTIONS}
+                  value={refundChannel}
+                  onChange={(val) => setRefundChannel((val as string) || null)}
+                  placeholder={t('contract.cancelSaving_selectChannel')}
+                  showChevron
+                />
+              </div>
+            )}
+
+            {/* Close reason */}
+            <div className="flex flex-col">
+              <label className="form-label">{t('contract.closeReason')} *</label>
+              <Select
+                options={CANCEL_CLOSE_REASON_OPTIONS}
+                value={closeReason}
+                onChange={(val) => setCloseReason((val as string) || null)}
+                placeholder={t('contract.selectCloseReason')}
+                showChevron
+              />
+            </div>
+
+            {/* Note */}
+            <div className="flex flex-col">
+              <label className="form-label">{t('contract.note')}</label>
+              <TextArea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder={t('contract.notePlaceholder')}
+                rows={3}
+              />
+            </div>
+
+            {/* PIN */}
+            <div className="flex flex-col">
+              <label className="form-label">{t('contract.pin')} *</label>
+              <Input
+                type="password"
+                value={pin}
+                onChange={(e) => setPin(e.target.value)}
+                placeholder={t('contract.pinPlaceholder')}
+                maxLength={6}
+                className="w-full"
+              />
+            </div>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button
+            color="danger"
+            onClick={() => mutation.mutate()}
+            disabled={!canSubmit || mutation.isPending}
+          >
+            {mutation.isPending ? stepLabel || t('common.loading') : t('contract.action_cancel')}
+          </Button>
+        </div>
+      </div>
     </Modal>
   );
 }
