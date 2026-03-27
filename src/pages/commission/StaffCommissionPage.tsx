@@ -8,6 +8,7 @@ import {
 } from 'tsp-form';
 import { ArrowRightFromLine, CheckCircle, XCircle, ArrowDownCircle, RotateCcw } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import { useAuth } from '../../contexts/AuthContext';
 import { DateTime } from '../../components/DateTime';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -63,10 +64,14 @@ const getTxnLabel = (type: string, t: (k: string) => string) => {
 
 // ── Component ────────────────────────────────────────────────────────────────
 
+const ADMIN_ROLES = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'];
+
 export function StaffCommissionPage() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
+  const canManage = ADMIN_ROLES.includes(user?.role_code ?? '');
 
   const [tab, setTab] = useState<'monthly' | 'detail'>('monthly');
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -158,10 +163,10 @@ export function StaffCommissionPage() {
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('commission.note')} />,
       cell: ({ row }) => <span className="text-xs text-subtle truncate max-w-40 block">{row.original.note ?? '—'}</span>,
     },
-    {
+    ...(canManage ? [{
       id: 'actions',
       className: 'w-10',
-      cell: ({ row }) => {
+      cell: ({ row }: { row: { original: CommissionDetail } }) => {
         if (row.original.txn_type === 'COMMISSION_WITHDRAW') {
           return (
             <Button size="sm" variant="ghost" className="btn-icon-sm" onClick={() => setRevertTxn(row.original)}>
@@ -171,8 +176,8 @@ export function StaffCommissionPage() {
         }
         return null;
       },
-    },
-  ], [t]);
+    }] : []),
+  ], [t, canManage]);
 
   const tabs = [
     { key: 'monthly' as const, label: t('commission.tabMonthly') },
@@ -200,9 +205,11 @@ export function StaffCommissionPage() {
         {/* Desktop header */}
         <div className="flex items-center justify-between mb-4 flex-none max-md:hidden">
           <h1 className="heading-2">{t('commission.staffTitle')}</h1>
-          <Button color="primary" startIcon={<ArrowDownCircle size={16} />} onClick={() => setWithdrawOpen(true)}>
-            {t('commission.withdraw')}
-          </Button>
+          {canManage && (
+            <Button color="primary" startIcon={<ArrowDownCircle size={16} />} onClick={() => setWithdrawOpen(true)}>
+              {t('commission.withdraw')}
+            </Button>
+          )}
         </div>
 
         {/* Tabs */}
