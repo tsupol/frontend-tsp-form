@@ -88,6 +88,7 @@
     "blacklist": "บัญชีดำ",
     "icloud": "iCloud Pool",
     "branchPin": "PIN สาขา",
+    "priceCheck": "เช็คราคา",
     "contracts": "สัญญา",
     "contractSearch": "ค้นหาสัญญา",
     "savingContracts": "สัญญาออม"
@@ -1342,5 +1343,26 @@
     "action_transfer_accept_success": "รับโอนสำเร็จ",
     "action_transfer_cancel": "ยกเลิกโอน",
     "action_transfer_cancel_success": "ยกเลิกการโอนสำเร็จ"
+  },
+  "priceCheck": {
+    "title": "เช็คราคา",
+    "subtitle": "ค้นหาราคาและแผนผ่อนชำระสำหรับลูกค้า",
+    "searchPlaceholder": "ค้นหารุ่นสินค้า...",
+    "noModels": "ไม่พบรุ่นสินค้า",
+    "noQuotes": "ไม่มีข้อมูลราคาสำหรับรุ่นนี้",
+    "variants": "สี",
+    "changeModel": "เปลี่ยน",
+    "allVariants": "ทุกสี",
+    "allTerms": "ทุกงวด",
+    "allPlans": "ทุกแผน",
+    "emptyHint": "ค้นหาสินค้าเพื่อดูแผนผ่อนชำระ",
+    "retailPrice": "ราคาขาย",
+    "downPayment": "เงินดาวน์",
+    "installment": "ผ่อน/เดือน",
+    "totalAmount": "รวมทั้งหมด",
+    "interest": "ดอกเบี้ย",
+    "profit": "กำไร",
+    "fin1Desc": "อัตราคงที่",
+    "fin2Desc": "ต่อรองได้"
   }
 }

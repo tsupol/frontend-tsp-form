@@ -38,6 +38,7 @@ import { PurchaseOrdersPage } from './pages/inventory/PurchaseOrdersPage';
 import { TransfersPage } from './pages/inventory/TransfersPage';
 import { RepairsPage } from './pages/inventory/RepairsPage';
 import { BuybackPage } from './pages/inventory/BuybackPage';
+import { PriceCheckPage } from './pages/PriceCheckPage';
 import { ContractsLayout } from './pages/contracts/ContractsLayout';
 import { ContractSearchPage } from './pages/contracts/ContractSearchPage';
 import { SavingContractsPage } from './pages/contracts/SavingContractsPage';
@@ -320,6 +321,18 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <InventoryLayout><SalePage /></InventoryLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Price Check */}
+      <Route
+        path="/admin/price-check"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <PriceCheckPage />
             </AdminLayout>
           </ProtectedRoute>
         }

@@ -17,6 +17,7 @@ import {
   FileText,
   ClipboardList,
   Smartphone,
+  Calculator,
   Settings,
   HelpCircle,
   LogOut,
@@ -182,6 +183,7 @@ export const AppSideNav = () => {
         { key: 'pin', label: t('nav.branchPin'), path: '/admin/company/pin' },
       ],
     },
+    { key: 'price-check', icon: <Calculator size="1rem" />, label: t('nav.priceCheck'), path: '/admin/price-check' },
     {
       key: 'contracts', icon: <FileText size="1rem" />, label: t('nav.contracts'),
       path: '/admin/contracts/search',

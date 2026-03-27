@@ -88,6 +88,7 @@
     "blacklist": "Blacklist",
     "icloud": "iCloud Pool",
     "branchPin": "Branch PIN",
+    "priceCheck": "Price Check",
     "contracts": "Contracts",
     "contractSearch": "Contract Search",
     "savingContracts": "Saving Contracts"
@@ -1342,5 +1343,26 @@
     "action_transfer_accept_success": "Transfer accepted",
     "action_transfer_cancel": "Cancel Transfer",
     "action_transfer_cancel_success": "Transfer cancelled"
+  },
+  "priceCheck": {
+    "title": "Price Check",
+    "subtitle": "Look up pricing and installment plans for customers",
+    "searchPlaceholder": "Search product model...",
+    "noModels": "No models found",
+    "noQuotes": "No pricing available for this model",
+    "variants": "variants",
+    "changeModel": "Change",
+    "allVariants": "All Colors",
+    "allTerms": "All Terms",
+    "allPlans": "All Plans",
+    "emptyHint": "Search for a product to see installment plans",
+    "retailPrice": "Retail Price",
+    "downPayment": "Down Payment",
+    "installment": "Monthly",
+    "totalAmount": "Total",
+    "interest": "Interest",
+    "profit": "Profit",
+    "fin1Desc": "Fixed Rate",
+    "fin2Desc": "Negotiable"
   }
 }
