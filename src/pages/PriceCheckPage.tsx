@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Input, Badge } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, Search, Calculator, Clock, Trash2 } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, Search, Calculator, Clock, Trash2, X } from 'lucide-react';
 import { apiClient } from '../lib/api';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -356,7 +356,7 @@ function ModelItem({ model, isSelected, onClick, onRemove }: {
 
       {/* Sliding content */}
       <button
-        className={`w-full text-left px-4 py-2.5 flex items-center gap-3 cursor-pointer relative bg-surface ${
+        className={`w-full text-left px-4 py-2.5 flex items-center gap-3 cursor-pointer relative bg-surface group ${
           isSelected ? 'bg-primary/10' : 'hover:bg-surface-hover'
         }`}
         style={{
@@ -372,6 +372,16 @@ function ModelItem({ model, isSelected, onClick, onRemove }: {
           <div className="font-medium text-sm truncate">{model.family_name} {model.model_name}</div>
           <div className="text-xs text-subtle">{model.brand_name}</div>
         </div>
+        {onRemove && (
+          <span
+            role="button"
+            className="shrink-0 hidden [@media(hover:hover)]:group-hover:flex items-center justify-center w-5 h-5 rounded-full hover:bg-fg/10 text-subtle hover:text-fg cursor-pointer"
+            onClick={(e) => { e.stopPropagation(); onRemove(); }}
+            aria-label="Remove"
+          >
+            <X size={12} />
+          </span>
+        )}
       </button>
     </div>
   );
