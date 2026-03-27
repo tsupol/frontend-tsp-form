@@ -1,8 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Input, Select, Badge, MobileHeader } from 'tsp-form';
-import { ArrowRightFromLine, Search, Calculator } from 'lucide-react';
+import { PageNav, PageNavPanel, MobileHeader, Input, Badge } from 'tsp-form';
+import { ArrowLeft, ArrowRightFromLine, Search, Calculator, Clock, X } from 'lucide-react';
 import { apiClient } from '../lib/api';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -13,18 +13,11 @@ interface ProductModel {
   family_name: string;
   brand_name: string;
   variant_count: number;
-  variants: {
-    variant_id: number;
-    name: string;
-    sku_code: string;
-    attributes: { option_set?: Record<string, string> } | null;
-  }[];
 }
 
 interface Quote {
   variant_id: number;
   item_name: string;
-  sku_code: string;
   finance_model: string;
   term_months: number;
   down_percent: number;
@@ -37,7 +30,6 @@ interface Quote {
   interest_percent_total: number | null;
   max_discount_percent: number;
   fin2_profit_amount: number | null;
-  master_color_code: string;
 }
 
 interface QuoteResponse {
@@ -48,9 +40,54 @@ interface QuoteResponse {
   quotes: Quote[];
 }
 
+/** Deduplicated pricing row — same finance_model + term + down% have identical prices regardless of color */
+interface PricingRow {
+  finance_model: string;
+  term_months: number;
+  down_percent: number;
+  down_amount: number;
+  retail_price: number;
+  installment_amount: number;
+  total_amount: number;
+  financed_amount: number;
+  interest_percent_total: number | null;
+  max_discount_percent: number;
+  fin2_profit_amount: number | null;
+}
+
+interface RecentModel {
+  model_id: number;
+  model_name: string;
+  family_name: string;
+  brand_name: string;
+}
+
+// ── Recent models (localStorage) ─────────────────────────────────────────────
+
+const RECENT_KEY = 'priceCheck_recent';
+const MAX_RECENT = 10;
+
+function getRecentModels(): RecentModel[] {
+  try {
+    return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]');
+  } catch { return []; }
+}
+
+function addRecentModel(model: RecentModel) {
+  const recent = getRecentModels().filter(m => m.model_id !== model.model_id);
+  recent.unshift(model);
+  if (recent.length > MAX_RECENT) recent.length = MAX_RECENT;
+  localStorage.setItem(RECENT_KEY, JSON.stringify(recent));
+}
+
+function removeRecentModel(modelId: number) {
+  const recent = getRecentModels().filter(m => m.model_id !== modelId);
+  localStorage.setItem(RECENT_KEY, JSON.stringify(recent));
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+const fmt = (n: number) => n.toLocaleString('en-US');
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -60,9 +97,8 @@ export function PriceCheckPage() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedModelId, setSelectedModelId] = useState<number | null>(null);
-  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
-  const [selectedTerm, setSelectedTerm] = useState<string | null>(null);
-  const [financeFilter, setFinanceFilter] = useState<string | null>(null);
+  const [selectedModelInfo, setSelectedModelInfo] = useState<RecentModel | null>(null);
+  const [recentModels, setRecentModels] = useState<RecentModel[]>(getRecentModels);
 
   // Debounce search
   useEffect(() => {
@@ -74,7 +110,7 @@ export function PriceCheckPage() {
   const { data: models, isFetching: modelsLoading } = useQuery({
     queryKey: ['price-check-models', debouncedSearch],
     queryFn: () => {
-      let url = '/v_product_model_list?is_active=is.true&order=brand_name,family_name,model_name&limit=50';
+      let url = '/v_product_model_list?is_active=is.true&order=brand_name,family_name,model_name&limit=30';
       if (debouncedSearch) {
         const term = debouncedSearch.replace(/\s+/g, '*');
         url += `&search_name=ilike.*${encodeURIComponent(term)}*`;
@@ -93,261 +129,321 @@ export function PriceCheckPage() {
     enabled: !!selectedModelId,
   });
 
-  const selectedModel = useMemo(() => {
-    return models?.find(m => m.model_id === selectedModelId) ?? null;
-  }, [models, selectedModelId]);
+  const handleSelectModel = useCallback((model: RecentModel, goTo?: (id: string) => void) => {
+    setSelectedModelId(model.model_id);
+    setSelectedModelInfo(model);
+    addRecentModel(model);
+    setRecentModels(getRecentModels());
+    setSearch('');
+    setDebouncedSearch('');
+    if (goTo) goTo('detail');
+  }, []);
 
-  // Available filter options from quotes
-  const quotes = quoteData?.quotes ?? [];
+  const handleRemoveRecent = useCallback((e: React.MouseEvent, modelId: number) => {
+    e.stopPropagation();
+    removeRecentModel(modelId);
+    setRecentModels(getRecentModels());
+  }, []);
 
-  const variantOptions = useMemo(() => {
-    const seen = new Map<number, string>();
-    quotes.forEach(q => { if (!seen.has(q.variant_id)) seen.set(q.variant_id, q.item_name); });
-    return Array.from(seen, ([id, name]) => ({ value: String(id), label: name }));
-  }, [quotes]);
-
-  const termOptions = useMemo(() => {
-    const terms = [...new Set(quotes.map(q => q.term_months))].sort((a, b) => a - b);
-    return terms.map(t => ({ value: String(t), label: `${t} ${t === 1 ? 'month' : 'months'}` }));
-  }, [quotes]);
-
-  const financeOptions = useMemo(() => {
-    const types = [...new Set(quotes.map(q => q.finance_model))].sort();
-    return types.map(f => ({ value: f, label: f }));
-  }, [quotes]);
-
-  // Filter quotes
-  const filteredQuotes = useMemo(() => {
-    let result = quotes;
-    if (selectedVariantId) result = result.filter(q => q.variant_id === Number(selectedVariantId));
-    if (selectedTerm) result = result.filter(q => q.term_months === Number(selectedTerm));
-    if (financeFilter) result = result.filter(q => q.finance_model === financeFilter);
-    return result;
-  }, [quotes, selectedVariantId, selectedTerm, financeFilter]);
-
-  // Group by finance model for display
-  const groupedByFinance = useMemo(() => {
-    const groups: Record<string, Quote[]> = {};
-    filteredQuotes.forEach(q => {
-      if (!groups[q.finance_model]) groups[q.finance_model] = [];
-      groups[q.finance_model].push(q);
-    });
-    return groups;
-  }, [filteredQuotes]);
-
-  const handleSelectModel = (modelId: number) => {
-    setSelectedModelId(modelId);
-    setSelectedVariantId(null);
-    setSelectedTerm(null);
-    setFinanceFilter(null);
-  };
+  // Items to show in list: search results or recent
+  const isSearching = debouncedSearch.length >= 2;
+  const listItems = isSearching ? (models ?? []) : [];
 
   return (
-    <div className="page-content responsive-dvh-mobile-header">
-      <MobileHeader className="mobile-header-scrolled-shadow md:hidden">
-        <div className="mobile-header-start">
-          <button className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current" onClick={() => window.dispatchEvent(new CustomEvent('sidemenu:open'))}>
-            <ArrowRightFromLine size={18} />
-          </button>
-        </div>
-        <div className="mobile-header-title">{t('priceCheck.title')}</div>
-        <div className="mobile-header-end w-12" />
-      </MobileHeader>
+    <PageNav panels={['list', 'detail']} className="h-dvh">
+      {({ isMobile, isRoot, goTo, goBack }) => (
+        <>
+          {isMobile && (
+            <MobileHeader className="mobile-header-bordered">
+              <div className="mobile-header-start">
+                {isRoot ? (
+                  <button className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current" onClick={() => window.dispatchEvent(new CustomEvent('sidemenu:open'))}>
+                    <ArrowRightFromLine size={18} />
+                  </button>
+                ) : (
+                  <button className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current" onClick={goBack}>
+                    <ArrowLeft size={20} />
+                  </button>
+                )}
+              </div>
+              <div className="mobile-header-title mobile-header-title-truncate">
+                {isRoot ? t('priceCheck.title') : (selectedModelInfo ? `${selectedModelInfo.family_name} ${selectedModelInfo.model_name}` : '')}
+              </div>
+              <div className="mobile-header-end w-12" />
+            </MobileHeader>
+          )}
 
-      <div className="max-md:hidden flex-none px-6 py-4 border-b border-line">
-        <h1 className="heading-2">{t('priceCheck.title')}</h1>
-        <p className="text-sm text-subtle mt-1">{t('priceCheck.subtitle')}</p>
-      </div>
-
-      <div className="flex-1 overflow-auto better-scroll">
-        <div className="px-4 md:px-6 py-4 max-w-4xl">
-          {/* Search */}
-          <div className="mb-4">
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={t('priceCheck.searchPlaceholder')}
-              startIcon={<Search size={16} />}
-              className="w-full"
-            />
-          </div>
-
-          {/* Model results */}
-          {debouncedSearch.length >= 2 && !selectedModelId && (
-            <div className="mb-4">
-              {modelsLoading ? (
-                <div className="p-4 text-center text-subtle">{t('common.loading')}</div>
-              ) : !models?.length ? (
-                <div className="p-4 text-center text-subtle">{t('priceCheck.noModels')}</div>
-              ) : (
-                <div className="border border-line rounded-lg divide-y divide-line overflow-hidden">
-                  {models.map(model => (
-                    <button
-                      key={model.model_id}
-                      className="w-full text-left px-4 py-3 hover:bg-surface-hover transition-colors cursor-pointer flex items-center justify-between"
-                      onClick={() => handleSelectModel(model.model_id)}
-                    >
-                      <div>
-                        <div className="font-medium text-sm">{model.brand_name} {model.family_name}</div>
-                        <div className="text-xs text-subtle">{model.model_name} · {model.variant_count} {t('priceCheck.variants')}</div>
-                      </div>
-                      <Calculator size={16} className="text-subtle shrink-0" />
-                    </button>
-                  ))}
-                </div>
-              )}
+          {!isMobile && (
+            <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
+              <h1 className="heading-2 shrink-0">{t('priceCheck.title')}</h1>
             </div>
           )}
 
-          {/* Selected model + quotes */}
-          {selectedModelId && (
-            <>
-              {/* Selected model header */}
-              <div className="mb-4 px-4 py-3 rounded-lg bg-primary/5 border border-primary/20 flex items-center justify-between">
-                <div>
-                  <div className="font-semibold">{selectedModel ? `${selectedModel.brand_name} ${selectedModel.family_name}` : quoteData?.model_name}</div>
-                  <div className="text-sm text-subtle">{selectedModel?.model_name ?? quoteData?.model_code}</div>
-                </div>
-                <button
-                  className="text-xs text-primary cursor-pointer bg-transparent border-none underline"
-                  onClick={() => { setSelectedModelId(null); setSearch(''); }}
-                >
-                  {t('priceCheck.changeModel')}
-                </button>
+          <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
+            {/* ── Left: Search + Model List ── */}
+            <PageNavPanel id="list" className={isMobile ? '' : 'w-80 xl:w-96 border-r border-line flex flex-col'}>
+              {/* Search */}
+              <div className="flex-none px-4 py-2 border-b border-line">
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder={t('priceCheck.searchPlaceholder')}
+                  size="sm"
+                  startIcon={<Search size={16} />}
+                  className="w-full"
+                />
               </div>
 
-              {/* Filters */}
-              {quotes.length > 0 && (
-                <div className="flex gap-2 mb-4 flex-wrap">
-                  {variantOptions.length > 1 && (
-                    <div style={{ width: '10rem' }}>
-                      <Select
-                        options={variantOptions}
-                        value={selectedVariantId}
-                        onChange={(val) => setSelectedVariantId((val as string) || null)}
-                        placeholder={t('priceCheck.allVariants')}
-                        size="sm"
-                        showChevron
-                        clearable
-                      />
+              {/* List */}
+              <div className="flex-1 overflow-auto better-scroll">
+                {/* Search results */}
+                {isSearching && (
+                  modelsLoading ? (
+                    <div className="p-4 text-center text-subtle text-sm">{t('common.loading')}</div>
+                  ) : listItems.length === 0 ? (
+                    <div className="p-4 text-center text-subtle text-sm">{t('priceCheck.noModels')}</div>
+                  ) : (
+                    <div className="flex flex-col divide-y divide-line">
+                      {listItems.map(model => (
+                        <ModelItem
+                          key={model.model_id}
+                          model={model}
+                          isSelected={model.model_id === selectedModelId}
+                          onClick={() => handleSelectModel(model, isMobile ? goTo : undefined)}
+                        />
+                      ))}
                     </div>
-                  )}
-                  {termOptions.length > 1 && (
-                    <div style={{ width: '8rem' }}>
-                      <Select
-                        options={termOptions}
-                        value={selectedTerm}
-                        onChange={(val) => setSelectedTerm((val as string) || null)}
-                        placeholder={t('priceCheck.allTerms')}
-                        size="sm"
-                        showChevron
-                        clearable
-                      />
-                    </div>
-                  )}
-                  {financeOptions.length > 1 && (
-                    <div style={{ width: '7rem' }}>
-                      <Select
-                        options={financeOptions}
-                        value={financeFilter}
-                        onChange={(val) => setFinanceFilter((val as string) || null)}
-                        placeholder={t('priceCheck.allPlans')}
-                        size="sm"
-                        showChevron
-                        clearable
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
+                  )
+                )}
 
-              {/* Quote cards */}
-              {quotesLoading ? (
-                <div className="p-8 text-center text-subtle">{t('common.loading')}</div>
-              ) : filteredQuotes.length === 0 ? (
-                <div className="p-8 text-center text-subtle">{t('priceCheck.noQuotes')}</div>
+                {/* Recent models — shown when not searching */}
+                {!isSearching && recentModels.length > 0 && (
+                  <>
+                    <div className="px-4 pt-3 pb-1 flex items-center gap-1.5 text-xs text-subtle">
+                      <Clock size={12} />
+                      <span>{t('priceCheck.recent')}</span>
+                    </div>
+                    <div className="flex flex-col divide-y divide-line">
+                      {recentModels.map(model => (
+                        <ModelItem
+                          key={model.model_id}
+                          model={model}
+                          isSelected={model.model_id === selectedModelId}
+                          onClick={() => handleSelectModel(model, isMobile ? goTo : undefined)}
+                          onRemove={(e) => handleRemoveRecent(e, model.model_id)}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {/* Empty state */}
+                {!isSearching && recentModels.length === 0 && (
+                  <div className="p-8 text-center text-subtler">
+                    <Calculator size={28} className="mx-auto mb-2 opacity-30" />
+                    <div className="text-sm">{t('priceCheck.emptyHint')}</div>
+                  </div>
+                )}
+              </div>
+            </PageNavPanel>
+
+            {/* ── Right: Pricing Detail ── */}
+            <PageNavPanel id="detail" className={isMobile ? '' : 'flex-1 flex flex-col'}>
+              {selectedModelId && selectedModelInfo ? (
+                <PricingDetail
+                  model={selectedModelInfo}
+                  quoteData={quoteData ?? null}
+                  loading={quotesLoading}
+                  t={t}
+                />
               ) : (
-                <div className="flex flex-col gap-6">
-                  {Object.entries(groupedByFinance).map(([finModel, groupQuotes]) => (
-                    <div key={finModel}>
-                      <div className="flex items-center gap-2 mb-3">
-                        <Badge size="sm" color={finModel === 'FIN1' ? 'info' : 'warning'}>{finModel}</Badge>
-                        <span className="text-sm text-subtle">
-                          {finModel === 'FIN1' ? t('priceCheck.fin1Desc') : t('priceCheck.fin2Desc')}
-                        </span>
-                      </div>
-
-                      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                        {groupQuotes.map((q, i) => (
-                          <QuoteCard key={`${q.variant_id}-${q.term_months}-${q.down_percent}-${i}`} quote={q} t={t} />
-                        ))}
-                      </div>
-                    </div>
-                  ))}
+                <div className="flex-1 h-full flex items-center justify-center text-subtler">
+                  <div className="text-center">
+                    <Calculator size={32} className="mx-auto mb-2 opacity-40" />
+                    <div>{t('priceCheck.selectToView')}</div>
+                  </div>
                 </div>
               )}
-            </>
-          )}
+            </PageNavPanel>
+          </div>
+        </>
+      )}
+    </PageNav>
+  );
+}
 
-          {/* Empty state */}
-          {!selectedModelId && debouncedSearch.length < 2 && (
-            <div className="p-12 text-center text-subtler">
-              <Calculator size={40} className="mx-auto mb-3 opacity-30" />
-              <div className="text-lg font-medium mb-1">{t('priceCheck.title')}</div>
-              <div className="text-sm">{t('priceCheck.emptyHint')}</div>
-            </div>
+// ── Model List Item ──────────────────────────────────────────────────────────
+
+function ModelItem({ model, isSelected, onClick, onRemove }: {
+  model: RecentModel | ProductModel;
+  isSelected: boolean;
+  onClick: () => void;
+  onRemove?: (e: React.MouseEvent) => void;
+}) {
+  return (
+    <button
+      className={`w-full text-left px-4 py-2.5 flex items-center gap-3 transition-colors cursor-pointer group ${
+        isSelected ? 'bg-primary/10' : 'hover:bg-surface-hover'
+      }`}
+      onClick={onClick}
+    >
+      <div className="flex-1 min-w-0">
+        <div className="font-medium text-sm truncate">{model.family_name} {model.model_name}</div>
+        <div className="text-xs text-subtle">{model.brand_name}</div>
+      </div>
+      {onRemove && (
+        <button
+          className="shrink-0 opacity-0 group-hover:opacity-60 hover:!opacity-100 cursor-pointer bg-transparent border-none text-current p-1"
+          onClick={onRemove}
+          aria-label="Remove"
+        >
+          <X size={12} />
+        </button>
+      )}
+    </button>
+  );
+}
+
+// ── Pricing Detail Panel ─────────────────────────────────────────────────────
+
+function PricingDetail({ model, quoteData, loading, t }: {
+  model: RecentModel;
+  quoteData: QuoteResponse | null;
+  loading: boolean;
+  t: (key: string) => string;
+}) {
+  // Deduplicate quotes — group by finance_model + term + down%, take first (prices are identical across colors)
+  const dedupedQuotes = useMemo(() => {
+    const quotes = quoteData?.quotes ?? [];
+    const seen = new Map<string, PricingRow>();
+    for (const q of quotes) {
+      const key = `${q.finance_model}-${q.term_months}-${q.down_percent}`;
+      if (!seen.has(key)) {
+        seen.set(key, {
+          finance_model: q.finance_model,
+          term_months: q.term_months,
+          down_percent: q.down_percent,
+          down_amount: q.down_amount,
+          retail_price: q.retail_price,
+          installment_amount: q.installment_amount,
+          total_amount: q.total_amount,
+          financed_amount: q.financed_amount,
+          interest_percent_total: q.interest_percent_total,
+          max_discount_percent: q.max_discount_percent,
+          fin2_profit_amount: q.fin2_profit_amount,
+        });
+      }
+    }
+    return Array.from(seen.values());
+  }, [quoteData]);
+
+  const fin1Rows = useMemo(() => dedupedQuotes.filter(r => r.finance_model === 'FIN1'), [dedupedQuotes]);
+  const fin2Rows = useMemo(() => dedupedQuotes.filter(r => r.finance_model === 'FIN2'), [dedupedQuotes]);
+  const fin1Terms = useMemo(() => [...new Set(fin1Rows.map(r => r.term_months))].sort((a, b) => a - b), [fin1Rows]);
+  const fin2Terms = useMemo(() => [...new Set(fin2Rows.map(r => r.term_months))].sort((a, b) => a - b), [fin2Rows]);
+
+  const retailPrice = dedupedQuotes[0]?.retail_price;
+
+  return (
+    <div className="flex-1 overflow-auto better-scroll">
+      <div className="px-4 md:px-6 py-4">
+        {/* Model header */}
+        <div className="mb-5 flex items-baseline gap-2 flex-wrap">
+          <h2 className="text-lg font-semibold">{model.family_name} {model.model_name}</h2>
+          <span className="text-sm text-subtle">{model.brand_name}</span>
+          {retailPrice != null && (
+            <span className="text-sm text-subtle ml-auto tabular-nums">{t('priceCheck.retailPrice')} {fmt(retailPrice)}</span>
           )}
         </div>
+
+        {loading ? (
+          <div className="p-8 text-center text-subtle">{t('common.loading')}</div>
+        ) : dedupedQuotes.length === 0 ? (
+          <div className="p-8 text-center text-subtle">{t('priceCheck.noQuotes')}</div>
+        ) : (
+          <div className="flex flex-col gap-6">
+            {/* FIN1 — Fixed Rate */}
+            {fin1Rows.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <Badge size="sm" color="info">FIN1</Badge>
+                  <span className="text-sm font-medium">{t('priceCheck.fin1Desc')}</span>
+                  <span className="text-xs text-subtle">· {t('priceCheck.maxDiscount')} {fin1Rows[0].max_discount_percent}%</span>
+                </div>
+                <PricingTable rows={fin1Rows} terms={fin1Terms} type="fin1" t={t} />
+              </div>
+            )}
+
+            {/* FIN2 — Negotiable */}
+            {fin2Rows.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <Badge size="sm" color="warning">FIN2</Badge>
+                  <span className="text-sm font-medium">{t('priceCheck.fin2Desc')}</span>
+                  <span className="text-xs text-subtle">· {t('priceCheck.maxDiscount')} {fin2Rows[0].max_discount_percent}%</span>
+                </div>
+                <PricingTable rows={fin2Rows} terms={fin2Terms} type="fin2" t={t} />
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-// ── Quote Card ───────────────────────────────────────────────────────────────
+// ── Pricing Table ────────────────────────────────────────────────────────────
 
-function QuoteCard({ quote: q, t }: { quote: Quote; t: (key: string) => string }) {
+function PricingTable({ rows, terms, type, t }: {
+  rows: PricingRow[];
+  terms: number[];
+  type: 'fin1' | 'fin2';
+  t: (key: string) => string;
+}) {
   return (
-    <div className="border border-line rounded-lg p-4 bg-surface hover:shadow-sm transition-shadow">
-      <div className="flex items-center justify-between mb-3">
-        <div className="font-medium text-sm truncate">{q.item_name}</div>
-        <Badge size="xs">{q.term_months}m</Badge>
-      </div>
-
-      <div className="space-y-2 text-sm">
-        <div className="flex justify-between">
-          <span className="text-subtle">{t('priceCheck.retailPrice')}</span>
-          <span className="tabular-nums">{fmt(q.retail_price)}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-subtle">{t('priceCheck.downPayment')} ({q.down_percent}%)</span>
-          <span className="tabular-nums font-medium">{fmt(q.down_amount)}</span>
-        </div>
-
-        <div className="border-t border-line my-2" />
-
-        <div className="flex justify-between">
-          <span className="text-subtle">{t('priceCheck.installment')}</span>
-          <span className="tabular-nums text-primary font-semibold text-base">{fmt(q.installment_amount)}</span>
-        </div>
-        <div className="flex justify-between text-xs">
-          <span className="text-subtle">{t('priceCheck.totalAmount')}</span>
-          <span className="tabular-nums">{fmt(q.total_amount)}</span>
-        </div>
-
-        {q.interest_percent_total != null && (
-          <div className="flex justify-between text-xs">
-            <span className="text-subtle">{t('priceCheck.interest')}</span>
-            <span className="tabular-nums">{q.interest_percent_total}%</span>
-          </div>
-        )}
-
-        {q.fin2_profit_amount != null && (
-          <div className="flex justify-between text-xs">
-            <span className="text-subtle">{t('priceCheck.profit')}</span>
-            <span className="tabular-nums">{fmt(q.fin2_profit_amount)}</span>
-          </div>
-        )}
-      </div>
+    <div className="border border-line rounded-lg overflow-hidden">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="bg-surface-hover text-subtle text-xs">
+            <th className="text-left px-4 py-2 font-medium">{t('priceCheck.term')}</th>
+            <th className="text-right px-4 py-2 font-medium">{t('priceCheck.downPayment')}</th>
+            <th className="text-right px-4 py-2 font-medium">{t('priceCheck.installment')}</th>
+            <th className="text-right px-4 py-2 font-medium max-sm:hidden">{t('priceCheck.totalAmount')}</th>
+            <th className="text-right px-4 py-2 font-medium max-sm:hidden">
+              {type === 'fin1' ? t('priceCheck.interest') : t('priceCheck.profit')}
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-line">
+          {terms.map(term => {
+            const termRows = rows.filter(r => r.term_months === term);
+            return termRows.map((row, i) => (
+              <tr key={`${term}-${row.down_percent}`}>
+                {i === 0 && (
+                  <td className="px-4 py-2.5 font-medium" rowSpan={termRows.length}>
+                    {term} {t('priceCheck.months')}
+                  </td>
+                )}
+                <td className="text-right px-4 py-2.5 tabular-nums">
+                  {fmt(row.down_amount)} <span className="text-subtle text-xs">({row.down_percent}%)</span>
+                </td>
+                <td className="text-right px-4 py-2.5 tabular-nums text-primary font-semibold">
+                  {fmt(row.installment_amount)}
+                </td>
+                <td className="text-right px-4 py-2.5 tabular-nums text-subtle max-sm:hidden">
+                  {fmt(row.total_amount)}
+                </td>
+                <td className="text-right px-4 py-2.5 tabular-nums text-subtle max-sm:hidden">
+                  {type === 'fin1'
+                    ? (row.interest_percent_total != null ? `${row.interest_percent_total}%` : '—')
+                    : (row.fin2_profit_amount != null ? fmt(row.fin2_profit_amount) : '—')
+                  }
+                </td>
+              </tr>
+            ));
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
