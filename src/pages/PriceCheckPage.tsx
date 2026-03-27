@@ -180,9 +180,9 @@ export function PriceCheckPage() {
             </div>
           )}
 
-          <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
+          <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0 overflow-hidden'}>
             {/* ── Left: Search + Model List ── */}
-            <PageNavPanel id="list" className={isMobile ? '' : 'w-80 xl:w-96 border-r border-line flex flex-col'}>
+            <PageNavPanel id="list" className={isMobile ? '' : 'w-4/12 xl:w-3/12 min-w-56 border-r border-line flex flex-col'}>
               {/* Search */}
               <div className="flex-none px-4 py-2 border-b border-line">
                 <Input
@@ -249,7 +249,7 @@ export function PriceCheckPage() {
             </PageNavPanel>
 
             {/* ── Right: Pricing Detail ── */}
-            <PageNavPanel id="detail" className={isMobile ? '' : 'flex-1 flex flex-col'}>
+            <PageNavPanel id="detail" className={isMobile ? '' : 'flex-1 min-w-0 flex flex-col'}>
               {selectedModelId && selectedModelInfo ? (
                 <PricingDetail
                   model={selectedModelInfo}
