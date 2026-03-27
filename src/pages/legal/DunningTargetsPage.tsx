@@ -270,7 +270,7 @@ export function DunningTargetsPage() {
               />
             </div>
             {/* Bucket — visible ≥md */}
-            <div className="hidden md:block flex-1 min-w-0 md:max-w-40">
+            <div className="hidden md:block flex-1 min-w-0 md:max-w-56">
               <Select
                 options={BUCKET_OPTIONS}
                 value={filterBucket}
@@ -282,7 +282,7 @@ export function DunningTargetsPage() {
               />
             </div>
             {/* Date from — visible ≥lg */}
-            <div className="hidden lg:block" style={{ width: '9rem' }}>
+            <div className="hidden lg:block flex-1 min-w-0 lg:max-w-56">
               <InputDatePicker
                 value={dateFrom}
                 onChange={(d) => { setDateFrom(d); setPageIndex(0); }}
@@ -292,7 +292,7 @@ export function DunningTargetsPage() {
               />
             </div>
             {/* Date to — visible ≥lg */}
-            <div className="hidden lg:block" style={{ width: '9rem' }}>
+            <div className="hidden lg:block flex-1 min-w-0 lg:max-w-56">
               <InputDatePicker
                 value={dateTo}
                 onChange={(d) => { setDateTo(d); setPageIndex(0); }}
