@@ -18,6 +18,7 @@ import {
   ClipboardList,
   Smartphone,
   Calculator,
+  Coins,
   Settings,
   HelpCircle,
   LogOut,
@@ -190,6 +191,14 @@ export const AppSideNav = () => {
       children: [
         { key: 'contract-search', label: t('nav.contractSearch'), path: '/admin/contracts/search' },
         { key: 'saving-contracts', label: t('nav.savingContracts'), path: '/admin/contracts/saving' },
+      ],
+    },
+    {
+      key: 'commission', icon: <Coins size="1rem" />, label: t('nav.commission'),
+      path: '/admin/commission/staff',
+      children: [
+        { key: 'staff-commission', label: t('nav.staffCommission'), path: '/admin/commission/staff' },
+        { key: 'partner-commission', label: t('nav.partnerCommission'), path: '/admin/commission/partner' },
       ],
     },
     {

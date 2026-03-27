@@ -39,6 +39,9 @@ import { TransfersPage } from './pages/inventory/TransfersPage';
 import { RepairsPage } from './pages/inventory/RepairsPage';
 import { BuybackPage } from './pages/inventory/BuybackPage';
 import { PriceCheckPage } from './pages/PriceCheckPage';
+import { CommissionLayout } from './pages/commission/CommissionLayout';
+import { StaffCommissionPage } from './pages/commission/StaffCommissionPage';
+import { PartnerCommissionPage } from './pages/commission/PartnerCommissionPage';
 import { ContractsLayout } from './pages/contracts/ContractsLayout';
 import { ContractSearchPage } from './pages/contracts/ContractSearchPage';
 import { SavingContractsPage } from './pages/contracts/SavingContractsPage';
@@ -355,6 +358,28 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <ContractsLayout><SavingContractsPage /></ContractsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Commission */}
+      <Route
+        path="/admin/commission/staff"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <CommissionLayout><StaffCommissionPage /></CommissionLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/commission/partner"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <CommissionLayout><PartnerCommissionPage /></CommissionLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
