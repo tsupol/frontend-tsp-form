@@ -27,3 +27,13 @@ When the spec says what to build (tabs, views, fields), build exactly that. Don'
 ## 7. Verify against the spec before guessing at the API
 
 When an API call 404s, go back to the spec docs first — the correct view/RPC names are usually documented there. Don't guess naming conventions, and don't conclude something doesn't exist after trying one name. The spec is the primary source; MCP discovery is for confirming, not replacing it.
+
+## 8. Choose pagination strategy based on data, not UI layout
+
+When building a list page, decide client-side vs server-side pagination by asking "how many rows can this view return?" — not by looking at the UI pattern. A side-panel list (PageNav) can have thousands of rows just like a DataTable. The data characteristics drive the decision:
+
+- **Data grows over time** (cases, contracts, transactions, logs) → server-side
+- **Unbounded or 100+ rows possible** → server-side
+- **Small, bounded, stable** (branches, config, enums) → client-side is fine
+
+The mistake was thinking about the component layout ("it's a selector panel, not a full grid") instead of the data volume. Layout is presentation; pagination strategy is about data. Don't confuse the two.

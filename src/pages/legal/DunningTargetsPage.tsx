@@ -18,19 +18,22 @@ interface DunningTarget {
   branch_name: string;
   contract_code: string;
   contract_code_display: string | null;
+  contract_id: number;
   customer_id: number | null;
   customer_name: string | null;
   customer_tel: string | null;
-  product_sale_id: number;
   bucket_code: string;
   first_overdue_due_date: string | null;
   overdue_amount: number;
   overdue_installment_count: number;
-  overdue_streak_count: number;
-  overdue_streak_amount: number;
-  overdue_streak_start_due_date: string | null;
-  overdue_streak_latest_due_date: string | null;
-  computed_at: string;
+  overdue_days: number;
+  outstanding_amount: number;
+  total_paid: number;
+  next_due_date: string | null;
+  next_due_amount: number | null;
+  last_payment_date: string | null;
+  state: string;
+  commercial_model: string | null;
 }
 
 interface Branch {
@@ -43,6 +46,7 @@ interface Branch {
 const fmt = (n: number) => n.toLocaleString('en-US');
 
 const BUCKET_OPTIONS = [
+  { value: 'CURRENT', label: 'Current' },
   { value: 'OVERDUE_1_7', label: '1-7 days' },
   { value: 'OVERDUE_8_15', label: '8-15 days' },
   { value: 'OVERDUE_16_30', label: '16-30 days' },
@@ -68,13 +72,8 @@ const getBucketLabel = (bucket: string) => {
   }
 };
 
-function overdueDuration(dateStr: string | null): string {
-  if (!dateStr) return '';
-  const from = new Date(dateStr);
-  const to = new Date();
-  if (to < from) return '';
-  const diffMs = to.getTime() - from.getTime();
-  const days = Math.round(diffMs / 86400000);
+function overdueDaysLabel(days: number): string {
+  if (days <= 0) return '';
   if (days < 30) return `${days}d`;
   const months = Math.floor(days / 30);
   const remainDays = days - months * 30;
@@ -106,7 +105,7 @@ const SORT_OPTIONS = [
 export function DunningTargetsPage() {
   const { t } = useTranslation();
 
-  const [sorting, setSorting] = useState<SortingState>([{ id: 'first_overdue_due_date', desc: false }]);
+  const [sorting, setSorting] = useState<SortingState>([]);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
   const [filterBucket, setFilterBucket] = useState<string | null>(null);
@@ -137,21 +136,22 @@ export function DunningTargetsPage() {
   }, [branches]);
 
   // Server-side paginated query
-  const sortCol = sorting[0]?.id ?? 'first_overdue_due_date';
+  const sortCol = sorting[0]?.id;
   const sortDir = sorting[0]?.desc ? 'desc' : 'asc';
 
   const { data: pageData, isFetching } = useQuery({
     queryKey: ['dunning-targets', filterBucket, filterBranchId, debouncedSearch, dateFrom ? toLocalDateStr(dateFrom) : null, dateTo ? toLocalDateStr(dateTo) : null, pageIndex, pageSize, sortCol, sortDir],
     queryFn: () => {
-      let url = `/v_dunning_targets?order=${sortCol}.${sortDir}.nullslast`;
-      if (filterBucket) url += `&bucket_code=eq.${filterBucket}`;
-      else url += `&bucket_code=neq.CURRENT`;
-      if (filterBranchId) url += `&branch_id=eq.${filterBranchId}`;
-      if (dateFrom) url += `&first_overdue_due_date=gte.${toLocalDateStr(dateFrom)}`;
-      if (dateTo) url += `&first_overdue_due_date=lte.${toLocalDateStr(dateTo)}`;
+      const params: string[] = [];
+      if (sortCol) params.push(`order=${sortCol}.${sortDir}.nullslast`);
+      if (filterBucket) params.push(`bucket_code=eq.${filterBucket}`);
+      if (filterBranchId) params.push(`branch_id=eq.${filterBranchId}`);
+      if (dateFrom) params.push(`first_overdue_due_date=gte.${toLocalDateStr(dateFrom)}`);
+      if (dateTo) params.push(`first_overdue_due_date=lte.${toLocalDateStr(dateTo)}`);
       if (debouncedSearch) {
-        url += `&or=(contract_code.ilike.*${encodeURIComponent(debouncedSearch)}*,customer_name.ilike.*${encodeURIComponent(debouncedSearch)}*)`;
+        params.push(`or=(contract_code.ilike.*${encodeURIComponent(debouncedSearch)}*,customer_name.ilike.*${encodeURIComponent(debouncedSearch)}*)`);
       }
+      const url = `/v_dunning_targets${params.length ? '?' + params.join('&') : ''}`;
       return apiClient.getPaginated<DunningTarget>(url, { page: pageIndex + 1, pageSize });
     },
     staleTime: 60 * 1000,
@@ -161,7 +161,7 @@ export function DunningTargetsPage() {
   const list = pageData?.data ?? [];
   const totalCount = pageData?.totalCount ?? 0;
 
-  const activeFilterCount = [filterBucket, filterBranchId, dateFrom, dateTo].filter(Boolean).length + (sorting[0]?.id !== 'first_overdue_due_date' || sorting[0]?.desc ? 1 : 0);
+  const activeFilterCount = [filterBucket, filterBranchId, dateFrom, dateTo].filter(Boolean).length + (sorting.length > 0 ? 1 : 0);
 
   // ── Desktop columns ──
   const columns: ColumnDef<DunningTarget>[] = useMemo(() => [
@@ -205,14 +205,18 @@ export function DunningTargetsPage() {
       cell: ({ row }) => <span className="tabular-nums font-medium text-danger text-xs">{fmt(row.original.overdue_amount)}</span>,
     },
     {
+      accessorKey: 'outstanding_amount',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('legal.outstanding')} />,
+      cell: ({ row }) => <span className="tabular-nums text-xs">{fmt(row.original.outstanding_amount)}</span>,
+    },
+    {
       accessorKey: 'first_overdue_due_date',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('legal.since')} />,
       cell: ({ row }) => {
-        const dateStr = row.original.first_overdue_due_date;
-        const dur = overdueDuration(dateStr);
+        const dur = overdueDaysLabel(row.original.overdue_days);
         return (
           <div>
-            <div className="text-xs tabular-nums">{formatDate(dateStr)}</div>
+            <div className="text-xs tabular-nums">{formatDate(row.original.first_overdue_due_date)}</div>
             {dur && <div className="text-[11px] text-subtle">({dur})</div>}
           </div>
         );
@@ -362,7 +366,7 @@ export function DunningTargetsPage() {
                     value={sorting[0]?.id ?? null}
                     onChange={(val) => {
                       if (val) setSorting([{ id: val as string, desc: false }]);
-                      else setSorting([{ id: 'first_overdue_due_date', desc: false }]);
+                      else setSorting([]);
                       setPageIndex(0);
                     }}
                     placeholder={t('common.sortBy')}
@@ -415,10 +419,11 @@ export function DunningTargetsPage() {
             ) : (
               <div className="flex flex-col divide-y divide-line">
                 {list.map((item) => (
-                  <div key={`${item.product_sale_id}-${item.branch_id}`} className="flex items-center gap-3 px-1 py-3">
+                  <div key={item.contract_id} className="flex items-center gap-3 px-1 py-3">
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm truncate">{item.contract_code_display ?? item.contract_code}</div>
                       <div className="text-xs text-control-label truncate">{item.customer_name ?? item.branch_name}</div>
+                      {item.customer_tel && <div className="text-xs text-subtle truncate">{item.customer_tel}</div>}
                       <div className="flex items-center gap-2 mt-1">
                         <Badge size="xs" color={getBucketColor(item.bucket_code)}>
                           {getBucketLabel(item.bucket_code)}
@@ -429,8 +434,8 @@ export function DunningTargetsPage() {
                     <div className="shrink-0 text-right">
                       <div className="tabular-nums font-medium text-sm text-danger">{fmt(item.overdue_amount)}</div>
                       <div className="text-xs text-subtle">{formatDate(item.first_overdue_due_date)}</div>
-                      {overdueDuration(item.first_overdue_due_date) && (
-                        <div className="text-[11px] text-subtle">({overdueDuration(item.first_overdue_due_date)})</div>
+                      {item.overdue_days > 0 && (
+                        <div className="text-[11px] text-subtle">({overdueDaysLabel(item.overdue_days)})</div>
                       )}
                     </div>
                   </div>

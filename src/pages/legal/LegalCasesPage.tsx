@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
   PageNav, PageNavPanel, MobileHeader, Input, Select, Button, Badge,
   Modal, TextArea, DataTableFooter, useSnackbarContext,
 } from 'tsp-form';
 import { ArrowLeft, ArrowRightFromLine, Search, Scale, CheckCircle, XCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import { useAuth } from '../../contexts/AuthContext';
 import { DateTime } from '../../components/DateTime';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -15,23 +16,42 @@ interface LegalCase {
   id: number;
   case_code: string;
   ref_contract_id: number;
-  ref_contract_code: string;
+  ref_contract_code: string | null;
+  ref_contract_source: string | null;
+  source: string;
+  holding_id: number | null;
+  company_id: number | null;
+  branch_id: number | null;
+  branch_name: string | null;
+  customer_id: number | null;
+  customer_name: string | null;
+  customer_tel: string | null;
   status: string;
   bucket_code: string;
   overdue_amount: number;
   overdue_installment_count: number;
-  current_overdue_amount: number;
-  current_overdue_installment_count: number;
+  current_overdue_amount: number | null;
+  current_overdue_installment_count: number | null;
+  current_first_overdue_due_date: string | null;
   first_overdue_due_date: string | null;
+  next_due_date: string | null;
+  next_due_amount: number | null;
+  current_outstanding: number | null;
+  contract_state: string | null;
   assigned_to_user_id: number | null;
-  is_mine: boolean | null;
+  assigned_to_username: string | null;
+  is_mine: boolean;
   is_takeable: boolean;
   queue_flag: string | null;
   last_action_note: string | null;
   last_action_at: string | null;
+  closed_at: string | null;
+  closed_reason: string | null;
   province_name: string | null;
   district_name: string | null;
+  subdistrict_name: string | null;
   created_at: string;
+  updated_at: string;
 }
 
 interface CaseDetail {
@@ -163,6 +183,8 @@ export function LegalCasesPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
+  const { user } = useAuth();
+  const canAct = user?.role_code === 'COMPANY_REPO';
 
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -184,31 +206,25 @@ export function LegalCasesPage() {
 
   useEffect(() => { setPageIndex(0); }, [debouncedSearch, filterStatus]);
 
-  // Case list
-  const { data: allCases } = useQuery({
-    queryKey: ['legal-cases', filterStatus],
+  // Case list — server-side paginated
+  const { data: pageData, isFetching } = useQuery({
+    queryKey: ['legal-cases', filterStatus, debouncedSearch, pageIndex, pageSize],
     queryFn: () => {
       let url = '/v_legal_case_list?order=created_at.desc';
       if (filterStatus) url += `&status=eq.${filterStatus}`;
-      return apiClient.get<LegalCase[]>(url);
+      if (debouncedSearch) {
+        url += `&or=(case_code.ilike.*${encodeURIComponent(debouncedSearch)}*,ref_contract_code.ilike.*${encodeURIComponent(debouncedSearch)}*,customer_name.ilike.*${encodeURIComponent(debouncedSearch)}*)`;
+      }
+      return apiClient.getPaginated<LegalCase>(url, { page: pageIndex + 1, pageSize });
     },
     staleTime: 60 * 1000,
+    placeholderData: keepPreviousData,
   });
 
-  const filtered = useMemo(() => {
-    let list = allCases ?? [];
-    if (debouncedSearch) {
-      const term = debouncedSearch.toLowerCase();
-      list = list.filter(c =>
-        c.case_code.toLowerCase().includes(term)
-        || c.ref_contract_code.toLowerCase().includes(term)
-        || (c.province_name ?? '').toLowerCase().includes(term)
-      );
-    }
-    return list;
-  }, [allCases, debouncedSearch]);
+  const paged = pageData?.data ?? [];
+  const totalCount = pageData?.totalCount ?? 0;
 
-  const paged = filtered.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize);
+  const selectedCase = useMemo(() => paged.find(c => c.id === selectedCaseId) ?? null, [paged, selectedCaseId]);
 
   // Case detail
   const { data: caseDetail } = useQuery({
@@ -364,7 +380,7 @@ export function LegalCasesPage() {
               </div>
 
               {/* Case list */}
-              <div className="flex-1 overflow-auto better-scroll">
+              <div className={`flex-1 overflow-auto better-scroll ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
                 {paged.length === 0 ? (
                   <div className="p-8 text-center text-subtler">{t('common.noData')}</div>
                 ) : (
@@ -381,14 +397,18 @@ export function LegalCasesPage() {
                           <span className="font-medium text-sm">{c.case_code}</span>
                           <Badge size="xs" color={getStatusColor(c.status)}>{getStatusLabel(c.status)}</Badge>
                         </div>
-                        <div className="text-xs text-subtle">{c.ref_contract_code}</div>
-                        <div className="flex items-center justify-between mt-1 text-xs">
-                          <span className="text-subtle">{c.province_name ?? ''}</span>
-                          <span className="tabular-nums text-danger font-medium">{fmt(c.current_overdue_amount)}</span>
-                        </div>
-                        {c.queue_flag === 'NEW' && c.status === 'QUEUED' && (
-                          <Badge size="xs" color="info" className="mt-1">NEW</Badge>
+                        {(c.customer_name || c.ref_contract_code) && (
+                          <div className="text-xs text-subtle truncate">{c.customer_name ?? c.ref_contract_code}</div>
                         )}
+                        {c.customer_tel && <div className="text-xs text-subtle">{c.customer_tel}</div>}
+                        <div className="flex items-center justify-between mt-1 text-xs">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            {c.source === 'LEGACY' && <Badge size="xs" color="default">LEGACY</Badge>}
+                            {c.queue_flag === 'NEW' && c.status === 'QUEUED' && <Badge size="xs" color="info">NEW</Badge>}
+                            <span className="text-subtle truncate">{[c.branch_name, c.province_name].filter(Boolean).join(' · ')}</span>
+                          </div>
+                          <span className="tabular-nums text-danger font-medium shrink-0 ml-2">{fmt(c.current_overdue_amount ?? c.overdue_amount)}</span>
+                        </div>
                       </button>
                     ))}
                   </div>
@@ -396,16 +416,16 @@ export function LegalCasesPage() {
               </div>
 
               {/* Pagination */}
-              {filtered.length > 0 && (
+              {totalCount > 0 && (
                 <div className="flex-none border-t border-line px-2 py-1">
                   <DataTableFooter
                     currentPage={pageIndex + 1}
-                    totalPages={Math.ceil(filtered.length / pageSize)}
+                    totalPages={Math.ceil(totalCount / pageSize) || 1}
                     onPageChange={(p) => setPageIndex(p - 1)}
                     pageSize={pageSize}
                     pageSizeOptions={[15, 25, 50]}
                     onPageSizeChange={(ps) => { setPageSize(ps); setPageIndex(0); }}
-                    totalRows={filtered.length}
+                    totalRows={totalCount}
                   />
                 </div>
               )}
@@ -438,12 +458,30 @@ export function LegalCasesPage() {
                       </div>
                     </div>
 
-                    {/* Contract ref */}
-                    <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line text-sm">
+                    {/* Contract & case info */}
+                    <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line text-sm space-y-1.5">
                       <div className="flex justify-between">
                         <span className="text-subtle">{t('legal.contract')}</span>
-                        <span className="font-medium">{caseDetail.case.ref_contract_code}</span>
+                        <span className="font-medium">{caseDetail.case.ref_contract_code ?? '—'}</span>
                       </div>
+                      {selectedCase?.branch_name && (
+                        <div className="flex justify-between">
+                          <span className="text-subtle">{t('legal.branch')}</span>
+                          <span>{selectedCase.branch_name}</span>
+                        </div>
+                      )}
+                      {selectedCase?.assigned_to_username && (
+                        <div className="flex justify-between">
+                          <span className="text-subtle">{t('legal.assignedTo')}</span>
+                          <span>{selectedCase.assigned_to_username}</span>
+                        </div>
+                      )}
+                      {selectedCase?.current_outstanding != null && (
+                        <div className="flex justify-between">
+                          <span className="text-subtle">{t('legal.outstanding')}</span>
+                          <span className="tabular-nums">{fmt(selectedCase.current_outstanding)}</span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Customer info */}
@@ -530,7 +568,7 @@ export function LegalCasesPage() {
                   </div>
 
                   {/* Action buttons */}
-                  {actions.length > 0 && (
+                  {canAct && actions.length > 0 && (
                     <div className="flex-none px-4 py-3 border-t border-line flex flex-wrap gap-2">
                       {actions.map(a => (
                         <Button

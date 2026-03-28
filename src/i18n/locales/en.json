@@ -1457,6 +1457,9 @@
     "actionRevertSuccess": "Case reverted",
     "actionReleaseSuccess": "Case released",
     "actionCloseSuccess": "Case closed",
-    "actionNoteSuccess": "Note added"
+    "actionNoteSuccess": "Note added",
+    "outstanding": "Outstanding",
+    "assignedTo": "Assigned To",
+    "branch": "Branch"
   }
 }

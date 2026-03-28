@@ -1457,6 +1457,9 @@
     "actionRevertSuccess": "ย้อนกลับสำเร็จ",
     "actionReleaseSuccess": "ปล่อยเคสสำเร็จ",
     "actionCloseSuccess": "ปิดเคสสำเร็จ",
-    "actionNoteSuccess": "เพิ่มหมายเหตุสำเร็จ"
+    "actionNoteSuccess": "เพิ่มหมายเหตุสำเร็จ",
+    "outstanding": "ยอดคงเหลือ",
+    "assignedTo": "ผู้รับผิดชอบ",
+    "branch": "สาขา"
   }
 }

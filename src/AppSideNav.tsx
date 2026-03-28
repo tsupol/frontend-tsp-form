@@ -132,6 +132,8 @@ export const AppSideNav = () => {
   const location = useLocation();
   const { t } = useTranslation();
   const navGuard = useNavGuard();
+  const { user } = useAuth();
+  const role = user?.role_code ?? '';
 
   const menuItems: SideMenuItemData[] = [
     { key: 'dashboard', icon: <LayoutDashboard size="1rem" />, label: t('nav.dashboard'), path: '/admin' },
@@ -202,14 +204,16 @@ export const AppSideNav = () => {
         { key: 'partner-commission', label: t('nav.partnerCommission'), path: '/admin/commission/partner' },
       ],
     },
-    {
+    ...(['COMPANY_REPO', 'COMPANY_COLLECTOR', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [{
       key: 'legal', icon: <Scale size="1rem" />, label: t('nav.legal'),
       path: '/admin/legal/dunning',
       children: [
         { key: 'dunning-targets', label: t('nav.dunningTargets'), path: '/admin/legal/dunning' },
-        { key: 'legal-cases', label: t('nav.legalCases'), path: '/admin/legal/cases' },
+        ...(['COMPANY_REPO', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
+          { key: 'legal-cases', label: t('nav.legalCases'), path: '/admin/legal/cases' },
+        ] : []),
       ],
-    },
+    }] : []),
     {
       key: 'call-center', icon: <Headset size="1rem" />, label: t('nav.callCenter'),
       path: '/admin/call-center',
