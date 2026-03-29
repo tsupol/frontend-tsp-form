@@ -48,6 +48,7 @@ import { PartnerCommissionPage } from './pages/commission/PartnerCommissionPage'
 import { ContractsLayout } from './pages/contracts/ContractsLayout';
 import { ContractSearchPage } from './pages/contracts/ContractSearchPage';
 import { SavingContractsPage } from './pages/contracts/SavingContractsPage';
+import { ContractWizardPage } from './pages/contracts/ContractWizardPage';
 import { CompanyLayout } from './pages/company/CompanyLayout';
 import { CompanyConfigRoot } from './pages/company/CompanyConfigRoot';
 import { CompanyConfigDetailPage } from './pages/company/CompanyConfigDetailPage';
@@ -361,6 +362,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <ContractsLayout><SavingContractsPage /></ContractsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/contracts/new"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <ContractWizardPage />
             </AdminLayout>
           </ProtectedRoute>
         }

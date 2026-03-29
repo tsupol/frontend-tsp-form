@@ -1,16 +1,16 @@
-import { useState, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm, Controller } from 'react-hook-form';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
   DataTable, DataTableColumnHeader, DataTableFooter, Button, Input, Select,
-  PopOver, MenuItem, Modal, MobileHeader,
+  PopOver, MenuItem, Modal, MobileHeader, InputDatePicker,
   useSnackbarContext, FormErrorMessage,
   type ColumnDef, type SortingState,
 } from 'tsp-form';
 import {
-  Plus, MoreHorizontal, Trash2,
-  XCircle, CheckCircle, ArrowRightFromLine,
+  Plus, MoreHorizontal, Trash2, Calendar,
+  XCircle, CheckCircle, ArrowRightFromLine, SlidersHorizontal,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -35,7 +35,7 @@ interface Company {
 
 interface HolidayForm {
   company_id: string;
-  holiday_date: string;
+  holiday_date: Date | null;
   description: string;
 }
 
@@ -91,14 +91,14 @@ function AddHolidayModal({ open, onClose, companies }: {
   const { register, handleSubmit, reset, control, formState: { errors } } = useForm<HolidayForm>({
     defaultValues: {
       company_id: '',
-      holiday_date: '',
+      holiday_date: null,
       description: '',
     },
   });
 
   const prevOpen = useRef(open);
   if (open && !prevOpen.current) {
-    reset({ company_id: '', holiday_date: '', description: '' });
+    reset({ company_id: '', holiday_date: null, description: '' });
     setErrorMessage('');
   }
   prevOpen.current = open;
@@ -113,7 +113,7 @@ function AddHolidayModal({ open, onClose, companies }: {
       await apiClient.rpc('fn_holiday_manage', {
         p_company_id: Number(data.company_id),
         p_action: 'ADD',
-        p_holiday_date: data.holiday_date,
+        p_holiday_date: data.holiday_date ? data.holiday_date.toISOString().split('T')[0] : '',
         p_description: data.description,
         p_managed_by: user.user_id,
       });
@@ -171,7 +171,19 @@ function AddHolidayModal({ open, onClose, companies }: {
             </div>
             <div className="flex flex-col">
               <label className="form-label">{t('settings.holidays.holidayDate')}</label>
-              <Input type="date" {...register('holiday_date', { required: t('common.required') })} className="w-full" />
+              <Controller
+                name="holiday_date"
+                control={control}
+                rules={{ required: t('common.required') }}
+                render={({ field }) => (
+                  <InputDatePicker
+                    value={field.value}
+                    onChange={(date) => field.onChange(date)}
+                    placeholder={t('settings.holidays.holidayDate')}
+                    endIcon={<Calendar size={18} />}
+                  />
+                )}
+              />
               <FormErrorMessage error={errors.holiday_date} />
             </div>
             <div className="flex flex-col">
@@ -273,50 +285,73 @@ function formatDate(dateStr: string) {
 
 // ── Main Page ────────────────────────────────────────────────────────────────
 
+// ── Sort helpers ─────────────────────────────────────────────────────────────
+
+const sortColumnMap: Record<string, string> = {
+  holiday_date: 'holiday_date',
+  company_name: 'company_name',
+  description: 'description',
+};
+
+// ── Main Page (continued) ───────────────────────────────────────────────────
+
 export function HolidaysPage() {
   const { t } = useTranslation();
-  const { addSnackbar: _ } = useSnackbarContext();
-  void _;
 
-  const [sorting, setSorting] = useState<SortingState>([]);
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'holiday_date', desc: false }]);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const [companyFilter, setCompanyFilter] = useState<number | null>(null);
+  const [filterOpen, setFilterOpen] = useState(false);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [removeHoliday, setRemoveHoliday] = useState<Holiday | null>(null);
-
-  const { data: holidays = [], isFetching, isLoading } = useQuery({
-    queryKey: ['company-holidays'],
-    queryFn: () => apiClient.get<Holiday[]>('/v_company_holidays?order=holiday_date.desc,company_name'),
-  });
 
   const { data: companies = [] } = useQuery({
     queryKey: ['companies-for-holidays'],
     queryFn: () => apiClient.get<Company[]>('/v_company_config?select=company_id,company_name&order=company_name'),
   });
 
-  const filtered = search.trim()
-    ? holidays.filter(h => {
-        const term = search.trim().toLowerCase();
-        return h.company_name.toLowerCase().includes(term)
-          || h.description.toLowerCase().includes(term);
-      })
-    : holidays;
+  const companyOptions = companies.map(c => ({ value: String(c.company_id), label: c.company_name }));
 
-  const totalCount = filtered.length;
-  const paginated = filtered.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize);
+  const buildEndpoint = () => {
+    const params: string[] = [];
+    if (search.trim()) {
+      params.push(`description=ilike.*${encodeURIComponent(search.trim())}*`);
+    }
+    if (companyFilter) params.push(`company_id=eq.${companyFilter}`);
+    const sort = sorting[0];
+    const col = sort ? sortColumnMap[sort.id] : null;
+    params.push(col ? `order=${col}.${sort.desc ? 'desc' : 'asc'}` : 'order=holiday_date.asc');
+    return `/v_company_holidays?${params.join('&')}`;
+  };
+
+  const { data, isFetching, isLoading } = useQuery({
+    queryKey: ['company-holidays', pageIndex, pageSize, search, companyFilter, sorting],
+    queryFn: () => apiClient.getPaginated<Holiday>(buildEndpoint(), { page: pageIndex + 1, pageSize }),
+    placeholderData: keepPreviousData,
+  });
+
+  const holidays = data?.data ?? [];
+  const totalCount = data?.totalCount ?? 0;
+
+  useEffect(() => { setPageIndex(0); }, [search, companyFilter, sorting]);
 
   const handleSearch = (value: string) => {
     setSearchInput(value);
     clearTimeout(searchTimer.current);
     searchTimer.current = setTimeout(() => {
       setSearch(value);
-      setPageIndex(0);
     }, 300);
   };
+
+  const sortOptions = [
+    { value: 'holiday_date', label: t('settings.holidays.colDate') },
+    { value: 'company_name', label: t('settings.holidays.colCompany') },
+  ];
 
   const columns: ColumnDef<Holiday>[] = [
     {
@@ -387,23 +422,77 @@ export function HolidaysPage() {
         </div>
 
         {/* Filter bar */}
-        <div className="flex-none pb-4">
-          <div className="flex items-center gap-2">
-            <div className="flex-1 min-w-0 md:max-w-56">
-              <Input
-                placeholder={t('common.search')}
-                value={searchInput}
-                onChange={(e) => handleSearch(e.target.value)}
-                size="sm"
-                className="w-full"
-              />
-            </div>
+        <div className="flex items-center gap-2 pb-4 flex-none">
+          {/* Search — always visible */}
+          <div className="flex-1 min-w-0 md:max-w-56">
+            <Input
+              placeholder={t('settings.holidays.searchPlaceholder')}
+              value={searchInput}
+              onChange={(e) => handleSearch(e.target.value)}
+              size="sm"
+              className="w-full"
+            />
+          </div>
+          {/* Company — visible ≥sm */}
+          <div className="hidden sm:block flex-1 min-w-0 md:max-w-56">
+            <Select
+              options={companyOptions}
+              value={companyFilter !== null ? String(companyFilter) : null}
+              onChange={(val) => setCompanyFilter(val ? Number(val) : null)}
+              placeholder={t('settings.holidays.filterAllCompanies')}
+              size="sm"
+              showChevron
+              clearable
+            />
+          </div>
+          {/* PopOver — visible <sm */}
+          <div className="sm:hidden shrink-0">
+            <PopOver
+              isOpen={filterOpen}
+              onClose={() => setFilterOpen(false)}
+              placement="bottom"
+              align="end"
+              maxWidth="300px"
+              maxHeight="400px"
+              trigger={
+                <Button size="sm" className="relative btn-icon-sm" onClick={() => setFilterOpen(!filterOpen)}>
+                  <SlidersHorizontal size={16} />
+                  {companyFilter && (
+                    <span className="absolute -top-1.5 -right-1.5 bg-primary text-white text-xs rounded-full w-4 h-4 flex items-center justify-center leading-none">1</span>
+                  )}
+                </Button>
+              }
+            >
+              <div className="flex flex-col gap-3 p-3">
+                <div className="text-xs font-medium text-muted uppercase tracking-wide">{t('common.filters')}</div>
+                <Select
+                  options={companyOptions}
+                  value={companyFilter !== null ? String(companyFilter) : null}
+                  onChange={(val) => setCompanyFilter(val ? Number(val) : null)}
+                  placeholder={t('settings.holidays.filterAllCompanies')}
+                  size="sm"
+                  showChevron
+                  clearable
+                />
+                <div className="text-xs font-medium text-muted uppercase tracking-wide mt-1">{t('common.sortBy')}</div>
+                <Select
+                  options={sortOptions}
+                  value={sorting[0]?.id ?? null}
+                  onChange={(val) => {
+                    if (val) setSorting([{ id: val as string, desc: sorting[0]?.desc ?? false }]);
+                    else setSorting([]);
+                  }}
+                  size="sm"
+                  showChevron
+                />
+              </div>
+            </PopOver>
           </div>
         </div>
 
         {/* Desktop: DataTable */}
         <DataTable<Holiday>
-          data={paginated}
+          data={holidays}
           columns={columns}
           sorting={sorting}
           onSortingChange={setSorting}
@@ -427,13 +516,13 @@ export function HolidaysPage() {
         {/* Mobile: Card list */}
         <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
           <div className="flex-1 overflow-auto better-scroll pb-8">
-            {filtered.length === 0 ? (
+            {holidays.length === 0 ? (
               <div className="p-8 text-center text-control-label">
                 {isLoading ? t('common.loading') : t('settings.holidays.empty')}
               </div>
             ) : (
               <div className="flex flex-col divide-y divide-line">
-                {paginated.map((holiday) => (
+                {holidays.map((holiday) => (
                   <div
                     key={holiday.id}
                     className="flex items-center gap-3 px-4 py-3"

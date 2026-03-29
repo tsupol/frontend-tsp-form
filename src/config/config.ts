@@ -81,4 +81,41 @@ export const imageConfig = {
       lg: { resize: RESIZE_LG, path: (poLineId: number, idx: number) => `uploads/buyback/${poLineId}/condition-${idx}-lg.webp` },
     },
   },
+  customerIdCard: {
+    entityType: 'CUSTOMER',
+    usageType: 'ID_CARD',
+    sizes: {
+      sm: { resize: RESIZE_SM, path: (customerId: number) => `uploads/customers/${customerId}/id-card-sm.webp` },
+      lg: { resize: RESIZE_LG, path: (customerId: number) => `uploads/customers/${customerId}/id-card-lg.webp` },
+    },
+  },
+
+  contractSignature: {
+    entityType: 'CONTRACT',
+    usageType: 'SIGNATURE',
+    sizes: {
+      sm: { resize: RESIZE_SM, path: (contractId: number) => `uploads/contracts/${contractId}/signature-sm.webp` },
+      lg: { resize: RESIZE_LG, path: (contractId: number) => `uploads/contracts/${contractId}/signature-lg.webp` },
+    },
+  },
+
+  contractEvidence: {
+    entityType: 'CONTRACT',
+    usageType: 'EVIDENCE',
+    maxFiles: 10,
+    sizes: {
+      sm: { resize: RESIZE_SM, path: (contractId: number, idx: number) => `uploads/contracts/${contractId}/evidence-${idx}-sm.webp` },
+      lg: { resize: RESIZE_LG, path: (contractId: number, idx: number) => `uploads/contracts/${contractId}/evidence-${idx}-lg.webp` },
+    },
+  },
+
+  contractPaymentSlip: {
+    entityType: 'CONTRACT',
+    usageType: 'PAYMENT_SLIP',
+    maxFiles: 5,
+    sizes: {
+      sm: { resize: RESIZE_SM, path: (contractId: number, idx: number) => `uploads/contracts/${contractId}/slip-${idx}-sm.webp` },
+      lg: { resize: RESIZE_LG, path: (contractId: number, idx: number) => `uploads/contracts/${contractId}/slip-${idx}-lg.webp` },
+    },
+  },
 } as const;

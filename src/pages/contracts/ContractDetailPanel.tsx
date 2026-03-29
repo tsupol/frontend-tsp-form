@@ -382,7 +382,7 @@ function OverviewTab({ contract, t }: { contract: ContractDetail; t: ReturnType<
             <div className="flex-1 bg-fg/10 rounded-full h-2">
               <div
                 className="bg-primary rounded-full h-2 transition-all"
-                style={{ width: `${Math.min(100, (contract.paid_installment_count / contract.total_installments) * 100)}%` }}
+                style={{ width: `${contract.total_installments > 0 ? Math.min(100, (contract.paid_installment_count / contract.total_installments) * 100) : 0}%` }}
               />
             </div>
             <span className="text-sm font-medium tabular-nums shrink-0">
@@ -417,7 +417,7 @@ function OverviewTab({ contract, t }: { contract: ContractDetail; t: ReturnType<
             <div className="flex-1 bg-fg/10 rounded-full h-2">
               <div
                 className="bg-info rounded-full h-2 transition-all"
-                style={{ width: `${Math.min(100, ((contract.saving_balance ?? 0) / contract.saving_target_amount) * 100)}%` }}
+                style={{ width: `${contract.saving_target_amount > 0 ? Math.min(100, ((contract.saving_balance ?? 0) / contract.saving_target_amount) * 100) : 0}%` }}
               />
             </div>
             <span className="text-sm font-medium tabular-nums shrink-0">

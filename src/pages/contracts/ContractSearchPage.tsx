@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Badge, Input, Select, Button, DataTableFooter } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, Search, FileText, SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, Search, FileText, SlidersHorizontal, Plus } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { getStateColor, getStateLabel, fmtCurrency, SCOPE_OPTIONS, STATE_OPTIONS, type ContractScope } from './contractUtils';
@@ -66,6 +67,7 @@ interface Branch {
 
 export function ContractSearchPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
 
   const [scope, setScope] = useState<ContractScope>('OPEN');
   const [keyword, setKeyword] = useState('');
@@ -156,6 +158,11 @@ export function ContractSearchPage() {
           {!isMobile && (
             <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
               <h1 className="heading-2 shrink-0">{t('nav.contractSearch')}</h1>
+              <div className="ml-auto">
+                <Button size="sm" color="primary" onClick={() => navigate('/admin/contracts/new')} startIcon={<Plus size={14} />}>
+                  {t('wizard.newContract')}
+                </Button>
+              </div>
             </div>
           )}
 

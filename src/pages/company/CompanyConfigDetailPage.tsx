@@ -44,8 +44,8 @@ export function CompanyConfigDetailPage() {
     { key: 'comm_min_active_days', label: t('settings.config.commMinActiveDays'), type: 'number', group: 'commission' },
     { key: 'comm_min_paid_installments', label: t('settings.config.commMinPaidInstallments'), type: 'number', group: 'commission' },
     { key: 'comm_require_no_overdue', label: t('settings.config.commRequireNoOverdue'), type: 'boolean', group: 'commission' },
-    { key: 'pause_enabled', label: t('settings.config.pauseEnabled'), type: 'boolean', group: 'pause' },
     { key: 'pause_max_deferred', label: t('settings.config.pauseMaxDeferred'), type: 'number', group: 'pause' },
+    { key: 'pause_enabled', label: t('settings.config.pauseEnabled'), type: 'boolean', group: 'pause' },
     { key: 'repo_fee_per_case', label: t('settings.config.repoFeePerCase'), type: 'number', group: 'legal' },
   ];
 
@@ -184,7 +184,7 @@ export function CompanyConfigDetailPage() {
         <div className="mobile-header-end w-nav" />
       </MobileHeader>
 
-      <div className="page-content max-w-lg mx-auto pb-0">
+      <div className="page-content max-w-2xl mx-auto pb-0">
         {/* Desktop header */}
         <div className="flex items-center gap-3 mb-6 max-md:hidden">
           <button
@@ -212,7 +212,7 @@ export function CompanyConfigDetailPage() {
               <div key={group.key}>
                 {i > 0 && <hr className="border-line mt-0 mb-6" />}
                 <h4 className="text-sm font-semibold text-fg uppercase tracking-wider mb-3">{group.label}</h4>
-                <div className="form-grid">
+                <div className="form-grid md:grid-cols-2">
                   {groupFields.map(field => (
                     <div key={field.key} className="flex flex-col">
                       <label className="form-label">{field.label}</label>
