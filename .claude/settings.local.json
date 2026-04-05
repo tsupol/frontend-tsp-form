@@ -9,7 +9,7 @@
       "Glob",
       "Grep",
       "WebFetch(*)",
-      "mcp__nnf-api__*",
+      "mcp__paas-dock__*",
       "mcp__dev-api__*"
     ]
   }
