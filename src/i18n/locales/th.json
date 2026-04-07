@@ -97,7 +97,8 @@
     "legalCases": "คดี",
     "contracts": "สัญญา",
     "contractSearch": "ค้นหาสัญญา",
-    "savingContracts": "สัญญาออม"
+    "savingContracts": "สัญญาออม",
+    "branches": "สาขา"
   },
   "user": {
     "id": "รหัสผู้ใช้",
@@ -1040,6 +1041,13 @@
     "iosOnlyDesc": "การลงทะเบียน MDM ใช้ได้เฉพาะอุปกรณ์ iPhone และ iPad เท่านั้น"
   },
   "settings": {
+    "title": "ตั้งค่า",
+    "holdings": "โฮลดิ้ง",
+    "holdingsDesc": "จัดการบริษัทโฮลดิ้ง",
+    "holding": "โฮลดิ้ง",
+    "companies": "บริษัท",
+    "companiesDesc": "จัดการบริษัทภายในโฮลดิ้ง",
+    "company": "บริษัท",
     "config": {
       "title": "ตั้งค่าบริษัท",
       "description": "ตั้งค่าสัญญา ค่าปรับ คอมมิชชั่น และการพักงวดตามบริษัท",
@@ -1471,6 +1479,40 @@
     "thb": "บาท",
     "fin2Calc": "คำนวณเอง",
     "fin2UsingRate": "ใช้อัตรากำไรของ"
+  },
+  "org": {
+    "title": "องค์กร",
+    "description": "โฮลดิ้ง บริษัท และสาขา",
+    "empty": "ไม่พบข้อมูลองค์กร",
+    "noResults": "ไม่พบผลลัพธ์",
+    "companies": "บริษัท",
+    "branches": "สาขา",
+    "addHolding": "เพิ่มโฮลดิ้ง",
+    "addCompany": "เพิ่มบริษัท",
+    "addBranch": "เพิ่มสาขา",
+    "createHolding": "สร้างโฮลดิ้ง",
+    "editHolding": "แก้ไขโฮลดิ้ง",
+    "createCompany": "สร้างบริษัท",
+    "editCompany": "แก้ไขบริษัท",
+    "createBranch": "สร้างสาขา",
+    "editBranch": "แก้ไขสาขา",
+    "code": "รหัส",
+    "codePlaceholder": "เช่น HQ-01",
+    "name": "ชื่อ",
+    "branchTypeLabel": "ประเภทสาขา",
+    "address": "ที่อยู่",
+    "deactivate": "ปิดใช้งาน",
+    "branchType": {
+      "INTERNAL": "สาขาภายใน",
+      "EXTERNAL": "สาขาภายนอก",
+      "DEAL_PARTNER": "คู่ค้า"
+    }
+  },
+  "branches": {
+    "title": "สาขา",
+    "description": "จัดการสาขาและประเภทสาขา",
+    "allTypes": "ทุกประเภท",
+    "allCompanies": "ทุกบริษัท"
   },
   "commission": {
     "staffTitle": "ค่าคอมฯ พนักงาน",

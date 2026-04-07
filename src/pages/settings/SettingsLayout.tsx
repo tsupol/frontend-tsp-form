@@ -1,39 +1,34 @@
-import { useMemo, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { MapPin, Building2, Landmark, CalendarDays, AlertTriangle, ShieldBan, Cloud, KeyRound } from 'lucide-react';
+import { User, Building2, Store } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useAuth } from '../../contexts/AuthContext';
 
-const ADMIN_ROLES = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'];
-
-export function CompanyLayout({ children }: { children: ReactNode }) {
+export function SettingsLayout({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
   const navGuard = useNavGuard();
   const { user } = useAuth();
   const role = user?.role_code ?? '';
-  const isAdmin = ADMIN_ROLES.includes(role);
+  const canManageOrg = ['HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
 
-  const navItems = useMemo(() => [
-    ...(isAdmin ? [{ path: '/admin/company/branches', labelKey: 'nav.branches', icon: MapPin }] : []),
-    { path: '/admin/company/pin', labelKey: 'nav.branchPin', icon: KeyRound },
-    { path: '/admin/company/config', labelKey: 'nav.companyConfig', icon: Building2 },
-    { path: '/admin/company/bank-accounts', labelKey: 'nav.bankAccounts', icon: Landmark },
-    { path: '/admin/company/holidays', labelKey: 'nav.holidays', icon: CalendarDays },
-    { path: '/admin/company/dunning', labelKey: 'nav.dunning', icon: AlertTriangle },
-    { path: '/admin/company/blacklist', labelKey: 'nav.blacklist', icon: ShieldBan },
-    { path: '/admin/company/icloud', labelKey: 'nav.icloud', icon: Cloud },
-  ], [isAdmin]);
+  const navItems = [
+    { path: '/admin/settings/profile', labelKey: 'nav.profile', icon: User },
+    ...(canManageOrg ? [
+      { path: '/admin/settings/holdings', labelKey: 'settings.holdings', icon: Building2 },
+      { path: '/admin/settings/companies', labelKey: 'settings.companies', icon: Store },
+    ] : []),
+  ];
 
   return (
     <div className="flex min-h-full">
       <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-48 border-r border-line p-4 pt-7.5 sticky top-0 h-dvh">
         <span className="text-xs font-semibold text-control-label uppercase tracking-wider mb-2 px-2">
-          {t('nav.company')}
+          {t('settings.title')}
         </span>
         {navItems.map(({ path, labelKey, icon: Icon }) => {
-          const isActive = pathname === path;
+          const isActive = pathname.startsWith(path);
           return (
             <a
               key={path}

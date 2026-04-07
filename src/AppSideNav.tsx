@@ -81,9 +81,9 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
     >
       <div className="py-1 w-[calc(var(--spacing-side-menu)-1rem)]">
         <MenuItem
-          icon={<User size={14} />}
-          label={t('nav.profile')}
-          onClick={() => { navigate('/admin/profile'); setOpen(false); }}
+          icon={<Settings size={14} />}
+          label={t('settings.title')}
+          onClick={() => { navigate('/admin/settings/profile'); setOpen(false); }}
         />
         <MenuSeparator />
         <SubMenu icon={<Settings size={14} />} label={t('theme.title')}>
@@ -176,15 +176,18 @@ export const AppSideNav = () => {
     },
     {
       key: 'company', icon: <Building2 size="1rem" />, label: t('nav.company'),
-      path: '/admin/company/config',
+      path: ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? '/admin/company/branches' : '/admin/company/config',
       children: [
+        ...(['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
+          { key: 'branches', label: t('nav.branches'), path: '/admin/company/branches' },
+        ] : []),
+        { key: 'pin', label: t('nav.branchPin'), path: '/admin/company/pin' },
         { key: 'company-config', label: t('nav.companyConfig'), path: '/admin/company/config' },
         { key: 'bank-accounts', label: t('nav.bankAccounts'), path: '/admin/company/bank-accounts' },
         { key: 'holidays', label: t('nav.holidays'), path: '/admin/company/holidays' },
         { key: 'dunning', label: t('nav.dunning'), path: '/admin/company/dunning' },
         { key: 'blacklist', label: t('nav.blacklist'), path: '/admin/company/blacklist' },
         { key: 'icloud', label: t('nav.icloud'), path: '/admin/company/icloud' },
-        { key: 'pin', label: t('nav.branchPin'), path: '/admin/company/pin' },
       ],
     },
     { key: 'price-check', icon: <Calculator size="1rem" />, label: t('nav.priceCheck'), path: '/admin/price-check' },

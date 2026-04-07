@@ -97,7 +97,8 @@
     "legalCases": "Cases",
     "contracts": "Contracts",
     "contractSearch": "Contract Search",
-    "savingContracts": "Saving Contracts"
+    "savingContracts": "Saving Contracts",
+    "branches": "Branches"
   },
   "user": {
     "id": "User ID",
@@ -1040,6 +1041,13 @@
     "iosOnlyDesc": "MDM enrollment is only available for iPhone and iPad devices."
   },
   "settings": {
+    "title": "Settings",
+    "holdings": "Holdings",
+    "holdingsDesc": "Manage holding companies",
+    "holding": "Holding",
+    "companies": "Companies",
+    "companiesDesc": "Manage companies within holdings",
+    "company": "Company",
     "config": {
       "title": "Company Configuration",
       "description": "Contract settings, late fees, commission rules, and pause options per company.",
@@ -1471,6 +1479,40 @@
     "thb": "THB",
     "fin2Calc": "Custom Calculator",
     "fin2UsingRate": "Using profit rate from"
+  },
+  "org": {
+    "title": "Organization",
+    "description": "Holdings, companies, and branches",
+    "empty": "No organizations found",
+    "noResults": "No matches found",
+    "companies": "companies",
+    "branches": "branches",
+    "addHolding": "Add Holding",
+    "addCompany": "Add Company",
+    "addBranch": "Add Branch",
+    "createHolding": "Create Holding",
+    "editHolding": "Edit Holding",
+    "createCompany": "Create Company",
+    "editCompany": "Edit Company",
+    "createBranch": "Create Branch",
+    "editBranch": "Edit Branch",
+    "code": "Code",
+    "codePlaceholder": "e.g. HQ-01",
+    "name": "Name",
+    "branchTypeLabel": "Branch Type",
+    "address": "Address",
+    "deactivate": "Deactivate",
+    "branchType": {
+      "INTERNAL": "Internal",
+      "EXTERNAL": "External",
+      "DEAL_PARTNER": "Deal Partner"
+    }
+  },
+  "branches": {
+    "title": "Branches",
+    "description": "Manage branches and their types",
+    "allTypes": "All types",
+    "allCompanies": "All companies"
   },
   "commission": {
     "staffTitle": "Staff Commission",

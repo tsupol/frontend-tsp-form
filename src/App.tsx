@@ -58,6 +58,10 @@ import { DunningConfigPage } from './pages/company/DunningConfigPage';
 import { BlacklistPage } from './pages/company/BlacklistPage';
 import { ICloudPoolPage } from './pages/company/ICloudPoolPage';
 import { BranchPinPage } from './pages/company/BranchPinPage';
+import { BranchesPage } from './pages/BranchesPage';
+import { SettingsLayout } from './pages/settings/SettingsLayout';
+import { HoldingsPage } from './pages/settings/HoldingsPage';
+import { CompaniesPage } from './pages/settings/CompaniesPage';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -111,17 +115,39 @@ function App() {
         }
       />
 
-      {/* User profile */}
+      {/* Settings — profile, holdings, companies */}
       <Route
-        path="/admin/profile"
+        path="/admin/settings/profile"
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <UserPage />
+              <SettingsLayout><UserPage /></SettingsLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/admin/settings/holdings"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <SettingsLayout><HoldingsPage /></SettingsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/settings/companies"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <SettingsLayout><CompaniesPage /></SettingsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      {/* Redirect old profile path */}
+      <Route path="/admin/profile" element={<Navigate to="/admin/settings/profile" replace />} />
 
       {/* Users */}
       <Route
@@ -423,6 +449,16 @@ function App() {
 
       {/* Company */}
       <Route
+        path="/admin/company/branches"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <CompanyLayout><BranchesPage /></CompanyLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/admin/company/config"
         element={
           <ProtectedRoute>
@@ -494,6 +530,7 @@ function App() {
           </ProtectedRoute>
         }
       />
+
 
       {/* Registration flow */}
       <Route
