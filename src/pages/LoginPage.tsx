@@ -2,28 +2,18 @@ import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button, Input, FormErrorMessage, Select } from 'tsp-form';
+import { Button, Input, FormErrorMessage } from 'tsp-form';
 import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { ApiError } from '../lib/api';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
+import { QuickLogin } from '../components/QuickLogin';
 
 interface LoginFormData {
   username: string;
   password: string;
 }
 
-const TEST_USERS = [
-  { label: 'alice (SYSTEM_DEV)', value: 'alice' },
-  { label: 'test_holding_admin (HOLDING_ADMIN)', value: 'test_holding_admin' },
-  { label: 'test_company_admin (COMPANY_ADMIN)', value: 'test_company_admin' },
-  { label: 'test_company_accountant (COMPANY_ACCOUNTANT)', value: 'test_company_accountant' },
-  { label: 'test_company_inventory (COMPANY_INVENTORY)', value: 'test_company_inventory' },
-  { label: 'test_company_collector (COMPANY_COLLECTOR)', value: 'test_company_collector' },
-  { label: 'test_company_repo (COMPANY_REPO)', value: 'test_company_repo' },
-  { label: 'test_branch_manager (BRANCH_MANAGER)', value: 'test_branch_manager' },
-  { label: 'test_branch_staff (BRANCH_STAFF)', value: 'test_branch_staff' },
-];
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -32,7 +22,6 @@ export function LoginPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
   const [isPending, setIsPending] = useState(false);
-  const [selectedUser, setSelectedUser] = useState('alice');
   const [errorMessage, setErrorMessage] = useState('');
 
   const reasonRef = useRef(searchParams.get('reason'));
@@ -48,13 +37,15 @@ export function LoginPage() {
     }
   }, [searchParams, setSearchParams]);
 
+  const lastUser = localStorage.getItem('quick_login_last_user') || 'alice';
+
   const {
     register,
     handleSubmit,
     setValue,
     formState: { errors },
   } = useForm<LoginFormData>({
-    defaultValues: { username: 'alice', password: 'Test123456' },
+    defaultValues: { username: lastUser, password: 'Test123456' },
   });
 
   const onSubmit = async (data: LoginFormData) => {
@@ -103,20 +94,12 @@ export function LoginPage() {
           </div>
         )}
 
-        <div className="mb-4">
-          <label className="form-label">Quick login</label>
-          <Select
-            options={TEST_USERS}
-            value={selectedUser}
-            onChange={(val) => {
-              setSelectedUser((val as string) ?? '');
-              setValue('username', (val as string) ?? '');
-              setValue('password', 'Test123456');
-            }}
-            searchable={false}
-            showChevron
-          />
-        </div>
+        <QuickLogin
+          onSelect={(username, password) => {
+            setValue('username', username);
+            setValue('password', password);
+          }}
+        />
 
         <form onSubmit={handleSubmit(onSubmit)}>
           <div className="grid gap-5 pb-8">
