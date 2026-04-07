@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Input, Badge } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, Search, Calculator, Clock, Trash2, X } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, Search, Calculator, Clock, Trash2, X, ArrowUp, Info } from 'lucide-react';
 import { apiClient } from '../lib/api';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -50,6 +50,7 @@ interface PricingRow {
   installment_amount: number;
   total_amount: number;
   financed_amount: number;
+  cost_price: number;
   interest_percent_total: number | null;
   max_discount_percent: number;
   fin2_profit_amount: number | null;
@@ -143,6 +144,11 @@ export function PriceCheckPage() {
     setRecentModels(getRecentModels());
   }, []);
 
+  const handleClearAllRecent = useCallback(() => {
+    localStorage.removeItem(RECENT_KEY);
+    setRecentModels([]);
+  }, []);
+
   // Refresh recent list from localStorage when search clears (recent list becomes visible)
   const isSearching = debouncedSearch.length >= 2;
   useEffect(() => {
@@ -222,7 +228,13 @@ export function PriceCheckPage() {
                   <>
                     <div className="px-4 pt-3 pb-1 flex items-center gap-1.5 text-xs text-subtle">
                       <Clock size={12} />
-                      <span>{t('priceCheck.recent')}</span>
+                      <span className="flex-1">{t('priceCheck.recent')}</span>
+                      <button
+                        className="text-xs text-subtle hover:text-fg cursor-pointer bg-transparent border-none px-1"
+                        onClick={handleClearAllRecent}
+                      >
+                        {t('priceCheck.clearAll')}
+                      </button>
                     </div>
                     <div className="flex flex-col divide-y divide-line">
                       {recentModels.map(model => (
@@ -241,7 +253,7 @@ export function PriceCheckPage() {
                 {/* Empty state */}
                 {!isSearching && recentModels.length === 0 && (
                   <div className="p-8 text-center text-subtler">
-                    <Calculator size={28} className="mx-auto mb-2 opacity-30" />
+                    <ArrowUp size={28} className="mx-auto mb-2 opacity-30" />
                     <div className="text-sm">{t('priceCheck.emptyHint')}</div>
                   </div>
                 )}
@@ -411,6 +423,7 @@ function PricingDetail({ model, quoteData, loading, t }: {
           installment_amount: q.installment_amount,
           total_amount: q.total_amount,
           financed_amount: q.financed_amount,
+          cost_price: q.cost_price,
           interest_percent_total: q.interest_percent_total,
           max_discount_percent: q.max_discount_percent,
           fin2_profit_amount: q.fin2_profit_amount,
@@ -466,11 +479,121 @@ function PricingDetail({ model, quoteData, loading, t }: {
                   <span className="text-xs text-subtle">· {t('priceCheck.maxDiscount')} {fin2Rows[0].max_discount_percent}%</span>
                 </div>
                 <PricingTable rows={fin2Rows} terms={fin2Terms} type="fin2" t={t} />
+                <Fin2Calculator fin2Rows={fin2Rows} fin2Terms={fin2Terms} t={t} />
               </div>
             )}
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── FIN2 Calculator ──────────────────────────────────────────────────────────
+
+/** Resolve profit_amount from the nearest-lower configured term */
+function resolveProfit(fin2Rows: PricingRow[], fin2Terms: number[], termMonths: number) {
+  // Find the largest configured term that is <= input term
+  let resolved: number | undefined;
+  for (const t of fin2Terms) {
+    if (t <= termMonths) resolved = t;
+    else break; // fin2Terms is sorted asc
+  }
+  // If input is below the smallest term, use the smallest
+  if (resolved == null) resolved = fin2Terms[0];
+  const row = fin2Rows.find(r => r.term_months === resolved);
+  return row ? { baseTerm: resolved, profit: row.fin2_profit_amount ?? 0, cost: row.cost_price, maxDiscount: row.max_discount_percent } : null;
+}
+
+function Fin2Calculator({ fin2Rows, fin2Terms, t }: {
+  fin2Rows: PricingRow[];
+  fin2Terms: number[];
+  t: (key: string) => string;
+}) {
+  const [termInput, setTermInput] = useState('');
+  const [downInput, setDownInput] = useState('');
+
+  const termMonths = parseInt(termInput) || 0;
+  const downAmount = parseFloat(downInput) || 0;
+
+  const result = useMemo(() => {
+    if (termMonths < 1 || fin2Terms.length === 0) return null;
+    const resolved = resolveProfit(fin2Rows, fin2Terms, termMonths);
+    if (!resolved) return null;
+
+    const total = resolved.cost + resolved.profit;
+    const financed = Math.max(0, total - downAmount);
+    const installment = termMonths > 0 ? Math.round(financed / termMonths) : 0;
+    const isCustomTerm = !fin2Terms.includes(termMonths);
+
+    return {
+      baseTerm: resolved.baseTerm,
+      profit: resolved.profit,
+      cost: resolved.cost,
+      total,
+      downAmount: Math.min(downAmount, total),
+      financed,
+      installment,
+      isCustomTerm,
+      maxDiscount: resolved.maxDiscount,
+    };
+  }, [termMonths, downAmount, fin2Rows, fin2Terms]);
+
+  return (
+    <div className="mt-4 border border-line rounded-lg p-4 bg-surface-hover/50">
+      <div className="flex items-center gap-1.5 mb-3">
+        <Calculator size={14} className="text-subtle" />
+        <span className="text-sm font-medium">{t('priceCheck.fin2Calc')}</span>
+      </div>
+
+      <div className="flex gap-3 mb-3">
+        <div className="flex flex-col gap-1 flex-1">
+          <label className="form-label">{t('priceCheck.term')} ({t('priceCheck.months')})</label>
+          <Input
+            size="sm"
+            type="number"
+            min={1}
+            placeholder={fin2Terms.join(', ')}
+            value={termInput}
+            onChange={(e) => setTermInput(e.target.value)}
+            className="w-full"
+          />
+        </div>
+        <div className="flex flex-col gap-1 flex-1">
+          <label className="form-label">{t('priceCheck.downPayment')}</label>
+          <Input
+            size="sm"
+            type="number"
+            min={0}
+            placeholder={t('priceCheck.thb')}
+            value={downInput}
+            onChange={(e) => setDownInput(e.target.value)}
+            className="w-full"
+          />
+        </div>
+      </div>
+
+      {result && (
+        <div className="border border-line rounded-md bg-surface p-3">
+          {result.isCustomTerm && (
+            <div className="flex items-start gap-1.5 mb-2 text-xs text-subtle">
+              <Info size={12} className="shrink-0 mt-0.5" />
+              <span>{t('priceCheck.fin2UsingRate')} {result.baseTerm} {t('priceCheck.months')}</span>
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+            <span className="text-subtle">{t('priceCheck.profit')}</span>
+            <span className="text-right tabular-nums">{fmt(result.profit)}</span>
+            <span className="text-subtle">{t('priceCheck.totalAmount')}</span>
+            <span className="text-right tabular-nums">{fmt(result.total)}</span>
+            <span className="text-subtle">{t('priceCheck.downPayment')}</span>
+            <span className="text-right tabular-nums">{fmt(result.downAmount)}</span>
+            <div className="col-span-2 border-t border-line my-1" />
+            <span className="font-medium">{t('priceCheck.installment')}</span>
+            <span className="text-right tabular-nums text-primary font-semibold text-base">{fmt(result.installment)}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

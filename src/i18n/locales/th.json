@@ -1456,6 +1456,7 @@
     "emptyHint": "ค้นหาสินค้าเพื่อดูแผนผ่อนชำระ",
     "selectToView": "เลือกรุ่นเพื่อดูราคา",
     "recent": "ดูล่าสุด",
+    "clearAll": "ล้างทั้งหมด",
     "retailPrice": "ราคาขาย",
     "downPayment": "ดาวน์",
     "installment": "ผ่อน/เดือน",
@@ -1466,7 +1467,10 @@
     "months": "ด.",
     "maxDiscount": "ลดสูงสุด",
     "fin1Desc": "อัตราคงที่",
-    "fin2Desc": "ต่อรองได้"
+    "fin2Desc": "ต่อรองได้",
+    "thb": "บาท",
+    "fin2Calc": "คำนวณเอง",
+    "fin2UsingRate": "ใช้อัตรากำไรของ"
   },
   "commission": {
     "staffTitle": "ค่าคอมฯ พนักงาน",

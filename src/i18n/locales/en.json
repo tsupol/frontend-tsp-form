@@ -1456,6 +1456,7 @@
     "emptyHint": "Search for a product to see installment plans",
     "selectToView": "Select a model to view pricing",
     "recent": "Recently Viewed",
+    "clearAll": "Clear all",
     "retailPrice": "Retail",
     "downPayment": "Down",
     "installment": "Monthly",
@@ -1466,7 +1467,10 @@
     "months": "mo",
     "maxDiscount": "Max discount",
     "fin1Desc": "Fixed Rate",
-    "fin2Desc": "Negotiable"
+    "fin2Desc": "Negotiable",
+    "thb": "THB",
+    "fin2Calc": "Custom Calculator",
+    "fin2UsingRate": "Using profit rate from"
   },
   "commission": {
     "staffTitle": "Staff Commission",
