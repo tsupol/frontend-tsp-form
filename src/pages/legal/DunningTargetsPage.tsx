@@ -1,12 +1,13 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import {
   DataTable, DataTableColumnHeader, DataTableFooter, Input, Select, Badge, Button,
   PopOver, MobileHeader, InputDatePicker,
   type ColumnDef, type SortingState,
 } from 'tsp-form';
-import { ArrowRightFromLine, Search, SlidersHorizontal, Calendar } from 'lucide-react';
+import { ArrowRightFromLine, Search, SlidersHorizontal, Calendar, ExternalLink } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -104,6 +105,11 @@ const SORT_OPTIONS = [
 
 export function DunningTargetsPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+
+  const goToContract = useCallback((contractId: number) => {
+    navigate(`/admin/contracts/search/${contractId}`);
+  }, [navigate]);
 
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pageIndex, setPageIndex] = useState(0);
@@ -170,7 +176,12 @@ export function DunningTargetsPage() {
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('legal.contract')} />,
       cell: ({ row }) => (
         <div>
-          <div className="text-xs font-medium">{row.original.contract_code_display ?? row.original.contract_code}</div>
+          <button
+            className="text-xs font-medium text-primary hover:underline cursor-pointer bg-transparent border-none p-0"
+            onClick={() => goToContract(row.original.contract_id)}
+          >
+            {row.original.contract_code_display ?? row.original.contract_code}
+          </button>
           <div className="text-[11px] text-subtle">{row.original.branch_name}</div>
         </div>
       ),
@@ -222,7 +233,22 @@ export function DunningTargetsPage() {
         );
       },
     },
-  ], [t]);
+    {
+      id: 'actions',
+      header: () => null,
+      cell: ({ row }) => (
+        <button
+          className="p-1.5 rounded hover:bg-surface-hover transition-colors cursor-pointer bg-transparent border-none text-subtle hover:text-primary"
+          onClick={() => goToContract(row.original.contract_id)}
+          title={t('legal.viewContract')}
+        >
+          <ExternalLink size={14} />
+        </button>
+      ),
+      enableSorting: false,
+      className: 'w-10',
+    },
+  ], [t, goToContract]);
 
   return (
     <>
@@ -419,7 +445,11 @@ export function DunningTargetsPage() {
             ) : (
               <div className="flex flex-col divide-y divide-line">
                 {list.map((item) => (
-                  <div key={item.contract_id} className="flex items-center gap-3 px-1 py-3">
+                  <div
+                    key={item.contract_id}
+                    className="flex items-center gap-3 px-1 py-3 cursor-pointer active:bg-surface-hover"
+                    onClick={() => goToContract(item.contract_id)}
+                  >
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm truncate">{item.contract_code_display ?? item.contract_code}</div>
                       <div className="text-xs text-control-label truncate">{item.customer_name ?? item.branch_name}</div>

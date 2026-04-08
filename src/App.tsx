@@ -373,7 +373,7 @@ function App() {
 
       {/* Contracts */}
       <Route
-        path="/admin/contracts/search"
+        path="/admin/contracts/search/:contractId?"
         element={
           <ProtectedRoute>
             <AdminLayout>

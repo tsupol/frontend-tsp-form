@@ -1131,17 +1131,27 @@
     },
     "dunning": {
       "title": "Dunning Configuration",
-      "description": "Configure overdue collection levels and actions.",
+      "description": "Configure overdue collection levels and actions per company.",
       "company": "Company",
       "level": "Level",
-      "overdueDays": "Overdue Days",
+      "overdueDays": "Days",
       "action": "Action",
       "actionDescription": "Description",
       "isActive": "Active",
-      "save": "Save",
       "saved": "Dunning configuration saved.",
       "empty": "No dunning levels configured.",
-      "selectCompany": "Select a company"
+      "selectCompany": "Select a company",
+      "selectAction": "Select action",
+      "descriptionPlaceholder": "What happens at this level",
+      "modified": "modified",
+      "daysWarning": "Overdue days should increase with each level.",
+      "lastUpdated": "Updated by",
+      "pendingChanges": "{{count}} unsaved change(s)",
+      "actionRemind": "Remind",
+      "actionCollect": "Collect",
+      "actionRestrict": "Restrict",
+      "actionRepoCase": "Legal Case",
+      "actionBlacklist": "Blacklist"
     },
     "blacklist": {
       "title": "Blacklist",
@@ -1603,6 +1613,7 @@
     "actionNoteSuccess": "Note added",
     "outstanding": "Outstanding",
     "assignedTo": "Assigned To",
-    "branch": "Branch"
+    "branch": "Branch",
+    "viewContract": "View contract"
   }
 }

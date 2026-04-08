@@ -1131,17 +1131,27 @@
     },
     "dunning": {
       "title": "ตั้งค่าทวงถาม",
-      "description": "ตั้งค่าระดับและการดำเนินการทวงถาม",
+      "description": "ตั้งค่าระดับและการดำเนินการทวงถามตามบริษัท",
       "company": "บริษัท",
       "level": "ระดับ",
-      "overdueDays": "วันค้างชำระ",
+      "overdueDays": "วัน",
       "action": "การดำเนินการ",
       "actionDescription": "รายละเอียด",
       "isActive": "เปิดใช้งาน",
-      "save": "บันทึก",
       "saved": "บันทึกการตั้งค่าทวงถามแล้ว",
       "empty": "ยังไม่มีการตั้งค่าระดับทวงถาม",
-      "selectCompany": "เลือกบริษัท"
+      "selectCompany": "เลือกบริษัท",
+      "selectAction": "เลือกการดำเนินการ",
+      "descriptionPlaceholder": "สิ่งที่เกิดขึ้นในระดับนี้",
+      "modified": "แก้ไขแล้ว",
+      "daysWarning": "จำนวนวันค้างชำระควรเพิ่มขึ้นตามระดับ",
+      "lastUpdated": "แก้ไขโดย",
+      "pendingChanges": "{{count}} รายการที่ยังไม่บันทึก",
+      "actionRemind": "แจ้งเตือน",
+      "actionCollect": "ทวงถาม",
+      "actionRestrict": "จำกัดบริการ",
+      "actionRepoCase": "คดีกฎหมาย",
+      "actionBlacklist": "บัญชีดำ"
     },
     "blacklist": {
       "title": "บัญชีดำ",
@@ -1603,6 +1613,7 @@
     "actionNoteSuccess": "เพิ่มหมายเหตุสำเร็จ",
     "outstanding": "ยอดคงเหลือ",
     "assignedTo": "ผู้รับผิดชอบ",
-    "branch": "สาขา"
+    "branch": "สาขา",
+    "viewContract": "ดูสัญญา"
   }
 }

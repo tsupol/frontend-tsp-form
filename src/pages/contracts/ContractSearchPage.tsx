@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Badge, Input, Select, Button, DataTableFooter } from 'tsp-form';
@@ -77,7 +77,13 @@ export function ContractSearchPage() {
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const { contractId: contractIdParam } = useParams<{ contractId?: string }>();
+  const selectedId = contractIdParam ? Number(contractIdParam) : null;
+
+  const setSelectedId = (id: number | null) => {
+    if (id) navigate(`/admin/contracts/search/${id}`, { replace: true });
+    else navigate('/admin/contracts/search', { replace: true });
+  };
 
   // Debounce keyword
   useEffect(() => {
@@ -122,17 +128,11 @@ export function ContractSearchPage() {
   const totalCount = searchData?.count ?? 0;
   const totalPages = Math.ceil(totalCount / pageSize);
 
-  // Clear selection when contracts change
-  useEffect(() => {
-    if (selectedId && contracts.length > 0 && !contracts.find(c => c.id === selectedId)) {
-      setSelectedId(null);
-    }
-  }, [contracts, selectedId]);
 
   const extraFilterCount = [filterState, filterBranchId].filter(Boolean).length;
 
   return (
-    <PageNav panels={['list', 'detail']} className="h-dvh">
+    <PageNav panels={['list', 'detail']} defaultPanel={selectedId ? 'detail' : 'list'} className="h-dvh">
       {({ isMobile, isRoot, goTo, goBack }) => (
         <>
           {isMobile && (
@@ -143,7 +143,7 @@ export function ContractSearchPage() {
                     <ArrowRightFromLine size={18} />
                   </button>
                 ) : (
-                  <button className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current" onClick={goBack}>
+                  <button className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current" onClick={() => { setSelectedId(null); goBack(); }}>
                     <ArrowLeft size={20} />
                   </button>
                 )}
