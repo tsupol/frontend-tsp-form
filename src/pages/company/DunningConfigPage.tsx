@@ -4,7 +4,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   MobileHeader, Button, Input, Select, Switch, Badge, useSnackbarContext,
 } from 'tsp-form';
-import { ArrowRightFromLine, CheckCircle, XCircle, Save } from 'lucide-react';
+import { ArrowRightFromLine, CheckCircle, XCircle, Save, Plus, Trash2, Info, ExternalLink } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -28,15 +29,16 @@ interface CompanyOption {
 }
 
 interface EditableRow {
-  level: number;
+  _key: number; // stable React key
+  level: string;
   overdue_days: string;
   action: string;
   description: string;
   is_active: boolean;
-  // Read-only from server
   channel: string;
   updated_by_name: string | null;
   updated_at: string | null;
+  isNew: boolean;
   dirty: boolean;
 }
 
@@ -57,53 +59,40 @@ const CHANNEL_LABELS: Record<string, string> = {
   SYSTEM: 'System',
 };
 
-const MAX_LEVELS = 9;
+let nextKey = 1;
 
-function createEmptyRows(): EditableRow[] {
-  return Array.from({ length: MAX_LEVELS }, (_, i) => ({
-    level: i + 1,
-    overdue_days: '',
-    action: '',
-    description: '',
-    is_active: true,
-    channel: '',
-    updated_by_name: null,
-    updated_at: null,
+function serverToEditable(rows: DunningConfigRow[]): EditableRow[] {
+  return rows.map(r => ({
+    _key: nextKey++,
+    level: String(r.level),
+    overdue_days: String(r.overdue_days),
+    action: r.action,
+    description: r.description,
+    is_active: r.is_active,
+    channel: r.channel,
+    updated_by_name: r.updated_by_name,
+    updated_at: r.updated_at,
+    isNew: false,
     dirty: false,
   }));
 }
 
-function serverToEditable(rows: DunningConfigRow[]): EditableRow[] {
-  const base = createEmptyRows();
-  for (const r of rows) {
-    const idx = r.level - 1;
-    if (idx >= 0 && idx < MAX_LEVELS) {
-      base[idx] = {
-        level: r.level,
-        overdue_days: String(r.overdue_days),
-        action: r.action,
-        description: r.description,
-        is_active: r.is_active,
-        channel: r.channel,
-        updated_by_name: r.updated_by_name,
-        updated_at: r.updated_at,
-        dirty: false,
-      };
-    }
-  }
-  return base;
+function nextLevel(rows: EditableRow[]): number {
+  const levels = rows.map(r => Number(r.level) || 0);
+  return levels.length > 0 ? Math.max(...levels) + 1 : 1;
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function DunningConfigPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { addSnackbar } = useSnackbarContext();
   const queryClient = useQueryClient();
 
   const [selectedCompany, setSelectedCompany] = useState('');
-  const [rows, setRows] = useState<EditableRow[]>(createEmptyRows);
+  const [rows, setRows] = useState<EditableRow[]>([]);
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -120,14 +109,12 @@ export function DunningConfigPage() {
     enabled: !!selectedCompany,
   });
 
-  // Auto-select single company
   useEffect(() => {
     if (companies.length === 1 && !selectedCompany) {
       setSelectedCompany(String(companies[0].company_id));
     }
   }, [companies, selectedCompany]);
 
-  // Sync server data to editable rows
   useEffect(() => {
     if (serverRows) {
       setRows(serverToEditable(serverRows));
@@ -138,30 +125,57 @@ export function DunningConfigPage() {
 
   const handleCompanyChange = (val: string | string[] | null) => {
     setSelectedCompany((val as string) ?? '');
-    setRows(createEmptyRows());
+    setRows([]);
     setErrorMessage('');
   };
 
-  const updateRow = useCallback((level: number, field: keyof EditableRow, value: string | boolean) => {
+  const updateRow = useCallback((key: number, field: keyof EditableRow, value: string | boolean) => {
     setRows(prev => prev.map(r =>
-      r.level === level ? { ...r, [field]: value, dirty: true } : r
+      r._key === key ? { ...r, [field]: value, dirty: true } : r
     ));
   }, []);
 
-  const dirtyRows = rows.filter(r => r.dirty && r.action);
+  const addRow = useCallback(() => {
+    setRows(prev => [...prev, {
+      _key: nextKey++,
+      level: String(nextLevel(prev)),
+      overdue_days: '',
+      action: '',
+      description: '',
+      is_active: true,
+      channel: '',
+      updated_by_name: null,
+      updated_at: null,
+      isNew: true,
+      dirty: true,
+    }]);
+  }, []);
 
-  // Validation: check days ascending for filled rows
-  const filledRows = rows.filter(r => r.action);
+  const removeRow = useCallback((key: number) => {
+    setRows(prev => prev.filter(r => r._key !== key));
+  }, []);
+
+  const dirtyRows = rows.filter(r => r.dirty && r.action && r.level);
+
+  // Validation: check days ascending
   const daysWarning = (() => {
-    const days = filledRows.map(r => Number(r.overdue_days) || 0);
+    const sorted = [...rows].filter(r => r.action).sort((a, b) => (Number(a.level) || 0) - (Number(b.level) || 0));
+    const days = sorted.map(r => Number(r.overdue_days) || 0);
     for (let i = 1; i < days.length; i++) {
       if (days[i] <= days[i - 1]) return true;
     }
     return false;
   })();
 
+  // Check duplicate levels
+  const duplicateLevels = (() => {
+    const levels = rows.map(r => r.level).filter(Boolean);
+    return levels.length !== new Set(levels).size;
+  })();
+
   const handleSave = async () => {
     if (!user || !selectedCompany || dirtyRows.length === 0) return;
+    if (duplicateLevels) return;
 
     setSaving(true);
     setErrorMessage('');
@@ -170,7 +184,7 @@ export function DunningConfigPage() {
       for (const row of dirtyRows) {
         await apiClient.rpc('fn_dunning_config_upsert', {
           p_company_id: Number(selectedCompany),
-          p_level: row.level,
+          p_level: Number(row.level),
           p_overdue_days: Number(row.overdue_days) || 0,
           p_action: row.action,
           p_description: row.description.trim(),
@@ -218,14 +232,26 @@ export function DunningConfigPage() {
         <div className="mobile-header-title mobile-header-title-truncate">
           {t('settings.dunning.title')}
         </div>
-        <div className="mobile-header-end w-nav" />
+        <div className="mobile-header-end">
+          <button
+            className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-subtle hover:text-fg"
+            onClick={() => navigate('/admin/legal/dunning')}
+          >
+            <ExternalLink size={18} />
+          </button>
+        </div>
       </MobileHeader>
 
       <div className="page-content">
         {/* Desktop header */}
-        <div className="mb-6 max-md:hidden">
-          <h1 className="heading-2">{t('settings.dunning.title')}</h1>
-          <p className="text-sm text-fg/60 mt-1">{t('settings.dunning.description')}</p>
+        <div className="flex items-center justify-between mb-6 max-md:hidden">
+          <div>
+            <h1 className="heading-2">{t('settings.dunning.title')}</h1>
+            <p className="text-sm text-fg/60 mt-1">{t('settings.dunning.description')}</p>
+          </div>
+          <Button variant="ghost" size="sm" startIcon={<ExternalLink size={14} />} onClick={() => navigate('/admin/legal/dunning')}>
+            {t('settings.dunning.viewTargets')}
+          </Button>
         </div>
 
         {/* Company selector — only show if multiple */}
@@ -260,98 +286,126 @@ export function DunningConfigPage() {
         ) : (
           <>
             {daysWarning && (
-              <div className="alert alert-warning mb-4">
+              <div className="alert alert-info mb-4">
+                <Info size={16} />
                 <div className="alert-description">{t('settings.dunning.daysWarning')}</div>
+              </div>
+            )}
+
+            {duplicateLevels && (
+              <div className="alert alert-danger mb-4">
+                <XCircle size={16} />
+                <div className="alert-description">{t('settings.dunning.duplicateLevel')}</div>
               </div>
             )}
 
             {/* Levels */}
             <div className="flex flex-col gap-3 pb-4">
-              {rows.map(row => {
-                const isFilled = !!row.action;
-                const isConfigured = !!row.channel; // has server data
-
-                return (
-                  <div
-                    key={row.level}
-                    className={`border rounded-lg p-4 transition-colors ${
-                      !row.is_active && isFilled ? 'border-line/50 opacity-60' :
-                      row.dirty ? 'border-primary/40 bg-primary/3' :
-                      isFilled ? 'border-line' :
-                      'border-dashed border-line/50'
-                    }`}
-                  >
-                    {/* Row header */}
-                    <div className="flex items-center gap-3 mb-3">
-                      <span className="text-xs font-semibold text-subtle uppercase w-16 shrink-0">
-                        {t('settings.dunning.level')} {row.level}
+              {rows.length === 0 && (
+                <div className="p-8 text-center text-subtle text-sm">{t('settings.dunning.empty')}</div>
+              )}
+              {rows.map(row => (
+                <div
+                  key={row._key}
+                  className={`border rounded-lg p-4 transition-colors ${
+                    !row.is_active ? 'border-line/50 opacity-60' :
+                    row.dirty ? 'border-primary/40 bg-primary/3' :
+                    'border-line'
+                  }`}
+                >
+                  {/* Row header */}
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-semibold text-subtle uppercase shrink-0">
+                        {t('settings.dunning.level')}
                       </span>
-                      {isConfigured && row.channel && (
-                        <Badge size="sm" color="default">{CHANNEL_LABELS[row.channel] ?? row.channel}</Badge>
-                      )}
-                      {!row.is_active && isFilled && (
-                        <Badge size="sm" color="default">{t('common.inactive')}</Badge>
-                      )}
-                      {row.dirty && (
-                        <span className="text-xs text-primary">{t('settings.dunning.modified')}</span>
-                      )}
-                      <div className="ml-auto flex items-center gap-2">
-                        {isFilled && (
-                          <Switch
-                            checked={row.is_active}
-                            onChange={(e) => updateRow(row.level, 'is_active', (e.target as HTMLInputElement).checked)}
-                          />
-                        )}
-                      </div>
+                      <Input
+                        type="number"
+                        size="sm"
+                        className="w-16"
+                        value={row.level}
+                        onChange={(e) => updateRow(row._key, 'level', e.target.value)}
+                        min={1}
+                      />
                     </div>
-
-                    {/* Fields */}
-                    <div className="grid grid-cols-1 sm:grid-cols-[6rem_1fr_1fr] gap-3">
-                      <div className="flex flex-col">
-                        <label className="form-label">{t('settings.dunning.overdueDays')}</label>
-                        <Input
-                          type="number"
-                          size="sm"
-                          className="w-full"
-                          value={row.overdue_days}
-                          onChange={(e) => updateRow(row.level, 'overdue_days', e.target.value)}
-                          placeholder="0"
-                        />
-                      </div>
-                      <div className="flex flex-col">
-                        <label className="form-label">{t('settings.dunning.action')}</label>
-                        <Select
-                          value={row.action || null}
-                          onChange={(val) => updateRow(row.level, 'action', (val as string) ?? '')}
-                          options={actionOptions}
-                          placeholder={t('settings.dunning.selectAction')}
-                          size="sm"
-                          showChevron
-                          clearable
-                          searchable={false}
-                        />
-                      </div>
-                      <div className="flex flex-col">
-                        <label className="form-label">{t('settings.dunning.actionDescription')}</label>
-                        <Input
-                          size="sm"
-                          className="w-full"
-                          value={row.description}
-                          onChange={(e) => updateRow(row.level, 'description', e.target.value)}
-                          placeholder={t('settings.dunning.descriptionPlaceholder')}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Last updated info */}
-                    {isConfigured && row.updated_at && (
-                      <div className="mt-2 text-[11px] text-subtle">
-                        {t('settings.dunning.lastUpdated')} {row.updated_by_name ?? '—'} · {new Date(row.updated_at).toLocaleDateString()}
-                      </div>
+                    {row.channel && (
+                      <Badge size="sm" color="default">{CHANNEL_LABELS[row.channel] ?? row.channel}</Badge>
                     )}
+                    {row.dirty && (
+                      <span className="text-xs text-primary">{t('settings.dunning.modified')}</span>
+                    )}
+                    <div className="ml-auto flex items-center gap-2">
+                      <Switch
+                        checked={row.is_active}
+                        onChange={(e) => updateRow(row._key, 'is_active', (e.target as HTMLInputElement).checked)}
+                      />
+                      {row.isNew && (
+                        <button
+                          className="p-1 rounded hover:bg-danger/10 cursor-pointer bg-transparent border-none text-subtle hover:text-danger"
+                          onClick={() => removeRow(row._key)}
+                          title={t('common.delete')}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                );
-              })}
+
+                  {/* Fields */}
+                  <div className="grid grid-cols-1 sm:grid-cols-[6rem_1fr_1fr] gap-3">
+                    <div className="flex flex-col">
+                      <label className="form-label">{t('settings.dunning.overdueDays')}</label>
+                      <Input
+                        type="number"
+                        size="sm"
+                        className="w-full"
+                        value={row.overdue_days}
+                        onChange={(e) => updateRow(row._key, 'overdue_days', e.target.value)}
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="flex flex-col">
+                      <label className="form-label">{t('settings.dunning.action')}</label>
+                      <Select
+                        value={row.action || null}
+                        onChange={(val) => updateRow(row._key, 'action', (val as string) ?? '')}
+                        options={actionOptions}
+                        placeholder={t('settings.dunning.selectAction')}
+                        size="sm"
+                        showChevron
+                        clearable
+                        searchable={false}
+                      />
+                    </div>
+                    <div className="flex flex-col">
+                      <label className="form-label">{t('settings.dunning.actionDescription')}</label>
+                      <Input
+                        size="sm"
+                        className="w-full"
+                        value={row.description}
+                        onChange={(e) => updateRow(row._key, 'description', e.target.value)}
+                        placeholder={t('settings.dunning.descriptionPlaceholder')}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Last updated info */}
+                  {!row.isNew && row.updated_at && (
+                    <div className="mt-2 text-[11px] text-subtle">
+                      {t('settings.dunning.lastUpdated')} {row.updated_by_name ?? '—'} · {new Date(row.updated_at).toLocaleDateString()}
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {/* Add level button */}
+              <button
+                className="border border-dashed border-line rounded-lg p-3 flex items-center justify-center gap-2 text-sm text-subtle hover:text-fg hover:border-fg/30 cursor-pointer bg-transparent transition-colors"
+                onClick={addRow}
+              >
+                <Plus size={16} />
+                {t('settings.dunning.addLevel')}
+              </button>
             </div>
 
             {/* Sticky save footer */}
@@ -364,7 +418,7 @@ export function DunningConfigPage() {
                 size="sm"
                 startIcon={<Save size={16} />}
                 onClick={handleSave}
-                disabled={saving || dirtyRows.length === 0}
+                disabled={saving || dirtyRows.length === 0 || duplicateLevels}
               >
                 {saving ? t('common.saving') : t('common.save')}
               </Button>
