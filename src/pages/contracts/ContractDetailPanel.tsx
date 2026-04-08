@@ -201,7 +201,7 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
   }
 
   return (
-    <div className="relative flex flex-col h-full">
+    <div className="relative flex flex-col h-full min-w-0">
       {/* Desktop header */}
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
@@ -219,7 +219,7 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
       )}
 
       {/* Tabs */}
-      <div className="flex-none flex border-b border-line px-2 overflow-x-auto">
+      <div className="flex-none flex border-b border-line px-2 overflow-x-auto hidden-scroll">
         {TABS.map(tab => (
           <button
             key={tab}
