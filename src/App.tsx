@@ -62,6 +62,7 @@ import { BranchesPage } from './pages/BranchesPage';
 import { SettingsLayout } from './pages/settings/SettingsLayout';
 import { HoldingsPage } from './pages/settings/HoldingsPage';
 import { CompaniesPage } from './pages/settings/CompaniesPage';
+import { CustomersPage } from './pages/customers/CustomersPage';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -392,6 +393,18 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <ContractWizardPage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Customers */}
+      <Route
+        path="/admin/customers"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <CustomersPage />
             </AdminLayout>
           </ProtectedRoute>
         }

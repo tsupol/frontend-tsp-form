@@ -12,6 +12,8 @@
 
 ## tsp-form Component Usage
 
+**IMPORTANT:** Always read `C:\Users\tonsu\.claude\tsp-form-guide.md` before writing any component code. It contains the complete cross-project guide for tsp-form conventions, component APIs, and common pitfalls.
+
 When using tsp-form components, follow this lookup order:
 
 1. **This project first:** Check existing usage in `src/` — reuse the same patterns for consistency

@@ -19,6 +19,7 @@ import {
   Smartphone,
   Calculator,
   Coins,
+  UserSearch,
   Scale,
   Settings,
   HelpCircle,
@@ -197,6 +198,10 @@ export const AppSideNav = () => {
         { key: 'contract-search', label: t('nav.contractSearch'), path: '/admin/contracts/search' },
         { key: 'saving-contracts', label: t('nav.savingContracts'), path: '/admin/contracts/saving' },
       ],
+    },
+    {
+      key: 'customers', icon: <UserSearch size="1rem" />, label: t('nav.customers'),
+      path: '/admin/customers',
     },
     {
       key: 'commission', icon: <Coins size="1rem" />, label: t('nav.commission'),
