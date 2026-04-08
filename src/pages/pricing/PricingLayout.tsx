@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { DollarSign, Calculator, TrendingUp, Percent, ClipboardCheck, Handshake } from 'lucide-react';
+import { DollarSign, Calculator, TrendingUp, Percent, Handshake } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 
 const navItems = [
@@ -9,7 +9,6 @@ const navItems = [
   { path: '/admin/pricing/fin1-rates', labelKey: 'nav.fin1Rates', icon: Calculator },
   { path: '/admin/pricing/fin2-rates', labelKey: 'nav.fin2Rates', icon: TrendingUp },
   { path: '/admin/pricing/discount-policies', labelKey: 'nav.discountPolicies', icon: Percent },
-  { path: '/admin/pricing/discount-approvals', labelKey: 'nav.discountApprovals', icon: ClipboardCheck },
   { path: '/admin/pricing/deal-partner-rates', labelKey: 'nav.dealPartnerRates', icon: Handshake },
 ];
 

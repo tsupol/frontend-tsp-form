@@ -28,7 +28,7 @@ interface Company {
 }
 
 const BRANCH_TYPE_OPTIONS = ['INTERNAL', 'EXTERNAL', 'DEAL_PARTNER'] as const;
-const BRANCH_TYPE_COLORS = { INTERNAL: 'info', EXTERNAL: 'warning', DEAL_PARTNER: 'purple' } as const;
+const BRANCH_TYPE_COLORS = { INTERNAL: 'info', EXTERNAL: 'warning', DEAL_PARTNER: 'secondary' } as const;
 
 // ── Component ────────────────────────────────────────────────────────────────
 

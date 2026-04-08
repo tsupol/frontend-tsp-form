@@ -6,12 +6,19 @@ import {
   Modal, TextArea, Badge, Drawer, MobileHeader, useSnackbarContext,
   type ColumnDef, type SortingState, type RowExpansionState,
 } from 'tsp-form';
-import { ArrowRightFromLine, ArrowDownCircle, SlidersHorizontal, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowRightFromLine, PencilLine, CheckCircle, XCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { DateTime } from '../../components/DateTime';
 
 // ── Types ────────────────────────────────────────────────────────────────────
+
+interface UserLookup {
+  id: number;
+  username: string;
+  role_code: string;
+  branch_name: string | null;
+}
 
 interface CommissionBalance {
   user_id: number;
@@ -89,7 +96,6 @@ export function StaffCommissionPage() {
   const [ledgerPageIndex, setLedgerPageIndex] = useState(0);
   const [ledgerPageSize, setLedgerPageSize] = useState(15);
 
-  const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [adjustOpen, setAdjustOpen] = useState(false);
 
   // ── Balance query ──
@@ -235,10 +241,34 @@ export function StaffCommissionPage() {
     queryClient.invalidateQueries({ queryKey: ['commission-ledger'] });
   };
 
+  // ── Users lookup for modals ──
+  const { data: usersData } = useQuery({
+    queryKey: ['users-lookup'],
+    queryFn: () => apiClient.get<UserLookup[]>('/v_users?select=id,username,role_code,branch_name&is_active=is.true&order=username'),
+    staleTime: 5 * 60 * 1000,
+    enabled: canManage,
+  });
+
   const userOptions = useMemo(
-    () => balanceList.map(u => ({ value: String(u.user_id), label: `${u.username} (${fmt(u.balance)})` })),
-    [balanceList],
+    () => (usersData ?? []).map(u => ({ value: String(u.id), label: u.username })),
+    [usersData],
   );
+
+  const usersMap = useMemo(() => {
+    const map = new Map<string, UserLookup>();
+    for (const u of usersData ?? []) map.set(String(u.id), u);
+    return map;
+  }, [usersData]);
+
+  const renderUserOption = (option: { value: string; label: string }) => {
+    const u = usersMap.get(option.value);
+    return (
+      <div className="min-w-0">
+        <div className="truncate">{option.label}</div>
+        {u?.branch_name && <div className="text-xs text-subtle truncate">{u.branch_name}</div>}
+      </div>
+    );
+  };
 
   return (
     <>
@@ -251,8 +281,8 @@ export function StaffCommissionPage() {
         <div className="mobile-header-title">{t('commission.staffTitle')}</div>
         <div className="mobile-header-end">
           {canManage && (
-            <button className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current" onClick={() => setWithdrawOpen(true)}>
-              <ArrowDownCircle size={18} />
+            <button className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current" onClick={() => setAdjustOpen(true)}>
+              <PencilLine size={18} />
             </button>
           )}
         </div>
@@ -263,14 +293,9 @@ export function StaffCommissionPage() {
         <div className="flex items-center justify-between mb-4 flex-none max-md:hidden">
           <h1 className="heading-2">{t('commission.staffTitle')}</h1>
           {canManage && (
-            <div className="flex gap-2">
-              <Button variant="outline" startIcon={<SlidersHorizontal size={16} />} onClick={() => setAdjustOpen(true)}>
-                {t('commission.adjust')}
-              </Button>
-              <Button color="primary" startIcon={<ArrowDownCircle size={16} />} onClick={() => setWithdrawOpen(true)}>
-                {t('commission.withdraw')}
-              </Button>
-            </div>
+            <Button color="primary" startIcon={<PencilLine size={16} />} onClick={() => setAdjustOpen(true)}>
+              {t('commission.adjust')}
+            </Button>
           )}
         </div>
 
@@ -429,29 +454,13 @@ export function StaffCommissionPage() {
         onLedgerPageSizeChange={(ps) => { setLedgerPageSize(ps); setLedgerPageIndex(0); }}
       />
 
-      {/* Withdraw Modal */}
-      {canManage && (
-        <WithdrawModal
-          open={withdrawOpen}
-          onClose={() => setWithdrawOpen(false)}
-          userOptions={userOptions}
-          currentUserId={user?.user_id ?? 0}
-          onSuccess={() => {
-            setWithdrawOpen(false);
-            refreshAll();
-            addSnackbar({
-              message: <div className="alert alert-success"><CheckCircle size={16} /><span>{t('commission.withdrawSuccess')}</span></div>,
-            });
-          }}
-        />
-      )}
-
       {/* Adjust Modal */}
       {canManage && (
         <AdjustModal
           open={adjustOpen}
           onClose={() => setAdjustOpen(false)}
           userOptions={userOptions}
+          renderUserOption={renderUserOption}
           currentUserId={user?.user_id ?? 0}
           onSuccess={() => {
             setAdjustOpen(false);
@@ -559,96 +568,13 @@ function DetailRow({ label, value, bold, color }: { label: string; value: string
   );
 }
 
-// ── Withdraw Modal ──────────────────────────────────────────────────────────
-
-function WithdrawModal({ open, onClose, userOptions, currentUserId, onSuccess }: {
-  open: boolean;
-  onClose: () => void;
-  userOptions: { value: string; label: string }[];
-  currentUserId: number;
-  onSuccess: () => void;
-}) {
-  const { t } = useTranslation();
-  const [userId, setUserId] = useState<string | null>(null);
-  const [amount, setAmount] = useState('');
-  const [note, setNote] = useState('');
-  const [error, setError] = useState('');
-  const [errorKey, setErrorKey] = useState(0);
-
-  const resetForm = () => { setUserId(null); setAmount(''); setNote(''); setError(''); };
-
-  // Backend note: fn_commission_withdraw has a branch_id NOT NULL bug on commission_ledger.
-  // The modal is built correctly — will work once backend fixes the constraint.
-  const mutation = useMutation({
-    mutationFn: () => apiClient.rpc('fn_commission_withdraw', {
-      p_user_id: Number(userId),
-      p_amount: Number(amount),
-      p_note: note.trim() || null,
-      p_withdrawn_by: currentUserId,
-    }),
-    onSuccess: () => { resetForm(); onSuccess(); },
-    onError: (err) => {
-      if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
-        setError(translated || err.message);
-      } else setError(String(err));
-      setErrorKey(k => k + 1);
-    },
-  });
-
-  const canSubmit = userId && Number(amount) > 0;
-
-  return (
-    <Modal open={open} onClose={() => { resetForm(); onClose(); }} maxWidth="24rem" width="100%">
-      <div className="modal-header">
-        <h2 className="modal-title">{t('commission.withdraw')}</h2>
-        <button type="button" className="modal-close-btn" onClick={() => { resetForm(); onClose(); }}>&times;</button>
-      </div>
-      <div className="modal-content">
-        {error && (
-          <div key={errorKey} className="alert alert-danger mb-4 animate-pop-in">
-            <XCircle size={16} /><span>{error}</span>
-          </div>
-        )}
-        <div className="form-grid gap-4">
-          <div className="flex flex-col">
-            <label className="form-label">{t('commission.selectUser')} *</label>
-            <Select
-              options={userOptions}
-              value={userId}
-              onChange={val => setUserId(val as string)}
-              placeholder={t('commission.selectUser')}
-              searchable
-              showChevron
-            />
-          </div>
-          <div className="flex flex-col">
-            <label className="form-label">{t('commission.amount')} *</label>
-            <Input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0" className="w-full" min="1" />
-          </div>
-          <div className="flex flex-col">
-            <label className="form-label">{t('commission.note')}</label>
-            <TextArea value={note} onChange={e => setNote(e.target.value)} placeholder={t('commission.notePlaceholder')} rows={2} />
-          </div>
-        </div>
-      </div>
-      <div className="modal-footer">
-        <Button onClick={() => { resetForm(); onClose(); }}>{t('common.cancel')}</Button>
-        <Button color="primary" onClick={() => mutation.mutate()} disabled={!canSubmit || mutation.isPending}>
-          {mutation.isPending ? t('common.loading') : t('commission.withdraw')}
-        </Button>
-      </div>
-    </Modal>
-  );
-}
-
 // ── Adjust Modal ────────────────────────────────────────────────────────────
 
-function AdjustModal({ open, onClose, userOptions, currentUserId, onSuccess }: {
+function AdjustModal({ open, onClose, userOptions, renderUserOption, currentUserId, onSuccess }: {
   open: boolean;
   onClose: () => void;
   userOptions: { value: string; label: string }[];
+  renderUserOption: (option: { value: string; label: string }) => React.ReactNode;
   currentUserId: number;
   onSuccess: () => void;
 }) {
@@ -661,11 +587,16 @@ function AdjustModal({ open, onClose, userOptions, currentUserId, onSuccess }: {
 
   const resetForm = () => { setUserId(null); setAmount(''); setNote(''); setError(''); };
 
-  // Backend note: fn_commission_adjust has the same branch_id NOT NULL bug as withdraw.
+  // Backend note: fn_commission_adjust has a branch_id NOT NULL bug on commission_ledger.
+  // The modal is built correctly — will work once backend fixes the constraint.
+  const submit = (sign: 1 | -1) => {
+    mutation.mutate(sign);
+  };
+
   const mutation = useMutation({
-    mutationFn: () => apiClient.rpc('fn_commission_adjust', {
+    mutationFn: (sign: 1 | -1) => apiClient.rpc('fn_commission_adjust', {
       p_user_id: Number(userId),
-      p_amount: Number(amount),
+      p_amount: sign * Math.abs(Number(amount)),
       p_note: note.trim(),
       p_adjusted_by: currentUserId,
     }),
@@ -680,7 +611,7 @@ function AdjustModal({ open, onClose, userOptions, currentUserId, onSuccess }: {
     },
   });
 
-  const canSubmit = userId && Number(amount) !== 0 && note.trim().length > 0;
+  const canSubmit = userId && Number(amount) > 0 && note.trim().length > 0;
 
   return (
     <Modal open={open} onClose={() => { resetForm(); onClose(); }} maxWidth="24rem" width="100%">
@@ -704,11 +635,12 @@ function AdjustModal({ open, onClose, userOptions, currentUserId, onSuccess }: {
               placeholder={t('commission.selectUser')}
               searchable
               showChevron
+              renderOption={renderUserOption}
             />
           </div>
           <div className="flex flex-col">
             <label className="form-label">{t('commission.amount')} *</label>
-            <Input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="e.g. 5 or -3" className="w-full" />
+            <Input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0" className="w-full" min="1" />
           </div>
           <div className="flex flex-col">
             <label className="form-label">{t('commission.note')} *</label>
@@ -718,8 +650,11 @@ function AdjustModal({ open, onClose, userOptions, currentUserId, onSuccess }: {
       </div>
       <div className="modal-footer">
         <Button onClick={() => { resetForm(); onClose(); }}>{t('common.cancel')}</Button>
-        <Button color="primary" onClick={() => mutation.mutate()} disabled={!canSubmit || mutation.isPending}>
-          {mutation.isPending ? t('common.loading') : t('commission.adjust')}
+        <Button color="danger" onClick={() => submit(-1)} disabled={!canSubmit || mutation.isPending}>
+          {mutation.isPending ? t('common.loading') : t('commission.deduct')}
+        </Button>
+        <Button color="success" onClick={() => submit(1)} disabled={!canSubmit || mutation.isPending}>
+          {mutation.isPending ? t('common.loading') : t('commission.add')}
         </Button>
       </div>
     </Modal>

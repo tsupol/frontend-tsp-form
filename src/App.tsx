@@ -258,13 +258,7 @@ function App() {
       />
       <Route
         path="/admin/pricing/discount-approvals"
-        element={
-          <ProtectedRoute>
-            <AdminLayout>
-              <PricingLayout><DiscountApprovalsPage /></PricingLayout>
-            </AdminLayout>
-          </ProtectedRoute>
-        }
+        element={<Navigate to="/admin/commission/approvals" replace />}
       />
       <Route
         path="/admin/pricing/deal-partner-rates"

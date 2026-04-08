@@ -1,66 +1,90 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   DataTable, DataTableColumnHeader, DataTableFooter, MobileHeader,
-  Button, Input, Modal, Badge, Switch,
+  Button, Input, Select, Modal, Badge, Switch, TextArea,
   useSnackbarContext, FormErrorMessage,
   type ColumnDef, type SortingState,
 } from 'tsp-form';
 import { ArrowRightFromLine, Plus, XCircle, CheckCircle, Pencil } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 interface DealPartnerRate {
   id: number;
   holding_id: number;
+  holding_name: string;
   company_id: number;
-  branch_id: number;
-  branch_name: string;
+  company_name: string;
+  branch_id: number | null;
+  branch_name: string | null;
   rate_percent: number;
   is_active: boolean;
   note: string | null;
-  created_by: number | null;
+  scope_level: string;
+  created_by: number;
   created_at: string;
   updated_at: string;
 }
 
-// ── Upsert Modal ─────────────────────────────────────────────────────────────
+interface BranchLookup {
+  id: number;
+  name: string;
+}
+
+// ── Upsert Modal ────────────────────────────────────────────────────────────
 
 interface RateFormData {
+  scope: string;
   branch_id: string;
   rate_percent: string;
   note: string;
 }
 
-function RateModal({ open, onClose, editRate, onSuccess }: {
+function RateModal({ open, onClose, editRate, branches, onSuccess }: {
   open: boolean;
   onClose: () => void;
   editRate: DealPartnerRate | null;
+  branches: BranchLookup[];
   onSuccess: () => void;
 }) {
   const { t } = useTranslation();
+  const { user } = useAuth();
 
-  const { register, handleSubmit, formState: { errors, isDirty }, reset } = useForm<RateFormData>({
-    defaultValues: { branch_id: '', rate_percent: '', note: '' },
+  const { register, handleSubmit, formState: { errors, isDirty }, reset, watch, setValue } = useForm<RateFormData>({
+    defaultValues: { scope: 'BRANCH', branch_id: '', rate_percent: '', note: '' },
+  });
+
+  // Register scope and branch_id so they participate in form data + validation
+  register('scope');
+  register('branch_id', {
+    validate: (val) => {
+      if (watch('scope') === 'BRANCH' && !val) return t('dealPartnerRate.branchRequired');
+      return true;
+    },
   });
 
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
 
+  const scope = watch('scope');
+
   useEffect(() => {
     if (open) {
       if (editRate) {
         reset({
-          branch_id: String(editRate.branch_id),
+          scope: editRate.scope_level,
+          branch_id: editRate.branch_id ? String(editRate.branch_id) : '',
           rate_percent: String(editRate.rate_percent),
           note: editRate.note ?? '',
         });
       } else {
-        reset({ branch_id: '', rate_percent: '', note: '' });
+        reset({ scope: 'BRANCH', branch_id: '', rate_percent: '', note: '' });
       }
       setErrorMessage('');
     }
@@ -71,15 +95,18 @@ function RateModal({ open, onClose, editRate, onSuccess }: {
     setErrorMessage('');
     try {
       await apiClient.rpc('fn_deal_partner_rate_upsert', {
-        p_branch_id: parseInt(data.branch_id),
         p_rate_percent: parseFloat(data.rate_percent),
+        p_scope: data.scope,
+        p_branch_id: data.scope === 'BRANCH' ? parseInt(data.branch_id) : null,
         p_note: data.note.trim() || null,
+        p_updated_by: user?.user_id,
       });
       onSuccess();
       onClose();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
         setErrorMessage(translated || err.message);
       } else {
         setErrorMessage(t('common.error'));
@@ -95,11 +122,22 @@ function RateModal({ open, onClose, editRate, onSuccess }: {
   };
 
   const forceClose = () => {
-    reset({ branch_id: '', rate_percent: '', note: '' });
+    reset({ scope: 'BRANCH', branch_id: '', rate_percent: '', note: '' });
     setErrorMessage('');
     setConfirmCloseOpen(false);
     onClose();
   };
+
+  const scopeOptions = [
+    { value: 'BRANCH', label: t('dealPartnerRate.scopeBranch') },
+    { value: 'COMPANY', label: t('dealPartnerRate.scopeCompany') },
+    { value: 'HOLDING', label: t('dealPartnerRate.scopeHolding') },
+  ];
+
+  const branchOptions = useMemo(
+    () => branches.map(b => ({ value: String(b.id), label: b.name })),
+    [branches],
+  );
 
   return (
     <>
@@ -121,17 +159,32 @@ function RateModal({ open, onClose, editRate, onSuccess }: {
             )}
 
             <div className="flex flex-col">
-              <label className="form-label">{t('dealPartnerRate.branchId')}</label>
-              <Input
-                type="number"
-                min={1}
-                step={1}
-                size="sm"
+              <label className="form-label">{t('dealPartnerRate.scope')}</label>
+              <Select
+                options={scopeOptions}
+                value={scope}
+                onChange={val => { setValue('scope', val as string, { shouldDirty: true }); if (val !== 'BRANCH') setValue('branch_id', ''); }}
+                showChevron
+                searchable={false}
                 disabled={!!editRate}
-                {...register('branch_id', { required: t('dealPartnerRate.branchRequired') })}
               />
-              <FormErrorMessage error={errors.branch_id} />
             </div>
+
+            {scope === 'BRANCH' && (
+              <div className="flex flex-col">
+                <label className="form-label">{t('dealPartnerRate.branch')}</label>
+                <Select
+                  options={branchOptions}
+                  value={watch('branch_id')}
+                  onChange={val => setValue('branch_id', val as string, { shouldDirty: true })}
+                  placeholder={t('dealPartnerRate.selectBranch')}
+                  searchable
+                  showChevron
+                  disabled={!!editRate}
+                />
+                <FormErrorMessage error={errors.branch_id} />
+              </div>
+            )}
 
             <div className="flex flex-col">
               <label className="form-label">{t('dealPartnerRate.ratePercent')}</label>
@@ -140,7 +193,8 @@ function RateModal({ open, onClose, editRate, onSuccess }: {
                 min={0}
                 max={100}
                 step="0.01"
-                size="sm"
+                size="md"
+                className="w-full"
                 {...register('rate_percent', { required: t('dealPartnerRate.rateRequired') })}
               />
               <FormErrorMessage error={errors.rate_percent} />
@@ -148,8 +202,8 @@ function RateModal({ open, onClose, editRate, onSuccess }: {
 
             <div className="flex flex-col">
               <label className="form-label">{t('dealPartnerRate.note')}</label>
-              <Input
-                size="sm"
+              <TextArea
+                rows={2}
                 {...register('note')}
                 placeholder={t('dealPartnerRate.notePlaceholder')}
               />
@@ -157,10 +211,10 @@ function RateModal({ open, onClose, editRate, onSuccess }: {
           </div>
         </div>
         <div className="modal-footer">
-          <Button variant="outline" size="sm" onClick={handleClose} type="button">
+          <Button variant="outline" onClick={handleClose} type="button">
             {t('common.cancel')}
           </Button>
-          <Button color="primary" size="sm" type="submit" disabled={isSaving}>
+          <Button color="primary" type="submit" disabled={isSaving}>
             {isSaving ? t('pricing.saving') : t('common.save')}
           </Button>
         </div>
@@ -185,6 +239,8 @@ export function DealPartnerRatesPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
+  const { user } = useAuth();
+  const canManage = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(user?.role_code ?? '');
 
   const [sorting, setSorting] = useState<SortingState>([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -194,8 +250,14 @@ export function DealPartnerRatesPage() {
 
   const { data: rates = [], isFetching } = useQuery({
     queryKey: ['deal-partner-rates'],
-    queryFn: () => apiClient.get<DealPartnerRate[]>('/v_deal_partner_rates?order=branch_name'),
+    queryFn: () => apiClient.get<DealPartnerRate[]>('/v_deal_partner_rates?order=scope_level,branch_name.asc.nullslast'),
     staleTime: 30 * 1000,
+  });
+
+  const { data: branches = [] } = useQuery({
+    queryKey: ['branches-deal-partner'],
+    queryFn: () => apiClient.get<BranchLookup[]>('/v_branches?select=id,name&branch_type=eq.DEAL_PARTNER&is_active=is.true&order=name'),
+    staleTime: 5 * 60 * 1000,
   });
 
   const totalCount = rates.length;
@@ -216,19 +278,16 @@ export function DealPartnerRatesPage() {
       await apiClient.rpc('fn_deal_partner_rate_set_active', {
         p_rate_id: rate.id,
         p_is_active: !rate.is_active,
+        p_updated_by: user?.user_id,
       });
       queryClient.invalidateQueries({ queryKey: ['deal-partner-rates'] });
       addSnackbar({
         message: (
           <div className="alert alert-success">
-            <CheckCircle size={18} />
-            <div><div className="alert-title">
-              {t(rate.is_active ? 'dealPartnerRate.deactivated' : 'dealPartnerRate.activated')}
-            </div></div>
+            <CheckCircle size={16} />
+            <span>{t(rate.is_active ? 'dealPartnerRate.deactivated' : 'dealPartnerRate.activated')}</span>
           </div>
         ),
-        type: 'success',
-        duration: 3000,
       });
     } catch (err) {
       const msg = err instanceof ApiError
@@ -237,12 +296,10 @@ export function DealPartnerRatesPage() {
       addSnackbar({
         message: (
           <div className="alert alert-danger">
-            <XCircle size={18} />
-            <div><div className="alert-title">{msg}</div></div>
+            <XCircle size={16} />
+            <span>{msg}</span>
           </div>
         ),
-        type: 'error',
-        duration: 5000,
       });
     }
   };
@@ -251,24 +308,37 @@ export function DealPartnerRatesPage() {
     addSnackbar({
       message: (
         <div className="alert alert-success">
-          <CheckCircle size={18} />
-          <div><div className="alert-title">{t('dealPartnerRate.saved')}</div></div>
+          <CheckCircle size={16} />
+          <span>{t('dealPartnerRate.saved')}</span>
         </div>
       ),
-      type: 'success',
-      duration: 3000,
     });
     queryClient.invalidateQueries({ queryKey: ['deal-partner-rates'] });
   };
 
+  const scopeLabel = (level: string) => {
+    switch (level) {
+      case 'BRANCH': return t('dealPartnerRate.scopeBranch');
+      case 'COMPANY': return t('dealPartnerRate.scopeCompany');
+      case 'HOLDING': return t('dealPartnerRate.scopeHolding');
+      default: return level;
+    }
+  };
+
   const columns: ColumnDef<DealPartnerRate>[] = [
+    {
+      accessorKey: 'scope_level',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.scope')} />,
+      cell: ({ row }) => <Badge size="sm" color="info">{scopeLabel(row.original.scope_level)}</Badge>,
+      className: 'w-28',
+    },
     {
       accessorKey: 'branch_name',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.branch')} />,
       cell: ({ row }) => (
         <div>
-          <div className="text-sm font-medium">{row.original.branch_name}</div>
-          <div className="text-[11px] text-control-label">ID: {row.original.branch_id}</div>
+          <div className="text-sm font-medium">{row.original.branch_name ?? '—'}</div>
+          {row.original.company_name && <div className="text-[11px] text-control-label">{row.original.company_name}</div>}
         </div>
       ),
     },
@@ -278,13 +348,15 @@ export function DealPartnerRatesPage() {
       cell: ({ row }) => (
         <span className="text-sm tabular-nums font-medium">{row.original.rate_percent}%</span>
       ),
+      className: 'w-28',
     },
     {
       accessorKey: 'note',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.note')} />,
       cell: ({ row }) => (
-        <span className="text-sm text-control-label">{row.original.note ?? '—'}</span>
+        <span className="text-sm text-control-label truncate max-w-40 block">{row.original.note ?? '—'}</span>
       ),
+      className: 'max-md:hidden',
     },
     {
       accessorKey: 'is_active',
@@ -294,13 +366,14 @@ export function DealPartnerRatesPage() {
           checked={row.original.is_active}
           onChange={() => handleToggleActive(row.original)}
           size="sm"
+          disabled={!canManage}
         />
       ),
       className: 'w-20',
     },
-    {
+    ...(canManage ? [{
       id: 'actions',
-      cell: ({ row }) => (
+      cell: ({ row }: { row: { original: DealPartnerRate } }) => (
         <button
           className="flex items-center justify-center w-8 h-8 rounded hover:bg-surface-hover cursor-pointer text-control-label hover:text-fg"
           onClick={() => handleEdit(row.original)}
@@ -310,17 +383,15 @@ export function DealPartnerRatesPage() {
         </button>
       ),
       className: 'w-10',
-    },
+    }] : []),
   ];
 
   return (
     <>
-      {/* Mobile header */}
       <MobileHeader className="mobile-header-bordered md:hidden">
         <div className="mobile-header-start">
           <button
             className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
-            aria-label="Open menu"
             onClick={() => window.dispatchEvent(new CustomEvent('sidemenu:open'))}
           >
             <ArrowRightFromLine size={18} />
@@ -330,26 +401,27 @@ export function DealPartnerRatesPage() {
           {t('dealPartnerRate.title')}
         </div>
         <div className="mobile-header-end px-2">
-          <button
-            className="flex items-center justify-center w-8 h-8 rounded hover:bg-surface-hover cursor-pointer text-current"
-            aria-label={t('dealPartnerRate.addRate')}
-            onClick={handleCreate}
-          >
-            <Plus size={18} />
-          </button>
+          {canManage && (
+            <button
+              className="flex items-center justify-center w-8 h-8 rounded hover:bg-surface-hover cursor-pointer text-current"
+              onClick={handleCreate}
+            >
+              <Plus size={18} />
+            </button>
+          )}
         </div>
       </MobileHeader>
 
       <div className="page-content responsive-dvh-mobile-header">
-        {/* Desktop header */}
         <div className="flex items-center justify-between mb-4 flex-none max-md:hidden">
           <h1 className="heading-2">{t('dealPartnerRate.title')}</h1>
-          <Button color="primary" startIcon={<Plus size={16} />} onClick={handleCreate}>
-            {t('dealPartnerRate.addRate')}
-          </Button>
+          {canManage && (
+            <Button color="primary" startIcon={<Plus size={16} />} onClick={handleCreate}>
+              {t('dealPartnerRate.addRate')}
+            </Button>
+          )}
         </div>
 
-        {/* Desktop: DataTable */}
         <DataTable<DealPartnerRate>
           data={paginatedRates}
           columns={columns}
@@ -360,51 +432,38 @@ export function DealPartnerRatesPage() {
           pageSize={pageSize}
           pageSizeOptions={[10, 25, 50]}
           rowCount={totalCount}
-          onPageChange={({ pageIndex: pi, pageSize: ps }) => {
-            setPageIndex(pi);
-            setPageSize(ps);
-          }}
+          onPageChange={({ pageIndex: pi, pageSize: ps }) => { setPageIndex(pi); setPageSize(ps); }}
           className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
-          noResults={
-            <div className="p-8 text-center text-control-label">
-              {t('dealPartnerRate.empty')}
-            </div>
-          }
+          noResults={<div className="p-8 text-center text-control-label">{t('dealPartnerRate.empty')}</div>}
         />
 
-        {/* Mobile: Card list */}
+        {/* Mobile cards */}
         <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
           <div className="flex-1 overflow-auto better-scroll pb-8">
             {rates.length === 0 ? (
-              <div className="p-8 text-center text-control-label">
-                {t('dealPartnerRate.empty')}
-              </div>
+              <div className="p-8 text-center text-control-label">{t('dealPartnerRate.empty')}</div>
             ) : (
               <div className="flex flex-col divide-y divide-line">
-                {paginatedRates.map((rate) => (
+                {paginatedRates.map(rate => (
                   <div
                     key={rate.id}
                     className="px-1 py-3 cursor-pointer active:bg-surface-hover"
-                    onClick={() => handleEdit(rate)}
+                    onClick={() => canManage && handleEdit(rate)}
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate">{rate.branch_name}</div>
-                        <div className="text-xs text-control-label">ID: {rate.branch_id}</div>
+                        <div className="font-medium truncate">{rate.branch_name ?? scopeLabel(rate.scope_level)}</div>
+                        {rate.company_name && <div className="text-xs text-control-label">{rate.company_name}</div>}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge size="sm" color={rate.is_active ? 'success' : 'default'}>
-                          {rate.is_active ? t('dealPartnerRate.activeLabel') : t('dealPartnerRate.inactiveLabel')}
-                        </Badge>
-                      </div>
+                      <Badge size="sm" color={rate.is_active ? 'success' : 'default'}>
+                        {rate.is_active ? t('dealPartnerRate.activeLabel') : t('dealPartnerRate.inactiveLabel')}
+                      </Badge>
                     </div>
-                    <div className="flex items-center justify-between mt-2 text-sm">
-                      <span className="text-control-label">{t('dealPartnerRate.ratePercent')}</span>
+                    <div className="flex items-center justify-between mt-1 text-sm">
+                      <Badge size="xs" color="info">{scopeLabel(rate.scope_level)}</Badge>
                       <span className="tabular-nums font-medium">{rate.rate_percent}%</span>
                     </div>
-                    {rate.note && (
-                      <div className="text-xs text-control-label mt-1 truncate">{rate.note}</div>
-                    )}
+                    {rate.note && <div className="text-xs text-control-label mt-1 truncate">{rate.note}</div>}
                   </div>
                 ))}
               </div>
@@ -414,10 +473,10 @@ export function DealPartnerRatesPage() {
             <DataTableFooter
               currentPage={pageIndex + 1}
               totalPages={Math.ceil(totalCount / pageSize)}
-              onPageChange={(p) => setPageIndex(p - 1)}
+              onPageChange={p => setPageIndex(p - 1)}
               pageSize={pageSize}
               pageSizeOptions={[10, 25, 50]}
-              onPageSizeChange={(ps) => { setPageSize(ps); setPageIndex(0); }}
+              onPageSizeChange={ps => { setPageSize(ps); setPageIndex(0); }}
               totalRows={totalCount}
             />
           )}
@@ -428,6 +487,7 @@ export function DealPartnerRatesPage() {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         editRate={editRate}
+        branches={branches}
         onSuccess={handleSuccess}
       />
     </>

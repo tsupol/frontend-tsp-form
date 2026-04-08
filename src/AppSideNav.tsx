@@ -156,7 +156,6 @@ export const AppSideNav = () => {
         { key: 'fin1-rates', label: t('nav.fin1Rates'), path: '/admin/pricing/fin1-rates' },
         { key: 'fin2-rates', label: t('nav.fin2Rates'), path: '/admin/pricing/fin2-rates' },
         { key: 'discount-policies', label: t('nav.discountPolicies'), path: '/admin/pricing/discount-policies' },
-        { key: 'discount-approvals', label: t('nav.discountApprovals'), path: '/admin/pricing/discount-approvals' },
         { key: 'deal-partner-rates', label: t('nav.dealPartnerRates'), path: '/admin/pricing/deal-partner-rates' },
       ],
     },
