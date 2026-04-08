@@ -44,7 +44,7 @@ import { DunningTargetsPage } from './pages/legal/DunningTargetsPage';
 import { LegalCasesPage } from './pages/legal/LegalCasesPage';
 import { CommissionLayout } from './pages/commission/CommissionLayout';
 import { StaffCommissionPage } from './pages/commission/StaffCommissionPage';
-import { PartnerCommissionPage } from './pages/commission/PartnerCommissionPage';
+import { NegotiationApprovalsPage } from './pages/commission/NegotiationApprovalsPage';
 import { ContractsLayout } from './pages/contracts/ContractsLayout';
 import { ContractSearchPage } from './pages/contracts/ContractSearchPage';
 import { SavingContractsPage } from './pages/contracts/SavingContractsPage';
@@ -415,11 +415,11 @@ function App() {
         }
       />
       <Route
-        path="/admin/commission/partner"
+        path="/admin/commission/approvals"
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <CommissionLayout><PartnerCommissionPage /></CommissionLayout>
+              <CommissionLayout><NegotiationApprovalsPage /></CommissionLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

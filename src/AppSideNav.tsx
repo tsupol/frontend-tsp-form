@@ -204,7 +204,7 @@ export const AppSideNav = () => {
       path: '/admin/commission/staff',
       children: [
         { key: 'staff-commission', label: t('nav.staffCommission'), path: '/admin/commission/staff' },
-        { key: 'partner-commission', label: t('nav.partnerCommission'), path: '/admin/commission/partner' },
+        { key: 'approvals', label: t('nav.negotiationApprovals'), path: '/admin/commission/approvals' },
       ],
     },
     ...(['COMPANY_REPO', 'COMPANY_COLLECTOR', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [{

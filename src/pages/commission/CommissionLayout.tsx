@@ -1,12 +1,12 @@
 import type { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { UserCheck, Handshake } from 'lucide-react';
+import { UserCheck, ClipboardCheck } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 
 const navItems = [
   { path: '/admin/commission/staff', labelKey: 'nav.staffCommission', icon: UserCheck },
-  { path: '/admin/commission/partner', labelKey: 'nav.partnerCommission', icon: Handshake },
+  { path: '/admin/commission/approvals', labelKey: 'nav.negotiationApprovals', icon: ClipboardCheck },
 ];
 
 export function CommissionLayout({ children }: { children: ReactNode }) {
