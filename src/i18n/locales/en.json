@@ -1617,6 +1617,10 @@
     "outstanding": "Outstanding",
     "assignedTo": "Assigned To",
     "branch": "Branch",
-    "viewContract": "View contract"
+    "caseCreated": "Created",
+    "contractState": "Contract State",
+    "viewContract": "View contract",
+    "actionDate": "Action Date",
+    "actionDatePlaceholder": "Optional — defaults to today"
   }
 }

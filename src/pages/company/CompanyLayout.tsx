@@ -33,7 +33,7 @@ export function CompanyLayout({ children }: { children: ReactNode }) {
           {t('nav.company')}
         </span>
         {navItems.map(({ path, labelKey, icon: Icon }) => {
-          const isActive = pathname === path;
+          const isActive = pathname.startsWith(path);
           return (
             <a
               key={path}

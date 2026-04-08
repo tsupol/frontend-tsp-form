@@ -21,7 +21,7 @@ export function CommissionLayout({ children }: { children: ReactNode }) {
           {t('nav.commission')}
         </span>
         {navItems.map(({ path, labelKey, icon: Icon }) => {
-          const isActive = pathname === path;
+          const isActive = pathname.startsWith(path);
           return (
             <a
               key={path}

@@ -21,7 +21,7 @@ export function LegalLayout({ children }: { children: ReactNode }) {
           {t('nav.legal')}
         </span>
         {navItems.map(({ path, labelKey, icon: Icon }) => {
-          const isActive = pathname === path;
+          const isActive = pathname.startsWith(path);
           return (
             <a
               key={path}

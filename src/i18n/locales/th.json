@@ -1617,6 +1617,10 @@
     "outstanding": "ยอดคงเหลือ",
     "assignedTo": "ผู้รับผิดชอบ",
     "branch": "สาขา",
-    "viewContract": "ดูสัญญา"
+    "caseCreated": "สร้างเมื่อ",
+    "contractState": "สถานะสัญญา",
+    "viewContract": "ดูสัญญา",
+    "actionDate": "วันที่ดำเนินการ",
+    "actionDatePlaceholder": "ไม่ระบุ — ใช้วันนี้"
   }
 }

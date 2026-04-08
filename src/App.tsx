@@ -437,7 +437,7 @@ function App() {
         }
       />
       <Route
-        path="/admin/legal/cases"
+        path="/admin/legal/cases/:caseId?"
         element={
           <ProtectedRoute>
             <AdminLayout>
