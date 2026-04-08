@@ -1,14 +1,16 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useForm } from 'react-hook-form';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
   DataTable, DataTableColumnHeader, Button, Input, InputDatePicker, Select, TextArea,
-  Badge, Drawer, MobileHeader, useSnackbarContext,
+  Badge, Drawer, Modal, MobileHeader, FormErrorMessage, useSnackbarContext,
   type ColumnDef, type RowExpansionState, type SortingState,
 } from 'tsp-form';
 import { ArrowRightFromLine, Calendar, CheckCircle, XCircle, Pencil, Plus, Trash2, Star } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
+import { ContractDetailPanel } from '../contracts/ContractDetailPanel';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -322,6 +324,9 @@ function CustomerDrawer({ customer, open, onClose, onUpdated }: {
     enabled: !!customerId,
   });
 
+  // ── Contract modal ──
+  const [contractModalId, setContractModalId] = useState<number | null>(null);
+
   // ── Section states ──
   const [editingInfo, setEditingInfo] = useState(false);
   const [editingAddress, setEditingAddress] = useState<string | null>(null); // address_type or null
@@ -500,18 +505,17 @@ function CustomerDrawer({ customer, open, onClose, onUpdated }: {
               ) : (
                 <div className="space-y-1">
                   {contracts.map(c => (
-                    <a
+                    <div
                       key={c.id}
-                      href={`/admin/contracts/search/${c.id}`}
-                      onClick={e => { e.preventDefault(); window.location.href = `/admin/contracts/search/${c.id}`; }}
-                      className="block py-2 px-2 -mx-2 rounded-md hover:bg-surface-hover transition-colors"
+                      className="block py-2 px-2 -mx-2 rounded-md hover:bg-surface-hover transition-colors cursor-pointer"
+                      onClick={() => setContractModalId(c.id)}
                     >
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-primary">{c.code_display}</span>
                         <Badge size="xs" color={stateColor(c.state)}>{c.state}</Badge>
                       </div>
                       {c.branch_name && <div className="text-xs text-control-label mt-0.5">{c.branch_name}</div>}
-                    </a>
+                    </div>
                   ))}
                 </div>
               )}
@@ -519,6 +523,15 @@ function CustomerDrawer({ customer, open, onClose, onUpdated }: {
           </div>
         )}
       </div>
+
+      {/* Contract detail modal */}
+      <Modal open={!!contractModalId} onClose={() => setContractModalId(null)} maxWidth="56rem" width="100%">
+        <div className="h-[80dvh] flex flex-col">
+          {contractModalId && (
+            <ContractDetailPanel contractId={contractModalId} isMobile={false} />
+          )}
+        </div>
+      </Modal>
     </Drawer>
   );
 }
@@ -672,132 +685,143 @@ function AddressForm({ customerId, addressType, existing, onSuccess }: {
   onSuccess: () => void;
 }) {
   const { t } = useTranslation();
-  const [form, setForm] = useState({
-    address_line1: existing?.address_line1 ?? '',
-    address_line2: existing?.address_line2 ?? '',
-    soi: existing?.soi ?? '',
-    road: existing?.road ?? '',
-    postal_code: existing?.postal_code ?? '',
-    sub_district: existing?.sub_district ?? '',
-    district: existing?.district ?? '',
-    province: existing?.province ?? '',
+
+  const { register, handleSubmit, formState: { errors }, watch, setValue } = useForm({
+    defaultValues: {
+      address_line1: existing?.address_line1 ?? '',
+      address_line2: existing?.address_line2 ?? '',
+      soi: existing?.soi ?? '',
+      road: existing?.road ?? '',
+      postal_code: existing?.postal_code ?? '',
+      sub_district: existing?.sub_district ?? '',
+      district: existing?.district ?? '',
+      province: existing?.province ?? '',
+    },
   });
+
+  // Register fields managed by Select/auto-fill so they're always in form data
+  register('sub_district', { required: t('common.required') });
+  register('district', { required: t('common.required') });
+  register('province', { required: t('common.required') });
+
+  const postalCode = watch('postal_code');
   const [postalResults, setPostalResults] = useState<PostalLookup[]>([]);
-  const [error, setError] = useState('');
+  const [apiError, setApiError] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const set = (key: string, value: string) => setForm(prev => ({ ...prev, [key]: value }));
-
-  // Postal code lookup
+  // Postal code lookup — auto-fill helper
   useEffect(() => {
-    if (form.postal_code.length === 5) {
-      apiClient.get<PostalLookup[]>(`/v_postal_lookup?postal_code=eq.${form.postal_code}`)
+    if (postalCode.length === 5) {
+      apiClient.get<PostalLookup[]>(`/v_postal_lookup?postal_code=eq.${postalCode}`)
         .then(setPostalResults)
         .catch(() => setPostalResults([]));
     } else {
       setPostalResults([]);
     }
-  }, [form.postal_code]);
+  }, [postalCode]);
 
   const subDistrictOptions = useMemo(
     () => postalResults.map(p => ({ value: p.sub_district, label: p.sub_district })),
     [postalResults],
   );
 
-  const handleSubDistrictChange = (val: string | string[] | null) => {
+  const handleSubDistrictSelect = (val: string | string[] | null) => {
     const sub = val as string;
     const match = postalResults.find(p => p.sub_district === sub);
-    setForm(prev => ({
-      ...prev,
-      sub_district: sub ?? '',
-      district: match?.district ?? '',
-      province: match?.province ?? '',
-    }));
+    if (match) {
+      setValue('sub_district', match.sub_district, { shouldDirty: true });
+      setValue('district', match.district, { shouldDirty: true });
+      setValue('province', match.province, { shouldDirty: true });
+    }
   };
 
-  const handleSave = async () => {
-    if (!form.address_line1.trim() || !form.sub_district || !form.district || !form.province || !form.postal_code) return;
+  const onSubmit = async (data: Record<string, string>) => {
     setSaving(true);
-    setError('');
+    setApiError('');
     try {
       await apiClient.rpc('fn_customer_address_upsert', {
         p_customer_id: customerId,
         p_address_type: addressType,
-        p_address_line1: form.address_line1.trim(),
-        p_address_line2: form.address_line2.trim() || null,
-        p_soi: form.soi.trim() || null,
-        p_road: form.road.trim() || null,
-        p_sub_district: form.sub_district,
-        p_district: form.district,
-        p_province: form.province,
-        p_postal_code: form.postal_code,
+        p_address_line1: data.address_line1.trim(),
+        p_address_line2: data.address_line2.trim() || null,
+        p_soi: data.soi.trim() || null,
+        p_road: data.road.trim() || null,
+        p_sub_district: data.sub_district.trim(),
+        p_district: data.district.trim(),
+        p_province: data.province.trim(),
+        p_postal_code: data.postal_code.trim(),
       });
       onSuccess();
     } catch (err) {
       if (err instanceof ApiError) {
         const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
           || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
-        setError(translated || err.message);
-      } else setError(String(err));
+        setApiError(translated || err.message);
+      } else setApiError(String(err));
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="space-y-3">
-      {error && <div className="alert alert-danger text-xs"><XCircle size={14} /><span>{error}</span></div>}
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
+      {apiError && <div className="alert alert-danger text-xs"><XCircle size={14} /><span>{apiError}</span></div>}
       <div className="form-grid">
         <div className="flex flex-col">
           <label className="form-label">{t('customer.addressLine1')} *</label>
-          <Input size="sm" value={form.address_line1} onChange={e => set('address_line1', e.target.value)} className="w-full" />
+          <Input size="sm" className="w-full" {...register('address_line1', { required: t('common.required') })} />
+          <FormErrorMessage error={errors.address_line1} />
         </div>
         <div className="flex flex-col">
           <label className="form-label">{t('customer.addressLine2')}</label>
-          <Input size="sm" value={form.address_line2} onChange={e => set('address_line2', e.target.value)} className="w-full" />
+          <Input size="sm" className="w-full" {...register('address_line2')} />
         </div>
         <div className="flex gap-3">
           <div className="flex flex-col flex-1">
             <label className="form-label">{t('customer.soi')}</label>
-            <Input size="sm" value={form.soi} onChange={e => set('soi', e.target.value)} className="w-full" />
+            <Input size="sm" className="w-full" {...register('soi')} />
           </div>
           <div className="flex flex-col flex-1">
             <label className="form-label">{t('customer.road')}</label>
-            <Input size="sm" value={form.road} onChange={e => set('road', e.target.value)} className="w-full" />
+            <Input size="sm" className="w-full" {...register('road')} />
           </div>
         </div>
         <div className="flex flex-col">
           <label className="form-label">{t('customer.postalCode')} *</label>
-          <Input size="sm" value={form.postal_code} onChange={e => set('postal_code', e.target.value)} className="w-full" maxLength={5} />
+          <Input size="sm" className="w-full" maxLength={5} {...register('postal_code', { required: t('common.required') })} />
+          <FormErrorMessage error={errors.postal_code} />
         </div>
-        {postalResults.length > 0 && (
-          <>
-            <div className="flex flex-col">
-              <label className="form-label">{t('customer.subDistrict')} *</label>
-              <Select
-                size="sm"
-                options={subDistrictOptions}
-                value={form.sub_district}
-                onChange={handleSubDistrictChange}
-                placeholder={t('customer.selectSubDistrict')}
-                showChevron
-              />
-            </div>
-            <div className="flex flex-col">
-              <label className="form-label">{t('customer.district')}</label>
-              <Input size="sm" value={form.district} disabled className="w-full" />
-            </div>
-            <div className="flex flex-col">
-              <label className="form-label">{t('customer.province')}</label>
-              <Input size="sm" value={form.province} disabled className="w-full" />
-            </div>
-          </>
-        )}
+        <div className="flex flex-col">
+          <label className="form-label">{t('customer.subDistrict')} *</label>
+          {postalResults.length > 0 ? (
+            <Select
+              size="sm"
+              options={subDistrictOptions}
+              value={watch('sub_district')}
+              onChange={handleSubDistrictSelect}
+              placeholder={t('customer.selectSubDistrict')}
+              showChevron
+            />
+          ) : (
+            <Input size="sm" className="w-full" value={watch('sub_district')} onChange={e => setValue('sub_district', e.target.value, { shouldValidate: true })} />
+          )}
+          <FormErrorMessage error={errors.sub_district} />
+        </div>
+        <div className="flex flex-col">
+          <label className="form-label">{t('customer.district')} *</label>
+          <Input size="sm" className="w-full" disabled={postalResults.length > 0} value={watch('district')} onChange={e => setValue('district', e.target.value, { shouldValidate: true })} />
+          <FormErrorMessage error={errors.district} />
+        </div>
+        <div className="flex flex-col">
+          <label className="form-label">{t('customer.province')} *</label>
+          <Input size="sm" className="w-full" disabled={postalResults.length > 0} value={watch('province')} onChange={e => setValue('province', e.target.value, { shouldValidate: true })} />
+          <FormErrorMessage error={errors.province} />
+        </div>
       </div>
-      <Button size="sm" color="primary" onClick={handleSave} disabled={saving}>
+      <Button size="sm" color="primary" type="submit" disabled={saving}>
         {saving ? t('common.loading') : t('common.save')}
       </Button>
-    </div>
+    </form>
   );
 }
 

@@ -1660,7 +1660,8 @@
     "noCustomers": "ไม่พบลูกค้า",
     "noContracts": "ไม่มีสัญญาที่เกี่ยวข้อง",
     "noContacts": "ไม่มีเบอร์ติดต่อ",
-    "noReferences": "ไม่มีบุคคลอ้างอิง"
+    "noReferences": "ไม่มีบุคคลอ้างอิง",
+    "postalCodeRequired": "กรุณากรอกรหัสไปรษณีย์และเลือกตำบล/แขวง"
   },
   "legal": {
     "dunningTitle": "ทวงถาม",

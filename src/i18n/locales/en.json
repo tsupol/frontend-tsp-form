@@ -1660,7 +1660,8 @@
     "noCustomers": "No customers found",
     "noContracts": "No related contracts",
     "noContacts": "No contacts",
-    "noReferences": "No references"
+    "noReferences": "No references",
+    "postalCodeRequired": "Please enter postal code and select sub-district"
   },
   "legal": {
     "dunningTitle": "Dunning Targets",

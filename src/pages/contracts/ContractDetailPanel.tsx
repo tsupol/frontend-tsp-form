@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Badge } from 'tsp-form';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { getStateColor, getStateLabel, fmtCurrency } from './contractUtils';
@@ -176,6 +177,78 @@ type DetailTab = 'overview' | 'installments' | 'txns' | 'customers' | 'notes' | 
 
 const TABS: DetailTab[] = ['overview', 'installments', 'txns', 'customers', 'notes', 'payments'];
 
+// ── Scrollable Tabs ─────────────────────────────────────────────────────────
+
+function ScrollableTabs({ tabs, activeTab, onTabChange, t }: {
+  tabs: DetailTab[];
+  activeTab: DetailTab;
+  onTabChange: (tab: DetailTab) => void;
+  t: (key: string) => string;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 0);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
+  }, []);
+
+  useEffect(() => {
+    checkScroll();
+    const el = scrollRef.current;
+    if (!el) return;
+    el.addEventListener('scroll', checkScroll, { passive: true });
+    const ro = new ResizeObserver(checkScroll);
+    ro.observe(el);
+    return () => { el.removeEventListener('scroll', checkScroll); ro.disconnect(); };
+  }, [checkScroll]);
+
+  const scroll = (dir: 'left' | 'right') => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollBy({ left: dir === 'left' ? -120 : 120, behavior: 'smooth' });
+  };
+
+  return (
+    <div className="flex-none relative border-b border-line">
+      {canScrollLeft && (
+        <button
+          className="absolute left-0 top-0 bottom-0 z-10 w-7 flex items-center justify-center bg-bg border-r border-line cursor-pointer border-y-0 border-l-0"
+          onClick={() => scroll('left')}
+        >
+          <ChevronLeft size={14} className="text-fg/60" />
+        </button>
+      )}
+      <div ref={scrollRef} className="flex px-2 overflow-x-auto hidden-scroll">
+        {tabs.map(tab => (
+          <button
+            key={tab}
+            className={`py-2 px-3 text-sm font-medium transition-colors cursor-pointer border-b-2 whitespace-nowrap ${
+              activeTab === tab
+                ? 'border-primary text-primary'
+                : 'border-transparent text-fg/50 hover:text-fg/80'
+            }`}
+            onClick={() => onTabChange(tab)}
+          >
+            {t(`contract.tab_${tab}`)}
+          </button>
+        ))}
+      </div>
+      {canScrollRight && (
+        <button
+          className="absolute right-0 top-0 bottom-0 z-10 w-7 flex items-center justify-center bg-bg border-l border-line cursor-pointer border-y-0 border-r-0"
+          onClick={() => scroll('right')}
+        >
+          <ChevronRight size={14} className="text-fg/60" />
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function ContractDetailPanel({ contractId, isMobile }: { contractId: number; isMobile: boolean }) {
@@ -218,22 +291,8 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex-none flex border-b border-line px-2 overflow-x-auto hidden-scroll">
-        {TABS.map(tab => (
-          <button
-            key={tab}
-            className={`py-2 px-3 text-sm font-medium transition-colors cursor-pointer border-b-2 whitespace-nowrap ${
-              activeTab === tab
-                ? 'border-primary text-primary'
-                : 'border-transparent text-fg/50 hover:text-fg/80'
-            }`}
-            onClick={() => setActiveTab(tab)}
-          >
-            {t(`contract.tab_${tab}`)}
-          </button>
-        ))}
-      </div>
+      {/* Tabs with scroll arrows */}
+      <ScrollableTabs tabs={TABS} activeTab={activeTab} onTabChange={setActiveTab} t={t} />
 
       {/* Tab content */}
       <div className="flex-1 overflow-auto better-scroll">
