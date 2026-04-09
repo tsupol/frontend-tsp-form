@@ -298,8 +298,8 @@ export function StockDashboardPage() {
                   <div className="px-4 py-2 bg-surface text-xs font-semibold text-subtle uppercase tracking-wider border-b border-line">
                     {group.branch_name}
                   </div>
-                  {group.rows.map(row => {
-                    const key = selKey({ branchId: row.branch_id, bucket: row.current_bucket });
+                  {group.rows.map((row, idx) => {
+                    const key = `${row.branch_id}-${row.current_bucket}-${idx}`;
                     const isSelected = selected && selKey(selected) === key;
                     return (
                       <button

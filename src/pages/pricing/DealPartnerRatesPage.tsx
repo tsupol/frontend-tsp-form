@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   DataTable, DataTableColumnHeader, DataTableFooter, MobileHeader,
-  Button, Input, Select, Modal, Badge, Switch, TextArea,
+  Button, Input, Select, Modal, Badge, TextArea,
   useSnackbarContext, FormErrorMessage,
   type ColumnDef, type SortingState,
 } from 'tsp-form';
@@ -325,28 +325,41 @@ export function DealPartnerRatesPage() {
     }
   };
 
+  const scopeBadgeColor = (scope: string): 'info' | 'warning' | 'success' => {
+    switch (scope) {
+      case 'HOLDING': return 'warning';
+      case 'COMPANY': return 'info';
+      case 'BRANCH': return 'success';
+      default: return 'info';
+    }
+  };
+
   const columns: ColumnDef<DealPartnerRate>[] = [
     {
       accessorKey: 'scope_level',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.scope')} />,
-      cell: ({ row }) => <Badge size="sm" color="info">{scopeLabel(row.original.scope_level)}</Badge>,
-      className: 'w-28',
+      cell: ({ row }) => <Badge size="sm" color={scopeBadgeColor(row.original.scope_level)}>{scopeLabel(row.original.scope_level)}</Badge>,
+      className: 'w-24',
+    },
+    {
+      accessorKey: 'company_name',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.company')} />,
+      cell: ({ row }) => (
+        <span className="text-sm">{row.original.company_name ?? '—'}</span>
+      ),
     },
     {
       accessorKey: 'branch_name',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.branch')} />,
       cell: ({ row }) => (
-        <div>
-          <div className="text-sm font-medium">{row.original.branch_name ?? '—'}</div>
-          {row.original.company_name && <div className="text-[11px] text-control-label">{row.original.company_name}</div>}
-        </div>
+        <span className="text-sm">{row.original.branch_name ?? '—'}</span>
       ),
     },
     {
       accessorKey: 'rate_percent',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.ratePercent')} />,
       cell: ({ row }) => (
-        <span className="text-sm tabular-nums font-medium">{row.original.rate_percent}%</span>
+        <span className="text-sm tabular-nums">{row.original.rate_percent}%</span>
       ),
       className: 'w-28',
     },
@@ -361,18 +374,14 @@ export function DealPartnerRatesPage() {
     {
       accessorKey: 'is_active',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.active')} />,
-      cell: ({ row }) => (
-        <Switch
-          checked={row.original.is_active}
-          onChange={() => handleToggleActive(row.original)}
-          size="sm"
-          disabled={!canManage}
-        />
-      ),
-      className: 'w-20',
+      cell: ({ row }) => row.original.is_active
+        ? <Badge size="sm" color="success" startIcon={<CheckCircle />} />
+        : <Badge size="sm" color="default" startIcon={<XCircle />} />,
+      className: 'w-16',
     },
     ...(canManage ? [{
       id: 'actions',
+      header: () => null,
       cell: ({ row }: { row: { original: DealPartnerRate } }) => (
         <button
           className="flex items-center justify-center w-8 h-8 rounded hover:bg-surface-hover cursor-pointer text-control-label hover:text-fg"
@@ -382,6 +391,7 @@ export function DealPartnerRatesPage() {
           <Pencil size={14} />
         </button>
       ),
+      enableSorting: false,
       className: 'w-10',
     }] : []),
   ];

@@ -397,17 +397,27 @@ export function DiscountPoliciesPage() {
   // Filters
   const [filterScope, setFilterScope] = useState('');
   const [filterActive, setFilterActive] = useState('');
+  const [filterCompany, setFilterCompany] = useState('');
   const [filterOpen, setFilterOpen] = useState(false);
 
+  const { data: filterCompanies = [] } = useQuery({
+    queryKey: ['companies-lookup'],
+    queryFn: () => apiClient.get<CompanyLookup[]>('/v_companies?select=id,name&is_active=is.true&order=name'),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const companyFilterOptions = useMemo(
+    () => filterCompanies.map(c => ({ value: String(c.id), label: c.name })),
+    [filterCompanies],
+  );
+
   const scopeOptions = [
-    { value: '', label: t('discount.allScopes') },
     { value: 'Holding', label: t('discount.scopeHolding') },
     { value: 'Company', label: t('discount.scopeCompany') },
     { value: 'Branch', label: t('discount.scopeBranch') },
   ];
 
   const activeOptions = [
-    { value: '', label: t('discount.allStatuses') },
     { value: 'active', label: t('discount.activeOnly') },
     { value: 'inactive', label: t('discount.inactiveOnly') },
   ];
@@ -427,18 +437,21 @@ export function DiscountPoliciesPage() {
     if (filterScope) {
       result = result.filter(p => getScopeLabel(p) === filterScope);
     }
+    if (filterCompany) {
+      result = result.filter(p => p.company_id === Number(filterCompany));
+    }
     if (filterActive === 'active') {
       result = result.filter(p => p.is_active);
     } else if (filterActive === 'inactive') {
       result = result.filter(p => !p.is_active);
     }
     return result;
-  }, [policies, filterScope, filterActive]);
+  }, [policies, filterScope, filterCompany, filterActive]);
 
   // Reset page when filters change
   useEffect(() => {
     setPageIndex(0);
-  }, [filterScope, filterActive]);
+  }, [filterScope, filterCompany, filterActive]);
 
   const totalCount = filteredPolicies.length;
   const paginatedPolicies = filteredPolicies.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize);
@@ -469,6 +482,64 @@ export function DiscountPoliciesPage() {
 
   const columns: ColumnDef<DiscountPolicy>[] = [
     {
+      id: 'scope',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('discount.scope')} />,
+      cell: ({ row }) => {
+        const p = row.original;
+        const scope = getScopeLabel(p);
+        return (
+          <div>
+            <Badge size="sm" color={scopeBadgeColor(scope)}>{t(`discount.scope${scope}`)}</Badge>
+            <div className="text-xs text-control-label mt-0.5 truncate">
+              {p.branch_name ?? p.company_name ?? '—'}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      id: 'max_discount',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('discount.maxDiscount')} />,
+      cell: ({ row }) => {
+        const p = row.original;
+        return (
+          <div className="tabular-nums text-sm">
+            <div><span className="text-[10px] text-control-label uppercase">Retail</span> {p.retail_max_discount_percent}%</div>
+            <div><span className="text-[10px] text-control-label">FIN1</span> {p.fin1_max_discount_percent}% · <span className="text-[10px] text-control-label">FIN2</span> {p.fin2_max_discount_percent}%</div>
+          </div>
+        );
+      },
+    },
+    {
+      id: 'effective_period',
+      accessorKey: 'effective_from',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('discount.effectivePeriod')} />,
+      cell: ({ row }) => {
+        const p = row.original;
+        if (!p.effective_from && !p.effective_to) return <span className="text-sm text-control-label">—</span>;
+        return (
+          <div className="text-xs text-control-label">
+            {p.effective_from && <DateTime value={p.effective_from} showTime={false} />}
+            {p.effective_from && p.effective_to && <span> — </span>}
+            {p.effective_to && <DateTime value={p.effective_to} showTime={false} />}
+          </div>
+        );
+      },
+      className: 'max-md:hidden',
+    },
+    {
+      accessorKey: 'is_active',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('discount.active')} className="justify-center" />,
+      cell: ({ row }) => (
+        <div className="flex justify-center">
+          {row.original.is_active
+            ? <Badge size="sm" color="success" startIcon={<CheckCircle />} />
+            : <Badge size="sm" color="default" startIcon={<XCircle />} />}
+        </div>
+      ),
+      className: 'w-16',
+    },
+    {
       id: 'actions',
       header: () => null,
       cell: ({ row }) => (
@@ -482,77 +553,6 @@ export function DiscountPoliciesPage() {
       ),
       enableSorting: false,
       className: 'w-10',
-    },
-    {
-      id: 'scope',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('discount.scope')} />,
-      cell: ({ row }) => {
-        const scope = getScopeLabel(row.original);
-        return <Badge size="sm" color={scopeBadgeColor(scope)}>{t(`discount.scope${scope}`)}</Badge>;
-      },
-      className: 'w-24',
-    },
-    {
-      accessorKey: 'company_name',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('discount.company')} />,
-      cell: ({ row }) => (
-        <span className="text-sm">{row.original.company_name ?? '—'}</span>
-      ),
-    },
-    {
-      accessorKey: 'branch_name',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('discount.branch')} />,
-      cell: ({ row }) => (
-        <span className="text-sm">{row.original.branch_name ?? '—'}</span>
-      ),
-    },
-    {
-      accessorKey: 'retail_max_discount_percent',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('discount.retailMaxDiscount')} />,
-      cell: ({ row }) => (
-        <span className="text-sm tabular-nums">{row.original.retail_max_discount_percent}%</span>
-      ),
-      className: 'w-28',
-    },
-    {
-      accessorKey: 'fin1_max_discount_percent',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('discount.fin1MaxDiscount')} />,
-      cell: ({ row }) => (
-        <span className="text-sm tabular-nums">{row.original.fin1_max_discount_percent}%</span>
-      ),
-      className: 'w-24',
-    },
-    {
-      accessorKey: 'fin2_max_discount_percent',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('discount.fin2MaxDiscount')} />,
-      cell: ({ row }) => (
-        <span className="text-sm tabular-nums">{row.original.fin2_max_discount_percent}%</span>
-      ),
-      className: 'w-24',
-    },
-    {
-      accessorKey: 'is_active',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('discount.active')} />,
-      cell: ({ row }) => row.original.is_active
-        ? <Badge size="sm" color="success" startIcon={<CheckCircle />} />
-        : <Badge size="sm" color="default" startIcon={<XCircle />} />,
-      className: 'w-16',
-    },
-    {
-      id: 'effective_period',
-      accessorKey: 'effective_from',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('discount.effectivePeriod')} />,
-      cell: ({ row }) => {
-        const p = row.original;
-        if (!p.effective_from && !p.effective_to) return <span className="text-sm text-control-label">—</span>;
-        return (
-          <div className="text-xs text-control-label">
-            {p.effective_from && <DateTime value={p.effective_from} />}
-            {p.effective_from && p.effective_to && <span> — </span>}
-            {p.effective_to && <DateTime value={p.effective_to} />}
-          </div>
-        );
-      },
     },
   ];
 
@@ -597,22 +597,37 @@ export function DiscountPoliciesPage() {
           <div className="flex-1 min-w-0 md:max-w-56">
             <Select
               options={scopeOptions}
-              value={filterScope}
+              value={filterScope || null}
               onChange={(val) => setFilterScope((val as string) ?? '')}
+              placeholder={t('discount.allScopes')}
               size="sm"
               showChevron
+              clearable
             />
           </div>
           <div className="hidden sm:block flex-1 min-w-0 md:max-w-56">
             <Select
-              options={activeOptions}
-              value={filterActive}
-              onChange={(val) => setFilterActive((val as string) ?? '')}
+              options={companyFilterOptions}
+              value={filterCompany || null}
+              onChange={(val) => setFilterCompany((val as string) ?? '')}
+              placeholder={t('discount.allCompanies')}
               size="sm"
               showChevron
+              clearable
             />
           </div>
-          <div className="sm:hidden shrink-0">
+          <div className="hidden md:block flex-1 min-w-0 md:max-w-56">
+            <Select
+              options={activeOptions}
+              value={filterActive || null}
+              onChange={(val) => setFilterActive((val as string) ?? '')}
+              placeholder={t('discount.allStatuses')}
+              size="sm"
+              showChevron
+              clearable
+            />
+          </div>
+          <div className="md:hidden shrink-0">
             <PopOver
               isOpen={filterOpen}
               onClose={() => setFilterOpen(false)}
@@ -623,8 +638,10 @@ export function DiscountPoliciesPage() {
               trigger={
                 <Button variant="outline" size="sm" className="relative btn-icon-sm" onClick={() => setFilterOpen(!filterOpen)}>
                   <SlidersHorizontal size={16} />
-                  {(filterActive) && (
-                    <span className="absolute -top-1.5 -right-1.5 bg-primary text-white text-xs rounded-full w-4 h-4 flex items-center justify-center leading-none">1</span>
+                  {(filterCompany || filterActive) && (
+                    <span className="absolute -top-1.5 -right-1.5 bg-primary text-white text-xs rounded-full w-4 h-4 flex items-center justify-center leading-none">
+                      {(filterCompany ? 1 : 0) + (filterActive ? 1 : 0)}
+                    </span>
                   )}
                 </Button>
               }
@@ -632,11 +649,22 @@ export function DiscountPoliciesPage() {
               <div className="flex flex-col gap-3 p-3">
                 <div className="text-xs font-medium text-muted uppercase tracking-wide">{t('common.filters')}</div>
                 <Select
+                  options={companyFilterOptions}
+                  value={filterCompany}
+                  onChange={(val) => setFilterCompany((val as string) ?? '')}
+                  placeholder={t('discount.allCompanies')}
+                  size="sm"
+                  showChevron
+                  clearable
+                />
+                <Select
                   options={activeOptions}
                   value={filterActive}
                   onChange={(val) => setFilterActive((val as string) ?? '')}
+                  placeholder={t('discount.allStatuses')}
                   size="sm"
                   showChevron
+                  clearable
                 />
                 <div className="text-xs font-medium text-muted uppercase tracking-wide mt-1">{t('common.sortBy')}</div>
                 <Select

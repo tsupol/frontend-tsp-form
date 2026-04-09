@@ -3,31 +3,13 @@ import { Button } from 'tsp-form';
 
 const STORAGE_KEY = 'quick_login_last_user';
 
-const GROUPS = [
-  {
-    label: 'System / Holding',
-    users: [
-      { username: 'alice', role: 'SYS_DEV' },
-      { username: 'test_holding_admin', role: 'HOLD_ADMIN' },
-    ],
-  },
-  {
-    label: 'Company',
-    users: [
-      { username: 'test_company_admin', role: 'CO_ADMIN' },
-      { username: 'test_company_accountant', role: 'CO_ACCT' },
-      { username: 'test_company_inventory', role: 'CO_INV' },
-      { username: 'test_company_collector', role: 'CO_COLL' },
-      { username: 'test_company_repo', role: 'CO_REPO' },
-    ],
-  },
-  {
-    label: 'Branch',
-    users: [
-      { username: 'test_branch_manager', role: 'BR_MGR' },
-      { username: 'test_branch_staff', role: 'BR_STAFF' },
-    ],
-  },
+const USERS = [
+  { username: 'alice', role: 'SYS_DEV', color: 'danger' as const },
+  { username: 'ui_holding_admin', role: 'HOLD_ADMIN', color: 'warning' as const },
+  { username: 'ui_company_admin', role: 'CO_ADMIN', color: 'info' as const },
+  { username: 'ui_company_inventory', role: 'CO_INV', color: 'info' as const },
+  { username: 'ui_branch_manager', role: 'BR_MGR', color: 'success' as const },
+  { username: 'ui_branch_staff', role: 'BR_STAFF', color: 'success' as const },
 ];
 
 interface QuickLoginProps {
@@ -40,7 +22,6 @@ export function QuickLogin({ onSelect }: QuickLoginProps) {
   });
 
   useEffect(() => {
-    // Auto-select last used on mount
     if (active) {
       onSelect(active, 'Test123456');
     }
@@ -56,25 +37,20 @@ export function QuickLogin({ onSelect }: QuickLoginProps) {
   return (
     <div className="flex flex-col gap-2 mb-4">
       <label className="form-label">Quick login</label>
-      {GROUPS.map((group) => (
-        <div key={group.label}>
-          <div className="text-xs text-text-muted mb-1">{group.label}</div>
-          <div className="flex flex-wrap gap-1">
-            {group.users.map((u) => (
-              <Button
-                key={u.username}
-                type="button"
-                size="sm"
-                color={active === u.username ? 'primary' : undefined}
-                variant={active === u.username ? 'solid' : 'outline'}
-                onClick={() => handleClick(u.username)}
-              >
-                {u.role}
-              </Button>
-            ))}
-          </div>
-        </div>
-      ))}
+      <div className="flex flex-wrap gap-1">
+        {USERS.map((u) => (
+          <Button
+            key={u.username}
+            type="button"
+            size="sm"
+            color={u.color}
+            variant={active === u.username ? 'solid' : 'outline'}
+            onClick={() => handleClick(u.username)}
+          >
+            {u.role}
+          </Button>
+        ))}
+      </div>
     </div>
   );
 }
