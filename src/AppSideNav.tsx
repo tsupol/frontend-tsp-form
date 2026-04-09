@@ -15,8 +15,6 @@ import {
   Warehouse,
   Building2,
   FileText,
-  ClipboardList,
-  Smartphone,
   Calculator,
   Coins,
   UserSearch,
@@ -140,6 +138,11 @@ export const AppSideNav = () => {
     { key: 'dashboard', icon: <LayoutDashboard size="1rem" />, label: t('nav.dashboard'), path: '/admin' },
     { key: 'users', icon: <Users size="1rem" />, label: t('nav.users'), path: '/admin/users' },
     {
+      key: 'customers', icon: <UserSearch size="1rem" />, label: t('nav.customers'),
+      path: '/admin/customers',
+    },
+    { key: 'price-check', icon: <Calculator size="1rem" />, label: t('nav.priceCheck'), path: '/admin/price-check' },
+    {
       key: 'products', icon: <Package size="1rem" />, label: t('nav.products'),
       path: '/admin/products/models',
       children: [
@@ -164,10 +167,13 @@ export const AppSideNav = () => {
       key: 'inventory', icon: <Warehouse size="1rem" />, label: t('nav.inventory'),
       path: '/admin/inventory/stock',
       children: [
+        { type: 'group', key: 'grp-stock', label: t('nav.groupStock') },
         { key: 'stock', label: t('nav.stock'), path: '/admin/inventory/stock' },
         { key: 'assets', label: t('nav.assets'), path: '/admin/inventory/assets' },
+        { type: 'group', key: 'grp-procurement', label: t('nav.groupProcurement') },
         { key: 'po', label: t('nav.purchaseOrders'), path: '/admin/inventory/po' },
         { key: 'receiving', label: t('nav.receiving'), path: '/admin/inventory/receiving' },
+        { type: 'group', key: 'grp-operations', label: t('nav.groupOperations') },
         { key: 'transfers', label: t('nav.transfers'), path: '/admin/inventory/transfers' },
         { key: 'repairs', label: t('nav.repairs'), path: '/admin/inventory/repairs' },
         { key: 'buyback', label: t('nav.buyback'), path: '/admin/inventory/buyback' },
@@ -178,19 +184,21 @@ export const AppSideNav = () => {
       key: 'company', icon: <Building2 size="1rem" />, label: t('nav.company'),
       path: ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? '/admin/company/branches' : '/admin/company/config',
       children: [
+        { type: 'group', key: 'grp-org', label: t('nav.groupOrganization') },
         ...(['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
           { key: 'branches', label: t('nav.branches'), path: '/admin/company/branches' },
         ] : []),
         { key: 'pin', label: t('nav.branchPin'), path: '/admin/company/pin' },
-        { key: 'company-config', label: t('nav.companyConfig'), path: '/admin/company/config' },
+        { type: 'group', key: 'grp-finance', label: t('nav.groupFinance') },
         { key: 'bank-accounts', label: t('nav.bankAccounts'), path: '/admin/company/bank-accounts' },
+        { key: 'company-config', label: t('nav.companyConfig'), path: '/admin/company/config' },
+        { type: 'group', key: 'grp-policy', label: t('nav.groupPolicy') },
         { key: 'holidays', label: t('nav.holidays'), path: '/admin/company/holidays' },
         { key: 'dunning', label: t('nav.dunning'), path: '/admin/company/dunning' },
         { key: 'blacklist', label: t('nav.blacklist'), path: '/admin/company/blacklist' },
         { key: 'icloud', label: t('nav.icloud'), path: '/admin/company/icloud' },
       ],
     },
-    { key: 'price-check', icon: <Calculator size="1rem" />, label: t('nav.priceCheck'), path: '/admin/price-check' },
     {
       key: 'contracts', icon: <FileText size="1rem" />, label: t('nav.contracts'),
       path: '/admin/contracts/search',
@@ -198,10 +206,6 @@ export const AppSideNav = () => {
         { key: 'contract-search', label: t('nav.contractSearch'), path: '/admin/contracts/search' },
         { key: 'saving-contracts', label: t('nav.savingContracts'), path: '/admin/contracts/saving' },
       ],
-    },
-    {
-      key: 'customers', icon: <UserSearch size="1rem" />, label: t('nav.customers'),
-      path: '/admin/customers',
     },
     {
       key: 'commission', icon: <Coins size="1rem" />, label: t('nav.commission'),
@@ -221,16 +225,7 @@ export const AppSideNav = () => {
         ] : []),
       ],
     }] : []),
-    {
-      key: 'call-center', icon: <Headset size="1rem" />, label: t('nav.callCenter'),
-      path: '/admin/call-center',
-      children: [
-        { key: 'ticket-queue', label: t('nav.ticketQueue'), path: '/admin/call-center' },
-      ],
-    },
-    { type: 'group', key: 'grp-demo', label: t('nav.conceptDemo') },
-    { key: 'register', icon: <ClipboardList size="1rem" />, label: t('nav.register'), path: '/admin/register' },
-    { key: 'enrollment', icon: <Smartphone size="1rem" />, label: t('nav.enrollment'), path: '/admin/enrollment' },
+    { key: 'call-center', icon: <Headset size="1rem" />, label: t('nav.callCenter'), path: '/admin/call-center' },
   ];
 
   const handleSelect = (_key: string, path?: string) => {

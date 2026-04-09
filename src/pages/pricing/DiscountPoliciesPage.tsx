@@ -594,7 +594,7 @@ export function DiscountPoliciesPage() {
 
         {/* Filters — scope always visible, active ≥sm, popover <sm */}
         <div className="flex items-center gap-2 pb-4 flex-none">
-          <div className="flex-1 min-w-0 md:max-w-56">
+          <div className="flex-1 min-w-0">
             <Select
               options={scopeOptions}
               value={filterScope || null}
@@ -605,7 +605,7 @@ export function DiscountPoliciesPage() {
               clearable
             />
           </div>
-          <div className="hidden sm:block flex-1 min-w-0 md:max-w-56">
+          <div className="hidden sm:block flex-1 min-w-0">
             <Select
               options={companyFilterOptions}
               value={filterCompany || null}
@@ -616,7 +616,7 @@ export function DiscountPoliciesPage() {
               clearable
             />
           </div>
-          <div className="hidden md:block flex-1 min-w-0 md:max-w-56">
+          <div className="hidden md:block flex-1 min-w-0">
             <Select
               options={activeOptions}
               value={filterActive || null}

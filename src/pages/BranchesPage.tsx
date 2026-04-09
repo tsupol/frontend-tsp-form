@@ -196,7 +196,7 @@ export function BranchesPage() {
       accessorKey: 'address',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('org.address')} />,
       cell: ({ row }) => <span className="text-xs text-subtle truncate">{row.original.address ?? '—'}</span>,
-      className: 'w-[25%] min-w-32 max-lg:hidden',
+      className: 'w-[25%] min-w-32',
     },
     {
       id: 'status',
@@ -259,12 +259,12 @@ export function BranchesPage() {
         {/* Filters */}
         <div className="flex-none pb-4">
           <div className="flex items-center gap-2">
-            <div className="flex-1 min-w-0 md:max-w-56">
+            <div className="flex-1 min-w-0">
               <Input placeholder={t('common.search')} value={searchInput} onChange={(e) => handleSearch(e.target.value)} size="sm" startIcon={<Search size={16} />} className="w-full" />
             </div>
             {/* Company filter — visible ≥sm, holding-level+ only */}
             {isHoldingLevel && companies.length > 1 && (
-              <div className="hidden sm:block" style={{ width: '14rem' }}>
+              <div className="hidden sm:block flex-1 min-w-0">
                 <Select
                   value={filterCompany || null}
                   onChange={(val) => { setFilterCompany((val as string) ?? ''); setPageIndex(0); }}
@@ -278,7 +278,7 @@ export function BranchesPage() {
               </div>
             )}
             {/* Type filter — visible ≥md (or ≥sm if no company filter) */}
-            <div className={isHoldingLevel && companies.length > 1 ? 'hidden md:block' : 'hidden sm:block'} style={{ width: '12rem' }}>
+            <div className={`${isHoldingLevel && companies.length > 1 ? 'hidden md:block' : 'hidden sm:block'} flex-1 min-w-0`}>
               <Select
                 value={filterType || null}
                 onChange={(val) => { setFilterType((val as string) ?? ''); setPageIndex(0); }}

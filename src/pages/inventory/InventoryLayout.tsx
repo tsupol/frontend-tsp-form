@@ -3,15 +3,22 @@ import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { BarChart3, Box, ClipboardList, PackagePlus, ArrowLeftRight, Wrench, RotateCcw, ShoppingCart } from 'lucide-react';
 
-const navItems = [
-  { path: '/admin/inventory/stock', labelKey: 'nav.stock', icon: BarChart3 },
-  { path: '/admin/inventory/assets', labelKey: 'nav.assets', icon: Box },
-  { path: '/admin/inventory/po', labelKey: 'nav.purchaseOrders', icon: ClipboardList },
-  { path: '/admin/inventory/receiving', labelKey: 'nav.receiving', icon: PackagePlus },
-  { path: '/admin/inventory/transfers', labelKey: 'nav.transfers', icon: ArrowLeftRight },
-  { path: '/admin/inventory/repairs', labelKey: 'nav.repairs', icon: Wrench },
-  { path: '/admin/inventory/buyback', labelKey: 'nav.buyback', icon: RotateCcw },
-  { path: '/admin/inventory/sale', labelKey: 'nav.sale', icon: ShoppingCart },
+type NavItem =
+  | { type: 'link'; path: string; labelKey: string; icon: typeof BarChart3 }
+  | { type: 'group'; labelKey: string };
+
+const navItems: NavItem[] = [
+  { type: 'group', labelKey: 'nav.groupStock' },
+  { type: 'link', path: '/admin/inventory/stock', labelKey: 'nav.stock', icon: BarChart3 },
+  { type: 'link', path: '/admin/inventory/assets', labelKey: 'nav.assets', icon: Box },
+  { type: 'group', labelKey: 'nav.groupProcurement' },
+  { type: 'link', path: '/admin/inventory/po', labelKey: 'nav.purchaseOrders', icon: ClipboardList },
+  { type: 'link', path: '/admin/inventory/receiving', labelKey: 'nav.receiving', icon: PackagePlus },
+  { type: 'group', labelKey: 'nav.groupOperations' },
+  { type: 'link', path: '/admin/inventory/transfers', labelKey: 'nav.transfers', icon: ArrowLeftRight },
+  { type: 'link', path: '/admin/inventory/repairs', labelKey: 'nav.repairs', icon: Wrench },
+  { type: 'link', path: '/admin/inventory/buyback', labelKey: 'nav.buyback', icon: RotateCcw },
+  { type: 'link', path: '/admin/inventory/sale', labelKey: 'nav.sale', icon: ShoppingCart },
 ];
 
 export function InventoryLayout({ children }: { children: ReactNode }) {
@@ -20,25 +27,32 @@ export function InventoryLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-dvh">
       <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-48 border-r border-line p-4 pt-8">
-        <span className="text-xs font-semibold text-control-label uppercase tracking-wider mb-2 px-2">
-          {t('nav.inventory')}
-        </span>
-        {navItems.map(({ path, labelKey, icon: Icon }) => (
-          <NavLink
-            key={path}
-            to={path}
-            className={({ isActive }) =>
-              `flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors ${
-                isActive
-                  ? 'bg-primary/10 text-primary font-medium'
-                  : 'text-fg/70 hover:bg-surface-hover hover:text-fg'
-              }`
-            }
-          >
-            <Icon size={15} />
-            {t(labelKey)}
-          </NavLink>
-        ))}
+        {navItems.map((item, i) => {
+          if (item.type === 'group') {
+            return (
+              <span key={item.labelKey} className={`text-[11px] text-subtle uppercase tracking-wider px-2 ${i > 0 ? 'mt-3 mb-1' : 'mb-1'}`}>
+                {t(item.labelKey)}
+              </span>
+            );
+          }
+          const { path, labelKey, icon: Icon } = item;
+          return (
+            <NavLink
+              key={path}
+              to={path}
+              className={({ isActive }) =>
+                `flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors ${
+                  isActive
+                    ? 'bg-primary/10 text-primary font-medium'
+                    : 'text-fg hover:bg-surface-hover'
+                }`
+              }
+            >
+              <Icon size={15} />
+              {t(labelKey)}
+            </NavLink>
+          );
+        })}
       </nav>
       <div className="flex-1 min-w-0 h-full">
         {children}

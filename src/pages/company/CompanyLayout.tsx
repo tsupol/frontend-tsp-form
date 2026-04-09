@@ -7,6 +7,10 @@ import { useAuth } from '../../contexts/AuthContext';
 
 const ADMIN_ROLES = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'];
 
+type NavItem =
+  | { type: 'link'; path: string; labelKey: string; icon: typeof MapPin }
+  | { type: 'group'; labelKey: string };
+
 export function CompanyLayout({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
@@ -15,24 +19,32 @@ export function CompanyLayout({ children }: { children: ReactNode }) {
   const role = user?.role_code ?? '';
   const isAdmin = ADMIN_ROLES.includes(role);
 
-  const navItems = useMemo(() => [
-    ...(isAdmin ? [{ path: '/admin/company/branches', labelKey: 'nav.branches', icon: MapPin }] : []),
-    { path: '/admin/company/pin', labelKey: 'nav.branchPin', icon: KeyRound },
-    { path: '/admin/company/config', labelKey: 'nav.companyConfig', icon: Building2 },
-    { path: '/admin/company/bank-accounts', labelKey: 'nav.bankAccounts', icon: Landmark },
-    { path: '/admin/company/holidays', labelKey: 'nav.holidays', icon: CalendarDays },
-    { path: '/admin/company/dunning', labelKey: 'nav.dunning', icon: AlertTriangle },
-    { path: '/admin/company/blacklist', labelKey: 'nav.blacklist', icon: ShieldBan },
-    { path: '/admin/company/icloud', labelKey: 'nav.icloud', icon: Cloud },
+  const navItems: NavItem[] = useMemo(() => [
+    { type: 'group', labelKey: 'nav.groupOrganization' },
+    ...(isAdmin ? [{ type: 'link' as const, path: '/admin/company/branches', labelKey: 'nav.branches', icon: MapPin }] : []),
+    { type: 'link', path: '/admin/company/pin', labelKey: 'nav.branchPin', icon: KeyRound },
+    { type: 'group', labelKey: 'nav.groupFinance' },
+    { type: 'link', path: '/admin/company/bank-accounts', labelKey: 'nav.bankAccounts', icon: Landmark },
+    { type: 'link', path: '/admin/company/config', labelKey: 'nav.companyConfig', icon: Building2 },
+    { type: 'group', labelKey: 'nav.groupPolicy' },
+    { type: 'link', path: '/admin/company/holidays', labelKey: 'nav.holidays', icon: CalendarDays },
+    { type: 'link', path: '/admin/company/dunning', labelKey: 'nav.dunning', icon: AlertTriangle },
+    { type: 'link', path: '/admin/company/blacklist', labelKey: 'nav.blacklist', icon: ShieldBan },
+    { type: 'link', path: '/admin/company/icloud', labelKey: 'nav.icloud', icon: Cloud },
   ], [isAdmin]);
 
   return (
     <div className="flex min-h-full">
       <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-48 border-r border-line p-4 pt-7.5 sticky top-0 h-dvh">
-        <span className="text-xs font-semibold text-control-label uppercase tracking-wider mb-2 px-2">
-          {t('nav.company')}
-        </span>
-        {navItems.map(({ path, labelKey, icon: Icon }) => {
+        {navItems.map((item, i) => {
+          if (item.type === 'group') {
+            return (
+              <span key={item.labelKey} className={`text-[11px] text-subtle uppercase tracking-wider px-2 ${i > 0 ? 'mt-3 mb-1' : 'mb-1'}`}>
+                {t(item.labelKey)}
+              </span>
+            );
+          }
+          const { path, labelKey, icon: Icon } = item;
           const isActive = pathname.startsWith(path);
           return (
             <a
@@ -45,7 +57,7 @@ export function CompanyLayout({ children }: { children: ReactNode }) {
               className={`flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors ${
                 isActive
                   ? 'bg-primary/10 text-primary font-medium'
-                  : 'text-fg/70 hover:bg-surface-hover hover:text-fg'
+                  : 'text-fg hover:bg-surface-hover'
               }`}
             >
               <Icon size={15} />

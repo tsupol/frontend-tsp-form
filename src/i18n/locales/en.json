@@ -100,7 +100,13 @@
     "contractSearch": "Contract Search",
     "savingContracts": "Saving Contracts",
     "branches": "Branches",
-    "customers": "Customers"
+    "customers": "Customers",
+    "groupStock": "Stock",
+    "groupProcurement": "Procurement",
+    "groupOperations": "Operations",
+    "groupOrganization": "Organization",
+    "groupFinance": "Finance",
+    "groupPolicy": "Policy"
   },
   "user": {
     "id": "User ID",

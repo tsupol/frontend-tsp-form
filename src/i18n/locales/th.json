@@ -100,7 +100,13 @@
     "contractSearch": "ค้นหาสัญญา",
     "savingContracts": "สัญญาออม",
     "branches": "สาขา",
-    "customers": "ลูกค้า"
+    "customers": "ลูกค้า",
+    "groupStock": "สต็อก",
+    "groupProcurement": "จัดซื้อ",
+    "groupOperations": "ปฏิบัติการ",
+    "groupOrganization": "องค์กร",
+    "groupFinance": "การเงิน",
+    "groupPolicy": "นโยบาย"
   },
   "user": {
     "id": "รหัสผู้ใช้",

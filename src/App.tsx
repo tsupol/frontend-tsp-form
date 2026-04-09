@@ -7,11 +7,6 @@ import { LoginPage } from './pages/LoginPage';
 import { HomePage } from './pages/HomePage';
 import { DashboardPage } from './pages/DashboardPage';
 import { UserPage } from './pages/UserPage';
-import { RegisterLayout } from './pages/register/RegisterLayout';
-import { Step1DeviceInfo } from './pages/register/Step1DeviceInfo';
-import { Step2Scan } from './pages/register/Step2Scan';
-import { Step3Status } from './pages/register/Step3Status';
-import { EnrollmentPage } from './pages/EnrollmentPage';
 import { EnrollRedirectPage } from './pages/EnrollRedirectPage';
 import { HoldingSelectModal } from './components/HoldingSelectModal';
 import { UsersPage } from './pages/UsersPage';
@@ -20,7 +15,6 @@ import { FamiliesPage } from './pages/products/FamiliesPage';
 import { AttributesPage } from './pages/products/AttributesPage';
 import { ModelsPage } from './pages/products/ModelsPage';
 import { ProductsLayout } from './pages/products/ProductsLayout';
-import { CallCenterLayout } from './pages/call-center/CallCenterLayout';
 import { TicketQueuePage } from './pages/call-center/TicketQueuePage';
 import { PricingLayout } from './pages/pricing/PricingLayout';
 import { PricebookPage } from './pages/pricing/PricebookPage';
@@ -210,7 +204,7 @@ function App() {
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <CallCenterLayout><TicketQueuePage /></CallCenterLayout>
+              <TicketQueuePage />
             </AdminLayout>
           </ProtectedRoute>
         }
@@ -539,33 +533,6 @@ function App() {
       />
 
 
-      {/* Registration flow */}
-      <Route
-        path="/admin/register"
-        element={
-          <ProtectedRoute>
-            <AdminLayout>
-              <RegisterLayout />
-            </AdminLayout>
-          </ProtectedRoute>
-        }
-      >
-        <Route index element={<Step1DeviceInfo />} />
-        <Route path="scan" element={<Step2Scan />} />
-        <Route path="status" element={<Step3Status />} />
-      </Route>
-
-      {/* Enrollment */}
-      <Route
-        path="/admin/enrollment"
-        element={
-          <ProtectedRoute>
-            <AdminLayout>
-              <EnrollmentPage />
-            </AdminLayout>
-          </ProtectedRoute>
-        }
-      />
 
       {/* Catch-all redirect */}
       <Route path="*" element={<Navigate to="/" replace />} />
