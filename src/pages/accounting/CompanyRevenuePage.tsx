@@ -6,6 +6,7 @@ export function CompanyRevenuePage() {
       titleKey="nav.companyRevenue"
       descriptionKey="accounting.revenue.description"
       viewEndpoint="/v_company_revenue"
+      exportRpc="fn_company_revenue_export"
     />
   );
 }

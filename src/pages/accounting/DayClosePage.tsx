@@ -1,14 +1,14 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
   PageNav, PageNavPanel, MobileHeader, Button, Input, Select, Badge,
-  DataTable, InputDatePicker,
+  DataTable, InputDatePicker, Modal, useSnackbarContext,
 } from 'tsp-form';
 import {
-  ArrowRightFromLine, ArrowLeft, CalendarCheck, AlertTriangle, CheckCircle2, Lock, Sparkles, Calendar,
+  ArrowRightFromLine, ArrowLeft, CalendarCheck, AlertTriangle, CheckCircle2, Lock, Sparkles, Calendar, XCircle,
 } from 'lucide-react';
-import { apiClient } from '../../lib/api';
+import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { toLocalDateStr, makeDatePickerFormat } from '../../lib/format';
 import {
@@ -28,6 +28,11 @@ export function DayClosePage() {
   const [note, setNote] = useState<string>('');
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [closeError, setCloseError] = useState('');
+  const queryClient = useQueryClient();
+  const { addSnackbar } = useSnackbarContext();
 
   const { data: branches = [] } = useQuery({
     queryKey: ['branches-active'],
@@ -96,8 +101,38 @@ export function DayClosePage() {
     return actual - expected;
   }, [actualAmount, expected]);
 
-  const handleCloseDay = () => {
-    alert(t('accounting.dayClose.stubMessage'));
+  const handleCloseDay = async () => {
+    setClosing(true);
+    setCloseError('');
+    const start = Date.now();
+    try {
+      await apiClient.rpc('fn_day_close_create', {
+        p_branch_id: Number(effectiveBranchId),
+        p_close_date: today,
+        p_actual_amount: parseFloat(actualAmount || '0'),
+        p_note: note || null,
+      });
+      addSnackbar({
+        message: <div className="alert alert-success"><CheckCircle2 size={16} /><span className="alert-description">{t('accounting.dayClose.closeSuccess')}</span></div>,
+        type: 'success',
+      });
+      queryClient.invalidateQueries({ queryKey: ['accounting'] });
+      setActualAmount('');
+      setNote('');
+      setConfirmOpen(false);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setCloseError(translated || err.message);
+      } else {
+        setCloseError(t('common.error'));
+      }
+    } finally {
+      const elapsed = Date.now() - start;
+      if (elapsed < 300) await new Promise(r => setTimeout(r, 300 - elapsed));
+      setClosing(false);
+    }
   };
 
   const selectDate = (d: string, goTo?: (panel: string) => void) => {
@@ -112,6 +147,7 @@ export function DayClosePage() {
       : t('nav.dayClose');
 
   return (
+    <>
     <PageNav panels={['list', 'detail']} className="h-dvh">
       {({ isMobile, isRoot, goTo, goBack }) => (
         <>
@@ -407,7 +443,7 @@ export function DayClosePage() {
                       <Button
                         color="primary"
                         startIcon={<CalendarCheck size={16} />}
-                        onClick={handleCloseDay}
+                        onClick={() => { setCloseError(''); setConfirmOpen(true); }}
                         disabled={!actualAmount || summary.pending_bill_count > 0}
                       >
                         {t('accounting.dayClose.closeDay')}
@@ -421,6 +457,31 @@ export function DayClosePage() {
         </>
       )}
     </PageNav>
+
+    <Modal open={confirmOpen} onClose={() => !closing && setConfirmOpen(false)} maxWidth="24rem" width="100%">
+      <div className="modal-header"><h2 className="modal-title">{t('accounting.dayClose.confirmTitle')}</h2></div>
+      <div className="modal-content">
+        {closeError && (
+          <div className="alert alert-danger mb-4 animate-pop-in">
+            <XCircle size={18} />
+            <div><div className="alert-description">{closeError}</div></div>
+          </div>
+        )}
+        <p className="text-sm">{t('accounting.dayClose.confirmMessage')}</p>
+        <div className="mt-3 text-sm space-y-1">
+          <div><span className="text-fg/60">{t('accounting.dayClose.expected')}:</span> <span className="font-semibold tabular-nums">{fmtAmount(expected)}</span></div>
+          <div><span className="text-fg/60">{t('accounting.dayClose.actual')}:</span> <span className="font-semibold tabular-nums">{fmtAmount(parseFloat(actualAmount || '0'))}</span></div>
+          <div><span className="text-fg/60">{t('accounting.dayClose.difference')}:</span> <span className={`font-semibold tabular-nums ${diff < 0 ? 'text-danger' : diff > 0 ? 'text-warning' : 'text-success'}`}>{diff >= 0 ? '+' : ''}{fmtAmount(diff)}</span></div>
+        </div>
+      </div>
+      <div className="modal-footer">
+        <Button onClick={() => setConfirmOpen(false)} disabled={closing}>{t('common.cancel')}</Button>
+        <Button color="primary" onClick={handleCloseDay} disabled={closing}>
+          {closing ? t('common.loading') : t('accounting.dayClose.closeDay')}
+        </Button>
+      </div>
+    </Modal>
+    </>
   );
 }
 

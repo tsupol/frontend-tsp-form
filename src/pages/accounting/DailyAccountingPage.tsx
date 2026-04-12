@@ -8,6 +8,7 @@ import {
 import { ArrowRightFromLine, Calendar, Download } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { toLocalDateStr, makeDatePickerFormat } from '../../lib/format';
+import { downloadCsv } from '../../lib/csv';
 import {
   type Branch, type DailyAccountingRow, fmtAmount, todayISO,
 } from './accountingTypes';
@@ -34,8 +35,19 @@ export function DailyAccountingPage() {
   });
 
   const handleExport = () => {
-    // Stubbed — would call fn or build client-side CSV
-    alert(t('accounting.exportStub'));
+    if (rows.length === 0) return;
+    downloadCsv(
+      rows as unknown as Record<string, unknown>[],
+      [
+        { key: 'txn_date', label: t('accounting.date') },
+        { key: 'direction', label: t('accounting.daily.direction') },
+        { key: 'txn_type', label: t('accounting.daily.txnType') },
+        { key: 'category_th', label: t('accounting.daily.category') },
+        { key: 'txn_count', label: t('accounting.daily.count') },
+        { key: 'total_amount', label: t('accounting.daily.amount') },
+      ],
+      `daily-accounting_${date}.csv`
+    );
   };
 
   const columns: ColumnDef<DailyAccountingRow>[] = [

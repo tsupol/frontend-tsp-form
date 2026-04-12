@@ -10,6 +10,7 @@ import { ArrowRightFromLine, Calendar, Download } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { toLocalDateStr, makeDateRangePickerFormat } from '../../lib/format';
+import { downloadCsv } from '../../lib/csv';
 import {
   type Branch, type RemittanceRevenueRow, fmtAmount,
 } from './accountingTypes';
@@ -18,9 +19,10 @@ interface Props {
   titleKey: string;
   descriptionKey: string;
   viewEndpoint: string; // e.g. '/v_holding_remittance'
+  exportRpc: string; // e.g. 'fn_holding_remittance_export'
 }
 
-export function RemittanceRevenueView({ titleKey, descriptionKey, viewEndpoint }: Props) {
+export function RemittanceRevenueView({ titleKey, descriptionKey, viewEndpoint, exportRpc }: Props) {
   const { t, i18n } = useTranslation();
   const [branchId, setBranchId] = useState<string>('');
   const [fromDate, setFromDate] = useState<string>('');
@@ -60,8 +62,35 @@ export function RemittanceRevenueView({ titleKey, descriptionKey, viewEndpoint }
   const rows = data?.data ?? [];
   const totalCount = data?.totalCount ?? 0;
 
-  const handleExport = () => {
-    alert(t('accounting.exportStub'));
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const params: Record<string, unknown> = {};
+      if (branchId) params.p_branch_id = Number(branchId);
+      if (fromDate) params.p_date_from = fromDate;
+      if (toDate) params.p_date_to = toDate;
+      const result = await apiClient.rpc<{ rows: RemittanceRevenueRow[]; count: number; total_amount: number }>(exportRpc, params);
+      const csvCols = [
+        { key: 'bill_date', label: t('accounting.rr.date') },
+        { key: 'branch_name', label: t('accounting.branch') },
+        { key: 'branch_code', label: 'Branch Code' },
+        { key: 'bill_code', label: t('accounting.rr.billCode') },
+        { key: 'contract_code', label: t('accounting.rr.contractCode') },
+        { key: 'charge_type', label: t('accounting.rr.chargeType') },
+        { key: 'charge_name_th', label: 'Charge Name' },
+        { key: 'description', label: 'Description' },
+        { key: 'amount', label: t('accounting.rr.amount') },
+        { key: 'day_closed', label: t('accounting.rr.dayClosed') },
+      ];
+      const filename = `${exportRpc.replace('fn_', '')}_${fromDate || 'all'}_${toDate || 'all'}.csv`;
+      downloadCsv(result.rows as unknown as Record<string, unknown>[], csvCols, filename);
+    } catch {
+      // silent — export is best-effort
+    } finally {
+      setExporting(false);
+    }
   };
 
   // Reset to page 0 when filters change
@@ -132,8 +161,8 @@ export function RemittanceRevenueView({ titleKey, descriptionKey, viewEndpoint }
             <h1 className="heading-2">{t(titleKey)}</h1>
             <p className="text-sm text-fg/60 mt-1">{t(descriptionKey)}</p>
           </div>
-          <Button color="primary" startIcon={<Download size={16} />} onClick={handleExport}>
-            {t('accounting.exportCsv')}
+          <Button color="primary" startIcon={<Download size={16} />} onClick={handleExport} disabled={exporting}>
+            {exporting ? t('common.loading') : t('accounting.exportCsv')}
           </Button>
         </div>
 

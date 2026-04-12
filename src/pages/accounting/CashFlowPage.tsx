@@ -8,6 +8,7 @@ import {
 import { ArrowRightFromLine, Calendar, Download } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { toLocalDateStr, makeDatePickerFormat } from '../../lib/format';
+import { downloadCsv } from '../../lib/csv';
 import {
   type Branch, type DailyCashflowRow, fmtAmount, todayISO,
 } from './accountingTypes';
@@ -34,7 +35,19 @@ export function CashFlowPage() {
   });
 
   const handleExport = () => {
-    alert(t('accounting.exportStub'));
+    if (rows.length === 0) return;
+    downloadCsv(
+      rows as unknown as Record<string, unknown>[],
+      [
+        { key: 'txn_date', label: t('accounting.date') },
+        { key: 'method', label: t('accounting.cashflow.method') },
+        { key: 'bank_name', label: t('accounting.cashflow.bank') },
+        { key: 'account_number', label: t('accounting.cashflow.account') },
+        { key: 'payment_count', label: t('accounting.cashflow.count') },
+        { key: 'total_in', label: t('accounting.cashflow.totalIn') },
+      ],
+      `cashflow_${date}.csv`
+    );
   };
 
   const columns: ColumnDef<DailyCashflowRow>[] = [
