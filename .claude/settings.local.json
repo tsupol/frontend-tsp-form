@@ -10,7 +10,8 @@
       "Grep",
       "WebFetch(*)",
       "mcp__paas-dock__*",
-      "mcp__dev-api__*"
+      "mcp__dev-api__*",
+      "mcp__playwright__*"
     ]
   }
 }
