@@ -119,7 +119,8 @@
     "cashFlow": "กระแสเงินสด",
     "branchBalance": "ยอดคงค้างสาขา",
     "holdingRemittance": "ส่ง Holding",
-    "companyRevenue": "รายได้บริษัท"
+    "companyRevenue": "รายได้บริษัท",
+    "branchLedger": "รายการเคลื่อนไหว"
   },
   "user": {
     "id": "รหัสผู้ใช้",
@@ -1879,6 +1880,25 @@
       "lateFeePending": "ค่าปรับค้าง",
       "stockCount": "จำนวนสต็อก",
       "stockValue": "มูลค่าสต็อก"
+    },
+    "ledger": {
+      "description": "รายการรับ-จ่ายทั้งหมดของสาขา กรองตามช่วงวัน ทิศทาง และช่องทาง",
+      "time": "เวลา",
+      "direction": "ทิศทาง",
+      "in": "รับเข้า",
+      "out": "จ่ายออก",
+      "category": "หมวด",
+      "channel": "ช่องทาง",
+      "cash": "เงินสด",
+      "transfer": "โอน",
+      "bill": "บิล",
+      "contract": "สัญญา",
+      "chargeType": "ประเภท",
+      "amount": "จำนวนเงิน",
+      "allDirections": "ทุกทิศทาง",
+      "allChannels": "ทุกช่องทาง",
+      "searchPlaceholder": "เลขบิลหรือสัญญา",
+      "empty": "ไม่พบรายการ"
     },
     "remittance": {
       "description": "รายการที่ต้องส่ง Holding — งวดผ่อน เงินดาวน์ ค่าปรับ คอมมิชชั่นพาร์ทเนอร์"

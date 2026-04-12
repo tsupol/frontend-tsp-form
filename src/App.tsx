@@ -64,6 +64,7 @@ import { CashFlowPage } from './pages/accounting/CashFlowPage';
 import { BranchBalancePage } from './pages/accounting/BranchBalancePage';
 import { HoldingRemittancePage } from './pages/accounting/HoldingRemittancePage';
 import { CompanyRevenuePage } from './pages/accounting/CompanyRevenuePage';
+import { BranchLedgerPage } from './pages/accounting/BranchLedgerPage';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -568,6 +569,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <AccountingLayout><CashFlowPage /></AccountingLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/accounting/ledger"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <AccountingLayout><BranchLedgerPage /></AccountingLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

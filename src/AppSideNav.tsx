@@ -225,6 +225,7 @@ export const AppSideNav = () => {
         { type: 'group', key: 'grp-acc-reports', label: t('accounting.groupReports') },
         { key: 'daily-accounting', label: t('nav.dailyAccounting'), path: '/admin/accounting/daily' },
         { key: 'cashflow', label: t('nav.cashFlow'), path: '/admin/accounting/cashflow' },
+        { key: 'branch-ledger', label: t('nav.branchLedger'), path: '/admin/accounting/ledger' },
         { key: 'branch-balance', label: t('nav.branchBalance'), path: '/admin/accounting/balance' },
         { type: 'group', key: 'grp-acc-remit', label: t('accounting.groupRemittance') },
         { key: 'holding-remittance', label: t('nav.holdingRemittance'), path: '/admin/accounting/remittance' },

@@ -119,7 +119,8 @@
     "cashFlow": "Cash Flow",
     "branchBalance": "Branch Balance",
     "holdingRemittance": "Holding Remittance",
-    "companyRevenue": "Company Revenue"
+    "companyRevenue": "Company Revenue",
+    "branchLedger": "Branch Ledger"
   },
   "user": {
     "id": "User ID",
@@ -1879,6 +1880,25 @@
       "lateFeePending": "Late Fee Pending",
       "stockCount": "Stock Count",
       "stockValue": "Stock Value"
+    },
+    "ledger": {
+      "description": "Every payment in/out for a branch. Filter by date range, direction, and channel.",
+      "time": "Time",
+      "direction": "Direction",
+      "in": "In",
+      "out": "Out",
+      "category": "Category",
+      "channel": "Channel",
+      "cash": "Cash",
+      "transfer": "Transfer",
+      "bill": "Bill",
+      "contract": "Contract",
+      "chargeType": "Charge Type",
+      "amount": "Amount",
+      "allDirections": "All directions",
+      "allChannels": "All channels",
+      "searchPlaceholder": "Bill or contract code",
+      "empty": "No transactions found"
     },
     "remittance": {
       "description": "Items owed to holding — installments, down payments, late fees, partner commission."

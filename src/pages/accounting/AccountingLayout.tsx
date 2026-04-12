@@ -2,7 +2,7 @@ import { useMemo, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  CalendarCheck, BookOpen, Wallet, Scale, ArrowUpRight, Coins,
+  CalendarCheck, BookOpen, Wallet, Scale, ArrowUpRight, Coins, List,
 } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 
@@ -21,6 +21,7 @@ export function AccountingLayout({ children }: { children: ReactNode }) {
     { type: 'group', labelKey: 'accounting.groupReports' },
     { type: 'link', path: '/admin/accounting/daily', labelKey: 'nav.dailyAccounting', icon: BookOpen },
     { type: 'link', path: '/admin/accounting/cashflow', labelKey: 'nav.cashFlow', icon: Wallet },
+    { type: 'link', path: '/admin/accounting/ledger', labelKey: 'nav.branchLedger', icon: List },
     { type: 'link', path: '/admin/accounting/balance', labelKey: 'nav.branchBalance', icon: Scale },
     { type: 'group', labelKey: 'accounting.groupRemittance' },
     { type: 'link', path: '/admin/accounting/remittance', labelKey: 'nav.holdingRemittance', icon: ArrowUpRight },
