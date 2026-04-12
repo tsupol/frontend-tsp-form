@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Badge } from 'tsp-form';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Copy, Check } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { getStateColor, getStateLabel, fmtCurrency } from './contractUtils';
@@ -255,6 +255,14 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<DetailTab>('overview');
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyCode = useCallback((code: string) => {
+    navigator.clipboard.writeText(code).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }, []);
 
   const { data: contract, isLoading } = useQuery({
     queryKey: ['contract-detail', contractId],
@@ -279,6 +287,15 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
           <span className="font-semibold">{contract.code_display ?? contract.code}</span>
+          <button
+            type="button"
+            onClick={() => handleCopyCode(contract.code_display ?? contract.code)}
+            className="p-1 rounded hover:bg-surface-hover transition-colors cursor-pointer text-fg/60 hover:text-fg"
+            aria-label={t('common.copy')}
+            title={copied ? t('common.copied') : t('common.copy')}
+          >
+            {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
+          </button>
           <Badge size="xs" className={getStateColor(contract.state)}>
             {getStateLabel(contract.state, t)}
           </Badge>
@@ -358,6 +375,14 @@ function MediaRow({ label, media }: { label: string; media: EntityMedia[] }) {
 
 function OverviewTab({ contract, t }: { contract: ContractDetail; t: ReturnType<typeof useTranslation>['t'] }) {
   const isFin2 = contract.commercial_model === 'FIN2';
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const copyValue = (field: string, value: string) => {
+    navigator.clipboard.writeText(value).then(() => {
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 1500);
+    });
+  };
 
   // Contract media: signature + evidence
   const { data: contractMedia = [] } = useQuery({
@@ -378,7 +403,20 @@ function OverviewTab({ contract, t }: { contract: ContractDetail; t: ReturnType<
         <div className="grid grid-cols-2 gap-3">
           <div>
             <div className="text-xs text-subtle">{t('contract.customer')}</div>
-            <div className="font-semibold text-sm">{contract.customer_name ?? '—'}</div>
+            <div className="font-semibold text-sm flex items-center gap-1">
+              <span>{contract.customer_name ?? '—'}</span>
+              {contract.customer_name && (
+                <button
+                  type="button"
+                  onClick={() => copyValue('customer', contract.customer_name!)}
+                  className="p-0.5 rounded hover:bg-surface-hover transition-colors cursor-pointer text-fg/60 hover:text-fg"
+                  aria-label={t('common.copy')}
+                  title={copiedField === 'customer' ? t('common.copied') : t('common.copy')}
+                >
+                  {copiedField === 'customer' ? <Check size={12} className="text-success" /> : <Copy size={12} />}
+                </button>
+              )}
+            </div>
           </div>
           <div>
             <div className="text-xs text-subtle">{t('contract.branch')}</div>

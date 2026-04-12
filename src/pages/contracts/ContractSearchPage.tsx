@@ -106,20 +106,65 @@ export function ContractSearchPage() {
     return branches.map(b => ({ value: String(b.id), label: b.name }));
   }, [branches]);
 
-  // Contract search
+  // Contract search — supports multi-word keywords (e.g. "firstname lastname")
+  // by firing parallel queries per word and intersecting by contract id.
+  // Single-word uses server pagination; multi-word falls back to client-side
+  // pagination over the intersection of up to 200 matches per word.
+  const keywordWords = useMemo(
+    () => debouncedKeyword.split(/\s+/).filter(Boolean),
+    [debouncedKeyword]
+  );
+  const isMultiWord = keywordWords.length > 1;
+
   const { data: searchData, isFetching } = useQuery({
-    queryKey: ['contract-search', scope, debouncedKeyword, filterState, filterBranchId, page, pageSize],
-    queryFn: async () => {
-      const params: Record<string, unknown> = {
+    queryKey: ['contract-search', scope, debouncedKeyword, filterState, filterBranchId, page, pageSize, isMultiWord],
+    queryFn: async (): Promise<SearchResponse> => {
+      const baseParams: Record<string, unknown> = {
         p_scope: scope,
-        p_page: page,
-        p_per_page: pageSize,
       };
-      if (debouncedKeyword) params.p_keyword = debouncedKeyword;
-      if (filterState) params.p_state = filterState;
-      // Note: fn_contract_search may not support branch filter directly,
-      // but we include it for future backend support
-      return apiClient.rpc<SearchResponse>('fn_contract_search', params);
+      if (filterState) baseParams.p_state = filterState;
+
+      if (!isMultiWord) {
+        // Single word (or empty): server pagination
+        const params = {
+          ...baseParams,
+          p_page: page,
+          p_per_page: pageSize,
+          ...(debouncedKeyword ? { p_keyword: debouncedKeyword } : {}),
+        };
+        return apiClient.rpc<SearchResponse>('fn_contract_search', params);
+      }
+
+      // Multi-word: fetch each word's matches (up to 200 per word), intersect by id
+      const FETCH_LIMIT = 200;
+      const results = await Promise.all(
+        keywordWords.map(word =>
+          apiClient.rpc<SearchResponse>('fn_contract_search', {
+            ...baseParams,
+            p_keyword: word,
+            p_page: 1,
+            p_per_page: FETCH_LIMIT,
+          })
+        )
+      );
+
+      // Intersect: keep contracts whose id appears in every word's result set
+      const [first, ...rest] = results;
+      const idSets = rest.map(r => new Set(r.contracts.map(c => c.id)));
+      const intersected = first.contracts.filter(c => idSets.every(s => s.has(c.id)));
+
+      // Client-side pagination
+      const start = (page - 1) * pageSize;
+      const paged = intersected.slice(start, start + pageSize);
+
+      return {
+        page,
+        per_page: pageSize,
+        count: intersected.length,
+        scope,
+        has_more: start + pageSize < intersected.length,
+        contracts: paged,
+      };
     },
     placeholderData: keepPreviousData,
   });
@@ -271,13 +316,22 @@ export function ContractSearchPage() {
                             </div>
                           </div>
                           <div className="text-right shrink-0">
-                            {contract.installment_amount != null && (
-                              <div className="text-sm font-medium tabular-nums">{fmtCurrency(contract.installment_amount)}</div>
-                            )}
-                            {contract.paid_count != null && contract.total_installments != null && (
-                              <div className="text-xs text-subtle tabular-nums">
-                                {contract.paid_count}/{contract.total_installments}
+                            {(contract.state === 'DRAFT' || contract.state === 'SAVING') && (contract.total_paid ?? 0) > 0 ? (
+                              <div className="text-info tabular-nums">
+                                <span className="text-xs font-normal">{t('contract.saved')} </span>
+                                <span className="text-sm font-medium">{fmtCurrency(contract.total_paid ?? 0)}</span>
                               </div>
+                            ) : (
+                              <>
+                                {contract.installment_amount != null && (
+                                  <div className="text-sm font-medium tabular-nums">{fmtCurrency(contract.installment_amount)}</div>
+                                )}
+                                {contract.paid_count != null && contract.total_installments != null && (
+                                  <div className="text-xs text-subtle tabular-nums">
+                                    {contract.paid_count}/{contract.total_installments}
+                                  </div>
+                                )}
+                              </>
                             )}
                             <div className="text-xs text-subtle"><DateTime value={contract.created_at} showTime={false} /></div>
                           </div>
