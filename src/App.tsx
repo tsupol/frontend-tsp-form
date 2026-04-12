@@ -57,6 +57,13 @@ import { SettingsLayout } from './pages/settings/SettingsLayout';
 import { HoldingsPage } from './pages/settings/HoldingsPage';
 import { CompaniesPage } from './pages/settings/CompaniesPage';
 import { CustomersPage } from './pages/customers/CustomersPage';
+import { AccountingLayout } from './pages/accounting/AccountingLayout';
+import { DayClosePage } from './pages/accounting/DayClosePage';
+import { DailyAccountingPage } from './pages/accounting/DailyAccountingPage';
+import { CashFlowPage } from './pages/accounting/CashFlowPage';
+import { BranchBalancePage } from './pages/accounting/BranchBalancePage';
+import { HoldingRemittancePage } from './pages/accounting/HoldingRemittancePage';
+import { CompanyRevenuePage } from './pages/accounting/CompanyRevenuePage';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -382,11 +389,11 @@ function App() {
         }
       />
       <Route
-        path="/admin/contracts/new"
+        path="/admin/contracts/new/:contractId?"
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <ContractWizardPage />
+              <ContractsLayout><ContractWizardPage /></ContractsLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
@@ -533,6 +540,68 @@ function App() {
       />
 
 
+
+      {/* Accounting */}
+      <Route
+        path="/admin/accounting/day-close"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <AccountingLayout><DayClosePage /></AccountingLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/accounting/daily"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <AccountingLayout><DailyAccountingPage /></AccountingLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/accounting/cashflow"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <AccountingLayout><CashFlowPage /></AccountingLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/accounting/balance"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <AccountingLayout><BranchBalancePage /></AccountingLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/accounting/remittance"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <AccountingLayout><HoldingRemittancePage /></AccountingLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/accounting/revenue"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <AccountingLayout><CompanyRevenuePage /></AccountingLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
 
       {/* Catch-all redirect */}
       <Route path="*" element={<Navigate to="/" replace />} />

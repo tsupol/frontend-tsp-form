@@ -4,15 +4,18 @@
 
 - **Never start the dev server** (`npm run dev` / `npx vite`) — the user already has it running. Only use `npm run build` or `npx tsc --noEmit` to check for errors.
 - Use Bangkok time (UTC+7) when displaying times to the user
+- **Date/time display:** always use `<DateTime value={isoString} showTime={true|false} />` from `src/components/DateTime.tsx`. It wraps `formatDateTime` in `src/lib/format.ts`, handles Bangkok TZ + locale-aware formatting, and returns `—` for null. Never hand-roll `.slice(0,10)` / `.replace('T',' ')` / raw `{row.original.some_date}` for display. The `.slice(0,10)` idiom is ONLY for ISO query-string state (e.g. `InputDatePicker.onChange → setDateStr`), never for display.
 - Theme uses `data-theme` attribute on `<html>` (`light` / `dark`), not CSS classes
 - **`src/index.css`** — tsp-form theme only (copy from `example.css`, change `@import` line to `@import "tailwindcss"`)
 - **`src/app.css`** — app-specific styles (`.page-content`, layout utilities, overrides)
 - **Responsive page pattern** — see `.claude/responsive-page-pattern.md` for the standard dual mobile/desktop table page structure
 - **Navigation guard pattern** — see `.claude/nav-guard-pattern.md` for protecting unsaved changes on editor pages
+- **MCP API debugging** — when calling RPCs via the `dev-api` MCP, read `.claude/mcp-api-debug.md` before assuming any RPC is missing or renamed (PGRST202 with a hint means wrong params, not missing function)
+- **Stale backend docs** — `UI_SUMMARY/` docs can drift from the running API. Before trusting documented flows/RPCs, check `.claude/stale-backend-docs.md` for known discrepancies. Full findings are filed in `D:/dev/nnf/UI_FEEDBACK/YYYY-MM-DD_topic.md`.
 
 ## tsp-form Component Usage
 
-**IMPORTANT:** Always read `C:\Users\tonsu\.claude\tsp-form-guide.md` before writing any component code. It contains the complete cross-project guide for tsp-form conventions, component APIs, and common pitfalls.
+**This project uses tsp-form everywhere.** Every page, every form, every table is built from tsp-form components. Before writing any component code in this project, read `C:\Users\tonsu\.claude\tsp-form-guide.md` **in full**. Not skim, not grep, not defer. The file is small. Component APIs have gotchas that only the guide documents, and pattern-matching from sibling pages will miss them. Past sessions have shipped broken code by skipping this step.
 
 When using tsp-form components, follow this lookup order:
 

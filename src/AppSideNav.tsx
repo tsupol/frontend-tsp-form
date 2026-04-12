@@ -19,6 +19,7 @@ import {
   Coins,
   UserSearch,
   Scale,
+  BookOpen,
   Settings,
   HelpCircle,
   LogOut,
@@ -213,6 +214,21 @@ export const AppSideNav = () => {
       children: [
         { key: 'staff-commission', label: t('nav.staffCommission'), path: '/admin/commission/staff' },
         { key: 'approvals', label: t('nav.negotiationApprovals'), path: '/admin/commission/approvals' },
+      ],
+    },
+    {
+      key: 'accounting', icon: <BookOpen size="1rem" />, label: t('nav.accounting'),
+      path: '/admin/accounting/day-close',
+      children: [
+        { type: 'group', key: 'grp-acc-close', label: t('accounting.groupDayClose') },
+        { key: 'day-close', label: t('nav.dayClose'), path: '/admin/accounting/day-close' },
+        { type: 'group', key: 'grp-acc-reports', label: t('accounting.groupReports') },
+        { key: 'daily-accounting', label: t('nav.dailyAccounting'), path: '/admin/accounting/daily' },
+        { key: 'cashflow', label: t('nav.cashFlow'), path: '/admin/accounting/cashflow' },
+        { key: 'branch-balance', label: t('nav.branchBalance'), path: '/admin/accounting/balance' },
+        { type: 'group', key: 'grp-acc-remit', label: t('accounting.groupRemittance') },
+        { key: 'holding-remittance', label: t('nav.holdingRemittance'), path: '/admin/accounting/remittance' },
+        { key: 'company-revenue', label: t('nav.companyRevenue'), path: '/admin/accounting/revenue' },
       ],
     },
     ...(['COMPANY_REPO', 'COMPANY_COLLECTOR', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [{
