@@ -95,6 +95,7 @@
   "SALE.STATE.INSURANCE_NOT_CLEARED": "ต้องจัดการยอดประกันก่อนยกเลิก",
   "SALE.STATE.BILL_ALREADY_VOIDED": "บิลถูก void แล้ว",
   "SALE.STATE.BILL_NOT_OPEN": "บิลไม่อยู่ในสถานะเปิด",
+  "SALE.STATE.PREVIOUS_DAY_NOT_CLOSED": "ยังไม่ได้ปิดวันก่อนหน้า",
   "SALE.STATE.DAY_ALREADY_CLOSED": "ปิดวันแล้ว",
   "SALE.STATE.PAUSE_DEVICE_BOUND": "ไม่สามารถ pause ขณะมีเครื่องผูกอยู่",
   "SALE.STATE.PAUSE_DISABLED": "Pause ถูกปิดใช้งานสำหรับบริษัทนี้",

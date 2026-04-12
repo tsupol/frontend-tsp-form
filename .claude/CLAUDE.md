@@ -3,6 +3,7 @@
 ## General
 
 - **Never start the dev server** (`npm run dev` / `npx vite`) — the user already has it running. Only use `npm run build` or `npx tsc --noEmit` to check for errors.
+- **Dev server URL**: `https://localhost:5173` (HTTPS, not HTTP)
 - Use Bangkok time (UTC+7) when displaying times to the user
 - **Date/time display:** always use `<DateTime value={isoString} showTime={true|false} />` from `src/components/DateTime.tsx`. It wraps `formatDateTime` in `src/lib/format.ts`, handles Bangkok TZ + locale-aware formatting, and returns `—` for null. Never hand-roll `.slice(0,10)` / `.replace('T',' ')` / raw `{row.original.some_date}` for display. The `.slice(0,10)` idiom is ONLY for ISO query-string state (e.g. `InputDatePicker.onChange → setDateStr`), never for display.
 - Theme uses `data-theme` attribute on `<html>` (`light` / `dark`), not CSS classes

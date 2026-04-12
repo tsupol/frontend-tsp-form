@@ -41,7 +41,8 @@ type ContractAction =
   | 'transfer_cancel'
   | 'detach_customer'
   | 'settlement_refund'
-  | 'change_draft_owner';
+  | 'change_draft_owner'
+  | 'saving_deposit';
 
 // ── State → available actions ────────────────────────────────────────────────
 
@@ -86,11 +87,13 @@ function getAvailableActions(contract: ContractForActions): ContractAction[] {
   }
 
   if (state === 'DRAFT') {
+    actions.push('saving_deposit');
     actions.push('cancel');
     actions.push('change_draft_owner');
   }
 
   if (state === 'SAVING') {
+    actions.push('saving_deposit');
     actions.push('cancel');
     actions.push('change_draft_owner');
   }
@@ -284,6 +287,19 @@ const ACTION_CONFIGS: Record<ContractAction, ActionConfig> = {
     needsNewOwner: true,
     successKey: 'contract.action_change_draft_owner_success',
   },
+  saving_deposit: {
+    rpc: '', // handled by SavingDepositModal
+    color: 'primary',
+    needsPin: false,
+    needsNote: false,
+    needsReason: false,
+    needsBranch: false,
+    needsDevice: false,
+    needsAmount: false,
+    needsCloseReason: false,
+    needsNewOwner: false,
+    successKey: 'contract.action_saving_deposit_success',
+  },
   early_payoff: {
     rpc: '', // multi-step, handled by EarlyPayoffModal
     color: 'primary',
@@ -365,6 +381,7 @@ export function ContractActionButtons({ contract, onRefresh }: {
 
   const isCancelSaving = activeAction === 'cancel' && contract.state === 'SAVING';
   const isEarlyPayoff = activeAction === 'early_payoff';
+  const isSavingDeposit = activeAction === 'saving_deposit';
 
   const handleSuccess = (msgKey: string) => {
     setActiveAction(null);
@@ -398,29 +415,31 @@ export function ContractActionButtons({ contract, onRefresh }: {
         })}
       </div>
 
-      {isCancelSaving ? (
-        <CancelSavingModal
-          open
-          contract={contract}
-          onClose={() => setActiveAction(null)}
-          onSuccess={handleSuccess}
-        />
-      ) : isEarlyPayoff ? (
-        <EarlyPayoffModal
-          open
-          contract={contract}
-          onClose={() => setActiveAction(null)}
-          onSuccess={handleSuccess}
-        />
-      ) : (
-        <ContractActionModal
-          open={!!activeAction}
-          action={activeAction}
-          contract={contract}
-          onClose={() => setActiveAction(null)}
-          onSuccess={handleSuccess}
-        />
-      )}
+      <SavingDepositModal
+        open={isSavingDeposit}
+        contract={contract}
+        onClose={() => setActiveAction(null)}
+        onSuccess={handleSuccess}
+      />
+      <CancelSavingModal
+        open={isCancelSaving}
+        contract={contract}
+        onClose={() => setActiveAction(null)}
+        onSuccess={handleSuccess}
+      />
+      <EarlyPayoffModal
+        open={isEarlyPayoff}
+        contract={contract}
+        onClose={() => setActiveAction(null)}
+        onSuccess={handleSuccess}
+      />
+      <ContractActionModal
+        open={!!activeAction && !isSavingDeposit && !isCancelSaving && !isEarlyPayoff}
+        action={activeAction}
+        contract={contract}
+        onClose={() => setActiveAction(null)}
+        onSuccess={handleSuccess}
+      />
     </>
   );
 }
@@ -749,6 +768,128 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
           </div>
         </div>
       )}
+    </Modal>
+  );
+}
+
+// ── Saving Deposit Modal ─────────────────────────────────────────────────
+
+function SavingDepositModal({ open, contract, onClose, onSuccess }: {
+  open: boolean;
+  contract: ContractForActions;
+  onClose: () => void;
+  onSuccess: (msgKey: string) => void;
+}) {
+  const { t } = useTranslation();
+  const [amount, setAmount] = useState('');
+  const [channel, setChannel] = useState<string>('CASH');
+  const [note, setNote] = useState('');
+  const [error, setError] = useState('');
+  const [errorKey, setErrorKey] = useState(0);
+
+  useEffect(() => {
+    if (open) {
+      setAmount('');
+      setChannel('CASH');
+      setNote('');
+      setError('');
+    }
+  }, [open]);
+
+  const setApiError = (err: unknown) => {
+    if (err instanceof ApiError) {
+      const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+        || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+      setError(translated || err.code || err.message);
+    } else {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+    setErrorKey(k => k + 1);
+  };
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      await apiClient.rpc('fn_payment_record', {
+        p_contract_id: contract.id,
+        p_amount: Number(amount),
+        p_payment_type: 'SAVING_DEPOSIT',
+        p_channel: channel,
+        p_branch_id: contract.branch_id,
+        p_note: note.trim() || undefined,
+      });
+    },
+    onSuccess: () => onSuccess('contract.action_saving_deposit_success'),
+    onError: setApiError,
+  });
+
+  const parsedAmount = Number(amount);
+  const canSubmit = parsedAmount > 0 && !mutation.isPending;
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
+      <div className="flex flex-col overflow-hidden">
+        <div className="modal-header">
+          <h2 className="modal-title">{t('contract.savingDeposit_title')}</h2>
+          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+        </div>
+        <div className="modal-content">
+          {error && (
+            <div key={errorKey} className="alert alert-danger mb-4 animate-pop-in">
+              <XCircle size={16} />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
+            <div className="font-medium text-sm">{contract.code_display ?? contract.code}</div>
+            <div className="text-xs text-subtle">{contract.state} · {t('contract.savingBalance')}: {fmtCurrency(contract.saving_balance ?? 0)}</div>
+          </div>
+
+          <div className="form-grid">
+            <div className="flex flex-col">
+              <label className="form-label">{t('contract.amount')}</label>
+              <Input
+                type="number"
+                value={amount}
+                onChange={e => setAmount(e.target.value)}
+                placeholder="0"
+                className="w-full"
+                autoFocus
+              />
+            </div>
+            <div className="flex flex-col">
+              <label className="form-label">{t('contract.savingDeposit_channel')}</label>
+              <Select
+                options={[
+                  { value: 'CASH', label: t('contract.channel_cash') },
+                  { value: 'TRANSFER', label: t('contract.channel_transfer') },
+                ]}
+                value={channel}
+                onChange={val => setChannel(val as string)}
+              />
+            </div>
+            <div className="flex flex-col">
+              <label className="form-label">{t('contract.note')}</label>
+              <Input
+                value={note}
+                onChange={e => setNote(e.target.value)}
+                placeholder={t('contract.savingDeposit_notePlaceholder')}
+                className="w-full"
+              />
+            </div>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <Button variant="outline" onClick={onClose}>{t('common.cancel')}</Button>
+          <Button
+            color="primary"
+            onClick={() => mutation.mutate()}
+            disabled={!canSubmit}
+          >
+            {mutation.isPending ? t('common.loading') : t('contract.action_saving_deposit')}
+          </Button>
+        </div>
+      </div>
     </Modal>
   );
 }
