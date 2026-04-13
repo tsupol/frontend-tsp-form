@@ -2,7 +2,9 @@
 
 export type ModalId =
   | 'productPlan'
+  | 'saving'
   | 'customer'
+  | 'contactRef'
   | 'guarantor'
   | 'documents'
   | 'payment'
@@ -220,11 +222,13 @@ export interface WorkspaceData {
   selectedQuote: Quote | null;
   savingEnabled: boolean;
   savingTargetAmount: number;
+  savingBalance: number;
 
   // Customer
   customerId: number | null;
   customerName: string;
   customerResult: CustomerRegisterResult | null;
+  customerDateOfBirth: string | null;
   customerAddresses: { current: boolean; work: boolean };
   customerContactCount: number;
   customerReferenceCount: number;

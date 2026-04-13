@@ -204,7 +204,7 @@ export function ContractSearchPage() {
             <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
               <h1 className="heading-2 shrink-0">{t('nav.contractSearch')}</h1>
               <div className="ml-auto">
-                <Button size="sm" color="primary" onClick={() => navigate('/admin/contracts/new')} startIcon={<Plus size={14} />}>
+                <Button size="sm" color="primary" onClick={() => navigate('/admin/contracts/draft')} startIcon={<Plus size={14} />}>
                   {t('wizard.newContract')}
                 </Button>
               </div>

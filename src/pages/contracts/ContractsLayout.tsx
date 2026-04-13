@@ -6,14 +6,14 @@ import { Search, PiggyBank, FilePlus } from 'lucide-react';
 const navItems = [
   { path: '/admin/contracts/search', labelKey: 'nav.contractSearch', icon: Search },
   { path: '/admin/contracts/saving', labelKey: 'nav.savingContracts', icon: PiggyBank },
-  { path: '/admin/contracts/new', labelKey: 'nav.newContract', icon: FilePlus },
+  { path: '/admin/contracts/draft', labelKey: 'nav.newContract', icon: FilePlus },
 ];
 
 export function ContractsLayout({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
 
   return (
-    <div className="flex h-dvh">
+    <div className="flex h-dvh overflow-hidden">
       <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-48 border-r border-line p-4 pt-8">
         <span className="text-xs font-semibold text-control-label uppercase tracking-wider mb-2 px-2">
           {t('nav.contracts')}

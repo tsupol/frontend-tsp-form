@@ -1,12 +1,13 @@
-import { useRef, useEffect, useCallback, useMemo, useState } from 'react';
+import { useEffect, useCallback, useMemo, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, Select, Button, MobileHeader, Badge } from 'tsp-form';
+import { PageNav, PageNavPanel, Select, Button, MobileHeader, Badge, Modal } from 'tsp-form';
 import { ArrowLeft, ArrowRightFromLine, XCircle, Loader2, Save } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavGuard } from '../../contexts/NavGuardContext';
+
 import { WorkspaceProvider, useWorkspace } from './workspace/WorkspaceContext';
 import { CardProductPlan } from './workspace/CardProductPlan';
 import { CardSaving } from './workspace/CardSaving';
@@ -21,6 +22,9 @@ import { PanelCustomer } from './workspace/PanelCustomer';
 import { PanelGuarantor } from './workspace/PanelGuarantor';
 import { PanelDocuments } from './workspace/PanelDocuments';
 import { PanelDelivery } from './workspace/PanelDelivery';
+import { PanelSaving } from './workspace/PanelSaving';
+import { CardContactRef } from './workspace/CardContactRef';
+import { PanelContactRef } from './workspace/PanelContactRef';
 import type { ModalId } from './workspace/WorkspaceTypes';
 
 interface Branch {
@@ -34,16 +38,16 @@ function WorkspaceContent() {
   const { user } = useAuth();
   const navGuard = useNavGuard();
   const dirtyRef = useRef(false);
-  const { data, updateData, resetData, openModal, setOpenModal, isPostPayment } = useWorkspace();
+  const { data, updateData, resetData, openModal, setOpenModal, isPostPayment, panelDirtyRef, pendingModal, confirmPanelSwitch, cancelPanelSwitch } = useWorkspace();
 
   const needsBranchSelect = !user?.branch_id;
   const [savingDraft, setSavingDraft] = useState(false);
   const [saveError, setSaveError] = useState('');
 
-  // Nav guard
+  // Track dirty — workspace data OR panel has unsaved input
   useEffect(() => {
-    dirtyRef.current = !!data.contractId;
-  }, [data.contractId]);
+    dirtyRef.current = !!(data.customerId || data.modelId || data.savingBalance > 0) || panelDirtyRef.current;
+  }, [data.customerId, data.modelId, data.savingBalance, panelDirtyRef]);
 
   useEffect(() => {
     navGuard?.setDirtyRef(dirtyRef);
@@ -87,7 +91,6 @@ function WorkspaceContent() {
           savingTargetAmount: data.savingTargetAmount,
         },
       });
-      dirtyRef.current = false;
       navigate('/admin/contracts/search');
     } catch (err) {
       if (err instanceof ApiError) {
@@ -127,6 +130,8 @@ function WorkspaceContent() {
   const panelTitle: Record<string, string> = {
     productPlan: t('workspace.cardProduct'),
     customer: t('workspace.cardCustomer'),
+    saving: t('workspace.cardSaving'),
+    contactRef: t('workspace.cardContactRef'),
     guarantor: t('workspace.cardGuarantor'),
     documents: t('workspace.cardDocuments'),
     delivery: t('workspace.cardDelivery'),
@@ -217,8 +222,9 @@ function WorkspaceContent() {
                     )}
 
                     <CardProductPlan onEdit={() => handleEditOpen('productPlan')} />
-                    <CardSaving />
                     <CardCustomer onEdit={() => handleEditOpen('customer')} />
+                    <CardSaving onEdit={() => handleEditOpen('saving')} />
+                    <CardContactRef onEdit={() => handleEditOpen('contactRef')} />
                     <CardGuarantor onEdit={() => handleEditOpen('guarantor')} />
                     <CardDocuments onEdit={() => handleEditOpen('documents')} />
 
@@ -250,7 +256,7 @@ function WorkspaceContent() {
 
                 {isMobile && isPostPayment && (
                   <div className="shrink-0 border-t border-line bg-bg px-4 py-3 flex items-center justify-end gap-2">
-                    <Button size="sm" onClick={() => { resetData(); navigate('/admin/contracts/new'); }}>
+                    <Button size="sm" onClick={() => { resetData(); navigate('/admin/contracts/draft'); }}>
                       {t('wizard.newContract')}
                     </Button>
                     <Button size="sm" color="primary" onClick={() => navigate('/admin/contracts/search')}>
@@ -261,10 +267,12 @@ function WorkspaceContent() {
               </PageNavPanel>
 
               {/* Right panel — Edit content */}
-              <PageNavPanel id="edit" className={isMobile ? '' : 'flex-1 flex flex-col min-w-0'}>
+              <PageNavPanel id="edit" className={isMobile ? '' : 'flex-1 flex flex-col min-w-0 overflow-hidden'}>
                 <div className="flex-1 overflow-y-auto better-scroll">
                   {openModal === 'productPlan' && <PanelProductPlan onClose={handleEditClose} />}
+                  {openModal === 'saving' && <PanelSaving onClose={handleEditClose} />}
                   {openModal === 'customer' && <PanelCustomer onClose={handleEditClose} />}
+                  {openModal === 'contactRef' && <PanelContactRef onClose={handleEditClose} />}
                   {openModal === 'guarantor' && <PanelGuarantor onClose={handleEditClose} />}
                   {openModal === 'documents' && <PanelDocuments onClose={handleEditClose} />}
                   {openModal === 'delivery' && <PanelDelivery onClose={handleEditClose} />}
@@ -276,6 +284,20 @@ function WorkspaceContent() {
                 </div>
               </PageNavPanel>
             </div>
+
+            {/* Confirm discard when switching panels with unsaved input */}
+            <Modal open={!!pendingModal} onClose={cancelPanelSwitch} maxWidth="24rem" width="100%">
+              <div className="modal-header">
+                <h2 className="modal-title">{t('workspace.discardChangesTitle')}</h2>
+              </div>
+              <div className="modal-content">
+                <p className="text-sm">{t('workspace.discardChangesMessage')}</p>
+              </div>
+              <div className="modal-footer">
+                <Button variant="outline" onClick={cancelPanelSwitch}>{t('common.cancel')}</Button>
+                <Button color="danger" onClick={confirmPanelSwitch}>{t('common.discard')}</Button>
+              </div>
+            </Modal>
           </>
         );
       }}

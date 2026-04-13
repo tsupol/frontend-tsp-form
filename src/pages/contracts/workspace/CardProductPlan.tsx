@@ -36,9 +36,9 @@ export function CardProductPlan({ onEdit }: { onEdit?: () => void }) {
               <span>{t('contract.installmentAmount')} {fmtCurrency(q.installment_amount)}</span>
             </div>
           )}
-          {data.savingEnabled && (
+          {data.savingBalance > 0 && (
             <div className="text-xs text-info">
-              {t('workspace.savingContract')} · {t('workspace.savingTarget')} {fmtCurrency(data.savingTargetAmount)}
+              {t('workspace.cardSaving')}: {fmtCurrency(data.savingBalance)}
             </div>
           )}
         </div>

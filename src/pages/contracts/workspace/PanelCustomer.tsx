@@ -1,16 +1,12 @@
-/**
- * Panel version of ModalCustomer — same content, no <Modal> wrapper.
- * Renders directly inside the PageNav right panel.
- */
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Input, Select, Button, InputDatePicker, Badge, Switch } from 'tsp-form';
-import { AlertTriangle, ShieldAlert, CheckCircle, XCircle, Calendar, ChevronDown, ChevronRight, Plus, Trash2, Star } from 'lucide-react';
+import { Input, Select, Button, InputDatePicker, Checkbox, Modal } from 'tsp-form';
+import { ShieldAlert, AlertTriangle, CheckCircle, XCircle, Calendar, Search, Loader2 } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { useWorkspace } from './WorkspaceContext';
 import { AddressFormPostal } from './AddressFormPostal';
-import type { CustomerRegisterResult, CustomerAddress, CustomerContact, CustomerReference } from './WorkspaceTypes';
+import type { CustomerRegisterResult, CustomerAddress } from './WorkspaceTypes';
 
 const ID_TYPE_OPTIONS = [
   { value: 'CITIZEN_ID', label: 'Citizen ID' },
@@ -27,14 +23,73 @@ const PREFIX_OPTIONS = [
   { value: 'Ms.', label: 'Ms.' },
 ];
 
-const CONTACT_TYPES = ['MOBILE', 'HOME', 'WORK', 'LINE', 'FACEBOOK', 'OTHER'];
+interface CustomerSearchResult {
+  id: number;
+  id_type: string;
+  id_number: string;
+  prefix: string | null;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  tel: string | null;
+  tel2: string | null;
+  date_of_birth: string | null;
+}
+
+interface CustomerSnapshot {
+  idType: string;
+  idNumber: string;
+  prefix: string;
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string;
+  tel: string;
+  tel2: string;
+}
+
+function makeSnapshot(c: CustomerSearchResult): CustomerSnapshot {
+  return {
+    idType: c.id_type, idNumber: c.id_number, prefix: c.prefix ?? '',
+    firstName: c.first_name, lastName: c.last_name,
+    dateOfBirth: c.date_of_birth ?? '', tel: c.tel ?? '', tel2: c.tel2 ?? '',
+  };
+}
+
+interface FieldComparison {
+  field: string;
+  value: string;
+  original: string;
+  changed: boolean;
+}
+
+const COMPARE_FIELDS: Array<{ key: keyof CustomerSnapshot; label: string }> = [
+  { key: 'idType', label: 'ID Type' },
+  { key: 'idNumber', label: 'ID Number' },
+  { key: 'prefix', label: 'Prefix' },
+  { key: 'firstName', label: 'First Name' },
+  { key: 'lastName', label: 'Last Name' },
+  { key: 'dateOfBirth', label: 'Date of Birth' },
+  { key: 'tel', label: 'Tel' },
+  { key: 'tel2', label: 'Tel 2' },
+];
+
+function compareFields(original: CustomerSnapshot, current: CustomerSnapshot): { all: FieldComparison[]; hasChanges: boolean } {
+  const all: FieldComparison[] = COMPARE_FIELDS.map(({ key, label }) => ({
+    field: label,
+    value: current[key] || '—',
+    original: original[key] || '—',
+    changed: original[key] !== current[key],
+  }));
+  return { all, hasChanges: all.some(f => f.changed) };
+}
 
 interface Props { onClose: () => void }
 
 export function PanelCustomer({ onClose }: Props) {
-  const { t } = useTranslation();
-  const { data: workspace, updateData } = useWorkspace();
+  const { t, i18n } = useTranslation();
+  const { data: workspace, updateData, setPanelDirty } = useWorkspace();
 
+  // Form fields
   const [idType, setIdType] = useState<'CITIZEN_ID' | 'PASSPORT'>('CITIZEN_ID');
   const [idNumber, setIdNumber] = useState('');
   const [prefix, setPrefix] = useState('');
@@ -44,40 +99,114 @@ export function PanelCustomer({ onClose }: Props) {
   const [tel, setTel] = useState('');
   const [tel2, setTel2] = useState('');
 
+  // Selected existing customer — original snapshot for diff
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerSearchResult | null>(null);
+  const originalRef = useRef<CustomerSnapshot | null>(null);
+
+  // UI state
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState('');
   const [result, setResult] = useState<CustomerRegisterResult | null>(workspace.customerResult);
+  const [searching, setSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<CustomerSearchResult[]>([]);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [confirmData, setConfirmData] = useState<FieldComparison[] | null>(null);
 
+  // Address
+  const [useDifferentWorkAddress, setUseDifferentWorkAddress] = useState(false);
   const customerId = workspace.customerId;
-
-  const [showAddressCurrent, setShowAddressCurrent] = useState(false);
-  const [showAddressWork, setShowAddressWork] = useState(false);
-  const [showContacts, setShowContacts] = useState(false);
-  const [showReferences, setShowReferences] = useState(false);
 
   const { data: addresses = [], refetch: refetchAddresses } = useQuery({
     queryKey: ['customer-addresses', customerId],
     queryFn: () => apiClient.get<CustomerAddress[]>(`/v_customer_addresses?customer_id=eq.${customerId}&order=address_type`),
     enabled: !!customerId,
   });
-
-  const { data: contacts = [], refetch: refetchContacts } = useQuery({
-    queryKey: ['customer-contacts', customerId],
-    queryFn: () => apiClient.get<CustomerContact[]>(`/v_customer_contacts?customer_id=eq.${customerId}&order=is_primary.desc,contact_type`),
-    enabled: !!customerId,
-  });
-
-  const { data: references = [], refetch: refetchReferences } = useQuery({
-    queryKey: ['customer-references', customerId],
-    queryFn: () => apiClient.get<CustomerReference[]>(`/v_customer_references?customer_id=eq.${customerId}&order=id`),
-    enabled: !!customerId,
-  });
-
   const currentAddress = addresses.find(a => a.address_type === 'CURRENT');
   const workAddress = addresses.find(a => a.address_type === 'WORK');
 
-  const handleRegister = async () => {
+  // Dirty tracking
+  useEffect(() => {
+    const hasInput = !!(idNumber || firstName || lastName || tel || tel2 || dateOfBirth || prefix);
+    setPanelDirty(hasInput);
+  }, [idNumber, firstName, lastName, tel, tel2, dateOfBirth, prefix, setPanelDirty]);
+  useEffect(() => () => setPanelDirty(false), [setPanelDirty]);
+
+  // ── Search ──────────────────────────────────────────────────────────────
+  const handleSearch = async () => {
+    setSearching(true);
+    setHasSearched(true);
+    try {
+      const params: string[] = ['is_active=is.true', 'order=full_name', 'limit=10'];
+      const orParts: string[] = [];
+      if (idNumber.trim()) orParts.push(`id_number.ilike.*${encodeURIComponent(idNumber.trim())}*`);
+      if (firstName.trim()) orParts.push(`first_name.ilike.*${encodeURIComponent(firstName.trim())}*`);
+      if (lastName.trim()) orParts.push(`last_name.ilike.*${encodeURIComponent(lastName.trim())}*`);
+      if (orParts.length > 0) params.push(`or=(${orParts.join(',')})`);
+      const results = await apiClient.get<CustomerSearchResult[]>(`/v_customers?${params.join('&')}`);
+      setSearchResults(results);
+    } catch {
+      setSearchResults([]);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  // ── Select existing customer ────────────────────────────────────────────
+  const handleSelectCustomer = (customer: CustomerSearchResult) => {
+    setSelectedCustomer(customer);
+    const snap = makeSnapshot(customer);
+    originalRef.current = snap;
+
+    // Fill form
+    setIdType(customer.id_type as 'CITIZEN_ID' | 'PASSPORT');
+    setIdNumber(customer.id_number);
+    setPrefix(customer.prefix ?? '');
+    setFirstName(customer.first_name);
+    setLastName(customer.last_name);
+    setDateOfBirth(customer.date_of_birth ?? '');
+    setTel(customer.tel ?? '');
+    setTel2(customer.tel2 ?? '');
+    setApiError('');
+    setResult(null);
+  };
+
+  // ── Use / Register ──────────────────────────────────────────────────────
+  const getCurrentSnapshot = (): CustomerSnapshot => ({
+    idType, idNumber, prefix, firstName, lastName, dateOfBirth, tel, tel2,
+  });
+
+  const handleUseOrRegister = () => {
+    setApiError('');
+
+    // If existing customer selected, check for changes
+    if (selectedCustomer && originalRef.current) {
+      const { all, hasChanges } = compareFields(originalRef.current, getCurrentSnapshot());
+      if (hasChanges) {
+        // Validate CID only if ID was changed
+        const idChanged = all.some(f => f.changed && (f.field === 'ID Number' || f.field === 'ID Type'));
+        if (idChanged && idType === 'CITIZEN_ID' && idNumber.replace(/\D/g, '').length !== 13) {
+          setApiError(t('workspace.citizenIdLength'));
+          return;
+        }
+        setConfirmData(all);
+        return;
+      }
+      // No changes — just attach
+      doAttach(selectedCustomer.id, selectedCustomer.full_name);
+      return;
+    }
+
+    // New customer — validate all
+    if (idType === 'CITIZEN_ID' && idNumber.replace(/\D/g, '').length !== 13) {
+      setApiError(t('workspace.citizenIdLength'));
+      return;
+    }
     if (!idNumber.trim() || !firstName.trim() || !lastName.trim() || !tel.trim()) return;
+
+    doRegister();
+  };
+
+  const doRegister = async () => {
     setSubmitting(true);
     setApiError('');
     try {
@@ -88,43 +217,57 @@ export function PanelCustomer({ onClose }: Props) {
       });
       setResult(res);
       if (res.action !== 'BLOCK') {
-        updateData({ customerId: res.customer_id, customerName: res.full_name, customerResult: res });
+        doAttach(res.customer_id, res.full_name);
+        // Update snapshot so subsequent clicks don't re-confirm
+        setSelectedCustomer(null);
+        originalRef.current = null;
       }
     } catch (err) {
       if (err instanceof ApiError) {
         const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
           || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
-        setApiError(translated || err.message);
+        setApiError(translated || err.code || err.message);
       } else setApiError(String(err));
     } finally { setSubmitting(false); }
+  };
+
+  const doUpdateAndAttach = async () => {
+    setConfirmData(null);
+    await doRegister(); // fn_customer_register_or_update handles both create and update by id_number
+  };
+
+  const doAttach = (custId: number, custName: string) => {
+    updateData({
+      customerId: custId,
+      customerName: custName,
+      customerDateOfBirth: dateOfBirth || null,
+      customerResult: result ?? {
+        customer_id: custId, is_new: false, id_type: idType, id_number: idNumber,
+        full_name: custName, is_blacklisted: false, blacklist_reasons: [],
+        has_overdue: false, overdue_contract_count: 0, active_contract_count: 0, action: 'OK',
+      },
+    });
+    setPanelDirty(false);
   };
 
   const handleAddressSuccess = (type: 'CURRENT' | 'WORK') => {
     refetchAddresses();
     const updated = { ...workspace.customerAddresses };
-    if (type === 'CURRENT') { updated.current = true; setShowAddressCurrent(false); }
-    else { updated.work = true; setShowAddressWork(false); }
+    if (type === 'CURRENT') updated.current = true;
+    else updated.work = true;
     updateData({ customerAddresses: updated });
   };
 
-  const handleContactSuccess = () => { refetchContacts(); updateData({ customerContactCount: contacts.length + 1 }); };
-  const handleContactDeleted = () => { refetchContacts(); updateData({ customerContactCount: Math.max(0, contacts.length - 1) }); };
-  const handleReferenceSuccess = () => { refetchReferences(); updateData({ customerReferenceCount: references.length + 1 }); };
-
-  const handleClose = () => {
-    updateData({
-      customerAddresses: { current: !!currentAddress, work: !!workAddress },
-      customerContactCount: contacts.length,
-      customerReferenceCount: references.length,
-    });
-    onClose();
-  };
+  const canSearch = !!(idNumber.trim() || firstName.trim() || lastName.trim());
+  const isExisting = !!selectedCustomer;
+  const buttonLabel = isExisting ? t('workspace.useThisCustomer') : t('wizard.registerCustomer');
 
   return (
     <div className="p-4 flex flex-col gap-5 max-w-2xl">
       {apiError && <div className="alert alert-danger"><XCircle size={18} /><div><div className="alert-description">{apiError}</div></div></div>}
       {result && <ResultBanner result={result} t={t} />}
 
+      {/* Form */}
       <div className="form-grid gap-4">
         <div className="flex gap-3">
           <div className="flex flex-col" style={{ width: '10rem' }}>
@@ -133,7 +276,7 @@ export function PanelCustomer({ onClose }: Props) {
           </div>
           <div className="flex flex-col flex-1 min-w-0">
             <label className="form-label">{t('wizard.idNumber')}</label>
-            <Input value={idNumber} onChange={(e) => setIdNumber(e.target.value)} placeholder={idType === 'CITIZEN_ID' ? '1-xxxx-xxxxx-xx-x' : 'Passport number'} size="sm" className="w-full" />
+            <Input value={idNumber} onChange={(e) => setIdNumber(e.target.value)} placeholder={idType === 'CITIZEN_ID' ? '13 digits' : 'Passport number'} size="sm" className="w-full" />
           </div>
         </div>
         <div className="flex gap-3">
@@ -153,7 +296,7 @@ export function PanelCustomer({ onClose }: Props) {
         <div className="flex gap-3">
           <div className="flex flex-col flex-1 min-w-0">
             <label className="form-label">{t('wizard.dateOfBirth')}</label>
-            <InputDatePicker value={dateOfBirth ? new Date(dateOfBirth) : null} onChange={(date) => setDateOfBirth(date ? date.toISOString().slice(0, 10) : '')} size="sm" endIcon={<Calendar size={16} />} calendar="gregorian" />
+            <InputDatePicker value={dateOfBirth ? new Date(dateOfBirth + 'T00:00:00') : null} onChange={(date) => setDateOfBirth(date ? `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}` : '')} size="sm" endIcon={<Calendar size={16} />} calendar="gregorian" locale={i18n.language} />
           </div>
           <div className="flex flex-col flex-1 min-w-0">
             <label className="form-label">{t('wizard.tel')}</label>
@@ -166,63 +309,117 @@ export function PanelCustomer({ onClose }: Props) {
         </div>
       </div>
 
-      <div className="flex justify-end">
-        <Button color="primary" onClick={handleRegister} disabled={submitting || !idNumber.trim() || !firstName.trim() || !lastName.trim() || !tel.trim()}>
-          {submitting ? t('common.saving') : (customerId ? t('wizard.updateCustomer') : t('wizard.registerCustomer'))}
+      {/* Buttons */}
+      <div className="flex justify-end gap-2">
+        <Button
+          variant="outline"
+          onClick={handleSearch}
+          disabled={searching || !canSearch}
+          startIcon={searching ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+        >
+          {t('workspace.checkCustomer')}
+        </Button>
+        <Button
+          color={isExisting ? 'primary' : undefined}
+          variant={isExisting ? undefined : 'outline'}
+          onClick={handleUseOrRegister}
+          disabled={submitting || !idNumber.trim() || !firstName.trim() || !lastName.trim() || !tel.trim()}
+          startIcon={submitting ? <Loader2 size={14} className="animate-spin" /> : undefined}
+        >
+          {submitting ? t('common.saving') : buttonLabel}
         </Button>
       </div>
 
-      {customerId && (
-        <>
-          <div className="border-t border-line" />
-          <ExpandableSection title={t('workspace.addressCurrent')} done={!!currentAddress} expanded={showAddressCurrent} onToggle={() => setShowAddressCurrent(!showAddressCurrent)}>
-            <AddressFormPostal customerId={customerId} addressType="CURRENT" existing={currentAddress} onSuccess={() => handleAddressSuccess('CURRENT')} />
-          </ExpandableSection>
-          <ExpandableSection title={t('workspace.addressWork')} done={!!workAddress} expanded={showAddressWork} onToggle={() => setShowAddressWork(!showAddressWork)}>
-            <AddressFormPostal customerId={customerId} addressType="WORK" existing={workAddress} onSuccess={() => handleAddressSuccess('WORK')} />
-          </ExpandableSection>
-          <ExpandableSection title={`${t('workspace.contacts')} (${contacts.length})`} done={contacts.length > 0} expanded={showContacts} onToggle={() => setShowContacts(!showContacts)}>
-            <div className="flex flex-col gap-2">
-              {contacts.map(c => <ContactRow key={c.id} contact={c} onDeleted={handleContactDeleted} />)}
-              <ContactAddForm customerId={customerId} onSuccess={handleContactSuccess} />
-            </div>
-          </ExpandableSection>
-          <ExpandableSection title={`${t('workspace.references')} (${references.length})`} done={references.length > 0} expanded={showReferences} onToggle={() => setShowReferences(!showReferences)} warning={references.length === 0 ? t('workspace.refRequired') : undefined}>
-            <div className="flex flex-col gap-2">
-              {references.map(r => (
-                <div key={r.id} className="flex items-center gap-2 text-sm py-1">
-                  <span className="font-medium">{r.name} {r.last_name}</span>
-                  {r.relation && <Badge size="xs" className="bg-fg/10 text-fg/60">{r.relation}</Badge>}
-                  {r.tel && <span className="text-subtle tabular-nums">{r.tel}</span>}
-                </div>
+      {/* Search results — always visible */}
+      {hasSearched && (
+        <div className="flex flex-col gap-1">
+          {searchResults.length > 0 ? (
+            <div className="border border-line rounded-lg divide-y divide-line overflow-hidden max-h-48 overflow-y-auto better-scroll">
+              {searchResults.map(c => (
+                <button
+                  key={c.id}
+                  className={`w-full text-left px-4 py-2.5 hover:bg-surface-hover transition-colors cursor-pointer flex items-center justify-between ${
+                    selectedCustomer?.id === c.id ? 'bg-primary/5 border-l-2 border-l-primary' : ''
+                  }`}
+                  onClick={() => handleSelectCustomer(c)}
+                >
+                  <div>
+                    <div className="font-medium text-sm">{c.full_name}</div>
+                    <div className="text-xs text-subtle">{c.id_type}: {c.id_number} {c.tel ? `· ${c.tel}` : ''}</div>
+                  </div>
+                  {selectedCustomer?.id === c.id && <CheckCircle size={14} className="text-primary" />}
+                </button>
               ))}
-              <ReferenceAddForm customerId={customerId} onSuccess={handleReferenceSuccess} />
             </div>
-          </ExpandableSection>
-        </>
+          ) : !searching ? (
+            <div className="text-sm text-subtle text-center py-2">{t('workspace.noCustomerFound')}</div>
+          ) : null}
+        </div>
       )}
 
-      <div className="sticky bottom-0 bg-bg border-t border-line py-3 flex justify-end -mx-4 px-4">
-        <Button variant="ghost" onClick={handleClose}>{t('common.close')}</Button>
+      {/* Address — disabled until customer attached */}
+      <div className="border-t border-line pt-4" />
+      <div className={!customerId ? 'opacity-50 pointer-events-none' : ''}>
+        <div className="font-medium text-sm mb-3">{t('workspace.addressCurrent')}</div>
+        <AddressFormPostal
+          customerId={customerId ?? 0}
+          addressType="CURRENT"
+          existing={currentAddress}
+          onSuccess={() => handleAddressSuccess('CURRENT')}
+        />
+
+        <div className="mt-4 mb-3">
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <Checkbox
+              checked={useDifferentWorkAddress}
+              onChange={(e) => setUseDifferentWorkAddress((e.target as HTMLInputElement).checked)}
+            />
+            {t('workspace.useDifferentWorkAddress')}
+          </label>
+        </div>
+
+        {useDifferentWorkAddress && (
+          <>
+            <div className="font-medium text-sm mb-3">{t('workspace.addressWork')}</div>
+            <AddressFormPostal
+              customerId={customerId ?? 0}
+              addressType="WORK"
+              existing={workAddress}
+              onSuccess={() => handleAddressSuccess('WORK')}
+            />
+          </>
+        )}
       </div>
-    </div>
-  );
-}
 
-// ── Sub-components (same as ModalCustomer) ───────────────────────────────
-
-function ExpandableSection({ title, done, expanded, onToggle, warning, children }: {
-  title: string; done: boolean; expanded: boolean; onToggle: () => void; warning?: string; children: React.ReactNode;
-}) {
-  return (
-    <div className="border border-line rounded-lg overflow-hidden">
-      <button className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium hover:bg-surface-hover transition-colors cursor-pointer text-left" onClick={onToggle}>
-        {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        {done ? <CheckCircle size={14} className="text-success" /> : <span className="w-3.5 h-3.5 rounded-full border-2 border-fg/30 shrink-0" />}
-        <span className="flex-1">{title}</span>
-        {warning && <span className="text-xs text-warning">{warning}</span>}
-      </button>
-      {expanded && <div className="px-4 pb-3 border-t border-line pt-3">{children}</div>}
+      {/* Confirm changes modal — shows all fields, changed ones in green */}
+      <Modal open={!!confirmData} onClose={() => setConfirmData(null)} maxWidth="32rem" width="100%">
+        <div className="modal-header">
+          <h2 className="modal-title">{t('workspace.confirmUpdateTitle')}</h2>
+          <button type="button" className="modal-close-btn" onClick={() => setConfirmData(null)} aria-label="Close">&times;</button>
+        </div>
+        <div className="modal-content">
+          <p className="text-sm mb-3">{t('workspace.confirmUpdateMessage')}</p>
+          {confirmData && (
+            <div className="border border-line rounded-lg divide-y divide-line text-sm">
+              {confirmData.map((f, i) => (
+                <div key={i} className="px-3 py-2 flex items-center gap-3">
+                  <span className="font-medium w-28 shrink-0 text-subtle">{f.field}</span>
+                  <span className={`flex-1 ${f.changed ? 'text-success font-medium' : ''}`}>
+                    {f.value}
+                  </span>
+                  {f.changed && (
+                    <span className="text-xs text-danger line-through shrink-0">{f.original}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="modal-footer">
+          <Button variant="outline" onClick={() => setConfirmData(null)}>{t('common.cancel')}</Button>
+          <Button color="primary" onClick={doUpdateAndAttach}>{t('workspace.updateAndUse')}</Button>
+        </div>
+      </Modal>
     </div>
   );
 }
@@ -231,69 +428,4 @@ function ResultBanner({ result, t }: { result: CustomerRegisterResult; t: (key: 
   if (result.action === 'BLOCK') return <div className="alert alert-danger"><ShieldAlert size={18} /><div><div className="alert-title">{t('wizard.blacklisted')}</div><div className="alert-description">{result.blacklist_reasons?.[0]?.reason ?? t('wizard.blacklistedDesc')}</div></div></div>;
   if (result.action === 'WARNING') return <div className="alert alert-warning"><AlertTriangle size={18} /><div><div className="alert-title">{t('wizard.customerWarning')}</div><div className="alert-description">{t('wizard.overdueContracts', { count: result.overdue_contract_count })}</div></div></div>;
   return <div className="alert alert-success"><CheckCircle size={18} /><div><div className="alert-title">{result.is_new ? t('wizard.customerCreated') : t('wizard.customerUpdated')}</div></div></div>;
-}
-
-function ContactRow({ contact, onDeleted }: { contact: CustomerContact; onDeleted: () => void }) {
-  const [deleting, setDeleting] = useState(false);
-  const handleDelete = async () => { setDeleting(true); try { await apiClient.rpc('fn_customer_contact_delete', { p_id: contact.id }); onDeleted(); } catch {} finally { setDeleting(false); } };
-  return (
-    <div className="flex items-center justify-between py-1.5 text-sm">
-      <div className="flex items-center gap-2">
-        {contact.is_primary && <Star size={12} className="text-warning fill-warning" />}
-        <Badge size="xs" color="info">{contact.contact_type}</Badge>
-        <span className="tabular-nums">{contact.value}</span>
-        {contact.label && <span className="text-control-label text-xs">({contact.label})</span>}
-      </div>
-      <button className="p-1 rounded hover:bg-surface-hover cursor-pointer text-control-label hover:text-danger" onClick={handleDelete} disabled={deleting}><Trash2 size={13} /></button>
-    </div>
-  );
-}
-
-function ContactAddForm({ customerId, onSuccess }: { customerId: number; onSuccess: () => void }) {
-  const { t } = useTranslation();
-  const [contactType, setContactType] = useState('MOBILE');
-  const [value, setValue] = useState('');
-  const [isPrimary, setIsPrimary] = useState(false);
-  const [error, setError] = useState('');
-  const [saving, setSaving] = useState(false);
-  const typeOptions = CONTACT_TYPES.map(ct => ({ value: ct, label: ct }));
-  const handleSave = async () => {
-    if (!value.trim()) return; setSaving(true); setError('');
-    try { await apiClient.rpc('fn_customer_contact_upsert', { p_customer_id: customerId, p_contact_type: contactType, p_value: value.trim(), p_label: null, p_is_primary: isPrimary, p_note: null }); setValue(''); setIsPrimary(false); onSuccess(); }
-    catch (err) { if (err instanceof ApiError) { const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : ''); setError(tr || err.message); } else setError(String(err)); }
-    finally { setSaving(false); }
-  };
-  return (
-    <div className="space-y-2 p-3 rounded-md border border-dashed border-line mt-1">
-      {error && <div className="alert alert-danger text-xs"><XCircle size={14} /><span>{error}</span></div>}
-      <div className="flex gap-3">
-        <div className="flex flex-col" style={{ width: '8rem' }}><Select size="sm" options={typeOptions} value={contactType} onChange={v => setContactType(v as string)} showChevron searchable={false} /></div>
-        <div className="flex flex-col flex-1 min-w-0"><Input size="sm" value={value} onChange={e => setValue(e.target.value)} className="w-full" placeholder="095-xxx-xxxx" /></div>
-      </div>
-      <div className="flex items-center justify-between">
-        <label className="flex items-center gap-2 text-xs cursor-pointer"><Switch size="sm" checked={isPrimary} onChange={e => setIsPrimary((e.target as HTMLInputElement).checked)} />{t('customer.contactPrimary')}</label>
-        <Button color="primary" size="sm" onClick={handleSave} disabled={saving || !value.trim()} startIcon={<Plus size={12} />}>{t('common.add')}</Button>
-      </div>
-    </div>
-  );
-}
-
-function ReferenceAddForm({ customerId, onSuccess }: { customerId: number; onSuccess: () => void }) {
-  const { t } = useTranslation();
-  const [name, setName] = useState(''); const [lastName, setLastName] = useState(''); const [tel, setTel] = useState(''); const [relation, setRelation] = useState('');
-  const [error, setError] = useState(''); const [saving, setSaving] = useState(false);
-  const handleSave = async () => {
-    if (!name.trim()) return; setSaving(true); setError('');
-    try { await apiClient.rpc('fn_customer_reference_add', { p_customer_id: customerId, p_name: name.trim(), p_last_name: lastName.trim() || null, p_tel: tel.trim() || null, p_relation: relation.trim() || null, p_facebook: null, p_line_id: null }); setName(''); setLastName(''); setTel(''); setRelation(''); onSuccess(); }
-    catch (err) { if (err instanceof ApiError) { const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : ''); setError(tr || err.message); } else setError(String(err)); }
-    finally { setSaving(false); }
-  };
-  return (
-    <div className="space-y-2 p-3 rounded-md border border-dashed border-line mt-1">
-      {error && <div className="alert alert-danger text-xs"><XCircle size={14} /><span>{error}</span></div>}
-      <div className="flex gap-3"><div className="flex flex-col flex-1"><Input size="sm" value={name} onChange={e => setName(e.target.value)} className="w-full" placeholder={t('customer.refName')} /></div><div className="flex flex-col flex-1"><Input size="sm" value={lastName} onChange={e => setLastName(e.target.value)} className="w-full" placeholder={t('customer.refLastName')} /></div></div>
-      <div className="flex gap-3"><div className="flex flex-col flex-1"><Input size="sm" value={tel} onChange={e => setTel(e.target.value)} className="w-full" placeholder={t('customer.refTel')} /></div><div className="flex flex-col flex-1"><Input size="sm" value={relation} onChange={e => setRelation(e.target.value)} className="w-full" placeholder={t('customer.refRelation')} /></div></div>
-      <div className="flex justify-end"><Button color="primary" size="sm" onClick={handleSave} disabled={saving || !name.trim()} startIcon={<Plus size={12} />}>{t('common.add')}</Button></div>
-    </div>
-  );
 }

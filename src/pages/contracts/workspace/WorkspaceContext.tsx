@@ -17,9 +17,11 @@ const defaultData: WorkspaceData = {
   selectedQuote: null,
   savingEnabled: false,
   savingTargetAmount: 0,
+  savingBalance: 0,
   customerId: null,
   customerName: '',
   customerResult: null,
+  customerDateOfBirth: null,
   customerAddresses: { current: false, work: false },
   customerContactCount: 0,
   customerReferenceCount: 0,
@@ -67,6 +69,13 @@ interface WorkspaceContextValue {
   // Readiness refetch trigger
   readinessKey: number;
   triggerReadinessRefetch: () => void;
+
+  // Panel dirty tracking — panels call setPanelDirty(true) when inputs change
+  panelDirtyRef: React.RefObject<boolean>;
+  setPanelDirty: (dirty: boolean) => void;
+  pendingModal: { id: ModalId } | null;
+  confirmPanelSwitch: () => void;
+  cancelPanelSwitch: () => void;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue | undefined>(undefined);
@@ -82,8 +91,36 @@ export function useWorkspace() {
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [data, setData] = useState<WorkspaceData>(defaultData);
-  const [openModal, setOpenModal] = useState<ModalId>(null);
+  const [openModal, setOpenModalRaw] = useState<ModalId>(null);
   const [readinessKey, setReadinessKey] = useState(0);
+  const panelDirtyRef = useRef(false);
+  const [pendingModal, setPendingModal] = useState<{ id: ModalId } | null>(null);
+
+  const setPanelDirty = useCallback((dirty: boolean) => {
+    panelDirtyRef.current = dirty;
+  }, []);
+
+  // Guarded setOpenModal — if panel is dirty, confirm before switching
+  const setOpenModal = useCallback((id: ModalId) => {
+    if (panelDirtyRef.current && id !== openModal) {
+      setPendingModal({ id });
+    } else {
+      panelDirtyRef.current = false;
+      setOpenModalRaw(id);
+    }
+  }, [openModal]);
+
+  const confirmPanelSwitch = useCallback(() => {
+    if (pendingModal) {
+      panelDirtyRef.current = false;
+      setOpenModalRaw(pendingModal.id);
+      setPendingModal(null);
+    }
+  }, [pendingModal]);
+
+  const cancelPanelSwitch = useCallback(() => {
+    setPendingModal(null);
+  }, []);
 
   // Ref to track if draft creation is in flight
   const draftInFlight = useRef(false);
@@ -120,6 +157,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   // ── Draft auto-creation ──────────────────────────────────────────────
   useEffect(() => {
     if (!data.selectedQuote) return;
+    if (!data.customerId) return;
     if (data.contractId || data.draftCreating) return;
     if (!data.branchId || !user) return;
     if (draftInFlight.current) return;
@@ -219,7 +257,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     isReadOnly,
     readinessKey,
     triggerReadinessRefetch,
-  }), [data, updateData, resetData, openModal, getCardStatus, isPreDraft, isPreBill, isPostBill, isPostPayment, isReadOnly, readinessKey, triggerReadinessRefetch]);
+    panelDirtyRef,
+    setPanelDirty,
+    pendingModal,
+    confirmPanelSwitch,
+    cancelPanelSwitch,
+  }), [data, updateData, resetData, openModal, setOpenModal, getCardStatus, isPreDraft, isPreBill, isPostBill, isPostPayment, isReadOnly, readinessKey, triggerReadinessRefetch, setPanelDirty, pendingModal, confirmPanelSwitch, cancelPanelSwitch]);
 
   return (
     <WorkspaceContext.Provider value={value}>

@@ -1,58 +1,55 @@
 import { useTranslation } from 'react-i18next';
-import { Button } from 'tsp-form';
-import { ShieldCheck, AlertTriangle } from 'lucide-react';
+import { ShieldCheck, AlertTriangle, CheckCircle } from 'lucide-react';
 import { useWorkspace } from './WorkspaceContext';
 import { SummaryCard } from './SummaryCard';
 
+function getAge(dob: string): number {
+  const birth = new Date(dob);
+  const now = new Date();
+  let age = now.getFullYear() - birth.getFullYear();
+  const m = now.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--;
+  return age;
+}
+
 export function CardGuarantor({ onEdit }: { onEdit?: () => void }) {
   const { t } = useTranslation();
-  const { data, getCardStatus, updateData, isReadOnly } = useWorkspace();
-  const status = getCardStatus('guarantor');
+  const { data, isReadOnly } = useWorkspace();
 
-  const handleSkip = () => {
-    updateData({ guarantorSkipped: true });
-  };
+  const hasCustomer = !!data.customerId;
+  const dob = data.customerDateOfBirth;
+  const isMinor = dob ? getAge(dob) < 18 : false;
+  const needsGuarantor = hasCustomer && isMinor;
 
-  const handleUnskip = () => {
-    updateData({ guarantorSkipped: false });
-  };
+  const status = !hasCustomer ? 'locked' as const
+    : needsGuarantor ? (data.guarantorId ? 'complete' as const : 'warning' as const)
+    : 'complete' as const;
 
   return (
     <SummaryCard
       title={t('workspace.cardGuarantor')}
       status={status}
-      onEdit={data.guarantorSkipped ? undefined : onEdit}
-      disabled={isReadOnly}
-      actions={
-        !isReadOnly && !data.guarantorId ? (
-          data.guarantorSkipped ? (
-            <Button size="sm" variant="ghost" onClick={handleUnskip}>
-              {t('workspace.unskipGuarantor')}
-            </Button>
-          ) : (
-            <Button size="sm" variant="ghost" onClick={handleSkip}>
-              {t('workspace.skipGuarantor')}
-            </Button>
-          )
-        ) : undefined
-      }
+      onEdit={needsGuarantor ? onEdit : undefined}
+      disabled={isReadOnly || !hasCustomer}
     >
-      {data.guarantorSkipped ? (
-        <div className="text-subtle text-xs">{t('workspace.guarantorSkipped')}</div>
+      {!hasCustomer ? (
+        <div className="text-subtle text-xs">{t('workspace.needCustomerFirst')}</div>
+      ) : !needsGuarantor ? (
+        <div className="text-subtle flex items-center gap-2 text-xs">
+          <CheckCircle size={14} className="text-success" />
+          <span>{t('workspace.guarantorNotNeeded')}</span>
+        </div>
       ) : data.guarantorId ? (
         <div className="flex flex-col gap-1">
           <div className="font-medium flex items-center gap-2">
             <ShieldCheck size={14} className="text-success" />
             {data.guarantorResult?.full_name}
           </div>
-          {data.guarantorResult && (
-            <div className="text-xs text-subtle">{data.guarantorResult.id_number}</div>
-          )}
         </div>
       ) : (
-        <div className="text-subtle flex items-center gap-2 text-xs">
-          <AlertTriangle size={14} className="opacity-40" />
-          <span>{t('workspace.noGuarantor')}</span>
+        <div className="text-warning flex items-center gap-2 text-xs">
+          <AlertTriangle size={14} />
+          <span>{t('workspace.guarantorRequired')}</span>
         </div>
       )}
     </SummaryCard>
