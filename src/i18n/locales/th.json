@@ -1387,6 +1387,7 @@
     "action_change_draft_owner_success": "เปลี่ยนเจ้าของสำเร็จ",
     "action_saving_deposit": "ฝากเงินออม",
     "action_saving_deposit_success": "บันทึกเงินฝากออมสำเร็จ",
+    "continueDraft": "แก้ไขร่าง",
     "savingDeposit_title": "ฝากเงินออม",
     "savingDeposit_channel": "ช่องทาง",
     "savingDeposit_notePlaceholder": "หมายเหตุ (ไม่บังคับ)",
@@ -1562,6 +1563,7 @@
     "shippingNote": "หมายเหตุ",
     "creatingDraft": "กำลังสร้างฉบับร่าง...",
     "saveDraft": "บันทึกฉบับร่าง",
+    "draftSaved": "บันทึกร่างสำเร็จ",
     "saveDraftNeedsCustomer": "ต้องระบุลูกค้าก่อนบันทึก",
     "allReady": "ผ่านทุกรายการ — พร้อมออกบิล",
     "recheck": "ตรวจใหม่",
@@ -1879,7 +1881,15 @@
       "flagVoidHigh": "void %",
       "flagVoidAmountHigh": "void ฿",
       "flagRefundHigh": "คืนเงิน %",
-      "flagGiftCostHigh": "ของแถม"
+      "flagGiftCostHigh": "ของแถม",
+      "unclosedBadge": "ยังไม่ปิด",
+      "unclosedDesc": "{{count}} บิล · ค้าง {{days}} วัน",
+      "unclosedTitle": "วันก่อนหน้ายังไม่ปิด",
+      "unclosedMessage": "มี {{count}} บิลจากวันนี้ที่ยังไม่ได้ปิดวัน (ค้าง {{days}} วัน) ต้องปิดวันนี้ก่อน",
+      "previousUnclosedTitle": "ต้องปิดวันก่อนหน้าก่อน",
+      "previousUnclosedMessage": "มี {{count}} วันที่ยังไม่ปิดและมีบิลค้าง ต้องปิดวันเก่าก่อนถึงจะปิดวันนี้ได้",
+      "closeDateBtn": "ปิดวันที่ {{date}}",
+      "closeForDate": "วันที่"
     },
     "dayCloseHistory": {
       "description": "บันทึกประวัติการปิดวันพร้อมธงเตือน"

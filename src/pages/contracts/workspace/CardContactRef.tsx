@@ -3,7 +3,7 @@ import { Phone } from 'lucide-react';
 import { useWorkspace } from './WorkspaceContext';
 import { SummaryCard } from './SummaryCard';
 
-export function CardContactRef({ onEdit }: { onEdit?: () => void }) {
+export function CardContactRef({ onEdit, active }: { onEdit?: () => void; active?: boolean }) {
   const { t } = useTranslation();
   const { data, isReadOnly } = useWorkspace();
 
@@ -18,6 +18,7 @@ export function CardContactRef({ onEdit }: { onEdit?: () => void }) {
       title={t('workspace.cardContactRef')}
       status={status}
       onEdit={onEdit}
+      active={active}
       disabled={isReadOnly || !hasCustomer}
     >
       {!hasCustomer ? (

@@ -138,14 +138,68 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setReadinessKey(k => k + 1);
   }, []);
 
-  // Refetch readiness when any modal closes
+  // Refetch contract state from backend when any panel closes
   const prevModal = useRef<ModalId>(null);
   useEffect(() => {
-    if (prevModal.current !== null && openModal === null) {
+    if (prevModal.current !== null && openModal === null && data.contractId) {
       triggerReadinessRefetch();
+      // Refetch contract + customer data to sync workspace state
+      const refetch = async () => {
+        try {
+          const [contracts, guarantors] = await Promise.all([
+            apiClient.get<Array<{
+              customer_id: number | null; customer_name: string | null;
+              saving_balance: number; saving_target_amount: number | null;
+              model_id: number | null; model_name: string | null;
+              variant_id: number | null; variant_name: string | null;
+              step_data: Record<string, unknown> | null;
+            }>>(`/v_contract_detail?id=eq.${data.contractId}&select=customer_id,customer_name,saving_balance,saving_target_amount,model_id,model_name,variant_id,variant_name,step_data`),
+            apiClient.get<Array<{ customer_id: number; customer_name: string }>>(`/v_contract_customers?contract_id=eq.${data.contractId}&role=eq.GUARANTOR&order=created_at.desc&limit=1`).catch(() => []),
+          ]);
+          const c = contracts[0];
+          if (!c) return;
+
+          const updates: Partial<WorkspaceData> = {
+            customerName: c.customer_name ?? '',
+            savingBalance: c.saving_balance ?? 0,
+            modelId: c.model_id,
+            modelName: c.model_name ?? '',
+            variantId: c.variant_id,
+            variantName: c.variant_name ?? '',
+          };
+
+          // Sync guarantor
+          const g = guarantors[0];
+          if (g) {
+            updates.guarantorId = g.customer_id;
+          }
+
+          // Sync customer counts if customer exists
+          if (c.customer_id) {
+            const [addrs, contacts, refs, custs] = await Promise.all([
+              apiClient.get<Array<{ address_type: string }>>(`/v_customer_addresses?customer_id=eq.${c.customer_id}&select=address_type`).catch(() => []),
+              apiClient.get<Array<{ id: number }>>(`/v_customer_contacts?customer_id=eq.${c.customer_id}&select=id`).catch(() => []),
+              apiClient.get<Array<{ id: number }>>(`/v_customer_references?customer_id=eq.${c.customer_id}&select=id`).catch(() => []),
+              apiClient.get<Array<{ date_of_birth: string | null }>>(`/v_customers?id=eq.${c.customer_id}&select=date_of_birth`).catch(() => []),
+            ]);
+            updates.customerAddresses = {
+              current: addrs.some(a => a.address_type === 'CURRENT'),
+              work: addrs.some(a => a.address_type === 'WORK'),
+            };
+            updates.customerContactCount = contacts.length;
+            updates.customerReferenceCount = refs.length;
+            updates.customerDateOfBirth = custs[0]?.date_of_birth ?? null;
+          }
+
+          setData(prev => ({ ...prev, ...updates }));
+        } catch {
+          // ignore refetch errors
+        }
+      };
+      refetch();
     }
     prevModal.current = openModal;
-  }, [openModal, triggerReadinessRefetch]);
+  }, [openModal, data.contractId, triggerReadinessRefetch]);
 
   // Initialize branchId from JWT
   useEffect(() => {
@@ -154,9 +208,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
   }, [user?.branch_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Draft auto-creation ──────────────────────────────────────────────
+  // ── Draft auto-creation — triggers when customer is attached ─────────
   useEffect(() => {
-    if (!data.selectedQuote) return;
     if (!data.customerId) return;
     if (data.contractId || data.draftCreating) return;
     if (!data.branchId || !user) return;
@@ -171,7 +224,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           p_holding_id: user.holding_id,
           p_company_id: user.company_id,
           p_branch_id: data.branchId,
-          p_commercial_model: data.selectedQuote!.finance_model,
+          p_commercial_model: data.selectedQuote?.finance_model ?? 'FIN1',
           p_model_id: data.modelId,
           p_variant_id: data.variantId,
           p_customer_id: data.customerId,
@@ -195,7 +248,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     };
 
     createDraft();
-  }, [data.selectedQuote, data.contractId, data.draftCreating, data.branchId, data.modelId, data.variantId, data.customerId, user]);
+  }, [data.customerId, data.contractId, data.draftCreating, data.branchId, data.modelId, data.variantId, data.selectedQuote, user]);
 
   // ── Customer attachment (when customerId set after draft exists) ──────
   const prevCustomerId = useRef<number | null>(null);

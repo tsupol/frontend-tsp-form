@@ -5,8 +5,10 @@ import type { CardStatus } from './WorkspaceTypes';
 interface SummaryCardProps {
   title: string;
   status: CardStatus;
+  icon?: ReactNode;
   onEdit?: () => void;
   disabled?: boolean;
+  active?: boolean;
   children: ReactNode;
   actions?: ReactNode;
 }
@@ -19,12 +21,13 @@ const STATUS_ICON: Record<CardStatus, ReactNode> = {
   locked: <Lock size={16} className="text-fg/20 shrink-0" />,
 };
 
-export function SummaryCard({ title, status, onEdit, disabled, children, actions }: SummaryCardProps) {
+export function SummaryCard({ title, status, icon, onEdit, disabled, active, children, actions }: SummaryCardProps) {
   const clickable = !!onEdit && !disabled && status !== 'locked';
 
   return (
     <div
       className={`border rounded-lg transition-colors ${
+        active ? 'border-primary bg-primary/5' :
         status === 'complete' ? 'border-success/30 bg-success/3' :
         status === 'locked' ? 'border-line/50 bg-surface/50 opacity-60' :
         'border-line bg-bg'
@@ -35,7 +38,7 @@ export function SummaryCard({ title, status, onEdit, disabled, children, actions
       onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') onEdit?.(); } : undefined}
     >
       <div className="flex items-center gap-2 px-4 py-3">
-        {STATUS_ICON[status]}
+        {icon ?? STATUS_ICON[status]}
         <span className="font-medium text-sm flex-1">{title}</span>
         {actions}
       </div>

@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { Badge } from 'tsp-form';
-import { ChevronLeft, ChevronRight, Copy, Check } from 'lucide-react';
+import { Badge, Button } from 'tsp-form';
+import { ChevronLeft, ChevronRight, Copy, Check, Pencil } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { getStateColor, getStateLabel, fmtCurrency } from './contractUtils';
@@ -374,7 +375,9 @@ function MediaRow({ label, media }: { label: string; media: EntityMedia[] }) {
 // ── Overview Tab ─────────────────────────────────────────────────────────────
 
 function OverviewTab({ contract, t }: { contract: ContractDetail; t: ReturnType<typeof useTranslation>['t'] }) {
+  const navigate = useNavigate();
   const isFin2 = contract.commercial_model === 'FIN2';
+  const isDraftOrSaving = contract.state === 'DRAFT' || contract.state === 'SAVING';
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const copyValue = (field: string, value: string) => {
@@ -543,6 +546,20 @@ function OverviewTab({ contract, t }: { contract: ContractDetail; t: ReturnType<
             {contract.shipping_method && <InfoCell label={t('contract.shippingMethod')} value={contract.shipping_method} />}
             {contract.tracking_number && <InfoCell label={t('contract.trackingNumber')} value={contract.tracking_number} />}
           </div>
+        </div>
+      )}
+
+      {/* Continue draft button */}
+      {isDraftOrSaving && (
+        <div className="pb-2">
+          <Button
+            color="primary"
+            size="sm"
+            startIcon={<Pencil size={14} />}
+            onClick={() => navigate(`/admin/contracts/draft/${contract.id}`)}
+          >
+            {t('contract.continueDraft')}
+          </Button>
         </div>
       )}
 

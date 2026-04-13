@@ -1,10 +1,10 @@
-import { useEffect, useCallback, useMemo, useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useCallback, useMemo, useRef } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, Select, Button, MobileHeader, Badge, Modal } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, XCircle, Loader2, Save } from 'lucide-react';
-import { apiClient, ApiError } from '../../lib/api';
+import { ArrowLeft, ArrowRightFromLine, XCircle, Loader2 } from 'lucide-react';
+import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 
@@ -14,7 +14,7 @@ import { CardSaving } from './workspace/CardSaving';
 import { CardCustomer } from './workspace/CardCustomer';
 import { CardGuarantor } from './workspace/CardGuarantor';
 import { CardDocuments } from './workspace/CardDocuments';
-import { CardReadiness } from './workspace/CardReadiness';
+
 import { CardPayment } from './workspace/CardPayment';
 import { CardPostPayment } from './workspace/CardPostPayment';
 import { PanelProductPlan } from './workspace/PanelProductPlan';
@@ -35,14 +35,112 @@ interface Branch {
 function WorkspaceContent() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { contractId: paramContractId } = useParams<{ contractId?: string }>();
   const { user } = useAuth();
   const navGuard = useNavGuard();
   const dirtyRef = useRef(false);
+  const loadedRef = useRef(false);
   const { data, updateData, resetData, openModal, setOpenModal, isPostPayment, panelDirtyRef, pendingModal, confirmPanelSwitch, cancelPanelSwitch } = useWorkspace();
 
   const needsBranchSelect = !user?.branch_id;
-  const [savingDraft, setSavingDraft] = useState(false);
-  const [saveError, setSaveError] = useState('');
+
+  // ── Load existing contract from route param ───────────────────────────
+  useEffect(() => {
+    if (!paramContractId || loadedRef.current || data.contractId) return;
+    loadedRef.current = true;
+
+    const loadContract = async () => {
+      try {
+        const contracts = await apiClient.get<Array<{
+          id: number; code: string; code_display: string;
+          state: string; commercial_model: string;
+          branch_id: number; customer_id: number | null; customer_name: string | null;
+          model_id: number | null; model_name: string | null;
+          variant_id: number | null; variant_name: string | null;
+          agreed_price: number | null; down_payment: number | null;
+          installment_amount: number | null; value_month: number | null;
+          saving_balance: number; saving_target_amount: number | null;
+          step_data: Record<string, unknown> | null;
+        }>>(`/v_contract_detail?id=eq.${paramContractId}`);
+        const c = contracts[0];
+        if (!c) return;
+
+        const stepSaving = (c.step_data?.SAVING_TARGET as { saving_target_amount?: number } | undefined);
+
+        // Fetch customer + guarantor details
+        let customerAddresses = { current: false, work: false };
+        let customerContactCount = 0;
+        let customerReferenceCount = 0;
+        let customerDateOfBirth: string | null = null;
+        let guarantorId: number | null = null;
+        let guarantorResult: import('./workspace/WorkspaceTypes').CustomerRegisterResult | null = null;
+
+        const fetches: Promise<void>[] = [];
+
+        if (c.customer_id) {
+          fetches.push(
+            Promise.all([
+              apiClient.get<Array<{ address_type: string }>>(`/v_customer_addresses?customer_id=eq.${c.customer_id}&select=address_type`).catch(() => []),
+              apiClient.get<Array<{ id: number }>>(`/v_customer_contacts?customer_id=eq.${c.customer_id}&select=id`).catch(() => []),
+              apiClient.get<Array<{ id: number }>>(`/v_customer_references?customer_id=eq.${c.customer_id}&select=id`).catch(() => []),
+              apiClient.get<Array<{ date_of_birth: string | null }>>(`/v_customers?id=eq.${c.customer_id}&select=date_of_birth`).catch(() => []),
+            ]).then(([addrs, contacts, refs, custs]) => {
+              customerAddresses = {
+                current: addrs.some(a => a.address_type === 'CURRENT'),
+                work: addrs.some(a => a.address_type === 'WORK'),
+              };
+              customerContactCount = contacts.length;
+              customerReferenceCount = refs.length;
+              customerDateOfBirth = custs[0]?.date_of_birth ?? null;
+            })
+          );
+        }
+
+        // Fetch guarantor
+        fetches.push(
+          apiClient.get<Array<{ customer_id: number; customer_name: string; role: string }>>(`/v_contract_customers?contract_id=eq.${c.id}&role=eq.GUARANTOR`)
+            .then(gs => {
+              const g = gs[0];
+              if (g) {
+                guarantorId = g.customer_id;
+                guarantorResult = {
+                  customer_id: g.customer_id, is_new: false, id_type: '', id_number: '',
+                  full_name: g.customer_name, is_blacklisted: false, blacklist_reasons: [],
+                  has_overdue: false, overdue_contract_count: 0, active_contract_count: 0, action: 'OK',
+                };
+              }
+            })
+            .catch(() => {})
+        );
+
+        await Promise.all(fetches);
+
+        updateData({
+          contractId: c.id,
+          contractCode: c.code_display || c.code,
+          branchId: c.branch_id,
+          customerId: c.customer_id,
+          customerName: c.customer_name ?? '',
+          customerDateOfBirth,
+          customerAddresses,
+          customerContactCount,
+          customerReferenceCount,
+          guarantorId,
+          guarantorResult,
+          modelId: c.model_id,
+          modelName: c.model_name ?? '',
+          variantId: c.variant_id,
+          variantName: c.variant_name ?? '',
+          savingBalance: c.saving_balance ?? 0,
+          savingTargetAmount: stepSaving?.saving_target_amount ?? c.saving_target_amount ?? 0,
+        });
+      } catch {
+        // ignore load errors
+      }
+    };
+
+    loadContract();
+  }, [paramContractId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Track dirty — workspace data OR panel has unsaved input
   useEffect(() => {
@@ -74,36 +172,6 @@ function WorkspaceContent() {
     [branches]
   );
 
-  // Save draft
-  const handleSaveDraft = async () => {
-    if (!data.contractId || !data.customerId) return;
-    setSavingDraft(true);
-    setSaveError('');
-    try {
-      await apiClient.rpc('fn_contract_save_step', {
-        p_contract_id: data.contractId,
-        p_step: 'WORKSPACE',
-        p_data: {
-          modelId: data.modelId,
-          variantId: data.variantId,
-          selectedQuote: data.selectedQuote,
-          savingEnabled: data.savingEnabled,
-          savingTargetAmount: data.savingTargetAmount,
-        },
-      });
-      navigate('/admin/contracts/search');
-    } catch (err) {
-      if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
-        setSaveError(translated || err.message);
-      } else {
-        setSaveError(String(err));
-      }
-    } finally {
-      setSavingDraft(false);
-    }
-  };
 
   // Branch selector screen
   if (needsBranchSelect && !data.branchId) {
@@ -185,19 +253,6 @@ function WorkspaceContent() {
                 {data.contractCode && (
                   <Badge size="sm" className="bg-fg/10 text-fg/60 font-mono">{data.contractCode}</Badge>
                 )}
-                <div className="ml-auto flex items-center gap-2">
-                  {data.contractId && (
-                    <Button
-                      size="sm"
-                      onClick={handleSaveDraft}
-                      disabled={!data.customerId || savingDraft}
-                      startIcon={savingDraft ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                      title={!data.customerId ? t('workspace.saveDraftNeedsCustomer') : undefined}
-                    >
-                      {t('workspace.saveDraft')}
-                    </Button>
-                  )}
-                </div>
               </div>
             )}
 
@@ -221,38 +276,19 @@ function WorkspaceContent() {
                       </div>
                     )}
 
-                    <CardProductPlan onEdit={() => handleEditOpen('productPlan')} />
-                    <CardCustomer onEdit={() => handleEditOpen('customer')} />
-                    <CardSaving onEdit={() => handleEditOpen('saving')} />
-                    <CardContactRef onEdit={() => handleEditOpen('contactRef')} />
-                    <CardGuarantor onEdit={() => handleEditOpen('guarantor')} />
-                    <CardDocuments onEdit={() => handleEditOpen('documents')} />
+                    <CardProductPlan onEdit={() => handleEditOpen('productPlan')} active={openModal === 'productPlan'} />
+                    <CardCustomer onEdit={() => handleEditOpen('customer')} active={openModal === 'customer'} />
+                    <CardSaving onEdit={() => handleEditOpen('saving')} active={openModal === 'saving'} />
+                    <CardContactRef onEdit={() => handleEditOpen('contactRef')} active={openModal === 'contactRef'} />
+                    <CardGuarantor onEdit={() => handleEditOpen('guarantor')} active={openModal === 'guarantor'} />
+                    <CardDocuments onEdit={() => handleEditOpen('documents')} active={openModal === 'documents'} />
 
-                    {data.contractId && !data.billId && <CardReadiness />}
+
                     {data.billId && !data.billConfirmed && <CardPayment />}
                     {data.billConfirmed && <CardPostPayment onEditDelivery={() => handleEditOpen('delivery')} />}
                   </div>
                 </div>
 
-                {/* Mobile footer */}
-                {isMobile && !isPostPayment && data.contractId && (
-                  <div className="shrink-0 border-t border-line bg-bg px-4 py-3">
-                    {saveError && (
-                      <div className="alert alert-danger text-xs mb-2"><XCircle size={14} /><span>{saveError}</span></div>
-                    )}
-                    <div className="flex items-center justify-between">
-                      <Button variant="ghost" size="sm" onClick={handleExit}>{t('common.cancel')}</Button>
-                      <Button
-                        size="sm"
-                        onClick={handleSaveDraft}
-                        disabled={!data.customerId || savingDraft}
-                        startIcon={savingDraft ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                      >
-                        {t('workspace.saveDraft')}
-                      </Button>
-                    </div>
-                  </div>
-                )}
 
                 {isMobile && isPostPayment && (
                   <div className="shrink-0 border-t border-line bg-bg px-4 py-3 flex items-center justify-end gap-2">

@@ -102,11 +102,35 @@ export function PanelCustomer({ onClose }: Props) {
   // Selected existing customer — original snapshot for diff
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerSearchResult | null>(null);
   const originalRef = useRef<CustomerSnapshot | null>(null);
+  const prefilledRef = useRef(false);
 
   // UI state
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState('');
   const [result, setResult] = useState<CustomerRegisterResult | null>(workspace.customerResult);
+
+  // Pre-fill from existing customer when continuing a draft
+  useEffect(() => {
+    if (prefilledRef.current || !workspace.customerId || idNumber) return;
+    prefilledRef.current = true;
+
+    apiClient.get<CustomerSearchResult[]>(`/v_customers?id=eq.${workspace.customerId}`)
+      .then(res => {
+        const c = res[0];
+        if (!c) return;
+        setIdType(c.id_type as 'CITIZEN_ID' | 'PASSPORT');
+        setIdNumber(c.id_number);
+        setPrefix(c.prefix ?? '');
+        setFirstName(c.first_name);
+        setLastName(c.last_name);
+        setDateOfBirth(c.date_of_birth ?? '');
+        setTel(c.tel ?? '');
+        setTel2(c.tel2 ?? '');
+        setSelectedCustomer(c);
+        originalRef.current = makeSnapshot(c);
+      })
+      .catch(() => {});
+  }, [workspace.customerId]); // eslint-disable-line react-hooks/exhaustive-deps
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<CustomerSearchResult[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
@@ -124,11 +148,15 @@ export function PanelCustomer({ onClose }: Props) {
   const currentAddress = addresses.find(a => a.address_type === 'CURRENT');
   const workAddress = addresses.find(a => a.address_type === 'WORK');
 
-  // Dirty tracking
+  // Dirty tracking — compare against loaded snapshot, not just non-empty
   useEffect(() => {
-    const hasInput = !!(idNumber || firstName || lastName || tel || tel2 || dateOfBirth || prefix);
-    setPanelDirty(hasInput);
-  }, [idNumber, firstName, lastName, tel, tel2, dateOfBirth, prefix, setPanelDirty]);
+    if (originalRef.current) {
+      const { hasChanges } = compareFields(originalRef.current, getCurrentSnapshot());
+      setPanelDirty(hasChanges);
+    } else {
+      setPanelDirty(!!(idNumber || firstName || lastName || tel || tel2 || dateOfBirth || prefix));
+    }
+  }, [idNumber, firstName, lastName, tel, tel2, dateOfBirth, prefix, idType, setPanelDirty]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => setPanelDirty(false), [setPanelDirty]);
 
   // ── Search ──────────────────────────────────────────────────────────────
@@ -272,11 +300,11 @@ export function PanelCustomer({ onClose }: Props) {
         <div className="flex gap-3">
           <div className="flex flex-col" style={{ width: '10rem' }}>
             <label className="form-label">{t('wizard.idType')}</label>
-            <Select options={ID_TYPE_OPTIONS} value={idType} onChange={(val) => setIdType((val as string) as 'CITIZEN_ID' | 'PASSPORT')} size="sm" />
+            <Select options={ID_TYPE_OPTIONS} value={idType} onChange={(val) => setIdType((val as string) as 'CITIZEN_ID' | 'PASSPORT')} size="sm" disabled={!!selectedCustomer} />
           </div>
           <div className="flex flex-col flex-1 min-w-0">
             <label className="form-label">{t('wizard.idNumber')}</label>
-            <Input value={idNumber} onChange={(e) => setIdNumber(e.target.value)} placeholder={idType === 'CITIZEN_ID' ? '13 digits' : 'Passport number'} size="sm" className="w-full" />
+            <Input value={idNumber} onChange={(e) => setIdNumber(e.target.value)} placeholder={idType === 'CITIZEN_ID' ? '13 digits' : 'Passport number'} size="sm" className="w-full" disabled={!!selectedCustomer} />
           </div>
         </div>
         <div className="flex gap-3">

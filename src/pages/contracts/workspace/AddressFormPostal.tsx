@@ -114,36 +114,40 @@ export function AddressFormPostal({ customerId, addressType, existing, onSuccess
             <Input size="sm" className="w-full" {...register('road')} />
           </div>
         </div>
-        <div className="flex flex-col">
-          <label className="form-label">{t('customer.postalCode')} *</label>
-          <Input size="sm" className="w-full" maxLength={5} {...register('postal_code', { required: t('common.required') })} />
-          <FormErrorMessage error={errors.postal_code} />
+        <div className="flex gap-3">
+          <div className="flex flex-col flex-1">
+            <label className="form-label">{t('customer.postalCode')} *</label>
+            <Input size="sm" className="w-full" maxLength={5} {...register('postal_code', { required: t('common.required') })} />
+            <FormErrorMessage error={errors.postal_code} />
+          </div>
+          <div className="flex flex-col flex-1">
+            <label className="form-label">{t('customer.subDistrict')} *</label>
+            {postalResults.length > 0 ? (
+              <Select
+                size="sm"
+                options={subDistrictOptions}
+                value={watch('sub_district')}
+                onChange={handleSubDistrictSelect}
+                placeholder={t('customer.selectSubDistrict')}
+                showChevron
+              />
+            ) : (
+              <Input size="sm" className="w-full" value={watch('sub_district')} onChange={e => setValue('sub_district', e.target.value, { shouldValidate: true })} />
+            )}
+            <FormErrorMessage error={errors.sub_district} />
+          </div>
         </div>
-        <div className="flex flex-col">
-          <label className="form-label">{t('customer.subDistrict')} *</label>
-          {postalResults.length > 0 ? (
-            <Select
-              size="sm"
-              options={subDistrictOptions}
-              value={watch('sub_district')}
-              onChange={handleSubDistrictSelect}
-              placeholder={t('customer.selectSubDistrict')}
-              showChevron
-            />
-          ) : (
-            <Input size="sm" className="w-full" value={watch('sub_district')} onChange={e => setValue('sub_district', e.target.value, { shouldValidate: true })} />
-          )}
-          <FormErrorMessage error={errors.sub_district} />
-        </div>
-        <div className="flex flex-col">
-          <label className="form-label">{t('customer.district')} *</label>
-          <Input size="sm" className="w-full" disabled={postalResults.length > 0} value={watch('district')} onChange={e => setValue('district', e.target.value, { shouldValidate: true })} />
-          <FormErrorMessage error={errors.district} />
-        </div>
-        <div className="flex flex-col">
-          <label className="form-label">{t('customer.province')} *</label>
-          <Input size="sm" className="w-full" disabled={postalResults.length > 0} value={watch('province')} onChange={e => setValue('province', e.target.value, { shouldValidate: true })} />
-          <FormErrorMessage error={errors.province} />
+        <div className="flex gap-3">
+          <div className="flex flex-col flex-1">
+            <label className="form-label">{t('customer.district')} *</label>
+            <Input size="sm" className="w-full" disabled={postalResults.length > 0} value={watch('district')} onChange={e => setValue('district', e.target.value, { shouldValidate: true })} />
+            <FormErrorMessage error={errors.district} />
+          </div>
+          <div className="flex flex-col flex-1">
+            <label className="form-label">{t('customer.province')} *</label>
+            <Input size="sm" className="w-full" disabled={postalResults.length > 0} value={watch('province')} onChange={e => setValue('province', e.target.value, { shouldValidate: true })} />
+            <FormErrorMessage error={errors.province} />
+          </div>
         </div>
       </div>
       <Button size="sm" color="primary" type="submit" disabled={saving}>

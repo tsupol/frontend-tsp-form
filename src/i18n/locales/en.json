@@ -1387,6 +1387,7 @@
     "action_change_draft_owner_success": "Owner changed",
     "action_saving_deposit": "Deposit Saving",
     "action_saving_deposit_success": "Saving deposit recorded",
+    "continueDraft": "Continue Draft",
     "savingDeposit_title": "Deposit Saving",
     "savingDeposit_channel": "Channel",
     "savingDeposit_notePlaceholder": "Note (optional)",
@@ -1562,6 +1563,7 @@
     "shippingNote": "Note",
     "creatingDraft": "Creating draft...",
     "saveDraft": "Save Draft",
+    "draftSaved": "Draft saved",
     "saveDraftNeedsCustomer": "Customer required to save draft",
     "allReady": "All checks passed — ready to create bill",
     "recheck": "Recheck",
@@ -1879,7 +1881,15 @@
       "flagVoidHigh": "void %",
       "flagVoidAmountHigh": "void ฿",
       "flagRefundHigh": "refund %",
-      "flagGiftCostHigh": "gift cost"
+      "flagGiftCostHigh": "gift cost",
+      "unclosedBadge": "Unclosed",
+      "unclosedDesc": "{{count}} bill(s) · {{days}} day(s) overdue",
+      "unclosedTitle": "Previous day not closed",
+      "unclosedMessage": "{{count}} bill(s) from this date have not been closed yet ({{days}} day(s) overdue). Close this day before proceeding.",
+      "previousUnclosedTitle": "Close previous days first",
+      "previousUnclosedMessage": "There are {{count}} unclosed day(s) with pending bills. You must close them before closing today.",
+      "closeDateBtn": "Close {{date}}",
+      "closeForDate": "Date"
     },
     "dayCloseHistory": {
       "description": "Historical day close snapshots with audit flags."

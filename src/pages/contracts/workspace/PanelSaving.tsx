@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, Input, Select } from 'tsp-form';
@@ -28,6 +28,25 @@ export function PanelSaving({ onClose }: Props) {
   const hasDraft = !!data.contractId;
   const hasCustomer = !!data.customerId;
   const canDeposit = hasDraft && !isReadOnly;
+  const [savingTarget, setSavingTarget] = useState(false);
+  const lastSavedTarget = useRef(data.savingTargetAmount);
+
+  const handleTargetBlur = async () => {
+    if (!data.contractId || data.savingTargetAmount === lastSavedTarget.current) return;
+    setSavingTarget(true);
+    try {
+      await apiClient.rpc('fn_contract_save_step', {
+        p_contract_id: data.contractId,
+        p_step: 'SAVING_TARGET',
+        p_data: { saving_target_amount: data.savingTargetAmount },
+      });
+      lastSavedTarget.current = data.savingTargetAmount;
+    } catch {
+      // ignore
+    } finally {
+      setSavingTarget(false);
+    }
+  };
 
   // Deposit form state
   const [amount, setAmount] = useState('');
@@ -118,68 +137,78 @@ export function PanelSaving({ onClose }: Props) {
           type="number"
           value={String(data.savingTargetAmount || '')}
           onChange={e => updateData({ savingTargetAmount: parseFloat(e.target.value) || 0 })}
+          onBlur={handleTargetBlur}
           size="sm"
           className="w-full"
           placeholder="0"
-          disabled={isReadOnly}
+          disabled={isReadOnly || !hasDraft}
         />
-        <span className="text-xs text-subtle mt-1">{t('workspace.savingTargetHint')}</span>
+        <span className="text-xs text-subtle mt-1">
+          {savingTarget ? t('common.saving') : t('workspace.savingTargetHint')}
+        </span>
       </div>
 
       {/* Deposit form */}
       {canDeposit && (
-        <div className="border border-line rounded-lg p-4 flex flex-col gap-3">
-          <div className="font-medium text-sm">{t('workspace.savingDeposit')}</div>
+        <div className="border border-line rounded-lg p-4">
+          <div className="font-medium text-sm mb-4">{t('workspace.savingDeposit')}</div>
 
           {error && (
-            <div key={errorKey} className="alert alert-danger animate-pop-in">
+            <div key={errorKey} className="alert alert-danger animate-pop-in mb-4">
               <XCircle size={16} />
               <span>{error}</span>
             </div>
           )}
 
-          <div className="flex flex-col">
-            <label className="form-label">{t('contract.amount')}</label>
-            <Input
-              type="number"
-              value={amount}
-              onChange={e => setAmount(e.target.value)}
-              placeholder="0"
-              size="sm"
-              className="w-full"
-            />
+          <div className="form-grid">
+            <div className="flex flex-col">
+              <label className="form-label">{t('contract.amount')}</label>
+              <div className="input-group">
+                <div className="w-28 shrink-0">
+                  <Select
+                    options={[
+                      { value: 'CASH', label: t('contract.channel_cash') },
+                      { value: 'TRANSFER', label: t('contract.channel_transfer') },
+                    ]}
+                    value={channel}
+                    onChange={val => setChannel(val as string)}
+                    size="sm"
+                    searchable={false}
+                  />
+                </div>
+                <div className="input-group-divider" />
+                <Input
+                  type="number"
+                  value={amount}
+                  onChange={e => setAmount(e.target.value)}
+                  placeholder="0"
+                  size="sm"
+                  className="w-full"
+                />
+              </div>
+            </div>
+            <div className="flex flex-col">
+              <label className="form-label">{t('contract.note')}</label>
+              <Input
+                value={note}
+                onChange={e => setNote(e.target.value)}
+                placeholder={t('contract.savingDeposit_notePlaceholder')}
+                size="sm"
+                className="w-full"
+              />
+            </div>
           </div>
-          <div className="flex flex-col">
-            <label className="form-label">{t('contract.savingDeposit_channel')}</label>
-            <Select
-              options={[
-                { value: 'CASH', label: t('contract.channel_cash') },
-                { value: 'TRANSFER', label: t('contract.channel_transfer') },
-              ]}
-              value={channel}
-              onChange={val => setChannel(val as string)}
+          <div className="flex justify-end mt-4">
+            <Button
               size="sm"
-            />
+              color="primary"
+              onClick={() => mutation.mutate()}
+              disabled={!canSubmit}
+              startIcon={mutation.isPending ? <Loader2 size={14} className="animate-spin" /> : undefined}
+            >
+              {mutation.isPending ? t('common.loading') : t('contract.action_saving_deposit')}
+            </Button>
           </div>
-          <div className="flex flex-col">
-            <label className="form-label">{t('contract.note')}</label>
-            <Input
-              value={note}
-              onChange={e => setNote(e.target.value)}
-              placeholder={t('contract.savingDeposit_notePlaceholder')}
-              size="sm"
-              className="w-full"
-            />
-          </div>
-          <Button
-            size="sm"
-            color="primary"
-            onClick={() => mutation.mutate()}
-            disabled={!canSubmit}
-            startIcon={mutation.isPending ? <Loader2 size={14} className="animate-spin" /> : undefined}
-          >
-            {mutation.isPending ? t('common.loading') : t('contract.action_saving_deposit')}
-          </Button>
         </div>
       )}
 

@@ -4,7 +4,7 @@ import { fmtCurrency } from '../contractUtils';
 import { useWorkspace } from './WorkspaceContext';
 import { SummaryCard } from './SummaryCard';
 
-export function CardSaving({ onEdit }: { onEdit?: () => void }) {
+export function CardSaving({ onEdit, active }: { onEdit?: () => void; active?: boolean }) {
   const { t } = useTranslation();
   const { data, isReadOnly } = useWorkspace();
 
@@ -12,35 +12,26 @@ export function CardSaving({ onEdit }: { onEdit?: () => void }) {
   const balance = data.savingBalance;
   const target = data.savingTargetAmount;
   const hasBalance = balance > 0;
-  const status = !hasCustomer ? 'locked' as const
-    : hasBalance ? 'partial' as const
-    : 'empty' as const;
+  const status = !hasCustomer ? 'locked' as const : 'empty' as const;
 
   return (
     <SummaryCard
       title={t('workspace.cardSaving')}
       status={status}
+      icon={<PiggyBank size={16} className={hasBalance ? 'text-info shrink-0' : 'text-fg/30 shrink-0'} />}
       onEdit={onEdit}
+      active={active}
       disabled={isReadOnly || !hasCustomer}
     >
       {!hasCustomer ? (
         <div className="text-subtle text-xs">{t('workspace.needCustomerFirst')}</div>
       ) : hasBalance ? (
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <PiggyBank size={14} className="text-info" />
-            <span className="font-semibold tabular-nums text-info">{fmtCurrency(balance)}</span>
-          </div>
-          {target > 0 && (
-            <div className="text-xs text-subtle">
-              {t('workspace.savingTarget')}: {fmtCurrency(target)}
-            </div>
-          )}
-        </div>
+        <span className="font-semibold tabular-nums text-info">
+          {fmtCurrency(balance)}{target > 0 && <span className="text-subtle font-normal"> / {fmtCurrency(target)}</span>}
+        </span>
       ) : (
-        <div className="text-subtle flex items-center gap-2">
-          <PiggyBank size={14} className="opacity-40" />
-          <span>{t('workspace.savingEmpty')}</span>
+        <div className="text-subtle">
+          {t('workspace.savingEmpty')}
         </div>
       )}
     </SummaryCard>

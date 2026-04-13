@@ -4,7 +4,7 @@ import { fmtCurrency } from '../contractUtils';
 import { useWorkspace } from './WorkspaceContext';
 import { SummaryCard } from './SummaryCard';
 
-export function CardProductPlan({ onEdit }: { onEdit?: () => void }) {
+export function CardProductPlan({ onEdit, active }: { onEdit?: () => void; active?: boolean }) {
   const { t } = useTranslation();
   const { data, getCardStatus, isReadOnly } = useWorkspace();
   const status = getCardStatus('productPlan');
@@ -15,6 +15,7 @@ export function CardProductPlan({ onEdit }: { onEdit?: () => void }) {
       title={t('workspace.cardProduct')}
       status={status}
       onEdit={onEdit}
+      active={active}
       disabled={isReadOnly}
     >
       {status === 'empty' ? (

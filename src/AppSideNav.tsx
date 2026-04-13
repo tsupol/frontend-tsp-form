@@ -48,8 +48,9 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
     navigate('/login');
   };
 
-  const displayName = user?.role_code ?? 'User';
+  const displayName = user?.nickname || user?.firstname || user?.username || 'User';
   const initials = displayName.slice(0, 2).toUpperCase();
+  const roleName = (user?.role_code ?? '').replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
 
   return (
     <PopOver
@@ -70,8 +71,9 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
           </div>
           {!collapsed && (
             <>
-              <div className="flex-1 text-left truncate">
-                <span className="text-sm font-medium capitalize">{displayName}</span>
+              <div className="flex-1 text-left min-w-0">
+                <div className="text-sm font-medium truncate">{displayName}</div>
+                <div className="text-xs text-item-fg/50 truncate">{roleName}</div>
               </div>
               <ChevronsUpDown size={14} className="opacity-50 shrink-0" />
             </>

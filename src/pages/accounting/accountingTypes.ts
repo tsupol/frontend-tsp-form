@@ -165,6 +165,17 @@ export interface RemittanceRevenueRow {
   day_closed: boolean;
 }
 
+export interface UnclosedDayRow {
+  holding_id: number;
+  company_id: number;
+  branch_id: number;
+  branch_name: string;
+  bill_date: string;
+  bill_count: number;
+  total_amount: number;
+  days_overdue: number;
+}
+
 export function fmtAmount(n: number | null | undefined): string {
   if (n == null) return '—';
   return n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });

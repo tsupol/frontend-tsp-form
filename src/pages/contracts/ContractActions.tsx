@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Button, Modal, Input, Select, TextArea, Badge, useSnackbarContext } from 'tsp-form';
-import { CheckCircle, XCircle } from 'lucide-react';
+import { CheckCircle, XCircle, Pencil } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { fmtCurrency } from './contractUtils';
 
@@ -372,10 +373,12 @@ export function ContractActionButtons({ contract, onRefresh }: {
   onRefresh: () => void;
 }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [activeAction, setActiveAction] = useState<ContractAction | null>(null);
   const { addSnackbar } = useSnackbarContext();
 
   const actions = getAvailableActions(contract);
+  const isDraftOrSaving = contract.state === 'DRAFT' || contract.state === 'SAVING';
 
   if (actions.length === 0) return null;
 
@@ -399,6 +402,16 @@ export function ContractActionButtons({ contract, onRefresh }: {
   return (
     <>
       <div className="flex-none px-4 py-3 border-t border-line flex flex-wrap gap-2">
+        {isDraftOrSaving && (
+          <Button
+            size="sm"
+            color="primary"
+            startIcon={<Pencil size={14} />}
+            onClick={() => navigate(`/admin/contracts/draft/${contract.id}`)}
+          >
+            {t('contract.continueDraft')}
+          </Button>
+        )}
         {actions.map(action => {
           const config = ACTION_CONFIGS[action];
           return (

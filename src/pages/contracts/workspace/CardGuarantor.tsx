@@ -12,7 +12,7 @@ function getAge(dob: string): number {
   return age;
 }
 
-export function CardGuarantor({ onEdit }: { onEdit?: () => void }) {
+export function CardGuarantor({ onEdit, active }: { onEdit?: () => void; active?: boolean }) {
   const { t } = useTranslation();
   const { data, isReadOnly } = useWorkspace();
 
@@ -30,6 +30,7 @@ export function CardGuarantor({ onEdit }: { onEdit?: () => void }) {
       title={t('workspace.cardGuarantor')}
       status={status}
       onEdit={needsGuarantor ? onEdit : undefined}
+      active={active}
       disabled={isReadOnly || !hasCustomer}
     >
       {!hasCustomer ? (
