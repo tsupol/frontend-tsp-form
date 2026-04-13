@@ -2,8 +2,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Input, Select, Badge, Button } from 'tsp-form';
-import { Search, Check } from 'lucide-react';
-import { apiClient } from '../../../lib/api';
+import { Search, Check, XCircle } from 'lucide-react';
+import { apiClient, ApiError } from '../../../lib/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import { fmtCurrency } from '../contractUtils';
 import { useWorkspace } from './WorkspaceContext';
@@ -125,14 +125,54 @@ export function PanelProductPlan({ onClose }: Props) {
     localQuote?.term_months === q.term_months &&
     localQuote?.down_percent === q.down_percent;
 
-  const handleConfirm = () => {
-    updateData({
-      modelId: localModelId, modelName: localModelName,
-      familyName: localFamilyName, brandName: localBrandName,
-      variantId: localVariantId, variantName: localVariantName,
-      selectedQuote: localQuote,
-    });
-    onClose();
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+
+  const handleConfirm = async () => {
+    setSaving(true);
+    setSaveError('');
+    try {
+      // Save product selection to backend if draft exists
+      if (wizardData.contractId && localQuote) {
+        await apiClient.rpc('fn_contract_save_step', {
+          p_contract_id: wizardData.contractId,
+          p_step: 'WORKSPACE',
+          p_data: {
+            modelId: localModelId,
+            variantId: localVariantId,
+            selectedQuote: localQuote,
+            savingTargetAmount: wizardData.savingTargetAmount,
+          },
+        });
+        // Also set pricing on the contract via seed helper if available
+        await apiClient.rpc('fn_seed_set_contract_pricing', {
+          p_contract_id: wizardData.contractId,
+          p_agreed_price: localQuote.retail_price,
+          p_down_payment: localQuote.down_amount,
+          p_installment_amount: localQuote.installment_amount,
+          p_value_month: localQuote.term_months,
+          p_list_price: localQuote.retail_price,
+          p_cost_price: localQuote.cost_price,
+        }).catch(() => {}); // seed helper may not exist in prod
+      }
+      updateData({
+        modelId: localModelId, modelName: localModelName,
+        familyName: localFamilyName, brandName: localBrandName,
+        variantId: localVariantId, variantName: localVariantName,
+        selectedQuote: localQuote,
+      });
+      onClose();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setSaveError(tr || err.code || err.message);
+      } else {
+        setSaveError(String(err));
+      }
+    } finally {
+      setSaving(false);
+    }
   };
 
   const fmt = (n: number) => n.toLocaleString('en-US');
@@ -237,9 +277,12 @@ export function PanelProductPlan({ onClose }: Props) {
       )}
 
       {/* Footer */}
+      {saveError && <div className="alert alert-danger"><XCircle size={16} /><span>{saveError}</span></div>}
       <div className="sticky bottom-0 bg-bg border-t border-line py-3 flex justify-end gap-2 -mx-4 px-4">
         <Button variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
-        <Button color="primary" onClick={handleConfirm} disabled={!localQuote}>{t('common.confirm')}</Button>
+        <Button color="primary" onClick={handleConfirm} disabled={!localQuote || saving}>
+          {saving ? t('common.saving') : t('common.confirm')}
+        </Button>
       </div>
     </div>
   );

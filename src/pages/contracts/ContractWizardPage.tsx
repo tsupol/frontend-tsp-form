@@ -66,6 +66,7 @@ function WorkspaceContent() {
         if (!c) return;
 
         const stepSaving = (c.step_data?.SAVING_TARGET as { saving_target_amount?: number } | undefined);
+        const stepWorkspace = (c.step_data?.WORKSPACE as { modelId?: number; variantId?: number; selectedQuote?: unknown } | undefined);
 
         // Fetch customer + guarantor details
         let customerAddresses = { current: false, work: false };
@@ -127,10 +128,11 @@ function WorkspaceContent() {
           customerReferenceCount,
           guarantorId,
           guarantorResult,
-          modelId: c.model_id,
+          modelId: c.model_id ?? stepWorkspace?.modelId ?? null,
           modelName: c.model_name ?? '',
-          variantId: c.variant_id,
+          variantId: c.variant_id ?? stepWorkspace?.variantId ?? null,
           variantName: c.variant_name ?? '',
+          selectedQuote: (stepWorkspace?.selectedQuote as import('./workspace/WorkspaceTypes').Quote | undefined) ?? null,
           savingBalance: c.saving_balance ?? 0,
           savingTargetAmount: stepSaving?.saving_target_amount ?? c.saving_target_amount ?? 0,
         });

@@ -97,7 +97,7 @@ UI guide: `D:\dev\nnf\database\DB_PART_001_AUTH_CORE\MEDIA_REGISTRY_UI_GUIDE.md`
 ```ts
 await apiClient.rpc('fn_media_attach', {
   p_holding_id:        number,      // from JWT/auth
-  p_storage_path:      string,      // relative path: 'uploads/assets/123/photo-0.webp'
+  p_storage_path:      string,      // relative path with leading slash: '/uploads/assets/123/photo-0.webp'
   p_variants_json:     null,        // null for single-size (no variants needed)
   p_media_type:        'IMAGE',     // IMAGE | DOCUMENT | VIDEO
   p_access_level:      'PUBLIC',    // PUBLIC | INTERNAL | CONFIDENTIAL | RESTRICTED
