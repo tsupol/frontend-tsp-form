@@ -16,7 +16,6 @@ interface EntityMedia {
   usage_type: string;
   sort_order: number;
   storage_path: string;
-  is_active: boolean;
 }
 
 interface Props { onClose: () => void }
@@ -35,7 +34,7 @@ export function PanelDocuments({ onClose }: Props) {
   const { data: media = [] } = useQuery({
     queryKey: ['contract-media', contractId],
     queryFn: () => apiClient.get<EntityMedia[]>(
-      `/v_entity_media?entity_type=eq.CONTRACT&entity_id=eq.${contractId}&is_active=eq.true&order=usage_type,sort_order`
+      `/v_entity_media?entity_type=eq.CONTRACT&entity_id=eq.${contractId}&order=usage_type,sort_order`
     ),
     enabled: !!contractId,
   });
@@ -98,7 +97,7 @@ export function PanelDocuments({ onClose }: Props) {
 
   const handleDetach = async (entityMediaId: number) => {
     try {
-      await apiClient.rpc('fn_media_detach', { p_entity_media_id: entityMediaId });
+      await apiClient.rpc('fn_media_remove', { p_entity_media_id: entityMediaId });
       queryClient.invalidateQueries({ queryKey: ['contract-media', contractId] });
     } catch {}
   };
