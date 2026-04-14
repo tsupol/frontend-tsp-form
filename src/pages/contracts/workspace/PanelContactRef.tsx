@@ -80,14 +80,12 @@ function ContactRow({ contact, onDeleted }: { contact: CustomerContact; onDelete
   const [deleting, setDeleting] = useState(false);
   const handleDelete = async () => { setDeleting(true); try { await apiClient.rpc('fn_customer_contact_delete', { p_id: contact.id }); onDeleted(); } catch {} finally { setDeleting(false); } };
   return (
-    <div className="flex items-center justify-between py-1.5 text-sm">
-      <div className="flex items-center gap-2">
-        <Badge size="xs" color="info">{contact.contact_type}</Badge>
-        <span className="tabular-nums">{contact.value}</span>
-        {contact.is_primary && <Star size={12} className="text-warning fill-warning" />}
-        {contact.label && <span className="text-control-label text-xs">({contact.label})</span>}
-      </div>
-      <button className="p-1 rounded hover:bg-surface-hover cursor-pointer text-control-label hover:text-danger" onClick={handleDelete} disabled={deleting}><Trash2 size={13} /></button>
+    <div className="flex items-center gap-2 px-3 py-2 border border-line rounded-lg text-sm">
+      <Badge size="xs" color="info">{contact.contact_type}</Badge>
+      <span className="tabular-nums flex-1">{contact.value}</span>
+      {contact.is_primary && <Star size={12} className="text-warning fill-warning shrink-0" />}
+      {contact.label && <span className="text-control-label text-xs shrink-0">({contact.label})</span>}
+      <button className="p-1 rounded hover:bg-surface-hover cursor-pointer text-control-label hover:text-danger shrink-0 bg-transparent border-none" onClick={handleDelete} disabled={deleting}><Trash2 size={13} /></button>
     </div>
   );
 }
@@ -102,13 +100,12 @@ function ReferenceRow({ reference, onDeleted }: { reference: CustomerReference; 
     } catch {} finally { setDeleting(false); }
   };
   return (
-    <div className="flex items-center justify-between py-1.5 text-sm">
-      <div className="flex items-center gap-2">
-        <span className="font-medium">{reference.name} {reference.last_name}</span>
-        {reference.relation && <Badge size="xs" className="bg-fg/10 text-fg/60">{reference.relation}</Badge>}
-        {reference.tel && <span className="text-subtle tabular-nums">{reference.tel}</span>}
-      </div>
-      <button className="p-1 rounded hover:bg-surface-hover cursor-pointer text-control-label hover:text-danger" onClick={handleDelete} disabled={deleting}><Trash2 size={13} /></button>
+    <div className="flex items-center gap-2 px-3 py-2 border border-line rounded-lg text-sm">
+      <span className="font-medium">{reference.name} {reference.last_name}</span>
+      {reference.relation && <Badge size="xs" className="bg-fg/10 text-fg/60">{reference.relation}</Badge>}
+      {reference.tel && <span className="text-subtle tabular-nums flex-1">{reference.tel}</span>}
+      {!reference.tel && <span className="flex-1" />}
+      <button className="p-1 rounded hover:bg-surface-hover cursor-pointer text-control-label hover:text-danger shrink-0 bg-transparent border-none" onClick={handleDelete} disabled={deleting}><Trash2 size={13} /></button>
     </div>
   );
 }
