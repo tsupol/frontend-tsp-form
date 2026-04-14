@@ -123,7 +123,7 @@ export function PanelSaving({ onClose }: Props) {
   const canSubmit = parsedAmount > 0 && !mutation.isPending;
 
   return (
-    <div className="p-4 flex flex-col gap-5">
+    <div className="p-4 flex flex-col">
       {/* Balance display */}
       <div className={`rounded-lg px-4 py-3 border ${balance > 0 ? 'border-info/30 bg-info/5' : 'border-line bg-surface'}`}>
         <div className="text-xs text-subtle mb-1">{t('workspace.savingCurrentBalance')}</div>
@@ -148,7 +148,7 @@ export function PanelSaving({ onClose }: Props) {
       </div>
 
       {/* Target amount */}
-      <div className="flex flex-col">
+      <div className="flex flex-col mt-4">
         <label className="form-label">{t('workspace.savingTarget')}</label>
         <Input
           type="number"
@@ -165,7 +165,7 @@ export function PanelSaving({ onClose }: Props) {
 
       {/* Deposit form */}
       {canDeposit && (
-        <div className="border border-line rounded-lg p-4">
+        <div className="border border-line rounded-lg p-4 mt-4">
           <div className="font-medium text-sm mb-4">{t('workspace.savingDeposit')}</div>
 
           {error && (
@@ -228,7 +228,7 @@ export function PanelSaving({ onClose }: Props) {
       )}
 
       {!hasDraft && (
-        <div className="text-sm text-subtle">
+        <div className="text-sm text-subtle mt-4">
           {!hasCustomer
             ? t('workspace.savingNeedCustomer')
             : t('workspace.savingDepositAfterDraft')
@@ -238,7 +238,7 @@ export function PanelSaving({ onClose }: Props) {
 
       {/* Deposit history */}
       {txns && txns.length > 0 && (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 mt-4">
           <div className="font-medium text-sm">{t('workspace.savingHistory')}</div>
           <div className="border border-line rounded-lg divide-y divide-line overflow-hidden">
             {txns.map(txn => (

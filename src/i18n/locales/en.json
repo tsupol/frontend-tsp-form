@@ -105,7 +105,7 @@
     "contracts": "Contracts",
     "contractSearch": "Contract Search",
     "savingContracts": "Saving Contracts",
-    "newContract": "New Contract",
+    "newContract": "Open Contract",
     "branches": "Branches",
     "customers": "Customers",
     "groupStock": "Stock",
@@ -1421,7 +1421,7 @@
     "action_transfer_cancel_success": "Transfer cancelled"
   },
   "wizard": {
-    "title": "New Contract",
+    "title": "Open Contract",
     "stepOf": "Step {{current}} of {{total}}",
     "step_product": "Select Product",
     "step_plan": "Finance Plan",
@@ -1557,6 +1557,7 @@
     "guarantorAddresses": "Guarantor addresses (both required)",
     "addGuarantor": "Add Guarantor",
     "guarantorAlreadyAttached": "This guarantor is already attached to this contract",
+    "guarantorCannotBeSelf": "The contract customer cannot be their own guarantor",
     "needsDraft": "Create draft first to upload documents",
     "docIdPhoto": "ID Card Photo",
     "docSignature": "Signature",

@@ -291,7 +291,7 @@ export function PanelCustomer({ onClose }: Props) {
   const buttonLabel = isExisting ? t('workspace.useThisCustomer') : t('wizard.registerCustomer');
 
   return (
-    <div className="p-4 flex flex-col gap-5 max-w-2xl">
+    <div className="p-4 flex flex-col max-w-2xl">
       {apiError && <div className="alert alert-danger"><XCircle size={18} /><div><div className="alert-description">{apiError}</div></div></div>}
       {result && <ResultBanner result={result} t={t} />}
 
@@ -386,7 +386,7 @@ export function PanelCustomer({ onClose }: Props) {
       )}
 
       {/* Address — disabled until customer attached */}
-      <div className="border-t border-line pt-4" />
+      <div className="border-t border-line my-4" />
       <div className={!customerId ? 'opacity-50 pointer-events-none' : ''}>
         <div className="font-medium text-sm mb-3">{t('workspace.addressCurrent')}</div>
         <AddressFormPostal

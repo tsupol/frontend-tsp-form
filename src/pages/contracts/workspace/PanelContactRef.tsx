@@ -49,19 +49,19 @@ export function PanelContactRef({ onClose }: Props) {
   if (!customerId) return null;
 
   return (
-    <div className="p-4 flex flex-col gap-5 max-w-2xl">
+    <div className="p-4 flex flex-col max-w-2xl">
       {/* Contacts */}
       <div className="flex flex-col gap-3">
-        <div className="font-medium text-sm">{t('workspace.contacts')} ({contacts.length})</div>
+        <div className="font-semibold text-sm text-fg/80 uppercase tracking-wide">{t('workspace.contacts')} ({contacts.length})</div>
         {contacts.map(c => <ContactRow key={c.id} contact={c} onDeleted={handleContactDeleted} />)}
         <ContactAddForm customerId={customerId} onSuccess={handleContactSuccess} />
       </div>
 
-      <div className="border-t border-line" />
+      <div className="border-t border-line my-4" />
 
       {/* References */}
       <div className="flex flex-col gap-3">
-        <div className="font-medium text-sm">
+        <div className="font-semibold text-sm text-fg/80 uppercase tracking-wide">
           {t('workspace.references')} ({references.length})
           {references.length === 0 && <span className="text-warning text-xs ml-2">({t('common.required')})</span>}
         </div>
@@ -80,7 +80,7 @@ function ContactRow({ contact, onDeleted }: { contact: CustomerContact; onDelete
   const [deleting, setDeleting] = useState(false);
   const handleDelete = async () => { setDeleting(true); try { await apiClient.rpc('fn_customer_contact_delete', { p_id: contact.id }); onDeleted(); } catch {} finally { setDeleting(false); } };
   return (
-    <div className="flex items-center gap-2 px-3 py-2 border border-line rounded-lg text-sm">
+    <div className="flex items-center gap-2 px-3 py-2 border border-success/30 rounded-lg text-sm">
       <Badge size="xs" color="info">{contact.contact_type}</Badge>
       <span className="tabular-nums flex-1">{contact.value}</span>
       {contact.is_primary && <Star size={12} className="text-warning fill-warning shrink-0" />}
@@ -100,7 +100,7 @@ function ReferenceRow({ reference, onDeleted }: { reference: CustomerReference; 
     } catch {} finally { setDeleting(false); }
   };
   return (
-    <div className="flex items-center gap-2 px-3 py-2 border border-line rounded-lg text-sm">
+    <div className="flex items-center gap-2 px-3 py-2 border border-success/30 rounded-lg text-sm">
       <span className="font-medium">{reference.name} {reference.last_name}</span>
       {reference.relation && <Badge size="xs" className="bg-fg/10 text-fg/60">{reference.relation}</Badge>}
       {reference.tel && <span className="text-subtle tabular-nums flex-1">{reference.tel}</span>}
@@ -142,7 +142,7 @@ function ContactAddForm({ customerId, onSuccess }: { customerId: number; onSucce
           </div>
         </div>
       </div>
-      <div className="flex items-center justify-between mt-3">
+      <div className="flex items-center justify-between">
         <label className="flex items-center gap-2 text-xs cursor-pointer"><Switch size="sm" checked={isPrimary} onChange={e => setIsPrimary((e.target as HTMLInputElement).checked)} />{t('customer.contactPrimary')}</label>
         <Button color="primary" size="sm" onClick={handleSave} disabled={saving || !value.trim()} startIcon={<Plus size={12} />}>{t('common.add')}</Button>
       </div>
@@ -195,7 +195,7 @@ function ReferenceAddForm({ customerId, onSuccess }: { customerId: number; onSuc
           </div>
         </div>
       </div>
-      <div className="flex justify-end mt-3">
+      <div className="flex justify-end">
         <Button color="primary" size="sm" onClick={handleSave} disabled={saving || !name.trim()} startIcon={<Plus size={12} />}>{t('common.add')}</Button>
       </div>
     </div>

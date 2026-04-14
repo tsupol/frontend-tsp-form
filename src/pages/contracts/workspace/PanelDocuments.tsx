@@ -106,7 +106,7 @@ export function PanelDocuments({ onClose }: Props) {
   if (!contractId) return null;
 
   return (
-    <div className="p-4 flex flex-col gap-5 max-w-2xl">
+    <div className="p-4 flex flex-col max-w-2xl">
       {error && <div className="alert alert-danger"><XCircle size={18} /><div><div className="alert-description">{error}</div></div></div>}
 
       {/* ID Card / Scan */}
@@ -122,7 +122,7 @@ export function PanelDocuments({ onClose }: Props) {
         t={t}
       />
 
-      <div className="border-t border-line" />
+      <div className="border-t border-line my-4" />
 
       {/* Signature */}
       <UploadSection
@@ -137,7 +137,7 @@ export function PanelDocuments({ onClose }: Props) {
         t={t}
       />
 
-      <div className="border-t border-line" />
+      <div className="border-t border-line my-4" />
 
       {/* Evidence (gallery) */}
       <UploadSection
@@ -153,7 +153,7 @@ export function PanelDocuments({ onClose }: Props) {
         t={t}
       />
 
-      <div className="border-t border-line" />
+      <div className="border-t border-line my-4" />
 
       {/* Shipping address */}
       <ShippingSection contractId={contractId} workspace={workspace} updateData={updateData} t={t} />
@@ -271,7 +271,7 @@ function ShippingSection({ contractId, workspace, updateData, t }: {
           <Input size="sm" value={shippingNote} onChange={e => setShippingNote(e.target.value)} className="w-full" />
         </div>
       </div>
-      <div className="flex justify-end mt-3">
+      <div className="flex justify-end">
         <Button size="sm" color="primary" onClick={handleSave} disabled={saving}>
           {saving ? t('common.loading') : t('common.save')}
         </Button>

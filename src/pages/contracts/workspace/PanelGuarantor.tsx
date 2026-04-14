@@ -92,7 +92,8 @@ export function PanelGuarantor({ onClose }: Props) { // eslint-disable-line @typ
       if (firstName.trim()) orParts.push(`first_name.ilike.*${encodeURIComponent(firstName.trim())}*`);
       if (lastName.trim()) orParts.push(`last_name.ilike.*${encodeURIComponent(lastName.trim())}*`);
       if (orParts.length > 0) params.push(`or=(${orParts.join(',')})`);
-      setSearchResults(await apiClient.get<SearchResult[]>(`/v_customers?${params.join('&')}`));
+      const results = await apiClient.get<SearchResult[]>(`/v_customers?${params.join('&')}`);
+      setSearchResults(workspace.customerId ? results.filter(c => c.id !== workspace.customerId) : results);
     } catch { setSearchResults([]); }
     finally { setSearching(false); }
   };
@@ -111,6 +112,11 @@ export function PanelGuarantor({ onClose }: Props) { // eslint-disable-line @typ
 
   const attachGuarantor = async (custId: number, fullName: string, idNum: string) => {
     if (!workspace.contractId) return;
+    // Cannot add self as guarantor
+    if (custId === workspace.customerId) {
+      setApiError(t('workspace.guarantorCannotBeSelf'));
+      return;
+    }
     // Check not already attached
     if (workspace.guarantors.some(g => g.customerId === custId)) {
       setApiError(t('workspace.guarantorAlreadyAttached'));
@@ -174,7 +180,7 @@ export function PanelGuarantor({ onClose }: Props) { // eslint-disable-line @typ
   const buttonLabel = isExisting ? t('workspace.useThisCustomer') : t('wizard.registerCustomer');
 
   return (
-    <div className="p-4 flex flex-col gap-5 max-w-2xl">
+    <div className="p-4 flex flex-col max-w-2xl">
       {/* ── Existing guarantors list ───────────────────────────────────── */}
       {workspace.guarantors.length > 0 && (
         <div className="flex flex-col gap-2">
@@ -194,8 +200,8 @@ export function PanelGuarantor({ onClose }: Props) { // eslint-disable-line @typ
       )}
 
       {/* ── Add guarantor form ─────────────────────────────────────────── */}
-      {workspace.guarantors.length > 0 && <div className="border-t border-line" />}
-      <div className="font-medium text-sm">{t('workspace.addGuarantor')}</div>
+      {workspace.guarantors.length > 0 && <div className="border-t border-line my-4" />}
+      <div className="font-medium text-sm mb-3">{t('workspace.addGuarantor')}</div>
 
           {apiError && <div className="alert alert-danger"><XCircle size={18} /><div><div className="alert-description">{apiError}</div></div></div>}
           {result?.action === 'BLOCK' && (
@@ -292,7 +298,7 @@ function GuarantorRow({ guarantor, expanded, onToggle, onRemove, removing }: {
   const workAddress = addresses.find(a => a.address_type === 'WORK');
 
   return (
-    <div className="border border-line rounded-lg overflow-hidden">
+    <div className="border border-success/30 rounded-lg overflow-hidden">
       <div className="flex items-center gap-2 px-3 py-2.5">
         <button className="flex-1 min-w-0 flex items-center gap-2 text-left cursor-pointer bg-transparent border-none text-current" onClick={onToggle}>
           <ShieldCheck size={14} className="text-success shrink-0" />

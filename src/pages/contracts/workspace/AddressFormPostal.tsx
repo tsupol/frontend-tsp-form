@@ -92,8 +92,8 @@ export function AddressFormPostal({ customerId, addressType, existing, onSuccess
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
-      {apiError && <div className="alert alert-danger text-xs"><XCircle size={14} /><span>{apiError}</span></div>}
+    <form onSubmit={handleSubmit(onSubmit)}>
+      {apiError && <div className="alert alert-danger text-xs mb-3"><XCircle size={14} /><span>{apiError}</span></div>}
       <div className="form-grid">
         <div className="flex flex-col">
           <label className="form-label">{t('customer.addressLine1')} *</label>
@@ -150,9 +150,11 @@ export function AddressFormPostal({ customerId, addressType, existing, onSuccess
           </div>
         </div>
       </div>
-      <Button size="sm" color="primary" type="submit" disabled={saving}>
-        {saving ? t('common.loading') : t('common.save')}
-      </Button>
+      <div className="flex justify-end">
+        <Button size="sm" color="primary" type="submit" disabled={saving}>
+          {saving ? t('common.loading') : t('common.save')}
+        </Button>
+      </div>
     </form>
   );
 }
