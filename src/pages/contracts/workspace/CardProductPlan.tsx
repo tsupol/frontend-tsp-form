@@ -27,7 +27,13 @@ export function CardProductPlan({ onEdit, active }: { onEdit?: () => void; activ
         <div className="flex flex-col gap-1">
           <div className="font-medium">
             {data.familyName} {data.modelName}
-            {data.variantName && <span className="text-subtle font-normal"> · {data.variantName}</span>}
+            {data.variantName && (
+              <span className="text-subtle font-normal"> · {
+                data.variantName.startsWith(data.modelName)
+                  ? data.variantName.slice(data.modelName.length).trim()
+                  : data.variantName
+              }</span>
+            )}
           </div>
           {q && (
             <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-subtle">

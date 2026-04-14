@@ -156,7 +156,14 @@ export function PanelProductPlan({ onClose }: Props) {
       p_limit: 10,
     }).then(res => {
       const match = res.rows.find(m => m.model_id === wizardData.modelId);
-      if (match) setSelectedModel(match);
+      if (match) {
+        setSelectedModel(match);
+        // Fix variant display name to color label
+        if (wizardData.variantId) {
+          const v = match.variants.find(v => v.variant_id === wizardData.variantId);
+          if (v) setLocalVariantName(colorLabel(v));
+        }
+      }
     }).catch(() => {});
   }, [wizardData.modelId, wizardData.modelName]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -168,7 +175,7 @@ export function PanelProductPlan({ onClose }: Props) {
   useEffect(() => {
     if (variants.length === 1 && !localVariantId) {
       setLocalVariantId(variants[0].variant_id);
-      setLocalVariantName(variants[0].name);
+      setLocalVariantName(colorLabel(variants[0]));
       setSearch('');
       setDebouncedSearch('');
     }
@@ -230,7 +237,7 @@ export function PanelProductPlan({ onClose }: Props) {
 
   const handleSelectVariant = (v: SearchVariant) => {
     setLocalVariantId(v.variant_id);
-    setLocalVariantName(v.name);
+    setLocalVariantName(colorLabel(v));
     setLocalQuote(null);
     // Now product is fully selected — clear search
     setSearch('');
