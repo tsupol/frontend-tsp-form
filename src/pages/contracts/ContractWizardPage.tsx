@@ -73,8 +73,7 @@ function WorkspaceContent() {
         let customerContactCount = 0;
         let customerReferenceCount = 0;
         let customerDateOfBirth: string | null = null;
-        let guarantorId: number | null = null;
-        let guarantorResult: import('./workspace/WorkspaceTypes').CustomerRegisterResult | null = null;
+        let guarantors: Array<{ customerId: number; fullName: string; idNumber: string }> = [];
 
         const fetches: Promise<void>[] = [];
 
@@ -97,19 +96,15 @@ function WorkspaceContent() {
           );
         }
 
-        // Fetch guarantor
+        // Fetch guarantors
         fetches.push(
-          apiClient.get<Array<{ customer_id: number; customer_name: string; role: string }>>(`/v_contract_customers?contract_id=eq.${c.id}&role=eq.GUARANTOR`)
+          apiClient.get<Array<{ customer_id: number; customer_name: string; id_number?: string }>>(`/v_contract_customers?contract_id=eq.${c.id}&role=eq.GUARANTOR&order=created_at`)
             .then(gs => {
-              const g = gs[0];
-              if (g) {
-                guarantorId = g.customer_id;
-                guarantorResult = {
-                  customer_id: g.customer_id, is_new: false, id_type: '', id_number: '',
-                  full_name: g.customer_name, is_blacklisted: false, blacklist_reasons: [],
-                  has_overdue: false, overdue_contract_count: 0, active_contract_count: 0, action: 'OK',
-                };
-              }
+              guarantors = gs.map(g => ({
+                customerId: g.customer_id,
+                fullName: g.customer_name,
+                idNumber: g.id_number ?? '',
+              }));
             })
             .catch(() => {})
         );
@@ -126,8 +121,7 @@ function WorkspaceContent() {
           customerAddresses,
           customerContactCount,
           customerReferenceCount,
-          guarantorId,
-          guarantorResult,
+          guarantors,
           modelId: c.model_id ?? stepWorkspace?.modelId ?? null,
           modelName: c.model_name ?? '',
           variantId: c.variant_id ?? stepWorkspace?.variantId ?? null,

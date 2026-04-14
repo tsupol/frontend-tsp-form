@@ -42,9 +42,9 @@ export function ModalGuarantor({ open, onClose }: Props) {
 
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState('');
-  const [result, setResult] = useState<CustomerRegisterResult | null>(workspace.guarantorResult);
+  const [result, setResult] = useState<CustomerRegisterResult | null>(null);
 
-  const guarantorId = workspace.guarantorId;
+  const guarantorId = workspace.guarantors.length > 0 ? workspace.guarantors[0].customerId : null;
 
   const [showAddressCurrent, setShowAddressCurrent] = useState(false);
   const [showAddressWork, setShowAddressWork] = useState(false);
@@ -78,8 +78,7 @@ export function ModalGuarantor({ open, onClose }: Props) {
 
       if (res.action !== 'BLOCK') {
         updateData({
-          guarantorId: res.customer_id,
-          guarantorResult: res,
+          guarantors: [...workspace.guarantors, { customerId: res.customer_id, fullName: res.full_name, idNumber: res.id_number }],
           guarantorSkipped: false,
         });
 

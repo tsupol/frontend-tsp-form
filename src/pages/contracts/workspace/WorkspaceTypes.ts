@@ -233,9 +233,8 @@ export interface WorkspaceData {
   customerContactCount: number;
   customerReferenceCount: number;
 
-  // Guarantor
-  guarantorId: number | null;
-  guarantorResult: CustomerRegisterResult | null;
+  // Guarantors (multiple)
+  guarantors: Array<{ customerId: number; fullName: string; idNumber: string }>;
   guarantorSkipped: boolean;
 
   // Documents

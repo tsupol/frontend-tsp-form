@@ -25,8 +25,7 @@ const defaultData: WorkspaceData = {
   customerAddresses: { current: false, work: false },
   customerContactCount: 0,
   customerReferenceCount: 0,
-  guarantorId: null,
-  guarantorResult: null,
+  guarantors: [],
   guarantorSkipped: false,
   hasIdPhoto: false,
   hasSignature: false,
@@ -91,7 +90,7 @@ export function useWorkspace() {
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [data, setData] = useState<WorkspaceData>(defaultData);
-  const [openModal, setOpenModalRaw] = useState<ModalId>(null);
+  const [openModal, setOpenModalRaw] = useState<ModalId>('productPlan');
   const [readinessKey, setReadinessKey] = useState(0);
   const panelDirtyRef = useRef(false);
   const [pendingModal, setPendingModal] = useState<{ id: ModalId } | null>(null);
@@ -154,7 +153,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
               variant_id: number | null; variant_name: string | null;
               step_data: Record<string, unknown> | null;
             }>>(`/v_contract_detail?id=eq.${data.contractId}&select=customer_id,customer_name,saving_balance,saving_target_amount,model_id,model_name,variant_id,variant_name,step_data`),
-            apiClient.get<Array<{ customer_id: number; customer_name: string }>>(`/v_contract_customers?contract_id=eq.${data.contractId}&role=eq.GUARANTOR&order=created_at.desc&limit=1`).catch(() => []),
+            apiClient.get<Array<{ customer_id: number; customer_name: string; id_number?: string }>>(`/v_contract_customers?contract_id=eq.${data.contractId}&role=eq.GUARANTOR&order=created_at`).catch(() => []),
           ]);
           const c = contracts[0];
           if (!c) return;
@@ -168,11 +167,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
             variantName: c.variant_name ?? '',
           };
 
-          // Sync guarantor
-          const g = guarantors[0];
-          if (g) {
-            updates.guarantorId = g.customer_id;
-          }
+          // Sync guarantors
+          updates.guarantors = guarantors.map(g => ({
+            customerId: g.customer_id,
+            fullName: g.customer_name,
+            idNumber: g.id_number ?? '',
+          }));
 
           // Sync customer counts if customer exists
           if (c.customer_id) {
@@ -250,10 +250,17 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     createDraft();
   }, [data.customerId, data.contractId, data.draftCreating, data.branchId, data.modelId, data.variantId, data.selectedQuote, user]);
 
-  // ── Customer attachment (when customerId set after draft exists) ──────
+  // ── Customer attachment (when customerId changes after draft exists) ──
   const prevCustomerId = useRef<number | null>(null);
+  const customerAttachReady = useRef(false);
   useEffect(() => {
     if (!data.contractId || !data.customerId) return;
+    // Skip the first time — loadContract already has customer attached
+    if (!customerAttachReady.current) {
+      prevCustomerId.current = data.customerId;
+      customerAttachReady.current = true;
+      return;
+    }
     if (data.customerId === prevCustomerId.current) return;
     prevCustomerId.current = data.customerId;
 
@@ -277,7 +284,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         return 'partial';
       case 'guarantor':
         if (data.guarantorSkipped) return 'complete';
-        if (data.guarantorId) return 'complete';
+        if (data.guarantors.length > 0) return 'complete';
         return 'empty';
       case 'documents':
         if (!data.contractId) return 'locked';

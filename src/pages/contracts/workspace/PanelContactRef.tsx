@@ -41,6 +41,10 @@ export function PanelContactRef({ onClose }: Props) {
     queryClient.invalidateQueries({ queryKey: ['customer-references', customerId] });
     updateData({ customerReferenceCount: references.length + 1 });
   };
+  const handleReferenceDeleted = () => {
+    queryClient.invalidateQueries({ queryKey: ['customer-references', customerId] });
+    updateData({ customerReferenceCount: Math.max(0, references.length - 1) });
+  };
 
   if (!customerId) return null;
 
@@ -62,11 +66,7 @@ export function PanelContactRef({ onClose }: Props) {
           {references.length === 0 && <span className="text-warning text-xs ml-2">({t('common.required')})</span>}
         </div>
         {references.map(r => (
-          <div key={r.id} className="flex items-center gap-2 text-sm py-1">
-            <span className="font-medium">{r.name} {r.last_name}</span>
-            {r.relation && <Badge size="xs" className="bg-fg/10 text-fg/60">{r.relation}</Badge>}
-            {r.tel && <span className="text-subtle tabular-nums">{r.tel}</span>}
-          </div>
+          <ReferenceRow key={r.id} reference={r} onDeleted={handleReferenceDeleted} />
         ))}
         <ReferenceAddForm customerId={customerId} onSuccess={handleReferenceSuccess} />
       </div>
@@ -86,6 +86,27 @@ function ContactRow({ contact, onDeleted }: { contact: CustomerContact; onDelete
         <span className="tabular-nums">{contact.value}</span>
         {contact.is_primary && <Star size={12} className="text-warning fill-warning" />}
         {contact.label && <span className="text-control-label text-xs">({contact.label})</span>}
+      </div>
+      <button className="p-1 rounded hover:bg-surface-hover cursor-pointer text-control-label hover:text-danger" onClick={handleDelete} disabled={deleting}><Trash2 size={13} /></button>
+    </div>
+  );
+}
+
+function ReferenceRow({ reference, onDeleted }: { reference: CustomerReference; onDeleted: () => void }) {
+  const [deleting, setDeleting] = useState(false);
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await apiClient.delete(`/v_customer_references?id=eq.${reference.id}`);
+      onDeleted();
+    } catch {} finally { setDeleting(false); }
+  };
+  return (
+    <div className="flex items-center justify-between py-1.5 text-sm">
+      <div className="flex items-center gap-2">
+        <span className="font-medium">{reference.name} {reference.last_name}</span>
+        {reference.relation && <Badge size="xs" className="bg-fg/10 text-fg/60">{reference.relation}</Badge>}
+        {reference.tel && <span className="text-subtle tabular-nums">{reference.tel}</span>}
       </div>
       <button className="p-1 rounded hover:bg-surface-hover cursor-pointer text-control-label hover:text-danger" onClick={handleDelete} disabled={deleting}><Trash2 size={13} /></button>
     </div>
