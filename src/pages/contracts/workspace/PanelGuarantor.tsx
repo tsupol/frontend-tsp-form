@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Input, Select, Button, InputDatePicker, Checkbox } from 'tsp-form';
-import { ShieldAlert, CheckCircle, XCircle, Calendar, Search, Loader2, Trash2, Plus, ShieldCheck } from 'lucide-react';
+import { ShieldAlert, CheckCircle, XCircle, Calendar, Search, Loader2, Trash2, ShieldCheck } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { useWorkspace } from './WorkspaceContext';
 import { AddressFormPostal } from './AddressFormPostal';
@@ -60,7 +60,6 @@ export function PanelGuarantor({ onClose }: Props) { // eslint-disable-line @typ
   };
 
   // ── Add new guarantor form ──────────────────────────────────────────────
-  const [showAddForm, setShowAddForm] = useState(workspace.guarantors.length === 0);
   const [idType, setIdType] = useState<'CITIZEN_ID' | 'PASSPORT'>('CITIZEN_ID');
   const [idNumber, setIdNumber] = useState('');
   const [prefix, setPrefix] = useState('');
@@ -128,7 +127,6 @@ export function PanelGuarantor({ onClose }: Props) { // eslint-disable-line @typ
         guarantorSkipped: false,
       });
       resetForm();
-      setShowAddForm(false);
     } catch (err) {
       if (err instanceof ApiError) {
         const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
@@ -195,17 +193,9 @@ export function PanelGuarantor({ onClose }: Props) { // eslint-disable-line @typ
         </div>
       )}
 
-      {/* ── Add guarantor button / form ────────────────────────────────── */}
-      {!showAddForm && (
-        <Button variant="outline" size="sm" startIcon={<Plus size={14} />} onClick={() => { resetForm(); setShowAddForm(true); }}>
-          {t('workspace.addGuarantor')}
-        </Button>
-      )}
-
-      {showAddForm && (
-        <>
-          <div className="border-t border-line pt-4" />
-          <div className="font-medium text-sm">{t('workspace.addGuarantor')}</div>
+      {/* ── Add guarantor form ─────────────────────────────────────────── */}
+      {workspace.guarantors.length > 0 && <div className="border-t border-line" />}
+      <div className="font-medium text-sm">{t('workspace.addGuarantor')}</div>
 
           {apiError && <div className="alert alert-danger"><XCircle size={18} /><div><div className="alert-description">{apiError}</div></div></div>}
           {result?.action === 'BLOCK' && (
@@ -250,11 +240,6 @@ export function PanelGuarantor({ onClose }: Props) { // eslint-disable-line @typ
           </div>
 
           <div className="flex justify-end gap-2">
-            {workspace.guarantors.length > 0 && (
-              <Button variant="ghost" size="sm" onClick={() => { resetForm(); setShowAddForm(false); }}>
-                {t('common.cancel')}
-              </Button>
-            )}
             <Button variant="outline" size="sm" onClick={handleSearch} disabled={searching || !canSearch} startIcon={searching ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}>
               {t('workspace.checkCustomer')}
             </Button>
@@ -282,8 +267,6 @@ export function PanelGuarantor({ onClose }: Props) { // eslint-disable-line @typ
               ) : null}
             </div>
           )}
-        </>
-      )}
     </div>
   );
 }
