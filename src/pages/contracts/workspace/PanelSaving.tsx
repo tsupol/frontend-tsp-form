@@ -1,8 +1,8 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, Input, Select } from 'tsp-form';
-import { PiggyBank, XCircle, Loader2 } from 'lucide-react';
+import { PiggyBank, XCircle, Loader2, Check } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { fmtCurrency } from '../contractUtils';
 import { DateTime } from '../../../components/DateTime';
@@ -28,25 +28,42 @@ export function PanelSaving({ onClose }: Props) {
   const hasDraft = !!data.contractId;
   const hasCustomer = !!data.customerId;
   const canDeposit = hasDraft && !isReadOnly;
-  const [savingTarget, setSavingTarget] = useState(false);
+  const [targetSaving, setTargetSaving] = useState(false);
+  const [targetSaved, setTargetSaved] = useState(false);
   const lastSavedTarget = useRef(data.savingTargetAmount);
+  const saveTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const savedTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  const handleTargetBlur = async () => {
-    if (!data.contractId || data.savingTargetAmount === lastSavedTarget.current) return;
-    setSavingTarget(true);
+  const saveTarget = useCallback(async (amount: number) => {
+    if (!data.contractId || amount === lastSavedTarget.current) return;
+    setTargetSaving(true);
     try {
       await apiClient.rpc('fn_contract_save_step', {
         p_contract_id: data.contractId,
         p_step: 'SAVING_TARGET',
-        p_data: { saving_target_amount: data.savingTargetAmount },
+        p_data: { saving_target_amount: amount },
       });
-      lastSavedTarget.current = data.savingTargetAmount;
+      lastSavedTarget.current = amount;
+      setTargetSaved(true);
+      clearTimeout(savedTimer.current);
+      savedTimer.current = setTimeout(() => setTargetSaved(false), 2000);
     } catch {
       // ignore
     } finally {
-      setSavingTarget(false);
+      setTargetSaving(false);
     }
+  }, [data.contractId]);
+
+  const handleTargetChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = parseFloat(e.target.value) || 0;
+    updateData({ savingTargetAmount: val });
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => saveTarget(val), 1000);
   };
+
+  useEffect(() => {
+    return () => { clearTimeout(saveTimer.current); clearTimeout(savedTimer.current); };
+  }, []);
 
   // Deposit form state
   const [amount, setAmount] = useState('');
@@ -136,16 +153,14 @@ export function PanelSaving({ onClose }: Props) {
         <Input
           type="number"
           value={String(data.savingTargetAmount || '')}
-          onChange={e => updateData({ savingTargetAmount: parseFloat(e.target.value) || 0 })}
-          onBlur={handleTargetBlur}
+          onChange={handleTargetChange}
           size="sm"
           className="w-full"
           placeholder="0"
           disabled={isReadOnly || !hasDraft}
+          endIcon={targetSaving ? <Loader2 size={14} className="animate-spin text-subtle" /> : targetSaved ? <Check size={14} className="text-success" /> : undefined}
         />
-        <span className="text-xs text-subtle mt-1">
-          {savingTarget ? t('common.saving') : t('workspace.savingTargetHint')}
-        </span>
+        <span className="text-xs text-subtle mt-1">{t('workspace.savingTargetHint')}</span>
       </div>
 
       {/* Deposit form */}
