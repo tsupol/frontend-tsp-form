@@ -7,6 +7,7 @@ import { apiClient, ApiError } from '../../../lib/api';
 import { fmtCurrency } from '../contractUtils';
 import { DateTime } from '../../../components/DateTime';
 import { useWorkspace } from './WorkspaceContext';
+import { PanelSection } from './PanelSection';
 
 interface ContractTxn {
   id: number;
@@ -124,125 +125,46 @@ export function PanelSaving({ onClose }: Props) {
 
   return (
     <div className="p-4 flex flex-col">
-      {/* Balance display */}
-      <div className={`rounded-lg px-4 py-3 border ${balance > 0 ? 'border-info/30 bg-info/5' : 'border-line bg-surface'}`}>
-        <div className="text-xs text-subtle mb-1">{t('workspace.savingCurrentBalance')}</div>
-        <div className="flex items-center gap-2">
-          <PiggyBank size={18} className={balance > 0 ? 'text-info' : 'text-fg/30'} />
-          <span className="text-xl font-semibold tabular-nums">{fmtCurrency(balance)}</span>
-        </div>
-        {data.savingTargetAmount > 0 && balance > 0 && (
-          <div className="mt-2">
-            <div className="flex justify-between text-xs text-subtle mb-1">
-              <span>{t('workspace.savingProgress')}</span>
-              <span>{Math.min(100, Math.round((balance / data.savingTargetAmount) * 100))}%</span>
-            </div>
-            <div className="h-1.5 rounded-full bg-fg/10 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-info transition-all"
-                style={{ width: `${Math.min(100, (balance / data.savingTargetAmount) * 100)}%` }}
-              />
-            </div>
+      {/* ── Saving Setup ─────────────────────────────────────────────── */}
+        <div className={`rounded-lg px-4 py-3 border mb-4 ${balance > 0 ? 'border-info/30 bg-info/5' : 'border-line bg-surface'}`}>
+          <div className="text-xs text-subtle mb-1">{t('workspace.savingCurrentBalance')}</div>
+          <div className="flex items-center gap-2">
+            <PiggyBank size={18} className={balance > 0 ? 'text-info' : 'text-fg/30'} />
+            <span className="text-xl font-semibold tabular-nums">{fmtCurrency(balance)}</span>
           </div>
-        )}
-      </div>
-
-      {/* Target amount */}
-      <div className="flex flex-col mt-4">
-        <label className="form-label">{t('workspace.savingTarget')}</label>
-        <Input
-          type="number"
-          value={String(data.savingTargetAmount || '')}
-          onChange={handleTargetChange}
-          size="sm"
-          className="w-full"
-          placeholder="0"
-          disabled={isReadOnly || !hasDraft}
-          endIcon={targetSaving ? <Loader2 size={14} className="animate-spin text-subtle" /> : targetSaved ? <Check size={14} className="text-success" /> : undefined}
-        />
-        <span className="text-xs text-subtle mt-1">{t('workspace.savingTargetHint')}</span>
-      </div>
-
-      {/* Deposit form */}
-      {canDeposit && (
-        <div className="border border-line rounded-lg p-4 mt-4">
-          <div className="font-medium text-sm mb-4">{t('workspace.savingDeposit')}</div>
-
-          {error && (
-            <div key={errorKey} className="alert alert-danger animate-pop-in mb-4">
-              <XCircle size={16} />
-              <span>{error}</span>
-            </div>
-          )}
-
-          <div className="form-grid">
-            <div className="flex flex-col">
-              <label className="form-label">{t('contract.amount')}</label>
-              <div className="input-group">
-                <div className="w-28 shrink-0">
-                  <Select
-                    options={[
-                      { value: 'CASH', label: t('contract.channel_cash') },
-                      { value: 'TRANSFER', label: t('contract.channel_transfer') },
-                    ]}
-                    value={channel}
-                    onChange={val => setChannel(val as string)}
-                    size="sm"
-                    searchable={false}
-                  />
-                </div>
-                <div className="input-group-divider" />
-                <Input
-                  type="number"
-                  value={amount}
-                  onChange={e => setAmount(e.target.value)}
-                  placeholder="0"
-                  size="sm"
-                  className="w-full"
-                />
+          {data.savingTargetAmount > 0 && balance > 0 && (
+            <div className="mt-2">
+              <div className="flex justify-between text-xs text-subtle mb-1">
+                <span>{t('workspace.savingProgress')}</span>
+                <span>{Math.min(100, Math.round((balance / data.savingTargetAmount) * 100))}%</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-fg/10 overflow-hidden">
+                <div className="h-full rounded-full bg-info transition-all" style={{ width: `${Math.min(100, (balance / data.savingTargetAmount) * 100)}%` }} />
               </div>
             </div>
-            <div className="flex flex-col">
-              <label className="form-label">{t('contract.note')}</label>
-              <Input
-                value={note}
-                onChange={e => setNote(e.target.value)}
-                placeholder={t('contract.savingDeposit_notePlaceholder')}
-                size="sm"
-                className="w-full"
-              />
-            </div>
-          </div>
-          <div className="flex justify-end mt-4">
-            <Button
-              size="sm"
-              color="primary"
-              onClick={() => mutation.mutate()}
-              disabled={!canSubmit}
-              startIcon={mutation.isPending ? <Loader2 size={14} className="animate-spin" /> : undefined}
-            >
-              {mutation.isPending ? t('common.loading') : t('contract.action_saving_deposit')}
-            </Button>
-          </div>
+          )}
         </div>
-      )}
-
-      {!hasDraft && (
-        <div className="text-sm text-subtle mt-4">
-          {!hasCustomer
-            ? t('workspace.savingNeedCustomer')
-            : t('workspace.savingDepositAfterDraft')
-          }
+        <div className="flex flex-col">
+          <label className="form-label">{t('workspace.savingTarget')}</label>
+          <Input
+            type="number"
+            value={String(data.savingTargetAmount || '')}
+            onChange={handleTargetChange}
+            size="sm"
+            className="w-full"
+            placeholder="0"
+            disabled={isReadOnly || !hasDraft}
+            endIcon={targetSaving ? <Loader2 size={14} className="animate-spin text-subtle" /> : targetSaved ? <Check size={14} className="text-success" /> : undefined}
+          />
+          <span className="text-xs text-subtle mt-1">{t('workspace.savingTargetHint')}</span>
         </div>
-      )}
 
-      {/* Deposit history */}
-      {txns && txns.length > 0 && (
-        <div className="flex flex-col gap-2 mt-4">
-          <div className="font-medium text-sm">{t('workspace.savingHistory')}</div>
-          <div className="border border-line rounded-lg divide-y divide-line overflow-hidden">
+      {/* ── Deposits ─────────────────────────────────────────────────── */}
+      <PanelSection title={t('workspace.savingDeposit')} count={txns?.length ?? 0} className="mt-6">
+        {txns && txns.length > 0 && (
+          <div className="flex flex-col gap-2 mb-4">
             {txns.map(txn => (
-              <div key={txn.id} className="px-3 py-2 flex items-center gap-3 text-sm">
+              <div key={txn.id} className="px-3 py-2 border border-success/30 rounded-lg flex items-center gap-3 text-sm">
                 <span className={`font-semibold tabular-nums ${txn.amount > 0 ? 'text-success' : 'text-danger'}`}>
                   {txn.amount > 0 ? '+' : ''}{fmtCurrency(txn.amount)}
                 </span>
@@ -253,8 +175,77 @@ export function PanelSaving({ onClose }: Props) {
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+
+        {canDeposit && (
+          <div className="p-3 rounded-md border border-dashed border-line">
+            {error && (
+              <div key={errorKey} className="alert alert-danger animate-pop-in mb-3">
+                <XCircle size={16} />
+                <span>{error}</span>
+              </div>
+            )}
+            <div className="form-grid">
+              <div className="flex flex-col">
+                <label className="form-label">{t('contract.amount')}</label>
+                <div className="input-group">
+                  <div className="w-28 shrink-0">
+                    <Select
+                      options={[
+                        { value: 'CASH', label: t('contract.channel_cash') },
+                        { value: 'TRANSFER', label: t('contract.channel_transfer') },
+                      ]}
+                      value={channel}
+                      onChange={val => setChannel(val as string)}
+                      size="sm"
+                      searchable={false}
+                    />
+                  </div>
+                  <div className="input-group-divider" />
+                  <Input
+                    type="number"
+                    value={amount}
+                    onChange={e => setAmount(e.target.value)}
+                    placeholder="0"
+                    size="sm"
+                    className="w-full"
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col">
+                <label className="form-label">{t('contract.note')}</label>
+                <Input
+                  value={note}
+                  onChange={e => setNote(e.target.value)}
+                  placeholder={t('contract.savingDeposit_notePlaceholder')}
+                  size="sm"
+                  className="w-full"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <Button
+                size="sm"
+                color="primary"
+                onClick={() => mutation.mutate()}
+                disabled={!canSubmit}
+                startIcon={mutation.isPending ? <Loader2 size={14} className="animate-spin" /> : undefined}
+              >
+                {mutation.isPending ? t('common.loading') : t('contract.action_saving_deposit')}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {!hasDraft && (
+          <div className="text-sm text-subtle">
+            {!hasCustomer
+              ? t('workspace.savingNeedCustomer')
+              : t('workspace.savingDepositAfterDraft')
+            }
+          </div>
+        )}
+      </PanelSection>
     </div>
   );
 }

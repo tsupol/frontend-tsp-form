@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Input, Select, Button, InputDatePicker, Checkbox } from 'tsp-form';
-import { ShieldAlert, CheckCircle, XCircle, Calendar, Search, Loader2, Trash2, ShieldCheck } from 'lucide-react';
+import { ShieldAlert, CheckCircle, XCircle, Calendar, Search, Loader2, Trash2, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { useWorkspace } from './WorkspaceContext';
+import { PanelSection } from './PanelSection';
 import { AddressFormPostal } from './AddressFormPostal';
 import type { CustomerRegisterResult, CustomerAddress } from './WorkspaceTypes';
 
@@ -181,29 +182,37 @@ export function PanelGuarantor({ onClose }: Props) { // eslint-disable-line @typ
 
   return (
     <div className="p-4 flex flex-col max-w-2xl">
-      {/* ── Existing guarantors list ───────────────────────────────────── */}
-      {workspace.guarantors.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <div className="font-medium text-sm">{t('workspace.cardGuarantor')} ({workspace.guarantors.length})</div>
-          {removeError && <div className="alert alert-danger text-xs"><XCircle size={14} /><span>{removeError}</span></div>}
-          {workspace.guarantors.map(g => (
-            <GuarantorRow
-              key={g.customerId}
-              guarantor={g}
-              expanded={expandedGuarantor === g.customerId}
-              onToggle={() => setExpandedGuarantor(expandedGuarantor === g.customerId ? null : g.customerId)}
-              onRemove={() => handleRemove(g.customerId)}
-              removing={removing === g.customerId}
-            />
-          ))}
-        </div>
-      )}
+      <PanelSection title={t('workspace.cardGuarantor')} count={workspace.guarantors.length}
+        alert={
+          removeError ? <div className="alert alert-danger"><XCircle size={14} /><span>{removeError}</span></div>
+          : (workspace.customerId && workspace.guarantors.length === 0 && workspace.customerDateOfBirth && (() => {
+              const birth = new Date(workspace.customerDateOfBirth!);
+              const now = new Date();
+              let age = now.getFullYear() - birth.getFullYear();
+              const m = now.getMonth() - birth.getMonth();
+              if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--;
+              return age < 18;
+            })()) ? <div className="alert alert-warning"><AlertTriangle size={14} /><span>{t('workspace.guarantorRequired')}</span></div>
+          : undefined
+        }
+      >
+        {workspace.guarantors.length > 0 && (
+          <div className="flex flex-col gap-2 mb-4">
+            {workspace.guarantors.map(g => (
+              <GuarantorRow
+                key={g.customerId}
+                guarantor={g}
+                expanded={expandedGuarantor === g.customerId}
+                onToggle={() => setExpandedGuarantor(expandedGuarantor === g.customerId ? null : g.customerId)}
+                onRemove={() => handleRemove(g.customerId)}
+                removing={removing === g.customerId}
+              />
+            ))}
+          </div>
+        )}
 
-      {/* ── Add guarantor form ─────────────────────────────────────────── */}
-      {workspace.guarantors.length > 0 && <div className="border-t border-line my-4" />}
-      <div className="font-medium text-sm mb-3">{t('workspace.addGuarantor')}</div>
-
-          {apiError && <div className="alert alert-danger"><XCircle size={18} /><div><div className="alert-description">{apiError}</div></div></div>}
+        <div className="p-3 rounded-md border border-dashed border-line">
+          {apiError && <div className="alert alert-danger mb-3"><XCircle size={18} /><div><div className="alert-description">{apiError}</div></div></div>}
           {result?.action === 'BLOCK' && (
             <div className="alert alert-danger"><ShieldAlert size={18} /><div><div className="alert-title">{t('wizard.blacklisted')}</div></div></div>
           )}
@@ -273,6 +282,8 @@ export function PanelGuarantor({ onClose }: Props) { // eslint-disable-line @typ
               ) : null}
             </div>
           )}
+        </div>
+      </PanelSection>
     </div>
   );
 }

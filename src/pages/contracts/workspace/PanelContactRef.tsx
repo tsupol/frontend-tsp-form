@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Input, Select, Switch, Badge } from 'tsp-form';
-import { Plus, Trash2, Star, XCircle } from 'lucide-react';
+import { Plus, Trash2, Star, XCircle, AlertTriangle } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { useWorkspace } from './WorkspaceContext';
+import { PanelSection } from './PanelSection';
 import type { CustomerContact, CustomerReference } from './WorkspaceTypes';
 
 const CONTACT_TYPES = ['MOBILE', 'HOME', 'WORK', 'LINE', 'FACEBOOK', 'OTHER'];
@@ -50,26 +51,32 @@ export function PanelContactRef({ onClose }: Props) {
 
   return (
     <div className="p-4 flex flex-col max-w-2xl">
-      {/* Contacts */}
-      <div className="flex flex-col gap-3">
-        <div className="font-semibold text-sm text-fg/80 uppercase tracking-wide">{t('workspace.contacts')} ({contacts.length})</div>
-        {contacts.map(c => <ContactRow key={c.id} contact={c} onDeleted={handleContactDeleted} />)}
+      <PanelSection title={t('workspace.contacts')} count={contacts.length}>
+        {contacts.length > 0 && (
+          <div className="flex flex-col gap-2 mb-4">
+            {contacts.map(c => <ContactRow key={c.id} contact={c} onDeleted={handleContactDeleted} />)}
+          </div>
+        )}
         <ContactAddForm customerId={customerId} onSuccess={handleContactSuccess} />
-      </div>
+      </PanelSection>
 
-      <div className="border-t border-line my-4" />
-
-      {/* References */}
-      <div className="flex flex-col gap-3">
-        <div className="font-semibold text-sm text-fg/80 uppercase tracking-wide">
-          {t('workspace.references')} ({references.length})
-          {references.length === 0 && <span className="text-warning text-xs ml-2">({t('common.required')})</span>}
-        </div>
-        {references.map(r => (
-          <ReferenceRow key={r.id} reference={r} onDeleted={handleReferenceDeleted} />
-        ))}
+      <PanelSection
+        title={t('workspace.references')}
+        count={references.length}
+        className="mt-6"
+        alert={references.length === 0 ? (
+          <div className="alert alert-warning"><AlertTriangle size={14} /><span>{t('workspace.refRequired')}</span></div>
+        ) : undefined}
+      >
+        {references.length > 0 && (
+          <div className="flex flex-col gap-2 mb-4">
+            {references.map(r => (
+              <ReferenceRow key={r.id} reference={r} onDeleted={handleReferenceDeleted} />
+            ))}
+          </div>
+        )}
         <ReferenceAddForm customerId={customerId} onSuccess={handleReferenceSuccess} />
-      </div>
+      </PanelSection>
     </div>
   );
 }

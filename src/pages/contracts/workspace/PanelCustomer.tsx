@@ -5,6 +5,7 @@ import { Input, Select, Button, InputDatePicker, Checkbox, Modal } from 'tsp-for
 import { ShieldAlert, AlertTriangle, CheckCircle, XCircle, Calendar, Search, Loader2 } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { useWorkspace } from './WorkspaceContext';
+import { PanelSection } from './PanelSection';
 import { AddressFormPostal } from './AddressFormPostal';
 import type { CustomerRegisterResult, CustomerAddress } from './WorkspaceTypes';
 
@@ -147,6 +148,10 @@ export function PanelCustomer({ onClose }: Props) {
   });
   const currentAddress = addresses.find(a => a.address_type === 'CURRENT');
   const workAddress = addresses.find(a => a.address_type === 'WORK');
+
+  useEffect(() => {
+    if (workAddress) setUseDifferentWorkAddress(true);
+  }, [workAddress]);
 
   // Dirty tracking — compare against loaded snapshot, not just non-empty
   useEffect(() => {
@@ -386,36 +391,31 @@ export function PanelCustomer({ onClose }: Props) {
       )}
 
       {/* Address — disabled until customer attached */}
-      <div className="border-t border-line my-4" />
-      <div className={!customerId ? 'opacity-50 pointer-events-none' : ''}>
-        <div className="font-medium text-sm mb-3">{t('workspace.addressCurrent')}</div>
-        <AddressFormPostal
-          customerId={customerId ?? 0}
-          addressType="CURRENT"
-          existing={currentAddress}
-          onSuccess={() => handleAddressSuccess('CURRENT')}
-        />
+      <div className={`mt-6 ${!customerId ? 'opacity-50 pointer-events-none' : ''}`}>
+        <PanelSection title={t('workspace.addressCurrent')}>
+          <AddressFormPostal
+            customerId={customerId ?? 0}
+            addressType="CURRENT"
+            existing={currentAddress}
+            onSuccess={() => handleAddressSuccess('CURRENT')}
+          />
+        </PanelSection>
 
-        <div className="mt-4 mb-3">
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <Checkbox
-              checked={useDifferentWorkAddress}
-              onChange={(e) => setUseDifferentWorkAddress((e.target as HTMLInputElement).checked)}
-            />
-            {t('workspace.useDifferentWorkAddress')}
-          </label>
-        </div>
+        <label className="flex items-center gap-2 text-sm cursor-pointer py-2">
+          <Checkbox
+            checked={useDifferentWorkAddress}
+            onChange={(e) => setUseDifferentWorkAddress((e.target as HTMLInputElement).checked)}
+          />
+          {t('workspace.useDifferentWorkAddress')}
+        </label>
 
         {useDifferentWorkAddress && (
-          <>
-            <div className="font-medium text-sm mb-3">{t('workspace.addressWork')}</div>
-            <AddressFormPostal
-              customerId={customerId ?? 0}
-              addressType="WORK"
-              existing={workAddress}
-              onSuccess={() => handleAddressSuccess('WORK')}
-            />
-          </>
+          <AddressFormPostal
+            customerId={customerId ?? 0}
+            addressType="WORK"
+            existing={workAddress}
+            onSuccess={() => handleAddressSuccess('WORK')}
+          />
         )}
       </div>
 

@@ -11,6 +11,7 @@ interface SummaryCardProps {
   active?: boolean;
   children: ReactNode;
   actions?: ReactNode;
+  className?: string;
 }
 
 const STATUS_ICON: Record<CardStatus, ReactNode> = {
@@ -21,7 +22,7 @@ const STATUS_ICON: Record<CardStatus, ReactNode> = {
   locked: <Lock size={16} className="text-fg/20 shrink-0" />,
 };
 
-export function SummaryCard({ title, status, icon, onEdit, disabled, active, children, actions }: SummaryCardProps) {
+export function SummaryCard({ title, status, icon, onEdit, disabled, active, children, actions, className }: SummaryCardProps) {
   const clickable = !!onEdit && !disabled && !active && status !== 'locked';
 
   return (
@@ -31,7 +32,7 @@ export function SummaryCard({ title, status, icon, onEdit, disabled, active, chi
         status === 'complete' ? 'border-success/30 bg-success/3' :
         status === 'locked' ? 'border-line/50 bg-surface/50 opacity-60' :
         'border-line bg-bg'
-      } ${clickable ? 'cursor-pointer hover:border-fg/20' : ''}`}
+      } ${clickable ? 'cursor-pointer hover:border-fg/20' : ''} ${className ?? ''}`}
       onClick={clickable ? onEdit : undefined}
       role={clickable ? 'button' : undefined}
       tabIndex={clickable ? 0 : undefined}
