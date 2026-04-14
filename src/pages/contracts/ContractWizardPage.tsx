@@ -109,6 +109,31 @@ function WorkspaceContent() {
             .catch(() => {})
         );
 
+        // Resolve model + brand/family names
+        const resolvedModelId = c.model_id ?? stepWorkspace?.modelId ?? null;
+        let resolvedModelName = c.model_name ?? '';
+        let resolvedVariantName = c.variant_name ?? '';
+        let resolvedFamilyName = '';
+        let resolvedBrandName = '';
+
+        if (resolvedModelId) {
+          try {
+            const models = await apiClient.get<Array<{ model_name: string; family_name: string; brand_name: string }>>(`/v_product_model_list?model_id=eq.${resolvedModelId}&select=model_name,family_name,brand_name&limit=1`);
+            if (models[0]) {
+              resolvedModelName = resolvedModelName || models[0].model_name;
+              resolvedFamilyName = models[0].family_name;
+              resolvedBrandName = models[0].brand_name;
+            }
+          } catch {}
+        }
+
+        // Resolve variant name from selectedQuote if not on contract row
+        const resolvedVariantId = c.variant_id ?? stepWorkspace?.variantId ?? null;
+        if (resolvedVariantId && !c.variant_name) {
+          const q = stepWorkspace?.selectedQuote as { item_name?: string } | undefined;
+          if (q?.item_name) resolvedVariantName = q.item_name;
+        }
+
         await Promise.all(fetches);
 
         updateData({
@@ -122,10 +147,12 @@ function WorkspaceContent() {
           customerContactCount,
           customerReferenceCount,
           guarantors,
-          modelId: c.model_id ?? stepWorkspace?.modelId ?? null,
-          modelName: c.model_name ?? '',
-          variantId: c.variant_id ?? stepWorkspace?.variantId ?? null,
-          variantName: c.variant_name ?? '',
+          modelId: resolvedModelId,
+          modelName: resolvedModelName,
+          familyName: resolvedFamilyName,
+          brandName: resolvedBrandName,
+          variantId: resolvedVariantId,
+          variantName: resolvedVariantName,
           selectedQuote: (stepWorkspace?.selectedQuote as import('./workspace/WorkspaceTypes').Quote | undefined) ?? null,
           savingBalance: c.saving_balance ?? 0,
           savingTargetAmount: stepSaving?.saving_target_amount ?? c.saving_target_amount ?? 0,
