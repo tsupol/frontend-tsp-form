@@ -169,6 +169,8 @@ export function PanelProductPlan({ onClose }: Props) {
     if (variants.length === 1 && !localVariantId) {
       setLocalVariantId(variants[0].variant_id);
       setLocalVariantName(variants[0].name);
+      setSearch('');
+      setDebouncedSearch('');
     }
   }, [variants]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -224,14 +226,15 @@ export function PanelProductPlan({ onClose }: Props) {
     setLocalVariantId(null);
     setLocalVariantName('');
     setLocalQuote(null);
-    setSearch('');
-    setDebouncedSearch('');
   };
 
   const handleSelectVariant = (v: SearchVariant) => {
     setLocalVariantId(v.variant_id);
     setLocalVariantName(v.name);
     setLocalQuote(null);
+    // Now product is fully selected — clear search
+    setSearch('');
+    setDebouncedSearch('');
   };
 
   const handleResetModel = () => {
@@ -324,8 +327,8 @@ export function PanelProductPlan({ onClose }: Props) {
     }
   };
 
-  // Is the search/list area showing results or the selected model?
-  const showingSearch = shouldSearch || !localModelId;
+  // Show search list until both model AND variant are selected
+  const showingSearch = shouldSearch || !localModelId || !localVariantId;
 
   return (
     <div className="flex flex-col h-full max-w-2xl">
