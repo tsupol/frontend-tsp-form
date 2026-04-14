@@ -37,11 +37,6 @@ export function CardProductPlan({ onEdit, active }: { onEdit?: () => void; activ
               <span>{t('contract.installmentAmount')} {fmtCurrency(q.installment_amount)}</span>
             </div>
           )}
-          {data.savingBalance > 0 && (
-            <div className="text-xs text-info">
-              {t('workspace.cardSaving')}: {fmtCurrency(data.savingBalance)}
-            </div>
-          )}
         </div>
       )}
     </SummaryCard>

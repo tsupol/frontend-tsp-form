@@ -1613,7 +1613,8 @@
     "fin2Desc": "Negotiable",
     "thb": "THB",
     "fin2Calc": "Custom Calculator",
-    "fin2UsingRate": "Using profit rate from"
+    "fin2UsingRate": "Using profit rate from",
+    "useThisPlan": "Use This Plan"
   },
   "org": {
     "title": "Organization",

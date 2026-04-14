@@ -313,7 +313,6 @@ export function PanelProductPlan({ onClose }: Props) {
         variantId: localVariantId, variantName: localVariantName,
         selectedQuote: localQuote,
       });
-      onClose();
     } catch (err) {
       if (err instanceof ApiError) {
         const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
@@ -405,7 +404,24 @@ export function PanelProductPlan({ onClose }: Props) {
                 <span className="text-sm font-medium">{t('priceCheck.fin2Desc')}</span>
               </div>
               <QuoteTable rows={fin2Rows} terms={fin2Terms} type="fin2" isSelected={isSelected} onSelect={(r) => setLocalQuote(toQuote(r, 'FIN2'))} t={t} />
-              <Fin2Calculator fin2Rows={fin2Rows} fin2Terms={fin2Terms} t={t} />
+              <Fin2Calculator fin2Rows={fin2Rows} fin2Terms={fin2Terms} t={t} onUse={(r) => {
+                setLocalQuote({
+                  variant_id: localVariantId!,
+                  item_name: localVariantName,
+                  finance_model: 'FIN2',
+                  term_months: r.termMonths,
+                  down_percent: 0,
+                  down_amount: r.downAmount,
+                  retail_price: fin2Rows[0]?.retail_price ?? 0,
+                  installment_amount: r.installment,
+                  total_amount: r.total,
+                  financed_amount: r.financed,
+                  cost_price: fin2Rows[0]?.cost_price ?? 0,
+                  interest_percent_total: null,
+                  max_discount_percent: fin2Rows[0]?.max_discount_percent ?? 0,
+                  fin2_profit_amount: r.profit,
+                });
+              }} />
             </div>
           )}
         </div>
@@ -513,10 +529,20 @@ function resolveProfit(fin2Rows: PricingRow[], fin2Terms: number[], termMonths: 
   return row ? { baseTerm: resolved, profit: row.fin2_profit_amount ?? 0, cost: row.cost_price } : null;
 }
 
-function Fin2Calculator({ fin2Rows, fin2Terms, t }: {
+interface CalcResult {
+  termMonths: number;
+  profit: number;
+  total: number;
+  downAmount: number;
+  financed: number;
+  installment: number;
+}
+
+function Fin2Calculator({ fin2Rows, fin2Terms, t, onUse }: {
   fin2Rows: PricingRow[];
   fin2Terms: number[];
   t: (key: string) => string;
+  onUse: (r: CalcResult) => void;
 }) {
   const [termInput, setTermInput] = useState('');
   const [downInput, setDownInput] = useState('');
@@ -581,6 +607,11 @@ function Fin2Calculator({ fin2Rows, fin2Terms, t }: {
             <div className="col-span-2 border-t border-line my-1" />
             <span className="font-medium">{t('priceCheck.installment')}</span>
             <span className="text-right tabular-nums text-primary font-semibold text-base">{fmt(result.installment)}</span>
+          </div>
+          <div className="flex justify-end mt-3">
+            <Button size="sm" color="primary" onClick={() => onUse({ termMonths, profit: result.profit, total: result.total, downAmount: result.downAmount, financed: result.financed, installment: result.installment })}>
+              {t('priceCheck.useThisPlan')}
+            </Button>
           </div>
         </div>
       )}

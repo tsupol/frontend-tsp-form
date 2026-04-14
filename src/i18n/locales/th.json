@@ -1613,7 +1613,8 @@
     "fin2Desc": "ต่อรองได้",
     "thb": "บาท",
     "fin2Calc": "คำนวณเอง",
-    "fin2UsingRate": "ใช้อัตรากำไรของ"
+    "fin2UsingRate": "ใช้อัตรากำไรของ",
+    "useThisPlan": "ใช้แผนนี้"
   },
   "org": {
     "title": "องค์กร",
