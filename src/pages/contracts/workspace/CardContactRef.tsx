@@ -1,9 +1,8 @@
 import { useTranslation } from 'react-i18next';
-import { Phone } from 'lucide-react';
 import { useWorkspace } from './WorkspaceContext';
 import { SummaryCard } from './SummaryCard';
 
-export function CardContactRef({ onEdit, active }: { onEdit?: () => void; active?: boolean }) {
+export function CardContactRef({ onEdit, active, shake }: { onEdit?: () => void; active?: boolean; shake?: boolean }) {
   const { t } = useTranslation();
   const { data, isReadOnly } = useWorkspace();
 
@@ -19,6 +18,7 @@ export function CardContactRef({ onEdit, active }: { onEdit?: () => void; active
       status={status}
       onEdit={onEdit}
       active={active}
+      shake={shake}
       disabled={isReadOnly || !hasCustomer}
     >
       {!hasCustomer ? (

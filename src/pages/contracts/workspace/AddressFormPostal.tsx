@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
-import { Input, Select, Button, FormErrorMessage } from 'tsp-form';
-import { XCircle } from 'lucide-react';
+import { Input, Select, Button, FormErrorMessage, useSnackbarContext } from 'tsp-form';
+import { XCircle, CheckCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import type { PostalLookup, CustomerAddress } from './WorkspaceTypes';
 
@@ -18,7 +18,7 @@ export function AddressFormPostal({ customerId, addressType, existing, onSuccess
 
   const isShipping = addressType === 'SHIPPING';
 
-  const { register, handleSubmit, formState: { errors }, watch, setValue, reset } = useForm({
+  const { register, handleSubmit, formState: { errors, isDirty }, watch, setValue, reset } = useForm({
     defaultValues: {
       address_line1: existing?.address_line1 ?? '',
       address_line2: existing?.address_line2 ?? '',
@@ -59,10 +59,12 @@ export function AddressFormPostal({ customerId, addressType, existing, onSuccess
   register('district', { required: t('common.required') });
   register('province', { required: t('common.required') });
 
+  const { addSnackbar } = useSnackbarContext();
   const postalCode = watch('postal_code');
   const [postalResults, setPostalResults] = useState<PostalLookup[]>([]);
   const [apiError, setApiError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     if (postalCode.length === 5) {
@@ -108,6 +110,20 @@ export function AddressFormPostal({ customerId, addressType, existing, onSuccess
         p_recipient_tel: isShipping ? (data.recipient_tel.trim() || null) : null,
         p_note: data.note.trim() || null,
         p_id: existing?.id ?? null,
+      });
+      // Reset dirty state with saved values
+      reset(data);
+      // Button state
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      // Snackbar
+      addSnackbar({
+        message: (
+          <div className="alert alert-success">
+            <CheckCircle size={18} />
+            <div><div className="alert-title">{t('customer.addressSaved')}</div></div>
+          </div>
+        ),
       });
       onSuccess();
     } catch (err) {
@@ -199,8 +215,13 @@ export function AddressFormPostal({ customerId, addressType, existing, onSuccess
         )}
       </div>
       <div className="flex justify-end">
-        <Button size="sm" color="primary" type="submit" disabled={saving}>
-          {saving ? t('common.loading') : t('common.save')}
+        <Button
+          color={saved ? 'success' : 'primary'}
+          type="submit"
+          disabled={saving || (!isDirty && !saved)}
+          startIcon={saved ? <CheckCircle size={16} /> : undefined}
+        >
+          {saving ? t('common.loading') : saved ? t('common.saved') : t('common.save')}
         </Button>
       </div>
     </form>

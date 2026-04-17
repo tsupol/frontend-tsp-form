@@ -3,7 +3,7 @@ import { User } from 'lucide-react';
 import { useWorkspace } from './WorkspaceContext';
 import { SummaryCard } from './SummaryCard';
 
-export function CardCustomer({ onEdit, active }: { onEdit?: () => void; active?: boolean }) {
+export function CardCustomer({ onEdit, active, shake }: { onEdit?: () => void; active?: boolean; shake?: boolean }) {
   const { t } = useTranslation();
   const { data, getCardStatus, isReadOnly } = useWorkspace();
   const status = getCardStatus('customer');
@@ -14,6 +14,7 @@ export function CardCustomer({ onEdit, active }: { onEdit?: () => void; active?:
       status={status}
       onEdit={onEdit}
       active={active}
+      shake={shake}
       disabled={isReadOnly}
     >
       {!data.customerId ? (

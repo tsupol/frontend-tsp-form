@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Input, Select, Switch, Badge } from 'tsp-form';
-import { Plus, Trash2, Star, XCircle, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, Star, XCircle, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { useWorkspace } from './WorkspaceContext';
 import { PanelSection } from './PanelSection';
@@ -12,7 +12,7 @@ const CONTACT_TYPES = ['MOBILE', 'HOME', 'WORK', 'LINE', 'FACEBOOK', 'OTHER'];
 
 interface Props { onClose: () => void }
 
-export function PanelContactRef({ onClose }: Props) {
+export function PanelContactRef({ onClose: _onClose }: Props) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { data: workspace, updateData } = useWorkspace();
@@ -98,6 +98,8 @@ function ContactRow({ contact, onDeleted }: { contact: CustomerContact; onDelete
 }
 
 function ReferenceRow({ reference, onDeleted }: { reference: CustomerReference; onDeleted: () => void }) {
+  const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const handleDelete = async () => {
     setDeleting(true);
@@ -107,12 +109,38 @@ function ReferenceRow({ reference, onDeleted }: { reference: CustomerReference; 
     } catch {} finally { setDeleting(false); }
   };
   return (
-    <div className="flex items-center gap-2 px-3 py-2 border border-success/30 rounded-lg text-sm">
-      <span className="font-medium">{reference.name} {reference.last_name}</span>
-      {reference.relation && <Badge size="xs" className="bg-fg/10 text-fg/60">{reference.relation}</Badge>}
-      {reference.tel && <span className="text-subtle tabular-nums flex-1">{reference.tel}</span>}
-      {!reference.tel && <span className="flex-1" />}
-      <button className="p-1 rounded hover:bg-surface-hover cursor-pointer text-control-label hover:text-danger shrink-0 bg-transparent border-none" onClick={handleDelete} disabled={deleting}><Trash2 size={13} /></button>
+    <div className="border border-success/30 rounded-lg overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-surface-hover transition-colors" onClick={() => setExpanded(!expanded)}>
+        {expanded ? <ChevronDown size={14} className="text-subtle shrink-0" /> : <ChevronRight size={14} className="text-subtle shrink-0" />}
+        <span className="font-medium text-sm flex-1 truncate">{reference.name} {reference.last_name}</span>
+        {reference.relation && <Badge size="xs" className="bg-fg/10 text-fg/60">{reference.relation}</Badge>}
+        <button
+          className="p-1 rounded hover:bg-danger/10 cursor-pointer text-control-label hover:text-danger shrink-0 bg-transparent border-none"
+          onClick={(e) => { e.stopPropagation(); handleDelete(); }}
+          disabled={deleting}
+        >
+          <Trash2 size={13} />
+        </button>
+      </div>
+      {expanded && (
+        <div className="border-t border-line px-3 py-2 text-sm flex flex-col gap-1">
+          {reference.tel && (
+            <div className="flex gap-2">
+              <span className="text-subtle w-16 shrink-0">{t('customer.refTel')}</span>
+              <span className="tabular-nums">{reference.tel}</span>
+            </div>
+          )}
+          {reference.relation && (
+            <div className="flex gap-2">
+              <span className="text-subtle w-16 shrink-0">{t('customer.refRelation')}</span>
+              <span>{reference.relation}</span>
+            </div>
+          )}
+          {!reference.tel && !reference.relation && (
+            <span className="text-subtle text-xs">{t('common.noData')}</span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -151,7 +179,7 @@ function ContactAddForm({ customerId, onSuccess }: { customerId: number; onSucce
       </div>
       <div className="flex items-center justify-between">
         <label className="flex items-center gap-2 text-xs cursor-pointer"><Switch size="sm" checked={isPrimary} onChange={e => setIsPrimary((e.target as HTMLInputElement).checked)} />{t('customer.contactPrimary')}</label>
-        <Button color="primary" size="sm" onClick={handleSave} disabled={saving || !value.trim()} startIcon={<Plus size={12} />}>{t('common.add')}</Button>
+        <Button color="primary" onClick={handleSave} disabled={saving || !value.trim()} startIcon={<Plus size={12} />}>{t('common.add')}</Button>
       </div>
     </div>
   );
@@ -203,7 +231,7 @@ function ReferenceAddForm({ customerId, onSuccess }: { customerId: number; onSuc
         </div>
       </div>
       <div className="flex justify-end">
-        <Button color="primary" size="sm" onClick={handleSave} disabled={saving || !name.trim()} startIcon={<Plus size={12} />}>{t('common.add')}</Button>
+        <Button color="primary" onClick={handleSave} disabled={saving || !name.trim()} startIcon={<Plus size={12} />}>{t('common.add')}</Button>
       </div>
     </div>
   );

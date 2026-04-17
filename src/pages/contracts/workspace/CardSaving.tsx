@@ -4,7 +4,7 @@ import { fmtCurrency } from '../contractUtils';
 import { useWorkspace } from './WorkspaceContext';
 import { SummaryCard } from './SummaryCard';
 
-export function CardSaving({ onEdit, active }: { onEdit?: () => void; active?: boolean }) {
+export function CardSaving({ onEdit, active, shake }: { onEdit?: () => void; active?: boolean; shake?: boolean }) {
   const { t } = useTranslation();
   const { data, isReadOnly } = useWorkspace();
 
@@ -21,6 +21,7 @@ export function CardSaving({ onEdit, active }: { onEdit?: () => void; active?: b
       icon={<PiggyBank size={16} className={hasBalance ? 'text-info shrink-0' : 'text-fg/30 shrink-0'} />}
       onEdit={onEdit}
       active={active}
+      shake={shake}
       disabled={isReadOnly || !hasCustomer}
       className={!active && hasBalance ? 'border-info/30 bg-info/5' : undefined}
     >

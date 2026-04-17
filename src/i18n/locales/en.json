@@ -32,7 +32,8 @@
     "status": "Status",
     "close": "Close",
     "add": "Add",
-    "select": "Select"
+    "select": "Select",
+    "saved": "Saved"
   },
   "auth": {
     "login": "Login",

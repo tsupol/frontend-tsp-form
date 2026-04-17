@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button, Input, Select } from 'tsp-form';
+import { Button, Input, Select, MaskedInput } from 'tsp-form';
 import { PiggyBank, XCircle, Loader2, Check } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { fmtCurrency } from '../contractUtils';
@@ -20,7 +20,7 @@ interface ContractTxn {
 
 interface Props { onClose: () => void }
 
-export function PanelSaving({ onClose }: Props) {
+export function PanelSaving({ onClose: _onClose }: Props) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { data, updateData, isReadOnly } = useWorkspace();
@@ -55,8 +55,8 @@ export function PanelSaving({ onClose }: Props) {
     }
   }, [data.contractId]);
 
-  const handleTargetChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = parseFloat(e.target.value) || 0;
+  const handleTargetChange = (raw: string) => {
+    const val = parseFloat(raw) || 0;
     updateData({ savingTargetAmount: val });
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => saveTarget(val), 1000);
@@ -146,8 +146,9 @@ export function PanelSaving({ onClose }: Props) {
         </div>
         <div className="flex flex-col">
           <label className="form-label">{t('workspace.savingTarget')}</label>
-          <Input
-            type="number"
+          <MaskedInput
+            mask="number"
+            decimalScale={0}
             value={String(data.savingTargetAmount || '')}
             onChange={handleTargetChange}
             size="sm"
@@ -202,10 +203,11 @@ export function PanelSaving({ onClose }: Props) {
                     />
                   </div>
                   <div className="input-group-divider" />
-                  <Input
-                    type="number"
+                  <MaskedInput
+                    mask="number"
+                    decimalScale={2}
                     value={amount}
-                    onChange={e => setAmount(e.target.value)}
+                    onChange={(raw) => setAmount(raw)}
                     placeholder="0"
                     size="sm"
                     className="w-full"
@@ -225,7 +227,6 @@ export function PanelSaving({ onClose }: Props) {
             </div>
             <div className="flex justify-end">
               <Button
-                size="sm"
                 color="primary"
                 onClick={() => mutation.mutate()}
                 disabled={!canSubmit}

@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, Select, Button, MobileHeader, Badge, Modal } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, XCircle, Loader2 } from 'lucide-react';
-import { apiClient } from '../../lib/api';
+import { ArrowLeft, ArrowRightFromLine, XCircle, Loader2, FileCheck } from 'lucide-react';
+import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 
@@ -25,7 +25,8 @@ import { PanelDelivery } from './workspace/PanelDelivery';
 import { PanelSaving } from './workspace/PanelSaving';
 import { CardContactRef } from './workspace/CardContactRef';
 import { PanelContactRef } from './workspace/PanelContactRef';
-import type { ModalId } from './workspace/WorkspaceTypes';
+import type { ModalId, ReadinessResult, BillOpenResult } from './workspace/WorkspaceTypes';
+import { ERROR_TO_MODAL } from './workspace/WorkspaceTypes';
 
 interface Branch {
   id: number;
@@ -41,6 +42,7 @@ function WorkspaceContent() {
   const dirtyRef = useRef(false);
   const loadedRef = useRef(false);
   const { data, updateData, resetData, openModal, setOpenModal, isPostPayment, panelDirtyRef, pendingModal, confirmPanelSwitch, cancelPanelSwitch } = useWorkspace();
+  const [shakingCards, setShakingCards] = useState<Set<string>>(new Set());
 
   const needsBranchSelect = !user?.branch_id;
 
@@ -311,14 +313,16 @@ function WorkspaceContent() {
                       </div>
                     )}
 
-                    <CardProductPlan onEdit={() => handleEditOpen('productPlan')} active={openModal === 'productPlan'} />
-                    <CardCustomer onEdit={() => handleEditOpen('customer')} active={openModal === 'customer'} />
-                    <CardSaving onEdit={() => handleEditOpen('saving')} active={openModal === 'saving'} />
-                    <CardContactRef onEdit={() => handleEditOpen('contactRef')} active={openModal === 'contactRef'} />
-                    <CardGuarantor onEdit={() => handleEditOpen('guarantor')} active={openModal === 'guarantor'} />
-                    <CardDocuments onEdit={() => handleEditOpen('documents')} active={openModal === 'documents'} />
+                    <CardProductPlan onEdit={() => handleEditOpen('productPlan')} active={openModal === 'productPlan'} shake={shakingCards.has('productPlan')} />
+                    <CardCustomer onEdit={() => handleEditOpen('customer')} active={openModal === 'customer'} shake={shakingCards.has('customer')} />
+                    <CardSaving onEdit={() => handleEditOpen('saving')} active={openModal === 'saving'} shake={shakingCards.has('saving')} />
+                    <CardContactRef onEdit={() => handleEditOpen('contactRef')} active={openModal === 'contactRef'} shake={shakingCards.has('contactRef')} />
+                    <CardGuarantor onEdit={() => handleEditOpen('guarantor')} active={openModal === 'guarantor'} shake={shakingCards.has('guarantor')} />
+                    <CardDocuments onEdit={() => handleEditOpen('documents')} active={openModal === 'documents'} shake={shakingCards.has('documents')} />
 
-
+                    {!data.billId && data.contractId && (
+                      <CreateBillButton contractId={data.contractId} onBillCreated={(bill) => updateData({ billId: bill.bill_id, billCode: bill.bill_code, billData: bill })} onShake={(cards) => { setShakingCards(cards); setTimeout(() => setShakingCards(new Set()), 600); }} />
+                    )}
                     {data.billId && !data.billConfirmed && <CardPayment />}
                     {data.billConfirmed && <CardPostPayment onEditDelivery={() => handleEditOpen('delivery')} />}
                   </div>
@@ -381,5 +385,68 @@ export function ContractWizardPage() {
     <WorkspaceProvider>
       <WorkspaceContent />
     </WorkspaceProvider>
+  );
+}
+
+// ── Create Bill button — validates readiness, shakes incomplete cards ──
+
+function CreateBillButton({ contractId, onBillCreated, onShake }: {
+  contractId: number;
+  onBillCreated: (bill: BillOpenResult) => void;
+  onShake: (cards: Set<string>) => void;
+}) {
+  const { t } = useTranslation();
+  const [loading, setLoading] = useState(false);
+  const [billError, setBillError] = useState('');
+
+  const handleClick = async () => {
+    setLoading(true);
+    setBillError('');
+    try {
+      const readiness = await apiClient.rpc<ReadinessResult>('fn_contract_validate_ready', {
+        p_contract_id: contractId,
+      });
+      if (!readiness.ready) {
+        // Collect unique card IDs from errors
+        const cards = new Set<string>();
+        for (const err of readiness.errors) {
+          const modal = ERROR_TO_MODAL[err.code];
+          if (modal) cards.add(modal);
+        }
+        onShake(cards);
+        return;
+      }
+      const bill = await apiClient.rpc<BillOpenResult>('fn_bill_contract_open', {
+        p_contract_id: contractId,
+      });
+      onBillCreated(bill);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setBillError(translated || err.message);
+      } else {
+        setBillError(String(err));
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      {billError && (
+        <div className="alert alert-danger"><XCircle size={18} /><div><div className="alert-description">{billError}</div></div></div>
+      )}
+      <Button
+        color="primary"
+        onClick={handleClick}
+        disabled={loading}
+        startIcon={loading ? <Loader2 size={16} className="animate-spin" /> : <FileCheck size={16} />}
+        className="w-full"
+      >
+        {loading ? t('common.loading') : t('workspace.createBill')}
+      </Button>
+    </div>
   );
 }

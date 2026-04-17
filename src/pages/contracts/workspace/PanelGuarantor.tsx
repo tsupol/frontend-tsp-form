@@ -1,13 +1,26 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
-import { Input, Select, Button, InputDatePicker, Checkbox } from 'tsp-form';
-import { ShieldAlert, CheckCircle, XCircle, Calendar, Search, Loader2, Trash2, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Input, Select, Button, InputDatePicker } from 'tsp-form';
+import type { UploadedImage } from 'tsp-form';
+import { ShieldAlert, CheckCircle, XCircle, Calendar, Search, Loader2, Trash2, AlertTriangle, CreditCard, PenLine, ChevronDown, ChevronRight, Plus } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
+import { uploadToS3 } from '../../../lib/upload';
 import { useWorkspace } from './WorkspaceContext';
 import { PanelSection } from './PanelSection';
 import { AddressFormPostal } from './AddressFormPostal';
+import { SingleUpload } from './SingleUpload';
 import type { CustomerRegisterResult, CustomerAddress } from './WorkspaceTypes';
+
+interface CustomerDocument {
+  id: number;
+  file_url: string;
+}
+
+interface ContractDocument {
+  id: number;
+  file_url: string;
+}
 
 const ID_TYPE_OPTIONS = [
   { value: 'CITIZEN_ID', label: 'Citizen ID' },
@@ -34,7 +47,10 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
   // ── Existing guarantors list ────────────────────────────────────────────
   const [removing, setRemoving] = useState<number | null>(null);
   const [removeError, setRemoveError] = useState('');
-  const [expandedGuarantor, setExpandedGuarantor] = useState<number | null>(null);
+  const [expandedGuarantor, setExpandedGuarantor] = useState<number | null>(
+    workspace.guarantors.length === 1 ? workspace.guarantors[0].customerId : null
+  );
+  const [showAddForm, setShowAddForm] = useState(workspace.guarantors.length === 0);
 
   const handleRemove = async (customerId: number) => {
     if (!workspace.contractId) return;
@@ -113,12 +129,10 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
 
   const attachGuarantor = async (custId: number, fullName: string, idNum: string) => {
     if (!workspace.contractId) return;
-    // Cannot add self as guarantor
     if (custId === workspace.customerId) {
       setApiError(t('workspace.guarantorCannotBeSelf'));
       return;
     }
-    // Check not already attached
     if (workspace.guarantors.some(g => g.customerId === custId)) {
       setApiError(t('workspace.guarantorAlreadyAttached'));
       return;
@@ -134,6 +148,8 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
         guarantorSkipped: false,
       });
       resetForm();
+      setShowAddForm(false);
+      setExpandedGuarantor(custId);
     } catch (err) {
       if (err instanceof ApiError) {
         const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
@@ -149,7 +165,6 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
       await attachGuarantor(selectedCustomer.id, selectedCustomer.full_name, selectedCustomer.id_number);
       return;
     }
-    // Register new
     if (idType === 'CITIZEN_ID' && idNumber.replace(/\D/g, '').length !== 13) {
       setApiError(t('workspace.citizenIdLength')); return;
     }
@@ -179,6 +194,7 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
   const canSearch = !!(idNumber.trim() || firstName.trim() || lastName.trim());
   const isExisting = !!selectedCustomer;
   const buttonLabel = isExisting ? t('workspace.useThisCustomer') : t('wizard.registerCustomer');
+  const hasGuarantors = workspace.guarantors.length > 0;
 
   return (
     <div className="p-4 flex flex-col max-w-2xl">
@@ -196,12 +212,14 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
           : undefined
         }
       >
-        {workspace.guarantors.length > 0 && (
+        {/* Existing guarantors — accordion */}
+        {hasGuarantors && (
           <div className="flex flex-col gap-2 mb-4">
             {workspace.guarantors.map(g => (
               <GuarantorRow
                 key={g.customerId}
                 guarantor={g}
+                contractId={workspace.contractId}
                 expanded={expandedGuarantor === g.customerId}
                 onToggle={() => setExpandedGuarantor(expandedGuarantor === g.customerId ? null : g.customerId)}
                 onRemove={() => handleRemove(g.customerId)}
@@ -211,141 +229,257 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
           </div>
         )}
 
-        <div className="p-3 rounded-md border border-dashed border-line">
-          {apiError && <div className="alert alert-danger mb-3"><XCircle size={18} /><div><div className="alert-description">{apiError}</div></div></div>}
-          {result?.action === 'BLOCK' && (
-            <div className="alert alert-danger"><ShieldAlert size={18} /><div><div className="alert-title">{t('wizard.blacklisted')}</div></div></div>
-          )}
+        {/* Add form — inline when no guarantors, expandable toggle when 1+ */}
+        {hasGuarantors && !showAddForm && (
+          <button
+            className="w-full flex items-center gap-2 px-3 py-2.5 border border-dashed border-line rounded-lg text-sm text-subtle hover:border-primary/40 hover:text-fg cursor-pointer transition-colors bg-transparent"
+            onClick={() => setShowAddForm(true)}
+          >
+            <Plus size={14} />
+            <span>{t('workspace.addGuarantor')}</span>
+          </button>
+        )}
 
-          <div className="form-grid gap-4">
-            <div className="flex gap-3">
-              <div className="flex flex-col" style={{ width: '10rem' }}>
-                <label className="form-label">{t('wizard.idType')}</label>
-                <Select options={ID_TYPE_OPTIONS} value={idType} onChange={(val) => setIdType((val as string) as 'CITIZEN_ID' | 'PASSPORT')} size="sm" disabled={!!selectedCustomer} />
+        {(showAddForm || !hasGuarantors) && (
+          <div className={hasGuarantors ? 'border border-line rounded-lg p-3' : 'p-3 rounded-md border border-dashed border-line'}>
+            {hasGuarantors && (
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-medium">{t('workspace.addGuarantor')}</span>
+                <button className="text-subtle hover:text-fg cursor-pointer bg-transparent border-none p-1" onClick={() => { setShowAddForm(false); resetForm(); }}>
+                  <XCircle size={16} />
+                </button>
               </div>
-              <div className="flex flex-col flex-1 min-w-0">
-                <label className="form-label">{t('wizard.idNumber')}</label>
-                <Input value={idNumber} onChange={(e) => setIdNumber(e.target.value)} size="sm" className="w-full" disabled={!!selectedCustomer} />
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <div className="flex flex-col" style={{ width: '7rem' }}>
-                <label className="form-label">{t('wizard.prefix')}</label>
-                <Select options={PREFIX_OPTIONS} value={prefix} onChange={(val) => setPrefix(val as string)} size="sm" clearable />
-              </div>
-              <div className="flex flex-col flex-1 min-w-0">
-                <label className="form-label">{t('wizard.firstName')}</label>
-                <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} size="sm" className="w-full" />
-              </div>
-              <div className="flex flex-col flex-1 min-w-0">
-                <label className="form-label">{t('wizard.lastName')}</label>
-                <Input value={lastName} onChange={(e) => setLastName(e.target.value)} size="sm" className="w-full" />
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <div className="flex flex-col flex-1 min-w-0">
-                <label className="form-label">{t('wizard.dateOfBirth')}</label>
-                <InputDatePicker value={dateOfBirth ? new Date(dateOfBirth + 'T00:00:00') : null} onChange={(date) => setDateOfBirth(date ? `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}` : '')} size="sm" endIcon={<Calendar size={16} />} calendar="gregorian" locale={i18n.language} />
-              </div>
-              <div className="flex flex-col flex-1 min-w-0">
-                <label className="form-label">{t('wizard.tel')}</label>
-                <Input value={tel} onChange={(e) => setTel(e.target.value)} placeholder="0xx-xxx-xxxx" size="sm" className="w-full" />
-              </div>
-            </div>
-          </div>
+            )}
 
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={handleSearch} disabled={searching || !canSearch} startIcon={searching ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}>
-              {t('workspace.checkCustomer')}
-            </Button>
-            <Button color={isExisting ? 'primary' : undefined} variant={isExisting ? undefined : 'outline'} size="sm" onClick={handleUseOrRegister} disabled={submitting || !idNumber.trim() || !firstName.trim() || !lastName.trim() || !tel.trim()} startIcon={submitting ? <Loader2 size={14} className="animate-spin" /> : undefined}>
-              {submitting ? t('common.saving') : buttonLabel}
-            </Button>
-          </div>
+            {apiError && <div className="alert alert-danger mb-3"><XCircle size={18} /><div><div className="alert-description">{apiError}</div></div></div>}
+            {result?.action === 'BLOCK' && (
+              <div className="alert alert-danger"><ShieldAlert size={18} /><div><div className="alert-title">{t('wizard.blacklisted')}</div></div></div>
+            )}
 
-          {hasSearched && (
-            <div className="flex flex-col gap-1 mt-3">
-              {searchResults.length > 0 ? (
-                <div className="border border-line rounded-lg divide-y divide-line overflow-hidden max-h-48 overflow-y-auto better-scroll">
-                  {searchResults.map(c => (
-                    <button key={c.id} className={`w-full text-left px-4 py-2.5 hover:bg-surface-hover transition-colors cursor-pointer flex items-center justify-between ${selectedCustomer?.id === c.id ? 'bg-primary/5 border-l-2 border-l-primary' : ''}`} onClick={() => handleSelectCustomer(c)}>
-                      <div>
-                        <div className="font-medium text-sm">{c.full_name}</div>
-                        <div className="text-xs text-subtle">{c.id_type}: {c.id_number} {c.tel ? `· ${c.tel}` : ''}</div>
-                      </div>
-                      {selectedCustomer?.id === c.id && <CheckCircle size={14} className="text-primary" />}
-                    </button>
-                  ))}
+            <div className="form-grid gap-4">
+              <div className="flex gap-3">
+                <div className="flex flex-col" style={{ width: '10rem' }}>
+                  <label className="form-label">{t('wizard.idType')}</label>
+                  <Select options={ID_TYPE_OPTIONS} value={idType} onChange={(val) => setIdType((val as string) as 'CITIZEN_ID' | 'PASSPORT')} size="sm" disabled={!!selectedCustomer} />
                 </div>
-              ) : !searching ? (
-                <div className="text-sm text-subtle text-center py-2">{t('workspace.noCustomerFound')}</div>
-              ) : null}
+                <div className="flex flex-col flex-1 min-w-0">
+                  <label className="form-label">{t('wizard.idNumber')}</label>
+                  <Input value={idNumber} onChange={(e) => setIdNumber(e.target.value)} size="sm" className="w-full" disabled={!!selectedCustomer} />
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <div className="flex flex-col" style={{ width: '7rem' }}>
+                  <label className="form-label">{t('wizard.prefix')}</label>
+                  <Select options={PREFIX_OPTIONS} value={prefix} onChange={(val) => setPrefix(val as string)} size="sm" clearable />
+                </div>
+                <div className="flex flex-col flex-1 min-w-0">
+                  <label className="form-label">{t('wizard.firstName')}</label>
+                  <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} size="sm" className="w-full" />
+                </div>
+                <div className="flex flex-col flex-1 min-w-0">
+                  <label className="form-label">{t('wizard.lastName')}</label>
+                  <Input value={lastName} onChange={(e) => setLastName(e.target.value)} size="sm" className="w-full" />
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <div className="flex flex-col flex-1 min-w-0">
+                  <label className="form-label">{t('wizard.dateOfBirth')}</label>
+                  <InputDatePicker value={dateOfBirth ? new Date(dateOfBirth + 'T00:00:00') : null} onChange={(date) => setDateOfBirth(date ? `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}` : '')} size="sm" endIcon={<Calendar size={16} />} calendar="gregorian" locale={i18n.language} />
+                </div>
+                <div className="flex flex-col flex-1 min-w-0">
+                  <label className="form-label">{t('wizard.tel')}</label>
+                  <Input value={tel} onChange={(e) => setTel(e.target.value)} placeholder="0xx-xxx-xxxx" size="sm" className="w-full" />
+                </div>
+              </div>
             </div>
-          )}
-        </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={handleSearch} disabled={searching || !canSearch} startIcon={searching ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}>
+                {t('workspace.checkCustomer')}
+              </Button>
+              <Button color={isExisting ? 'primary' : undefined} variant={isExisting ? undefined : 'outline'} onClick={handleUseOrRegister} disabled={submitting || !idNumber.trim() || !firstName.trim() || !lastName.trim() || !tel.trim()} startIcon={submitting ? <Loader2 size={14} className="animate-spin" /> : undefined}>
+                {submitting ? t('common.saving') : buttonLabel}
+              </Button>
+            </div>
+
+            {hasSearched && (
+              <div className="flex flex-col gap-1 mt-3">
+                {searchResults.length > 0 ? (
+                  <div className="border border-line rounded-lg divide-y divide-line overflow-hidden max-h-48 overflow-y-auto better-scroll">
+                    {searchResults.map(c => (
+                      <button key={c.id} className={`w-full text-left px-4 py-2.5 hover:bg-surface-hover transition-colors cursor-pointer flex items-center justify-between ${selectedCustomer?.id === c.id ? 'bg-primary/5 border-l-2 border-l-primary' : ''}`} onClick={() => handleSelectCustomer(c)}>
+                        <div>
+                          <div className="font-medium text-sm">{c.full_name}</div>
+                          <div className="text-xs text-subtle">{c.id_type}: {c.id_number} {c.tel ? `· ${c.tel}` : ''}</div>
+                        </div>
+                        {selectedCustomer?.id === c.id && <CheckCircle size={14} className="text-primary" />}
+                      </button>
+                    ))}
+                  </div>
+                ) : !searching ? (
+                  <div className="text-sm text-subtle text-center py-2">{t('workspace.noCustomerFound')}</div>
+                ) : null}
+              </div>
+            )}
+          </div>
+        )}
       </PanelSection>
     </div>
   );
 }
 
-// ── Guarantor row with expand for address ─────────────────────────────────
+// ── Guarantor row — accordion with chevron ────────────────────────────────
 
-function GuarantorRow({ guarantor, expanded, onToggle, onRemove, removing }: {
+function GuarantorRow({ guarantor, contractId, expanded, onToggle, onRemove, removing }: {
   guarantor: { customerId: number; fullName: string; idNumber: string };
+  contractId: number | null;
   expanded: boolean;
   onToggle: () => void;
   onRemove: () => void;
   removing: boolean;
 }) {
   const { t } = useTranslation();
-  const [useDifferentWorkAddress, setUseDifferentWorkAddress] = useState(false);
+  const queryClient = useQueryClient();
+  const [uploading, setUploading] = useState('');
+  const [cacheBust, setCacheBust] = useState(0);
+  const [confirmRemove, setConfirmRemove] = useState(false);
 
   const { data: addresses = [], refetch: refetchAddresses } = useQuery({
     queryKey: ['guarantor-addresses', guarantor.customerId],
     queryFn: () => apiClient.get<CustomerAddress[]>(`/v_customer_addresses?customer_id=eq.${guarantor.customerId}&order=address_type`),
-    enabled: expanded,
   });
-  const currentAddress = addresses.find(a => a.address_type === 'HOME');
+  const homeAddress = addresses.find(a => a.address_type === 'HOME');
   const workAddress = addresses.find(a => a.address_type === 'WORK');
 
+  const { data: idCardDocs = [] } = useQuery({
+    queryKey: ['guarantor-idcard', guarantor.customerId],
+    queryFn: () => apiClient.get<CustomerDocument[]>(
+      `/v_customer_documents?customer_id=eq.${guarantor.customerId}&doc_type=eq.ID_CARD_FRONT&is_active=eq.true&select=id,file_url`
+    ),
+  });
+
+  const { data: sigDocs = [] } = useQuery({
+    queryKey: ['guarantor-signature', contractId, guarantor.customerId],
+    queryFn: () => apiClient.get<ContractDocument[]>(
+      `/v_contract_documents?contract_id=eq.${contractId}&customer_id=eq.${guarantor.customerId}&doc_type=eq.SIGNATURE_PAD&select=id,file_url`
+    ),
+    enabled: !!contractId,
+  });
+
+  const idCard = idCardDocs[0] ?? null;
+  const signature = sigDocs[0] ?? null;
+  const isComplete = !!homeAddress && !!workAddress && !!idCard && !!signature;
+
+  const uploadIdCard = async (images: UploadedImage[]) => {
+    if (images.length === 0) return;
+    setUploading('ID_CARD');
+    try {
+      const img = images[0];
+      const ts = Date.now();
+      const key = `uploads/customers/${guarantor.customerId}/id-card-${ts}.webp`;
+      await uploadToS3(img.file, key);
+      await apiClient.rpc('fn_customer_document_upload', {
+        p_customer_id: guarantor.customerId,
+        p_doc_type: 'ID_CARD_FRONT',
+        p_file_url: `/${key}`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['guarantor-idcard', guarantor.customerId] });
+      setCacheBust(n => n + 1);
+    } catch {} finally { setUploading(''); }
+  };
+
+  const uploadSignature = async (images: UploadedImage[]) => {
+    if (!contractId || images.length === 0) return;
+    setUploading('SIGNATURE');
+    try {
+      const img = images[0];
+      const ts = Date.now();
+      const key = `uploads/contracts/${contractId}/signature-${guarantor.customerId}-${ts}.webp`;
+      await uploadToS3(img.file, key);
+      await apiClient.rpc('fn_contract_document_upload', {
+        p_contract_id: contractId,
+        p_doc_type: 'SIGNATURE_PAD',
+        p_file_url: `/${key}`,
+        p_customer_id: guarantor.customerId,
+      });
+      queryClient.invalidateQueries({ queryKey: ['guarantor-signature', contractId, guarantor.customerId] });
+      setCacheBust(n => n + 1);
+    } catch {} finally { setUploading(''); }
+  };
+
   return (
-    <div className="border border-success/30 rounded-lg overflow-hidden">
-      <div className="flex items-center gap-2 px-3 py-2.5">
-        <button className="flex-1 min-w-0 flex items-center gap-2 text-left cursor-pointer bg-transparent border-none text-current" onClick={onToggle}>
-          <ShieldCheck size={14} className="text-success shrink-0" />
-          <div className="min-w-0">
-            <div className="font-medium text-sm truncate">{guarantor.fullName}</div>
-            {guarantor.idNumber && <div className="text-xs text-subtle">{guarantor.idNumber}</div>}
+    <div className={`border rounded-lg overflow-hidden ${isComplete ? 'border-success/30' : 'border-warning/30'}`}>
+      <div className="flex items-center gap-2 px-3 py-2.5 cursor-pointer hover:bg-surface-hover transition-colors" onClick={onToggle}>
+        {expanded ? <ChevronDown size={14} className="text-subtle shrink-0" /> : <ChevronRight size={14} className="text-subtle shrink-0" />}
+        {isComplete
+          ? <CheckCircle size={14} className="text-success shrink-0" />
+          : <AlertTriangle size={14} className="text-warning shrink-0" />
+        }
+        <div className="flex-1 min-w-0">
+          <div className="font-medium text-sm truncate">{guarantor.fullName}</div>
+          {guarantor.idNumber && <div className="text-xs text-subtle">{guarantor.idNumber}</div>}
+        </div>
+        {confirmRemove ? (
+          <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+            <button
+              className="px-2 py-1 rounded text-xs font-medium bg-danger text-white hover:bg-danger/80 cursor-pointer border-none"
+              onClick={() => { setConfirmRemove(false); onRemove(); }}
+              disabled={removing}
+            >
+              {removing ? <Loader2 size={12} className="animate-spin" /> : t('common.confirm')}
+            </button>
+            <button
+              className="px-2 py-1 rounded text-xs text-subtle hover:text-fg cursor-pointer bg-transparent border-none"
+              onClick={() => setConfirmRemove(false)}
+            >
+              {t('common.cancel')}
+            </button>
           </div>
-        </button>
-        <button
-          className="p-1.5 rounded hover:bg-danger/10 cursor-pointer text-control-label hover:text-danger transition-colors bg-transparent border-none"
-          onClick={onRemove}
-          disabled={removing}
-          title={t('common.remove')}
-        >
-          {removing ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-        </button>
+        ) : (
+          <button
+            className="p-1.5 rounded hover:bg-danger/10 cursor-pointer text-control-label hover:text-danger transition-colors bg-transparent border-none"
+            onClick={(e) => { e.stopPropagation(); setConfirmRemove(true); }}
+            title={t('common.remove')}
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
       </div>
 
       {expanded && (
-        <div className="border-t border-line p-3 flex flex-col gap-4">
-          <div className="font-medium text-sm">{t('workspace.addressHome')}</div>
-          <AddressFormPostal customerId={guarantor.customerId} addressType="HOME" existing={currentAddress} onSuccess={() => refetchAddresses()} />
-
+        <div className="border-t border-line p-3 flex flex-col gap-6">
+          {/* HOME address */}
           <div>
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <Checkbox checked={useDifferentWorkAddress} onChange={(e) => setUseDifferentWorkAddress((e.target as HTMLInputElement).checked)} />
-              {t('workspace.useDifferentWorkAddress')}
-            </label>
+            <div className="font-medium text-sm mb-2">{t('workspace.addressHome')}</div>
+            <AddressFormPostal customerId={guarantor.customerId} addressType="HOME" existing={homeAddress} onSuccess={() => refetchAddresses()} />
           </div>
 
-          {useDifferentWorkAddress && (
-            <>
-              <div className="font-medium text-sm">{t('workspace.addressWork')}</div>
-              <AddressFormPostal customerId={guarantor.customerId} addressType="WORK" existing={workAddress} onSuccess={() => refetchAddresses()} />
-            </>
-          )}
+          {/* WORK address */}
+          <div>
+            <div className="font-medium text-sm mb-2">{t('workspace.addressWork')}</div>
+            <AddressFormPostal customerId={guarantor.customerId} addressType="WORK" existing={workAddress} onSuccess={() => refetchAddresses()} />
+          </div>
+
+          {/* Documents */}
+          <div className="border-t border-line pt-4 flex flex-col gap-4">
+            <SingleUpload
+              icon={<CreditCard size={14} />}
+              label={t('workspace.docIdPhoto')}
+              fileUrl={idCard?.file_url ?? null}
+              uploading={uploading === 'ID_CARD'}
+              onUpload={uploadIdCard}
+              cacheBust={cacheBust}
+            />
+            <SingleUpload
+              icon={<PenLine size={14} />}
+              label={t('workspace.docSignature')}
+              fileUrl={signature?.file_url ?? null}
+              uploading={uploading === 'SIGNATURE'}
+              onUpload={uploadSignature}
+              disabled={!contractId}
+              cacheBust={cacheBust}
+            />
+          </div>
         </div>
       )}
     </div>

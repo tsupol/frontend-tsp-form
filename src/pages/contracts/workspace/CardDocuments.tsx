@@ -15,7 +15,7 @@ function MiniCheck({ done, label }: { done: boolean; label: string }) {
   );
 }
 
-export function CardDocuments({ onEdit, active }: { onEdit?: () => void; active?: boolean }) {
+export function CardDocuments({ onEdit, active, shake }: { onEdit?: () => void; active?: boolean; shake?: boolean }) {
   const { t } = useTranslation();
   const { data, getCardStatus, isReadOnly } = useWorkspace();
   const status = getCardStatus('documents');
@@ -26,6 +26,7 @@ export function CardDocuments({ onEdit, active }: { onEdit?: () => void; active?
       status={status}
       onEdit={status !== 'locked' ? onEdit : undefined}
       active={active}
+      shake={shake}
       disabled={isReadOnly}
     >
       {status === 'locked' ? (
