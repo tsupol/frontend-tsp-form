@@ -96,6 +96,8 @@ export interface CustomerAddress {
   id: number;
   customer_id: number;
   address_type: string;
+  label: string | null;
+  is_default: boolean;
   address_line1: string;
   address_line2: string | null;
   soi: string | null;
@@ -104,6 +106,9 @@ export interface CustomerAddress {
   district: string;
   province: string;
   postal_code: string;
+  recipient_name: string | null;
+  recipient_tel: string | null;
+  note: string | null;
 }
 
 export interface CustomerContact {
@@ -229,7 +234,7 @@ export interface WorkspaceData {
   customerName: string;
   customerResult: CustomerRegisterResult | null;
   customerDateOfBirth: string | null;
-  customerAddresses: { current: boolean; work: boolean };
+  customerAddresses: { home: boolean; work: boolean; shipping: boolean };
   customerContactCount: number;
   customerReferenceCount: number;
 
@@ -241,8 +246,6 @@ export interface WorkspaceData {
   hasIdPhoto: boolean;
   hasSignature: boolean;
   evidenceCount: number;
-  hasShippingAddress: boolean;
-
   // Draft
   contractId: number | null;
   contractCode: string;

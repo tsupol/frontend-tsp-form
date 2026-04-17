@@ -27,7 +27,7 @@ interface SearchResult {
 
 interface Props { onClose: () => void }
 
-export function PanelGuarantor({ onClose }: Props) { // eslint-disable-line @typescript-eslint/no-unused-vars
+export function PanelGuarantor({ onClose: _onClose }: Props) {
   const { t, i18n } = useTranslation();
   const { data: workspace, updateData } = useWorkspace();
 
@@ -264,7 +264,7 @@ export function PanelGuarantor({ onClose }: Props) { // eslint-disable-line @typ
           </div>
 
           {hasSearched && (
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1 mt-3">
               {searchResults.length > 0 ? (
                 <div className="border border-line rounded-lg divide-y divide-line overflow-hidden max-h-48 overflow-y-auto better-scroll">
                   {searchResults.map(c => (
@@ -305,7 +305,7 @@ function GuarantorRow({ guarantor, expanded, onToggle, onRemove, removing }: {
     queryFn: () => apiClient.get<CustomerAddress[]>(`/v_customer_addresses?customer_id=eq.${guarantor.customerId}&order=address_type`),
     enabled: expanded,
   });
-  const currentAddress = addresses.find(a => a.address_type === 'CURRENT');
+  const currentAddress = addresses.find(a => a.address_type === 'HOME');
   const workAddress = addresses.find(a => a.address_type === 'WORK');
 
   return (
@@ -330,8 +330,8 @@ function GuarantorRow({ guarantor, expanded, onToggle, onRemove, removing }: {
 
       {expanded && (
         <div className="border-t border-line p-3 flex flex-col gap-4">
-          <div className="font-medium text-sm">{t('workspace.addressCurrent')}</div>
-          <AddressFormPostal customerId={guarantor.customerId} addressType="CURRENT" existing={currentAddress} onSuccess={() => refetchAddresses()} />
+          <div className="font-medium text-sm">{t('workspace.addressHome')}</div>
+          <AddressFormPostal customerId={guarantor.customerId} addressType="HOME" existing={currentAddress} onSuccess={() => refetchAddresses()} />
 
           <div>
             <label className="flex items-center gap-2 text-sm cursor-pointer">

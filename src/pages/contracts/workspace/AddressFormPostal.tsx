@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { Input, Select, Button, FormErrorMessage } from 'tsp-form';
@@ -8,7 +8,7 @@ import type { PostalLookup, CustomerAddress } from './WorkspaceTypes';
 
 interface Props {
   customerId: number;
-  addressType: 'CURRENT' | 'WORK';
+  addressType: 'HOME' | 'WORK' | 'SHIPPING';
   existing?: CustomerAddress;
   onSuccess: () => void;
 }
@@ -16,7 +16,9 @@ interface Props {
 export function AddressFormPostal({ customerId, addressType, existing, onSuccess }: Props) {
   const { t } = useTranslation();
 
-  const { register, handleSubmit, formState: { errors }, watch, setValue } = useForm({
+  const isShipping = addressType === 'SHIPPING';
+
+  const { register, handleSubmit, formState: { errors }, watch, setValue, reset } = useForm({
     defaultValues: {
       address_line1: existing?.address_line1 ?? '',
       address_line2: existing?.address_line2 ?? '',
@@ -26,8 +28,32 @@ export function AddressFormPostal({ customerId, addressType, existing, onSuccess
       sub_district: existing?.sub_district ?? '',
       district: existing?.district ?? '',
       province: existing?.province ?? '',
+      recipient_name: existing?.recipient_name ?? '',
+      recipient_tel: existing?.recipient_tel ?? '',
+      note: existing?.note ?? '',
     },
   });
+
+  // Sync form when existing data arrives after mount (async query)
+  const loadedId = useRef<number | undefined>(existing?.id);
+  useEffect(() => {
+    if (existing && existing.id !== loadedId.current) {
+      loadedId.current = existing.id;
+      reset({
+        address_line1: existing.address_line1 ?? '',
+        address_line2: existing.address_line2 ?? '',
+        soi: existing.soi ?? '',
+        road: existing.road ?? '',
+        postal_code: existing.postal_code ?? '',
+        sub_district: existing.sub_district ?? '',
+        district: existing.district ?? '',
+        province: existing.province ?? '',
+        recipient_name: existing.recipient_name ?? '',
+        recipient_tel: existing.recipient_tel ?? '',
+        note: existing.note ?? '',
+      });
+    }
+  }, [existing, reset]);
 
   register('sub_district', { required: t('common.required') });
   register('district', { required: t('common.required') });
@@ -78,6 +104,10 @@ export function AddressFormPostal({ customerId, addressType, existing, onSuccess
         p_district: data.district.trim(),
         p_province: data.province.trim(),
         p_postal_code: data.postal_code.trim(),
+        p_recipient_name: isShipping ? (data.recipient_name.trim() || null) : null,
+        p_recipient_tel: isShipping ? (data.recipient_tel.trim() || null) : null,
+        p_note: data.note.trim() || null,
+        p_id: existing?.id ?? null,
       });
       onSuccess();
     } catch (err) {
@@ -149,6 +179,24 @@ export function AddressFormPostal({ customerId, addressType, existing, onSuccess
             <FormErrorMessage error={errors.province} />
           </div>
         </div>
+        {isShipping && (
+          <>
+            <div className="flex gap-3">
+              <div className="flex flex-col flex-1">
+                <label className="form-label">{t('customer.recipientName')}</label>
+                <Input size="sm" className="w-full" {...register('recipient_name')} />
+              </div>
+              <div className="flex flex-col flex-1">
+                <label className="form-label">{t('customer.recipientTel')}</label>
+                <Input size="sm" className="w-full" {...register('recipient_tel')} />
+              </div>
+            </div>
+            <div className="flex flex-col">
+              <label className="form-label">{t('customer.note')}</label>
+              <Input size="sm" className="w-full" {...register('note')} />
+            </div>
+          </>
+        )}
       </div>
       <div className="flex justify-end">
         <Button size="sm" color="primary" type="submit" disabled={saving}>

@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, Button, Input } from 'tsp-form';
+import { Modal, Button } from 'tsp-form';
 import { ImageUploader } from 'tsp-form';
 import type { UploadedImage } from 'tsp-form';
 import { CheckCircle, XCircle, CreditCard } from 'lucide-react';
-import { apiClient, ApiError } from '../../../lib/api';
+import { apiClient } from '../../../lib/api';
 import { uploadToS3 } from '../../../lib/upload';
 import { imageConfig } from '../../../config/config';
 import { useWorkspace } from './WorkspaceContext';
@@ -25,11 +25,6 @@ export function ModalDocuments({ open, onClose }: Props) {
   const [uploading, setUploading] = useState('');
   const [error, setError] = useState('');
 
-  // Shipping address
-  const [recipientName, setRecipientName] = useState('');
-  const [recipientTel, setRecipientTel] = useState('');
-  const [shippingNote, setShippingNote] = useState('');
-  const [savingShipping, setSavingShipping] = useState(false);
 
   const handleIdPhotoUpload = async (images: UploadedImage[]) => {
     if (!contractId || images.length === 0) return;
@@ -127,28 +122,7 @@ export function ModalDocuments({ open, onClose }: Props) {
     }
   };
 
-  const handleSaveShipping = async () => {
-    if (!contractId) return;
-    setSavingShipping(true);
-    setError('');
-    try {
-      await apiClient.rpc('fn_contract_shipping_address_upsert', {
-        p_contract_id: contractId,
-        p_recipient_name: recipientName.trim() || null,
-        p_recipient_tel: recipientTel.trim() || null,
-        p_note: shippingNote.trim() || null,
-      });
-      updateData({ hasShippingAddress: true });
-    } catch (err) {
-      if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
-        setError(translated || err.message);
-      } else setError(String(err));
-    } finally {
-      setSavingShipping(false);
-    }
-  };
+
 
   if (!contractId) return null;
 
@@ -217,36 +191,6 @@ export function ModalDocuments({ open, onClose }: Props) {
             />
           </div>
 
-          <div className="border-t border-line" />
-
-          {/* Shipping Address */}
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              {workspace.hasShippingAddress ? <CheckCircle size={14} className="text-success" /> : <span className="w-3.5 h-3.5 rounded-full border-2 border-fg/30" />}
-              <label className="form-label mb-0">{t('workspace.docShipping')}</label>
-            </div>
-            <div className="form-grid gap-3">
-              <div className="flex gap-3">
-                <div className="flex flex-col flex-1">
-                  <label className="form-label text-xs">{t('workspace.recipientName')}</label>
-                  <Input size="sm" value={recipientName} onChange={e => setRecipientName(e.target.value)} className="w-full" />
-                </div>
-                <div className="flex flex-col flex-1">
-                  <label className="form-label text-xs">{t('workspace.recipientTel')}</label>
-                  <Input size="sm" value={recipientTel} onChange={e => setRecipientTel(e.target.value)} className="w-full" />
-                </div>
-              </div>
-              <div className="flex flex-col">
-                <label className="form-label text-xs">{t('workspace.shippingNote')}</label>
-                <Input size="sm" value={shippingNote} onChange={e => setShippingNote(e.target.value)} className="w-full" />
-              </div>
-            </div>
-            <div className="flex justify-end mt-2">
-              <Button size="sm" color="primary" onClick={handleSaveShipping} disabled={savingShipping}>
-                {savingShipping ? t('common.loading') : t('common.save')}
-              </Button>
-            </div>
-          </div>
         </div>
       </div>
       <div className="modal-footer">

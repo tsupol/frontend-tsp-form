@@ -1,13 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
-  DataTable, DataTableColumnHeader, Button, Input, InputDatePicker, Select, TextArea,
+  DataTable, DataTableColumnHeader, Button, Input, InputDatePicker, Select,
   Badge, Drawer, Modal, MobileHeader, FormErrorMessage, useSnackbarContext,
   type ColumnDef, type RowExpansionState, type SortingState,
 } from 'tsp-form';
-import { ArrowRightFromLine, Calendar, CheckCircle, XCircle, Pencil, Plus, Trash2, Star } from 'lucide-react';
+import { ArrowRightFromLine, Calendar, CheckCircle, XCircle, Trash2, Star } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { ContractDetailPanel } from '../contracts/ContractDetailPanel';
@@ -348,7 +348,7 @@ function CustomerDrawer({ customer, open, onClose, onUpdated }: {
     queryClient.invalidateQueries({ queryKey: ['customer-references', customerId] });
   };
 
-  const currentAddress = addresses.find(a => a.address_type === 'CURRENT');
+  const homeAddress = addresses.find(a => a.address_type === 'HOME');
   const workAddress = addresses.find(a => a.address_type === 'WORK');
 
   return (
@@ -401,12 +401,12 @@ function CustomerDrawer({ customer, open, onClose, onUpdated }: {
 
               {/* Current address */}
               <AddressCard
-                label={t('customer.addressCurrent')}
-                address={currentAddress}
-                editing={editingAddress === 'CURRENT'}
-                onEdit={() => setEditingAddress(editingAddress === 'CURRENT' ? null : 'CURRENT')}
+                label={t('customer.addressHome')}
+                address={homeAddress}
+                editing={editingAddress === 'HOME'}
+                onEdit={() => setEditingAddress(editingAddress === 'HOME' ? null : 'HOME')}
                 customerId={customer.id}
-                addressType="CURRENT"
+                addressType="HOME"
                 onSaved={() => {
                   setEditingAddress(null);
                   refreshAll();
@@ -898,7 +898,6 @@ function ContactForm({ customerId, onSuccess }: { customerId: number; onSuccess:
 // ── Contact Row ─────────────────────────────────────────────────────────────
 
 function ContactRow({ contact, onDeleted }: { contact: CustomerContact; onDeleted: () => void }) {
-  const { t } = useTranslation();
   const [deleting, setDeleting] = useState(false);
 
   const handleDelete = async () => {

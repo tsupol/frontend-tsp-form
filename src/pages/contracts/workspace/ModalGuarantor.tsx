@@ -55,7 +55,7 @@ export function ModalGuarantor({ open, onClose }: Props) {
     enabled: !!guarantorId,
   });
 
-  const currentAddress = addresses.find(a => a.address_type === 'CURRENT');
+  const currentAddress = addresses.find(a => a.address_type === 'HOME');
   const workAddress = addresses.find(a => a.address_type === 'WORK');
 
   const handleRegister = async () => {
@@ -193,10 +193,10 @@ export function ModalGuarantor({ open, onClose }: Props) {
                 onClick={() => setShowAddressCurrent(!showAddressCurrent)}
               >
                 {currentAddress ? <CheckCircle size={14} className="text-success" /> : <span className="w-3.5 h-3.5 rounded-full border-2 border-fg/30" />}
-                <span className="flex-1">{t('workspace.addressCurrent')}</span>
+                <span className="flex-1">{t('workspace.addressHome')}</span>
               </button>
               {showAddressCurrent && (
-                <AddressFormPostal customerId={guarantorId} addressType="CURRENT" existing={currentAddress} onSuccess={() => { refetchAddresses(); setShowAddressCurrent(false); }} />
+                <AddressFormPostal customerId={guarantorId} addressType="HOME" existing={currentAddress} onSuccess={() => { refetchAddresses(); setShowAddressCurrent(false); }} />
               )}
 
               <button

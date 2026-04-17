@@ -13,6 +13,7 @@
 - **Navigation guard pattern** — see `.claude/nav-guard-pattern.md` for protecting unsaved changes on editor pages
 - **MCP API debugging** — when calling RPCs via the `dev-api` MCP, read `.claude/mcp-api-debug.md` before assuming any RPC is missing or renamed (PGRST202 with a hint means wrong params, not missing function)
 - **Stale backend docs** — `UI_SUMMARY/` docs can drift from the running API. Before trusting documented flows/RPCs, check `.claude/stale-backend-docs.md` for known discrepancies. Full findings are filed in `D:/dev/nnf/UI_FEEDBACK/YYYY-MM-DD_topic.md`.
+- **Playwright MCP** — before using Playwright, read `.claude/playwright-guide.md` for login shortcuts and performance rules (use `browser_run_code` to batch actions, `browser_snapshot` not screenshots)
 
 ## tsp-form Component Usage
 
@@ -55,6 +56,8 @@ When using tsp-form components, follow this lookup order:
 - OpenAPI doc available at root endpoint
 - Backend is PostgREST (in development, may change)
 - Backend repo: `https://github.com/czynet/nnf` — cloned at `D:\dev\nnf` (pull before reading)
+- **Misc Go service** (`D:\dev\nnf-misc-go`): file upload microservice at `misc.ecap.cc`. Uses `nnf-system-bucket` in `ap-southeast-1`. Key routes: `POST /api/v1/upload/s3` (upload), `DELETE /api/v1/delete/s3` (batch delete, body: `{files: [key1, key2]}`), `GET /api/v1/list/s3?prefix=...`. See `D:\dev\nnf-misc-go\.claude\API.md` for full reference.
+- **Misc Infrastructure** (`D:\dev\nnf-misc-infrastructure`): Traefik reverse proxy with auto Let's Encrypt SSL. Server: `nnfsup@103.208.24.76`.
 - **Views:** Read endpoints use `v_[table_name]` views (e.g. `/v_users`), returns plain arrays (no v2 envelope)
 - **Writes:** Mutations use RPC functions (e.g. `/rpc/user_create`, `/rpc/user_update`)
 - **Pagination:** PostgREST `Range` / `Content-Range` headers with `Prefer: count=exact`

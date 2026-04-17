@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Modal, Input, Select, Button, InputDatePicker, Badge } from 'tsp-form';
-import { AlertTriangle, ShieldAlert, CheckCircle, XCircle, Calendar, ChevronDown, ChevronRight, Plus, Trash2, Star } from 'lucide-react';
+import { AlertTriangle, ShieldAlert, CheckCircle, XCircle, Calendar, ChevronDown, ChevronRight, Plus, Trash2, Star, Info } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { useWorkspace } from './WorkspaceContext';
 import { AddressFormPostal } from './AddressFormPostal';
@@ -54,8 +54,9 @@ export function ModalCustomer({ open, onClose }: Props) {
   const customerId = workspace.customerId;
 
   // Expandable sections
-  const [showAddressCurrent, setShowAddressCurrent] = useState(false);
+  const [showAddressHome, setShowAddressHome] = useState(false);
   const [showAddressWork, setShowAddressWork] = useState(false);
+  const [showAddressShipping, setShowAddressShipping] = useState(false);
   const [showContacts, setShowContacts] = useState(false);
   const [showReferences, setShowReferences] = useState(false);
 
@@ -80,8 +81,9 @@ export function ModalCustomer({ open, onClose }: Props) {
     enabled: !!customerId,
   });
 
-  const currentAddress = addresses.find(a => a.address_type === 'CURRENT');
+  const homeAddress = addresses.find(a => a.address_type === 'HOME');
   const workAddress = addresses.find(a => a.address_type === 'WORK');
+  const shippingAddress = addresses.find(a => a.address_type === 'SHIPPING');
 
   // Validation
   const errors: Record<string, string> = {};
@@ -129,15 +131,18 @@ export function ModalCustomer({ open, onClose }: Props) {
     }
   };
 
-  const handleAddressSuccess = (type: 'CURRENT' | 'WORK') => {
+  const handleAddressSuccess = (type: 'HOME' | 'WORK' | 'SHIPPING') => {
     refetchAddresses();
     const updatedAddresses = { ...workspace.customerAddresses };
-    if (type === 'CURRENT') {
-      updatedAddresses.current = true;
-      setShowAddressCurrent(false);
-    } else {
+    if (type === 'HOME') {
+      updatedAddresses.home = true;
+      setShowAddressHome(false);
+    } else if (type === 'WORK') {
       updatedAddresses.work = true;
       setShowAddressWork(false);
+    } else {
+      updatedAddresses.shipping = true;
+      setShowAddressShipping(false);
     }
     updateData({ customerAddresses: updatedAddresses });
   };
@@ -160,7 +165,7 @@ export function ModalCustomer({ open, onClose }: Props) {
   const handleClose = () => {
     // Sync final counts
     updateData({
-      customerAddresses: { current: !!currentAddress, work: !!workAddress },
+      customerAddresses: { home: !!homeAddress, work: !!workAddress, shipping: !!shippingAddress },
       customerContactCount: contacts.length,
       customerReferenceCount: references.length,
     });
@@ -263,18 +268,18 @@ export function ModalCustomer({ open, onClose }: Props) {
             <>
               <div className="border-t border-line" />
 
-              {/* Address: CURRENT */}
+              {/* Address: HOME */}
               <ExpandableSection
-                title={t('workspace.addressCurrent')}
-                done={!!currentAddress}
-                expanded={showAddressCurrent}
-                onToggle={() => setShowAddressCurrent(!showAddressCurrent)}
+                title={t('workspace.addressHome')}
+                done={!!homeAddress}
+                expanded={showAddressHome}
+                onToggle={() => setShowAddressHome(!showAddressHome)}
               >
                 <AddressFormPostal
                   customerId={customerId}
-                  addressType="CURRENT"
-                  existing={currentAddress}
-                  onSuccess={() => handleAddressSuccess('CURRENT')}
+                  addressType="HOME"
+                  existing={homeAddress}
+                  onSuccess={() => handleAddressSuccess('HOME')}
                 />
               </ExpandableSection>
 
@@ -290,6 +295,25 @@ export function ModalCustomer({ open, onClose }: Props) {
                   addressType="WORK"
                   existing={workAddress}
                   onSuccess={() => handleAddressSuccess('WORK')}
+                />
+              </ExpandableSection>
+
+              {/* Address: SHIPPING */}
+              <ExpandableSection
+                title={t('workspace.addressShipping')}
+                done={!!shippingAddress}
+                expanded={showAddressShipping}
+                onToggle={() => setShowAddressShipping(!showAddressShipping)}
+              >
+                <div className="alert alert-info mb-3">
+                  <Info size={16} />
+                  <div><div className="alert-description">{t('workspace.shippingAddressHint')}</div></div>
+                </div>
+                <AddressFormPostal
+                  customerId={customerId}
+                  addressType="SHIPPING"
+                  existing={shippingAddress}
+                  onSuccess={() => handleAddressSuccess('SHIPPING')}
                 />
               </ExpandableSection>
 

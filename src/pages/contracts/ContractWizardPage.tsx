@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
@@ -69,11 +69,14 @@ function WorkspaceContent() {
         const stepWorkspace = (c.step_data?.WORKSPACE as { modelId?: number; variantId?: number; selectedQuote?: unknown } | undefined);
 
         // Fetch customer + guarantor details
-        let customerAddresses = { current: false, work: false };
+        let customerAddresses = { home: false, work: false, shipping: false };
         let customerContactCount = 0;
         let customerReferenceCount = 0;
         let customerDateOfBirth: string | null = null;
         let guarantors: Array<{ customerId: number; fullName: string; idNumber: string }> = [];
+        let hasIdPhoto = false;
+        let hasSignature = false;
+        let evidenceCount = 0;
 
         const fetches: Promise<void>[] = [];
 
@@ -84,17 +87,31 @@ function WorkspaceContent() {
               apiClient.get<Array<{ id: number }>>(`/v_customer_contacts?customer_id=eq.${c.customer_id}&select=id`).catch(() => []),
               apiClient.get<Array<{ id: number }>>(`/v_customer_references?customer_id=eq.${c.customer_id}&select=id`).catch(() => []),
               apiClient.get<Array<{ date_of_birth: string | null }>>(`/v_customers?id=eq.${c.customer_id}&select=date_of_birth`).catch(() => []),
-            ]).then(([addrs, contacts, refs, custs]) => {
+              apiClient.get<Array<{ id: number }>>(`/v_customer_documents?customer_id=eq.${c.customer_id}&doc_type=eq.ID_CARD_FRONT&is_active=eq.true&select=id`).catch(() => []),
+            ]).then(([addrs, contacts, refs, custs, customerIdCards]) => {
               customerAddresses = {
-                current: addrs.some(a => a.address_type === 'CURRENT'),
+                home: addrs.some(a => a.address_type === 'HOME'),
                 work: addrs.some(a => a.address_type === 'WORK'),
+                shipping: addrs.some(a => a.address_type === 'SHIPPING'),
               };
               customerContactCount = contacts.length;
               customerReferenceCount = refs.length;
               customerDateOfBirth = custs[0]?.date_of_birth ?? null;
+              hasIdPhoto = customerIdCards.length > 0;
             })
           );
         }
+
+        // Fetch contract documents (SIGNATURE_PAD) + media (ATTACHMENT)
+        fetches.push(
+          Promise.all([
+            apiClient.get<Array<{ id: number }>>(`/v_contract_documents?contract_id=eq.${c.id}&doc_type=eq.SIGNATURE_PAD&select=id`).catch(() => []),
+            apiClient.get<Array<{ usage_type: string }>>(`/v_entity_media?entity_type=eq.CONTRACT&entity_id=eq.${c.id}&usage_type=eq.ATTACHMENT&select=usage_type`).catch(() => []),
+          ]).then(([sigDocs, mediaList]) => {
+            hasSignature = sigDocs.length > 0;
+            evidenceCount = mediaList.length;
+          })
+        );
 
         // Fetch guarantors
         fetches.push(
@@ -156,6 +173,9 @@ function WorkspaceContent() {
           selectedQuote: (stepWorkspace?.selectedQuote as import('./workspace/WorkspaceTypes').Quote | undefined) ?? null,
           savingBalance: c.saving_balance ?? 0,
           savingTargetAmount: stepSaving?.saving_target_amount ?? c.saving_target_amount ?? 0,
+          hasIdPhoto,
+          hasSignature,
+          evidenceCount,
         });
       } catch {
         // ignore load errors
@@ -173,14 +193,6 @@ function WorkspaceContent() {
   useEffect(() => {
     navGuard?.setDirtyRef(dirtyRef);
   }, [navGuard]);
-
-  const handleExit = useCallback(() => {
-    if (dirtyRef.current) {
-      navGuard?.guardedNavigate('/admin/contracts/search');
-    } else {
-      navigate('/admin/contracts/search');
-    }
-  }, [navigate, navGuard]);
 
   // Fetch branches for users without branch_id
   const { data: branches } = useQuery({

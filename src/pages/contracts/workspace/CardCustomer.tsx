@@ -6,7 +6,7 @@ import { SummaryCard } from './SummaryCard';
 export function CardCustomer({ onEdit, active }: { onEdit?: () => void; active?: boolean }) {
   const { t } = useTranslation();
   const { data, getCardStatus, isReadOnly } = useWorkspace();
-  const status = data.customerId ? 'complete' as const : 'empty' as const;
+  const status = getCardStatus('customer');
 
   return (
     <SummaryCard

@@ -1,13 +1,20 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Input, Select, Button, InputDatePicker, Checkbox, Modal } from 'tsp-form';
-import { ShieldAlert, AlertTriangle, CheckCircle, XCircle, Calendar, Search, Loader2 } from 'lucide-react';
+import { Input, Select, Button, InputDatePicker, Modal, MaskedInput } from 'tsp-form';
+import { ShieldAlert, AlertTriangle, CheckCircle, XCircle, Calendar, Search, Loader2, Info } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { useWorkspace } from './WorkspaceContext';
 import { PanelSection } from './PanelSection';
 import { AddressFormPostal } from './AddressFormPostal';
 import type { CustomerRegisterResult, CustomerAddress } from './WorkspaceTypes';
+
+const thaiPhoneMask = (digits: string) => {
+  if (digits.startsWith('02')) return '##-###-####';
+  const prefix = digits.slice(0, 2);
+  if (['03','04','05','07'].includes(prefix)) return '###-###-###';
+  return '###-###-####'; // mobile 06x, 08x, 09x
+};
 
 const ID_TYPE_OPTIONS = [
   { value: 'CITIZEN_ID', label: 'Citizen ID' },
@@ -86,7 +93,7 @@ function compareFields(original: CustomerSnapshot, current: CustomerSnapshot): {
 
 interface Props { onClose: () => void }
 
-export function PanelCustomer({ onClose }: Props) {
+export function PanelCustomer({ onClose: _onClose }: Props) {
   const { t, i18n } = useTranslation();
   const { data: workspace, updateData, setPanelDirty } = useWorkspace();
 
@@ -138,7 +145,6 @@ export function PanelCustomer({ onClose }: Props) {
   const [confirmData, setConfirmData] = useState<FieldComparison[] | null>(null);
 
   // Address
-  const [useDifferentWorkAddress, setUseDifferentWorkAddress] = useState(false);
   const customerId = workspace.customerId;
 
   const { data: addresses = [], refetch: refetchAddresses } = useQuery({
@@ -146,12 +152,10 @@ export function PanelCustomer({ onClose }: Props) {
     queryFn: () => apiClient.get<CustomerAddress[]>(`/v_customer_addresses?customer_id=eq.${customerId}&order=address_type`),
     enabled: !!customerId,
   });
-  const currentAddress = addresses.find(a => a.address_type === 'CURRENT');
+  const homeAddress = addresses.find(a => a.address_type === 'HOME');
   const workAddress = addresses.find(a => a.address_type === 'WORK');
+  const shippingAddress = addresses.find(a => a.address_type === 'SHIPPING');
 
-  useEffect(() => {
-    if (workAddress) setUseDifferentWorkAddress(true);
-  }, [workAddress]);
 
   // Dirty tracking — compare against loaded snapshot, not just non-empty
   useEffect(() => {
@@ -283,11 +287,12 @@ export function PanelCustomer({ onClose }: Props) {
     setPanelDirty(false);
   };
 
-  const handleAddressSuccess = (type: 'CURRENT' | 'WORK') => {
+  const handleAddressSuccess = (type: 'HOME' | 'WORK' | 'SHIPPING') => {
     refetchAddresses();
     const updated = { ...workspace.customerAddresses };
-    if (type === 'CURRENT') updated.current = true;
-    else updated.work = true;
+    if (type === 'HOME') updated.home = true;
+    else if (type === 'WORK') updated.work = true;
+    else updated.shipping = true;
     updateData({ customerAddresses: updated });
   };
 
@@ -309,7 +314,11 @@ export function PanelCustomer({ onClose }: Props) {
           </div>
           <div className="flex flex-col flex-1 min-w-0">
             <label className="form-label">{t('wizard.idNumber')}</label>
-            <Input value={idNumber} onChange={(e) => setIdNumber(e.target.value)} placeholder={idType === 'CITIZEN_ID' ? '13 digits' : 'Passport number'} size="sm" className="w-full" disabled={!!selectedCustomer} />
+            {idType === 'CITIZEN_ID' ? (
+              <MaskedInput mask="#-####-#####-##-#" value={idNumber} onChange={(raw) => setIdNumber(raw)} size="sm" className="w-full" disabled={!!selectedCustomer} />
+            ) : (
+              <Input value={idNumber} onChange={(e) => setIdNumber(e.target.value)} placeholder="Passport number" size="sm" className="w-full" disabled={!!selectedCustomer} />
+            )}
           </div>
         </div>
         <div className="flex gap-3">
@@ -333,11 +342,11 @@ export function PanelCustomer({ onClose }: Props) {
           </div>
           <div className="flex flex-col flex-1 min-w-0">
             <label className="form-label">{t('wizard.tel')}</label>
-            <Input value={tel} onChange={(e) => setTel(e.target.value)} placeholder="0xx-xxx-xxxx" size="sm" className="w-full" />
+            <MaskedInput dynamicMask={thaiPhoneMask} value={tel} onChange={(raw) => setTel(raw)} placeholder="0X-XXX-XXXX" size="sm" className="w-full" />
           </div>
           <div className="flex flex-col flex-1 min-w-0">
             <label className="form-label">{t('wizard.tel2')}</label>
-            <Input value={tel2} onChange={(e) => setTel2(e.target.value)} size="sm" className="w-full" />
+            <MaskedInput dynamicMask={thaiPhoneMask} value={tel2} onChange={(raw) => setTel2(raw)} size="sm" className="w-full" />
           </div>
         </div>
       </div>
@@ -365,7 +374,7 @@ export function PanelCustomer({ onClose }: Props) {
 
       {/* Search results — always visible */}
       {hasSearched && (
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1 mt-3">
           {searchResults.length > 0 ? (
             <div className="border border-line rounded-lg divide-y divide-line overflow-hidden max-h-48 overflow-y-auto better-scroll">
               {searchResults.map(c => (
@@ -392,31 +401,36 @@ export function PanelCustomer({ onClose }: Props) {
 
       {/* Address — disabled until customer attached */}
       <div className={`mt-6 ${!customerId ? 'opacity-50 pointer-events-none' : ''}`}>
-        <PanelSection title={t('workspace.addressCurrent')}>
+        <PanelSection title={t('workspace.addressHome')}>
           <AddressFormPostal
             customerId={customerId ?? 0}
-            addressType="CURRENT"
-            existing={currentAddress}
-            onSuccess={() => handleAddressSuccess('CURRENT')}
+            addressType="HOME"
+            existing={homeAddress}
+            onSuccess={() => handleAddressSuccess('HOME')}
           />
         </PanelSection>
 
-        <label className="flex items-center gap-2 text-sm cursor-pointer py-2">
-          <Checkbox
-            checked={useDifferentWorkAddress}
-            onChange={(e) => setUseDifferentWorkAddress((e.target as HTMLInputElement).checked)}
-          />
-          {t('workspace.useDifferentWorkAddress')}
-        </label>
-
-        {useDifferentWorkAddress && (
+        <PanelSection title={t('workspace.addressWork')}>
           <AddressFormPostal
             customerId={customerId ?? 0}
             addressType="WORK"
             existing={workAddress}
             onSuccess={() => handleAddressSuccess('WORK')}
           />
-        )}
+        </PanelSection>
+
+        <PanelSection title={t('workspace.addressShipping')}>
+          <div className="alert alert-info mb-3">
+            <Info size={16} />
+            <div><div className="alert-description">{t('workspace.shippingAddressHint')}</div></div>
+          </div>
+          <AddressFormPostal
+            customerId={customerId ?? 0}
+            addressType="SHIPPING"
+            existing={shippingAddress}
+            onSuccess={() => handleAddressSuccess('SHIPPING')}
+          />
+        </PanelSection>
       </div>
 
       {/* Confirm changes modal — shows all fields, changed ones in green */}

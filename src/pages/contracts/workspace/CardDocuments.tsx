@@ -40,7 +40,6 @@ export function CardDocuments({ onEdit, active }: { onEdit?: () => void; active?
               <span>{t('workspace.docEvidence')} ({data.evidenceCount})</span>
             </span>
           )}
-          <MiniCheck done={data.hasShippingAddress} label={t('workspace.docShipping')} />
         </div>
       )}
     </SummaryCard>
