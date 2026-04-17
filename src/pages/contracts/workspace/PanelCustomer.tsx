@@ -238,7 +238,7 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
       setApiError(t('workspace.citizenIdLength'));
       return;
     }
-    if (!idNumber.trim() || !firstName.trim() || !lastName.trim() || !tel.trim()) return;
+    if (!idNumber.trim() || !firstName.trim() || !lastName.trim() || !tel.trim() || !dateOfBirth) return;
 
     doRegister();
   };
@@ -337,7 +337,7 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
         </div>
         <div className="flex gap-3">
           <div className="flex flex-col flex-1 min-w-0">
-            <label className="form-label">{t('wizard.dateOfBirth')}</label>
+            <label className="form-label">{t('wizard.dateOfBirth')} *</label>
             <InputDatePicker value={dateOfBirth ? new Date(dateOfBirth + 'T00:00:00') : null} onChange={(date) => setDateOfBirth(date ? `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}` : '')} size="sm" endIcon={<Calendar size={16} />} calendar="gregorian" locale={i18n.language} />
           </div>
           <div className="flex flex-col flex-1 min-w-0">
@@ -365,7 +365,7 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
           color={isExisting ? 'primary' : undefined}
           variant={isExisting ? undefined : 'outline'}
           onClick={handleUseOrRegister}
-          disabled={submitting || !idNumber.trim() || !firstName.trim() || !lastName.trim() || !tel.trim()}
+          disabled={submitting || !idNumber.trim() || !firstName.trim() || !lastName.trim() || !tel.trim() || !dateOfBirth}
           startIcon={submitting ? <Loader2 size={14} className="animate-spin" /> : undefined}
         >
           {submitting ? t('common.saving') : buttonLabel}

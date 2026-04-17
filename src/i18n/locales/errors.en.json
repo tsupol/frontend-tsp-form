@@ -121,5 +121,23 @@
   "LEGAL.STATE.NOT_ASSIGNEE": "Only the assigned agent may perform this action",
   "LEGAL.STATE.REVERT_WINDOW_EXPIRED": "Revert window (1 hour) has expired",
   "LEGAL.VALIDATION.INVALID_PAYLOAD": "Invalid payload",
-  "legal.not_found.case_not_found": "Legal case not found"
+  "legal.not_found.case_not_found": "Legal case not found",
+
+  "CONTRACT.INVALID_STATE": "Contract is in an invalid state",
+  "CONTRACT.BRANCH_INACTIVE": "Branch is inactive",
+  "CONTRACT.CUSTOMER_REQUIRED": "Customer is required",
+  "CONTRACT.GUARANTOR_REQUIRED_FOR_MINOR": "Guarantor is required (customer is under 18)",
+  "CONTRACT.REFERENCE_REQUIRED": "At least 1 reference is required",
+  "CONTRACT.MODEL_REQUIRED": "Product model is required",
+  "CONTRACT.PRICING_REQUIRED": "Pricing plan is required",
+  "CONTRACT.RATE_CARD_REQUIRED": "Rate card is required",
+  "CONTRACT.CUSTOMER_ADDRESS_REQUIRED": "Customer home address is required",
+  "CONTRACT.GUARANTOR_ADDRESS_REQUIRED": "Guarantor home address is required",
+  "CONTRACT.CUSTOMER_ID_CARD_REQUIRED": "Customer ID card photo is required",
+  "CONTRACT.GUARANTOR_ID_CARD_REQUIRED": "Guarantor ID card photo is required",
+  "CONTRACT.CUSTOMER_SIGNATURE_REQUIRED": "Customer signature is required",
+  "CONTRACT.GUARANTOR_SIGNATURE_REQUIRED": "Guarantor signature is required",
+  "CONTRACT.DISCOUNT_APPROVAL_REQUIRED": "Discount approval is required",
+  "CONTRACT.DEAL_PARTNER_APPROVAL_REQUIRED": "Deal partner approval is required",
+  "sale.validation.contract_not_ready": "Contract is not ready for activation"
 }

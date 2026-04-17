@@ -6,6 +6,8 @@
 
 .animate-shake {
     animation: shake 0.5s ease-in-out;
+    border-color: var(--color-danger) !important;
+    background: color-mix(in srgb, var(--color-danger) 8%, transparent) !important;
 }
 
 @layer components {

@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Input, Badge, Button } from 'tsp-form';
-import { Search, XCircle, X, Calculator, Info } from 'lucide-react';
+import { Input, Badge, Button, MaskedInput, useSnackbarContext } from 'tsp-form';
+import { Search, XCircle, X, Calculator, Info, CheckCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { fmtCurrency } from '../contractUtils';
 import { useWorkspace } from './WorkspaceContext';
@@ -280,8 +280,16 @@ export function PanelProductPlan({ onClose }: Props) {
     localQuote?.term_months === r.term_months &&
     localQuote?.down_percent === r.down_percent;
 
+  const { addSnackbar } = useSnackbarContext();
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState('');
+
+  const hasChanges = localModelId !== wizardData.modelId
+    || localVariantId !== wizardData.variantId
+    || localQuote?.finance_model !== wizardData.selectedQuote?.finance_model
+    || localQuote?.term_months !== wizardData.selectedQuote?.term_months
+    || localQuote?.down_percent !== wizardData.selectedQuote?.down_percent;
 
   const handleConfirm = async () => {
     setSaving(true);
@@ -299,6 +307,9 @@ export function PanelProductPlan({ onClose }: Props) {
           },
         });
         if (localVariantId) {
+          // TODO: fn_contract_set_product doesn't update commercial_model.
+          // If user switches FIN1↔FIN2 after draft creation, the contract's commercial_model stays wrong.
+          // Backend needs p_commercial_model param or a separate RPC.
           await apiClient.rpc('fn_contract_set_product', {
             p_contract_id: wizardData.contractId,
             p_model_id: localModelId,
@@ -319,6 +330,16 @@ export function PanelProductPlan({ onClose }: Props) {
         familyName: localFamilyName, brandName: localBrandName,
         variantId: localVariantId, variantName: localVariantName,
         selectedQuote: localQuote,
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      addSnackbar({
+        message: (
+          <div className="alert alert-success">
+            <CheckCircle size={18} />
+            <div><div className="alert-title">{t('common.saved')}</div></div>
+          </div>
+        ),
       });
     } catch (err) {
       if (err instanceof ApiError) {
@@ -465,8 +486,13 @@ export function PanelProductPlan({ onClose }: Props) {
     {/* Footer — sticky bottom */}
     <div className="shrink-0 border-t border-line bg-bg px-4 py-3 flex justify-end gap-2">
       <Button variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
-      <Button color="primary" onClick={handleConfirm} disabled={!localModelId || saving}>
-        {saving ? t('common.saving') : t('common.confirm')}
+      <Button
+        color={saved ? 'success' : 'primary'}
+        onClick={handleConfirm}
+        disabled={!localModelId || saving || (!hasChanges && !saved)}
+        startIcon={saved ? <CheckCircle size={16} /> : undefined}
+      >
+        {saving ? t('common.saving') : saved ? t('common.saved') : t('common.confirm')}
       </Button>
     </div>
     </div>
@@ -592,7 +618,7 @@ function Fin2Calculator({ fin2Rows, fin2Terms, t, onUse }: {
         </div>
         <div className="flex flex-col gap-1 flex-1">
           <label className="form-label">{t('priceCheck.downPayment')}</label>
-          <Input size="sm" type="number" min={0} placeholder={t('priceCheck.thb')} value={downInput} onChange={(e) => setDownInput(e.target.value)} className="w-full" />
+          <MaskedInput size="sm" mask="number" decimalScale={0} value={downInput} onChange={(raw) => setDownInput(raw)} placeholder={t('priceCheck.thb')} className="w-full" />
         </div>
       </div>
 

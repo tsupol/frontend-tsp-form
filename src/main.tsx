@@ -19,7 +19,7 @@ createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <AuthProvider>
-          <SnackbarProvider>
+          <SnackbarProvider defaults={{ position: 'top-right' }}>
             <ModalProvider>
               <BrowserRouter>
                 <NavGuardProvider>

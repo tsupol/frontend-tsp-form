@@ -27,6 +27,7 @@ const defaultData: WorkspaceData = {
   customerReferenceCount: 0,
   guarantors: [],
   guarantorSkipped: false,
+  guarantorsComplete: false,
   hasIdPhoto: false,
   hasSignature: false,
   evidenceCount: 0,
@@ -292,10 +293,26 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         if (data.customerAddresses.home && data.customerAddresses.work &&
             data.customerContactCount > 0 && data.customerReferenceCount > 0) return 'complete';
         return 'partial';
-      case 'guarantor':
-        if (data.guarantorSkipped) return 'complete';
-        if (data.guarantors.length > 0) return 'complete';
+      case 'contactRef':
+        if (!data.customerId) return 'locked';
+        if (data.customerContactCount > 0 && data.customerReferenceCount > 0) return 'complete';
+        if (data.customerContactCount > 0 || data.customerReferenceCount > 0) return 'partial';
         return 'empty';
+      case 'guarantor': {
+        if (!data.customerId) return 'locked';
+        const needsGuarantor = data.customerDateOfBirth && (() => {
+          const birth = new Date(data.customerDateOfBirth!);
+          const now = new Date();
+          let age = now.getFullYear() - birth.getFullYear();
+          const m = now.getMonth() - birth.getMonth();
+          if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--;
+          return age < 18;
+        })();
+        if (needsGuarantor && data.guarantors.length === 0) return 'warning';
+        if (data.guarantors.length === 0) return 'complete';
+        if (data.guarantorsComplete) return 'complete';
+        return 'partial';
+      }
       case 'documents':
         if (!data.contractId) return 'locked';
         if (data.hasIdPhoto && data.hasSignature) return 'complete';

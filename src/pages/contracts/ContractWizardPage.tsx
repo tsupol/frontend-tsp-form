@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, Select, Button, MobileHeader, Badge, Modal } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, XCircle, Loader2, FileCheck } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, XCircle, X, Loader2, FileCheck } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavGuard } from '../../contexts/NavGuardContext';
@@ -25,7 +25,7 @@ import { PanelDelivery } from './workspace/PanelDelivery';
 import { PanelSaving } from './workspace/PanelSaving';
 import { CardContactRef } from './workspace/CardContactRef';
 import { PanelContactRef } from './workspace/PanelContactRef';
-import type { ModalId, ReadinessResult, BillOpenResult } from './workspace/WorkspaceTypes';
+import type { ModalId, BillOpenResult } from './workspace/WorkspaceTypes';
 import { ERROR_TO_MODAL } from './workspace/WorkspaceTypes';
 
 interface Branch {
@@ -320,14 +320,16 @@ function WorkspaceContent() {
                     <CardGuarantor onEdit={() => handleEditOpen('guarantor')} active={openModal === 'guarantor'} shake={shakingCards.has('guarantor')} />
                     <CardDocuments onEdit={() => handleEditOpen('documents')} active={openModal === 'documents'} shake={shakingCards.has('documents')} />
 
-                    {!data.billId && data.contractId && (
-                      <CreateBillButton contractId={data.contractId} onBillCreated={(bill) => updateData({ billId: bill.bill_id, billCode: bill.bill_code, billData: bill })} onShake={(cards) => { setShakingCards(cards); setTimeout(() => setShakingCards(new Set()), 600); }} />
-                    )}
                     {data.billId && !data.billConfirmed && <CardPayment />}
                     {data.billConfirmed && <CardPostPayment onEditDelivery={() => handleEditOpen('delivery')} />}
                   </div>
                 </div>
 
+                {!data.billId && data.contractId && (
+                  <div className="shrink-0 border-t border-line bg-bg px-4 py-3">
+                    <CreateBillButton contractId={data.contractId} onBillCreated={(bill) => updateData({ billId: bill.bill_id, billCode: bill.bill_code, billData: bill })} onShake={(cards) => { setShakingCards(cards); setTimeout(() => setShakingCards(new Set()), 600); }} />
+                  </div>
+                )}
 
                 {isMobile && isPostPayment && (
                   <div className="shrink-0 border-t border-line bg-bg px-4 py-3 flex items-center justify-end gap-2">
@@ -396,35 +398,53 @@ function CreateBillButton({ contractId, onBillCreated, onShake }: {
   onShake: (cards: Set<string>) => void;
 }) {
   const { t } = useTranslation();
+  const { getCardStatus } = useWorkspace();
   const [loading, setLoading] = useState(false);
   const [billError, setBillError] = useState('');
 
+  const cardIds = ['productPlan', 'customer', 'contactRef', 'guarantor', 'documents'] as const;
+  const allComplete = cardIds.every(id => getCardStatus(id) === 'complete');
+
   const handleClick = async () => {
+    // First check cards client-side — shake incomplete ones
+    const incomplete = new Set<string>();
+    for (const id of cardIds) {
+      if (getCardStatus(id) !== 'complete') incomplete.add(id);
+    }
+    if (incomplete.size > 0) {
+      onShake(incomplete);
+      return;
+    }
+
     setLoading(true);
     setBillError('');
     try {
-      const readiness = await apiClient.rpc<ReadinessResult>('fn_contract_validate_ready', {
-        p_contract_id: contractId,
-      });
-      if (!readiness.ready) {
-        // Collect unique card IDs from errors
-        const cards = new Set<string>();
-        for (const err of readiness.errors) {
-          const modal = ERROR_TO_MODAL[err.code];
-          if (modal) cards.add(modal);
-        }
-        onShake(cards);
-        return;
-      }
       const bill = await apiClient.rpc<BillOpenResult>('fn_bill_contract_open', {
         p_contract_id: contractId,
       });
       onBillCreated(bill);
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
-        setBillError(translated || err.message);
+        // If CONTRACT_NOT_READY, extract nested errors and shake relevant cards
+        const nestedErrors = (err.messageParams as { errors?: Array<{ code: string }> })?.errors;
+        if (nestedErrors?.length) {
+          const cards = new Set<string>();
+          for (const e of nestedErrors) {
+            const modal = ERROR_TO_MODAL[e.code];
+            if (modal) cards.add(modal);
+          }
+          if (cards.size > 0) onShake(cards);
+          // Show nested error codes as message
+          const messages = nestedErrors.map(e => {
+            const tr = t(e.code, { ns: 'apiErrors', defaultValue: '' });
+            return tr || e.code;
+          });
+          setBillError(messages.join(', '));
+        } else {
+          const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+            || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+          setBillError(translated || err.message);
+        }
       } else {
         setBillError(String(err));
       }
@@ -436,10 +456,16 @@ function CreateBillButton({ contractId, onBillCreated, onShake }: {
   return (
     <div className="flex flex-col gap-2">
       {billError && (
-        <div className="alert alert-danger"><XCircle size={18} /><div><div className="alert-description">{billError}</div></div></div>
+        <div className="alert alert-danger">
+          <XCircle size={18} />
+          <div className="flex-1"><div className="alert-description">{billError}</div></div>
+          <button className="p-0.5 rounded hover:bg-white/20 cursor-pointer bg-transparent border-none text-current shrink-0" onClick={() => setBillError('')}>
+            <X size={14} />
+          </button>
+        </div>
       )}
       <Button
-        color="primary"
+        color={allComplete ? 'primary' : undefined}
         onClick={handleClick}
         disabled={loading}
         startIcon={loading ? <Loader2 size={16} className="animate-spin" /> : <FileCheck size={16} />}

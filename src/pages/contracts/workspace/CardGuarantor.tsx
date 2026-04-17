@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle, Circle } from 'lucide-react';
@@ -16,7 +17,7 @@ function getAge(dob: string): number {
 
 export function CardGuarantor({ onEdit, active, shake }: { onEdit?: () => void; active?: boolean; shake?: boolean }) {
   const { t } = useTranslation();
-  const { data, isReadOnly } = useWorkspace();
+  const { data, isReadOnly, updateData } = useWorkspace();
 
   const hasCustomer = !!data.customerId;
   const dob = data.customerDateOfBirth;
@@ -29,15 +30,17 @@ export function CardGuarantor({ onEdit, active, shake }: { onEdit?: () => void; 
     queryKey: ['guarantor-status', data.contractId, data.guarantors.map(g => g.customerId).join(',')],
     queryFn: async () => {
       const results = await Promise.all(data.guarantors.map(async (g) => {
-        const [addrs, idCard, sig] = await Promise.all([
+        const [addrs, idCard, sig, custInfo] = await Promise.all([
           apiClient.get<Array<{ address_type: string }>>(`/v_customer_addresses?customer_id=eq.${g.customerId}&select=address_type`).catch(() => []),
           apiClient.get<Array<{ id: number }>>(`/v_customer_documents?customer_id=eq.${g.customerId}&doc_type=eq.ID_CARD_FRONT&is_active=eq.true&select=id`).catch(() => []),
           data.contractId
             ? apiClient.get<Array<{ id: number }>>(`/v_contract_documents?contract_id=eq.${data.contractId}&customer_id=eq.${g.customerId}&doc_type=eq.SIGNATURE_PAD&select=id`).catch(() => [])
             : [],
+          apiClient.get<Array<{ date_of_birth: string | null }>>(`/v_customers?id=eq.${g.customerId}&select=date_of_birth`).catch(() => []),
         ]);
         return {
           customerId: g.customerId,
+          hasInfo: !!custInfo[0]?.date_of_birth,
           hasHome: addrs.some(a => a.address_type === 'HOME'),
           hasWork: addrs.some(a => a.address_type === 'WORK'),
           hasIdCard: idCard.length > 0,
@@ -50,7 +53,14 @@ export function CardGuarantor({ onEdit, active, shake }: { onEdit?: () => void; 
     staleTime: 0,
   });
 
-  const allGuarantorsComplete = guarantorStatus?.every(g => g.hasHome && g.hasWork && g.hasIdCard && g.hasSignature) ?? false;
+  const allGuarantorsComplete = guarantorStatus?.every(g => g.hasInfo && g.hasHome && g.hasWork && g.hasIdCard && g.hasSignature) ?? false;
+
+  // Sync to workspace so getCardStatus can use it
+  useEffect(() => {
+    if (data.guarantorsComplete !== allGuarantorsComplete) {
+      updateData({ guarantorsComplete: allGuarantorsComplete });
+    }
+  }, [allGuarantorsComplete]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const status = !hasCustomer ? 'locked' as const
     : needsGuarantor && !hasGuarantors ? 'warning' as const
@@ -78,8 +88,9 @@ export function CardGuarantor({ onEdit, active, shake }: { onEdit?: () => void; 
         <div className="flex flex-col gap-1.5">
           {data.guarantors.map(g => {
             const gs = guarantorStatus?.find(s => s.customerId === g.customerId);
-            const complete = gs ? (gs.hasHome && gs.hasWork && gs.hasIdCard && gs.hasSignature) : false;
+            const complete = gs ? (gs.hasInfo && gs.hasHome && gs.hasWork && gs.hasIdCard && gs.hasSignature) : false;
             const missing: string[] = [];
+            if (gs && !gs.hasInfo) missing.push(t('customer.basicInfo'));
             if (gs && !gs.hasHome) missing.push(t('workspace.addressHome'));
             if (gs && !gs.hasWork) missing.push(t('workspace.addressWork'));
             if (gs && !gs.hasIdCard) missing.push(t('workspace.docIdPhoto'));

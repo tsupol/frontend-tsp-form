@@ -198,6 +198,7 @@ export const ERROR_TO_MODAL: Record<string, ModalId> = {
   'CONTRACT.GUARANTOR_ID_CARD_REQUIRED': 'guarantor',
   'CONTRACT.CUSTOMER_SIGNATURE_REQUIRED': 'documents',
   'CONTRACT.GUARANTOR_SIGNATURE_REQUIRED': 'guarantor',
+  'CONTRACT.RATE_CARD_REQUIRED': 'productPlan',
   'CONTRACT.DISCOUNT_APPROVAL_REQUIRED': null,
   'CONTRACT.DEAL_PARTNER_APPROVAL_REQUIRED': null,
 };
@@ -245,6 +246,7 @@ export interface WorkspaceData {
   // Guarantors (multiple)
   guarantors: Array<{ customerId: number; fullName: string; idNumber: string }>;
   guarantorSkipped: boolean;
+  guarantorsComplete: boolean;
 
   // Documents
   hasIdPhoto: boolean;

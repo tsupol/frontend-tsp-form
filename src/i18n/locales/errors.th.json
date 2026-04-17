@@ -121,5 +121,23 @@
   "LEGAL.STATE.NOT_ASSIGNEE": "เฉพาะเจ้าหน้าที่ที่รับเรื่องเท่านั้น",
   "LEGAL.STATE.REVERT_WINDOW_EXPIRED": "หมดเวลาย้อนกลับ (1 ชั่วโมง)",
   "LEGAL.VALIDATION.INVALID_PAYLOAD": "ข้อมูลไม่ถูกต้อง",
-  "legal.not_found.case_not_found": "ไม่พบคดี"
+  "legal.not_found.case_not_found": "ไม่พบคดี",
+
+  "CONTRACT.INVALID_STATE": "สถานะสัญญาไม่ถูกต้อง",
+  "CONTRACT.BRANCH_INACTIVE": "สาขาไม่ได้เปิดใช้งาน",
+  "CONTRACT.CUSTOMER_REQUIRED": "ต้องระบุลูกค้า",
+  "CONTRACT.GUARANTOR_REQUIRED_FOR_MINOR": "ต้องมีผู้ค้ำประกัน (ลูกค้าอายุต่ำกว่า 18 ปี)",
+  "CONTRACT.REFERENCE_REQUIRED": "ต้องมีบุคคลอ้างอิงอย่างน้อย 1 คน",
+  "CONTRACT.MODEL_REQUIRED": "ต้องเลือกรุ่นสินค้า",
+  "CONTRACT.PRICING_REQUIRED": "ต้องเลือกแผนราคา",
+  "CONTRACT.RATE_CARD_REQUIRED": "ต้องระบุ Rate Card",
+  "CONTRACT.CUSTOMER_ADDRESS_REQUIRED": "ต้องกรอกที่อยู่บ้านลูกค้า",
+  "CONTRACT.GUARANTOR_ADDRESS_REQUIRED": "ต้องกรอกที่อยู่บ้านผู้ค้ำประกัน",
+  "CONTRACT.CUSTOMER_ID_CARD_REQUIRED": "ต้องอัปโหลดรูปบัตรประชาชนลูกค้า",
+  "CONTRACT.GUARANTOR_ID_CARD_REQUIRED": "ต้องอัปโหลดรูปบัตรประชาชนผู้ค้ำประกัน",
+  "CONTRACT.CUSTOMER_SIGNATURE_REQUIRED": "ต้องเซ็นลายมือชื่อลูกค้า",
+  "CONTRACT.GUARANTOR_SIGNATURE_REQUIRED": "ต้องเซ็นลายมือชื่อผู้ค้ำประกัน",
+  "CONTRACT.DISCOUNT_APPROVAL_REQUIRED": "ต้องได้รับอนุมัติส่วนลด",
+  "CONTRACT.DEAL_PARTNER_APPROVAL_REQUIRED": "ต้องได้รับอนุมัติจาก Deal Partner",
+  "sale.validation.contract_not_ready": "สัญญายังไม่พร้อมเปิดใช้งาน"
 }
