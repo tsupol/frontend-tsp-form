@@ -8,13 +8,11 @@ export function CardCustomer({ onEdit, active, shake }: { onEdit?: () => void; a
   const { contract, customer, getCardStatus, isReadOnly } = useWorkspace();
   const status = getCardStatus('customer');
 
-  // Missing items when customer exists but incomplete
+  // Missing items — only customer-owned fields (contacts/refs belong to CardContactRef)
   const missing: string[] = [];
   if (contract?.customer_id && customer) {
     if (!customer.addresses.home) missing.push(t('workspace.addressHome'));
     if (!customer.addresses.work) missing.push(t('workspace.addressWork'));
-    if (customer.contactCount === 0) missing.push(t('workspace.contacts'));
-    if (customer.referenceCount === 0) missing.push(t('workspace.references'));
   }
 
   return (

@@ -23,10 +23,7 @@ export function getCardStatus(
     case 'customer':
       if (!contract?.customer_id) return 'empty';
       if (!customer) return 'partial';
-      if (
-        customer.addresses.home && customer.addresses.work &&
-        customer.contactCount > 0 && customer.referenceCount > 0
-      ) return 'complete';
+      if (customer.addresses.home && customer.addresses.work) return 'complete';
       return 'partial';
 
     case 'contactRef':
