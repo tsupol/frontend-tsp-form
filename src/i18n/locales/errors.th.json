@@ -139,5 +139,23 @@
   "CONTRACT.GUARANTOR_SIGNATURE_REQUIRED": "ต้องเซ็นลายมือชื่อผู้ค้ำประกัน",
   "CONTRACT.DISCOUNT_APPROVAL_REQUIRED": "ต้องได้รับอนุมัติส่วนลด",
   "CONTRACT.DEAL_PARTNER_APPROVAL_REQUIRED": "ต้องได้รับอนุมัติจาก Deal Partner",
-  "sale.validation.contract_not_ready": "สัญญายังไม่พร้อมเปิดใช้งาน"
+  "sale.validation.contract_not_ready": "สัญญายังไม่พร้อมเปิดใช้งาน",
+
+  "SALE.VALIDATION.SNAPSHOT_NOT_SET": "ยังไม่ได้ตั้งราคา — กรุณาตั้ง rate ก่อน",
+  "SALE.VALIDATION.SNAPSHOT_INCOMPLETE": "ข้อมูลราคาตั้งต้นไม่ครบ — กรุณาตั้ง rate ใหม่",
+  "CONTRACT.SNAPSHOT_REQUIRED": "ต้องตั้งราคาก่อนเปิดสัญญา",
+  "CONTRACT.VALIDATE_READY_FAILED": "สัญญายังไม่พร้อม — กรุณากรอกข้อมูลให้ครบ",
+  "SALE.VALIDATION.FINANCIAL_LOCKED": "ไม่สามารถแก้ไขราคาได้ขณะรออนุมัติ",
+  "SALE.VALIDATION.DP_ONLY_RETAIL": "ปรับราคาขายปลีกได้เฉพาะสาขาพาร์ทเนอร์",
+  "SALE.VALIDATION.RETAIL_INVALID": "ราคาขายปลีกต้องมากกว่า 0",
+  "SALE.VALIDATION.NOT_INSTALLMENT_MODEL": "ใช้ได้เฉพาะแผนผ่อนชำระเท่านั้น",
+  "SALE.VALIDATION.USED_ASSET_UNSUPPORTED": "ไม่รองรับการตั้ง rate สำหรับสัญญาเครื่องมือสอง",
+  "SALE.VALIDATION.INSURANCE_FIN2_ONLY": "เงินประกันใช้ได้เฉพาะสัญญา FIN2",
+  "SALE.VALIDATION.SAVING_TARGET_INVALID": "ยอดเป้าหมายออมไม่ถูกต้อง",
+  "SALE.VALIDATION.STAFF_SCORE_INVALID": "คะแนนพนักงานต้องอยู่ระหว่าง 1 ถึง 3",
+  "SALE.VALIDATION.INSURANCE_AMOUNT_INVALID": "จำนวนเงินประกันไม่ถูกต้อง",
+  "SALE.VALIDATION.RATE_NOT_FOUND": "ไม่พบอัตราสำหรับจำนวนงวดและเงินดาวน์ที่เลือก",
+  "SALE.VALIDATION.DOWN_PERCENT_REQUIRED": "ต้องระบุ % เงินดาวน์สำหรับ FIN1",
+  "CORE.VALIDATION.INVALID_COMMERCIAL_MODEL": "รูปแบบการค้าไม่ถูกต้อง",
+  "PRICING.VALIDATION.NOT_INSTALLMENT_MODEL": "คำนวณราคาได้เฉพาะแผนผ่อนชำระเท่านั้น"
 }

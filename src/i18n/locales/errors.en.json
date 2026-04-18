@@ -139,5 +139,23 @@
   "CONTRACT.GUARANTOR_SIGNATURE_REQUIRED": "Guarantor signature is required",
   "CONTRACT.DISCOUNT_APPROVAL_REQUIRED": "Discount approval is required",
   "CONTRACT.DEAL_PARTNER_APPROVAL_REQUIRED": "Deal partner approval is required",
-  "sale.validation.contract_not_ready": "Contract is not ready for activation"
+  "sale.validation.contract_not_ready": "Contract is not ready for activation",
+
+  "SALE.VALIDATION.SNAPSHOT_NOT_SET": "Rate snapshot has not been set — please set rate first",
+  "SALE.VALIDATION.SNAPSHOT_INCOMPLETE": "Rate snapshot is incomplete — please set rate again",
+  "CONTRACT.SNAPSHOT_REQUIRED": "Rate snapshot is required — please set rate before opening",
+  "CONTRACT.VALIDATE_READY_FAILED": "Contract is not ready — please complete all required fields",
+  "SALE.VALIDATION.FINANCIAL_LOCKED": "Financial terms are locked while approval is pending",
+  "SALE.VALIDATION.DP_ONLY_RETAIL": "Retail price adjustment is only available for partner branches",
+  "SALE.VALIDATION.RETAIL_INVALID": "Retail price must be greater than zero",
+  "SALE.VALIDATION.NOT_INSTALLMENT_MODEL": "This action is only available for installment plans",
+  "SALE.VALIDATION.USED_ASSET_UNSUPPORTED": "Rate setting is not supported for used asset contracts",
+  "SALE.VALIDATION.INSURANCE_FIN2_ONLY": "Insurance deposit is only available for FIN2 contracts",
+  "SALE.VALIDATION.SAVING_TARGET_INVALID": "Saving target amount is invalid",
+  "SALE.VALIDATION.STAFF_SCORE_INVALID": "Staff score must be between 1 and 3",
+  "SALE.VALIDATION.INSURANCE_AMOUNT_INVALID": "Insurance deposit amount is invalid",
+  "SALE.VALIDATION.RATE_NOT_FOUND": "No rate found for this term and down payment combination",
+  "SALE.VALIDATION.DOWN_PERCENT_REQUIRED": "Down payment percentage is required for FIN1",
+  "CORE.VALIDATION.INVALID_COMMERCIAL_MODEL": "Invalid commercial model",
+  "PRICING.VALIDATION.NOT_INSTALLMENT_MODEL": "Pricing calculation is only available for installment plans"
 }
