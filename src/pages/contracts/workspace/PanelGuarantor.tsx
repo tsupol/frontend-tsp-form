@@ -244,7 +244,7 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
 
             {apiError && <div className="alert alert-danger mb-3"><XCircle size={18} /><div><div className="alert-description">{apiError}</div></div></div>}
             {result?.action === 'BLOCK' && (
-              <div className="alert alert-danger"><ShieldAlert size={18} /><div><div className="alert-title">{t('wizard.blacklisted')}</div></div></div>
+              <div className="alert alert-danger mb-3"><ShieldAlert size={18} /><div><div className="alert-title">{t('wizard.blacklisted')}</div></div></div>
             )}
 
             <div className="form-grid gap-4">
