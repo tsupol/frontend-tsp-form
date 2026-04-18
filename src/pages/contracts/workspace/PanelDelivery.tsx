@@ -15,7 +15,7 @@ interface Props { onClose: () => void }
 
 export function PanelDelivery({ onClose }: Props) {
   const { t } = useTranslation();
-  const { data: workspace, updateData } = useWorkspace();
+  const { data: workspace, invalidateContract } = useWorkspace();
 
   const [method, setMethod] = useState('PICKUP');
   const [trackingNumber, setTrackingNumber] = useState('');
@@ -31,7 +31,7 @@ export function PanelDelivery({ onClose }: Props) {
         p_tracking_number: trackingNumber.trim() || null,
         p_shipped_at: new Date().toISOString(),
       });
-      updateData({ deliveryDone: true });
+      invalidateContract();
       await apiClient.rpc('fn_contract_save_step', {
         p_contract_id: workspace.contractId,
         p_step: 'DELIVERY',

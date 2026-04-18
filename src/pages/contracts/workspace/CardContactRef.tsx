@@ -4,13 +4,12 @@ import { SummaryCard } from './SummaryCard';
 
 export function CardContactRef({ onEdit, active, shake }: { onEdit?: () => void; active?: boolean; shake?: boolean }) {
   const { t } = useTranslation();
-  const { data, isReadOnly } = useWorkspace();
+  const { contract, customer, getCardStatus, isReadOnly } = useWorkspace();
 
-  const hasCustomer = !!data.customerId;
-  const hasContact = data.customerContactCount > 0;
-  const hasRef = data.customerReferenceCount > 0;
-  const status = !hasCustomer ? 'locked' as const
-    : (hasRef ? 'complete' as const : 'empty' as const);
+  const hasCustomer = !!contract?.customer_id;
+  const contactCount = customer?.contactCount ?? 0;
+  const refCount = customer?.referenceCount ?? 0;
+  const status = getCardStatus('contactRef');
 
   return (
     <SummaryCard
@@ -25,8 +24,8 @@ export function CardContactRef({ onEdit, active, shake }: { onEdit?: () => void;
         <div className="text-subtle text-xs">{t('workspace.needCustomerFirst')}</div>
       ) : (
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-          <span className={hasContact ? '' : 'text-subtle'}>{t('workspace.contacts')}: {data.customerContactCount}</span>
-          <span className={hasRef ? '' : 'text-warning'}>{t('workspace.references')}: {data.customerReferenceCount} {!hasRef && `(${t('common.required')})`}</span>
+          <span className={contactCount > 0 ? '' : 'text-subtle'}>{t('workspace.contacts')}: {contactCount}</span>
+          <span className={refCount > 0 ? '' : 'text-warning'}>{t('workspace.references')}: {refCount} {refCount === 0 && `(${t('common.required')})`}</span>
         </div>
       )}
     </SummaryCard>

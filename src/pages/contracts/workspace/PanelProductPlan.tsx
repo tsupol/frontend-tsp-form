@@ -93,7 +93,7 @@ interface Props {
 
 export function PanelProductPlan({ onClose }: Props) {
   const { t } = useTranslation();
-  const { data: wizardData, updateData } = useWorkspace();
+  const { data: wizardData, contract, invalidateContract, isFinancialLocked } = useWorkspace();
 
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -340,12 +340,7 @@ export function PanelProductPlan({ onClose }: Props) {
           }
         }
       }
-      updateData({
-        modelId: localModelId, modelName: localModelName,
-        familyName: localFamilyName, brandName: localBrandName,
-        variantId: localVariantId, variantName: localVariantName,
-        selectedQuote: localQuote,
-      });
+      invalidateContract();
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
       addSnackbar({

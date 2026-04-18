@@ -15,7 +15,7 @@ interface Props { onClose: () => void }
 export function PanelContactRef({ onClose: _onClose }: Props) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const { data: workspace, updateData } = useWorkspace();
+  const { data: workspace, invalidateCustomer } = useWorkspace();
   const customerId = workspace.customerId;
 
   const { data: contacts = [] } = useQuery({
@@ -32,19 +32,19 @@ export function PanelContactRef({ onClose: _onClose }: Props) {
 
   const handleContactSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ['customer-contacts', customerId] });
-    updateData({ customerContactCount: contacts.length + 1 });
+    invalidateCustomer();
   };
   const handleContactDeleted = () => {
     queryClient.invalidateQueries({ queryKey: ['customer-contacts', customerId] });
-    updateData({ customerContactCount: Math.max(0, contacts.length - 1) });
+    invalidateCustomer();
   };
   const handleReferenceSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ['customer-references', customerId] });
-    updateData({ customerReferenceCount: references.length + 1 });
+    invalidateCustomer();
   };
   const handleReferenceDeleted = () => {
     queryClient.invalidateQueries({ queryKey: ['customer-references', customerId] });
-    updateData({ customerReferenceCount: Math.max(0, references.length - 1) });
+    invalidateCustomer();
   };
 
   if (!customerId) return null;

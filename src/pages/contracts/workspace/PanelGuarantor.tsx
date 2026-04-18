@@ -42,7 +42,7 @@ interface Props { onClose: () => void }
 
 export function PanelGuarantor({ onClose: _onClose }: Props) {
   const { t, i18n } = useTranslation();
-  const { data: workspace, updateData } = useWorkspace();
+  const { data: workspace, invalidateGuarantors } = useWorkspace();
 
   // ── Existing guarantors list ────────────────────────────────────────────
   const [removing, setRemoving] = useState<number | null>(null);
@@ -61,9 +61,7 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
         p_contract_id: workspace.contractId,
         p_customer_id: customerId,
       });
-      updateData({
-        guarantors: workspace.guarantors.filter(g => g.customerId !== customerId),
-      });
+      invalidateGuarantors();
       if (expandedGuarantor === customerId) setExpandedGuarantor(null);
     } catch (err) {
       if (err instanceof ApiError) {
@@ -143,10 +141,7 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
         p_customer_id: custId,
         p_relation: null,
       });
-      updateData({
-        guarantors: [...workspace.guarantors, { customerId: custId, fullName, idNumber: idNum }],
-        guarantorSkipped: false,
-      });
+      invalidateGuarantors();
       resetForm();
       setShowAddForm(false);
       setExpandedGuarantor(custId);

@@ -5,7 +5,7 @@ import { SummaryCard } from './SummaryCard';
 
 export function CardCustomer({ onEdit, active, shake }: { onEdit?: () => void; active?: boolean; shake?: boolean }) {
   const { t } = useTranslation();
-  const { data, getCardStatus, isReadOnly } = useWorkspace();
+  const { contract, getCardStatus, isReadOnly } = useWorkspace();
   const status = getCardStatus('customer');
 
   return (
@@ -17,17 +17,14 @@ export function CardCustomer({ onEdit, active, shake }: { onEdit?: () => void; a
       shake={shake}
       disabled={isReadOnly}
     >
-      {!data.customerId ? (
+      {!contract?.customer_id ? (
         <div className="text-subtle flex items-center gap-2">
           <User size={14} className="opacity-40" />
           <span>{t('workspace.selectCustomer')}</span>
         </div>
       ) : (
         <div className="flex flex-col gap-1">
-          <div className="font-medium">{data.customerName}</div>
-          {data.customerResult && (
-            <div className="text-xs text-subtle">{data.customerResult.id_number}</div>
-          )}
+          <div className="font-medium">{contract.customer_name ?? ''}</div>
         </div>
       )}
     </SummaryCard>

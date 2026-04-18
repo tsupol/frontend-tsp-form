@@ -95,7 +95,7 @@ interface Props { onClose: () => void }
 
 export function PanelCustomer({ onClose: _onClose }: Props) {
   const { t, i18n } = useTranslation();
-  const { data: workspace, updateData, setPanelDirty } = useWorkspace();
+  const { data: workspace, updateData, invalidateContract, invalidateCustomer, setPanelDirty } = useWorkspace();
 
   // Form fields
   const [idType, setIdType] = useState<'CITIZEN_ID' | 'PASSPORT'>('CITIZEN_ID');
@@ -274,6 +274,7 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
   };
 
   const doAttach = (custId: number, custName: string) => {
+    // updateData still needed for customerId — triggers draft auto-creation
     updateData({
       customerId: custId,
       customerName: custName,
@@ -284,16 +285,14 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
         has_overdue: false, overdue_contract_count: 0, active_contract_count: 0, action: 'OK',
       },
     });
+    invalidateContract();
+    invalidateCustomer();
     setPanelDirty(false);
   };
 
-  const handleAddressSuccess = (type: 'HOME' | 'WORK' | 'SHIPPING') => {
+  const handleAddressSuccess = (_type: 'HOME' | 'WORK' | 'SHIPPING') => {
     refetchAddresses();
-    const updated = { ...workspace.customerAddresses };
-    if (type === 'HOME') updated.home = true;
-    else if (type === 'WORK') updated.work = true;
-    else updated.shipping = true;
-    updateData({ customerAddresses: updated });
+    invalidateCustomer();
   };
 
   const canSearch = !!(idNumber.trim() || firstName.trim() || lastName.trim());

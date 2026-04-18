@@ -1,7 +1,6 @@
-import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle, Circle } from 'lucide-react';
+import { AlertTriangle, CheckCircle } from 'lucide-react';
 import { apiClient } from '../../../lib/api';
 import { useWorkspace } from './WorkspaceContext';
 import { SummaryCard } from './SummaryCard';
@@ -17,24 +16,27 @@ function getAge(dob: string): number {
 
 export function CardGuarantor({ onEdit, active, shake }: { onEdit?: () => void; active?: boolean; shake?: boolean }) {
   const { t } = useTranslation();
-  const { data, isReadOnly, updateData } = useWorkspace();
+  const { contract, customer, guarantorList, isReadOnly } = useWorkspace();
 
-  const hasCustomer = !!data.customerId;
-  const dob = data.customerDateOfBirth;
+  const hasCustomer = !!contract?.customer_id;
+  const dob = customer?.dateOfBirth;
   const isMinor = dob ? getAge(dob) < 18 : false;
   const needsGuarantor = hasCustomer && isMinor;
-  const hasGuarantors = data.guarantors.length > 0;
+  const guarantors = guarantorList.map(g => ({ customerId: g.customer_id, fullName: g.customer_name, idNumber: g.id_number ?? '' }));
+  const hasGuarantors = guarantors.length > 0;
+
+  const contractId = contract?.id ?? null;
 
   // Check guarantor completeness — addresses, ID card, signature
   const { data: guarantorStatus } = useQuery({
-    queryKey: ['guarantor-status', data.contractId, data.guarantors.map(g => g.customerId).join(',')],
+    queryKey: ['guarantor-status', contractId, guarantors.map(g => g.customerId).join(',')],
     queryFn: async () => {
-      const results = await Promise.all(data.guarantors.map(async (g) => {
+      const results = await Promise.all(guarantors.map(async (g) => {
         const [addrs, idCard, sig, custInfo] = await Promise.all([
           apiClient.get<Array<{ address_type: string }>>(`/v_customer_addresses?customer_id=eq.${g.customerId}&select=address_type`).catch(() => []),
           apiClient.get<Array<{ id: number }>>(`/v_customer_documents?customer_id=eq.${g.customerId}&doc_type=eq.ID_CARD_FRONT&is_active=eq.true&select=id`).catch(() => []),
-          data.contractId
-            ? apiClient.get<Array<{ id: number }>>(`/v_contract_documents?contract_id=eq.${data.contractId}&customer_id=eq.${g.customerId}&doc_type=eq.SIGNATURE_PAD&select=id`).catch(() => [])
+          contractId
+            ? apiClient.get<Array<{ id: number }>>(`/v_contract_documents?contract_id=eq.${contractId}&customer_id=eq.${g.customerId}&doc_type=eq.SIGNATURE_PAD&select=id`).catch(() => [])
             : [],
           apiClient.get<Array<{ date_of_birth: string | null }>>(`/v_customers?id=eq.${g.customerId}&select=date_of_birth`).catch(() => []),
         ]);
@@ -55,13 +57,6 @@ export function CardGuarantor({ onEdit, active, shake }: { onEdit?: () => void; 
 
   const allGuarantorsComplete = guarantorStatus?.every(g => g.hasInfo && g.hasHome && g.hasWork && g.hasIdCard && g.hasSignature) ?? false;
 
-  // Sync to workspace so getCardStatus can use it
-  useEffect(() => {
-    if (data.guarantorsComplete !== allGuarantorsComplete) {
-      updateData({ guarantorsComplete: allGuarantorsComplete });
-    }
-  }, [allGuarantorsComplete]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const status = !hasCustomer ? 'locked' as const
     : needsGuarantor && !hasGuarantors ? 'warning' as const
     : hasGuarantors && !allGuarantorsComplete ? 'partial' as const
@@ -70,7 +65,7 @@ export function CardGuarantor({ onEdit, active, shake }: { onEdit?: () => void; 
 
   return (
     <SummaryCard
-      title={`${t('workspace.cardGuarantor')} (${data.guarantors.length})`}
+      title={`${t('workspace.cardGuarantor')} (${guarantors.length})`}
       status={status}
       onEdit={onEdit}
       active={active}
@@ -86,7 +81,7 @@ export function CardGuarantor({ onEdit, active, shake }: { onEdit?: () => void; 
         </div>
       ) : hasGuarantors ? (
         <div className="flex flex-col gap-1.5">
-          {data.guarantors.map(g => {
+          {guarantors.map(g => {
             const gs = guarantorStatus?.find(s => s.customerId === g.customerId);
             const complete = gs ? (gs.hasInfo && gs.hasHome && gs.hasWork && gs.hasIdCard && gs.hasSignature) : false;
             const missing: string[] = [];

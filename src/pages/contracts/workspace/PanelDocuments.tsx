@@ -43,7 +43,7 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const { data: workspace, updateData } = useWorkspace();
+  const { data: workspace, invalidateDocs, invalidateCustomer } = useWorkspace();
   const contractId = workspace.contractId;
   const customerId = workspace.customerId;
 
@@ -99,7 +99,7 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
       });
       queryClient.invalidateQueries({ queryKey: ['customer-documents', customerId] });
       setCacheBust(n => n + 1);
-      updateData({ hasIdPhoto: true });
+      invalidateCustomer();
     } catch (err) {
       if (err instanceof ApiError) {
         const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
@@ -129,7 +129,7 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
       });
       queryClient.invalidateQueries({ queryKey: ['contract-documents', contractId] });
       setCacheBust(n => n + 1);
-      updateData({ hasSignature: true });
+      invalidateDocs();
     } catch (err) {
       if (err instanceof ApiError) {
         const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
@@ -168,7 +168,7 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
         });
       }
       queryClient.invalidateQueries({ queryKey: ['contract-media', contractId] });
-      updateData({ evidenceCount: attachments.length + images.length });
+      invalidateDocs();
     } catch (err) {
       if (err instanceof ApiError) {
         const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')

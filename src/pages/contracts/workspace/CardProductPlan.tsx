@@ -1,14 +1,17 @@
 import { useTranslation } from 'react-i18next';
-import { Package } from 'lucide-react';
+import { Package, Lock } from 'lucide-react';
 import { fmtCurrency } from '../contractUtils';
 import { useWorkspace } from './WorkspaceContext';
 import { SummaryCard } from './SummaryCard';
 
 export function CardProductPlan({ onEdit, active, shake }: { onEdit?: () => void; active?: boolean; shake?: boolean }) {
   const { t } = useTranslation();
-  const { data, getCardStatus, isReadOnly } = useWorkspace();
+  const { contract, getCardStatus, isReadOnly, isFinancialLocked } = useWorkspace();
   const status = getCardStatus('productPlan');
-  const q = data.selectedQuote;
+
+  const modelName = contract?.model_name ?? '';
+  const variantName = contract?.variant_name ?? '';
+  const hasRate = contract?.value_month != null && contract?.installment_amount != null;
 
   return (
     <SummaryCard
@@ -27,21 +30,22 @@ export function CardProductPlan({ onEdit, active, shake }: { onEdit?: () => void
       ) : (
         <div className="flex flex-col gap-1">
           <div className="font-medium">
-            {data.familyName} {data.modelName}
-            {data.variantName && (
+            {modelName}
+            {variantName && (
               <span className="text-subtle font-normal"> · {
-                data.variantName.startsWith(data.modelName)
-                  ? data.variantName.slice(data.modelName.length).trim()
-                  : data.variantName
+                variantName.startsWith(modelName)
+                  ? variantName.slice(modelName.length).trim()
+                  : variantName
               }</span>
             )}
           </div>
-          {q && (
+          {hasRate && (
             <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-subtle">
-              <span>{q.finance_model}</span>
-              <span>{q.term_months} {t('contract.months')}</span>
-              <span>{t('contract.downPayment')} {fmtCurrency(q.down_amount)} ({q.down_percent}%)</span>
-              <span>{t('contract.installmentAmount')} {fmtCurrency(q.installment_amount)}</span>
+              <span>{contract.commercial_model}</span>
+              <span>{contract.value_month} {t('contract.months')}</span>
+              {contract.down_payment != null && <span>{t('contract.downPayment')} {fmtCurrency(contract.down_payment)}</span>}
+              <span>{t('contract.installmentAmount')} {fmtCurrency(contract.installment_amount!)}</span>
+              {isFinancialLocked && <Lock size={12} className="text-warning" />}
             </div>
           )}
         </div>

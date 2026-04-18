@@ -209,77 +209,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setReadinessKey(k => k + 1);
   }, []);
 
-  // Refetch contract state from backend when any panel closes
+  // Trigger readiness refetch when any panel closes
   const prevModal = useRef<ModalId>(null);
   useEffect(() => {
     if (prevModal.current !== null && openModal === null && data.contractId) {
       triggerReadinessRefetch();
-      // Refetch contract + customer data to sync workspace state
-      const refetch = async () => {
-        try {
-          const [contracts, guarantors] = await Promise.all([
-            apiClient.get<Array<{
-              customer_id: number | null; customer_name: string | null;
-              saving_balance: number; saving_target_amount: number | null;
-              model_id: number | null; model_name: string | null;
-              variant_id: number | null; variant_name: string | null;
-              step_data: Record<string, unknown> | null;
-            }>>(`/v_contract_detail?id=eq.${data.contractId}&select=customer_id,customer_name,saving_balance,saving_target_amount,model_id,model_name,variant_id,variant_name,step_data`),
-            apiClient.get<Array<{ customer_id: number; customer_name: string; id_number?: string }>>(`/v_contract_customers?contract_id=eq.${data.contractId}&role=eq.GUARANTOR&order=created_at`).catch(() => []),
-          ]);
-          const c = contracts[0];
-          if (!c) return;
-
-          const updates: Partial<WorkspaceData> = {
-            customerName: c.customer_name ?? '',
-            savingBalance: c.saving_balance ?? 0,
-            modelId: c.model_id,
-            modelName: c.model_name ?? '',
-            variantId: c.variant_id,
-            variantName: c.variant_name ?? '',
-          };
-
-          // Sync guarantors
-          updates.guarantors = guarantors.map(g => ({
-            customerId: g.customer_id,
-            fullName: g.customer_name,
-            idNumber: g.id_number ?? '',
-          }));
-
-          // Sync customer counts + media if customer exists
-          if (c.customer_id) {
-            const [addrs, contacts, refs, custs, customerIdCards] = await Promise.all([
-              apiClient.get<Array<{ address_type: string }>>(`/v_customer_addresses?customer_id=eq.${c.customer_id}&select=address_type`).catch(() => []),
-              apiClient.get<Array<{ id: number }>>(`/v_customer_contacts?customer_id=eq.${c.customer_id}&select=id`).catch(() => []),
-              apiClient.get<Array<{ id: number }>>(`/v_customer_references?customer_id=eq.${c.customer_id}&select=id`).catch(() => []),
-              apiClient.get<Array<{ date_of_birth: string | null }>>(`/v_customers?id=eq.${c.customer_id}&select=date_of_birth`).catch(() => []),
-              apiClient.get<Array<{ id: number }>>(`/v_customer_documents?customer_id=eq.${c.customer_id}&doc_type=eq.ID_CARD_FRONT&is_active=eq.true&select=id`).catch(() => []),
-            ]);
-            updates.customerAddresses = {
-              home: addrs.some(a => a.address_type === 'HOME'),
-              work: addrs.some(a => a.address_type === 'WORK'),
-              shipping: addrs.some(a => a.address_type === 'SHIPPING'),
-            };
-            updates.customerContactCount = contacts.length;
-            updates.customerReferenceCount = refs.length;
-            updates.customerDateOfBirth = custs[0]?.date_of_birth ?? null;
-            updates.hasIdPhoto = customerIdCards.length > 0;
-          }
-
-          // Sync contract documents (SIGNATURE_PAD) + media (ATTACHMENT)
-          const [contractDocList, contractMediaList] = await Promise.all([
-            apiClient.get<Array<{ id: number }>>(`/v_contract_documents?contract_id=eq.${data.contractId}&doc_type=eq.SIGNATURE_PAD&select=id`).catch(() => []),
-            apiClient.get<Array<{ usage_type: string }>>(`/v_entity_media?entity_type=eq.CONTRACT&entity_id=eq.${data.contractId}&usage_type=eq.ATTACHMENT&select=usage_type`).catch(() => []),
-          ]);
-          updates.hasSignature = contractDocList.length > 0;
-          updates.evidenceCount = contractMediaList.length;
-
-          setData(prev => ({ ...prev, ...updates }));
-        } catch {
-          // ignore refetch errors
-        }
-      };
-      refetch();
     }
     prevModal.current = openModal;
   }, [openModal, data.contractId, triggerReadinessRefetch]);
@@ -353,47 +287,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }).catch(() => {});
   }, [data.contractId, data.customerId]);
 
-  // ── Card statuses ────────────────────────────────────────────────────
+  // ── Card statuses (derived from server state) ────────────────────────
+  const guarantorCount = guarantorList.length;
+  // CardGuarantor computes allComplete itself — for getCardStatus we approximate
   const getCardStatus = useCallback((card: string): CardStatus => {
-    switch (card) {
-      case 'productPlan':
-        if (data.selectedQuote) return 'complete';
-        if (data.modelId) return 'partial';
-        return 'empty';
-      case 'customer':
-        if (!data.customerId) return 'empty';
-        if (data.customerAddresses.home && data.customerAddresses.work &&
-            data.customerContactCount > 0 && data.customerReferenceCount > 0) return 'complete';
-        return 'partial';
-      case 'contactRef':
-        if (!data.customerId) return 'locked';
-        if (data.customerContactCount > 0 && data.customerReferenceCount > 0) return 'complete';
-        if (data.customerContactCount > 0 || data.customerReferenceCount > 0) return 'partial';
-        return 'empty';
-      case 'guarantor': {
-        if (!data.customerId) return 'locked';
-        const needsGuarantor = data.customerDateOfBirth && (() => {
-          const birth = new Date(data.customerDateOfBirth!);
-          const now = new Date();
-          let age = now.getFullYear() - birth.getFullYear();
-          const m = now.getMonth() - birth.getMonth();
-          if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--;
-          return age < 18;
-        })();
-        if (needsGuarantor && data.guarantors.length === 0) return 'warning';
-        if (data.guarantors.length === 0) return 'complete';
-        if (data.guarantorsComplete) return 'complete';
-        return 'partial';
-      }
-      case 'documents':
-        if (!data.contractId) return 'locked';
-        if (data.hasIdPhoto && data.hasSignature) return 'complete';
-        if (data.hasIdPhoto || data.hasSignature || data.evidenceCount > 0) return 'partial';
-        return 'empty';
-      default:
-        return 'empty';
-    }
-  }, [data]);
+    return deriveCardStatus(card, contract, customer, docs, {
+      count: guarantorCount,
+      allComplete: data.guarantorsComplete, // still read from legacy until CardGuarantor syncs
+    });
+  }, [contract, customer, docs, guarantorCount, data.guarantorsComplete]);
 
   // Phase flags
   const isPreDraft = !data.contractId;

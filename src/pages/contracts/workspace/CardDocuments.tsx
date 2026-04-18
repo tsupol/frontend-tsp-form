@@ -17,8 +17,12 @@ function MiniCheck({ done, label }: { done: boolean; label: string }) {
 
 export function CardDocuments({ onEdit, active, shake }: { onEdit?: () => void; active?: boolean; shake?: boolean }) {
   const { t } = useTranslation();
-  const { data, getCardStatus, isReadOnly } = useWorkspace();
+  const { customer, docs, getCardStatus, isReadOnly } = useWorkspace();
   const status = getCardStatus('documents');
+
+  const hasIdPhoto = customer?.hasIdPhoto ?? false;
+  const hasSignature = docs?.hasSignature ?? false;
+  const evidenceCount = docs?.evidenceCount ?? 0;
 
   return (
     <SummaryCard
@@ -33,12 +37,12 @@ export function CardDocuments({ onEdit, active, shake }: { onEdit?: () => void; 
         <div className="text-subtle text-xs">{t('workspace.needsDraft')}</div>
       ) : (
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-          <MiniCheck done={data.hasIdPhoto} label={t('workspace.docIdPhoto')} />
-          <MiniCheck done={data.hasSignature} label={t('workspace.docSignature')} />
-          {data.evidenceCount > 0 && (
+          <MiniCheck done={hasIdPhoto} label={t('workspace.docIdPhoto')} />
+          <MiniCheck done={hasSignature} label={t('workspace.docSignature')} />
+          {evidenceCount > 0 && (
             <span className="inline-flex items-center gap-1">
               <CheckCircle size={12} className="text-success" />
-              <span>{t('workspace.docEvidence')} ({data.evidenceCount})</span>
+              <span>{t('workspace.docEvidence')} ({evidenceCount})</span>
             </span>
           )}
         </div>

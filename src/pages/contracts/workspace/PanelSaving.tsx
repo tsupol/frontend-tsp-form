@@ -23,7 +23,7 @@ interface Props { onClose: () => void }
 export function PanelSaving({ onClose: _onClose }: Props) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const { data, updateData, isReadOnly } = useWorkspace();
+  const { data, updateData, invalidateContract, isReadOnly } = useWorkspace();
 
   const balance = data.savingBalance;
   const hasDraft = !!data.contractId;
@@ -39,11 +39,11 @@ export function PanelSaving({ onClose: _onClose }: Props) {
     if (!data.contractId || amount === lastSavedTarget.current) return;
     setTargetSaving(true);
     try {
-      await apiClient.rpc('fn_contract_save_step', {
+      await apiClient.rpc('fn_contract_set_saving_target', {
         p_contract_id: data.contractId,
-        p_step: 'SAVING_TARGET',
-        p_data: { saving_target_amount: amount },
+        p_amount: amount,
       });
+      invalidateContract();
       lastSavedTarget.current = amount;
       setTargetSaved(true);
       clearTimeout(savedTimer.current);
@@ -93,18 +93,13 @@ export function PanelSaving({ onClose: _onClose }: Props) {
         p_branch_id: data.branchId,
         p_note: note.trim() || undefined,
       });
-      const detail = await apiClient.get<Array<{ saving_balance: number }>>(
-        `/v_contract_detail?id=eq.${data.contractId}&select=saving_balance`
-      );
-      return detail[0]?.saving_balance ?? 0;
     },
-    onSuccess: (newBalance) => {
-      updateData({ savingBalance: newBalance });
+    onSuccess: () => {
       setAmount('');
       setNote('');
       setError('');
+      invalidateContract();
       queryClient.invalidateQueries({ queryKey: ['contract-saving-txns', data.contractId] });
-      queryClient.invalidateQueries({ queryKey: ['contract-detail', data.contractId] });
       queryClient.invalidateQueries({ queryKey: ['contract-search'] });
       queryClient.invalidateQueries({ queryKey: ['saving-contracts'] });
     },

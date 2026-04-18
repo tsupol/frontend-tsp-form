@@ -6,11 +6,11 @@ import { SummaryCard } from './SummaryCard';
 
 export function CardSaving({ onEdit, active, shake }: { onEdit?: () => void; active?: boolean; shake?: boolean }) {
   const { t } = useTranslation();
-  const { data, isReadOnly } = useWorkspace();
+  const { contract, isReadOnly } = useWorkspace();
 
-  const hasCustomer = !!data.customerId;
-  const balance = data.savingBalance;
-  const target = data.savingTargetAmount;
+  const hasCustomer = !!contract?.customer_id;
+  const balance = contract?.saving_balance ?? 0;
+  const target = contract?.saving_target_amount ?? 0;
   const hasBalance = balance > 0;
   const status = !hasCustomer ? 'locked' as const : 'empty' as const;
 
