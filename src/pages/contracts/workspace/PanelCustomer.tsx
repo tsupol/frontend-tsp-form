@@ -315,7 +315,7 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
           <div className="flex flex-col flex-1 min-w-0">
             <label className="form-label">{t('wizard.idNumber')}</label>
             {idType === 'CITIZEN_ID' ? (
-              <MaskedInput mask="#-####-#####-##-#" value={idNumber} onChange={(raw) => setIdNumber(raw)} size="sm" className="w-full" disabled={!!selectedCustomer} />
+              <MaskedInput mask="#-####-#####-##-#" placeholder="" value={idNumber} onChange={(raw) => setIdNumber(raw)} size="sm" className="w-full" disabled={!!selectedCustomer} />
             ) : (
               <Input value={idNumber} onChange={(e) => setIdNumber(e.target.value)} size="sm" className="w-full" disabled={!!selectedCustomer} />
             )}
