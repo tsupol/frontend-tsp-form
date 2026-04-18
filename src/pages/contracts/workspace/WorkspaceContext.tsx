@@ -3,6 +3,15 @@ import type { ReactNode } from 'react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import type { ModalId, CardStatus, WorkspaceData, DraftCreateResult } from './WorkspaceTypes';
+import { useContractQuery, useInvalidateContract } from './useContractQuery';
+import type { ContractServerState } from './useContractQuery';
+import { useCustomerSummary, useInvalidateCustomer } from './useCustomerSummary';
+import type { CustomerSummary } from './useCustomerSummary';
+import { useContractDocuments, useInvalidateDocs } from './useContractDocuments';
+import type { ContractDocSummary } from './useContractDocuments';
+import { useContractGuarantors, useInvalidateGuarantors } from './useContractGuarantors';
+import type { GuarantorRow } from './useContractGuarantors';
+import { getCardStatus as deriveCardStatus } from './cardStatus';
 
 // ── Default state ────────────────────────────────────────────────────────
 
@@ -47,9 +56,27 @@ const defaultData: WorkspaceData = {
 // ── Context interface ────────────────────────────────────────────────────
 
 interface WorkspaceContextValue {
+  // Legacy data (kept during migration — panels will gradually stop using this)
   data: WorkspaceData;
   updateData: (updates: Partial<WorkspaceData>) => void;
   resetData: () => void;
+
+  // ── Server state (React Query) ──────────────────────────────────────
+  contract: ContractServerState | null;
+  contractLoading: boolean;
+  customer: CustomerSummary | null;
+  docs: ContractDocSummary | null;
+  guarantorList: GuarantorRow[];
+
+  // Invalidation helpers — call after RPCs instead of updateData
+  invalidateContract: () => void;
+  invalidateCustomer: () => void;
+  invalidateDocs: () => void;
+  invalidateGuarantors: () => void;
+  invalidateAll: () => void;
+
+  // Financial lock flag (from server)
+  isFinancialLocked: boolean;
 
   // Modal
   openModal: ModalId;
@@ -120,6 +147,51 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const cancelPanelSwitch = useCallback(() => {
     setPendingModal(null);
   }, []);
+
+  // ── Server state queries ──────────────────────────────────────────────
+  const contractQuery = useContractQuery(data.contractId);
+  const contract = contractQuery.data ?? null;
+  const contractLoading = contractQuery.isLoading;
+
+  const customerQuery = useCustomerSummary(contract?.customer_id ?? data.customerId);
+  const customer = customerQuery.data ?? null;
+
+  const docsQuery = useContractDocuments(data.contractId);
+  const docs = docsQuery.data ?? null;
+
+  const guarantorsQuery = useContractGuarantors(data.contractId);
+  const guarantorList = guarantorsQuery.data ?? [];
+
+  // Invalidation helpers
+  const _invalidateContract = useInvalidateContract();
+  const _invalidateCustomer = useInvalidateCustomer();
+  const _invalidateDocs = useInvalidateDocs();
+  const _invalidateGuarantors = useInvalidateGuarantors();
+
+  const invalidateContract = useCallback(() => {
+    _invalidateContract(data.contractId);
+  }, [_invalidateContract, data.contractId]);
+
+  const invalidateCustomer = useCallback(() => {
+    _invalidateCustomer(contract?.customer_id ?? data.customerId);
+  }, [_invalidateCustomer, contract?.customer_id, data.customerId]);
+
+  const invalidateDocs = useCallback(() => {
+    _invalidateDocs(data.contractId);
+  }, [_invalidateDocs, data.contractId]);
+
+  const invalidateGuarantors = useCallback(() => {
+    _invalidateGuarantors(data.contractId);
+  }, [_invalidateGuarantors, data.contractId]);
+
+  const invalidateAll = useCallback(() => {
+    invalidateContract();
+    invalidateCustomer();
+    invalidateDocs();
+    invalidateGuarantors();
+  }, [invalidateContract, invalidateCustomer, invalidateDocs, invalidateGuarantors]);
+
+  const isFinancialLocked = contract?.is_financial_locked ?? false;
 
   // Ref to track if draft creation is in flight
   const draftInFlight = useRef(false);
@@ -334,6 +406,19 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     data,
     updateData,
     resetData,
+    // Server state
+    contract,
+    contractLoading,
+    customer,
+    docs,
+    guarantorList,
+    invalidateContract,
+    invalidateCustomer,
+    invalidateDocs,
+    invalidateGuarantors,
+    invalidateAll,
+    isFinancialLocked,
+    // Modal
     openModal,
     setOpenModal,
     getCardStatus,
@@ -349,7 +434,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     pendingModal,
     confirmPanelSwitch,
     cancelPanelSwitch,
-  }), [data, updateData, resetData, openModal, setOpenModal, getCardStatus, isPreDraft, isPreBill, isPostBill, isPostPayment, isReadOnly, readinessKey, triggerReadinessRefetch, setPanelDirty, pendingModal, confirmPanelSwitch, cancelPanelSwitch]);
+  }), [data, updateData, resetData, contract, contractLoading, customer, docs, guarantorList, invalidateContract, invalidateCustomer, invalidateDocs, invalidateGuarantors, invalidateAll, isFinancialLocked, openModal, setOpenModal, getCardStatus, isPreDraft, isPreBill, isPostBill, isPostPayment, isReadOnly, readinessKey, triggerReadinessRefetch, setPanelDirty, pendingModal, confirmPanelSwitch, cancelPanelSwitch]);
 
   return (
     <WorkspaceContext.Provider value={value}>
