@@ -300,7 +300,7 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
   const buttonLabel = isExisting ? t('workspace.useThisCustomer') : t('wizard.registerCustomer');
 
   return (
-    <div className="p-4 flex flex-col max-w-2xl">
+    <div className="p-4 flex flex-col gap-3 max-w-2xl">
       {apiError && <div className="alert alert-danger"><XCircle size={18} /><div><div className="alert-description">{apiError}</div></div></div>}
       {result && <ResultBanner result={result} t={t} />}
 
