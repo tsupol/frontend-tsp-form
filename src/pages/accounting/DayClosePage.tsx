@@ -8,6 +8,7 @@ import {
 import {
   ArrowRightFromLine, ArrowLeft, CalendarCheck, AlertTriangle, CheckCircle2, Lock, Sparkles, Calendar, XCircle, Clock,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { toLocalDateStr, parseLocalDate, makeDatePickerFormat, fmtCurrency } from '../../lib/format';
@@ -24,6 +25,7 @@ const TODAY_KEY = '__today__';
 
 export function DayClosePage() {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
   const today = todayISO();
   const [branchId, setBranchId] = useState<string>('');
   const [selectedDate, setSelectedDate] = useState<string>(today);
@@ -429,6 +431,12 @@ export function DayClosePage() {
                             <div className="alert-description">
                               {t('accounting.dayClose.hasPendingDesc', { count: unclosedSummary.pending_bill_count })}
                             </div>
+                            <button
+                              className="text-sm underline mt-1 cursor-pointer bg-transparent border-none text-current"
+                              onClick={() => navigate('/admin/accounting/bills')}
+                            >
+                              {t('accounting.dayClose.viewBills')}
+                            </button>
                           </div>
                         </div>
                       )}
@@ -619,6 +627,12 @@ export function DayClosePage() {
                             <div className="alert-description">
                               {t('accounting.dayClose.hasPendingDesc', { count: summary.pending_bill_count })}
                             </div>
+                            <button
+                              className="text-sm underline mt-1 cursor-pointer bg-transparent border-none text-current"
+                              onClick={() => navigate('/admin/accounting/bills')}
+                            >
+                              {t('accounting.dayClose.viewBills')}
+                            </button>
                           </div>
                         </div>
                       )}

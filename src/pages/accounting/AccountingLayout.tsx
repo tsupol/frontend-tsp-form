@@ -2,7 +2,7 @@ import { useMemo, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  CalendarCheck, BookOpen, Wallet, Scale, ArrowUpRight, Coins, List,
+  CalendarCheck, BookOpen, Wallet, Scale, ArrowUpRight, Coins, List, Receipt,
 } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 
@@ -18,6 +18,7 @@ export function AccountingLayout({ children }: { children: ReactNode }) {
   const navItems: NavItem[] = useMemo(() => [
     { type: 'group', labelKey: 'accounting.groupDayClose' },
     { type: 'link', path: '/admin/accounting/day-close', labelKey: 'nav.dayClose', icon: CalendarCheck },
+    { type: 'link', path: '/admin/accounting/bills', labelKey: 'nav.bills', icon: Receipt },
     { type: 'group', labelKey: 'accounting.groupReports' },
     { type: 'link', path: '/admin/accounting/daily', labelKey: 'nav.dailyAccounting', icon: BookOpen },
     { type: 'link', path: '/admin/accounting/cashflow', labelKey: 'nav.cashFlow', icon: Wallet },
