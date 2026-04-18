@@ -1530,6 +1530,8 @@
     "cardPayment": "Payment",
     "cardDelivery": "Delivery",
     "selectProduct": "Select product and finance plan",
+    "missingModel": "Product not selected",
+    "missingPricingPlan": "Pricing plan not set",
     "selectCustomer": "Search or register customer",
     "addressHome": "Home Address",
     "addressWork": "Work Address",

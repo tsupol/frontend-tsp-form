@@ -1,19 +1,7 @@
 import { useTranslation } from 'react-i18next';
-import { CheckCircle, Circle } from 'lucide-react';
+import { CheckCircle, AlertTriangle } from 'lucide-react';
 import { useWorkspace } from './WorkspaceContext';
 import { SummaryCard } from './SummaryCard';
-
-function MiniCheck({ done, label }: { done: boolean; label: string }) {
-  return (
-    <span className="inline-flex items-center gap-1">
-      {done
-        ? <CheckCircle size={12} className="text-success" />
-        : <Circle size={12} className="text-fg/25" />
-      }
-      <span className={done ? '' : 'text-subtle'}>{label}</span>
-    </span>
-  );
-}
 
 export function CardDocuments({ onEdit, active, shake }: { onEdit?: () => void; active?: boolean; shake?: boolean }) {
   const { t } = useTranslation();
@@ -23,6 +11,14 @@ export function CardDocuments({ onEdit, active, shake }: { onEdit?: () => void; 
   const hasIdPhoto = customer?.hasIdPhoto ?? false;
   const hasSignature = docs?.hasSignature ?? false;
   const evidenceCount = docs?.evidenceCount ?? 0;
+
+  const items: Array<{ done: boolean; label: string; required: boolean }> = [
+    { done: hasIdPhoto, label: t('workspace.docIdPhoto'), required: true },
+    { done: hasSignature, label: t('workspace.docSignature'), required: true },
+  ];
+  if (evidenceCount > 0) {
+    items.push({ done: true, label: `${t('workspace.docEvidence')} (${evidenceCount})`, required: false });
+  }
 
   return (
     <SummaryCard
@@ -37,14 +33,15 @@ export function CardDocuments({ onEdit, active, shake }: { onEdit?: () => void; 
         <div className="text-subtle text-xs">{t('workspace.needsDraft')}</div>
       ) : (
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-          <MiniCheck done={hasIdPhoto} label={t('workspace.docIdPhoto')} />
-          <MiniCheck done={hasSignature} label={t('workspace.docSignature')} />
-          {evidenceCount > 0 && (
-            <span className="inline-flex items-center gap-1">
-              <CheckCircle size={12} className="text-success" />
-              <span>{t('workspace.docEvidence')} ({evidenceCount})</span>
+          {items.map(item => (
+            <span key={item.label} className={`inline-flex items-center gap-1 ${!item.done && item.required ? 'text-warning' : !item.done ? 'text-subtle' : ''}`}>
+              {item.done
+                ? <CheckCircle size={12} className="text-success" />
+                : <AlertTriangle size={12} />
+              }
+              <span>{item.label}</span>
             </span>
-          )}
+          ))}
         </div>
       )}
     </SummaryCard>

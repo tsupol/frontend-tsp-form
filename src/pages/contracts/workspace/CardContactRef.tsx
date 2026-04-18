@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { CheckCircle, AlertTriangle } from 'lucide-react';
 import { useWorkspace } from './WorkspaceContext';
 import { SummaryCard } from './SummaryCard';
 
@@ -24,8 +25,14 @@ export function CardContactRef({ onEdit, active, shake }: { onEdit?: () => void;
         <div className="text-subtle text-xs">{t('workspace.needCustomerFirst')}</div>
       ) : (
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-          <span className={contactCount > 0 ? '' : 'text-subtle'}>{t('workspace.contacts')}: {contactCount}</span>
-          <span className={refCount > 0 ? '' : 'text-warning'}>{t('workspace.references')}: {refCount} {refCount === 0 && `(${t('common.required')})`}</span>
+          <span className={`inline-flex items-center gap-1 ${contactCount > 0 ? '' : 'text-warning'}`}>
+            {contactCount > 0 ? <CheckCircle size={12} className="text-success" /> : <AlertTriangle size={12} />}
+            {t('workspace.contacts')}: {contactCount}
+          </span>
+          <span className={`inline-flex items-center gap-1 ${refCount > 0 ? '' : 'text-warning'}`}>
+            {refCount > 0 ? <CheckCircle size={12} className="text-success" /> : <AlertTriangle size={12} />}
+            {t('workspace.references')}: {refCount}
+          </span>
         </div>
       )}
     </SummaryCard>

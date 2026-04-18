@@ -1530,6 +1530,8 @@
     "cardPayment": "ชำระเงิน",
     "cardDelivery": "จัดส่ง",
     "selectProduct": "เลือกสินค้าและแผนผ่อน",
+    "missingModel": "ยังไม่ได้เลือกสินค้า",
+    "missingPricingPlan": "ยังไม่ได้ตั้งแผนราคา",
     "selectCustomer": "ค้นหาหรือลงทะเบียนลูกค้า",
     "addressHome": "ที่อยู่บ้าน",
     "addressWork": "ที่อยู่ที่ทำงาน",

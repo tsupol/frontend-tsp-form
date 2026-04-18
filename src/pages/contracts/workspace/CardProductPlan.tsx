@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Package, Lock } from 'lucide-react';
+import { Package, Lock, CheckCircle, AlertTriangle } from 'lucide-react';
 import { fmtCurrency } from '../contractUtils';
 import { useWorkspace } from './WorkspaceContext';
 import { SummaryCard } from './SummaryCard';
@@ -11,7 +11,13 @@ export function CardProductPlan({ onEdit, active, shake }: { onEdit?: () => void
 
   const modelName = contract?.model_name ?? '';
   const variantName = contract?.variant_name ?? '';
+  const hasModel = !!contract?.model_id;
   const hasRate = contract?.value_month != null && contract?.installment_amount != null;
+
+  // Missing items for partial state
+  const missing: string[] = [];
+  if (!hasModel) missing.push(t('workspace.missingModel'));
+  if (hasModel && !hasRate) missing.push(t('workspace.missingPricingPlan'));
 
   return (
     <SummaryCard
@@ -39,13 +45,18 @@ export function CardProductPlan({ onEdit, active, shake }: { onEdit?: () => void
               }</span>
             )}
           </div>
-          {hasRate && (
+          {hasRate ? (
             <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-subtle">
               <span>{contract.commercial_model}</span>
               <span>{contract.value_month} {t('contract.months')}</span>
               {contract.down_payment != null && <span>{t('contract.downPayment')} {fmtCurrency(contract.down_payment)}</span>}
               <span>{t('contract.installmentAmount')} {fmtCurrency(contract.installment_amount!)}</span>
               {isFinancialLocked && <Lock size={12} className="text-warning" />}
+            </div>
+          ) : missing.length > 0 && (
+            <div className="flex items-center gap-1.5 text-xs text-warning">
+              <AlertTriangle size={12} className="shrink-0" />
+              <span>{missing.join(', ')}</span>
             </div>
           )}
         </div>
