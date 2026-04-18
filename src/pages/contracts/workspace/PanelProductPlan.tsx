@@ -296,6 +296,7 @@ export function PanelProductPlan({ onClose }: Props) {
     setSaveError('');
     try {
       if (wizardData.contractId && localModelId) {
+        // 1. Persist UI state
         await apiClient.rpc('fn_contract_save_step', {
           p_contract_id: wizardData.contractId,
           p_step: 'WORKSPACE',
@@ -306,23 +307,37 @@ export function PanelProductPlan({ onClose }: Props) {
             savingTargetAmount: wizardData.savingTargetAmount,
           },
         });
+
         if (localVariantId) {
-          // TODO: fn_contract_set_product doesn't update commercial_model.
-          // If user switches FIN1↔FIN2 after draft creation, the contract's commercial_model stays wrong.
-          // Backend needs p_commercial_model param or a separate RPC.
-          await apiClient.rpc('fn_contract_set_product', {
-            p_contract_id: wizardData.contractId,
-            p_model_id: localModelId,
-            p_variant_id: localVariantId,
-            ...(localQuote ? {
-              p_agreed_price: localQuote.retail_price,
-              p_down_payment: localQuote.down_amount,
-              p_installment_amount: localQuote.installment_amount,
-              p_value_month: localQuote.term_months,
-              p_list_price: localQuote.retail_price,
-              p_cost_price: localQuote.cost_price,
-            } : {}),
-          }).catch(() => {});
+          const productChanged = localModelId !== wizardData.modelId || localVariantId !== wizardData.variantId;
+
+          // 2. Set product (model + variant only) — clears rate/snapshot if product changed
+          if (productChanged) {
+            await apiClient.rpc('fn_contract_set_product', {
+              p_contract_id: wizardData.contractId,
+              p_model_id: localModelId,
+              p_variant_id: localVariantId,
+            });
+          }
+
+          // 3. Set commercial model if finance model changed
+          const prevModel = wizardData.selectedQuote?.finance_model;
+          const newModel = localQuote?.finance_model;
+          if (newModel && newModel !== prevModel) {
+            await apiClient.rpc('fn_contract_set_commercial_model', {
+              p_contract_id: wizardData.contractId,
+              p_commercial_model: newModel,
+            });
+          }
+
+          // 4. Set rate — creates snapshot
+          if (localQuote) {
+            await apiClient.rpc('fn_contract_set_rate', {
+              p_contract_id: wizardData.contractId,
+              p_term_months: localQuote.term_months,
+              ...(localQuote.finance_model === 'FIN1' ? { p_down_percent: localQuote.down_percent } : {}),
+            });
+          }
         }
       }
       updateData({

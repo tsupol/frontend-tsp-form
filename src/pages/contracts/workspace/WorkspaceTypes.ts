@@ -177,7 +177,7 @@ export interface BankAccount {
 
 export interface ReadinessError {
   code: string;
-  message: string;
+  detail?: unknown;
 }
 
 export interface ReadinessResult {
@@ -199,6 +199,7 @@ export const ERROR_TO_MODAL: Record<string, ModalId> = {
   'CONTRACT.CUSTOMER_SIGNATURE_REQUIRED': 'documents',
   'CONTRACT.GUARANTOR_SIGNATURE_REQUIRED': 'guarantor',
   'CONTRACT.RATE_CARD_REQUIRED': 'productPlan',
+  'CONTRACT.SNAPSHOT_REQUIRED': 'productPlan',
   'CONTRACT.DISCOUNT_APPROVAL_REQUIRED': null,
   'CONTRACT.DEAL_PARTNER_APPROVAL_REQUIRED': null,
 };

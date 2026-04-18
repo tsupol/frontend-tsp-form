@@ -95,7 +95,7 @@ export function CardReadiness() {
                       disabled={!targetModal}
                     >
                       <XCircle size={14} className="shrink-0" />
-                      <span>{err.message}</span>
+                      <span>{t(err.code, { ns: 'apiErrors', defaultValue: err.code })}</span>
                     </button>
                   );
                 })}
