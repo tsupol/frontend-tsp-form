@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { authService } from '../lib/auth';
-import { setAuthErrorHandler } from '../lib/api';
+import { apiClient, setAuthErrorHandler } from '../lib/api';
 import type { UserInfo } from '../lib/auth';
 
 interface LoginResult {
@@ -111,6 +111,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
           }
 
+          // Resolve org names from v_branches
+          if (userInfo.branch_id) {
+            try {
+              const branches = await apiClient.get<{ name: string; company_name: string }[]>(
+                `/v_branches?id=eq.${userInfo.branch_id}&limit=1`
+              );
+              if (branches[0]) {
+                userInfo.branch_name = branches[0].name;
+                userInfo.company_name = branches[0].company_name;
+              }
+            } catch { /* non-critical */ }
+          }
+
           setUser(userInfo);
           setNeedsHoldingSelect(userInfo.holding_id === null);
           scheduleRefresh();
@@ -147,6 +160,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Role needs to select — clear any stale holding from previous login
         localStorage.removeItem('selected_holding_id');
       }
+
+      // Carry org names from login response
+      userInfo.branch_name = response.branch_name;
+      userInfo.company_name = response.company_name;
 
       setUser(userInfo);
       setNeedsHoldingSelect(holdingNeeded);

@@ -486,7 +486,7 @@ function GuarantorRow({ guarantor, contractId, expanded, onToggle, onRemove, rem
   return (
     <div className={`border rounded-lg overflow-hidden ${isComplete ? 'border-success/30' : 'border-warning/30'}`}>
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2.5 cursor-pointer hover:bg-surface-hover transition-colors" onClick={onToggle}>
+      <div className="flex items-center gap-2 px-3 py-2.5 cursor-pointer bg-surface-hover/50 hover:bg-surface-hover transition-colors" onClick={onToggle}>
         {expanded ? <ChevronDown size={14} className="text-subtle shrink-0" /> : <ChevronRight size={14} className="text-subtle shrink-0" />}
         {isComplete
           ? <CheckCircle size={14} className="text-success shrink-0" />

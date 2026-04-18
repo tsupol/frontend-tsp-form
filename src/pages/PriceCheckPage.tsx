@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, Input, Badge } from 'tsp-form';
+import { PageNav, PageNavPanel, MobileHeader, Input, Badge, MaskedInput } from 'tsp-form';
 import { ArrowLeft, ArrowRightFromLine, Search, Calculator, Clock, Trash2, X, ArrowUp, Info } from 'lucide-react';
 import { apiClient } from '../lib/api';
 
@@ -561,13 +561,13 @@ function Fin2Calculator({ fin2Rows, fin2Terms, t }: {
         </div>
         <div className="flex flex-col gap-1 flex-1">
           <label className="form-label">{t('priceCheck.downPayment')}</label>
-          <Input
+          <MaskedInput
             size="sm"
-            type="number"
-            min={0}
+            mask="number"
+            decimalScale={0}
             placeholder={t('priceCheck.thb')}
             value={downInput}
-            onChange={(e) => setDownInput(e.target.value)}
+            onChange={(raw) => setDownInput(raw)}
             className="w-full"
           />
         </div>

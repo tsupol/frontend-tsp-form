@@ -31,6 +31,8 @@ export interface UserInfo {
   holding_id: number | null;
   company_id: number | null;
   branch_id: number | null;
+  branch_name: string | null;
+  company_name: string | null;
   firstname: string | null;
   lastname: string | null;
   nickname: string | null;
@@ -48,6 +50,8 @@ export interface LoginResponse {
   user_id: number;
   holding_id: number | null;
   role_code: string;
+  branch_name: string | null;
+  company_name: string | null;
   access_token: string;
   token_type: string;
   expires_at: string;
@@ -149,6 +153,8 @@ export const authService = {
       holding_id: p.holding_id,
       company_id: p.company_id,
       branch_id: p.branch_id,
+      branch_name: null,
+      company_name: null,
       firstname: p.firstname,
       lastname: p.lastname,
       nickname: p.nickname,

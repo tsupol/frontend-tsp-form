@@ -35,8 +35,15 @@ export const fmtCurrency = (value: number | null | undefined): string => {
 
 // ── Scope options ───────────────────────────────────────────────────────────
 
-export const SCOPE_OPTIONS = ['OPEN', 'OVERDUE', 'CLOSED', 'ALL'] as const;
+export const SCOPE_OPTIONS = ['OPEN', 'CLOSED', 'ALL'] as const;
 export type ContractScope = typeof SCOPE_OPTIONS[number];
+
+/** Maps UI scope tabs to p_states[] for fn_contract_search */
+export const SCOPE_TO_STATES: Record<ContractScope, string[] | null> = {
+  OPEN: ['ACTIVE', 'WAIT_LEGAL_PROCESS', 'ON_LEGAL_PROCESS', 'ON_COURT_PROCESS'],
+  CLOSED: ['COMPLETED', 'TERMINATED', 'VOIDED'],
+  ALL: null,
+};
 
 // ── State filter options ────────────────────────────────────────────────────
 

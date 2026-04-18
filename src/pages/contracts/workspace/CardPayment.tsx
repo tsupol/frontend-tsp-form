@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Button, Select, Input } from 'tsp-form';
+import { Button, Select, MaskedInput } from 'tsp-form';
 import { Plus, Trash2, XCircle, Loader2, CreditCard } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { fmtCurrency } from '../contractUtils';
@@ -149,10 +149,11 @@ export function CardPayment() {
                 </div>
                 <div className="flex flex-col flex-1 min-w-0">
                   <label className="form-label text-xs">{t('contract.amount')}</label>
-                  <Input
-                    type="number"
-                    value={String(payment.amount)}
-                    onChange={(e) => updatePayment(idx, { amount: parseFloat(e.target.value) || 0 })}
+                  <MaskedInput
+                    mask="number"
+                    decimalScale={2}
+                    value={String(payment.amount || '')}
+                    onChange={(raw) => updatePayment(idx, { amount: parseFloat(raw) || 0 })}
                     size="sm"
                     className="w-full"
                   />

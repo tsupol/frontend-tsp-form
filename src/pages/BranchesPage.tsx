@@ -65,8 +65,6 @@ export function BranchesPage() {
     queryFn: () => apiClient.get<Company[]>('/v_companies?order=name&select=id,name'),
   });
 
-  const companyMap = useMemo(() => new Map(companies.map(c => [c.id, c.name])), [companies]);
-
   const filtered = useMemo(() => {
     let result = branches;
     if (search.trim()) {

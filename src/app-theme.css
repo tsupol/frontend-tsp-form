@@ -12,6 +12,7 @@
     --color-subtler: #70737c;      /* empty states, placeholders */
     --color-figure: #aabde8;       /* money / currency values */
     --color-qty: #c2c7d7;          /* quantity / count values */
+    --color-muted: #99999999;
 }
 
 [data-theme="light"] {

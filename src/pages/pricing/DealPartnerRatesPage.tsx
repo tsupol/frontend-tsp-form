@@ -273,36 +273,7 @@ export function DealPartnerRatesPage() {
     setModalOpen(true);
   };
 
-  const handleToggleActive = async (rate: DealPartnerRate) => {
-    try {
-      await apiClient.rpc('fn_deal_partner_rate_set_active', {
-        p_rate_id: rate.id,
-        p_is_active: !rate.is_active,
-        p_updated_by: user?.user_id,
-      });
-      queryClient.invalidateQueries({ queryKey: ['deal-partner-rates'] });
-      addSnackbar({
-        message: (
-          <div className="alert alert-success">
-            <CheckCircle size={16} />
-            <span>{t(rate.is_active ? 'dealPartnerRate.deactivated' : 'dealPartnerRate.activated')}</span>
-          </div>
-        ),
-      });
-    } catch (err) {
-      const msg = err instanceof ApiError
-        ? (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') || err.message
-        : t('common.error');
-      addSnackbar({
-        message: (
-          <div className="alert alert-danger">
-            <XCircle size={16} />
-            <span>{msg}</span>
-          </div>
-        ),
-      });
-    }
-  };
+
 
   const handleSuccess = () => {
     addSnackbar({

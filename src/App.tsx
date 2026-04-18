@@ -21,7 +21,6 @@ import { PricebookPage } from './pages/pricing/PricebookPage';
 import { Fin1RatesPage } from './pages/pricing/Fin1RatesPage';
 import { Fin2RatesPage } from './pages/pricing/Fin2RatesPage';
 import { DiscountPoliciesPage } from './pages/pricing/DiscountPoliciesPage';
-import { DiscountApprovalsPage } from './pages/pricing/DiscountApprovalsPage';
 import { DealPartnerRatesPage } from './pages/pricing/DealPartnerRatesPage';
 import { InventoryLayout } from './pages/inventory/InventoryLayout';
 import { StockDashboardPage } from './pages/inventory/StockDashboardPage';

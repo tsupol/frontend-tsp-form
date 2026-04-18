@@ -6,7 +6,7 @@ import { PageNav, PageNavPanel, MobileHeader, Badge, Input, Select, Button, Data
 import { ArrowLeft, ArrowRightFromLine, Search, FileText, SlidersHorizontal, Plus } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
-import { getStateColor, getStateLabel, fmtCurrency, SCOPE_OPTIONS, STATE_OPTIONS, type ContractScope } from './contractUtils';
+import { getStateColor, getStateLabel, fmtCurrency, SCOPE_OPTIONS, SCOPE_TO_STATES, STATE_OPTIONS, type ContractScope } from './contractUtils';
 import { ContractDetailPanel } from './ContractDetailPanel';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -52,7 +52,7 @@ interface ContractSearchResult {
 interface SearchResponse {
   page: number;
   count: number;
-  scope: string;
+  states_filter: string[] | null;
   has_more: boolean;
   per_page: number;
   contracts: ContractSearchResult[];
@@ -119,10 +119,12 @@ export function ContractSearchPage() {
   const { data: searchData, isFetching } = useQuery({
     queryKey: ['contract-search', scope, debouncedKeyword, filterState, filterBranchId, page, pageSize, isMultiWord],
     queryFn: async (): Promise<SearchResponse> => {
+      // Build p_states: if user picked a specific state filter, use that; otherwise use scope mapping
+      const p_states = filterState ? [filterState] : SCOPE_TO_STATES[scope];
+
       const baseParams: Record<string, unknown> = {
-        p_scope: scope,
+        ...(p_states ? { p_states } : {}),
       };
-      if (filterState) baseParams.p_state = filterState;
 
       if (!isMultiWord) {
         // Single word (or empty): server pagination
@@ -161,7 +163,7 @@ export function ContractSearchPage() {
         page,
         per_page: pageSize,
         count: intersected.length,
-        scope,
+        states_filter: p_states ?? null,
         has_more: start + pageSize < intersected.length,
         contracts: paged,
       };

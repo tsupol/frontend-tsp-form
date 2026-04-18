@@ -677,7 +677,7 @@ function ApprovalReviewDrawer({ pending, history, open, onClose, onSuccess }: {
               <DetailRow label={t('approval.customer')} value={customerName ?? '—'} />
               <DetailRow label={t('approval.product')} value={productName ?? '—'} />
               <DetailRow label={t('approval.requestedBy')} value={requestedByName ?? '—'} />
-              <DetailRow label={t('approval.requestedAt')}><DateTime value={requestedAt} /></DetailRow>
+              <DetailRow label={t('approval.requestedAt')}><DateTime value={requestedAt ?? null} /></DetailRow>
               {history?.expires_at && (
                 <DetailRow label={t('approval.expiresAt')}><DateTime value={history.expires_at} /></DetailRow>
               )}

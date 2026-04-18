@@ -2,11 +2,11 @@ import { useState, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  DataTable, DataTableColumnHeader, DataTableFooter, MobileHeader,
+  DataTable, DataTableColumnHeader, MobileHeader,
   Input, Badge, Modal, Button,
   type ColumnDef, type SortingState,
 } from 'tsp-form';
-import { ArrowRightFromLine, Plus, Pencil, Power, ArrowLeft } from 'lucide-react';
+import { ArrowRightFromLine, Plus, Pencil, Power } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 
 interface Holding {
