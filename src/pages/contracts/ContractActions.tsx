@@ -5,7 +5,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { Button, Modal, Input, Select, TextArea, Badge, useSnackbarContext } from 'tsp-form';
 import { CheckCircle, XCircle, Pencil } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
-import { fmtCurrency } from './contractUtils';
+import { fmtCurrency } from '../../lib/format';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 

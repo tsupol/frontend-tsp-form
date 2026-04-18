@@ -7,10 +7,10 @@ import {
 } from 'tsp-form';
 import { ArrowRightFromLine, Calendar, Download } from 'lucide-react';
 import { apiClient } from '../../lib/api';
-import { toLocalDateStr, parseLocalDate, makeDatePickerFormat } from '../../lib/format';
+import { toLocalDateStr, parseLocalDate, makeDatePickerFormat, fmtCurrency } from '../../lib/format';
 import { downloadCsv } from '../../lib/csv';
 import {
-  type Branch, type DailyAccountingRow, fmtAmount, todayISO,
+  type Branch, type DailyAccountingRow, todayISO,
 } from './accountingTypes';
 
 export function DailyAccountingPage() {
@@ -77,7 +77,7 @@ export function DailyAccountingPage() {
     {
       accessorKey: 'total_amount',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('accounting.daily.amount')} />,
-      cell: ({ row }) => <span className="tabular-nums font-medium">{fmtAmount(row.original.total_amount)}</span>,
+      cell: ({ row }) => <span className="tabular-nums font-medium">{fmtCurrency(row.original.total_amount)}</span>,
     },
   ];
 
@@ -142,11 +142,11 @@ export function DailyAccountingPage() {
           <div className="flex-none grid grid-cols-2 gap-3 mb-4">
             <div className="border border-line rounded-lg p-3">
               <div className="text-xs text-fg/60">{t('accounting.daily.totalIn')}</div>
-              <div className="text-lg font-semibold tabular-nums text-success">{fmtAmount(totalIn)}</div>
+              <div className="text-lg font-semibold tabular-nums text-success">{fmtCurrency(totalIn)}</div>
             </div>
             <div className="border border-line rounded-lg p-3">
               <div className="text-xs text-fg/60">{t('accounting.daily.totalOut')}</div>
-              <div className="text-lg font-semibold tabular-nums text-danger">{fmtAmount(totalOut)}</div>
+              <div className="text-lg font-semibold tabular-nums text-danger">{fmtCurrency(totalOut)}</div>
             </div>
           </div>
         )}
@@ -176,7 +176,7 @@ export function DailyAccountingPage() {
                   <div key={i} className="px-4 py-3">
                     <div className="flex items-center justify-between">
                       <span className="font-medium">{r.category_th}</span>
-                      <span className="tabular-nums font-semibold">{fmtAmount(r.total_amount)}</span>
+                      <span className="tabular-nums font-semibold">{fmtCurrency(r.total_amount)}</span>
                     </div>
                     <div className="text-xs text-fg/60 mt-0.5">{r.direction} · {r.txn_count} txn</div>
                   </div>

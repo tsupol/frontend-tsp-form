@@ -10,11 +10,11 @@ import {
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
-import { toLocalDateStr, parseLocalDate, makeDatePickerFormat } from '../../lib/format';
+import { toLocalDateStr, parseLocalDate, makeDatePickerFormat, fmtCurrency } from '../../lib/format';
 import {
   type Branch, type BranchTodaySummaryRow, type DayCloseHistoryRow, type DayCloseAuditRow,
   type UnclosedDayRow,
-  fmtAmount, todayISO,
+  todayISO,
 } from './accountingTypes';
 
 const UNCLOSED_PREFIX = '__unclosed__';
@@ -270,7 +270,7 @@ export function DayClosePage() {
                   </div>
                   {summary && (
                     <div className="text-right shrink-0 text-sm tabular-nums">
-                      {fmtAmount(summary.net_total)}
+                      {fmtCurrency(summary.net_total)}
                     </div>
                   )}
                 </button>
@@ -299,7 +299,7 @@ export function DayClosePage() {
                       </div>
                     </div>
                     <div className="text-right shrink-0 text-sm tabular-nums">
-                      {fmtAmount(u.total_amount)}
+                      {fmtCurrency(u.total_amount)}
                     </div>
                   </button>
                 );
@@ -341,9 +341,9 @@ export function DayClosePage() {
                         </div>
                       </div>
                       <div className="text-right shrink-0 text-sm tabular-nums">
-                        <div>{fmtAmount(h.expected_amount)}</div>
-                        {h.shortage > 0 && <div className="text-xs text-danger">-{fmtAmount(h.shortage)}</div>}
-                        {h.overage > 0 && <div className="text-xs text-warning">+{fmtAmount(h.overage)}</div>}
+                        <div>{fmtCurrency(h.expected_amount)}</div>
+                        {h.shortage > 0 && <div className="text-xs text-danger">-{fmtCurrency(h.shortage)}</div>}
+                        {h.overage > 0 && <div className="text-xs text-warning">+{fmtCurrency(h.overage)}</div>}
                       </div>
                     </button>
                   );
@@ -411,14 +411,14 @@ export function DayClosePage() {
                     <>
                       <h3 className="text-base font-semibold mb-3">{t('accounting.dayClose.preview')}</h3>
                       <dl className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                        <Stat label={t('accounting.dayClose.expected')} value={fmtAmount(unclosedSummary.net_total)} />
-                        <Stat label={t('accounting.dayClose.totalCash')} value={fmtAmount(unclosedSummary.net_cash)} />
-                        <Stat label={t('accounting.dayClose.totalTransfer')} value={fmtAmount(unclosedSummary.net_transfer)} />
+                        <Stat label={t('accounting.dayClose.expected')} value={fmtCurrency(unclosedSummary.net_total)} />
+                        <Stat label={t('accounting.dayClose.totalCash')} value={fmtCurrency(unclosedSummary.net_cash)} />
+                        <Stat label={t('accounting.dayClose.totalTransfer')} value={fmtCurrency(unclosedSummary.net_transfer)} />
                         <Stat label={t('accounting.dayClose.billCount')} value={String(unclosedSummary.bill_count)} />
-                        <Stat label={t('accounting.dayClose.contractAmount')} value={fmtAmount(unclosedSummary.contract_amount)} />
-                        <Stat label={t('accounting.dayClose.retailAmount')} value={fmtAmount(unclosedSummary.retail_amount)} />
-                        <Stat label={t('accounting.dayClose.remitHolding')} value={fmtAmount(unclosedSummary.remit_holding)} />
-                        <Stat label={t('accounting.dayClose.remitCompany')} value={fmtAmount(unclosedSummary.remit_company)} />
+                        <Stat label={t('accounting.dayClose.contractAmount')} value={fmtCurrency(unclosedSummary.contract_amount)} />
+                        <Stat label={t('accounting.dayClose.retailAmount')} value={fmtCurrency(unclosedSummary.retail_amount)} />
+                        <Stat label={t('accounting.dayClose.remitHolding')} value={fmtCurrency(unclosedSummary.remit_holding)} />
+                        <Stat label={t('accounting.dayClose.remitCompany')} value={fmtCurrency(unclosedSummary.remit_company)} />
                       </dl>
 
                       {unclosedSummary.pending_bill_count > 0 && (
@@ -459,7 +459,7 @@ export function DayClosePage() {
                           <div className="text-sm">
                             <span className="text-fg/60">{t('accounting.dayClose.difference')}: </span>
                             <span className={`font-semibold tabular-nums ${diff < 0 ? 'text-danger' : diff > 0 ? 'text-warning' : 'text-success'}`}>
-                              {diff >= 0 ? '+' : ''}{fmtAmount(diff)}
+                              {diff >= 0 ? '+' : ''}{fmtCurrency(diff)}
                             </span>
                           </div>
                         )}
@@ -485,7 +485,7 @@ export function DayClosePage() {
                     <>
                       <dl className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                         <Stat label={t('accounting.dayClose.billCount')} value={String(selectedUnclosed.bill_count)} />
-                        <Stat label={t('accounting.dayClose.expected')} value={fmtAmount(selectedUnclosed.total_amount)} />
+                        <Stat label={t('accounting.dayClose.expected')} value={fmtCurrency(selectedUnclosed.total_amount)} />
                       </dl>
 
                       <h3 className="text-base font-semibold mb-3">{t('accounting.dayClose.enterActual')}</h3>
@@ -537,26 +537,26 @@ export function DayClosePage() {
                   </div>
 
                   <dl className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                    <Stat label={t('accounting.dayClose.expected')} value={fmtAmount(selectedClose.expected_amount)} />
-                    <Stat label={t('accounting.dayClose.actual')} value={fmtAmount(selectedClose.actual_amount)} />
+                    <Stat label={t('accounting.dayClose.expected')} value={fmtCurrency(selectedClose.expected_amount)} />
+                    <Stat label={t('accounting.dayClose.actual')} value={fmtCurrency(selectedClose.actual_amount)} />
                     <Stat
                       label={t('accounting.dayClose.shortage')}
-                      value={fmtAmount(selectedClose.shortage)}
+                      value={fmtCurrency(selectedClose.shortage)}
                       tone={selectedClose.shortage > 0 ? 'danger' : undefined}
                     />
                     <Stat
                       label={t('accounting.dayClose.overage')}
-                      value={fmtAmount(selectedClose.overage)}
+                      value={fmtCurrency(selectedClose.overage)}
                       tone={selectedClose.overage > 0 ? 'warning' : undefined}
                     />
-                    <Stat label={t('accounting.dayClose.totalCash')} value={fmtAmount(selectedClose.total_cash)} />
-                    <Stat label={t('accounting.dayClose.totalTransfer')} value={fmtAmount(selectedClose.total_transfer)} />
+                    <Stat label={t('accounting.dayClose.totalCash')} value={fmtCurrency(selectedClose.total_cash)} />
+                    <Stat label={t('accounting.dayClose.totalTransfer')} value={fmtCurrency(selectedClose.total_transfer)} />
                     <Stat label={t('accounting.dayClose.billCount')} value={String(selectedClose.bill_count)} />
                     <Stat label={t('accounting.dayClose.closedAt')} value={<DateTime value={selectedClose.closed_at} />} />
-                    <Stat label={t('accounting.dayClose.contractAmount')} value={fmtAmount(selectedClose.contract_amount)} />
-                    <Stat label={t('accounting.dayClose.retailAmount')} value={fmtAmount(selectedClose.retail_amount)} />
-                    <Stat label={t('accounting.dayClose.remitHolding')} value={fmtAmount(selectedClose.holding_amount)} />
-                    <Stat label={t('accounting.dayClose.remitCompany')} value={fmtAmount(selectedClose.company_amount)} />
+                    <Stat label={t('accounting.dayClose.contractAmount')} value={fmtCurrency(selectedClose.contract_amount)} />
+                    <Stat label={t('accounting.dayClose.retailAmount')} value={fmtCurrency(selectedClose.retail_amount)} />
+                    <Stat label={t('accounting.dayClose.remitHolding')} value={fmtCurrency(selectedClose.holding_amount)} />
+                    <Stat label={t('accounting.dayClose.remitCompany')} value={fmtCurrency(selectedClose.company_amount)} />
                   </dl>
 
                   {selectedClose.note && (
@@ -601,14 +601,14 @@ export function DayClosePage() {
                     <>
                       <h3 className="text-base font-semibold mb-3">{t('accounting.dayClose.preview')}</h3>
                       <dl className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                        <Stat label={t('accounting.dayClose.expected')} value={fmtAmount(summary.net_total)} />
-                        <Stat label={t('accounting.dayClose.totalCash')} value={fmtAmount(summary.net_cash)} />
-                        <Stat label={t('accounting.dayClose.totalTransfer')} value={fmtAmount(summary.net_transfer)} />
+                        <Stat label={t('accounting.dayClose.expected')} value={fmtCurrency(summary.net_total)} />
+                        <Stat label={t('accounting.dayClose.totalCash')} value={fmtCurrency(summary.net_cash)} />
+                        <Stat label={t('accounting.dayClose.totalTransfer')} value={fmtCurrency(summary.net_transfer)} />
                         <Stat label={t('accounting.dayClose.billCount')} value={String(summary.bill_count)} />
-                        <Stat label={t('accounting.dayClose.contractAmount')} value={fmtAmount(summary.contract_amount)} />
-                        <Stat label={t('accounting.dayClose.retailAmount')} value={fmtAmount(summary.retail_amount)} />
-                        <Stat label={t('accounting.dayClose.remitHolding')} value={fmtAmount(summary.remit_holding)} />
-                        <Stat label={t('accounting.dayClose.remitCompany')} value={fmtAmount(summary.remit_company)} />
+                        <Stat label={t('accounting.dayClose.contractAmount')} value={fmtCurrency(summary.contract_amount)} />
+                        <Stat label={t('accounting.dayClose.retailAmount')} value={fmtCurrency(summary.retail_amount)} />
+                        <Stat label={t('accounting.dayClose.remitHolding')} value={fmtCurrency(summary.remit_holding)} />
+                        <Stat label={t('accounting.dayClose.remitCompany')} value={fmtCurrency(summary.remit_company)} />
                       </dl>
 
                       {summary.pending_bill_count > 0 && (
@@ -651,7 +651,7 @@ export function DayClosePage() {
                               <div className="text-sm">
                                 <span className="text-fg/60">{t('accounting.dayClose.difference')}: </span>
                                 <span className={`font-semibold tabular-nums ${diff < 0 ? 'text-danger' : diff > 0 ? 'text-warning' : 'text-success'}`}>
-                                  {diff >= 0 ? '+' : ''}{fmtAmount(diff)}
+                                  {diff >= 0 ? '+' : ''}{fmtCurrency(diff)}
                                 </span>
                               </div>
                             )}
@@ -691,9 +691,9 @@ export function DayClosePage() {
           {closingDate !== today && (
             <div><span className="text-fg/60">{t('accounting.dayClose.closeForDate')}:</span> <span className="font-semibold"><DateTime value={closingDate} showTime={false} /></span></div>
           )}
-          <div><span className="text-fg/60">{t('accounting.dayClose.expected')}:</span> <span className="font-semibold tabular-nums">{fmtAmount(expected)}</span></div>
-          <div><span className="text-fg/60">{t('accounting.dayClose.actual')}:</span> <span className="font-semibold tabular-nums">{fmtAmount(parseFloat(actualAmount || '0'))}</span></div>
-          <div><span className="text-fg/60">{t('accounting.dayClose.difference')}:</span> <span className={`font-semibold tabular-nums ${diff < 0 ? 'text-danger' : diff > 0 ? 'text-warning' : 'text-success'}`}>{diff >= 0 ? '+' : ''}{fmtAmount(diff)}</span></div>
+          <div><span className="text-fg/60">{t('accounting.dayClose.expected')}:</span> <span className="font-semibold tabular-nums">{fmtCurrency(expected)}</span></div>
+          <div><span className="text-fg/60">{t('accounting.dayClose.actual')}:</span> <span className="font-semibold tabular-nums">{fmtCurrency(parseFloat(actualAmount || '0'))}</span></div>
+          <div><span className="text-fg/60">{t('accounting.dayClose.difference')}:</span> <span className={`font-semibold tabular-nums ${diff < 0 ? 'text-danger' : diff > 0 ? 'text-warning' : 'text-success'}`}>{diff >= 0 ? '+' : ''}{fmtCurrency(diff)}</span></div>
         </div>
       </div>
       <div className="modal-footer">

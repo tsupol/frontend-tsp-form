@@ -5,7 +5,8 @@ import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, Moda
 import { ArrowLeft, ArrowRightFromLine, Box, Search, SlidersHorizontal, CheckCircle, XCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
-import { getBucketLabel, getBucketColor, getConditionLabel, getConditionTextColor, fmtCurrency, CONDITION_OPTIONS } from './inventoryUtils';
+import { fmtCurrency } from '../../lib/format';
+import { getBucketLabel, getBucketColor, getConditionLabel, getConditionTextColor, CONDITION_OPTIONS } from './inventoryUtils';
 
 // ============================================================================
 // Types (verified against live API 2026-03-25)

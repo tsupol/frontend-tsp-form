@@ -3,7 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { MobileHeader } from 'tsp-form';
 import { ArrowRightFromLine } from 'lucide-react';
 import { apiClient } from '../../lib/api';
-import { type BranchBalanceRow, type Branch, fmtAmount } from './accountingTypes';
+import { fmtCurrency } from '../../lib/format';
+import { type BranchBalanceRow, type Branch } from './accountingTypes';
 
 export function BranchBalancePage() {
   const { t } = useTranslation();
@@ -66,14 +67,14 @@ export function BranchBalancePage() {
                   </div>
                 </div>
                 <dl className="grid grid-cols-2 gap-3 text-sm">
-                  <Item label={t('accounting.balance.outstanding')} value={fmtAmount(r.total_outstanding)} />
-                  <Item label={t('accounting.balance.overdue')} value={fmtAmount(r.total_overdue)} tone={r.total_overdue > 0 ? 'danger' : undefined} />
-                  <Item label={t('accounting.balance.insuranceHeld')} value={fmtAmount(r.total_insurance_held)} />
-                  <Item label={t('accounting.balance.savingHeld')} value={fmtAmount(r.total_saving_held)} />
-                  <Item label={t('accounting.balance.creditHeld')} value={fmtAmount(r.total_credit_held)} />
-                  <Item label={t('accounting.balance.lateFeePending')} value={fmtAmount(r.total_late_fee_pending)} />
+                  <Item label={t('accounting.balance.outstanding')} value={fmtCurrency(r.total_outstanding)} />
+                  <Item label={t('accounting.balance.overdue')} value={fmtCurrency(r.total_overdue)} tone={r.total_overdue > 0 ? 'danger' : undefined} />
+                  <Item label={t('accounting.balance.insuranceHeld')} value={fmtCurrency(r.total_insurance_held)} />
+                  <Item label={t('accounting.balance.savingHeld')} value={fmtCurrency(r.total_saving_held)} />
+                  <Item label={t('accounting.balance.creditHeld')} value={fmtCurrency(r.total_credit_held)} />
+                  <Item label={t('accounting.balance.lateFeePending')} value={fmtCurrency(r.total_late_fee_pending)} />
                   <Item label={t('accounting.balance.stockCount')} value={r.stock_asset_count != null ? String(r.stock_asset_count) : '—'} />
-                  <Item label={t('accounting.balance.stockValue')} value={fmtAmount(r.stock_asset_value ?? 0)} />
+                  <Item label={t('accounting.balance.stockValue')} value={fmtCurrency(r.stock_asset_value ?? 0)} />
                 </dl>
               </div>
             );

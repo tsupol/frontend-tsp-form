@@ -1,3 +1,10 @@
+// ── Currency formatter ──────────────────────────────────────────────────────
+
+export function fmtCurrency(value: number | null | undefined): string {
+  if (value === null || value === undefined) return '—';
+  return new Intl.NumberFormat('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(value);
+}
+
 function getLocale(lang: string): string {
   return lang === 'th' ? 'th-TH-u-ca-gregory' : 'en-GB';
 }

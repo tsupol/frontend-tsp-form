@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Button, Select, MaskedInput } from 'tsp-form';
 import { Plus, Trash2, XCircle, Loader2, CreditCard } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
-import { fmtCurrency } from '../contractUtils';
+import { fmtCurrency } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
 import type { PaymentMethod, PaymentLine, BankAccount } from './WorkspaceTypes';
 

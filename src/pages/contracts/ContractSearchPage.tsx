@@ -6,7 +6,8 @@ import { PageNav, PageNavPanel, MobileHeader, Badge, Input, Select, Button, Data
 import { ArrowLeft, ArrowRightFromLine, Search, FileText, SlidersHorizontal, Plus } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
-import { getStateColor, getStateLabel, fmtCurrency, SCOPE_OPTIONS, SCOPE_TO_STATES, STATE_OPTIONS, type ContractScope } from './contractUtils';
+import { fmtCurrency } from '../../lib/format';
+import { getStateColor, getStateLabel, SCOPE_OPTIONS, SCOPE_TO_STATES, STATE_OPTIONS, type ContractScope } from './contractUtils';
 import { ContractDetailPanel } from './ContractDetailPanel';
 
 // ── Types ────────────────────────────────────────────────────────────────────

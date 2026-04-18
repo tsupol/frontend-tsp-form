@@ -7,7 +7,8 @@ import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { DateTime } from '../../components/DateTime';
 import { ModelName } from '../../components/ModelName';
-import { getBucketLabel, getBucketColor, getConditionLabel, getConditionTextColor, fmtCurrency } from './inventoryUtils';
+import { fmtCurrency } from '../../lib/format';
+import { getBucketLabel, getBucketColor, getConditionLabel, getConditionTextColor } from './inventoryUtils';
 
 // ============================================================================
 // Types

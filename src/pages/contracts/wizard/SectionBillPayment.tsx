@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Button, Select, Input } from 'tsp-form';
 import { XCircle, Plus, Trash2, CheckCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
-import { fmtCurrency } from '../contractUtils';
+import { fmtCurrency } from '../../../lib/format';
 import { useWizard } from './WizardContext';
 import type { PaymentMethod, PaymentLine, BillCreateResult, BankAccount } from './WizardTypes';
 

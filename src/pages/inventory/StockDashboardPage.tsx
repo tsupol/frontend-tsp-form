@@ -4,7 +4,8 @@ import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Badge, Select } from 'tsp-form';
 import { apiClient } from '../../lib/api';
 import { Package, ShieldAlert, Wrench, Truck, ArrowLeft, ArrowRightFromLine } from 'lucide-react';
-import { getBucketLabel, getBucketColor, fmtNum, fmtCurrency } from './inventoryUtils';
+import { fmtCurrency } from '../../lib/format';
+import { getBucketLabel, getBucketColor, fmtNum } from './inventoryUtils';
 
 // ============================================================================
 // Types

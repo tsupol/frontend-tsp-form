@@ -4,7 +4,7 @@ import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Input, Select, Button, DataTableFooter } from 'tsp-form';
 import { ArrowLeft, ArrowRightFromLine, Search, PiggyBank, SlidersHorizontal } from 'lucide-react';
 import { apiClient } from '../../lib/api';
-import { fmtCurrency } from './contractUtils';
+import { fmtCurrency } from '../../lib/format';
 import { ContractDetailPanel } from './ContractDetailPanel';
 
 // ── Types ────────────────────────────────────────────────────────────────────

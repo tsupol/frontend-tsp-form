@@ -9,8 +9,8 @@ import {
 import { ArrowRightFromLine, Calendar, SlidersHorizontal } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
-import { toLocalDateStr, parseLocalDate, makeDateRangePickerFormat } from '../../lib/format';
-import { type Branch, fmtAmount } from './accountingTypes';
+import { toLocalDateStr, parseLocalDate, makeDateRangePickerFormat, fmtCurrency } from '../../lib/format';
+import { type Branch } from './accountingTypes';
 
 interface TxnRow {
   holding_id: number;
@@ -156,8 +156,8 @@ export function BranchLedgerPage() {
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('accounting.ledger.amount')} />,
       cell: ({ row }) => {
         const r = row.original;
-        if (r.amount_in > 0) return <span className="tabular-nums font-medium text-success">+{fmtAmount(r.amount_in)}</span>;
-        if (r.amount_out > 0) return <span className="tabular-nums font-medium text-danger">-{fmtAmount(r.amount_out)}</span>;
+        if (r.amount_in > 0) return <span className="tabular-nums font-medium text-success">+{fmtCurrency(r.amount_in)}</span>;
+        if (r.amount_out > 0) return <span className="tabular-nums font-medium text-danger">-{fmtCurrency(r.amount_out)}</span>;
         return <span className="tabular-nums">0</span>;
       },
     },
@@ -359,7 +359,7 @@ export function BranchLedgerPage() {
                         <span className="font-medium text-sm truncate">{r.category}</span>
                       </div>
                       <span className={`tabular-nums font-semibold shrink-0 ${r.direction === 'IN' ? 'text-success' : 'text-danger'}`}>
-                        {r.direction === 'IN' ? '+' : '-'}{fmtAmount(r.direction === 'IN' ? r.amount_in : r.amount_out)}
+                        {r.direction === 'IN' ? '+' : '-'}{fmtCurrency(r.direction === 'IN' ? r.amount_in : r.amount_out)}
                       </span>
                     </div>
                     <div className="text-xs text-fg/60 mt-0.5">

@@ -7,10 +7,10 @@ import {
 } from 'tsp-form';
 import { ArrowRightFromLine, Calendar, Download } from 'lucide-react';
 import { apiClient } from '../../lib/api';
-import { toLocalDateStr, parseLocalDate, makeDatePickerFormat } from '../../lib/format';
+import { toLocalDateStr, parseLocalDate, makeDatePickerFormat, fmtCurrency } from '../../lib/format';
 import { downloadCsv } from '../../lib/csv';
 import {
-  type Branch, type DailyCashflowRow, fmtAmount, todayISO,
+  type Branch, type DailyCashflowRow, todayISO,
 } from './accountingTypes';
 
 export function CashFlowPage() {
@@ -80,7 +80,7 @@ export function CashFlowPage() {
     {
       accessorKey: 'total_in',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('accounting.cashflow.totalIn')} />,
-      cell: ({ row }) => <span className="tabular-nums font-medium">{fmtAmount(row.original.total_in)}</span>,
+      cell: ({ row }) => <span className="tabular-nums font-medium">{fmtCurrency(row.original.total_in)}</span>,
     },
   ];
 
@@ -143,7 +143,7 @@ export function CashFlowPage() {
         {rows.length > 0 && (
           <div className="flex-none border border-line rounded-lg p-3 mb-4">
             <div className="text-xs text-fg/60">{t('accounting.cashflow.grandTotal')}</div>
-            <div className="text-lg font-semibold tabular-nums">{fmtAmount(grand)}</div>
+            <div className="text-lg font-semibold tabular-nums">{fmtCurrency(grand)}</div>
           </div>
         )}
 
@@ -172,7 +172,7 @@ export function CashFlowPage() {
                   <div key={i} className="px-4 py-3">
                     <div className="flex items-center justify-between">
                       <span className="font-medium">{r.method}{r.bank_name ? ` · ${r.bank_name}` : ''}</span>
-                      <span className="tabular-nums font-semibold">{fmtAmount(r.total_in)}</span>
+                      <span className="tabular-nums font-semibold">{fmtCurrency(r.total_in)}</span>
                     </div>
                     {r.account_number && (
                       <div className="text-xs text-fg/60 tabular-nums mt-0.5">{r.account_number}</div>

@@ -26,13 +26,6 @@ export function getStateLabel(state: string, t: TFunction): string {
   return t(`contract.state_${state}`, { defaultValue: state });
 }
 
-// ── Currency formatter ──────────────────────────────────────────────────────
-
-export const fmtCurrency = (value: number | null | undefined): string => {
-  if (value === null || value === undefined) return '—';
-  return new Intl.NumberFormat('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(value);
-};
-
 // ── Scope options ───────────────────────────────────────────────────────────
 
 export const SCOPE_OPTIONS = ['OPEN', 'CLOSED', 'ALL'] as const;

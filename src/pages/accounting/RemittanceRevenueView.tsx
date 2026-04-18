@@ -9,10 +9,10 @@ import {
 import { ArrowRightFromLine, Calendar, Download } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
-import { toLocalDateStr, parseLocalDate, makeDateRangePickerFormat } from '../../lib/format';
+import { toLocalDateStr, parseLocalDate, makeDateRangePickerFormat, fmtCurrency } from '../../lib/format';
 import { downloadCsv } from '../../lib/csv';
 import {
-  type Branch, type RemittanceRevenueRow, fmtAmount,
+  type Branch, type RemittanceRevenueRow,
 } from './accountingTypes';
 
 interface Props {
@@ -125,7 +125,7 @@ export function RemittanceRevenueView({ titleKey, descriptionKey, viewEndpoint, 
     {
       accessorKey: 'amount',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('accounting.rr.amount')} />,
-      cell: ({ row }) => <span className="tabular-nums font-medium">{fmtAmount(row.original.amount)}</span>,
+      cell: ({ row }) => <span className="tabular-nums font-medium">{fmtCurrency(row.original.amount)}</span>,
     },
     {
       accessorKey: 'day_closed',
@@ -230,7 +230,7 @@ export function RemittanceRevenueView({ titleKey, descriptionKey, viewEndpoint, 
                   <div key={r.line_id} className="px-4 py-3">
                     <div className="flex items-center justify-between">
                       <span className="font-medium text-sm">{r.charge_name_th}</span>
-                      <span className="tabular-nums font-semibold">{fmtAmount(r.amount)}</span>
+                      <span className="tabular-nums font-semibold">{fmtCurrency(r.amount)}</span>
                     </div>
                     <div className="text-xs text-fg/60 mt-0.5">
                       <DateTime value={r.bill_date} showTime={false} /> · {r.branch_name}

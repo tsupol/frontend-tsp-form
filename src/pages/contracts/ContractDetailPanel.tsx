@@ -6,7 +6,8 @@ import { Badge, Button } from 'tsp-form';
 import { ChevronLeft, ChevronRight, Copy, Check, Pencil } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
-import { getStateColor, getStateLabel, fmtCurrency } from './contractUtils';
+import { fmtCurrency } from '../../lib/format';
+import { getStateColor, getStateLabel } from './contractUtils';
 import { ContractActionButtons } from './ContractActions';
 import { config } from '../../config/config';
 

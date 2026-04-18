@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { PiggyBank } from 'lucide-react';
-import { fmtCurrency } from '../contractUtils';
+import { fmtCurrency } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
 import { SummaryCard } from './SummaryCard';
 

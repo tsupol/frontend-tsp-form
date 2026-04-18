@@ -176,10 +176,6 @@ export interface UnclosedDayRow {
   days_overdue: number;
 }
 
-export function fmtAmount(n: number | null | undefined): string {
-  if (n == null) return '—';
-  return n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-}
 
 export function todayISO(): string {
   // Bangkok (UTC+7) calendar date, as YYYY-MM-DD

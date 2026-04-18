@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, Input, Select, MaskedInput } from 'tsp-form';
 import { PiggyBank, XCircle, Loader2, Check } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
-import { fmtCurrency } from '../contractUtils';
+import { fmtCurrency } from '../../../lib/format';
 import { DateTime } from '../../../components/DateTime';
 import { useWorkspace } from './WorkspaceContext';
 import { PanelSection } from './PanelSection';

@@ -5,7 +5,7 @@ import { Modal, Input, Select, Badge, Button } from 'tsp-form';
 import { Search, Check } from 'lucide-react';
 import { apiClient } from '../../../lib/api';
 import { useAuth } from '../../../contexts/AuthContext';
-import { fmtCurrency } from '../contractUtils';
+import { fmtCurrency } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
 import type { ProductModel, Variant, Quote, QuoteResponse, BrandLookup, FamilyLookup } from './WorkspaceTypes';
 

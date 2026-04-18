@@ -5,7 +5,8 @@ import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Modal, Text
 import { ArrowLeft, ArrowRightFromLine, ClipboardList, CheckCircle, XCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
-import { fmtNum, fmtCurrency } from './inventoryUtils';
+import { fmtCurrency } from '../../lib/format';
+import { fmtNum } from './inventoryUtils';
 
 // ============================================================================
 // Types

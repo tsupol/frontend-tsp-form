@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Input, Badge, Button, MaskedInput, useSnackbarContext } from 'tsp-form';
 import { Search, XCircle, X, Calculator, Info, CheckCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
-import { fmtCurrency } from '../contractUtils';
+import { fmtCurrency } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
 import type { Quote } from './WorkspaceTypes';
 

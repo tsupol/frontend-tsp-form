@@ -81,7 +81,3 @@ export function fmtNum(n: number | null | undefined): string {
   return n.toLocaleString();
 }
 
-export function fmtCurrency(n: number | null | undefined): string {
-  if (n == null) return '0.00';
-  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}

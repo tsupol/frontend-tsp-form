@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Badge } from 'tsp-form';
 import { Check, Package } from 'lucide-react';
 import { apiClient } from '../../../lib/api';
-import { fmtCurrency } from '../contractUtils';
+import { fmtCurrency } from '../../../lib/format';
 import { useWizard } from './WizardContext';
 import type { Quote, QuoteResponse } from './WizardTypes';
 
