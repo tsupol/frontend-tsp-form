@@ -9,6 +9,7 @@ import {
 } from 'tsp-form';
 import { ArrowRightFromLine, Calendar, CheckCircle, XCircle, Trash2, Star } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import { toLocalDateStr, parseLocalDate } from '../contracts/contractUtils';
 import { DateTime } from '../../components/DateTime';
 import { ContractDetailPanel } from '../contracts/ContractDetailPanel';
 
@@ -617,8 +618,8 @@ function BasicInfoForm({ customer, onSuccess }: { customer: Customer; onSuccess:
           <label className="form-label">{t('customer.dateOfBirth')}</label>
           <InputDatePicker
             size="sm"
-            value={form.date_of_birth ? new Date(form.date_of_birth + 'T00:00:00') : null}
-            onChange={v => set('date_of_birth', v ? v.toISOString().slice(0, 10) : '')}
+            value={parseLocalDate(form.date_of_birth)}
+            onChange={v => set('date_of_birth', toLocalDateStr(v))}
             endIcon={<Calendar size={14} />}
           />
         </div>

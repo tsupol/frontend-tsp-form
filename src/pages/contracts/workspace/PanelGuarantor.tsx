@@ -6,6 +6,7 @@ import type { UploadedImage } from 'tsp-form';
 import { ShieldAlert, CheckCircle, XCircle, Calendar, Search, Loader2, Trash2, AlertTriangle, CreditCard, PenLine, ChevronDown, ChevronRight, Plus, User } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { uploadToS3 } from '../../../lib/upload';
+import { toLocalDateStr, parseLocalDate } from '../contractUtils';
 import { useWorkspace } from './WorkspaceContext';
 import { PanelSection } from './PanelSection';
 import { AddressFormPostal } from './AddressFormPostal';
@@ -275,7 +276,7 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
               <div className="flex gap-3">
                 <div className="flex flex-col flex-1 min-w-0">
                   <label className="form-label">{t('wizard.dateOfBirth')} *</label>
-                  <InputDatePicker value={dateOfBirth ? new Date(dateOfBirth + 'T00:00:00') : null} onChange={(date) => setDateOfBirth(date ? `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}` : '')} size="sm" endIcon={<Calendar size={16} />} calendar="gregorian" locale={i18n.language} />
+                  <InputDatePicker value={parseLocalDate(dateOfBirth)} onChange={(date) => setDateOfBirth(toLocalDateStr(date))} size="sm" endIcon={<Calendar size={16} />} calendar="gregorian" locale={i18n.language} />
                 </div>
                 <div className="flex flex-col flex-1 min-w-0">
                   <label className="form-label">{t('wizard.tel')}</label>
@@ -544,7 +545,7 @@ function GuarantorRow({ guarantor, contractId, expanded, onToggle, onRemove, rem
                   <div className="flex gap-3">
                     <div className="flex flex-col flex-1 min-w-0">
                       <label className="form-label">{t('wizard.dateOfBirth')} *</label>
-                      <InputDatePicker value={editDob ? new Date(editDob + 'T00:00:00') : null} onChange={(date) => setEditDob(date ? `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}` : '')} size="sm" endIcon={<Calendar size={16} />} calendar="gregorian" locale={i18n.language} />
+                      <InputDatePicker value={parseLocalDate(editDob)} onChange={(date) => setEditDob(toLocalDateStr(date))} size="sm" endIcon={<Calendar size={16} />} calendar="gregorian" locale={i18n.language} />
                     </div>
                     <div className="flex flex-col flex-1 min-w-0">
                       <label className="form-label">{t('wizard.tel')}</label>

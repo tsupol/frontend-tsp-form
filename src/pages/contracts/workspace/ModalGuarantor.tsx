@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Modal, Input, Select, Button, InputDatePicker } from 'tsp-form';
 import { ShieldAlert, CheckCircle, XCircle, Calendar } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
+import { toLocalDateStr, parseLocalDate } from '../contractUtils';
 import { useWorkspace } from './WorkspaceContext';
 import { AddressFormPostal } from './AddressFormPostal';
 import type { CustomerRegisterResult, CustomerAddress } from './WorkspaceTypes';
@@ -162,8 +163,8 @@ export function ModalGuarantor({ open, onClose }: Props) {
               <div className="flex flex-col flex-1 min-w-0">
                 <label className="form-label">{t('wizard.dateOfBirth')}</label>
                 <InputDatePicker
-                  value={dateOfBirth ? new Date(dateOfBirth) : null}
-                  onChange={(date) => setDateOfBirth(date ? date.toISOString().slice(0, 10) : '')}
+                  value={parseLocalDate(dateOfBirth)}
+                  onChange={(date) => setDateOfBirth(toLocalDateStr(date))}
                   size="sm"
                   endIcon={<Calendar size={16} />}
                   calendar="gregorian"

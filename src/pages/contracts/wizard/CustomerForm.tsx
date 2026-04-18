@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Input, TextArea, Select, Button, FormErrorMessage, InputDatePicker } from 'tsp-form';
 import { AlertTriangle, ShieldAlert, CheckCircle, XCircle, Calendar } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
+import { toLocalDateStr, parseLocalDate } from '../contractUtils';
 import { MOCK_PROVINCES, getDistrictsByProvince, getSubdistrictsByDistrict } from './AddressMock';
 import type { CustomerFormData, CustomerRegisterResult } from './WizardTypes';
 
@@ -232,8 +233,8 @@ export function CustomerForm({ title, onSubmit, submitLabel, loading: externalLo
           <div className="flex flex-col flex-1 min-w-0">
             <label className="form-label">{t('wizard.dateOfBirth')}</label>
             <InputDatePicker
-              value={form.date_of_birth ? new Date(form.date_of_birth) : null}
-              onChange={(date) => set('date_of_birth', date ? date.toISOString().slice(0, 10) : '')}
+              value={parseLocalDate(form.date_of_birth)}
+              onChange={(date) => set('date_of_birth', toLocalDateStr(date))}
               size="sm"
               endIcon={<Calendar size={16} />}
               calendar="gregorian"
