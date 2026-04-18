@@ -5,7 +5,8 @@ import { SummaryCard } from './SummaryCard';
 
 export function CardPostPayment({ onEditDelivery }: { onEditDelivery?: () => void }) {
   const { t } = useTranslation();
-  const { data } = useWorkspace();
+  const { contract } = useWorkspace();
+  const deliveryDone = !!contract?.shipped_at;
 
   return (
     <div className="flex flex-col gap-3">
@@ -21,10 +22,10 @@ export function CardPostPayment({ onEditDelivery }: { onEditDelivery?: () => voi
       {/* Delivery card */}
       <SummaryCard
         title={t('workspace.cardDelivery')}
-        status={data.deliveryDone ? 'complete' : 'empty'}
+        status={deliveryDone ? 'complete' : 'empty'}
         onEdit={onEditDelivery}
       >
-        {data.deliveryDone ? (
+        {deliveryDone ? (
           <div className="text-xs text-success">{t('wizard.deliveryRecorded')}</div>
         ) : (
           <div className="text-xs text-subtle">{t('workspace.deliveryPending')}</div>

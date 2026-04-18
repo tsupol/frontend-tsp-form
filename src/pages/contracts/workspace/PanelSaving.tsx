@@ -23,15 +23,16 @@ interface Props { onClose: () => void }
 export function PanelSaving({ onClose: _onClose }: Props) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const { data, updateData, invalidateContract, isReadOnly } = useWorkspace();
+  const { data, updateData, contract, invalidateContract, isReadOnly } = useWorkspace();
 
-  const balance = data.savingBalance;
+  const balance = contract?.saving_balance ?? 0;
+  const savingTarget = contract?.saving_target_amount ?? 0;
   const hasDraft = !!data.contractId;
   const hasCustomer = !!data.customerId;
   const canDeposit = hasDraft && !isReadOnly;
   const [targetSaving, setTargetSaving] = useState(false);
   const [targetSaved, setTargetSaved] = useState(false);
-  const lastSavedTarget = useRef(data.savingTargetAmount);
+  const lastSavedTarget = useRef(savingTarget);
   const saveTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const savedTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -127,14 +128,14 @@ export function PanelSaving({ onClose: _onClose }: Props) {
             <PiggyBank size={18} className={balance > 0 ? 'text-info' : 'text-fg/30'} />
             <span className="text-xl font-semibold tabular-nums">{fmtCurrency(balance)}</span>
           </div>
-          {data.savingTargetAmount > 0 && balance > 0 && (
+          {savingTarget > 0 && balance > 0 && (
             <div className="mt-2">
               <div className="flex justify-between text-xs text-subtle mb-1">
                 <span>{t('workspace.savingProgress')}</span>
-                <span>{Math.min(100, Math.round((balance / data.savingTargetAmount) * 100))}%</span>
+                <span>{Math.min(100, Math.round((balance / savingTarget) * 100))}%</span>
               </div>
               <div className="h-1.5 rounded-full bg-fg/10 overflow-hidden">
-                <div className="h-full rounded-full bg-info transition-all" style={{ width: `${Math.min(100, (balance / data.savingTargetAmount) * 100)}%` }} />
+                <div className="h-full rounded-full bg-info transition-all" style={{ width: `${Math.min(100, (balance / savingTarget) * 100)}%` }} />
               </div>
             </div>
           )}
@@ -144,7 +145,7 @@ export function PanelSaving({ onClose: _onClose }: Props) {
           <MaskedInput
             mask="number"
             decimalScale={0}
-            value={String(data.savingTargetAmount || '')}
+            value={String(savingTarget || '')}
             onChange={handleTargetChange}
             size="sm"
             className="w-full"
