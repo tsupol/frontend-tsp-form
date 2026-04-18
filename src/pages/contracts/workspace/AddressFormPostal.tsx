@@ -163,7 +163,7 @@ export function AddressFormPostal({ customerId, addressType, existing, onSuccess
         <div className="flex gap-3">
           <div className="flex flex-col flex-1">
             <label className="form-label">{t('customer.postalCode')} *</label>
-            <Input size="sm" className="w-full" maxLength={5} {...register('postal_code', { required: t('common.required') })} />
+            <Input size="sm" className="w-full" maxLength={5} placeholder={t('customer.postalCodeHint')} {...register('postal_code', { required: t('common.required') })} />
             <FormErrorMessage error={errors.postal_code} />
           </div>
           <div className="flex flex-col flex-1">

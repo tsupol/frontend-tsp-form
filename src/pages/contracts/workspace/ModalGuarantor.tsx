@@ -172,7 +172,7 @@ export function ModalGuarantor({ open, onClose }: Props) {
               </div>
               <div className="flex flex-col flex-1 min-w-0">
                 <label className="form-label">{t('wizard.tel')}</label>
-                <Input value={tel} onChange={(e) => setTel(e.target.value)} placeholder="0xx-xxx-xxxx" size="sm" className="w-full" />
+                <Input value={tel} onChange={(e) => setTel(e.target.value)} size="sm" className="w-full" />
               </div>
             </div>
           </div>

@@ -280,7 +280,7 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
                 </div>
                 <div className="flex flex-col flex-1 min-w-0">
                   <label className="form-label">{t('wizard.tel')}</label>
-                  <MaskedInput dynamicMask={thaiPhoneMask} value={tel} onChange={(raw) => setTel(raw)} placeholder="0X-XXX-XXXX" size="sm" className="w-full" />
+                  <MaskedInput dynamicMask={thaiPhoneMask} value={tel} onChange={(raw) => setTel(raw)} size="sm" className="w-full" />
                 </div>
               </div>
             </div>
@@ -549,7 +549,7 @@ function GuarantorRow({ guarantor, contractId, expanded, onToggle, onRemove, rem
                     </div>
                     <div className="flex flex-col flex-1 min-w-0">
                       <label className="form-label">{t('wizard.tel')}</label>
-                      <MaskedInput dynamicMask={thaiPhoneMask} value={editTel} onChange={(raw) => setEditTel(raw)} placeholder="0X-XXX-XXXX" size="sm" className="w-full" />
+                      <MaskedInput dynamicMask={thaiPhoneMask} value={editTel} onChange={(raw) => setEditTel(raw)} size="sm" className="w-full" />
                     </div>
                   </div>
                 </div>

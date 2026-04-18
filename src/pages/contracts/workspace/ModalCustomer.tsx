@@ -208,7 +208,6 @@ export function ModalCustomer({ open, onClose }: Props) {
                 <Input
                   value={idNumber}
                   onChange={(e) => setIdNumber(e.target.value)}
-                  placeholder={idType === 'CITIZEN_ID' ? '1-xxxx-xxxxx-xx-x' : 'Passport number'}
                   size="sm"
                   className="w-full"
                 />
@@ -249,7 +248,7 @@ export function ModalCustomer({ open, onClose }: Props) {
               </div>
               <div className="flex flex-col flex-1 min-w-0">
                 <label className="form-label">{t('wizard.tel')}</label>
-                <Input value={tel} onChange={(e) => setTel(e.target.value)} placeholder="0xx-xxx-xxxx" size="sm" className="w-full" />
+                <Input value={tel} onChange={(e) => setTel(e.target.value)} size="sm" className="w-full" />
               </div>
               <div className="flex flex-col flex-1 min-w-0">
                 <label className="form-label">{t('wizard.tel2')}</label>
@@ -506,7 +505,7 @@ function ContactAddForm({ customerId, onSuccess }: { customerId: number; onSucce
           <Select size="sm" options={typeOptions} value={contactType} onChange={v => setContactType(v as string)} showChevron searchable={false} />
         </div>
         <div className="flex flex-col flex-1 min-w-0">
-          <Input size="sm" value={value} onChange={e => setValue(e.target.value)} className="w-full" placeholder="095-xxx-xxxx" />
+          <Input size="sm" value={value} onChange={e => setValue(e.target.value)} className="w-full" />
         </div>
       </div>
       <div className="flex items-center justify-between">

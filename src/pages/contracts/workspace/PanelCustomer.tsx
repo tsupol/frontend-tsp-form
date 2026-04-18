@@ -317,7 +317,7 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
             {idType === 'CITIZEN_ID' ? (
               <MaskedInput mask="#-####-#####-##-#" value={idNumber} onChange={(raw) => setIdNumber(raw)} size="sm" className="w-full" disabled={!!selectedCustomer} />
             ) : (
-              <Input value={idNumber} onChange={(e) => setIdNumber(e.target.value)} placeholder="Passport number" size="sm" className="w-full" disabled={!!selectedCustomer} />
+              <Input value={idNumber} onChange={(e) => setIdNumber(e.target.value)} size="sm" className="w-full" disabled={!!selectedCustomer} />
             )}
           </div>
         </div>
@@ -342,7 +342,7 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
           </div>
           <div className="flex flex-col flex-1 min-w-0">
             <label className="form-label">{t('wizard.tel')}</label>
-            <MaskedInput dynamicMask={thaiPhoneMask} value={tel} onChange={(raw) => setTel(raw)} placeholder="0X-XXX-XXXX" size="sm" className="w-full" />
+            <MaskedInput dynamicMask={thaiPhoneMask} value={tel} onChange={(raw) => setTel(raw)} size="sm" className="w-full" />
           </div>
           <div className="flex flex-col flex-1 min-w-0">
             <label className="form-label">{t('wizard.tel2')}</label>

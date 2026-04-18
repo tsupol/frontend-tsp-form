@@ -1760,6 +1760,7 @@
     "soi": "Soi",
     "road": "Road",
     "postalCode": "Postal Code",
+    "postalCodeHint": "Enter first to auto-fill address",
     "subDistrict": "Sub-district",
     "district": "District",
     "province": "Province",

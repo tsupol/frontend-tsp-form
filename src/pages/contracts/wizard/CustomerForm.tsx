@@ -196,7 +196,7 @@ export function CustomerForm({ title, onSubmit, submitLabel, loading: externalLo
             <Input
               value={form.id_number}
               onChange={(e) => set('id_number', e.target.value)}
-              placeholder={form.id_type === 'CITIZEN_ID' ? '1-xxxx-xxxxx-xx-x' : 'Passport number'}
+              placeholder={form.id_type === 'PASSPORT' ? t('wizard.passportNumber') : undefined}
               size="sm"
               className="w-full"
             />
@@ -242,7 +242,7 @@ export function CustomerForm({ title, onSubmit, submitLabel, loading: externalLo
           </div>
           <div className="flex flex-col flex-1 min-w-0">
             <label className="form-label">{t('wizard.tel')}</label>
-            <Input value={form.tel} onChange={(e) => set('tel', e.target.value)} placeholder="0xx-xxx-xxxx" size="sm" className="w-full" />
+            <Input value={form.tel} onChange={(e) => set('tel', e.target.value)} size="sm" className="w-full" />
             <FormErrorMessage error={errors.tel ? { message: errors.tel } : undefined} />
           </div>
           <div className="flex flex-col flex-1 min-w-0">

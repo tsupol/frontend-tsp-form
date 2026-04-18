@@ -173,7 +173,7 @@ function ContactAddForm({ customerId, onSuccess }: { customerId: number; onSucce
           </div>
           <div className="flex flex-col flex-1 min-w-0">
             <label className="form-label">{t('customer.contactValue')}</label>
-            <Input size="sm" value={value} onChange={e => setValue(e.target.value)} className="w-full" placeholder="095-xxx-xxxx" />
+            <Input size="sm" value={value} onChange={e => setValue(e.target.value)} className="w-full" />
           </div>
         </div>
       </div>
