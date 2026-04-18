@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Modal, Input, Select, Button, InputDatePicker, Badge } from 'tsp-form';
 import { AlertTriangle, ShieldAlert, CheckCircle, XCircle, Calendar, ChevronDown, ChevronRight, Plus, Trash2, Star, Info } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
-import { toLocalDateStr, parseLocalDate } from '../contractUtils';
+import { toLocalDateStr, parseLocalDate } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
 import { AddressFormPostal } from './AddressFormPostal';
 import type { CustomerRegisterResult, CustomerAddress, CustomerContact, CustomerReference } from './WorkspaceTypes';

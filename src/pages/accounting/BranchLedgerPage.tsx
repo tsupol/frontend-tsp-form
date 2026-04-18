@@ -9,7 +9,7 @@ import {
 import { ArrowRightFromLine, Calendar, SlidersHorizontal } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
-import { toLocalDateStr, makeDateRangePickerFormat } from '../../lib/format';
+import { toLocalDateStr, parseLocalDate, makeDateRangePickerFormat } from '../../lib/format';
 import { type Branch, fmtAmount } from './accountingTypes';
 
 interface TxnRow {
@@ -203,8 +203,8 @@ export function BranchLedgerPage() {
           </div>
           <div className="flex-1 min-w-0">
             <InputDateRangePicker
-              fromDate={fromDate ? new Date(fromDate + 'T00:00:00') : null}
-              toDate={toDate ? new Date(toDate + 'T00:00:00') : null}
+              fromDate={parseLocalDate(fromDate)}
+              toDate={parseLocalDate(toDate)}
               onFromDateChange={(v) => { setFromDate(toLocalDateStr(v)); resetPage(); }}
               onToDateChange={(v) => { setToDate(toLocalDateStr(v)); resetPage(); }}
               dateFormat={makeDateRangePickerFormat(i18n.language)}

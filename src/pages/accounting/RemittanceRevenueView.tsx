@@ -9,7 +9,7 @@ import {
 import { ArrowRightFromLine, Calendar, Download } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
-import { toLocalDateStr, makeDateRangePickerFormat } from '../../lib/format';
+import { toLocalDateStr, parseLocalDate, makeDateRangePickerFormat } from '../../lib/format';
 import { downloadCsv } from '../../lib/csv';
 import {
   type Branch, type RemittanceRevenueRow, fmtAmount,
@@ -180,8 +180,8 @@ export function RemittanceRevenueView({ titleKey, descriptionKey, viewEndpoint, 
           </div>
           <div className="flex-1 min-w-0 md:max-w-xs">
             <InputDateRangePicker
-              fromDate={fromDate ? new Date(fromDate + 'T00:00:00') : null}
-              toDate={toDate ? new Date(toDate + 'T00:00:00') : null}
+              fromDate={parseLocalDate(fromDate)}
+              toDate={parseLocalDate(toDate)}
               onFromDateChange={(v) => { setFromDate(toLocalDateStr(v)); resetPage(); }}
               onToDateChange={(v) => { setToDate(toLocalDateStr(v)); resetPage(); }}
               dateFormat={makeDateRangePickerFormat(i18n.language)}

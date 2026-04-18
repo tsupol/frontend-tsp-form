@@ -2,7 +2,7 @@ import type { CardStatus } from './WorkspaceTypes';
 import type { ContractServerState } from './useContractQuery';
 import type { CustomerSummary } from './useCustomerSummary';
 import type { ContractDocSummary } from './useContractDocuments';
-import { getAge } from '../contractUtils';
+import { getAge } from '../../../lib/format';
 
 // ── Card status derivation ──────────────────────────────────────────────
 

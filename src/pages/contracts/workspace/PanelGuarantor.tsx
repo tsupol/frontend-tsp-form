@@ -6,7 +6,7 @@ import type { UploadedImage } from 'tsp-form';
 import { ShieldAlert, CheckCircle, XCircle, Calendar, Search, Loader2, Trash2, AlertTriangle, CreditCard, PenLine, ChevronDown, ChevronRight, Plus, User } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { uploadToS3 } from '../../../lib/upload';
-import { toLocalDateStr, parseLocalDate } from '../contractUtils';
+import { toLocalDateStr, parseLocalDate } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
 import { PanelSection } from './PanelSection';
 import { AddressFormPostal } from './AddressFormPostal';

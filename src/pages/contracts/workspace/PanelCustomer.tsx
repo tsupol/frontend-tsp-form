@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Input, Select, Button, InputDatePicker, Modal, MaskedInput } from 'tsp-form';
 import { ShieldAlert, AlertTriangle, CheckCircle, XCircle, Calendar, Search, Loader2, Info } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
-import { toLocalDateStr, parseLocalDate } from '../contractUtils';
+import { toLocalDateStr, parseLocalDate } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
 import { PanelSection } from './PanelSection';
 import { AddressFormPostal } from './AddressFormPostal';

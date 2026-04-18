@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Input, TextArea, Select, Button, FormErrorMessage, InputDatePicker } from 'tsp-form';
 import { AlertTriangle, ShieldAlert, CheckCircle, XCircle, Calendar } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
-import { toLocalDateStr, parseLocalDate } from '../contractUtils';
+import { toLocalDateStr, parseLocalDate } from '../../../lib/format';
 import { MOCK_PROVINCES, getDistrictsByProvince, getSubdistrictsByDistrict } from './AddressMock';
 import type { CustomerFormData, CustomerRegisterResult } from './WizardTypes';
 

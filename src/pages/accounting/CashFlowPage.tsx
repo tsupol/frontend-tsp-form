@@ -7,7 +7,7 @@ import {
 } from 'tsp-form';
 import { ArrowRightFromLine, Calendar, Download } from 'lucide-react';
 import { apiClient } from '../../lib/api';
-import { toLocalDateStr, makeDatePickerFormat } from '../../lib/format';
+import { toLocalDateStr, parseLocalDate, makeDatePickerFormat } from '../../lib/format';
 import { downloadCsv } from '../../lib/csv';
 import {
   type Branch, type DailyCashflowRow, fmtAmount, todayISO,
@@ -128,7 +128,7 @@ export function CashFlowPage() {
           </div>
           <div className="flex-1 min-w-0 md:max-w-xs">
             <InputDatePicker
-              value={date ? new Date(date + 'T00:00:00') : null}
+              value={parseLocalDate(date)}
               onChange={(v) => setDate(toLocalDateStr(v))}
               dateFormat={makeDatePickerFormat(i18n.language)}
               placeholder={t('accounting.date')}

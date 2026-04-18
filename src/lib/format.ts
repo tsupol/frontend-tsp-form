@@ -31,6 +31,22 @@ export function toLocalDateStr(d: Date | null | undefined): string {
   return `${y}-${m}-${day}`;
 }
 
+/** Parse a YYYY-MM-DD string to a Date in local timezone (avoids UTC shift) */
+export function parseLocalDate(str: string | null | undefined): Date | null {
+  if (!str) return null;
+  return new Date(str + 'T00:00:00');
+}
+
+/** Calculate age from a DOB string (YYYY-MM-DD or ISO) */
+export function getAge(dob: string): number {
+  const birth = new Date(dob);
+  const now = new Date();
+  let age = now.getFullYear() - birth.getFullYear();
+  const m = now.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--;
+  return age;
+}
+
 function formatPickerDate(date: Date, lang: string, showTime: boolean): string {
   const opts: Intl.DateTimeFormatOptions = {
     day: 'numeric',

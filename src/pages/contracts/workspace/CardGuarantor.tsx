@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle } from 'lucide-react';
 import { apiClient } from '../../../lib/api';
-import { getAge } from '../contractUtils';
+import { getAge } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
 import { SummaryCard } from './SummaryCard';
 

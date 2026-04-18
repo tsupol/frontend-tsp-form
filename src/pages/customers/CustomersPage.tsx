@@ -9,7 +9,7 @@ import {
 } from 'tsp-form';
 import { ArrowRightFromLine, Calendar, CheckCircle, XCircle, Trash2, Star } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
-import { toLocalDateStr, parseLocalDate } from '../contracts/contractUtils';
+import { toLocalDateStr, parseLocalDate } from '../../lib/format';
 import { DateTime } from '../../components/DateTime';
 import { ContractDetailPanel } from '../contracts/ContractDetailPanel';
 

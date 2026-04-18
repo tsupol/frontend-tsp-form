@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
-import { toLocalDateStr, makeDatePickerFormat } from '../../lib/format';
+import { toLocalDateStr, parseLocalDate, makeDatePickerFormat } from '../../lib/format';
 import {
   type Branch, type BranchTodaySummaryRow, type DayCloseHistoryRow, type DayCloseAuditRow,
   type UnclosedDayRow,
@@ -236,7 +236,7 @@ export function DayClosePage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <InputDatePicker
-                    value={!selectedIsToday && !selectedUnclosedDate && selectedDate ? new Date(selectedDate + 'T00:00:00') : null}
+                    value={!selectedIsToday && !selectedUnclosedDate && selectedDate ? parseLocalDate(selectedDate) : null}
                     onChange={(v) => {
                       const d = toLocalDateStr(v);
                       if (d) selectDate(d, isMobile ? goTo : undefined);
