@@ -48,7 +48,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         scheduleRefresh(); // Schedule next refresh with new expiry
       } catch {
         console.error('[Auth] Background token refresh failed');
-        // Don't clear tokens here — let the next API call trigger the auth error flow
+        // Session is no longer valid — clear and redirect
+        authService.clearTokens();
+        setUser(null);
+        window.location.href = '/login?reason=session_expired';
       }
     }, delay);
   }, []);
@@ -198,7 +201,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
-        isAuthenticated: !!user,
+        isAuthenticated: !!user && !authService.isTokenExpired(),
         isLoading,
         needsHoldingSelect,
         login,
