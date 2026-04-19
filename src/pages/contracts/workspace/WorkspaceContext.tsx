@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -287,15 +288,41 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }).catch(() => {});
   }, [data.contractId, data.customerId]);
 
-  // ── Card statuses (derived from server state) ────────────────────────
+  // ── Guarantor completeness (server-derived) ──────────────────────────
   const guarantorCount = guarantorList.length;
-  // CardGuarantor computes allComplete itself — for getCardStatus we approximate
+  const guarantorIds = useMemo(() => guarantorList.map(g => g.customer_id), [guarantorList]);
+
+  const { data: guarantorsAllComplete = false } = useQuery({
+    queryKey: ['guarantor-all-complete', data.contractId, guarantorIds.join(',')],
+    queryFn: async () => {
+      const results = await Promise.all(guarantorIds.map(async (custId) => {
+        const [addrs, idCard, sig, custInfo] = await Promise.all([
+          apiClient.get<Array<{ address_type: string }>>(`/v_customer_addresses?customer_id=eq.${custId}&select=address_type`).catch(() => []),
+          apiClient.get<Array<{ id: number }>>(`/v_customer_documents?customer_id=eq.${custId}&doc_type=eq.ID_CARD_FRONT&is_active=eq.true&select=id`).catch(() => []),
+          data.contractId
+            ? apiClient.get<Array<{ id: number }>>(`/v_contract_documents?contract_id=eq.${data.contractId}&customer_id=eq.${custId}&doc_type=eq.SIGNATURE_PAD&select=id`).catch(() => [])
+            : [],
+          apiClient.get<Array<{ date_of_birth: string | null }>>(`/v_customers?id=eq.${custId}&select=date_of_birth`).catch(() => []),
+        ]);
+        return !!custInfo[0]?.date_of_birth
+          && addrs.some(a => a.address_type === 'HOME')
+          && addrs.some(a => a.address_type === 'WORK')
+          && idCard.length > 0
+          && sig.length > 0;
+      }));
+      return results.every(Boolean);
+    },
+    enabled: guarantorCount > 0,
+    staleTime: 0,
+  });
+
+  // ── Card statuses (derived from server state) ────────────────────────
   const getCardStatus = useCallback((card: string): CardStatus => {
     return deriveCardStatus(card, contract, customer, docs, {
       count: guarantorCount,
-      allComplete: data.guarantorsComplete, // still read from legacy until CardGuarantor syncs
+      allComplete: guarantorsAllComplete,
     });
-  }, [contract, customer, docs, guarantorCount, data.guarantorsComplete]);
+  }, [contract, customer, docs, guarantorCount, guarantorsAllComplete]);
 
   // Phase flags
   const isPreDraft = !data.contractId;

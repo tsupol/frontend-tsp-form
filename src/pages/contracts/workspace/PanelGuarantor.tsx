@@ -477,7 +477,7 @@ function GuarantorRow({ guarantor, contractId, expanded, onToggle, onRemove, rem
         p_date_of_birth: editDob || null, p_tel: editTel.trim(),
       });
       refetchCustInfo();
-      queryClient.invalidateQueries({ queryKey: ['guarantor-status'] });
+      queryClient.invalidateQueries({ queryKey: ['guarantor-status'] }); queryClient.invalidateQueries({ queryKey: ['guarantor-all-complete'] });
       setInfoSaved(true);
       setTimeout(() => setInfoSaved(false), 2000);
       addSnackbar({ message: <div className="alert alert-success"><CheckCircle size={18} /><div><div className="alert-title">{t('common.saved')}</div></div></div> });
@@ -497,6 +497,7 @@ function GuarantorRow({ guarantor, contractId, expanded, onToggle, onRemove, rem
         p_customer_id: guarantor.customerId, p_doc_type: 'ID_CARD_FRONT', p_file_url: `/${key}`,
       });
       queryClient.invalidateQueries({ queryKey: ['guarantor-idcard', guarantor.customerId] });
+      queryClient.invalidateQueries({ queryKey: ['guarantor-status'] }); queryClient.invalidateQueries({ queryKey: ['guarantor-all-complete'] });
       setCacheBust(n => n + 1);
     } catch {} finally { setUploading(''); }
   };
@@ -514,6 +515,7 @@ function GuarantorRow({ guarantor, contractId, expanded, onToggle, onRemove, rem
         p_customer_id: guarantor.customerId,
       });
       queryClient.invalidateQueries({ queryKey: ['guarantor-signature', contractId, guarantor.customerId] });
+      queryClient.invalidateQueries({ queryKey: ['guarantor-status'] }); queryClient.invalidateQueries({ queryKey: ['guarantor-all-complete'] });
       setCacheBust(n => n + 1);
     } catch {} finally { setUploading(''); }
   };
@@ -639,7 +641,7 @@ function GuarantorRow({ guarantor, contractId, expanded, onToggle, onRemove, rem
             <SectionHeader label={t('workspace.addressHome')} done={!!homeAddress} expanded={openSection === 'home'} onToggle={() => toggle('home')} />
             {openSection === 'home' && (
               <div className="pt-2 pb-4">
-                <AddressFormPostal customerId={guarantor.customerId} addressType="HOME" existing={homeAddress} onSuccess={() => refetchAddresses()} />
+                <AddressFormPostal customerId={guarantor.customerId} addressType="HOME" existing={homeAddress} onSuccess={() => { refetchAddresses(); queryClient.invalidateQueries({ queryKey: ['guarantor-status'] }); queryClient.invalidateQueries({ queryKey: ['guarantor-all-complete'] }); }} />
               </div>
             )}
           </div>
@@ -649,7 +651,7 @@ function GuarantorRow({ guarantor, contractId, expanded, onToggle, onRemove, rem
             <SectionHeader label={t('workspace.addressWork')} done={!!workAddress} expanded={openSection === 'work'} onToggle={() => toggle('work')} />
             {openSection === 'work' && (
               <div className="pt-2 pb-4">
-                <AddressFormPostal customerId={guarantor.customerId} addressType="WORK" existing={workAddress} onSuccess={() => refetchAddresses()} />
+                <AddressFormPostal customerId={guarantor.customerId} addressType="WORK" existing={workAddress} onSuccess={() => { refetchAddresses(); queryClient.invalidateQueries({ queryKey: ['guarantor-status'] }); queryClient.invalidateQueries({ queryKey: ['guarantor-all-complete'] }); }} />
               </div>
             )}
           </div>
