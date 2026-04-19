@@ -22,7 +22,6 @@ import { PanelProductPlan } from './workspace/PanelProductPlan';
 import { PanelCustomer } from './workspace/PanelCustomer';
 import { PanelGuarantor } from './workspace/PanelGuarantor';
 import { PanelDocuments } from './workspace/PanelDocuments';
-import { PanelDelivery } from './workspace/PanelDelivery';
 import { PanelSaving } from './workspace/PanelSaving';
 import { CardContactRef } from './workspace/CardContactRef';
 import { PanelContactRef } from './workspace/PanelContactRef';
@@ -240,7 +239,6 @@ function WorkspaceContent() {
     contactRef: t('workspace.cardContactRef'),
     guarantor: t('workspace.cardGuarantor'),
     documents: t('workspace.cardDocuments'),
-    delivery: t('workspace.cardDelivery'),
   };
 
   return (
@@ -327,7 +325,7 @@ function WorkspaceContent() {
                     <CardDocuments onEdit={() => handleEditOpen('documents')} active={openModal === 'documents'} shake={shakingCards.has('documents')} />
 
                     {!data.billConfirmed && data.contractId && <CardReviewPay onEdit={reviewPayReady ? () => handleEditOpen('reviewPay') : undefined} active={openModal === 'reviewPay'} disabled={!reviewPayReady} />}
-                    {data.billConfirmed && <CardPostPayment onEditDelivery={() => handleEditOpen('delivery')} />}
+                    {data.billConfirmed && <CardPostPayment />}
                   </div>
                 </div>
 
@@ -352,7 +350,6 @@ function WorkspaceContent() {
                   {openModal === 'contactRef' && <PanelContactRef onClose={handleEditClose} />}
                   {openModal === 'guarantor' && <PanelGuarantor onClose={handleEditClose} />}
                   {openModal === 'documents' && <PanelDocuments onClose={handleEditClose} />}
-                  {openModal === 'delivery' && <PanelDelivery onClose={handleEditClose} />}
                   {openModal === 'reviewPay' && <PanelReviewPay onClose={handleEditClose} />}
                   {!openModal && !isMobile && (
                     <div className="flex items-center justify-center h-full text-subtle text-sm">

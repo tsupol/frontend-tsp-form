@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Modal, Input, Select, Button, InputDatePicker, Badge } from 'tsp-form';
-import { AlertTriangle, ShieldAlert, CheckCircle, XCircle, Calendar, ChevronDown, ChevronRight, Plus, Trash2, Star, Info } from 'lucide-react';
+import { AlertTriangle, ShieldAlert, CheckCircle, XCircle, Calendar, Keyboard, ChevronDown, ChevronRight, Plus, Trash2, Star, Info } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { toLocalDateStr, parseLocalDate } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
@@ -34,7 +34,7 @@ interface Props {
 }
 
 export function ModalCustomer({ open, onClose }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { data: workspace, updateData } = useWorkspace();
 
   // Form state
@@ -46,6 +46,7 @@ export function ModalCustomer({ open, onClose }: Props) {
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [tel, setTel] = useState('');
   const [tel2, setTel2] = useState('');
+  const [isTypingDob, setIsTypingDob] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState('');
@@ -192,7 +193,7 @@ export function ModalCustomer({ open, onClose }: Props) {
           {result && <ResultBanner result={result} t={t} />}
 
           {/* ── Main customer form ── */}
-          <div className="form-grid gap-4">
+          <div className="form-grid">
             <div className="flex gap-3">
               <div className="flex flex-col" style={{ width: '10rem' }}>
                 <label className="form-label">{t('wizard.idType')}</label>
@@ -242,8 +243,25 @@ export function ModalCustomer({ open, onClose }: Props) {
                   value={parseLocalDate(dateOfBirth)}
                   onChange={(date) => setDateOfBirth(toLocalDateStr(date))}
                   size="sm"
-                  endIcon={<Calendar size={16} />}
+                  endIcon={<Keyboard size={16} />}
+                  onEndIconClick={() => setIsTypingDob(t => !t)}
+                  locale={i18n.language}
                   calendar="gregorian"
+                  typingMode={isTypingDob}
+                  onTypingModeChange={setIsTypingDob}
+                  typingMask="##/##/####"
+                  typingPlaceholder="DD/MM/YYYY"
+                  parseTypedDate={(raw) => {
+                    if (raw.length !== 8) return null;
+                    const day = parseInt(raw.slice(0, 2), 10);
+                    const month = parseInt(raw.slice(2, 4), 10);
+                    let year = parseInt(raw.slice(4, 8), 10);
+                    if (year > 2400) year -= 543;
+                    if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+                    const d = new Date(year, month - 1, day);
+                    if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+                    return d;
+                  }}
                 />
               </div>
               <div className="flex flex-col flex-1 min-w-0">

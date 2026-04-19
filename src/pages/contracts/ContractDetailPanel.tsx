@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { Badge } from 'tsp-form';
-import { ChevronLeft, ChevronRight, Copy, Check } from 'lucide-react';
+import { Badge, Button, Input, Select, Modal, useSnackbarContext } from 'tsp-form';
+import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { useMutation } from '@tanstack/react-query';
+import { ApiError } from '../../lib/api';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency } from '../../lib/format';
@@ -314,7 +316,7 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
 
       {/* Tab content */}
       <div className="flex-1 overflow-auto better-scroll">
-        {activeTab === 'overview' && <OverviewTab contract={contract} t={t} />}
+        {activeTab === 'overview' && <OverviewTab contract={contract} t={t} queryClient={queryClient} />}
         {activeTab === 'installments' && <InstallmentsTab contractId={contractId} t={t} />}
         {activeTab === 'txns' && <TxnsTab contractId={contractId} t={t} />}
         {activeTab === 'customers' && <CustomersTab contractId={contractId} customerId={contract.customer_id} t={t} />}
@@ -374,9 +376,11 @@ function MediaRow({ label, media }: { label: string; media: EntityMedia[] }) {
 
 // ── Overview Tab ─────────────────────────────────────────────────────────────
 
-function OverviewTab({ contract, t }: { contract: ContractDetail; t: ReturnType<typeof useTranslation>['t'] }) {
+function OverviewTab({ contract, t, queryClient }: { contract: ContractDetail; t: ReturnType<typeof useTranslation>['t']; queryClient: ReturnType<typeof useQueryClient> }) {
   const isFin2 = contract.commercial_model === 'FIN2';
+  const isActive = contract.state === 'ACTIVE' || contract.state === 'COMPLETED' || contract.state === 'TERMINATED';
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
 
   const copyValue = (field: string, value: string) => {
     navigator.clipboard.writeText(value).then(() => {
@@ -513,15 +517,32 @@ function OverviewTab({ contract, t }: { contract: ContractDetail; t: ReturnType<
         </div>
       )}
 
-      {/* Shipping info */}
-      {contract.shipped_at && (
+      {/* Delivery */}
+      {isActive && (
         <div className="border border-line rounded-md px-4 py-3">
-          <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-3">{t('contract.shipping')}</h3>
-          <div className="grid grid-cols-2 gap-3">
-            <InfoCell label={t('contract.shippedAt')} value={<DateTime value={contract.shipped_at} />} />
-            {contract.shipping_method && <InfoCell label={t('contract.shippingMethod')} value={contract.shipping_method} />}
-            {contract.tracking_number && <InfoCell label={t('contract.trackingNumber')} value={contract.tracking_number} />}
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider flex items-center gap-1.5">
+              <Truck size={13} />
+              {t('contract.shipping')}
+            </h3>
+            <button
+              type="button"
+              onClick={() => setDeliveryModalOpen(true)}
+              className="p-1 rounded hover:bg-surface-hover transition-colors cursor-pointer text-fg/60 hover:text-fg bg-transparent border-none"
+              title={t('common.edit')}
+            >
+              <Pencil size={13} />
+            </button>
           </div>
+          {contract.shipped_at ? (
+            <div className="grid grid-cols-2 gap-3">
+              <InfoCell label={t('contract.shippedAt')} value={<DateTime value={contract.shipped_at} showTime={false} />} />
+              {contract.shipping_method && <InfoCell label={t('contract.shippingMethod')} value={contract.shipping_method} />}
+              {contract.tracking_number && <InfoCell label={t('contract.trackingNumber')} value={contract.tracking_number} />}
+            </div>
+          ) : (
+            <div className="text-sm text-subtler">{t('contract.deliveryNotRecorded')}</div>
+          )}
         </div>
       )}
 
@@ -535,6 +556,17 @@ function OverviewTab({ contract, t }: { contract: ContractDetail; t: ReturnType<
         {contract.commission_owner_name && <span>{t('contract.commissionOwner')}: {contract.commission_owner_name}</span>}
         {contract.last_note && <span>{t('contract.lastNote')}: {contract.last_note}</span>}
       </div>
+
+      {/* Delivery modal */}
+      <DeliveryModal
+        open={deliveryModalOpen}
+        contract={contract}
+        onClose={() => setDeliveryModalOpen(false)}
+        onSuccess={() => {
+          setDeliveryModalOpen(false);
+          queryClient.invalidateQueries({ queryKey: ['contract-detail', contract.id] });
+        }}
+      />
     </div>
   );
 }
@@ -772,6 +804,99 @@ function PaymentsTab({ contractId, t }: { contractId: number; t: ReturnType<type
         </div>
       )}
     </div>
+  );
+}
+
+// ── Delivery Modal ──────────────────────────────────────────────────────────
+
+const SHIPPING_OPTIONS = [
+  { value: 'PICKUP', label: 'Pickup at store' },
+  { value: 'DELIVERY', label: 'Delivery' },
+  { value: 'COURIER', label: 'Courier / Shipping' },
+];
+
+function DeliveryModal({ open, contract, onClose, onSuccess }: {
+  open: boolean;
+  contract: ContractDetail;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const { t } = useTranslation();
+  const { addSnackbar } = useSnackbarContext();
+  const [method, setMethod] = useState(contract.shipping_method ?? 'PICKUP');
+  const [trackingNumber, setTrackingNumber] = useState(contract.tracking_number ?? '');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (open) {
+      setMethod(contract.shipping_method ?? 'PICKUP');
+      setTrackingNumber(contract.tracking_number ?? '');
+      setError('');
+    }
+  }, [open, contract.shipping_method, contract.tracking_number]);
+
+  const mutation = useMutation({
+    mutationFn: () => apiClient.rpc('fn_contract_update_delivery', {
+      p_contract_id: contract.id,
+      p_shipping_method: method,
+      p_tracking_number: trackingNumber.trim() || null,
+      p_shipped_at: contract.shipped_at ?? new Date().toISOString(),
+    }),
+    onSuccess: () => {
+      addSnackbar({
+        message: <div className="alert alert-success"><CheckCircle size={16} /><span>{t('contract.deliverySaved')}</span></div>,
+      });
+      onSuccess();
+    },
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setError(translated || err.message);
+      } else setError(String(err));
+    },
+  });
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
+      <div className="flex flex-col overflow-hidden">
+        <div className="modal-header">
+          <h2 className="modal-title">{t('contract.shipping')}</h2>
+          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+        </div>
+        <div className="modal-content">
+          {error && (
+            <div className="alert alert-danger mb-4">
+              <XCircle size={16} />
+              <span>{error}</span>
+            </div>
+          )}
+          <div className="form-grid">
+            <div className="flex flex-col">
+              <label className="form-label">{t('contract.shippingMethod')}</label>
+              <Select options={SHIPPING_OPTIONS} value={method} onChange={(val) => setMethod(val as string)} showChevron />
+            </div>
+            {method !== 'PICKUP' && (
+              <div className="flex flex-col">
+                <label className="form-label">{t('contract.trackingNumber')}</label>
+                <Input value={trackingNumber} onChange={(e) => setTrackingNumber(e.target.value)} placeholder={t('contract.trackingPlaceholder')} className="w-full" />
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="modal-footer">
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button
+            color="primary"
+            onClick={() => mutation.mutate()}
+            disabled={mutation.isPending}
+            startIcon={mutation.isPending ? <Loader2 size={16} className="animate-spin" /> : undefined}
+          >
+            {mutation.isPending ? t('common.loading') : t('common.save')}
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 

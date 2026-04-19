@@ -74,7 +74,7 @@ export function SectionDelivery() {
         </div>
       )}
 
-      <div className="form-grid gap-4">
+      <div className="form-grid">
         <div className="flex flex-col">
           <label className="form-label">{t('wizard.shippingMethod')}</label>
           <Select

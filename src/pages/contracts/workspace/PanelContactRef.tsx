@@ -16,6 +16,7 @@ const thaiPhoneMask = (digits: string) => {
 };
 
 const CONTACT_TYPES = ['MOBILE', 'HOME', 'WORK', 'LINE', 'FACEBOOK', 'OTHER'];
+const PHONE_TYPES = new Set(['MOBILE', 'HOME', 'WORK']);
 
 interface Props { onClose: () => void }
 
@@ -179,8 +180,12 @@ function ContactAddForm({ customerId, onSuccess }: { customerId: number; onSucce
             <Select size="sm" options={typeOptions} value={contactType} onChange={v => setContactType(v as string)} showChevron searchable={false} />
           </div>
           <div className="flex flex-col flex-1 min-w-0">
-            <label className="form-label">{t('customer.contactValue')}</label>
-            <Input size="sm" value={value} onChange={e => setValue(e.target.value)} className="w-full" />
+            <label className="form-label">{PHONE_TYPES.has(contactType) ? t('wizard.tel') : contactType}</label>
+            {PHONE_TYPES.has(contactType) ? (
+              <MaskedInput size="sm" dynamicMask={thaiPhoneMask} value={value} onChange={(raw) => setValue(raw)} className="w-full" />
+            ) : (
+              <Input size="sm" value={value} onChange={e => setValue(e.target.value)} className="w-full" />
+            )}
           </div>
         </div>
       </div>

@@ -948,7 +948,7 @@ export function PricebookPage() {
 
             {/* ── Filter bar — above panels, always visible on list view ── */}
             {(isRoot || !isMobile) && (
-              <div className="flex-none px-4 py-2 border-b border-line">
+              <div className="flex-none p-2 border-b border-line">
                 <div className="flex items-center gap-2">
                   <div className="flex-1 min-w-0">
                     <Input

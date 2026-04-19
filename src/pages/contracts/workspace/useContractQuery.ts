@@ -60,8 +60,8 @@ export interface ContractServerState {
   discount_approval_id: number | null;
   discount_approval_status: string | null;
 
-  // Commission
-  staff_score: number | null;
+  // Staff confidence (pre-validate risk assessment)
+  staff_confidence_score: number | null;
   draft_note: string | null;
 
   // Saving

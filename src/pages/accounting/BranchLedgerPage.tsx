@@ -32,6 +32,31 @@ interface TxnRow {
   slip_ref: string | null;
 }
 
+const CHARGE_TYPE_COLOR: Record<string, 'primary' | 'success' | 'warning' | 'danger' | 'info' | 'secondary'> = {
+  INSTALLMENT: 'primary',
+  DOWN_PAYMENT: 'primary',
+  EARLY_PAYOFF: 'primary',
+  INSURANCE_DEPOSIT: 'info',
+  INSURANCE_TOPUP: 'info',
+  INSURANCE_DEDUCT: 'info',
+  INSURANCE_REFUND: 'info',
+  SAVING_DEPOSIT: 'secondary',
+  SAVING_REFUND: 'secondary',
+  SAVING_FEE: 'secondary',
+  SAVING_WITHDRAW: 'secondary',
+  CREDIT_IN: 'secondary',
+  CREDIT_REFUND: 'secondary',
+  RETAIL_SALE: 'success',
+  GIFT: 'success',
+  GIFT_DISCOUNT: 'success',
+  LATE_FEE_OVERDUE: 'danger',
+  LATE_FEE_WAIVE: 'warning',
+  SERVICE_CHARGE: 'warning',
+  PARTNER_COMMISSION: 'warning',
+  COMMISSION_WITHDRAW: 'warning',
+  SETTLEMENT_REFUND: 'danger',
+};
+
 export function BranchLedgerPage() {
   const { t, i18n } = useTranslation();
   const [branchId, setBranchId] = useState<string>('');
@@ -106,53 +131,72 @@ export function BranchLedgerPage() {
     {
       accessorKey: 'txn_time',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('accounting.ledger.time')} />,
-      cell: ({ row }) => <DateTime value={row.original.txn_time} />,
-    },
-    {
-      accessorKey: 'direction',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('accounting.ledger.direction')} />,
-      cell: ({ row }) => (
-        <Badge color={row.original.direction === 'IN' ? 'success' : 'danger'} size="sm">
-          {row.original.direction === 'IN' ? t('accounting.ledger.in') : t('accounting.ledger.out')}
-        </Badge>
-      ),
+      cell: ({ row }) => <span className="text-xs text-fg/40"><DateTime value={row.original.txn_time} /></span>,
     },
     {
       accessorKey: 'category',
+      enableSorting: false,
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('accounting.ledger.category')} />,
-    },
-    {
-      accessorKey: 'channel',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('accounting.ledger.channel')} />,
       cell: ({ row }) => {
         const r = row.original;
         return (
           <div>
-            <div>{r.channel}</div>
-            {r.bank_name && <div className="text-xs text-fg/60">{r.bank_name} {r.account_number}</div>}
+            <div className="flex items-center gap-2">
+              <Badge color={r.direction === 'IN' ? 'success' : 'danger'} size="sm">
+                {r.direction === 'IN' ? t('accounting.ledger.in') : t('accounting.ledger.out')}
+              </Badge>
+            </div>
+            <div className="text-xs text-fg/50 mt-0.5">{r.category}</div>
           </div>
         );
       },
     },
     {
-      accessorKey: 'bill_code_display',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('accounting.ledger.bill')} />,
-      cell: ({ row }) => <span className="font-mono text-xs">{row.original.bill_code_display}</span>,
-    },
-    {
-      accessorKey: 'contract_code',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('accounting.ledger.contract')} />,
-      cell: ({ row }) => row.original.contract_code
-        ? <span className="font-mono text-xs">{row.original.contract_code}</span>
-        : <span className="opacity-30">—</span>,
+      id: 'reference',
+      enableSorting: false,
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('accounting.ledger.reference')} />,
+      cell: ({ row }) => {
+        const r = row.original;
+        return (
+          <div className="font-mono text-xs">
+            <div>{r.bill_code_display}</div>
+            {r.contract_code && <div className="text-fg/50">{r.contract_code}</div>}
+          </div>
+        );
+      },
     },
     {
       accessorKey: 'charge_types',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('accounting.ledger.chargeType')} />,
-      cell: ({ row }) => <span className="text-xs">{row.original.charge_types}</span>,
+      enableSorting: false,
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('accounting.ledger.detail')} />,
+      cell: ({ row }) => {
+        const r = row.original;
+        const types = r.charge_types?.split(',').map(s => s.trim()).filter(Boolean) ?? [];
+        return (
+          <div>
+            {types.length > 0 ? (
+              <div className="flex flex-wrap gap-1">
+                {types.map((ct, i) => (
+                  <Badge key={i} color={CHARGE_TYPE_COLOR[ct] ?? 'default'} size="sm">
+                    {t(`accounting.ledger.ct_${ct}`, { defaultValue: ct.replace(/_/g, ' ') })}
+                  </Badge>
+                ))}
+              </div>
+            ) : (
+              <span className="text-fg/30">—</span>
+            )}
+            <div className="mt-0.5">
+              <Badge color="default" size="sm">
+                {t(`accounting.ledger.ch_${r.channel}`, { defaultValue: r.channel })}
+              </Badge>
+              {r.bank_name && <span className="text-xs text-fg/50 ml-1">{r.bank_name} {r.account_number}</span>}
+            </div>
+          </div>
+        );
+      },
     },
     {
-      id: 'amount',
+      accessorKey: 'amount_in',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('accounting.ledger.amount')} />,
       cell: ({ row }) => {
         const r = row.original;
@@ -363,7 +407,7 @@ export function BranchLedgerPage() {
                       </span>
                     </div>
                     <div className="text-xs text-fg/60 mt-0.5">
-                      <DateTime value={r.txn_time} /> · {r.channel}{r.bank_name ? ` · ${r.bank_name}` : ''}
+                      <DateTime value={r.txn_time} /> · {t(`accounting.ledger.ch_${r.channel}`, { defaultValue: r.channel })}{r.bank_name ? ` · ${r.bank_name}` : ''}
                     </div>
                     <div className="text-xs font-mono text-fg/50 mt-0.5">
                       {r.bill_code_display}{r.contract_code ? ` · ${r.contract_code}` : ''}

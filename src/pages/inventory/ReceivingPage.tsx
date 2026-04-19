@@ -185,7 +185,7 @@ export function ReceivingPage() {
 
           <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
             <PageNavPanel id="list" className={isMobile ? '' : 'w-1/2 xl:w-5/12 border-r border-line flex flex-col'}>
-              <div className="flex-none flex flex-col gap-2 px-4 py-2 border-b border-line">
+              <div className="flex-none flex flex-col gap-2 p-2 border-b border-line">
                 <div className="flex gap-2 w-full">
                   <div className="flex-[2] min-w-0">
                     <Select

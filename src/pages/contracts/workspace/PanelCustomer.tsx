@@ -2,9 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Input, Select, Button, InputDatePicker, Modal, MaskedInput } from 'tsp-form';
-import { ShieldAlert, AlertTriangle, CheckCircle, XCircle, Calendar, Search, Loader2, Info } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, CheckCircle, XCircle, Calendar, Keyboard, Search, Loader2, Info } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
-import { toLocalDateStr, parseLocalDate } from '../../../lib/format';
+import { toLocalDateStr, parseLocalDate, makeDatePickerFormat } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
 import { PanelSection } from './PanelSection';
 import { AddressFormPostal } from './AddressFormPostal';
@@ -107,6 +107,7 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [tel, setTel] = useState('');
   const [tel2, setTel2] = useState('');
+  const [isTypingDob, setIsTypingDob] = useState(false);
 
   // Selected existing customer — original snapshot for diff
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerSearchResult | null>(null);
@@ -306,7 +307,7 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
       {result && <ResultBanner result={result} t={t} />}
 
       {/* Form */}
-      <div className="form-grid gap-4">
+      <div className="form-grid">
         <div className="flex gap-3">
           <div className="flex flex-col" style={{ width: '10rem' }}>
             <label className="form-label">{t('wizard.idType')}</label>
@@ -338,7 +339,31 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
         <div className="flex gap-3">
           <div className="flex flex-col flex-1 min-w-0">
             <label className="form-label">{t('wizard.dateOfBirth')} *</label>
-            <InputDatePicker value={parseLocalDate(dateOfBirth)} onChange={(date) => setDateOfBirth(toLocalDateStr(date))} size="sm" endIcon={<Calendar size={16} />} calendar="gregorian" locale={i18n.language} />
+            <InputDatePicker
+              value={parseLocalDate(dateOfBirth)}
+              onChange={(date) => setDateOfBirth(toLocalDateStr(date))}
+              size="sm"
+              endIcon={<Keyboard size={16} />}
+              onEndIconClick={() => setIsTypingDob(t => !t)}
+              calendar="gregorian"
+              locale={i18n.language}
+              dateFormat={makeDatePickerFormat(i18n.language)}
+              typingMode={isTypingDob}
+              onTypingModeChange={setIsTypingDob}
+              typingMask="##/##/####"
+              typingPlaceholder="DD/MM/YYYY"
+              parseTypedDate={(raw) => {
+                if (raw.length !== 8) return null;
+                const day = parseInt(raw.slice(0, 2), 10);
+                const month = parseInt(raw.slice(2, 4), 10);
+                let year = parseInt(raw.slice(4, 8), 10);
+                if (year > 2400) year -= 543;
+                if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+                const d = new Date(year, month - 1, day);
+                if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+                return d;
+              }}
+            />
           </div>
           <div className="flex flex-col flex-1 min-w-0">
             <label className="form-label">{t('wizard.tel')}</label>

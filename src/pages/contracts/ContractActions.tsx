@@ -1523,7 +1523,14 @@ function PendingPaymentModal({ open, contract, onClose, onSuccess }: {
   const isBalanced = totalAmount > 0 && Math.abs(totalPayment - totalAmount) < 0.01;
 
   const updatePayment = (idx: number, updates: Partial<PaymentLine>) => {
-    setPayments(prev => prev.map((p, i) => i === idx ? { ...p, ...updates } : p));
+    setPayments(prev => prev.map((p, i) => {
+      if (i !== idx) return p;
+      const merged = { ...p, ...updates };
+      if (merged.method === 'SAVING_WALLET') {
+        merged.amount = Math.min(merged.amount, savingBalance);
+      }
+      return merged;
+    }));
   };
 
   const handleConfirm = async () => {

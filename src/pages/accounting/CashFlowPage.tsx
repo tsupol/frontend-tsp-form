@@ -56,7 +56,7 @@ export function CashFlowPage() {
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('accounting.cashflow.method')} />,
       cell: ({ row }) => (
         <Badge color={row.original.method === 'CASH' ? 'success' : 'primary'} size="sm">
-          {row.original.method}
+          {t(`accounting.ledger.ch_${row.original.method}`, { defaultValue: row.original.method })}
         </Badge>
       ),
     },
@@ -171,7 +171,7 @@ export function CashFlowPage() {
                 {rows.map((r, i) => (
                   <div key={i} className="px-4 py-3">
                     <div className="flex items-center justify-between">
-                      <span className="font-medium">{r.method}{r.bank_name ? ` · ${r.bank_name}` : ''}</span>
+                      <span className="font-medium">{t(`accounting.ledger.ch_${r.method}`, { defaultValue: r.method })}{r.bank_name ? ` · ${r.bank_name}` : ''}</span>
                       <span className="tabular-nums font-semibold">{fmtCurrency(r.total_in)}</span>
                     </div>
                     {r.account_number && (

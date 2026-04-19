@@ -8,7 +8,7 @@ export type ModalId =
   | 'guarantor'
   | 'documents'
   | 'payment'
-  | 'delivery'
+  | 'reviewPay'
   | null;
 
 export type CardStatus = 'empty' | 'partial' | 'complete' | 'warning' | 'locked';

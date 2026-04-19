@@ -6,6 +6,11 @@
 - **Dev server URL**: `https://localhost:5173` (HTTPS, not HTTP)
 - Use Bangkok time (UTC+7) when displaying times to the user
 - **Date/time display:** always use `<DateTime value={isoString} showTime={true|false} />` from `src/components/DateTime.tsx`. It wraps `formatDateTime` in `src/lib/format.ts`, handles Bangkok TZ + locale-aware formatting, and returns `—` for null. Never hand-roll `.slice(0,10)` / `.replace('T',' ')` / raw `{row.original.some_date}` for display. The `.slice(0,10)` idiom is ONLY for ISO query-string state (e.g. `InputDatePicker.onChange → setDateStr`), never for display.
+- **InputDatePicker — always pass `dateFormat` and typing mode props.** Every `InputDatePicker` in this project must include:
+  - `dateFormat={makeDatePickerFormat(i18n.language)}` — from `src/lib/format.ts`, prevents default English "Oct 1, 2020" display
+  - `locale={i18n.language}` and `calendar="gregorian"`
+  - Typing mode: `typingMode`, `onTypingModeChange`, `typingMask="##/##/####"`, `typingPlaceholder="DD/MM/YYYY"`, `parseTypedDate` (with Buddhist Era support: `if (year > 2400) year -= 543`)
+  - `endIcon={<Keyboard size={16} />}` with `onEndIconClick` to toggle typing mode (import `Keyboard` from lucide-react)
 - Theme uses `data-theme` attribute on `<html>` (`light` / `dark`), not CSS classes
 - **`src/index.css`** — tsp-form theme only (copy from `example.css`, change `@import` line to `@import "tailwindcss"`)
 - **`src/app.css`** — app-specific styles (`.page-content`, layout utilities, overrides)

@@ -132,7 +132,7 @@ export function ModalGuarantor({ open, onClose }: Props) {
             )
           )}
 
-          <div className="form-grid gap-4">
+          <div className="form-grid">
             <div className="flex gap-3">
               <div className="flex flex-col" style={{ width: '10rem' }}>
                 <label className="form-label">{t('wizard.idType')}</label>

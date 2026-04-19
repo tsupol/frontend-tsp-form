@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Input, TextArea, Select, Button, FormErrorMessage, InputDatePicker } from 'tsp-form';
-import { AlertTriangle, ShieldAlert, CheckCircle, XCircle, Calendar } from 'lucide-react';
+import { AlertTriangle, ShieldAlert, CheckCircle, XCircle, Calendar, Keyboard } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { toLocalDateStr, parseLocalDate } from '../../../lib/format';
 import { MOCK_PROVINCES, getDistrictsByProvince, getSubdistrictsByDistrict } from './AddressMock';
@@ -51,12 +51,13 @@ interface Props {
 }
 
 export function CustomerForm({ title, onSubmit, submitLabel, loading: externalLoading }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [form, setForm] = useState<CustomerFormData>({ ...emptyForm });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState('');
   const [result, setResult] = useState<CustomerRegisterResult | null>(null);
+  const [isTypingDob, setIsTypingDob] = useState(false);
 
   const set = <K extends keyof CustomerFormData>(key: K, value: CustomerFormData[K]) => {
     setForm(prev => ({ ...prev, [key]: value }));
@@ -179,7 +180,7 @@ export function CustomerForm({ title, onSubmit, submitLabel, loading: externalLo
       )}
 
       {/* Form fields */}
-      <div className="form-grid gap-4">
+      <div className="form-grid">
         {/* ID Type + Number */}
         <div className="flex gap-3">
           <div className="flex flex-col" style={{ width: '10rem' }}>
@@ -236,8 +237,25 @@ export function CustomerForm({ title, onSubmit, submitLabel, loading: externalLo
               value={parseLocalDate(form.date_of_birth)}
               onChange={(date) => set('date_of_birth', toLocalDateStr(date))}
               size="sm"
-              endIcon={<Calendar size={16} />}
+              endIcon={<Keyboard size={16} />}
+              onEndIconClick={() => setIsTypingDob(t => !t)}
+              locale={i18n.language}
               calendar="gregorian"
+              typingMode={isTypingDob}
+              onTypingModeChange={setIsTypingDob}
+              typingMask="##/##/####"
+              typingPlaceholder="DD/MM/YYYY"
+              parseTypedDate={(raw) => {
+                if (raw.length !== 8) return null;
+                const day = parseInt(raw.slice(0, 2), 10);
+                const month = parseInt(raw.slice(2, 4), 10);
+                let year = parseInt(raw.slice(4, 8), 10);
+                if (year > 2400) year -= 543;
+                if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+                const d = new Date(year, month - 1, day);
+                if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+                return d;
+              }}
             />
           </div>
           <div className="flex flex-col flex-1 min-w-0">

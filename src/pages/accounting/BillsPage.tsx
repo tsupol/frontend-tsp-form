@@ -255,7 +255,7 @@ export function BillsPage() {
               </div>
 
               {/* Branch + type filter — 50/50 */}
-              <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
+              <div className="flex-none flex items-center p-2 border-b border-line gap-2">
                 <div className="flex-1 min-w-0">
                   <Select
                     value={effectiveBranchId}

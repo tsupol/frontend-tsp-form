@@ -234,7 +234,7 @@ export function ContractSearchPage() {
               </div>
 
               {/* Filters */}
-              <div className="flex-none flex flex-col gap-2 px-4 py-2 border-b border-line">
+              <div className="flex-none flex flex-col gap-2 p-2 border-b border-line">
                 <div className="flex gap-2 w-full">
                   <div className="flex-[3] min-w-0">
                     <Input
@@ -347,7 +347,7 @@ export function ContractSearchPage() {
 
               {/* Pagination */}
               {totalCount > 0 && (
-                <div className="flex-none border-t border-line px-2 py-1">
+                <div className="flex-none border-t border-line px-2 py-2">
                   <DataTableFooter
                     currentPage={page}
                     totalPages={totalPages || 1}

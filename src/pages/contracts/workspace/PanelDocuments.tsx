@@ -186,6 +186,7 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
       await apiClient.rpc('fn_media_detach', { p_entity_media_id: entityMediaId });
       if (media?.storage_path) deleteFromS3([media.storage_path]).catch(() => {});
       queryClient.invalidateQueries({ queryKey: ['contract-media', contractId] });
+      invalidateDocs();
     } catch {}
   };
 

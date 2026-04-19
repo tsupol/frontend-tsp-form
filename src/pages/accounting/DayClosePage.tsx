@@ -225,7 +225,7 @@ export function DayClosePage() {
           <div key="panels" className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
             <PageNavPanel id="list" className={isMobile ? '' : 'w-1/2 xl:w-5/12 border-r border-line flex flex-col'}>
               {/* Branch + date jump header */}
-              <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
+              <div className="flex-none flex items-center p-2 border-b border-line gap-2">
                 <div className="flex-1 min-w-0">
                   <Select
                     value={effectiveBranchId}

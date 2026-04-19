@@ -355,7 +355,7 @@ export function SalePage() {
           <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
             {/* ── Left Panel: Asset Search ── */}
             <PageNavPanel id="list" className="w-1/2 xl:w-5/12 border-r border-line flex flex-col" mobileClassName="flex flex-col overflow-hidden">
-              <div className="flex-none flex flex-col gap-2 px-4 py-2 border-b border-line">
+              <div className="flex-none flex flex-col gap-2 p-2 border-b border-line">
                 {/* Row 1: Search + Branch + Status + Expand */}
                 <div className="flex gap-2 w-full">
                   <div className="flex-[2] min-w-0">
@@ -403,12 +403,12 @@ export function SalePage() {
                     />
                   </div>
                   <Button
-                    variant="ghost"
                     size="sm"
                     className={`btn-icon-sm shrink-0 ${filtersExpanded || extraFilterCount > 0 ? 'text-primary' : ''}`}
-                    startIcon={<SlidersHorizontal size={14} />}
                     onClick={() => setFiltersExpanded(!filtersExpanded)}
-                  />
+                  >
+                    <SlidersHorizontal size={14} />
+                  </Button>
                 </div>
                 {/* Row 2: Expanded filters (Brand + Family) */}
                 {filtersExpanded && (
