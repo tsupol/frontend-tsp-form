@@ -102,13 +102,14 @@ export function PanelProductPlan({ onClose }: Props) {
   const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const searchRef = useRef<HTMLInputElement>(null);
 
+  // Initialize from contract (server = source of truth), wizardData only for selectedQuote (UI-only)
   const [selectedModel, setSelectedModel] = useState<SearchModel | null>(null);
-  const [localModelId, setLocalModelId] = useState<number | null>(wizardData.modelId ?? contract?.model_id ?? null);
-  const [localModelName, setLocalModelName] = useState(wizardData.modelName || contract?.model_name || '');
-  const [localFamilyName, setLocalFamilyName] = useState(wizardData.familyName);
-  const [localBrandName, setLocalBrandName] = useState(wizardData.brandName);
-  const [localVariantId, setLocalVariantId] = useState<number | null>(wizardData.variantId ?? contract?.variant_id ?? null);
-  const [localVariantName, setLocalVariantName] = useState(wizardData.variantName || contract?.variant_name || '');
+  const [localModelId, setLocalModelId] = useState<number | null>(contract?.model_id ?? null);
+  const [localModelName, setLocalModelName] = useState(contract?.model_name ?? '');
+  const [localFamilyName, setLocalFamilyName] = useState('');
+  const [localBrandName, setLocalBrandName] = useState('');
+  const [localVariantId, setLocalVariantId] = useState<number | null>(contract?.variant_id ?? null);
+  const [localVariantName, setLocalVariantName] = useState(contract?.variant_name ?? '');
   const [localQuote, setLocalQuote] = useState<Quote | null>(wizardData.selectedQuote);
 
   const handleSearchInput = (value: string) => {
@@ -134,50 +135,37 @@ export function PanelProductPlan({ onClose }: Props) {
 
   const models = searchData?.rows ?? [];
 
-  // ── Restore selected model on load ────────────────────────────────────
+  // ── Restore from server state ──────────────────────────────────────────
 
   const restoredRef = useRef(false);
   useEffect(() => {
     if (restoredRef.current || selectedModel) return;
-
-    // Use wizardData first (has step_data), fall back to contract server state
-    const modelId = wizardData.modelId ?? contract?.model_id ?? null;
-    const modelName = wizardData.modelName || contract?.model_name || '';
-    const variantId = wizardData.variantId ?? contract?.variant_id ?? null;
-    const variantName = wizardData.variantName || contract?.variant_name || '';
-
-    if (!modelId || !modelName) return;
+    if (!contract?.model_id || !contract?.model_name) return;
     restoredRef.current = true;
 
-    if (!localModelId) {
-      setLocalModelId(modelId);
-      setLocalModelName(modelName);
-      setLocalFamilyName(wizardData.familyName);
-      setLocalBrandName(wizardData.brandName);
-      setLocalVariantId(variantId);
-      setLocalVariantName(variantName);
-      setLocalQuote(wizardData.selectedQuote);
-    }
+    setLocalModelId(contract.model_id);
+    setLocalModelName(contract.model_name);
+    setLocalVariantId(contract.variant_id);
+    setLocalVariantName(contract.variant_name ?? '');
 
+    // Fetch SearchModel for variant list + brand/family names
     apiClient.rpc<SearchResponse>('fn_product_search', {
-      p_q: modelName,
+      p_q: contract.model_name,
       p_is_contractable: true,
       p_limit: 10,
     }).then(res => {
-      const match = res.rows.find(m => m.model_id === modelId);
+      const match = res.rows.find(m => m.model_id === contract.model_id);
       if (match) {
         setSelectedModel(match);
-        // Fix variant display name to color label
-        if (variantId) {
-          const v = match.variants.find(v => v.variant_id === variantId);
+        setLocalFamilyName(match.family_name);
+        setLocalBrandName(match.brand_name);
+        if (contract.variant_id) {
+          const v = match.variants.find(v => v.variant_id === contract.variant_id);
           if (v) setLocalVariantName(colorLabel(v));
         }
-        // Resolve family + brand names if missing
-        if (!wizardData.familyName) setLocalFamilyName(match.family_name);
-        if (!wizardData.brandName) setLocalBrandName(match.brand_name);
       }
     }).catch(() => {});
-  }, [wizardData.modelId, wizardData.modelName, contract?.model_id, contract?.model_name]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [contract?.model_id, contract?.model_name]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Variants from selected model ──────────────────────────────────────
 
@@ -297,20 +285,21 @@ export function PanelProductPlan({ onClose }: Props) {
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState('');
 
-  const hasChanges = localModelId !== wizardData.modelId
-    || localVariantId !== wizardData.variantId
-    || localQuote?.finance_model !== wizardData.selectedQuote?.finance_model
-    || localQuote?.term_months !== wizardData.selectedQuote?.term_months
-    || localQuote?.down_percent !== wizardData.selectedQuote?.down_percent;
+  const hasChanges = localModelId !== (contract?.model_id ?? null)
+    || localVariantId !== (contract?.variant_id ?? null)
+    || localQuote?.finance_model !== (contract?.commercial_model ?? undefined)
+    || localQuote?.term_months !== (contract?.value_month ?? undefined)
+    || localQuote?.down_percent !== (contract?.snapshot_down_percent ?? undefined);
 
   const handleConfirm = async () => {
     setSaving(true);
     setSaveError('');
     try {
-      if (wizardData.contractId && localModelId) {
-        // 1. Persist UI state
+      const contractId = contract?.id ?? wizardData.contractId;
+      if (contractId && localModelId) {
+        // 1. Persist UI-only state (selectedQuote for restore)
         await apiClient.rpc('fn_contract_save_step', {
-          p_contract_id: wizardData.contractId,
+          p_contract_id: contractId,
           p_step: 'WORKSPACE',
           p_data: {
             modelId: localModelId,
@@ -321,23 +310,23 @@ export function PanelProductPlan({ onClose }: Props) {
         });
 
         if (localVariantId) {
-          const productChanged = localModelId !== wizardData.modelId || localVariantId !== wizardData.variantId;
+          const productChanged = localModelId !== contract?.model_id || localVariantId !== contract?.variant_id;
 
           // 2. Set product (model + variant only) — clears rate/snapshot if product changed
           if (productChanged) {
             await apiClient.rpc('fn_contract_set_product', {
-              p_contract_id: wizardData.contractId,
+              p_contract_id: contractId,
               p_model_id: localModelId,
               p_variant_id: localVariantId,
             });
           }
 
           // 3. Set commercial model if finance model changed
-          const prevModel = wizardData.selectedQuote?.finance_model;
+          const prevModel = contract?.commercial_model;
           const newModel = localQuote?.finance_model;
           if (newModel && newModel !== prevModel) {
             await apiClient.rpc('fn_contract_set_commercial_model', {
-              p_contract_id: wizardData.contractId,
+              p_contract_id: contractId,
               p_commercial_model: newModel,
             });
           }
@@ -346,7 +335,7 @@ export function PanelProductPlan({ onClose }: Props) {
           if (localQuote) {
             const rateTerm = localQuote.base_term_months ?? localQuote.term_months;
             await apiClient.rpc('fn_contract_set_rate', {
-              p_contract_id: wizardData.contractId,
+              p_contract_id: contractId,
               p_term_months: rateTerm,
               ...(localQuote.finance_model === 'FIN1' ? { p_down_percent: localQuote.down_percent } : {}),
             });
@@ -356,7 +345,7 @@ export function PanelProductPlan({ onClose }: Props) {
             const hasCustomDown = localQuote.finance_model === 'FIN2' && localQuote.down_amount > 0;
             if (hasCustomTerm || hasCustomDown) {
               await apiClient.rpc('fn_contract_apply_negotiation', {
-                p_contract_id: wizardData.contractId,
+                p_contract_id: contractId,
                 p_installment_amount: localQuote.installment_amount,
                 ...(hasCustomTerm ? { p_value_month: localQuote.term_months } : {}),
                 ...(hasCustomDown ? { p_down_payment: localQuote.down_amount } : {}),
