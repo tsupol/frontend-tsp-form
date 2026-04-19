@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Input, Badge, Button, MaskedInput, useSnackbarContext } from 'tsp-form';
 import { Search, XCircle, X, Calculator, Info, CheckCircle } from 'lucide-react';
@@ -93,7 +94,8 @@ interface Props {
 
 export function PanelProductPlan({ onClose }: Props) {
   const { t } = useTranslation();
-  const { data: wizardData, contract, invalidateContract, isFinancialLocked } = useWorkspace();
+  const { contractId: paramContractId } = useParams<{ contractId?: string }>();
+  const { data: wizardData, contract, invalidateContract } = useWorkspace();
 
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -101,12 +103,12 @@ export function PanelProductPlan({ onClose }: Props) {
   const searchRef = useRef<HTMLInputElement>(null);
 
   const [selectedModel, setSelectedModel] = useState<SearchModel | null>(null);
-  const [localModelId, setLocalModelId] = useState<number | null>(wizardData.modelId);
-  const [localModelName, setLocalModelName] = useState(wizardData.modelName);
+  const [localModelId, setLocalModelId] = useState<number | null>(wizardData.modelId ?? contract?.model_id ?? null);
+  const [localModelName, setLocalModelName] = useState(wizardData.modelName || contract?.model_name || '');
   const [localFamilyName, setLocalFamilyName] = useState(wizardData.familyName);
   const [localBrandName, setLocalBrandName] = useState(wizardData.brandName);
-  const [localVariantId, setLocalVariantId] = useState<number | null>(wizardData.variantId);
-  const [localVariantName, setLocalVariantName] = useState(wizardData.variantName);
+  const [localVariantId, setLocalVariantId] = useState<number | null>(wizardData.variantId ?? contract?.variant_id ?? null);
+  const [localVariantName, setLocalVariantName] = useState(wizardData.variantName || contract?.variant_name || '');
   const [localQuote, setLocalQuote] = useState<Quote | null>(wizardData.selectedQuote);
 
   const handleSearchInput = (value: string) => {
@@ -137,35 +139,45 @@ export function PanelProductPlan({ onClose }: Props) {
   const restoredRef = useRef(false);
   useEffect(() => {
     if (restoredRef.current || selectedModel) return;
-    if (!wizardData.modelId || !wizardData.modelName) return;
+
+    // Use wizardData first (has step_data), fall back to contract server state
+    const modelId = wizardData.modelId ?? contract?.model_id ?? null;
+    const modelName = wizardData.modelName || contract?.model_name || '';
+    const variantId = wizardData.variantId ?? contract?.variant_id ?? null;
+    const variantName = wizardData.variantName || contract?.variant_name || '';
+
+    if (!modelId || !modelName) return;
     restoredRef.current = true;
 
     if (!localModelId) {
-      setLocalModelId(wizardData.modelId);
-      setLocalModelName(wizardData.modelName);
+      setLocalModelId(modelId);
+      setLocalModelName(modelName);
       setLocalFamilyName(wizardData.familyName);
       setLocalBrandName(wizardData.brandName);
-      setLocalVariantId(wizardData.variantId);
-      setLocalVariantName(wizardData.variantName);
+      setLocalVariantId(variantId);
+      setLocalVariantName(variantName);
       setLocalQuote(wizardData.selectedQuote);
     }
 
     apiClient.rpc<SearchResponse>('fn_product_search', {
-      p_q: wizardData.modelName,
+      p_q: modelName,
       p_is_contractable: true,
       p_limit: 10,
     }).then(res => {
-      const match = res.rows.find(m => m.model_id === wizardData.modelId);
+      const match = res.rows.find(m => m.model_id === modelId);
       if (match) {
         setSelectedModel(match);
         // Fix variant display name to color label
-        if (wizardData.variantId) {
-          const v = match.variants.find(v => v.variant_id === wizardData.variantId);
+        if (variantId) {
+          const v = match.variants.find(v => v.variant_id === variantId);
           if (v) setLocalVariantName(colorLabel(v));
         }
+        // Resolve family + brand names if missing
+        if (!wizardData.familyName) setLocalFamilyName(match.family_name);
+        if (!wizardData.brandName) setLocalBrandName(match.brand_name);
       }
     }).catch(() => {});
-  }, [wizardData.modelId, wizardData.modelName]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [wizardData.modelId, wizardData.modelName, contract?.model_id, contract?.model_name]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Variants from selected model ──────────────────────────────────────
 
@@ -378,7 +390,9 @@ export function PanelProductPlan({ onClose }: Props) {
   };
 
   // Show search list until both model AND variant are selected
-  const showingSearch = shouldSearch || !localModelId || !localVariantId;
+  // When loading an existing contract (refresh/comeback), don't flash the search UI
+  const awaitingRestore = !localModelId && !!paramContractId && !contract;
+  const showingSearch = !awaitingRestore && (shouldSearch || !localModelId || !localVariantId);
 
   return (
     <div className="flex flex-col h-full max-w-2xl">
@@ -388,7 +402,9 @@ export function PanelProductPlan({ onClose }: Props) {
 
       {/* Model area — search results or selected model */}
       <div className="border border-line rounded-lg overflow-hidden h-48 overflow-y-auto better-scroll">
-        {showingSearch ? (
+        {awaitingRestore ? (
+          <div className="flex items-center justify-center h-full text-subtle text-sm">{t('common.loading')}</div>
+        ) : showingSearch ? (
           // Search results list
           !shouldSearch ? (
             <div className="flex items-center justify-center h-full text-subtle text-sm">{t('wizard.typeToSearch')}</div>
