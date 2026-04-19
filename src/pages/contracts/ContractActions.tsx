@@ -2,8 +2,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { Button, Modal, Input, Select, TextArea, Badge, useSnackbarContext } from 'tsp-form';
-import { CheckCircle, XCircle, Pencil } from 'lucide-react';
+import { Button, Modal, Input, Select, TextArea, MaskedInput, Badge, useSnackbarContext } from 'tsp-form';
+import { CheckCircle, XCircle, Pencil, Plus, Trash2, Loader2 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { fmtCurrency } from '../../lib/format';
 
@@ -43,7 +43,9 @@ type ContractAction =
   | 'detach_customer'
   | 'settlement_refund'
   | 'change_draft_owner'
-  | 'saving_deposit';
+  | 'saving_deposit'
+  | 'void_bill'
+  | 'continue_pay';
 
 // ── State → available actions ────────────────────────────────────────────────
 
@@ -85,6 +87,11 @@ function getAvailableActions(contract: ContractForActions): ContractAction[] {
     }
     actions.push('detach_customer');
     actions.push('void');
+  }
+
+  if (state === 'PENDING_PAYMENT') {
+    actions.push('continue_pay');
+    actions.push('void_bill');
   }
 
   if (state === 'DRAFT') {
@@ -377,14 +384,19 @@ export function ContractActionButtons({ contract, onRefresh }: {
   const [activeAction, setActiveAction] = useState<ContractAction | null>(null);
   const { addSnackbar } = useSnackbarContext();
 
-  const actions = getAvailableActions(contract);
+  const allActions = getAvailableActions(contract);
+  // Filter out special actions that are rendered as dedicated buttons
+  const actions = allActions.filter(a => a !== 'continue_pay' && a !== 'void_bill');
   const isDraftOrSaving = contract.state === 'DRAFT' || contract.state === 'SAVING';
+  const isPendingPayment = contract.state === 'PENDING_PAYMENT';
 
-  if (actions.length === 0) return null;
+  if (allActions.length === 0) return null;
 
   const isCancelSaving = activeAction === 'cancel' && contract.state === 'SAVING';
   const isEarlyPayoff = activeAction === 'early_payoff';
   const isSavingDeposit = activeAction === 'saving_deposit';
+  const isContinuePay = activeAction === 'continue_pay';
+  const isVoidBill = activeAction === 'void_bill';
 
   const handleSuccess = (msgKey: string) => {
     setActiveAction(null);
@@ -411,6 +423,25 @@ export function ContractActionButtons({ contract, onRefresh }: {
           >
             {t('contract.continueDraft')}
           </Button>
+        )}
+        {isPendingPayment && (
+          <>
+            <Button
+              size="sm"
+              color="primary"
+              onClick={() => setActiveAction('continue_pay')}
+            >
+              {t('contract.action_continue_pay')}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              color="danger"
+              onClick={() => setActiveAction('void_bill')}
+            >
+              {t('contract.action_void_bill')}
+            </Button>
+          </>
         )}
         {actions.map(action => {
           const config = ACTION_CONFIGS[action];
@@ -446,8 +477,20 @@ export function ContractActionButtons({ contract, onRefresh }: {
         onClose={() => setActiveAction(null)}
         onSuccess={handleSuccess}
       />
+      <PendingPaymentModal
+        open={isContinuePay}
+        contract={contract}
+        onClose={() => setActiveAction(null)}
+        onSuccess={handleSuccess}
+      />
+      <VoidBillModal
+        open={isVoidBill}
+        contract={contract}
+        onClose={() => setActiveAction(null)}
+        onSuccess={handleSuccess}
+      />
       <ContractActionModal
-        open={!!activeAction && !isSavingDeposit && !isCancelSaving && !isEarlyPayoff}
+        open={!!activeAction && !isSavingDeposit && !isCancelSaving && !isEarlyPayoff && !isContinuePay && !isVoidBill}
         action={activeAction}
         contract={contract}
         onClose={() => setActiveAction(null)}
@@ -639,7 +682,7 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
               <div className="text-xs text-subtle">{contract.state} · {contract.commercial_model ?? ''}</div>
             </div>
 
-            <div className="form-grid gap-4">
+            <div className="form-grid">
               {config.needsCloseReason && (
                 <div className="flex flex-col">
                   <label className="form-label">{t('contract.closeReason')} *</label>
@@ -1034,7 +1077,7 @@ function CancelSavingModal({ open, contract, onClose, onSuccess }: {
             <div className="text-lg font-semibold tabular-nums">{fmtCurrency(savingBalance)}</div>
           </div>
 
-          <div className="form-grid gap-4">
+          <div className="form-grid">
             {/* Fee deduction */}
             {savingBalance > 0 && (
               <div className="flex flex-col">
@@ -1232,7 +1275,7 @@ function EarlyPayoffModal({ open, contract, onClose, onSuccess }: {
             <div className="text-lg font-semibold tabular-nums">{fmtCurrency(outstanding)}</div>
           </div>
 
-          <div className="form-grid gap-4">
+          <div className="form-grid">
             {/* Payoff amount */}
             <div className="flex flex-col">
               <label className="form-label">{t('contract.earlyPayoff_amount')} *</label>
@@ -1301,6 +1344,322 @@ function EarlyPayoffModal({ open, contract, onClose, onSuccess }: {
             {mutation.isPending ? stepLabel || t('common.loading') : t('contract.action_early_payoff')}
           </Button>
         </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ── Void Bill Modal ──────────────────────────────────────────────────────────
+
+function VoidBillModal({ open, contract, onClose, onSuccess }: {
+  open: boolean;
+  contract: ContractForActions;
+  onClose: () => void;
+  onSuccess: (msgKey: string) => void;
+}) {
+  const { t } = useTranslation();
+  const [pin, setPin] = useState('');
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (open) { setPin(''); setReason(''); setError(''); }
+  }, [open]);
+
+  // Fetch open bill for this contract
+  const { data: bills } = useQuery({
+    queryKey: ['contract-open-bills', contract.id],
+    queryFn: () => apiClient.get<Array<{ id: number; code_display: string; total_amount: number }>>(
+      `/v_bills?contract_id=eq.${contract.id}&status=eq.OPEN&bill_purpose=eq.CONTRACT_OPEN&select=id,code_display,total_amount&limit=1`
+    ),
+    enabled: open,
+  });
+
+  const bill = bills?.[0];
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      if (!bill) throw new Error('No open bill found');
+      await apiClient.rpc('fn_bill_cancel', {
+        p_bill_id: bill.id,
+        p_reason: reason,
+        p_pin: pin,
+      });
+    },
+    onSuccess: () => onSuccess('contract.action_void_bill_success'),
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setError(translated || err.message);
+      } else {
+        setError(String(err));
+      }
+    },
+  });
+
+  return (
+    <Modal open={open} onClose={onClose} className="max-w-md">
+      <div className="modal-content">
+        <div className="modal-header">
+          <h2 className="modal-title">{t('contract.action_void_bill')}</h2>
+        </div>
+
+        {bill && (
+          <div className="alert alert-warning mb-4">
+            <span>{t('contract.voidBill_warning', { code: bill.code_display, amount: fmtCurrency(bill.total_amount) })}</span>
+          </div>
+        )}
+
+        {error && (
+          <div className="alert alert-danger mb-4">
+            <XCircle size={16} />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <div className="form-grid">
+          <div className="flex flex-col">
+            <label className="form-label">{t('contract.reason')} *</label>
+            <TextArea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} />
+          </div>
+          <div className="flex flex-col">
+            <label className="form-label">{t('contract.pin')} *</label>
+            <Input type="password" value={pin} onChange={(e) => setPin(e.target.value)} className="w-full" />
+          </div>
+        </div>
+      </div>
+      <div className="modal-footer">
+        <Button onClick={onClose}>{t('common.cancel')}</Button>
+        <Button
+          color="danger"
+          onClick={() => mutation.mutate()}
+          disabled={!bill || !reason || !pin || mutation.isPending}
+        >
+          {mutation.isPending ? t('common.loading') : t('contract.action_void_bill')}
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
+// ── Pending Payment Modal ────────────────────────────────────────────────────
+
+type PaymentMethod = 'CASH' | 'TRANSFER' | 'SAVING_WALLET';
+
+interface PaymentLine {
+  method: PaymentMethod;
+  amount: number;
+  bank_account_id: number | null;
+}
+
+interface BankAccount {
+  id: number;
+  bank_name: string;
+  account_number: string;
+  account_name: string;
+}
+
+const BASE_METHODS = [
+  { value: 'CASH', label: 'Cash' },
+  { value: 'TRANSFER', label: 'Bank Transfer' },
+];
+
+function PendingPaymentModal({ open, contract, onClose, onSuccess }: {
+  open: boolean;
+  contract: ContractForActions;
+  onClose: () => void;
+  onSuccess: (msgKey: string) => void;
+}) {
+  const { t } = useTranslation();
+  const savingBalance = contract.saving_balance ?? 0;
+
+  // Fetch open bill
+  const { data: bills } = useQuery({
+    queryKey: ['contract-open-bills', contract.id],
+    queryFn: () => apiClient.get<Array<{ bill_id: number; bill_code_display: string; total_amount: number }>>(
+      `/v_bill_detail?contract_id=eq.${contract.id}&status=eq.OPEN&bill_purpose=eq.CONTRACT_OPEN&select=bill_id,bill_code_display,total_amount&limit=1`
+    ),
+    enabled: open,
+  });
+
+  const bill = bills?.[0];
+  const totalAmount = bill?.total_amount ?? 0;
+
+  const methodOptions = useMemo(() => {
+    const opts = [...BASE_METHODS];
+    if (savingBalance > 0) {
+      opts.push({ value: 'SAVING_WALLET', label: `${t('workspace.savingWallet')} (${fmtCurrency(savingBalance)})` });
+    }
+    return opts;
+  }, [savingBalance, t]);
+
+  const [payments, setPayments] = useState<PaymentLine[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  // Reset when opened
+  useEffect(() => {
+    if (open && totalAmount > 0) {
+      const defaultMethod: PaymentMethod = savingBalance >= totalAmount ? 'SAVING_WALLET' : 'CASH';
+      setPayments([{ method: defaultMethod, amount: totalAmount, bank_account_id: null }]);
+      setError('');
+    }
+  }, [open, totalAmount, savingBalance]);
+
+  const { data: bankAccounts } = useQuery({
+    queryKey: ['bank-accounts-active'],
+    queryFn: () => apiClient.get<BankAccount[]>('/v_bank_accounts?is_active=is.true&order=bank_name'),
+    staleTime: 5 * 60 * 1000,
+    enabled: open,
+  });
+
+  const bankOptions = (bankAccounts ?? []).map(b => ({
+    value: String(b.id),
+    label: `${b.bank_name} - ${b.account_number} (${b.account_name})`,
+  }));
+
+  const totalPayment = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+  const isBalanced = totalAmount > 0 && Math.abs(totalPayment - totalAmount) < 0.01;
+
+  const updatePayment = (idx: number, updates: Partial<PaymentLine>) => {
+    setPayments(prev => prev.map((p, i) => i === idx ? { ...p, ...updates } : p));
+  };
+
+  const handleConfirm = async () => {
+    if (!isBalanced || !bill) return;
+    setLoading(true);
+    setError('');
+    try {
+      for (const payment of payments) {
+        await apiClient.rpc('fn_bill_payment_add', {
+          p_bill_id: bill.bill_id,
+          p_method: payment.method,
+          p_amount: payment.amount,
+          p_bank_account_id: payment.method === 'TRANSFER' ? payment.bank_account_id : null,
+        });
+      }
+      await apiClient.rpc('fn_bill_payment_confirm', {
+        p_bill_id: bill.bill_id,
+        p_contract_id: contract.id,
+      });
+      onSuccess('contract.action_continue_pay_success');
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setError(translated || err.message);
+      } else {
+        setError(String(err));
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} className="max-w-lg">
+      <div className="modal-content">
+        <div className="modal-header">
+          <h2 className="modal-title">{t('contract.action_continue_pay')}</h2>
+          {bill && <span className="text-xs font-mono text-subtle">{bill.bill_code_display}</span>}
+        </div>
+
+        {error && (
+          <div className="alert alert-danger mb-4">
+            <XCircle size={16} />
+            <span>{error}</span>
+          </div>
+        )}
+
+        {!bill ? (
+          <div className="text-sm text-subtle py-4">{t('common.loading')}</div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {/* Bill total */}
+            <div className="flex justify-between items-center p-3 rounded-lg border border-line bg-surface">
+              <span className="text-sm font-medium">{t('workspace.total')}</span>
+              <span className="font-semibold tabular-nums">{fmtCurrency(totalAmount)}</span>
+            </div>
+
+            {/* Payment lines */}
+            <div className="flex flex-col gap-3">
+              <label className="form-label">{t('wizard.paymentMethods')}</label>
+              {payments.map((payment, idx) => (
+                <div key={idx} className="border border-line rounded-lg p-3 flex flex-col gap-3">
+                  <div className="flex gap-3 items-end">
+                    <div className="flex flex-col" style={{ width: '10rem' }}>
+                      <label className="form-label text-xs">{t('wizard.method')}</label>
+                      <Select
+                        options={methodOptions}
+                        value={payment.method}
+                        onChange={(val) => updatePayment(idx, { method: val as PaymentMethod, bank_account_id: null })}
+                        size="sm"
+                      />
+                    </div>
+                    <div className="flex flex-col flex-1 min-w-0">
+                      <label className="form-label text-xs">{t('contract.amount')}</label>
+                      <MaskedInput
+                        mask="number"
+                        decimalScale={2}
+                        value={String(payment.amount || '')}
+                        onChange={(raw) => updatePayment(idx, { amount: parseFloat(raw) || 0 })}
+                        size="sm"
+                        className="w-full"
+                      />
+                    </div>
+                    {payments.length > 1 && (
+                      <Button size="sm" className="btn-icon-sm shrink-0" onClick={() => setPayments(prev => prev.filter((_, i) => i !== idx))}>
+                        <Trash2 size={14} />
+                      </Button>
+                    )}
+                  </div>
+                  {payment.method === 'TRANSFER' && (
+                    <div className="flex flex-col">
+                      <label className="form-label text-xs">{t('wizard.bankAccount')}</label>
+                      <Select
+                        options={bankOptions}
+                        value={payment.bank_account_id ? String(payment.bank_account_id) : null}
+                        onChange={(val) => updatePayment(idx, { bank_account_id: val ? Number(val) : null })}
+                        placeholder={t('wizard.selectBankAccount')}
+                        size="sm"
+                        showChevron
+                        searchable
+                      />
+                    </div>
+                  )}
+                </div>
+              ))}
+              <Button size="sm" onClick={() => {
+                const remaining = totalAmount - totalPayment;
+                setPayments(prev => [...prev, { method: 'CASH', amount: remaining > 0 ? remaining : 0, bank_account_id: null }]);
+              }} startIcon={<Plus size={14} />}>
+                {t('wizard.addPayment')}
+              </Button>
+            </div>
+
+            {/* Total check */}
+            <div className={`flex justify-between items-center p-3 rounded-lg border ${
+              isBalanced ? 'border-success/30 bg-success/5' : 'border-warning/30 bg-warning/5'
+            }`}>
+              <span className="text-sm">{t('wizard.totalPayment')}</span>
+              <span className={`font-semibold tabular-nums ${isBalanced ? 'text-success' : 'text-warning'}`}>
+                {fmtCurrency(totalPayment)}
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="modal-footer">
+        <Button onClick={onClose}>{t('common.cancel')}</Button>
+        <Button
+          color="primary"
+          onClick={handleConfirm}
+          disabled={loading || !isBalanced}
+          startIcon={loading ? <Loader2 size={16} className="animate-spin" /> : undefined}
+        >
+          {loading ? t('common.loading') : t('wizard.confirmPayment')}
+        </Button>
       </div>
     </Modal>
   );

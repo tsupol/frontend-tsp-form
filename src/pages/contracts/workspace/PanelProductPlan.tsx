@@ -330,13 +330,26 @@ export function PanelProductPlan({ onClose }: Props) {
             });
           }
 
-          // 4. Set rate — creates snapshot
+          // 4. Set rate — creates snapshot (use catalog term, not custom)
           if (localQuote) {
+            const rateTerm = localQuote.base_term_months ?? localQuote.term_months;
             await apiClient.rpc('fn_contract_set_rate', {
               p_contract_id: wizardData.contractId,
-              p_term_months: localQuote.term_months,
+              p_term_months: rateTerm,
               ...(localQuote.finance_model === 'FIN1' ? { p_down_percent: localQuote.down_percent } : {}),
             });
+
+            // 5. Apply negotiation if custom term/down differs from catalog
+            const hasCustomTerm = localQuote.base_term_months != null && localQuote.term_months !== localQuote.base_term_months;
+            const hasCustomDown = localQuote.finance_model === 'FIN2' && localQuote.down_amount > 0;
+            if (hasCustomTerm || hasCustomDown) {
+              await apiClient.rpc('fn_contract_apply_negotiation', {
+                p_contract_id: wizardData.contractId,
+                p_installment_amount: localQuote.installment_amount,
+                ...(hasCustomTerm ? { p_value_month: localQuote.term_months } : {}),
+                ...(hasCustomDown ? { p_down_payment: localQuote.down_amount } : {}),
+              });
+            }
           }
         }
       }
@@ -458,6 +471,7 @@ export function PanelProductPlan({ onClose }: Props) {
                   interest_percent_total: null,
                   max_discount_percent: fin2Rows[0]?.max_discount_percent ?? 0,
                   fin2_profit_amount: r.profit,
+                  base_term_months: r.baseTerm,
                 });
               }} />
             </div>
@@ -574,6 +588,7 @@ function resolveProfit(fin2Rows: PricingRow[], fin2Terms: number[], termMonths: 
 
 interface CalcResult {
   termMonths: number;
+  baseTerm: number;
   profit: number;
   total: number;
   downAmount: number;
@@ -652,7 +667,7 @@ function Fin2Calculator({ fin2Rows, fin2Terms, t, onUse }: {
             <span className="text-right tabular-nums text-primary font-semibold text-base">{fmt(result.installment)}</span>
           </div>
           <div className="flex justify-end mt-3">
-            <Button size="sm" color="primary" onClick={() => onUse({ termMonths, profit: result.profit, total: result.total, downAmount: result.downAmount, financed: result.financed, installment: result.installment })}>
+            <Button size="sm" color="primary" onClick={() => onUse({ termMonths, baseTerm: result.baseTerm, profit: result.profit, total: result.total, downAmount: result.downAmount, financed: result.financed, installment: result.installment })}>
               {t('priceCheck.useThisPlan')}
             </Button>
           </div>
