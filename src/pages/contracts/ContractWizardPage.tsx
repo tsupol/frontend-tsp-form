@@ -15,7 +15,8 @@ import { CardCustomer } from './workspace/CardCustomer';
 import { CardGuarantor } from './workspace/CardGuarantor';
 import { CardDocuments } from './workspace/CardDocuments';
 
-import { CardPayment } from './workspace/CardPayment';
+import { CardReviewPay } from './workspace/CardReviewPay';
+import { PanelReviewPay } from './workspace/PanelReviewPay';
 import { CardPostPayment } from './workspace/CardPostPayment';
 import { PanelProductPlan } from './workspace/PanelProductPlan';
 import { PanelCustomer } from './workspace/PanelCustomer';
@@ -38,7 +39,6 @@ function WorkspaceContent() {
   const { contractId: paramContractId } = useParams<{ contractId?: string }>();
   const { user } = useAuth();
   const navGuard = useNavGuard();
-  const dirtyRef = useRef(false);
   const loadedRef = useRef(false);
   const { data, updateData, resetData, openModal, setOpenModal, isPostPayment, getCardStatus, panelDirtyRef, pendingModal, confirmPanelSwitch, cancelPanelSwitch } = useWorkspace();
   const [shakingCards, setShakingCards] = useState<Set<string>>(new Set());
@@ -154,6 +154,10 @@ function WorkspaceContent() {
 
         await Promise.all(fetches);
 
+        // Detect post-bill / post-payment states
+        const isActive = c.state === 'ACTIVE' || c.state === 'COMPLETED' || c.state === 'TERMINATED';
+        const isPendingPayment = c.state === 'PENDING_PAYMENT';
+
         updateData({
           contractId: c.id,
           contractCode: c.code_display || c.code,
@@ -177,6 +181,8 @@ function WorkspaceContent() {
           hasIdPhoto,
           hasSignature,
           evidenceCount,
+          ...(isActive ? { billConfirmed: true } : {}),
+          ...(isPendingPayment ? { billId: -1 } : {}), // signal that bill exists, actual ID fetched when needed
         });
       } catch {
         // ignore load errors
@@ -186,14 +192,10 @@ function WorkspaceContent() {
     loadContract();
   }, [paramContractId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Track dirty — workspace data OR panel has unsaved input
+  // Track dirty — navGuard reads the ref on navigation attempts
   useEffect(() => {
-    dirtyRef.current = !!(data.customerId || data.modelId || data.savingBalance > 0) || panelDirtyRef.current;
-  }, [data.customerId, data.modelId, data.savingBalance, panelDirtyRef]);
-
-  useEffect(() => {
-    navGuard?.setDirtyRef(dirtyRef);
-  }, [navGuard]);
+    navGuard?.setDirtyRef(panelDirtyRef);
+  }, [navGuard, panelDirtyRef]);
 
   // Fetch branches for users without branch_id
   const { data: branches } = useQuery({
@@ -255,10 +257,10 @@ function WorkspaceContent() {
           if (isMobile) goBack();
         };
 
-        // Show payment card when all required cards are complete or bill already exists (resumed PENDING_PAYMENT)
+        // Review & Pay card: always visible once draft exists, but disabled until all cards complete
         const requiredCards = ['productPlan', 'customer', 'contactRef', 'guarantor', 'documents'] as const;
         const allCardsComplete = data.contractId != null && requiredCards.every(id => getCardStatus(id) === 'complete');
-        const showPaymentCard = allCardsComplete || !!data.billId;
+        const reviewPayReady = allCardsComplete || !!data.billId;
 
         return (
           <>
@@ -324,7 +326,7 @@ function WorkspaceContent() {
                     <CardGuarantor onEdit={() => handleEditOpen('guarantor')} active={openModal === 'guarantor'} shake={shakingCards.has('guarantor')} />
                     <CardDocuments onEdit={() => handleEditOpen('documents')} active={openModal === 'documents'} shake={shakingCards.has('documents')} />
 
-                    {!data.billConfirmed && showPaymentCard && <CardPayment />}
+                    {!data.billConfirmed && data.contractId && <CardReviewPay onEdit={reviewPayReady ? () => handleEditOpen('reviewPay') : undefined} active={openModal === 'reviewPay'} disabled={!reviewPayReady} />}
                     {data.billConfirmed && <CardPostPayment onEditDelivery={() => handleEditOpen('delivery')} />}
                   </div>
                 </div>
@@ -351,6 +353,7 @@ function WorkspaceContent() {
                   {openModal === 'guarantor' && <PanelGuarantor onClose={handleEditClose} />}
                   {openModal === 'documents' && <PanelDocuments onClose={handleEditClose} />}
                   {openModal === 'delivery' && <PanelDelivery onClose={handleEditClose} />}
+                  {openModal === 'reviewPay' && <PanelReviewPay onClose={handleEditClose} />}
                   {!openModal && !isMobile && (
                     <div className="flex items-center justify-center h-full text-subtle text-sm">
                       {t('workspace.selectToEdit')}

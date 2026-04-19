@@ -1,9 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { Badge, Button } from 'tsp-form';
-import { ChevronLeft, ChevronRight, Copy, Check, Pencil } from 'lucide-react';
+import { Badge } from 'tsp-form';
+import { ChevronLeft, ChevronRight, Copy, Check } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency } from '../../lib/format';
@@ -72,7 +71,7 @@ interface ContractDetail {
   overdue_count: number | null;
   overdue_since_date: string | null;
   overdue_days: number | null;
-  staff_score: number | null;
+  staff_confidence_score: number | null;
   commission_owner_id: number | null;
   commission_owner_name: string | null;
   shipped_at: string | null;
@@ -376,9 +375,7 @@ function MediaRow({ label, media }: { label: string; media: EntityMedia[] }) {
 // ── Overview Tab ─────────────────────────────────────────────────────────────
 
 function OverviewTab({ contract, t }: { contract: ContractDetail; t: ReturnType<typeof useTranslation>['t'] }) {
-  const navigate = useNavigate();
   const isFin2 = contract.commercial_model === 'FIN2';
-  const isDraftOrSaving = contract.state === 'DRAFT' || contract.state === 'SAVING';
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const copyValue = (field: string, value: string) => {
@@ -387,18 +384,6 @@ function OverviewTab({ contract, t }: { contract: ContractDetail; t: ReturnType<
       setTimeout(() => setCopiedField(null), 1500);
     });
   };
-
-  // Contract media: signature + evidence
-  const { data: contractMedia = [] } = useQuery({
-    queryKey: ['entity-media', 'CONTRACT', contract.id],
-    queryFn: () => apiClient.get<EntityMedia[]>(
-      `/v_entity_media?entity_type=eq.CONTRACT&entity_id=eq.${contract.id}&is_active=eq.true&order=usage_type,sort_order`
-    ),
-  });
-
-  const signatures = contractMedia.filter(m => m.usage_type === 'SIGNATURE');
-  const evidence = contractMedia.filter(m => m.usage_type === 'EVIDENCE');
-  const documents = contractMedia.filter(m => m.usage_type === 'DOCUMENT');
 
   return (
     <div className="p-4 flex flex-col gap-4">
@@ -528,16 +513,6 @@ function OverviewTab({ contract, t }: { contract: ContractDetail; t: ReturnType<
         </div>
       )}
 
-      {/* Media: signature, evidence, documents */}
-      {(signatures.length > 0 || evidence.length > 0 || documents.length > 0) && (
-        <div className="border border-line rounded-md px-4 py-3 flex flex-col gap-3">
-          <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider">{t('contract.media')}</h3>
-          <MediaRow label={t('contract.signature')} media={signatures} />
-          <MediaRow label={t('contract.evidence')} media={evidence} />
-          <MediaRow label={t('contract.documents')} media={documents} />
-        </div>
-      )}
-
       {/* Shipping info */}
       {contract.shipped_at && (
         <div className="border border-line rounded-md px-4 py-3">
@@ -547,20 +522,6 @@ function OverviewTab({ contract, t }: { contract: ContractDetail; t: ReturnType<
             {contract.shipping_method && <InfoCell label={t('contract.shippingMethod')} value={contract.shipping_method} />}
             {contract.tracking_number && <InfoCell label={t('contract.trackingNumber')} value={contract.tracking_number} />}
           </div>
-        </div>
-      )}
-
-      {/* Continue draft button */}
-      {isDraftOrSaving && (
-        <div className="pb-2">
-          <Button
-            color="primary"
-            size="sm"
-            startIcon={<Pencil size={14} />}
-            onClick={() => navigate(`/admin/contracts/draft/${contract.id}`)}
-          >
-            {t('contract.continueDraft')}
-          </Button>
         </div>
       )}
 
@@ -690,7 +651,7 @@ function CustomersTab({ contractId, customerId, t }: { contractId: number; custo
   const { data: idCardMedia = [] } = useQuery({
     queryKey: ['entity-media', 'CUSTOMER', customerId],
     queryFn: () => apiClient.get<EntityMedia[]>(
-      `/v_entity_media?entity_type=eq.CUSTOMER&entity_id=eq.${customerId}&usage_type=eq.ID_CARD&is_active=eq.true`
+      `/v_entity_media?entity_type=eq.CUSTOMER&entity_id=eq.${customerId}&usage_type=eq.ID_CARD`
     ),
     enabled: !!customerId,
   });
@@ -758,7 +719,7 @@ function PaymentsTab({ contractId, t }: { contractId: number; t: ReturnType<type
   const { data: paymentSlips = [] } = useQuery({
     queryKey: ['entity-media', 'CONTRACT', contractId, 'PAYMENT_SLIP'],
     queryFn: () => apiClient.get<EntityMedia[]>(
-      `/v_entity_media?entity_type=eq.CONTRACT&entity_id=eq.${contractId}&usage_type=eq.PAYMENT_SLIP&is_active=eq.true&order=sort_order`
+      `/v_entity_media?entity_type=eq.CONTRACT&entity_id=eq.${contractId}&usage_type=eq.PAYMENT_SLIP&order=sort_order`
     ),
   });
 

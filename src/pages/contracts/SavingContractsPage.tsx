@@ -5,7 +5,7 @@ import { PageNav, PageNavPanel, MobileHeader, Input, Select, Button, DataTableFo
 import { ArrowLeft, ArrowRightFromLine, Search, PiggyBank, SlidersHorizontal } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { fmtCurrency } from '../../lib/format';
-import { ContractDetailPanel } from './ContractDetailPanel';
+import { SavingDetailPanel } from './SavingDetailPanel';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -240,7 +240,7 @@ export function SavingContractsPage() {
 
             <PageNavPanel id="detail" className={isMobile ? '' : 'flex-1 flex flex-col'}>
               {selectedId ? (
-                <ContractDetailPanel contractId={selectedId} isMobile={isMobile} />
+                <SavingDetailPanel contractId={selectedId} isMobile={isMobile} />
               ) : (
                 <div className="flex-1 h-full flex items-center justify-center text-subtler">
                   <div className="text-center">

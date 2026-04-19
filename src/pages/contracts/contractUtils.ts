@@ -43,8 +43,16 @@ export const SCOPE_TO_STATES: Record<ContractScope, string[] | null> = {
 export const STATE_OPTIONS = [
   { value: 'DRAFT', label: 'Draft' },
   { value: 'SAVING', label: 'Saving' },
+  { value: 'PENDING_APPROVAL', label: 'Pending Approval' },
+  { value: 'APPROVED', label: 'Approved' },
+  { value: 'PENDING_PAYMENT', label: 'Pending Payment' },
   { value: 'ACTIVE', label: 'Active' },
+  { value: 'WAIT_LEGAL_PROCESS', label: 'Wait Legal Process' },
+  { value: 'ON_LEGAL_PROCESS', label: 'On Legal Process' },
+  { value: 'ON_COURT_PROCESS', label: 'On Court Process' },
   { value: 'COMPLETED', label: 'Completed' },
   { value: 'TERMINATED', label: 'Terminated' },
   { value: 'VOIDED', label: 'Voided' },
+  { value: 'CANCELLED', label: 'Cancelled' },
+  { value: 'EXPIRED', label: 'Expired' },
 ];

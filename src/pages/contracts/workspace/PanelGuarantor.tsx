@@ -1,12 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Input, Select, Button, InputDatePicker, MaskedInput, useSnackbarContext } from 'tsp-form';
 import type { UploadedImage } from 'tsp-form';
-import { ShieldAlert, CheckCircle, XCircle, Calendar, Search, Loader2, Trash2, AlertTriangle, CreditCard, PenLine, ChevronDown, ChevronRight, Plus, User } from 'lucide-react';
+import { ShieldAlert, CheckCircle, XCircle, Keyboard, Search, Loader2, Trash2, AlertTriangle, CreditCard, PenLine, ChevronDown, ChevronRight, Plus } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { uploadToS3 } from '../../../lib/upload';
-import { toLocalDateStr, parseLocalDate } from '../../../lib/format';
+import { toLocalDateStr, parseLocalDate, makeDatePickerFormat } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
 import { PanelSection } from './PanelSection';
 import { AddressFormPostal } from './AddressFormPostal';
@@ -43,15 +43,18 @@ interface Props { onClose: () => void }
 
 export function PanelGuarantor({ onClose: _onClose }: Props) {
   const { t, i18n } = useTranslation();
-  const { data: workspace, invalidateGuarantors } = useWorkspace();
+  const { data: workspace, guarantorList, invalidateGuarantors, setPanelDirty } = useWorkspace();
+
+  // Map server guarantorList to the shape used by the panel
+  const guarantors = guarantorList.map(g => ({ customerId: g.customer_id, fullName: g.customer_name, idNumber: g.id_number ?? '' }));
 
   // ── Existing guarantors list ────────────────────────────────────────────
   const [removing, setRemoving] = useState<number | null>(null);
   const [removeError, setRemoveError] = useState('');
   const [expandedGuarantor, setExpandedGuarantor] = useState<number | null>(
-    workspace.guarantors.length === 1 ? workspace.guarantors[0].customerId : null
+    guarantors.length === 1 ? guarantors[0].customerId : null
   );
-  const [showAddForm, setShowAddForm] = useState(workspace.guarantors.length === 0);
+  const [showAddForm, setShowAddForm] = useState(guarantors.length === 0);
 
   const handleRemove = async (customerId: number) => {
     if (!workspace.contractId) return;
@@ -84,6 +87,7 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [tel, setTel] = useState('');
 
+  const [isTypingDob, setIsTypingDob] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<SearchResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState('');
@@ -91,6 +95,12 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
+
+  // Track dirty state for nav guard
+  useEffect(() => {
+    setPanelDirty(!!(idNumber || firstName || lastName || tel || dateOfBirth || prefix));
+  }, [idNumber, firstName, lastName, tel, dateOfBirth, prefix, setPanelDirty]);
+  useEffect(() => () => setPanelDirty(false), [setPanelDirty]);
 
   const resetForm = () => {
     setIdType('CITIZEN_ID'); setIdNumber(''); setPrefix(''); setFirstName('');
@@ -132,7 +142,7 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
       setApiError(t('workspace.guarantorCannotBeSelf'));
       return;
     }
-    if (workspace.guarantors.some(g => g.customerId === custId)) {
+    if (guarantors.some(g => g.customerId === custId)) {
       setApiError(t('workspace.guarantorAlreadyAttached'));
       return;
     }
@@ -190,14 +200,14 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
   const canSearch = !!(idNumber.trim() || firstName.trim() || lastName.trim());
   const isExisting = !!selectedCustomer;
   const buttonLabel = isExisting ? t('workspace.useThisCustomer') : t('wizard.registerCustomer');
-  const hasGuarantors = workspace.guarantors.length > 0;
+  const hasGuarantors = guarantors.length > 0;
 
   return (
     <div className="p-4 flex flex-col max-w-2xl">
-      <PanelSection title={t('workspace.cardGuarantor')} count={workspace.guarantors.length}
+      <PanelSection title={t('workspace.cardGuarantor')} count={guarantors.length}
         alert={
           removeError ? <div className="alert alert-danger"><XCircle size={14} /><span>{removeError}</span></div>
-          : (workspace.customerId && workspace.guarantors.length === 0 && workspace.customerDateOfBirth && (() => {
+          : (workspace.customerId && guarantors.length === 0 && workspace.customerDateOfBirth && (() => {
               const birth = new Date(workspace.customerDateOfBirth!);
               const now = new Date();
               let age = now.getFullYear() - birth.getFullYear();
@@ -211,7 +221,7 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
         {/* Existing guarantors — accordion */}
         {hasGuarantors && (
           <div className="flex flex-col gap-2 mb-4">
-            {workspace.guarantors.map(g => (
+            {guarantors.map(g => (
               <GuarantorRow
                 key={g.customerId}
                 guarantor={g}
@@ -248,7 +258,7 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
               <div className="alert alert-danger mb-3"><ShieldAlert size={18} /><div><div className="alert-title">{t('wizard.blacklisted')}</div></div></div>
             )}
 
-            <div className="form-grid gap-4">
+            <div className="form-grid">
               <div className="flex gap-3">
                 <div className="flex flex-col" style={{ width: '10rem' }}>
                   <label className="form-label">{t('wizard.idType')}</label>
@@ -256,7 +266,11 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
                 </div>
                 <div className="flex flex-col flex-1 min-w-0">
                   <label className="form-label">{t('wizard.idNumber')}</label>
-                  <Input value={idNumber} onChange={(e) => setIdNumber(e.target.value)} size="sm" className="w-full" disabled={!!selectedCustomer} />
+                  {idType === 'CITIZEN_ID' ? (
+                    <MaskedInput mask="#-####-#####-##-#" placeholder="" value={idNumber} onChange={(raw) => setIdNumber(raw)} size="sm" className="w-full" disabled={!!selectedCustomer} />
+                  ) : (
+                    <Input value={idNumber} onChange={(e) => setIdNumber(e.target.value)} size="sm" className="w-full" disabled={!!selectedCustomer} />
+                  )}
                 </div>
               </div>
               <div className="flex gap-3">
@@ -276,7 +290,31 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
               <div className="flex gap-3">
                 <div className="flex flex-col flex-1 min-w-0">
                   <label className="form-label">{t('wizard.dateOfBirth')} *</label>
-                  <InputDatePicker value={parseLocalDate(dateOfBirth)} onChange={(date) => setDateOfBirth(toLocalDateStr(date))} size="sm" endIcon={<Calendar size={16} />} calendar="gregorian" locale={i18n.language} />
+                  <InputDatePicker
+                    value={parseLocalDate(dateOfBirth)}
+                    onChange={(date) => setDateOfBirth(toLocalDateStr(date))}
+                    size="sm"
+                    endIcon={<Keyboard size={16} />}
+                    onEndIconClick={() => setIsTypingDob(v => !v)}
+                    calendar="gregorian"
+                    locale={i18n.language}
+                    dateFormat={makeDatePickerFormat(i18n.language)}
+                    typingMode={isTypingDob}
+                    onTypingModeChange={setIsTypingDob}
+                    typingMask="##/##/####"
+                    typingPlaceholder="DD/MM/YYYY"
+                    parseTypedDate={(raw) => {
+                      if (raw.length !== 8) return null;
+                      const day = parseInt(raw.slice(0, 2), 10);
+                      const month = parseInt(raw.slice(2, 4), 10);
+                      let year = parseInt(raw.slice(4, 8), 10);
+                      if (year > 2400) year -= 543;
+                      if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+                      const d = new Date(year, month - 1, day);
+                      if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+                      return d;
+                    }}
+                  />
                 </div>
                 <div className="flex flex-col flex-1 min-w-0">
                   <label className="form-label">{t('wizard.tel')}</label>
@@ -416,6 +454,7 @@ function GuarantorRow({ guarantor, contractId, expanded, onToggle, onRemove, rem
   const [infoLoaded, setInfoLoaded] = useState(false);
   const [infoSaving, setInfoSaving] = useState(false);
   const [infoSaved, setInfoSaved] = useState(false);
+  const [isTypingEditDob, setIsTypingEditDob] = useState(false);
 
   // Sync form when custInfo arrives
   if (custInfo && !infoLoaded) {
@@ -525,7 +564,11 @@ function GuarantorRow({ guarantor, contractId, expanded, onToggle, onRemove, rem
                     </div>
                     <div className="flex flex-col flex-1 min-w-0">
                       <label className="form-label">{t('wizard.idNumber')}</label>
-                      <Input size="sm" value={custInfo?.id_number ?? ''} disabled className="w-full" />
+                      {custInfo?.id_type === 'CITIZEN_ID' ? (
+                        <MaskedInput mask="#-####-#####-##-#" placeholder="" value={custInfo?.id_number ?? ''} onChange={() => {}} size="sm" className="w-full" disabled />
+                      ) : (
+                        <Input size="sm" value={custInfo?.id_number ?? ''} disabled className="w-full" />
+                      )}
                     </div>
                   </div>
                   <div className="flex gap-3">
@@ -545,7 +588,31 @@ function GuarantorRow({ guarantor, contractId, expanded, onToggle, onRemove, rem
                   <div className="flex gap-3">
                     <div className="flex flex-col flex-1 min-w-0">
                       <label className="form-label">{t('wizard.dateOfBirth')} *</label>
-                      <InputDatePicker value={parseLocalDate(editDob)} onChange={(date) => setEditDob(toLocalDateStr(date))} size="sm" endIcon={<Calendar size={16} />} calendar="gregorian" locale={i18n.language} />
+                      <InputDatePicker
+                        value={parseLocalDate(editDob)}
+                        onChange={(date) => setEditDob(toLocalDateStr(date))}
+                        size="sm"
+                        endIcon={<Keyboard size={16} />}
+                        onEndIconClick={() => setIsTypingEditDob(v => !v)}
+                        calendar="gregorian"
+                        locale={i18n.language}
+                        dateFormat={makeDatePickerFormat(i18n.language)}
+                        typingMode={isTypingEditDob}
+                        onTypingModeChange={setIsTypingEditDob}
+                        typingMask="##/##/####"
+                        typingPlaceholder="DD/MM/YYYY"
+                        parseTypedDate={(raw) => {
+                          if (raw.length !== 8) return null;
+                          const day = parseInt(raw.slice(0, 2), 10);
+                          const month = parseInt(raw.slice(2, 4), 10);
+                          let year = parseInt(raw.slice(4, 8), 10);
+                          if (year > 2400) year -= 543;
+                          if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+                          const d = new Date(year, month - 1, day);
+                          if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+                          return d;
+                        }}
+                      />
                     </div>
                     <div className="flex flex-col flex-1 min-w-0">
                       <label className="form-label">{t('wizard.tel')}</label>
