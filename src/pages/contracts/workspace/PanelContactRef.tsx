@@ -1,12 +1,19 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Input, Select, Switch, Badge } from 'tsp-form';
+import { Button, Input, MaskedInput, Select, Switch, Badge } from 'tsp-form';
 import { Plus, Trash2, Star, XCircle, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { useWorkspace } from './WorkspaceContext';
 import { PanelSection } from './PanelSection';
 import type { CustomerContact, CustomerReference } from './WorkspaceTypes';
+
+const thaiPhoneMask = (digits: string) => {
+  if (digits.startsWith('02')) return '##-###-####';
+  const prefix = digits.slice(0, 2);
+  if (['03','04','05','07'].includes(prefix)) return '###-###-###';
+  return '###-###-####'; // mobile 06x, 08x, 09x
+};
 
 const CONTACT_TYPES = ['MOBILE', 'HOME', 'WORK', 'LINE', 'FACEBOOK', 'OTHER'];
 
@@ -222,7 +229,7 @@ function ReferenceAddForm({ customerId, onSuccess }: { customerId: number; onSuc
         <div className="flex gap-3">
           <div className="flex flex-col flex-1">
             <label className="form-label">{t('customer.refTel')}</label>
-            <Input size="sm" value={tel} onChange={e => setTel(e.target.value)} className="w-full" />
+            <MaskedInput size="sm" dynamicMask={thaiPhoneMask} value={tel} onChange={(raw) => setTel(raw)} className="w-full" />
           </div>
           <div className="flex flex-col flex-1">
             <label className="form-label">{t('customer.refRelation')}</label>

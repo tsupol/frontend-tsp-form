@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Input, Badge, Button, MaskedInput, useSnackbarContext } from 'tsp-form';
 import { Search, XCircle, X, Calculator, Info, CheckCircle } from 'lucide-react';
@@ -94,7 +93,6 @@ interface Props {
 
 export function PanelProductPlan({ onClose }: Props) {
   const { t } = useTranslation();
-  const { contractId: paramContractId } = useParams<{ contractId?: string }>();
   const { data: wizardData, contract, invalidateContract } = useWorkspace();
 
   const [search, setSearch] = useState('');
@@ -103,11 +101,12 @@ export function PanelProductPlan({ onClose }: Props) {
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Initialize from contract (server = source of truth), wizardData only for selectedQuote (UI-only)
+
   const [selectedModel, setSelectedModel] = useState<SearchModel | null>(null);
   const [localModelId, setLocalModelId] = useState<number | null>(contract?.model_id ?? null);
   const [localModelName, setLocalModelName] = useState(contract?.model_name ?? '');
-  const [localFamilyName, setLocalFamilyName] = useState('');
-  const [localBrandName, setLocalBrandName] = useState('');
+  const [localFamilyName, setLocalFamilyName] = useState(wizardData.familyName);
+  const [localBrandName, setLocalBrandName] = useState(wizardData.brandName);
   const [localVariantId, setLocalVariantId] = useState<number | null>(contract?.variant_id ?? null);
   const [localVariantName, setLocalVariantName] = useState(contract?.variant_name ?? '');
   const [localQuote, setLocalQuote] = useState<Quote | null>(wizardData.selectedQuote);
@@ -378,42 +377,13 @@ export function PanelProductPlan({ onClose }: Props) {
     }
   };
 
-  // Show search list until both model AND variant are selected
-  // When loading an existing contract (refresh/comeback), don't flash the search UI
-  const awaitingRestore = !localModelId && !!paramContractId && !contract;
-  const showingSearch = !awaitingRestore && (shouldSearch || !localModelId || !localVariantId);
-
   return (
     <div className="flex flex-col h-full max-w-2xl">
     <div className="flex-1 overflow-y-auto better-scroll p-4 flex flex-col gap-3">
-      {/* Search */}
-      <Input ref={searchRef} value={search} onChange={(e) => handleSearchInput(e.target.value)} placeholder={t('wizard.searchProductPlaceholder')} startIcon={<Search size={16} />} className="w-full" size="sm" />
-
-      {/* Model area — search results or selected model */}
-      <div className="border border-line rounded-lg overflow-hidden h-48 overflow-y-auto better-scroll">
-        {awaitingRestore ? (
-          <div className="flex items-center justify-center h-full text-subtle text-sm">{t('common.loading')}</div>
-        ) : showingSearch ? (
-          // Search results list
-          !shouldSearch ? (
-            <div className="flex items-center justify-center h-full text-subtle text-sm">{t('wizard.typeToSearch')}</div>
-          ) : searching ? (
-            <div className="flex items-center justify-center h-full text-subtle text-sm">{t('common.loading')}</div>
-          ) : models.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-subtle text-sm">{t('wizard.noModelsFound')}</div>
-          ) : (
-            <div className="flex flex-col divide-y divide-line">
-              {models.map(model => (
-                <button key={model.model_id} className={`w-full text-left px-4 py-2.5 cursor-pointer transition-colors ${model.model_id === localModelId ? 'bg-primary/10' : 'hover:bg-surface-hover'}`} onClick={() => handleSelectModel(model)}>
-                  <div className="font-medium text-sm truncate">{model.family_name} {model.model_name}</div>
-                  <div className="text-xs text-subtle">{model.brand_name}</div>
-                </button>
-              ))}
-            </div>
-          )
-        ) : (
-          // Selected model display
-          <div className="flex items-center h-full px-4">
+      {/* Selected model display */}
+      {localModelId && (
+        <div className="border border-line rounded-lg">
+          <div className="flex items-center px-4 py-3">
             <div className="flex-1 min-w-0">
               <div className="font-medium">{localFamilyName} {localModelName}</div>
               <div className="text-xs text-subtle">{localBrandName}</div>
@@ -423,8 +393,33 @@ export function PanelProductPlan({ onClose }: Props) {
               <X size={16} />
             </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* Search */}
+      {!localModelId && (
+        <>
+          <Input ref={searchRef} value={search} onChange={(e) => handleSearchInput(e.target.value)} placeholder={t('wizard.searchProductPlaceholder')} startIcon={<Search size={16} />} className="w-full" size="sm" />
+          <div className="border border-line rounded-lg overflow-hidden h-48 overflow-y-auto better-scroll">
+            {!shouldSearch ? (
+              <div className="flex items-center justify-center h-full text-subtle text-sm">{t('wizard.typeToSearch')}</div>
+            ) : searching ? (
+              <div className="flex items-center justify-center h-full text-subtle text-sm">{t('common.loading')}</div>
+            ) : models.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-subtle text-sm">{t('wizard.noModelsFound')}</div>
+            ) : (
+              <div className="flex flex-col divide-y divide-line">
+                {models.map(model => (
+                  <button key={model.model_id} className={`w-full text-left px-4 py-2.5 cursor-pointer transition-colors ${model.model_id === localModelId ? 'bg-primary/10' : 'hover:bg-surface-hover'}`} onClick={() => handleSelectModel(model)}>
+                    <div className="font-medium text-sm truncate">{model.family_name} {model.model_name}</div>
+                    <div className="text-xs text-subtle">{model.brand_name}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
 
       {/* Variant select — only if multiple */}
       {localModelId && variants.length > 1 && (
