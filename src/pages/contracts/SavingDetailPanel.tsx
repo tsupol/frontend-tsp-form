@@ -214,8 +214,9 @@ export function SavingDetailPanel({ contractId, isMobile }: { contractId: number
 function SavingOverviewTab({ contract, t }: { contract: ContractDetail; t: ReturnType<typeof useTranslation>['t'] }) {
   const isFin2 = contract.commercial_model === 'FIN2';
   const balance = contract.saving_balance ?? 0;
-  const target = contract.saving_target_amount ?? 0;
-  const pct = target > 0 ? Math.min(100, (balance / target) * 100) : 0;
+  const target = contract.saving_target_amount ?? contract.down_payment ?? 0;
+  const hasTarget = target > 0;
+  const pct = hasTarget ? Math.min(100, (balance / target) * 100) : 0;
 
   // Saving transactions
   const { data: txns } = useQuery({
@@ -235,7 +236,7 @@ function SavingOverviewTab({ contract, t }: { contract: ContractDetail; t: Retur
           <span className="text-xs text-subtle">{t('workspace.savingCurrentBalance')}</span>
         </div>
         <div className="text-2xl font-bold tabular-nums mb-2">{fmtCurrency(balance)}</div>
-        {target > 0 && (
+        {hasTarget && (
           <>
             <div className="h-2 rounded-full bg-fg/10 overflow-hidden mb-1.5">
               <div

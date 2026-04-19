@@ -1330,6 +1330,8 @@
     "trackingPlaceholder": "Enter tracking number",
     "deliveryNotRecorded": "Not yet recorded",
     "deliverySaved": "Delivery info saved",
+    "deliveryPhotos": "Proof of Delivery",
+    "uploadFailed": "Upload failed",
     "createdBy": "Created by",
     "createdAt": "Created",
     "activatedAt": "Activated",

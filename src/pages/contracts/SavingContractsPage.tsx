@@ -180,7 +180,10 @@ export function SavingContractsPage() {
                   <div className="flex flex-col divide-y divide-line">
                     {list.map(contract => {
                       const isSelected = contract.id === selectedId;
-                      const pct = contract.progress_percent ?? 0;
+                      const saved = contract.total_saved ?? 0;
+                      const target = contract.saving_target_amount;
+                      const hasTarget = target != null && target > 0;
+                      const pct = hasTarget ? Math.min(100, (saved / target) * 100) : 0;
                       return (
                         <button
                           key={contract.id}
@@ -196,24 +199,25 @@ export function SavingContractsPage() {
                                 <span className="text-xs text-subtle shrink-0">{contract.age_days}{t('contract.daysShort')}</span>
                               )}
                             </div>
-                            <span className="text-sm font-medium tabular-nums shrink-0">{fmtCurrency(contract.total_saved)}</span>
+                            <span className="text-sm font-medium tabular-nums shrink-0">{fmtCurrency(saved)}</span>
                           </div>
                           <div className="text-xs text-subtle truncate">
                             {contract.customer_name ?? t('contract.noCustomer')}
                             {contract.model_name && ` · ${contract.model_name}`}
                           </div>
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1 bg-fg/10 rounded-full h-1.5">
-                              <div
-                                className="bg-info rounded-full h-1.5 transition-all"
-                                style={{ width: `${Math.min(100, pct)}%` }}
-                              />
+                          {hasTarget && (
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 bg-fg/10 rounded-full h-1.5">
+                                <div
+                                  className="bg-info rounded-full h-1.5 transition-all"
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                              <span className="text-xs tabular-nums shrink-0">{fmtCurrency(saved)} / {fmtCurrency(target)}</span>
                             </div>
-                            <span className="text-xs tabular-nums shrink-0 w-8 text-right">{Math.round(pct)}%</span>
-                          </div>
+                          )}
                           <div className="flex items-center justify-between text-xs text-subtle">
                             <span>{contract.branch_name}</span>
-                            <span className="tabular-nums">{fmtCurrency(contract.remaining)} {t('contract.remaining')}</span>
                           </div>
                         </button>
                       );

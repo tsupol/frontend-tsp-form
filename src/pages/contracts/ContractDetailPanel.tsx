@@ -2,9 +2,11 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Badge, Button, Input, Select, Modal, useSnackbarContext } from 'tsp-form';
-import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Upload, Camera } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import { ApiError } from '../../lib/api';
+import { uploadToS3 } from '../../lib/upload';
+import { useAuth } from '../../contexts/AuthContext';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency } from '../../lib/format';
@@ -420,8 +422,7 @@ function OverviewTab({ contract, t, queryClient }: { contract: ContractDetail; t
           <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-line">
             <div>
               <div className="text-xs text-subtle">{t('contract.device')}</div>
-              <div className="text-sm">{contract.model_name ?? '—'}</div>
-              {contract.variant_name && <div className="text-xs text-subtle">{contract.variant_name}</div>}
+              <div className="text-sm">{contract.variant_name ?? contract.model_name ?? '—'}</div>
             </div>
             {contract.device_identifier && (
               <div>
@@ -519,9 +520,9 @@ function OverviewTab({ contract, t, queryClient }: { contract: ContractDetail; t
 
       {/* Delivery */}
       {isActive && (
-        <div className="border border-line rounded-md px-4 py-3">
+        <div className={`border rounded-md px-4 py-3 ${contract.shipped_at ? 'border-line' : 'border-warning/30 bg-warning/5'}`}>
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider flex items-center gap-1.5">
+            <h3 className={`text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 ${contract.shipped_at ? 'text-subtle' : 'text-warning'}`}>
               <Truck size={13} />
               {t('contract.shipping')}
             </h3>
@@ -541,7 +542,7 @@ function OverviewTab({ contract, t, queryClient }: { contract: ContractDetail; t
               {contract.tracking_number && <InfoCell label={t('contract.trackingNumber')} value={contract.tracking_number} />}
             </div>
           ) : (
-            <div className="text-sm text-subtler">{t('contract.deliveryNotRecorded')}</div>
+            <div className="text-sm text-warning">{t('contract.deliveryNotRecorded')}</div>
           )}
         </div>
       )}
@@ -821,10 +822,14 @@ function DeliveryModal({ open, contract, onClose, onSuccess }: {
   onSuccess: () => void;
 }) {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
+  const { user } = useAuth();
+  const fileRef = useRef<HTMLInputElement>(null);
   const [method, setMethod] = useState(contract.shipping_method ?? 'PICKUP');
   const [trackingNumber, setTrackingNumber] = useState(contract.tracking_number ?? '');
   const [error, setError] = useState('');
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -833,6 +838,15 @@ function DeliveryModal({ open, contract, onClose, onSuccess }: {
       setError('');
     }
   }, [open, contract.shipping_method, contract.tracking_number]);
+
+  // Contract photos (ATTACHMENT)
+  const { data: photos = [], refetch: refetchPhotos } = useQuery({
+    queryKey: ['contract-media', contract.id],
+    queryFn: () => apiClient.get<EntityMedia[]>(
+      `/v_entity_media?entity_type=eq.CONTRACT&entity_id=eq.${contract.id}&usage_type=eq.ATTACHMENT&order=sort_order`
+    ),
+    enabled: open,
+  });
 
   const mutation = useMutation({
     mutationFn: () => apiClient.rpc('fn_contract_update_delivery', {
@@ -856,8 +870,59 @@ function DeliveryModal({ open, contract, onClose, onSuccess }: {
     },
   });
 
+  const handleUploadPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !user) return;
+    setUploading(true);
+    try {
+      const ts = Date.now();
+      const key = `uploads/contracts/${contract.id}/attachment-${ts}.webp`;
+      // Resize before upload
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      const resized = await new Promise<File>((resolve) => {
+        img.onload = () => {
+          URL.revokeObjectURL(url);
+          const maxW = 1280, maxH = 1280;
+          let w = img.width, h = img.height;
+          if (w > maxW || h > maxH) {
+            const ratio = Math.min(maxW / w, maxH / h);
+            w = Math.round(w * ratio); h = Math.round(h * ratio);
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
+          canvas.toBlob((blob) => {
+            resolve(new File([blob!], file.name, { type: 'image/webp' }));
+          }, 'image/webp', 0.85);
+        };
+        img.src = url;
+      });
+      await uploadToS3(resized, key);
+      await apiClient.rpc('fn_media_attach', {
+        p_holding_id: user.holding_id,
+        p_storage_path: `/${key}`,
+        p_variants_json: null,
+        p_media_type: 'IMAGE',
+        p_access_level: 'CONFIDENTIAL',
+        p_mime_type: 'image/webp',
+        p_file_size_bytes: resized.size,
+        p_original_filename: file.name,
+        p_entity_type: 'CONTRACT',
+        p_entity_id: contract.id,
+        p_usage_type: 'ATTACHMENT',
+      });
+      refetchPhotos();
+    } catch {
+      setError(t('contract.uploadFailed'));
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
-    <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
+    <Modal open={open} onClose={onClose} maxWidth="32rem" width="100%">
       <div className="flex flex-col overflow-hidden">
         <div className="modal-header">
           <h2 className="modal-title">{t('contract.shipping')}</h2>
@@ -881,6 +946,40 @@ function DeliveryModal({ open, contract, onClose, onSuccess }: {
                 <Input value={trackingNumber} onChange={(e) => setTrackingNumber(e.target.value)} placeholder={t('contract.trackingPlaceholder')} className="w-full" />
               </div>
             )}
+          </div>
+
+          {/* Contract photos */}
+          <div className="mt-5 pt-4 border-t border-line">
+            <label className="form-label flex items-center gap-1.5">
+              <Camera size={14} />
+              {t('contract.deliveryPhotos')}
+            </label>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {photos.map(m => {
+                const src = m.storage_path.sm || m.storage_path.md || m.storage_path.original;
+                if (!src) return null;
+                return (
+                  <img
+                    key={m.entity_media_id}
+                    src={`${config.s3BaseUrl}${src}`}
+                    alt={m.caption ?? ''}
+                    className="w-20 h-20 object-cover rounded border border-line"
+                  />
+                );
+              })}
+              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleUploadPhoto} />
+              <button
+                type="button"
+                className="w-20 h-20 flex flex-col items-center justify-center gap-1 rounded border-2 border-dashed border-line hover:border-primary hover:bg-surface-hover transition-colors cursor-pointer text-subtle bg-transparent"
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading}
+              >
+                {uploading
+                  ? <Loader2 size={16} className="animate-spin" />
+                  : <><Upload size={16} /><span className="text-[10px]">{t('common.add')}</span></>
+                }
+              </button>
+            </div>
           </div>
         </div>
         <div className="modal-footer">

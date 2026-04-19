@@ -1330,6 +1330,8 @@
     "trackingPlaceholder": "กรอกเลขพัสดุ",
     "deliveryNotRecorded": "ยังไม่ได้บันทึก",
     "deliverySaved": "บันทึกข้อมูลส่งมอบแล้ว",
+    "deliveryPhotos": "หลักฐานการส่งมอบ",
+    "uploadFailed": "อัปโหลดไม่สำเร็จ",
     "createdBy": "สร้างโดย",
     "createdAt": "สร้างเมื่อ",
     "activatedAt": "เปิดใช้เมื่อ",
