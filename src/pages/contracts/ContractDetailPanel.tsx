@@ -178,7 +178,7 @@ interface EntityMedia {
 
 type DetailTab = 'overview' | 'installments' | 'txns' | 'customers' | 'notes' | 'payments';
 
-const TABS: DetailTab[] = ['overview', 'installments', 'txns', 'customers', 'notes', 'payments'];
+const TABS: DetailTab[] = ['overview', 'installments', 'txns', 'payments', 'notes', 'customers'];
 
 // ── Scrollable Tabs ─────────────────────────────────────────────────────────
 
@@ -598,11 +598,10 @@ function InstallmentsTab({ contractId, t }: { contractId: number; t: ReturnType<
           <thead>
             <tr className="border-b border-line bg-surface">
               <th className="text-left px-3 py-2 font-medium text-subtle">#</th>
-              <th className="text-left px-3 py-2 font-medium text-subtle">{t('contract.dueDate')}</th>
-              <th className="text-right px-3 py-2 font-medium text-subtle">{t('contract.dueAmount')}</th>
-              <th className="text-right px-3 py-2 font-medium text-subtle">{t('contract.paidAmount')}</th>
+              <th className="text-left px-3 py-2 font-medium text-subtle">{t('contract.due')}</th>
+              <th className="text-right px-3 py-2 font-medium text-subtle">{t('contract.amount')}</th>
+              <th className="text-right px-3 py-2 font-medium text-subtle">{t('contract.paid')}</th>
               <th className="text-left px-3 py-2 font-medium text-subtle">{t('common.status')}</th>
-              <th className="text-left px-3 py-2 font-medium text-subtle">{t('contract.paidAt')}</th>
             </tr>
           </thead>
           <tbody>
@@ -614,16 +613,16 @@ function InstallmentsTab({ contractId, t }: { contractId: number; t: ReturnType<
                     <span className="text-xs text-subtle ml-1">(→{inst.deferred_from})</span>
                   )}
                 </td>
-                <td className="px-3 py-2"><DateTime value={inst.due_date} showTime={false} /></td>
+                <td className="px-3 py-2 text-xs text-subtle"><DateTime value={inst.due_date} showTime={false} /></td>
                 <td className="px-3 py-2 text-right tabular-nums">{fmtCurrency(inst.due_amount)}</td>
                 <td className="px-3 py-2 text-right tabular-nums">{fmtCurrency(inst.paid_amount)}</td>
                 <td className="px-3 py-2">
                   <Badge size="xs" className={getInstallmentStatusColor(inst.status)}>
                     {t(`contract.installmentStatus_${inst.status}`, { defaultValue: inst.status })}
                   </Badge>
-                </td>
-                <td className="px-3 py-2 text-subtle">
-                  {inst.paid_at ? <DateTime value={inst.paid_at} /> : '—'}
+                  {inst.paid_at && (
+                    <div className="text-xs text-subtle mt-0.5"><DateTime value={inst.paid_at} /></div>
+                  )}
                 </td>
               </tr>
             ))}
