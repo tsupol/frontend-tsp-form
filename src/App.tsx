@@ -369,6 +369,7 @@ function App() {
       />
 
       {/* Contracts */}
+      <Route path="/admin/contracts" element={<Navigate to="/admin/contracts/search" replace />} />
       <Route
         path="/admin/contracts/search/:contractId?"
         element={

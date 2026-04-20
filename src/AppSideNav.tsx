@@ -214,7 +214,7 @@ export const AppSideNav = () => {
     },
     {
       key: 'contracts', icon: <FileText size="1rem" />, label: t('nav.contracts'),
-      path: '/admin/contracts/search',
+      path: '/admin/contracts',
       children: [
         { key: 'contract-search', icon: <Search size="1rem" />, label: t('nav.contractSearch'), path: '/admin/contracts/search' },
         { key: 'saving-contracts', icon: <PiggyBank size="1rem" />, label: t('nav.savingContracts'), path: '/admin/contracts/saving' },
