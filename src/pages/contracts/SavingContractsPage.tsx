@@ -4,6 +4,7 @@ import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Input, Select, Button, DataTableFooter } from 'tsp-form';
 import { ArrowLeft, ArrowRightFromLine, Search, PiggyBank, SlidersHorizontal } from 'lucide-react';
 import { apiClient } from '../../lib/api';
+import { useAuth } from '../../contexts/AuthContext';
 import { fmtCurrency } from '../../lib/format';
 import { SavingDetailPanel } from './SavingDetailPanel';
 
@@ -44,13 +45,19 @@ interface Branch {
 
 // ── Component ────────────────────────────────────────────────────────────────
 
+const BRANCH_ROLES = ['BRANCH_STAFF', 'BRANCH_MANAGER'];
+
 export function SavingContractsPage() {
   const { t } = useTranslation();
+  const { user } = useAuth();
+
+  const isBranchUser = BRANCH_ROLES.includes(user?.role_code ?? '');
+  const defaultBranchId = isBranchUser && user?.branch_id ? user.branch_id : null;
 
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [filterBranchId, setFilterBranchId] = useState<number | null>(null);
-  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [filterBranchId, setFilterBranchId] = useState<number | null>(defaultBranchId);
+  const [filtersExpanded, setFiltersExpanded] = useState(isBranchUser);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
   const [selectedId, setSelectedId] = useState<number | null>(null);

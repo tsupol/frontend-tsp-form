@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Badge, Input, Select, Button, DataTableFooter } from 'tsp-form';
+import { useAuth } from '../../contexts/AuthContext';
 import { ArrowLeft, ArrowRightFromLine, Search, FileText, SlidersHorizontal, Plus } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
@@ -69,13 +70,17 @@ interface Branch {
 export function ContractSearchPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const isBranchUser = ['BRANCH_STAFF', 'BRANCH_MANAGER'].includes(user?.role_code ?? '');
+  const defaultBranchId = isBranchUser && user?.branch_id ? user.branch_id : null;
 
   const [scope, setScope] = useState<ContractScope>('OPEN');
   const [keyword, setKeyword] = useState('');
   const [debouncedKeyword, setDebouncedKeyword] = useState('');
   const [filterState, setFilterState] = useState<string | null>(null);
-  const [filterBranchId, setFilterBranchId] = useState<number | null>(null);
-  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [filterBranchId, setFilterBranchId] = useState<number | null>(defaultBranchId);
+  const [filtersExpanded, setFiltersExpanded] = useState(isBranchUser);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
   const { contractId: contractIdParam } = useParams<{ contractId?: string }>();
