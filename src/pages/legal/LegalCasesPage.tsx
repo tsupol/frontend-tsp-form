@@ -121,7 +121,7 @@ interface LegalCaseCustomer {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-const fmt = (n: number) => n.toLocaleString('en-US');
+const fmt = (n: number | null | undefined) => n == null ? '—' : n.toLocaleString('en-US');
 
 function overdueDuration(dateStr: string | null): string {
   if (!dateStr) return '—';
@@ -390,7 +390,7 @@ export function LegalCasesPage() {
           <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
             {/* ── List ── */}
             <PageNavPanel id="list" className={isMobile ? '' : 'w-5/12 xl:w-4/12 border-r border-line flex flex-col'}>
-              <div className="flex-none flex gap-2 px-4 py-2 border-b border-line">
+              <div className="flex-none flex gap-2 p-2 border-b border-line">
                 <div className="flex-1 min-w-0">
                   <Input
                     value={search}
@@ -460,7 +460,7 @@ export function LegalCasesPage() {
               </div>
 
               {totalCount > 0 && (
-                <div className="flex-none border-t border-line px-2 py-1">
+                <div className="flex-none border-t border-line p-2">
                   <DataTableFooter
                     currentPage={pageIndex + 1}
                     totalPages={Math.ceil(totalCount / pageSize) || 1}

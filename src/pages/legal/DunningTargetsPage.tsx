@@ -3,12 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import {
-  DataTable, DataTableColumnHeader, DataTableFooter, Input, Select, Badge, Button,
-  PopOver, MobileHeader, InputDatePicker,
-  type ColumnDef, type SortingState,
+  PageNav, PageNavPanel, MobileHeader, DataTableFooter, Input, Select, Badge, Button,
+  PopOver, InputDatePicker,
 } from 'tsp-form';
-import { ArrowRightFromLine, Search, SlidersHorizontal, Calendar, ExternalLink } from 'lucide-react';
+import { ArrowRightFromLine, ArrowLeft, Search, SlidersHorizontal, Calendar, ExternalLink, ChevronsUpDown } from 'lucide-react';
 import { apiClient } from '../../lib/api';
+import { DateTime } from '../../components/DateTime';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -44,7 +44,7 @@ interface Branch {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-const fmt = (n: number) => n.toLocaleString('en-US');
+const fmt = (n: number | null | undefined) => n == null ? '—' : n.toLocaleString('en-US');
 
 const BUCKET_OPTIONS = [
   { value: 'CURRENT', label: 'Current' },
@@ -82,11 +82,6 @@ function overdueDaysLabel(days: number): string {
   return `${months}m`;
 }
 
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Bangkok' });
-}
-
 function toLocalDateStr(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -95,11 +90,32 @@ function toLocalDateStr(d: Date): string {
 }
 
 const SORT_OPTIONS = [
-  { value: 'first_overdue_due_date', label: 'Since (oldest)' },
-  { value: 'overdue_amount', label: 'Amount' },
-  { value: 'overdue_installment_count', label: 'Overdue count' },
-  { value: 'branch_name', label: 'Branch' },
+  { value: 'first_overdue_due_date.asc', label: 'Oldest overdue' },
+  { value: 'first_overdue_due_date.desc', label: 'Newest overdue' },
+  { value: 'overdue_amount.desc', label: 'Highest amount' },
+  { value: 'overdue_installment_count.desc', label: 'Most installments' },
+  { value: 'branch_name.asc', label: 'Branch A→Z' },
 ];
+
+const getStateLabel = (state: string) => {
+  switch (state) {
+    case 'ACTIVE': return 'Active';
+    case 'COMPLETED': return 'Completed';
+    case 'DEFAULTED': return 'Defaulted';
+    case 'CANCELLED': return 'Cancelled';
+    default: return state;
+  }
+};
+
+const getStateColor = (state: string) => {
+  switch (state) {
+    case 'ACTIVE': return 'success';
+    case 'COMPLETED': return 'info';
+    case 'DEFAULTED': return 'danger';
+    case 'CANCELLED': return 'default';
+    default: return 'default' as const;
+  }
+};
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -111,15 +127,19 @@ export function DunningTargetsPage() {
     navigate(`/admin/contracts/search/${contractId}`);
   }, [navigate]);
 
-  const [sorting, setSorting] = useState<SortingState>([]);
-  const [pageIndex, setPageIndex] = useState(0);
-  const [pageSize, setPageSize] = useState(15);
+  // Selection
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+
+  // Filters
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterBucket, setFilterBucket] = useState<string | null>(null);
   const [filterBranchId, setFilterBranchId] = useState<string | null>(null);
   const [dateFrom, setDateFrom] = useState<Date | null>(null);
   const [dateTo, setDateTo] = useState<Date | null>(null);
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [sortBy, setSortBy] = useState('first_overdue_due_date.asc');
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageSize, setPageSize] = useState(15);
   const [filterOpen, setFilterOpen] = useState(false);
 
   useEffect(() => {
@@ -127,7 +147,7 @@ export function DunningTargetsPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  useEffect(() => { setPageIndex(0); }, [filterBucket, filterBranchId, debouncedSearch, dateFrom, dateTo]);
+  useEffect(() => { setPageIndex(0); }, [filterBucket, filterBranchId, debouncedSearch, dateFrom, dateTo, sortBy]);
 
   // Branch lookup
   const { data: branches } = useQuery({
@@ -142,14 +162,11 @@ export function DunningTargetsPage() {
   }, [branches]);
 
   // Server-side paginated query
-  const sortCol = sorting[0]?.id;
-  const sortDir = sorting[0]?.desc ? 'desc' : 'asc';
-
   const { data: pageData, isFetching } = useQuery({
-    queryKey: ['dunning-targets', filterBucket, filterBranchId, debouncedSearch, dateFrom ? toLocalDateStr(dateFrom) : null, dateTo ? toLocalDateStr(dateTo) : null, pageIndex, pageSize, sortCol, sortDir],
+    queryKey: ['dunning-targets', filterBucket, filterBranchId, debouncedSearch, dateFrom ? toLocalDateStr(dateFrom) : null, dateTo ? toLocalDateStr(dateTo) : null, pageIndex, pageSize, sortBy],
     queryFn: () => {
       const params: string[] = [];
-      if (sortCol) params.push(`order=${sortCol}.${sortDir}.nullslast`);
+      params.push(`order=${sortBy}.nullslast`);
       if (filterBucket) params.push(`bucket_code=eq.${filterBucket}`);
       if (filterBranchId) params.push(`branch_id=eq.${filterBranchId}`);
       if (dateFrom) params.push(`first_overdue_due_date=gte.${toLocalDateStr(dateFrom)}`);
@@ -167,326 +184,376 @@ export function DunningTargetsPage() {
   const list = pageData?.data ?? [];
   const totalCount = pageData?.totalCount ?? 0;
 
-  const activeFilterCount = [filterBucket, filterBranchId, dateFrom, dateTo].filter(Boolean).length + (sorting.length > 0 ? 1 : 0);
+  const activeFilterCount = [filterBucket, filterBranchId, dateFrom, dateTo].filter(Boolean).length + (sortBy !== 'first_overdue_due_date.asc' ? 1 : 0);
 
-  // ── Desktop columns ──
-  const columns: ColumnDef<DunningTarget>[] = useMemo(() => [
-    {
-      accessorKey: 'contract_code',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('legal.contract')} />,
-      cell: ({ row }) => (
-        <div>
-          <button
-            className="text-xs font-medium text-primary hover:underline cursor-pointer bg-transparent border-none p-0"
-            onClick={() => goToContract(row.original.contract_id)}
-          >
-            {row.original.contract_code_display ?? row.original.contract_code}
-          </button>
-          <div className="text-[11px] text-subtle">{row.original.branch_name}</div>
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'customer_name',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('legal.customer')} />,
-      cell: ({ row }) => (
-        <div>
-          <div className="text-xs">{row.original.customer_name ?? '—'}</div>
-          {row.original.customer_tel && <div className="text-[11px] text-subtle">{row.original.customer_tel}</div>}
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'bucket_code',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('legal.bucket')} />,
-      cell: ({ row }) => (
-        <Badge size="sm" color={getBucketColor(row.original.bucket_code)}>
-          {getBucketLabel(row.original.bucket_code)}
-        </Badge>
-      ),
-    },
-    {
-      accessorKey: 'overdue_installment_count',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('legal.overdueCount')} />,
-      cell: ({ row }) => <span className="tabular-nums text-xs">{row.original.overdue_installment_count} {t('legal.installments')}</span>,
-    },
-    {
-      accessorKey: 'overdue_amount',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('legal.overdueAmount')} />,
-      cell: ({ row }) => <span className="tabular-nums font-medium text-danger text-xs">{fmt(row.original.overdue_amount)}</span>,
-    },
-    {
-      accessorKey: 'outstanding_amount',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('legal.outstanding')} />,
-      cell: ({ row }) => <span className="tabular-nums text-xs">{fmt(row.original.outstanding_amount)}</span>,
-    },
-    {
-      accessorKey: 'first_overdue_due_date',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('legal.since')} />,
-      cell: ({ row }) => {
-        const dur = overdueDaysLabel(row.original.overdue_days);
-        return (
-          <div>
-            <div className="text-xs tabular-nums">{formatDate(row.original.first_overdue_due_date)}</div>
-            {dur && <div className="text-[11px] text-subtle">({dur})</div>}
-          </div>
-        );
-      },
-    },
-    {
-      id: 'actions',
-      header: () => null,
-      cell: ({ row }) => (
-        <button
-          className="p-1.5 rounded hover:bg-surface-hover transition-colors cursor-pointer bg-transparent border-none text-subtle hover:text-primary"
-          onClick={() => goToContract(row.original.contract_id)}
-          title={t('legal.viewContract')}
-        >
-          <ExternalLink size={14} />
-        </button>
-      ),
-      enableSorting: false,
-      className: 'w-10',
-    },
-  ], [t, goToContract]);
+  // Selected item from list
+  const selected = selectedId ? list.find(i => i.contract_id === selectedId) ?? null : null;
 
   return (
-    <>
-      {/* Mobile header */}
-      <MobileHeader className="mobile-header-bordered md:hidden">
-        <div className="mobile-header-start">
-          <button
-            className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
-            onClick={() => window.dispatchEvent(new CustomEvent('sidemenu:open'))}
-          >
-            <ArrowRightFromLine size={18} />
-          </button>
-        </div>
-        <div className="mobile-header-title mobile-header-title-truncate">{t('legal.dunningTitle')}</div>
-        <div className="mobile-header-end w-12" />
-      </MobileHeader>
+    <PageNav panels={['list', 'detail']} className="h-dvh">
+      {({ isMobile, isRoot, goTo, goBack }) => {
 
-      <div className="page-content responsive-dvh-mobile-header">
-        {/* Desktop header */}
-        <div className="flex items-center justify-between mb-4 flex-none max-md:hidden">
-          <h1 className="heading-2">{t('legal.dunningTitle')}</h1>
-        </div>
+        const handleSelect = (item: DunningTarget) => {
+          if (item.contract_id === selectedId) return;
+          setSelectedId(item.contract_id);
+          if (isMobile) goTo('detail');
+        };
 
-        {/* Filters bar */}
-        <div className="flex-none pb-4">
-          <div className="flex items-center gap-2">
-            {/* Search — always visible */}
-            <div className="flex-1 min-w-0 md:max-w-56">
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder={t('legal.searchContract')}
-                size="sm"
-                startIcon={<Search size={16} />}
-                className="w-full"
-              />
-            </div>
-            {/* Branch — visible ≥sm */}
-            <div className="hidden sm:block flex-1 min-w-0 md:max-w-56">
-              <Select
-                options={branchOptions}
-                value={filterBranchId}
-                onChange={(val) => { setFilterBranchId((val as string) || null); setPageIndex(0); }}
-                placeholder={t('legal.allBranches')}
-                size="sm"
-                showChevron
-                clearable
-                searchable
-              />
-            </div>
-            {/* Bucket — visible ≥md */}
-            <div className="hidden md:block flex-1 min-w-0 md:max-w-56">
-              <Select
-                options={BUCKET_OPTIONS}
-                value={filterBucket}
-                onChange={(val) => { setFilterBucket((val as string) || null); setPageIndex(0); }}
-                placeholder={t('legal.allBuckets')}
-                size="sm"
-                showChevron
-                clearable
-              />
-            </div>
-            {/* Date from — visible ≥lg */}
-            <div className="hidden lg:block flex-1 min-w-0 lg:max-w-56">
-              <InputDatePicker
-                value={dateFrom}
-                onChange={(d) => { setDateFrom(d); setPageIndex(0); }}
-                placeholder={t('legal.dateFrom')}
-                size="sm"
-                endIcon={<Calendar size={14} />}
-              />
-            </div>
-            {/* Date to — visible ≥lg */}
-            <div className="hidden lg:block flex-1 min-w-0 lg:max-w-56">
-              <InputDatePicker
-                value={dateTo}
-                onChange={(d) => { setDateTo(d); setPageIndex(0); }}
-                placeholder={t('legal.dateTo')}
-                size="sm"
-                endIcon={<Calendar size={14} />}
-              />
-            </div>
-            {/* Popover — visible <lg */}
-            <div className="lg:hidden shrink-0">
-              <PopOver
-                isOpen={filterOpen}
-                onClose={() => setFilterOpen(false)}
-                placement="bottom"
-                align="end"
-                maxWidth="300px"
-                trigger={
-                  <Button variant="outline" size="sm" className="relative btn-icon-sm" onClick={() => setFilterOpen(!filterOpen)}>
-                    <SlidersHorizontal size={16} />
-                    {activeFilterCount > 0 && (
-                      <span className="absolute -top-1.5 -right-1.5 bg-primary text-white text-xs rounded-full w-4 h-4 flex items-center justify-center leading-none">
-                        {activeFilterCount}
-                      </span>
-                    )}
-                  </Button>
-                }
-              >
-                <div className="flex flex-col gap-3 p-3">
-                  <div className="text-xs font-medium text-muted uppercase tracking-wide">{t('common.filters')}</div>
-                  <Select
-                    options={branchOptions}
-                    value={filterBranchId}
-                    onChange={(val) => { setFilterBranchId((val as string) || null); setPageIndex(0); }}
-                    placeholder={t('legal.allBranches')}
-                    size="sm"
-                    showChevron
-                    clearable
-                    searchable
-                  />
-                  <Select
-                    options={BUCKET_OPTIONS}
-                    value={filterBucket}
-                    onChange={(val) => { setFilterBucket((val as string) || null); setPageIndex(0); }}
-                    placeholder={t('legal.allBuckets')}
-                    size="sm"
-                    showChevron
-                    clearable
-                  />
-                  <div className="text-xs font-medium text-muted uppercase tracking-wide mt-1">{t('legal.dateRange')}</div>
-                  <InputDatePicker
-                    value={dateFrom}
-                    onChange={(d) => { setDateFrom(d); setPageIndex(0); }}
-                    placeholder={t('legal.dateFrom')}
-                    size="sm"
-                    endIcon={<Calendar size={14} />}
-                  />
-                  <InputDatePicker
-                    value={dateTo}
-                    onChange={(d) => { setDateTo(d); setPageIndex(0); }}
-                    placeholder={t('legal.dateTo')}
-                    size="sm"
-                    endIcon={<Calendar size={14} />}
-                  />
-                  <div className="text-xs font-medium text-muted uppercase tracking-wide mt-1">{t('common.sortBy')}</div>
-                  <Select
-                    options={SORT_OPTIONS}
-                    value={sorting[0]?.id ?? null}
-                    onChange={(val) => {
-                      if (val) setSorting([{ id: val as string, desc: false }]);
-                      else setSorting([]);
-                      setPageIndex(0);
-                    }}
-                    placeholder={t('common.sortBy')}
-                    size="sm"
-                    showChevron
-                    clearable
-                    searchable={false}
-                  />
+        const detailTitle = selected
+          ? (selected.contract_code_display ?? selected.contract_code)
+          : t('legal.dunningTitle');
+
+        return (
+          <>
+            {/* ── Mobile Header ── */}
+            {isMobile && (
+              <MobileHeader className="mobile-header-bordered">
+                <div className="mobile-header-start">
+                  {isRoot ? (
+                    <button className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current" onClick={() => window.dispatchEvent(new CustomEvent('sidemenu:open'))}>
+                      <ArrowRightFromLine size={18} />
+                    </button>
+                  ) : (
+                    <button className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current" onClick={goBack}>
+                      <ArrowLeft size={20} />
+                    </button>
+                  )}
                 </div>
-              </PopOver>
-            </div>
-          </div>
-        </div>
+                <div className="mobile-header-title mobile-header-title-truncate">
+                  {isRoot ? t('legal.dunningTitle') : detailTitle}
+                </div>
+                <div className="mobile-header-end w-12" />
+              </MobileHeader>
+            )}
 
-        {/* Desktop: DataTable */}
-        <DataTable
-          data={list}
-          columns={columns}
-          enableSorting
-          manualSorting
-          sorting={sorting}
-          onSortingChange={(updater) => {
-            const next = typeof updater === 'function' ? updater(sorting) : updater;
-            setSorting(next);
-            setPageIndex(0);
-          }}
-          enablePagination
-          pageIndex={pageIndex}
-          pageSize={pageSize}
-          pageSizeOptions={[15, 25, 50]}
-          rowCount={totalCount}
-          siblingCount={2}
-          onPageChange={({ pageIndex: pi, pageSize: ps }) => {
-            setPageIndex(pi);
-            setPageSize(ps);
-          }}
-          className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
-          noResults={
-            <div className="p-8 text-center text-control-label">
-              {t('common.noData')}
-            </div>
-          }
-        />
-
-        {/* Mobile: Card list */}
-        <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
-          <div className="flex-1 overflow-auto better-scroll pb-8">
-            {list.length === 0 ? (
-              <div className="p-8 text-center text-control-label">{t('common.noData')}</div>
-            ) : (
-              <div className="flex flex-col divide-y divide-line">
-                {list.map((item) => (
-                  <div
-                    key={item.contract_id}
-                    className="flex items-center gap-3 px-1 py-3 cursor-pointer active:bg-surface-hover"
-                    onClick={() => goToContract(item.contract_id)}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm truncate">{item.contract_code_display ?? item.contract_code}</div>
-                      <div className="text-xs text-control-label truncate">{item.customer_name ?? item.branch_name}</div>
-                      {item.customer_tel && <div className="text-xs text-subtle truncate">{item.customer_tel}</div>}
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge size="xs" color={getBucketColor(item.bucket_code)}>
-                          {getBucketLabel(item.bucket_code)}
-                        </Badge>
-                        <span className="text-xs text-control-label">{item.overdue_installment_count} {t('legal.installments')}</span>
-                      </div>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <div className="tabular-nums font-medium text-sm text-danger">{fmt(item.overdue_amount)}</div>
-                      <div className="text-xs text-subtle">{formatDate(item.first_overdue_due_date)}</div>
-                      {item.overdue_days > 0 && (
-                        <div className="text-[11px] text-subtle">({overdueDaysLabel(item.overdue_days)})</div>
-                      )}
-                    </div>
-                  </div>
-                ))}
+            {/* ── Desktop Header ── */}
+            {!isMobile && (
+              <div className="flex-none px-4 py-2.5 border-b border-line">
+                <h1 className="heading-2">{t('legal.dunningTitle')}</h1>
               </div>
             )}
-          </div>
-          {totalCount > 0 && (
-            <DataTableFooter
-              currentPage={pageIndex + 1}
-              totalPages={Math.ceil(totalCount / pageSize) || 1}
-              onPageChange={(p) => setPageIndex(p - 1)}
-              pageSize={pageSize}
-              pageSizeOptions={[15, 25, 50]}
-              onPageSizeChange={(ps) => { setPageSize(ps); setPageIndex(0); }}
-              totalRows={totalCount}
-              siblingCount={2}
-            />
-          )}
-        </div>
-      </div>
-    </>
+
+            {/* ── Filter bar ── */}
+            {(isRoot || !isMobile) && (
+              <div className="flex-none p-2 border-b border-line">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <Input
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder={t('legal.searchContract')}
+                      size="sm"
+                      startIcon={<Search size={16} />}
+                      className="w-full"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0 hidden sm:block">
+                    <Select
+                      options={branchOptions}
+                      value={filterBranchId}
+                      onChange={(val) => { setFilterBranchId((val as string) || null); setPageIndex(0); }}
+                      placeholder={t('legal.allBranches')}
+                      size="sm"
+                      showChevron
+                      clearable
+                      searchable
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0 hidden md:block">
+                    <Select
+                      options={BUCKET_OPTIONS}
+                      value={filterBucket}
+                      onChange={(val) => { setFilterBucket((val as string) || null); setPageIndex(0); }}
+                      placeholder={t('legal.allBuckets')}
+                      size="sm"
+                      showChevron
+                      clearable
+                    />
+                  </div>
+                  <div className="hidden lg:block flex-1 min-w-0 lg:max-w-40">
+                    <InputDatePicker
+                      value={dateFrom}
+                      onChange={(d) => { setDateFrom(d); setPageIndex(0); }}
+                      placeholder={t('legal.dateFrom')}
+                      size="sm"
+                      endIcon={<Calendar size={14} />}
+                    />
+                  </div>
+                  <div className="hidden lg:block flex-1 min-w-0 lg:max-w-40">
+                    <InputDatePicker
+                      value={dateTo}
+                      onChange={(d) => { setDateTo(d); setPageIndex(0); }}
+                      placeholder={t('legal.dateTo')}
+                      size="sm"
+                      endIcon={<Calendar size={14} />}
+                    />
+                  </div>
+                  <div className="hidden xl:flex items-center gap-1.5 text-control-label flex-1 min-w-0" style={{ maxWidth: '12rem' }}>
+                    <ChevronsUpDown size={14} className="shrink-0" />
+                    <div className="flex-1">
+                      <Select
+                        options={SORT_OPTIONS}
+                        value={sortBy}
+                        onChange={(val) => setSortBy((val as string) ?? 'first_overdue_due_date.asc')}
+                        size="sm"
+                        showChevron
+                        searchable={false}
+                      />
+                    </div>
+                  </div>
+                  {/* Popover for hidden filters */}
+                  <div className="xl:hidden shrink-0">
+                    <PopOver
+                      isOpen={filterOpen}
+                      onClose={() => setFilterOpen(false)}
+                      placement="bottom"
+                      align="end"
+                      maxWidth="300px"
+                      trigger={
+                        <Button variant="outline" size="sm" className="relative btn-icon-sm" onClick={() => setFilterOpen(!filterOpen)}>
+                          <SlidersHorizontal size={16} />
+                          {activeFilterCount > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 bg-primary text-white text-xs rounded-full w-4 h-4 flex items-center justify-center leading-none">
+                              {activeFilterCount}
+                            </span>
+                          )}
+                        </Button>
+                      }
+                    >
+                      <div className="flex flex-col gap-3 p-3">
+                        <div className="text-xs font-medium text-muted uppercase tracking-wide">{t('common.filters')}</div>
+                        <Select
+                          options={branchOptions}
+                          value={filterBranchId}
+                          onChange={(val) => { setFilterBranchId((val as string) || null); setPageIndex(0); }}
+                          placeholder={t('legal.allBranches')}
+                          size="sm"
+                          showChevron
+                          clearable
+                          searchable
+                        />
+                        <Select
+                          options={BUCKET_OPTIONS}
+                          value={filterBucket}
+                          onChange={(val) => { setFilterBucket((val as string) || null); setPageIndex(0); }}
+                          placeholder={t('legal.allBuckets')}
+                          size="sm"
+                          showChevron
+                          clearable
+                        />
+                        <div className="text-xs font-medium text-muted uppercase tracking-wide mt-1">{t('legal.dateRange')}</div>
+                        <InputDatePicker
+                          value={dateFrom}
+                          onChange={(d) => { setDateFrom(d); setPageIndex(0); }}
+                          placeholder={t('legal.dateFrom')}
+                          size="sm"
+                          endIcon={<Calendar size={14} />}
+                        />
+                        <InputDatePicker
+                          value={dateTo}
+                          onChange={(d) => { setDateTo(d); setPageIndex(0); }}
+                          placeholder={t('legal.dateTo')}
+                          size="sm"
+                          endIcon={<Calendar size={14} />}
+                        />
+                        <div className="text-xs font-medium text-muted uppercase tracking-wide mt-1">{t('common.sortBy')}</div>
+                        <Select
+                          options={SORT_OPTIONS}
+                          value={sortBy}
+                          onChange={(val) => setSortBy((val as string) ?? 'first_overdue_due_date.asc')}
+                          size="sm"
+                          showChevron
+                          searchable={false}
+                        />
+                      </div>
+                    </PopOver>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── Panels ── */}
+            <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
+              {/* ── List Panel ── */}
+              <PageNavPanel id="list" className={isMobile ? '' : 'w-5/12 xl:w-4/12 border-r border-line flex flex-col'}>
+                <div className={`flex-1 overflow-auto better-scroll ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
+                  {list.length === 0 ? (
+                    <div className="p-8 text-center text-subtler">{t('common.noData')}</div>
+                  ) : (
+                    <div className="flex flex-col divide-y divide-line">
+                      {list.map((item) => (
+                        <button
+                          key={item.contract_id}
+                          className={`w-full text-left px-4 py-2.5 transition-colors cursor-pointer ${
+                            item.contract_id === selectedId ? 'bg-primary/10' : 'hover:bg-surface-hover'
+                          }`}
+                          onClick={() => handleSelect(item)}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-medium text-sm truncate">{item.contract_code_display ?? item.contract_code}</span>
+                            <Badge size="xs" color={getBucketColor(item.bucket_code)}>
+                              {getBucketLabel(item.bucket_code)}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="text-subtle truncate">
+                                {item.customer_name ?? '—'} · {item.branch_name}
+                              </span>
+                            </div>
+                            <span className="tabular-nums text-danger font-medium shrink-0 ml-2">
+                              {fmt(item.overdue_amount)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-[11px] text-subtler mt-0.5">
+                            <span>{item.overdue_installment_count} {t('legal.installments')}</span>
+                            {item.overdue_days > 0 && (
+                              <span className="tabular-nums">{overdueDaysLabel(item.overdue_days)}</span>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {totalCount > 0 && (
+                  <div className="flex-none border-t border-line p-2">
+                    <DataTableFooter
+                      currentPage={pageIndex + 1}
+                      totalPages={Math.ceil(totalCount / pageSize) || 1}
+                      onPageChange={(p) => setPageIndex(p - 1)}
+                      pageSize={pageSize}
+                      pageSizeOptions={[15, 25, 50]}
+                      onPageSizeChange={(ps) => { setPageSize(ps); setPageIndex(0); }}
+                      totalRows={totalCount}
+                    />
+                  </div>
+                )}
+              </PageNavPanel>
+
+              {/* ── Detail Panel ── */}
+              <PageNavPanel id="detail" className={isMobile ? '' : 'flex-1 min-w-0 flex flex-col'}>
+                {selected ? (
+                  <div className="flex-1 overflow-auto better-scroll">
+                    <div className="px-4 md:px-6 py-4 max-w-2xl">
+                      {/* Header */}
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h2 className="text-lg font-semibold">{selected.contract_code_display ?? selected.contract_code}</h2>
+                          <div className="text-sm text-subtle">{selected.customer_name ?? '—'}</div>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          startIcon={<ExternalLink size={14} />}
+                          onClick={() => goToContract(selected.contract_id)}
+                        >
+                          {t('legal.viewContract')}
+                        </Button>
+                      </div>
+
+                      {/* Overdue summary */}
+                      <div className="mb-4 px-3 py-2.5 rounded-md bg-danger/5 border border-danger/20">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-subtle">{t('legal.overdueAmount')}</span>
+                          <span className="tabular-nums font-semibold text-danger">{fmt(selected.overdue_amount)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs mt-1">
+                          <span className="text-subtle">{t('legal.overdueCount')}</span>
+                          <span className="tabular-nums">{selected.overdue_installment_count} {t('legal.installments')}</span>
+                        </div>
+                        <div className="flex justify-between text-xs mt-1">
+                          <span className="text-subtle">{t('legal.since')}</span>
+                          <span>
+                            {selected.first_overdue_due_date
+                              ? <><DateTime value={selected.first_overdue_due_date} showTime={false} /> ({overdueDaysLabel(selected.overdue_days)})</>
+                              : '—'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-xs mt-1">
+                          <span className="text-subtle">{t('legal.bucket')}</span>
+                          <Badge size="xs" color={getBucketColor(selected.bucket_code)}>
+                            {getBucketLabel(selected.bucket_code)}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      {/* Contract info */}
+                      <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line text-sm space-y-1.5">
+                        <div className="flex justify-between">
+                          <span className="text-subtle">{t('legal.outstanding')}</span>
+                          <span className="tabular-nums font-medium">{fmt(selected.outstanding_amount)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-subtle">{t('legal.contractState')}</span>
+                          <Badge size="xs" color={getStateColor(selected.state)}>{getStateLabel(selected.state)}</Badge>
+                        </div>
+                        {selected.commercial_model && (
+                          <div className="flex justify-between text-xs">
+                            <span className="text-subtle">Model</span>
+                            <span>{selected.commercial_model}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between text-xs">
+                          <span className="text-subtle">{t('legal.branch')}</span>
+                          <span>{selected.branch_name}</span>
+                        </div>
+                      </div>
+
+                      {/* Customer & contact */}
+                      <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line text-sm space-y-1.5">
+                        <div className="flex justify-between">
+                          <span className="text-subtle">{t('legal.customer')}</span>
+                          <span>{selected.customer_name ?? '—'}</span>
+                        </div>
+                        {selected.customer_tel && (
+                          <div className="flex justify-between text-xs">
+                            <span className="text-subtle">{t('legal.tel')}</span>
+                            <span>{selected.customer_tel}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Payment info */}
+                      <div className="px-3 py-2.5 rounded-md bg-surface border border-line text-sm space-y-1.5">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-subtle">Total Paid</span>
+                          <span className="tabular-nums">{fmt(selected.total_paid)}</span>
+                        </div>
+                        {selected.last_payment_date && (
+                          <div className="flex justify-between text-xs">
+                            <span className="text-subtle">Last Payment</span>
+                            <DateTime value={selected.last_payment_date} showTime={false} />
+                          </div>
+                        )}
+                        {selected.next_due_date && (
+                          <div className="flex justify-between text-xs">
+                            <span className="text-subtle">Next Due</span>
+                            <span>
+                              <DateTime value={selected.next_due_date} showTime={false} />
+                              {selected.next_due_amount != null && (
+                                <span className="ml-1.5 tabular-nums text-subtle">({fmt(selected.next_due_amount)})</span>
+                              )}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex-1 h-full flex items-center justify-center text-subtler">
+                    <div className="text-center">
+                      <Search size={32} className="mx-auto mb-2 opacity-40" />
+                      <div>Select a contract to view details</div>
+                    </div>
+                  </div>
+                )}
+              </PageNavPanel>
+            </div>
+          </>
+        );
+      }}
+    </PageNav>
   );
 }

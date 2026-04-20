@@ -4,11 +4,12 @@ import { useForm, Controller } from 'react-hook-form';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   DataTable, DataTableColumnHeader, DataTableFooter, MobileHeader, Modal,
-  Badge, Input, Select, Button, Switch, PopOver,
+  Badge, Select, Button, Switch, PopOver, MaskedInput,
   InputDateRangePicker, useSnackbarContext,
   type ColumnDef, type SortingState,
 } from 'tsp-form';
-import { ArrowRightFromLine, Plus, Pencil, CheckCircle, XCircle, Calendar, SlidersHorizontal } from 'lucide-react';
+import { ArrowRightFromLine, Plus, Pencil, CheckCircle, XCircle, Keyboard, SlidersHorizontal } from 'lucide-react';
+import { makeDateRangePickerFormat } from '../../lib/format';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { useAuth } from '../../contexts/AuthContext';
@@ -87,7 +88,7 @@ function PolicyModal({ open, onClose, editPolicy, onSuccess }: {
   const isHoldingLevel = !userCompanyId && !userBranchId;
   const isCompanyLevel = !!userCompanyId && !userBranchId;
 
-  const { register, handleSubmit, control, watch, setValue, formState: { isDirty }, reset } = useForm<PolicyFormData>({
+  const { handleSubmit, control, watch, setValue, formState: { isDirty }, reset } = useForm<PolicyFormData>({
     defaultValues: {
       company_id: '',
       branch_id: '',
@@ -103,6 +104,7 @@ function PolicyModal({ open, onClose, editPolicy, onSuccess }: {
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+  const [isTypingDateRange, setIsTypingDateRange] = useState(false);
 
   const selectedCompanyId = watch('company_id');
 
@@ -296,24 +298,51 @@ function PolicyModal({ open, onClose, editPolicy, onSuccess }: {
 
             <div className="flex flex-col">
               <label className="form-label">{t('discount.retailMaxDiscount')}</label>
-              <Input
-                type="number" min={0} max={100} step="0.1"
-                {...register('retail_max_discount_percent')}
+              <Controller
+                control={control}
+                name="retail_max_discount_percent"
+                render={({ field }) => (
+                  <MaskedInput
+                    mask="number"
+                    decimalScale={1}
+                    value={field.value}
+                    onChange={(raw) => field.onChange(raw)}
+                    suffix="%"
+                  />
+                )}
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col">
                 <label className="form-label">{t('discount.fin1MaxDiscount')}</label>
-                <Input
-                  type="number" min={0} max={100} step="0.1"
-                  {...register('fin1_max_discount_percent')}
+                <Controller
+                  control={control}
+                  name="fin1_max_discount_percent"
+                  render={({ field }) => (
+                    <MaskedInput
+                      mask="number"
+                      decimalScale={1}
+                      value={field.value}
+                      onChange={(raw) => field.onChange(raw)}
+                      suffix="%"
+                    />
+                  )}
                 />
               </div>
               <div className="flex flex-col">
                 <label className="form-label">{t('discount.fin2MaxDiscount')}</label>
-                <Input
-                  type="number" min={0} max={100} step="0.1"
-                  {...register('fin2_max_discount_percent')}
+                <Controller
+                  control={control}
+                  name="fin2_max_discount_percent"
+                  render={({ field }) => (
+                    <MaskedInput
+                      mask="number"
+                      decimalScale={1}
+                      value={field.value}
+                      onChange={(raw) => field.onChange(raw)}
+                      suffix="%"
+                    />
+                  )}
                 />
               </div>
             </div>
@@ -333,10 +362,32 @@ function PolicyModal({ open, onClose, editPolicy, onSuccess }: {
                         onFromDateChange={onFromChange}
                         onToDateChange={onToChange}
                         placeholder={t('discount.effectivePeriod')}
-                        endIcon={<Calendar size={18} />}
+                        endIcon={<Keyboard size={16} />}
+                        onEndIconClick={() => setIsTypingDateRange(v => !v)}
                         locale={i18n.language}
                         calendar="gregorian"
-                        datePickerProps={{ showTime: true, timeFormat: '24h' }}
+                        dateFormat={makeDateRangePickerFormat(i18n.language)}
+                        typingMode={isTypingDateRange}
+                        onTypingModeChange={setIsTypingDateRange}
+                        typingMask="##/##/#### - ##/##/####"
+                        typingPlaceholder="DD/MM/YYYY - DD/MM/YYYY"
+                        parseTypedDates={(raw) => {
+                          const parseDate = (digits: string) => {
+                            if (digits.length !== 8) return null;
+                            const day = parseInt(digits.slice(0, 2), 10);
+                            const month = parseInt(digits.slice(2, 4), 10);
+                            let year = parseInt(digits.slice(4, 8), 10);
+                            if (year > 2400) year -= 543;
+                            if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+                            const d = new Date(year, month - 1, day);
+                            if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+                            return d;
+                          };
+                          return {
+                            from: parseDate(raw.slice(0, 8)),
+                            to: raw.length >= 16 ? parseDate(raw.slice(8, 16)) : null,
+                          };
+                        }}
                       />
                     )}
                   />

@@ -4,7 +4,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   DataTable, DataTableColumnHeader, DataTableFooter, MobileHeader,
-  Button, Input, Select, Modal, Badge,
+  Button, Select, Modal, Badge, MaskedInput,
   useSnackbarContext, FormErrorMessage,
   type ColumnDef, type SortingState,
 } from 'tsp-form';
@@ -69,7 +69,7 @@ function Fin1Modal({ open, onClose, categories, onSuccess }: {
     max_discount_percent: '5',
   };
 
-  const { register, handleSubmit, control, formState: { errors, isDirty }, reset } = useForm<Fin1FormData>({
+  const { handleSubmit, control, formState: { errors, isDirty }, reset } = useForm<Fin1FormData>({
     defaultValues: defaults,
   });
 
@@ -178,24 +178,39 @@ function Fin1Modal({ open, onClose, categories, onSuccess }: {
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col">
                 <label className="form-label">{t('fin1.termMonths')}</label>
-                <Input
-                  type="number"
-                  min={1}
-                  step={1}
-                  size="sm"
-                  {...register('term_months', { required: t('fin1.termRequired') })}
+                <Controller
+                  name="term_months"
+                  control={control}
+                  rules={{ required: t('fin1.termRequired') }}
+                  render={({ field }) => (
+                    <MaskedInput
+                      mask="number"
+                      decimalScale={0}
+                      value={field.value}
+                      onChange={(raw) => field.onChange(raw)}
+                      size="sm"
+                      placeholder="12"
+                    />
+                  )}
                 />
                 <FormErrorMessage error={errors.term_months} />
               </div>
               <div className="flex flex-col">
                 <label className="form-label">{t('fin1.downPercent')}</label>
-                <Input
-                  type="number"
-                  min={0}
-                  max={100}
-                  step="0.1"
-                  size="sm"
-                  {...register('down_percent', { required: t('fin1.downPercentRequired') })}
+                <Controller
+                  name="down_percent"
+                  control={control}
+                  rules={{ required: t('fin1.downPercentRequired') }}
+                  render={({ field }) => (
+                    <MaskedInput
+                      mask="number"
+                      decimalScale={1}
+                      value={field.value}
+                      onChange={(raw) => field.onChange(raw)}
+                      size="sm"
+                      suffix="%"
+                    />
+                  )}
                 />
                 <FormErrorMessage error={errors.down_percent} />
               </div>
@@ -204,23 +219,39 @@ function Fin1Modal({ open, onClose, categories, onSuccess }: {
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col">
                 <label className="form-label">{t('fin1.interestPercent')}</label>
-                <Input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  size="sm"
-                  {...register('interest_percent_total', { required: t('fin1.interestRequired') })}
+                <Controller
+                  name="interest_percent_total"
+                  control={control}
+                  rules={{ required: t('fin1.interestRequired') }}
+                  render={({ field }) => (
+                    <MaskedInput
+                      mask="number"
+                      decimalScale={2}
+                      value={field.value}
+                      onChange={(raw) => field.onChange(raw)}
+                      size="sm"
+                      suffix="%"
+                    />
+                  )}
                 />
                 <FormErrorMessage error={errors.interest_percent_total} />
               </div>
               <div className="flex flex-col">
                 <label className="form-label">{t('fin1.roundingUnit')}</label>
-                <Input
-                  type="number"
-                  min={1}
-                  step={1}
-                  size="sm"
-                  {...register('rounding_unit', { required: t('fin1.roundingRequired') })}
+                <Controller
+                  name="rounding_unit"
+                  control={control}
+                  rules={{ required: t('fin1.roundingRequired') }}
+                  render={({ field }) => (
+                    <MaskedInput
+                      mask="number"
+                      decimalScale={0}
+                      value={field.value}
+                      onChange={(raw) => field.onChange(raw)}
+                      size="sm"
+                      placeholder="10"
+                    />
+                  )}
                 />
                 <FormErrorMessage error={errors.rounding_unit} />
               </div>
@@ -228,13 +259,21 @@ function Fin1Modal({ open, onClose, categories, onSuccess }: {
 
             <div className="flex flex-col">
               <label className="form-label">{t('fin1.maxDiscount')}</label>
-              <Input
-                type="number"
-                min={0}
-                max={100}
-                step="0.1"
-                size="sm"
-                {...register('max_discount_percent', { required: t('fin1.maxDiscountRequired') })}
+              <Controller
+                name="max_discount_percent"
+                control={control}
+                rules={{ required: t('fin1.maxDiscountRequired') }}
+                render={({ field }) => (
+                  <MaskedInput
+                    mask="number"
+                    decimalScale={1}
+                    value={field.value}
+                    onChange={(raw) => field.onChange(raw)}
+                    size="sm"
+                    suffix="%"
+                    placeholder="5"
+                  />
+                )}
               />
               <FormErrorMessage error={errors.max_discount_percent} />
             </div>

@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   DataTable, DataTableColumnHeader, DataTableFooter, MobileHeader,
-  Button, Input, Select, Modal, Badge, TextArea,
+  Button, Select, Modal, Badge, TextArea, MaskedInput,
   useSnackbarContext, FormErrorMessage,
   type ColumnDef, type SortingState,
 } from 'tsp-form';
@@ -55,7 +55,7 @@ function RateModal({ open, onClose, editRate, branches, onSuccess }: {
   const { t } = useTranslation();
   const { user } = useAuth();
 
-  const { register, handleSubmit, formState: { errors, isDirty }, reset, watch, setValue } = useForm<RateFormData>({
+  const { register, handleSubmit, control, formState: { errors, isDirty }, reset, watch, setValue } = useForm<RateFormData>({
     defaultValues: { scope: 'BRANCH', branch_id: '', rate_percent: '', note: '' },
   });
 
@@ -188,14 +188,19 @@ function RateModal({ open, onClose, editRate, branches, onSuccess }: {
 
             <div className="flex flex-col">
               <label className="form-label">{t('dealPartnerRate.ratePercent')}</label>
-              <Input
-                type="number"
-                min={0}
-                max={100}
-                step="0.01"
-                size="md"
-                className="w-full"
-                {...register('rate_percent', { required: t('dealPartnerRate.rateRequired') })}
+              <Controller
+                name="rate_percent"
+                control={control}
+                rules={{ required: t('dealPartnerRate.rateRequired') }}
+                render={({ field }) => (
+                  <MaskedInput
+                    mask="number"
+                    decimalScale={2}
+                    value={field.value}
+                    onChange={(raw) => field.onChange(raw)}
+                    suffix="%"
+                  />
+                )}
               />
               <FormErrorMessage error={errors.rate_percent} />
             </div>

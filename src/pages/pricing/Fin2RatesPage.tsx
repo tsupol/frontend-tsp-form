@@ -1,10 +1,10 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, DataTable, Input, Select, Button, PopOver, Tooltip, Modal, NumberSpinner, InputDatePicker, useSnackbarContext } from 'tsp-form';
-import { ArrowRightFromLine, ArrowLeft, SlidersHorizontal, ChevronsUpDown, CheckCircle, XCircle, Pencil, Loader2, MousePointerClick, Plus, X, Calendar } from 'lucide-react';
+import { PageNav, PageNavPanel, MobileHeader, DataTable, Input, Select, Button, PopOver, Modal, NumberSpinner, InputDatePicker, MaskedInput, useSnackbarContext } from 'tsp-form';
+import { ArrowRightFromLine, ArrowLeft, SlidersHorizontal, ChevronsUpDown, CheckCircle, XCircle, Loader2, Plus, X, Keyboard } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
-import { formatDateTime } from '../../lib/format';
+import { makeDatePickerFormat } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useFormSnapshot } from '../../hooks/useFormSnapshot';
@@ -92,13 +92,14 @@ const formatTHB = (value: number | null): string => {
 
 // ── Editor Panel ─────────────────────────────────────────────────────────────
 
-function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, isDirtyRef }: {
+function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, isDirtyRef, canManageTerms }: {
   modelId: number | null;
   modelCode: string;
   familyName: string;
   baseModelName: string;
   suffix: string;
   isDirtyRef?: React.MutableRefObject<boolean>;
+  canManageTerms: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
@@ -116,6 +117,10 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
   const [newTermEffective, setNewTermEffective] = useState<Date | null>(null);
   const [isAddingTerm, setIsAddingTerm] = useState(false);
   const [isRemovingTerm, setIsRemovingTerm] = useState<number | null>(null);
+
+  // Typing mode for date pickers
+  const [typingModes, setTypingModes] = useState<Record<number, boolean>>({});
+  const [isTypingNewTerm, setIsTypingNewTerm] = useState(false);
 
   const initializedForRef = useRef<number | null>(null);
 
@@ -282,7 +287,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
       await apiClient.rpc('fin2_term_upsert', {
         p_model_id: modelId,
         p_term_months: months,
-        p_max_discount_percent: 5,
+        p_is_active: true,
       });
       const rateParams: Record<string, unknown> = {
         p_program_code: 'FIN2',
@@ -358,13 +363,8 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
 
       {!modelId && (
         <div className="flex flex-col items-center justify-center py-10 text-center text-sm text-control-label gap-3">
-          <Pencil size={24} className="opacity-20" />
           <div>
             <div className="font-medium">{t('fin2.selectToEdit')}</div>
-            <div className="flex items-center gap-1 mt-1 text-xs opacity-70">
-              <MousePointerClick size={12} />
-              {t('pricing.doubleClickHint')}
-            </div>
           </div>
         </div>
       )}
@@ -400,14 +400,13 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                     <label className="form-label text-xs">{t('pricing.termMonths', { months: term })}</label>
                     <div className="flex items-center gap-2">
                       <div className="input-group flex-1">
-                        <Input
+                        <MaskedInput
                           className="w-full"
-                          type="number"
-                          min={0}
-                          step="0.01"
+                          mask="number"
+                          decimalScale={2}
+
                           value={fin2Profits[term] ?? ''}
-                          onChange={(e) => setFin2Profits(prev => ({ ...prev, [term]: e.target.value }))}
-                          placeholder="0.00"
+                          onChange={(raw) => setFin2Profits(prev => ({ ...prev, [term]: raw }))}
                           size="sm"
                           disabled={busy}
                         />
@@ -421,26 +420,43 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                           {isSavingFin2 === term ? t('pricing.saving') : t('common.save')}
                         </Button>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="btn-icon-sm text-control-label hover:text-danger"
-                        disabled={busy || isRemovingTerm === term}
-                        onClick={() => handleRemoveTerm(term)}
-                      >
-                        {isRemovingTerm === term ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
-                      </Button>
+                      {canManageTerms && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="btn-icon-sm text-control-label hover:text-danger"
+                          disabled={busy || isRemovingTerm === term}
+                          onClick={() => handleRemoveTerm(term)}
+                        >
+                          {isRemovingTerm === term ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
+                        </Button>
+                      )}
                     </div>
                     <InputDatePicker
                       value={fin2EffectiveDates[term] ?? null}
                       onChange={(date) => setFin2EffectiveDates(prev => ({ ...prev, [term]: date }))}
                       size="sm"
                       placeholder={t('fin2.effectiveFrom')}
-                      endIcon={<Calendar size={18} />}
+                      endIcon={<Keyboard size={16} />}
+                      onEndIconClick={() => setTypingModes(prev => ({ ...prev, [term]: !prev[term] }))}
                       locale={i18n.language}
                       calendar="gregorian"
-                      dateFormat={(d) => d ? formatDateTime(d.toISOString(), i18n.language) : ''}
-                      datePickerProps={{ showTime: true, timeFormat: '24h' }}
+                      dateFormat={makeDatePickerFormat(i18n.language)}
+                      typingMode={typingModes[term] ?? false}
+                      onTypingModeChange={(v) => setTypingModes(prev => ({ ...prev, [term]: v }))}
+                      typingMask="##/##/####"
+                      typingPlaceholder="DD/MM/YYYY"
+                      parseTypedDate={(raw) => {
+                        if (raw.length !== 8) return null;
+                        const day = parseInt(raw.slice(0, 2), 10);
+                        const month = parseInt(raw.slice(2, 4), 10);
+                        let year = parseInt(raw.slice(4, 8), 10);
+                        if (year > 2400) year -= 543;
+                        if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+                        const d = new Date(year, month - 1, day);
+                        if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+                        return d;
+                      }}
                     />
                     {!fin2EffectiveDates[term] && (
                       <div className="text-[10px] text-control-label">{t('fin2.effectiveFrom')}: {t('fin2.now')}</div>
@@ -450,67 +466,82 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
               })}
             </div>
 
-            {/* Add term */}
-            <div className="mt-3 pt-3 border-t border-line space-y-2">
-              <div className="flex gap-2">
-                <div className="flex flex-col shrink-0">
-                  <span className="form-label text-xs" id="fin2-enter-months-label">{t('pricing.enterMonths')}</span>
-                  <NumberSpinner
-                    aria-labelledby="fin2-enter-months-label"
-                    className="w-32"
-                    min={1}
-                    max={120}
-                    value={newTermMonths}
-                    onChange={setNewTermMonths}
-                    scale="sm"
-                    disabled={busy || isAddingTerm}
-                    placeholder="12"
-                  />
+            {/* Add term — HOLDING_ADMIN only */}
+            {canManageTerms && (
+              <div className="mt-3 pt-3 border-t border-line space-y-2">
+                <div className="flex gap-2">
+                  <div className="flex flex-col shrink-0">
+                    <span className="form-label text-xs" id="fin2-enter-months-label">{t('pricing.enterMonths')}</span>
+                    <NumberSpinner
+                      aria-labelledby="fin2-enter-months-label"
+                      className="w-32"
+                      min={1}
+                      max={120}
+                      value={newTermMonths}
+                      onChange={setNewTermMonths}
+                      scale="sm"
+                      disabled={busy || isAddingTerm}
+                      placeholder="12"
+                    />
+                  </div>
+                  <div className="flex flex-col flex-1 min-w-0">
+                    <label className="form-label text-xs">{t('pricing.profitAmount')}</label>
+                    <MaskedInput
+                      className="w-full"
+                      mask="number"
+                      decimalScale={2}
+                      value={newTermProfit}
+                      onChange={(raw) => setNewTermProfit(raw)}
+                      size="sm"
+                      disabled={busy || isAddingTerm}
+                    />
+                  </div>
                 </div>
-                <div className="flex flex-col flex-1 min-w-0">
-                  <label className="form-label text-xs">{t('pricing.profitAmount')}</label>
-                  <Input
-                    className="w-full"
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={newTermProfit}
-                    onChange={(e) => setNewTermProfit(e.target.value)}
-                    placeholder="0.00"
+                <div className="flex flex-col">
+                  <label className="form-label text-xs">{t('fin2.effectiveFrom')}</label>
+                  <InputDatePicker
+                    value={newTermEffective}
+                    onChange={setNewTermEffective}
                     size="sm"
+                    placeholder={t('fin2.effectiveFrom')}
                     disabled={busy || isAddingTerm}
+                    endIcon={<Keyboard size={16} />}
+                    onEndIconClick={() => setIsTypingNewTerm(v => !v)}
+                    locale={i18n.language}
+                    calendar="gregorian"
+                    dateFormat={makeDatePickerFormat(i18n.language)}
+                    typingMode={isTypingNewTerm}
+                    onTypingModeChange={setIsTypingNewTerm}
+                    typingMask="##/##/####"
+                    typingPlaceholder="DD/MM/YYYY"
+                    parseTypedDate={(raw) => {
+                      if (raw.length !== 8) return null;
+                      const day = parseInt(raw.slice(0, 2), 10);
+                      const month = parseInt(raw.slice(2, 4), 10);
+                      let year = parseInt(raw.slice(4, 8), 10);
+                      if (year > 2400) year -= 543;
+                      if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+                      const d = new Date(year, month - 1, day);
+                      if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+                      return d;
+                    }}
                   />
+                  {!newTermEffective && (
+                    <div className="text-[10px] text-control-label mt-0.5">{t('fin2.now')}</div>
+                  )}
                 </div>
-              </div>
-              <div className="flex flex-col">
-                <label className="form-label text-xs">{t('fin2.effectiveFrom')}</label>
-                <InputDatePicker
-                  value={newTermEffective}
-                  onChange={setNewTermEffective}
+                <Button
+                  color="primary"
                   size="sm"
-                  placeholder={t('fin2.effectiveFrom')}
-                  disabled={busy || isAddingTerm}
-                  endIcon={<Calendar size={18} />}
-                  locale={i18n.language}
-                  calendar="gregorian"
-                  dateFormat={(d) => d ? formatDateTime(d.toISOString(), i18n.language) : ''}
-                  datePickerProps={{ showTime: true, timeFormat: '24h' }}
-                />
-                {!newTermEffective && (
-                  <div className="text-[10px] text-control-label mt-0.5">{t('fin2.now')}</div>
-                )}
+                  className="w-full"
+                  disabled={busy || isAddingTerm || newTermMonths === '' || newTermMonths <= 0 || !newTermProfit.trim()}
+                  onClick={handleAddTerm}
+                  startIcon={isAddingTerm ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                >
+                  {t('pricing.addTerm')}
+                </Button>
               </div>
-              <Button
-                color="primary"
-                size="sm"
-                className="w-full"
-                disabled={busy || isAddingTerm || newTermMonths === '' || newTermMonths <= 0 || !newTermProfit.trim()}
-                onClick={handleAddTerm}
-                startIcon={isAddingTerm ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-              >
-                {t('pricing.addTerm')}
-              </Button>
-            </div>
+            )}
           </div>
         </>
       )}
@@ -524,6 +555,7 @@ export function Fin2RatesPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const holdingId = user?.holding_id ?? null;
+  const canManageTerms = ['HOLDING_ADMIN', 'SYSTEM_DEV'].includes(user?.role_code ?? '');
   const navGuard = useNavGuard();
 
   // Table state
@@ -802,7 +834,7 @@ export function Fin2RatesPage() {
 
             {/* ── Filter bar — above panels, always visible on list view ── */}
             {(isRoot || !isMobile) && (
-              <div className="flex-none px-4 py-2 border-b border-line">
+              <div className="flex-none p-2 border-b border-line">
                 <div className="flex items-center gap-2">
                   <div className="flex-1 min-w-0">
                     <Input
@@ -967,21 +999,8 @@ export function Fin2RatesPage() {
                           {/* Collapsed row */}
                           <div
                             className={`flex items-center gap-3 px-3 py-2.5 border-b border-line hover:bg-surface-hover transition-colors select-none cursor-pointer ${isSelected ? 'bg-primary/5' : ''}`}
-                            onClick={() => { if (isMobile) handleRowSelect(model.id); }}
-                            onDoubleClick={() => { if (!isMobile) handleRowSelect(model.id); }}
+                            onClick={() => handleRowSelect(model.id)}
                           >
-                            {!isMobile && (
-                              <Tooltip content={t('fin2.editProfit')}>
-                                <Button
-                                  variant="ghost"
-                                  size="xs"
-                                  startIcon={<Pencil size={14} />}
-                                  className={`shrink-0 ${isSelected ? 'text-primary' : 'text-control-label hover:text-fg'}`}
-                                  onClick={(e) => { e.stopPropagation(); handleRowSelect(model.id); }}
-                                />
-                              </Tooltip>
-                            )}
-
                             <div className="flex-1 min-w-0">
                               <div className="flex items-baseline gap-1.5 min-w-0">
                                 <ModelName brand={model.brand_name} family={model.family_name} model={model.name} />
@@ -1044,6 +1063,7 @@ export function Fin2RatesPage() {
                       baseModelName={selectedModel?.base_model_name ?? ''}
                       suffix={''}
                       isDirtyRef={editorDirtyRef}
+                      canManageTerms={canManageTerms}
                     />
                   </div>
                 </PageNavPanel>

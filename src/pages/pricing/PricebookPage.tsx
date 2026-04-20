@@ -1,8 +1,8 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, DataTable, Badge, Input, Select, Button, Switch, PopOver, Tooltip, Modal, NumberSpinner, useSnackbarContext } from 'tsp-form';
-import { ArrowRightFromLine, ArrowLeft, SlidersHorizontal, ChevronsUpDown, AlertTriangle, CheckCircle, XCircle, Pencil, Loader2, MousePointerClick, Plus, X } from 'lucide-react';
+import { PageNav, PageNavPanel, MobileHeader, DataTable, Badge, Input, Select, Button, Switch, PopOver, Tooltip, Modal, NumberSpinner, MaskedInput, useSnackbarContext } from 'tsp-form';
+import { ArrowRightFromLine, ArrowLeft, SlidersHorizontal, ChevronsUpDown, AlertTriangle, CheckCircle, XCircle, Loader2, Plus, X } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavGuard } from '../../contexts/NavGuardContext';
@@ -88,13 +88,14 @@ const calcMargin = (retail: number | null, cost: number | null): string => {
 // Always mounted — accepts modelId which can be null (shows placeholder).
 // Handles model switches internally without remounting.
 
-function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, isDirtyRef }: {
+function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, isDirtyRef, canManageTerms }: {
   modelId: number | null;
   modelCode: string;
   familyName: string;
   baseModelName: string;
   suffix: string;
   isDirtyRef?: React.MutableRefObject<boolean>;
+  canManageTerms: boolean;
 }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -335,7 +336,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
       await apiClient.rpc('fin2_term_upsert', {
         p_model_id: modelId,
         p_term_months: months,
-        p_max_discount_percent: 5,
+        p_is_active: true,
       });
       await apiClient.rpc('price_rate_upsert', {
         p_program_code: 'FIN2',
@@ -426,13 +427,8 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
       {/* ── No model selected — placeholder ── */}
       {!modelId && (
         <div className="flex flex-col items-center justify-center py-10 text-center text-sm text-control-label gap-3">
-          <Pencil size={24} className="opacity-20" />
           <div>
             <div className="font-medium">{t('pricing.selectToEdit')}</div>
-            <div className="flex items-center gap-1 mt-1 text-xs opacity-70">
-              <MousePointerClick size={12} />
-              {t('pricing.doubleClickHint')}
-            </div>
           </div>
         </div>
       )}
@@ -465,28 +461,24 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
               <div className="space-y-3">
                 <div className="flex flex-col">
                   <label className="form-label text-xs" htmlFor="ed-retail">{t('pricing.retailPrice')}</label>
-                  <Input
+                  <MaskedInput
                     id="ed-retail"
-                    type="number"
-                    min={0}
-                    step="0.01"
+                    mask="number"
+                    decimalScale={2}
                     value={retailPrice}
-                    onChange={(e) => setRetailPrice(e.target.value)}
-                    placeholder="0.00"
+                    onChange={(raw) => setRetailPrice(raw)}
                     size="sm"
                     disabled={busy}
                   />
                 </div>
                 <div className="flex flex-col">
                   <label className="form-label text-xs" htmlFor="ed-cost">{t('pricing.costPrice')}</label>
-                  <Input
+                  <MaskedInput
                     id="ed-cost"
-                    type="number"
-                    min={0}
-                    step="0.01"
+                    mask="number"
+                    decimalScale={2}
                     value={costPrice}
-                    onChange={(e) => setCostPrice(e.target.value)}
-                    placeholder="0.00"
+                    onChange={(raw) => setCostPrice(raw)}
                     size="sm"
                     disabled={busy}
                   />
@@ -543,14 +535,13 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                         <label className="form-label text-xs">{t('pricing.termMonths', { months: term })}</label>
                         <div className="flex items-center gap-2">
                           <div className="input-group flex-1">
-                            <Input
+                            <MaskedInput
                               className="w-full"
-                              type="number"
-                              min={0}
-                              step="0.01"
+                              mask="number"
+                              decimalScale={2}
+
                               value={fin2Profits[term] ?? ''}
-                              onChange={(e) => setFin2Profits(prev => ({ ...prev, [term]: e.target.value }))}
-                              placeholder="0.00"
+                              onChange={(raw) => setFin2Profits(prev => ({ ...prev, [term]: raw }))}
                               size="sm"
                               disabled={busy}
                             />
@@ -564,62 +555,64 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                               {isSavingFin2 === term ? t('pricing.saving') : t('common.save')}
                             </Button>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="btn-icon-sm text-control-label hover:text-danger"
-                            disabled={busy || isRemovingTerm === term}
-                            onClick={() => handleRemoveTerm(term)}
-                          >
-                            {isRemovingTerm === term ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
-                          </Button>
+                          {canManageTerms && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="btn-icon-sm text-control-label hover:text-danger"
+                              disabled={busy || isRemovingTerm === term}
+                              onClick={() => handleRemoveTerm(term)}
+                            >
+                              {isRemovingTerm === term ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
+                            </Button>
+                          )}
                         </div>
                       </div>
                     );
                   })}
                 </div>
-                {/* Add term */}
-                <div className="mt-3 pt-3 border-t border-line space-y-2">
-                  <div className="flex gap-2">
-                    <div className="flex flex-col shrink-0">
-                      <label className="form-label text-xs">{t('pricing.enterMonths')}</label>
-                      <NumberSpinner
-                        className="w-32"
-                        min={1}
-                        max={120}
-                        value={newTermMonths}
-                        onChange={setNewTermMonths}
-                        scale="sm"
-                        disabled={busy || isAddingTerm}
-                        placeholder="12"
-                      />
+                {/* Add term — HOLDING_ADMIN only */}
+                {canManageTerms && (
+                  <div className="mt-3 pt-3 border-t border-line space-y-2">
+                    <div className="flex gap-2">
+                      <div className="flex flex-col shrink-0">
+                        <label className="form-label text-xs">{t('pricing.enterMonths')}</label>
+                        <NumberSpinner
+                          className="w-32"
+                          min={1}
+                          max={120}
+                          value={newTermMonths}
+                          onChange={setNewTermMonths}
+                          scale="sm"
+                          disabled={busy || isAddingTerm}
+                          placeholder="12"
+                        />
+                      </div>
+                      <div className="flex flex-col flex-1 min-w-0">
+                        <label className="form-label text-xs">{t('pricing.profitAmount')}</label>
+                        <MaskedInput
+                          className="w-full"
+                          mask="number"
+                          decimalScale={2}
+                          value={newTermProfit}
+                          onChange={(raw) => setNewTermProfit(raw)}
+                          size="sm"
+                          disabled={busy || isAddingTerm}
+                        />
+                      </div>
                     </div>
-                    <div className="flex flex-col flex-1 min-w-0">
-                      <label className="form-label text-xs">{t('pricing.profitAmount')}</label>
-                      <Input
-                        className="w-full"
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={newTermProfit}
-                        onChange={(e) => setNewTermProfit(e.target.value)}
-                        placeholder="0.00"
-                        size="sm"
-                        disabled={busy || isAddingTerm}
-                      />
-                    </div>
+                    <Button
+                      color="primary"
+                      size="sm"
+                      className="w-full"
+                      disabled={busy || isAddingTerm || newTermMonths === '' || newTermMonths <= 0 || !newTermProfit.trim()}
+                      onClick={handleAddTerm}
+                      startIcon={isAddingTerm ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                    >
+                      {t('pricing.addTerm')}
+                    </Button>
                   </div>
-                  <Button
-                    color="primary"
-                    size="sm"
-                    className="w-full"
-                    disabled={busy || isAddingTerm || newTermMonths === '' || newTermMonths <= 0 || !newTermProfit.trim()}
-                    onClick={handleAddTerm}
-                    startIcon={isAddingTerm ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-                  >
-                    {t('pricing.addTerm')}
-                  </Button>
-                </div>
+                )}
               </div>
             )}
 
@@ -663,6 +656,7 @@ export function PricebookPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const holdingId = user?.holding_id ?? null;
+  const canManageTerms = ['HOLDING_ADMIN', 'SYSTEM_DEV'].includes(user?.role_code ?? '');
   const navGuard = useNavGuard();
 
   // Table state
@@ -1114,20 +1108,8 @@ export function PricebookPage() {
                       return (
                         <div
                           className={`flex items-center gap-3 px-3 py-2.5 border-b border-line hover:bg-surface-hover transition-colors select-none cursor-pointer ${isSelected ? 'bg-primary/5' : ''}`}
-                          onClick={() => { if (isMobile) handleRowSelect(model.id); }}
-                          onDoubleClick={() => { if (!isMobile) handleRowSelect(model.id); }}
+                          onClick={() => handleRowSelect(model.id)}
                         >
-                          {!isMobile && (
-                            <Tooltip content={t('pricing.editPrice')}>
-                              <Button
-                                variant="ghost"
-                                size="xs"
-                                startIcon={<Pencil size={14} />}
-                                className={`shrink-0 ${isSelected ? 'text-primary' : 'text-control-label hover:text-fg'}`}
-                                onClick={(e) => { e.stopPropagation(); handleRowSelect(model.id); }}
-                              />
-                            </Tooltip>
-                          )}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-baseline gap-1.5 min-w-0">
                               <ModelName brand={model.brand_name} family={model.family_name} model={model.name} />
@@ -1213,6 +1195,7 @@ export function PricebookPage() {
                       baseModelName={selectedModel?.base_model_name ?? ''}
                       suffix={''}
                       isDirtyRef={editorDirtyRef}
+                      canManageTerms={canManageTerms}
                     />
                   </div>
                 </PageNavPanel>
