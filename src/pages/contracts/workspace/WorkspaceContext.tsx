@@ -118,7 +118,7 @@ export function useWorkspace() {
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [data, setData] = useState<WorkspaceData>(defaultData);
-  const [openModal, setOpenModalRaw] = useState<ModalId>('productPlan');
+  const [openModal, setOpenModalRaw] = useState<ModalId>('customer');
   const [readinessKey, setReadinessKey] = useState(0);
   const panelDirtyRef = useRef(false);
   const [pendingModal, setPendingModal] = useState<{ id: ModalId } | null>(null);

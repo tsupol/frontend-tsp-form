@@ -7,7 +7,8 @@ import { SummaryCard } from './SummaryCard';
 export function CardProductPlan({ onEdit, active, shake }: { onEdit?: () => void; active?: boolean; shake?: boolean }) {
   const { t } = useTranslation();
   const { contract, getCardStatus, isReadOnly, isFinancialLocked } = useWorkspace();
-  const status = getCardStatus('productPlan');
+  const hasCustomer = !!contract?.customer_id;
+  const status = !hasCustomer ? 'locked' as const : getCardStatus('productPlan');
 
   const modelName = contract?.model_name ?? '';
   const variantName = contract?.variant_name ?? '';
@@ -26,9 +27,11 @@ export function CardProductPlan({ onEdit, active, shake }: { onEdit?: () => void
       onEdit={onEdit}
       active={active}
       shake={shake}
-      disabled={isReadOnly}
+      disabled={isReadOnly || !hasCustomer}
     >
-      {status === 'empty' ? (
+      {!hasCustomer ? (
+        <div className="text-subtle text-xs">{t('workspace.needCustomerFirst')}</div>
+      ) : status === 'empty' ? (
         <div className="text-subtle flex items-center gap-2">
           <Package size={14} className="opacity-40" />
           <span>{t('workspace.selectProduct')}</span>

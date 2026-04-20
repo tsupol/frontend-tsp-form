@@ -23,7 +23,7 @@ interface Asset {
   asset_code: string;
   code_display: string | null;
   current_bucket: string;
-  intake_condition: string;
+  condition_grade: string;
   original_cost_basis: number;
   current_cost_basis: number;
   original_retail_price: number;
@@ -203,7 +203,8 @@ export function AssetsPage() {
       let url = '/v_assets?order=created_at.desc';
       if (filterBucket) url += `&current_bucket=eq.${filterBucket}`;
       if (filterBranchId) url += `&branch_id=eq.${filterBranchId}`;
-      if (filterCondition) url += `&intake_condition=eq.${filterCondition}`;
+      if (filterCondition === 'USED') url += `&condition_grade=in.(USED_A,USED_B)`;
+      else if (filterCondition) url += `&condition_grade=eq.${filterCondition}`;
       if (filterBrand) url += `&brand_name=eq.${encodeURIComponent(filterBrand)}`;
       if (filterFamily) url += `&family_name=eq.${encodeURIComponent(filterFamily)}`;
       if (debouncedSearch) {
@@ -368,8 +369,8 @@ export function AssetsPage() {
                           <Badge size="xs" className={getBucketColor(asset.current_bucket)}>
                             {getBucketLabel(asset.current_bucket, t)}
                           </Badge>
-                          <span className={`text-xs ${getConditionTextColor(asset.intake_condition)}`}>
-                            {getConditionLabel(asset.intake_condition, t)}
+                          <span className={`text-xs ${getConditionTextColor(asset.condition_grade)}`}>
+                            {getConditionLabel(asset.condition_grade, t)}
                           </span>
                           <span className="text-xs text-subtle">{asset.branch_name}</span>
                         </div>
@@ -455,8 +456,8 @@ function AssetDetailPanel({
           <Badge size="xs" className={getBucketColor(asset.current_bucket)}>
             {getBucketLabel(asset.current_bucket, t)}
           </Badge>
-          <span className={`text-xs ${getConditionTextColor(asset.intake_condition)}`}>
-            {getConditionLabel(asset.intake_condition, t)}
+          <span className={`text-xs ${getConditionTextColor(asset.condition_grade)}`}>
+            {getConditionLabel(asset.condition_grade, t)}
           </span>
         </div>
       )}

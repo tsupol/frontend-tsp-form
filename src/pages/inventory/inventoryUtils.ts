@@ -68,6 +68,7 @@ export function getConditionTextColor(condition: string): string {
 export const CONDITION_OPTIONS = [
   { value: 'NEW', label: 'New' },
   { value: 'REFURBISHED', label: 'Refurbished' },
+  { value: 'USED', label: 'Used (A+B)' },
   { value: 'USED_A', label: 'Used A' },
   { value: 'USED_B', label: 'Used B' },
 ];

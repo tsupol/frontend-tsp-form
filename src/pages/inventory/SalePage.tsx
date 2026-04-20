@@ -20,7 +20,7 @@ interface Asset {
   serial_no: string | null;
   imei: string | null;
   current_bucket: string;
-  intake_condition: string;
+  condition_grade: string;
   original_cost_basis: number;
   current_cost_basis: number;
   variant_name: string;
@@ -524,8 +524,8 @@ export function SalePage() {
                   <div className="flex-none grid grid-cols-2 sm:grid-cols-4 gap-3 px-4 py-3 border-b border-line bg-surface">
                     <div>
                       <div className="text-[10px] text-subtle uppercase tracking-wider">{t('sale.condition')}</div>
-                      <div className={`font-semibold text-sm ${getConditionTextColor(selectedAsset.intake_condition)}`}>
-                        {getConditionLabel(selectedAsset.intake_condition, t)}
+                      <div className={`font-semibold text-sm ${getConditionTextColor(selectedAsset.condition_grade)}`}>
+                        {getConditionLabel(selectedAsset.condition_grade, t)}
                       </div>
                     </div>
                     <div>

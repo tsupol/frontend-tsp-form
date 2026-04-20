@@ -317,8 +317,8 @@ function WorkspaceContent() {
                       </div>
                     )}
 
-                    <CardProductPlan onEdit={() => handleEditOpen('productPlan')} active={openModal === 'productPlan'} shake={shakingCards.has('productPlan')} />
                     <CardCustomer onEdit={() => handleEditOpen('customer')} active={openModal === 'customer'} shake={shakingCards.has('customer')} />
+                    <CardProductPlan onEdit={() => handleEditOpen('productPlan')} active={openModal === 'productPlan'} shake={shakingCards.has('productPlan')} />
                     <CardSaving onEdit={() => handleEditOpen('saving')} active={openModal === 'saving'} shake={shakingCards.has('saving')} />
                     <CardContactRef onEdit={() => handleEditOpen('contactRef')} active={openModal === 'contactRef'} shake={shakingCards.has('contactRef')} />
                     <CardGuarantor onEdit={() => handleEditOpen('guarantor')} active={openModal === 'guarantor'} shake={shakingCards.has('guarantor')} />

@@ -159,7 +159,7 @@ export function PanelProductPlan({ onClose }: Props) {
     assetSearchTimer.current = setTimeout(() => setDebouncedAssetSearch(value.trim()), 300);
   };
 
-  const shouldAssetSearch = debouncedAssetSearch.length >= 2;
+  const shouldAssetSearch = true; // always show — list all when empty, filter when typing
 
   // ── NEW: Search via fn_product_search ───────────────────────────────
 
@@ -265,7 +265,63 @@ export function PanelProductPlan({ onClose }: Props) {
     enabled: !!localModelId && mode === 'new',
   });
 
+  // ── USED: Quotes via fn_pricing_calculate_used ────────────────────
+
+  interface UsedQuoteResponse {
+    quotes: { cost_price: number; down_amount: number; term_months: number; retail_price: number; total_amount: number; profit_percent: number; financed_amount: number; installment_amount: number }[];
+    resolved_cost: number;
+    resolved_retail: number;
+    commercial_model: string;
+  }
+
+  const { data: usedFin1Data } = useQuery({
+    queryKey: ['used-pricing', localTargetAssetId, 'FIN1'],
+    queryFn: () => apiClient.rpc<UsedQuoteResponse>('fn_pricing_calculate_used', {
+      p_asset_id: localTargetAssetId,
+      p_commercial_model: 'FIN1',
+    }),
+    staleTime: 2 * 60 * 1000,
+    enabled: !!localTargetAssetId && mode === 'used',
+  });
+
+  const { data: usedFin2Data } = useQuery({
+    queryKey: ['used-pricing', localTargetAssetId, 'FIN2'],
+    queryFn: () => apiClient.rpc<UsedQuoteResponse>('fn_pricing_calculate_used', {
+      p_asset_id: localTargetAssetId,
+      p_commercial_model: 'FIN2',
+    }),
+    staleTime: 2 * 60 * 1000,
+    enabled: !!localTargetAssetId && mode === 'used',
+  });
+
+  // ── Unified quote rows ────────────────────────────────────────────
+
   const dedupedQuotes = useMemo(() => {
+    if (mode === 'used') {
+      // Map used pricing responses to PricingRow
+      const rows: PricingRow[] = [];
+      for (const src of [usedFin1Data, usedFin2Data]) {
+        if (!src?.quotes) continue;
+        for (const q of src.quotes) {
+          rows.push({
+            finance_model: src.commercial_model,
+            term_months: q.term_months,
+            down_percent: 0,
+            down_amount: q.down_amount,
+            retail_price: q.retail_price,
+            installment_amount: q.installment_amount,
+            total_amount: q.total_amount,
+            financed_amount: q.financed_amount,
+            cost_price: q.cost_price,
+            interest_percent_total: null,
+            max_discount_percent: 0,
+            fin2_profit_amount: q.profit_percent != null ? q.cost_price * q.profit_percent / 100 : null,
+          });
+        }
+      }
+      return rows;
+    }
+    // NEW path — dedup from fn_quote_calculate
     const quotes = quoteData?.quotes ?? [];
     const seen = new Map<string, PricingRow>();
     for (const q of quotes) {
@@ -288,13 +344,13 @@ export function PanelProductPlan({ onClose }: Props) {
       }
     }
     return Array.from(seen.values());
-  }, [quoteData]);
+  }, [mode, quoteData, usedFin1Data, usedFin2Data]);
 
   const fin1Rows = useMemo(() => dedupedQuotes.filter(r => r.finance_model === 'FIN1'), [dedupedQuotes]);
   const fin2Rows = useMemo(() => dedupedQuotes.filter(r => r.finance_model === 'FIN2'), [dedupedQuotes]);
   const fin1Terms = useMemo(() => [...new Set(fin1Rows.map(r => r.term_months))].sort((a, b) => a - b), [fin1Rows]);
   const fin2Terms = useMemo(() => [...new Set(fin2Rows.map(r => r.term_months))].sort((a, b) => a - b), [fin2Rows]);
-  const retailPrice = dedupedQuotes[0]?.retail_price;
+  const retailPrice = (mode === 'used' ? usedFin1Data?.resolved_retail : dedupedQuotes[0]?.retail_price) ?? dedupedQuotes[0]?.retail_price;
 
   // ── Handlers: NEW ───────────────────────────────────────────────────
 
@@ -596,12 +652,14 @@ export function PanelProductPlan({ onClose }: Props) {
               <X size={16} />
             </button>
           </div>
-          <div className="px-4 pb-3">
-            <div className="flex items-center gap-1.5 text-xs text-warning">
-              <AlertTriangle size={12} />
-              <span>{t('wizard.softTargetWarning')}</span>
+          {contract?.state === 'SAVING' && (
+            <div className="px-4 pb-3">
+              <div className="flex items-center gap-1.5 text-xs text-warning">
+                <AlertTriangle size={12} />
+                <span>{t('wizard.softTargetWarning')}</span>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -655,9 +713,7 @@ export function PanelProductPlan({ onClose }: Props) {
             <>
               <Input ref={assetSearchRef} value={assetSearch} onChange={(e) => handleAssetSearchInput(e.target.value)} placeholder={t('wizard.searchAssetPlaceholder')} startIcon={<Search size={16} />} className="w-full" size="sm" />
               <div className="border border-line rounded-lg overflow-hidden h-48 overflow-y-auto better-scroll">
-                {!shouldAssetSearch ? (
-                  <div className="flex items-center justify-center h-full text-subtle text-sm">{t('wizard.typeToSearch')}</div>
-                ) : assetSearching ? (
+                {assetSearching ? (
                   <div className="flex items-center justify-center h-full text-subtle text-sm">{t('common.loading')}</div>
                 ) : assets.length === 0 ? (
                   <div className="flex items-center justify-center h-full text-subtle text-sm">{t('wizard.noAssetsFound')}</div>
@@ -701,8 +757,8 @@ export function PanelProductPlan({ onClose }: Props) {
         </div>
       )}
 
-      {/* ── Quote tables (NEW: when variant selected) ────────────────── */}
-      {mode === 'new' && localVariantId && dedupedQuotes.length > 0 && (
+      {/* ── Quote tables ────────────────────────────────────────────── */}
+      {((mode === 'new' && localVariantId) || (mode === 'used' && localTargetAssetId)) && dedupedQuotes.length > 0 && (
         <div className="flex flex-col gap-5">
           {fin1Rows.length > 0 && (
             <div>
@@ -745,9 +801,7 @@ export function PanelProductPlan({ onClose }: Props) {
         </div>
       )}
 
-      {/* ── TODO: USED quote tables (pricing from set_rate response) ──── */}
-      {/* For now, USED pricing is committed on save via set_rate. */}
-      {/* A future iteration can show a preview using fn_pricing_calculate or similar. */}
+      {/* Quote tables for USED are rendered by the same block above */}
 
       {/* ── Selected plan summary ────────────────────────────────────── */}
       {localQuote && (
@@ -946,3 +1000,4 @@ function Fin2Calculator({ fin2Rows, fin2Terms, t, onUse }: {
     </div>
   );
 }
+
