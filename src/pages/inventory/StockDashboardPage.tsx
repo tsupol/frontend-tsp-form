@@ -5,6 +5,7 @@ import { PageNav, PageNavPanel, MobileHeader, Badge, Select } from 'tsp-form';
 import { apiClient } from '../../lib/api';
 import { Package, ShieldAlert, Wrench, Truck, ArrowLeft, ArrowRightFromLine } from 'lucide-react';
 import { fmtCurrency } from '../../lib/format';
+import { useAuth } from '../../contexts/AuthContext';
 import { getBucketLabel, getBucketColor, fmtNum } from './inventoryUtils';
 
 // ============================================================================
@@ -84,8 +85,13 @@ function selKey(s: Selection): string {
 
 export function StockDashboardPage() {
   const { t } = useTranslation();
+  const { user } = useAuth();
+
+  const isBranchUser = ['BRANCH_STAFF', 'BRANCH_MANAGER'].includes(user?.role_code ?? '');
+  const defaultBranchId = isBranchUser && user?.branch_id ? user.branch_id : null;
+
   const [selected, setSelected] = useState<Selection | null>(null);
-  const [filterBranchId, setFilterBranchId] = useState<number | null>(null);
+  const [filterBranchId, setFilterBranchId] = useState<number | null>(defaultBranchId);
   const [filterBucket, setFilterBucket] = useState<string | null>(null);
 
   // Branch list for filter

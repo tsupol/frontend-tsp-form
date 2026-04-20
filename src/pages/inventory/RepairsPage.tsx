@@ -5,6 +5,7 @@ import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Modal, Text
 import { ArrowLeft, ArrowRightFromLine, Wrench, CheckCircle, XCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
+import { useAuth } from '../../contexts/AuthContext';
 
 // ============================================================================
 // Types (verified against live API 2026-03-24)
@@ -89,9 +90,13 @@ export function RepairsPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
+  const { user } = useAuth();
+
+  const isBranchUser = ['BRANCH_STAFF', 'BRANCH_MANAGER'].includes(user?.role_code ?? '');
+  const defaultBranchId = isBranchUser && user?.branch_id ? user.branch_id : null;
 
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
-  const [filterBranchId, setFilterBranchId] = useState<number | null>(null);
+  const [filterBranchId, setFilterBranchId] = useState<number | null>(defaultBranchId);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
   const [selectedId, setSelectedId] = useState<number | null>(null);

@@ -2,9 +2,10 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Input, Badge, Button, MaskedInput, useSnackbarContext } from 'tsp-form';
-import { Search, XCircle, X, Calculator, Info, CheckCircle } from 'lucide-react';
+import { Search, XCircle, X, Calculator, Info, CheckCircle, Package, Smartphone, AlertTriangle } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { fmtCurrency } from '../../../lib/format';
+import { getConditionLabel, getConditionTextColor } from '../../inventory/inventoryUtils';
 import { useWorkspace } from './WorkspaceContext';
 import type { Quote } from './WorkspaceTypes';
 
@@ -72,6 +73,21 @@ interface PricingRow {
   fin2_profit_amount: number | null;
 }
 
+interface UsedAsset {
+  asset_id: number;
+  asset_code: string;
+  model_name: string;
+  variant_name: string;
+  brand_name: string;
+  family_name: string;
+  condition_grade: string;
+  current_cost_basis: number;
+  serial_no: string | null;
+  imei: string | null;
+}
+
+type SelectionMode = 'new' | 'used';
+
 // ── Helpers ─────────────────────────────────────────────────────────────
 
 function titleCase(s: string): string {
@@ -95,12 +111,15 @@ export function PanelProductPlan({ onClose }: Props) {
   const { t } = useTranslation();
   const { data: wizardData, contract, invalidateContract } = useWorkspace();
 
+  // ── Mode: new vs used ───────────────────────────────────────────────
+  const initialMode: SelectionMode = contract?.is_used_asset ? 'used' : 'new';
+  const [mode, setMode] = useState<SelectionMode>(initialMode);
+
+  // ── NEW product state ───────────────────────────────────────────────
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const searchRef = useRef<HTMLInputElement>(null);
-
-  // Initialize from contract (server = source of truth), wizardData only for selectedQuote (UI-only)
 
   const [selectedModel, setSelectedModel] = useState<SearchModel | null>(null);
   const [localModelId, setLocalModelId] = useState<number | null>(contract?.model_id ?? null);
@@ -111,6 +130,19 @@ export function PanelProductPlan({ onClose }: Props) {
   const [localVariantName, setLocalVariantName] = useState(contract?.variant_name ?? '');
   const [localQuote, setLocalQuote] = useState<Quote | null>(wizardData.selectedQuote);
 
+  // ── USED asset state ────────────────────────────────────────────────
+  const [assetSearch, setAssetSearch] = useState('');
+  const [debouncedAssetSearch, setDebouncedAssetSearch] = useState('');
+  const assetSearchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const assetSearchRef = useRef<HTMLInputElement>(null);
+  const [selectedAsset, setSelectedAsset] = useState<UsedAsset | null>(null);
+  const [localTargetAssetId, setLocalTargetAssetId] = useState<number | null>(contract?.target_asset_id ?? null);
+
+  // Determine if something is selected (either mode)
+  const hasSelection = mode === 'new' ? !!localModelId : !!localTargetAssetId;
+
+  // ── NEW: search debounce ────────────────────────────────────────────
+
   const handleSearchInput = (value: string) => {
     setSearch(value);
     clearTimeout(searchTimer.current);
@@ -119,7 +151,17 @@ export function PanelProductPlan({ onClose }: Props) {
 
   const shouldSearch = debouncedSearch.length >= 2;
 
-  // ── Search via fn_product_search ──────────────────────────────────────
+  // ── USED: search debounce ───────────────────────────────────────────
+
+  const handleAssetSearchInput = (value: string) => {
+    setAssetSearch(value);
+    clearTimeout(assetSearchTimer.current);
+    assetSearchTimer.current = setTimeout(() => setDebouncedAssetSearch(value.trim()), 300);
+  };
+
+  const shouldAssetSearch = debouncedAssetSearch.length >= 2;
+
+  // ── NEW: Search via fn_product_search ───────────────────────────────
 
   const { data: searchData, isFetching: searching } = useQuery({
     queryKey: ['product-search', debouncedSearch],
@@ -129,17 +171,38 @@ export function PanelProductPlan({ onClose }: Props) {
       p_limit: 20,
     }),
     staleTime: 2 * 60 * 1000,
-    enabled: shouldSearch,
+    enabled: shouldSearch && mode === 'new',
   });
 
   const models = searchData?.rows ?? [];
 
-  // ── Restore from server state ──────────────────────────────────────────
+  // ── USED: Search v_assets ───────────────────────────────────────────
+
+  const branchId = contract?.branch_id ?? wizardData.branchId;
+
+  const { data: assetResults, isFetching: assetSearching } = useQuery({
+    queryKey: ['used-asset-search', debouncedAssetSearch, branchId],
+    queryFn: () => {
+      let url = '/v_assets?condition_grade=in.(USED_A,USED_B)&current_bucket=eq.ON_HAND_AVAILABLE&is_contractable=is.true&order=asset_code&limit=20';
+      if (branchId) url += `&branch_id=eq.${branchId}`;
+      if (debouncedAssetSearch) {
+        url += `&or=(asset_code.ilike.*${debouncedAssetSearch}*,serial_no.ilike.*${debouncedAssetSearch}*,imei.ilike.*${debouncedAssetSearch}*,model_name.ilike.*${debouncedAssetSearch}*)`;
+      }
+      return apiClient.get<UsedAsset[]>(url);
+    },
+    staleTime: 30_000,
+    enabled: shouldAssetSearch && mode === 'used',
+  });
+
+  const assets = assetResults ?? [];
+
+  // ── NEW: Restore from server state ──────────────────────────────────
 
   const restoredRef = useRef(false);
   useEffect(() => {
     if (restoredRef.current || selectedModel) return;
     if (!contract?.model_id || !contract?.model_name) return;
+    if (contract.is_used_asset) return; // USED restore is separate
     restoredRef.current = true;
 
     setLocalModelId(contract.model_id);
@@ -147,7 +210,6 @@ export function PanelProductPlan({ onClose }: Props) {
     setLocalVariantId(contract.variant_id);
     setLocalVariantName(contract.variant_name ?? '');
 
-    // Fetch SearchModel for variant list + brand/family names
     apiClient.rpc<SearchResponse>('fn_product_search', {
       p_q: contract.model_name,
       p_is_contractable: true,
@@ -166,11 +228,25 @@ export function PanelProductPlan({ onClose }: Props) {
     }).catch(() => {});
   }, [contract?.model_id, contract?.model_name]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Variants from selected model ──────────────────────────────────────
+  // ── USED: Restore from server state ─────────────────────────────────
+
+  const restoredUsedRef = useRef(false);
+  useEffect(() => {
+    if (restoredUsedRef.current) return;
+    if (!contract?.is_used_asset || !contract?.target_asset_id) return;
+    restoredUsedRef.current = true;
+
+    setLocalTargetAssetId(contract.target_asset_id);
+    setLocalModelId(contract.model_id);
+    setLocalModelName(contract.model_name ?? '');
+    setLocalVariantName(contract.variant_name ?? '');
+    // We don't have full UsedAsset from contract, but we have enough to display
+  }, [contract?.is_used_asset, contract?.target_asset_id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── NEW: Variants from selected model ───────────────────────────────
 
   const variants = selectedModel?.variants ?? [];
 
-  // Auto-select variant if only one
   useEffect(() => {
     if (variants.length === 1 && !localVariantId) {
       setLocalVariantId(variants[0].variant_id);
@@ -180,16 +256,15 @@ export function PanelProductPlan({ onClose }: Props) {
     }
   }, [variants]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Quotes via fn_quote_calculate ─────────────────────────────────────
+  // ── NEW: Quotes via fn_quote_calculate ──────────────────────────────
 
   const { data: quoteData } = useQuery({
     queryKey: ['quote-calc', localModelId],
     queryFn: () => apiClient.rpc<QuoteResponse>('fn_quote_calculate', { p_model_id: localModelId }),
     staleTime: 2 * 60 * 1000,
-    enabled: !!localModelId,
+    enabled: !!localModelId && mode === 'new',
   });
 
-  // Deduplicate quotes — same finance_model + term + down% across colors
   const dedupedQuotes = useMemo(() => {
     const quotes = quoteData?.quotes ?? [];
     const seen = new Map<string, PricingRow>();
@@ -221,7 +296,7 @@ export function PanelProductPlan({ onClose }: Props) {
   const fin2Terms = useMemo(() => [...new Set(fin2Rows.map(r => r.term_months))].sort((a, b) => a - b), [fin2Rows]);
   const retailPrice = dedupedQuotes[0]?.retail_price;
 
-  // ── Handlers ──────────────────────────────────────────────────────────
+  // ── Handlers: NEW ───────────────────────────────────────────────────
 
   const handleSelectModel = (model: SearchModel) => {
     setSelectedModel(model);
@@ -238,12 +313,12 @@ export function PanelProductPlan({ onClose }: Props) {
     setLocalVariantId(v.variant_id);
     setLocalVariantName(colorLabel(v));
     setLocalQuote(null);
-    // Now product is fully selected — clear search
     setSearch('');
     setDebouncedSearch('');
   };
 
-  const handleResetModel = () => {
+  const handleResetSelection = () => {
+    // Reset both NEW and USED state
     setSelectedModel(null);
     setLocalModelId(null);
     setLocalModelName('');
@@ -252,10 +327,44 @@ export function PanelProductPlan({ onClose }: Props) {
     setLocalVariantId(null);
     setLocalVariantName('');
     setLocalQuote(null);
+    setSelectedAsset(null);
+    setLocalTargetAssetId(null);
     setSearch('');
     setDebouncedSearch('');
-    setTimeout(() => searchRef.current?.focus(), 0);
+    setAssetSearch('');
+    setDebouncedAssetSearch('');
+    setTimeout(() => {
+      if (mode === 'new') searchRef.current?.focus();
+      else assetSearchRef.current?.focus();
+    }, 0);
   };
+
+  // ── Handlers: USED ──────────────────────────────────────────────────
+
+  const handleSelectAsset = (asset: UsedAsset) => {
+    setSelectedAsset(asset);
+    setLocalTargetAssetId(asset.asset_id);
+    setLocalModelId(null); // model/variant come from set_target_asset response
+    setLocalModelName(asset.model_name);
+    setLocalFamilyName(asset.family_name);
+    setLocalBrandName(asset.brand_name);
+    setLocalVariantId(null);
+    setLocalVariantName(asset.variant_name);
+    setLocalQuote(null);
+    setAssetSearch('');
+    setDebouncedAssetSearch('');
+  };
+
+  const handleSwitchMode = (newMode: SelectionMode) => {
+    setMode(newMode);
+    // Don't reset selection — only reset search
+    setSearch('');
+    setDebouncedSearch('');
+    setAssetSearch('');
+    setDebouncedAssetSearch('');
+  };
+
+  // ── Quote helpers ───────────────────────────────────────────────────
 
   const toQuote = (r: PricingRow, finModel: string): Quote => ({
     variant_id: localVariantId!,
@@ -279,80 +388,145 @@ export function PanelProductPlan({ onClose }: Props) {
     localQuote?.term_months === r.term_months &&
     localQuote?.down_percent === r.down_percent;
 
+  // ── Save ─────────────────────────────────────────────────────────────
+
   const { addSnackbar } = useSnackbarContext();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState('');
 
-  const hasChanges = localModelId !== (contract?.model_id ?? null)
-    || localVariantId !== (contract?.variant_id ?? null)
-    || localQuote?.finance_model !== (contract?.commercial_model ?? undefined)
-    || localQuote?.term_months !== (contract?.value_month ?? undefined)
-    || localQuote?.down_percent !== (contract?.snapshot_down_percent ?? undefined);
+  const hasChanges = mode === 'used'
+    ? localTargetAssetId !== (contract?.target_asset_id ?? null)
+      || localQuote?.finance_model !== (contract?.commercial_model ?? undefined)
+      || localQuote?.term_months !== (contract?.value_month ?? undefined)
+      || localQuote?.down_percent !== (contract?.snapshot_down_percent ?? undefined)
+    : localModelId !== (contract?.model_id ?? null)
+      || localVariantId !== (contract?.variant_id ?? null)
+      || localQuote?.finance_model !== (contract?.commercial_model ?? undefined)
+      || localQuote?.term_months !== (contract?.value_month ?? undefined)
+      || localQuote?.down_percent !== (contract?.snapshot_down_percent ?? undefined);
 
   const handleConfirm = async () => {
     setSaving(true);
     setSaveError('');
     try {
       const contractId = contract?.id ?? wizardData.contractId;
-      if (contractId && localModelId) {
-        // 1. Persist UI-only state (selectedQuote for restore)
-        await apiClient.rpc('fn_contract_save_step', {
-          p_contract_id: contractId,
-          p_step: 'WORKSPACE',
-          p_data: {
-            modelId: localModelId,
-            variantId: localVariantId,
-            selectedQuote: localQuote,
-            savingTargetAmount: wizardData.savingTargetAmount,
-          },
-        });
+      if (!contractId) return;
 
-        if (localVariantId) {
-          const productChanged = localModelId !== contract?.model_id || localVariantId !== contract?.variant_id;
+      // 1. Persist UI-only state
+      await apiClient.rpc('fn_contract_save_step', {
+        p_contract_id: contractId,
+        p_step: 'WORKSPACE',
+        p_data: {
+          modelId: localModelId,
+          variantId: localVariantId,
+          selectedQuote: localQuote,
+          savingTargetAmount: wizardData.savingTargetAmount,
+          isUsedAsset: mode === 'used',
+          targetAssetId: localTargetAssetId,
+        },
+      });
 
-          // 2. Set product (model + variant only) — clears rate/snapshot if product changed
-          if (productChanged) {
-            await apiClient.rpc('fn_contract_set_product', {
+      if (mode === 'used' && localTargetAssetId) {
+        // ── USED path ─────────────────────────────────────────────
+        const targetChanged = localTargetAssetId !== contract?.target_asset_id;
+
+        // If switching from NEW to USED, or changing target asset
+        if (targetChanged || !contract?.is_used_asset) {
+          // Clear old target if switching asset
+          if (contract?.is_used_asset && contract?.target_asset_id && targetChanged) {
+            await apiClient.rpc('fn_contract_clear_target', {
               p_contract_id: contractId,
-              p_model_id: localModelId,
-              p_variant_id: localVariantId,
             });
           }
 
-          // 3. Set commercial model if finance model changed
-          const prevModel = contract?.commercial_model;
-          const newModel = localQuote?.finance_model;
-          if (newModel && newModel !== prevModel) {
-            await apiClient.rpc('fn_contract_set_commercial_model', {
+          await apiClient.rpc('fn_contract_set_target_asset', {
+            p_contract_id: contractId,
+            p_asset_id: localTargetAssetId,
+          });
+        }
+
+        // Set commercial model if changed
+        const prevModel = contract?.commercial_model;
+        const newModel = localQuote?.finance_model;
+        if (newModel && newModel !== prevModel) {
+          await apiClient.rpc('fn_contract_set_commercial_model', {
+            p_contract_id: contractId,
+            p_commercial_model: newModel,
+          });
+        }
+
+        // Set rate (USED path — server detects target_asset_id)
+        if (localQuote) {
+          const rateTerm = localQuote.base_term_months ?? localQuote.term_months;
+          await apiClient.rpc('fn_contract_set_rate', {
+            p_contract_id: contractId,
+            p_term_months: rateTerm,
+            ...(localQuote.finance_model === 'FIN1' ? { p_down_percent: localQuote.down_percent } : {}),
+          });
+
+          // Apply negotiation if custom term/down
+          const hasCustomTerm = localQuote.base_term_months != null && localQuote.term_months !== localQuote.base_term_months;
+          const hasCustomDown = localQuote.finance_model === 'FIN2' && localQuote.down_amount > 0;
+          if (hasCustomTerm || hasCustomDown) {
+            await apiClient.rpc('fn_contract_apply_negotiation', {
               p_contract_id: contractId,
-              p_commercial_model: newModel,
+              p_installment_amount: localQuote.installment_amount,
+              ...(hasCustomTerm ? { p_value_month: localQuote.term_months } : {}),
+              ...(hasCustomDown ? { p_down_payment: localQuote.down_amount } : {}),
             });
           }
+        }
+      } else if (mode === 'new' && localModelId && localVariantId) {
+        // ── NEW path ──────────────────────────────────────────────
 
-          // 4. Set rate — creates snapshot (use catalog term, not custom)
-          if (localQuote) {
-            const rateTerm = localQuote.base_term_months ?? localQuote.term_months;
-            await apiClient.rpc('fn_contract_set_rate', {
+        // If switching from USED to NEW, clear target first
+        if (contract?.is_used_asset && contract?.target_asset_id) {
+          await apiClient.rpc('fn_contract_clear_target', {
+            p_contract_id: contractId,
+          });
+        }
+
+        const productChanged = localModelId !== contract?.model_id || localVariantId !== contract?.variant_id;
+
+        if (productChanged) {
+          await apiClient.rpc('fn_contract_set_product', {
+            p_contract_id: contractId,
+            p_model_id: localModelId,
+            p_variant_id: localVariantId,
+          });
+        }
+
+        const prevModel = contract?.commercial_model;
+        const newModel = localQuote?.finance_model;
+        if (newModel && newModel !== prevModel) {
+          await apiClient.rpc('fn_contract_set_commercial_model', {
+            p_contract_id: contractId,
+            p_commercial_model: newModel,
+          });
+        }
+
+        if (localQuote) {
+          const rateTerm = localQuote.base_term_months ?? localQuote.term_months;
+          await apiClient.rpc('fn_contract_set_rate', {
+            p_contract_id: contractId,
+            p_term_months: rateTerm,
+            ...(localQuote.finance_model === 'FIN1' ? { p_down_percent: localQuote.down_percent } : {}),
+          });
+
+          const hasCustomTerm = localQuote.base_term_months != null && localQuote.term_months !== localQuote.base_term_months;
+          const hasCustomDown = localQuote.finance_model === 'FIN2' && localQuote.down_amount > 0;
+          if (hasCustomTerm || hasCustomDown) {
+            await apiClient.rpc('fn_contract_apply_negotiation', {
               p_contract_id: contractId,
-              p_term_months: rateTerm,
-              ...(localQuote.finance_model === 'FIN1' ? { p_down_percent: localQuote.down_percent } : {}),
+              p_installment_amount: localQuote.installment_amount,
+              ...(hasCustomTerm ? { p_value_month: localQuote.term_months } : {}),
+              ...(hasCustomDown ? { p_down_payment: localQuote.down_amount } : {}),
             });
-
-            // 5. Apply negotiation if custom term/down differs from catalog
-            const hasCustomTerm = localQuote.base_term_months != null && localQuote.term_months !== localQuote.base_term_months;
-            const hasCustomDown = localQuote.finance_model === 'FIN2' && localQuote.down_amount > 0;
-            if (hasCustomTerm || hasCustomDown) {
-              await apiClient.rpc('fn_contract_apply_negotiation', {
-                p_contract_id: contractId,
-                p_installment_amount: localQuote.installment_amount,
-                ...(hasCustomTerm ? { p_value_month: localQuote.term_months } : {}),
-                ...(hasCustomDown ? { p_down_payment: localQuote.down_amount } : {}),
-              });
-            }
           }
         }
       }
+
       invalidateContract();
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -377,11 +551,18 @@ export function PanelProductPlan({ onClose }: Props) {
     }
   };
 
+  // ── Confirm button enabled logic ────────────────────────────────────
+
+  const canConfirm = mode === 'used'
+    ? !!localTargetAssetId && !!localQuote && !saving && (hasChanges || saved)
+    : !!localModelId && !saving && (hasChanges || saved);
+
   return (
     <div className="flex flex-col h-full max-w-2xl">
     <div className="flex-1 overflow-y-auto better-scroll p-4 flex flex-col gap-3">
-      {/* Selected model display */}
-      {localModelId && (
+
+      {/* ── Selected display (either mode) ───────────────────────────── */}
+      {hasSelection && mode === 'new' && localModelId && (
         <div className="border border-line rounded-lg">
           <div className="flex items-center px-4 py-3">
             <div className="flex-1 min-w-0">
@@ -389,40 +570,125 @@ export function PanelProductPlan({ onClose }: Props) {
               <div className="text-xs text-subtle">{localBrandName}</div>
               {retailPrice != null && <div className="text-sm text-subtle mt-1">{t('priceCheck.retailPrice')} {fmtCurrency(retailPrice)}</div>}
             </div>
-            <button className="p-1.5 rounded hover:bg-surface-hover cursor-pointer text-subtle hover:text-fg transition-colors bg-transparent border-none" onClick={handleResetModel} title={t('common.remove')}>
+            <button className="p-1.5 rounded hover:bg-surface-hover cursor-pointer text-subtle hover:text-fg transition-colors bg-transparent border-none" onClick={handleResetSelection} title={t('common.remove')}>
               <X size={16} />
             </button>
           </div>
         </div>
       )}
 
-      {/* Search */}
-      {!localModelId && (
-        <>
-          <Input ref={searchRef} value={search} onChange={(e) => handleSearchInput(e.target.value)} placeholder={t('wizard.searchProductPlaceholder')} startIcon={<Search size={16} />} className="w-full" size="sm" />
-          <div className="border border-line rounded-lg overflow-hidden h-48 overflow-y-auto better-scroll">
-            {!shouldSearch ? (
-              <div className="flex items-center justify-center h-full text-subtle text-sm">{t('wizard.typeToSearch')}</div>
-            ) : searching ? (
-              <div className="flex items-center justify-center h-full text-subtle text-sm">{t('common.loading')}</div>
-            ) : models.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-subtle text-sm">{t('wizard.noModelsFound')}</div>
-            ) : (
-              <div className="flex flex-col divide-y divide-line">
-                {models.map(model => (
-                  <button key={model.model_id} className={`w-full text-left px-4 py-2.5 cursor-pointer transition-colors ${model.model_id === localModelId ? 'bg-primary/10' : 'hover:bg-surface-hover'}`} onClick={() => handleSelectModel(model)}>
-                    <div className="font-medium text-sm truncate">{model.family_name} {model.model_name}</div>
-                    <div className="text-xs text-subtle">{model.brand_name}</div>
-                  </button>
-                ))}
+      {hasSelection && mode === 'used' && localTargetAssetId && (
+        <div className="border border-line rounded-lg">
+          <div className="flex items-center px-4 py-3 gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="font-medium">{selectedAsset?.asset_code ?? contract?.target_asset_identifier ?? `#${localTargetAssetId}`}</span>
+                {(selectedAsset?.condition_grade ?? contract?.target_asset_condition_grade) && (
+                  <span className={`text-xs font-medium ${getConditionTextColor(selectedAsset?.condition_grade ?? contract?.target_asset_condition_grade ?? '')}`}>
+                    {getConditionLabel(selectedAsset?.condition_grade ?? contract?.target_asset_condition_grade ?? '', t)}
+                  </span>
+                )}
               </div>
-            )}
+              <div className="text-xs text-subtle mt-0.5">{localBrandName} {localFamilyName} {localModelName} {localVariantName && `· ${localVariantName}`}</div>
+              <div className="text-sm text-subtle mt-1">{t('wizard.costBasis')} {fmtCurrency(selectedAsset?.current_cost_basis ?? contract?.target_asset_cost_basis ?? 0)}</div>
+            </div>
+            <button className="p-1.5 rounded hover:bg-surface-hover cursor-pointer text-subtle hover:text-fg transition-colors bg-transparent border-none" onClick={handleResetSelection} title={t('common.remove')}>
+              <X size={16} />
+            </button>
           </div>
+          <div className="px-4 pb-3">
+            <div className="flex items-center gap-1.5 text-xs text-warning">
+              <AlertTriangle size={12} />
+              <span>{t('wizard.softTargetWarning')}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Mode picker + Search (only when nothing selected) ────────── */}
+      {!hasSelection && (
+        <>
+          <div className="flex gap-2">
+            <button
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-colors cursor-pointer ${mode === 'new' ? 'border-primary bg-primary/5 text-primary' : 'border-line hover:border-fg/30 bg-transparent text-fg'}`}
+              onClick={() => handleSwitchMode('new')}
+            >
+              <Package size={18} />
+              <span className="font-medium text-sm">{t('wizard.newProduct')}</span>
+            </button>
+            <button
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-colors cursor-pointer ${mode === 'used' ? 'border-primary bg-primary/5 text-primary' : 'border-line hover:border-fg/30 bg-transparent text-fg'}`}
+              onClick={() => handleSwitchMode('used')}
+            >
+              <Smartphone size={18} />
+              <span className="font-medium text-sm">{t('wizard.usedAsset')}</span>
+            </button>
+          </div>
+
+          {/* NEW search */}
+          {mode === 'new' && (
+            <>
+              <Input ref={searchRef} value={search} onChange={(e) => handleSearchInput(e.target.value)} placeholder={t('wizard.searchProductPlaceholder')} startIcon={<Search size={16} />} className="w-full" size="sm" />
+              <div className="border border-line rounded-lg overflow-hidden h-48 overflow-y-auto better-scroll">
+                {!shouldSearch ? (
+                  <div className="flex items-center justify-center h-full text-subtle text-sm">{t('wizard.typeToSearch')}</div>
+                ) : searching ? (
+                  <div className="flex items-center justify-center h-full text-subtle text-sm">{t('common.loading')}</div>
+                ) : models.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-subtle text-sm">{t('wizard.noModelsFound')}</div>
+                ) : (
+                  <div className="flex flex-col divide-y divide-line">
+                    {models.map(model => (
+                      <button key={model.model_id} className={`w-full text-left px-4 py-2.5 cursor-pointer transition-colors hover:bg-surface-hover`} onClick={() => handleSelectModel(model)}>
+                        <div className="font-medium text-sm truncate">{model.family_name} {model.model_name}</div>
+                        <div className="text-xs text-subtle">{model.brand_name}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* USED search */}
+          {mode === 'used' && (
+            <>
+              <Input ref={assetSearchRef} value={assetSearch} onChange={(e) => handleAssetSearchInput(e.target.value)} placeholder={t('wizard.searchAssetPlaceholder')} startIcon={<Search size={16} />} className="w-full" size="sm" />
+              <div className="border border-line rounded-lg overflow-hidden h-48 overflow-y-auto better-scroll">
+                {!shouldAssetSearch ? (
+                  <div className="flex items-center justify-center h-full text-subtle text-sm">{t('wizard.typeToSearch')}</div>
+                ) : assetSearching ? (
+                  <div className="flex items-center justify-center h-full text-subtle text-sm">{t('common.loading')}</div>
+                ) : assets.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-subtle text-sm">{t('wizard.noAssetsFound')}</div>
+                ) : (
+                  <div className="flex flex-col divide-y divide-line">
+                    {assets.map(asset => (
+                      <button key={asset.asset_id} className="w-full text-left px-4 py-2.5 cursor-pointer transition-colors hover:bg-surface-hover" onClick={() => handleSelectAsset(asset)}>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm">{asset.asset_code}</span>
+                          <span className={`text-xs font-medium ${getConditionTextColor(asset.condition_grade)}`}>
+                            {getConditionLabel(asset.condition_grade, t)}
+                          </span>
+                        </div>
+                        <div className="text-xs text-subtle truncate">{asset.brand_name} {asset.family_name} {asset.model_name} · {asset.variant_name}</div>
+                        <div className="flex items-center gap-3 text-xs text-subtle mt-0.5">
+                          <span>{t('wizard.costBasis')} {fmtCurrency(asset.current_cost_basis)}</span>
+                          {asset.imei && <span>IMEI: {asset.imei}</span>}
+                          {asset.serial_no && <span>S/N: {asset.serial_no}</span>}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </>
       )}
 
-      {/* Variant select — only if multiple */}
-      {localModelId && variants.length > 1 && (
+      {/* ── Variant select (NEW only, multiple variants) ─────────────── */}
+      {mode === 'new' && localModelId && variants.length > 1 && (
         <div>
           <label className="form-label">{t('wizard.selectColor')}</label>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -435,8 +701,8 @@ export function PanelProductPlan({ onClose }: Props) {
         </div>
       )}
 
-      {/* Quote tables — show when variant selected */}
-      {localVariantId && dedupedQuotes.length > 0 && (
+      {/* ── Quote tables (NEW: when variant selected) ────────────────── */}
+      {mode === 'new' && localVariantId && dedupedQuotes.length > 0 && (
         <div className="flex flex-col gap-5">
           {fin1Rows.length > 0 && (
             <div>
@@ -479,7 +745,11 @@ export function PanelProductPlan({ onClose }: Props) {
         </div>
       )}
 
-      {/* Selected plan summary */}
+      {/* ── TODO: USED quote tables (pricing from set_rate response) ──── */}
+      {/* For now, USED pricing is committed on save via set_rate. */}
+      {/* A future iteration can show a preview using fn_pricing_calculate or similar. */}
+
+      {/* ── Selected plan summary ────────────────────────────────────── */}
       {localQuote && (
         <div className="border border-primary/30 rounded-lg p-4 bg-primary/5">
           <div className="text-xs text-primary font-medium mb-2">{t('wizard.selectedPlan')}</div>
@@ -513,7 +783,7 @@ export function PanelProductPlan({ onClose }: Props) {
       <Button
         color={saved ? 'success' : 'primary'}
         onClick={handleConfirm}
-        disabled={!localModelId || saving || (!hasChanges && !saved)}
+        disabled={!canConfirm}
         startIcon={saved ? <CheckCircle size={16} /> : undefined}
       >
         {saving ? t('common.saving') : saved ? t('common.saved') : t('common.confirm')}

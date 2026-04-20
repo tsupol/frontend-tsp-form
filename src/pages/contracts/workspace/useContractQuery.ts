@@ -73,8 +73,15 @@ export interface ContractServerState {
   shipping_method: string | null;
   tracking_number: string | null;
 
-  // Misc
+  // Used asset
   is_used_asset: boolean;
+  target_asset_id: number | null;
+  target_asset_identifier: string | null;
+  target_asset_condition_grade: string | null;
+  target_asset_cost_basis: number | null;
+  target_asset_current_bucket: string | null;
+
+  // Misc
   source: string | null;
   step_data: Record<string, unknown> | null;
   created_at: string;

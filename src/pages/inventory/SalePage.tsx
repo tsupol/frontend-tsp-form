@@ -76,12 +76,15 @@ export function SalePage() {
   const canSell = user?.role_code === 'BRANCH_STAFF' || user?.role_code === 'BRANCH_MANAGER';
   const userBranchId = user?.branch_id ?? null;
 
+  const isBranchUser = ['BRANCH_STAFF', 'BRANCH_MANAGER'].includes(user?.role_code ?? '');
+  const defaultBranchId = isBranchUser && user?.branch_id ? user.branch_id : null;
+
   // Filters
-  const [filterBranchId, setFilterBranchId] = useState<number | null>(null);
+  const [filterBranchId, setFilterBranchId] = useState<number | null>(defaultBranchId);
   const [filterBucket, setFilterBucket] = useState<string | null>(null);
   const [filterBrand, setFilterBrand] = useState<string>('');
   const [filterFamily, setFilterFamily] = useState<string>('');
-  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [filtersExpanded, setFiltersExpanded] = useState(isBranchUser);
 
   // Search state
   const [searchTerm, setSearchTerm] = useState('');

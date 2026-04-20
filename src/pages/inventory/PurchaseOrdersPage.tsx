@@ -6,6 +6,7 @@ import { ArrowLeft, ArrowRightFromLine, ClipboardList, CheckCircle, XCircle } fr
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency } from '../../lib/format';
+import { useAuth } from '../../contexts/AuthContext';
 import { fmtNum } from './inventoryUtils';
 
 // ============================================================================
@@ -105,10 +106,14 @@ export function PurchaseOrdersPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
+  const { user } = useAuth();
+
+  const isBranchUser = ['BRANCH_STAFF', 'BRANCH_MANAGER'].includes(user?.role_code ?? '');
+  const defaultBranchId = isBranchUser && user?.branch_id ? user.branch_id : null;
 
   // Filters
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
-  const [filterBranchId, setFilterBranchId] = useState<number | null>(null);
+  const [filterBranchId, setFilterBranchId] = useState<number | null>(defaultBranchId);
 
   // Pagination
   const [pageIndex, setPageIndex] = useState(0);

@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, Input, Select, Button, DataTableFooter } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, Search, PiggyBank, SlidersHorizontal } from 'lucide-react';
+import { PageNav, PageNavPanel, MobileHeader, Input, Select, DataTableFooter } from 'tsp-form';
+import { ArrowLeft, ArrowRightFromLine, Search, PiggyBank } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { fmtCurrency } from '../../lib/format';
@@ -57,7 +57,6 @@ export function SavingContractsPage() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterBranchId, setFilterBranchId] = useState<number | null>(defaultBranchId);
-  const [filtersExpanded, setFiltersExpanded] = useState(isBranchUser);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -107,7 +106,7 @@ export function SavingContractsPage() {
     }
   }, [list, selectedId]);
 
-  const extraFilterCount = [filterBranchId].filter(Boolean).length;
+
 
   return (
     <PageNav panels={['list', 'detail']} className="h-dvh">
@@ -142,41 +141,28 @@ export function SavingContractsPage() {
           <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
             <PageNavPanel id="list" className={isMobile ? '' : 'w-5/12 xl:w-4/12 border-r border-line flex flex-col'}>
               {/* Filters */}
-              <div className="flex-none flex flex-col gap-2 p-2 border-b border-line">
-                <div className="flex gap-2 w-full">
-                  <div className="flex-[3] min-w-0">
-                    <Input
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      placeholder={t('contract.searchPlaceholder')}
-                      size="sm"
-                      startIcon={<Search size={16} />}
-                      className="w-full"
-                    />
-                  </div>
-                  <Button
+              <div className="flex-none flex gap-2 p-2 border-b border-line">
+                <div className="flex-1 min-w-0">
+                  <Input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder={t('contract.searchPlaceholder')}
                     size="sm"
-                    className={`btn-icon-sm shrink-0 ${filtersExpanded || extraFilterCount > 0 ? 'text-primary' : ''}`}
-                    onClick={() => setFiltersExpanded(!filtersExpanded)}
-                  >
-                    <SlidersHorizontal size={14} />
-                  </Button>
+                    startIcon={<Search size={16} />}
+                    className="w-full"
+                  />
                 </div>
-                {filtersExpanded && (
-                  <div className="flex gap-2 w-full">
-                    <div className="flex-1 min-w-0">
-                      <Select
-                        options={branchOptions}
-                        value={filterBranchId !== null ? String(filterBranchId) : null}
-                        onChange={(val) => setFilterBranchId(val ? Number(val) : null)}
-                        placeholder={t('contract.allBranches')}
-                        size="sm"
-                        showChevron
-                        clearable
-                      />
-                    </div>
-                  </div>
-                )}
+                <div className="flex-1 min-w-0">
+                  <Select
+                    options={branchOptions}
+                    value={filterBranchId !== null ? String(filterBranchId) : null}
+                    onChange={(val) => setFilterBranchId(val ? Number(val) : null)}
+                    placeholder={t('contract.allBranches')}
+                    size="sm"
+                    showChevron
+                    clearable
+                  />
+                </div>
               </div>
 
               {/* Saving contract list */}
