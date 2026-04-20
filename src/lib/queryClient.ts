@@ -1,6 +1,5 @@
 import { QueryClient } from '@tanstack/react-query';
 import { ApiError } from './api';
-import { authService } from './auth';
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -21,29 +20,3 @@ export const queryClient = new QueryClient({
     },
   },
 });
-
-// Setup token refresh interceptor
-let isRefreshing = false;
-let refreshPromise: Promise<boolean> | null = null;
-
-export async function ensureValidToken(): Promise<boolean> {
-  if (!authService.getAccessToken()) {
-    return false;
-  }
-
-  if (authService.shouldRefreshToken() || authService.isTokenExpired()) {
-    if (isRefreshing && refreshPromise) {
-      return refreshPromise;
-    }
-
-    isRefreshing = true;
-    refreshPromise = authService.validateAndRefresh().finally(() => {
-      isRefreshing = false;
-      refreshPromise = null;
-    });
-
-    return refreshPromise;
-  }
-
-  return true;
-}

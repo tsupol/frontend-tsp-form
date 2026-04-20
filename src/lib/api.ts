@@ -104,7 +104,7 @@ function isAuthError(code: string, message: string): boolean {
 }
 
 // ============================================================================
-// Auth Error Handler
+// Auth Error Handler & Token Refresh
 // ============================================================================
 
 type AuthErrorCallback = (details: { code: string; message: string }) => void;
@@ -121,16 +121,35 @@ function triggerAuthError(code: string, message: string) {
   }
 }
 
+// Token refresher — set by AuthContext to avoid circular imports
+type TokenRefresher = () => Promise<boolean>;
+let tokenRefresher: TokenRefresher | null = null;
+let refreshInFlight: Promise<boolean> | null = null;
+
+export function setTokenRefresher(fn: TokenRefresher | null) {
+  tokenRefresher = fn;
+}
+
+/** Attempt a token refresh, deduplicating concurrent calls. */
+async function tryRefreshToken(): Promise<boolean> {
+  if (!tokenRefresher) return false;
+  if (refreshInFlight) return refreshInFlight;
+
+  refreshInFlight = tokenRefresher().finally(() => {
+    refreshInFlight = null;
+  });
+  return refreshInFlight;
+}
+
 // ============================================================================
 // Response Handling
 // ============================================================================
 
-function handleV2Error(err: V2Error['error'], httpStatus?: number): never {
+function makeV2ApiError(err: V2Error['error'], httpStatus?: number): ApiError {
   const status = httpStatus ?? err.http_status;
   const auth = isAuthError(err.code, err.message) || status === 401;
-  if (auth) triggerAuthError(err.code, err.message);
 
-  throw new ApiError({
+  return new ApiError({
     code: err.code,
     message: err.message,
     messageKey: err.message_key,
@@ -140,9 +159,9 @@ function handleV2Error(err: V2Error['error'], httpStatus?: number): never {
   });
 }
 
-function parseResponse<T>(data: unknown, endpoint: string): T {
+function parseResponseData<T>(data: unknown, endpoint: string): T {
   if (isV2Error(data)) {
-    handleV2Error(data.error);
+    throw makeV2ApiError(data.error);
   }
 
   if (isV2Success<T>(data)) {
@@ -179,7 +198,7 @@ export class ApiClient {
     return headers;
   }
 
-  private handleNonV2Error(data: unknown, endpoint: string, status: number): never {
+  private makeNonV2Error(data: unknown, endpoint: string, status: number): ApiError {
     console.error(`[API] Non-v2 error from ${endpoint} (HTTP ${status}). Expected {ok, error}. Got:`, data);
 
     // PostgREST returns 401 + code "42501" for permission denied — treat as 403, not auth error
@@ -187,14 +206,13 @@ export class ApiClient {
     const isPermissionDenied = pgCode === '42501';
 
     const auth = status === 401 && !isPermissionDenied;
-    if (auth) triggerAuthError('HTTP_401', `HTTP ${status} from ${endpoint}`);
 
     const errorCode = isPermissionDenied ? 'PERMISSION_DENIED' : `HTTP_${status}`;
     const errorMessage = isPermissionDenied
       ? `Permission denied: ${endpoint}`
       : `Request failed: ${endpoint} (HTTP ${status})`;
 
-    throw new ApiError({
+    return new ApiError({
       code: errorCode,
       message: errorMessage,
       isAuthError: auth,
@@ -202,30 +220,68 @@ export class ApiClient {
     });
   }
 
+  /**
+   * Core fetch method. All requests go through here.
+   * Returns { response, data } so callers can read headers if needed.
+   * Handles auth retry: on auth error, refreshes token and retries once.
+   */
+  private async _fetch(
+    endpoint: string,
+    options: RequestInit = {},
+    includeAuth: boolean = true,
+  ): Promise<{ response: Response; data: unknown }> {
+    const doFetch = async () => {
+      const url = `${API_BASE_URL}${endpoint}`;
+      const headers = { ...this.getHeaders(includeAuth), ...options.headers as Record<string, string> };
+      const response = await fetch(url, { ...options, headers });
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : null;
+      return { response, data };
+    };
+
+    const buildError = (response: Response, data: unknown): ApiError => {
+      if (isV2Error(data)) return makeV2ApiError(data.error, response.status);
+      return this.makeNonV2Error(data, endpoint, response.status);
+    };
+
+    let result = await doFetch();
+
+    if (!result.response.ok) {
+      const error = buildError(result.response, result.data);
+
+      // If it's an auth error and we have a refresher, try to refresh and retry once
+      if (error.isAuthError && includeAuth) {
+        const refreshed = await tryRefreshToken();
+        if (refreshed) {
+          // Retry with the new token
+          result = await doFetch();
+          if (!result.response.ok) {
+            const retryError = buildError(result.response, result.data);
+            if (retryError.isAuthError) triggerAuthError(retryError.code, retryError.message);
+            throw retryError;
+          }
+          return result;
+        }
+
+        // Refresh failed — session is truly dead
+        triggerAuthError(error.code, error.message);
+      }
+
+      if (!error.isAuthError) throw error;
+      // Auth error with no successful refresh — already triggered above
+      throw error;
+    }
+
+    return result;
+  }
+
   async request<T>(
     endpoint: string,
     options: RequestInit = {},
     includeAuth: boolean = true
   ): Promise<T> {
-    const url = `${API_BASE_URL}${endpoint}`;
-    const headers = this.getHeaders(includeAuth);
-
-    const response = await fetch(url, {
-      ...options,
-      headers: { ...headers, ...options.headers },
-    });
-
-    const text = await response.text();
-    const data = text ? JSON.parse(text) : null;
-
-    if (!response.ok) {
-      if (isV2Error(data)) {
-        handleV2Error(data.error, response.status);
-      }
-      this.handleNonV2Error(data, endpoint, response.status);
-    }
-
-    return parseResponse<T>(data, endpoint);
+    const { data } = await this._fetch(endpoint, options, includeAuth);
+    return parseResponseData<T>(data, endpoint);
   }
 
   async get<T>(endpoint: string, includeAuth: boolean = true): Promise<T> {
@@ -239,32 +295,25 @@ export class ApiClient {
     const offset = (page - 1) * pageSize;
     const rangeEnd = offset + pageSize - 1;
 
-    const url = `${API_BASE_URL}${endpoint}`;
-    const headers = {
-      ...this.getHeaders(includeAuth),
-      'Range-Unit': 'items',
-      'Range': `${offset}-${rangeEnd}`,
-      'Prefer': 'count=exact',
-    };
-
-    const response = await fetch(url, { method: 'GET', headers });
-
-    const text = await response.text();
-    const data = text ? JSON.parse(text) : null;
-
-    if (!response.ok) {
-      if (isV2Error(data)) {
-        handleV2Error(data.error, response.status);
-      }
-      this.handleNonV2Error(data, endpoint, response.status);
-    }
+    const { response, data } = await this._fetch(
+      endpoint,
+      {
+        method: 'GET',
+        headers: {
+          'Range-Unit': 'items',
+          'Range': `${offset}-${rangeEnd}`,
+          'Prefer': 'count=exact',
+        },
+      },
+      includeAuth,
+    );
 
     // Parse Content-Range: 0-14/100
     const contentRange = response.headers.get('Content-Range') ?? '';
     const match = contentRange.match(/\/(\d+)/);
     const totalCount = match ? parseInt(match[1], 10) : (Array.isArray(data) ? data.length : 0);
 
-    return { data: parseResponse<T[]>(data, endpoint), totalCount };
+    return { data: parseResponseData<T[]>(data, endpoint), totalCount };
   }
 
   async post<T>(endpoint: string, body?: unknown, includeAuth: boolean = true): Promise<T> {

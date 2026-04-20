@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { authService } from '../lib/auth';
-import { apiClient, setAuthErrorHandler } from '../lib/api';
+import { apiClient, setAuthErrorHandler, setTokenRefresher } from '../lib/api';
 import type { UserInfo } from '../lib/auth';
 
 interface LoginResult {
@@ -78,11 +78,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.location.href = `/login?${params.toString()}`;
   }, []);
 
-  // Register auth error handler
+  // Register auth error handler and token refresher
   useEffect(() => {
     setAuthErrorHandler(handleAuthError);
-    return () => setAuthErrorHandler(null);
-  }, [handleAuthError]);
+    setTokenRefresher(async () => {
+      try {
+        await authService.refresh();
+        scheduleRefresh(); // Reschedule background timer with new expiry
+        return true;
+      } catch {
+        return false;
+      }
+    });
+    return () => {
+      setAuthErrorHandler(null);
+      setTokenRefresher(null);
+    };
+  }, [handleAuthError, scheduleRefresh]);
 
   // Cleanup refresh timer on unmount
   useEffect(() => {
