@@ -35,6 +35,15 @@
     "select": "Select",
     "saved": "Saved"
   },
+  "paymentMethod": {
+    "CASH": "Cash",
+    "TRANSFER": "Transfer",
+    "SAVING_WALLET": "Saving Wallet",
+    "CREDIT_WALLET": "Credit Wallet",
+    "INSURANCE_WALLET": "Insurance Wallet",
+    "HOLDING_BUDGET": "Holding Budget",
+    "INTERNAL": "Internal"
+  },
   "auth": {
     "login": "Login",
     "logout": "Logout",

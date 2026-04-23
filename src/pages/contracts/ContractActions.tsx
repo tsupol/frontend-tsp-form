@@ -6,6 +6,7 @@ import { Button, Modal, Input, Select, TextArea, MaskedInput, Badge, useSnackbar
 import { CheckCircle, XCircle, Pencil, Plus, Trash2, Loader2 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { fmtCurrency } from '../../lib/format';
+import { BranchPinInput } from '../../components/BranchPinInput';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -24,6 +25,10 @@ interface ContractForActions {
   is_paused: boolean;
   saving_balance: number | null;
   transfer_to_branch_id: number | null;
+  paid_installment_count: number | null;
+  total_installments: number | null;
+  total_paid: number | null;
+  agreed_total_financed: number | null;
 }
 
 type ContractAction =
@@ -61,8 +66,9 @@ function getAvailableActions(contract: ContractForActions): ContractAction[] {
       && (insurance_balance ?? 0) === 0;
     if (canComplete) actions.push('complete');
 
-    // Early payoff: has outstanding, no late fees
-    const canEarlyPayoff = (outstanding_amount ?? 0) > 0 && (late_fee_balance ?? 0) === 0;
+    // Early payoff: has unpaid installments remaining, no late fees
+    const hasUnpaidInstallments = (contract.paid_installment_count ?? 0) < (contract.total_installments ?? 0);
+    const canEarlyPayoff = hasUnpaidInstallments && (late_fee_balance ?? 0) === 0;
     if (canEarlyPayoff) actions.push('early_payoff');
 
     actions.push('settlement_refund');
@@ -346,6 +352,32 @@ const ACTION_CONFIGS: Record<ContractAction, ActionConfig> = {
     needsCloseReason: false,
     needsNewOwner: false,
     successKey: 'contract.action_transfer_cancel_success',
+  },
+  void_bill: {
+    rpc: 'fn_contract_void_bill',
+    color: 'danger',
+    needsPin: true,
+    needsNote: true,
+    needsReason: true,
+    needsBranch: false,
+    needsDevice: false,
+    needsAmount: false,
+    needsCloseReason: false,
+    needsNewOwner: false,
+    successKey: 'contract.action_void_bill_success',
+  },
+  continue_pay: {
+    rpc: 'fn_contract_continue_pay',
+    color: 'primary',
+    needsPin: true,
+    needsNote: false,
+    needsReason: false,
+    needsBranch: false,
+    needsDevice: false,
+    needsAmount: false,
+    needsCloseReason: false,
+    needsNewOwner: false,
+    successKey: 'contract.action_continue_pay_success',
   },
 };
 
@@ -798,17 +830,7 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
               )}
 
               {config.needsPin && (
-                <div className="flex flex-col">
-                  <label className="form-label">{t('contract.pin')} *</label>
-                  <Input
-                    type="password"
-                    value={pin}
-                    onChange={(e) => setPin(e.target.value)}
-                    placeholder={t('contract.pinPlaceholder')}
-                    maxLength={6}
-                    className="w-full"
-                  />
-                </div>
+                <BranchPinInput value={pin} onChange={setPin} required />
               )}
             </div>
           </div>
@@ -1138,17 +1160,7 @@ function CancelSavingModal({ open, contract, onClose, onSuccess }: {
             </div>
 
             {/* PIN */}
-            <div className="flex flex-col">
-              <label className="form-label">{t('contract.pin')} *</label>
-              <Input
-                type="password"
-                value={pin}
-                onChange={(e) => setPin(e.target.value)}
-                placeholder={t('contract.pinPlaceholder')}
-                maxLength={6}
-                className="w-full"
-              />
-            </div>
+            <BranchPinInput value={pin} onChange={setPin} required />
           </div>
         </div>
         <div className="modal-footer">
@@ -1168,6 +1180,22 @@ function CancelSavingModal({ open, contract, onClose, onSuccess }: {
 
 // ── Early Payoff Modal ────────────────────────────────────────────────────
 
+interface EarlyPayoffPayment {
+  method: string;
+  amount: number;
+  bank_account_id: number | null;
+}
+
+interface ExistingBillDetail {
+  bill_id: number;
+  bill_code_display: string;
+  total_amount: number;
+  paid_amount: number;
+  remaining: number;
+  line_items: { charge_type: string }[];
+  payments: { method: string; amount: number }[] | null;
+}
+
 function EarlyPayoffModal({ open, contract, onClose, onSuccess }: {
   open: boolean;
   contract: ContractForActions;
@@ -1175,37 +1203,129 @@ function EarlyPayoffModal({ open, contract, onClose, onSuccess }: {
   onSuccess: (msgKey: string) => void;
 }) {
   const { t } = useTranslation();
-  const outstanding = contract.outstanding_amount ?? 0;
+  const remainingBalance = (contract.agreed_total_financed ?? 0) - (contract.total_paid ?? 0);
 
-  const [payoffAmount, setPayoffAmount] = useState('');
-  const [channel, setChannel] = useState<string | null>(null);
+  const [existingBill, setExistingBill] = useState<ExistingBillDetail | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [payments, setPayments] = useState<EarlyPayoffPayment[]>([{ method: '', amount: 0, bank_account_id: null }]);
   const [note, setNote] = useState('');
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [errorKey, setErrorKey] = useState(0);
   const [step, setStep] = useState('');
 
-  // Reset form on open
+  // Allowed payment methods for this bill purpose
+  const { data: allowedMethods } = useQuery({
+    queryKey: ['purpose-allowed-methods', 'CONTRACT_HOLDING'],
+    queryFn: () => apiClient.get<{ method: string }[]>(
+      '/v_purpose_allowed_methods?bill_purpose=eq.CONTRACT_HOLDING&is_active=eq.true&select=method'
+    ),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const methodOptions = (allowedMethods ?? []).map(m => ({
+    value: m.method,
+    label: t(`paymentMethod.${m.method}`, { defaultValue: m.method }),
+  }));
+
+  // Bank accounts for transfer
+  const { data: bankAccounts } = useQuery({
+    queryKey: ['bank-accounts-active'],
+    queryFn: () => apiClient.get<BankAccount[]>('/v_bank_accounts?is_active=is.true&order=bank_name'),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const bankOptions = (bankAccounts ?? []).map(b => ({
+    value: String(b.id),
+    label: `${b.bank_name} - ${b.account_number} (${b.account_name})`,
+  }));
+
+  // Check for existing OPEN early payoff bill on modal open
   useEffect(() => {
-    if (open) {
-      setPayoffAmount(String(outstanding));
-      setChannel(null);
+    if (!open) {
+      setExistingBill(null);
+      setLoading(false);
+      setPayments([{ method: '', amount: 0, bank_account_id: null }]);
       setNote('');
       setPin('');
       setError('');
       setStep('');
+      return;
     }
-  }, [open, outstanding]);
 
-  const amount = Number(payoffAmount) || 0;
-  const discount = outstanding - amount;
+    let cancelled = false;
+    const checkExisting = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const bills = await apiClient.get<{ id: number }[]>(
+          `/v_bills?contract_id=eq.${contract.id}&bill_purpose=eq.CONTRACT_HOLDING&status=eq.OPEN&order=id.desc&limit=5&select=id`
+        );
+        if (cancelled) return;
 
-  const canSubmit = (() => {
-    if (!pin) return false;
-    if (!channel) return false;
-    if (amount <= 0 || amount > outstanding) return false;
-    return true;
-  })();
+        for (const bill of bills) {
+          const details = await apiClient.get<ExistingBillDetail[]>(
+            `/v_bill_detail?bill_id=eq.${bill.id}`
+          );
+          if (cancelled) return;
+          const detail = details[0];
+          if (detail?.line_items?.some(li => li.charge_type === 'EARLY_PAYOFF')) {
+            setExistingBill(detail);
+            return;
+          }
+        }
+      } catch (err) {
+        if (!cancelled) {
+          if (err instanceof ApiError) {
+            const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+              || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+            setError(translated || err.message);
+          } else {
+            setError(String(err));
+          }
+          setErrorKey(k => k + 1);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    checkExisting();
+    return () => { cancelled = true; };
+  }, [open, contract.id, t]);
+
+  // Bill amount — from existing bill or estimate from contract
+  const billTotal = existingBill?.total_amount ?? remainingBalance;
+  const installmentsCount = existingBill
+    ? existingBill.line_items.filter(li => li.charge_type === 'EARLY_PAYOFF').length
+    : (contract.total_installments ?? 0) - (contract.paid_installment_count ?? 0);
+
+  // Existing payments already committed to DB (read-only)
+  const existingPayments = existingBill?.payments ?? [];
+  const existingPaidAmount = existingPayments.reduce((sum, p) => sum + p.amount, 0);
+  const amountNeeded = billTotal - existingPaidAmount;
+
+  // New payment lines (local state, written on submit)
+  const totalNewPayment = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+  const needsNewPayments = amountNeeded > 0;
+  const isBalanced = needsNewPayments
+    ? Math.abs(totalNewPayment - amountNeeded) < 0.01
+    : existingPaidAmount >= billTotal;
+
+  const addPaymentLine = () => {
+    setPayments(prev => [...prev, { method: '', amount: 0, bank_account_id: null }]);
+  };
+
+  const removePaymentLine = (idx: number) => {
+    setPayments(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const updatePayment = (idx: number, updates: Partial<EarlyPayoffPayment>) => {
+    setPayments(prev => prev.map((p, i) => i === idx ? { ...p, ...updates } : p));
+  };
+
+  const canSubmit = !!pin && isBalanced
+    && (!needsNewPayments || (payments.length > 0
+      && payments.every(p => !!p.method && p.amount > 0 && (p.method !== 'TRANSFER' || p.bank_account_id))));
 
   const setApiError = (err: unknown) => {
     if (err instanceof ApiError) {
@@ -1220,18 +1340,38 @@ function EarlyPayoffModal({ open, contract, onClose, onSuccess }: {
 
   const mutation = useMutation({
     mutationFn: async () => {
-      // Step 1: Record early payoff payment
-      setStep('payment');
-      await apiClient.rpc('fn_payment_record', {
-        p_contract_id: contract.id,
-        p_amount: amount,
-        p_payment_type: 'EARLY_PAYOFF',
-        p_channel: channel,
-        p_branch_id: contract.branch_id,
-        p_note: note.trim() || undefined,
+      let billId = existingBill?.bill_id;
+
+      // Step 1: Create bill if none exists
+      if (!billId) {
+        setStep('collect');
+        const collectResult = await apiClient.rpc<{ bill_id: number }>('fn_bill_early_payoff_collect', {
+          p_contract_id: contract.id,
+          p_note: note.trim() || undefined,
+        });
+        billId = collectResult.bill_id;
+      }
+
+      // Step 2: Add new payment lines
+      if (needsNewPayments) {
+        setStep('payment');
+        for (const payment of payments) {
+          await apiClient.rpc('fn_bill_payment_add', {
+            p_bill_id: billId,
+            p_method: payment.method,
+            p_amount: payment.amount,
+            p_bank_account_id: payment.method === 'TRANSFER' ? payment.bank_account_id : null,
+          });
+        }
+      }
+
+      // Step 3: Confirm bill
+      setStep('confirm');
+      await apiClient.rpc('fn_bill_payment_confirm', {
+        p_bill_id: billId,
       });
 
-      // Step 2: Complete contract
+      // Step 4: Complete contract
       setStep('complete');
       await apiClient.rpc('fn_contract_complete', {
         p_contract_id: contract.id,
@@ -1239,17 +1379,21 @@ function EarlyPayoffModal({ open, contract, onClose, onSuccess }: {
         p_note: note.trim() || undefined,
         p_pin: pin,
       });
+
+      setStep('done');
     },
     onSuccess: () => onSuccess('contract.action_early_payoff_success'),
     onError: setApiError,
   });
 
-  const stepLabel = step === 'payment' ? t('contract.earlyPayoff_stepPayment')
+  const stepLabel = step === 'collect' ? t('contract.earlyPayoff_stepCollect', { defaultValue: 'Creating bill...' })
+    : step === 'payment' ? t('contract.earlyPayoff_stepPayment')
+    : step === 'confirm' ? t('contract.earlyPayoff_stepConfirm', { defaultValue: 'Confirming...' })
     : step === 'complete' ? t('contract.earlyPayoff_stepComplete')
     : '';
 
   return (
-    <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
+    <Modal open={open} onClose={onClose} maxWidth="32rem" width="100%">
       <div className="flex flex-col overflow-hidden">
         <div className="modal-header">
           <h2 className="modal-title">{t('contract.earlyPayoff_title')}</h2>
@@ -1269,77 +1413,134 @@ function EarlyPayoffModal({ open, contract, onClose, onSuccess }: {
             <div className="text-xs text-subtle">{contract.state} · {contract.commercial_model ?? ''}</div>
           </div>
 
-          {/* Outstanding amount display */}
-          <div className="mb-4 px-3 py-2.5 rounded-md bg-warning/10 border border-warning/20">
-            <div className="text-xs text-subtle">{t('contract.earlyPayoff_outstanding')}</div>
-            <div className="text-lg font-semibold tabular-nums">{fmtCurrency(outstanding)}</div>
-          </div>
-
-          <div className="form-grid">
-            {/* Payoff amount */}
-            <div className="flex flex-col">
-              <label className="form-label">{t('contract.earlyPayoff_amount')} *</label>
-              <Input
-                type="number"
-                value={payoffAmount}
-                onChange={(e) => setPayoffAmount(e.target.value)}
-                placeholder="0.00"
-                className="w-full"
-                min="0"
-                max={outstanding}
-                step="0.01"
-              />
-              {discount > 0 && amount > 0 && (
-                <div className="text-xs text-success mt-1">
-                  {t('contract.earlyPayoff_discount')}: <span className="font-medium tabular-nums">{fmtCurrency(discount)}</span>
-                  {' '}({((discount / outstanding) * 100).toFixed(1)}%)
+          {loading ? (
+            <div className="flex items-center gap-2 py-8 justify-center text-subtle">
+              <Loader2 size={18} className="animate-spin" />
+              <span>{t('common.loading')}</span>
+            </div>
+          ) : (
+            <>
+              {/* Existing bill notice */}
+              {existingBill && (
+                <div className="mb-4 px-3 py-2.5 rounded-md bg-info/10 border border-info/20">
+                  <div className="text-xs text-subtle">{t('contract.earlyPayoff_existingBill', { defaultValue: 'Existing early payoff bill' })}</div>
+                  <div className="text-sm font-medium">{existingBill.bill_code_display}</div>
                 </div>
               )}
-            </div>
 
-            {/* Payment channel */}
-            <div className="flex flex-col">
-              <label className="form-label">{t('contract.earlyPayoff_channel')} *</label>
-              <Select
-                options={REFUND_CHANNEL_OPTIONS}
-                value={channel}
-                onChange={(val) => setChannel((val as string) || null)}
-                placeholder={t('contract.cancelSaving_selectChannel')}
-                showChevron
-              />
-            </div>
+              {/* Payoff amount */}
+              <div className="mb-4 px-3 py-2.5 rounded-md bg-warning/10 border border-warning/20">
+                <div className="text-xs text-subtle">{t('contract.earlyPayoff_outstanding')}</div>
+                <div className="text-lg font-semibold tabular-nums">{fmtCurrency(billTotal)}</div>
+                <div className="text-xs text-subtle mt-1">
+                  {t('contract.earlyPayoff_installmentsRemaining', {
+                    count: installmentsCount,
+                    defaultValue: '{{count}} installments remaining',
+                  })}
+                </div>
+              </div>
 
-            {/* Note */}
-            <div className="flex flex-col">
-              <label className="form-label">{t('contract.note')}</label>
-              <TextArea
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder={t('contract.notePlaceholder')}
-                rows={3}
-              />
-            </div>
+              {/* Existing payments (read-only) */}
+              {existingPayments.length > 0 && (
+                <div className="mb-4">
+                  <label className="form-label">{t('contract.earlyPayoff_existingPayments', { defaultValue: 'Recorded Payments' })}</label>
+                  {existingPayments.map((p, idx) => (
+                    <div key={idx} className="flex justify-between items-center px-3 py-2 rounded-md bg-surface border border-line mb-1">
+                      <span className="text-sm">{t(`paymentMethod.${p.method}`, { defaultValue: p.method })}</span>
+                      <span className="text-sm font-medium tabular-nums">{fmtCurrency(p.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
 
-            {/* PIN */}
-            <div className="flex flex-col">
-              <label className="form-label">{t('contract.pin')} *</label>
-              <Input
-                type="password"
-                value={pin}
-                onChange={(e) => setPin(e.target.value)}
-                placeholder={t('contract.pinPlaceholder')}
-                maxLength={6}
-                className="w-full"
-              />
-            </div>
-          </div>
+              {/* New payment lines */}
+              {needsNewPayments && (
+                <div className="flex flex-col gap-3 mb-4">
+                  <label className="form-label">{t('wizard.paymentMethods', { defaultValue: 'Payment Methods' })}</label>
+                  {payments.map((payment, idx) => (
+                    <div key={idx} className="flex flex-col gap-2">
+                      <div className="flex gap-2 items-center">
+                        <div className="input-group flex-1 min-w-0">
+                          <div className="w-28 shrink-0">
+                            <Select
+                              options={methodOptions}
+                              value={payment.method || null}
+                              onChange={(val) => updatePayment(idx, { method: val as string, bank_account_id: null })}
+                              placeholder={t('wizard.method', { defaultValue: 'Method' })}
+                              size="sm"
+                              searchable={false}
+                            />
+                          </div>
+                          <div className="input-group-divider" />
+                          <MaskedInput
+                            mask="number"
+                            decimalScale={2}
+                            value={payment.amount ? String(payment.amount) : ''}
+                            onChange={(raw) => updatePayment(idx, { amount: parseFloat(raw) || 0 })}
+                            placeholder="0.00"
+                            size="sm"
+                            className="w-full"
+                          />
+                        </div>
+                        {payments.length > 1 && (
+                          <Button size="sm" className="btn-icon-sm shrink-0" onClick={() => removePaymentLine(idx)}>
+                            <Trash2 size={14} />
+                          </Button>
+                        )}
+                      </div>
+                      {payment.method === 'TRANSFER' && (
+                        <Select
+                          options={bankOptions}
+                          value={payment.bank_account_id ? String(payment.bank_account_id) : null}
+                          onChange={(val) => updatePayment(idx, { bank_account_id: val ? Number(val) : null })}
+                          placeholder={t('wizard.selectBankAccount', { defaultValue: 'Select bank account' })}
+                          size="sm"
+                          showChevron
+                          searchable
+                        />
+                      )}
+                    </div>
+                  ))}
+                  <Button size="sm" onClick={addPaymentLine} startIcon={<Plus size={14} />}>
+                    {t('wizard.addPayment', { defaultValue: 'Add Payment' })}
+                  </Button>
+                </div>
+              )}
+
+              {/* Total check */}
+              <div className={`flex justify-between items-center p-3 rounded-lg border mb-4 ${
+                isBalanced ? 'border-success/30 bg-success/5' : 'border-warning/30 bg-warning/5'
+              }`}>
+                <span className="text-sm">{t('wizard.totalPayment', { defaultValue: 'Total Payment' })}</span>
+                <span className={`font-semibold tabular-nums ${isBalanced ? 'text-success' : 'text-warning'}`}>
+                  {fmtCurrency(existingPaidAmount + totalNewPayment)} / {fmtCurrency(billTotal)}
+                </span>
+              </div>
+
+              <div className="form-grid">
+                {/* Note */}
+                <div className="flex flex-col">
+                  <label className="form-label">{t('contract.note')}</label>
+                  <TextArea
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder={t('contract.notePlaceholder')}
+                    rows={2}
+                  />
+                </div>
+
+                {/* PIN */}
+                <BranchPinInput value={pin} onChange={setPin} required />
+              </div>
+            </>
+          )}
         </div>
         <div className="modal-footer">
           <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button
             color="primary"
             onClick={() => mutation.mutate()}
-            disabled={!canSubmit || mutation.isPending}
+            disabled={!canSubmit || mutation.isPending || loading}
           >
             {mutation.isPending ? stepLabel || t('common.loading') : t('contract.action_early_payoff')}
           </Button>
@@ -1423,10 +1624,7 @@ function VoidBillModal({ open, contract, onClose, onSuccess }: {
             <label className="form-label">{t('contract.reason')} *</label>
             <TextArea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} />
           </div>
-          <div className="flex flex-col">
-            <label className="form-label">{t('contract.pin')} *</label>
-            <Input type="password" value={pin} onChange={(e) => setPin(e.target.value)} className="w-full" />
-          </div>
+          <BranchPinInput value={pin} onChange={setPin} required />
         </div>
       </div>
       <div className="modal-footer">

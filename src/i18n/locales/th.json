@@ -35,6 +35,15 @@
     "select": "เลือก",
     "saved": "บันทึกแล้ว"
   },
+  "paymentMethod": {
+    "CASH": "เงินสด",
+    "TRANSFER": "โอนเงิน",
+    "SAVING_WALLET": "กระเป๋าออม",
+    "CREDIT_WALLET": "กระเป๋าเครดิต",
+    "INSURANCE_WALLET": "กระเป๋าประกัน",
+    "HOLDING_BUDGET": "งบโฮลดิ้ง",
+    "INTERNAL": "ภายใน"
+  },
   "auth": {
     "login": "เข้าสู่ระบบ",
     "logout": "ออกจากระบบ",
