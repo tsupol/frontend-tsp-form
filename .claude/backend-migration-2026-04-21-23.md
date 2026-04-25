@@ -12,7 +12,7 @@
 |---|---|---|
 | SAVING_DEPOSIT → fn_bill_wallet (ContractActions.tsx:894) | pending | param rename only |
 | SAVING_DEPOSIT → fn_bill_wallet (PanelSaving.tsx:89) | pending | param rename only |
-| EARLY_PAYOFF → 3-step flow (ContractActions.tsx:1251) | **done** | 4-step: collect→pay→confirm→complete. Amount is system-calculated (read-only). Bill cleanup on error. |
+| EARLY_PAYOFF → 3-step flow (ContractActions.tsx) | **done** | 3-view modal: estimate → create bill (fn_bill_early_payoff_collect) → pay (fn_bill_payment_add × N + confirm) → complete (fn_contract_complete). On-click validation, PIN only on complete step. Payment methods from v_purpose_allowed_methods. |
 | Early payoff guard bug (ContractActions.tsx:65) | **done** | was using outstanding_amount, fixed to paid_installment_count < total_installments |
 | WAIVE in METHOD_COLOR (BillsPage.tsx:127) | pending | cosmetic, low priority |
 
