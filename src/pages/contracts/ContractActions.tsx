@@ -1186,14 +1186,37 @@ interface EarlyPayoffPayment {
   bank_account_id: number | null;
 }
 
-interface CollectedBill {
+interface PayoffPreview {
+  contract_id: number;
+  contract_code: string;
+  state: string;
+  installments: {
+    count_unpaid: number;
+    gross_remaining: number;
+    items: { installment_id: number; pay_no: number; due_date: string; due_amount: number; remaining: number; status: string }[];
+  };
+  wallets: {
+    credit: { balance: number; applies_to: string };
+    insurance: { balance: number; applies_to: string };
+    saving: { balance: number; applies_to: string };
+  };
+  late_fee_balance: number;
+  summary: {
+    gross: number;
+    wallet_offset_max: number;
+    cash_required_after_wallets: number;
+  };
+  allowed_methods: string[];
+}
+
+interface ConfirmedBill {
   bill_id: number;
   bill_code: string;
   bill_total: number;
   installments_count: number;
 }
 
-type EarlyPayoffView = 'estimate' | 'pay' | 'confirmed';
+type EarlyPayoffView = 'pay' | 'confirmed';
 
 function EarlyPayoffModal({ open, contract, onClose, onSuccess }: {
   open: boolean;
@@ -1202,32 +1225,17 @@ function EarlyPayoffModal({ open, contract, onClose, onSuccess }: {
   onSuccess: (msgKey: string) => void;
 }) {
   const { t } = useTranslation();
-  const estimatedBalance = (contract.agreed_total_financed ?? 0) - (contract.total_paid ?? 0);
-  const estimatedInstallments = (contract.total_installments ?? 0) - (contract.paid_installment_count ?? 0);
 
-  const [view, setView] = useState<EarlyPayoffView>('estimate');
-  const [collectedBill, setCollectedBill] = useState<CollectedBill | null>(null);
-  const [collecting, setCollecting] = useState(false);
+  const [view, setView] = useState<EarlyPayoffView>('pay');
+  const [preview, setPreview] = useState<PayoffPreview | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [confirmedBill, setConfirmedBill] = useState<ConfirmedBill | null>(null);
   const [payments, setPayments] = useState<EarlyPayoffPayment[]>([{ method: '', amount: 0, bank_account_id: null }]);
   const [note, setNote] = useState('');
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [errorKey, setErrorKey] = useState(0);
   const [step, setStep] = useState('');
-
-  // Allowed payment methods for this bill purpose
-  const { data: allowedMethods } = useQuery({
-    queryKey: ['purpose-allowed-methods', 'CONTRACT_HOLDING'],
-    queryFn: () => apiClient.get<{ method: string }[]>(
-      '/v_purpose_allowed_methods?bill_purpose=eq.CONTRACT_HOLDING&is_active=eq.true&select=method'
-    ),
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const methodOptions = (allowedMethods ?? []).map(m => ({
-    value: m.method,
-    label: t(`paymentMethod.${m.method}`, { defaultValue: m.method }),
-  }));
 
   // Bank accounts for transfer
   const { data: bankAccounts } = useQuery({
@@ -1241,48 +1249,57 @@ function EarlyPayoffModal({ open, contract, onClose, onSuccess }: {
     label: `${b.bank_name} - ${b.account_number} (${b.account_name})`,
   }));
 
-  // Reset on open/close
+  // Methods derived from preview response
+  const methodOptions = (preview?.allowed_methods ?? []).map(m => ({
+    value: m,
+    label: t(`paymentMethod.${m}`, { defaultValue: m }),
+  }));
+
+  // Reset + load preview on open
   useEffect(() => {
     if (!open) {
-      setView('estimate');
-      setCollectedBill(null);
-      setCollecting(false);
+      setView('pay');
+      setPreview(null);
+      setPreviewLoading(false);
+      setConfirmedBill(null);
       setPayments([{ method: '', amount: 0, bank_account_id: null }]);
       setNote('');
       setPin('');
       setError('');
       setStep('');
+      return;
     }
-  }, [open]);
 
-  // Step 2: User clicks "Create Payoff Bill" → fn_bill_early_payoff_collect
-  const handleCollect = async () => {
-    setCollecting(true);
-    setError('');
-    try {
-      const result = await apiClient.rpc<CollectedBill>('fn_bill_early_payoff_collect', {
-        p_contract_id: contract.id,
-        p_note: note.trim() || undefined,
-      });
-      setCollectedBill(result);
-      setPayments([{ method: '', amount: 0, bank_account_id: null }]);
-      setView('pay');
-    } catch (err) {
-      if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
-        setError(translated || err.message);
-      } else {
-        setError(String(err));
+    let cancelled = false;
+    const loadPreview = async () => {
+      setPreviewLoading(true);
+      setError('');
+      try {
+        const result = await apiClient.rpc<PayoffPreview>('fn_bill_early_payoff_preview', {
+          p_contract_id: contract.id,
+        });
+        if (!cancelled) setPreview(result);
+      } catch (err) {
+        if (!cancelled) {
+          if (err instanceof ApiError) {
+            const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+              || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+            setError(translated || err.message);
+          } else {
+            setError(String(err));
+          }
+          setErrorKey(k => k + 1);
+        }
+      } finally {
+        if (!cancelled) setPreviewLoading(false);
       }
-      setErrorKey(k => k + 1);
-    } finally {
-      setCollecting(false);
-    }
-  };
+    };
+    loadPreview();
+    return () => { cancelled = true; };
+  }, [open, contract.id, t]);
 
   // Payment line management
-  const billTotal = collectedBill?.bill_total ?? 0;
+  const billTotal = preview?.installments.gross_remaining ?? 0;
   const totalPayment = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
   const isBalanced = billTotal > 0 && Math.abs(totalPayment - billTotal) < 0.01;
 
@@ -1305,7 +1322,7 @@ function EarlyPayoffModal({ open, contract, onClose, onSuccess }: {
   };
 
   const validatePayment = (): string | null => {
-    if (!collectedBill) return t('contract.earlyPayoff_noBill', { defaultValue: 'No bill created' });
+    if (!preview) return t('contract.earlyPayoff_noPreview', { defaultValue: 'Loading payoff data...' });
     if (payments.length === 0) return t('contract.earlyPayoff_noPayment', { defaultValue: 'Add at least one payment' });
     const emptyMethod = payments.find(p => !p.method);
     if (emptyMethod) return t('contract.earlyPayoff_selectMethod', { defaultValue: 'Select payment method for all rows' });
@@ -1338,13 +1355,18 @@ function EarlyPayoffModal({ open, contract, onClose, onSuccess }: {
     payMutation.mutate();
   };
 
-  // Pay + confirm mutation
+  // Atomic mutation: collect → add × N → confirm
   const payMutation = useMutation({
     mutationFn: async () => {
-      if (!collectedBill) throw new Error('No bill');
-      const billId = collectedBill.bill_id;
+      // Step 1: Create the bill
+      setStep('collect');
+      const collectResult = await apiClient.rpc<{ bill_id: number; bill_code: string; bill_total: number; installments_count: number }>('fn_bill_early_payoff_collect', {
+        p_contract_id: contract.id,
+        p_note: note.trim() || undefined,
+      });
+      const billId = collectResult.bill_id;
 
-      // Add payment lines
+      // Step 2: Add payments
       setStep('payment');
       for (const payment of payments) {
         await apiClient.rpc('fn_bill_payment_add', {
@@ -1355,12 +1377,13 @@ function EarlyPayoffModal({ open, contract, onClose, onSuccess }: {
         });
       }
 
-      // Confirm bill
+      // Step 3: Confirm bill
       setStep('confirm');
       await apiClient.rpc('fn_bill_payment_confirm', {
         p_bill_id: billId,
       });
 
+      setConfirmedBill(collectResult);
       setStep('');
     },
     onSuccess: () => {
@@ -1386,10 +1409,18 @@ function EarlyPayoffModal({ open, contract, onClose, onSuccess }: {
     onError: setApiError,
   });
 
-  const stepLabel = step === 'payment' ? t('contract.earlyPayoff_stepPayment')
+  const stepLabel = step === 'collect' ? t('contract.earlyPayoff_stepCollect', { defaultValue: 'Creating bill...' })
+    : step === 'payment' ? t('contract.earlyPayoff_stepPayment')
     : step === 'confirm' ? t('contract.earlyPayoff_stepConfirm', { defaultValue: 'Confirming...' })
     : step === 'complete' ? t('contract.earlyPayoff_stepComplete')
     : '';
+
+  // Wallet badges
+  const walletEntries = preview ? [
+    { code: 'CREDIT_WALLET', balance: preview.wallets.credit.balance, label: t('paymentMethod.CREDIT_WALLET', { defaultValue: 'Credit' }) },
+    { code: 'INSURANCE_WALLET', balance: preview.wallets.insurance.balance, label: t('paymentMethod.INSURANCE_WALLET', { defaultValue: 'Insurance' }) },
+    { code: 'SAVING_WALLET', balance: preview.wallets.saving.balance, label: t('paymentMethod.SAVING_WALLET', { defaultValue: 'Saving' }) },
+  ].filter(w => w.balance > 0) : [];
 
   return (
     <Modal open={open} onClose={onClose} maxWidth="32rem" width="100%">
@@ -1412,59 +1443,39 @@ function EarlyPayoffModal({ open, contract, onClose, onSuccess }: {
             <div className="text-xs text-subtle">{contract.state} · {contract.commercial_model ?? ''}</div>
           </div>
 
-          {view === 'estimate' ? (
-            /* ── Estimate view — show estimate, button to create bill ── */
+          {previewLoading ? (
+            <div className="flex items-center gap-2 py-8 justify-center text-subtle">
+              <Loader2 size={18} className="animate-spin" />
+              <span>{t('common.loading')}</span>
+            </div>
+          ) : view === 'pay' && preview ? (
+            /* ── Pay view — preview data + payment form ── */
             <>
-              {/* Estimated payoff */}
-              <div className="mb-4 px-3 py-2.5 rounded-md bg-warning/10 border border-warning/20">
-                <div className="text-xs text-subtle">{t('contract.earlyPayoff_estimatedAmount', { defaultValue: 'Estimated Payoff Amount' })}</div>
-                <div className="text-lg font-semibold tabular-nums">{fmtCurrency(estimatedBalance)}</div>
-                <div className="text-xs text-subtle mt-1">
-                  {t('contract.earlyPayoff_installmentsRemaining', {
-                    count: estimatedInstallments,
-                    defaultValue: '{{count}} installments remaining',
-                  })}
-                </div>
-              </div>
-
-              {/* Info alert — creating bill is a commitment */}
-              <div className="alert alert-info mb-4">
-                <div>
-                  <div className="alert-description">
-                    {t('contract.earlyPayoff_collectWarning', {
-                      defaultValue: 'Creating a payoff bill will calculate the exact amount from the system. If there is an existing early payoff bill, it will be cancelled and replaced.',
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              <div className="form-grid">
-                <div className="flex flex-col">
-                  <label className="form-label">{t('contract.note')}</label>
-                  <TextArea
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                    placeholder={t('contract.notePlaceholder')}
-                    rows={2}
-                  />
-                </div>
-              </div>
-            </>
-
-          ) : view === 'pay' && collectedBill ? (
-            /* ── Payment form — bill created, add payments ── */
-            <>
-              {/* Bill info */}
+              {/* Payoff amount (from preview) */}
               <div className="mb-4 px-3 py-2.5 rounded-md bg-warning/10 border border-warning/20">
                 <div className="text-xs text-subtle">{t('contract.earlyPayoff_payoffAmount', { defaultValue: 'Payoff Amount' })}</div>
-                <div className="text-lg font-semibold tabular-nums">{fmtCurrency(collectedBill.bill_total)}</div>
+                <div className="text-lg font-semibold tabular-nums">{fmtCurrency(preview.installments.gross_remaining)}</div>
                 <div className="text-xs text-subtle mt-1">
-                  {collectedBill.bill_code} · {t('contract.earlyPayoff_installmentsRemaining', {
-                    count: collectedBill.installments_count,
+                  {t('contract.earlyPayoff_installmentsRemaining', {
+                    count: preview.installments.count_unpaid,
                     defaultValue: '{{count}} installments remaining',
                   })}
                 </div>
               </div>
+
+              {/* Available wallets */}
+              {walletEntries.length > 0 && (
+                <div className="mb-4">
+                  <div className="text-xs text-subtle mb-1">{t('contract.earlyPayoff_availableWallets', { defaultValue: 'Available Wallets' })}</div>
+                  <div className="flex flex-wrap gap-2">
+                    {walletEntries.map(w => (
+                      <Badge key={w.code} color="info" size="sm">
+                        {w.label}: {fmtCurrency(w.balance)}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Payment lines */}
               <div className="flex flex-col gap-3 mb-4">
@@ -1530,9 +1541,20 @@ function EarlyPayoffModal({ open, contract, onClose, onSuccess }: {
                 </span>
               </div>
 
+              <div className="form-grid">
+                <div className="flex flex-col">
+                  <label className="form-label">{t('contract.note')}</label>
+                  <TextArea
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder={t('contract.notePlaceholder')}
+                    rows={2}
+                  />
+                </div>
+              </div>
             </>
 
-          ) : view === 'confirmed' ? (
+          ) : view === 'confirmed' && confirmedBill ? (
             /* ── Confirmed — bill PAID, complete contract ── */
             <>
               <div className="alert alert-success mb-4">
@@ -1540,7 +1562,7 @@ function EarlyPayoffModal({ open, contract, onClose, onSuccess }: {
                 <div>
                   <div className="alert-title">{t('contract.earlyPayoff_billConfirmed', { defaultValue: 'Payment confirmed' })}</div>
                   <div className="alert-description">
-                    {collectedBill?.bill_code} · {fmtCurrency(collectedBill?.bill_total ?? 0)} — {collectedBill?.installments_count} {t('contract.earlyPayoff_installments', { defaultValue: 'installments' })}
+                    {confirmedBill.bill_code} · {fmtCurrency(confirmedBill.bill_total)} — {confirmedBill.installments_count} {t('contract.earlyPayoff_installments', { defaultValue: 'installments' })}
                   </div>
                 </div>
               </div>
@@ -1553,26 +1575,13 @@ function EarlyPayoffModal({ open, contract, onClose, onSuccess }: {
         </div>
 
         <div className="modal-footer">
-          {view === 'estimate' && (
-            <>
-              <Button onClick={onClose}>{t('common.cancel')}</Button>
-              <Button
-                color="primary"
-                onClick={handleCollect}
-                disabled={collecting}
-              >
-                {collecting ? t('common.loading') : t('contract.earlyPayoff_createBill', { defaultValue: 'Create Payoff Bill' })}
-              </Button>
-            </>
-          )}
-
           {view === 'pay' && (
             <>
               <Button onClick={onClose}>{t('common.cancel')}</Button>
               <Button
                 color="primary"
                 onClick={handlePayClick}
-                disabled={payMutation.isPending}
+                disabled={previewLoading || payMutation.isPending}
               >
                 {payMutation.isPending ? stepLabel || t('common.loading') : t('contract.earlyPayoff_confirmPayment', { defaultValue: 'Confirm Payment' })}
               </Button>
