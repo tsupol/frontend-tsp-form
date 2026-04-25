@@ -1216,7 +1216,16 @@ interface ConfirmedBill {
   installments_count: number;
 }
 
-type EarlyPayoffView = 'pay' | 'confirmed';
+type EarlyPayoffView = 'pay' | 'conflict' | 'confirmed';
+
+interface ConflictBill {
+  bill_id: number;
+  bill_code: string;
+  bill_status: string;
+  bill_total: number;
+  created_at: string;
+  created_by: number;
+}
 
 function EarlyPayoffModal({ open, contract, onClose, onSuccess }: {
   open: boolean;
@@ -1230,9 +1239,11 @@ function EarlyPayoffModal({ open, contract, onClose, onSuccess }: {
   const [preview, setPreview] = useState<PayoffPreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [confirmedBill, setConfirmedBill] = useState<ConfirmedBill | null>(null);
+  const [conflictBill, setConflictBill] = useState<ConflictBill | null>(null);
   const [payments, setPayments] = useState<EarlyPayoffPayment[]>([{ method: '', amount: 0, bank_account_id: null }]);
   const [note, setNote] = useState('');
   const [pin, setPin] = useState('');
+  const [conflictPin, setConflictPin] = useState('');
   const [error, setError] = useState('');
   const [errorKey, setErrorKey] = useState(0);
   const [step, setStep] = useState('');
@@ -1262,9 +1273,11 @@ function EarlyPayoffModal({ open, contract, onClose, onSuccess }: {
       setPreview(null);
       setPreviewLoading(false);
       setConfirmedBill(null);
+      setConflictBill(null);
       setPayments([{ method: '', amount: 0, bank_account_id: null }]);
       setNote('');
       setPin('');
+      setConflictPin('');
       setError('');
       setStep('');
       return;
@@ -1355,39 +1368,80 @@ function EarlyPayoffModal({ open, contract, onClose, onSuccess }: {
     payMutation.mutate();
   };
 
+  // Reusable: collect → add × N → confirm
+  const collectAddConfirm = async () => {
+    setStep('collect');
+    const collectResult = await apiClient.rpc<{ bill_id: number; bill_code: string; bill_total: number; installments_count: number }>('fn_bill_early_payoff_collect', {
+      p_contract_id: contract.id,
+      p_note: note.trim() || undefined,
+    });
+    const billId = collectResult.bill_id;
+
+    setStep('payment');
+    for (const payment of payments) {
+      await apiClient.rpc('fn_bill_payment_add', {
+        p_bill_id: billId,
+        p_method: payment.method,
+        p_amount: payment.amount,
+        p_bank_account_id: payment.method === 'TRANSFER' ? payment.bank_account_id : null,
+      });
+    }
+
+    setStep('confirm');
+    await apiClient.rpc('fn_bill_payment_confirm', {
+      p_bill_id: billId,
+    });
+
+    setConfirmedBill(collectResult);
+    setStep('');
+    return collectResult;
+  };
+
   // Atomic mutation: collect → add × N → confirm
   const payMutation = useMutation({
-    mutationFn: async () => {
-      // Step 1: Create the bill
-      setStep('collect');
-      const collectResult = await apiClient.rpc<{ bill_id: number; bill_code: string; bill_total: number; installments_count: number }>('fn_bill_early_payoff_collect', {
-        p_contract_id: contract.id,
-        p_note: note.trim() || undefined,
-      });
-      const billId = collectResult.bill_id;
-
-      // Step 2: Add payments
-      setStep('payment');
-      for (const payment of payments) {
-        await apiClient.rpc('fn_bill_payment_add', {
-          p_bill_id: billId,
-          p_method: payment.method,
-          p_amount: payment.amount,
-          p_bank_account_id: payment.method === 'TRANSFER' ? payment.bank_account_id : null,
+    mutationFn: collectAddConfirm,
+    onSuccess: () => {
+      setError('');
+      setView('confirmed');
+    },
+    onError: (err: unknown) => {
+      // Detect duplicate bill conflict
+      if (err instanceof ApiError && err.code === 'BILL.CONFLICT.EARLY_PAYOFF_EXISTS') {
+        const params = (err as ApiError & { params?: Record<string, unknown> }).params ?? {};
+        setConflictBill({
+          bill_id: Number(params.existing_bill_id),
+          bill_code: String(params.existing_bill_code ?? ''),
+          bill_status: String(params.existing_bill_status ?? ''),
+          bill_total: Number(params.existing_bill_total ?? 0),
+          created_at: String(params.existing_bill_created_at ?? ''),
+          created_by: Number(params.existing_bill_created_by ?? 0),
         });
+        setError('');
+        setStep('');
+        setView('conflict');
+        return;
       }
+      setApiError(err);
+    },
+  });
 
-      // Step 3: Confirm bill
-      setStep('confirm');
-      await apiClient.rpc('fn_bill_payment_confirm', {
-        p_bill_id: billId,
+  // Void existing bill + retry the pay flow
+  const voidAndRetryMutation = useMutation({
+    mutationFn: async () => {
+      if (!conflictBill || !conflictPin) throw new Error('Missing data');
+      setStep('void');
+      await apiClient.rpc('fn_bill_cancel', {
+        p_bill_id: conflictBill.bill_id,
+        p_reason: 'Restart early payoff',
+        p_pin: conflictPin,
       });
-
-      setConfirmedBill(collectResult);
-      setStep('');
+      // Now retry the original pay flow
+      await collectAddConfirm();
     },
     onSuccess: () => {
       setError('');
+      setConflictBill(null);
+      setConflictPin('');
       setView('confirmed');
     },
     onError: setApiError,
@@ -1409,7 +1463,8 @@ function EarlyPayoffModal({ open, contract, onClose, onSuccess }: {
     onError: setApiError,
   });
 
-  const stepLabel = step === 'collect' ? t('contract.earlyPayoff_stepCollect', { defaultValue: 'Creating bill...' })
+  const stepLabel = step === 'void' ? t('contract.earlyPayoff_stepVoid', { defaultValue: 'Voiding old bill...' })
+    : step === 'collect' ? t('contract.earlyPayoff_stepCollect', { defaultValue: 'Creating bill...' })
     : step === 'payment' ? t('contract.earlyPayoff_stepPayment')
     : step === 'confirm' ? t('contract.earlyPayoff_stepConfirm', { defaultValue: 'Confirming...' })
     : step === 'complete' ? t('contract.earlyPayoff_stepComplete')
@@ -1554,6 +1609,34 @@ function EarlyPayoffModal({ open, contract, onClose, onSuccess }: {
               </div>
             </>
 
+          ) : view === 'conflict' && conflictBill ? (
+            /* ── Conflict — existing payoff bill must be voided first ── */
+            <>
+              <div className="alert alert-warning mb-4">
+                <XCircle size={16} />
+                <div>
+                  <div className="alert-title">{t('contract.earlyPayoff_conflictTitle', { defaultValue: 'Existing payoff bill found' })}</div>
+                  <div className="alert-description">
+                    {t('contract.earlyPayoff_conflictDesc', { defaultValue: 'You must void the existing bill before creating a new one. Any payments already recorded will be reversed (CREDIT_NOTE).' })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
+                <div className="text-sm font-medium">{conflictBill.bill_code}</div>
+                <div className="text-xs text-subtle mt-1">
+                  {t('contract.earlyPayoff_conflictTotal', { defaultValue: 'Total' })}: {fmtCurrency(conflictBill.bill_total)} · {conflictBill.bill_status}
+                </div>
+                <div className="text-xs text-subtle">
+                  {t('contract.earlyPayoff_conflictCreated', { defaultValue: 'Created' })}: {conflictBill.created_at}
+                </div>
+              </div>
+
+              <div className="form-grid">
+                <BranchPinInput value={conflictPin} onChange={setConflictPin} required />
+              </div>
+            </>
+
           ) : view === 'confirmed' && confirmedBill ? (
             /* ── Confirmed — bill PAID, complete contract ── */
             <>
@@ -1584,6 +1667,19 @@ function EarlyPayoffModal({ open, contract, onClose, onSuccess }: {
                 disabled={previewLoading || payMutation.isPending}
               >
                 {payMutation.isPending ? stepLabel || t('common.loading') : t('contract.earlyPayoff_confirmPayment', { defaultValue: 'Confirm Payment' })}
+              </Button>
+            </>
+          )}
+
+          {view === 'conflict' && (
+            <>
+              <Button onClick={() => { setView('pay'); setConflictBill(null); setConflictPin(''); }}>{t('common.back', { defaultValue: 'Back' })}</Button>
+              <Button
+                color="danger"
+                onClick={() => voidAndRetryMutation.mutate()}
+                disabled={!conflictPin || voidAndRetryMutation.isPending}
+              >
+                {voidAndRetryMutation.isPending ? stepLabel || t('common.loading') : t('contract.earlyPayoff_voidAndRetry', { defaultValue: 'Void existing and continue' })}
               </Button>
             </>
           )}
