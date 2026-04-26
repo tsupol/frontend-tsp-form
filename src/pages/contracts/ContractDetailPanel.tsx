@@ -12,6 +12,7 @@ import { DateTime } from '../../components/DateTime';
 import { fmtCurrency } from '../../lib/format';
 import { getStateColor, getStateLabel } from './contractUtils';
 import { ContractActionButtons } from './ContractActions';
+import { WalletsTab } from './wallet/WalletsTab';
 import { config } from '../../config/config';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -62,6 +63,8 @@ interface ContractDetail {
   total_paid: number | null;
   outstanding_amount: number | null;
   credit_balance: number | null;
+  credit_balance_company: number | null;
+  credit_balance_holding: number | null;
   late_fee_balance: number | null;
   total_refunded: number | null;
   saving_balance: number | null;
@@ -178,9 +181,9 @@ interface EntityMedia {
 
 // ── Tabs ─────────────────────────────────────────────────────────────────────
 
-type DetailTab = 'overview' | 'installments' | 'txns' | 'customers' | 'notes' | 'payments';
+type DetailTab = 'overview' | 'installments' | 'txns' | 'customers' | 'notes' | 'payments' | 'wallets';
 
-const TABS: DetailTab[] = ['overview', 'installments', 'txns', 'payments', 'notes', 'customers'];
+const TABS: DetailTab[] = ['overview', 'installments', 'txns', 'payments', 'wallets', 'notes', 'customers'];
 
 // ── Scrollable Tabs ─────────────────────────────────────────────────────────
 
@@ -324,6 +327,7 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
         {activeTab === 'customers' && <CustomersTab contractId={contractId} customerId={contract.customer_id} t={t} />}
         {activeTab === 'notes' && <NotesTab contractId={contractId} t={t} />}
         {activeTab === 'payments' && <PaymentsTab contractId={contractId} t={t} />}
+        {activeTab === 'wallets' && <WalletsTab contract={contract} />}
       </div>
 
       {/* Contract actions */}
@@ -822,7 +826,6 @@ function DeliveryModal({ open, contract, onClose, onSuccess }: {
   onSuccess: () => void;
 }) {
   const { t } = useTranslation();
-  const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
   const { user } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);

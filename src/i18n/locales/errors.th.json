@@ -167,5 +167,17 @@
   "SALE.VALIDATION.RATE_NOT_FOUND": "ไม่พบอัตราสำหรับจำนวนงวดและเงินดาวน์ที่เลือก",
   "SALE.VALIDATION.DOWN_PERCENT_REQUIRED": "ต้องระบุ % เงินดาวน์สำหรับ FIN1",
   "CORE.VALIDATION.INVALID_COMMERCIAL_MODEL": "รูปแบบการค้าไม่ถูกต้อง",
-  "PRICING.VALIDATION.NOT_INSTALLMENT_MODEL": "คำนวณราคาได้เฉพาะแผนผ่อนชำระเท่านั้น"
+  "PRICING.VALIDATION.NOT_INSTALLMENT_MODEL": "คำนวณราคาได้เฉพาะแผนผ่อนชำระเท่านั้น",
+  "SALE.VALIDATION.WALLET_ACTION_NOT_SUPPORTED": "ไม่รองรับ action นี้สำหรับกระเป๋าที่เลือก",
+  "SALE.STATE.WALLET_ACTION_INVALID_STATE": "สถานะสัญญาไม่อนุญาตให้ทำรายการกระเป๋านี้",
+  "SALE.VALIDATION.REASON_REQUIRED": "ต้องระบุเหตุผล",
+  "SALE.VALIDATION.INVALID_REASON": "เหตุผลที่เลือกไม่ถูกต้องสำหรับรายการนี้",
+  "SALE.VALIDATION.REASON_NOTE_REQUIRED_FOR_OTHER": "ต้องระบุหมายเหตุเมื่อเลือกเหตุผล อื่นๆ",
+  "SALE.VALIDATION.CASHOUT_EXCEEDS_SAVING": "จำนวนเงินเกินยอดเงินออม",
+  "SALE.VALIDATION.CASHOUT_EXCEEDS_INSURANCE": "จำนวนเงินเกินยอดเงินประกัน",
+  "SALE.VALIDATION.CASHOUT_EXCEEDS_COMPANY_CREDIT": "จำนวนเงินเกินเครดิตที่ถอนได้ (เครดิตฝั่ง HOLDING ถอนไม่ได้)",
+  "SALE.VALIDATION.INSTALLMENTS_NOT_COMPLETE": "ต้องชำระค่างวดครบทุกงวดก่อนคืนประกัน",
+  "SALE.VALIDATION.INVALID_CASHOUT_CHANNEL": "ช่องทางต้องเป็นเงินสดหรือโอนเท่านั้น",
+  "CORE.AUTH.PIN_REQUIRED": "กรุณาใส่ PIN",
+  "CORE.AUTH.INVALID_PIN": "PIN ไม่ถูกต้อง"
 }

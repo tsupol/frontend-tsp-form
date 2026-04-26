@@ -167,5 +167,17 @@
   "SALE.VALIDATION.RATE_NOT_FOUND": "No rate found for this term and down payment combination",
   "SALE.VALIDATION.DOWN_PERCENT_REQUIRED": "Down payment percentage is required for FIN1",
   "CORE.VALIDATION.INVALID_COMMERCIAL_MODEL": "Invalid commercial model",
-  "PRICING.VALIDATION.NOT_INSTALLMENT_MODEL": "Pricing calculation is only available for installment plans"
+  "PRICING.VALIDATION.NOT_INSTALLMENT_MODEL": "Pricing calculation is only available for installment plans",
+  "SALE.VALIDATION.WALLET_ACTION_NOT_SUPPORTED": "This action is not supported for the selected wallet",
+  "SALE.STATE.WALLET_ACTION_INVALID_STATE": "Contract state does not allow this wallet operation",
+  "SALE.VALIDATION.REASON_REQUIRED": "A reason is required",
+  "SALE.VALIDATION.INVALID_REASON": "Selected reason is not valid for this wallet action",
+  "SALE.VALIDATION.REASON_NOTE_REQUIRED_FOR_OTHER": "A note is required when reason is OTHER",
+  "SALE.VALIDATION.CASHOUT_EXCEEDS_SAVING": "Amount exceeds saving balance",
+  "SALE.VALIDATION.CASHOUT_EXCEEDS_INSURANCE": "Amount exceeds insurance balance",
+  "SALE.VALIDATION.CASHOUT_EXCEEDS_COMPANY_CREDIT": "Amount exceeds cashable credit (HOLDING credit cannot be cashed out)",
+  "SALE.VALIDATION.INSTALLMENTS_NOT_COMPLETE": "All installments must be paid before insurance cashout",
+  "SALE.VALIDATION.INVALID_CASHOUT_CHANNEL": "Channel must be CASH or TRANSFER",
+  "CORE.AUTH.PIN_REQUIRED": "PIN is required",
+  "CORE.AUTH.INVALID_PIN": "PIN is incorrect"
 }
