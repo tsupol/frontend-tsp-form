@@ -105,7 +105,6 @@ interface PaymentLine {
 /* ── Constants ── */
 
 const TYPE_OPTIONS = [
-  { value: '', label: 'All' },
   { value: 'INVOICE', label: 'Invoice' },
   { value: 'CREDIT_NOTE', label: 'Credit Note' },
   { value: 'JOURNAL', label: 'Journal' },
@@ -148,22 +147,19 @@ export function BillsPage() {
     queryFn: () => apiClient.get<Branch[]>('/v_branches?is_active=is.true&order=name'),
   });
 
-  const effectiveBranchId = branchId || (branches[0]?.id ? String(branches[0].id) : '');
-
   // Build query params
   const params = new URLSearchParams();
-  params.set('branch_id', `eq.${effectiveBranchId}`);
+  if (branchId) params.set('branch_id', `eq.${branchId}`);
   params.set('order', 'created_at.desc');
   if (statusFilter) params.set('status', `eq.${statusFilter}`);
   if (typeFilter) params.set('bill_type', `eq.${typeFilter}`);
 
   const { data: billsData, isFetching } = useQuery({
-    queryKey: ['accounting', 'bills', effectiveBranchId, statusFilter, typeFilter, pageIndex, pageSize],
+    queryKey: ['accounting', 'bills', branchId, statusFilter, typeFilter, pageIndex, pageSize],
     queryFn: () => apiClient.getPaginated<BillRow>(
       `/v_bills?${params.toString()}`,
       { page: pageIndex + 1, pageSize }
     ),
-    enabled: !!effectiveBranchId,
     placeholderData: keepPreviousData,
   });
   const bills = billsData?.data ?? [];
@@ -171,11 +167,10 @@ export function BillsPage() {
 
   // Pending count for the header badge
   const { data: pendingData } = useQuery({
-    queryKey: ['accounting', 'bills-pending-count', effectiveBranchId],
+    queryKey: ['accounting', 'bills-pending-count', branchId],
     queryFn: () => apiClient.get<BillRow[]>(
-      `/v_bills_pending?branch_id=eq.${effectiveBranchId}&select=id`,
+      `/v_bills_pending?${branchId ? `branch_id=eq.${branchId}&` : ''}select=id`,
     ),
-    enabled: !!effectiveBranchId,
   });
   const pendingCount = pendingData?.length ?? 0;
 
@@ -259,22 +254,24 @@ export function BillsPage() {
               <div className="flex-none flex items-center p-2 border-b border-line gap-2">
                 <div className="flex-1 min-w-0">
                   <Select
-                    value={effectiveBranchId}
-                    onChange={(v) => { setBranchId(v as string); setPageIndex(0); }}
+                    value={branchId || null}
+                    onChange={(v) => { setBranchId((v as string) ?? ''); setPageIndex(0); }}
                     placeholder={t('accounting.branch')}
                     options={branches.map(b => ({ label: b.name, value: String(b.id) }))}
                     size="sm"
                     showChevron
+                    clearable
                   />
                 </div>
                 <div className="flex-1 min-w-0">
                   <Select
-                    value={typeFilter}
-                    onChange={(v) => { setTypeFilter(v as string); setPageIndex(0); }}
+                    value={typeFilter || null}
+                    onChange={(v) => { setTypeFilter((v as string) ?? ''); setPageIndex(0); }}
                     options={TYPE_OPTIONS}
                     size="sm"
                     showChevron
                     placeholder={t('accounting.bills.type')}
+                    clearable
                   />
                 </div>
               </div>
