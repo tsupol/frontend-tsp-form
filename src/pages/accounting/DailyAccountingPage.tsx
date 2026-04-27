@@ -5,7 +5,7 @@ import {
   DataTable, DataTableColumnHeader, Select, MobileHeader, InputDatePicker, Button, Badge,
   type ColumnDef, type SortingState,
 } from 'tsp-form';
-import { ArrowRightFromLine, Calendar, Download } from 'lucide-react';
+import { ArrowRightFromLine, Keyboard, Download } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { toLocalDateStr, parseLocalDate, makeDatePickerFormat, fmtCurrency } from '../../lib/format';
 import { downloadCsv } from '../../lib/csv';
@@ -17,6 +17,7 @@ export function DailyAccountingPage() {
   const { t, i18n } = useTranslation();
   const [branchId, setBranchId] = useState<string>('');
   const [date, setDate] = useState<string>(todayISO());
+  const [isTypingDate, setIsTypingDate] = useState(false);
   const [sorting, setSorting] = useState<SortingState>([]);
 
   const { data: branches = [] } = useQuery({
@@ -130,10 +131,26 @@ export function DailyAccountingPage() {
               onChange={(v) => setDate(toLocalDateStr(v))}
               dateFormat={makeDatePickerFormat(i18n.language)}
               placeholder={t('accounting.date')}
-              endIcon={<Calendar size={14} />}
+              endIcon={<Keyboard size={14} />}
+              onEndIconClick={() => setIsTypingDate(v => !v)}
               size="sm"
               locale={i18n.language}
               calendar="gregorian"
+              typingMode={isTypingDate}
+              onTypingModeChange={setIsTypingDate}
+              typingMask="##/##/####"
+              typingPlaceholder="DD/MM/YYYY"
+              parseTypedDate={(raw) => {
+                if (raw.length !== 8) return null;
+                const day = parseInt(raw.slice(0, 2), 10);
+                const month = parseInt(raw.slice(2, 4), 10);
+                let year = parseInt(raw.slice(4, 8), 10);
+                if (year > 2400) year -= 543;
+                if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+                const d = new Date(year, month - 1, day);
+                if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+                return d;
+              }}
             />
           </div>
         </div>

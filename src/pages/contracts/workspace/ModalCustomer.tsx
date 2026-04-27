@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Modal, Input, Select, Button, InputDatePicker, Badge } from 'tsp-form';
-import { AlertTriangle, ShieldAlert, CheckCircle, XCircle, Calendar, Keyboard, ChevronDown, ChevronRight, Plus, Trash2, Star, Info } from 'lucide-react';
+import { AlertTriangle, ShieldAlert, CheckCircle, XCircle, Keyboard, ChevronDown, ChevronRight, Plus, Trash2, Star, Info } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { toLocalDateStr, parseLocalDate } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';

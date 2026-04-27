@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
+import { BranchPinInput } from '../../components/BranchPinInput';
 import { fmtCurrency } from '../../lib/format';
 import { type Branch } from './accountingTypes';
 
@@ -693,17 +694,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
                 className="w-full"
               />
             </div>
-            <div className="flex flex-col">
-              <label className="form-label">{t('accounting.bills.pin')} *</label>
-              <Input
-                type="password"
-                value={voidPin}
-                onChange={(e) => setVoidPin(e.target.value)}
-                placeholder="••••••"
-                maxLength={6}
-                className="w-full"
-              />
-            </div>
+            <BranchPinInput value={voidPin} onChange={setVoidPin} label={t('accounting.bills.pin')} required />
           </div>
         </div>
         <div className="modal-footer">

@@ -6,7 +6,7 @@ import {
   InputDateRangePicker, Input, Badge, Button, PopOver,
   type ColumnDef, type SortingState,
 } from 'tsp-form';
-import { ArrowRightFromLine, Calendar, SlidersHorizontal } from 'lucide-react';
+import { ArrowRightFromLine, Keyboard, SlidersHorizontal } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { toLocalDateStr, parseLocalDate, makeDateRangePickerFormat, fmtCurrency } from '../../lib/format';
@@ -62,6 +62,7 @@ export function BranchLedgerPage() {
   const [branchId, setBranchId] = useState<string>('');
   const [fromDate, setFromDate] = useState<string>('');
   const [toDate, setToDate] = useState<string>('');
+  const [isTypingDateRange, setIsTypingDateRange] = useState(false);
   const [direction, setDirection] = useState<string>('');
   const [channel, setChannel] = useState<string>('');
   const [searchInput, setSearchInput] = useState('');
@@ -253,10 +254,32 @@ export function BranchLedgerPage() {
               onToDateChange={(v) => { setToDate(toLocalDateStr(v)); resetPage(); }}
               dateFormat={makeDateRangePickerFormat(i18n.language)}
               placeholder={t('accounting.dateRange')}
-              endIcon={<Calendar size={14} />}
+              endIcon={<Keyboard size={14} />}
+              onEndIconClick={() => setIsTypingDateRange(v => !v)}
               size="sm"
               locale={i18n.language}
               calendar="gregorian"
+              typingMode={isTypingDateRange}
+              onTypingModeChange={setIsTypingDateRange}
+              typingMask="##/##/#### - ##/##/####"
+              typingPlaceholder="DD/MM/YYYY - DD/MM/YYYY"
+              parseTypedDates={(raw) => {
+                const parseDate = (digits: string) => {
+                  if (digits.length !== 8) return null;
+                  const day = parseInt(digits.slice(0, 2), 10);
+                  const month = parseInt(digits.slice(2, 4), 10);
+                  let year = parseInt(digits.slice(4, 8), 10);
+                  if (year > 2400) year -= 543;
+                  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+                  const d = new Date(year, month - 1, day);
+                  if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+                  return d;
+                };
+                return {
+                  from: parseDate(raw.slice(0, 8)),
+                  to: raw.length >= 16 ? parseDate(raw.slice(8, 16)) : null,
+                };
+              }}
             />
           </div>
           <div className="hidden sm:block flex-1 min-w-0">

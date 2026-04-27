@@ -145,25 +145,27 @@ interface ContractNote {
 }
 
 interface Payment {
-  id: number;
+  payment_id: number;
   code: string;
   code_display: string | null;
+  bill_id: number;
+  bill_code: string | null;
   contract_id: number;
-  contract_code: string;
-  customer_name: string | null;
-  payment_type: string | null;
+  charge_types: string[] | null;
+  method: string | null;
   amount: number;
-  channel: string | null;
+  bank_account_id: number | null;
   bank_name: string | null;
   account_number: string | null;
-  reference: string | null;
   payer_type: string | null;
+  payer_id: number | null;
   payer_name: string | null;
-  submit_channel: string | null;
-  is_voided: boolean;
   days_early: number | null;
-  recorded_by: number | null;
+  is_reversal: boolean;
+  ref_voided_id: number | null;
+  void_note: string | null;
   created_at: string;
+  created_by: number | null;
 }
 
 interface EntityMedia {
@@ -772,21 +774,21 @@ function PaymentsTab({ contractId, t }: { contractId: number; t: ReturnType<type
       {hasPayments && (
         <div className="flex flex-col gap-2">
           {payments!.map(p => (
-            <div key={p.id} className={`border border-line rounded-md px-4 py-3 ${p.is_voided ? 'opacity-50' : ''}`}>
+            <div key={p.payment_id} className={`border border-line rounded-md px-4 py-3 ${p.is_reversal ? 'opacity-50' : ''}`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-sm">{p.code_display ?? p.code}</span>
-                  {p.payment_type && (
-                    <Badge size="xs" className="bg-fg/10 text-fg/60">{p.payment_type}</Badge>
-                  )}
-                  {p.is_voided && (
+                  {p.charge_types?.map(ct => (
+                    <Badge key={ct} size="xs" className="bg-fg/10 text-fg/60">{ct}</Badge>
+                  ))}
+                  {p.is_reversal && (
                     <Badge size="xs" className="bg-danger/15 text-danger">VOID</Badge>
                   )}
                 </div>
                 <span className="font-medium text-sm tabular-nums">{fmtCurrency(p.amount)}</span>
               </div>
               <div className="flex items-center gap-3 mt-1 text-xs text-subtle">
-                {p.channel && <span>{p.channel}</span>}
+                {p.method && <span>{p.method}</span>}
                 {p.bank_name && <span>{p.bank_name}</span>}
                 {p.payer_name && <span>{t('contract.payer')}: {p.payer_name}</span>}
               </div>

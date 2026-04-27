@@ -136,7 +136,7 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
     setApiError(''); setResult(null);
   };
 
-  const attachGuarantor = async (custId: number, fullName: string, idNum: string) => {
+  const attachGuarantor = async (custId: number, _fullName: string, _idNum: string) => {
     if (!workspace.contractId) return;
     if (custId === workspace.customerId) {
       setApiError(t('workspace.guarantorCannotBeSelf'));
