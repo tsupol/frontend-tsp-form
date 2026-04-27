@@ -42,6 +42,13 @@ When using tsp-form components, follow this lookup order:
 - **Select in flex rows:** Wrap `Select` in a `<div>` with fixed width when placing inline with other controls — without a container the Select width is buggy
 - **Input width:** `Input` does NOT auto-fill remaining width like `Select` — add `className="w-full"` when inside flex/input-group containers
 
+### Branch PIN Input
+
+- **Always use `<BranchPinInput>`** (`src/components/BranchPinInput.tsx`) for any PIN authorization field — never use raw `<Input type="password">` for PIN
+- Props: `value`, `onChange` (string), `label?` (defaults to `t('contract.pin')`), `required?`, `error?`, `disabled?`
+- Enforces 6-digit numeric input, shows password dots, includes label + `FormErrorMessage`
+- Usage: `<BranchPinInput value={pin} onChange={setPin} required />`
+
 ### PopOver & Icon Buttons
 
 - **PopOver**: `import { PopOver } from 'tsp-form'` — portal-based, auto-flips. Props: `isOpen`, `onClose`, `trigger`, `placement`, `align`, `maxWidth`, `maxHeight`, `offset`

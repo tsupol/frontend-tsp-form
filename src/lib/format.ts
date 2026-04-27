@@ -93,3 +93,20 @@ export function makeDateRangePickerFormat(lang: string, showTime = false) {
     return from || to;
   };
 }
+
+/** Format Thai phone: 0xx-xxx-xxxx (mobile) or 0x-xxx-xxxx (landline) */
+export function formatTel(tel: string | null | undefined): string {
+  if (!tel) return '—';
+  const d = tel.replace(/\D/g, '');
+  if (d.length === 10) return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`;
+  if (d.length === 9) return `${d.slice(0, 2)}-${d.slice(2, 5)}-${d.slice(5)}`;
+  return tel;
+}
+
+/** Format Thai citizen ID: X-XXXX-XXXXX-XX-X */
+export function formatCid(cid: string | null | undefined): string {
+  if (!cid) return '—';
+  const d = cid.replace(/\D/g, '');
+  if (d.length === 13) return `${d[0]}-${d.slice(1, 5)}-${d.slice(5, 10)}-${d.slice(10, 12)}-${d[12]}`;
+  return cid;
+}
