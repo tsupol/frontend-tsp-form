@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
-  PageNav, PageNavPanel, MobileHeader, DataTable, Select, Badge,
+  PageNav, PageNavPanel, MobileHeader, DataTable, Select, Badge, Button,
 } from 'tsp-form';
-import { ArrowRightFromLine, ArrowLeft } from 'lucide-react';
+import { ArrowRightFromLine, ArrowLeft, Plus } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency } from '../../lib/format';
+import { CreateRetailBillModal } from './CreateRetailBillModal';
 
 interface Branch {
   id: number;
@@ -72,11 +73,13 @@ const STATUS_VALUES = ['PAID', 'VOIDED'] as const;
 export function RetailBillsPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [branchId, setBranchId] = useState<string>(user?.branch_id ? String(user.branch_id) : '');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [selectedBillId, setSelectedBillId] = useState<number | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const { data: branches = [] } = useQuery({
     queryKey: ['branches-active'],
@@ -132,14 +135,32 @@ export function RetailBillsPage() {
               <div className="mobile-header-title mobile-header-title-truncate">
                 {isRoot ? t('retail.bills.title') : detailTitle}
               </div>
-              <div className="mobile-header-end w-12" />
+              <div className="mobile-header-end">
+                {isRoot && (
+                  <button
+                    className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
+                    aria-label={t('retail.bills.newBill')}
+                    onClick={() => setCreateOpen(true)}
+                  >
+                    <Plus size={20} />
+                  </button>
+                )}
+              </div>
             </MobileHeader>
           )}
 
           {!isMobile && (
             <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
               <h1 className="heading-2 shrink-0">{t('retail.bills.title')}</h1>
-              <p className="text-sm text-fg/60 truncate">{t('retail.bills.description')}</p>
+              <p className="text-sm text-fg/60 truncate flex-1">{t('retail.bills.description')}</p>
+              <Button
+                color="primary"
+                size="sm"
+                startIcon={<Plus size={14} />}
+                onClick={() => setCreateOpen(true)}
+              >
+                {t('retail.bills.newBill')}
+              </Button>
             </div>
           )}
 
@@ -225,6 +246,15 @@ export function RetailBillsPage() {
               {selectedBillId && <RetailBillDetail billId={selectedBillId} />}
             </PageNavPanel>
           </div>
+
+          <CreateRetailBillModal
+            open={createOpen}
+            onClose={() => setCreateOpen(false)}
+            onSuccess={() => {
+              queryClient.invalidateQueries({ queryKey: ['retail', 'bills'] });
+              setPageIndex(0);
+            }}
+          />
         </>
       )}
     </PageNav>

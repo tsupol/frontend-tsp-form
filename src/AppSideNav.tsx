@@ -31,7 +31,7 @@ import {
   // Fanout child icons — Inventory
   BarChart3, ClipboardList, PackagePlus, ArrowLeftRight, Wrench, RotateCcw, ShoppingCart,
   // Retail
-  Store, Receipt,
+  Store,
   // Fanout child icons — Company
   MapPin, KeyRound, Landmark, CalendarDays, AlertTriangle, ShieldBan, Cloud,
   // Fanout child icons — Contracts
@@ -197,11 +197,7 @@ export const AppSideNav = () => {
     },
     {
       key: 'retail', icon: <Store size="1rem" />, label: t('nav.retail'),
-      path: '/admin/retail/pos',
-      children: [
-        { key: 'retail-pos', icon: <ShoppingCart size="1rem" />, label: t('nav.retailPos'), path: '/admin/retail/pos' },
-        { key: 'retail-bills', icon: <Receipt size="1rem" />, label: t('nav.retailBills'), path: '/admin/retail/bills' },
-      ],
+      path: '/admin/retail/bills',
     },
     {
       key: 'company', icon: <Building2 size="1rem" />, label: t('nav.company'),
