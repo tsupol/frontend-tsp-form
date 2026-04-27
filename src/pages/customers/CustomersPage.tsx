@@ -1,16 +1,18 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
-  DataTable, DataTableColumnHeader, Button, Input, InputDatePicker, Select,
-  Badge, Drawer, Modal, MobileHeader, FormErrorMessage, useSnackbarContext,
-  type ColumnDef, type RowExpansionState, type SortingState,
+  PageNav, PageNavPanel, MobileHeader, DataTableFooter, Input, Select, Button, Badge,
+  Modal, LabeledCheckbox, FormErrorMessage, useSnackbarContext,
 } from 'tsp-form';
-import { ArrowRightFromLine, Calendar, CheckCircle, XCircle, Trash2, Star } from 'lucide-react';
+import { ArrowRightFromLine, ArrowLeft, Search, Users, CheckCircle, XCircle, Trash2, Star, Plus, Pencil, MapPin, UserPlus, ExternalLink } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
-import { toLocalDateStr, parseLocalDate } from '../../lib/format';
+import { toLocalDateStr, parseLocalDate, formatTel, formatCid } from '../../lib/format';
 import { DateTime } from '../../components/DateTime';
+import { DatePicker } from '../../components/DatePicker';
+import { PhoneInput } from '../../components/PhoneInput';
 import { ContractDetailPanel } from '../contracts/ContractDetailPanel';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -53,6 +55,9 @@ interface CustomerAddress {
   is_default: boolean;
   created_at: string;
   updated_at: string;
+  recipient_name?: string | null;
+  recipient_tel?: string | null;
+  note?: string | null;
 }
 
 interface CustomerContact {
@@ -107,17 +112,35 @@ const stateColor = (state: string) => {
 
 const CONTACT_TYPES = ['MOBILE', 'HOME', 'WORK', 'LINE', 'FACEBOOK', 'OTHER'];
 
-// ── Component ────────────────────────────────────────────────────────────────
+const PREFIX_OPTIONS = [
+  { value: '', label: '-' },
+  { value: 'นาย', label: 'นาย' },
+  { value: 'นาง', label: 'นาง' },
+  { value: 'นางสาว', label: 'นางสาว' },
+  { value: 'Mr.', label: 'Mr.' },
+  { value: 'Mrs.', label: 'Mrs.' },
+  { value: 'Ms.', label: 'Ms.' },
+];
+
+const formatAddress = (a: CustomerAddress): string => {
+  const parts = [a.address_line1];
+  if (a.address_line2) parts.push(a.address_line2);
+  if (a.soi) parts.push(`ซ.${a.soi}`);
+  if (a.road) parts.push(`ถ.${a.road}`);
+  parts.push(`${a.sub_district}, ${a.district}, ${a.province} ${a.postal_code}`);
+  return parts.join(', ');
+};
+
+// ── Main Page ────────────────────────────────────────────────────────────────
 
 export function CustomersPage() {
   const { t } = useTranslation();
 
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [sorting, setSorting] = useState<SortingState>([]);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => { setDebouncedSearch(search.trim()); setPageIndex(0); }, 300);
@@ -125,182 +148,147 @@ export function CustomersPage() {
   }, [search]);
 
   // ── List query ──
-  const buildEndpoint = () => {
-    const params: string[] = ['order=full_name.asc'];
-    if (debouncedSearch.length >= 2) {
-      params.push(`or=(full_name.ilike.*${debouncedSearch}*,id_number.ilike.*${debouncedSearch}*,tel.ilike.*${debouncedSearch}*)`);
-    }
-    return `/v_customers?${params.join('&')}`;
-  };
-
   const { data: customersData, isFetching } = useQuery({
     queryKey: ['customers', debouncedSearch, pageIndex, pageSize],
-    queryFn: () => apiClient.getPaginated<Customer>(buildEndpoint(), { page: pageIndex + 1, pageSize }),
+    queryFn: () => {
+      const params: string[] = ['order=full_name.asc'];
+      if (debouncedSearch.length >= 2) {
+        params.push(`or=(full_name.ilike.*${debouncedSearch}*,id_number.ilike.*${debouncedSearch}*,tel.ilike.*${debouncedSearch}*)`);
+      }
+      return apiClient.getPaginated<Customer>(`/v_customers?${params.join('&')}`, { page: pageIndex + 1, pageSize });
+    },
     placeholderData: keepPreviousData,
   });
   const customers = customersData?.data ?? [];
   const totalCount = customersData?.totalCount ?? 0;
 
-  // ── Columns ──
-  const columns: ColumnDef<Customer>[] = useMemo(() => [
-    {
-      accessorKey: 'full_name',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('customer.name')} />,
-      cell: ({ row }) => (
-        <div>
-          <div className="text-sm font-medium">{row.original.full_name}</div>
-          {row.original.tel && <div className="text-xs text-control-label">{row.original.tel}</div>}
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'id_number',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('customer.idNumber')} />,
-      cell: ({ row }) => <span className="text-sm tabular-nums">{row.original.id_number}</span>,
-      className: 'max-md:hidden',
-    },
-    {
-      accessorKey: 'tel',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('customer.phone')} />,
-      cell: ({ row }) => <span className="text-sm tabular-nums">{row.original.tel ?? '—'}</span>,
-      className: 'max-lg:hidden',
-    },
-    {
-      accessorKey: 'date_of_birth',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('customer.dateOfBirth')} />,
-      cell: ({ row }) => row.original.date_of_birth
-        ? <DateTime value={row.original.date_of_birth} showTime={false} className="text-xs text-control-label" />
-        : <span className="text-xs text-control-label">—</span>,
-      className: 'w-28 max-lg:hidden',
-    },
-    {
-      accessorKey: 'is_active',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('approval.status')} />,
-      cell: ({ row }) => (
-        <Badge size="sm" color={row.original.is_active ? 'success' : 'default'}>
-          {row.original.is_active ? t('customer.active') : t('customer.inactive')}
-        </Badge>
-      ),
-      className: 'w-20 max-md:hidden',
-    },
-  ], [t]);
-
-  // ── Row click ──
-  const handleRowExpansion = (updater: RowExpansionState | ((prev: RowExpansionState) => RowExpansionState)) => {
-    const next = typeof updater === 'function' ? updater({}) : updater;
-    const clickedId = Object.keys(next).find(k => next[k]);
-    if (clickedId) {
-      const row = customers[Number(clickedId)];
-      if (row) setSelectedCustomer(row);
-    }
-  };
-
   return (
-    <>
-      <MobileHeader className="mobile-header-bordered md:hidden">
-        <div className="mobile-header-start">
-          <button className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current" onClick={() => window.dispatchEvent(new CustomEvent('sidemenu:open'))}>
-            <ArrowRightFromLine size={18} />
-          </button>
-        </div>
-        <div className="mobile-header-title">{t('customer.title')}</div>
-        <div className="mobile-header-end w-12" />
-      </MobileHeader>
+    <PageNav panels={['list', 'detail']} className="h-dvh">
+      {({ isMobile, isRoot, goTo, goBack }) => {
+        const selected = selectedId ? customers.find(c => c.id === selectedId) ?? null : null;
+        const detailTitle = selected?.full_name ?? t('customer.title');
 
-      <div className="page-content responsive-dvh-mobile-header">
-        <div className="flex items-center justify-between mb-4 flex-none max-md:hidden">
-          <h1 className="heading-2">{t('customer.title')}</h1>
-        </div>
+        const handleSelect = (c: Customer) => {
+          if (c.id === selectedId) return;
+          setSelectedId(c.id);
+          if (isMobile) goTo('detail');
+        };
 
-        {/* Search */}
-        <div className="flex items-center gap-2 pb-4 flex-none">
-          <div className="w-full max-w-72 min-w-0">
-            <Input
-              size="sm"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder={t('customer.search')}
-              className="w-full"
-            />
-          </div>
-        </div>
+        return (
+          <>
+            {/* ── Mobile Header ── */}
+            {isMobile && (
+              <MobileHeader className="mobile-header-bordered">
+                <div className="mobile-header-start">
+                  {isRoot ? (
+                    <button className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current" onClick={() => window.dispatchEvent(new CustomEvent('sidemenu:open'))}>
+                      <ArrowRightFromLine size={18} />
+                    </button>
+                  ) : (
+                    <button className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current" onClick={goBack}>
+                      <ArrowLeft size={20} />
+                    </button>
+                  )}
+                </div>
+                <div className="mobile-header-title mobile-header-title-truncate">
+                  {isRoot ? t('customer.title') : detailTitle}
+                </div>
+                <div className="mobile-header-end w-12" />
+              </MobileHeader>
+            )}
 
-        {/* Desktop table */}
-        <DataTable<Customer>
-          data={customers}
-          columns={columns}
-          sorting={sorting}
-          onSortingChange={setSorting}
-          expandOnRowClick
-          getRowCanExpand={() => true}
-          renderExpandedRow={() => null}
-          rowExpansion={{}}
-          onRowExpansionChange={handleRowExpansion}
-          enablePagination
-          pageIndex={pageIndex}
-          pageSize={pageSize}
-          pageSizeOptions={[15, 25, 50]}
-          rowCount={totalCount}
-          onPageChange={({ pageIndex: pi, pageSize: ps }) => { setPageIndex(pi); setPageSize(ps); }}
-          tableClassName="[&_tbody_tr]:cursor-pointer"
-          className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
-          noResults={<div className="p-8 text-center text-control-label">{t('customer.noCustomers')}</div>}
-        />
-
-        {/* Mobile cards */}
-        <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
-          <div className="flex-1 overflow-auto better-scroll pb-8">
-            {customers.length === 0 ? (
-              <div className="p-8 text-center text-control-label">{t('customer.noCustomers')}</div>
-            ) : (
-              <div className="flex flex-col divide-y divide-line">
-                {customers.map(c => (
-                  <div
-                    key={c.id}
-                    className="px-1 py-3 cursor-pointer active:bg-surface-hover"
-                    onClick={() => setSelectedCustomer(c)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium text-sm">{c.full_name}</span>
-                      {!c.is_active && <Badge size="sm" color="default">{t('customer.inactive')}</Badge>}
-                    </div>
-                    <div className="text-xs text-control-label mt-0.5 tabular-nums">
-                      {c.id_number} · {c.tel ?? '—'}
-                    </div>
-                  </div>
-                ))}
+            {/* ── Desktop Header ── */}
+            {!isMobile && (
+              <div className="flex-none px-4 py-2.5 border-b border-line">
+                <h1 className="heading-2">{t('customer.title')}</h1>
               </div>
             )}
-          </div>
-        </div>
-      </div>
 
-      {/* Detail Drawer */}
-      <CustomerDrawer
-        customer={selectedCustomer}
-        open={!!selectedCustomer}
-        onClose={() => setSelectedCustomer(null)}
-        onUpdated={(updated) => setSelectedCustomer(updated)}
-      />
-    </>
+            {/* ── Panels ── */}
+            <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
+              {/* ── List Panel ── */}
+              <PageNavPanel id="list" className={isMobile ? '' : 'w-5/12 xl:w-4/12 border-r border-line flex flex-col'}>
+                <div className="flex-none p-2 border-b border-line">
+                  <Input
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    placeholder={t('customer.search')}
+                    size="sm"
+                    startIcon={<Search size={16} />}
+                    className="w-full"
+                  />
+                </div>
+                <div className={`flex-1 overflow-auto better-scroll ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
+                  {customers.length === 0 ? (
+                    <div className="p-8 text-center text-subtler">{t('customer.noCustomers')}</div>
+                  ) : (
+                    <div className="flex flex-col">
+                      {customers.map(c => (
+                        <button
+                          key={c.id}
+                          className={`w-full text-left px-4 py-2.5 border-b border-line transition-colors cursor-pointer ${
+                            c.id === selectedId ? 'bg-primary/10' : 'hover:bg-surface-hover'
+                          }`}
+                          onClick={() => handleSelect(c)}
+                        >
+                          <div className="flex items-center justify-between mb-0.5">
+                            <span className="font-medium text-sm truncate">{c.full_name}</span>
+                            {!c.is_active && <Badge size="xs" color="default">{t('customer.inactive')}</Badge>}
+                          </div>
+                          <div className="text-xs text-subtle tabular-nums">
+                            {formatCid(c.id_number)} · {formatTel(c.tel)}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {totalCount > 0 && (
+                  <div className="flex-none border-t border-line p-2">
+                    <DataTableFooter
+                      currentPage={pageIndex + 1}
+                      totalPages={Math.ceil(totalCount / pageSize) || 1}
+                      onPageChange={(p) => setPageIndex(p - 1)}
+                      pageSize={pageSize}
+                      pageSizeOptions={[15, 25, 50]}
+                      onPageSizeChange={(ps) => { setPageSize(ps); setPageIndex(0); }}
+                      totalRows={totalCount}
+                    />
+                  </div>
+                )}
+              </PageNavPanel>
+
+              {/* ── Detail Panel ── */}
+              <PageNavPanel id="detail" className={isMobile ? '' : 'flex-1 min-w-0 flex flex-col'}>
+                {selectedId ? (
+                  <CustomerDetail customerId={selectedId} customer={selected} />
+                ) : (
+                  <div className="flex-1 h-full flex items-center justify-center text-subtler">
+                    <div className="text-center">
+                      <Users size={32} className="mx-auto mb-2 opacity-40" />
+                      <div>Select a customer to view details</div>
+                    </div>
+                  </div>
+                )}
+              </PageNavPanel>
+            </div>
+          </>
+        );
+      }}
+    </PageNav>
   );
 }
 
-// ── Customer Detail Drawer ──────────────────────────────────────────────────
+// ── Customer Detail ─────────────────────────────────────────────────────────
 
-function CustomerDrawer({ customer, open, onClose, onUpdated }: {
-  customer: Customer | null;
-  open: boolean;
-  onClose: () => void;
-  onUpdated: (c: Customer) => void;
-}) {
+function CustomerDetail({ customerId, customer }: { customerId: number; customer: Customer | null }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
 
-  const customerId = customer?.id;
-
-  // ── Sub-queries ──
+  // Sub-queries
   const { data: addresses = [] } = useQuery({
     queryKey: ['customer-addresses', customerId],
     queryFn: () => apiClient.get<CustomerAddress[]>(`/v_customer_addresses?customer_id=eq.${customerId}&order=address_type`),
@@ -325,21 +313,22 @@ function CustomerDrawer({ customer, open, onClose, onUpdated }: {
     enabled: !!customerId,
   });
 
-  // ── Contract modal ──
+  const homeAddress = addresses.find(a => a.address_type === 'HOME');
+  const workAddress = addresses.find(a => a.address_type === 'WORK');
+
+  // Modal states
+  const [editInfoOpen, setEditInfoOpen] = useState(false);
+  const [editAddressType, setEditAddressType] = useState<string | null>(null);
+  const [addContactOpen, setAddContactOpen] = useState(false);
+  const [addReferenceOpen, setAddReferenceOpen] = useState(false);
   const [contractModalId, setContractModalId] = useState<number | null>(null);
 
-  // ── Section states ──
-  const [editingInfo, setEditingInfo] = useState(false);
-  const [editingAddress, setEditingAddress] = useState<string | null>(null); // address_type or null
-  const [addingContact, setAddingContact] = useState(false);
-  const [addingReference, setAddingReference] = useState(false);
-
-  // Reset edit states when customer changes
+  // Reset modals when customer changes
   useEffect(() => {
-    setEditingInfo(false);
-    setEditingAddress(null);
-    setAddingContact(false);
-    setAddingReference(false);
+    setEditInfoOpen(false);
+    setEditAddressType(null);
+    setAddContactOpen(false);
+    setAddReferenceOpen(false);
   }, [customerId]);
 
   const refreshAll = () => {
@@ -349,197 +338,243 @@ function CustomerDrawer({ customer, open, onClose, onUpdated }: {
     queryClient.invalidateQueries({ queryKey: ['customer-references', customerId] });
   };
 
-  const homeAddress = addresses.find(a => a.address_type === 'HOME');
-  const workAddress = addresses.find(a => a.address_type === 'WORK');
+  const showSuccess = (msg: string) => {
+    addSnackbar({ message: <div className="alert alert-success"><CheckCircle size={16} /><span>{msg}</span></div> });
+  };
+
+  if (!customer) return null;
 
   return (
-    <Drawer open={open} onClose={onClose} side="right" ariaLabel={customer?.full_name ?? ''}>
-      <div className="drawer-header">
-        <h2 className="drawer-title">{customer?.full_name}</h2>
-        <button className="drawer-close-btn" onClick={onClose}>&times;</button>
-      </div>
-      <div className="drawer-content">
-        {customer && (
-          <div className="space-y-5">
-            {/* Basic Info */}
-            <section>
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-xs font-semibold text-control-label uppercase tracking-wider">{t('customer.basicInfo')}</h3>
-                <button className="text-primary text-xs cursor-pointer hover:underline" onClick={() => setEditingInfo(!editingInfo)}>
-                  {editingInfo ? t('common.cancel') : t('common.edit')}
-                </button>
-              </div>
-              {editingInfo ? (
-                <BasicInfoForm customer={customer} onSuccess={(updated) => {
-                  setEditingInfo(false);
-                  onUpdated(updated);
-                  refreshAll();
-                  addSnackbar({ message: <div className="alert alert-success"><CheckCircle size={16} /><span>{t('customer.saveSuccess')}</span></div> });
-                }} />
-              ) : (
-                <div className="space-y-1.5 text-sm">
-                  <DetailRow label={t('customer.idType')} value={customer.id_type} />
-                  <DetailRow label={t('customer.idNumber')} value={customer.id_number} mono />
-                  <DetailRow label={t('customer.prefix')} value={customer.prefix ?? '—'} />
-                  <DetailRow label={t('customer.firstName')} value={customer.first_name} />
-                  <DetailRow label={t('customer.lastName')} value={customer.last_name} />
-                  <DetailRow label={t('customer.phone')} value={customer.tel ?? '—'} mono />
-                  {customer.tel2 && <DetailRow label={`${t('customer.phone')} 2`} value={customer.tel2} mono />}
-                  <DetailRow label={t('customer.dateOfBirth')}>
-                    {customer.date_of_birth ? <DateTime value={customer.date_of_birth} showTime={false} /> : <span>—</span>}
-                  </DetailRow>
-                  {customer.facebook && <DetailRow label={t('customer.facebook')} value={customer.facebook} />}
-                  {customer.line_id && <DetailRow label={t('customer.lineId')} value={customer.line_id} />}
-                </div>
-              )}
-            </section>
-
-            <hr className="border-line" />
-
-            {/* Addresses */}
-            <section>
-              <h3 className="text-xs font-semibold text-control-label uppercase tracking-wider mb-2">{t('customer.addresses')}</h3>
-
-              {/* Current address */}
-              <AddressCard
-                label={t('customer.addressHome')}
-                address={homeAddress}
-                editing={editingAddress === 'HOME'}
-                onEdit={() => setEditingAddress(editingAddress === 'HOME' ? null : 'HOME')}
-                customerId={customer.id}
-                addressType="HOME"
-                onSaved={() => {
-                  setEditingAddress(null);
-                  refreshAll();
-                  addSnackbar({ message: <div className="alert alert-success"><CheckCircle size={16} /><span>{t('customer.addressSaved')}</span></div> });
-                }}
-              />
-
-              {/* Work address */}
-              <AddressCard
-                label={t('customer.addressWork')}
-                address={workAddress}
-                editing={editingAddress === 'WORK'}
-                onEdit={() => setEditingAddress(editingAddress === 'WORK' ? null : 'WORK')}
-                customerId={customer.id}
-                addressType="WORK"
-                onSaved={() => {
-                  setEditingAddress(null);
-                  refreshAll();
-                  addSnackbar({ message: <div className="alert alert-success"><CheckCircle size={16} /><span>{t('customer.addressSaved')}</span></div> });
-                }}
-              />
-            </section>
-
-            <hr className="border-line" />
-
-            {/* Contacts */}
-            <section>
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-xs font-semibold text-control-label uppercase tracking-wider">{t('customer.contacts')}</h3>
-                <button className="text-primary text-xs cursor-pointer hover:underline" onClick={() => setAddingContact(!addingContact)}>
-                  {addingContact ? t('common.cancel') : t('customer.addContact')}
-                </button>
-              </div>
-              {addingContact && (
-                <ContactForm customerId={customer.id} onSuccess={() => {
-                  setAddingContact(false);
-                  refreshAll();
-                  addSnackbar({ message: <div className="alert alert-success"><CheckCircle size={16} /><span>{t('customer.contactSaved')}</span></div> });
-                }} />
-              )}
-              {contacts.length === 0 && !addingContact ? (
-                <div className="text-sm text-control-label py-2">{t('customer.noContacts')}</div>
-              ) : (
-                <div className="space-y-1">
-                  {contacts.map(c => (
-                    <ContactRow key={c.id} contact={c} onDeleted={() => {
-                      refreshAll();
-                      addSnackbar({ message: <div className="alert alert-success"><CheckCircle size={16} /><span>{t('customer.contactDeleted')}</span></div> });
-                    }} />
-                  ))}
-                </div>
-              )}
-            </section>
-
-            <hr className="border-line" />
-
-            {/* References */}
-            <section>
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-xs font-semibold text-control-label uppercase tracking-wider">{t('customer.references')}</h3>
-                <button className="text-primary text-xs cursor-pointer hover:underline" onClick={() => setAddingReference(!addingReference)}>
-                  {addingReference ? t('common.cancel') : t('customer.addReference')}
-                </button>
-              </div>
-              {addingReference && (
-                <ReferenceForm customerId={customer.id} onSuccess={() => {
-                  setAddingReference(false);
-                  refreshAll();
-                  addSnackbar({ message: <div className="alert alert-success"><CheckCircle size={16} /><span>{t('customer.referenceSaved')}</span></div> });
-                }} />
-              )}
-              {references.length === 0 && !addingReference ? (
-                <div className="text-sm text-control-label py-2">{t('customer.noReferences')}</div>
-              ) : (
-                <div className="space-y-1">
-                  {references.map(r => (
-                    <div key={r.id} className="text-sm py-1.5 flex items-center justify-between">
-                      <div>
-                        <span className="font-medium">{r.name} {r.last_name}</span>
-                        {r.relation && <span className="text-control-label ml-1">({r.relation})</span>}
-                      </div>
-                      <span className="text-xs tabular-nums text-control-label">{r.tel}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            <hr className="border-line" />
-
-            {/* Related Contracts */}
-            <section>
-              <h3 className="text-xs font-semibold text-control-label uppercase tracking-wider mb-2">{t('customer.relatedContracts')}</h3>
-              {contracts.length === 0 ? (
-                <div className="text-sm text-control-label py-2">{t('customer.noContracts')}</div>
-              ) : (
-                <div className="space-y-1">
-                  {contracts.map(c => (
-                    <div
-                      key={c.id}
-                      className="block py-2 px-2 -mx-2 rounded-md hover:bg-surface-hover transition-colors cursor-pointer"
-                      onClick={() => setContractModalId(c.id)}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-primary">{c.code_display}</span>
-                        <Badge size="xs" color={stateColor(c.state)}>{c.state}</Badge>
-                      </div>
-                      {c.branch_name && <div className="text-xs text-control-label mt-0.5">{c.branch_name}</div>}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
+    <div className="flex-1 overflow-auto better-scroll">
+      <div className="px-4 md:px-6 py-4 max-w-2xl">
+        {/* ── Header ── */}
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-semibold">{customer.full_name}</h2>
+            <div className="flex items-center gap-2 mt-0.5">
+              <Badge size="xs" color={customer.is_active ? 'success' : 'default'}>
+                {customer.is_active ? t('customer.active') : t('customer.inactive')}
+              </Badge>
+              <span className="text-xs text-subtle tabular-nums">{customer.id_type}: {formatCid(customer.id_number)}</span>
+            </div>
           </div>
-        )}
-      </div>
+          <Button variant="outline" size="sm" startIcon={<Pencil size={14} />} onClick={() => setEditInfoOpen(true)}>
+            {t('common.edit')}
+          </Button>
+        </div>
 
-      {/* Contract detail modal */}
-      <Modal open={!!contractModalId} onClose={() => setContractModalId(null)} maxWidth="56rem" width="100%">
-        <div className="h-[80dvh] flex flex-col">
-          {contractModalId && (
-            <ContractDetailPanel contractId={contractModalId} isMobile={false} />
+        {/* ── Basic Info ── */}
+        <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line text-sm space-y-1.5">
+          <DetailRow label={t('customer.phone')} value={formatTel(customer.tel)} mono />
+          {customer.tel2 && <DetailRow label={`${t('customer.phone')} 2`} value={formatTel(customer.tel2)} mono />}
+          <DetailRow label={t('customer.dateOfBirth')}>
+            {customer.date_of_birth ? <DateTime value={customer.date_of_birth} showTime={false} /> : <span>—</span>}
+          </DetailRow>
+          {customer.facebook && <DetailRow label={t('customer.facebook')} value={customer.facebook} />}
+          {customer.line_id && <DetailRow label={t('customer.lineId')} value={customer.line_id} />}
+          <DetailRow label="Created">
+            <DateTime value={customer.created_at} showTime={false} />
+          </DetailRow>
+        </div>
+
+        {/* ── Addresses ── */}
+        <SectionHeader title={t('customer.addresses')} />
+
+        <AddressCard
+          label={t('customer.addressHome')}
+          address={homeAddress}
+          onEdit={() => setEditAddressType('HOME')}
+        />
+        <AddressCard
+          label={t('customer.addressWork')}
+          address={workAddress}
+          onEdit={() => setEditAddressType('WORK')}
+        />
+
+        {/* ── Contacts ── */}
+        <SectionHeader
+          title={`${t('customer.contacts')} (${contacts.length})`}
+          action={<Button variant="ghost" size="sm" startIcon={<Plus size={14} />} onClick={() => setAddContactOpen(true)}>{t('customer.addContact')}</Button>}
+        />
+        <div className="mb-4 rounded-md bg-surface border border-line">
+          {contacts.length === 0 ? (
+            <div className="px-3 py-3 text-sm text-subtler">{t('customer.noContacts')}</div>
+          ) : (
+            <div className="divide-y divide-line">
+              {contacts.map(c => (
+                <ContactRow key={c.id} contact={c} onDeleted={() => { refreshAll(); showSuccess(t('customer.contactDeleted')); }} />
+              ))}
+            </div>
           )}
         </div>
+
+        {/* ── References ── */}
+        <SectionHeader
+          title={`${t('customer.references')} (${references.length})`}
+          action={<Button variant="ghost" size="sm" startIcon={<UserPlus size={14} />} onClick={() => setAddReferenceOpen(true)}>{t('customer.addReference')}</Button>}
+        />
+        <div className="mb-4 rounded-md bg-surface border border-line">
+          {references.length === 0 ? (
+            <div className="px-3 py-3 text-sm text-subtler">{t('customer.noReferences')}</div>
+          ) : (
+            <div className="divide-y divide-line">
+              {references.map(r => (
+                <div key={r.id} className="px-3 py-2.5 flex items-center justify-between text-sm">
+                  <div>
+                    <span className="font-medium">{r.name} {r.last_name}</span>
+                    {r.relation && <span className="text-subtle ml-1.5">({r.relation})</span>}
+                  </div>
+                  <span className="text-xs tabular-nums text-subtle">{r.tel ?? '—'}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ── Related Contracts ── */}
+        <SectionHeader title={`${t('customer.relatedContracts')} (${contracts.length})`} />
+        <div className="mb-4 rounded-md bg-surface border border-line">
+          {contracts.length === 0 ? (
+            <div className="px-3 py-3 text-sm text-subtler">{t('customer.noContracts')}</div>
+          ) : (
+            <div className="divide-y divide-line">
+              {contracts.map(c => (
+                <div key={c.id} className="px-3 py-2.5 flex items-center justify-between">
+                  <div>
+                    <span className="text-sm font-medium">{c.code_display}</span>
+                    {c.branch_name && <div className="text-xs text-subtle">{c.branch_name}</div>}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Badge size="xs" color={stateColor(c.state)}>{c.state}</Badge>
+                    <Button variant="ghost" className="btn-icon-xs" onClick={() => navigate(`/admin/contracts/search/${c.id}`)} startIcon={<ExternalLink size={12} />} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Modals ── */}
+      <EditInfoModal
+        open={editInfoOpen}
+        onClose={() => setEditInfoOpen(false)}
+        customer={customer}
+        onSuccess={() => { setEditInfoOpen(false); refreshAll(); showSuccess(t('customer.saveSuccess')); }}
+      />
+
+      <EditAddressModal
+        open={!!editAddressType}
+        onClose={() => setEditAddressType(null)}
+        customerId={customerId}
+        addressType={editAddressType ?? 'HOME'}
+        existing={editAddressType === 'HOME' ? homeAddress : workAddress}
+        onSuccess={() => { setEditAddressType(null); refreshAll(); showSuccess(t('customer.addressSaved')); }}
+      />
+
+      <AddContactModal
+        open={addContactOpen}
+        onClose={() => setAddContactOpen(false)}
+        customerId={customerId}
+        onSuccess={() => { setAddContactOpen(false); refreshAll(); showSuccess(t('customer.contactSaved')); }}
+      />
+
+      <AddReferenceModal
+        open={addReferenceOpen}
+        onClose={() => setAddReferenceOpen(false)}
+        customerId={customerId}
+        onSuccess={() => { setAddReferenceOpen(false); refreshAll(); showSuccess(t('customer.referenceSaved')); }}
+      />
+
+      <Modal open={!!contractModalId} onClose={() => setContractModalId(null)} maxWidth="56rem" width="100%">
+        <div className="h-[80dvh] flex flex-col">
+          {contractModalId && <ContractDetailPanel contractId={contractModalId} isMobile={false} />}
+        </div>
       </Modal>
-    </Drawer>
+    </div>
   );
 }
 
-// ── Basic Info Form ─────────────────────────────────────────────────────────
+// ── Section Header ──────────────────────────────────────────────────────────
 
-function BasicInfoForm({ customer, onSuccess }: { customer: Customer; onSuccess: (c: Customer) => void }) {
+function SectionHeader({ title, action }: { title: string; action?: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between mb-2 mt-2">
+      <h3 className="text-xs font-semibold text-control-label uppercase tracking-wider">{title}</h3>
+      {action}
+    </div>
+  );
+}
+
+// ── Address Card (read-only) ────────────────────────────────────────────────
+
+function AddressCard({ label, address, onEdit }: {
+  label: string;
+  address: CustomerAddress | undefined;
+  onEdit: () => void;
+}) {
+  return (
+    <div className="mb-3 px-3 py-2.5 rounded-md bg-surface border border-line">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-sm font-medium flex items-center gap-1.5">
+          <MapPin size={13} className="text-subtle" />
+          {label}
+        </span>
+        <Button variant="ghost" className="btn-icon-xs" onClick={onEdit} startIcon={address ? <Pencil size={12} /> : <Plus size={12} />} />
+      </div>
+      {address ? (
+        <div className="text-sm text-subtle">{formatAddress(address)}</div>
+      ) : (
+        <div className="text-sm text-subtler">—</div>
+      )}
+    </div>
+  );
+}
+
+// ── Contact Row ─────────────────────────────────────────────────────────────
+
+function ContactRow({ contact, onDeleted }: { contact: CustomerContact; onDeleted: () => void }) {
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await apiClient.rpc('fn_customer_contact_delete', { p_id: contact.id });
+      onDeleted();
+    } catch { /* silently fail */ } finally { setDeleting(false); }
+  };
+
+  return (
+    <div className="flex items-center justify-between px-3 py-2 text-sm">
+      <div className="flex items-center gap-2">
+        {contact.is_primary && <Star size={12} className="text-warning fill-warning" />}
+        <Badge size="xs" color="info">{contact.contact_type}</Badge>
+        <span className="tabular-nums">{contact.value}</span>
+        {contact.label && <span className="text-subtle text-xs">({contact.label})</span>}
+      </div>
+      <Button variant="ghost" className="btn-icon-xs text-control-label hover:text-danger" onClick={handleDelete} disabled={deleting} startIcon={<Trash2 size={12} />} />
+    </div>
+  );
+}
+
+// ── Detail Row ──────────────────────────────────────────────────────────────
+
+function DetailRow({ label, value, mono, children }: {
+  label: string; value?: string; mono?: boolean; children?: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <span className="text-subtle shrink-0">{label}</span>
+      {children ?? <span className={`text-right ${mono ? 'tabular-nums' : ''}`}>{value}</span>}
+    </div>
+  );
+}
+
+// ── Edit Info Modal ─────────────────────────────────────────────────────────
+
+function EditInfoModal({ open, onClose, customer, onSuccess }: {
+  open: boolean; onClose: () => void; customer: Customer; onSuccess: () => void;
+}) {
   const { t } = useTranslation();
   const [form, setForm] = useState({
     prefix: customer.prefix ?? '',
@@ -553,6 +588,23 @@ function BasicInfoForm({ customer, onSuccess }: { customer: Customer; onSuccess:
   });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Re-sync form when customer changes or modal opens
+  useEffect(() => {
+    if (open) {
+      setForm({
+        prefix: customer.prefix ?? '',
+        first_name: customer.first_name,
+        last_name: customer.last_name,
+        tel: customer.tel ?? '',
+        tel2: customer.tel2 ?? '',
+        date_of_birth: customer.date_of_birth ?? '',
+        facebook: customer.facebook ?? '',
+        line_id: customer.line_id ?? '',
+      });
+      setError('');
+    }
+  }, [open, customer]);
 
   const set = (key: string, value: string) => setForm(prev => ({ ...prev, [key]: value }));
 
@@ -573,134 +625,111 @@ function BasicInfoForm({ customer, onSuccess }: { customer: Customer; onSuccess:
         p_facebook: form.facebook.trim() || null,
         p_line_id: form.line_id.trim() || null,
       });
-      onSuccess({ ...customer, ...form, full_name: `${form.first_name} ${form.last_name}` });
+      onSuccess();
     } catch (err) {
       if (err instanceof ApiError) {
         const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
           || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
         setError(translated || err.message);
       } else setError(String(err));
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
 
-  const prefixOptions = [
-    { value: '', label: '—' },
-    { value: 'นาย', label: 'นาย' },
-    { value: 'นาง', label: 'นาง' },
-    { value: 'นางสาว', label: 'นางสาว' },
-  ];
-
   return (
-    <div className="space-y-3">
-      {error && <div className="alert alert-danger text-xs"><XCircle size={14} /><span>{error}</span></div>}
-      <div className="form-grid">
-        <div className="flex flex-col">
-          <label className="form-label">{t('customer.prefix')}</label>
-          <Select size="sm" options={prefixOptions} value={form.prefix} onChange={v => set('prefix', (v as string) ?? '')} showChevron searchable={false} />
-        </div>
-        <div className="flex gap-3">
-          <div className="flex flex-col flex-1">
-            <label className="form-label">{t('customer.firstName')} *</label>
-            <Input size="sm" value={form.first_name} onChange={e => set('first_name', e.target.value)} className="w-full" />
+    <Modal open={open} onClose={onClose} maxWidth="32rem" width="100%">
+      <div className="modal-header">
+        <h2 className="modal-title">{t('customer.basicInfo')}</h2>
+        <button type="button" className="modal-close-btn" onClick={onClose}>&times;</button>
+      </div>
+      <div className="modal-content">
+        {error && <div className="alert alert-danger mb-3"><XCircle size={14} /><span>{error}</span></div>}
+        <div className="form-grid">
+          <div className="flex flex-col">
+            <label className="form-label">{t('customer.prefix')}</label>
+            <Select size="sm" options={PREFIX_OPTIONS} value={form.prefix} onChange={v => set('prefix', (v as string) ?? '')} showChevron clearable />
           </div>
-          <div className="flex flex-col flex-1">
-            <label className="form-label">{t('customer.lastName')} *</label>
-            <Input size="sm" value={form.last_name} onChange={e => set('last_name', e.target.value)} className="w-full" />
+          <div className="flex gap-3">
+            <div className="flex flex-col flex-1">
+              <label className="form-label">{t('customer.firstName')} *</label>
+              <Input size="sm" value={form.first_name} onChange={e => set('first_name', e.target.value)} className="w-full" />
+            </div>
+            <div className="flex flex-col flex-1">
+              <label className="form-label">{t('customer.lastName')} *</label>
+              <Input size="sm" value={form.last_name} onChange={e => set('last_name', e.target.value)} className="w-full" />
+            </div>
           </div>
-        </div>
-        <div className="flex flex-col">
-          <label className="form-label">{t('customer.phone')}</label>
-          <Input size="sm" value={form.tel} onChange={e => set('tel', e.target.value)} className="w-full" />
-        </div>
-        <div className="flex flex-col">
-          <label className="form-label">{t('customer.dateOfBirth')}</label>
-          <InputDatePicker
-            size="sm"
-            value={parseLocalDate(form.date_of_birth)}
-            onChange={v => set('date_of_birth', toLocalDateStr(v))}
-            endIcon={<Calendar size={14} />}
-          />
-        </div>
-        <div className="flex flex-col">
-          <label className="form-label">{t('customer.facebook')}</label>
-          <Input size="sm" value={form.facebook} onChange={e => set('facebook', e.target.value)} className="w-full" />
-        </div>
-        <div className="flex flex-col">
-          <label className="form-label">{t('customer.lineId')}</label>
-          <Input size="sm" value={form.line_id} onChange={e => set('line_id', e.target.value)} className="w-full" />
+          <div className="flex gap-3">
+            <div className="flex flex-col flex-1">
+              <label className="form-label">{t('customer.phone')}</label>
+              <PhoneInput value={form.tel} onChange={(raw) => set('tel', raw)} size="sm" className="w-full" />
+            </div>
+            <div className="flex flex-col flex-1">
+              <label className="form-label">{t('customer.phone')} 2</label>
+              <PhoneInput value={form.tel2} onChange={(raw) => set('tel2', raw)} size="sm" className="w-full" />
+            </div>
+          </div>
+          <div className="flex flex-col">
+            <label className="form-label">{t('customer.dateOfBirth')}</label>
+            <DatePicker
+              size="sm"
+              value={parseLocalDate(form.date_of_birth)}
+              onChange={v => set('date_of_birth', toLocalDateStr(v))}
+            />
+          </div>
+          <div className="flex gap-3">
+            <div className="flex flex-col flex-1">
+              <label className="form-label">{t('customer.facebook')}</label>
+              <Input size="sm" value={form.facebook} onChange={e => set('facebook', e.target.value)} className="w-full" />
+            </div>
+            <div className="flex flex-col flex-1">
+              <label className="form-label">{t('customer.lineId')}</label>
+              <Input size="sm" value={form.line_id} onChange={e => set('line_id', e.target.value)} className="w-full" />
+            </div>
+          </div>
         </div>
       </div>
-      <Button size="sm" color="primary" onClick={handleSave} disabled={saving}>
-        {saving ? t('common.loading') : t('common.save')}
-      </Button>
-    </div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
+        <Button color="primary" onClick={handleSave} disabled={saving || !form.first_name.trim() || !form.last_name.trim()}>
+          {saving ? t('common.loading') : t('common.save')}
+        </Button>
+      </div>
+    </Modal>
   );
 }
 
-// ── Address Card ────────────────────────────────────────────────────────────
+// ── Edit Address Modal ──────────────────────────────────────────────────────
 
-function AddressCard({ label, address, editing, onEdit, customerId, addressType, onSaved }: {
-  label: string;
-  address: CustomerAddress | undefined;
-  editing: boolean;
-  onEdit: () => void;
-  customerId: number;
-  addressType: string;
-  onSaved: () => void;
+function EditAddressModal({ open, onClose, customerId, addressType, existing, onSuccess }: {
+  open: boolean; onClose: () => void; customerId: number; addressType: string;
+  existing?: CustomerAddress; onSuccess: () => void;
 }) {
   const { t } = useTranslation();
 
-  return (
-    <div className="mb-3">
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-sm font-medium">{label}</span>
-        <button className="text-primary text-xs cursor-pointer hover:underline" onClick={onEdit}>
-          {editing ? t('common.cancel') : t('customer.editAddress')}
-        </button>
-      </div>
-      {editing ? (
-        <AddressForm customerId={customerId} addressType={addressType} existing={address} onSuccess={onSaved} />
-      ) : address ? (
-        <div className="text-sm text-control-label space-y-0.5 px-3 py-2 rounded-md bg-surface border border-line">
-          <div>{address.address_line1}</div>
-          {address.address_line2 && <div>{address.address_line2}</div>}
-          {address.soi && <div>{t('customer.soi')} {address.soi}</div>}
-          {address.road && <div>{t('customer.road')} {address.road}</div>}
-          <div>{address.sub_district}, {address.district}, {address.province} {address.postal_code}</div>
-        </div>
-      ) : (
-        <div className="text-sm text-control-label py-2">—</div>
-      )}
-    </div>
-  );
-}
-
-// ── Address Form ────────────────────────────────────────────────────────────
-
-function AddressForm({ customerId, addressType, existing, onSuccess }: {
-  customerId: number;
-  addressType: string;
-  existing?: CustomerAddress;
-  onSuccess: () => void;
-}) {
-  const { t } = useTranslation();
-
-  const { register, handleSubmit, formState: { errors }, watch, setValue } = useForm({
+  const { register, handleSubmit, formState: { errors }, watch, setValue, reset } = useForm({
     defaultValues: {
-      address_line1: existing?.address_line1 ?? '',
-      address_line2: existing?.address_line2 ?? '',
-      soi: existing?.soi ?? '',
-      road: existing?.road ?? '',
-      postal_code: existing?.postal_code ?? '',
-      sub_district: existing?.sub_district ?? '',
-      district: existing?.district ?? '',
-      province: existing?.province ?? '',
+      address_line1: '', address_line2: '', soi: '', road: '',
+      postal_code: '', sub_district: '', district: '', province: '',
     },
   });
 
-  // Register fields managed by Select/auto-fill so they're always in form data
+  // Re-sync form when modal opens
+  useEffect(() => {
+    if (open) {
+      reset({
+        address_line1: existing?.address_line1 ?? '',
+        address_line2: existing?.address_line2 ?? '',
+        soi: existing?.soi ?? '',
+        road: existing?.road ?? '',
+        postal_code: existing?.postal_code ?? '',
+        sub_district: existing?.sub_district ?? '',
+        district: existing?.district ?? '',
+        province: existing?.province ?? '',
+      });
+      setApiError('');
+    }
+  }, [open, existing, reset]);
+
   register('sub_district', { required: t('common.required') });
   register('district', { required: t('common.required') });
   register('province', { required: t('common.required') });
@@ -710,7 +739,6 @@ function AddressForm({ customerId, addressType, existing, onSuccess }: {
   const [apiError, setApiError] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // Postal code lookup — auto-fill helper
   useEffect(() => {
     if (postalCode.length === 5) {
       apiClient.get<PostalLookup[]>(`/v_postal_lookup?postal_code=eq.${postalCode}`)
@@ -759,76 +787,93 @@ function AddressForm({ customerId, addressType, existing, onSuccess }: {
           || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
         setApiError(translated || err.message);
       } else setApiError(String(err));
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
 
+  const addressLabel = addressType === 'HOME' ? t('customer.addressHome') : t('customer.addressWork');
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
-      {apiError && <div className="alert alert-danger text-xs"><XCircle size={14} /><span>{apiError}</span></div>}
-      <div className="form-grid">
-        <div className="flex flex-col">
-          <label className="form-label">{t('customer.addressLine1')} *</label>
-          <Input size="sm" className="w-full" {...register('address_line1', { required: t('common.required') })} />
-          <FormErrorMessage error={errors.address_line1} />
+    <Modal open={open} onClose={onClose} maxWidth="32rem" width="100%">
+      <form onSubmit={handleSubmit(onSubmit)}>
+        <div className="modal-header">
+          <h2 className="modal-title">{addressLabel}</h2>
+          <button type="button" className="modal-close-btn" onClick={onClose}>&times;</button>
         </div>
-        <div className="flex flex-col">
-          <label className="form-label">{t('customer.addressLine2')}</label>
-          <Input size="sm" className="w-full" {...register('address_line2')} />
-        </div>
-        <div className="flex gap-3">
-          <div className="flex flex-col flex-1">
-            <label className="form-label">{t('customer.soi')}</label>
-            <Input size="sm" className="w-full" {...register('soi')} />
+        <div className="modal-content">
+          {apiError && <div className="alert alert-danger mb-3"><XCircle size={14} /><span>{apiError}</span></div>}
+          <div className="form-grid">
+            <div className="flex flex-col">
+              <label className="form-label">{t('customer.addressLine1')} *</label>
+              <Input size="sm" className="w-full" {...register('address_line1', { required: t('common.required') })} />
+              <FormErrorMessage error={errors.address_line1} />
+            </div>
+            <div className="flex flex-col">
+              <label className="form-label">{t('customer.addressLine2')}</label>
+              <Input size="sm" className="w-full" {...register('address_line2')} />
+            </div>
+            <div className="flex gap-3">
+              <div className="flex flex-col flex-1">
+                <label className="form-label">{t('customer.soi')}</label>
+                <Input size="sm" className="w-full" {...register('soi')} />
+              </div>
+              <div className="flex flex-col flex-1">
+                <label className="form-label">{t('customer.road')}</label>
+                <Input size="sm" className="w-full" {...register('road')} />
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <div className="flex flex-col flex-1">
+                <label className="form-label">{t('customer.postalCode')} *</label>
+                <Input size="sm" className="w-full" maxLength={5} placeholder={t('customer.postalCodeHint')} {...register('postal_code', { required: t('common.required') })} />
+                <FormErrorMessage error={errors.postal_code} />
+              </div>
+              <div className="flex flex-col flex-1">
+                <label className="form-label">{t('customer.subDistrict')} *</label>
+                {postalResults.length > 0 ? (
+                  <Select
+                    size="sm"
+                    options={subDistrictOptions}
+                    value={watch('sub_district')}
+                    onChange={handleSubDistrictSelect}
+                    placeholder={t('customer.selectSubDistrict')}
+                    showChevron
+                  />
+                ) : (
+                  <Input size="sm" className="w-full" value={watch('sub_district')} onChange={e => setValue('sub_district', e.target.value, { shouldValidate: true })} />
+                )}
+                <FormErrorMessage error={errors.sub_district} />
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <div className="flex flex-col flex-1">
+                <label className="form-label">{t('customer.district')} *</label>
+                <Input size="sm" className="w-full" disabled={postalResults.length > 0} value={watch('district')} onChange={e => setValue('district', e.target.value, { shouldValidate: true })} />
+                <FormErrorMessage error={errors.district} />
+              </div>
+              <div className="flex flex-col flex-1">
+                <label className="form-label">{t('customer.province')} *</label>
+                <Input size="sm" className="w-full" disabled={postalResults.length > 0} value={watch('province')} onChange={e => setValue('province', e.target.value, { shouldValidate: true })} />
+                <FormErrorMessage error={errors.province} />
+              </div>
+            </div>
           </div>
-          <div className="flex flex-col flex-1">
-            <label className="form-label">{t('customer.road')}</label>
-            <Input size="sm" className="w-full" {...register('road')} />
-          </div>
         </div>
-        <div className="flex flex-col">
-          <label className="form-label">{t('customer.postalCode')} *</label>
-          <Input size="sm" className="w-full" maxLength={5} {...register('postal_code', { required: t('common.required') })} />
-          <FormErrorMessage error={errors.postal_code} />
+        <div className="modal-footer">
+          <Button variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
+          <Button color="primary" type="submit" disabled={saving}>
+            {saving ? t('common.loading') : t('common.save')}
+          </Button>
         </div>
-        <div className="flex flex-col">
-          <label className="form-label">{t('customer.subDistrict')} *</label>
-          {postalResults.length > 0 ? (
-            <Select
-              size="sm"
-              options={subDistrictOptions}
-              value={watch('sub_district')}
-              onChange={handleSubDistrictSelect}
-              placeholder={t('customer.selectSubDistrict')}
-              showChevron
-            />
-          ) : (
-            <Input size="sm" className="w-full" value={watch('sub_district')} onChange={e => setValue('sub_district', e.target.value, { shouldValidate: true })} />
-          )}
-          <FormErrorMessage error={errors.sub_district} />
-        </div>
-        <div className="flex flex-col">
-          <label className="form-label">{t('customer.district')} *</label>
-          <Input size="sm" className="w-full" disabled={postalResults.length > 0} value={watch('district')} onChange={e => setValue('district', e.target.value, { shouldValidate: true })} />
-          <FormErrorMessage error={errors.district} />
-        </div>
-        <div className="flex flex-col">
-          <label className="form-label">{t('customer.province')} *</label>
-          <Input size="sm" className="w-full" disabled={postalResults.length > 0} value={watch('province')} onChange={e => setValue('province', e.target.value, { shouldValidate: true })} />
-          <FormErrorMessage error={errors.province} />
-        </div>
-      </div>
-      <Button size="sm" color="primary" type="submit" disabled={saving}>
-        {saving ? t('common.loading') : t('common.save')}
-      </Button>
-    </form>
+      </form>
+    </Modal>
   );
 }
 
-// ── Contact Form ────────────────────────────────────────────────────────────
+// ── Add Contact Modal ───────────────────────────────────────────────────────
 
-function ContactForm({ customerId, onSuccess }: { customerId: number; onSuccess: () => void }) {
+function AddContactModal({ open, onClose, customerId, onSuccess }: {
+  open: boolean; onClose: () => void; customerId: number; onSuccess: () => void;
+}) {
   const { t } = useTranslation();
   const [contactType, setContactType] = useState('MOBILE');
   const [value, setValue] = useState('');
@@ -836,6 +881,10 @@ function ContactForm({ customerId, onSuccess }: { customerId: number; onSuccess:
   const [isPrimary, setIsPrimary] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open) { setValue(''); setLabel(''); setIsPrimary(false); setContactType('MOBILE'); setError(''); }
+  }, [open]);
 
   const typeOptions = CONTACT_TYPES.map(ct => ({ value: ct, label: ct }));
 
@@ -859,82 +908,54 @@ function ContactForm({ customerId, onSuccess }: { customerId: number; onSuccess:
           || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
         setError(translated || err.message);
       } else setError(String(err));
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
 
   return (
-    <div className="space-y-3 mb-3 p-3 rounded-md border border-line">
-      {error && <div className="alert alert-danger text-xs"><XCircle size={14} /><span>{error}</span></div>}
-      <div className="form-grid">
-        <div className="flex gap-3">
-          <div className="flex flex-col" style={{ width: '8rem' }}>
-            <label className="form-label">{t('customer.contactType')}</label>
-            <Select size="sm" options={typeOptions} value={contactType} onChange={v => setContactType(v as string)} showChevron searchable={false} />
+    <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
+      <div className="modal-header">
+        <h2 className="modal-title">{t('customer.addContact')}</h2>
+        <button type="button" className="modal-close-btn" onClick={onClose}>&times;</button>
+      </div>
+      <div className="modal-content">
+        {error && <div className="alert alert-danger mb-3"><XCircle size={14} /><span>{error}</span></div>}
+        <div className="form-grid">
+          <div className="flex gap-3">
+            <div className="flex flex-col" style={{ width: '8rem' }}>
+              <label className="form-label">{t('customer.contactType')}</label>
+              <Select size="sm" options={typeOptions} value={contactType} onChange={v => setContactType(v as string)} showChevron searchable={false} />
+            </div>
+            <div className="flex flex-col flex-1 min-w-0">
+              <label className="form-label">{t('customer.contactValue')} *</label>
+              {['MOBILE', 'HOME', 'WORK'].includes(contactType) ? (
+                <PhoneInput value={value} onChange={(raw) => setValue(raw)} size="sm" className="w-full" />
+              ) : (
+                <Input size="sm" value={value} onChange={e => setValue(e.target.value)} className="w-full" />
+              )}
+            </div>
           </div>
-          <div className="flex flex-col flex-1 min-w-0">
-            <label className="form-label">{t('customer.contactValue')} *</label>
-            <Input size="sm" value={value} onChange={e => setValue(e.target.value)} className="w-full" placeholder="095-xxx-xxxx" />
+          <div className="flex flex-col">
+            <label className="form-label">{t('customer.contactLabel')}</label>
+            <Input size="sm" value={label} onChange={e => setLabel(e.target.value)} className="w-full" />
           </div>
-        </div>
-        <div className="flex flex-col">
-          <label className="form-label">{t('customer.contactLabel')}</label>
-          <Input size="sm" value={label} onChange={e => setLabel(e.target.value)} className="w-full" />
+          <LabeledCheckbox label={t('customer.contactPrimary')} checked={isPrimary} onChange={e => setIsPrimary(e.target.checked)} />
         </div>
       </div>
-      <div className="flex items-center justify-between">
-        <label className="flex items-center gap-2 text-sm cursor-pointer">
-          <input type="checkbox" checked={isPrimary} onChange={e => setIsPrimary(e.target.checked)} />
-          {t('customer.contactPrimary')}
-        </label>
-        <Button color="primary" size="sm" onClick={handleSave} disabled={saving || !value.trim()}>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
+        <Button color="primary" onClick={handleSave} disabled={saving || !value.trim()}>
           {saving ? t('common.loading') : t('common.save')}
         </Button>
       </div>
-    </div>
+    </Modal>
   );
 }
 
-// ── Contact Row ─────────────────────────────────────────────────────────────
+// ── Add Reference Modal ─────────────────────────────────────────────────────
 
-function ContactRow({ contact, onDeleted }: { contact: CustomerContact; onDeleted: () => void }) {
-  const [deleting, setDeleting] = useState(false);
-
-  const handleDelete = async () => {
-    setDeleting(true);
-    try {
-      await apiClient.rpc('fn_customer_contact_delete', { p_id: contact.id });
-      onDeleted();
-    } catch {
-      // silently fail
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  return (
-    <div className="flex items-center justify-between py-1.5 text-sm">
-      <div className="flex items-center gap-2">
-        {contact.is_primary && <Star size={12} className="text-warning fill-warning" />}
-        <Badge size="xs" color="info">{contact.contact_type}</Badge>
-        <span className="tabular-nums">{contact.value}</span>
-        {contact.label && <span className="text-control-label text-xs">({contact.label})</span>}
-      </div>
-      <button
-        className="p-1 rounded hover:bg-surface-hover cursor-pointer text-control-label hover:text-danger"
-        onClick={handleDelete}
-        disabled={deleting}
-      >
-        <Trash2 size={13} />
-      </button>
-    </div>
-  );
-}
-
-// ── Reference Form ──────────────────────────────────────────────────────────
-
-function ReferenceForm({ customerId, onSuccess }: { customerId: number; onSuccess: () => void }) {
+function AddReferenceModal({ open, onClose, customerId, onSuccess }: {
+  open: boolean; onClose: () => void; customerId: number; onSuccess: () => void;
+}) {
   const { t } = useTranslation();
   const [name, setName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -942,6 +963,10 @@ function ReferenceForm({ customerId, onSuccess }: { customerId: number; onSucces
   const [relation, setRelation] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open) { setName(''); setLastName(''); setTel(''); setRelation(''); setError(''); }
+  }, [open]);
 
   const handleSave = async () => {
     if (!name.trim()) return;
@@ -964,57 +989,46 @@ function ReferenceForm({ customerId, onSuccess }: { customerId: number; onSucces
           || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
         setError(translated || err.message);
       } else setError(String(err));
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
 
   return (
-    <div className="space-y-3 mb-3 p-3 rounded-md border border-line">
-      {error && <div className="alert alert-danger text-xs"><XCircle size={14} /><span>{error}</span></div>}
-      <div className="form-grid">
-        <div className="flex gap-3">
-          <div className="flex flex-col flex-1">
-            <label className="form-label">{t('customer.refName')} *</label>
-            <Input size="sm" value={name} onChange={e => setName(e.target.value)} className="w-full" />
+    <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
+      <div className="modal-header">
+        <h2 className="modal-title">{t('customer.addReference')}</h2>
+        <button type="button" className="modal-close-btn" onClick={onClose}>&times;</button>
+      </div>
+      <div className="modal-content">
+        {error && <div className="alert alert-danger mb-3"><XCircle size={14} /><span>{error}</span></div>}
+        <div className="form-grid">
+          <div className="flex gap-3">
+            <div className="flex flex-col flex-1">
+              <label className="form-label">{t('customer.refName')} *</label>
+              <Input size="sm" value={name} onChange={e => setName(e.target.value)} className="w-full" />
+            </div>
+            <div className="flex flex-col flex-1">
+              <label className="form-label">{t('customer.refLastName')}</label>
+              <Input size="sm" value={lastName} onChange={e => setLastName(e.target.value)} className="w-full" />
+            </div>
           </div>
-          <div className="flex flex-col flex-1">
-            <label className="form-label">{t('customer.refLastName')}</label>
-            <Input size="sm" value={lastName} onChange={e => setLastName(e.target.value)} className="w-full" />
-          </div>
-        </div>
-        <div className="flex gap-3">
-          <div className="flex flex-col flex-1">
-            <label className="form-label">{t('customer.refTel')}</label>
-            <Input size="sm" value={tel} onChange={e => setTel(e.target.value)} className="w-full" />
-          </div>
-          <div className="flex flex-col flex-1">
-            <label className="form-label">{t('customer.refRelation')}</label>
-            <Input size="sm" value={relation} onChange={e => setRelation(e.target.value)} className="w-full" />
+          <div className="flex gap-3">
+            <div className="flex flex-col flex-1">
+              <label className="form-label">{t('customer.refTel')}</label>
+              <PhoneInput value={tel} onChange={(raw) => setTel(raw)} size="sm" className="w-full" />
+            </div>
+            <div className="flex flex-col flex-1">
+              <label className="form-label">{t('customer.refRelation')}</label>
+              <Input size="sm" value={relation} onChange={e => setRelation(e.target.value)} className="w-full" />
+            </div>
           </div>
         </div>
       </div>
-      <div className="flex justify-end">
-        <Button color="primary" size="sm" onClick={handleSave} disabled={saving || !name.trim()}>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
+        <Button color="primary" onClick={handleSave} disabled={saving || !name.trim()}>
           {saving ? t('common.loading') : t('common.save')}
         </Button>
       </div>
-    </div>
-  );
-}
-
-// ── Detail Row ──────────────────────────────────────────────────────────────
-
-function DetailRow({ label, value, mono, children }: {
-  label: string;
-  value?: string;
-  mono?: boolean;
-  children?: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-start justify-between gap-4">
-      <span className="text-control-label shrink-0">{label}</span>
-      {children ?? <span className={`text-right ${mono ? 'tabular-nums' : ''}`}>{value}</span>}
-    </div>
+    </Modal>
   );
 }
