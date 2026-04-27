@@ -65,6 +65,9 @@ import { HoldingRemittancePage } from './pages/accounting/HoldingRemittancePage'
 import { CompanyRevenuePage } from './pages/accounting/CompanyRevenuePage';
 import { BranchLedgerPage } from './pages/accounting/BranchLedgerPage';
 import { BillsPage } from './pages/accounting/BillsPage';
+import { RetailLayout } from './pages/retail/RetailLayout';
+import { RetailPosPage } from './pages/retail/RetailPosPage';
+import { RetailBillsPage } from './pages/retail/RetailBillsPage';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -542,6 +545,29 @@ function App() {
       />
 
 
+
+      {/* Retail */}
+      <Route path="/admin/retail" element={<Navigate to="/admin/retail/pos" replace />} />
+      <Route
+        path="/admin/retail/pos"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <RetailLayout><RetailPosPage /></RetailLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/retail/bills"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <RetailLayout><RetailBillsPage /></RetailLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
 
       {/* Accounting */}
       <Route

@@ -30,6 +30,8 @@ import {
   TrendingUp, Percent, Handshake,
   // Fanout child icons — Inventory
   BarChart3, ClipboardList, PackagePlus, ArrowLeftRight, Wrench, RotateCcw, ShoppingCart,
+  // Retail
+  Store, Receipt,
   // Fanout child icons — Company
   MapPin, KeyRound, Landmark, CalendarDays, AlertTriangle, ShieldBan, Cloud,
   // Fanout child icons — Contracts
@@ -191,6 +193,14 @@ export const AppSideNav = () => {
         { key: 'repairs', icon: <Wrench size="1rem" />, label: t('nav.repairs'), path: '/admin/inventory/repairs' },
         { key: 'buyback', icon: <RotateCcw size="1rem" />, label: t('nav.buyback'), path: '/admin/inventory/buyback' },
         { key: 'sale', icon: <ShoppingCart size="1rem" />, label: t('nav.sale'), path: '/admin/inventory/sale' },
+      ],
+    },
+    {
+      key: 'retail', icon: <Store size="1rem" />, label: t('nav.retail'),
+      path: '/admin/retail/pos',
+      children: [
+        { key: 'retail-pos', icon: <ShoppingCart size="1rem" />, label: t('nav.retailPos'), path: '/admin/retail/pos' },
+        { key: 'retail-bills', icon: <Receipt size="1rem" />, label: t('nav.retailBills'), path: '/admin/retail/bills' },
       ],
     },
     {
