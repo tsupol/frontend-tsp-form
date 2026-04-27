@@ -40,7 +40,7 @@ function WorkspaceContent() {
   const navGuard = useNavGuard();
   const loadedRef = useRef(false);
   const { data, updateData, resetData, openModal, setOpenModal, isPostPayment, getCardStatus, panelDirtyRef, pendingModal, confirmPanelSwitch, cancelPanelSwitch } = useWorkspace();
-  const [shakingCards, setShakingCards] = useState<Set<string>>(new Set());
+  const [shakingCards] = useState<Set<string>>(new Set());
 
   const needsBranchSelect = !user?.branch_id;
 

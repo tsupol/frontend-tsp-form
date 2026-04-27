@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { User, CheckCircle, AlertTriangle } from 'lucide-react';
+import { User, AlertTriangle } from 'lucide-react';
 import { useWorkspace } from './WorkspaceContext';
 import { SummaryCard } from './SummaryCard';
 
