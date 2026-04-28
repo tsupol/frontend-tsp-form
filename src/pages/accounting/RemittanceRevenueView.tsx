@@ -153,7 +153,7 @@ export function RemittanceRevenueView({ titleKey, descriptionKey, viewEndpoint, 
         <div className="mobile-header-title mobile-header-title-truncate">
           {t(titleKey)}
         </div>
-        <div className="mobile-header-end" />
+        <div className="mobile-header-end w-nav" />
       </MobileHeader>
 
       <div className="page-content responsive-dvh-mobile-header">

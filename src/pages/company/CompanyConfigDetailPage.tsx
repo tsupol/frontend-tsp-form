@@ -154,7 +154,7 @@ export function CompanyConfigDetailPage() {
             </button>
           </div>
           <div className="mobile-header-title" />
-          <div className="mobile-header-end" />
+          <div className="mobile-header-end w-nav" />
         </MobileHeader>
         <div className="page-content">
           <div className="p-8 text-center text-control-label">

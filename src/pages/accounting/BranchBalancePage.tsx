@@ -35,7 +35,7 @@ export function BranchBalancePage() {
         <div className="mobile-header-title mobile-header-title-truncate">
           {t('nav.branchBalance')}
         </div>
-        <div className="mobile-header-end" />
+        <div className="mobile-header-end w-nav" />
       </MobileHeader>
 
       <div className="page-content">

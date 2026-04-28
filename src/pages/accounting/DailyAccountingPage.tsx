@@ -100,7 +100,7 @@ export function DailyAccountingPage() {
         <div className="mobile-header-title mobile-header-title-truncate">
           {t('nav.dailyAccounting')}
         </div>
-        <div className="mobile-header-end" />
+        <div className="mobile-header-end w-nav" />
       </MobileHeader>
 
       <div className="page-content responsive-dvh-mobile-header">
