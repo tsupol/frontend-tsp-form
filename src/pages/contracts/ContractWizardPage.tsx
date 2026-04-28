@@ -255,6 +255,10 @@ function WorkspaceContent() {
           if (isMobile) goBack();
         };
 
+        // On mobile summary panel, no card is "active" — active highlighting is only meaningful
+        // on desktop (split-pane) or on mobile when the edit panel is showing
+        const isCardActive = (id: ModalId) => openModal === id && !(isMobile && isRoot);
+
         // Review & Pay card: always visible once draft exists, but disabled until all cards complete
         const requiredCards = ['productPlan', 'customer', 'contactRef', 'guarantor', 'documents'] as const;
         const allCardsComplete = data.contractId != null && requiredCards.every(id => getCardStatus(id) === 'complete');
@@ -279,7 +283,7 @@ function WorkspaceContent() {
                 <div className="mobile-header-title mobile-header-title-truncate">
                   {isRoot ? t('wizard.title') : (openModal ? panelTitle[openModal] ?? t('wizard.title') : t('wizard.title'))}
                 </div>
-                <div className="mobile-header-end">
+                <div className="mobile-header-end min-w-nav">
                   {data.contractCode && (
                     <Badge size="sm" className="bg-fg/10 text-fg/60 font-mono mr-2">{data.contractCode}</Badge>
                   )}
@@ -317,14 +321,14 @@ function WorkspaceContent() {
                       </div>
                     )}
 
-                    <CardCustomer onEdit={() => handleEditOpen('customer')} active={openModal === 'customer'} shake={shakingCards.has('customer')} />
-                    <CardProductPlan onEdit={() => handleEditOpen('productPlan')} active={openModal === 'productPlan'} shake={shakingCards.has('productPlan')} />
-                    <CardSaving onEdit={() => handleEditOpen('saving')} active={openModal === 'saving'} shake={shakingCards.has('saving')} />
-                    <CardContactRef onEdit={() => handleEditOpen('contactRef')} active={openModal === 'contactRef'} shake={shakingCards.has('contactRef')} />
-                    <CardGuarantor onEdit={() => handleEditOpen('guarantor')} active={openModal === 'guarantor'} shake={shakingCards.has('guarantor')} />
-                    <CardDocuments onEdit={() => handleEditOpen('documents')} active={openModal === 'documents'} shake={shakingCards.has('documents')} />
+                    <CardCustomer onEdit={() => handleEditOpen('customer')} active={isCardActive('customer')} shake={shakingCards.has('customer')} />
+                    <CardProductPlan onEdit={() => handleEditOpen('productPlan')} active={isCardActive('productPlan')} shake={shakingCards.has('productPlan')} />
+                    <CardSaving onEdit={() => handleEditOpen('saving')} active={isCardActive('saving')} shake={shakingCards.has('saving')} />
+                    <CardContactRef onEdit={() => handleEditOpen('contactRef')} active={isCardActive('contactRef')} shake={shakingCards.has('contactRef')} />
+                    <CardGuarantor onEdit={() => handleEditOpen('guarantor')} active={isCardActive('guarantor')} shake={shakingCards.has('guarantor')} />
+                    <CardDocuments onEdit={() => handleEditOpen('documents')} active={isCardActive('documents')} shake={shakingCards.has('documents')} />
 
-                    {!data.billConfirmed && data.contractId && <CardReviewPay onEdit={reviewPayReady ? () => handleEditOpen('reviewPay') : undefined} active={openModal === 'reviewPay'} disabled={!reviewPayReady} />}
+                    {!data.billConfirmed && data.contractId && <CardReviewPay onEdit={reviewPayReady ? () => handleEditOpen('reviewPay') : undefined} active={isCardActive('reviewPay')} disabled={!reviewPayReady} />}
                     {data.billConfirmed && <CardPostPayment />}
                   </div>
                 </div>
