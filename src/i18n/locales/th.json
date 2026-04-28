@@ -1013,7 +1013,19 @@
       "createdAt": "สร้างเมื่อ",
       "lineItems": "รายการ",
       "payments": "การชำระเงิน",
-      "noPayments": "ไม่มีการชำระเงิน"
+      "noPayments": "ไม่มีการชำระเงิน",
+      "takePayment": "รับชำระเงิน",
+      "void": "ยกเลิก",
+      "amountDue": "ยอดที่ต้องชำระ",
+      "paymentMethod": "วิธี",
+      "confirmPayment": "ยืนยันการชำระ",
+      "paymentSuccess": "รับชำระเรียบร้อย — เงินทอน {{change}}",
+      "paymentBlockedByApproval": "ชำระไม่ได้: ส่วนลด {{count}} รายการรออนุมัติ ({{statuses}})",
+      "voidWarning": "การยกเลิกบิลนี้ไม่สามารถย้อนกลับได้",
+      "voidReason": "เหตุผล",
+      "voidReasonPlaceholder": "ทำไมต้องยกเลิก?",
+      "confirmVoid": "ยืนยันการยกเลิก",
+      "voidSuccess": "ยกเลิกบิลเรียบร้อย"
     }
   },
   "sale": {

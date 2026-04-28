@@ -1013,7 +1013,19 @@
       "createdAt": "Created",
       "lineItems": "Line Items",
       "payments": "Payments",
-      "noPayments": "No payments"
+      "noPayments": "No payments",
+      "takePayment": "Take Payment",
+      "void": "Void",
+      "amountDue": "Amount Due",
+      "paymentMethod": "Method",
+      "confirmPayment": "Confirm Payment",
+      "paymentSuccess": "Payment confirmed — change {{change}}",
+      "paymentBlockedByApproval": "Payment blocked: {{count}} discount line(s) awaiting approval ({{statuses}})",
+      "voidWarning": "This will void the bill. Cannot be undone.",
+      "voidReason": "Reason",
+      "voidReasonPlaceholder": "Why are you voiding this bill?",
+      "confirmVoid": "Void Bill",
+      "voidSuccess": "Bill voided"
     }
   },
   "sale": {

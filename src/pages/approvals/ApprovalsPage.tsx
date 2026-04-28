@@ -389,35 +389,41 @@ function ApprovalReviewDrawer({
     const trimmed = reason.trim();
     switch (row.type) {
       case 'NEGOTIATION': {
+        // PostgREST overload-matches on the exact param set — always send
+        // every key the function declares (use null when blank).
         const rpc = action === 'approve' ? 'fn_negotiation_approve' : 'fn_negotiation_reject';
         const params: Record<string, unknown> = { p_request_id: row.id };
-        if (action === 'reject') params.p_reason = trimmed;
-        else if (trimmed) params.p_note = trimmed;
+        if (action === 'reject') params.p_reason = trimmed || null;
+        else params.p_note = trimmed || null;
         return { rpc, params };
       }
       case 'BILL_LINE_DISCOUNT': {
-        // Single RPC with p_approved boolean.
-        const params: Record<string, unknown> = {
-          p_line_item_id: row.id,
-          p_approved: action === 'approve',
+        // Single RPC with p_approved boolean. p_reason must always be sent
+        // (PostgREST resolves overloads by exact param set; the function
+        // signature requires all 3 — use null when the cashier left it blank).
+        return {
+          rpc: 'fn_bill_line_item_review_approval',
+          params: {
+            p_line_item_id: row.id,
+            p_approved: action === 'approve',
+            p_reason: trimmed || null,
+          },
         };
-        if (trimmed) params.p_reason = trimmed;
-        return { rpc: 'fn_bill_line_item_review_approval', params };
       }
       case 'DEAL_PARTNER': {
         const rpc = action === 'approve'
           ? 'fn_contract_deal_partner_approve'
           : 'fn_contract_deal_partner_reject';
         const params: Record<string, unknown> = { p_request_id: row.id };
-        if (action === 'reject') params.p_reason = trimmed;
-        else if (trimmed) params.p_note = trimmed;
+        if (action === 'reject') params.p_reason = trimmed || null;
+        else params.p_note = trimmed || null;
         return { rpc, params };
       }
       case 'BUYBACK': {
         const rpc = action === 'approve' ? 'fn_inv_buyback_approve' : 'fn_inv_buyback_reject';
         const params: Record<string, unknown> = { p_po_id: row.id };
-        if (action === 'reject') params.p_reason = trimmed;
-        else if (trimmed) params.p_note = trimmed;
+        if (action === 'reject') params.p_reason = trimmed || null;
+        else params.p_note = trimmed || null;
         return { rpc, params };
       }
     }

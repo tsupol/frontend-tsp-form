@@ -372,7 +372,11 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
     setDiscountForLineIdx(null);
   };
 
-  const total = preview?.bill?.total_amount ?? lines.reduce((s, l) => {
+  // Don't trust preview.bill.total_amount — fn_bill_retail_preview currently
+  // returns gross sum (sums DISCOUNT line amounts as positive). Submit returns
+  // correct net (per nnf commit ac6c376), but preview is unfixed. Compute
+  // locally so the cart total matches what the bill will actually be.
+  const total = lines.reduce((s, l) => {
     const sign = l.charge_type === 'RETAIL_DISCOUNT' ? -1 : 1;
     return s + sign * l.amount * (l.qty ?? 1);
   }, 0);

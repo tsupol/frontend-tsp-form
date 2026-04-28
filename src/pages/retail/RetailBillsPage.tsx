@@ -1,13 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
 import {
   PageNav, PageNavPanel, MobileHeader, DataTable, Select, Badge, Button,
+  Modal, MaskedInput, TextArea, useSnackbarContext,
 } from 'tsp-form';
-import { ArrowRightFromLine, ArrowLeft, Plus } from 'lucide-react';
-import { apiClient } from '../../lib/api';
+import {
+  ArrowRightFromLine, ArrowLeft, Plus, Wallet, Ban, AlertCircle, CheckCircle, XCircle,
+} from 'lucide-react';
+import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { DateTime } from '../../components/DateTime';
+import { BranchPinInput } from '../../components/BranchPinInput';
 import { fmtCurrency } from '../../lib/format';
 import { CreateRetailBillModal } from './CreateRetailBillModal';
 
@@ -41,6 +45,7 @@ interface BillLineItem {
   quantity: number;
   owner_type: string;
   variant_id: number | null;
+  approval_status: string;
 }
 
 interface BillPayment {
@@ -54,16 +59,27 @@ interface BillPayment {
 
 interface BillDetail {
   bill_id: number;
+  branch_id: number;
   bill_code_display: string;
   status: string;
   total_amount: number;
   paid_amount: number;
+  remaining: number;
   customer_name: string | null;
   bill_date: string | null;
   created_at: string | null;
   line_items: BillLineItem[];
   payments: BillPayment[] | null;
 }
+
+interface BankAccount {
+  id: number;
+  bank_name: string;
+  account_number: string;
+  account_name: string;
+}
+
+type PaymentMethod = 'CASH' | 'TRANSFER';
 
 const METHOD_COLOR: Record<string, 'success' | 'primary' | 'secondary' | 'info' | 'default'> = {
   CASH: 'success',
@@ -265,6 +281,9 @@ export function RetailBillsPage() {
 
 function RetailBillDetail({ billId, isMobile }: { billId: number; isMobile: boolean }) {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const [payOpen, setPayOpen] = useState(false);
+  const [voidOpen, setVoidOpen] = useState(false);
 
   const { data: details, isLoading } = useQuery({
     queryKey: ['retail', 'bill-detail', billId],
@@ -279,13 +298,47 @@ function RetailBillDetail({ billId, isMobile }: { billId: number; isMobile: bool
   const payments = detail.payments ?? [];
   const statusColor = detail.status === 'PAID' ? 'success' : detail.status === 'VOIDED' ? 'default' : 'warning';
 
+  // Payment is blocked while any approval line is unresolved.
+  const blockingLines = lines.filter(l =>
+    l.approval_status && !['NOT_REQUIRED', 'APPROVED'].includes(l.approval_status),
+  );
+  const canTakePayment = detail.status === 'OPEN' && blockingLines.length === 0;
+  const canVoid = detail.status === 'OPEN'; // Voiding PAID retail bills is Case B (CN) — out of scope here.
+
+  const onMutationSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['retail', 'bill-detail', billId] });
+    queryClient.invalidateQueries({ queryKey: ['retail', 'bills'] });
+  };
+
   return (
     <div className="flex flex-col h-full">
-      {/* Desktop header — thin status row with code + badge */}
+      {/* Desktop header — thin status row with code + badge + actions */}
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
           <span className="font-semibold font-mono">{detail.bill_code_display}</span>
           <Badge color={statusColor} size="sm">{detail.status}</Badge>
+          <div className="flex-1" />
+          {canTakePayment && (
+            <Button
+              size="sm"
+              color="primary"
+              startIcon={<Wallet size={14} />}
+              onClick={() => setPayOpen(true)}
+            >
+              {t('retail.bills.takePayment')}
+            </Button>
+          )}
+          {canVoid && (
+            <Button
+              size="sm"
+              variant="outline"
+              color="danger"
+              startIcon={<Ban size={14} />}
+              onClick={() => setVoidOpen(true)}
+            >
+              {t('retail.bills.void')}
+            </Button>
+          )}
         </div>
       )}
 
@@ -314,6 +367,50 @@ function RetailBillDetail({ billId, isMobile }: { billId: number; isMobile: bool
           <span>{t('retail.bills.createdAt')}: <DateTime value={detail.created_at} /></span>
         )}
       </div>
+
+      {/* Mobile action row */}
+      {isMobile && (canTakePayment || canVoid) && (
+        <div className="flex-none flex gap-2 px-4 py-3 border-b border-line">
+          {canTakePayment && (
+            <Button
+              size="sm"
+              color="primary"
+              className="flex-1"
+              startIcon={<Wallet size={14} />}
+              onClick={() => setPayOpen(true)}
+            >
+              {t('retail.bills.takePayment')}
+            </Button>
+          )}
+          {canVoid && (
+            <Button
+              size="sm"
+              variant="outline"
+              color="danger"
+              className="flex-1"
+              startIcon={<Ban size={14} />}
+              onClick={() => setVoidOpen(true)}
+            >
+              {t('retail.bills.void')}
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Blocked-by-approval hint */}
+      {detail.status === 'OPEN' && blockingLines.length > 0 && (
+        <div className="flex-none px-4 py-3 border-b border-line">
+          <div className="alert alert-warning">
+            <AlertCircle size={16} />
+            <div className="alert-description">
+              {t('retail.bills.paymentBlockedByApproval', {
+                count: blockingLines.length,
+                statuses: blockingLines.map(l => l.approval_status).join(', '),
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Body: lines + payments stacked */}
       <div className="flex-1 overflow-auto better-scroll">
@@ -359,6 +456,290 @@ function RetailBillDetail({ billId, isMobile }: { billId: number; isMobile: bool
           ))
         )}
       </div>
+
+      <TakePaymentModal
+        open={payOpen}
+        onClose={() => setPayOpen(false)}
+        billId={detail.bill_id}
+        remaining={detail.remaining}
+        onSuccess={() => { setPayOpen(false); onMutationSuccess(); }}
+      />
+      <VoidBillModal
+        open={voidOpen}
+        onClose={() => setVoidOpen(false)}
+        billId={detail.bill_id}
+        branchId={detail.branch_id}
+        onSuccess={() => { setVoidOpen(false); onMutationSuccess(); }}
+      />
     </div>
+  );
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * Take Payment Modal
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+function TakePaymentModal({
+  open, onClose, billId, remaining, onSuccess,
+}: {
+  open: boolean;
+  onClose: () => void;
+  billId: number;
+  remaining: number;
+  onSuccess: () => void;
+}) {
+  const { t } = useTranslation();
+  const { addSnackbar } = useSnackbarContext();
+  const [method, setMethod] = useState<PaymentMethod>('CASH');
+  const [amountStr, setAmountStr] = useState('');
+  const [bankAccountId, setBankAccountId] = useState<number | null>(null);
+  const [reference, setReference] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+
+  useEffect(() => {
+    if (open) {
+      setMethod('CASH');
+      setAmountStr(String(remaining));
+      setBankAccountId(null);
+      setReference('');
+      setErrorMessage('');
+    }
+  }, [open, remaining]);
+
+  const { data: bankAccounts = [] } = useQuery({
+    queryKey: ['bank-accounts-active'],
+    queryFn: () => apiClient.get<BankAccount[]>('/v_bank_accounts?is_active=is.true&order=bank_name'),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const amount = parseFloat(amountStr) || 0;
+  const change = amount > remaining ? amount - remaining : 0;
+  const valid =
+    amount >= remaining &&
+    (method === 'CASH' || (method === 'TRANSFER' && bankAccountId != null));
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      await apiClient.rpc('fn_bill_payment_add', {
+        p_bill_id: billId,
+        p_method: method,
+        p_amount: amount,
+        p_bank_account_id: method === 'TRANSFER' ? bankAccountId : null,
+        p_reference: reference.trim() || null,
+      });
+      await apiClient.rpc('fn_bill_payment_confirm', { p_bill_id: billId });
+    },
+    onSuccess: () => {
+      addSnackbar({
+        type: 'success',
+        message: (
+          <div className="alert alert-success">
+            <CheckCircle size={16} />
+            <span className="alert-description">
+              {t('retail.bills.paymentSuccess', { change: fmtCurrency(change) })}
+            </span>
+          </div>
+        ),
+      });
+      onSuccess();
+    },
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setErrorMessage(translated || err.message);
+      } else {
+        setErrorMessage(String(err));
+      }
+    },
+  });
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%" ariaLabel="Take Payment">
+      <div className="flex flex-col overflow-hidden">
+        <div className="modal-header">
+          <h2 className="modal-title">{t('retail.bills.takePayment')}</h2>
+          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">×</button>
+        </div>
+        <div className="modal-content form-grid">
+          <div className="flex flex-col">
+            <label className="form-label">{t('retail.bills.amountDue')}</label>
+            <div className="text-base font-semibold tabular-nums">{fmtCurrency(remaining)}</div>
+          </div>
+          <div className="flex flex-col">
+            <label className="form-label">{t('retail.bills.paymentMethod')}</label>
+            <div className="input-group">
+              <div className="w-28 shrink-0">
+                <Select
+                  value={method}
+                  onChange={(v) => { setMethod((v as PaymentMethod) ?? 'CASH'); setBankAccountId(null); }}
+                  options={[
+                    { label: t('paymentMethod.CASH', { defaultValue: 'CASH' }), value: 'CASH' },
+                    { label: t('paymentMethod.TRANSFER', { defaultValue: 'TRANSFER' }), value: 'TRANSFER' },
+                  ]}
+                  size="sm"
+                  searchable={false}
+                />
+              </div>
+              <div className="input-group-divider" />
+              <MaskedInput
+                mask="number"
+                decimalScale={2}
+                value={amountStr}
+                onChange={(raw) => setAmountStr(raw)}
+                placeholder={t('retail.create.amountPlaceholder')}
+                size="sm"
+                className="w-full"
+                endIcon={<Wallet size={14} />}
+                onEndIconClick={() => setAmountStr(String(remaining))}
+              />
+            </div>
+          </div>
+          {method === 'TRANSFER' && (
+            <div className="flex flex-col">
+              <label className="form-label">{t('retail.create.selectBank')}</label>
+              <Select
+                value={bankAccountId ? String(bankAccountId) : null}
+                onChange={(v) => setBankAccountId(v ? Number(v) : null)}
+                options={bankAccounts.map(b => ({
+                  label: `${b.bank_name} - ${b.account_number}`,
+                  value: String(b.id),
+                }))}
+                placeholder={t('retail.create.selectBank')}
+                size="sm"
+                showChevron
+              />
+            </div>
+          )}
+          {amount > remaining && (
+            <div className="flex justify-between text-sm">
+              <span className="text-fg/60">{t('retail.create.change')}</span>
+              <span className="font-medium tabular-nums text-success">{fmtCurrency(change)}</span>
+            </div>
+          )}
+          {errorMessage && (
+            <div className="alert alert-danger">
+              <XCircle size={16} />
+              <div className="alert-description">{errorMessage}</div>
+            </div>
+          )}
+        </div>
+        <div className="modal-footer">
+          <Button onClick={onClose} disabled={mutation.isPending}>{t('common.cancel')}</Button>
+          <Button
+            color="primary"
+            disabled={!valid || mutation.isPending}
+            onClick={() => mutation.mutate()}
+          >
+            {t('retail.bills.confirmPayment')}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * Void Bill Modal
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+function VoidBillModal({
+  open, onClose, billId, branchId, onSuccess,
+}: {
+  open: boolean;
+  onClose: () => void;
+  billId: number;
+  branchId: number;
+  onSuccess: () => void;
+}) {
+  const { t } = useTranslation();
+  const { addSnackbar } = useSnackbarContext();
+  const [reason, setReason] = useState('');
+  const [pin, setPin] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+
+  useEffect(() => {
+    if (open) {
+      setReason('');
+      setPin('');
+      setErrorMessage('');
+    }
+  }, [open]);
+
+  const valid = reason.trim().length > 0 && pin.length === 6;
+
+  const mutation = useMutation({
+    mutationFn: () => apiClient.rpc('fn_bill_cancel', {
+      p_bill_id: billId,
+      p_branch_id: branchId,
+      p_pin: pin,
+      p_reason: reason.trim(),
+    }),
+    onSuccess: () => {
+      addSnackbar({
+        type: 'success',
+        message: (
+          <div className="alert alert-success">
+            <CheckCircle size={16} />
+            <span className="alert-description">{t('retail.bills.voidSuccess')}</span>
+          </div>
+        ),
+      });
+      onSuccess();
+    },
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setErrorMessage(translated || err.message);
+      } else {
+        setErrorMessage(String(err));
+      }
+    },
+  });
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="26rem" width="100%" ariaLabel="Void Bill">
+      <div className="flex flex-col overflow-hidden">
+        <div className="modal-header">
+          <h2 className="modal-title">{t('retail.bills.void')}</h2>
+          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">×</button>
+        </div>
+        <div className="modal-content form-grid">
+          <div className="alert alert-warning">
+            <AlertCircle size={16} />
+            <div className="alert-description">{t('retail.bills.voidWarning')}</div>
+          </div>
+          <div className="flex flex-col">
+            <label className="form-label">{t('retail.bills.voidReason')}</label>
+            <TextArea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder={t('retail.bills.voidReasonPlaceholder')}
+              size="sm"
+              rows={2}
+              className="w-full"
+            />
+          </div>
+          <BranchPinInput value={pin} onChange={setPin} required />
+          {errorMessage && (
+            <div className="alert alert-danger">
+              <XCircle size={16} />
+              <div className="alert-description">{errorMessage}</div>
+            </div>
+          )}
+        </div>
+        <div className="modal-footer">
+          <Button onClick={onClose} disabled={mutation.isPending}>{t('common.cancel')}</Button>
+          <Button
+            color="danger"
+            disabled={!valid || mutation.isPending}
+            onClick={() => mutation.mutate()}
+          >
+            {t('retail.bills.confirmVoid')}
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 }
