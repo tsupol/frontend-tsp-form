@@ -1508,6 +1508,18 @@
     "action_continue_pay_success": "Payment confirmed — contract activated",
     "action_void_bill": "Void Bill",
     "action_void_bill_success": "Bill voided — contract returned to draft",
+    "actionNotImplemented": "Not yet wired in this page",
+    "actionCategory": {
+      "lifecycle": "Lifecycle",
+      "payment": "Payment",
+      "billing": "Billing",
+      "wallet": "Wallet",
+      "fee": "Fees",
+      "device": "Device",
+      "customer": "Customer",
+      "approval": "Approvals",
+      "document": "Documents"
+    },
     "voidBill_warning": "This will void bill {{code}} ({{amount}}) and return the contract to DRAFT.",
     "selectCloseReason": "Select close reason",
     "amount": "Amount",

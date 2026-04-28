@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { Button, Modal, Input, Select, TextArea, MaskedInput, Badge, useSnackbarContext } from 'tsp-form';
+import { Button, Modal, Input, Select, TextArea, MaskedInput, Badge, Tooltip, useSnackbarContext } from 'tsp-form';
 import { CheckCircle, XCircle, Pencil, Plus, Trash2, Loader2, ChevronsRight } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { fmtCurrency } from '../../lib/format';
@@ -51,69 +51,6 @@ type ContractAction =
   | 'saving_deposit'
   | 'void_bill'
   | 'continue_pay';
-
-// ── State → available actions ────────────────────────────────────────────────
-
-function getAvailableActions(contract: ContractForActions): ContractAction[] {
-  const actions: ContractAction[] = [];
-  const { state, outstanding_amount, late_fee_balance, credit_balance, insurance_balance, device_id, is_paused } = contract;
-
-  if (state === 'ACTIVE') {
-    // Complete: only if fully paid and no balances
-    const canComplete = (outstanding_amount ?? 0) === 0
-      && (late_fee_balance ?? 0) === 0
-      && (credit_balance ?? 0) === 0
-      && (insurance_balance ?? 0) === 0;
-    if (canComplete) actions.push('complete');
-
-    // Early payoff: has unpaid installments remaining, no late fees
-    const hasUnpaidInstallments = (contract.paid_installment_count ?? 0) < (contract.total_installments ?? 0);
-    const canEarlyPayoff = hasUnpaidInstallments && (late_fee_balance ?? 0) === 0;
-    if (canEarlyPayoff) actions.push('early_payoff');
-
-    actions.push('settlement_refund');
-    actions.push('terminate');
-    if (!is_paused) actions.push('pause');
-
-    // Device actions
-    if (device_id) {
-      actions.push('deposit_device');
-      actions.push('unbind_device');
-    } else {
-      actions.push('return_deposit');
-      actions.push('bind_device');
-    }
-
-    // Transfer actions
-    if (contract.transfer_to_branch_id) {
-      actions.push('transfer_accept');
-      actions.push('transfer_cancel');
-    } else {
-      actions.push('transfer_branch');
-    }
-    actions.push('detach_customer');
-    actions.push('void');
-  }
-
-  if (state === 'PENDING_PAYMENT') {
-    actions.push('continue_pay');
-    actions.push('void_bill');
-  }
-
-  if (state === 'DRAFT') {
-    actions.push('saving_deposit');
-    actions.push('cancel');
-    actions.push('change_draft_owner');
-  }
-
-  if (state === 'SAVING') {
-    actions.push('saving_deposit');
-    actions.push('cancel');
-    actions.push('change_draft_owner');
-  }
-
-  return actions;
-}
 
 // ── Action config ────────────────────────────────────────────────────────────
 
@@ -407,6 +344,75 @@ const REFUND_CHANNEL_OPTIONS = [
 
 // ── Action Buttons ───────────────────────────────────────────────────────────
 
+interface BackendContractAction {
+  action_code: string;
+  action_name_th: string;
+  category: string;
+  rpc_name: string;
+  is_available: boolean;
+  blocking_reason: string | null;
+  require_pin: boolean;
+  sort_order: number;
+  target_state: string | null;
+  creates_bill: boolean;
+}
+
+interface ContractActionsResponse {
+  contract_id: number;
+  state: string;
+  is_paused: boolean;
+  device_bound: boolean;
+  device_bucket: string | null;
+  has_pending_transfer: boolean;
+  has_loaner: boolean;
+  branch_type: string;
+  actions: BackendContractAction[];
+}
+
+// FE local action code → backend action_code (only those with existing FE modals/handlers)
+const FE_TO_BACKEND_ACTION: Record<ContractAction, string> = {
+  complete: 'COMPLETE_CONTRACT',
+  early_payoff: 'EARLY_PAYOFF',
+  terminate: 'TERMINATE_CONTRACT',
+  cancel: 'CANCEL_CONTRACT',
+  void: 'VOID_CONTRACT',
+  pause: 'PAUSE_CONTRACT',
+  deposit_device: 'CUSTOMER_DEPOSIT_DEVICE',
+  return_deposit: 'RETURN_DEPOSIT',
+  unbind_device: 'UNBIND_DEVICE',
+  bind_device: 'BIND_DEVICE',
+  transfer_branch: 'TRANSFER_BRANCH',
+  transfer_accept: 'TRANSFER_ACCEPT',
+  transfer_cancel: 'TRANSFER_CANCEL',
+  detach_customer: 'DETACH_CUSTOMER',
+  settlement_refund: 'HOLDING_REFUND',
+  change_draft_owner: 'CHANGE_DRAFT_OWNER',
+  saving_deposit: 'SAVING_DEPOSIT',
+  void_bill: '',           // no backend equivalent — keep FE-only behavior
+  continue_pay: 'PAY_OPEN_BILL',
+};
+
+const BACKEND_TO_FE_ACTION: Record<string, ContractAction> = Object.entries(FE_TO_BACKEND_ACTION)
+  .filter(([, b]) => b)
+  .reduce((acc, [fe, be]) => ({ ...acc, [be]: fe as ContractAction }), {});
+
+const CATEGORY_ORDER: string[] = [
+  'LIFECYCLE', 'PAYMENT', 'BILLING', 'WALLET', 'FEE',
+  'DEVICE', 'CUSTOMER', 'APPROVAL', 'DOCUMENT',
+];
+
+const CATEGORY_LABEL_KEY: Record<string, string> = {
+  LIFECYCLE: 'contract.actionCategory.lifecycle',
+  PAYMENT: 'contract.actionCategory.payment',
+  BILLING: 'contract.actionCategory.billing',
+  WALLET: 'contract.actionCategory.wallet',
+  FEE: 'contract.actionCategory.fee',
+  DEVICE: 'contract.actionCategory.device',
+  CUSTOMER: 'contract.actionCategory.customer',
+  APPROVAL: 'contract.actionCategory.approval',
+  DOCUMENT: 'contract.actionCategory.document',
+};
+
 export function ContractActionButtons({ contract, onRefresh }: {
   contract: ContractForActions;
   onRefresh: () => void;
@@ -416,13 +422,15 @@ export function ContractActionButtons({ contract, onRefresh }: {
   const [activeAction, setActiveAction] = useState<ContractAction | null>(null);
   const { addSnackbar } = useSnackbarContext();
 
-  const allActions = getAvailableActions(contract);
-  // Filter out special actions that are rendered as dedicated buttons
-  const actions = allActions.filter(a => a !== 'continue_pay' && a !== 'void_bill');
-  const isDraftOrSaving = contract.state === 'DRAFT' || contract.state === 'SAVING';
-  const isPendingPayment = contract.state === 'PENDING_PAYMENT';
+  const { data: actionsResp } = useQuery({
+    queryKey: ['contract-actions', contract.id],
+    queryFn: () => apiClient.rpc<ContractActionsResponse>('fn_contract_available_actions', {
+      p_contract_id: contract.id,
+    }),
+    staleTime: 30 * 1000,
+  });
 
-  if (allActions.length === 0) return null;
+  const isDraftOrSaving = contract.state === 'DRAFT' || contract.state === 'SAVING';
 
   const isCancelSaving = activeAction === 'cancel' && contract.state === 'SAVING';
   const isEarlyPayoff = activeAction === 'early_payoff';
@@ -443,50 +451,90 @@ export function ContractActionButtons({ contract, onRefresh }: {
     });
   };
 
+  const handleBackendAction = (action: BackendContractAction) => {
+    const feAction = BACKEND_TO_FE_ACTION[action.action_code];
+    if (feAction) {
+      setActiveAction(feAction);
+      return;
+    }
+    // No FE modal yet — surface a friendly notice with the action context
+    addSnackbar({
+      message: (
+        <div className="alert alert-info">
+          <span>
+            {action.action_name_th} — {t('contract.actionNotImplemented', { defaultValue: 'ยังไม่ได้เชื่อมในหน้านี้' })}
+          </span>
+        </div>
+      ),
+    });
+  };
+
+  // Group backend actions by category; preserve sort_order within each
+  const grouped = (actionsResp?.actions ?? [])
+    .slice()
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .reduce<Record<string, BackendContractAction[]>>((acc, a) => {
+      (acc[a.category] ||= []).push(a);
+      return acc;
+    }, {});
+
+  const sortedCategories = Object.keys(grouped).sort((a, b) => {
+    const ai = CATEGORY_ORDER.indexOf(a);
+    const bi = CATEGORY_ORDER.indexOf(b);
+    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+  });
+
   return (
     <>
-      <div className="flex-none px-4 py-3 border-t border-line flex flex-wrap gap-2">
+      <div className="flex-none border-t border-line flex flex-col gap-3 px-4 py-3 max-h-[40vh] overflow-auto better-scroll">
         {isDraftOrSaving && (
           <Button
             size="sm"
             color="primary"
             startIcon={<Pencil size={14} />}
+            className="self-start"
             onClick={() => navigate(`/admin/contracts/draft/${contract.id}`)}
           >
             {t('contract.continueDraft')}
           </Button>
         )}
-        {isPendingPayment && (
-          <>
-            <Button
-              size="sm"
-              color="primary"
-              onClick={() => setActiveAction('continue_pay')}
-            >
-              {t('contract.action_continue_pay')}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              color="danger"
-              onClick={() => setActiveAction('void_bill')}
-            >
-              {t('contract.action_void_bill')}
-            </Button>
-          </>
-        )}
-        {actions.map(action => {
-          const config = ACTION_CONFIGS[action];
+
+        {sortedCategories.map(cat => {
+          const actions = grouped[cat];
+          if (!actions || actions.length === 0) return null;
           return (
-            <Button
-              key={action}
-              variant="outline"
-              size="sm"
-              color={config.color}
-              onClick={() => setActiveAction(action)}
-            >
-              {t(`contract.action_${action}`)}
-            </Button>
+            <div key={cat} className="flex flex-col gap-1.5">
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-subtle">
+                {t(CATEGORY_LABEL_KEY[cat] ?? cat, { defaultValue: cat })}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {actions.map(a => {
+                  const feAction = BACKEND_TO_FE_ACTION[a.action_code];
+                  const config = feAction ? ACTION_CONFIGS[feAction] : null;
+                  const tooltipContent = !a.is_available && a.blocking_reason
+                    ? t(`blockingReason.${a.blocking_reason}`, {
+                        ns: 'apiErrors',
+                        defaultValue: a.blocking_reason,
+                      })
+                    : !feAction
+                      ? t('contract.actionNotImplemented', { defaultValue: 'ยังไม่ได้เชื่อมในหน้านี้' })
+                      : a.action_name_th;
+                  return (
+                    <Tooltip key={a.action_code} content={tooltipContent} placement="top">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        color={config?.color}
+                        disabled={!a.is_available || !feAction}
+                        onClick={() => handleBackendAction(a)}
+                      >
+                        {a.action_name_th}
+                      </Button>
+                    </Tooltip>
+                  );
+                })}
+              </div>
+            </div>
           );
         })}
       </div>

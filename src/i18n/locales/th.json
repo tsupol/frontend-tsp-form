@@ -1508,6 +1508,18 @@
     "action_continue_pay_success": "ชำระเงินสำเร็จ — สัญญาเปิดใช้งานแล้ว",
     "action_void_bill": "ยกเลิกบิล",
     "action_void_bill_success": "ยกเลิกบิลสำเร็จ — สัญญากลับเป็นร่าง",
+    "actionNotImplemented": "ยังไม่ได้เชื่อมในหน้านี้",
+    "actionCategory": {
+      "lifecycle": "วงจรสัญญา",
+      "payment": "การชำระเงิน",
+      "billing": "การออกบิล",
+      "wallet": "เงินออม / ประกัน",
+      "fee": "ค่าธรรมเนียม",
+      "device": "เครื่อง",
+      "customer": "ลูกค้า",
+      "approval": "การอนุมัติ",
+      "document": "เอกสาร"
+    },
     "voidBill_warning": "ยกเลิกบิล {{code}} ({{amount}}) และคืนสัญญากลับเป็นสถานะร่าง",
     "selectCloseReason": "เลือกเหตุผลการปิด",
     "amount": "จำนวนเงิน",
