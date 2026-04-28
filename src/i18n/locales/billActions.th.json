@@ -1,0 +1,15 @@
+{
+  "ADD_PAYMENT": "รับชำระเงิน",
+  "CONFIRM_PAYMENT": "ยืนยันชำระครบ",
+  "VOID_PAYMENT": "ยกเลิกการรับชำระ",
+  "ADD_LINE": "เพิ่มรายการ",
+  "EDIT_LINE": "แก้ไขรายการ",
+  "REMOVE_LINE": "ลบรายการ",
+  "CONVERT_TO_GIFT": "แปลงเป็นของแถม",
+  "SUBMIT_APPROVAL": "ส่งขออนุมัติ",
+  "REVIEW_APPROVAL": "อนุมัติ/ปฏิเสธ",
+  "CANCEL_APPROVAL": "ยกเลิกการขออนุมัติ",
+  "CANCEL_BILL": "ยกเลิกบิล",
+  "VOID_BILL": "Void บิล (PAID)",
+  "REVERSE_BILL": "ทำใบลดหนี้ (Reverse)"
+}

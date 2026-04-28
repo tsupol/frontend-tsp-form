@@ -1,0 +1,15 @@
+{
+  "ADD_PAYMENT": "Add payment",
+  "CONFIRM_PAYMENT": "Confirm payment",
+  "VOID_PAYMENT": "Void payment",
+  "ADD_LINE": "Add line item",
+  "EDIT_LINE": "Edit line item",
+  "REMOVE_LINE": "Remove line item",
+  "CONVERT_TO_GIFT": "Convert to gift",
+  "SUBMIT_APPROVAL": "Submit for approval",
+  "REVIEW_APPROVAL": "Review approval",
+  "CANCEL_APPROVAL": "Cancel approval submission",
+  "CANCEL_BILL": "Cancel bill",
+  "VOID_BILL": "Void paid bill",
+  "REVERSE_BILL": "Reverse paid bill (credit note)"
+}

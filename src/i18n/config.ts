@@ -6,10 +6,12 @@ import en from './locales/en.json';
 import th from './locales/th.json';
 import errorsEn from './locales/errors.en.json';
 import errorsTh from './locales/errors.th.json';
+import billActionsEn from './locales/billActions.en.json';
+import billActionsTh from './locales/billActions.th.json';
 
 const resources = {
-  en: { translation: en, apiErrors: errorsEn },
-  th: { translation: th, apiErrors: errorsTh },
+  en: { translation: en, apiErrors: errorsEn, billActions: billActionsEn },
+  th: { translation: th, apiErrors: errorsTh, billActions: billActionsTh },
 };
 
 i18n

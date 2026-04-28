@@ -14,6 +14,7 @@ import { DateTime } from '../../components/DateTime';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { fmtCurrency } from '../../lib/format';
 import { CreateRetailBillModal } from './CreateRetailBillModal';
+import { useBillActions, type BillAction, type BillBlockingReason } from '../../hooks/useBillActions';
 
 interface Branch {
   id: number;
@@ -90,8 +91,9 @@ const STATUS_VALUES = ['OPEN', 'PAID', 'VOIDED'] as const;
 
 export function RetailBillsPage() {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   const queryClient = useQueryClient();
+  const canCreate = can('BILL.CREATE');
   const [branchId, setBranchId] = useState<string>(user?.branch_id ? String(user.branch_id) : '');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [pageIndex, setPageIndex] = useState(0);
@@ -154,7 +156,7 @@ export function RetailBillsPage() {
                 {isRoot ? t('retail.bills.title') : detailTitle}
               </div>
               <div className="mobile-header-end w-nav">
-                {isRoot ? (
+                {isRoot && canCreate ? (
                   <button
                     className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
                     aria-label={t('retail.bills.newBill')}
@@ -171,14 +173,16 @@ export function RetailBillsPage() {
             <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
               <h1 className="heading-2 shrink-0">{t('retail.bills.title')}</h1>
               <p className="text-sm text-fg/60 truncate flex-1">{t('retail.bills.description')}</p>
-              <Button
-                color="primary"
-                size="sm"
-                startIcon={<Plus size={14} />}
-                onClick={() => setCreateOpen(true)}
-              >
-                {t('retail.bills.newBill')}
-              </Button>
+              {canCreate && (
+                <Button
+                  color="primary"
+                  size="sm"
+                  startIcon={<Plus size={14} />}
+                  onClick={() => setCreateOpen(true)}
+                >
+                  {t('retail.bills.newBill')}
+                </Button>
+              )}
             </div>
           )}
 
@@ -290,6 +294,8 @@ function RetailBillDetail({ billId, isMobile }: { billId: number; isMobile: bool
     queryFn: () => apiClient.get<BillDetail[]>(`/v_bill_detail?bill_id=eq.${billId}`),
   });
 
+  const { data: actionsData, getAction } = useBillActions(billId);
+
   if (isLoading) return <div className="p-6 text-sm text-subtler">{t('common.loading')}</div>;
   const detail = details?.[0];
   if (!detail) return <div className="p-6 text-sm text-subtler">—</div>;
@@ -298,16 +304,15 @@ function RetailBillDetail({ billId, isMobile }: { billId: number; isMobile: bool
   const payments = detail.payments ?? [];
   const statusColor = detail.status === 'PAID' ? 'success' : detail.status === 'VOIDED' ? 'default' : 'warning';
 
-  // Payment is blocked while any approval line is unresolved.
-  const blockingLines = lines.filter(l =>
-    l.approval_status && !['NOT_REQUIRED', 'APPROVED'].includes(l.approval_status),
-  );
-  const canTakePayment = detail.status === 'OPEN' && blockingLines.length === 0;
-  const canVoid = detail.status === 'OPEN'; // Voiding PAID retail bills is Case B (CN) — out of scope here.
+  const addPaymentAction = getAction('ADD_PAYMENT');
+  const cancelBillAction = getAction('CANCEL_BILL');
+  const showPayBtn = !!addPaymentAction?.is_available;
+  const showVoidBtn = !!cancelBillAction?.is_available;
 
   const onMutationSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ['retail', 'bill-detail', billId] });
     queryClient.invalidateQueries({ queryKey: ['retail', 'bills'] });
+    queryClient.invalidateQueries({ queryKey: ['bill-actions', billId] });
   };
 
   return (
@@ -318,7 +323,7 @@ function RetailBillDetail({ billId, isMobile }: { billId: number; isMobile: bool
           <span className="font-semibold font-mono">{detail.bill_code_display}</span>
           <Badge color={statusColor} size="sm">{detail.status}</Badge>
           <div className="flex-1" />
-          {canTakePayment && (
+          {showPayBtn && (
             <Button
               size="sm"
               color="primary"
@@ -328,7 +333,7 @@ function RetailBillDetail({ billId, isMobile }: { billId: number; isMobile: bool
               {t('retail.bills.takePayment')}
             </Button>
           )}
-          {canVoid && (
+          {showVoidBtn && (
             <Button
               size="sm"
               variant="outline"
@@ -369,9 +374,9 @@ function RetailBillDetail({ billId, isMobile }: { billId: number; isMobile: bool
       </div>
 
       {/* Mobile action row */}
-      {isMobile && (canTakePayment || canVoid) && (
+      {isMobile && (showPayBtn || showVoidBtn) && (
         <div className="flex-none flex gap-2 px-4 py-3 border-b border-line">
-          {canTakePayment && (
+          {showPayBtn && (
             <Button
               size="sm"
               color="primary"
@@ -382,7 +387,7 @@ function RetailBillDetail({ billId, isMobile }: { billId: number; isMobile: bool
               {t('retail.bills.takePayment')}
             </Button>
           )}
-          {canVoid && (
+          {showVoidBtn && (
             <Button
               size="sm"
               variant="outline"
@@ -397,19 +402,14 @@ function RetailBillDetail({ billId, isMobile }: { billId: number; isMobile: bool
         </div>
       )}
 
-      {/* Blocked-by-approval hint */}
-      {detail.status === 'OPEN' && blockingLines.length > 0 && (
-        <div className="flex-none px-4 py-3 border-b border-line">
-          <div className="alert alert-warning">
-            <AlertCircle size={16} />
-            <div className="alert-description">
-              {t('retail.bills.paymentBlockedByApproval', {
-                count: blockingLines.length,
-                statuses: blockingLines.map(l => l.approval_status).join(', '),
-              })}
-            </div>
-          </div>
-        </div>
+      {/* Blocked-action hint — show why ADD_PAYMENT or CANCEL_BILL is unavailable */}
+      {actionsData && (addPaymentAction?.blocking_reason || cancelBillAction?.blocking_reason) && (
+        <BlockedActionHints
+          actions={[addPaymentAction, cancelBillAction].filter((a): a is BillAction => !!a && !a.is_available && !!a.blocking_reason)}
+          pendingCount={actionsData.pending_approval_count}
+          pendingTotal={actionsData.pending_approval_total}
+          remaining={actionsData.remaining_amount}
+        />
       )}
 
       {/* Body: lines + payments stacked */}
@@ -741,5 +741,49 @@ function VoidBillModal({
         </div>
       </div>
     </Modal>
+  );
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * Blocked Action Hints — explains *why* an action button is hidden
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+function BlockedActionHints({
+  actions, pendingCount, pendingTotal, remaining,
+}: {
+  actions: BillAction[];
+  pendingCount: number;
+  pendingTotal: number;
+  remaining: number;
+}) {
+  const { t } = useTranslation();
+  if (actions.length === 0) return null;
+
+  const reasonInterp = (reason: BillBlockingReason): Record<string, string | number> => {
+    switch (reason) {
+      case 'pending_approval_blocks':
+        return { count: pendingCount, total: fmtCurrency(pendingTotal) };
+      case 'not_paid_in_full':
+        return { remaining: fmtCurrency(remaining) };
+      default:
+        return {};
+    }
+  };
+
+  return (
+    <div className="flex-none px-4 py-3 border-b border-line flex flex-col gap-2">
+      {actions.map(a => (
+        <div key={a.action_code} className="alert alert-warning">
+          <AlertCircle size={16} />
+          <div className="alert-description">
+            <span className="font-medium">{t(a.action_code, { ns: 'billActions' })}: </span>
+            {t(`blockingReason.${a.blocking_reason}`, {
+              ns: 'apiErrors',
+              ...reasonInterp(a.blocking_reason as BillBlockingReason),
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }

@@ -1,4 +1,9 @@
 {
+  "blockingReason.status_not_allowed": "Not allowed in the current status",
+  "blockingReason.bill_purpose_not_match": "Not supported for this bill type",
+  "blockingReason.pending_approval_blocks": "{{count}} item(s) pending approval — total {{total}} THB",
+  "blockingReason.not_paid_in_full": "{{remaining}} THB still unpaid",
+  "blockingReason.permission_denied": "You do not have permission",
   "user.invalid_current_password": "Current password is incorrect",
   "user.password_same": "New password must be different from the current one",
   "user.password_weak": "Password is too weak",

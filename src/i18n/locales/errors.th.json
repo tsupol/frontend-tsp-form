@@ -1,4 +1,9 @@
 {
+  "blockingReason.status_not_allowed": "สถานะปัจจุบันไม่สามารถทำรายการนี้ได้",
+  "blockingReason.bill_purpose_not_match": "ประเภทบิลไม่รองรับการทำรายการนี้",
+  "blockingReason.pending_approval_blocks": "รออนุมัติ {{count}} รายการ — รวม {{total}} บาท",
+  "blockingReason.not_paid_in_full": "ค้างชำระอีก {{remaining}} บาท",
+  "blockingReason.permission_denied": "คุณไม่มีสิทธิ์ดำเนินการนี้",
   "user.invalid_current_password": "รหัสผ่านปัจจุบันไม่ถูกต้อง",
   "user.password_same": "รหัสผ่านใหม่ต้องไม่ซ้ำกับรหัสผ่านเดิม",
   "user.password_weak": "รหัสผ่านไม่ปลอดภัยเพียงพอ",

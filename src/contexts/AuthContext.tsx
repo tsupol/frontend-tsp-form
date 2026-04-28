@@ -8,11 +8,24 @@ interface LoginResult {
   needsHoldingSelect: boolean;
 }
 
+interface Capability {
+  code: string;
+  scope: string;
+  description: string;
+}
+
+interface CapabilitiesResponse {
+  role_code: string;
+  capabilities: Capability[];
+}
+
 interface AuthContextType {
   user: UserInfo | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   needsHoldingSelect: boolean;
+  capabilities: Set<string>;
+  can: (code: string) => boolean;
   login: (username: string, password: string) => Promise<LoginResult>;
   logout: () => Promise<void>;
   switchHolding: (holdingId: number) => Promise<void>;
@@ -24,6 +37,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [needsHoldingSelect, setNeedsHoldingSelect] = useState(false);
+  const [capabilities, setCapabilities] = useState<Set<string>>(new Set());
+
+  const fetchCapabilities = useCallback(async () => {
+    try {
+      const res = await apiClient.rpc<CapabilitiesResponse>('my_capabilities');
+      setCapabilities(new Set(res.capabilities.map(c => c.code)));
+    } catch (err) {
+      console.error('[Auth] Failed to fetch capabilities:', err);
+      setCapabilities(new Set());
+    }
+  }, []);
+
+  const can = useCallback((code: string) => capabilities.has(code), [capabilities]);
   const hasHandledAuthError = useRef(false);
   const isLoginInProgress = useRef(false);
   const suppressAuthRedirect = useRef(false);
@@ -142,6 +168,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(userInfo);
           setNeedsHoldingSelect(userInfo.holding_id === null);
           scheduleRefresh();
+          if (userInfo.holding_id !== null) {
+            await fetchCapabilities();
+          }
         } catch (err) {
           console.error('[Auth] Failed to fetch user info after token validation:', err);
           authService.clearTokens();
@@ -184,11 +213,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setNeedsHoldingSelect(holdingNeeded);
 
       scheduleRefresh();
+      if (!holdingNeeded) {
+        await fetchCapabilities();
+      }
       return { needsHoldingSelect: holdingNeeded };
     } finally {
       isLoginInProgress.current = false;
     }
-  }, []);
+  }, [fetchCapabilities]);
 
   const logout = useCallback(async () => {
     if (refreshTimerRef.current) {
@@ -199,6 +231,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('selected_holding_id');
     setUser(null);
     setNeedsHoldingSelect(false);
+    setCapabilities(new Set());
   }, []);
 
   const switchHolding = useCallback(async (holdingId: number) => {
@@ -207,7 +240,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(prev => prev ? { ...prev, holding_id: result.holding_id } : prev);
     setNeedsHoldingSelect(false);
     scheduleRefresh();
-  }, [scheduleRefresh]);
+    await fetchCapabilities();
+  }, [scheduleRefresh, fetchCapabilities]);
 
   return (
     <AuthContext.Provider
@@ -216,6 +250,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!user && !authService.isTokenExpired(),
         isLoading,
         needsHoldingSelect,
+        capabilities,
+        can,
         login,
         logout,
         switchHolding,
