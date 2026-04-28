@@ -1509,6 +1509,7 @@
     "action_void_bill": "Void Bill",
     "action_void_bill_success": "Bill voided — contract returned to draft",
     "actionNotImplemented": "Not yet wired in this page",
+    "moreActions": "More actions",
     "actionCategory": {
       "lifecycle": "Lifecycle",
       "payment": "Payment",

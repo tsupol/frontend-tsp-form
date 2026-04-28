@@ -1,9 +1,9 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { Button, Modal, Input, Select, TextArea, MaskedInput, Badge, Tooltip, useSnackbarContext } from 'tsp-form';
-import { CheckCircle, XCircle, Pencil, Plus, Trash2, Loader2, ChevronsRight } from 'lucide-react';
+import { Button, Modal, Input, Select, TextArea, MaskedInput, Badge, Tooltip, PopOver, useSnackbarContext } from 'tsp-form';
+import { CheckCircle, XCircle, Pencil, Plus, Trash2, Loader2, ChevronsRight, ChevronDown } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { fmtCurrency } from '../../lib/format';
 import { BranchPinInput } from '../../components/BranchPinInput';
@@ -441,6 +441,39 @@ const ACTION_GRID_STATES: ReadonlySet<string> = new Set([
   'COMPLETED', 'TERMINATED', 'VOIDED', 'CANCELLED',
 ]);
 
+// Up to 5 actions to surface inline as primary buttons. Picks per state are
+// the ones staff click 95% of the time. Anything not in this list goes into
+// the "More actions" PopOver.
+function getPrimaryActionCodes(contract: ContractForActions): string[] {
+  const { state, is_paused, transfer_to_branch_id, late_fee_balance, outstanding_amount } = contract;
+
+  if (state !== 'ACTIVE' && state !== 'WAIT_LEGAL_PROCESS' && state !== 'ON_LEGAL_PROCESS') {
+    return [];
+  }
+
+  const codes: string[] = [];
+
+  if (transfer_to_branch_id) {
+    codes.push('TRANSFER_ACCEPT', 'TRANSFER_CANCEL');
+  }
+
+  if (is_paused) {
+    codes.push('RESUME_CONTRACT');
+  }
+
+  if ((outstanding_amount ?? 0) > 0) {
+    codes.push('PAY_INSTALLMENT');
+  }
+
+  if ((late_fee_balance ?? 0) > 0) {
+    codes.push('LATE_FEE_COLLECT');
+  }
+
+  codes.push('EARLY_PAYOFF');
+
+  return codes.slice(0, 5);
+}
+
 const CATEGORY_LABEL_KEY: Record<string, string> = {
   LIFECYCLE: 'contract.actionCategory.lifecycle',
   PAYMENT: 'contract.actionCategory.payment',
@@ -473,6 +506,8 @@ export function ContractActionButtons({ contract, onRefresh }: {
   const isWizardState = WIZARD_STATES.has(contract.state);
   const isPendingPayment = contract.state === 'PENDING_PAYMENT';
   const showActionGrid = ACTION_GRID_STATES.has(contract.state);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreTriggerRef = useRef<HTMLButtonElement>(null);
 
   const isCancelSaving = activeAction === 'cancel' && contract.state === 'SAVING';
   const isEarlyPayoff = activeAction === 'early_payoff';
@@ -511,26 +546,63 @@ export function ContractActionButtons({ contract, onRefresh }: {
     });
   };
 
-  // Filter to curated allowlist, hide permission-denied, group by category, sort
-  const grouped = (actionsResp?.actions ?? [])
+  // Filter to curated allowlist, hide permission-denied
+  const allowedActions = (actionsResp?.actions ?? [])
     .filter(a => FOOTER_ACTION_ALLOWLIST.has(a.action_code))
     .filter(a => a.blocking_reason !== 'permission_denied')
     .slice()
-    .sort((a, b) => a.sort_order - b.sort_order)
-    .reduce<Record<string, BackendContractAction[]>>((acc, a) => {
-      (acc[a.category] ||= []).push(a);
-      return acc;
-    }, {});
+    .sort((a, b) => a.sort_order - b.sort_order);
 
-  const sortedCategories = Object.keys(grouped).sort((a, b) => {
+  const primaryCodes = getPrimaryActionCodes(contract);
+  const primarySet = new Set(primaryCodes);
+  // Preserve primaryCodes order so RESUME/PAY_INSTALLMENT etc. appear left-to-right consistently
+  const primaryActions = primaryCodes
+    .map(c => allowedActions.find(a => a.action_code === c))
+    .filter((a): a is BackendContractAction => !!a);
+  const secondaryActions = allowedActions.filter(a => !primarySet.has(a.action_code));
+
+  const groupedSecondary = secondaryActions.reduce<Record<string, BackendContractAction[]>>((acc, a) => {
+    (acc[a.category] ||= []).push(a);
+    return acc;
+  }, {});
+  const sortedCategories = Object.keys(groupedSecondary).sort((a, b) => {
     const ai = CATEGORY_ORDER.indexOf(a);
     const bi = CATEGORY_ORDER.indexOf(b);
     return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
   });
 
+  const renderActionButton = (a: BackendContractAction, primary = false) => {
+    const feAction = BACKEND_TO_FE_ACTION[a.action_code];
+    const config = feAction ? ACTION_CONFIGS[feAction] : null;
+    const tooltipContent = !a.is_available && a.blocking_reason
+      ? t(`blockingReason.${a.blocking_reason}`, {
+          ns: 'apiErrors',
+          defaultValue: a.blocking_reason,
+        })
+      : !feAction
+        ? t('contract.actionNotImplemented', { defaultValue: 'ยังไม่ได้เชื่อมในหน้านี้' })
+        : a.action_name_th;
+    return (
+      <Tooltip key={a.action_code} content={tooltipContent} placement="top">
+        <Button
+          variant={primary ? undefined : 'outline'}
+          size="sm"
+          color={primary && a.is_available && feAction ? (config?.color ?? 'primary') : config?.color}
+          disabled={!a.is_available || !feAction}
+          onClick={() => {
+            handleBackendAction(a);
+            setMoreOpen(false);
+          }}
+        >
+          {a.action_name_th}
+        </Button>
+      </Tooltip>
+    );
+  };
+
   return (
     <>
-      <div className="flex-none border-t border-line flex flex-col gap-3 px-4 py-3 max-h-[40vh] overflow-auto better-scroll">
+      <div className="flex-none border-t border-line flex flex-col gap-2 px-4 py-3">
         {isWizardState && (
           <Button
             size="sm"
@@ -563,44 +635,51 @@ export function ContractActionButtons({ contract, onRefresh }: {
           </div>
         )}
 
-        {showActionGrid && sortedCategories.map(cat => {
-          const actions = grouped[cat];
-          if (!actions || actions.length === 0) return null;
-          return (
-            <div key={cat} className="flex flex-col gap-1.5">
-              <div className="text-[11px] font-semibold uppercase tracking-wider text-subtle">
-                {t(CATEGORY_LABEL_KEY[cat] ?? cat, { defaultValue: cat })}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {actions.map(a => {
-                  const feAction = BACKEND_TO_FE_ACTION[a.action_code];
-                  const config = feAction ? ACTION_CONFIGS[feAction] : null;
-                  const tooltipContent = !a.is_available && a.blocking_reason
-                    ? t(`blockingReason.${a.blocking_reason}`, {
-                        ns: 'apiErrors',
-                        defaultValue: a.blocking_reason,
-                      })
-                    : !feAction
-                      ? t('contract.actionNotImplemented', { defaultValue: 'ยังไม่ได้เชื่อมในหน้านี้' })
-                      : a.action_name_th;
-                  return (
-                    <Tooltip key={a.action_code} content={tooltipContent} placement="top">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        color={config?.color}
-                        disabled={!a.is_available || !feAction}
-                        onClick={() => handleBackendAction(a)}
-                      >
-                        {a.action_name_th}
-                      </Button>
-                    </Tooltip>
-                  );
-                })}
-              </div>
+        {showActionGrid && (
+          <div className="flex flex-wrap items-center gap-2">
+            {primaryActions.map(a => renderActionButton(a, true))}
+            {secondaryActions.length > 0 && (
+              <Button
+                ref={moreTriggerRef}
+                variant="outline"
+                size="sm"
+                endIcon={<ChevronDown size={14} />}
+                onClick={() => setMoreOpen(v => !v)}
+              >
+                {t('contract.moreActions', { defaultValue: 'More actions' })}
+              </Button>
+            )}
+          </div>
+        )}
+
+        {showActionGrid && (
+          <PopOver
+            isOpen={moreOpen}
+            onClose={() => setMoreOpen(false)}
+            triggerRef={moreTriggerRef}
+            placement="top"
+            align="end"
+            maxWidth="32rem"
+            maxHeight="60vh"
+          >
+            <div className="flex flex-col gap-3 p-3">
+              {sortedCategories.map(cat => {
+                const actions = groupedSecondary[cat];
+                if (!actions || actions.length === 0) return null;
+                return (
+                  <div key={cat} className="flex flex-col gap-1.5">
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-subtle">
+                      {t(CATEGORY_LABEL_KEY[cat] ?? cat, { defaultValue: cat })}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {actions.map(a => renderActionButton(a))}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          );
-        })}
+          </PopOver>
+        )}
       </div>
 
       <SavingDepositModal

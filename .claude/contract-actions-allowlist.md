@@ -148,6 +148,33 @@ These actions DO show up in the contract detail's customer-section, but as part 
 
 ---
 
+## Layout — primary inline + "More actions" PopOver
+
+Even after curating to ~38, that's too many buttons to dump on screen. Staff click the same 3-5 actions 95% of the time; the rest are reachable but rare.
+
+**Layout pattern (matches POS / ERP convention):**
+
+- **Inline:** up to 5 primary actions (state-aware list — see `getPrimaryActionCodes()` in `ContractActions.tsx`)
+- **PopOver:** everything else, grouped by category, opens from a "More actions ▾" button
+
+**Primary picks per state (ACTIVE / WAIT_LEGAL_PROCESS / ON_LEGAL_PROCESS):**
+
+Order matters — they render left-to-right as listed. Order is contextual: pending transfer / paused state takes precedence because those are time-sensitive.
+
+1. `TRANSFER_ACCEPT` + `TRANSFER_CANCEL` — only if `transfer_to_branch_id` is set
+2. `RESUME_CONTRACT` — only if `is_paused`
+3. `PAY_INSTALLMENT` — if `outstanding_amount > 0`
+4. `LATE_FEE_COLLECT` — if `late_fee_balance > 0`
+5. `EARLY_PAYOFF` — always (until COMPLETED)
+
+Capped at 5; anything beyond falls into the PopOver.
+
+**Why this list:** these are the actions tied to the **most common reason a user opens this contract** — they're handling money, accepting an inbound transfer, or resuming a paused contract. Everything else (device handling, wallet ops, lifecycle close-outs) is rarer and lives in the PopOver.
+
+**Edit `getPrimaryActionCodes()` to tune.** When backend adds new common actions, decide if they replace one of the 5 or join the PopOver.
+
+---
+
 ## Visibility rules within the allowlist
 
 For each allowlisted action:

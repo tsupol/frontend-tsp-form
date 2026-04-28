@@ -1509,6 +1509,7 @@
     "action_void_bill": "ยกเลิกบิล",
     "action_void_bill_success": "ยกเลิกบิลสำเร็จ — สัญญากลับเป็นร่าง",
     "actionNotImplemented": "ยังไม่ได้เชื่อมในหน้านี้",
+    "moreActions": "เพิ่มเติม",
     "actionCategory": {
       "lifecycle": "วงจรสัญญา",
       "payment": "การชำระเงิน",
