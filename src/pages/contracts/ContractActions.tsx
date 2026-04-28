@@ -397,9 +397,49 @@ const BACKEND_TO_FE_ACTION: Record<string, ContractAction> = Object.entries(FE_T
   .reduce((acc, [fe, be]) => ({ ...acc, [be]: fe as ContractAction }), {});
 
 const CATEGORY_ORDER: string[] = [
-  'LIFECYCLE', 'PAYMENT', 'BILLING', 'WALLET', 'FEE',
-  'DEVICE', 'CUSTOMER', 'APPROVAL', 'DOCUMENT',
+  'PAYMENT', 'FEE', 'BILLING', 'WALLET',
+  'DEVICE', 'LIFECYCLE', 'CUSTOMER',
 ];
+
+// Curated set of actions that belong in the contract-detail right-panel footer.
+// Excluded actions live in: wizard (draft/setup), customer panel (profile edits),
+// inventory (post-terminal device handoffs), or admin pages (approvals/edge cases).
+// See .claude/contract-actions-allowlist.md
+const FOOTER_ACTION_ALLOWLIST: ReadonlySet<string> = new Set([
+  // LIFECYCLE
+  'PAUSE_CONTRACT', 'RESUME_CONTRACT',
+  'COMPLETE_CONTRACT', 'TERMINATE_CONTRACT', 'VOID_CONTRACT',
+  'TRANSFER_BRANCH', 'TRANSFER_ACCEPT', 'TRANSFER_CANCEL',
+  'APPOINTMENT_CREATE', 'APPOINTMENT_CANCEL',
+  'HOLDING_REFUND', 'HOLDING_REFUND_VOID',
+  'UPDATE_DELIVERY', 'ADD_NOTE',
+  // PAYMENT
+  'PAY_INSTALLMENT', 'EARLY_PAYOFF',
+  // BILLING
+  'ADD_ADDON',
+  // WALLET
+  'SAVING_DEPOSIT', 'SAVING_CASHOUT',
+  'INSURANCE_TOPUP', 'INSURANCE_DEDUCT', 'INSURANCE_CASHOUT', 'APPLY_INSURANCE',
+  'CREDIT_CASHOUT',
+  // FEE
+  'LATE_FEE_COLLECT', 'SERVICE_CHARGE', 'SAVING_DEDUCT',
+  // DEVICE
+  'BIND_DEVICE', 'UNBIND_DEVICE',
+  'CUSTOMER_DEPOSIT_DEVICE', 'RETURN_DEPOSIT',
+  'REPOSSESS', 'BIND_LOANER', 'UNBIND_LOANER', 'DEVICE_REPAIR_REQUEST',
+  // CUSTOMER (contract-scoped only)
+  'ADD_GUARANTOR', 'REMOVE_GUARANTOR',
+  'ATTACH_CUSTOMER', 'DETACH_CUSTOMER',
+]);
+
+// States where the wizard owns the user flow — footer just shows "Continue draft"
+const WIZARD_STATES: ReadonlySet<string> = new Set(['DRAFT', 'SAVING', 'PENDING_APPROVAL']);
+
+// States where the curated grid is shown
+const ACTION_GRID_STATES: ReadonlySet<string> = new Set([
+  'ACTIVE', 'WAIT_LEGAL_PROCESS', 'ON_LEGAL_PROCESS',
+  'COMPLETED', 'TERMINATED', 'VOIDED', 'CANCELLED',
+]);
 
 const CATEGORY_LABEL_KEY: Record<string, string> = {
   LIFECYCLE: 'contract.actionCategory.lifecycle',
@@ -430,7 +470,9 @@ export function ContractActionButtons({ contract, onRefresh }: {
     staleTime: 30 * 1000,
   });
 
-  const isDraftOrSaving = contract.state === 'DRAFT' || contract.state === 'SAVING';
+  const isWizardState = WIZARD_STATES.has(contract.state);
+  const isPendingPayment = contract.state === 'PENDING_PAYMENT';
+  const showActionGrid = ACTION_GRID_STATES.has(contract.state);
 
   const isCancelSaving = activeAction === 'cancel' && contract.state === 'SAVING';
   const isEarlyPayoff = activeAction === 'early_payoff';
@@ -469,8 +511,10 @@ export function ContractActionButtons({ contract, onRefresh }: {
     });
   };
 
-  // Group backend actions by category; preserve sort_order within each
+  // Filter to curated allowlist, hide permission-denied, group by category, sort
   const grouped = (actionsResp?.actions ?? [])
+    .filter(a => FOOTER_ACTION_ALLOWLIST.has(a.action_code))
+    .filter(a => a.blocking_reason !== 'permission_denied')
     .slice()
     .sort((a, b) => a.sort_order - b.sort_order)
     .reduce<Record<string, BackendContractAction[]>>((acc, a) => {
@@ -487,7 +531,7 @@ export function ContractActionButtons({ contract, onRefresh }: {
   return (
     <>
       <div className="flex-none border-t border-line flex flex-col gap-3 px-4 py-3 max-h-[40vh] overflow-auto better-scroll">
-        {isDraftOrSaving && (
+        {isWizardState && (
           <Button
             size="sm"
             color="primary"
@@ -499,7 +543,27 @@ export function ContractActionButtons({ contract, onRefresh }: {
           </Button>
         )}
 
-        {sortedCategories.map(cat => {
+        {isPendingPayment && (
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              color="primary"
+              onClick={() => setActiveAction('continue_pay')}
+            >
+              {t('contract.action_continue_pay')}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              color="danger"
+              onClick={() => setActiveAction('void_bill')}
+            >
+              {t('contract.action_void_bill')}
+            </Button>
+          </div>
+        )}
+
+        {showActionGrid && sortedCategories.map(cat => {
           const actions = grouped[cat];
           if (!actions || actions.length === 0) return null;
           return (
