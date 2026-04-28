@@ -202,19 +202,107 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, branchId, lines, paymentMethod, paymentAmount, bankAccountId]);
 
+  /**
+   * Submission strategy:
+   *  - No discount needing approval → atomic fn_bill_retail_submit (PAID immediately).
+   *  - Discount needs approval → 3-step flow per doc 25:
+   *      fn_bill_create (REVENUE lines)
+   *      → fn_bill_line_item_add (each DISCOUNT line)
+   *      → fn_bill_line_item_submit_approval (each DISCOUNT line)
+   *    Bill ends up OPEN with discount line PENDING. Payment is collected
+   *    later (after approver review) via fn_bill_payment_add/_confirm.
+   */
   const submitMutation = useMutation({
-    mutationFn: () => apiClient.rpc<SubmitResponse>('fn_bill_retail_submit', {
-      ...previewParams,
-      p_payment_reference: null,
-      p_preview_token: preview?.preview_token,
-    }),
-    onSuccess: (res) => {
+    mutationFn: async (): Promise<{ code: string; mode: 'atomic' | 'approval'; change: number }> => {
+      if (!preview?.approvals?.any_required) {
+        const res = await apiClient.rpc<SubmitResponse>('fn_bill_retail_submit', {
+          ...previewParams,
+          p_payment_reference: null,
+          p_preview_token: preview?.preview_token,
+        });
+        return { code: res.code_display, mode: 'atomic', change: res.change_amount };
+      }
+
+      // 3-step approval flow
+      const revenueLines = lines.filter(l => l.charge_type !== 'RETAIL_DISCOUNT');
+      const discountLines = lines
+        .map((l, idx) => ({ line: l, idx }))
+        .filter(({ line }) => line.charge_type === 'RETAIL_DISCOUNT');
+
+      // Step 1: create bill with REVENUE lines only.
+      const created = await apiClient.rpc<{
+        bill_id: number;
+        code_display: string;
+      }>('fn_bill_create', {
+        p_branch_id: branchId,
+        p_customer_id: null,
+        p_contract_id: null,
+        p_bill_purpose: 'RETAIL',
+        p_line_items: revenueLines.map(l => ({
+          line_type: 'REVENUE',
+          charge_type: l.charge_type,
+          description: l.description ?? null,
+          amount: l.amount,
+          quantity: l.qty ?? 1,
+          variant_id: l.variant_id ?? null,
+        })),
+      });
+
+      const billId = created.bill_id;
+
+      // fn_bill_create's response doesn't echo line ids — fetch them from v_bill_detail.
+      // line_items come back in line_no order, which matches the order we sent.
+      const detail = await apiClient.get<Array<{
+        line_items: Array<{ line_id: number; charge_type: string }>;
+      }>>(`/v_bill_detail?bill_id=eq.${billId}`);
+      const createdLines = detail[0]?.line_items ?? [];
+      const revenueLineIds = createdLines.map(li => li.line_id);
+
+      // Build a map from original cart index → bill_line_item id (revenue lines only).
+      const cartIdxToLineId = new Map<number, number>();
+      let cursor = 0;
+      lines.forEach((line, idx) => {
+        if (line.charge_type !== 'RETAIL_DISCOUNT') {
+          cartIdxToLineId.set(idx, revenueLineIds[cursor++]);
+        }
+      });
+
+      // Step 2 + 3: add each DISCOUNT line + submit for approval.
+      for (const { line } of discountLines) {
+        const targetCartIdx = line.target_line_index ?? 0;
+        const targetLineId = cartIdxToLineId.get(targetCartIdx);
+        if (!targetLineId) {
+          throw new Error(`Discount target line ${targetCartIdx} not found after create`);
+        }
+
+        const added = await apiClient.rpc<{ line_item_id: number }>('fn_bill_line_item_add', {
+          p_bill_id: billId,
+          p_line_type: 'DISCOUNT',
+          p_charge_type: 'RETAIL_DISCOUNT',
+          p_description: line.description ?? null,
+          p_amount: line.amount,
+          p_quantity: 1,
+          p_target_line_id: targetLineId,
+        });
+
+        await apiClient.rpc('fn_bill_line_item_submit_approval', {
+          p_line_item_id: added.line_item_id,
+          p_reason: line.description ?? null,
+        });
+      }
+
+      return { code: created.code_display, mode: 'approval', change: 0 };
+    },
+    onSuccess: ({ code, mode, change }) => {
       addSnackbar({
+        type: 'success',
         message: (
           <div className="alert alert-success">
             <CheckCircle size={16} />
             <span className="alert-description">
-              {t('retail.create.submitSuccess', { code: res.code_display, change: fmtCurrency(res.change_amount) })}
+              {mode === 'atomic'
+                ? t('retail.create.submitSuccess', { code, change: fmtCurrency(change) })
+                : t('retail.create.submitPendingApproval', { code })}
             </span>
           </div>
         ),
@@ -227,6 +315,7 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
         const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
           || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
         addSnackbar({
+          type: 'error',
           message: (
             <div className="alert alert-danger">
               <XCircle size={16} />
@@ -290,22 +379,29 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
   const change = paymentAmount > total ? paymentAmount - total : 0;
   const allowedMethods = preview?.payments_required?.allowed_methods ?? ['CASH', 'TRANSFER'];
 
+  const needsApproval = !!preview?.approvals?.any_required;
+
   const blockReasons: string[] = [];
   if (!branchId) blockReasons.push(t('retail.create.blockNoBranch'));
   if (lines.length === 0) blockReasons.push(t('retail.create.blockEmptyCart'));
-  if (paymentMethod === 'TRANSFER' && !bankAccountId) blockReasons.push(t('retail.create.blockNoBank'));
-  if (lines.length > 0 && paymentAmount < total) blockReasons.push(t('retail.create.blockInsufficient'));
-  if (preview?.approvals?.any_required) blockReasons.push(t('retail.create.blockNeedsApproval'));
+  // Payment-side checks only apply to atomic flow. Approval flow defers payment.
+  if (!needsApproval) {
+    if (paymentMethod === 'TRANSFER' && !bankAccountId) blockReasons.push(t('retail.create.blockNoBank'));
+    if (lines.length > 0 && paymentAmount < total) blockReasons.push(t('retail.create.blockInsufficient'));
+  }
   preview?.guards?.custom_guards?.forEach(g => {
     if (g.ok === false && g.message_th) blockReasons.push(g.message_th);
   });
   preview?.blockers?.forEach(b => {
     if (b.message_th || b.message_en) blockReasons.push(b.message_th || b.message_en || b.code);
   });
-  if (preview && !preview.valid && blockReasons.length === 0) {
+  // For atomic path, preview must be valid. For approval path, preview returns
+  // valid: false only because of the approval requirement — that's expected.
+  const previewOk = needsApproval ? !!preview : !!preview?.valid;
+  if (preview && !previewOk && blockReasons.length === 0) {
     blockReasons.push(t('retail.create.blockInvalid'));
   }
-  const canSubmit = blockReasons.length === 0 && !!preview?.valid && !submitMutation.isPending;
+  const canSubmit = blockReasons.length === 0 && previewOk && !submitMutation.isPending;
 
   const handleSubmitClick = () => {
     if (submitMutation.isPending || previewing) return;
@@ -472,42 +568,52 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
             </div>
           )}
 
-          {/* Payment method + amount (single payment per retail bill — split_allowed=false) */}
-          <div className="input-group">
-            <div className="w-28 shrink-0">
-              <Select
-                value={paymentMethod}
-                onChange={(v) => { setPaymentMethod((v as PaymentMethod) ?? 'CASH'); setBankAccountId(null); }}
-                options={allowedMethods.map(m => ({ label: t(`paymentMethod.${m}`, { defaultValue: m }), value: m }))}
-                size="sm"
-                searchable={false}
-              />
+          {/* Payment method + amount (atomic flow only — approval flow defers payment) */}
+          {!needsApproval && (
+            <>
+              <div className="input-group">
+                <div className="w-28 shrink-0">
+                  <Select
+                    value={paymentMethod}
+                    onChange={(v) => { setPaymentMethod((v as PaymentMethod) ?? 'CASH'); setBankAccountId(null); }}
+                    options={allowedMethods.map(m => ({ label: t(`paymentMethod.${m}`, { defaultValue: m }), value: m }))}
+                    size="sm"
+                    searchable={false}
+                  />
+                </div>
+                <div className="input-group-divider" />
+                <MaskedInput
+                  mask="number"
+                  decimalScale={2}
+                  value={paymentAmount ? String(paymentAmount) : ''}
+                  onChange={(raw) => setPaymentAmount(parseFloat(raw) || 0)}
+                  placeholder={t('retail.create.amountPlaceholder')}
+                  size="sm"
+                  className="w-full"
+                  endIcon={<Wallet size={14} />}
+                  onEndIconClick={total > 0 ? () => setPaymentAmount(total) : undefined}
+                />
+              </div>
+              {paymentMethod === 'TRANSFER' && (
+                <Select
+                  value={bankAccountId ? String(bankAccountId) : null}
+                  onChange={(v) => setBankAccountId(v ? Number(v) : null)}
+                  options={bankAccounts.map(b => ({
+                    label: `${b.bank_name} - ${b.account_number}`,
+                    value: String(b.id),
+                  }))}
+                  placeholder={t('retail.create.selectBank')}
+                  size="sm"
+                  showChevron
+                />
+              )}
+            </>
+          )}
+          {needsApproval && (
+            <div className="alert alert-info">
+              <AlertCircle size={16} />
+              <div className="alert-description">{t('retail.create.approvalNote')}</div>
             </div>
-            <div className="input-group-divider" />
-            <MaskedInput
-              mask="number"
-              decimalScale={2}
-              value={paymentAmount ? String(paymentAmount) : ''}
-              onChange={(raw) => setPaymentAmount(parseFloat(raw) || 0)}
-              placeholder={t('retail.create.amountPlaceholder')}
-              size="sm"
-              className="w-full"
-              endIcon={<Wallet size={14} />}
-              onEndIconClick={total > 0 ? () => setPaymentAmount(total) : undefined}
-            />
-          </div>
-          {paymentMethod === 'TRANSFER' && (
-            <Select
-              value={bankAccountId ? String(bankAccountId) : null}
-              onChange={(v) => setBankAccountId(v ? Number(v) : null)}
-              options={bankAccounts.map(b => ({
-                label: `${b.bank_name} - ${b.account_number}`,
-                value: String(b.id),
-              }))}
-              placeholder={t('retail.create.selectBank')}
-              size="sm"
-              showChevron
-            />
           )}
 
           {/* Total + change */}
@@ -533,11 +639,7 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
             disabled={submitMutation.isPending || previewing}
             onClick={handleSubmitClick}
           >
-            {submitMutation.isPending
-              ? t('common.loading')
-              : previewing
-              ? t('retail.create.previewing')
-              : t('retail.create.checkout')}
+            {needsApproval ? t('retail.create.submitForApproval') : t('retail.create.checkout')}
           </Button>
         </div>
       </div>

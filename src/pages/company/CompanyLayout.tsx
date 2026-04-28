@@ -1,7 +1,7 @@
 import { useMemo, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { MapPin, Building2, Landmark, CalendarDays, AlertTriangle, ShieldBan, Cloud, KeyRound } from 'lucide-react';
+import { MapPin, Building2, Landmark, CalendarDays, AlertTriangle, ShieldBan, Cloud, KeyRound, UserCheck } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -31,6 +31,8 @@ export function CompanyLayout({ children }: { children: ReactNode }) {
     { type: 'link', path: '/admin/company/dunning', labelKey: 'nav.dunning', icon: AlertTriangle },
     { type: 'link', path: '/admin/company/blacklist', labelKey: 'nav.blacklist', icon: ShieldBan },
     { type: 'link', path: '/admin/company/icloud', labelKey: 'nav.icloud', icon: Cloud },
+    { type: 'group', labelKey: 'nav.groupStaff' },
+    { type: 'link', path: '/admin/company/staff-commission', labelKey: 'nav.staffCommission', icon: UserCheck },
   ], [isAdmin]);
 
   return (

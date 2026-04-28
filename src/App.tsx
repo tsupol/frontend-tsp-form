@@ -35,9 +35,8 @@ import { PriceCheckPage } from './pages/PriceCheckPage';
 import { LegalLayout } from './pages/legal/LegalLayout';
 import { DunningTargetsPage } from './pages/legal/DunningTargetsPage';
 import { LegalCasesPage } from './pages/legal/LegalCasesPage';
-import { CommissionLayout } from './pages/commission/CommissionLayout';
 import { StaffCommissionPage } from './pages/commission/StaffCommissionPage';
-import { NegotiationApprovalsPage } from './pages/commission/NegotiationApprovalsPage';
+import { ApprovalsPage } from './pages/approvals/ApprovalsPage';
 import { ContractsLayout } from './pages/contracts/ContractsLayout';
 import { ContractSearchPage } from './pages/contracts/ContractSearchPage';
 import { SavingContractsPage } from './pages/contracts/SavingContractsPage';
@@ -262,7 +261,11 @@ function App() {
       />
       <Route
         path="/admin/pricing/discount-approvals"
-        element={<Navigate to="/admin/commission/approvals" replace />}
+        element={<Navigate to="/admin/approvals" replace />}
+      />
+      <Route
+        path="/admin/commission/approvals"
+        element={<Navigate to="/admin/approvals" replace />}
       />
       <Route
         path="/admin/pricing/deal-partner-rates"
@@ -414,23 +417,27 @@ function App() {
         }
       />
 
-      {/* Commission */}
+      {/* Staff Commission — moved under Company */}
       <Route
         path="/admin/commission/staff"
+        element={<Navigate to="/admin/company/staff-commission" replace />}
+      />
+      <Route
+        path="/admin/company/staff-commission"
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <CommissionLayout><StaffCommissionPage /></CommissionLayout>
+              <CompanyLayout><StaffCommissionPage /></CompanyLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
       />
       <Route
-        path="/admin/commission/approvals"
+        path="/admin/approvals"
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <CommissionLayout><NegotiationApprovalsPage /></CommissionLayout>
+              <ApprovalsPage />
             </AdminLayout>
           </ProtectedRoute>
         }

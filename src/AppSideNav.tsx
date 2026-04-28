@@ -216,6 +216,8 @@ export const AppSideNav = () => {
         { key: 'dunning', icon: <AlertTriangle size="1rem" />, label: t('nav.dunning'), path: '/admin/company/dunning' },
         { key: 'blacklist', icon: <ShieldBan size="1rem" />, label: t('nav.blacklist'), path: '/admin/company/blacklist' },
         { key: 'icloud', icon: <Cloud size="1rem" />, label: t('nav.icloud'), path: '/admin/company/icloud' },
+        { type: 'group', key: 'grp-staff', label: t('nav.groupStaff') },
+        { key: 'staff-commission', icon: <UserCheck size="1rem" />, label: t('nav.staffCommission'), path: '/admin/company/staff-commission' },
       ],
     },
     {
@@ -226,14 +228,14 @@ export const AppSideNav = () => {
         { key: 'saving-contracts', icon: <PiggyBank size="1rem" />, label: t('nav.savingContracts'), path: '/admin/contracts/saving' },
       ],
     },
-    {
-      key: 'commission', icon: <Coins size="1rem" />, label: t('nav.commission'),
-      path: '/admin/commission/staff',
-      children: [
-        { key: 'staff-commission', icon: <UserCheck size="1rem" />, label: t('nav.staffCommission'), path: '/admin/commission/staff' },
-        { key: 'approvals', icon: <ClipboardCheck size="1rem" />, label: t('nav.negotiationApprovals'), path: '/admin/commission/approvals' },
-      ],
-    },
+    ...(['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role)
+      ? [{
+          key: 'approvals',
+          icon: <ClipboardCheck size="1rem" />,
+          label: t('nav.approvals'),
+          path: '/admin/approvals',
+        }]
+      : []),
     {
       key: 'accounting', icon: <BookOpen size="1rem" />, label: t('nav.accounting'),
       path: '/admin/accounting/day-close',

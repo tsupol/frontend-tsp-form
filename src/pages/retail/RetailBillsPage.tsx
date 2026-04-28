@@ -59,6 +59,8 @@ interface BillDetail {
   total_amount: number;
   paid_amount: number;
   customer_name: string | null;
+  bill_date: string | null;
+  created_at: string | null;
   line_items: BillLineItem[];
   payments: BillPayment[] | null;
 }
@@ -68,7 +70,7 @@ const METHOD_COLOR: Record<string, 'success' | 'primary' | 'secondary' | 'info' 
   TRANSFER: 'primary',
 };
 
-const STATUS_VALUES = ['PAID', 'VOIDED'] as const;
+const STATUS_VALUES = ['OPEN', 'PAID', 'VOIDED'] as const;
 
 export function RetailBillsPage() {
   const { t } = useTranslation();
@@ -135,8 +137,8 @@ export function RetailBillsPage() {
               <div className="mobile-header-title mobile-header-title-truncate">
                 {isRoot ? t('retail.bills.title') : detailTitle}
               </div>
-              <div className="mobile-header-end">
-                {isRoot && (
+              <div className="mobile-header-end w-nav">
+                {isRoot ? (
                   <button
                     className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
                     aria-label={t('retail.bills.newBill')}
@@ -144,7 +146,7 @@ export function RetailBillsPage() {
                   >
                     <Plus size={20} />
                   </button>
-                )}
+                ) : null}
               </div>
             </MobileHeader>
           )}
@@ -237,13 +239,13 @@ export function RetailBillsPage() {
               />
             </PageNavPanel>
 
-            <PageNavPanel id="detail" className="flex-1 overflow-y-auto better-scroll">
+            <PageNavPanel id="detail" className={isMobile ? '' : 'flex-1 flex flex-col min-h-0'}>
               {!selectedBillId && (
                 <div className="flex-1 h-full flex items-center justify-center text-subtler p-8">
                   {t('retail.bills.selectToView')}
                 </div>
               )}
-              {selectedBillId && <RetailBillDetail billId={selectedBillId} />}
+              {selectedBillId && <RetailBillDetail billId={selectedBillId} isMobile={isMobile} />}
             </PageNavPanel>
           </div>
 
@@ -261,7 +263,7 @@ export function RetailBillsPage() {
   );
 }
 
-function RetailBillDetail({ billId }: { billId: number }) {
+function RetailBillDetail({ billId, isMobile }: { billId: number; isMobile: boolean }) {
   const { t } = useTranslation();
 
   const { data: details, isLoading } = useQuery({
@@ -278,68 +280,84 @@ function RetailBillDetail({ billId }: { billId: number }) {
   const statusColor = detail.status === 'PAID' ? 'success' : detail.status === 'VOIDED' ? 'default' : 'warning';
 
   return (
-    <div className="p-4 md:p-6">
-      <div className="flex items-center gap-3 mb-1">
-        <h2 className="heading-3 font-mono">{detail.bill_code_display}</h2>
-        <Badge color={statusColor} size="sm">{detail.status}</Badge>
-      </div>
-      <div className="text-sm text-fg/60 mb-6">
-        {detail.customer_name || t('retail.walkIn')}
-      </div>
+    <div className="flex flex-col h-full">
+      {/* Desktop header — thin status row with code + badge */}
+      {!isMobile && (
+        <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
+          <span className="font-semibold font-mono">{detail.bill_code_display}</span>
+          <Badge color={statusColor} size="sm">{detail.status}</Badge>
+        </div>
+      )}
 
-      <dl className="grid grid-cols-2 gap-4 mb-6">
+      {/* Summary stats */}
+      <div className="flex-none grid grid-cols-3 gap-3 px-4 py-3 border-b border-line bg-surface">
         <div>
-          <dt className="text-xs text-fg/60 uppercase mb-1">{t('retail.bills.totalCharged')}</dt>
-          <dd className="text-base font-semibold tabular-nums">{fmtCurrency(detail.total_amount)}</dd>
+          <div className="text-xs text-subtle">{t('retail.bills.customer')}</div>
+          <div className="font-semibold text-sm truncate">
+            {detail.customer_name || t('retail.walkIn')}
+          </div>
         </div>
         <div>
-          <dt className="text-xs text-fg/60 uppercase mb-1">{t('retail.bills.totalPaid')}</dt>
-          <dd className="text-base font-semibold tabular-nums">{fmtCurrency(detail.paid_amount)}</dd>
+          <div className="text-xs text-subtle">{t('retail.bills.totalCharged')}</div>
+          <div className="font-semibold text-sm tabular-nums">{fmtCurrency(detail.total_amount)}</div>
         </div>
-      </dl>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div>
-          <div className="text-xs font-semibold text-fg/60 uppercase mb-3">
+          <div className="text-xs text-subtle">{t('retail.bills.totalPaid')}</div>
+          <div className="font-semibold text-sm tabular-nums">{fmtCurrency(detail.paid_amount)}</div>
+        </div>
+      </div>
+
+      {/* Timestamps */}
+      <div className="flex-none px-4 py-2 border-b border-line flex flex-wrap gap-x-6 gap-y-1 text-xs text-subtle">
+        <span>{t('retail.bills.billDate')}: <DateTime value={detail.bill_date ?? detail.created_at} showTime={false} /></span>
+        {detail.created_at && (
+          <span>{t('retail.bills.createdAt')}: <DateTime value={detail.created_at} /></span>
+        )}
+      </div>
+
+      {/* Body: lines + payments stacked */}
+      <div className="flex-1 overflow-auto better-scroll">
+        {/* Line items */}
+        <div className="px-4 pt-3 pb-1">
+          <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider">
             {t('retail.bills.lineItems')} ({lines.length})
-          </div>
-          <div className="space-y-2">
-            {lines.map((line) => (
-              <div key={line.line_id} className="flex items-center gap-2 text-sm">
-                <Badge size="sm" color="default">{line.charge_type}</Badge>
-                <span className="flex-1 min-w-0 truncate">{line.description}</span>
-                <span className="tabular-nums font-medium shrink-0">
-                  {fmtCurrency(line.amount)}
-                </span>
-              </div>
-            ))}
-          </div>
+          </h3>
         </div>
-
-        <div>
-          <div className="text-xs font-semibold text-fg/60 uppercase mb-3">
-            {t('retail.bills.payments')} ({payments.length})
-          </div>
-          {payments.length === 0 ? (
-            <div className="text-sm text-fg/40 italic">{t('retail.bills.noPayments')}</div>
-          ) : (
-            <div className="space-y-2">
-              {payments.map((pay) => (
-                <div key={pay.id} className="flex items-center gap-2 text-sm">
-                  <Badge color={METHOD_COLOR[pay.method] ?? 'default'} size="sm">
-                    {pay.method}
-                  </Badge>
-                  <span className="flex-1 min-w-0 truncate text-fg/60">
-                    {pay.bank_name ? `${pay.bank_name} ${pay.account_number ?? ''}` : '—'}
-                  </span>
-                  <span className="tabular-nums font-medium shrink-0">
-                    {fmtCurrency(pay.amount)}
-                  </span>
-                </div>
-              ))}
+        {lines.length === 0 ? (
+          <div className="p-8 text-center text-subtler">{t('common.noData')}</div>
+        ) : (
+          lines.map((line) => (
+            <div key={line.line_id} className="px-4 py-2.5 border-b border-line flex items-center gap-3">
+              <Badge size="sm" color="default">{line.charge_type}</Badge>
+              <span className="flex-1 min-w-0 truncate text-sm">{line.description}</span>
+              <span className="tabular-nums font-medium shrink-0 text-sm">
+                {fmtCurrency(line.amount)}
+              </span>
             </div>
-          )}
+          ))
+        )}
+
+        {/* Payments */}
+        <div className="px-4 pt-4 pb-1">
+          <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider">
+            {t('retail.bills.payments')} ({payments.length})
+          </h3>
         </div>
+        {payments.length === 0 ? (
+          <div className="px-4 py-3 text-sm text-subtler italic">{t('retail.bills.noPayments')}</div>
+        ) : (
+          payments.map((pay) => (
+            <div key={pay.id} className="px-4 py-2.5 border-b border-line flex items-center gap-3">
+              <Badge color={METHOD_COLOR[pay.method] ?? 'default'} size="sm">{pay.method}</Badge>
+              <span className="flex-1 min-w-0 truncate text-sm text-fg/60">
+                {pay.bank_name ? `${pay.bank_name} ${pay.account_number ?? ''}` : '—'}
+              </span>
+              <span className="tabular-nums font-medium shrink-0 text-sm">
+                {fmtCurrency(pay.amount)}
+              </span>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
