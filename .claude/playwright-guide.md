@@ -1,4 +1,4 @@
-# Playwright MCP Usage Guide
+i # Playwright MCP Usage Guide
 
 ## Performance Rules
 
@@ -35,3 +35,4 @@ await page.waitForURL('**/admin');
 ## After Login
 
 Use `browser_snapshot` to get the DOM tree, then interact via `browser_run_code` for multi-step flows or individual `browser_click`/`browser_fill_form` for single actions.
+fi
