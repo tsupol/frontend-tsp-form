@@ -2,13 +2,14 @@ import { useState, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UploadedImage } from 'tsp-form';
-import { CheckCircle, XCircle, CreditCard, PenLine, FileImage, Trash2, Upload } from 'lucide-react';
+import { CheckCircle, XCircle, CreditCard, FileImage, Trash2, Upload } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { uploadToS3, deleteFromS3 } from '../../../lib/upload';
 import { config } from '../../../config/config';
 import { useWorkspace } from './WorkspaceContext';
 import { useAuth } from '../../../contexts/AuthContext';
 import { SingleUpload } from './SingleUpload';
+import { SignatureCapture } from './SignatureCapture';
 
 interface CustomerDocument {
   id: number;
@@ -208,9 +209,7 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
       />
 
       {/* Signature */}
-      <SingleUpload
-        icon={<PenLine size={14} />}
-        label={t('workspace.docSignature')}
+      <SignatureCapture
         fileUrl={signature?.file_url ?? null}
         uploading={uploading === 'SIGNATURE'}
         onUpload={uploadSignature}

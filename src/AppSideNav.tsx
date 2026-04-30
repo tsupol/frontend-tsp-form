@@ -40,10 +40,13 @@ import {
   UserCheck, ClipboardCheck,
   // Fanout child icons — Accounting
   CalendarCheck, Wallet, List, ArrowUpRight,
+  // Dev sandbox
+  FlaskConical, PenLine,
 } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
 import { useTheme } from './contexts/ThemeContext';
 import { useNavGuard } from './contexts/NavGuardContext';
+import { isLocalDev } from './lib/devEnv';
 
 const lgQuery = window.matchMedia('(min-width: 1024px)');
 const subscribeLg = (cb: () => void) => { lgQuery.addEventListener('change', cb); return () => lgQuery.removeEventListener('change', cb); };
@@ -263,6 +266,13 @@ export const AppSideNav = () => {
       ],
     }] : []),
     { key: 'call-center', icon: <Headset size="1rem" />, label: t('nav.callCenter'), path: '/admin/call-center' },
+    ...(isLocalDev() ? [{
+      key: 'dev', icon: <FlaskConical size="1rem" />, label: 'Dev',
+      path: '/dev/signature',
+      children: [
+        { key: 'dev-signature', icon: <PenLine size="1rem" />, label: 'Signature Pad', path: '/dev/signature' },
+      ],
+    }] : []),
   ];
 
   const handleSelect = (_key: string, path?: string) => {

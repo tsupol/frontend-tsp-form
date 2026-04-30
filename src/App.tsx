@@ -65,6 +65,9 @@ import { CompanyRevenuePage } from './pages/accounting/CompanyRevenuePage';
 import { BranchLedgerPage } from './pages/accounting/BranchLedgerPage';
 import { BillsPage } from './pages/accounting/BillsPage';
 import { RetailBillsPage } from './pages/retail/RetailBillsPage';
+import { DevLayout } from './pages/dev/DevLayout';
+import { DevSignaturePage } from './pages/dev/DevSignaturePage';
+import { isLocalDev } from './lib/devEnv';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -404,6 +407,23 @@ function App() {
           </ProtectedRoute>
         }
       />
+
+      {/* Dev sandbox — localhost only */}
+      {isLocalDev() && (
+        <>
+          <Route path="/dev" element={<Navigate to="/dev/signature" replace />} />
+          <Route
+            path="/dev/signature"
+            element={
+              <ProtectedRoute>
+                <AdminLayout>
+                  <DevLayout><DevSignaturePage /></DevLayout>
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+        </>
+      )}
 
       {/* Customers */}
       <Route
