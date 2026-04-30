@@ -28,7 +28,6 @@ interface Quote {
   financed_amount: number;
   cost_price: number;
   interest_percent_total: number | null;
-  max_discount_percent: number;
   fin2_profit_amount: number | null;
 }
 
@@ -52,7 +51,6 @@ interface PricingRow {
   financed_amount: number;
   cost_price: number;
   interest_percent_total: number | null;
-  max_discount_percent: number;
   fin2_profit_amount: number | null;
 }
 
@@ -425,7 +423,6 @@ function PricingDetail({ model, quoteData, loading, t }: {
           financed_amount: q.financed_amount,
           cost_price: q.cost_price,
           interest_percent_total: q.interest_percent_total,
-          max_discount_percent: q.max_discount_percent,
           fin2_profit_amount: q.fin2_profit_amount,
         });
       }
@@ -464,7 +461,6 @@ function PricingDetail({ model, quoteData, loading, t }: {
                 <div className="flex items-center gap-2 mb-3">
                   <Badge size="sm" color="info">FIN1</Badge>
                   <span className="text-sm font-medium">{t('priceCheck.fin1Desc')}</span>
-                  <span className="text-xs text-subtle">· {t('priceCheck.maxDiscount')} {fin1Rows[0].max_discount_percent}%</span>
                 </div>
                 <PricingTable rows={fin1Rows} terms={fin1Terms} type="fin1" t={t} />
               </div>
@@ -476,7 +472,6 @@ function PricingDetail({ model, quoteData, loading, t }: {
                 <div className="flex items-center gap-2 mb-3">
                   <Badge size="sm" color="warning">FIN2</Badge>
                   <span className="text-sm font-medium">{t('priceCheck.fin2Desc')}</span>
-                  <span className="text-xs text-subtle">· {t('priceCheck.maxDiscount')} {fin2Rows[0].max_discount_percent}%</span>
                 </div>
                 <PricingTable rows={fin2Rows} terms={fin2Terms} type="fin2" t={t} />
                 <Fin2Calculator fin2Rows={fin2Rows} fin2Terms={fin2Terms} t={t} />
@@ -502,7 +497,7 @@ function resolveProfit(fin2Rows: PricingRow[], fin2Terms: number[], termMonths: 
   // If input is below the smallest term, use the smallest
   if (resolved == null) resolved = fin2Terms[0];
   const row = fin2Rows.find(r => r.term_months === resolved);
-  return row ? { baseTerm: resolved, profit: row.fin2_profit_amount ?? 0, cost: row.cost_price, maxDiscount: row.max_discount_percent } : null;
+  return row ? { baseTerm: resolved, profit: row.fin2_profit_amount ?? 0, cost: row.cost_price } : null;
 }
 
 function Fin2Calculator({ fin2Rows, fin2Terms, t }: {
@@ -535,7 +530,6 @@ function Fin2Calculator({ fin2Rows, fin2Terms, t }: {
       financed,
       installment,
       isCustomTerm,
-      maxDiscount: resolved.maxDiscount,
     };
   }, [termMonths, downAmount, fin2Rows, fin2Terms]);
 

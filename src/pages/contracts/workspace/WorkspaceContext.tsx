@@ -268,25 +268,28 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     createDraft();
   }, [data.customerId, data.contractId, data.draftCreating, data.branchId, data.modelId, data.variantId, data.selectedQuote, user]);
 
-  // ── Customer attachment (when customerId changes after draft exists) ──
-  const prevCustomerId = useRef<number | null>(null);
-  const customerAttachReady = useRef(false);
+  // ── Customer attachment (when local customerId differs from server) ──
+  // Server contract is the source of truth — only call attach when local
+  // customerId diverges from contract.customer_id, then re-fetch so cards update.
+  const lastAttachedRef = useRef<number | null>(null);
   useEffect(() => {
     if (!data.contractId || !data.customerId) return;
-    // Skip the first time — loadContract already has customer attached
-    if (!customerAttachReady.current) {
-      prevCustomerId.current = data.customerId;
-      customerAttachReady.current = true;
+    if (contract?.customer_id === data.customerId) {
+      lastAttachedRef.current = data.customerId;
       return;
     }
-    if (data.customerId === prevCustomerId.current) return;
-    prevCustomerId.current = data.customerId;
+    if (lastAttachedRef.current === data.customerId) return;
+    lastAttachedRef.current = data.customerId;
 
     apiClient.rpc('fn_contract_attach_customer', {
       p_contract_id: data.contractId,
       p_customer_id: data.customerId,
-    }).catch(() => {});
-  }, [data.contractId, data.customerId]);
+    })
+      .then(() => invalidateContract())
+      .catch(() => {
+        lastAttachedRef.current = null;
+      });
+  }, [data.contractId, data.customerId, contract?.customer_id, invalidateContract]);
 
   // ── Guarantor completeness (server-derived) ──────────────────────────
   const guarantorCount = guarantorList.length;

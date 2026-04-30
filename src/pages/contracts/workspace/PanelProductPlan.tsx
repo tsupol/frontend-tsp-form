@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Input, Badge, Button, MaskedInput, useSnackbarContext } from 'tsp-form';
-import { Search, XCircle, X, Calculator, Info, CheckCircle, Package, Smartphone, AlertTriangle } from 'lucide-react';
+import { Search, XCircle, X, Calculator, Info, CheckCircle, Package, Smartphone, AlertTriangle, Wand2 } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { fmtCurrency } from '../../../lib/format';
 import { getConditionLabel, getConditionTextColor } from '../../inventory/inventoryUtils';
@@ -47,7 +47,6 @@ interface QuoteRow {
   financed_amount: number;
   cost_price: number;
   interest_percent_total: number | null;
-  max_discount_percent: number;
   fin2_profit_amount: number | null;
 }
 
@@ -69,7 +68,6 @@ interface PricingRow {
   financed_amount: number;
   cost_price: number;
   interest_percent_total: number | null;
-  max_discount_percent: number;
   fin2_profit_amount: number | null;
 }
 
@@ -314,7 +312,6 @@ export function PanelProductPlan({ onClose }: Props) {
             financed_amount: q.financed_amount,
             cost_price: q.cost_price,
             interest_percent_total: null,
-            max_discount_percent: 0,
             fin2_profit_amount: q.profit_percent != null ? q.cost_price * q.profit_percent / 100 : null,
           });
         }
@@ -338,7 +335,6 @@ export function PanelProductPlan({ onClose }: Props) {
           financed_amount: q.financed_amount,
           cost_price: q.cost_price,
           interest_percent_total: q.interest_percent_total,
-          max_discount_percent: q.max_discount_percent,
           fin2_profit_amount: q.fin2_profit_amount,
         });
       }
@@ -435,7 +431,6 @@ export function PanelProductPlan({ onClose }: Props) {
     financed_amount: r.financed_amount,
     cost_price: r.cost_price,
     interest_percent_total: r.interest_percent_total,
-    max_discount_percent: r.max_discount_percent,
     fin2_profit_amount: r.fin2_profit_amount,
   });
 
@@ -791,7 +786,6 @@ export function PanelProductPlan({ onClose }: Props) {
                   financed_amount: r.financed,
                   cost_price: fin2Rows[0]?.cost_price ?? 0,
                   interest_percent_total: null,
-                  max_discount_percent: fin2Rows[0]?.max_discount_percent ?? 0,
                   fin2_profit_amount: r.profit,
                   base_term_months: r.baseTerm,
                 });
@@ -907,7 +901,9 @@ function resolveProfit(fin2Rows: PricingRow[], fin2Terms: number[], termMonths: 
   }
   if (resolved == null) resolved = fin2Terms[0];
   const row = fin2Rows.find(r => r.term_months === resolved);
-  return row ? { baseTerm: resolved, profit: row.fin2_profit_amount ?? 0, cost: row.cost_price } : null;
+  return row
+    ? { baseTerm: resolved, profit: row.fin2_profit_amount ?? 0, cost: row.cost_price }
+    : null;
 }
 
 interface CalcResult {
@@ -923,35 +919,70 @@ interface CalcResult {
 function Fin2Calculator({ fin2Rows, fin2Terms, t, onUse }: {
   fin2Rows: PricingRow[];
   fin2Terms: number[];
-  t: (key: string) => string;
+  t: (key: string, opts?: Record<string, unknown>) => string;
   onUse: (r: CalcResult) => void;
 }) {
+  // 3 free user inputs — no auto-overwrite. Wand buttons fill on demand.
   const [termInput, setTermInput] = useState('');
   const [downInput, setDownInput] = useState('');
+  const [installmentInput, setInstallmentInput] = useState('');
 
   const termMonths = parseInt(termInput) || 0;
   const downAmount = parseFloat(downInput) || 0;
+  const installmentAmount = parseFloat(installmentInput) || 0;
 
+  // Anchor the profit-rate row on the typed term, or the longest base term if none.
+  const seedTerm = termMonths > 0 ? termMonths : (fin2Terms[fin2Terms.length - 1] ?? 0);
+  const resolved = useMemo(
+    () => resolveProfit(fin2Rows, fin2Terms, seedTerm),
+    [fin2Rows, fin2Terms, seedTerm],
+  );
+
+  const total = resolved ? resolved.cost + resolved.profit : 0;
+  const clampedDown = Math.min(Math.max(downAmount, 0), total);
+  const financed = Math.max(0, total - clampedDown);
+
+  // Auto-fill formulas
+  const fillTerm = () => {
+    if (installmentAmount <= 0 || financed <= 0) return;
+    const t = Math.max(1, Math.ceil(financed / installmentAmount));
+    setTermInput(String(t));
+  };
+  const fillInstallment = () => {
+    if (termMonths < 1) return;
+    const inst = Math.round(financed / termMonths);
+    setInstallmentInput(String(inst));
+  };
+
+  // Result is ready when we have a profit-rate row + both term and installment typed.
   const result = useMemo(() => {
-    if (termMonths < 1 || fin2Terms.length === 0) return null;
-    const resolved = resolveProfit(fin2Rows, fin2Terms, termMonths);
     if (!resolved) return null;
+    if (termMonths < 1 || installmentAmount <= 0) return null;
 
-    const total = resolved.cost + resolved.profit;
-    const financed = Math.max(0, total - downAmount);
-    const installment = termMonths > 0 ? Math.round(financed / termMonths) : 0;
+    // x1 = total = cost + profit (FIN2 has no interest markup)
+    // x2 = down + term × installment
+    // Per UI_SUMMARY/10 §fn_contract_apply_negotiation. Authoritative cap +
+    // needs_approval come from fn_contract_apply_negotiation when user saves;
+    // here we just preview the discount amount/percent.
+    // Discount may be negative (paying above rate) — UI always shows it.
+    const negotiatedTotal = clampedDown + termMonths * installmentAmount;
+    const discountAmount = total - negotiatedTotal;
+    const discountPercent = total > 0 ? (discountAmount / total) * 100 : 0;
     const isCustomTerm = !fin2Terms.includes(termMonths);
 
     return {
       baseTerm: resolved.baseTerm,
       profit: resolved.profit,
       total,
-      downAmount: Math.min(downAmount, total),
+      downAmount: clampedDown,
       financed,
-      installment,
+      termMonths,
+      installment: installmentAmount,
+      discountAmount,
+      discountPercent,
       isCustomTerm,
     };
-  }, [termMonths, downAmount, fin2Rows, fin2Terms]);
+  }, [resolved, termMonths, installmentAmount, clampedDown, total, financed, fin2Terms]);
 
   return (
     <div className="mt-3 border border-line rounded-lg p-4 bg-surface-hover/50">
@@ -963,11 +994,34 @@ function Fin2Calculator({ fin2Rows, fin2Terms, t, onUse }: {
       <div className="flex gap-3 mb-3">
         <div className="flex flex-col gap-1 flex-1">
           <label className="form-label">{t('priceCheck.term')} ({t('priceCheck.months')})</label>
-          <Input size="sm" type="number" min={1} placeholder={fin2Terms.join(', ')} value={termInput} onChange={(e) => setTermInput(e.target.value)} className="w-full" />
+          <Input
+            size="sm"
+            type="number"
+            min={1}
+            placeholder={fin2Terms.join(', ')}
+            value={termInput}
+            onChange={(e) => setTermInput(e.target.value)}
+            endIcon={<Wand2 size={14} />}
+            onEndIconClick={installmentAmount > 0 && financed > 0 ? fillTerm : undefined}
+            className="w-full"
+          />
         </div>
         <div className="flex flex-col gap-1 flex-1">
           <label className="form-label">{t('priceCheck.downPayment')}</label>
-          <MaskedInput size="sm" mask="number" decimalScale={0} value={downInput} onChange={(raw) => setDownInput(raw)} placeholder={t('priceCheck.thb')} className="w-full" />
+          <MaskedInput size="sm" mask="number" decimalScale={0} value={downInput} onChange={(raw) => setDownInput(raw)} className="w-full" />
+        </div>
+        <div className="flex flex-col gap-1 flex-1">
+          <label className="form-label">{t('priceCheck.installment')}</label>
+          <MaskedInput
+            size="sm"
+            mask="number"
+            decimalScale={0}
+            value={installmentInput}
+            onChange={(raw) => setInstallmentInput(raw)}
+            endIcon={<Wand2 size={14} />}
+            onEndIconClick={termMonths >= 1 ? fillInstallment : undefined}
+            className="w-full"
+          />
         </div>
       </div>
 
@@ -986,12 +1040,43 @@ function Fin2Calculator({ fin2Rows, fin2Terms, t, onUse }: {
             <span className="text-right tabular-nums">{fmt(result.total)}</span>
             <span className="text-subtle">{t('priceCheck.downPayment')}</span>
             <span className="text-right tabular-nums">{fmt(result.downAmount)}</span>
+            <span className="text-subtle">{t('priceCheck.term')}</span>
+            <span className="text-right tabular-nums">{result.termMonths} {t('priceCheck.months')}</span>
+            {(() => {
+              const cls = result.discountAmount > 0
+                ? 'text-success'
+                : result.discountAmount < 0
+                  ? 'text-danger'
+                  : 'text-subtle';
+              return (
+                <>
+                  <span className={cls}>{t('priceCheck.discount')}</span>
+                  <span className={`text-right tabular-nums ${cls}`}>
+                    <span className="text-xs text-subtle">({result.discountPercent.toFixed(2)}%)</span>
+                    {' '}{fmt(result.discountAmount)}
+                  </span>
+                </>
+              );
+            })()}
             <div className="col-span-2 border-t border-line my-1" />
             <span className="font-medium">{t('priceCheck.installment')}</span>
             <span className="text-right tabular-nums text-primary font-semibold text-base">{fmt(result.installment)}</span>
           </div>
+
           <div className="flex justify-end mt-3">
-            <Button size="sm" color="primary" onClick={() => onUse({ termMonths, baseTerm: result.baseTerm, profit: result.profit, total: result.total, downAmount: result.downAmount, financed: result.financed, installment: result.installment })}>
+            <Button
+              size="sm"
+              color="primary"
+              onClick={() => onUse({
+                termMonths: result.termMonths,
+                baseTerm: result.baseTerm,
+                profit: result.profit,
+                total: result.total,
+                downAmount: result.downAmount,
+                financed: result.financed,
+                installment: result.installment,
+              })}
+            >
               {t('priceCheck.useThisPlan')}
             </Button>
           </div>

@@ -13,7 +13,6 @@ export interface Quote {
   financed_amount: number;
   cost_price: number;
   interest_percent_total: number | null;
-  max_discount_percent: number;
   fin2_profit_amount: number | null;
 }
 

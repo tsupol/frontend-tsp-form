@@ -25,7 +25,6 @@ export interface PricingQuote {
   financed_amount: number;
   cost_price: number;
   interest_percent_total: number | null;
-  max_discount_percent: number;
   profit_amount: number | null;
 }
 
@@ -49,7 +48,6 @@ export interface Quote {
   financed_amount: number;
   cost_price: number;
   interest_percent_total: number | null;
-  max_discount_percent: number;
   fin2_profit_amount: number | null;
   /** Catalog term used for fn_contract_set_rate (differs from term_months when FIN2 calculator used) */
   base_term_months?: number;
