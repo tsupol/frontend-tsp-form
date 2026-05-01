@@ -8,7 +8,7 @@ interface Config {
 
 function loadConfig(): Config {
   return {
-    apiUrl: getEnv('VITE_API_URL', 'https://czynet.dyndns.org'),
+    apiUrl: getEnv('VITE_API_URL', 'https://nnf.czynet.dev/'),
     uploadUrl: getEnv('VITE_UPLOAD_URL', 'https://misc.ecap.cc/api/v1'),
     s3BaseUrl: getEnv('VITE_S3_BASE_URL', 'https://nnf-system-bucket.s3.ap-southeast-1.amazonaws.com'),
   };

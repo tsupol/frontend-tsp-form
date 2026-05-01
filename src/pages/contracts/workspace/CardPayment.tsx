@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Button, Select, MaskedInput } from 'tsp-form';
-import { Plus, Trash2, XCircle, Loader2, CreditCard } from 'lucide-react';
+import { Plus, Trash2, XCircle, Loader2, CreditCard, Wallet } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { fmtCurrency } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
@@ -191,6 +191,15 @@ export function CardPayment() {
                     onChange={(raw) => updatePayment(idx, { amount: parseFloat(raw) || 0 })}
                     size="sm"
                     className="w-full"
+                    endIcon={<Wallet size={14} />}
+                    onEndIconClick={() => {
+                      const otherTotal = payments.reduce((sum, p, i) => i === idx ? sum : sum + (p.amount || 0), 0);
+                      const remaining = Math.max(0, totalAmount - otherTotal);
+                      const fill = payment.method === 'SAVING_WALLET'
+                        ? Math.min(savingBalance, remaining)
+                        : remaining;
+                      updatePayment(idx, { amount: fill });
+                    }}
                   />
                 </div>
                 {payments.length > 1 && (

@@ -86,10 +86,11 @@ export function PanelSaving({ onClose: _onClose }: Props) {
 
   const mutation = useMutation({
     mutationFn: async () => {
-      await apiClient.rpc('fn_payment_record', {
+      await apiClient.rpc('fn_bill_wallet', {
         p_contract_id: data.contractId,
+        p_wallet_type: 'SAVING',
+        p_action: 'DEPOSIT',
         p_amount: Number(amount),
-        p_payment_type: 'SAVING_DEPOSIT',
         p_channel: channel,
         p_branch_id: data.branchId,
         p_note: note.trim() || undefined,

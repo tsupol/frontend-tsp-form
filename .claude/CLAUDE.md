@@ -63,8 +63,8 @@ When using tsp-form components, follow this lookup order:
 
 ## API
 
-- Base URL: `https://czynet.dyndns.org/`
-- API List: `https://czynet.dyndns.org/api_list`
+- Base URL: `https://nnf.czynet.dev/`
+- API List: `https://nnf.czynet.dev/api_list`
 - OpenAPI doc available at root endpoint
 - Backend is PostgREST (in development, may change)
 - Backend repo: `https://github.com/czynet/nnf` — cloned at `D:\dev\nnf` (pull before reading)

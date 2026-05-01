@@ -17,6 +17,8 @@ interface ContractForActions {
   state: string;
   commercial_model: string | null;
   branch_id: number;
+  model_id: number | null;
+  variant_id: number | null;
   device_id: number | null;
   outstanding_amount: number | null;
   late_fee_balance: number | null;
@@ -346,7 +348,6 @@ const REFUND_CHANNEL_OPTIONS = [
 
 interface BackendContractAction {
   action_code: string;
-  action_name_th: string;
   category: string;
   rpc_name: string;
   is_available: boolean;
@@ -486,14 +487,23 @@ const CATEGORY_LABEL_KEY: Record<string, string> = {
   DOCUMENT: 'contract.actionCategory.document',
 };
 
-export function ContractActionButtons({ contract, onRefresh }: {
+export function ContractActionButtons({ contract, onRefresh, requestedAction, onRequestedActionConsumed }: {
   contract: ContractForActions;
   onRefresh: () => void;
+  requestedAction?: ContractAction | null;
+  onRequestedActionConsumed?: () => void;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [activeAction, setActiveAction] = useState<ContractAction | null>(null);
   const { addSnackbar } = useSnackbarContext();
+
+  useEffect(() => {
+    if (requestedAction) {
+      setActiveAction(requestedAction);
+      onRequestedActionConsumed?.();
+    }
+  }, [requestedAction, onRequestedActionConsumed]);
 
   const { data: actionsResp } = useQuery({
     queryKey: ['contract-actions', contract.id],
@@ -535,11 +545,12 @@ export function ContractActionButtons({ contract, onRefresh }: {
       return;
     }
     // No FE modal yet — surface a friendly notice with the action context
+    const label = t(action.action_code, { ns: 'contractActions', defaultValue: action.action_code });
     addSnackbar({
       message: (
         <div className="alert alert-info">
           <span>
-            {action.action_name_th} — {t('contract.actionNotImplemented', { defaultValue: 'ยังไม่ได้เชื่อมในหน้านี้' })}
+            {label} — {t('contract.actionNotImplemented', { defaultValue: 'ยังไม่ได้เชื่อมในหน้านี้' })}
           </span>
         </div>
       ),
@@ -574,6 +585,7 @@ export function ContractActionButtons({ contract, onRefresh }: {
   const renderActionButton = (a: BackendContractAction, primary = false) => {
     const feAction = BACKEND_TO_FE_ACTION[a.action_code];
     const config = feAction ? ACTION_CONFIGS[feAction] : null;
+    const label = t(a.action_code, { ns: 'contractActions', defaultValue: a.action_code });
     const tooltipContent = !a.is_available && a.blocking_reason
       ? t(`blockingReason.${a.blocking_reason}`, {
           ns: 'apiErrors',
@@ -581,7 +593,7 @@ export function ContractActionButtons({ contract, onRefresh }: {
         })
       : !feAction
         ? t('contract.actionNotImplemented', { defaultValue: 'ยังไม่ได้เชื่อมในหน้านี้' })
-        : a.action_name_th;
+        : label;
     return (
       <Tooltip key={a.action_code} content={tooltipContent} placement="top">
         <Button
@@ -594,7 +606,7 @@ export function ContractActionButtons({ contract, onRefresh }: {
             setMoreOpen(false);
           }}
         >
-          {a.action_name_th}
+          {label}
         </Button>
       </Tooltip>
     );
@@ -799,12 +811,21 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
     return branches.map(b => ({ value: String(b.id), label: b.name }));
   }, [branches]);
 
-  // Assets for bind_device
+  // Assets for bind_device — must match contract branch + model (backend enforces both)
   const { data: assets } = useQuery({
-    queryKey: ['assets-available'],
-    queryFn: () => apiClient.get<Asset[]>('/v_assets?current_bucket=eq.ON_HAND_AVAILABLE&order=asset_code&limit=100'),
+    queryKey: ['assets-available', contract.branch_id, contract.model_id],
+    queryFn: () => {
+      const params = new URLSearchParams({
+        current_bucket: 'eq.ON_HAND_AVAILABLE',
+        branch_id: `eq.${contract.branch_id}`,
+        order: 'asset_code',
+        limit: '100',
+      });
+      if (contract.model_id != null) params.set('model_id', `eq.${contract.model_id}`);
+      return apiClient.get<Asset[]>(`/v_assets?${params.toString()}`);
+    },
     staleTime: 60 * 1000,
-    enabled: !!config?.needsDevice,
+    enabled: !!config?.needsDevice && contract.model_id != null,
   });
 
   const assetOptions = useMemo(() => {
@@ -948,7 +969,7 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
               )}
 
               {config.needsDevice && (
-                <div className="flex flex-col">
+                <div className="flex flex-col min-w-0">
                   <label className="form-label">{t('contract.selectDevice')} *</label>
                   <Select
                     options={assetOptions}
@@ -1078,10 +1099,11 @@ function SavingDepositModal({ open, contract, onClose, onSuccess }: {
 
   const mutation = useMutation({
     mutationFn: async () => {
-      await apiClient.rpc('fn_payment_record', {
+      await apiClient.rpc('fn_bill_wallet', {
         p_contract_id: contract.id,
+        p_wallet_type: 'SAVING',
+        p_action: 'DEPOSIT',
         p_amount: Number(amount),
-        p_payment_type: 'SAVING_DEPOSIT',
         p_channel: channel,
         p_branch_id: contract.branch_id,
         p_note: note.trim() || undefined,

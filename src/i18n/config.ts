@@ -8,10 +8,22 @@ import errorsEn from './locales/errors.en.json';
 import errorsTh from './locales/errors.th.json';
 import billActionsEn from './locales/billActions.en.json';
 import billActionsTh from './locales/billActions.th.json';
+import contractActionsEn from './locales/contractActions.en.json';
+import contractActionsTh from './locales/contractActions.th.json';
 
 const resources = {
-  en: { translation: en, apiErrors: errorsEn, billActions: billActionsEn },
-  th: { translation: th, apiErrors: errorsTh, billActions: billActionsTh },
+  en: {
+    translation: en,
+    apiErrors: errorsEn,
+    billActions: billActionsEn,
+    contractActions: contractActionsEn,
+  },
+  th: {
+    translation: th,
+    apiErrors: errorsTh,
+    billActions: billActionsTh,
+    contractActions: contractActionsTh,
+  },
 };
 
 i18n

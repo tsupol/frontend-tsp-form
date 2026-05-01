@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Button, Select, MaskedInput } from 'tsp-form';
-import { Star, Plus, Trash2, XCircle, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Star, Plus, Trash2, XCircle, Loader2, CheckCircle, AlertTriangle, Wallet } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { fmtCurrency } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
@@ -29,6 +30,7 @@ interface ReadinessResult {
 
 export function PanelReviewPay({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { data, updateData, contract, invalidateContract, setOpenModal } = useWorkspace();
   const savingBalance = contract?.saving_balance ?? 0;
   const score = contract?.staff_confidence_score ?? null;
@@ -161,9 +163,8 @@ export function PanelReviewPay({ onClose }: { onClose: () => void }) {
         p_contract_id: data.contractId,
       });
 
-      updateData({ billConfirmed: true });
       invalidateContract();
-      onClose();
+      navigate(`/admin/contracts/search/${data.contractId}`);
     } catch (err) {
       if (err instanceof ApiError) {
         const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
@@ -277,6 +278,15 @@ export function PanelReviewPay({ onClose }: { onClose: () => void }) {
                       onChange={(raw) => updatePayment(idx, { amount: parseFloat(raw) || 0 })}
                       size="sm"
                       className="w-full"
+                      endIcon={<Wallet size={14} />}
+                      onEndIconClick={() => {
+                        const otherTotal = payments.reduce((sum, p, i) => i === idx ? sum : sum + (p.amount || 0), 0);
+                        const remaining = Math.max(0, totalAmount - otherTotal);
+                        const fill = payment.method === 'SAVING_WALLET'
+                          ? Math.min(savingBalance, remaining)
+                          : remaining;
+                        updatePayment(idx, { amount: fill });
+                      }}
                     />
                   </div>
                   {payments.length > 1 && (

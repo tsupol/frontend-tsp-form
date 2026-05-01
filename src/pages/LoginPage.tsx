@@ -37,15 +37,13 @@ export function LoginPage() {
     }
   }, [searchParams, setSearchParams]);
 
-  const lastUser = localStorage.getItem('quick_login_last_user') || 'alice';
-
   const {
     register,
     handleSubmit,
     setValue,
     formState: { errors },
   } = useForm<LoginFormData>({
-    defaultValues: { username: lastUser, password: 'Test123456' },
+    defaultValues: { username: '', password: 'Test123456' },
   });
 
   const onSubmit = async (data: LoginFormData) => {

@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Input, Badge, Button, MaskedInput, useSnackbarContext } from 'tsp-form';
-import { Search, XCircle, X, Calculator, Info, CheckCircle, Package, Smartphone, AlertTriangle, Wand2 } from 'lucide-react';
+import { Input, Select, Badge, Button, MaskedInput, useSnackbarContext } from 'tsp-form';
+import { Search, XCircle, X, Calculator, Info, CheckCircle, Package, BookOpen, AlertTriangle, Wand2 } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { fmtCurrency } from '../../../lib/format';
 import { getConditionLabel, getConditionTextColor } from '../../inventory/inventoryUtils';
@@ -71,9 +71,11 @@ interface PricingRow {
   fin2_profit_amount: number | null;
 }
 
-interface UsedAsset {
+interface StockAsset {
   asset_id: number;
   asset_code: string;
+  model_id: number;
+  variant_id: number;
   model_name: string;
   variant_name: string;
   brand_name: string;
@@ -84,7 +86,12 @@ interface UsedAsset {
   imei: string | null;
 }
 
+/** Where the user is browsing — affects the search list, not the submit path */
+type SourceTab = 'instock' | 'catalog';
+/** The actual contract path — derived from the chosen item */
 type SelectionMode = 'new' | 'used';
+/** Condition filter for the In-Stock tab */
+type ConditionFilter = 'NEW' | 'USED' | null;
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
@@ -109,9 +116,16 @@ export function PanelProductPlan({ onClose }: Props) {
   const { t } = useTranslation();
   const { data: wizardData, contract, invalidateContract } = useWorkspace();
 
-  // ── Mode: new vs used ───────────────────────────────────────────────
+  // ── Mode: new vs used (drives the submit RPC path) ──────────────────
   const initialMode: SelectionMode = contract?.is_used_asset ? 'used' : 'new';
   const [mode, setMode] = useState<SelectionMode>(initialMode);
+
+  // ── Source tab: where the user is browsing ──────────────────────────
+  // Default = in-stock list. Catalog tab is for "promised but not in stock" rare path.
+  const [sourceTab, setSourceTab] = useState<SourceTab>('instock');
+
+  // ── In-stock condition filter (clearable: null = all, NEW = new only, USED = used A/B) ──
+  const [conditionFilter, setConditionFilter] = useState<ConditionFilter>(null);
 
   // ── NEW product state ───────────────────────────────────────────────
   const [search, setSearch] = useState('');
@@ -128,12 +142,12 @@ export function PanelProductPlan({ onClose }: Props) {
   const [localVariantName, setLocalVariantName] = useState(contract?.variant_name ?? '');
   const [localQuote, setLocalQuote] = useState<Quote | null>(wizardData.selectedQuote);
 
-  // ── USED asset state ────────────────────────────────────────────────
+  // ── In-stock asset search state (covers both NEW and USED selection paths) ──
   const [assetSearch, setAssetSearch] = useState('');
   const [debouncedAssetSearch, setDebouncedAssetSearch] = useState('');
   const assetSearchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const assetSearchRef = useRef<HTMLInputElement>(null);
-  const [selectedAsset, setSelectedAsset] = useState<UsedAsset | null>(null);
+  const [selectedAsset, setSelectedAsset] = useState<StockAsset | null>(null);
   const [localTargetAssetId, setLocalTargetAssetId] = useState<number | null>(contract?.target_asset_id ?? null);
 
   // Determine if something is selected (either mode)
@@ -159,7 +173,7 @@ export function PanelProductPlan({ onClose }: Props) {
 
   const shouldAssetSearch = true; // always show — list all when empty, filter when typing
 
-  // ── NEW: Search via fn_product_search ───────────────────────────────
+  // ── Catalog tab: search via fn_product_search ───────────────────────
 
   const { data: searchData, isFetching: searching } = useQuery({
     queryKey: ['product-search', debouncedSearch],
@@ -169,27 +183,34 @@ export function PanelProductPlan({ onClose }: Props) {
       p_limit: 20,
     }),
     staleTime: 2 * 60 * 1000,
-    enabled: shouldSearch && mode === 'new',
+    enabled: shouldSearch && sourceTab === 'catalog',
   });
 
   const models = searchData?.rows ?? [];
 
-  // ── USED: Search v_assets ───────────────────────────────────────────
+  // ── In-stock tab: search v_assets at branch (NEW + USED unified) ────
 
   const branchId = contract?.branch_id ?? wizardData.branchId;
 
+  const conditionFilterClause = conditionFilter === 'NEW'
+    ? '&condition_grade=eq.NEW'
+    : conditionFilter === 'USED'
+      ? '&condition_grade=in.(USED_A,USED_B)'
+      : '';
+
   const { data: assetResults, isFetching: assetSearching } = useQuery({
-    queryKey: ['used-asset-search', debouncedAssetSearch, branchId],
+    queryKey: ['stock-asset-search', debouncedAssetSearch, branchId, conditionFilter],
     queryFn: () => {
-      let url = '/v_assets?condition_grade=in.(USED_A,USED_B)&current_bucket=eq.ON_HAND_AVAILABLE&is_contractable=is.true&order=asset_code&limit=20';
+      let url = `/v_assets?current_bucket=eq.ON_HAND_AVAILABLE&is_contractable=is.true&order=asset_code&limit=50${conditionFilterClause}`;
       if (branchId) url += `&branch_id=eq.${branchId}`;
       if (debouncedAssetSearch) {
-        url += `&or=(asset_code.ilike.*${debouncedAssetSearch}*,serial_no.ilike.*${debouncedAssetSearch}*,imei.ilike.*${debouncedAssetSearch}*,model_name.ilike.*${debouncedAssetSearch}*)`;
+        const q = debouncedAssetSearch;
+        url += `&or=(asset_code.ilike.*${q}*,serial_no.ilike.*${q}*,imei.ilike.*${q}*,model_name.ilike.*${q}*,base_model_name.ilike.*${q}*,variant_name.ilike.*${q}*,variant_sku_code.ilike.*${q}*,family_name.ilike.*${q}*,brand_name.ilike.*${q}*,physical_color.ilike.*${q}*,manufacturer_color.ilike.*${q}*)`;
       }
-      return apiClient.get<UsedAsset[]>(url);
+      return apiClient.get<StockAsset[]>(url);
     },
     staleTime: 30_000,
-    enabled: shouldAssetSearch && mode === 'used',
+    enabled: shouldAssetSearch && sourceTab === 'instock',
   });
 
   const assets = assetResults ?? [];
@@ -386,34 +407,47 @@ export function PanelProductPlan({ onClose }: Props) {
     setAssetSearch('');
     setDebouncedAssetSearch('');
     setTimeout(() => {
-      if (mode === 'new') searchRef.current?.focus();
+      if (sourceTab === 'catalog') searchRef.current?.focus();
       else assetSearchRef.current?.focus();
     }, 0);
   };
 
-  // ── Handlers: USED ──────────────────────────────────────────────────
+  // ── Handlers: pick from in-stock list (asset → derive mode by condition) ──
 
-  const handleSelectAsset = (asset: UsedAsset) => {
+  const handleSelectAsset = (asset: StockAsset) => {
+    const isUsed = asset.condition_grade === 'USED_A' || asset.condition_grade === 'USED_B';
+    setMode(isUsed ? 'used' : 'new');
     setSelectedAsset(asset);
-    setLocalTargetAssetId(asset.asset_id);
-    setLocalModelId(null); // model/variant come from set_target_asset response
-    setLocalModelName(asset.model_name);
+    setLocalQuote(null);
     setLocalFamilyName(asset.family_name);
     setLocalBrandName(asset.brand_name);
-    setLocalVariantId(null);
+    setLocalModelName(asset.model_name);
     setLocalVariantName(asset.variant_name);
-    setLocalQuote(null);
+
+    if (isUsed) {
+      // USED path: target_asset drives everything; model/variant come from set_target_asset response
+      setLocalTargetAssetId(asset.asset_id);
+      setLocalModelId(null);
+      setLocalVariantId(null);
+    } else {
+      // NEW path: derive model/variant from the asset (no soft-bind — actual bind happens post-activate)
+      setLocalTargetAssetId(null);
+      setLocalModelId(asset.model_id);
+      setLocalVariantId(asset.variant_id);
+    }
     setAssetSearch('');
     setDebouncedAssetSearch('');
   };
 
-  const handleSwitchMode = (newMode: SelectionMode) => {
-    setMode(newMode);
+  const handleSwitchTab = (tab: SourceTab) => {
+    setSourceTab(tab);
     // Don't reset selection — only reset search
     setSearch('');
     setDebouncedSearch('');
     setAssetSearch('');
     setDebouncedAssetSearch('');
+    // Catalog tab is NEW-only path
+    if (tab === 'catalog') setMode('new');
   };
 
   // ── Quote helpers ───────────────────────────────────────────────────
@@ -658,55 +692,47 @@ export function PanelProductPlan({ onClose }: Props) {
         </div>
       )}
 
-      {/* ── Mode picker + Search (only when nothing selected) ────────── */}
+      {/* ── Source tabs + Search (only when nothing selected) ────────── */}
       {!hasSelection && (
         <>
           <div className="flex gap-2">
             <button
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-colors cursor-pointer ${mode === 'new' ? 'border-primary bg-primary/5 text-primary' : 'border-line hover:border-fg/30 bg-transparent text-fg'}`}
-              onClick={() => handleSwitchMode('new')}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-colors cursor-pointer ${sourceTab === 'instock' ? 'border-primary bg-primary/5 text-primary' : 'border-line hover:border-fg/30 bg-transparent text-fg'}`}
+              onClick={() => handleSwitchTab('instock')}
             >
               <Package size={18} />
-              <span className="font-medium text-sm">{t('wizard.newProduct')}</span>
+              <span className="font-medium text-sm">{t('wizard.tabInStock')}</span>
             </button>
             <button
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-colors cursor-pointer ${mode === 'used' ? 'border-primary bg-primary/5 text-primary' : 'border-line hover:border-fg/30 bg-transparent text-fg'}`}
-              onClick={() => handleSwitchMode('used')}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-colors cursor-pointer ${sourceTab === 'catalog' ? 'border-primary bg-primary/5 text-primary' : 'border-line hover:border-fg/30 bg-transparent text-fg'}`}
+              onClick={() => handleSwitchTab('catalog')}
             >
-              <Smartphone size={18} />
-              <span className="font-medium text-sm">{t('wizard.usedAsset')}</span>
+              <BookOpen size={18} />
+              <span className="font-medium text-sm">{t('wizard.tabCatalog')}</span>
             </button>
           </div>
 
-          {/* NEW search */}
-          {mode === 'new' && (
+          {/* In-stock search */}
+          {sourceTab === 'instock' && (
             <>
-              <Input ref={searchRef} value={search} onChange={(e) => handleSearchInput(e.target.value)} placeholder={t('wizard.searchProductPlaceholder')} startIcon={<Search size={16} />} className="w-full" size="sm" />
-              <div className="border border-line rounded-lg overflow-hidden h-48 overflow-y-auto better-scroll">
-                {!shouldSearch ? (
-                  <div className="flex items-center justify-center h-full text-subtle text-sm">{t('wizard.typeToSearch')}</div>
-                ) : searching ? (
-                  <div className="flex items-center justify-center h-full text-subtle text-sm">{t('common.loading')}</div>
-                ) : models.length === 0 ? (
-                  <div className="flex items-center justify-center h-full text-subtle text-sm">{t('wizard.noModelsFound')}</div>
-                ) : (
-                  <div className="flex flex-col divide-y divide-line">
-                    {models.map(model => (
-                      <button key={model.model_id} className={`w-full text-left px-4 py-2.5 cursor-pointer transition-colors hover:bg-surface-hover`} onClick={() => handleSelectModel(model)}>
-                        <div className="font-medium text-sm truncate">{model.family_name} {model.model_name}</div>
-                        <div className="text-xs text-subtle">{model.brand_name}</div>
-                      </button>
-                    ))}
-                  </div>
-                )}
+              <div className="flex gap-2">
+                <div className="flex-1 min-w-0">
+                  <Input ref={assetSearchRef} value={assetSearch} onChange={(e) => handleAssetSearchInput(e.target.value)} placeholder={t('wizard.searchAssetPlaceholder')} startIcon={<Search size={16} />} className="w-full" size="sm" />
+                </div>
+                <div style={{ width: '10rem' }} className="shrink-0">
+                  <Select
+                    options={[
+                      { value: 'NEW', label: t('wizard.conditionNew') },
+                      { value: 'USED', label: t('wizard.conditionUsed') },
+                    ]}
+                    value={conditionFilter}
+                    onChange={(v) => setConditionFilter((v as ConditionFilter) || null)}
+                    placeholder={t('wizard.allConditions')}
+                    clearable
+                    size="sm"
+                  />
+                </div>
               </div>
-            </>
-          )}
-
-          {/* USED search */}
-          {mode === 'used' && (
-            <>
-              <Input ref={assetSearchRef} value={assetSearch} onChange={(e) => handleAssetSearchInput(e.target.value)} placeholder={t('wizard.searchAssetPlaceholder')} startIcon={<Search size={16} />} className="w-full" size="sm" />
               <div className="border border-line rounded-lg overflow-hidden h-48 overflow-y-auto better-scroll">
                 {assetSearching ? (
                   <div className="flex items-center justify-center h-full text-subtle text-sm">{t('common.loading')}</div>
@@ -728,6 +754,31 @@ export function PanelProductPlan({ onClose }: Props) {
                           {asset.imei && <span>IMEI: {asset.imei}</span>}
                           {asset.serial_no && <span>S/N: {asset.serial_no}</span>}
                         </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* Catalog search */}
+          {sourceTab === 'catalog' && (
+            <>
+              <Input ref={searchRef} value={search} onChange={(e) => handleSearchInput(e.target.value)} placeholder={t('wizard.searchProductPlaceholder')} startIcon={<Search size={16} />} className="w-full" size="sm" />
+              <div className="border border-line rounded-lg overflow-hidden h-48 overflow-y-auto better-scroll">
+                {!shouldSearch ? (
+                  <div className="flex items-center justify-center h-full text-subtle text-sm">{t('wizard.typeToSearch')}</div>
+                ) : searching ? (
+                  <div className="flex items-center justify-center h-full text-subtle text-sm">{t('common.loading')}</div>
+                ) : models.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-subtle text-sm">{t('wizard.noModelsFound')}</div>
+                ) : (
+                  <div className="flex flex-col divide-y divide-line">
+                    {models.map(model => (
+                      <button key={model.model_id} className={`w-full text-left px-4 py-2.5 cursor-pointer transition-colors hover:bg-surface-hover`} onClick={() => handleSelectModel(model)}>
+                        <div className="font-medium text-sm truncate">{model.family_name} {model.model_name}</div>
+                        <div className="text-xs text-subtle">{model.brand_name}</div>
                       </button>
                     ))}
                   </div>

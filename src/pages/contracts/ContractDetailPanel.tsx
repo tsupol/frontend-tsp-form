@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Badge, Button, Input, Select, Modal, useSnackbarContext } from 'tsp-form';
-import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Upload, Camera } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Upload, Camera, Smartphone } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import { ApiError } from '../../lib/api';
 import { uploadToS3 } from '../../lib/upload';
@@ -34,6 +34,7 @@ interface ContractDetail {
   draft_note: string | null;
   device_id: number | null;
   device_identifier: string | null;
+  is_used_asset: boolean;
   is_paused: boolean;
   paused_at: string | null;
   product_id: number | null;
@@ -266,6 +267,7 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<DetailTab>('overview');
   const [copied, setCopied] = useState(false);
+  const [requestedAction, setRequestedAction] = useState<'bind_device' | null>(null);
 
   const handleCopyCode = useCallback((code: string) => {
     navigator.clipboard.writeText(code).then(() => {
@@ -323,7 +325,7 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
 
       {/* Tab content */}
       <div className="flex-1 overflow-auto better-scroll">
-        {activeTab === 'overview' && <OverviewTab contract={contract} t={t} queryClient={queryClient} />}
+        {activeTab === 'overview' && <OverviewTab contract={contract} t={t} queryClient={queryClient} onRequestBindDevice={() => setRequestedAction('bind_device')} />}
         {activeTab === 'installments' && <InstallmentsTab contractId={contractId} t={t} />}
         {activeTab === 'txns' && <TxnsTab contractId={contractId} t={t} />}
         {activeTab === 'customers' && <CustomersTab contractId={contractId} customerId={contract.customer_id} t={t} />}
@@ -335,6 +337,8 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
       {/* Contract actions */}
       <ContractActionButtons
         contract={contract}
+        requestedAction={requestedAction}
+        onRequestedActionConsumed={() => setRequestedAction(null)}
         onRefresh={() => {
           queryClient.invalidateQueries({ queryKey: ['contract-detail', contractId] });
           queryClient.invalidateQueries({ queryKey: ['contract-search'] });
@@ -384,9 +388,13 @@ function MediaRow({ label, media }: { label: string; media: EntityMedia[] }) {
 
 // ── Overview Tab ─────────────────────────────────────────────────────────────
 
-function OverviewTab({ contract, t, queryClient }: { contract: ContractDetail; t: ReturnType<typeof useTranslation>['t']; queryClient: ReturnType<typeof useQueryClient> }) {
+function OverviewTab({ contract, t, queryClient, onRequestBindDevice }: { contract: ContractDetail; t: ReturnType<typeof useTranslation>['t']; queryClient: ReturnType<typeof useQueryClient>; onRequestBindDevice: () => void }) {
   const isFin2 = contract.commercial_model === 'FIN2';
   const isActive = contract.state === 'ACTIVE' || contract.state === 'COMPLETED' || contract.state === 'TERMINATED';
+  const needsDeviceBind =
+    (contract.state === 'ACTIVE' || contract.state === 'WAIT_LEGAL_PROCESS' || contract.state === 'ON_LEGAL_PROCESS') &&
+    contract.device_id == null &&
+    !contract.is_used_asset;
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
 
@@ -399,6 +407,28 @@ function OverviewTab({ contract, t, queryClient }: { contract: ContractDetail; t
 
   return (
     <div className="p-4 flex flex-col gap-4">
+      {/* Bind device reminder — NEW asset post-activate */}
+      {needsDeviceBind && (
+        <div className="border rounded-md px-4 py-3 border-warning/30 bg-warning/5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <Smartphone size={14} className="text-warning shrink-0" />
+              <div className="min-w-0">
+                <div className="text-xs font-semibold uppercase tracking-wider text-warning">
+                  {t('contract.deviceNotBound')}
+                </div>
+                <div className="text-sm text-warning/90 mt-0.5">
+                  {t('contract.bindDeviceReminder')}
+                </div>
+              </div>
+            </div>
+            <Button size="sm" color="primary" onClick={onRequestBindDevice} className="shrink-0">
+              {t('contract.action_bind_device')}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Customer & Device */}
       <div className="border border-line rounded-md px-4 py-3">
         <div className="grid grid-cols-2 gap-3">
