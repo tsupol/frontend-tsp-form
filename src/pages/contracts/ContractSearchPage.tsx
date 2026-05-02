@@ -130,6 +130,7 @@ export function ContractSearchPage() {
 
       const baseParams: Record<string, unknown> = {
         ...(p_states ? { p_states } : {}),
+        ...(filterBranchId != null ? { p_branch_id: filterBranchId } : {}),
       };
 
       if (!isMultiWord) {
