@@ -402,10 +402,13 @@ function RetailBillDetail({ billId, isMobile }: { billId: number; isMobile: bool
         </div>
       )}
 
-      {/* Blocked-action hint — show why ADD_PAYMENT or CANCEL_BILL is unavailable */}
-      {actionsData && (addPaymentAction?.blocking_reason || cancelBillAction?.blocking_reason) && (
+      {/* Blocked-action hint — show why ADD_PAYMENT or CANCEL_BILL is unavailable.
+          status_not_allowed is suppressed: status alone is already obvious from the badge. */}
+      {actionsData && (
         <BlockedActionHints
-          actions={[addPaymentAction, cancelBillAction].filter((a): a is BillAction => !!a && !a.is_available && !!a.blocking_reason)}
+          actions={[addPaymentAction, cancelBillAction].filter((a): a is BillAction =>
+            !!a && !a.is_available && !!a.blocking_reason && a.blocking_reason !== 'status_not_allowed'
+          )}
           pendingCount={actionsData.pending_approval_count}
           pendingTotal={actionsData.pending_approval_total}
           remaining={actionsData.remaining_amount}

@@ -1,8 +1,8 @@
-import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, DataTable, Badge, Input, Select, Button, Switch, PopOver, Tooltip, Modal, NumberSpinner, MaskedInput, useSnackbarContext } from 'tsp-form';
-import { ArrowRightFromLine, ArrowLeft, SlidersHorizontal, ChevronsUpDown, AlertTriangle, CheckCircle, XCircle, Loader2, Plus, X } from 'lucide-react';
+import { ArrowRightFromLine, ArrowLeft, SlidersHorizontal, AlertTriangle, CheckCircle, XCircle, Loader2, Plus, X } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavGuard } from '../../contexts/NavGuardContext';
@@ -35,6 +35,21 @@ interface ModelRow {
   brand_name: string;
   family_name: string;
   is_active: boolean;
+}
+
+interface ProductSearchRow {
+  model_id: number;
+  model_code: string;
+  model_name: string;
+  base_model_name: string;
+  brand_name: string;
+  family_name: string;
+  is_active: boolean;
+}
+
+interface ProductSearchResponse {
+  total: number;
+  rows: ProductSearchRow[];
 }
 
 interface BrandLookup {
@@ -666,12 +681,11 @@ export function PricebookPage() {
   const [search, setSearch] = useState('');
   const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  // Filters & sort
+  // Filters
   const [filterBrand, setFilterBrand] = useState<string>('');
   const [filterFamily, setFilterFamily] = useState<string>('');
   const [filterBaseModel, setFilterBaseModel] = useState<string>('');
   const [filterNeedsSetup, setFilterNeedsSetup] = useState(false);
-  const [sortBy, setSortBy] = useState<string>('code.asc');
 
   // Filter popover (small screens)
   const [filterOpen, setFilterOpen] = useState(false);
@@ -768,39 +782,36 @@ export function PricebookPage() {
   const filteredFamilies = filterBrand ? families.filter(f => String(f.brand_id) === filterBrand) : families;
   const familyOptions = filteredFamilies.map((f) => ({ value: String(f.id), label: f.display_name }));
   const baseModelOptions = baseModels.map((name) => ({ value: name, label: name }));
-  const activeFilterCount = [filterBrand, filterFamily, filterBaseModel, filterNeedsSetup].filter(Boolean).length + (sortBy !== 'code.asc' ? 1 : 0);
-  const sortOptions = [
-    { value: 'code.asc', label: `${t('pricing.modelCode')} A→Z` },
-    { value: 'code.desc', label: `${t('pricing.modelCode')} Z→A` },
-    { value: 'id.desc', label: t('models.newestFirst') },
-    { value: 'id.asc', label: t('models.oldestFirst') },
-  ];
+  const activeFilterCount = [filterBrand, filterFamily, filterBaseModel, filterNeedsSetup].filter(Boolean).length;
 
-  // Build endpoint
-  const buildModelsEndpoint = useCallback(() => {
-    const params: string[] = [];
-    if (holdingId) params.push(`holding_id=eq.${holdingId}`);
-    params.push('is_active=is.true');
-    if (search.trim()) {
-      params.push(`or=(code.ilike.*${encodeURIComponent(search.trim())}*,name.ilike.*${encodeURIComponent(search.trim())}*)`);
-    }
-    if (filterBrand) params.push(`brand_id=eq.${filterBrand}`);
-    if (filterFamily) params.push(`family_id=eq.${filterFamily}`);
-    if (filterBaseModel) params.push(`base_model_name=eq.${encodeURIComponent(filterBaseModel)}`);
-    params.push(`order=${sortBy}`);
-    const qs = params.length > 0 ? `?${params.join('&')}` : '';
-    return `/v_ref_product_models${qs}`;
-  }, [holdingId, search, filterBrand, filterFamily, filterBaseModel, sortBy]);
-
-  // Fetch models (paginated)
-  const { data: modelsData, isError, error, isFetching } = useQuery({
-    queryKey: ['pricebook-models', pageIndex, pageSize, holdingId, search, filterBrand, filterFamily, filterBaseModel, sortBy],
-    queryFn: () => apiClient.getPaginated<ModelRow>(buildModelsEndpoint(), { page: pageIndex + 1, pageSize }),
+  // Fetch models via fuzzy-search RPC (handles both empty and non-empty queries via fast path)
+  const { data: searchData, isError, error, isFetching } = useQuery({
+    queryKey: ['pricebook-models', pageIndex, pageSize, holdingId, search, filterBrand, filterFamily, filterBaseModel],
+    queryFn: () => apiClient.rpc<ProductSearchResponse>('fn_product_search', {
+      p_q: search.trim() || null,
+      p_brand_id: filterBrand ? Number(filterBrand) : null,
+      p_family_id: filterFamily ? Number(filterFamily) : null,
+      p_base_model_name: filterBaseModel || null,
+      p_is_active: true,
+      p_limit: pageSize,
+      p_offset: pageIndex * pageSize,
+    }),
     placeholderData: keepPreviousData,
   });
 
-  const models = modelsData?.data ?? [];
-  const totalCount = modelsData?.totalCount ?? 0;
+  const models = useMemo<ModelRow[]>(() => {
+    const rows = searchData?.rows ?? [];
+    return rows.map(r => ({
+      id: r.model_id,
+      code: r.model_code,
+      name: r.model_name,
+      base_model_name: r.base_model_name,
+      brand_name: r.brand_name,
+      family_name: r.family_name,
+      is_active: r.is_active,
+    }));
+  }, [searchData]);
+  const totalCount = searchData?.total ?? 0;
 
   // Fetch pricing status for current page's models
   const modelIds = useMemo(() => models.map(m => m.id), [models]);
@@ -995,19 +1006,6 @@ export function PricebookPage() {
                     />
                     {t('pricing.filterNeedsSetup')}
                   </label>
-                  <div className="hidden xl:flex items-center gap-1.5 text-control-label flex-1 min-w-0" style={{ maxWidth: '12rem' }}>
-                    <ChevronsUpDown size={14} className="shrink-0" />
-                    <div className="flex-1">
-                      <Select
-                        options={sortOptions}
-                        value={sortBy}
-                        onChange={(val) => { setSortBy((val as string) ?? 'code.asc'); setPageIndex(0); }}
-                        size="sm"
-                        showChevron
-                        searchable={false}
-                      />
-                    </div>
-                  </div>
                   <div className="xl:hidden shrink-0">
                     <PopOver
                       isOpen={filterOpen}
@@ -1064,15 +1062,6 @@ export function PricebookPage() {
                           />
                           {t('pricing.filterNeedsSetup')}
                         </label>
-                        <div className="text-xs font-medium text-muted uppercase tracking-wide">{t('common.sortBy')}</div>
-                        <Select
-                          options={sortOptions}
-                          value={sortBy}
-                          onChange={(val) => { setSortBy((val as string) ?? 'code.asc'); setPageIndex(0); }}
-                          size="sm"
-                          showChevron
-                          searchable={false}
-                        />
                       </div>
                     </PopOver>
                   </div>

@@ -227,11 +227,18 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [user?.branch_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Draft auto-creation — triggers when customer is attached ─────────
+  // Failed attempts are remembered per (customerId, branchId) so a 403/error
+  // doesn't loop. User must reset (pick a different customer) to retry.
+  const failedDraftKeyRef = useRef<string | null>(null);
   useEffect(() => {
     if (!data.customerId) return;
-    if (data.contractId || data.draftCreating) return;
+    if (data.contractId) return;
     if (!data.branchId || !user) return;
     if (draftInFlight.current) return;
+    if (data.draftError) return;
+
+    const attemptKey = `${data.customerId}:${data.branchId}`;
+    if (failedDraftKeyRef.current === attemptKey) return;
 
     draftInFlight.current = true;
 
@@ -247,6 +254,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           p_variant_id: data.variantId,
           p_customer_id: data.customerId,
         });
+        failedDraftKeyRef.current = null;
         setData(prev => ({
           ...prev,
           contractId: res.contract_id,
@@ -255,6 +263,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           draftError: '',
         }));
       } catch (err) {
+        failedDraftKeyRef.current = attemptKey;
         setData(prev => ({
           ...prev,
           draftCreating: false,
@@ -266,7 +275,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     };
 
     createDraft();
-  }, [data.customerId, data.contractId, data.draftCreating, data.branchId, data.modelId, data.variantId, data.selectedQuote, user]);
+  }, [data.customerId, data.contractId, data.draftError, data.branchId, data.modelId, data.variantId, data.selectedQuote, user]);
 
   // ── Customer attachment (when local customerId differs from server) ──
   // Server contract is the source of truth — only call attach when local
