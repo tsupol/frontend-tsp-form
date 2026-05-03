@@ -542,6 +542,7 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   const isVoidBill = activeAction === 'void_bill';
   const isPayInstallment = activeAction === 'pay_installment';
   const isComplete = activeAction === 'complete';
+  const isTerminate = activeAction === 'terminate';
 
   const handleSuccess = (msgKey: string) => {
     setActiveAction(null);
@@ -752,12 +753,19 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
       <CompleteContractModal
         open={isComplete}
         contract={contract}
-        closeReason="NORMAL"
+        action={{ kind: 'complete', closeReason: 'NORMAL' }}
+        onClose={() => setActiveAction(null)}
+        onSuccess={handleSuccess}
+      />
+      <CompleteContractModal
+        open={isTerminate}
+        contract={contract}
+        action={{ kind: 'terminate' }}
         onClose={() => setActiveAction(null)}
         onSuccess={handleSuccess}
       />
       <ContractActionModal
-        open={!!activeAction && !isSavingDeposit && !isCancelSaving && !isEarlyPayoff && !isContinuePay && !isVoidBill && !isPayInstallment && !isComplete}
+        open={!!activeAction && !isSavingDeposit && !isCancelSaving && !isEarlyPayoff && !isContinuePay && !isVoidBill && !isPayInstallment && !isComplete && !isTerminate}
         action={activeAction}
         contract={contract}
         onClose={() => setActiveAction(null)}
