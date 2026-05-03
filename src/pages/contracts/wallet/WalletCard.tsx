@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Button, Badge } from 'tsp-form';
-import { PiggyBank, CreditCard, ShieldCheck, Lock, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Button, Tooltip } from 'tsp-form';
+import { PiggyBank, CreditCard, ShieldCheck, Lock, ChevronDown, ChevronUp } from 'lucide-react';
 import { apiClient } from '../../../lib/api';
 import { fmtCurrency } from '../../../lib/format';
 import { DateTime } from '../../../components/DateTime';
@@ -60,7 +60,7 @@ export function WalletCard({ contract, walletType, onAction }: WalletCardProps) 
   const [historyOpen, setHistoryOpen] = useState(false);
 
   const balance = walletBalance(contract, walletType);
-  const visible = isVisible(contract, walletType, balance);
+  const isActive = isWalletActive(contract, walletType, balance);
 
   const { data: actions } = useWalletActions();
   const allowedActions = useMemo(
@@ -68,7 +68,18 @@ export function WalletCard({ contract, walletType, onAction }: WalletCardProps) 
     [actions, walletType],
   );
 
-  const { data: available } = useWalletAvailable(contract.id, walletType, visible);
+  const { data: available } = useWalletAvailable(contract.id, walletType, isActive);
+
+  // Cheap probe to know whether history exists — drives whether to render the expander.
+  const { data: txnProbe } = useQuery({
+    queryKey: ['contract-wallet-txns-probe', contract.id, walletType],
+    queryFn: () =>
+      apiClient.get<ContractTxn[]>(
+        `/v_contract_txns?contract_id=eq.${contract.id}&txn_type=eq.${TXN_TYPE_FILTER[walletType]}&select=id&limit=1`,
+      ),
+    staleTime: 30 * 1000,
+  });
+  const hasHistory = (txnProbe?.length ?? 0) > 0;
 
   const { data: txns } = useQuery({
     queryKey: ['contract-wallet-txns', contract.id, walletType],
@@ -76,64 +87,77 @@ export function WalletCard({ contract, walletType, onAction }: WalletCardProps) 
       apiClient.get<ContractTxn[]>(
         `/v_contract_txns?contract_id=eq.${contract.id}&txn_type=eq.${TXN_TYPE_FILTER[walletType]}&order=created_at.desc&limit=20`,
       ),
-    enabled: visible && historyOpen,
+    enabled: historyOpen && hasHistory,
     staleTime: 30 * 1000,
   });
 
-  if (!visible) return null;
-
   const Icon = WALLET_ICON[walletType];
-  const blockingGuard = available?.guards.find(g => g.blocks_cashout);
 
   return (
     <div className="border border-line rounded-lg overflow-hidden">
-      <div className={`px-4 py-4 ${balance > 0 ? 'bg-info/5' : 'bg-surface'}`}>
+      <div className={`px-4 py-4 ${isActive && balance > 0 ? 'bg-info/5' : 'bg-surface'}`}>
         <div className="flex items-center gap-2 mb-1">
-          <Icon size={20} className={balance > 0 ? 'text-info' : 'text-fg/30'} />
+          <Icon size={20} className={isActive && balance > 0 ? 'text-info' : 'text-fg/30'} />
           <span className="text-xs text-subtle">{t(WALLET_LABEL_KEY[walletType])}</span>
+          {balance === 0 && (
+            <span className="text-xs text-subtler ml-1">
+              <span>—</span>
+              <span className="ml-2">{t('wallet.empty', { defaultValue: 'empty' })}</span>
+            </span>
+          )}
         </div>
 
-        <div className="text-2xl font-bold tabular-nums mb-2">{fmtCurrency(balance)}</div>
+        {balance > 0 && (
+          <div className={`text-2xl font-bold tabular-nums mb-2 ${isActive ? '' : 'text-fg/40'}`}>
+            {fmtCurrency(balance)}
+          </div>
+        )}
 
-        {walletType === 'CREDIT' && balance > 0 && (
+        {isActive && walletType === 'CREDIT' && balance > 0 && (
           <CreditSplitInfo contract={contract} t={t} />
         )}
 
-        {walletType === 'INSURANCE' && (
-          <InsuranceStatusRows contract={contract} blockingGuard={!!blockingGuard} t={t} />
+        {isActive && (
+          <div className="flex flex-wrap gap-2 mt-3">
+            {allowedActions.map(actionRow => {
+              const disabled = isActionDisabled(actionRow, contract, available, walletType);
+              const reason = disabledReason(actionRow, contract, available, walletType, t);
+              const button = (
+                <Button
+                  key={actionRow.action}
+                  size="sm"
+                  color="primary"
+                  variant={actionRow.action === 'CASHOUT' ? 'outline' : 'solid'}
+                  onClick={() => onAction(actionRow.action)}
+                  disabled={!!disabled}
+                  className={disabled ? 'pointer-events-none' : ''}
+                >
+                  {t(`wallet.action_${actionRow.action.toLowerCase()}`)}
+                  {actionRow.requires_pin && ' 🔑'}
+                </Button>
+              );
+              return (
+                <Tooltip key={actionRow.action} content={reason} disabled={!disabled || !reason}>
+                  {button}
+                </Tooltip>
+              );
+            })}
+          </div>
         )}
-
-        <div className="flex flex-wrap gap-2 mt-3">
-          {allowedActions.map(actionRow => {
-            const disabled = isActionDisabled(actionRow, contract, available, walletType);
-            return (
-              <Button
-                key={actionRow.action}
-                size="sm"
-                color="primary"
-                variant={actionRow.action === 'CASHOUT' ? 'outline' : 'solid'}
-                onClick={() => onAction(actionRow.action)}
-                disabled={!!disabled}
-                title={typeof disabled === 'string' ? disabled : undefined}
-              >
-                {t(`wallet.action_${actionRow.action.toLowerCase()}`)}
-                {actionRow.requires_pin && ' 🔑'}
-              </Button>
-            );
-          })}
-        </div>
       </div>
 
-      <button
-        type="button"
-        className="w-full px-4 py-2 text-xs text-subtle border-t border-line flex items-center justify-between hover:bg-surface"
-        onClick={() => setHistoryOpen(o => !o)}
-      >
-        <span>{t('wallet.history')}</span>
-        {historyOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-      </button>
+      {hasHistory && (
+        <button
+          type="button"
+          className="w-full px-4 py-2 text-xs text-subtle border-t border-line flex items-center justify-between cursor-pointer hover:bg-surface"
+          onClick={() => setHistoryOpen(o => !o)}
+        >
+          <span>{t('wallet.history')}</span>
+          {historyOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </button>
+      )}
 
-      {historyOpen && (
+      {hasHistory && historyOpen && (
         <div className="px-4 py-3 border-t border-line">
           {!txns || txns.length === 0 ? (
             <div className="text-sm text-subtler">{t('wallet.history_empty')}</div>
@@ -145,7 +169,7 @@ export function WalletCard({ contract, walletType, onAction }: WalletCardProps) 
                   className="flex items-center gap-3 text-sm py-1.5 border-b border-line last:border-b-0"
                 >
                   <span
-                    className={`font-semibold tabular-nums shrink-0 w-24 text-right ${
+                    className={`font-semibold tabular-nums shrink-0 ${
                       txn.amount > 0 ? 'text-success' : 'text-danger'
                     }`}
                   >
@@ -179,14 +203,16 @@ function walletBalance(c: ContractWalletInfo, w: WalletType): number {
   return c.insurance_balance ?? 0;
 }
 
-function isVisible(c: ContractWalletInfo, w: WalletType, balance: number): boolean {
-  // CREDIT: hide when balance = 0 (per doc 55 §16b.6)
+// Wallet is "active" → renders colored, with action buttons + sub-info.
+// Inactive wallets still render (grayed, no actions) so all 3 are always visible.
+function isWalletActive(c: ContractWalletInfo, w: WalletType, balance: number): boolean {
+  // CREDIT: only meaningful when balance > 0 (per doc 55 §16b.6)
   if (w === 'CREDIT') return balance > 0;
-  // SAVING: visible during DRAFT/SAVING/PENDING_PAYMENT/APPROVED, OR when balance > 0
+  // SAVING: actionable during DRAFT/SAVING/PENDING_PAYMENT/APPROVED, OR when balance > 0
   if (w === 'SAVING') {
     return ['DRAFT', 'SAVING', 'PENDING_PAYMENT', 'APPROVED'].includes(c.state) || balance > 0;
   }
-  // INSURANCE: visible during ACTIVE/WAIT_LEGAL_PROCESS, OR when balance > 0
+  // INSURANCE: actionable during ACTIVE/WAIT_LEGAL_PROCESS, OR when balance > 0
   return ['ACTIVE', 'WAIT_LEGAL_PROCESS'].includes(c.state) || balance > 0;
 }
 
@@ -209,6 +235,28 @@ function isActionDisabled(
     return true;
   }
   return false;
+}
+
+function disabledReason(
+  action: WalletActionRow,
+  c: ContractWalletInfo,
+  available: ReturnType<typeof useWalletAvailable>['data'],
+  walletType: WalletType,
+  t: ReturnType<typeof useTranslation>['t'],
+): string {
+  if (action.allowed_states && !action.allowed_states.includes(c.state)) {
+    return t('wallet.disabled_state', { defaultValue: 'Not allowed in current contract state' });
+  }
+  if (walletType === 'CREDIT' && action.action === 'CASHOUT' && (c.credit_balance_company ?? 0) === 0) {
+    return t('wallet.credit_locked_hint');
+  }
+  if (action.action === 'CASHOUT') {
+    const guard = available?.guards.find(g => g.blocks_cashout);
+    if (guard) {
+      return t(guard.error_code, { ns: 'apiErrors', defaultValue: guard.rule });
+    }
+  }
+  return '';
 }
 
 // ── CREDIT split sub-row ───────────────────────────────────────────────────
@@ -244,44 +292,3 @@ function CreditSplitInfo({
   );
 }
 
-// ── INSURANCE status rows ──────────────────────────────────────────────────
-
-function InsuranceStatusRows({
-  contract,
-  blockingGuard,
-  t,
-}: {
-  contract: ContractWalletInfo;
-  blockingGuard: boolean;
-  t: ReturnType<typeof useTranslation>['t'];
-}) {
-  const total = contract.total_installments ?? 0;
-  const paid = contract.paid_installment_count ?? 0;
-  const remaining = Math.max(0, total - paid);
-  const lastInstallment = total > 0 && remaining === 1;
-  const allPaid = total > 0 && remaining === 0;
-
-  return (
-    <div className="text-xs text-subtle space-y-0.5 mb-1">
-      <div className="flex items-center gap-1.5">
-        {lastInstallment ? (
-          <Badge color="success" size="xs">{t('wallet.insurance_method_ok')}</Badge>
-        ) : (
-          <span>
-            {t('wallet.insurance_method_blocked', { remaining })}
-          </span>
-        )}
-      </div>
-      <div className="flex items-center gap-1.5">
-        {allPaid ? (
-          <Badge color="success" size="xs">{t('wallet.insurance_cashout_ok')}</Badge>
-        ) : (
-          <span className={blockingGuard ? 'text-warning flex items-center gap-1' : ''}>
-            {blockingGuard && <AlertTriangle size={12} />}
-            {t('wallet.insurance_cashout_blocked', { remaining })}
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}

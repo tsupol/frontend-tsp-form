@@ -39,7 +39,7 @@ import {
   // Fanout child icons — Commission
   UserCheck, ClipboardCheck,
   // Fanout child icons — Accounting
-  CalendarCheck, Wallet, List, ArrowUpRight,
+  CalendarCheck, Wallet, List, ArrowUpRight, Receipt,
   // Dev sandbox
   FlaskConical, PenLine,
 } from 'lucide-react';
@@ -246,6 +246,7 @@ export const AppSideNav = () => {
         { type: 'group', key: 'grp-acc-close', label: t('accounting.groupDayClose') },
         { key: 'day-close', icon: <CalendarCheck size="1rem" />, label: t('nav.dayClose'), path: '/admin/accounting/day-close' },
         { type: 'group', key: 'grp-acc-reports', label: t('accounting.groupReports') },
+        { key: 'bills', icon: <Receipt size="1rem" />, label: t('nav.bills'), path: '/admin/accounting/bills' },
         { key: 'daily-accounting', icon: <BookOpen size="1rem" />, label: t('nav.dailyAccounting'), path: '/admin/accounting/daily' },
         { key: 'cashflow', icon: <Wallet size="1rem" />, label: t('nav.cashFlow'), path: '/admin/accounting/cashflow' },
         { key: 'branch-ledger', icon: <List size="1rem" />, label: t('nav.branchLedger'), path: '/admin/accounting/ledger' },

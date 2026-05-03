@@ -8,6 +8,7 @@ import { apiClient, ApiError } from '../../lib/api';
 import { fmtCurrency } from '../../lib/format';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { DateTime } from '../../components/DateTime';
+import { CompleteContractModal } from './CompleteContractModal';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -18,6 +19,7 @@ interface ContractForActions {
   state: string;
   commercial_model: string | null;
   branch_id: number;
+  holding_id: number;
   model_id: number | null;
   variant_id: number | null;
   device_id: number | null;
@@ -341,7 +343,6 @@ const ACTION_CONFIGS: Record<ContractAction, ActionConfig> = {
 const CLOSE_REASON_OPTIONS: Record<string, { value: string; label: string }[]> = {
   complete: [
     { value: 'NORMAL', label: 'Normal' },
-    { value: 'EARLY_PAYOFF', label: 'Early Payoff' },
   ],
   terminate: [
     { value: 'TERMINATED', label: 'Terminated' },
@@ -540,6 +541,7 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   const isContinuePay = activeAction === 'continue_pay';
   const isVoidBill = activeAction === 'void_bill';
   const isPayInstallment = activeAction === 'pay_installment';
+  const isComplete = activeAction === 'complete';
 
   const handleSuccess = (msgKey: string) => {
     setActiveAction(null);
@@ -747,8 +749,15 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
         onClose={() => setActiveAction(null)}
         onSuccess={handleSuccess}
       />
+      <CompleteContractModal
+        open={isComplete}
+        contract={contract}
+        closeReason="NORMAL"
+        onClose={() => setActiveAction(null)}
+        onSuccess={handleSuccess}
+      />
       <ContractActionModal
-        open={!!activeAction && !isSavingDeposit && !isCancelSaving && !isEarlyPayoff && !isContinuePay && !isVoidBill && !isPayInstallment}
+        open={!!activeAction && !isSavingDeposit && !isCancelSaving && !isEarlyPayoff && !isContinuePay && !isVoidBill && !isPayInstallment && !isComplete}
         action={activeAction}
         contract={contract}
         onClose={() => setActiveAction(null)}
@@ -1496,11 +1505,33 @@ function EarlyPayoffModal({ open, contract, onClose, onSuccess }: {
     label: `${b.bank_name} - ${b.account_number} (${b.account_name})`,
   }));
 
-  // Methods derived from preview response
-  const methodOptions = (preview?.allowed_methods ?? []).map(m => ({
-    value: m,
-    label: t(`paymentMethod.${m}`, { defaultValue: m }),
-  }));
+  // Methods: cash + transfer always; wallets always shown with balance + disabled when unusable.
+  // Preview's `allowed_methods` filters out wallets that BE rejects (e.g. INSURANCE blocked by guards).
+  const methodOptions = (() => {
+    const allowed = new Set(preview?.allowed_methods ?? []);
+    const baseLabel = (m: string) => t(`paymentMethod.${m}`, { defaultValue: m });
+    const walletBalance = (m: string): number => {
+      if (!preview) return 0;
+      if (m === 'CREDIT_WALLET') return preview.wallets.credit.balance;
+      if (m === 'INSURANCE_WALLET') return preview.wallets.insurance.balance;
+      if (m === 'SAVING_WALLET') return preview.wallets.saving.balance;
+      return 0;
+    };
+    const ALL_METHODS = ['CASH', 'TRANSFER', 'CREDIT_WALLET', 'INSURANCE_WALLET', 'SAVING_WALLET'];
+    return ALL_METHODS.map(m => {
+      const isWallet = m.endsWith('_WALLET');
+      if (!isWallet) {
+        return { value: m, label: baseLabel(m), disabled: !allowed.has(m) };
+      }
+      const balance = walletBalance(m);
+      const disabled = !allowed.has(m) || balance === 0;
+      return {
+        value: m,
+        label: `${baseLabel(m)} (${fmtCurrency(balance)})`,
+        disabled,
+      };
+    });
+  })();
 
   // Reset + load preview on open
   useEffect(() => {
@@ -1564,10 +1595,21 @@ function EarlyPayoffModal({ open, contract, onClose, onSuccess }: {
     setPayments(prev => prev.map((p, i) => i === idx ? { ...p, ...updates } : p));
   };
 
+  const walletBalanceFor = (method: string): number | null => {
+    if (!preview) return null;
+    if (method === 'CREDIT_WALLET') return preview.wallets.credit.balance;
+    if (method === 'INSURANCE_WALLET') return preview.wallets.insurance.balance;
+    if (method === 'SAVING_WALLET') return preview.wallets.saving.balance;
+    return null;
+  };
+
   const fillRemaining = (idx: number) => {
     const othersTotal = payments.reduce((sum, p, i) => i === idx ? sum : sum + (p.amount || 0), 0);
     const remaining = billTotal - othersTotal;
-    if (remaining > 0) updatePayment(idx, { amount: remaining });
+    if (remaining <= 0) return;
+    const walletCap = walletBalanceFor(payments[idx].method);
+    const fillAmount = walletCap !== null ? Math.min(remaining, walletCap) : remaining;
+    if (fillAmount > 0) updatePayment(idx, { amount: fillAmount });
   };
 
   const validatePayment = (): string | null => {

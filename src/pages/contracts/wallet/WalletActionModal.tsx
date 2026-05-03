@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Button, Modal, Input, Select, TextArea } from 'tsp-form';
-import { XCircle, AlertTriangle } from 'lucide-react';
+import { Button, Modal, Input, MaskedInput, Select, TextArea } from 'tsp-form';
+import { XCircle, AlertTriangle, Wallet } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { BranchPinInput } from '../../../components/BranchPinInput';
 import { fmtCurrency } from '../../../lib/format';
@@ -23,17 +23,6 @@ interface BankAccount {
   is_default: boolean;
 }
 
-interface WalletActionModalProps {
-  open: boolean;
-  onClose: () => void;
-  onSuccess: (msgKey: string) => void;
-  contractId: number;
-  contractCode: string;
-  holdingId: number;
-  walletType: WalletType;
-  action: WalletAction;
-}
-
 const ACTION_TITLE_KEY: Record<WalletAction, string> = {
   DEPOSIT: 'wallet.action_deposit',
   CASHOUT: 'wallet.action_cashout',
@@ -46,16 +35,35 @@ const SUCCESS_KEY: Record<WalletAction, string> = {
   DEDUCT: 'wallet.success_deduct',
 };
 
-export function WalletActionModal({
-  open,
-  onClose,
-  onSuccess,
+// ── Form (no Modal wrapper — embeddable) ─────────────────────────────────────
+
+interface WalletActionFormProps {
+  contractId: number;
+  contractCode: string;
+  holdingId: number;
+  walletType: WalletType;
+  action: WalletAction;
+  /** Called after a successful mutation. Receives the i18n key for the success snackbar. */
+  onSuccess: (msgKey: string) => void;
+  /** Cancel/back button label (defaults to common.cancel). */
+  cancelLabel?: string;
+  /** Cancel/back handler. */
+  onCancel: () => void;
+  /** When true, mounts and resets internal state. Use to drive form remount via parent state. */
+  active: boolean;
+}
+
+export function WalletActionForm({
   contractId,
   contractCode,
   holdingId,
   walletType,
   action,
-}: WalletActionModalProps) {
+  onSuccess,
+  cancelLabel,
+  onCancel,
+  active,
+}: WalletActionFormProps) {
   const { t, i18n } = useTranslation();
   const isThai = i18n.language === 'th';
 
@@ -79,7 +87,7 @@ export function WalletActionModal({
   const { data: available, isLoading: availableLoading } = useWalletAvailable(
     contractId,
     walletType,
-    open,
+    active,
   );
 
   const { data: bankAccounts } = useQuery({
@@ -88,12 +96,13 @@ export function WalletActionModal({
       apiClient.get<BankAccount[]>(
         `/v_bank_accounts?holding_id=eq.${holdingId}&is_active=eq.true&order=is_default.desc,bank_name.asc`,
       ),
-    enabled: open && channel === 'TRANSFER',
+    enabled: active && channel === 'TRANSFER',
     staleTime: 5 * 60 * 1000,
   });
 
+  // Reset state whenever the form (re)mounts on a new (wallet, action) pair
   useEffect(() => {
-    if (open) {
+    if (active) {
       setAmount('');
       setChannel('CASH');
       setBankAccountId('');
@@ -103,7 +112,7 @@ export function WalletActionModal({
       setPin('');
       setError('');
     }
-  }, [open]);
+  }, [active, walletType, action]);
 
   useEffect(() => {
     if (channel === 'TRANSFER' && bankAccounts && bankAccounts.length > 0 && !bankAccountId) {
@@ -169,6 +178,203 @@ export function WalletActionModal({
     );
   };
 
+  return (
+    <>
+      {error && (
+        <div key={errorKey} className="alert alert-danger mb-4 animate-pop-in">
+          <XCircle size={16} />
+          <span>{error}</span>
+        </div>
+      )}
+
+      <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
+        <div className="font-medium text-sm">{contractCode}</div>
+        <div className="text-xs text-subtle">
+          {availableLoading
+            ? t('common.loading')
+            : available
+              ? action === 'CASHOUT'
+                ? `${t('wallet.cashable')}: ${fmtCurrency(available.cashable)}`
+                : `${t('wallet.balance')}: ${fmtCurrency(available.total)}`
+              : ''}
+        </div>
+      </div>
+
+      {blockingGuard && (
+        <div className="alert alert-warning mb-4">
+          <AlertTriangle size={16} />
+          <span>
+            {t(blockingGuard.error_code, {
+              ns: 'apiErrors',
+              defaultValue: blockingGuard.rule,
+            })}
+          </span>
+        </div>
+      )}
+
+      <div className="form-grid">
+        <div className="flex flex-col">
+          <label className="form-label">
+            {t('wallet.amount')}
+            {available && (
+              <span className="text-xs text-subtle ml-2">
+                {t('wallet.maxHint', {
+                  max: fmtCurrency(
+                    action === 'CASHOUT' ? available.cashable : available.max_amount,
+                  ),
+                })}
+              </span>
+            )}
+          </label>
+          {(() => {
+            const fillMax = available
+              ? action === 'CASHOUT' ? available.cashable : available.max_amount
+              : 0;
+            const fillProps = fillMax > 0
+              ? { endIcon: <Wallet size={14} />, onEndIconClick: () => setAmount(String(fillMax)) }
+              : {};
+            return requiresChannel ? (
+              <div className="input-group">
+                <div className="w-28 shrink-0">
+                  <Select
+                    options={[
+                      { value: 'CASH', label: t('wallet.channel_cash') },
+                      { value: 'TRANSFER', label: t('wallet.channel_transfer') },
+                    ]}
+                    value={channel}
+                    onChange={val => setChannel(val as WalletChannel)}
+                    searchable={false}
+                  />
+                </div>
+                <div className="input-group-divider" />
+                <MaskedInput
+                  mask="number"
+                  decimalScale={2}
+                  value={amount}
+                  onChange={raw => setAmount(raw)}
+                  placeholder="0"
+                  className="w-full"
+                  autoFocus
+                  {...fillProps}
+                />
+              </div>
+            ) : (
+              <MaskedInput
+                mask="number"
+                decimalScale={2}
+                value={amount}
+                onChange={raw => setAmount(raw)}
+                placeholder="0"
+                className="w-full"
+                autoFocus
+                {...fillProps}
+              />
+            );
+          })()}
+        </div>
+
+        {requiresChannel && channel === 'TRANSFER' && (
+          <div className="flex flex-col">
+            <label className="form-label">{t('wallet.bankAccount')} *</label>
+            <Select
+              options={
+                bankAccounts?.map(b => ({
+                  value: String(b.id),
+                  label: `${b.bank_name} · ${b.account_number} · ${b.account_name}`,
+                })) ?? []
+              }
+              value={bankAccountId}
+              onChange={val => setBankAccountId(val as string)}
+            />
+          </div>
+        )}
+
+        {requiresReason && (
+          <>
+            <div className="flex flex-col">
+              <label className="form-label">{t('wallet.reason')} *</label>
+              <Select
+                options={
+                  reasons?.map(r => ({
+                    value: r.code,
+                    label: isThai ? r.label_th : r.label_en,
+                  })) ?? []
+                }
+                value={reasonCode}
+                onChange={val => setReasonCode(val as string)}
+                placeholder={t('wallet.reason_placeholder')}
+              />
+            </div>
+
+            {reasonNeedsNote && (
+              <div className="flex flex-col">
+                <label className="form-label">{t('wallet.reasonNote')} *</label>
+                <Input
+                  value={reasonNote}
+                  onChange={e => setReasonNote(e.target.value)}
+                  placeholder={t('wallet.reasonNote_placeholder')}
+                  className="w-full"
+                />
+              </div>
+            )}
+          </>
+        )}
+
+        <div className="flex flex-col">
+          <label className="form-label">{t('wallet.note')}</label>
+          <TextArea
+            value={note}
+            onChange={e => setNote(e.target.value)}
+            placeholder={t('wallet.note_placeholder')}
+            rows={2}
+          />
+        </div>
+
+        {requiresPin && (
+          <BranchPinInput value={pin} onChange={setPin} required />
+        )}
+      </div>
+
+      <div className="flex justify-between gap-2 mt-4">
+        <Button variant="outline" onClick={onCancel}>
+          {cancelLabel ?? t('common.cancel')}
+        </Button>
+        <Button color="primary" onClick={handleSubmit} disabled={!canSubmit}>
+          {mutation.isPending ? t('common.loading') : t(ACTION_TITLE_KEY[action])}
+        </Button>
+      </div>
+    </>
+  );
+}
+
+// ── Modal wrapper (existing call sites) ──────────────────────────────────────
+
+interface WalletActionModalProps {
+  open: boolean;
+  onClose: () => void;
+  onSuccess: (msgKey: string) => void;
+  contractId: number;
+  contractCode: string;
+  holdingId: number;
+  walletType: WalletType;
+  action: WalletAction;
+}
+
+export function WalletActionModal({
+  open,
+  onClose,
+  onSuccess,
+  contractId,
+  contractCode,
+  holdingId,
+  walletType,
+  action,
+}: WalletActionModalProps) {
+  const { t, i18n } = useTranslation();
+  const isThai = i18n.language === 'th';
+
+  const { data: actions } = useWalletActions();
+  const actionRow = actions?.find(a => a.wallet_type === walletType && a.action === action);
   const walletNameTh = actionRow?.wallet_name_th ?? walletType;
   const walletNameEn = actionRow?.wallet_name_en ?? walletType;
   const walletDisplayName = isThai ? walletNameTh : walletNameEn;
@@ -191,148 +397,16 @@ export function WalletActionModal({
         </div>
 
         <div className="modal-content">
-          {error && (
-            <div key={errorKey} className="alert alert-danger mb-4 animate-pop-in">
-              <XCircle size={16} />
-              <span>{error}</span>
-            </div>
-          )}
-
-          <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
-            <div className="font-medium text-sm">{contractCode}</div>
-            <div className="text-xs text-subtle">
-              {availableLoading
-                ? t('common.loading')
-                : available
-                  ? action === 'CASHOUT'
-                    ? `${t('wallet.cashable')}: ${fmtCurrency(available.cashable)}`
-                    : `${t('wallet.balance')}: ${fmtCurrency(available.total)}`
-                  : ''}
-            </div>
-          </div>
-
-          {blockingGuard && (
-            <div className="alert alert-warning mb-4">
-              <AlertTriangle size={16} />
-              <span>
-                {t(blockingGuard.error_code, {
-                  ns: 'apiErrors',
-                  defaultValue: blockingGuard.rule,
-                })}
-              </span>
-            </div>
-          )}
-
-          <div className="form-grid">
-            <div className="flex flex-col">
-              <label className="form-label">
-                {t('wallet.amount')}
-                {available && (
-                  <span className="text-xs text-subtle ml-2">
-                    {t('wallet.maxHint', {
-                      max: fmtCurrency(
-                        action === 'CASHOUT' ? available.cashable : available.max_amount,
-                      ),
-                    })}
-                  </span>
-                )}
-              </label>
-              <Input
-                type="number"
-                value={amount}
-                onChange={e => setAmount(e.target.value)}
-                placeholder="0"
-                className="w-full"
-                autoFocus
-              />
-            </div>
-
-            {requiresChannel && (
-              <>
-                <div className="flex flex-col">
-                  <label className="form-label">{t('wallet.channel')}</label>
-                  <Select
-                    options={[
-                      { value: 'CASH', label: t('wallet.channel_cash') },
-                      { value: 'TRANSFER', label: t('wallet.channel_transfer') },
-                    ]}
-                    value={channel}
-                    onChange={val => setChannel(val as WalletChannel)}
-                  />
-                </div>
-
-                {channel === 'TRANSFER' && (
-                  <div className="flex flex-col">
-                    <label className="form-label">{t('wallet.bankAccount')} *</label>
-                    <Select
-                      options={
-                        bankAccounts?.map(b => ({
-                          value: String(b.id),
-                          label: `${b.bank_name} · ${b.account_number} · ${b.account_name}`,
-                        })) ?? []
-                      }
-                      value={bankAccountId}
-                      onChange={val => setBankAccountId(val as string)}
-                    />
-                  </div>
-                )}
-              </>
-            )}
-
-            {requiresReason && (
-              <>
-                <div className="flex flex-col">
-                  <label className="form-label">{t('wallet.reason')} *</label>
-                  <Select
-                    options={
-                      reasons?.map(r => ({
-                        value: r.code,
-                        label: isThai ? r.label_th : r.label_en,
-                      })) ?? []
-                    }
-                    value={reasonCode}
-                    onChange={val => setReasonCode(val as string)}
-                    placeholder={t('wallet.reason_placeholder')}
-                  />
-                </div>
-
-                {reasonNeedsNote && (
-                  <div className="flex flex-col">
-                    <label className="form-label">{t('wallet.reasonNote')} *</label>
-                    <Input
-                      value={reasonNote}
-                      onChange={e => setReasonNote(e.target.value)}
-                      placeholder={t('wallet.reasonNote_placeholder')}
-                      className="w-full"
-                    />
-                  </div>
-                )}
-              </>
-            )}
-
-            <div className="flex flex-col">
-              <label className="form-label">{t('wallet.note')}</label>
-              <TextArea
-                value={note}
-                onChange={e => setNote(e.target.value)}
-                placeholder={t('wallet.note_placeholder')}
-                rows={2}
-              />
-            </div>
-
-            {requiresPin && (
-              <BranchPinInput value={pin} onChange={setPin} required />
-            )}
-          </div>
-        </div>
-
-        <div className="modal-footer">
-          <Button variant="outline" onClick={onClose}>
-            {t('common.cancel')}
-          </Button>
-          <Button color="primary" onClick={handleSubmit} disabled={!canSubmit}>
-            {mutation.isPending ? t('common.loading') : t(ACTION_TITLE_KEY[action])}
-          </Button>
+          <WalletActionForm
+            contractId={contractId}
+            contractCode={contractCode}
+            holdingId={holdingId}
+            walletType={walletType}
+            action={action}
+            onSuccess={onSuccess}
+            onCancel={onClose}
+            active={open}
+          />
         </div>
       </div>
     </Modal>

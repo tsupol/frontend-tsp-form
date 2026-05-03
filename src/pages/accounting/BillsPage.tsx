@@ -13,6 +13,7 @@ import { DateTime } from '../../components/DateTime';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { fmtCurrency } from '../../lib/format';
 import { type Branch } from './accountingTypes';
+import { useBillActions } from '../../hooks/useBillActions';
 
 /* ── Types ── */
 
@@ -70,6 +71,13 @@ interface BillPayment {
   reference: string | null;
 }
 
+interface BillCancelInfo {
+  cancelled_at: string;
+  credit_note_id: number;
+  credit_note_code: string;
+  credit_note_amount: number;
+}
+
 interface BillDetail {
   bill_id: number;
   bill_code_display: string;
@@ -77,6 +85,9 @@ interface BillDetail {
   bill_purpose: string;
   branch_id: number;
   status: string;
+  is_voided: boolean;
+  ref_bill_id: number | null;
+  ref_bill_code: string | null;
   total_amount: number;
   paid_amount: number;
   remaining: number;
@@ -85,6 +96,7 @@ interface BillDetail {
   contract_id: number | null;
   line_items: BillLineItem[];
   payments: BillPayment[] | null;
+  cancel_info: BillCancelInfo | null;
 }
 
 interface BankAccount {
@@ -282,7 +294,10 @@ export function BillsPage() {
                 renderRow={(row) => {
                   const b = row.original;
                   const isSelected = selectedBillId === b.id;
-                  const statusColor = b.status === 'PAID' ? 'success' : b.status === 'OPEN' ? 'danger' : b.status === 'PARTIAL' ? 'warning' : 'default';
+                  const cancelled = b.is_cancelled || b.status === 'VOIDED';
+                  const statusColor = cancelled
+                    ? 'default'
+                    : b.status === 'PAID' ? 'success' : b.status === 'OPEN' ? 'danger' : b.status === 'PARTIAL' ? 'warning' : 'default';
                   const typeColor = b.bill_type === 'INVOICE' ? 'primary' : b.bill_type === 'CREDIT_NOTE' ? 'danger' : 'warning';
                   return (
                     <button
@@ -296,7 +311,7 @@ export function BillsPage() {
                         <div className="flex items-center gap-2 mb-0.5">
                           <span className="font-mono text-sm font-medium">{b.code_display}</span>
                           <Badge color={typeColor} size="sm">{b.bill_type}</Badge>
-                          <Badge color={statusColor} size="sm">{b.status}</Badge>
+                          <Badge color={statusColor} size="sm">{cancelled ? 'VOIDED' : b.status}</Badge>
                         </div>
                         <div className="text-xs text-fg/60 flex items-center gap-1.5">
                           <span>{b.bill_purpose.replace(/_/g, ' ')}</span>
@@ -322,8 +337,8 @@ export function BillsPage() {
               />
             </PageNavPanel>
 
-            {/* Right panel — bill detail */}
-            <PageNavPanel id="detail" className="flex-1 overflow-y-auto better-scroll">
+            {/* Right panel — bill detail (flex column so detail's footer can be flex-none sticky) */}
+            <PageNavPanel id="detail" className="flex-1 min-h-0 flex flex-col">
               {!selectedBillId && (
                 <div className="flex-1 h-full flex items-center justify-center text-subtler p-8">
                   {t('accounting.bills.selectToView')}
@@ -365,6 +380,9 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
     queryKey: ['accounting', 'bill-detail', billId],
     queryFn: () => apiClient.get<BillDetail[]>(`/v_bill_detail?bill_id=eq.${billId}`),
   });
+
+  // Available actions (drives button visibility — replaces local isOpen heuristic)
+  const { isAvailable: isActionAvailable } = useBillActions(billId);
 
   // Bank accounts for transfer
   const { data: bankAccounts } = useQuery({
@@ -408,7 +426,11 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
   const lineTotal = lines.reduce((s, l) => s + l.amount, 0);
   const existingPayTotal = existingPayments.reduce((s, p) => s + p.amount, 0);
   const balanced = Math.abs(lineTotal - existingPayTotal) < 0.01;
-  const statusColor = detail.status === 'PAID' ? 'success' : detail.status === 'OPEN' ? 'danger' : detail.status === 'VOIDED' ? 'default' : 'warning';
+  const isCancelled = detail.is_voided || detail.status === 'VOIDED';
+  const displayStatus = isCancelled ? 'VOIDED' : detail.status;
+  const statusColor = isCancelled
+    ? 'default'
+    : detail.status === 'PAID' ? 'success' : detail.status === 'OPEN' ? 'danger' : 'warning';
 
   // Payment form helpers
   const totalPayment = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
@@ -443,6 +465,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
       await apiClient.rpc('fn_bill_payment_confirm', confirmParams);
       setPayments([]);
       queryClient.invalidateQueries({ queryKey: ['accounting', 'bill-detail', billId] });
+      queryClient.invalidateQueries({ queryKey: ['bill-actions', billId] });
       onBillChanged();
     } catch (err) {
       if (err instanceof ApiError) {
@@ -472,6 +495,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
       setVoidReason('');
       setVoidPin('');
       queryClient.invalidateQueries({ queryKey: ['accounting', 'bill-detail', billId] });
+      queryClient.invalidateQueries({ queryKey: ['bill-actions', billId] });
       onBillChanged();
     } catch (err) {
       if (err instanceof ApiError) {
@@ -486,40 +510,96 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
     }
   };
 
+  // BE evaluator currently still reports VOID_BILL/REVERSE_BILL as available on already-cancelled
+  // bills (it doesn't check is_voided). Gate FE-side defensively to avoid double-cancel attempts.
+  const hasLifecycleActions =
+    !isCancelled && (
+      isActionAvailable('CANCEL_BILL') ||
+      isActionAvailable('VOID_BILL') ||
+      isActionAvailable('REVERSE_BILL')
+    );
+
   return (
-    <div className="p-4 md:p-6">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-1">
-        <h2 className="heading-3 font-mono">{detail.bill_code_display}</h2>
-        <Badge color={statusColor} size="sm">{detail.status}</Badge>
-      </div>
-      <div className="text-sm text-fg/60 mb-6 flex items-center gap-2 flex-wrap">
-        <span>{detail.bill_type} · {detail.bill_purpose.replace(/_/g, ' ')}</span>
-        {detail.customer_name && <span>· {detail.customer_name}</span>}
-        {detail.contract_code && <span className="font-mono">· {detail.contract_code}</span>}
+    <div className="flex flex-col h-full min-h-0">
+      {/* Desktop header strip — code + status badge + secondary meta */}
+      <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
+        <span className="font-semibold font-mono">{detail.bill_code_display}</span>
+        <Badge color={statusColor} size="sm">{displayStatus}</Badge>
+        <span className="text-xs text-subtle">
+          {detail.bill_type} · {detail.bill_purpose.replace(/_/g, ' ')}
+        </span>
       </div>
 
-      {/* Summary stats */}
-      <dl className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <Stat label={t('accounting.bills.totalCharged')} value={fmtCurrency(detail.total_amount)} />
-        <Stat label={t('accounting.bills.totalPaid')} value={fmtCurrency(detail.paid_amount)} />
-        <Stat
-          label={t('accounting.bills.remaining')}
-          value={fmtCurrency(detail.remaining)}
-          tone={detail.remaining > 0 ? 'danger' : undefined}
-        />
-      </dl>
-
-      {/* Two columns: line items + payments */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left: Line Items */}
-        <div>
-          <div className="text-xs font-semibold text-fg/60 uppercase mb-3">
-            {t('accounting.bills.lineItems')} ({lines.length})
+      {/* Cancellation banner — visible when bill is voided */}
+      {isCancelled && detail.cancel_info && (
+        <div className="flex-none px-4 py-2 border-b border-line bg-fg/5">
+          <div className="text-xs text-subtle flex items-center gap-2 flex-wrap">
+            <Ban size={12} />
+            <span>{t('accounting.bills.voidedAt', { defaultValue: 'Voided at' })}:</span>
+            <DateTime value={detail.cancel_info.cancelled_at} showTime />
+            <span>·</span>
+            <span>{t('accounting.bills.creditNote', { defaultValue: 'Credit note' })}:</span>
+            <span className="font-mono">{detail.cancel_info.credit_note_code}</span>
           </div>
-          <div className="space-y-2">
+        </div>
+      )}
+      {isCancelled && !detail.cancel_info && detail.ref_bill_id && (
+        <div className="flex-none px-4 py-2 border-b border-line bg-fg/5">
+          <div className="text-xs text-subtle flex items-center gap-2 flex-wrap">
+            <Ban size={12} />
+            <span>{t('accounting.bills.linkedTo', { defaultValue: 'Linked to' })}:</span>
+            <span className="font-mono">{detail.ref_bill_code ?? `#${detail.ref_bill_id}`}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Customer / contract info block */}
+      {(detail.customer_name || detail.contract_code) && (
+        <div className="flex-none px-4 py-3 border-b border-line bg-surface">
+          {detail.customer_name && (
+            <div className="font-semibold text-sm">{detail.customer_name}</div>
+          )}
+          {detail.contract_code && (
+            <div className="text-xs font-mono text-subtle mt-0.5">{detail.contract_code}</div>
+          )}
+        </div>
+      )}
+
+      {/* Financial summary — 3-col key/value grid */}
+      <div className="flex-none grid grid-cols-3 gap-3 px-4 py-3 border-b border-line">
+        <div>
+          <div className="text-xs text-subtle">{t('accounting.bills.totalCharged')}</div>
+          <div className="font-semibold text-sm tabular-nums">{fmtCurrency(detail.total_amount)}</div>
+        </div>
+        <div>
+          <div className="text-xs text-subtle">{t('accounting.bills.totalPaid')}</div>
+          <div className="font-semibold text-sm tabular-nums">{fmtCurrency(detail.paid_amount)}</div>
+        </div>
+        <div>
+          <div className="text-xs text-subtle">{t('accounting.bills.remaining')}</div>
+          <div className={`font-semibold text-sm tabular-nums ${detail.remaining > 0 ? 'text-danger' : ''}`}>
+            {fmtCurrency(detail.remaining)}
+          </div>
+        </div>
+      </div>
+
+      {/* Reconciliation strip */}
+      <div className={`flex-none px-4 py-2 border-b border-line text-xs ${balanced ? 'text-success' : 'text-danger'}`}>
+        {t('accounting.bills.charged')} {fmtCurrency(lineTotal)} ={' '}
+        {t('accounting.bills.paid')} {fmtCurrency(existingPayTotal)}{' '}
+        {balanced ? '✅' : '❌'}
+      </div>
+
+      {/* Scrollable content — line items, payments, pay form */}
+      <div className="flex-1 overflow-auto better-scroll p-4 flex flex-col gap-5">
+        {/* Line items */}
+        <div>
+          <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-2">
+            {t('accounting.bills.lineItems')} ({lines.length})
+          </h3>
+          <div className="flex flex-col">
             {lines.map((line) => (
-              <div key={line.line_id} className="flex items-center gap-2 text-sm">
+              <div key={line.line_id} className="flex items-center gap-2 text-sm py-1.5 border-b border-line last:border-b-0">
                 <Badge color={LINE_TYPE_COLOR[line.line_type] ?? 'default'} size="sm">
                   {line.line_type}
                 </Badge>
@@ -533,27 +613,27 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
               </div>
             ))}
           </div>
-          <div className="mt-3 pt-3 border-t border-line text-sm font-semibold flex justify-between">
+          <div className="mt-2 pt-2 border-t border-line text-sm font-semibold flex justify-between">
             <span>{t('accounting.bills.totalCharged')}</span>
             <span className="tabular-nums">{fmtCurrency(lineTotal)}</span>
           </div>
         </div>
 
-        {/* Right: Payments */}
+        {/* Payments */}
         <div>
-          <div className="text-xs font-semibold text-fg/60 uppercase mb-3">
+          <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-2">
             {t('accounting.bills.payments')} ({existingPayments.length})
-          </div>
+          </h3>
           {existingPayments.length === 0 ? (
-            <div className="text-sm text-fg/40 italic">{t('accounting.bills.noPayments')}</div>
+            <div className="text-sm text-subtler italic">{t('accounting.bills.noPayments')}</div>
           ) : (
-            <div className="space-y-2">
+            <div className="flex flex-col">
               {existingPayments.map((pay) => (
-                <div key={pay.id} className="flex items-center gap-2 text-sm">
+                <div key={pay.id} className="flex items-center gap-2 text-sm py-1.5 border-b border-line last:border-b-0">
                   <Badge color={METHOD_COLOR[pay.method] ?? 'default'} size="sm">
                     {pay.method}
                   </Badge>
-                  <span className="flex-1 min-w-0 truncate text-fg/60">
+                  <span className="flex-1 min-w-0 truncate text-subtle">
                     {pay.bank_name ? `${pay.bank_name} ${pay.account_number ?? ''}` : pay.code_display}
                   </span>
                   <span className="tabular-nums font-medium shrink-0">
@@ -563,23 +643,17 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
               ))}
             </div>
           )}
-          <div className="mt-3 pt-3 border-t border-line text-sm font-semibold flex justify-between">
-            <span>{t('accounting.bills.totalPaid')}</span>
-            <span className="tabular-nums">{fmtCurrency(existingPayTotal)}</span>
-          </div>
+          {existingPayments.length > 0 && (
+            <div className="mt-2 pt-2 border-t border-line text-sm font-semibold flex justify-between">
+              <span>{t('accounting.bills.totalPaid')}</span>
+              <span className="tabular-nums">{fmtCurrency(existingPayTotal)}</span>
+            </div>
+          )}
         </div>
-      </div>
 
-      {/* Reconciliation check */}
-      <div className={`mt-4 pt-4 border-t border-line text-sm font-medium ${balanced ? 'text-success' : 'text-danger'}`}>
-        {t('accounting.bills.charged')} {fmtCurrency(lineTotal)} = {t('accounting.bills.paid')} {fmtCurrency(existingPayTotal)}{' '}
-        {balanced ? '✅' : '❌'}
-      </div>
-
-      {/* ── Actions for OPEN/PARTIAL bills ── */}
-      {isOpen && (
+      {/* ── Pay form (when BE says payment can be added) ── */}
+      {isActionAvailable('ADD_PAYMENT') && (
         <div className="mt-6 pt-6 border-t border-line">
-          {/* Pay form */}
           <h3 className="text-base font-semibold mb-3">{t('accounting.bills.payTitle')}</h3>
 
           {payError && (
@@ -653,21 +727,31 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
             <Button
               color="primary"
               onClick={handlePay}
-              disabled={!isPayBalanced || paying}
+              disabled={!isPayBalanced || paying || !isActionAvailable('CONFIRM_PAYMENT')}
               startIcon={<CheckCircle size={16} />}
             >
               {paying ? t('common.loading') : t('accounting.bills.confirmPay')}
             </Button>
+          </div>
+        </div>
+      )}
 
+      </div>{/* /scroll content */}
+
+      {/* ── Sticky lifecycle action footer (cancel / void / reverse — driven by BE) ── */}
+      {hasLifecycleActions && (
+        <div className="flex-none border-t border-line flex items-center gap-2 justify-end px-4 py-3">
+          {(isActionAvailable('CANCEL_BILL') || isActionAvailable('VOID_BILL')) && (
             <Button
+              size="sm"
               color="danger"
               variant="outline"
               onClick={() => { setVoidOpen(true); setVoidError(''); setVoidReason(''); setVoidPin(''); }}
-              startIcon={<Ban size={16} />}
+              startIcon={<Ban size={14} />}
             >
               {t('accounting.bills.voidBill')}
             </Button>
-          </div>
+          )}
         </div>
       )}
 

@@ -378,7 +378,7 @@ export function DayClosePage() {
               />
             </PageNavPanel>
 
-            <PageNavPanel id="detail" className="flex-1 overflow-y-auto better-scroll">
+            <PageNavPanel id="detail" className="flex-1 min-h-0 flex flex-col">
               {!selectedClose && !selectedIsToday && !selectedUnclosedDate && selectedFetching && (
                 <div className="flex-1 h-full flex items-center justify-center text-subtler p-8">
                   {t('common.loading')}
@@ -407,41 +407,45 @@ export function DayClosePage() {
 
               {/* Unclosed previous day — close form */}
               {selectedUnclosed && (
-                <div className="p-4 md:p-6">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Clock size={18} className="text-warning" />
-                    <h2 className="heading-3">
+                <div className="flex flex-col h-full min-h-0">
+                  {/* Header strip */}
+                  <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
+                    <Clock size={18} className="text-warning shrink-0" />
+                    <span className="font-semibold">
                       <DateTime value={selectedUnclosed.bill_date} showTime={false} />
-                    </h2>
+                    </span>
                     <Badge color="warning" size="sm">{t('accounting.dayClose.unclosedBadge')}</Badge>
                   </div>
 
-                  <div className="alert alert-warning mb-4">
-                    <AlertTriangle size={18} />
-                    <div>
-                      <div className="alert-title">{t('accounting.dayClose.unclosedTitle')}</div>
-                      <div className="alert-description">
-                        {t('accounting.dayClose.unclosedMessage', { count: selectedUnclosed.bill_count, days: selectedUnclosed.days_overdue })}
+                  <div className="flex-1 overflow-auto better-scroll p-4 flex flex-col gap-4">
+                    <div className="alert alert-warning">
+                      <AlertTriangle size={18} />
+                      <div>
+                        <div className="alert-title">{t('accounting.dayClose.unclosedTitle')}</div>
+                        <div className="alert-description">
+                          {t('accounting.dayClose.unclosedMessage', { count: selectedUnclosed.bill_count, days: selectedUnclosed.days_overdue })}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
                   {unclosedSummary && (
                     <>
-                      <h3 className="text-base font-semibold mb-3">{t('accounting.dayClose.preview')}</h3>
-                      <dl className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                        <Stat label={t('accounting.dayClose.expected')} value={fmtCurrency(unclosedSummary.net_total)} />
-                        <Stat label={t('accounting.dayClose.totalCash')} value={fmtCurrency(unclosedSummary.net_cash)} />
-                        <Stat label={t('accounting.dayClose.totalTransfer')} value={fmtCurrency(unclosedSummary.net_transfer)} />
-                        <Stat label={t('accounting.dayClose.billCount')} value={String(unclosedSummary.bill_count)} />
-                        <Stat label={t('accounting.dayClose.contractAmount')} value={fmtCurrency(unclosedSummary.contract_amount)} />
-                        <Stat label={t('accounting.dayClose.retailAmount')} value={fmtCurrency(unclosedSummary.retail_amount)} />
-                        <Stat label={t('accounting.dayClose.remitHolding')} value={fmtCurrency(unclosedSummary.remit_holding)} />
-                        <Stat label={t('accounting.dayClose.remitCompany')} value={fmtCurrency(unclosedSummary.remit_company)} />
-                      </dl>
+                      <div>
+                        <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-2">{t('accounting.dayClose.preview')}</h3>
+                        <dl className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-2">
+                          <Stat label={t('accounting.dayClose.expected')} value={fmtCurrency(unclosedSummary.net_total)} />
+                          <Stat label={t('accounting.dayClose.totalCash')} value={fmtCurrency(unclosedSummary.net_cash)} />
+                          <Stat label={t('accounting.dayClose.totalTransfer')} value={fmtCurrency(unclosedSummary.net_transfer)} />
+                          <Stat label={t('accounting.dayClose.billCount')} value={String(unclosedSummary.bill_count)} />
+                          <Stat label={t('accounting.dayClose.contractAmount')} value={fmtCurrency(unclosedSummary.contract_amount)} />
+                          <Stat label={t('accounting.dayClose.retailAmount')} value={fmtCurrency(unclosedSummary.retail_amount)} />
+                          <Stat label={t('accounting.dayClose.remitHolding')} value={fmtCurrency(unclosedSummary.remit_holding)} />
+                          <Stat label={t('accounting.dayClose.remitCompany')} value={fmtCurrency(unclosedSummary.remit_company)} />
+                        </dl>
+                      </div>
 
                       {unclosedSummary.pending_bill_count > 0 && (
-                        <div className="alert alert-warning mb-4">
+                        <div className="alert alert-warning">
                           <AlertTriangle size={18} />
                           <div>
                             <div className="alert-title">{t('accounting.dayClose.hasPendingTitle')}</div>
@@ -458,48 +462,41 @@ export function DayClosePage() {
                         </div>
                       )}
 
-                      <h3 className="text-base font-semibold mb-3">{t('accounting.dayClose.enterActual')}</h3>
-                      <div className="form-grid max-w-md mb-4">
-                        <div className="flex flex-col">
-                          <label className="form-label">{t('accounting.dayClose.actualAmount')}</label>
-                          <MaskedInput
-                            mask="number"
-                            decimalScale={2}
-                            value={actualAmount}
-                            onChange={(raw) => setActualAmount(raw)}
-                            className="w-full"
-                            size="sm"
-                            endIcon={<Wallet size={14} />}
-                            onEndIconClick={() => setActualAmount(String(unclosedSummary.net_total ?? 0))}
-                          />
-                        </div>
-                        <div className="flex flex-col">
-                          <label className="form-label">{t('accounting.dayClose.noteOptional')}</label>
-                          <Input
-                            value={note}
-                            onChange={(e) => setNote(e.target.value)}
-                            className="w-full"
-                            size="sm"
-                          />
-                        </div>
-                        {actualAmount && (
-                          <div className="text-sm">
-                            <span className="text-fg/60">{t('accounting.dayClose.difference')}: </span>
-                            <span className={`font-semibold tabular-nums ${diff < 0 ? 'text-danger' : diff > 0 ? 'text-warning' : 'text-success'}`}>
-                              {diff >= 0 ? '+' : ''}{fmtCurrency(diff)}
-                            </span>
+                      <div>
+                        <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-2">{t('accounting.dayClose.enterActual')}</h3>
+                        <div className="form-grid max-w-md">
+                          <div className="flex flex-col">
+                            <label className="form-label">{t('accounting.dayClose.actualAmount')}</label>
+                            <MaskedInput
+                              mask="number"
+                              decimalScale={2}
+                              value={actualAmount}
+                              onChange={(raw) => setActualAmount(raw)}
+                              className="w-full"
+                              size="sm"
+                              endIcon={<Wallet size={14} />}
+                              onEndIconClick={() => setActualAmount(String(unclosedSummary.net_total ?? 0))}
+                            />
                           </div>
-                        )}
+                          <div className="flex flex-col">
+                            <label className="form-label">{t('accounting.dayClose.noteOptional')}</label>
+                            <Input
+                              value={note}
+                              onChange={(e) => setNote(e.target.value)}
+                              className="w-full"
+                              size="sm"
+                            />
+                          </div>
+                          {actualAmount && (
+                            <div className="text-sm">
+                              <span className="text-subtle">{t('accounting.dayClose.difference')}: </span>
+                              <span className={`font-semibold tabular-nums ${diff < 0 ? 'text-danger' : diff > 0 ? 'text-warning' : 'text-success'}`}>
+                                {diff >= 0 ? '+' : ''}{fmtCurrency(diff)}
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
-
-                      <Button
-                        color="primary"
-                        startIcon={<CalendarCheck size={16} />}
-                        onClick={() => { setCloseError(''); setConfirmOpen(true); }}
-                        disabled={!actualAmount || unclosedSummary.pending_bill_count > 0}
-                      >
-                        {t('accounting.dayClose.closeDateBtn', { date: selectedUnclosedDate })}
-                      </Button>
                     </>
                   )}
 
@@ -510,13 +507,16 @@ export function DayClosePage() {
                   {/* Summary not available (date older than 7-day lookback) — show basic info */}
                   {!unclosedSummary && unclosedSummaryFetched && (
                     <>
-                      <dl className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                        <Stat label={t('accounting.dayClose.billCount')} value={String(selectedUnclosed.bill_count)} />
-                        <Stat label={t('accounting.dayClose.expected')} value={fmtCurrency(selectedUnclosed.total_amount)} />
-                      </dl>
+                      <div>
+                        <dl className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-2">
+                          <Stat label={t('accounting.dayClose.billCount')} value={String(selectedUnclosed.bill_count)} />
+                          <Stat label={t('accounting.dayClose.expected')} value={fmtCurrency(selectedUnclosed.total_amount)} />
+                        </dl>
+                      </div>
 
-                      <h3 className="text-base font-semibold mb-3">{t('accounting.dayClose.enterActual')}</h3>
-                      <div className="form-grid max-w-md mb-4">
+                      <div>
+                        <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-2">{t('accounting.dayClose.enterActual')}</h3>
+                        <div className="form-grid max-w-md">
                         <div className="flex flex-col">
                           <label className="form-label">{t('accounting.dayClose.actualAmount')}</label>
                           <MaskedInput
@@ -541,31 +541,39 @@ export function DayClosePage() {
                         </div>
                       </div>
 
-                      <Button
-                        color="primary"
-                        startIcon={<CalendarCheck size={16} />}
-                        onClick={() => { setCloseError(''); setConfirmOpen(true); }}
-                        disabled={!actualAmount}
-                      >
-                        {t('accounting.dayClose.closeDateBtn', { date: selectedUnclosedDate })}
-                      </Button>
+                      </div>
                     </>
                   )}
+                  </div>{/* /scroll */}
+
+                  {/* Sticky action footer */}
+                  <div className="flex-none border-t border-line flex items-center justify-end px-4 py-3">
+                    <Button
+                      size="sm"
+                      color="primary"
+                      startIcon={<CalendarCheck size={14} />}
+                      onClick={() => { setCloseError(''); setConfirmOpen(true); }}
+                      disabled={!actualAmount || (unclosedSummary?.pending_bill_count ?? 0) > 0}
+                    >
+                      {t('accounting.dayClose.closeDateBtn', { date: selectedUnclosedDate })}
+                    </Button>
+                  </div>
                 </div>
               )}
 
               {/* Closed snapshot view */}
               {selectedClose && !selectedIsToday && !selectedUnclosedDate && (
-                <div className="p-4 md:p-6">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Lock size={18} className="text-success" />
-                    <h2 className="heading-3">
+                <div className="flex flex-col h-full min-h-0">
+                  <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
+                    <Lock size={18} className="text-success shrink-0" />
+                    <span className="font-semibold">
                       <DateTime value={selectedClose.close_date} showTime={false} />
-                    </h2>
+                    </span>
                     <Badge color="success" size="sm">{t('accounting.dayClose.closedBadge')}</Badge>
                   </div>
 
-                  <dl className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                  <div className="flex-1 overflow-auto better-scroll p-4">
+                  <dl className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-2 mb-4">
                     <Stat label={t('accounting.dayClose.expected')} value={fmtCurrency(selectedClose.expected_amount)} />
                     <Stat label={t('accounting.dayClose.actual')} value={fmtCurrency(selectedClose.actual_amount)} />
                     <Stat
@@ -589,20 +597,23 @@ export function DayClosePage() {
                   </dl>
 
                   {selectedClose.note && (
-                    <div className="text-sm text-fg/60">
+                    <div className="text-sm text-subtle">
                       <span className="font-medium">{t('accounting.dayClose.note')}:</span> {selectedClose.note}
                     </div>
                   )}
+                  </div>{/* /scroll */}
                 </div>
               )}
 
               {/* Today — ready to close */}
               {selectedIsToday && !todayAlreadyClosed && (
-                <div className="p-4 md:p-6">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Sparkles size={18} className="text-primary" />
-                    <h2 className="heading-3">{t('accounting.dayClose.todayLabel')}</h2>
+                <div className="flex flex-col h-full min-h-0">
+                  <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
+                    <Sparkles size={18} className="text-primary shrink-0" />
+                    <span className="font-semibold">{t('accounting.dayClose.todayLabel')}</span>
                   </div>
+
+                  <div className="flex-1 overflow-auto better-scroll p-4 flex flex-col gap-4">
 
                   {/* Warning: must close previous days first */}
                   {unclosedDays.length > 0 && (
@@ -628,20 +639,22 @@ export function DayClosePage() {
 
                   {summary && (
                     <>
-                      <h3 className="text-base font-semibold mb-3">{t('accounting.dayClose.preview')}</h3>
-                      <dl className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                        <Stat label={t('accounting.dayClose.expected')} value={fmtCurrency(summary.net_total)} />
-                        <Stat label={t('accounting.dayClose.totalCash')} value={fmtCurrency(summary.net_cash)} />
-                        <Stat label={t('accounting.dayClose.totalTransfer')} value={fmtCurrency(summary.net_transfer)} />
-                        <Stat label={t('accounting.dayClose.billCount')} value={String(summary.bill_count)} />
-                        <Stat label={t('accounting.dayClose.contractAmount')} value={fmtCurrency(summary.contract_amount)} />
-                        <Stat label={t('accounting.dayClose.retailAmount')} value={fmtCurrency(summary.retail_amount)} />
-                        <Stat label={t('accounting.dayClose.remitHolding')} value={fmtCurrency(summary.remit_holding)} />
-                        <Stat label={t('accounting.dayClose.remitCompany')} value={fmtCurrency(summary.remit_company)} />
-                      </dl>
+                      <div>
+                        <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-2">{t('accounting.dayClose.preview')}</h3>
+                        <dl className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-2">
+                          <Stat label={t('accounting.dayClose.expected')} value={fmtCurrency(summary.net_total)} />
+                          <Stat label={t('accounting.dayClose.totalCash')} value={fmtCurrency(summary.net_cash)} />
+                          <Stat label={t('accounting.dayClose.totalTransfer')} value={fmtCurrency(summary.net_transfer)} />
+                          <Stat label={t('accounting.dayClose.billCount')} value={String(summary.bill_count)} />
+                          <Stat label={t('accounting.dayClose.contractAmount')} value={fmtCurrency(summary.contract_amount)} />
+                          <Stat label={t('accounting.dayClose.retailAmount')} value={fmtCurrency(summary.retail_amount)} />
+                          <Stat label={t('accounting.dayClose.remitHolding')} value={fmtCurrency(summary.remit_holding)} />
+                          <Stat label={t('accounting.dayClose.remitCompany')} value={fmtCurrency(summary.remit_company)} />
+                        </dl>
+                      </div>
 
                       {summary.pending_bill_count > 0 && (
-                        <div className="alert alert-warning mb-4">
+                        <div className="alert alert-warning">
                           <AlertTriangle size={18} />
                           <div>
                             <div className="alert-title">{t('accounting.dayClose.hasPendingTitle')}</div>
@@ -659,9 +672,9 @@ export function DayClosePage() {
                       )}
 
                       {unclosedDays.length === 0 && (
-                        <>
-                          <h3 className="text-base font-semibold mb-3">{t('accounting.dayClose.enterActual')}</h3>
-                          <div className="form-grid max-w-md mb-4">
+                        <div>
+                          <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-2">{t('accounting.dayClose.enterActual')}</h3>
+                          <div className="form-grid max-w-md">
                             <div className="flex flex-col">
                               <label className="form-label">{t('accounting.dayClose.actualAmount')}</label>
                               <MaskedInput
@@ -686,25 +699,32 @@ export function DayClosePage() {
                             </div>
                             {actualAmount && (
                               <div className="text-sm">
-                                <span className="text-fg/60">{t('accounting.dayClose.difference')}: </span>
+                                <span className="text-subtle">{t('accounting.dayClose.difference')}: </span>
                                 <span className={`font-semibold tabular-nums ${diff < 0 ? 'text-danger' : diff > 0 ? 'text-warning' : 'text-success'}`}>
                                   {diff >= 0 ? '+' : ''}{fmtCurrency(diff)}
                                 </span>
                               </div>
                             )}
                           </div>
-
-                          <Button
-                            color="primary"
-                            startIcon={<CalendarCheck size={16} />}
-                            onClick={() => { setCloseError(''); setConfirmOpen(true); }}
-                            disabled={!actualAmount || summary.pending_bill_count > 0}
-                          >
-                            {t('accounting.dayClose.closeDay')}
-                          </Button>
-                        </>
+                        </div>
                       )}
                     </>
+                  )}
+                  </div>{/* /scroll */}
+
+                  {/* Sticky action footer */}
+                  {summary && unclosedDays.length === 0 && (
+                    <div className="flex-none border-t border-line flex items-center justify-end px-4 py-3">
+                      <Button
+                        size="sm"
+                        color="primary"
+                        startIcon={<CalendarCheck size={14} />}
+                        onClick={() => { setCloseError(''); setConfirmOpen(true); }}
+                        disabled={!actualAmount || summary.pending_bill_count > 0}
+                      >
+                        {t('accounting.dayClose.closeDay')}
+                      </Button>
+                    </div>
                   )}
                 </div>
               )}
