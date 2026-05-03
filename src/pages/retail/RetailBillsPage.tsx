@@ -6,7 +6,7 @@ import {
   Modal, MaskedInput, TextArea, useSnackbarContext,
 } from 'tsp-form';
 import {
-  ArrowRightFromLine, ArrowLeft, Plus, Wallet, Ban, AlertCircle, CheckCircle, XCircle,
+  ArrowRightFromLine, ArrowLeft, Plus, Wallet, Ban, AlertCircle, CheckCircle, XCircle, ChevronsRight,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -593,7 +593,7 @@ function TakePaymentModal({
                 placeholder={t('retail.create.amountPlaceholder')}
                 size="sm"
                 className="w-full"
-                endIcon={<Wallet size={14} />}
+                endIcon={<ChevronsRight size={14} />}
                 onEndIconClick={() => setAmountStr(String(remaining))}
               />
             </div>

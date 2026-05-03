@@ -1776,6 +1776,7 @@
     "history_empty": "No transactions",
     "empty": "empty",
     "disabled_state": "Not allowed in current contract state",
+    "disabled_empty": "Wallet is empty",
     "action_deposit": "Deposit",
     "action_cashout": "Cashout",
     "action_deduct": "Deduct",

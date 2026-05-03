@@ -6,7 +6,7 @@ import {
   DataTable, InputDatePicker, MaskedInput, Modal, useSnackbarContext,
 } from 'tsp-form';
 import {
-  ArrowRightFromLine, ArrowLeft, CalendarCheck, AlertTriangle, CheckCircle2, Lock, Sparkles, Keyboard, XCircle, Clock, Wallet,
+  ArrowRightFromLine, ArrowLeft, CalendarCheck, AlertTriangle, CheckCircle2, Lock, Sparkles, Keyboard, XCircle, Clock, ChevronsRight,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient, ApiError } from '../../lib/api';
@@ -474,7 +474,7 @@ export function DayClosePage() {
                               onChange={(raw) => setActualAmount(raw)}
                               className="w-full"
                               size="sm"
-                              endIcon={<Wallet size={14} />}
+                              endIcon={<ChevronsRight size={14} />}
                               onEndIconClick={() => setActualAmount(String(unclosedSummary.net_total ?? 0))}
                             />
                           </div>
@@ -526,7 +526,7 @@ export function DayClosePage() {
                             onChange={(raw) => setActualAmount(raw)}
                             className="w-full"
                             size="sm"
-                            endIcon={<Wallet size={14} />}
+                            endIcon={<ChevronsRight size={14} />}
                             onEndIconClick={() => setActualAmount(String(selectedUnclosed.total_amount ?? 0))}
                           />
                         </div>
@@ -684,7 +684,7 @@ export function DayClosePage() {
                                 onChange={(raw) => setActualAmount(raw)}
                                 className="w-full"
                                 size="sm"
-                                endIcon={<Wallet size={14} />}
+                                endIcon={<ChevronsRight size={14} />}
                                 onEndIconClick={() => setActualAmount(String(summary.net_total ?? 0))}
                               />
                             </div>

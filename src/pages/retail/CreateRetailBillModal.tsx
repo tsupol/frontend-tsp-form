@@ -5,7 +5,7 @@ import {
   Modal, Button, Select, Badge, Input, MaskedInput, NumberSpinner, TextArea, useSnackbarContext,
 } from 'tsp-form';
 import {
-  Plus, Trash2, ShoppingCart, Truck, Percent, Wallet,
+  Plus, Trash2, ShoppingCart, Truck, Percent, ChevronsRight,
   AlertCircle, CheckCircle, XCircle, Search,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
@@ -594,7 +594,7 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
                   placeholder={t('retail.create.amountPlaceholder')}
                   size="sm"
                   className="w-full"
-                  endIcon={<Wallet size={14} />}
+                  endIcon={<ChevronsRight size={14} />}
                   onEndIconClick={total > 0 ? () => setPaymentAmount(total) : undefined}
                 />
               </div>

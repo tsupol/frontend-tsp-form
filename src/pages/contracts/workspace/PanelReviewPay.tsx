@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Button, Select, MaskedInput } from 'tsp-form';
-import { Star, Plus, Trash2, XCircle, Loader2, CheckCircle, AlertTriangle, Wallet } from 'lucide-react';
+import { Star, Plus, Trash2, XCircle, Loader2, CheckCircle, AlertTriangle, ChevronsRight } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { fmtCurrency } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
@@ -278,7 +278,7 @@ export function PanelReviewPay({ onClose }: { onClose: () => void }) {
                       onChange={(raw) => updatePayment(idx, { amount: parseFloat(raw) || 0 })}
                       size="sm"
                       className="w-full"
-                      endIcon={<Wallet size={14} />}
+                      endIcon={<ChevronsRight size={14} />}
                       onEndIconClick={() => {
                         const otherTotal = payments.reduce((sum, p, i) => i === idx ? sum : sum + (p.amount || 0), 0);
                         const remaining = Math.max(0, totalAmount - otherTotal);

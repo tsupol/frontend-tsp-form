@@ -1947,16 +1947,35 @@ function PayInstallmentModal({ open, contract, onClose, onSuccess }: {
 
           <div className="form-grid">
             <div className="flex flex-col">
-              <label className="form-label">{t('contract.amount')} *</label>
-              <MaskedInput
-                mask="number"
-                decimalScale={2}
-                value={amount}
-                onChange={(raw) => setAmount(raw)}
-                placeholder="0.00"
-                className="w-full"
-                autoFocus
-              />
+              <label className="form-label">{t('contract.payInstallment_channel')} / {t('contract.amount')} *</label>
+              <div className="input-group">
+                <div className="w-40 shrink-0">
+                  <Select
+                    options={channelOptions}
+                    value={channel}
+                    onChange={(val) => {
+                      setChannel(val as InstallmentChannel);
+                      setBankAccountId(null);
+                    }}
+                    searchable={false}
+                  />
+                </div>
+                <div className="input-group-divider" />
+                <MaskedInput
+                  mask="number"
+                  decimalScale={2}
+                  value={amount}
+                  onChange={(raw) => setAmount(raw)}
+                  placeholder="0.00"
+                  className="w-full"
+                  autoFocus
+                  endIcon={<ChevronsRight size={14} />}
+                  onEndIconClick={() => {
+                    const fill = nextDue > 0 ? nextDue : (outstanding > 0 ? outstanding : 0);
+                    if (fill > 0) setAmount(String(fill));
+                  }}
+                />
+              </div>
               {walletExceeded && (
                 <div className="text-xs text-danger mt-1">
                   {t('contract.payInstallment_walletExceeded', {
@@ -1974,19 +1993,6 @@ function PayInstallmentModal({ open, contract, onClose, onSuccess }: {
                   })}
                 </div>
               )}
-            </div>
-
-            <div className="flex flex-col">
-              <label className="form-label">{t('contract.payInstallment_channel')} *</label>
-              <Select
-                options={channelOptions}
-                value={channel}
-                onChange={(val) => {
-                  setChannel(val as InstallmentChannel);
-                  setBankAccountId(null);
-                }}
-                searchable={false}
-              />
               {channel === 'INSURANCE_WALLET' && unpaidCount !== 1 && (
                 <div className="text-xs text-warning mt-1">
                   {t('contract.payInstallment_insuranceLastOnly', {

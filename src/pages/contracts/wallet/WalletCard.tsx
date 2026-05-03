@@ -120,8 +120,8 @@ export function WalletCard({ contract, walletType, onAction }: WalletCardProps) 
         {isActive && (
           <div className="flex flex-wrap gap-2 mt-3">
             {allowedActions.map(actionRow => {
-              const disabled = isActionDisabled(actionRow, contract, available, walletType);
-              const reason = disabledReason(actionRow, contract, available, walletType, t);
+              const disabled = isActionDisabled(actionRow, contract, available, walletType, balance);
+              const reason = disabledReason(actionRow, contract, available, walletType, balance, t);
               const button = (
                 <Button
                   key={actionRow.action}
@@ -221,9 +221,14 @@ function isActionDisabled(
   c: ContractWalletInfo,
   available: ReturnType<typeof useWalletAvailable>['data'],
   walletType: WalletType,
+  balance: number,
 ): true | string | false {
   // State guard
   if (action.allowed_states && !action.allowed_states.includes(c.state)) {
+    return true;
+  }
+  // Spending actions blocked when wallet is empty
+  if (action.amount_sign === 'NEGATIVE' && balance === 0) {
     return true;
   }
   // CREDIT cashout: only when company portion > 0
@@ -242,10 +247,14 @@ function disabledReason(
   c: ContractWalletInfo,
   available: ReturnType<typeof useWalletAvailable>['data'],
   walletType: WalletType,
+  balance: number,
   t: ReturnType<typeof useTranslation>['t'],
 ): string {
   if (action.allowed_states && !action.allowed_states.includes(c.state)) {
     return t('wallet.disabled_state', { defaultValue: 'Not allowed in current contract state' });
+  }
+  if (action.amount_sign === 'NEGATIVE' && balance === 0) {
+    return t('wallet.disabled_empty', { defaultValue: 'Wallet is empty' });
   }
   if (walletType === 'CREDIT' && action.action === 'CASHOUT' && (c.credit_balance_company ?? 0) === 0) {
     return t('wallet.credit_locked_hint');

@@ -1776,6 +1776,7 @@
     "history_empty": "ไม่มีรายการ",
     "empty": "ว่าง",
     "disabled_state": "ไม่อนุญาตในสถานะสัญญาปัจจุบัน",
+    "disabled_empty": "กระเป๋าว่าง",
     "action_deposit": "ฝาก",
     "action_cashout": "ถอน",
     "action_deduct": "หัก",
