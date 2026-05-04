@@ -465,9 +465,11 @@ type ActionPlacement =
 
 // Override the backend `category` for popover grouping. Backend tags some
 // wallet-flavored actions as FEE (e.g. SAVING_DEDUCT); we want them visually
-// grouped with the rest of the wallet actions.
+// grouped with the rest of the wallet actions. ADD_NOTE is tagged CUSTOMER
+// upstream but writes a contract-level note, so it sits with LIFECYCLE.
 const CATEGORY_OVERRIDE: Record<string, string> = {
   SAVING_DEDUCT: 'WALLET',
+  ADD_NOTE: 'LIFECYCLE',
 };
 
 const ACTION_PLACEMENT: Record<string, ActionPlacement> = {
@@ -480,6 +482,13 @@ const ACTION_PLACEMENT: Record<string, ActionPlacement> = {
   INSURANCE_DEDUCT:  { kind: 'elsewhere', where: 'Wallets tab → Insurance' },
   INSURANCE_CASHOUT: { kind: 'elsewhere', where: 'Wallets tab → Insurance' },
   APPLY_INSURANCE:   { kind: 'elsewhere', where: 'Wallets tab → Insurance' },
+  // Note composer lives in the Notes tab
+  ADD_NOTE:          { kind: 'elsewhere', where: 'Notes tab' },
+  // Contract-customer ops live in the Customers tab
+  ATTACH_CUSTOMER:   { kind: 'elsewhere', where: 'Customers tab' },
+  DETACH_CUSTOMER:   { kind: 'elsewhere', where: 'Customers tab' },
+  ADD_GUARANTOR:     { kind: 'elsewhere', where: 'Customers tab' },
+  REMOVE_GUARANTOR:  { kind: 'elsewhere', where: 'Customers tab' },
 };
 
 // States where the wizard owns the user flow — footer just shows "Continue draft"

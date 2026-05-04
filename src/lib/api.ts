@@ -231,7 +231,9 @@ export class ApiClient {
     includeAuth: boolean = true,
   ): Promise<{ response: Response; data: unknown }> {
     const doFetch = async () => {
-      const url = `${API_BASE_URL}${endpoint}`;
+      const base = API_BASE_URL.replace(/\/+$/, '');
+      const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+      const url = `${base}${path}`;
       const headers = { ...this.getHeaders(includeAuth), ...options.headers as Record<string, string> };
       const response = await fetch(url, { ...options, headers });
       const text = await response.text();

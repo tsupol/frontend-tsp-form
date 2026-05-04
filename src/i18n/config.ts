@@ -10,6 +10,8 @@ import billActionsEn from './locales/billActions.en.json';
 import billActionsTh from './locales/billActions.th.json';
 import contractActionsEn from './locales/contractActions.en.json';
 import contractActionsTh from './locales/contractActions.th.json';
+import assetActionsEn from './locales/assetActions.en.json';
+import assetActionsTh from './locales/assetActions.th.json';
 
 const resources = {
   en: {
@@ -17,12 +19,14 @@ const resources = {
     apiErrors: errorsEn,
     billActions: billActionsEn,
     contractActions: contractActionsEn,
+    assetActions: assetActionsEn,
   },
   th: {
     translation: th,
     apiErrors: errorsTh,
     billActions: billActionsTh,
     contractActions: contractActionsTh,
+    assetActions: assetActionsTh,
   },
 };
 

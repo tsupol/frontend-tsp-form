@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { BarChart3, Box, ClipboardList, PackagePlus, ArrowLeftRight, Wrench, RotateCcw, ShoppingCart } from 'lucide-react';
 
@@ -18,11 +18,14 @@ const navItems: NavItem[] = [
   { type: 'link', path: '/admin/inventory/transfers', labelKey: 'nav.transfers', icon: ArrowLeftRight },
   { type: 'link', path: '/admin/inventory/repairs', labelKey: 'nav.repairs', icon: Wrench },
   { type: 'link', path: '/admin/inventory/buyback', labelKey: 'nav.buyback', icon: RotateCcw },
-  { type: 'link', path: '/admin/inventory/sale', labelKey: 'nav.sale', icon: ShoppingCart },
+  { type: 'link', path: '/admin/inventory/assets?view=sale', labelKey: 'nav.sale', icon: ShoppingCart },
 ];
 
 export function InventoryLayout({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
+  const location = useLocation();
+  const currentSearch = location.search;
+  const currentView = new URLSearchParams(currentSearch).get('view');
 
   return (
     <div className="flex h-dvh">
@@ -36,17 +39,22 @@ export function InventoryLayout({ children }: { children: ReactNode }) {
             );
           }
           const { path, labelKey, icon: Icon } = item;
+          const [pathOnly, query] = path.split('?');
+          const linkView = new URLSearchParams(query ?? '').get('view');
+          const pathMatches = location.pathname.startsWith(pathOnly);
+          const isActive = linkView
+            ? pathMatches && currentView === linkView
+            : pathMatches && !currentView;
           return (
             <NavLink
               key={path}
               to={path}
-              className={({ isActive }) =>
-                `flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors ${
-                  isActive
-                    ? 'bg-primary/10 text-primary font-medium'
-                    : 'text-fg hover:bg-surface-hover'
-                }`
-              }
+              end={!!linkView}
+              className={`flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors ${
+                isActive
+                  ? 'bg-primary/10 text-primary font-medium'
+                  : 'text-fg hover:bg-surface-hover'
+              }`}
             >
               <Icon size={15} />
               {t(labelKey)}

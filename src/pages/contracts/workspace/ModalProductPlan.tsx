@@ -134,7 +134,12 @@ export function ModalProductPlan({ open, onClose }: Props) {
   }, [quoteData, localVariantId]);
 
   const fin1Rows = useMemo(() => variantQuotes.filter(q => q.finance_model === 'FIN1'), [variantQuotes]);
-  const fin2Rows = useMemo(() => variantQuotes.filter(q => q.finance_model === 'FIN2'), [variantQuotes]);
+  // Drop FIN2 rows with no rates configured — backend returns null term_months/installment_amount
+  // when the model has no active FIN2 rates.
+  const fin2Rows = useMemo(
+    () => variantQuotes.filter(q => q.finance_model === 'FIN2' && q.term_months != null && q.installment_amount != null),
+    [variantQuotes],
+  );
   const fin1Terms = useMemo(() => [...new Set(fin1Rows.map(r => r.term_months))].sort((a, b) => a - b), [fin1Rows]);
   const fin2Terms = useMemo(() => [...new Set(fin2Rows.map(r => r.term_months))].sort((a, b) => a - b), [fin2Rows]);
 

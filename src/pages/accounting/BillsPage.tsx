@@ -793,12 +793,3 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
   );
 }
 
-function Stat({ label, value, tone }: { label: string; value: React.ReactNode; tone?: 'danger' | 'warning' }) {
-  const toneClass = tone === 'danger' ? 'text-danger' : tone === 'warning' ? 'text-warning' : '';
-  return (
-    <div>
-      <dt className="text-xs text-fg/60">{label}</dt>
-      <dd className={`text-base font-semibold tabular-nums ${toneClass}`}>{value}</dd>
-    </div>
-  );
-}

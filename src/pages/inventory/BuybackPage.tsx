@@ -7,15 +7,14 @@ import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
-import { fmtNum } from './inventoryUtils';
 
 // ============================================================================
-// Types — Buyback uses PO system (po_type=BUYBACK), same v_purchase_orders view
-// Verified against live API 2026-03-24
+// Types — uses dedicated v_buyback_list / v_buyback_detail views
+// (not the generic v_purchase_orders / v_po_lines)
 // ============================================================================
 
-interface BuybackOrder {
-  id: number;
+interface BuybackListItem {
+  id: number; // po_id
   po_no: string;
   code_display: string | null;
   holding_id: number;
@@ -23,52 +22,55 @@ interface BuybackOrder {
   company_name: string;
   branch_id: number | null;
   branch_name: string | null;
-  ownership: string;
-  po_type: string;
   status: string;
   supplier_name: string;
-  supplier_ref: string | null;
   c_total_lines: number;
-  c_total_qty: number;
-  c_total_amount: number;
-  c_received_qty: number;
-  c_received_amount: number;
-  outstanding_qty: number;
-  outstanding_amount: number;
-  received_percent: number;
-  days_since_approved: number | null;
-  ready_to_close: boolean;
-  has_unmatched: boolean;
+  c_completed_intakes: number;
+  auto_reject_after: string | null;
   submitted_at: string | null;
   approved_at: string | null;
+  rejected_at: string | null;
   cancelled_at: string | null;
-  created_by: number;
+  created_by: number | null;
   created_at: string;
+  total_price: number;
+  product_summary: {
+    brand_name: string | null;
+    model_name: string | null;
+    item_condition: string | null;
+    asset_match_result: string | null;
+  } | null;
 }
 
-interface BuybackLine {
+interface BuybackDetailLine {
   po_line_id: number;
-  po_id: number;
-  po_no: string;
-  po_type: string;
-  po_status: string;
-  holding_id: number;
-  branch_id: number | null;
-  variant_id: number;
-  model_id: number;
-  variant_sku_code: string;
-  variant_name: string;
-  model_name: string;
-  family_name: string;
-  brand_name: string;
   qty: number;
-  unit_cost: number;
-  line_total: number;
-  condition_snapshot: string | null;
-  images: unknown[];
-  buyback_price: number | null;
   note: string | null;
+  images: unknown[];
+  model_id: number;
+  sku_code: string;
+  unit_cost: number;
+  brand_name: string;
+  line_total: number;
+  model_name: string;
+  variant_id: number;
+  family_name: string;
+  variant_name: string;
+  buyback_price: number | null;
+  final_asset_id: number | null;
+  item_condition: string | null;
+  matched_asset_id: number | null;
+  asset_match_result: string | null;
+  condition_snapshot: Record<string, unknown> | null;
   asset_intake_status: string | null;
+  attempted_identifiers_json: { type: string; value: string }[] | null;
+}
+
+interface BuybackDetail extends Omit<BuybackListItem, 'id' | 'total_price' | 'product_summary'> {
+  po_id: number;
+  notes: string | null;
+  approved_by: number | null;
+  lines: BuybackDetailLine[];
 }
 
 interface Branch {
@@ -97,6 +99,18 @@ const BUYBACK_STATUS_OPTIONS = [
   { value: 'COMPLETED', label: 'Completed' },
   { value: 'CANCELLED', label: 'Cancelled' },
 ];
+
+const ASSET_MATCH_COLOR: Record<string, string> = {
+  MATCHED: 'bg-success/15 text-success',
+  NO_MATCH: 'bg-warning/15 text-warning',
+  CONFLICT: 'bg-danger/15 text-danger',
+};
+
+const INTAKE_STATUS_COLOR: Record<string, string> = {
+  PENDING: 'bg-warning/15 text-warning',
+  COMPLETED: 'bg-success/15 text-success',
+  FAILED: 'bg-danger/15 text-danger',
+};
 
 // ============================================================================
 // Component
@@ -130,10 +144,10 @@ export function BuybackPage() {
   const { data: listData, isFetching } = useQuery({
     queryKey: ['buyback-orders', filterStatus, filterBranchId, pageIndex, pageSize],
     queryFn: () => {
-      let url = '/v_purchase_orders?po_type=eq.BUYBACK&order=created_at.desc';
+      let url = '/v_buyback_list?order=created_at.desc';
       if (filterStatus) url += `&status=eq.${filterStatus}`;
       if (filterBranchId) url += `&branch_id=eq.${filterBranchId}`;
-      return apiClient.getPaginated<BuybackOrder>(url, { page: pageIndex + 1, pageSize });
+      return apiClient.getPaginated<BuybackListItem>(url, { page: pageIndex + 1, pageSize });
     },
     placeholderData: keepPreviousData,
   });
@@ -141,9 +155,12 @@ export function BuybackPage() {
   const list = listData?.data ?? [];
   const totalCount = listData?.totalCount ?? 0;
 
-  const { data: lines, isFetching: linesFetching } = useQuery({
-    queryKey: ['buyback-lines', selectedId],
-    queryFn: () => apiClient.get<BuybackLine[]>(`/v_po_lines?po_id=eq.${selectedId}&order=po_line_id`),
+  const { data: detail, isFetching: detailFetching } = useQuery({
+    queryKey: ['buyback-detail', selectedId],
+    queryFn: async () => {
+      const rows = await apiClient.get<BuybackDetail[]>(`/v_buyback_detail?po_id=eq.${selectedId}&limit=1`);
+      return rows[0] ?? null;
+    },
     enabled: !!selectedId,
     placeholderData: keepPreviousData,
   });
@@ -156,11 +173,11 @@ export function BuybackPage() {
     }
   }, [list, selectedId]);
 
-  const selectedOrder = list.find(o => o.id === selectedId) ?? null;
+  const selectedListItem = list.find(o => o.id === selectedId) ?? null;
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['buyback-orders'] });
-    queryClient.invalidateQueries({ queryKey: ['buyback-lines'] });
+    queryClient.invalidateQueries({ queryKey: ['buyback-detail'] });
   };
 
   return (
@@ -181,7 +198,7 @@ export function BuybackPage() {
                 )}
               </div>
               <div className="mobile-header-title mobile-header-title-truncate">
-                {isRoot ? t('nav.buyback') : selectedOrder?.po_no ?? ''}
+                {isRoot ? t('nav.buyback') : selectedListItem?.po_no ?? ''}
               </div>
               <div className="mobile-header-end w-12" />
             </MobileHeader>
@@ -222,11 +239,15 @@ export function BuybackPage() {
                 </div>
               </div>
 
-              <DataTable<BuybackOrder>
+              <DataTable<BuybackListItem>
                 data={list}
                 renderRow={(row) => {
                   const order = row.original;
                   const isSelected = order.id === selectedId;
+                  const ps = order.product_summary;
+                  const productLine = ps
+                    ? [ps.brand_name, ps.model_name].filter(Boolean).join(' ')
+                    : null;
                   return (
                     <button
                       key={order.id}
@@ -240,17 +261,27 @@ export function BuybackPage() {
                           <span className="font-medium text-sm truncate">{order.po_no}</span>
                           <span className="text-xs text-subtle truncate">· {order.supplier_name}</span>
                         </div>
+                        {productLine && (
+                          <div className="text-xs text-subtle truncate">
+                            {productLine}{ps?.item_condition ? ` · ${ps.item_condition}` : ''}
+                          </div>
+                        )}
                         <div className="flex items-center gap-2 mt-1 -ml-0.5">
                           <Badge size="xs" className={BUYBACK_STATUS_COLOR[order.status] ?? 'bg-fg/10 text-fg/60'}>
                             {t(`buyback.status_${order.status}`, order.status)}
                           </Badge>
+                          {ps?.asset_match_result && (
+                            <Badge size="xs" className={ASSET_MATCH_COLOR[ps.asset_match_result] ?? 'bg-fg/10 text-fg/60'}>
+                              {ps.asset_match_result}
+                            </Badge>
+                          )}
                           <span className="text-xs text-subtle">
                             {order.c_total_lines} {t('buyback.items')}
                           </span>
                         </div>
                       </div>
                       <div className="text-right shrink-0">
-                        <div className="text-sm font-medium tabular-nums">{fmtCurrency(order.c_total_amount)}</div>
+                        <div className="text-sm font-medium tabular-nums">{fmtCurrency(order.total_price)}</div>
                         <div className="text-xs text-subtle"><DateTime value={order.created_at} /></div>
                       </div>
                     </button>
@@ -268,16 +299,19 @@ export function BuybackPage() {
             </PageNavPanel>
 
             <PageNavPanel id="detail" className={isMobile ? '' : 'flex-1 flex flex-col'}>
-              {selectedOrder ? (
+              {selectedListItem && detail ? (
                 <BuybackDetailPanel
-                  order={selectedOrder}
-                  lines={lines ?? []}
-                  loading={linesFetching}
+                  detail={detail}
+                  loading={detailFetching}
                   isMobile={isMobile}
                   t={t}
                   onRefresh={invalidate}
                   addSnackbar={addSnackbar}
                 />
+              ) : selectedListItem ? (
+                <div className="flex-1 h-full flex items-center justify-center text-subtler">
+                  <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                </div>
               ) : (
                 <div className="flex-1 h-full flex items-center justify-center text-subtler">
                   <div className="text-center">
@@ -299,16 +333,14 @@ export function BuybackPage() {
 // ============================================================================
 
 function BuybackDetailPanel({
-  order,
-  lines,
+  detail,
   loading,
   isMobile,
   t,
   onRefresh,
   addSnackbar,
 }: {
-  order: BuybackOrder;
-  lines: BuybackLine[];
+  detail: BuybackDetail;
   loading: boolean;
   isMobile: boolean;
   t: ReturnType<typeof useTranslation>['t'];
@@ -318,15 +350,18 @@ function BuybackDetailPanel({
   const [actionModal, setActionModal] = useState<'submit' | 'revert' | 'approve' | 'reject' | null>(null);
   const [intakeError, setIntakeError] = useState('');
 
-  const canSubmit = order.status === 'DRAFT';
-  const canRevert = order.status === 'PENDING_APPROVAL';
-  const canDecide = order.status === 'PENDING_APPROVAL';
-  const canIntake = order.status === 'APPROVED';
+  const lines = detail.lines ?? [];
+  const totalPrice = lines.reduce((sum, l) => sum + (l.buyback_price ?? l.unit_cost), 0);
+
+  const canSubmit = detail.status === 'DRAFT';
+  const canRevert = detail.status === 'PENDING_APPROVAL';
+  const canDecide = detail.status === 'PENDING_APPROVAL';
+  const canIntake = detail.status === 'APPROVED';
 
   const intakeMutation = useMutation({
     mutationFn: () =>
       apiClient.rpc('fn_inv_buyback_confirm_intake', {
-        p_po_id: order.id,
+        p_po_id: detail.po_id,
         p_lines: lines.map(l => ({ po_line_id: l.po_line_id })),
       }),
     onSuccess: () => {
@@ -360,9 +395,9 @@ function BuybackDetailPanel({
 
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
-          <span className="font-semibold">{order.po_no}</span>
-          <Badge size="xs" className={BUYBACK_STATUS_COLOR[order.status] ?? 'bg-fg/10 text-fg/60'}>
-            {t(`buyback.status_${order.status}`, order.status)}
+          <span className="font-semibold">{detail.po_no}</span>
+          <Badge size="xs" className={BUYBACK_STATUS_COLOR[detail.status] ?? 'bg-fg/10 text-fg/60'}>
+            {t(`buyback.status_${detail.status}`, detail.status)}
           </Badge>
         </div>
       )}
@@ -370,24 +405,31 @@ function BuybackDetailPanel({
       <div className="flex-none grid grid-cols-3 gap-3 px-4 py-3 border-b border-line bg-surface">
         <div>
           <div className="text-xs text-subtle">{t('buyback.seller')}</div>
-          <div className="font-semibold text-sm truncate">{order.supplier_name}</div>
+          <div className="font-semibold text-sm truncate">{detail.supplier_name}</div>
         </div>
         <div>
           <div className="text-xs text-subtle">{t('buyback.totalItems')}</div>
-          <div className="font-semibold text-sm tabular-nums">{fmtNum(order.c_total_qty)}</div>
+          <div className="font-semibold text-sm tabular-nums">{detail.c_total_lines}</div>
         </div>
         <div>
           <div className="text-xs text-subtle">{t('buyback.totalAmount')}</div>
-          <div className="font-semibold text-sm tabular-nums">{fmtCurrency(order.c_total_amount)}</div>
+          <div className="font-semibold text-sm tabular-nums">{fmtCurrency(totalPrice)}</div>
         </div>
       </div>
 
       {/* Timestamps */}
       <div className="flex-none px-4 py-2 border-b border-line flex flex-wrap gap-x-6 gap-y-1 text-xs text-subtle">
-        <span>{t('buyback.created')}: <DateTime value={order.created_at} /></span>
-        {order.submitted_at && <span>{t('buyback.submitted')}: <DateTime value={order.submitted_at} /></span>}
-        {order.approved_at && <span>{t('buyback.approved')}: <DateTime value={order.approved_at} /></span>}
+        <span>{t('buyback.created')}: <DateTime value={detail.created_at} /></span>
+        {detail.submitted_at && <span>{t('buyback.submitted')}: <DateTime value={detail.submitted_at} /></span>}
+        {detail.approved_at && <span>{t('buyback.approved')}: <DateTime value={detail.approved_at} /></span>}
+        {detail.rejected_at && <span>{t('buyback.rejected')}: <DateTime value={detail.rejected_at} /></span>}
       </div>
+
+      {detail.notes && (
+        <div className="flex-none px-4 py-2 border-b border-line text-xs text-fg/70 whitespace-pre-line">
+          {detail.notes}
+        </div>
+      )}
 
       {intakeError && (
         <div className="flex-none px-4 py-2">
@@ -409,16 +451,33 @@ function BuybackDetailPanel({
           <div className="p-8 text-center text-subtler">{t('common.noData')}</div>
         )}
         {lines.map((line) => (
-          <div key={line.po_line_id} className="px-4 py-2.5 border-b border-line flex items-center gap-3">
+          <div key={line.po_line_id} className="px-4 py-2.5 border-b border-line flex items-start gap-3">
             <div className="flex-1 min-w-0">
               <div className="text-sm font-medium truncate">
                 {[line.brand_name, line.model_name].filter(Boolean).join(' ')}
               </div>
               <div className="text-xs text-subtle truncate">
-                {line.variant_name} · {line.variant_sku_code}
+                {line.variant_name} · {line.sku_code}
               </div>
-              {line.condition_snapshot && (
-                <div className="text-xs text-fg/50 mt-0.5">{t('buyback.condition')}: {line.condition_snapshot}</div>
+              <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                {line.item_condition && (
+                  <Badge size="xs" className="bg-fg/10 text-fg/60">{line.item_condition}</Badge>
+                )}
+                {line.asset_match_result && (
+                  <Badge size="xs" className={ASSET_MATCH_COLOR[line.asset_match_result] ?? 'bg-fg/10 text-fg/60'}>
+                    {line.asset_match_result}
+                  </Badge>
+                )}
+                {line.asset_intake_status && (
+                  <Badge size="xs" className={INTAKE_STATUS_COLOR[line.asset_intake_status] ?? 'bg-fg/10 text-fg/60'}>
+                    {line.asset_intake_status}
+                  </Badge>
+                )}
+              </div>
+              {line.attempted_identifiers_json && line.attempted_identifiers_json.length > 0 && (
+                <div className="text-xs text-fg/50 font-mono mt-1 truncate">
+                  {line.attempted_identifiers_json.map(id => id.value).join(', ')}
+                </div>
               )}
               {line.note && <div className="text-xs text-fg/50 mt-0.5 italic">{line.note}</div>}
             </div>
@@ -426,7 +485,9 @@ function BuybackDetailPanel({
               {line.buyback_price !== null && (
                 <div className="text-sm font-medium tabular-nums">{fmtCurrency(line.buyback_price)}</div>
               )}
-              <div className="text-xs text-subtle tabular-nums">cost: {fmtCurrency(line.unit_cost)}</div>
+              {line.buyback_price !== line.unit_cost && (
+                <div className="text-xs text-subtle tabular-nums">cost: {fmtCurrency(line.unit_cost)}</div>
+              )}
             </div>
           </div>
         ))}
@@ -472,7 +533,8 @@ function BuybackDetailPanel({
         open={!!actionModal}
         action={actionModal}
         onClose={() => setActionModal(null)}
-        order={order}
+        detail={detail}
+        totalPrice={totalPrice}
         t={t}
         onSuccess={() => {
           const msg = actionModal === 'submit' ? t('buyback.submitSuccess')
@@ -503,14 +565,16 @@ function BuybackActionModal({
   open,
   action,
   onClose,
-  order,
+  detail,
+  totalPrice,
   t,
   onSuccess,
 }: {
   open: boolean;
   action: 'submit' | 'revert' | 'approve' | 'reject' | null;
   onClose: () => void;
-  order: BuybackOrder;
+  detail: BuybackDetail;
+  totalPrice: number;
   t: ReturnType<typeof useTranslation>['t'];
   onSuccess: () => void;
 }) {
@@ -538,7 +602,7 @@ function BuybackActionModal({
   const mutation = useMutation({
     mutationFn: () => {
       if (!action) return Promise.reject(new Error('No action'));
-      const params: Record<string, unknown> = { p_po_id: order.id };
+      const params: Record<string, unknown> = { p_po_id: detail.po_id };
       if (action !== 'submit') {
         params.p_note = note || null;
       }
@@ -574,9 +638,9 @@ function BuybackActionModal({
             </div>
           )}
           <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
-            <div className="font-medium text-sm">{order.po_no}</div>
-            <div className="text-xs text-subtle">{order.supplier_name}</div>
-            <div className="text-xs text-subtle">{order.c_total_lines} {t('buyback.items')} · {fmtCurrency(order.c_total_amount)}</div>
+            <div className="font-medium text-sm">{detail.po_no}</div>
+            <div className="text-xs text-subtle">{detail.supplier_name}</div>
+            <div className="text-xs text-subtle">{detail.c_total_lines} {t('buyback.items')} · {fmtCurrency(totalPrice)}</div>
           </div>
           {showNote && (
             <div className="form-grid gap-4">

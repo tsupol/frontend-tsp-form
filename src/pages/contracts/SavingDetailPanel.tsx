@@ -57,6 +57,7 @@ interface ContractDetail {
   total_paid: number | null;
   outstanding_amount: number | null;
   credit_balance: number | null;
+  credit_balance_company: number | null;
   late_fee_balance: number | null;
   total_refunded: number | null;
   saving_balance: number | null;

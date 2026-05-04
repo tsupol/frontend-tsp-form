@@ -159,16 +159,28 @@ const FOOTER_ACTION_ALLOWLIST: ReadonlySet<string> = new Set([
 // The rest live in the allowlist but render disabled with "not yet implemented".
 type ExtraField =
   | { kind: 'select'; name: string; labelKey: string; options: { value: string; label: string }[]; required?: boolean; default?: string }
-  | { kind: 'text'; name: string; labelKey: string; required?: boolean };
+  | { kind: 'text'; name: string; labelKey: string; required?: boolean }
+  | { kind: 'number'; name: string; labelKey: string; required?: boolean; min?: number; step?: number }
+  | { kind: 'branch'; name: string; labelKey: string; required?: boolean }
+  | { kind: 'user'; name: string; labelKey: string; required?: boolean }
+  | { kind: 'identifier'; typeName: string; oldName: string; labelKey: string; required?: boolean };
 
 type SimpleActionConfig = {
   rpc: string;
   color?: 'primary' | 'danger';
   hasReason?: { options: { value: string; label: string }[]; required: boolean };
-  /** Extra fields injected into the params object. Param name is `name` (no p_ prefix added). */
+  /** Extra fields injected into the params object. */
   extraFields?: ExtraField[];
-  /** Which params to send. If omitted, defaults to ['p_asset_id', 'p_dedupe_key', 'p_note', 'p_reason_code']. */
-  paramShape?: 'asset' | 'asset_no_dedupe';
+  /**
+   * Param shape:
+   *   - 'asset' (default): { p_asset_id, p_dedupe_key }
+   *   - 'asset_no_dedupe': { p_asset_id }
+   *   - 'asset_array': { p_asset_ids: [asset_id] } — for bulk RPCs invoked single-asset
+   *   - 'asset_array_no_dedupe': same as above (alias for clarity)
+   */
+  paramShape?: 'asset' | 'asset_no_dedupe' | 'asset_array';
+  /** If set, the field name listed receives `[Number(extra[priceField])]` as a number array (for fn_inv_asset_disposal's p_sell_prices). */
+  arrayPriceField?: { from: string; to: string };
   successKey: string;
 };
 
@@ -190,6 +202,14 @@ const WRITE_OFF_REASON_OPTIONS = [
   { value: 'MISSING', label: 'Missing' },
   { value: 'THEFT', label: 'Theft' },
   { value: 'DAMAGED_BEYOND_USE', label: 'Damaged Beyond Use' },
+];
+
+// Condition grades for revalue (asset condition can change after refurbishment, etc.)
+const REVALUE_CONDITION_OPTIONS = [
+  { value: 'NEW', label: 'New' },
+  { value: 'REFURBISHED', label: 'Refurbished' },
+  { value: 'USED_A', label: 'Used A' },
+  { value: 'USED_B', label: 'Used B' },
 ];
 
 const SIMPLE_ACTIONS: Record<string, SimpleActionConfig> = {
@@ -225,6 +245,20 @@ const SIMPLE_ACTIONS: Record<string, SimpleActionConfig> = {
     rpc: 'fn_inv_write_off_reverse',
     successKey: 'success.write_off_reverse',
   },
+  ASSET_WRITE_OFF_JOURNAL: {
+    rpc: 'fn_inv_write_off_journal',
+    color: 'danger',
+    paramShape: 'asset_no_dedupe',
+    hasReason: { options: WRITE_OFF_REASON_OPTIONS, required: true },
+    successKey: 'success.write_off_journal',
+  },
+  ASSET_INTERNAL_USE_ASSIGN: {
+    rpc: 'fn_inv_internal_use_assign',
+    extraFields: [
+      { kind: 'user', name: 'p_custodian_id', labelKey: 'internalUse.custodian', required: true },
+    ],
+    successKey: 'success.internal_use_assign',
+  },
   ASSET_INTERNAL_USE_RELEASE: {
     rpc: 'fn_inv_internal_use_release',
     successKey: 'success.internal_use_release',
@@ -240,17 +274,55 @@ const SIMPLE_ACTIONS: Record<string, SimpleActionConfig> = {
     ],
     successKey: 'success.sell_external',
   },
+  ASSET_SELL_AT_COST: {
+    rpc: 'fn_inv_sell_at_cost',
+    color: 'primary',
+    paramShape: 'asset_array',
+    extraFields: [
+      { kind: 'branch', name: 'p_buyer_branch_id', labelKey: 'sellAtCost.buyerBranch', required: true },
+    ],
+    successKey: 'success.sell_at_cost',
+  },
+  ASSET_DISPOSAL: {
+    rpc: 'fn_inv_asset_disposal',
+    color: 'danger',
+    paramShape: 'asset_array',
+    extraFields: [
+      { kind: 'branch', name: 'p_buyer_branch_id', labelKey: 'disposal.buyerBranch', required: true },
+      { kind: 'number', name: 'p_sell_price', labelKey: 'disposal.sellPrice', required: true, min: 0 },
+    ],
+    arrayPriceField: { from: 'p_sell_price', to: 'p_sell_prices' },
+    successKey: 'success.disposal',
+  },
+  ASSET_REVALUE: {
+    rpc: 'fn_inv_asset_revalue',
+    extraFields: [
+      { kind: 'number', name: 'p_new_cost_basis', labelKey: 'revalue.newCostBasis', required: true, min: 0 },
+      { kind: 'text', name: 'p_reason', labelKey: 'revalue.reason', required: true },
+      { kind: 'select', name: 'p_condition_grade', labelKey: 'revalue.conditionGrade', options: REVALUE_CONDITION_OPTIONS },
+    ],
+    successKey: 'success.revalue',
+  },
+  ASSET_IDENTIFIER_CORRECT: {
+    rpc: 'fn_inv_identifier_correct',
+    paramShape: 'asset_no_dedupe',
+    extraFields: [
+      { kind: 'identifier', typeName: 'p_identifier_type', oldName: 'p_old_value', labelKey: 'identifierCorrect.existing', required: true },
+      { kind: 'text', name: 'p_new_value', labelKey: 'identifierCorrect.newValue', required: true },
+    ],
+    successKey: 'success.identifier_correct',
+  },
 };
 
 // Up to 4 actions surfaced inline as primary buttons; rest go behind "More actions".
 const PRIMARY_BY_BUCKET: Record<string, string[]> = {
-  ON_HAND_AVAILABLE: ['ASSET_SELL_EXTERNAL', 'ASSET_QUARANTINE_ADMIT', 'ASSET_REPAIR_REQUEST'],
-  QUARANTINED: ['ASSET_QUARANTINE_RELEASE', 'ASSET_REPAIR_REQUEST', 'ASSET_DISPOSE'],
+  ON_HAND_AVAILABLE: ['ASSET_SELL_EXTERNAL', 'ASSET_QUARANTINE_ADMIT', 'ASSET_REPAIR_REQUEST', 'ASSET_INTERNAL_USE_ASSIGN'],
+  QUARANTINED: ['ASSET_QUARANTINE_RELEASE', 'ASSET_SELL_EXTERNAL', 'ASSET_REPAIR_REQUEST', 'ASSET_WRITE_OFF_JOURNAL'],
   IN_REPAIR: [],
   IN_USE_INTERNAL: ['ASSET_INTERNAL_USE_RELEASE'],
   WITH_CUSTOMER_ACTIVE: ['ASSET_REPAIR_REQUEST'],
   REPOSSESSED_PENDING_CLEARANCE: ['ASSET_QUARANTINE_ADMIT'],
-  DAMAGED_SCRAP_PENDING: ['ASSET_DISPOSE'],
+  DAMAGED_SCRAP_PENDING: ['ASSET_DISPOSAL', 'ASSET_DISPOSE'],
   DISPOSED_SOLD_SCRAP: ['ASSET_DISPOSE_REVERSE'],
   WRITTEN_OFF: ['ASSET_WRITE_OFF_REVERSE'],
 };
@@ -942,6 +1014,32 @@ function AssetActionModal({
 
   const config = action ? SIMPLE_ACTIONS[action.action_code] : null;
 
+  // Determine if any extra field needs branches/users so we can lazy-load
+  const needsBranches = !!config?.extraFields?.some(f => f.kind === 'branch');
+  const needsUsers = !!config?.extraFields?.some(f => f.kind === 'user');
+
+  const { data: branches = [] } = useQuery({
+    queryKey: ['branches-active'],
+    queryFn: () => apiClient.get<{ id: number; name: string }[]>('/v_branches?is_active=is.true&order=name'),
+    enabled: open && needsBranches,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: users = [] } = useQuery({
+    queryKey: ['users-active'],
+    queryFn: () => apiClient.get<{ id: number; username: string; role_code: string; branch_name: string | null }[]>(
+      '/v_users?is_active=is.true&order=username'
+    ),
+    enabled: open && needsUsers,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const branchOptions = useMemo(() => branches.map(b => ({ value: String(b.id), label: b.name })), [branches]);
+  const userOptions = useMemo(() => users.map(u => ({
+    value: String(u.id),
+    label: u.branch_name ? `${u.username} — ${u.branch_name}` : u.username,
+  })), [users]);
+
   useEffect(() => {
     if (open) {
       setReason(null);
@@ -955,19 +1053,60 @@ function AssetActionModal({
     }
   }, [open, config]);
 
+  const isFieldFilled = (name: string) => {
+    const v = extra[name];
+    return !!(v && v.trim());
+  };
+
   const mutation = useMutation({
     mutationFn: () => {
       if (!action || !config) return Promise.reject(new Error('No action'));
-      const params: Record<string, unknown> = { p_asset_id: asset.asset_id };
-      if (config.paramShape !== 'asset_no_dedupe') {
-        params.p_dedupe_key = `${action.action_code}-${asset.asset_id}-${Date.now()}`;
+
+      const params: Record<string, unknown> = {};
+      if (config.paramShape === 'asset_array') {
+        params.p_asset_ids = [asset.asset_id];
+      } else {
+        params.p_asset_id = asset.asset_id;
+        if (config.paramShape !== 'asset_no_dedupe') {
+          params.p_dedupe_key = `${action.action_code}-${asset.asset_id}-${Date.now()}`;
+        }
       }
+      // Company-level users have null branch_id in JWT; backend requires p_branch_id explicitly.
+      // Always send the asset's branch_id — branch users get the same value they'd derive from JWT.
+      params.p_branch_id = asset.branch_id;
       if (note.trim()) params.p_note = note.trim();
       if (config.hasReason && reason) params.p_reason_code = reason;
+
       config.extraFields?.forEach(f => {
+        if (f.kind === 'identifier') {
+          // Stored as JSON: { type, value } in extra[oldName] (parsed below).
+          const raw = extra[f.oldName];
+          if (raw) {
+            try {
+              const parsed = JSON.parse(raw) as { type: string; value: string };
+              params[f.typeName] = parsed.type;
+              params[f.oldName] = parsed.value;
+            } catch {
+              // ignore
+            }
+          }
+          return;
+        }
         const v = extra[f.name];
-        if (v && v.trim()) params[f.name] = v.trim();
+        if (v && v.trim()) {
+          if (f.kind === 'number') params[f.name] = Number(v);
+          else if (f.kind === 'branch' || f.kind === 'user') params[f.name] = Number(v);
+          else params[f.name] = v.trim();
+        }
       });
+
+      // arrayPriceField: convert scalar → numeric array
+      if (config.arrayPriceField) {
+        const scalar = extra[config.arrayPriceField.from];
+        if (scalar) params[config.arrayPriceField.to] = [Number(scalar)];
+        delete params[config.arrayPriceField.from];
+      }
+
       return apiClient.rpc(config.rpc, params);
     },
     onSuccess: () => onSuccess(config!.successKey),
@@ -981,17 +1120,19 @@ function AssetActionModal({
     },
   });
 
-  if (!action || !config) return null;
-
-  const reasonValid = !config.hasReason?.required || !!reason;
-  const extraValid = (config.extraFields ?? []).every(f =>
-    !f.required || (extra[f.name] && extra[f.name].trim())
-  );
+  const reasonValid = !config?.hasReason?.required || !!reason;
+  const extraValid = (config?.extraFields ?? []).every(f => {
+    if (!f.required) return true;
+    if (f.kind === 'identifier') return isFieldFilled(f.oldName);
+    return isFieldFilled(f.name);
+  });
   const canSubmit = reasonValid && extraValid;
-  const label = t(action.action_code, { ns: 'assetActions', defaultValue: action.action_code });
+  const label = action ? t(action.action_code, { ns: 'assetActions', defaultValue: action.action_code }) : '';
 
+  // Modal stays mounted; inner content only renders when action+config are present.
   return (
-    <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
+    <Modal open={open && !!action && !!config} onClose={onClose} maxWidth="28rem" width="100%">
+      {action && config ? (
       <div className="flex flex-col overflow-hidden">
         <div className="modal-header">
           <h2 className="modal-title">{label}</h2>
@@ -1025,28 +1166,81 @@ function AssetActionModal({
                 />
               </div>
             )}
-            {config.extraFields?.map(f => (
-              <div key={f.name} className="flex flex-col">
-                <label className="form-label">
-                  {t(f.labelKey, { ns: 'assetActions', defaultValue: f.labelKey })}
-                  {f.required ? ' *' : ''}
-                </label>
-                {f.kind === 'select' ? (
-                  <Select
-                    options={f.options}
-                    value={extra[f.name] ?? null}
-                    onChange={(val) => setExtra(prev => ({ ...prev, [f.name]: (val as string) || '' }))}
-                    showChevron
-                  />
-                ) : (
-                  <Input
-                    value={extra[f.name] ?? ''}
-                    onChange={(e) => setExtra(prev => ({ ...prev, [f.name]: e.target.value }))}
-                    className="w-full"
-                  />
-                )}
-              </div>
-            ))}
+            {config.extraFields?.map(f => {
+              const fieldKey = f.kind === 'identifier' ? f.oldName : f.name;
+              const labelText = t(f.labelKey, { ns: 'assetActions', defaultValue: f.labelKey });
+              const setVal = (name: string, value: string) =>
+                setExtra(prev => ({ ...prev, [name]: value }));
+
+              return (
+                <div key={fieldKey} className="flex flex-col">
+                  <label className="form-label">
+                    {labelText}{f.required ? ' *' : ''}
+                  </label>
+                  {f.kind === 'select' && (
+                    <Select
+                      options={f.options}
+                      value={extra[f.name] ?? null}
+                      onChange={(val) => setVal(f.name, (val as string) || '')}
+                      showChevron
+                    />
+                  )}
+                  {f.kind === 'text' && (
+                    <Input
+                      value={extra[f.name] ?? ''}
+                      onChange={(e) => setVal(f.name, e.target.value)}
+                      className="w-full"
+                    />
+                  )}
+                  {f.kind === 'number' && (
+                    <Input
+                      type="number"
+                      value={extra[f.name] ?? ''}
+                      onChange={(e) => setVal(f.name, e.target.value)}
+                      min={f.min}
+                      step={f.step}
+                      className="w-full"
+                    />
+                  )}
+                  {f.kind === 'branch' && (
+                    <Select
+                      options={branchOptions}
+                      value={extra[f.name] ?? null}
+                      onChange={(val) => setVal(f.name, (val as string) || '')}
+                      placeholder={t('asset.selectBranch', { defaultValue: 'Select branch' })}
+                      showChevron
+                    />
+                  )}
+                  {f.kind === 'user' && (
+                    <Select
+                      options={userOptions}
+                      value={extra[f.name] ?? null}
+                      onChange={(val) => setVal(f.name, (val as string) || '')}
+                      placeholder={t('asset.selectUser', { defaultValue: 'Select user' })}
+                      showChevron
+                    />
+                  )}
+                  {f.kind === 'identifier' && (
+                    asset.identifiers.length === 0 ? (
+                      <div className="text-xs text-subtle italic">
+                        {t('identifierCorrect.noIdentifiers', { ns: 'assetActions', defaultValue: 'This asset has no identifiers to correct.' })}
+                      </div>
+                    ) : (
+                      <Select
+                        options={asset.identifiers.map(id => ({
+                          value: JSON.stringify({ type: id.type, value: id.value }),
+                          label: `${id.type}: ${id.value}`,
+                        }))}
+                        value={extra[f.oldName] ?? null}
+                        onChange={(val) => setVal(f.oldName, (val as string) || '')}
+                        placeholder={t('identifierCorrect.selectIdentifier', { ns: 'assetActions', defaultValue: 'Select identifier' })}
+                        showChevron
+                      />
+                    )
+                  )}
+                </div>
+              );
+            })}
             <div className="flex flex-col">
               <label className="form-label">{t('asset.note')}</label>
               <TextArea
@@ -1069,6 +1263,7 @@ function AssetActionModal({
           </Button>
         </div>
       </div>
+      ) : null}
     </Modal>
   );
 }

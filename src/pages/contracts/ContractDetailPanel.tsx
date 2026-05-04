@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { Badge, Button, Input, Select, Modal, useSnackbarContext } from 'tsp-form';
-import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Upload, Camera, Smartphone } from 'lucide-react';
+import { Badge, Button, Input, Select, Modal, TextArea, Tooltip, useSnackbarContext } from 'tsp-form';
+import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Upload, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2 } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import { ApiError } from '../../lib/api';
 import { uploadToS3 } from '../../lib/upload';
@@ -13,6 +13,9 @@ import { fmtCurrency } from '../../lib/format';
 import { getStateColor, getStateLabel } from './contractUtils';
 import { ContractActionButtons } from './ContractActions';
 import { WalletsTab } from './wallet/WalletsTab';
+import { useNavGuard } from '../../contexts/NavGuardContext';
+import { CustomerPickerModal } from './CustomerPickerModal';
+import { BranchPinInput } from '../../components/BranchPinInput';
 import { config } from '../../config/config';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -267,7 +270,40 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<DetailTab>('overview');
   const [copied, setCopied] = useState(false);
-  const [requestedAction, setRequestedAction] = useState<'bind_device' | null>(null);
+  const [requestedAction, setRequestedAction] = useState<'bind_device' | 'detach_customer' | null>(null);
+  const notesDirtyRef = useRef(false);
+  const [pendingTab, setPendingTab] = useState<DetailTab | null>(null);
+  const navGuard = useNavGuard();
+
+  useEffect(() => {
+    navGuard?.setDirtyRef(notesDirtyRef);
+  }, [navGuard]);
+
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (notesDirtyRef.current) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, []);
+
+  const handleTabChange = useCallback((next: DetailTab) => {
+    if (notesDirtyRef.current && activeTab !== next) {
+      setPendingTab(next);
+      return;
+    }
+    setActiveTab(next);
+  }, [activeTab]);
+
+  const confirmDiscardTab = () => {
+    if (!pendingTab) return;
+    notesDirtyRef.current = false;
+    setActiveTab(pendingTab);
+    setPendingTab(null);
+  };
 
   const handleCopyCode = useCallback((code: string) => {
     navigator.clipboard.writeText(code).then(() => {
@@ -321,15 +357,23 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
       )}
 
       {/* Tabs with scroll arrows */}
-      <ScrollableTabs tabs={TABS} activeTab={activeTab} onTabChange={setActiveTab} t={t} />
+      <ScrollableTabs tabs={TABS} activeTab={activeTab} onTabChange={handleTabChange} t={t} />
 
       {/* Tab content */}
       <div className="flex-1 overflow-auto better-scroll">
         {activeTab === 'overview' && <OverviewTab contract={contract} t={t} queryClient={queryClient} onRequestBindDevice={() => setRequestedAction('bind_device')} />}
         {activeTab === 'installments' && <InstallmentsTab contractId={contractId} t={t} />}
         {activeTab === 'txns' && <TxnsTab contractId={contractId} t={t} />}
-        {activeTab === 'customers' && <CustomersTab contractId={contractId} customerId={contract.customer_id} t={t} />}
-        {activeTab === 'notes' && <NotesTab contractId={contractId} t={t} />}
+        {activeTab === 'customers' && (
+          <CustomersTab
+            contractId={contractId}
+            customerId={contract.customer_id}
+            customerName={contract.customer_name}
+            t={t}
+            onRequestDetachCustomer={() => setRequestedAction('detach_customer')}
+          />
+        )}
+        {activeTab === 'notes' && <NotesTab contractId={contractId} t={t} dirtyRef={notesDirtyRef} />}
         {activeTab === 'payments' && <PaymentsTab contractId={contractId} t={t} />}
         {activeTab === 'wallets' && <WalletsTab contract={contract} />}
       </div>
@@ -348,6 +392,20 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
           queryClient.invalidateQueries({ queryKey: ['contract-payments', contractId] });
         }}
       />
+
+      <Modal open={!!pendingTab} onClose={() => setPendingTab(null)} maxWidth="400px" ariaLabel={t('common.unsavedChanges')}>
+        <div className="modal-header">
+          <h2 className="modal-title">{t('common.unsavedChanges')}</h2>
+          <button type="button" className="modal-close-btn" onClick={() => setPendingTab(null)} aria-label="Close">&times;</button>
+        </div>
+        <div className="modal-content">
+          <p>{t('common.unsavedChangesMessage')}</p>
+        </div>
+        <div className="modal-footer">
+          <Button variant="ghost" onClick={() => setPendingTab(null)}>{t('common.cancel')}</Button>
+          <Button color="danger" onClick={confirmDiscardTab}>{t('common.discard')}</Button>
+        </div>
+      </Modal>
     </div>
   );
 }
@@ -709,13 +767,72 @@ function TxnsTab({ contractId, t }: { contractId: number; t: ReturnType<typeof u
 
 // ── Customers Tab ────────────────────────────────────────────────────────────
 
-function CustomersTab({ contractId, customerId, t }: { contractId: number; customerId: number | null; t: ReturnType<typeof useTranslation>['t'] }) {
-  const { data: customers, isLoading } = useQuery({
+interface CustomerDetail {
+  id: number;
+  full_name: string;
+  tel: string | null;
+  tel2: string | null;
+  id_number: string | null;
+  prefix: string | null;
+}
+
+function CustomersTab({ contractId, customerId, customerName, t, onRequestDetachCustomer }: {
+  contractId: number;
+  customerId: number | null;
+  customerName: string | null;
+  t: ReturnType<typeof useTranslation>['t'];
+  onRequestDetachCustomer: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const { addSnackbar } = useSnackbarContext();
+  const [pickerMode, setPickerMode] = useState<'attach' | 'guarantor' | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<ContractCustomer | null>(null);
+
+  // v_contract_customers stores ONLY guarantors today (despite older docs that
+  // suggested it'd also include the primary). The primary customer lives on
+  // contract.customer_id directly — we get it via props.
+  const { data: guarantors, isLoading } = useQuery({
     queryKey: ['contract-customers', contractId],
     queryFn: () => apiClient.get<ContractCustomer[]>(`/v_contract_customers?contract_id=eq.${contractId}&order=created_at`),
   });
 
-  // Customer ID card media
+  const successSnack = (msg: string) => {
+    addSnackbar({
+      message: (
+        <div className="alert alert-success">
+          <CheckCircle size={16} />
+          <span>{msg}</span>
+        </div>
+      ),
+    });
+  };
+
+  const handleAttach = async (newCustomerId: number, fullName: string) => {
+    await apiClient.rpc('fn_contract_attach_customer', {
+      p_contract_id: contractId,
+      p_customer_id: newCustomerId,
+    });
+    queryClient.invalidateQueries({ queryKey: ['contract-detail', contractId] });
+    successSnack(t('contract.attached_customer', { defaultValue: `Attached ${fullName}`, customer: fullName }));
+  };
+
+  const handleAddGuarantor = async (newCustomerId: number, fullName: string) => {
+    if (newCustomerId === customerId) {
+      throw new Error(t('workspace.guarantorCannotBeSelf', { defaultValue: 'Guarantor cannot be the primary customer' }));
+    }
+    if ((guarantors ?? []).some(g => g.customer_id === newCustomerId)) {
+      throw new Error(t('workspace.guarantorAlreadyAttached', { defaultValue: 'Already a guarantor on this contract' }));
+    }
+    await apiClient.rpc('fn_contract_add_guarantor', {
+      p_contract_id: contractId,
+      p_customer_id: newCustomerId,
+      p_relation: null,
+    });
+    queryClient.invalidateQueries({ queryKey: ['contract-customers', contractId] });
+    successSnack(t('contract.added_guarantor', { defaultValue: `Added ${fullName} as guarantor`, customer: fullName }));
+  };
+
+  // Customer ID card media (primary customer only)
   const { data: idCardMedia = [] } = useQuery({
     queryKey: ['entity-media', 'CUSTOMER', customerId],
     queryFn: () => apiClient.get<EntityMedia[]>(
@@ -724,53 +841,382 @@ function CustomersTab({ contractId, customerId, t }: { contractId: number; custo
     enabled: !!customerId,
   });
 
+  // Pull customer detail for primary + every guarantor — gives us phone + ID number.
+  const allCustomerIds = [
+    ...(customerId ? [customerId] : []),
+    ...((guarantors ?? []).map(c => c.customer_id)),
+  ];
+  const { data: customerDetails = [] } = useQuery({
+    queryKey: ['customer-details', allCustomerIds.join(',')],
+    queryFn: () => apiClient.get<CustomerDetail[]>(
+      `/v_customers?id=in.(${allCustomerIds.join(',')})&select=id,full_name,tel,tel2,id_number,prefix`,
+    ),
+    enabled: allCustomerIds.length > 0,
+  });
+  const detailById = new Map(customerDetails.map(d => [d.id, d]));
+
   if (isLoading) return <div className="p-8 text-center text-subtler">{t('common.loading')}</div>;
-  if (!customers || customers.length === 0) return <div className="p-8 text-center text-subtler">{t('common.noData')}</div>;
+
+  const guarantorList = guarantors ?? [];
+  const primaryDetail = customerId != null ? detailById.get(customerId) : null;
+
+  const renderGuarantorRow = (c: ContractCustomer) => {
+    const d = detailById.get(c.customer_id);
+    return (
+      <div key={c.id} className="border border-line rounded-md px-4 py-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="font-medium text-sm">
+              {d?.prefix ? `${d.prefix} ` : ''}{c.customer_name}
+            </div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-xs text-subtle">
+              {d?.tel && (
+                <span className="inline-flex items-center gap-1"><Phone size={11} />{d.tel}</span>
+              )}
+              {d?.id_number && (
+                <span className="inline-flex items-center gap-1"><IdCard size={11} />{d.id_number}</span>
+              )}
+              {c.relation && (
+                <span>{t('contract.relation')}: {c.relation}</span>
+              )}
+            </div>
+            <div className="text-xs text-subtler mt-1">
+              <DateTime value={c.created_at} />
+            </div>
+          </div>
+          <Tooltip content={t('contract.removeGuarantor', { defaultValue: 'Remove guarantor' })} placement="top">
+            <Button
+              size="sm"
+              variant="outline"
+              color="danger"
+              className="btn-icon-sm"
+              startIcon={<Trash2 size={14} />}
+              onClick={() => setRemoveTarget(c)}
+            />
+          </Tooltip>
+        </div>
+      </div>
+    );
+  };
+
+  const renderPrimaryRow = () => {
+    if (customerId == null) return null;
+    return (
+      <div className="border border-line rounded-md px-4 py-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="font-medium text-sm">
+              {primaryDetail?.prefix ? `${primaryDetail.prefix} ` : ''}{customerName ?? primaryDetail?.full_name ?? '—'}
+            </div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-xs text-subtle">
+              {primaryDetail?.tel && (
+                <span className="inline-flex items-center gap-1"><Phone size={11} />{primaryDetail.tel}</span>
+              )}
+              {primaryDetail?.id_number && (
+                <span className="inline-flex items-center gap-1"><IdCard size={11} />{primaryDetail.id_number}</span>
+              )}
+            </div>
+          </div>
+          <Tooltip content={t('contract.detachCustomer', { defaultValue: 'Detach customer' })} placement="top">
+            <Button
+              size="sm"
+              variant="outline"
+              color="danger"
+              className="btn-icon-sm"
+              startIcon={<UserMinus size={14} />}
+              onClick={onRequestDetachCustomer}
+            />
+          </Tooltip>
+        </div>
+        {idCardMedia.length > 0 && (
+          <div className="mt-2 pt-2 border-t border-line">
+            <MediaRow label={t('contract.idCard')} media={idCardMedia} />
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
-    <div className="p-4 flex flex-col gap-2">
-      {customers.map(c => (
-        <div key={c.id} className="border border-line rounded-md px-4 py-3">
-          <div className="flex items-center justify-between">
-            <span className="font-medium text-sm">{c.customer_name}</span>
-            <Badge size="xs" className="bg-fg/10 text-fg/60">{c.role}</Badge>
+    <div className="p-4 flex flex-col gap-5">
+      {/* Primary customer section */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <div className="text-xs font-semibold uppercase tracking-wider text-subtle">
+            {t('contract.primaryCustomer', { defaultValue: 'Primary customer' })}
           </div>
-          {c.relation && <div className="text-xs text-subtle mt-1">{t('contract.relation')}: {c.relation}</div>}
-          <div className="text-xs text-subtle mt-1"><DateTime value={c.created_at} /></div>
-          {/* Show ID card for the primary customer */}
-          {c.customer_id === customerId && idCardMedia.length > 0 && (
-            <div className="mt-2 pt-2 border-t border-line">
-              <MediaRow label={t('contract.idCard')} media={idCardMedia} />
-            </div>
+          {customerId == null && (
+            <Button
+              size="sm"
+              variant="outline"
+              startIcon={<UserPlus size={14} />}
+              onClick={() => setPickerMode('attach')}
+            >
+              {t('contract.attachCustomer', { defaultValue: 'Attach customer' })}
+            </Button>
           )}
         </div>
-      ))}
+        {customerId == null ? (
+          <div className="text-xs text-subtler border border-dashed border-line rounded-md px-4 py-3">
+            {t('contract.noPrimaryCustomer', { defaultValue: 'No primary customer attached' })}
+          </div>
+        ) : (
+          renderPrimaryRow()
+        )}
+      </div>
+
+      {/* Guarantors section */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <div className="text-xs font-semibold uppercase tracking-wider text-subtle">
+            {t('contract.guarantors', { defaultValue: 'Guarantors' })}
+            {guarantorList.length > 0 && <span className="ml-1.5 text-fg/40">({guarantorList.length})</span>}
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            startIcon={<UserPlus size={14} />}
+            onClick={() => setPickerMode('guarantor')}
+          >
+            {t('contract.addGuarantor', { defaultValue: 'Add guarantor' })}
+          </Button>
+        </div>
+        {guarantorList.length === 0 ? (
+          <div className="text-xs text-subtler border border-dashed border-line rounded-md px-4 py-3">
+            {t('contract.noGuarantors', { defaultValue: 'No guarantors yet' })}
+          </div>
+        ) : (
+          guarantorList.map(c => renderGuarantorRow(c))
+        )}
+      </div>
+
+      <CustomerPickerModal
+        open={pickerMode !== null}
+        title={
+          pickerMode === 'attach'
+            ? t('contract.attachCustomer', { defaultValue: 'Attach customer' })
+            : t('contract.addGuarantor', { defaultValue: 'Add guarantor' })
+        }
+        excludeCustomerIds={
+          pickerMode === 'attach'
+            ? (customerId != null ? [customerId] : [])
+            : [
+                ...(customerId != null ? [customerId] : []),
+                ...guarantorList.map(g => g.customer_id),
+              ]
+        }
+        onClose={() => setPickerMode(null)}
+        onPick={async (cid, name) => {
+          if (pickerMode === 'attach') await handleAttach(cid, name);
+          else if (pickerMode === 'guarantor') await handleAddGuarantor(cid, name);
+        }}
+      />
+
+      <RemoveGuarantorModal
+        target={removeTarget}
+        contractId={contractId}
+        onClose={() => setRemoveTarget(null)}
+        onSuccess={(name) => {
+          setRemoveTarget(null);
+          queryClient.invalidateQueries({ queryKey: ['contract-customers', contractId] });
+          successSnack(t('contract.removed_guarantor', { defaultValue: `Removed ${name}`, customer: name }));
+        }}
+        t={t}
+      />
     </div>
+  );
+}
+
+// ── Remove guarantor confirm + PIN modal ─────────────────────────────────────
+
+function RemoveGuarantorModal({ target, contractId, onClose, onSuccess, t }: {
+  target: ContractCustomer | null;
+  contractId: number;
+  onClose: () => void;
+  onSuccess: (name: string) => void;
+  t: ReturnType<typeof useTranslation>['t'];
+}) {
+  const [pin, setPin] = useState('');
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (target) { setPin(''); setReason(''); setError(''); setSubmitting(false); }
+  }, [target]);
+
+  const handleConfirm = async () => {
+    if (!target) return;
+    setSubmitting(true); setError('');
+    try {
+      await apiClient.rpc('fn_contract_remove_guarantor', {
+        p_contract_id: contractId,
+        p_customer_id: target.customer_id,
+        p_reason: reason.trim() || null,
+        p_pin: pin || null,
+      });
+      onSuccess(target.customer_name);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setError(tr || err.code || err.message);
+      } else {
+        setError(err instanceof Error ? err.message : String(err));
+      }
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal open={!!target} onClose={onClose} maxWidth="28rem" width="100%">
+      <div className="flex flex-col overflow-hidden">
+        <div className="modal-header">
+          <h2 className="modal-title">{t('contract.removeGuarantor', { defaultValue: 'Remove guarantor' })}</h2>
+          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+        </div>
+        <div className="modal-content">
+          {error && (
+            <div className="alert alert-danger mb-3">
+              <XCircle size={16} />
+              <span>{error}</span>
+            </div>
+          )}
+          <p className="text-sm mb-4">
+            {t('contract.removeGuarantorConfirm', {
+              defaultValue: 'Remove {{name}} as guarantor?',
+              name: target?.customer_name ?? '',
+            })}
+          </p>
+          <div className="form-grid gap-3">
+            <div className="flex flex-col">
+              <label className="form-label">{t('contract.reason', { defaultValue: 'Reason (optional)' })}</label>
+              <Input value={reason} onChange={(e) => setReason(e.target.value)} className="w-full" />
+            </div>
+            <BranchPinInput value={pin} onChange={setPin} required />
+          </div>
+        </div>
+        <div className="modal-footer">
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button
+            color="danger"
+            onClick={handleConfirm}
+            disabled={submitting || pin.length !== 6}
+            startIcon={submitting ? <Loader2 size={14} className="animate-spin" /> : undefined}
+          >
+            {submitting ? t('common.saving') : t('common.remove')}
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
 // ── Notes Tab ────────────────────────────────────────────────────────────────
 
-function NotesTab({ contractId, t }: { contractId: number; t: ReturnType<typeof useTranslation>['t'] }) {
+function NotesTab({ contractId, t, dirtyRef }: {
+  contractId: number;
+  t: ReturnType<typeof useTranslation>['t'];
+  dirtyRef?: React.MutableRefObject<boolean>;
+}) {
+  const queryClient = useQueryClient();
+  const { addSnackbar } = useSnackbarContext();
+  const [draft, setDraft] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (dirtyRef) dirtyRef.current = draft.trim().length > 0;
+    return () => {
+      if (dirtyRef) dirtyRef.current = false;
+    };
+  }, [draft, dirtyRef]);
+
   const { data: notes, isLoading } = useQuery({
     queryKey: ['contract-notes', contractId],
     queryFn: () => apiClient.get<ContractNote[]>(`/v_contract_notes?contract_id=eq.${contractId}&order=created_at.desc`),
   });
 
-  if (isLoading) return <div className="p-8 text-center text-subtler">{t('common.loading')}</div>;
-  if (!notes || notes.length === 0) return <div className="p-8 text-center text-subtler">{t('common.noData')}</div>;
+  const addNote = useMutation({
+    mutationFn: (note: string) => apiClient.rpc('fn_contract_add_note', {
+      p_contract_id: contractId,
+      p_note: note,
+    }),
+    onSuccess: () => {
+      setDraft('');
+      setError('');
+      queryClient.invalidateQueries({ queryKey: ['contract-notes', contractId] });
+      addSnackbar({
+        message: (
+          <div className="alert alert-success">
+            <CheckCircle size={16} />
+            <span>{t('contract.note_added', { defaultValue: 'Note added' })}</span>
+          </div>
+        ),
+      });
+    },
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        setError(translated || err.message);
+      } else {
+        setError(String(err));
+      }
+    },
+  });
+
+  const handleSubmit = () => {
+    const trimmed = draft.trim();
+    if (!trimmed) return;
+    addNote.mutate(trimmed);
+  };
 
   return (
-    <div className="p-4 flex flex-col gap-2">
-      {notes.map(n => (
-        <div key={n.id} className="border border-line rounded-md px-4 py-3">
-          <div className="text-sm">{n.note}</div>
-          <div className="flex items-center gap-3 mt-2 text-xs text-subtle">
-            <span>{n.created_by_name}</span>
-            <DateTime value={n.created_at} />
+    <div className="p-4 flex flex-col gap-3">
+      <div className="border border-line rounded-md p-3 flex flex-col gap-2">
+        {error && (
+          <div className="alert alert-danger">
+            <XCircle size={16} />
+            <span>{error}</span>
           </div>
+        )}
+        <TextArea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder={t('contract.note_placeholder', { defaultValue: 'Write a note…' })}
+          rows={3}
+        />
+        <div className="flex justify-end">
+          <Button
+            size="sm"
+            color="primary"
+            startIcon={<Plus size={14} />}
+            disabled={!draft.trim() || addNote.isPending}
+            onClick={handleSubmit}
+          >
+            {addNote.isPending
+              ? t('common.loading')
+              : t('contract.add_note', { defaultValue: 'Add note' })}
+          </Button>
         </div>
-      ))}
+      </div>
+
+      {isLoading ? (
+        <div className="p-8 text-center text-subtler">{t('common.loading')}</div>
+      ) : !notes || notes.length === 0 ? (
+        <div className="p-8 text-center text-subtler">{t('common.noData')}</div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {notes.map(n => (
+            <div key={n.id} className="border border-line rounded-md px-4 py-3">
+              <div className="text-sm whitespace-pre-wrap">{n.note}</div>
+              <div className="flex items-center gap-3 mt-2 text-xs text-subtle">
+                <span>{n.created_by_name}</span>
+                <DateTime value={n.created_at} />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

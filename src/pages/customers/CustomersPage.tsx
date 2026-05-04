@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
@@ -135,12 +135,19 @@ const formatAddress = (a: CustomerAddress): string => {
 
 export function CustomersPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const { customerId: customerIdParam } = useParams<{ customerId?: string }>();
+  const selectedId = customerIdParam ? Number(customerIdParam) : null;
+
+  const setSelectedId = (id: number | null) => {
+    if (id) navigate(`/admin/customers/${id}`, { replace: true });
+    else navigate('/admin/customers', { replace: true });
+  };
 
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => { setDebouncedSearch(search.trim()); setPageIndex(0); }, 300);
@@ -162,10 +169,23 @@ export function CustomersPage() {
   const customers = customersData?.data ?? [];
   const totalCount = customersData?.totalCount ?? 0;
 
+  // Fallback fetch when deep-linked customer isn't in the current list page
+  const inList = selectedId ? customers.some(c => c.id === selectedId) : false;
+  const { data: selectedFromApi } = useQuery({
+    queryKey: ['customer', selectedId],
+    queryFn: async () => {
+      const rows = await apiClient.get<Customer[]>(`/v_customers?id=eq.${selectedId}`);
+      return rows[0] ?? null;
+    },
+    enabled: !!selectedId && !inList,
+  });
+
   return (
-    <PageNav panels={['list', 'detail']} className="h-dvh">
+    <PageNav panels={['list', 'detail']} defaultPanel={selectedId ? 'detail' : 'list'} className="h-dvh">
       {({ isMobile, isRoot, goTo, goBack }) => {
-        const selected = selectedId ? customers.find(c => c.id === selectedId) ?? null : null;
+        const selected = selectedId
+          ? (customers.find(c => c.id === selectedId) ?? selectedFromApi ?? null)
+          : null;
         const detailTitle = selected?.full_name ?? t('customer.title');
 
         const handleSelect = (c: Customer) => {
@@ -185,7 +205,7 @@ export function CustomersPage() {
                       <ArrowRightFromLine size={18} />
                     </button>
                   ) : (
-                    <button className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current" onClick={goBack}>
+                    <button className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current" onClick={() => { setSelectedId(null); goBack(); }}>
                       <ArrowLeft size={20} />
                     </button>
                   )}

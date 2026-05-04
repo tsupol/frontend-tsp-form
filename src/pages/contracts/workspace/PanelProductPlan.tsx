@@ -364,7 +364,13 @@ export function PanelProductPlan({ onClose }: Props) {
   }, [mode, quoteData, usedFin1Data, usedFin2Data]);
 
   const fin1Rows = useMemo(() => dedupedQuotes.filter(r => r.finance_model === 'FIN1'), [dedupedQuotes]);
-  const fin2Rows = useMemo(() => dedupedQuotes.filter(r => r.finance_model === 'FIN2'), [dedupedQuotes]);
+  // Drop FIN2 rows with no rates configured — backend returns null term_months/installment_amount
+  // when the model has no active FIN2 PROFIT_AMOUNT rows. Without this filter the UI shows a ghost
+  // row with empty term and "0" monthly.
+  const fin2Rows = useMemo(
+    () => dedupedQuotes.filter(r => r.finance_model === 'FIN2' && r.term_months != null && r.installment_amount != null),
+    [dedupedQuotes],
+  );
   const fin1Terms = useMemo(() => [...new Set(fin1Rows.map(r => r.term_months))].sort((a, b) => a - b), [fin1Rows]);
   const fin2Terms = useMemo(() => [...new Set(fin2Rows.map(r => r.term_months))].sort((a, b) => a - b), [fin2Rows]);
   const retailPrice = (mode === 'used' ? usedFin1Data?.resolved_retail : dedupedQuotes[0]?.retail_price) ?? dedupedQuotes[0]?.retail_price;

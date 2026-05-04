@@ -25,7 +25,6 @@ import { DealPartnerRatesPage } from './pages/pricing/DealPartnerRatesPage';
 import { InventoryLayout } from './pages/inventory/InventoryLayout';
 import { StockDashboardPage } from './pages/inventory/StockDashboardPage';
 import { ReceivingPage } from './pages/inventory/ReceivingPage';
-import { SalePage } from './pages/inventory/SalePage';
 import { AssetsPage } from './pages/inventory/AssetsPage';
 import { PurchaseOrdersPage } from './pages/inventory/PurchaseOrdersPage';
 import { TransfersPage } from './pages/inventory/TransfersPage';
@@ -352,16 +351,7 @@ function App() {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/admin/inventory/sale"
-        element={
-          <ProtectedRoute>
-            <AdminLayout>
-              <InventoryLayout><SalePage /></InventoryLayout>
-            </AdminLayout>
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/admin/inventory/sale" element={<Navigate to="/admin/inventory/assets?view=sale" replace />} />
 
       {/* Price Check */}
       <Route
@@ -427,7 +417,7 @@ function App() {
 
       {/* Customers */}
       <Route
-        path="/admin/customers"
+        path="/admin/customers/:customerId?"
         element={
           <ProtectedRoute>
             <AdminLayout>
