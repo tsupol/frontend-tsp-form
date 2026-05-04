@@ -9,7 +9,7 @@ import {
   type ColumnDef, type SortingState,
 } from 'tsp-form';
 import {
-  Plus, MoreHorizontal, Trash2, Calendar,
+  Plus, MoreHorizontal, Trash2, Pencil, Calendar,
   XCircle, CheckCircle, ArrowRightFromLine, SlidersHorizontal,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
@@ -41,8 +41,9 @@ interface HolidayForm {
 
 // ── Row Actions ──────────────────────────────────────────────────────────────
 
-function RowActions({ holiday, onRemove }: {
+function RowActions({ holiday, onEdit, onRemove }: {
   holiday: Holiday;
+  onEdit: (h: Holiday) => void;
   onRemove: (h: Holiday) => void;
 }) {
   const { t } = useTranslation();
@@ -67,18 +68,20 @@ function RowActions({ holiday, onRemove }: {
       }
     >
       <div className="py-1 min-w-[160px]">
+        <MenuItem icon={<Pencil size={14} />} label={t('common.edit')} onClick={() => { setOpen(false); onEdit(holiday); }} />
         <MenuItem icon={<Trash2 size={14} />} label={t('settings.holidays.remove')} onClick={() => { setOpen(false); onRemove(holiday); }} />
       </div>
     </PopOver>
   );
 }
 
-// ── Add Holiday Modal ────────────────────────────────────────────────────────
+// ── Holiday Form Modal (add + edit) ──────────────────────────────────────────
 
-function AddHolidayModal({ open, onClose, companies }: {
+function HolidayFormModal({ open, onClose, companies, holiday }: {
   open: boolean;
   onClose: () => void;
   companies: Company[];
+  holiday?: Holiday | null;
 }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -87,6 +90,7 @@ function AddHolidayModal({ open, onClose, companies }: {
   const [errorMessage, setErrorMessage] = useState('');
   const [errorKey, setErrorKey] = useState(0);
   const [isPending, setIsPending] = useState(false);
+  const isEdit = !!holiday;
 
   const { register, handleSubmit, reset, control, formState: { errors } } = useForm<HolidayForm>({
     defaultValues: {
@@ -98,7 +102,15 @@ function AddHolidayModal({ open, onClose, companies }: {
 
   const prevOpen = useRef(open);
   if (open && !prevOpen.current) {
-    reset({ company_id: '', holiday_date: null, description: '' });
+    if (holiday) {
+      reset({
+        company_id: String(holiday.company_id),
+        holiday_date: new Date(holiday.holiday_date + 'T00:00:00'),
+        description: holiday.description,
+      });
+    } else {
+      reset({ company_id: '', holiday_date: null, description: '' });
+    }
     setErrorMessage('');
   }
   prevOpen.current = open;
@@ -118,7 +130,7 @@ function AddHolidayModal({ open, onClose, companies }: {
         p_managed_by: user.user_id,
       });
       addSnackbar({
-        message: <div className="alert alert-success"><CheckCircle size={16} /><span className="alert-description">{t('settings.holidays.added')}</span></div>,
+        message: <div className="alert alert-success"><CheckCircle size={16} /><span className="alert-description">{isEdit ? t('settings.holidays.updated') : t('settings.holidays.added')}</span></div>,
         type: 'success',
       });
       queryClient.invalidateQueries({ queryKey: ['company-holidays'] });
@@ -142,7 +154,7 @@ function AddHolidayModal({ open, onClose, companies }: {
     <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
       <form className="flex flex-col overflow-hidden" onSubmit={handleSubmit(onSubmit)}>
         <div className="modal-header">
-          <h2 className="modal-title">{t('settings.holidays.addHoliday')}</h2>
+          <h2 className="modal-title">{isEdit ? t('settings.holidays.editHoliday') : t('settings.holidays.addHoliday')}</h2>
         </div>
         <div className="modal-content">
           {errorMessage && (
@@ -164,6 +176,7 @@ function AddHolidayModal({ open, onClose, companies }: {
                     onChange={(val) => field.onChange(val as string)}
                     placeholder={t('settings.holidays.company')}
                     options={companies.map(c => ({ label: c.company_name, value: String(c.company_id) }))}
+                    disabled={isEdit}
                   />
                 )}
               />
@@ -181,6 +194,7 @@ function AddHolidayModal({ open, onClose, companies }: {
                     onChange={(date) => field.onChange(date)}
                     placeholder={t('settings.holidays.holidayDate')}
                     endIcon={<Calendar size={18} />}
+                    disabled={isEdit}
                   />
                 )}
               />
@@ -196,7 +210,7 @@ function AddHolidayModal({ open, onClose, companies }: {
         <div className="modal-footer">
           <Button type="button" onClick={onClose}>{t('common.cancel')}</Button>
           <Button type="submit" color="primary" disabled={isPending}>
-            {isPending ? t('common.saving') : t('common.create')}
+            {isPending ? t('common.saving') : isEdit ? t('common.save') : t('common.create')}
           </Button>
         </div>
       </form>
@@ -300,7 +314,7 @@ export function HolidaysPage() {
 
   const [sorting, setSorting] = useState<SortingState>([{ id: 'holiday_date', desc: false }]);
   const [pageIndex, setPageIndex] = useState(0);
-  const [pageSize, setPageSize] = useState(25);
+  const [pageSize, setPageSize] = useState(15);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -308,6 +322,7 @@ export function HolidaysPage() {
   const [filterOpen, setFilterOpen] = useState(false);
 
   const [createOpen, setCreateOpen] = useState(false);
+  const [editHoliday, setEditHoliday] = useState<Holiday | null>(null);
   const [removeHoliday, setRemoveHoliday] = useState<Holiday | null>(null);
 
   const { data: companies = [] } = useQuery({
@@ -375,6 +390,7 @@ export function HolidaysPage() {
       cell: ({ row }) => (
         <RowActions
           holiday={row.original}
+          onEdit={setEditHoliday}
           onRemove={setRemoveHoliday}
         />
       ),
@@ -499,7 +515,7 @@ export function HolidaysPage() {
           enablePagination
           pageIndex={pageIndex}
           pageSize={pageSize}
-          pageSizeOptions={[25, 50]}
+          pageSizeOptions={[15, 25, 50]}
           rowCount={totalCount}
           onPageChange={({ pageIndex: pi, pageSize: ps }) => {
             setPageIndex(pi);
@@ -534,6 +550,7 @@ export function HolidaysPage() {
                     </div>
                     <RowActions
                       holiday={holiday}
+                      onEdit={setEditHoliday}
                       onRemove={setRemoveHoliday}
                     />
                   </div>
@@ -547,7 +564,7 @@ export function HolidaysPage() {
               totalPages={Math.ceil(totalCount / pageSize)}
               onPageChange={(p) => setPageIndex(p - 1)}
               pageSize={pageSize}
-              pageSizeOptions={[25, 50]}
+              pageSizeOptions={[15, 25, 50]}
               onPageSizeChange={(ps) => { setPageSize(ps); setPageIndex(0); }}
               totalRows={totalCount}
             />
@@ -556,10 +573,16 @@ export function HolidaysPage() {
       </div>
 
       {/* Modals */}
-      <AddHolidayModal
+      <HolidayFormModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         companies={companies}
+      />
+      <HolidayFormModal
+        open={!!editHoliday}
+        onClose={() => setEditHoliday(null)}
+        companies={companies}
+        holiday={editHoliday}
       />
       <ConfirmRemoveModal
         open={!!removeHoliday}

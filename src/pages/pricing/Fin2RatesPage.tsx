@@ -393,6 +393,14 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
 
             {/* Existing terms */}
             <div className="space-y-3">
+              {fin2Rows.length === 0 && !isLoading && (
+                <div className="rounded-lg border border-dashed border-line px-4 py-6 text-center">
+                  <div className="text-sm font-medium">{t('fin2.empty')}</div>
+                  <div className="text-xs text-control-label mt-1">
+                    {canManageTerms ? t('fin2.emptyAdminHint') : t('fin2.emptyStaffHint')}
+                  </div>
+                </div>
+              )}
               {fin2Rows.map((row) => {
                 const term = row.term_months!;
                 return (
@@ -811,8 +819,16 @@ export function Fin2RatesPage() {
     return map;
   }, [rateLookupRows]);
 
-  // Selected model object
-  const selectedModel = selectedModelId ? models.find(m => m.id === selectedModelId) ?? null : null;
+  // Selected model object — cache last-seen row so header survives search/filter changes
+  const selectedModelCacheRef = useRef<ModelRow | null>(null);
+  const selectedModelFromList = selectedModelId ? models.find(m => m.id === selectedModelId) ?? null : null;
+  if (selectedModelFromList && selectedModelFromList.id === selectedModelId) {
+    selectedModelCacheRef.current = selectedModelFromList;
+  }
+  if (!selectedModelId) {
+    selectedModelCacheRef.current = null;
+  }
+  const selectedModel = selectedModelFromList ?? selectedModelCacheRef.current;
   const detailTitle = selectedModel
     ? selectedModel.name
     : t('fin2.editProfit');

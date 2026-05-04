@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, DataTable, Badge, Input, Select, Button, Tooltip, useSnackbarContext } from 'tsp-form';
+import { PageNav, PageNavPanel, MobileHeader, DataTable, Badge, Input, Select, Button, TextArea, Tooltip, LabeledCheckbox, useSnackbarContext } from 'tsp-form';
 import {
   ArrowLeft,
   ArrowRightFromLine,
@@ -19,6 +19,8 @@ import {
   Clock,
   CirclePlus,
   GitBranchPlus,
+  User,
+  Snowflake,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -52,8 +54,11 @@ interface Ticket {
   severity: number;
   status: string;
   assigned_to_user_id: number | null;
+  is_mine: boolean | null;
   assigned_at: string | null;
   next_attempt_after: string | null;
+  is_cooling_down: boolean;
+  cooldown_remaining: string | null;
   closed_at: string | null;
   closed_reason: string | null;
   created_at: string;
@@ -78,6 +83,8 @@ interface TicketDetail {
   assigned_to_user_id: number | null;
   assigned_at: string | null;
   next_attempt_after: string | null;
+  is_cooling_down: boolean;
+  cooldown_remaining: string | null;
   closed_at: string | null;
   closed_reason: string | null;
   created_at: string;
@@ -103,26 +110,6 @@ interface TicketGetResponse {
   events: TicketEvent[];
 }
 
-interface TicketCustomer {
-  call_ticket_id: number;
-  ref_contract_id: number;
-  contract_code: string | null;
-  customer_id: number | null;
-  cus_firstname: string | null;
-  cus_lastname: string | null;
-  cus_tel: string | null;
-  cus_address: string | null;
-  cus_facebook: string | null;
-  ref1_firstname: string | null;
-  ref1_lastname: string | null;
-  ref1_tel: string | null;
-  ref1_relationship: string | null;
-  ref2_firstname: string | null;
-  ref2_lastname: string | null;
-  ref2_tel: string | null;
-  ref2_relationship: string | null;
-}
-
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function severityColor(severity: number): 'danger' | 'warning' | 'info' | undefined {
@@ -131,6 +118,12 @@ function severityColor(severity: number): 'danger' | 'warning' | 'info' | undefi
   if (severity >= 2) return 'info';
   return undefined;
 }
+
+const INTENT_KEYS: Record<string, string> = {
+  CALL_COLLECTION: 'callCenter.intentCollection',
+  PAYMENT_REMINDER: 'callCenter.intentReminder',
+  OVERDUE_COLLECTION: 'callCenter.intentOverdue',
+};
 
 const QUEUE_FLAG_KEYS: Record<string, string> = {
   NEW: 'callCenter.filterNew',
@@ -243,11 +236,18 @@ function formatAmount(amount: number | null): string {
   return amount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
-function formatTel(tel: string): string {
-  const d = tel.replace(/\D/g, '');
-  if (d.length === 10) return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6)}`;
-  if (d.length === 9) return `${d.slice(0, 2)} ${d.slice(2, 5)} ${d.slice(5)}`;
-  return tel;
+/** Format PostgREST interval (e.g. "23:45:30", "1 day 02:00:00") into "23h 46m" / "1d 2h". */
+function formatCooldown(raw: string | null): string {
+  if (!raw) return '';
+  const dayMatch = raw.match(/(\d+)\s*day/);
+  const days = dayMatch ? parseInt(dayMatch[1], 10) : 0;
+  const timeMatch = raw.match(/(\d+):(\d+):(\d+)/);
+  const hours = timeMatch ? parseInt(timeMatch[1], 10) : 0;
+  const minutes = timeMatch ? parseInt(timeMatch[2], 10) : 0;
+  if (days > 0) return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
+  if (hours > 0) return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+  if (minutes > 0) return `${minutes}m`;
+  return '<1m';
 }
 
 function eventIcon(eventType: string) {
@@ -285,6 +285,7 @@ function TicketDetailContent({
   const [errorKey, setErrorKey] = useState(0);
   const [noteText, setNoteText] = useState('');
   const [revertNote, setRevertNote] = useState('');
+  const [resultNote, setResultNote] = useState('');
 
   // Reset state when ticket changes
   useEffect(() => {
@@ -292,6 +293,7 @@ function TicketDetailContent({
     setErrorMessage('');
     setNoteText('');
     setRevertNote('');
+    setResultNote('');
   }, [ticketId]);
 
   const { data, isLoading, isError, error } = useQuery({
@@ -299,17 +301,8 @@ function TicketDetailContent({
     queryFn: () => apiClient.rpc<TicketGetResponse>('ops_call_ticket_get', { p_ticket_id: ticketId }),
   });
 
-  const { data: customerData } = useQuery({
-    queryKey: ['ticket-customer', ticketId],
-    queryFn: async () => {
-      const res = await apiClient.get<TicketCustomer[]>(`/v_ops_call_ticket_customer?call_ticket_id=eq.${ticketId}`);
-      return res[0] ?? null;
-    },
-  });
-
   const ticket = data?.ticket;
   const events = data?.events ?? [];
-  const customer = customerData ?? null;
 
   // ── Action helpers ─────────────────────────────────────────────────────────
 
@@ -351,7 +344,8 @@ function TicketDetailContent({
   });
 
   const handleSetResult = (result: string) => runAction('result', async () => {
-    await apiClient.rpc('ops_call_ticket_set_result', { p_ticket_id: ticketId, p_result: result, p_note: null });
+    await apiClient.rpc('ops_call_ticket_set_result', { p_ticket_id: ticketId, p_result: result, p_note: resultNote.trim() || null });
+    setResultNote('');
     addSnackbar({
       message: (
         <div className="alert alert-success">
@@ -462,6 +456,14 @@ function TicketDetailContent({
               <div className="min-h-info-content-h flex items-center">{ticket.ref_contract_source ?? '—'}</div>
             </div>
             <div>
+              <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.intent')}</div>
+              <div className="min-h-info-content-h flex items-center">
+                <Badge size="sm" color={ticket.intent_type === 'OVERDUE_COLLECTION' ? 'danger' : ticket.intent_type === 'PAYMENT_REMINDER' ? 'info' : undefined}>
+                  {INTENT_KEYS[ticket.intent_type] ? t(INTENT_KEYS[ticket.intent_type]) : ticket.intent_type}
+                </Badge>
+              </div>
+            </div>
+            <div>
               <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.lastResult')}</div>
               <div className="min-h-info-content-h flex items-center">
                 <Badge size="sm" color={statusColor(ticket.status)}>{STATUS_KEYS[ticket.status] ? t(STATUS_KEYS[ticket.status]) : ticket.status}</Badge>
@@ -516,7 +518,9 @@ function TicketDetailContent({
             <div>
               <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.stage')}</div>
               <div className="min-h-info-content-h flex items-center gap-1.5">
-                <Badge size="sm">{STAGE_KEYS[ticket.stage] ? t(STAGE_KEYS[ticket.stage]) : ticket.stage}</Badge>
+                {ticket.stage && ticket.stage !== 'NONE' && (
+                  <Badge size="sm">{STAGE_KEYS[ticket.stage] ? t(STAGE_KEYS[ticket.stage]) : ticket.stage}</Badge>
+                )}
                 <Tooltip content={t('callCenter.severity')}>
                   <Badge size="sm" color={severityColor(ticket.severity)}>
                     {ticket.severity}
@@ -558,8 +562,14 @@ function TicketDetailContent({
             {ticket.next_attempt_after && OPEN_STATUSES.includes(ticket.status) && (
               <div>
                 <div className="text-[10px] text-subtle uppercase tracking-wider">{t('callCenter.nextAttempt')}</div>
-                <div className="min-h-info-content-h flex items-center">
+                <div className="min-h-info-content-h flex items-center gap-1.5">
                   <DateTime value={ticket.next_attempt_after} className="text-sm" />
+                  {ticket.is_cooling_down && ticket.cooldown_remaining && (
+                    <Badge size="sm" color="default">
+                      <Snowflake size={10} className="inline-block mr-0.5 -mt-0.5" />
+                      {formatCooldown(ticket.cooldown_remaining)}
+                    </Badge>
+                  )}
                 </div>
               </div>
             )}
@@ -580,11 +590,6 @@ function TicketDetailContent({
                 >
                   {actionPending === 'take' ? t('callCenter.taking') : t('callCenter.take')}
                 </Button>
-                {customer?.cus_tel && (
-                  <a href={`tel:${customer.cus_tel}`} className="text-sm font-medium text-primary hover:underline">
-                    {formatTel(customer.cus_tel)}
-                  </a>
-                )}
               </div>
             )}
 
@@ -592,6 +597,13 @@ function TicketDetailContent({
             {canSetResult && (
               <div className="px-4 py-4 border-b border-line space-y-2">
                 <div className="text-sm font-medium">{t('callCenter.setResult')}</div>
+                <TextArea
+                  className="w-full"
+                  placeholder={t('callCenter.resultNotePlaceholder')}
+                  value={resultNote}
+                  onChange={(e) => setResultNote(e.target.value)}
+                  rows={2}
+                />
                 <div className="flex flex-wrap gap-2">
                   <Button
                     color="success"
@@ -719,6 +731,7 @@ export function TicketQueuePage() {
 
   // Filters & sort
   const [filterQueueFlag, setFilterQueueFlag] = useState<string>('READY_TO_CALL');
+  const [filterMineOnly, setFilterMineOnly] = useState(false);
   const [sortBy, setSortBy] = useState<string>('is_takeable.desc,severity.desc,overdue_amount.desc.nullslast,created_at.asc');
   const [filtersExpanded, setFiltersExpanded] = useState(false);
 
@@ -765,14 +778,17 @@ export function TicketQueuePage() {
     } else if (filterQueueFlag) {
       params.push(`queue_flag=eq.${filterQueueFlag}`);
     }
+    if (filterMineOnly) {
+      params.push('is_mine=is.true');
+    }
     params.push(`order=${sortBy}`);
     const qs = params.length > 0 ? `?${params.join('&')}` : '';
     return `/v_ops_call_ticket_list${qs}`;
-  }, [search, filterQueueFlag, sortBy]);
+  }, [search, filterQueueFlag, filterMineOnly, sortBy]);
 
   // Fetch tickets
   const { data, isError, error, isFetching } = useQuery({
-    queryKey: ['ticket-queue', pageIndex, pageSize, search, filterQueueFlag, sortBy],
+    queryKey: ['ticket-queue', pageIndex, pageSize, search, filterQueueFlag, filterMineOnly, sortBy],
     queryFn: () => apiClient.getPaginated<Ticket>(buildEndpoint(), { page: pageIndex + 1, pageSize }),
     placeholderData: keepPreviousData,
   });
@@ -871,6 +887,16 @@ export function TicketQueuePage() {
                     />
                   </div>
                 </div>
+                <div className="flex items-center mt-2">
+                  <LabeledCheckbox
+                    label={t('callCenter.mineOnly')}
+                    checked={filterMineOnly}
+                    onChange={(e) => {
+                      setFilterMineOnly(e.target.checked);
+                      setPageIndex(0);
+                    }}
+                  />
+                </div>
               </div>
 
               {isError && (
@@ -902,6 +928,11 @@ export function TicketQueuePage() {
                       >
                         {/* Row 1: ticket code + amount */}
                         <div className="flex items-center gap-2">
+                          {ticket.is_mine && (
+                            <Tooltip content={t('callCenter.assignedToMe')}>
+                              <User size={12} className="text-primary shrink-0" />
+                            </Tooltip>
+                          )}
                           <span className="font-medium text-xs truncate">{ticket.ticket_code}</span>
                           {ticket.overdue_amount != null && ticket.overdue_amount > 0 ? (
                             <span className="ml-auto shrink-0 text-sm font-medium text-figure">
@@ -930,12 +961,25 @@ export function TicketQueuePage() {
                             <Badge size="sm" color="success">
                               {t('callCenter.dueInDays', { duration: formatDuration(dueIn.months, dueIn.days) })}
                             </Badge>
-                          ) : (
+                          ) : ticket.stage && ticket.stage !== 'NONE' ? (
                             <Badge size="sm">
                               {STAGE_KEYS[ticket.stage] ? t(STAGE_KEYS[ticket.stage]) : ticket.stage}
                             </Badge>
+                          ) : null}
+                          {ticket.is_cooling_down && (
+                            <Tooltip content={t('callCenter.cooldownLeft', { duration: formatCooldown(ticket.cooldown_remaining) })}>
+                              <Badge size="sm" color="default">
+                                <Snowflake size={10} className="inline-block mr-0.5 -mt-0.5" />
+                                {formatCooldown(ticket.cooldown_remaining)}
+                              </Badge>
+                            </Tooltip>
                           )}
-                          <span className="ml-auto shrink-0">
+                          <span className="ml-auto shrink-0 flex items-center gap-1">
+                            {INTENT_KEYS[ticket.intent_type] && (
+                              <Badge size="sm" color={ticket.intent_type === 'OVERDUE_COLLECTION' ? 'danger' : ticket.intent_type === 'PAYMENT_REMINDER' ? 'info' : undefined}>
+                                {t(INTENT_KEYS[ticket.intent_type])}
+                              </Badge>
+                            )}
                             <Badge size="sm" color={queueFlagColor(ticket.queue_flag)}>
                               {QUEUE_FLAG_KEYS[ticket.queue_flag] ? t(QUEUE_FLAG_KEYS[ticket.queue_flag]) : ticket.queue_flag}
                             </Badge>

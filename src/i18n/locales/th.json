@@ -533,7 +533,15 @@
     "dueInDays": "ครบกำหนดใน {{duration}}",
     "missedCount": "ขาด {{count}} งวด",
     "overdue": "ค้างชำระ",
-    "nextDue": "ครบกำหนดถัดไป"
+    "nextDue": "ครบกำหนดถัดไป",
+    "intent": "ประเภทการโทร",
+    "intentCollection": "ทวงถาม",
+    "intentReminder": "แจ้งเตือนล่วงหน้า",
+    "intentOverdue": "ทวงค้าง",
+    "mineOnly": "เฉพาะตั๋วของฉัน",
+    "assignedToMe": "รับผิดชอบโดยฉัน",
+    "cooldownLeft": "พักโทรอีก {{duration}}",
+    "resultNotePlaceholder": "หมายเหตุ (ไม่บังคับ) — ลูกค้าตอบว่าอย่างไร?"
   },
   "pricing": {
     "title": "ตารางราคา",
@@ -619,6 +627,8 @@
     "saveSuccess": "บันทึกเงื่อนไขสำเร็จ",
     "missingProfit": "ยังไม่ได้ตั้งกำไร",
     "empty": "ไม่พบเงื่อนไข FIN2",
+    "emptyAdminHint": "รุ่นนี้ยังไม่มีอัตรากำไร FIN2 — เพิ่มงวดด้านล่างเพื่อเริ่มต้น",
+    "emptyStaffHint": "รุ่นนี้ยังไม่มีอัตรากำไร FIN2 — แจ้งผู้ดูแล holding ให้ตั้งค่าให้",
     "activeRates": "ใช้งาน",
     "closedRates": "ปิดแล้ว",
     "futureRates": "ในอนาคต",
@@ -1292,11 +1302,13 @@
       "title": "วันหยุด",
       "description": "วันหยุดบริษัทที่มีผลต่อวันครบกำหนดและค่าปรับ",
       "addHoliday": "เพิ่มวันหยุด",
+      "editHoliday": "แก้ไขวันหยุด",
       "company": "บริษัท",
       "holidayDate": "วันที่",
       "descriptionField": "รายละเอียด",
       "remove": "ลบ",
       "added": "เพิ่มวันหยุดแล้ว",
+      "updated": "อัปเดตวันหยุดแล้ว",
       "removed": "ลบวันหยุดแล้ว",
       "empty": "ไม่พบวันหยุด",
       "confirmRemove": "ลบวันหยุด",
@@ -1401,7 +1413,16 @@
       "result": "ผลลัพธ์",
       "searchPlaceholder": "ค้นหาผู้ใช้, สาขา...",
       "filterAllBranches": "ทุกสาขา",
-      "allPermissions": "ทุกสิทธิ์"
+      "allPermissions": "ทุกสิทธิ์",
+      "tabChange": "ประวัติการเปลี่ยน",
+      "tabUsage": "ประวัติการใช้งาน",
+      "action": "การกระทำ",
+      "actionSet": "ตั้งครั้งแรก",
+      "actionChange": "เปลี่ยน",
+      "changedBy": "เปลี่ยนโดย",
+      "setAt": "เวลา",
+      "changePin": "เปลี่ยน PIN",
+      "noChangeLogs": "ไม่มีประวัติการเปลี่ยน PIN"
     }
   },
   "contract": {

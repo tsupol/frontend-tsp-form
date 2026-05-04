@@ -533,7 +533,15 @@
     "dueInDays": "Due in {{duration}}",
     "missedCount": "{{count}} missed",
     "overdue": "Overdue",
-    "nextDue": "Next Due"
+    "nextDue": "Next Due",
+    "intent": "Intent",
+    "intentCollection": "Collection",
+    "intentReminder": "Reminder",
+    "intentOverdue": "Overdue",
+    "mineOnly": "My tickets only",
+    "assignedToMe": "Assigned to me",
+    "cooldownLeft": "Cooldown {{duration}}",
+    "resultNotePlaceholder": "Note (optional) — what did the customer say?"
   },
   "pricing": {
     "title": "Pricebook",
@@ -619,6 +627,8 @@
     "saveSuccess": "Term saved",
     "missingProfit": "No profit set",
     "empty": "No FIN2 terms found",
+    "emptyAdminHint": "This model has no FIN2 profit rates yet. Add a term below to start.",
+    "emptyStaffHint": "This model has no FIN2 profit rates. Ask a holding admin to set them up.",
     "activeRates": "Active",
     "closedRates": "Closed",
     "futureRates": "Future",
@@ -1292,11 +1302,13 @@
       "title": "Holidays",
       "description": "Company holidays that affect due date and late fee calculations.",
       "addHoliday": "Add Holiday",
+      "editHoliday": "Edit Holiday",
       "company": "Company",
       "holidayDate": "Holiday Date",
       "descriptionField": "Description",
       "remove": "Remove",
       "added": "Holiday added",
+      "updated": "Holiday updated",
       "removed": "Holiday removed",
       "empty": "No holidays found",
       "confirmRemove": "Remove Holiday",
@@ -1401,7 +1413,16 @@
       "result": "Result",
       "searchPlaceholder": "Search user, branch...",
       "filterAllBranches": "All Branches",
-      "allPermissions": "All Permissions"
+      "allPermissions": "All Permissions",
+      "tabChange": "Change Log",
+      "tabUsage": "Usage Log",
+      "action": "Action",
+      "actionSet": "Set",
+      "actionChange": "Change",
+      "changedBy": "Changed By",
+      "setAt": "Set At",
+      "changePin": "Change PIN",
+      "noChangeLogs": "No PIN changes"
     }
   },
   "contract": {
