@@ -1,8 +1,9 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, Modal, TextArea, DataTable, useSnackbarContext } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, Box, Search, SlidersHorizontal, CheckCircle, XCircle } from 'lucide-react';
+import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, Modal, TextArea, DataTable, PopOver, Tooltip, useSnackbarContext } from 'tsp-form';
+import { ArrowLeft, ArrowRightFromLine, Box, Search, SlidersHorizontal, CheckCircle, XCircle, ChevronDown, ShoppingCart, ExternalLink, Wrench } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency } from '../../lib/format';
@@ -100,19 +101,82 @@ const BUCKET_OPTIONS = [
 ];
 
 // ============================================================================
-// Action definitions — which actions are available per bucket
+// Backend action types & config
 // ============================================================================
 
-type ActionType = 'quarantine_admit' | 'quarantine_release' | 'repair_request' | 'dispose' | 'dispose_reverse' | 'write_off' | 'internal_use';
+interface BackendAssetAction {
+  action_code: string;
+  category: string;
+  rpc_name: string;
+  is_available: boolean;
+  blocking_reason: string | null;
+  require_pin: boolean;
+  sort_order: number;
+  target_bucket: string | null;
+  bill_type: string | null;
+  bill_purpose: string | null;
+  creates_bill: boolean;
+}
 
-const BUCKET_ACTIONS: Record<string, ActionType[]> = {
-  ON_HAND_AVAILABLE: ['quarantine_admit', 'repair_request', 'write_off', 'internal_use'],
-  QUARANTINED: ['quarantine_release', 'repair_request', 'dispose'],
-  WITH_CUSTOMER_ACTIVE: ['repair_request'],
-  REPOSSESSED_PENDING_CLEARANCE: ['quarantine_admit'],
-  DAMAGED_SCRAP_PENDING: ['dispose'],
-  DISPOSED_SOLD_SCRAP: ['dispose_reverse'],
+interface AssetActionsResponse {
+  asset_id: number;
+  current_bucket: string;
+  condition_grade: string;
+  owner_type: string;
+  has_custodian: boolean;
+  contract_bound: boolean;
+  bound_contract_id: number | null;
+  actions: BackendAssetAction[];
+}
+
+// Curated set of action codes that belong on the AssetsPage footer.
+// Excluded: contract-tied cmd_* actions (driven from contract closure modal),
+// transfer confirm/cancel (live in TransfersPage), admin-only ASSET_APPROVE.
+const FOOTER_ACTION_ALLOWLIST: ReadonlySet<string> = new Set([
+  // BUCKET_MOVE — same-branch reversible moves
+  'ASSET_QUARANTINE_ADMIT',
+  'ASSET_QUARANTINE_RELEASE',
+  'ASSET_INTERNAL_USE_ASSIGN',
+  'ASSET_INTERNAL_USE_RELEASE',
+  // REPAIR
+  'ASSET_REPAIR_REQUEST',
+  // LIFECYCLE
+  'ASSET_WRITE_OFF',
+  'ASSET_WRITE_OFF_JOURNAL',
+  'ASSET_WRITE_OFF_REVERSE',
+  'ASSET_DISPOSE',
+  'ASSET_DISPOSE_REVERSE',
+  // SALE
+  'ASSET_SELL_AT_COST',
+  'ASSET_SELL_EXTERNAL',
+  'ASSET_DISPOSAL',
+  // ADJUSTMENT
+  'ASSET_REVALUE',
+  'ASSET_IDENTIFIER_CORRECT',
+]);
+
+// Actions wireable today via the generic modal.
+// The rest live in the allowlist but render disabled with "not yet implemented".
+type ExtraField =
+  | { kind: 'select'; name: string; labelKey: string; options: { value: string; label: string }[]; required?: boolean; default?: string }
+  | { kind: 'text'; name: string; labelKey: string; required?: boolean };
+
+type SimpleActionConfig = {
+  rpc: string;
+  color?: 'primary' | 'danger';
+  hasReason?: { options: { value: string; label: string }[]; required: boolean };
+  /** Extra fields injected into the params object. Param name is `name` (no p_ prefix added). */
+  extraFields?: ExtraField[];
+  /** Which params to send. If omitted, defaults to ['p_asset_id', 'p_dedupe_key', 'p_note', 'p_reason_code']. */
+  paramShape?: 'asset' | 'asset_no_dedupe';
+  successKey: string;
 };
+
+const SALE_TYPE_OPTIONS = [
+  { value: 'RETAIL', label: 'Retail' },
+  { value: 'B2B', label: 'B2B (External)' },
+  { value: 'B2C', label: 'B2C (External)' },
+];
 
 const QUARANTINE_REASON_OPTIONS = [
   { value: 'DAMAGED', label: 'Damaged' },
@@ -128,6 +192,88 @@ const WRITE_OFF_REASON_OPTIONS = [
   { value: 'DAMAGED_BEYOND_USE', label: 'Damaged Beyond Use' },
 ];
 
+const SIMPLE_ACTIONS: Record<string, SimpleActionConfig> = {
+  ASSET_QUARANTINE_ADMIT: {
+    rpc: 'fn_inv_quarantine_admit',
+    hasReason: { options: QUARANTINE_REASON_OPTIONS, required: true },
+    successKey: 'success.quarantine_admit',
+  },
+  ASSET_QUARANTINE_RELEASE: {
+    rpc: 'fn_inv_quarantine_release',
+    successKey: 'success.quarantine_release',
+  },
+  ASSET_REPAIR_REQUEST: {
+    rpc: 'fn_inv_repair_request',
+    successKey: 'success.repair_request',
+  },
+  ASSET_DISPOSE: {
+    rpc: 'fn_inv_dispose',
+    color: 'danger',
+    successKey: 'success.dispose',
+  },
+  ASSET_DISPOSE_REVERSE: {
+    rpc: 'fn_inv_dispose_reverse',
+    successKey: 'success.dispose_reverse',
+  },
+  ASSET_WRITE_OFF: {
+    rpc: 'fn_inv_write_off',
+    color: 'danger',
+    hasReason: { options: WRITE_OFF_REASON_OPTIONS, required: true },
+    successKey: 'success.write_off',
+  },
+  ASSET_WRITE_OFF_REVERSE: {
+    rpc: 'fn_inv_write_off_reverse',
+    successKey: 'success.write_off_reverse',
+  },
+  ASSET_INTERNAL_USE_RELEASE: {
+    rpc: 'fn_inv_internal_use_release',
+    successKey: 'success.internal_use_release',
+  },
+  ASSET_SELL_EXTERNAL: {
+    rpc: 'fn_inv_sell_external',
+    color: 'primary',
+    paramShape: 'asset_no_dedupe',
+    extraFields: [
+      { kind: 'select', name: 'p_sale_type', labelKey: 'sellExternal.saleType', options: SALE_TYPE_OPTIONS, required: true, default: 'RETAIL' },
+      { kind: 'text', name: 'p_external_buyer_name', labelKey: 'sellExternal.buyerName' },
+      { kind: 'text', name: 'p_external_buyer_ref', labelKey: 'sellExternal.buyerRef' },
+    ],
+    successKey: 'success.sell_external',
+  },
+};
+
+// Up to 4 actions surfaced inline as primary buttons; rest go behind "More actions".
+const PRIMARY_BY_BUCKET: Record<string, string[]> = {
+  ON_HAND_AVAILABLE: ['ASSET_SELL_EXTERNAL', 'ASSET_QUARANTINE_ADMIT', 'ASSET_REPAIR_REQUEST'],
+  QUARANTINED: ['ASSET_QUARANTINE_RELEASE', 'ASSET_REPAIR_REQUEST', 'ASSET_DISPOSE'],
+  IN_REPAIR: [],
+  IN_USE_INTERNAL: ['ASSET_INTERNAL_USE_RELEASE'],
+  WITH_CUSTOMER_ACTIVE: ['ASSET_REPAIR_REQUEST'],
+  REPOSSESSED_PENDING_CLEARANCE: ['ASSET_QUARANTINE_ADMIT'],
+  DAMAGED_SCRAP_PENDING: ['ASSET_DISPOSE'],
+  DISPOSED_SOLD_SCRAP: ['ASSET_DISPOSE_REVERSE'],
+  WRITTEN_OFF: ['ASSET_WRITE_OFF_REVERSE'],
+};
+
+const CATEGORY_ORDER = ['BUCKET_MOVE', 'REPAIR', 'SALE', 'LIFECYCLE', 'ADJUSTMENT', 'INBOUND'];
+
+// Per-action placement override.
+//   "elsewhere" → action lives somewhere else in the UI; show it with a link icon
+//                 and tooltip pointing to the right surface.
+//   "not_wired" → no FE handler yet; show wrench icon + "Not yet wired" tooltip.
+//                 Auto-applied to allowlisted actions missing from SIMPLE_ACTIONS.
+type ActionPlacement =
+  | { kind: 'elsewhere'; where: string }
+  | { kind: 'not_wired' };
+
+const ACTION_PLACEMENT: Record<string, ActionPlacement> = {
+  // Add entries as actions get moved to other pages, e.g.:
+  // ASSET_TRANSFER_ACCEPT: { kind: 'elsewhere', where: 'Transfers page' },
+};
+
+// Optional category override for popover grouping (parallels ContractActions).
+const CATEGORY_OVERRIDE: Record<string, string> = {};
+
 // ============================================================================
 // Component
 // ============================================================================
@@ -137,6 +283,9 @@ export function AssetsPage() {
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const view = searchParams.get('view');
+  const isSaleView = view === 'sale';
 
   const isBranchUser = ['BRANCH_STAFF', 'BRANCH_MANAGER'].includes(user?.role_code ?? '');
   const defaultBranchId = isBranchUser && user?.branch_id ? user.branch_id : null;
@@ -198,9 +347,10 @@ export function AssetsPage() {
   const extraFilterCount = [filterBrand, filterFamily, filterCondition].filter(Boolean).length;
 
   const { data: listData, isFetching } = useQuery({
-    queryKey: ['assets', debouncedSearch, filterBucket, filterBranchId, filterCondition, filterBrand, filterFamily, pageIndex, pageSize],
+    queryKey: ['assets', isSaleView, debouncedSearch, filterBucket, filterBranchId, filterCondition, filterBrand, filterFamily, pageIndex, pageSize],
     queryFn: () => {
       let url = '/v_assets?order=created_at.desc';
+      if (isSaleView) url += '&is_sellable=eq.true';
       if (filterBucket) url += `&current_bucket=eq.${filterBucket}`;
       if (filterBranchId) url += `&branch_id=eq.${filterBranchId}`;
       if (filterCondition === 'USED') url += `&condition_grade=in.(USED_A,USED_B)`;
@@ -231,6 +381,7 @@ export function AssetsPage() {
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['assets'] });
     queryClient.invalidateQueries({ queryKey: ['asset-txns'] });
+    queryClient.invalidateQueries({ queryKey: ['asset-actions'] });
   };
 
   return (
@@ -251,7 +402,7 @@ export function AssetsPage() {
                 )}
               </div>
               <div className="mobile-header-title mobile-header-title-truncate">
-                {isRoot ? t('nav.assets') : selectedAsset?.asset_code ?? ''}
+                {isRoot ? t(isSaleView ? 'nav.sale' : 'nav.assets') : selectedAsset?.asset_code ?? ''}
               </div>
               <div className="mobile-header-end w-12" />
             </MobileHeader>
@@ -259,7 +410,10 @@ export function AssetsPage() {
 
           {!isMobile && (
             <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
-              <h1 className="heading-2 shrink-0">{t('nav.assets')}</h1>
+              <h1 className="heading-2 shrink-0 flex items-center gap-2">
+                {isSaleView && <ShoppingCart size={18} />}
+                {t(isSaleView ? 'nav.sale' : 'nav.assets')}
+              </h1>
             </div>
           )}
 
@@ -435,9 +589,7 @@ function AssetDetailPanel({
   onRefresh: () => void;
   addSnackbar: (opts: { message: React.ReactNode }) => void;
 }) {
-  const [actionModal, setActionModal] = useState<ActionType | null>(null);
-
-  const availableActions = BUCKET_ACTIONS[asset.current_bucket] ?? [];
+  const [activeAction, setActiveAction] = useState<BackendAssetAction | null>(null);
 
   const { data: txns } = useQuery({
     queryKey: ['asset-txns', asset.asset_id],
@@ -596,37 +748,26 @@ function AssetDetailPanel({
         )}
       </div>
 
-      {/* Action buttons */}
-      {availableActions.length > 0 && (
-        <div className="flex-none px-4 py-3 border-t border-line flex flex-wrap gap-2">
-          {availableActions.map(action => (
-            <Button
-              key={action}
-              variant="outline"
-              size="sm"
-              color={ACTION_CONFIG[action].color || undefined}
-              onClick={() => setActionModal(action)}
-            >
-              {t(`asset.action_${action}`)}
-            </Button>
-          ))}
-        </div>
-      )}
+      <AssetActionBar
+        asset={asset}
+        t={t}
+        onPick={setActiveAction}
+      />
 
       <AssetActionModal
-        open={!!actionModal}
-        action={actionModal}
-        onClose={() => setActionModal(null)}
+        open={!!activeAction}
+        action={activeAction}
+        onClose={() => setActiveAction(null)}
         asset={asset}
         t={t}
         onSuccess={(msgKey) => {
-          setActionModal(null);
+          setActiveAction(null);
           onRefresh();
           addSnackbar({
             message: (
               <div className="alert alert-success">
                 <CheckCircle size={16} />
-                <span>{t(msgKey)}</span>
+                <span>{t(msgKey, { ns: 'assetActions' })}</span>
               </div>
             ),
           });
@@ -637,59 +778,146 @@ function AssetDetailPanel({
 }
 
 // ============================================================================
-// Action config
+// Action bar — backend-driven primary + grouped-secondary actions
 // ============================================================================
 
-const ACTION_CONFIG: Record<ActionType, {
-  rpc: string;
-  color?: 'primary' | 'danger';
-  hasReason?: { options: { value: string; label: string }[]; required: boolean };
-  hasNote: boolean;
-  successKey: string;
-}> = {
-  quarantine_admit: {
-    rpc: 'fn_inv_quarantine_admit',
-    hasReason: { options: QUARANTINE_REASON_OPTIONS, required: true },
-    hasNote: true,
-    successKey: 'asset.quarantineAdmitSuccess',
-  },
-  quarantine_release: {
-    rpc: 'fn_inv_quarantine_release',
-    hasNote: true,
-    successKey: 'asset.quarantineReleaseSuccess',
-  },
-  repair_request: {
-    rpc: 'fn_inv_repair_request',
-    hasNote: true,
-    successKey: 'asset.repairRequestSuccess',
-  },
-  dispose: {
-    rpc: 'fn_inv_dispose',
-    color: 'danger',
-    hasNote: true,
-    successKey: 'asset.disposeSuccess',
-  },
-  dispose_reverse: {
-    rpc: 'fn_inv_dispose_reverse',
-    hasNote: true,
-    successKey: 'asset.disposeReverseSuccess',
-  },
-  write_off: {
-    rpc: 'fn_inv_write_off',
-    color: 'danger',
-    hasReason: { options: WRITE_OFF_REASON_OPTIONS, required: true },
-    hasNote: true,
-    successKey: 'asset.writeOffSuccess',
-  },
-  internal_use: {
-    rpc: 'fn_inv_internal_use_assign',
-    hasNote: true,
-    successKey: 'asset.internalUseSuccess',
-  },
-};
+function AssetActionBar({
+  asset,
+  t,
+  onPick,
+}: {
+  asset: Asset;
+  t: ReturnType<typeof useTranslation>['t'];
+  onPick: (action: BackendAssetAction) => void;
+}) {
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreTriggerRef = useRef<HTMLButtonElement>(null);
+
+  const { data: actionsResp } = useQuery({
+    queryKey: ['asset-actions', asset.asset_id],
+    queryFn: () => apiClient.rpc<AssetActionsResponse>('fn_asset_available_actions', {
+      p_asset_id: asset.asset_id,
+    }),
+    staleTime: 30 * 1000,
+  });
+
+  const allowedActions = (actionsResp?.actions ?? [])
+    .filter(a => FOOTER_ACTION_ALLOWLIST.has(a.action_code))
+    .filter(a => a.blocking_reason !== 'permission_denied')
+    .slice()
+    .sort((a, b) => a.sort_order - b.sort_order);
+
+  const primaryCodes = PRIMARY_BY_BUCKET[asset.current_bucket] ?? [];
+  const primarySet = new Set(primaryCodes);
+  const primaryActions = primaryCodes
+    .map(c => allowedActions.find(a => a.action_code === c))
+    .filter((a): a is BackendAssetAction => !!a);
+  const secondaryActions = allowedActions.filter(a => !primarySet.has(a.action_code));
+
+  const groupedSecondary = secondaryActions.reduce<Record<string, BackendAssetAction[]>>((acc, a) => {
+    const cat = CATEGORY_OVERRIDE[a.action_code] ?? a.category;
+    (acc[cat] ||= []).push(a);
+    return acc;
+  }, {});
+  const sortedCategories = Object.keys(groupedSecondary).sort((a, b) => {
+    const ai = CATEGORY_ORDER.indexOf(a);
+    const bi = CATEGORY_ORDER.indexOf(b);
+    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+  });
+
+  if (allowedActions.length === 0) return null;
+
+  const renderActionButton = (a: BackendAssetAction, primary = false) => {
+    const config = SIMPLE_ACTIONS[a.action_code];
+    const wired = !!config;
+    const label = t(a.action_code, { ns: 'assetActions', defaultValue: a.action_code });
+    const placement = ACTION_PLACEMENT[a.action_code];
+    let endIcon: React.ReactNode = undefined;
+    const lines: string[] = [label];
+    if (placement?.kind === 'elsewhere') {
+      endIcon = <ExternalLink size={12} />;
+      lines.push(`${t('actionElsewhere', { ns: 'assetActions', defaultValue: 'Use' })}: ${placement.where}`);
+    } else if (placement?.kind === 'not_wired' || !wired) {
+      endIcon = <Wrench size={12} />;
+      lines.push(t('notImplemented', { ns: 'assetActions', defaultValue: 'Not yet wired in this page' }));
+    }
+    if (!a.is_available && a.blocking_reason) {
+      lines.push(t(`blockingReason.${a.blocking_reason}`, { ns: 'apiErrors', defaultValue: a.blocking_reason }));
+    }
+    const tooltipContent: React.ReactNode = lines.length === 1
+      ? lines[0]
+      : (
+        <div className="flex flex-col gap-0.5">
+          {lines.map((line, i) => (
+            <div key={i} className={i === 0 ? 'font-medium' : 'text-xs opacity-90'}>{line}</div>
+          ))}
+        </div>
+      );
+    return (
+      <Tooltip key={a.action_code} content={tooltipContent} placement="top">
+        <Button
+          variant={primary ? undefined : 'outline'}
+          size="sm"
+          color={primary && a.is_available && wired ? (config?.color ?? 'primary') : config?.color}
+          disabled={!a.is_available || !wired}
+          endIcon={endIcon}
+          onClick={() => {
+            onPick(a);
+            setMoreOpen(false);
+          }}
+        >
+          {label}
+        </Button>
+      </Tooltip>
+    );
+  };
+
+  return (
+    <div className="flex-none px-4 py-3 border-t border-line flex flex-wrap items-center gap-2">
+      {primaryActions.map(a => renderActionButton(a, true))}
+      {secondaryActions.length > 0 && (
+        <Button
+          ref={moreTriggerRef}
+          variant="outline"
+          size="sm"
+          endIcon={<ChevronDown size={14} />}
+          onClick={() => setMoreOpen(v => !v)}
+        >
+          {t('contract.moreActions', { defaultValue: 'More' })}
+        </Button>
+      )}
+      <PopOver
+        isOpen={moreOpen}
+        onClose={() => setMoreOpen(false)}
+        triggerRef={moreTriggerRef}
+        placement="top"
+        align="end"
+        maxWidth="32rem"
+        maxHeight="60vh"
+      >
+        <div className="flex flex-col gap-3 p-3">
+          {sortedCategories.map(cat => {
+            const actions = groupedSecondary[cat];
+            if (!actions || actions.length === 0) return null;
+            return (
+              <div key={cat} className="flex flex-col gap-1.5">
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-subtle">
+                  {t(`category.${cat}`, { ns: 'assetActions', defaultValue: cat })}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {actions.map(a => renderActionButton(a))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </PopOver>
+    </div>
+  );
+}
 
 // ============================================================================
-// Action modal (generic for all asset actions)
+// Action modal (generic — drives any action whose config is in SIMPLE_ACTIONS)
 // ============================================================================
 
 function AssetActionModal({
@@ -701,7 +929,7 @@ function AssetActionModal({
   onSuccess,
 }: {
   open: boolean;
-  action: ActionType | null;
+  action: BackendAssetAction | null;
   onClose: () => void;
   asset: Asset;
   t: ReturnType<typeof useTranslation>['t'];
@@ -709,27 +937,37 @@ function AssetActionModal({
 }) {
   const [reason, setReason] = useState<string | null>(null);
   const [note, setNote] = useState('');
+  const [extra, setExtra] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (open) { setReason(null); setNote(''); setError(''); }
-  }, [open]);
+  const config = action ? SIMPLE_ACTIONS[action.action_code] : null;
 
-  const config = action ? ACTION_CONFIG[action] : null;
+  useEffect(() => {
+    if (open) {
+      setReason(null);
+      setNote('');
+      setError('');
+      const initial: Record<string, string> = {};
+      config?.extraFields?.forEach(f => {
+        if (f.kind === 'select' && f.default) initial[f.name] = f.default;
+      });
+      setExtra(initial);
+    }
+  }, [open, config]);
 
   const mutation = useMutation({
     mutationFn: () => {
       if (!action || !config) return Promise.reject(new Error('No action'));
-      const params: Record<string, unknown> = {
-        p_asset_id: asset.asset_id,
-        p_dedupe_key: `${action}-${asset.asset_id}-${Date.now()}`,
-      };
-      if (config.hasNote && note.trim()) {
-        params.p_note = note.trim();
+      const params: Record<string, unknown> = { p_asset_id: asset.asset_id };
+      if (config.paramShape !== 'asset_no_dedupe') {
+        params.p_dedupe_key = `${action.action_code}-${asset.asset_id}-${Date.now()}`;
       }
-      if (config.hasReason && reason) {
-        params.p_reason_code = reason;
-      }
+      if (note.trim()) params.p_note = note.trim();
+      if (config.hasReason && reason) params.p_reason_code = reason;
+      config.extraFields?.forEach(f => {
+        const v = extra[f.name];
+        if (v && v.trim()) params[f.name] = v.trim();
+      });
       return apiClient.rpc(config.rpc, params);
     },
     onSuccess: () => onSuccess(config!.successKey),
@@ -745,13 +983,18 @@ function AssetActionModal({
 
   if (!action || !config) return null;
 
-  const canSubmit = !config.hasReason?.required || !!reason;
+  const reasonValid = !config.hasReason?.required || !!reason;
+  const extraValid = (config.extraFields ?? []).every(f =>
+    !f.required || (extra[f.name] && extra[f.name].trim())
+  );
+  const canSubmit = reasonValid && extraValid;
+  const label = t(action.action_code, { ns: 'assetActions', defaultValue: action.action_code });
 
   return (
     <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
       <div className="flex flex-col overflow-hidden">
         <div className="modal-header">
-          <h2 className="modal-title">{t(`asset.action_${action}`)}</h2>
+          <h2 className="modal-title">{label}</h2>
           <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
         </div>
         <div className="modal-content">
@@ -782,17 +1025,37 @@ function AssetActionModal({
                 />
               </div>
             )}
-            {config.hasNote && (
-              <div className="flex flex-col">
-                <label className="form-label">{t('asset.note')}</label>
-                <TextArea
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  placeholder={t('asset.notePlaceholder')}
-                  rows={3}
-                />
+            {config.extraFields?.map(f => (
+              <div key={f.name} className="flex flex-col">
+                <label className="form-label">
+                  {t(f.labelKey, { ns: 'assetActions', defaultValue: f.labelKey })}
+                  {f.required ? ' *' : ''}
+                </label>
+                {f.kind === 'select' ? (
+                  <Select
+                    options={f.options}
+                    value={extra[f.name] ?? null}
+                    onChange={(val) => setExtra(prev => ({ ...prev, [f.name]: (val as string) || '' }))}
+                    showChevron
+                  />
+                ) : (
+                  <Input
+                    value={extra[f.name] ?? ''}
+                    onChange={(e) => setExtra(prev => ({ ...prev, [f.name]: e.target.value }))}
+                    className="w-full"
+                  />
+                )}
               </div>
-            )}
+            ))}
+            <div className="flex flex-col">
+              <label className="form-label">{t('asset.note')}</label>
+              <TextArea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder={t('asset.notePlaceholder')}
+                rows={3}
+              />
+            </div>
           </div>
         </div>
         <div className="modal-footer">
@@ -802,7 +1065,7 @@ function AssetActionModal({
             onClick={() => mutation.mutate()}
             disabled={!canSubmit || mutation.isPending}
           >
-            {mutation.isPending ? t('common.loading') : t(`asset.action_${action}`)}
+            {mutation.isPending ? t('common.loading') : label}
           </Button>
         </div>
       </div>

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, Modal, Input, Select, TextArea, MaskedInput, Badge, Tooltip, PopOver, useSnackbarContext } from 'tsp-form';
-import { CheckCircle, XCircle, Pencil, Plus, Trash2, Loader2, ChevronsRight, ChevronDown } from 'lucide-react';
+import { CheckCircle, XCircle, Pencil, Plus, Trash2, Loader2, ChevronsRight, ChevronDown, ExternalLink, Wrench } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { fmtCurrency } from '../../lib/format';
 import { BranchPinInput } from '../../components/BranchPinInput';
@@ -26,6 +26,7 @@ interface ContractForActions {
   outstanding_amount: number | null;
   late_fee_balance: number | null;
   credit_balance: number | null;
+  credit_balance_company: number | null;
   insurance_balance: number | null;
   is_paused: boolean;
   saving_balance: number | null;
@@ -453,6 +454,34 @@ const FOOTER_ACTION_ALLOWLIST: ReadonlySet<string> = new Set([
   'ATTACH_CUSTOMER', 'DETACH_CUSTOMER',
 ]);
 
+// Per-action placement override.
+//   "elsewhere" → action is implemented somewhere else in the UI; hide from footer by default,
+//                  but reveal under the "Show hidden" dev toggle with a link icon + tooltip.
+//   "not_wired" → no FE handler yet; keep visible (so devs see it) with a wrench icon + tooltip.
+// Anything not listed renders as a normal footer action.
+type ActionPlacement =
+  | { kind: 'elsewhere'; where: string }
+  | { kind: 'not_wired' };
+
+// Override the backend `category` for popover grouping. Backend tags some
+// wallet-flavored actions as FEE (e.g. SAVING_DEDUCT); we want them visually
+// grouped with the rest of the wallet actions.
+const CATEGORY_OVERRIDE: Record<string, string> = {
+  SAVING_DEDUCT: 'WALLET',
+};
+
+const ACTION_PLACEMENT: Record<string, ActionPlacement> = {
+  // Wallet ops live in the Wallets tab
+  SAVING_DEPOSIT:    { kind: 'elsewhere', where: 'Wallets tab → Saving' },
+  SAVING_CASHOUT:    { kind: 'elsewhere', where: 'Wallets tab → Saving' },
+  SAVING_DEDUCT:     { kind: 'elsewhere', where: 'Wallets tab → Saving' },
+  CREDIT_CASHOUT:    { kind: 'elsewhere', where: 'Wallets tab → Credit' },
+  INSURANCE_TOPUP:   { kind: 'elsewhere', where: 'Wallets tab → Insurance' },
+  INSURANCE_DEDUCT:  { kind: 'elsewhere', where: 'Wallets tab → Insurance' },
+  INSURANCE_CASHOUT: { kind: 'elsewhere', where: 'Wallets tab → Insurance' },
+  APPLY_INSURANCE:   { kind: 'elsewhere', where: 'Wallets tab → Insurance' },
+};
+
 // States where the wizard owns the user flow — footer just shows "Continue draft"
 const WIZARD_STATES: ReadonlySet<string> = new Set(['DRAFT', 'SAVING', 'PENDING_APPROVAL']);
 
@@ -593,7 +622,8 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   const secondaryActions = allowedActions.filter(a => !primarySet.has(a.action_code));
 
   const groupedSecondary = secondaryActions.reduce<Record<string, BackendContractAction[]>>((acc, a) => {
-    (acc[a.category] ||= []).push(a);
+    const cat = CATEGORY_OVERRIDE[a.action_code] ?? a.category;
+    (acc[cat] ||= []).push(a);
     return acc;
   }, {});
   const sortedCategories = Object.keys(groupedSecondary).sort((a, b) => {
@@ -606,14 +636,31 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
     const feAction = BACKEND_TO_FE_ACTION[a.action_code];
     const config = feAction ? ACTION_CONFIGS[feAction] : null;
     const label = t(a.action_code, { ns: 'contractActions', defaultValue: a.action_code });
-    const tooltipContent = !a.is_available && a.blocking_reason
-      ? t(`blockingReason.${a.blocking_reason}`, {
-          ns: 'apiErrors',
-          defaultValue: a.blocking_reason,
-        })
-      : !feAction
-        ? t('contract.actionNotImplemented', { defaultValue: 'ยังไม่ได้เชื่อมในหน้านี้' })
-        : label;
+    const placement = ACTION_PLACEMENT[a.action_code];
+    let endIcon: React.ReactNode = undefined;
+    const lines: string[] = [label];
+    if (placement?.kind === 'elsewhere') {
+      endIcon = <ExternalLink size={12} />;
+      lines.push(`${t('contract.actionElsewhere', { defaultValue: 'Use' })}: ${placement.where}`);
+    } else if (placement?.kind === 'not_wired' || !feAction) {
+      endIcon = <Wrench size={12} />;
+      lines.push(t('contract.actionNotImplemented', { defaultValue: 'Not yet wired in this page' }));
+    }
+    if (!a.is_available && a.blocking_reason) {
+      lines.push(t(`blockingReason.${a.blocking_reason}`, {
+        ns: 'apiErrors',
+        defaultValue: a.blocking_reason,
+      }));
+    }
+    const tooltipContent: React.ReactNode = lines.length === 1
+      ? lines[0]
+      : (
+        <div className="flex flex-col gap-0.5">
+          {lines.map((line, i) => (
+            <div key={i} className={i === 0 ? 'font-medium' : 'text-xs opacity-90'}>{line}</div>
+          ))}
+        </div>
+      );
     return (
       <Tooltip key={a.action_code} content={tooltipContent} placement="top">
         <Button
@@ -621,6 +668,7 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
           size="sm"
           color={primary && a.is_available && feAction ? (config?.color ?? 'primary') : config?.color}
           disabled={!a.is_available || !feAction}
+          endIcon={endIcon}
           onClick={() => {
             handleBackendAction(a);
             setMoreOpen(false);
@@ -678,7 +726,7 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
                 endIcon={<ChevronDown size={14} />}
                 onClick={() => setMoreOpen(v => !v)}
               >
-                {t('contract.moreActions', { defaultValue: 'More actions' })}
+                {t('contract.moreActions', { defaultValue: 'More' })}
               </Button>
             )}
           </div>
