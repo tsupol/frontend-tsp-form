@@ -54,6 +54,7 @@ interface QuoteResponse {
   model_id: number;
   model_name: string;
   quotes: QuoteRow[];
+  unconfigured_finance_models?: string[];
 }
 
 /** Deduplicated — same finance_model + term + down% have identical prices across colors */
@@ -364,13 +365,9 @@ export function PanelProductPlan({ onClose }: Props) {
   }, [mode, quoteData, usedFin1Data, usedFin2Data]);
 
   const fin1Rows = useMemo(() => dedupedQuotes.filter(r => r.finance_model === 'FIN1'), [dedupedQuotes]);
-  // Drop FIN2 rows with no rates configured — backend returns null term_months/installment_amount
-  // when the model has no active FIN2 PROFIT_AMOUNT rows. Without this filter the UI shows a ghost
-  // row with empty term and "0" monthly.
-  const fin2Rows = useMemo(
-    () => dedupedQuotes.filter(r => r.finance_model === 'FIN2' && r.term_months != null && r.installment_amount != null),
-    [dedupedQuotes],
-  );
+  const fin2Rows = useMemo(() => dedupedQuotes.filter(r => r.finance_model === 'FIN2'), [dedupedQuotes]);
+  const unconfiguredFinanceModels = quoteData?.unconfigured_finance_models ?? [];
+  const fin2Unconfigured = mode === 'new' && unconfiguredFinanceModels.includes('FIN2');
   const fin1Terms = useMemo(() => [...new Set(fin1Rows.map(r => r.term_months))].sort((a, b) => a - b), [fin1Rows]);
   const fin2Terms = useMemo(() => [...new Set(fin2Rows.map(r => r.term_months))].sort((a, b) => a - b), [fin2Rows]);
   const retailPrice = (mode === 'used' ? usedFin1Data?.resolved_retail : dedupedQuotes[0]?.retail_price) ?? dedupedQuotes[0]?.retail_price;
@@ -847,6 +844,16 @@ export function PanelProductPlan({ onClose }: Props) {
                   base_term_months: r.baseTerm,
                 });
               }} />
+            </div>
+          )}
+
+          {fin2Unconfigured && fin2Rows.length === 0 && (
+            <div className="alert alert-warning">
+              <AlertTriangle size={16} />
+              <div>
+                <div className="alert-title">{t('priceCheck.fin2NotConfigured')}</div>
+                <div className="alert-description">{t('priceCheck.fin2NotConfiguredDesc')}</div>
+              </div>
             </div>
           )}
         </div>

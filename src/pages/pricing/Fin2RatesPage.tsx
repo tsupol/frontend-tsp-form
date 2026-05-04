@@ -680,30 +680,74 @@ export function Fin2RatesPage() {
     { value: 'all', label: t('fin2.allRates') },
   ];
 
-  // Build models endpoint
+  // Build browse-mode endpoint (no search term — keeps user-selectable sort).
   const buildModelsEndpoint = useCallback(() => {
     const params: string[] = [];
     if (holdingId) params.push(`holding_id=eq.${holdingId}`);
     params.push('is_active=is.true');
-    if (search.trim()) {
-      params.push(`or=(code.ilike.*${encodeURIComponent(search.trim())}*,name.ilike.*${encodeURIComponent(search.trim())}*)`);
-    }
     if (filterBrand) params.push(`brand_id=eq.${filterBrand}`);
     if (filterFamily) params.push(`family_id=eq.${filterFamily}`);
     if (filterBaseModel) params.push(`base_model_name=eq.${encodeURIComponent(filterBaseModel)}`);
     params.push(`order=${sortBy}`);
     return `/v_ref_product_models?${params.join('&')}`;
-  }, [holdingId, search, filterBrand, filterFamily, filterBaseModel, sortBy]);
+  }, [holdingId, filterBrand, filterFamily, filterBaseModel, sortBy]);
 
-  // Query 1: Paginate models
-  const { data: modelsData, isError, error, isFetching } = useQuery({
-    queryKey: ['fin2-models', pageIndex, pageSize, holdingId, search, filterBrand, filterFamily, filterBaseModel, sortBy],
+  const hasSearch = search.trim().length > 0;
+
+  // Query 1a: Browse mode — no search term. Use the view directly so sort options work.
+  const { data: browseData, isError: browseIsError, error: browseError, isFetching: browseFetching } = useQuery({
+    queryKey: ['fin2-models', 'browse', pageIndex, pageSize, holdingId, filterBrand, filterFamily, filterBaseModel, sortBy],
     queryFn: () => apiClient.getPaginated<ModelRow>(buildModelsEndpoint(), { page: pageIndex + 1, pageSize }),
     placeholderData: keepPreviousData,
+    enabled: !hasSearch,
   });
 
-  const models = modelsData?.data ?? [];
-  const totalCount = modelsData?.totalCount ?? 0;
+  // Query 1b: Search mode — fuzzy + filters via fn_product_search. Sort is relevance-based.
+  interface ProductSearchRow {
+    model_id: number;
+    model_code: string;
+    model_name: string;
+    base_model_name: string;
+    brand_name: string;
+    family_name: string;
+    is_active: boolean;
+  }
+  interface ProductSearchResponse {
+    rows: ProductSearchRow[];
+    total: number;
+    has_more: boolean;
+  }
+  const { data: searchData, isError: searchIsError, error: searchError, isFetching: searchFetching } = useQuery({
+    queryKey: ['fin2-models', 'search', pageIndex, pageSize, holdingId, search, filterBrand, filterFamily, filterBaseModel],
+    queryFn: () => apiClient.rpc<ProductSearchResponse>('fn_product_search', {
+      p_q: search.trim(),
+      p_brand_id: filterBrand ? Number(filterBrand) : null,
+      p_family_id: filterFamily ? Number(filterFamily) : null,
+      p_base_model_name: filterBaseModel || null,
+      p_is_active: true,
+      p_limit: pageSize,
+      p_offset: pageIndex * pageSize,
+      p_with_pricing: false,
+    }),
+    placeholderData: keepPreviousData,
+    enabled: hasSearch,
+  });
+
+  const models: ModelRow[] = hasSearch
+    ? (searchData?.rows ?? []).map(r => ({
+        id: r.model_id,
+        code: r.model_code,
+        name: r.model_name,
+        base_model_name: r.base_model_name,
+        brand_name: r.brand_name,
+        family_name: r.family_name,
+        is_active: r.is_active,
+      }))
+    : (browseData?.data ?? []);
+  const totalCount = hasSearch ? (searchData?.total ?? 0) : (browseData?.totalCount ?? 0);
+  const isFetching = hasSearch ? searchFetching : browseFetching;
+  const isError = hasSearch ? searchIsError : browseIsError;
+  const error = hasSearch ? searchError : browseError;
 
   // Query 2: Fetch FIN2 rates for current page's models
   const modelIds = useMemo(() => models.map(m => m.id), [models]);

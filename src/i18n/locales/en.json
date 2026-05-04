@@ -1909,6 +1909,8 @@
     "months": "mo",
     "fin1Desc": "Fixed Rate",
     "fin2Desc": "Negotiable",
+    "fin2NotConfigured": "FIN2 rates not configured",
+    "fin2NotConfiguredDesc": "This model has no active FIN2 profit rates yet. Use FIN1 above, or ask an admin to set up FIN2 rates in Pricing.",
     "thb": "THB",
     "fin2Calc": "Custom Calculator",
     "fin2UsingRate": "Using profit rate from",
