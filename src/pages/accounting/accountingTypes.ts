@@ -87,9 +87,6 @@ export interface BranchTodaySummaryRow {
   remit_company: number;
   remit_holding: number;
   remit_total: number;
-  net_cash: number;
-  net_transfer: number;
-  net_total: number;
   total_saving: number;
   total_amount: number;
   total_paid: number;
@@ -176,6 +173,109 @@ export interface UnclosedDayRow {
   days_overdue: number;
 }
 
+// v_bills row — used by BillsPage and the day-close reconciliation panel
+export interface BillRow {
+  id: number;
+  code: string;
+  code_display: string;
+  bill_type: string;
+  bill_type_label_short: string;
+  bill_purpose: string;
+  bill_purpose_label: string;
+  bill_category: string;
+  ref_bill_id: number | null;
+  ref_bill_code_display: string | null;
+  is_reversal: boolean;
+  primary_description: string | null;
+  holding_id: number;
+  company_id: number;
+  branch_id: number;
+  branch_name: string | null;
+  customer_id: number | null;
+  customer_name: string | null;
+  contract_id: number | null;
+  contract_code: string | null;
+  total_amount: number;
+  paid_amount: number;
+  cash_amount: number;
+  transfer_amount: number;
+  saving_amount: number;
+  status: string;
+  bill_date: string;
+  created_by: number;
+  created_at: string;
+  is_cancelled: boolean;
+}
+
+// v_bill_detail row — line items + payments for one bill
+export interface BillLineItem {
+  line_id: number;
+  line_type: string;
+  charge_type: string;
+  description: string;
+  amount: number;
+  quantity: number;
+  owner_type: string;
+  variant_id: number | null;
+  ref_code: string | null;
+  ref_type: string | null;
+  ref_id: number | null;
+}
+
+export interface BillPayment {
+  id: number;
+  method: string;
+  amount: number;
+  bank_name: string | null;
+  account_number: string | null;
+  code_display: string;
+  created_at: string;
+  created_by: number;
+  created_by_name: string | null;
+  is_reversal: boolean;
+  reference: string | null;
+}
+
+export interface BillCancelInfo {
+  cancelled_at: string;
+  credit_note_id: number;
+  credit_note_code: string;
+  credit_note_amount: number;
+}
+
+export interface BillDetail {
+  bill_id: number;
+  bill_code_display: string;
+  bill_type: string;
+  bill_purpose: string;
+  branch_id: number;
+  status: string;
+  is_voided: boolean;
+  ref_bill_id: number | null;
+  ref_bill_code: string | null;
+  total_amount: number;
+  paid_amount: number;
+  remaining: number;
+  customer_name: string | null;
+  contract_code: string | null;
+  contract_id: number | null;
+  line_items: BillLineItem[];
+  payments: BillPayment[] | null;
+  cancel_info: BillCancelInfo | null;
+}
+
+
+// Net cash/transfer/total — derived (backend dropped raw net_* fields 2026-04-27).
+// refund_* values are already negative (CREDIT_NOTE).
+export function netCash(s: BranchTodaySummaryRow): number {
+  return (s.received_cash ?? 0) + (s.refund_cash ?? 0);
+}
+export function netTransfer(s: BranchTodaySummaryRow): number {
+  return (s.received_transfer ?? 0) + (s.refund_transfer ?? 0);
+}
+export function netTotal(s: BranchTodaySummaryRow): number {
+  return (s.received_total ?? 0) + (s.refund_total ?? 0);
+}
 
 export function todayISO(): string {
   // Bangkok (UTC+7) calendar date, as YYYY-MM-DD

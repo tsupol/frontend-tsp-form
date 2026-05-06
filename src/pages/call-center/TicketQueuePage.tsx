@@ -837,57 +837,47 @@ export function TicketQueuePage() {
             </div>
           )}
 
-          <div key="panels" className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
-            {/* ── Left Panel: Ticket Queue ── */}
-            <PageNavPanel id="list" className="w-1/2 xl:w-5/12 border-r border-line flex flex-col" mobileClassName="flex flex-col overflow-hidden">
-              <div className="flex-none @container px-4 py-2 border-b border-line">
-                <div className="flex flex-wrap gap-2 w-full">
-                  <div className="flex-[2] min-w-0 basis-24">
-                    <Input
-                      className="w-full"
-                      placeholder={t('common.search')}
-                      value={searchInput}
-                      onChange={(e) => handleSearch(e.target.value)}
-                      size="sm"
-                    />
-                  </div>
-                  <div className="flex-[2] min-w-0 basis-24">
-                    <Select
-                      options={queueFlagOptions}
-                      value={filterQueueFlag || null}
-                      onChange={(val) => {
-                        setFilterQueueFlag((val as string) ?? '');
-                        setPageIndex(0);
-                      }}
-                      placeholder={t('callCenter.allStatuses')}
-                      size="sm"
-                      showChevron
-                      clearable
-                    />
-                  </div>
-                  {/* Expand button: hidden when container is wide */}
-                  <Button
-                    variant="ghost"
+          {/* ── Filter bar (spans full page width on desktop, like /admin/legal/dunning) ── */}
+          {(isRoot || !isMobile) && (
+            <div className="flex-none px-4 py-2 border-b border-line">
+              <div className="flex flex-wrap items-center gap-2 w-full">
+                <div className="flex-[2] min-w-0 basis-24">
+                  <Input
+                    className="w-full"
+                    placeholder={t('common.search')}
+                    value={searchInput}
+                    onChange={(e) => handleSearch(e.target.value)}
                     size="sm"
-                    className={`btn-icon-sm shrink-0 @[28rem]:hidden ${filtersExpanded ? 'text-primary' : ''}`}
-                    startIcon={<SlidersHorizontal size={14} />}
-                    onClick={() => setFiltersExpanded(!filtersExpanded)}
                   />
-                  {/* Sort: always visible when wide, expandable when narrow */}
-                  <div className={`min-w-0 basis-24 flex-[2] ${filtersExpanded ? '' : 'hidden'} @[28rem]:block`}>
-                    <Select
-                      options={sortOptions}
-                      value={sortBy}
-                      onChange={(val) => {
-                        setSortBy((val as string) ?? 'severity.desc');
-                        setPageIndex(0);
-                      }}
-                      size="sm"
-                      showChevron
-                    />
-                  </div>
                 </div>
-                <div className="flex items-center mt-2">
+                <div className="flex-[2] min-w-0 basis-24">
+                  <Select
+                    options={queueFlagOptions}
+                    value={filterQueueFlag || null}
+                    onChange={(val) => {
+                      setFilterQueueFlag((val as string) ?? '');
+                      setPageIndex(0);
+                    }}
+                    placeholder={t('callCenter.allStatuses')}
+                    size="sm"
+                    showChevron
+                    clearable
+                  />
+                </div>
+                {/* Sort: always visible when viewport is wide, expandable when narrow */}
+                <div className={`min-w-0 basis-24 flex-[2] ${filtersExpanded ? '' : 'hidden'} md:block`}>
+                  <Select
+                    options={sortOptions}
+                    value={sortBy}
+                    onChange={(val) => {
+                      setSortBy((val as string) ?? 'severity.desc');
+                      setPageIndex(0);
+                    }}
+                    size="sm"
+                    showChevron
+                  />
+                </div>
+                <div className="hidden md:flex items-center shrink-0">
                   <LabeledCheckbox
                     label={t('callCenter.mineOnly')}
                     checked={filterMineOnly}
@@ -897,8 +887,32 @@ export function TicketQueuePage() {
                     }}
                   />
                 </div>
+                {/* Expand button: hidden when viewport is wide */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={`btn-icon-sm shrink-0 md:hidden ${filtersExpanded ? 'text-primary' : ''}`}
+                  startIcon={<SlidersHorizontal size={14} />}
+                  onClick={() => setFiltersExpanded(!filtersExpanded)}
+                />
               </div>
+              {/* Mine-only on narrow viewports — appears below the row when expanded */}
+              <div className={`md:hidden ${filtersExpanded ? 'flex' : 'hidden'} items-center mt-2`}>
+                <LabeledCheckbox
+                  label={t('callCenter.mineOnly')}
+                  checked={filterMineOnly}
+                  onChange={(e) => {
+                    setFilterMineOnly(e.target.checked);
+                    setPageIndex(0);
+                  }}
+                />
+              </div>
+            </div>
+          )}
 
+          <div key="panels" className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
+            {/* ── Left Panel: Ticket Queue ── */}
+            <PageNavPanel id="list" className="w-1/2 xl:w-5/12 border-r border-line flex flex-col" mobileClassName="flex flex-col overflow-hidden">
               {isError && (
                 <div className="flex-none p-4">
                   <div className="alert alert-danger">

@@ -13,6 +13,7 @@ import { fmtCurrency } from '../../lib/format';
 import { getStateColor, getStateLabel } from './contractUtils';
 import { ContractActionButtons } from './ContractActions';
 import { WalletsTab } from './wallet/WalletsTab';
+import { DeviceTab } from './DeviceTab';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { CustomerPickerModal } from './CustomerPickerModal';
 import { BranchPinInput } from '../../components/BranchPinInput';
@@ -37,6 +38,9 @@ interface ContractDetail {
   draft_note: string | null;
   device_id: number | null;
   device_identifier: string | null;
+  device_current_bucket: string | null;
+  device_condition_grade: string | null;
+  loaner_device_id: number | null;
   is_used_asset: boolean;
   is_paused: boolean;
   paused_at: string | null;
@@ -187,9 +191,9 @@ interface EntityMedia {
 
 // ── Tabs ─────────────────────────────────────────────────────────────────────
 
-type DetailTab = 'overview' | 'installments' | 'txns' | 'customers' | 'notes' | 'payments' | 'wallets';
+type DetailTab = 'overview' | 'installments' | 'txns' | 'customers' | 'notes' | 'payments' | 'wallets' | 'device';
 
-const TABS: DetailTab[] = ['overview', 'installments', 'txns', 'payments', 'wallets', 'notes', 'customers'];
+const TABS: DetailTab[] = ['overview', 'installments', 'txns', 'payments', 'wallets', 'device', 'notes', 'customers'];
 
 // ── Scrollable Tabs ─────────────────────────────────────────────────────────
 
@@ -270,7 +274,18 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<DetailTab>('overview');
   const [copied, setCopied] = useState(false);
-  const [requestedAction, setRequestedAction] = useState<'bind_device' | 'detach_customer' | null>(null);
+  const [requestedAction, setRequestedAction] = useState<
+    | 'bind_device'
+    | 'unbind_device'
+    | 'deposit_device'
+    | 'return_deposit'
+    | 'bind_loaner'
+    | 'unbind_loaner'
+    | 'device_repair_request'
+    | 'detach_customer'
+    | null
+  >(null);
+  const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
   const notesDirtyRef = useRef(false);
   const [pendingTab, setPendingTab] = useState<DetailTab | null>(null);
   const navGuard = useNavGuard();
@@ -361,7 +376,16 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
 
       {/* Tab content */}
       <div className="flex-1 overflow-auto better-scroll">
-        {activeTab === 'overview' && <OverviewTab contract={contract} t={t} queryClient={queryClient} onRequestBindDevice={() => setRequestedAction('bind_device')} />}
+        {activeTab === 'overview' && (
+          <OverviewTab
+            contract={contract}
+            t={t}
+            queryClient={queryClient}
+            onRequestBindDevice={() => setRequestedAction('bind_device')}
+            deliveryModalOpen={deliveryModalOpen}
+            setDeliveryModalOpen={setDeliveryModalOpen}
+          />
+        )}
         {activeTab === 'installments' && <InstallmentsTab contractId={contractId} t={t} />}
         {activeTab === 'txns' && <TxnsTab contractId={contractId} t={t} />}
         {activeTab === 'customers' && (
@@ -376,6 +400,9 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
         {activeTab === 'notes' && <NotesTab contractId={contractId} t={t} dirtyRef={notesDirtyRef} />}
         {activeTab === 'payments' && <PaymentsTab contractId={contractId} t={t} />}
         {activeTab === 'wallets' && <WalletsTab contract={contract} />}
+        {activeTab === 'device' && (
+          <DeviceTab contract={contract} onRequestAction={setRequestedAction} />
+        )}
       </div>
 
       {/* Contract actions */}
@@ -383,6 +410,7 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
         contract={contract}
         requestedAction={requestedAction}
         onRequestedActionConsumed={() => setRequestedAction(null)}
+        onRequestUpdateDelivery={() => setDeliveryModalOpen(true)}
         onRefresh={() => {
           queryClient.invalidateQueries({ queryKey: ['contract-detail', contractId] });
           queryClient.invalidateQueries({ queryKey: ['contract-search'] });
@@ -446,7 +474,14 @@ function MediaRow({ label, media }: { label: string; media: EntityMedia[] }) {
 
 // ── Overview Tab ─────────────────────────────────────────────────────────────
 
-function OverviewTab({ contract, t, queryClient, onRequestBindDevice }: { contract: ContractDetail; t: ReturnType<typeof useTranslation>['t']; queryClient: ReturnType<typeof useQueryClient>; onRequestBindDevice: () => void }) {
+function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryModalOpen, setDeliveryModalOpen }: {
+  contract: ContractDetail;
+  t: ReturnType<typeof useTranslation>['t'];
+  queryClient: ReturnType<typeof useQueryClient>;
+  onRequestBindDevice: () => void;
+  deliveryModalOpen: boolean;
+  setDeliveryModalOpen: (open: boolean) => void;
+}) {
   const isFin2 = contract.commercial_model === 'FIN2';
   const isActive = contract.state === 'ACTIVE' || contract.state === 'COMPLETED' || contract.state === 'TERMINATED';
   const needsDeviceBind =
@@ -454,7 +489,6 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice }: { contra
     contract.device_id == null &&
     !contract.is_used_asset;
   const [copiedField, setCopiedField] = useState<string | null>(null);
-  const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
 
   const copyValue = (field: string, value: string) => {
     navigator.clipboard.writeText(value).then(() => {

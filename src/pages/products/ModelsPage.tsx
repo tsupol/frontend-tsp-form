@@ -1,8 +1,8 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { DataTable, Badge, Input, Select, Button, Modal, Switch, MobileHeader, PopOver, useSnackbarContext, FormErrorMessage } from 'tsp-form';
-import { ChevronRight, ChevronDown, Plus, XCircle, CheckCircle, Info, SlidersHorizontal, ArrowRightFromLine } from 'lucide-react';
+import { PageNav, PageNavPanel, DataTable, Badge, Input, Select, Button, Modal, Switch, MobileHeader, PopOver, useSnackbarContext, FormErrorMessage } from 'tsp-form';
+import { Plus, XCircle, CheckCircle, Info, SlidersHorizontal, ArrowRightFromLine, ArrowLeft } from 'lucide-react';
 import { useForm, Controller } from 'react-hook-form';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -40,6 +40,32 @@ interface Model {
   category_name: string;
   variant_count: number;
   variants: ModelVariant[];
+}
+
+/** Row shape returned by fn_product_search RPC. */
+interface ProductSearchRow {
+  model_id: number;
+  model_code: string;
+  model_name: string;
+  base_model_name: string;
+  model_name_suffix?: string;
+  model_attributes?: Record<string, unknown> | null;
+  brand_code: string;
+  brand_name: string;
+  family_code: string;
+  family_name: string;
+  category_name?: string;
+  is_active: boolean;
+  is_contractable?: boolean;
+  is_sellable?: boolean;
+  is_giftable?: boolean;
+  variants?: ModelVariant[];
+}
+
+interface ProductSearchResponse {
+  total: number;
+  rows: ProductSearchRow[];
+  has_more?: boolean;
 }
 
 interface BrandLookup {
@@ -89,9 +115,49 @@ interface FamilyAttributeConfig {
   axes: Axis[];
 }
 
+/** Variant config shape mirrors model config but axes use use_in_sku_* fields. */
+interface VariantAxis extends Omit<Axis, 'use_in_model_name' | 'use_in_model_code'> {
+  use_in_sku_name: boolean;
+  use_in_sku_code: boolean;
+}
+
+interface FamilyVariantConfig {
+  family_id: number;
+  holding_id: number;
+  company_id: number | null;
+  brand_code: string;
+  brand_name: string;
+  family_code: string;
+  family_name: string;
+  axes: VariantAxis[];
+}
+
+interface VariantInput {
+  /** Stable client-side id for React keys + remove. */
+  client_id: string;
+  option_set: Record<string, string>;
+  manufacturer_color?: string;
+  master_color_code?: string;
+  color_group?: 'STD' | 'SPC';
+}
+
+interface PreviewVariant {
+  sort_order: number;
+  option_set: Record<string, string>;
+  generated_variant_name: string;
+  generated_sku_code: string;
+  color_group?: string;
+  manufacturer_color?: string;
+  master_color_code?: string;
+  attributes?: Record<string, unknown>;
+}
+
 interface PreviewData {
   generated_model_code: string;
   generated_model_name: string;
+  generated_item_base_name?: string;
+  variants?: PreviewVariant[];
+  warnings?: string[];
 }
 
 interface CreateModelForm {
@@ -120,6 +186,9 @@ function CreateModelModal({ open, onClose, holdingId, families }: {
   const [errorKey, setErrorKey] = useState(0);
   const [preview, setPreview] = useState<PreviewData | null>(null);
 
+  // Variants — managed outside react-hook-form (list state is simpler as plain useState)
+  const [variants, setVariants] = useState<VariantInput[]>([]);
+
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
   const { register, handleSubmit, reset, watch, setValue, control, formState: { errors, isDirty } } = useForm<CreateModelForm>({
     defaultValues: { family_id: '', model_name: '', is_contractable: false, is_sellable: true, is_giftable: false },
@@ -127,7 +196,7 @@ function CreateModelModal({ open, onClose, holdingId, families }: {
 
   const selectedFamilyId = watch('family_id');
 
-  // Fetch attribute config when family is selected
+  // Fetch model attribute config when family is selected
   const { data: familyConfig, isFetching: configLoading } = useQuery({
     queryKey: ['family-attr-config', selectedFamilyId],
     queryFn: () => apiClient.get<FamilyAttributeConfig[]>(
@@ -138,9 +207,24 @@ function CreateModelModal({ open, onClose, holdingId, families }: {
     select: (data) => data[0] ?? null,
   });
 
-  // Set defaults when config loads
+  // Fetch variant attribute config (separate view, may have axes like COLOR)
+  const { data: variantConfig } = useQuery({
+    queryKey: ['family-variant-attr-config', selectedFamilyId],
+    queryFn: () => apiClient.get<FamilyVariantConfig[]>(
+      `/v_family_variant_attribute_config?family_id=eq.${selectedFamilyId}&holding_id=eq.${holdingId}`
+    ),
+    enabled: !!selectedFamilyId && !!holdingId,
+    staleTime: 5 * 60 * 1000,
+    select: (data) => data[0] ?? null,
+  });
+
+  const variantAxes = variantConfig?.axes ?? [];
+
+  // Set defaults when config loads (and reset variants on family change)
   const lastConfigRef = useRef<number | null>(null);
-  if (familyConfig && familyConfig.family_id !== lastConfigRef.current) {
+  useEffect(() => {
+    if (!familyConfig) return;
+    if (familyConfig.family_id === lastConfigRef.current) return;
     lastConfigRef.current = familyConfig.family_id;
     if (familyConfig.default_model_name) {
       setValue('model_name', familyConfig.default_model_name);
@@ -151,10 +235,88 @@ function CreateModelModal({ open, onClose, holdingId, families }: {
         setValue(`axis_${axis.attribute_code}` as keyof CreateModelForm, defaultOpt.option_code);
       }
     }
-  }
+    setVariants([]);
+  }, [familyConfig, setValue]);
 
   const axes = familyConfig?.axes ?? [];
   const familyOptions = families.map(f => ({ value: String(f.id), label: f.display_name }));
+
+  // ── Variant helpers ────────────────────────────────────────────────────────
+
+  /** Stable key for a variant's option set, used for dedup. */
+  const optionSetKey = (os: Record<string, string>) =>
+    Object.keys(os).sort().map(k => `${k}=${os[k]}`).join('|');
+
+  /** Toggle a single option for a single axis — adds or removes the matching variant row. */
+  const toggleVariantOption = (axisCode: string, optionCode: string) => {
+    setPreview(null);
+    setVariants(prev => {
+      // For single-axis families (the common case), each toggled option = one variant row.
+      // For multi-axis families, the user needs to add a row first then refine — see below.
+      if (variantAxes.length === 1) {
+        const exists = prev.find(v => v.option_set[axisCode] === optionCode);
+        if (exists) {
+          return prev.filter(v => v !== exists);
+        }
+        return [
+          ...prev,
+          {
+            client_id: `v_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            option_set: { [axisCode]: optionCode },
+          },
+        ];
+      }
+      return prev;
+    });
+  };
+
+  /** True when this option is currently part of any variant row's option_set. */
+  const isOptionSelected = (axisCode: string, optionCode: string) =>
+    variants.some(v => v.option_set[axisCode] === optionCode);
+
+  /** Add a blank row for multi-axis families — user fills in each axis manually. */
+  const addBlankVariant = () => {
+    setPreview(null);
+    setVariants(prev => [
+      ...prev,
+      {
+        client_id: `v_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        option_set: {},
+      },
+    ]);
+  };
+
+  const removeVariant = (clientId: string) => {
+    setPreview(null);
+    setVariants(prev => prev.filter(v => v.client_id !== clientId));
+  };
+
+  const updateVariantAxis = (clientId: string, axisCode: string, optionCode: string) => {
+    setPreview(null);
+    setVariants(prev => prev.map(v =>
+      v.client_id === clientId
+        ? { ...v, option_set: { ...v.option_set, [axisCode]: optionCode } }
+        : v
+    ));
+  };
+
+  /** Detect duplicates by option_set hash — shown as a warning, not a hard block. */
+  const duplicateClientIds = (() => {
+    const seen = new Map<string, string>();
+    const dups = new Set<string>();
+    for (const v of variants) {
+      const key = optionSetKey(v.option_set);
+      if (!key) continue;
+      const existing = seen.get(key);
+      if (existing) {
+        dups.add(existing);
+        dups.add(v.client_id);
+      } else {
+        seen.set(key, v.client_id);
+      }
+    }
+    return dups;
+  })();
 
   const buildPayload = (data: CreateModelForm) => {
     const optionSet: Record<string, string> = {};
@@ -162,6 +324,14 @@ function CreateModelModal({ open, onClose, holdingId, families }: {
       const val = data[`axis_${axis.attribute_code}` as keyof CreateModelForm] as string;
       if (val) optionSet[axis.attribute_code] = val;
     }
+    const variantPayload = variants.map((v, idx) => ({
+      option_set: v.option_set,
+      sort_order: (idx + 1) * 10,
+      ...(v.color_group ? { color_group: v.color_group } : {}),
+      ...(v.manufacturer_color ? { manufacturer_color: v.manufacturer_color } : {}),
+      ...(v.master_color_code ? { master_color_code: v.master_color_code } : {}),
+      attributes: {},
+    }));
     return {
       p_holding_id: holdingId,
       p_company_id: null,
@@ -171,7 +341,7 @@ function CreateModelModal({ open, onClose, holdingId, families }: {
       p_is_contractable: data.is_contractable,
       p_is_sellable: data.is_sellable,
       p_is_giftable: data.is_giftable,
-      p_variants: [],
+      p_variants: variantPayload,
     };
   };
 
@@ -216,7 +386,7 @@ function CreateModelModal({ open, onClose, holdingId, families }: {
         duration: 3000,
       });
       queryClient.invalidateQueries({ queryKey: ['models'] });
-      handleClose();
+      forceClose();
     } catch (err) {
       if (err instanceof ApiError) {
         const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
@@ -233,7 +403,7 @@ function CreateModelModal({ open, onClose, holdingId, families }: {
   };
 
   const handleClose = () => {
-    if (isDirty) {
+    if (isDirty || variants.length > 0) {
       setConfirmCloseOpen(true);
       return;
     }
@@ -244,6 +414,7 @@ function CreateModelModal({ open, onClose, holdingId, families }: {
     reset();
     setErrorMessage('');
     setPreview(null);
+    setVariants([]);
     lastConfigRef.current = null;
     setConfirmCloseOpen(false);
     onClose();
@@ -268,9 +439,31 @@ function CreateModelModal({ open, onClose, holdingId, families }: {
           {preview && (
             <div className="alert alert-info mb-4">
               <Info size={18} />
-              <div>
-                <div className="alert-title">{t('models.previewCode')}: {preview.generated_model_code}</div>
+              <div className="min-w-0 flex-1">
+                <div className="alert-title">{t('models.previewCode')}: <span className="font-mono">{preview.generated_model_code}</span></div>
                 <div className="alert-description">{t('models.previewName')}: {preview.generated_model_name}</div>
+                {preview.variants && preview.variants.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-info/20">
+                    <div className="text-xs font-semibold uppercase tracking-wider mb-1.5 opacity-80">
+                      {t('models.variants')} ({preview.variants.length})
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      {preview.variants.map((v) => (
+                        <div key={v.generated_sku_code} className="text-xs flex items-baseline gap-2">
+                          <span className="font-mono shrink-0">{v.generated_sku_code}</span>
+                          <span className="text-control-label truncate">{v.generated_variant_name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {preview.warnings && preview.warnings.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-info/20 flex flex-col gap-1">
+                    {preview.warnings.map((w, i) => (
+                      <div key={i} className="text-xs text-warning">⚠ {w}</div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -360,23 +553,116 @@ function CreateModelModal({ open, onClose, holdingId, families }: {
                   );
                 })}
 
-                {/* Flags */}
-                <div className="flex items-center justify-between">
-                  <label className="form-label mb-0">{t('models.isSellable')}</label>
+                {/* Variant axes — render as regular labeled fields, in line with model axes */}
+                {variantAxes.length === 1 && variantAxes[0] && (() => {
+                  const axis = variantAxes[0];
+                  const sortedOptions = [...axis.options].sort((a, b) => a.sort_order - b.sort_order);
+                  return (
+                    <div className="flex flex-col">
+                      <label className="form-label">
+                        {axis.attribute_name}
+                        {axis.unit ? ` (${axis.unit})` : ''}
+                      </label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {sortedOptions.map(opt => {
+                          const selected = isOptionSelected(axis.attribute_code, opt.option_code);
+                          return (
+                            <button
+                              key={opt.option_id}
+                              type="button"
+                              onClick={() => toggleVariantOption(axis.attribute_code, opt.option_code)}
+                              className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
+                                selected
+                                  ? 'bg-primary text-on-primary border-primary'
+                                  : 'border-line text-fg/70 hover:bg-surface-hover'
+                              }`}
+                            >
+                              {opt.option_label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {variantAxes.length > 1 && (
+                  <div className="flex flex-col">
+                    <label className="form-label">{t('models.variants')}</label>
+                    <div className="flex flex-col gap-2">
+                      {variants.map((v) => {
+                        const isDup = duplicateClientIds.has(v.client_id);
+                        return (
+                          <div
+                            key={v.client_id}
+                            className={`border rounded-md p-2 flex flex-col gap-2 ${
+                              isDup ? 'border-warning bg-warning/5' : 'border-line'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="text-[11px] text-control-label">
+                                {isDup ? t('models.duplicateVariant') : ''}
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="btn-icon-sm text-control-label hover:text-danger"
+                                onClick={() => removeVariant(v.client_id)}
+                                startIcon={<XCircle size={14} />}
+                              />
+                            </div>
+                            {variantAxes.map(axis => {
+                              const sortedOptions = [...axis.options].sort((a, b) => a.sort_order - b.sort_order);
+                              return (
+                                <div key={axis.attribute_id} className="flex flex-col">
+                                  <label className="form-label text-xs">{axis.attribute_name}</label>
+                                  <Select
+                                    options={sortedOptions.map(o => ({ value: o.option_code, label: o.option_label }))}
+                                    value={v.option_set[axis.attribute_code] || null}
+                                    onChange={(val) => updateVariantAxis(v.client_id, axis.attribute_code, (val as string) ?? '')}
+                                    placeholder={t('models.selectOption')}
+                                    showChevron
+                                    size="sm"
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        startIcon={<Plus size={14} />}
+                        onClick={addBlankVariant}
+                      >
+                        {t('models.addVariant')}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Flags — one row */}
+                <div className="flex items-center gap-4 flex-wrap">
                   <Controller name="is_sellable" control={control} render={({ field: { onChange, value, ref } }) => (
-                    <Switch ref={ref} checked={value} onChange={(e) => onChange(e.target.checked)} />
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <Switch ref={ref} checked={value} onChange={(e) => onChange(e.target.checked)} size="sm" />
+                      <span className="text-sm">{t('models.isSellable')}</span>
+                    </label>
                   )} />
-                </div>
-                <div className="flex items-center justify-between">
-                  <label className="form-label mb-0">{t('models.isContractable')}</label>
                   <Controller name="is_contractable" control={control} render={({ field: { onChange, value, ref } }) => (
-                    <Switch ref={ref} checked={value} onChange={(e) => onChange(e.target.checked)} />
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <Switch ref={ref} checked={value} onChange={(e) => onChange(e.target.checked)} size="sm" />
+                      <span className="text-sm">{t('models.isContractable')}</span>
+                    </label>
                   )} />
-                </div>
-                <div className="flex items-center justify-between">
-                  <label className="form-label mb-0">{t('models.isGiftable')}</label>
                   <Controller name="is_giftable" control={control} render={({ field: { onChange, value, ref } }) => (
-                    <Switch ref={ref} checked={value} onChange={(e) => onChange(e.target.checked)} />
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <Switch ref={ref} checked={value} onChange={(e) => onChange(e.target.checked)} size="sm" />
+                      <span className="text-sm">{t('models.isGiftable')}</span>
+                    </label>
                   )} />
                 </div>
               </>
@@ -422,51 +708,51 @@ function VariantSubRow({ variants }: { variants: ModelVariant[] }) {
 
   if (variants.length === 0) {
     return (
-      <div className="px-6 py-4 text-center text-control-label text-xs">
+      <div className="px-4 pb-6 text-center text-control-label text-xs">
         {t('models.noVariantsFound')}
       </div>
     );
   }
 
   return (
-    <div className="px-6 py-3">
-      {/* Desktop: table */}
-      <table className="w-full text-xs max-sm:hidden">
-        <thead>
-          <tr className="border-b border-line">
-            <th className="px-2 py-1.5 text-left font-medium text-control-label">{t('models.skuCode')}</th>
-            <th className="px-2 py-1.5 text-left font-medium text-control-label">{t('models.variantName')}</th>
-            <th className="px-2 py-1.5 text-left font-medium text-control-label">{t('users.status')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {variants.map((v) => (
-            <tr key={v.variant_id} className="border-b border-line last:border-b-0">
-              <td className="px-2 py-1.5 font-medium">{v.sku_code}</td>
-              <td className="px-2 py-1.5">{v.name}</td>
-              <td className="px-2 py-1.5">
-                <Badge size="sm" color={v.is_active ? 'success' : 'danger'}>
-                  {v.is_active ? t('brandsModels.active') : t('brandsModels.inactive')}
-                </Badge>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {/* Mobile: compact list */}
-      <div className="flex flex-col divide-y divide-line text-xs sm:hidden">
-        {variants.map((v) => (
-          <div key={v.variant_id} className="flex items-center gap-2 py-1.5">
-            <div className="flex-1 min-w-0">
-              <div className="font-medium truncate">{v.sku_code}</div>
-              <div className="text-control-label truncate">{v.name}</div>
+    <div className="px-4 pb-4 flex flex-col gap-2">
+      {variants.map((v) => {
+        const attrEntries = v.attributes
+          ? Object.entries(v.attributes).filter(([, val]) => val !== null && val !== '' && val !== undefined)
+          : [];
+        return (
+          <div
+            key={v.variant_id}
+            className={`flex flex-col gap-2 rounded-lg border p-3 transition-colors ${
+              v.is_active ? 'border-line bg-surface' : 'border-line bg-surface opacity-60'
+            }`}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="font-medium text-sm truncate">{v.name}</div>
+                <div className="text-[11px] font-mono text-control-label truncate opacity-70 mt-0.5">{v.sku_code}</div>
+              </div>
+              <Badge size="sm" color={v.is_active ? 'success' : 'danger'}>
+                {v.is_active ? t('brandsModels.active') : t('brandsModels.inactive')}
+              </Badge>
             </div>
-            <Badge size="sm" color={v.is_active ? 'success' : 'danger'}>
-              {v.is_active ? t('brandsModels.active') : t('brandsModels.inactive')}
-            </Badge>
+
+            {attrEntries.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-1 border-t border-line/60">
+                {attrEntries.map(([key, val]) => (
+                  <span
+                    key={key}
+                    className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-fg/5 text-control-label"
+                  >
+                    <span className="opacity-70">{key}:</span>
+                    <span className="font-medium text-fg">{String(val)}</span>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
-        ))}
-      </div>
+        );
+      })}
     </div>
   );
 }
@@ -489,7 +775,6 @@ export function ModelsPage() {
   const [filterBrand, setFilterBrand] = useState<string>('');
   const [filterFamily, setFilterFamily] = useState<string>('');
   const [filterBaseModel, setFilterBaseModel] = useState<string>('');
-  const [sortBy, setSortBy] = useState<string>('model_code.asc');
 
   // Filter popover (small screens)
   const [filterOpen, setFilterOpen] = useState(false);
@@ -497,17 +782,8 @@ export function ModelsPage() {
   // Create modal
   const [createOpen, setCreateOpen] = useState(false);
 
-  // Expand state
-  const [expandedModels, setExpandedModels] = useState<Set<number>>(new Set());
-
-  const toggleExpand = useCallback((modelId: number) => {
-    setExpandedModels((prev) => {
-      const next = new Set(prev);
-      if (next.has(modelId)) next.delete(modelId);
-      else next.add(modelId);
-      return next;
-    });
-  }, []);
+  // Selected model for detail panel
+  const [selectedModelId, setSelectedModelId] = useState<number | null>(null);
 
   // Search debounce
   const handleSearch = (value: string) => {
@@ -570,281 +846,344 @@ export function ModelsPage() {
     }
   }, [filterFamily, baseModels, filterBaseModel]);
 
-  // Filter & sort options
+  // Filter options
   const brandOptions = brands.map((b) => ({ value: String(b.id), label: b.name }));
   const filteredFamilies = filterBrand ? families.filter(f => String(f.brand_id) === filterBrand) : families;
   const familyOptions = filteredFamilies.map((f) => ({ value: String(f.id), label: f.display_name }));
   const baseModelOptions = baseModels.map((name) => ({ value: name, label: name }));
-  const activeFilterCount = [filterBrand, filterFamily, filterBaseModel].filter(Boolean).length + (sortBy !== 'model_code.asc' ? 1 : 0);
-  const sortOptions = [
-    { value: 'model_code.asc', label: `${t('models.modelCode')} A→Z` },
-    { value: 'model_code.desc', label: `${t('models.modelCode')} Z→A` },
-    { value: 'model_name.asc', label: `${t('models.modelName')} A→Z` },
-    { value: 'model_name.desc', label: `${t('models.modelName')} Z→A` },
-    { value: 'model_id.desc', label: t('models.newestFirst') },
-    { value: 'model_id.asc', label: t('models.oldestFirst') },
-    { value: 'updated_at.desc', label: t('models.recentlyUpdated') },
-  ];
+  const activeFilterCount = [filterBrand, filterFamily, filterBaseModel].filter(Boolean).length;
 
-  // Build endpoint
-  const buildEndpoint = useCallback(() => {
-    const params: string[] = [];
-    if (holdingId) params.push(`holding_id=eq.${holdingId}`);
-    if (search.trim()) {
-      params.push(`or=(model_code.ilike.*${encodeURIComponent(search.trim())}*,model_name.ilike.*${encodeURIComponent(search.trim())}*,family_name.ilike.*${encodeURIComponent(search.trim())}*,brand_name.ilike.*${encodeURIComponent(search.trim())}*)`);
-    }
-    if (filterBrand) params.push(`brand_id=eq.${filterBrand}`);
-    if (filterFamily) params.push(`family_id=eq.${filterFamily}`);
-    if (filterBaseModel) params.push(`base_model_name=eq.${encodeURIComponent(filterBaseModel)}`);
-    params.push(`order=${sortBy}`);
-    const qs = params.length > 0 ? `?${params.join('&')}` : '';
-    return `/v_product_model_list${qs}`;
-  }, [holdingId, search, filterBrand, filterFamily, filterBaseModel, sortBy]);
-
-  // Fetch models
-  const { data, isError, error, isFetching } = useQuery({
-    queryKey: ['models', pageIndex, pageSize, holdingId, search, filterBrand, filterFamily, filterBaseModel, sortBy],
-    queryFn: () => apiClient.getPaginated<Model>(buildEndpoint(), { page: pageIndex + 1, pageSize }),
+  // Fetch models via fuzzy-search RPC (handles both empty and non-empty queries via fast path)
+  const { data: searchData, isError, error, isFetching } = useQuery({
+    queryKey: ['models-search', pageIndex, pageSize, holdingId, search, filterBrand, filterFamily, filterBaseModel],
+    queryFn: () => apiClient.rpc<ProductSearchResponse>('fn_product_search', {
+      p_q: search.trim() || null,
+      p_brand_id: filterBrand ? Number(filterBrand) : null,
+      p_family_id: filterFamily ? Number(filterFamily) : null,
+      p_base_model_name: filterBaseModel || null,
+      p_is_active: null, // show both active and inactive in admin view
+      p_limit: pageSize,
+      p_offset: pageIndex * pageSize,
+    }),
     placeholderData: keepPreviousData,
   });
 
-  const models = data?.data ?? [];
-  const totalCount = data?.totalCount ?? 0;
+  // Map RPC response to existing Model shape (variant_count derived from variants.length)
+  const models = useMemo<Model[]>(() => {
+    const rows = searchData?.rows ?? [];
+    return rows.map(r => ({
+      model_id: r.model_id,
+      holding_id: holdingId ?? 0,
+      company_id: null,
+      model_code: r.model_code,
+      base_model_name: r.base_model_name,
+      model_name_suffix: r.model_name_suffix ?? '',
+      model_name: r.model_name,
+      model_attributes: r.model_attributes ?? null,
+      is_active: r.is_active,
+      created_at: '',
+      updated_at: '',
+      family_id: 0,
+      family_code: r.family_code,
+      family_name: r.family_name,
+      brand_id: 0,
+      brand_code: r.brand_code,
+      brand_name: r.brand_name,
+      category_id: 0,
+      category_code: '',
+      category_name: r.category_name ?? '',
+      variant_count: r.variants?.length ?? 0,
+      variants: r.variants ?? [],
+    }));
+  }, [searchData, holdingId]);
+  const totalCount = searchData?.total ?? 0;
+
+  const selectedModel = selectedModelId ? models.find(m => m.model_id === selectedModelId) ?? null : null;
+  const detailTitle = selectedModel
+    ? (selectedModel.model_name_suffix
+        ? `${selectedModel.base_model_name} ${selectedModel.model_name_suffix}`
+        : selectedModel.base_model_name)
+    : t('models.title');
 
   return (
-    <>
-      <MobileHeader className="mobile-header-bordered md:hidden">
-        <div className="mobile-header-start">
-          <button
-            className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
-            aria-label="Open menu"
-            onClick={() => window.dispatchEvent(new CustomEvent('sidemenu:open'))}
-          >
-            <ArrowRightFromLine size={18} />
-          </button>
-        </div>
-        <div className="mobile-header-title mobile-header-title-truncate">
-          {t('models.title')}
-        </div>
-        <div className="mobile-header-end px-2">
-          <button
-            className="flex items-center justify-center w-8 h-8 rounded hover:bg-surface-hover cursor-pointer text-current"
-            aria-label={t('models.addModel')}
-            onClick={() => setCreateOpen(true)}
-          >
-            <Plus size={18} />
-          </button>
-        </div>
-      </MobileHeader>
+    <PageNav panels={['list', 'detail']} className="h-dvh">
+      {({ isMobile, isRoot, goTo, goBack }) => {
+        const handleRowSelect = (modelId: number) => {
+          setSelectedModelId(modelId);
+          if (isMobile) goTo('detail');
+        };
 
-      <div className="page-content responsive-dvh-mobile-header">
-        {/* Desktop header */}
-        <div className="flex items-center justify-between mb-4 flex-none max-md:hidden">
-          <h1 className="heading-2">{t('models.title')}</h1>
-          <Button color="primary" startIcon={<Plus size={16} />} onClick={() => setCreateOpen(true)}>
-            {t('models.addModel')}
-          </Button>
-        </div>
-
-        {/* Filter bar — progressive collapse */}
-        <div className="flex-none pb-4">
-          <div className="flex items-center gap-2">
-            <div className="flex-1 min-w-0">
-              <Input
-                placeholder={t('common.search')}
-                value={searchInput}
-                onChange={(e) => handleSearch(e.target.value)}
-                size="sm"
-                className="w-full"
-              />
-            </div>
-            <div className="flex-1 min-w-0 hidden sm:block">
-              <Select
-                options={brandOptions}
-                value={filterBrand || null}
-                onChange={(val) => { setFilterBrand((val as string) ?? ''); setPageIndex(0); }}
-                placeholder={t('brandsModels.selectBrand')}
-                size="sm"
-                showChevron
-                clearable
-              />
-            </div>
-            <div className="flex-1 min-w-0 hidden md:block">
-              <Select
-                options={familyOptions}
-                value={filterFamily || null}
-                onChange={(val) => { setFilterFamily((val as string) ?? ''); setPageIndex(0); }}
-                placeholder={t('models.selectFamily')}
-                size="sm"
-                showChevron
-                clearable
-              />
-            </div>
-            <div className="flex-1 min-w-0 hidden lg:block">
-              <Select
-                options={baseModelOptions}
-                value={filterBaseModel || null}
-                onChange={(val) => { setFilterBaseModel((val as string) ?? ''); setPageIndex(0); }}
-                placeholder={t('models.selectBaseModel')}
-                size="sm"
-                showChevron
-                clearable
-                disabled={!filterFamily}
-              />
-            </div>
-            <div className="flex-1 min-w-0 hidden lg:block">
-              <Select
-                options={sortOptions}
-                value={sortBy}
-                onChange={(val) => { setSortBy((val as string) ?? 'model_code.asc'); setPageIndex(0); }}
-                size="sm"
-                showChevron
-                searchable={false}
-              />
-            </div>
-            <div className="lg:hidden shrink-0">
-              <PopOver
-                isOpen={filterOpen}
-                onClose={() => setFilterOpen(false)}
-                placement="bottom"
-                align="end"
-                maxWidth="300px"
-                trigger={
-                  <Button variant="outline" size="sm" className="relative btn-icon-sm" onClick={() => setFilterOpen(!filterOpen)}>
-                    <SlidersHorizontal size={16} />
-                    {activeFilterCount > 0 && (
-                      <span className="absolute -top-1.5 -right-1.5 bg-primary text-white text-xs rounded-full w-4 h-4 flex items-center justify-center leading-none">
-                        {activeFilterCount}
-                      </span>
-                    )}
-                  </Button>
-                }
-              >
-                <div className="flex flex-col gap-3 p-3">
-                  <div className="text-xs font-medium text-muted uppercase tracking-wide">{t('common.filters')}</div>
-                  <Select
-                    options={brandOptions}
-                    value={filterBrand || null}
-                    onChange={(val) => { setFilterBrand((val as string) ?? ''); setPageIndex(0); }}
-                    placeholder={t('brandsModels.selectBrand')}
-                    size="sm"
-                    showChevron
-                    clearable
-                  />
-                  <Select
-                    options={familyOptions}
-                    value={filterFamily || null}
-                    onChange={(val) => { setFilterFamily((val as string) ?? ''); setPageIndex(0); }}
-                    placeholder={t('models.selectFamily')}
-                    size="sm"
-                    showChevron
-                    clearable
-                  />
-                  <Select
-                    options={baseModelOptions}
-                    value={filterBaseModel || null}
-                    onChange={(val) => { setFilterBaseModel((val as string) ?? ''); setPageIndex(0); }}
-                    placeholder={t('models.selectBaseModel')}
-                    size="sm"
-                    showChevron
-                    clearable
-                    disabled={!filterFamily}
-                  />
-                  <div className="text-xs font-medium text-muted uppercase tracking-wide">{t('common.sortBy')}</div>
-                  <Select
-                    options={sortOptions}
-                    value={sortBy}
-                    onChange={(val) => { setSortBy((val as string) ?? 'model_code.asc'); setPageIndex(0); }}
-                    size="sm"
-                    showChevron
-                    searchable={false}
-                  />
+        return (
+          <>
+            {/* ── Mobile Header ── */}
+            {isMobile && (
+              <MobileHeader className="mobile-header-bordered">
+                <div className="mobile-header-start">
+                  {isRoot ? (
+                    <button
+                      className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
+                      aria-label="Open menu"
+                      onClick={() => window.dispatchEvent(new CustomEvent('sidemenu:open'))}
+                    >
+                      <ArrowRightFromLine size={18} />
+                    </button>
+                  ) : (
+                    <button
+                      className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
+                      onClick={goBack}
+                    >
+                      <ArrowLeft size={20} />
+                    </button>
+                  )}
                 </div>
-              </PopOver>
-            </div>
-          </div>
-        </div>
+                <div className="mobile-header-title mobile-header-title-truncate">
+                  {isRoot ? t('models.title') : detailTitle}
+                </div>
+                <div className="mobile-header-end px-2">
+                  {isRoot ? (
+                    <button
+                      className="flex items-center justify-center w-8 h-8 rounded hover:bg-surface-hover cursor-pointer text-current"
+                      aria-label={t('models.addModel')}
+                      onClick={() => setCreateOpen(true)}
+                    >
+                      <Plus size={18} />
+                    </button>
+                  ) : (
+                    <div className="w-8" />
+                  )}
+                </div>
+              </MobileHeader>
+            )}
 
-        {/* Error display */}
-        {isError && (
-          <div className="px-6">
-            <div className="border border-line bg-surface p-6 rounded-lg text-center">
-              <div className="text-danger mb-4">{error instanceof Error ? error.message : t('common.error')}</div>
-            </div>
-          </div>
-        )}
+            {/* ── Desktop Header ── */}
+            {!isMobile && (
+              <div className="flex-none px-4 py-2.5 border-b border-line flex items-center justify-between gap-4">
+                <h1 className="heading-2">{t('models.title')}</h1>
+                <Button color="primary" size="sm" startIcon={<Plus size={16} />} onClick={() => setCreateOpen(true)}>
+                  {t('models.addModel')}
+                </Button>
+              </div>
+            )}
 
-        {/* Desktop: DataTable with renderRow */}
-        {!isError && (
-          <DataTable<Model>
-            data={models}
-            renderRow={(row) => {
-              const model = row.original;
-              const isExpanded = expandedModels.has(model.model_id);
-              return (
-                <>
-                  <div
-                    className="flex items-center gap-3 px-3 py-2 border-b border-line hover:bg-surface-hover transition-colors cursor-pointer"
-                    onClick={() => toggleExpand(model.model_id)}
-                  >
-                    <div className="shrink-0 w-5">
-                      {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                    </div>
-                    <div className="flex-1 min-w-0 space-y-1">
-                      <div className="text-xs sm:text-sm truncate">
-                        <span>{model.family_name}</span>
-                        {' '}
-                        <span className="font-medium text-info">{model.base_model_name}</span>
-                        {model.model_name_suffix && (
-                          <> <span className="font-semibold">{model.model_name_suffix}</span></>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 text-[11px] text-control-label">
-                        <span className="truncate opacity-60">{model.brand_name}</span>
-                        <span className="flex-1" />
-                        {model.variant_count > 0 && (
-                          <span className="shrink-0">{model.variant_count} {t('models.variants').toLowerCase()}</span>
-                        )}
-                        <Badge size="sm" color={model.is_active ? 'success' : 'danger'}>
-                          {model.is_active ? t('brandsModels.active') : t('brandsModels.inactive')}
-                        </Badge>
-                      </div>
-                    </div>
+            {/* ── Filter bar — above panels, list view only on mobile ── */}
+            {(isRoot || !isMobile) && (
+              <div className="flex-none p-2 border-b border-line">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <Input
+                      placeholder={t('common.search')}
+                      value={searchInput}
+                      onChange={(e) => handleSearch(e.target.value)}
+                      size="sm"
+                      className="w-full"
+                    />
                   </div>
-                  {isExpanded && (
-                    <div className="bg-surface border-b border-line">
-                      <VariantSubRow variants={model.variants} />
+                  <div className="flex-1 min-w-0 hidden sm:block">
+                    <Select
+                      options={brandOptions}
+                      value={filterBrand || null}
+                      onChange={(val) => { setFilterBrand((val as string) ?? ''); setPageIndex(0); }}
+                      placeholder={t('brandsModels.selectBrand')}
+                      size="sm"
+                      showChevron
+                      clearable
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0 hidden md:block">
+                    <Select
+                      options={familyOptions}
+                      value={filterFamily || null}
+                      onChange={(val) => { setFilterFamily((val as string) ?? ''); setPageIndex(0); }}
+                      placeholder={t('models.selectFamily')}
+                      size="sm"
+                      showChevron
+                      clearable
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0 hidden lg:block">
+                    <Select
+                      options={baseModelOptions}
+                      value={filterBaseModel || null}
+                      onChange={(val) => { setFilterBaseModel((val as string) ?? ''); setPageIndex(0); }}
+                      placeholder={t('models.selectBaseModel')}
+                      size="sm"
+                      showChevron
+                      clearable
+                      disabled={!filterFamily}
+                    />
+                  </div>
+                  <div className="xl:hidden shrink-0">
+                    <PopOver
+                      isOpen={filterOpen}
+                      onClose={() => setFilterOpen(false)}
+                      placement="bottom"
+                      align="end"
+                      maxWidth="300px"
+                      trigger={
+                        <Button variant="outline" size="sm" className="relative btn-icon-sm" onClick={() => setFilterOpen(!filterOpen)}>
+                          <SlidersHorizontal size={16} />
+                          {activeFilterCount > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 bg-primary text-white text-xs rounded-full w-4 h-4 flex items-center justify-center leading-none">
+                              {activeFilterCount}
+                            </span>
+                          )}
+                        </Button>
+                      }
+                    >
+                      <div className="flex flex-col gap-3 p-3">
+                        <div className="text-xs font-medium text-muted uppercase tracking-wide">{t('common.filters')}</div>
+                        <Select
+                          options={brandOptions}
+                          value={filterBrand || null}
+                          onChange={(val) => { setFilterBrand((val as string) ?? ''); setPageIndex(0); }}
+                          placeholder={t('brandsModels.selectBrand')}
+                          size="sm"
+                          showChevron
+                          clearable
+                        />
+                        <Select
+                          options={familyOptions}
+                          value={filterFamily || null}
+                          onChange={(val) => { setFilterFamily((val as string) ?? ''); setPageIndex(0); }}
+                          placeholder={t('models.selectFamily')}
+                          size="sm"
+                          showChevron
+                          clearable
+                        />
+                        <Select
+                          options={baseModelOptions}
+                          value={filterBaseModel || null}
+                          onChange={(val) => { setFilterBaseModel((val as string) ?? ''); setPageIndex(0); }}
+                          placeholder={t('models.selectBaseModel')}
+                          size="sm"
+                          showChevron
+                          clearable
+                          disabled={!filterFamily}
+                        />
+                      </div>
+                    </PopOver>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── Error display ── */}
+            {isError && (
+              <div className="px-6 py-4">
+                <div className="border border-line bg-surface p-6 rounded-lg text-center">
+                  <div className="text-danger">{error instanceof Error ? error.message : t('common.error')}</div>
+                </div>
+              </div>
+            )}
+
+            {/* ── Panels ── */}
+            {!isError && (
+              <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
+                {/* Left panel: Model list */}
+                <PageNavPanel id="list" className="w-1/2 xl:w-5/12 border-r border-line flex flex-col" mobileClassName="flex flex-col overflow-hidden">
+                  <DataTable<Model>
+                    data={models}
+                    renderRow={(row) => {
+                      const model = row.original;
+                      const isSelected = model.model_id === selectedModelId;
+                      return (
+                        <div
+                          className={`flex items-center gap-3 px-3 py-2 border-b border-line hover:bg-surface-hover transition-colors cursor-pointer ${
+                            isSelected ? 'bg-primary/10' : ''
+                          }`}
+                          onClick={() => handleRowSelect(model.model_id)}
+                        >
+                          <div className="flex-1 min-w-0 space-y-1">
+                            <div className="text-xs sm:text-sm truncate">
+                              <span>{model.family_name}</span>
+                              {' '}
+                              <span className="font-medium text-info">{model.base_model_name}</span>
+                              {model.model_name_suffix && (
+                                <> <span className="font-semibold">{model.model_name_suffix}</span></>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 text-[11px] text-control-label">
+                              <span className="truncate opacity-60">{model.brand_name}</span>
+                              <span className="flex-1" />
+                              {model.variant_count > 0 && (
+                                <span className="shrink-0">{model.variant_count} {t('models.variants').toLowerCase()}</span>
+                              )}
+                              <Badge size="sm" color={model.is_active ? 'success' : 'danger'}>
+                                {model.is_active ? t('brandsModels.active') : t('brandsModels.inactive')}
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }}
+                    enablePagination
+                    pageIndex={pageIndex}
+                    pageSize={pageSize}
+                    pageSizeOptions={[10, 25, 50]}
+                    siblingCount={2}
+                    rowCount={totalCount}
+                    onPageChange={({ pageIndex: pi, pageSize: ps }) => {
+                      setPageIndex(pi);
+                      setPageSize(ps);
+                    }}
+                    className={`flex-1 min-h-0 panel-datatable ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
+                    noResults={
+                      <div className="p-8 text-center text-control-label">
+                        {t('models.noModels')}
+                      </div>
+                    }
+                  />
+                </PageNavPanel>
+
+                {/* Right panel: Model detail (variants) */}
+                <PageNavPanel id="detail" className="flex-1 min-w-0 overflow-y-auto better-scroll" mobileClassName="flex flex-col overflow-hidden">
+                  {selectedModel ? (
+                    <div className="flex flex-col">
+                      {/* Detail header */}
+                      <div className="flex-none px-4 py-3 border-b border-line">
+                        <div className="flex items-baseline gap-1.5 flex-wrap">
+                          <span className="text-xs text-control-label truncate">{selectedModel.family_name}</span>
+                          <span className="text-sm font-medium text-info truncate">{selectedModel.base_model_name}</span>
+                          {selectedModel.model_name_suffix && (
+                            <span className="text-sm font-semibold truncate">{selectedModel.model_name_suffix}</span>
+                          )}
+                          <Badge size="sm" color={selectedModel.is_active ? 'success' : 'danger'}>
+                            {selectedModel.is_active ? t('brandsModels.active') : t('brandsModels.inactive')}
+                          </Badge>
+                        </div>
+                        <div className="text-[11px] text-control-label opacity-60 mt-0.5 truncate">
+                          {selectedModel.brand_name} · {selectedModel.model_code}
+                        </div>
+                      </div>
+
+                      {/* Variants section */}
+                      <div className="flex-1 min-h-0">
+                        <div className="px-4 py-3">
+                          <h3 className="text-xs font-semibold text-control-label uppercase tracking-wider mb-2">
+                            {t('models.variants')} ({selectedModel.variant_count})
+                          </h3>
+                        </div>
+                        <VariantSubRow variants={selectedModel.variants} />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 h-full flex items-center justify-center text-control-label p-8 text-center">
+                      <div>{t('models.selectToView', { defaultValue: 'Select a model to view details' })}</div>
                     </div>
                   )}
-                </>
-              );
-            }}
-            enablePagination
-            pageIndex={pageIndex}
-            pageSize={pageSize}
-            pageSizeOptions={[10, 25, 50]}
-            siblingCount={2}
-            rowCount={totalCount}
-            onPageChange={({ pageIndex: pi, pageSize: ps }) => {
-              setPageIndex(pi);
-              setPageSize(ps);
-            }}
-            className={`flex-1 min-h-0 ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
-            noResults={
-              <div className="p-8 text-center text-control-label">
-                {t('models.noModels')}
+                </PageNavPanel>
               </div>
-            }
-          />
-        )}
-      </div>
+            )}
 
-      <CreateModelModal
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        holdingId={holdingId}
-        families={families}
-      />
-    </>
+            <CreateModelModal
+              open={createOpen}
+              onClose={() => setCreateOpen(false)}
+              holdingId={holdingId}
+              families={families}
+            />
+          </>
+        );
+      }}
+    </PageNav>
   );
 }

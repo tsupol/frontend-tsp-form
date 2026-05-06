@@ -36,6 +36,7 @@ import { DunningTargetsPage } from './pages/legal/DunningTargetsPage';
 import { LegalCasesPage } from './pages/legal/LegalCasesPage';
 import { StaffCommissionPage } from './pages/commission/StaffCommissionPage';
 import { ApprovalsPage } from './pages/approvals/ApprovalsPage';
+import { PaymentSubmissionsPage } from './pages/PaymentSubmissionsPage';
 import { ContractsLayout } from './pages/contracts/ContractsLayout';
 import { ContractSearchPage } from './pages/contracts/ContractSearchPage';
 import { SavingContractsPage } from './pages/contracts/SavingContractsPage';
@@ -452,6 +453,16 @@ function App() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/admin/payment-submissions"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <PaymentSubmissionsPage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
 
       {/* Legal */}
       <Route
@@ -586,7 +597,17 @@ function App() {
         }
       />
       <Route
-        path="/admin/accounting/bills"
+        path="/admin/accounting/day-close/:branchId/:date"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <AccountingLayout><DayClosePage /></AccountingLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/accounting/bills/:billId?"
         element={
           <ProtectedRoute>
             <AdminLayout>

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
@@ -12,92 +13,10 @@ import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { fmtCurrency } from '../../lib/format';
-import { type Branch } from './accountingTypes';
+import { type Branch, type BillRow, type BillDetail } from './accountingTypes';
 import { useBillActions } from '../../hooks/useBillActions';
 
 /* ── Types ── */
-
-interface BillRow {
-  id: number;
-  code: string;
-  code_display: string;
-  bill_type: string;
-  bill_purpose: string;
-  ref_bill_id: number | null;
-  holding_id: number;
-  company_id: number;
-  branch_id: number;
-  branch_name: string | null;
-  customer_id: number | null;
-  customer_name: string | null;
-  contract_id: number | null;
-  contract_code: string | null;
-  total_amount: number;
-  paid_amount: number;
-  cash_amount: number;
-  transfer_amount: number;
-  status: string;
-  bill_date: string;
-  created_by: number;
-  created_at: string;
-  is_cancelled: boolean;
-}
-
-interface BillLineItem {
-  line_id: number;
-  line_type: string;
-  charge_type: string;
-  description: string;
-  amount: number;
-  quantity: number;
-  owner_type: string;
-  variant_id: number | null;
-  ref_code: string | null;
-  ref_type: string | null;
-  ref_id: number | null;
-}
-
-interface BillPayment {
-  id: number;
-  method: string;
-  amount: number;
-  bank_name: string | null;
-  account_number: string | null;
-  code_display: string;
-  created_at: string;
-  created_by: number;
-  created_by_name: string | null;
-  is_reversal: boolean;
-  reference: string | null;
-}
-
-interface BillCancelInfo {
-  cancelled_at: string;
-  credit_note_id: number;
-  credit_note_code: string;
-  credit_note_amount: number;
-}
-
-interface BillDetail {
-  bill_id: number;
-  bill_code_display: string;
-  bill_type: string;
-  bill_purpose: string;
-  branch_id: number;
-  status: string;
-  is_voided: boolean;
-  ref_bill_id: number | null;
-  ref_bill_code: string | null;
-  total_amount: number;
-  paid_amount: number;
-  remaining: number;
-  customer_name: string | null;
-  contract_code: string | null;
-  contract_id: number | null;
-  line_items: BillLineItem[];
-  payments: BillPayment[] | null;
-  cancel_info: BillCancelInfo | null;
-}
 
 interface BankAccount {
   id: number;
@@ -144,12 +63,20 @@ const METHOD_COLOR: Record<string, 'success' | 'primary' | 'secondary' | 'info'>
 
 export function BillsPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const { billId: billIdParam } = useParams<{ billId?: string }>();
+  const selectedBillId = billIdParam ? Number(billIdParam) : null;
+
+  const setSelectedBillId = useCallback((id: number | null) => {
+    if (id) navigate(`/admin/accounting/bills/${id}`, { replace: true });
+    else navigate('/admin/accounting/bills', { replace: true });
+  }, [navigate]);
+
   const [branchId, setBranchId] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [typeFilter, setTypeFilter] = useState<string>('');
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(25);
-  const [selectedBillId, setSelectedBillId] = useState<number | null>(null);
 
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
@@ -198,7 +125,7 @@ export function BillsPage() {
     : t('accounting.bills.title');
 
   return (
-    <PageNav panels={['list', 'detail']} className="h-dvh">
+    <PageNav panels={['list', 'detail']} defaultPanel={selectedBillId ? 'detail' : undefined} className="h-dvh">
       {({ isMobile, isRoot, goTo, goBack }) => (
         <>
           {isMobile && (

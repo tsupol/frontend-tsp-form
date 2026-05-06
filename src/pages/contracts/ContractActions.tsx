@@ -9,6 +9,10 @@ import { fmtCurrency } from '../../lib/format';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { DateTime } from '../../components/DateTime';
 import { CompleteContractModal } from './CompleteContractModal';
+import { BindLoanerModal, UnbindLoanerModal } from './LoanerModals';
+import { RepairRequestModal } from './RepairRequestModal';
+import { AppointmentCreateModal, AppointmentCancelModal } from './AppointmentModals';
+import { RefundVoidModal } from './RefundVoidModal';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -47,15 +51,22 @@ type ContractAction =
   | 'cancel'
   | 'void'
   | 'pause'
+  | 'resume'
   | 'deposit_device'
   | 'return_deposit'
   | 'unbind_device'
   | 'bind_device'
+  | 'bind_loaner'
+  | 'unbind_loaner'
+  | 'device_repair_request'
   | 'transfer_branch'
   | 'transfer_accept'
   | 'transfer_cancel'
   | 'detach_customer'
   | 'settlement_refund'
+  | 'settlement_refund_void'
+  | 'appointment_create'
+  | 'appointment_cancel'
   | 'change_draft_owner'
   | 'saving_deposit'
   | 'void_bill'
@@ -143,6 +154,19 @@ const ACTION_CONFIGS: Record<ContractAction, ActionConfig> = {
     needsCloseReason: false,
     needsNewOwner: false,
     successKey: 'contract.action_pause_success',
+  },
+  resume: {
+    rpc: 'fn_contract_resume',
+    color: 'primary',
+    needsPin: false,
+    needsNote: true,
+    needsReason: false,
+    needsBranch: false,
+    needsDevice: false,
+    needsAmount: false,
+    needsCloseReason: false,
+    needsNewOwner: false,
+    successKey: 'contract.action_resume_success',
   },
   deposit_device: {
     rpc: 'fn_contract_deposit_device',
@@ -339,6 +363,84 @@ const ACTION_CONFIGS: Record<ContractAction, ActionConfig> = {
     needsNewOwner: false,
     successKey: 'contract.action_pay_installment_success',
   },
+  bind_loaner: {
+    rpc: '', // handled by BindLoanerModal
+    color: 'primary',
+    needsPin: false,
+    needsNote: false,
+    needsReason: false,
+    needsBranch: false,
+    needsDevice: false,
+    needsAmount: false,
+    needsCloseReason: false,
+    needsNewOwner: false,
+    successKey: 'contract.action_bind_loaner_success',
+  },
+  unbind_loaner: {
+    rpc: '', // handled by UnbindLoanerModal
+    color: 'danger',
+    needsPin: false,
+    needsNote: false,
+    needsReason: false,
+    needsBranch: false,
+    needsDevice: false,
+    needsAmount: false,
+    needsCloseReason: false,
+    needsNewOwner: false,
+    successKey: 'contract.action_unbind_loaner_success',
+  },
+  device_repair_request: {
+    rpc: '', // handled by RepairRequestModal
+    color: 'primary',
+    needsPin: false,
+    needsNote: false,
+    needsReason: false,
+    needsBranch: false,
+    needsDevice: false,
+    needsAmount: false,
+    needsCloseReason: false,
+    needsNewOwner: false,
+    successKey: 'contract.action_device_repair_request_success',
+  },
+  appointment_create: {
+    rpc: '', // handled by AppointmentCreateModal
+    color: 'primary',
+    needsPin: false,
+    needsNote: false,
+    needsReason: false,
+    needsBranch: false,
+    needsDevice: false,
+    needsAmount: false,
+    needsCloseReason: false,
+    needsNewOwner: false,
+    successKey: 'contract.action_appointment_create_success',
+  },
+  appointment_cancel: {
+    rpc: '', // handled by AppointmentCancelModal
+    color: 'danger',
+    needsPin: false,
+    needsNote: false,
+    needsReason: false,
+    needsBranch: false,
+    needsDevice: false,
+    needsAmount: false,
+    needsCloseReason: false,
+    needsNewOwner: false,
+    successKey: 'contract.action_appointment_cancel_success',
+  },
+  settlement_refund_void: {
+    rpc: '', // handled by RefundVoidModal
+    color: 'danger',
+    needsPin: false,
+    needsNote: false,
+    needsReason: false,
+    needsBranch: false,
+    needsDevice: false,
+    needsAmount: false,
+    needsCloseReason: false,
+    needsNewOwner: false,
+    successKey: 'contract.action_settlement_refund_void_success',
+  },
 };
 
 const CLOSE_REASON_OPTIONS: Record<string, { value: string; label: string }[]> = {
@@ -398,15 +500,22 @@ const FE_TO_BACKEND_ACTION: Record<ContractAction, string> = {
   cancel: 'CANCEL_CONTRACT',
   void: 'VOID_CONTRACT',
   pause: 'PAUSE_CONTRACT',
+  resume: 'RESUME_CONTRACT',
+  appointment_create: 'APPOINTMENT_CREATE',
+  appointment_cancel: 'APPOINTMENT_CANCEL',
   deposit_device: 'CUSTOMER_DEPOSIT_DEVICE',
   return_deposit: 'RETURN_DEPOSIT',
   unbind_device: 'UNBIND_DEVICE',
   bind_device: 'BIND_DEVICE',
+  bind_loaner: 'BIND_LOANER',
+  unbind_loaner: 'UNBIND_LOANER',
+  device_repair_request: 'DEVICE_REPAIR_REQUEST',
   transfer_branch: 'TRANSFER_BRANCH',
   transfer_accept: 'TRANSFER_ACCEPT',
   transfer_cancel: 'TRANSFER_CANCEL',
   detach_customer: 'DETACH_CUSTOMER',
   settlement_refund: 'HOLDING_REFUND',
+  settlement_refund_void: 'HOLDING_REFUND_VOID',
   change_draft_owner: 'CHANGE_DRAFT_OWNER',
   saving_deposit: 'SAVING_DEPOSIT',
   void_bill: '',           // no backend equivalent — keep FE-only behavior
@@ -489,6 +598,16 @@ const ACTION_PLACEMENT: Record<string, ActionPlacement> = {
   DETACH_CUSTOMER:   { kind: 'elsewhere', where: 'Customers tab' },
   ADD_GUARANTOR:     { kind: 'elsewhere', where: 'Customers tab' },
   REMOVE_GUARANTOR:  { kind: 'elsewhere', where: 'Customers tab' },
+  // Delivery edit lives in the Overview tab → Shipping section
+  UPDATE_DELIVERY:       { kind: 'elsewhere', where: 'Overview tab → Shipping' },
+  // Device ops live in the Device tab
+  BIND_DEVICE:           { kind: 'elsewhere', where: 'Device tab' },
+  UNBIND_DEVICE:         { kind: 'elsewhere', where: 'Device tab' },
+  CUSTOMER_DEPOSIT_DEVICE: { kind: 'elsewhere', where: 'Device tab' },
+  RETURN_DEPOSIT:        { kind: 'elsewhere', where: 'Device tab' },
+  BIND_LOANER:           { kind: 'elsewhere', where: 'Device tab' },
+  UNBIND_LOANER:         { kind: 'elsewhere', where: 'Device tab' },
+  DEVICE_REPAIR_REQUEST: { kind: 'elsewhere', where: 'Device tab' },
 };
 
 // States where the wizard owns the user flow — footer just shows "Continue draft"
@@ -540,11 +659,12 @@ const CATEGORY_LABEL_KEY: Record<string, string> = {
   DOCUMENT: 'contract.actionCategory.document',
 };
 
-export function ContractActionButtons({ contract, onRefresh, requestedAction, onRequestedActionConsumed }: {
+export function ContractActionButtons({ contract, onRefresh, requestedAction, onRequestedActionConsumed, onRequestUpdateDelivery }: {
   contract: ContractForActions;
   onRefresh: () => void;
   requestedAction?: ContractAction | null;
   onRequestedActionConsumed?: () => void;
+  onRequestUpdateDelivery?: () => void;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -581,6 +701,12 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   const isPayInstallment = activeAction === 'pay_installment';
   const isComplete = activeAction === 'complete';
   const isTerminate = activeAction === 'terminate';
+  const isBindLoaner = activeAction === 'bind_loaner';
+  const isUnbindLoaner = activeAction === 'unbind_loaner';
+  const isRepairRequest = activeAction === 'device_repair_request';
+  const isAppointmentCreate = activeAction === 'appointment_create';
+  const isAppointmentCancel = activeAction === 'appointment_cancel';
+  const isRefundVoid = activeAction === 'settlement_refund_void';
 
   const handleSuccess = (msgKey: string) => {
     setActiveAction(null);
@@ -597,6 +723,11 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   };
 
   const handleBackendAction = (action: BackendContractAction) => {
+    // Special-case: UPDATE_DELIVERY opens the existing DeliveryModal in the Overview tab
+    if (action.action_code === 'UPDATE_DELIVERY') {
+      onRequestUpdateDelivery?.();
+      return;
+    }
     const feAction = BACKEND_TO_FE_ACTION[action.action_code];
     if (feAction) {
       setActiveAction(feAction);
@@ -646,6 +777,8 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
     const config = feAction ? ACTION_CONFIGS[feAction] : null;
     const label = t(a.action_code, { ns: 'contractActions', defaultValue: a.action_code });
     const placement = ACTION_PLACEMENT[a.action_code];
+    // An action is "wired" if it has a FE handler OR is routed elsewhere (e.g. UPDATE_DELIVERY → DeliveryModal)
+    const isWired = !!feAction || placement?.kind === 'elsewhere';
     let endIcon: React.ReactNode = undefined;
     const lines: string[] = [label];
     if (placement?.kind === 'elsewhere') {
@@ -675,8 +808,8 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
         <Button
           variant={primary ? undefined : 'outline'}
           size="sm"
-          color={primary && a.is_available && feAction ? (config?.color ?? 'primary') : config?.color}
-          disabled={!a.is_available || !feAction}
+          color={primary && a.is_available && isWired ? (config?.color ?? 'primary') : config?.color}
+          disabled={!a.is_available || !isWired}
           endIcon={endIcon}
           onClick={() => {
             handleBackendAction(a);
@@ -822,8 +955,46 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
         onClose={() => setActiveAction(null)}
         onSuccess={handleSuccess}
       />
+      <BindLoanerModal
+        open={isBindLoaner}
+        contractId={contract.id}
+        branchId={contract.branch_id}
+        onClose={() => setActiveAction(null)}
+        onSuccess={handleSuccess}
+      />
+      <UnbindLoanerModal
+        open={isUnbindLoaner}
+        contractId={contract.id}
+        onClose={() => setActiveAction(null)}
+        onSuccess={handleSuccess}
+      />
+      <RepairRequestModal
+        open={isRepairRequest}
+        assetId={contract.device_id ?? 0}
+        contractId={contract.id}
+        onClose={() => setActiveAction(null)}
+        onSuccess={handleSuccess}
+      />
+      <AppointmentCreateModal
+        open={isAppointmentCreate}
+        contractId={contract.id}
+        onClose={() => setActiveAction(null)}
+        onSuccess={handleSuccess}
+      />
+      <AppointmentCancelModal
+        open={isAppointmentCancel}
+        contractId={contract.id}
+        onClose={() => setActiveAction(null)}
+        onSuccess={handleSuccess}
+      />
+      <RefundVoidModal
+        open={isRefundVoid}
+        contractId={contract.id}
+        onClose={() => setActiveAction(null)}
+        onSuccess={handleSuccess}
+      />
       <ContractActionModal
-        open={!!activeAction && !isSavingDeposit && !isCancelSaving && !isEarlyPayoff && !isContinuePay && !isVoidBill && !isPayInstallment && !isComplete && !isTerminate}
+        open={!!activeAction && !isSavingDeposit && !isCancelSaving && !isEarlyPayoff && !isContinuePay && !isVoidBill && !isPayInstallment && !isComplete && !isTerminate && !isBindLoaner && !isUnbindLoaner && !isRepairRequest && !isAppointmentCreate && !isAppointmentCancel && !isRefundVoid}
         action={activeAction}
         contract={contract}
         onClose={() => setActiveAction(null)}

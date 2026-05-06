@@ -1,8 +1,10 @@
-import { SideMenu, SideMenuItems, type SideMenuItemData, PopOver, MenuItem, SubMenu, MenuSeparator, Checkmark } from 'tsp-form';
+import { SideMenu, SideMenuItems, type SideMenuItemData, PopOver, MenuItem, SubMenu, MenuSeparator, Checkmark, Badge } from 'tsp-form';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useState, useSyncExternalStore } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { clsx } from 'clsx';
+import { apiClient } from './lib/api';
 import {
   ArrowLeftFromLine,
   ArrowRightFromLine,
@@ -151,6 +153,64 @@ export const AppSideNav = () => {
   const navGuard = useNavGuard();
   const { user } = useAuth();
   const role = user?.role_code ?? '';
+  const canApprove = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
+
+  // Pending approvals count for nav badge (only for approver roles)
+  const { data: approvalsCountData } = useQuery({
+    queryKey: ['nav', 'pending-approvals-count'],
+    queryFn: () => apiClient.getPaginated<unknown>(
+      '/v_pending_approvals?select=type',
+      { page: 1, pageSize: 1 },
+    ),
+    enabled: canApprove,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+  });
+  const pendingApprovals = approvalsCountData?.totalCount ?? 0;
+
+  // Pending slip submissions count
+  const { data: slipsCountData } = useQuery({
+    queryKey: ['nav', 'pending-submissions-count'],
+    queryFn: () => apiClient.getPaginated<unknown>(
+      '/v_payment_submissions?status=eq.PENDING_REVIEW&select=id',
+      { page: 1, pageSize: 1 },
+    ),
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+  });
+  const pendingSlips = slipsCountData?.totalCount ?? 0;
+
+  // Render an icon with an optional count badge.
+  // - Expanded: inline Badge to the right of the label (returned via `badge`).
+  // - Collapsed: a small dot pinned to the top-right of the icon (returned via `icon` wrapper).
+  const iconWithCount = (icon: React.ReactNode, count: number): { icon: React.ReactNode; badge?: React.ReactNode } => {
+    if (count <= 0) return { icon };
+    const label = count > 99 ? '99+' : String(count);
+    if (menuCollapsed && !isMobile) {
+      return {
+        icon: (
+          <span key="icon-with-dot" className="relative inline-flex">
+            {icon}
+            <span
+              key="dot"
+              className="absolute -top-1.5 -right-2 inline-flex items-center justify-center min-w-[14px] h-[14px] px-1 pt-px rounded-full text-[9px] font-semibold tabular-nums ring-1 ring-bg"
+              style={{
+                background: 'var(--color-badge-warning-bg, color-mix(in srgb, var(--color-warning) 20%, var(--color-surface)))',
+                color: 'var(--color-badge-warning-fg, var(--color-warning-fade, var(--color-warning)))',
+              }}
+              aria-label={`${label} pending`}
+            >
+              {label}
+            </span>
+          </span>
+        ),
+      };
+    }
+    return {
+      icon,
+      badge: <Badge key="nav-count-badge" color="warning" size="xs">{label}</Badge>,
+    };
+  };
 
   const menuItems: SideMenuItemData[] = [
     { key: 'dashboard', icon: <LayoutDashboard size="1rem" />, label: t('nav.dashboard'), path: '/admin' },
@@ -231,14 +291,20 @@ export const AppSideNav = () => {
         { key: 'saving-contracts', icon: <PiggyBank size="1rem" />, label: t('nav.savingContracts'), path: '/admin/contracts/saving' },
       ],
     },
-    ...(['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role)
+    ...(canApprove
       ? [{
           key: 'approvals',
-          icon: <ClipboardCheck size="1rem" />,
+          ...iconWithCount(<ClipboardCheck size="1rem" />, pendingApprovals),
           label: t('nav.approvals'),
           path: '/admin/approvals',
         }]
       : []),
+    {
+      key: 'payment-submissions',
+      ...iconWithCount(<Receipt size="1rem" />, pendingSlips),
+      label: t('nav.paymentSubmissions'),
+      path: '/admin/payment-submissions',
+    },
     {
       key: 'accounting', icon: <BookOpen size="1rem" />, label: t('nav.accounting'),
       path: '/admin/accounting/day-close',
