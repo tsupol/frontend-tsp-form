@@ -45,6 +45,7 @@ export interface DayCloseHistoryRow {
 export interface DayCloseAuditRow {
   day_close_id: number;
   holding_id: number;
+  company_id?: number;
   branch_id: number;
   branch_name: string;
   close_date: string;

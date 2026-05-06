@@ -84,6 +84,7 @@
       "cash": "เงินสด",
       "transfer": "โอนเงิน",
       "wallet": "Wallet",
+      "total": "รับรวม",
       "toHolding": "นำส่ง holding",
       "toCompany": "นำส่ง company"
     },
@@ -101,6 +102,14 @@
     },
     "contracts": {
       "title": "สัญญาวันนี้"
+    },
+    "scope": {
+      "branch": "สาขา",
+      "company": "บริษัท",
+      "holding": "Holding",
+      "all": "ทั้งหมด",
+      "wholeCompany": "ทั้งบริษัท",
+      "wholeHolding": "ทั้ง holding"
     }
   },
   "paymentMethod": {
@@ -203,7 +212,8 @@
     "holdingRemittance": "ส่ง Holding",
     "companyRevenue": "รายได้บริษัท",
     "branchLedger": "รายการเคลื่อนไหว",
-    "bills": "บิล"
+    "bills": "บิล",
+    "auditFlags": "ธงตรวจสอบ"
   },
   "user": {
     "id": "รหัสผู้ใช้",
@@ -2403,6 +2413,31 @@
     },
     "dayCloseHistory": {
       "description": "บันทึกประวัติการปิดวันพร้อมธงเตือน"
+    },
+    "auditFlags": {
+      "description": "ตรวจสอบหลังปิดวัน — ดูวันที่มีธงเตือนทุกสาขา",
+      "selectToView": "เลือกวันที่ปิดเพื่อดูรายละเอียด",
+      "noFlags": "ไม่มีธงเตือน",
+      "snapshotVsCalc": "ค่าตอนปิด vs ปัจจุบัน",
+      "noDrift": "ไม่มีความต่าง — ค่าตอนปิดตรงกับปัจจุบัน",
+      "drift": "ส่วนต่าง",
+      "driftCash": "ส่วนต่างเงินสด",
+      "driftTransfer": "ส่วนต่างเงินโอน",
+      "snapshotCash": "เงินสด (ตอนปิด)",
+      "calcCash": "เงินสด (ปัจจุบัน)",
+      "snapshotTransfer": "เงินโอน (ตอนปิด)",
+      "calcTransfer": "เงินโอน (ปัจจุบัน)",
+      "billActive": "บิลที่ใช้งาน",
+      "billVoided": "บิลยกเลิก",
+      "voidedAmount": "ยอดยกเลิก",
+      "refundCount": "คืนเงิน",
+      "refundAmount": "ยอดคืนเงิน",
+      "giftCount": "ของแถม",
+      "giftCostTotal": "ต้นทุนของแถม",
+      "openDayClose": "เปิดหน้าปิดวัน →",
+      "filterRangeLabel": "ช่วงวันที่",
+      "rowFlagsLabel": "ธงเตือน",
+      "tamperingHint": "มีบิลถูกยกเลิก/แก้ไขหลังปิดวัน"
     },
     "bills": {
       "title": "บิล",

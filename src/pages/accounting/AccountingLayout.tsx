@@ -2,9 +2,10 @@ import { useMemo, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  CalendarCheck, BookOpen, Wallet, Scale, ArrowUpRight, Coins, List, Receipt,
+  CalendarCheck, BookOpen, Wallet, Scale, ArrowUpRight, Coins, List, Receipt, ShieldAlert,
 } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 type NavItem =
   | { type: 'link'; path: string; labelKey: string; icon: typeof BookOpen }
@@ -14,10 +15,13 @@ export function AccountingLayout({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
   const navGuard = useNavGuard();
+  const { user } = useAuth();
+  const canSeeAudit = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(user?.role_code ?? '');
 
   const navItems: NavItem[] = useMemo(() => [
     { type: 'group', labelKey: 'accounting.groupDayClose' },
     { type: 'link', path: '/admin/accounting/day-close', labelKey: 'nav.dayClose', icon: CalendarCheck },
+    ...(canSeeAudit ? [{ type: 'link' as const, path: '/admin/accounting/audit-flags', labelKey: 'nav.auditFlags', icon: ShieldAlert }] : []),
     { type: 'link', path: '/admin/accounting/bills', labelKey: 'nav.bills', icon: Receipt },
     { type: 'group', labelKey: 'accounting.groupReports' },
     { type: 'link', path: '/admin/accounting/daily', labelKey: 'nav.dailyAccounting', icon: BookOpen },
@@ -27,7 +31,7 @@ export function AccountingLayout({ children }: { children: ReactNode }) {
     { type: 'group', labelKey: 'accounting.groupRemittance' },
     { type: 'link', path: '/admin/accounting/remittance', labelKey: 'nav.holdingRemittance', icon: ArrowUpRight },
     { type: 'link', path: '/admin/accounting/revenue', labelKey: 'nav.companyRevenue', icon: Coins },
-  ], []);
+  ], [canSeeAudit]);
 
   return (
     <div className="flex min-h-full">

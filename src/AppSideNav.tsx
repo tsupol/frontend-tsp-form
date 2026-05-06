@@ -41,7 +41,7 @@ import {
   // Fanout child icons — Commission
   UserCheck, ClipboardCheck,
   // Fanout child icons — Accounting
-  CalendarCheck, Wallet, List, ArrowUpRight, Receipt,
+  CalendarCheck, Wallet, List, ArrowUpRight, Receipt, ShieldAlert,
   // Dev sandbox
   FlaskConical, PenLine,
 } from 'lucide-react';
@@ -49,6 +49,7 @@ import { useAuth } from './contexts/AuthContext';
 import { useTheme } from './contexts/ThemeContext';
 import { useNavGuard } from './contexts/NavGuardContext';
 import { isLocalDev } from './lib/devEnv';
+import { defaultScopeFor, scopeQuery, scopeKey } from './lib/scope';
 
 const lgQuery = window.matchMedia('(min-width: 1024px)');
 const subscribeLg = (cb: () => void) => { lgQuery.addEventListener('change', cb); return () => lgQuery.removeEventListener('change', cb); };
@@ -88,7 +89,7 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
           onClick={() => setOpen(!open)}
         >
           <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-primary-contrast text-sm font-semibold shrink-0">
-            {initials}
+            <span style={{ transform: 'translateY(var(--text-shift-y, 0px))' }}>{initials}</span>
           </div>
           <div className="flex-1 text-left min-w-0 gap-1 flex flex-col">
             <div className="text-sm font-medium truncate leading-tight">{displayName}</div>
@@ -155,11 +156,17 @@ export const AppSideNav = () => {
   const role = user?.role_code ?? '';
   const canApprove = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
 
-  // Pending approvals count for nav badge (only for approver roles)
+  // Side-menu badges always use the user's default scope (independent of any
+  // dashboard scope picker). Backend RLS leaks on these views — must send the
+  // explicit scope filter, see UI_FEEDBACK/2026-05-06_dashboard_endpoints.md.
+  const scope = defaultScopeFor(user);
+  const sk = scopeKey(scope);
+  const sq = scopeQuery(scope);
+
   const { data: approvalsCountData } = useQuery({
-    queryKey: ['nav', 'pending-approvals-count'],
+    queryKey: ['nav', 'pending-approvals-count', sk],
     queryFn: () => apiClient.getPaginated<unknown>(
-      '/v_pending_approvals?select=type',
+      `/v_pending_approvals?status=eq.PENDING&select=type${sq}`,
       { page: 1, pageSize: 1 },
     ),
     enabled: canApprove,
@@ -168,15 +175,15 @@ export const AppSideNav = () => {
   });
   const pendingApprovals = approvalsCountData?.totalCount ?? 0;
 
-  // Pending slip submissions count
   const { data: slipsCountData } = useQuery({
-    queryKey: ['nav', 'pending-submissions-count'],
+    queryKey: ['nav', 'pending-submissions-count', sk],
     queryFn: () => apiClient.getPaginated<unknown>(
-      '/v_payment_submissions?status=eq.PENDING_REVIEW&select=id',
+      `/v_payment_submissions?status=eq.PENDING_REVIEW&select=id${sq}`,
       { page: 1, pageSize: 1 },
     ),
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
+    retry: false, // 403 until BE re-grants — don't loop
   });
   const pendingSlips = slipsCountData?.totalCount ?? 0;
 
@@ -311,6 +318,9 @@ export const AppSideNav = () => {
       children: [
         { type: 'group', key: 'grp-acc-close', label: t('accounting.groupDayClose') },
         { key: 'day-close', icon: <CalendarCheck size="1rem" />, label: t('nav.dayClose'), path: '/admin/accounting/day-close' },
+        ...(['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
+          { key: 'audit-flags', icon: <ShieldAlert size="1rem" />, label: t('nav.auditFlags'), path: '/admin/accounting/audit-flags' },
+        ] : []),
         { type: 'group', key: 'grp-acc-reports', label: t('accounting.groupReports') },
         { key: 'bills', icon: <Receipt size="1rem" />, label: t('nav.bills'), path: '/admin/accounting/bills' },
         { key: 'daily-accounting', icon: <BookOpen size="1rem" />, label: t('nav.dailyAccounting'), path: '/admin/accounting/daily' },

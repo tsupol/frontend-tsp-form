@@ -84,6 +84,7 @@
       "cash": "Cash",
       "transfer": "Transfer",
       "wallet": "Wallet",
+      "total": "Received total",
       "toHolding": "To holding",
       "toCompany": "To company"
     },
@@ -101,6 +102,14 @@
     },
     "contracts": {
       "title": "Contracts today"
+    },
+    "scope": {
+      "branch": "Branch",
+      "company": "Company",
+      "holding": "Holding",
+      "all": "All",
+      "wholeCompany": "Whole company",
+      "wholeHolding": "Whole holding"
     }
   },
   "paymentMethod": {
@@ -203,7 +212,8 @@
     "holdingRemittance": "Holding Remittance",
     "companyRevenue": "Company Revenue",
     "branchLedger": "Branch Ledger",
-    "bills": "Bills"
+    "bills": "Bills",
+    "auditFlags": "Audit Flags"
   },
   "user": {
     "id": "User ID",
@@ -2403,6 +2413,31 @@
     },
     "dayCloseHistory": {
       "description": "Historical day close snapshots with audit flags."
+    },
+    "auditFlags": {
+      "description": "Post-close audit — review flagged days across all branches.",
+      "selectToView": "Select a closed day to view details",
+      "noFlags": "No flags raised",
+      "snapshotVsCalc": "Snapshot vs current",
+      "noDrift": "No drift — snapshot matches current calculation",
+      "drift": "Drift",
+      "driftCash": "Cash drift",
+      "driftTransfer": "Transfer drift",
+      "snapshotCash": "Snapshot cash",
+      "calcCash": "Current cash",
+      "snapshotTransfer": "Snapshot transfer",
+      "calcTransfer": "Current transfer",
+      "billActive": "Active bills",
+      "billVoided": "Voided bills",
+      "voidedAmount": "Voided amount",
+      "refundCount": "Refunds",
+      "refundAmount": "Refund amount",
+      "giftCount": "Gifts",
+      "giftCostTotal": "Gift cost",
+      "openDayClose": "Open day-close →",
+      "filterRangeLabel": "Date range",
+      "rowFlagsLabel": "Flags raised",
+      "tamperingHint": "Bills voided/edited after close"
     },
     "bills": {
       "title": "Bills",

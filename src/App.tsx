@@ -64,6 +64,7 @@ import { HoldingRemittancePage } from './pages/accounting/HoldingRemittancePage'
 import { CompanyRevenuePage } from './pages/accounting/CompanyRevenuePage';
 import { BranchLedgerPage } from './pages/accounting/BranchLedgerPage';
 import { BillsPage } from './pages/accounting/BillsPage';
+import { AuditFlagsPage } from './pages/accounting/AuditFlagsPage';
 import { RetailBillsPage } from './pages/retail/RetailBillsPage';
 import { DevLayout } from './pages/dev/DevLayout';
 import { DevSignaturePage } from './pages/dev/DevSignaturePage';
@@ -672,6 +673,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <AccountingLayout><CompanyRevenuePage /></AccountingLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/accounting/audit-flags"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <AccountingLayout><AuditFlagsPage /></AccountingLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
