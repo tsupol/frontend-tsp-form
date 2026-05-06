@@ -191,17 +191,21 @@ interface EntityMedia {
 
 // ── Tabs ─────────────────────────────────────────────────────────────────────
 
-type DetailTab = 'overview' | 'installments' | 'txns' | 'customers' | 'notes' | 'payments' | 'wallets' | 'device';
+type DetailTab = 'overview' | 'money' | 'device' | 'customers' | 'notes';
 
-const TABS: DetailTab[] = ['overview', 'installments', 'txns', 'payments', 'wallets', 'device', 'notes', 'customers'];
+const TABS: DetailTab[] = ['overview', 'money', 'device', 'customers', 'notes'];
+
+type MoneySection = 'installments' | 'txns' | 'payments' | 'wallets';
+
+const MONEY_SECTIONS: MoneySection[] = ['installments', 'txns', 'payments', 'wallets'];
 
 // ── Scrollable Tabs ─────────────────────────────────────────────────────────
 
-function ScrollableTabs({ tabs, activeTab, onTabChange, t }: {
-  tabs: DetailTab[];
-  activeTab: DetailTab;
-  onTabChange: (tab: DetailTab) => void;
-  t: (key: string) => string;
+function ScrollableTabs<T extends string>({ tabs, activeTab, onTabChange, renderLabel }: {
+  tabs: readonly T[];
+  activeTab: T;
+  onTabChange: (tab: T) => void;
+  renderLabel: (tab: T) => React.ReactNode;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -251,7 +255,7 @@ function ScrollableTabs({ tabs, activeTab, onTabChange, t }: {
             }`}
             onClick={() => onTabChange(tab)}
           >
-            {t(`contract.tab_${tab}`)}
+            {renderLabel(tab)}
           </button>
         ))}
       </div>
@@ -372,7 +376,12 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
       )}
 
       {/* Tabs with scroll arrows */}
-      <ScrollableTabs tabs={TABS} activeTab={activeTab} onTabChange={handleTabChange} t={t} />
+      <ScrollableTabs
+        tabs={TABS}
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        renderLabel={(tab) => t(`contract.tab_${tab}`)}
+      />
 
       {/* Tab content */}
       <div className="flex-1 overflow-auto better-scroll">
@@ -386,8 +395,7 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
             setDeliveryModalOpen={setDeliveryModalOpen}
           />
         )}
-        {activeTab === 'installments' && <InstallmentsTab contractId={contractId} t={t} />}
-        {activeTab === 'txns' && <TxnsTab contractId={contractId} t={t} />}
+        {activeTab === 'money' && <MoneyTab contractId={contractId} contract={contract} t={t} />}
         {activeTab === 'customers' && (
           <CustomersTab
             contractId={contractId}
@@ -398,8 +406,6 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
           />
         )}
         {activeTab === 'notes' && <NotesTab contractId={contractId} t={t} dirtyRef={notesDirtyRef} />}
-        {activeTab === 'payments' && <PaymentsTab contractId={contractId} t={t} />}
-        {activeTab === 'wallets' && <WalletsTab contract={contract} />}
         {activeTab === 'device' && (
           <DeviceTab contract={contract} onRequestAction={setRequestedAction} />
         )}
@@ -410,7 +416,7 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
         contract={contract}
         requestedAction={requestedAction}
         onRequestedActionConsumed={() => setRequestedAction(null)}
-        onRequestUpdateDelivery={() => setDeliveryModalOpen(true)}
+        onNavigateTab={(tab) => handleTabChange(tab)}
         onRefresh={() => {
           queryClient.invalidateQueries({ queryKey: ['contract-detail', contractId] });
           queryClient.invalidateQueries({ queryKey: ['contract-search'] });
@@ -696,6 +702,97 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
           queryClient.invalidateQueries({ queryKey: ['contract-detail', contract.id] });
         }}
       />
+    </div>
+  );
+}
+
+// ── Money Tab (wraps Installments / Txns / Payments / Wallets) ───────────────
+
+function MoneyTab({ contractId, contract, t }: {
+  contractId: number;
+  contract: ContractDetail;
+  t: ReturnType<typeof useTranslation>['t'];
+}) {
+  const [section, setSection] = useState<MoneySection>('installments');
+
+  // Counts for sub-tab badges. Use HEAD (count=exact) so we don't pull rows
+  // we won't render.
+  const { data: installmentDueCount } = useQuery({
+    queryKey: ['contract-installments-due-count', contractId],
+    queryFn: async () => {
+      const res = await apiClient.getPaginated<Installment>(
+        `/v_installments?contract_id=eq.${contractId}&status=in.(PENDING,DUE,OVERDUE)`,
+        { page: 1, pageSize: 1 },
+      );
+      return res.totalCount;
+    },
+    staleTime: 30 * 1000,
+  });
+
+  const { data: txnCount } = useQuery({
+    queryKey: ['contract-txns-count', contractId],
+    queryFn: async () => {
+      const res = await apiClient.getPaginated<ContractTxn>(
+        `/v_contract_txns?contract_id=eq.${contractId}`,
+        { page: 1, pageSize: 1 },
+      );
+      return res.totalCount;
+    },
+    staleTime: 30 * 1000,
+  });
+
+  const { data: paymentCount } = useQuery({
+    queryKey: ['contract-payments-count', contractId],
+    queryFn: async () => {
+      const res = await apiClient.getPaginated<Payment>(
+        `/v_payments?contract_id=eq.${contractId}`,
+        { page: 1, pageSize: 1 },
+      );
+      return res.totalCount;
+    },
+    staleTime: 30 * 1000,
+  });
+
+  const walletNonEmptyCount = [
+    contract.saving_balance,
+    contract.credit_balance,
+    contract.insurance_balance,
+  ].filter(b => b != null && b !== 0).length;
+
+  const counts: Record<MoneySection, number | null> = {
+    installments: installmentDueCount ?? null,
+    txns: txnCount ?? null,
+    payments: paymentCount ?? null,
+    wallets: walletNonEmptyCount,
+  };
+
+  return (
+    <div className="flex flex-col h-full min-h-0">
+      <ScrollableTabs
+        tabs={MONEY_SECTIONS}
+        activeTab={section}
+        onTabChange={setSection}
+        renderLabel={(s) => {
+          const c = counts[s];
+          const isActive = section === s;
+          return (
+            <span className="inline-flex items-center gap-1.5">
+              {t(`contract.moneySection_${s}`)}
+              {c != null && c > 0 && (
+                <Badge size="xs" className={isActive ? 'bg-primary/15 text-primary' : 'bg-fg/10 text-fg/70'}>
+                  {c}
+                </Badge>
+              )}
+            </span>
+          );
+        }}
+      />
+      <div className="flex-1 overflow-auto better-scroll">
+        {section === 'installments' && <InstallmentsTab contractId={contractId} t={t} />}
+        {section === 'txns' && <TxnsTab contractId={contractId} t={t} />}
+        {section === 'payments' && <PaymentsTab contractId={contractId} t={t} />}
+        {section === 'wallets' && <WalletsTab contract={contract} />}
+      </div>
     </div>
   );
 }

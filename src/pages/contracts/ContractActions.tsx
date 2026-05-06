@@ -581,6 +581,31 @@ const CATEGORY_OVERRIDE: Record<string, string> = {
   ADD_NOTE: 'LIFECYCLE',
 };
 
+// Maps `elsewhere` actions to the tab they live in, so a footer click can navigate there
+const ELSEWHERE_TAB: Record<string, 'overview' | 'device' | 'notes' | 'customers' | 'money'> = {
+  UPDATE_DELIVERY: 'overview',
+  SAVING_DEPOSIT: 'money',
+  SAVING_CASHOUT: 'money',
+  SAVING_DEDUCT: 'money',
+  CREDIT_CASHOUT: 'money',
+  INSURANCE_TOPUP: 'money',
+  INSURANCE_DEDUCT: 'money',
+  INSURANCE_CASHOUT: 'money',
+  APPLY_INSURANCE: 'money',
+  ADD_NOTE: 'notes',
+  ATTACH_CUSTOMER: 'customers',
+  DETACH_CUSTOMER: 'customers',
+  ADD_GUARANTOR: 'customers',
+  REMOVE_GUARANTOR: 'customers',
+  BIND_DEVICE: 'device',
+  UNBIND_DEVICE: 'device',
+  CUSTOMER_DEPOSIT_DEVICE: 'device',
+  RETURN_DEPOSIT: 'device',
+  BIND_LOANER: 'device',
+  UNBIND_LOANER: 'device',
+  DEVICE_REPAIR_REQUEST: 'device',
+};
+
 const ACTION_PLACEMENT: Record<string, ActionPlacement> = {
   // Wallet ops live in the Wallets tab
   SAVING_DEPOSIT:    { kind: 'elsewhere', where: 'Wallets tab → Saving' },
@@ -659,12 +684,12 @@ const CATEGORY_LABEL_KEY: Record<string, string> = {
   DOCUMENT: 'contract.actionCategory.document',
 };
 
-export function ContractActionButtons({ contract, onRefresh, requestedAction, onRequestedActionConsumed, onRequestUpdateDelivery }: {
+export function ContractActionButtons({ contract, onRefresh, requestedAction, onRequestedActionConsumed, onNavigateTab }: {
   contract: ContractForActions;
   onRefresh: () => void;
   requestedAction?: ContractAction | null;
   onRequestedActionConsumed?: () => void;
-  onRequestUpdateDelivery?: () => void;
+  onNavigateTab?: (tab: 'overview' | 'device' | 'notes' | 'customers' | 'money') => void;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -723,10 +748,14 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   };
 
   const handleBackendAction = (action: BackendContractAction) => {
-    // Special-case: UPDATE_DELIVERY opens the existing DeliveryModal in the Overview tab
-    if (action.action_code === 'UPDATE_DELIVERY') {
-      onRequestUpdateDelivery?.();
-      return;
+    // Routed-elsewhere actions: jump to their destination tab instead of opening a modal
+    const placement = ACTION_PLACEMENT[action.action_code];
+    if (placement?.kind === 'elsewhere') {
+      const target = ELSEWHERE_TAB[action.action_code];
+      if (target) {
+        onNavigateTab?.(target);
+        return;
+      }
     }
     const feAction = BACKEND_TO_FE_ACTION[action.action_code];
     if (feAction) {
