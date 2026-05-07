@@ -58,7 +58,7 @@ export function CompanyLayout({ children }: { children: ReactNode }) {
               }}
               className={`flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors ${
                 isActive
-                  ? 'bg-primary/10 text-primary font-medium'
+                  ? 'bg-item-active-bg text-item-active-fg font-medium'
                   : 'text-fg hover:bg-surface-hover'
               }`}
             >

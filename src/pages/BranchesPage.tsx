@@ -249,7 +249,7 @@ export function BranchesPage() {
             <h1 className="heading-2">{t('branches.title')}</h1>
             <p className="text-sm text-fg/60 mt-1">{t('branches.description')}</p>
           </div>
-          <Button size="sm" color="primary" startIcon={<Plus size={16} />} onClick={openCreate}>
+          <Button color="primary" startIcon={<Plus size={16} />} onClick={openCreate}>
             {t('org.addBranch')}
           </Button>
         </div>

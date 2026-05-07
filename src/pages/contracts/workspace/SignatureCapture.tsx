@@ -164,7 +164,7 @@ export function SignatureCapture({ fileUrl, uploading, disabled, cacheBust = 0, 
             disabled={disabled || uploading}
             className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded transition-colors ${
               mode === id
-                ? 'bg-primary/10 text-primary font-medium'
+                ? 'bg-item-active-bg text-item-active-fg font-medium'
                 : 'text-fg/70 hover:text-fg'
             }`}
           >
