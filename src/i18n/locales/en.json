@@ -329,7 +329,9 @@
   "public": {
     "welcome": "Welcome",
     "title": "NNF System",
-    "description": "Enterprise management platform"
+    "headline": "Run your branches, contracts and inventory in one place",
+    "description": "Enterprise management platform",
+    "scope": "Contracts • Branches • Inventory • Finance"
   },
   "device": {
     "title": "Device Validation",
