@@ -305,7 +305,7 @@ export function StaffCommissionPage() {
             <button
               key={tb.key}
               className={`px-4 py-2 text-sm font-medium transition-colors cursor-pointer border-b-2 ${
-                tab === tb.key ? 'border-primary text-primary' : 'border-transparent text-fg/50 hover:text-fg/80'
+                tab === tb.key ? 'border-primary text-primary' : 'border-transparent text-fg'
               }`}
               onClick={() => { setTab(tb.key); }}
             >

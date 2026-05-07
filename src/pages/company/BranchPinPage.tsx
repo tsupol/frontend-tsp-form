@@ -260,7 +260,7 @@ function ChangeLogTab({ branches, onSetPin }: { branches: Branch[]; onSetPin: (b
       accessorKey: 'set_at',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('settings.pin.setAt')} />,
       cell: ({ row }) => (
-        <span className="text-xs tabular-nums opacity-60">{formatBangkokTime(row.original.set_at)}</span>
+        <span className="text-xs tabular-nums text-subtle">{formatBangkokTime(row.original.set_at)}</span>
       ),
     },
     {
@@ -462,7 +462,7 @@ function UsageLogTab({ branches, permissionOptions }: { branches: Branch[]; perm
       accessorKey: 'used_at',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('settings.pin.usedAt')} />,
       cell: ({ row }) => (
-        <span className="text-xs tabular-nums opacity-60">{formatBangkokTime(row.original.used_at)}</span>
+        <span className="text-xs tabular-nums text-subtle">{formatBangkokTime(row.original.used_at)}</span>
       ),
     },
   ];

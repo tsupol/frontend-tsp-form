@@ -408,7 +408,7 @@ export function BankAccountsPage() {
       cell: ({ row }) => (
         <div>
           <div className="font-medium">{row.original.bank_name}</div>
-          <div className="text-xs opacity-50 tabular-nums">{row.original.account_number} · {row.original.account_name}</div>
+          <div className="text-xs text-subtle tabular-nums">{row.original.account_number} · {row.original.account_name}</div>
         </div>
       ),
     },

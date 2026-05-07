@@ -9,7 +9,7 @@ import { NavGuardProvider } from './contexts/NavGuardContext';
 import { queryClient } from './lib/queryClient';
 import App from './App';
 import './i18n/config';
-import './index.css';
+import './app-theme.css';
 import './styles/typography.css';
 import './styles/layout.css';
 import './app.css';

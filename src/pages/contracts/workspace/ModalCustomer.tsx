@@ -362,7 +362,7 @@ export function ModalCustomer({ open, onClose }: Props) {
                   {references.map(r => (
                     <div key={r.id} className="flex items-center gap-2 text-sm py-1">
                       <span className="font-medium">{r.name} {r.last_name}</span>
-                      {r.relation && <Badge size="xs" className="bg-fg/10 text-fg/60">{r.relation}</Badge>}
+                      {r.relation && <Badge size="xs" color="default">{r.relation}</Badge>}
                       {r.tel && <span className="text-subtle tabular-nums">{r.tel}</span>}
                     </div>
                   ))}

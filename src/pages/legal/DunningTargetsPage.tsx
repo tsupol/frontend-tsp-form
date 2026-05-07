@@ -376,7 +376,7 @@ export function DunningTargetsPage() {
             <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
               {/* ── List Panel ── */}
               <PageNavPanel id="list" className={isMobile ? '' : 'w-5/12 xl:w-4/12 border-r border-line flex flex-col'}>
-                <div className={`flex-1 overflow-auto better-scroll ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
+                <div className={`data-table-content better-scroll ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
                   {list.length === 0 ? (
                     <div className="p-8 text-center text-subtler">{t('common.noData')}</div>
                   ) : (

@@ -301,15 +301,15 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
                     >
                       {ro.repair_no}
                     </Link>
-                    <Badge size="xs" className={
-                      ro.status === 'OPEN' ? 'bg-warning/15 text-warning'
-                        : ro.status === 'COMPLETED' ? 'bg-success/15 text-success'
-                        : 'bg-fg/10 text-fg/60'
+                    <Badge size="xs" color={
+                      ro.status === 'OPEN' ? 'warning'
+                        : ro.status === 'COMPLETED' ? 'success'
+                        : 'default'
                     }>
                       {ro.status}
                     </Badge>
                     {ro.result && (
-                      <Badge size="xs" className={ro.result === 'FIXED' ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'}>
+                      <Badge size="xs" color={ro.result === 'FIXED' ? 'success' : 'danger'}>
                         {ro.result}
                       </Badge>
                     )}

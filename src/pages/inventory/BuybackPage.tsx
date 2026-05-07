@@ -82,13 +82,13 @@ interface Branch {
 // Status display
 // ============================================================================
 
-const BUYBACK_STATUS_COLOR: Record<string, string> = {
-  DRAFT: 'bg-fg/10 text-fg/60',
-  PENDING_APPROVAL: 'bg-warning/15 text-warning',
-  APPROVED: 'bg-success/15 text-success',
-  REJECTED: 'bg-danger/15 text-danger',
-  COMPLETED: 'bg-fg/10 text-fg/60',
-  CANCELLED: 'bg-danger/15 text-danger',
+const BUYBACK_STATUS_COLOR: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'default'> = {
+  DRAFT: 'default',
+  PENDING_APPROVAL: 'warning',
+  APPROVED: 'success',
+  REJECTED: 'danger',
+  COMPLETED: 'default',
+  CANCELLED: 'danger',
 };
 
 const BUYBACK_STATUS_OPTIONS = [
@@ -100,16 +100,16 @@ const BUYBACK_STATUS_OPTIONS = [
   { value: 'CANCELLED', label: 'Cancelled' },
 ];
 
-const ASSET_MATCH_COLOR: Record<string, string> = {
-  MATCHED: 'bg-success/15 text-success',
-  NO_MATCH: 'bg-warning/15 text-warning',
-  CONFLICT: 'bg-danger/15 text-danger',
+const ASSET_MATCH_COLOR: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'default'> = {
+  MATCHED: 'success',
+  NO_MATCH: 'warning',
+  CONFLICT: 'danger',
 };
 
-const INTAKE_STATUS_COLOR: Record<string, string> = {
-  PENDING: 'bg-warning/15 text-warning',
-  COMPLETED: 'bg-success/15 text-success',
-  FAILED: 'bg-danger/15 text-danger',
+const INTAKE_STATUS_COLOR: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'default'> = {
+  PENDING: 'warning',
+  COMPLETED: 'success',
+  FAILED: 'danger',
 };
 
 // ============================================================================
@@ -267,11 +267,11 @@ export function BuybackPage() {
                           </div>
                         )}
                         <div className="flex items-center gap-2 mt-1 -ml-0.5">
-                          <Badge size="xs" className={BUYBACK_STATUS_COLOR[order.status] ?? 'bg-fg/10 text-fg/60'}>
+                          <Badge size="xs" color={BUYBACK_STATUS_COLOR[order.status] ?? 'default'}>
                             {t(`buyback.status_${order.status}`, order.status)}
                           </Badge>
                           {ps?.asset_match_result && (
-                            <Badge size="xs" className={ASSET_MATCH_COLOR[ps.asset_match_result] ?? 'bg-fg/10 text-fg/60'}>
+                            <Badge size="xs" color={ASSET_MATCH_COLOR[ps.asset_match_result] ?? 'default'}>
                               {ps.asset_match_result}
                             </Badge>
                           )}
@@ -396,7 +396,7 @@ function BuybackDetailPanel({
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
           <span className="font-semibold">{detail.po_no}</span>
-          <Badge size="xs" className={BUYBACK_STATUS_COLOR[detail.status] ?? 'bg-fg/10 text-fg/60'}>
+          <Badge size="xs" color={BUYBACK_STATUS_COLOR[detail.status] ?? 'default'}>
             {t(`buyback.status_${detail.status}`, detail.status)}
           </Badge>
         </div>
@@ -426,7 +426,7 @@ function BuybackDetailPanel({
       </div>
 
       {detail.notes && (
-        <div className="flex-none px-4 py-2 border-b border-line text-xs text-fg/70 whitespace-pre-line">
+        <div className="flex-none px-4 py-2 border-b border-line text-xs text-subtle whitespace-pre-line">
           {detail.notes}
         </div>
       )}
@@ -461,15 +461,15 @@ function BuybackDetailPanel({
               </div>
               <div className="flex flex-wrap items-center gap-1.5 mt-1">
                 {line.item_condition && (
-                  <Badge size="xs" className="bg-fg/10 text-fg/60">{line.item_condition}</Badge>
+                  <Badge size="xs" color="default">{line.item_condition}</Badge>
                 )}
                 {line.asset_match_result && (
-                  <Badge size="xs" className={ASSET_MATCH_COLOR[line.asset_match_result] ?? 'bg-fg/10 text-fg/60'}>
+                  <Badge size="xs" color={ASSET_MATCH_COLOR[line.asset_match_result] ?? 'default'}>
                     {line.asset_match_result}
                   </Badge>
                 )}
                 {line.asset_intake_status && (
-                  <Badge size="xs" className={INTAKE_STATUS_COLOR[line.asset_intake_status] ?? 'bg-fg/10 text-fg/60'}>
+                  <Badge size="xs" color={INTAKE_STATUS_COLOR[line.asset_intake_status] ?? 'default'}>
                     {line.asset_intake_status}
                   </Badge>
                 )}

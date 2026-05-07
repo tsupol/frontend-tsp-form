@@ -250,7 +250,7 @@ export function ModalProductPlan({ open, onClose }: Props) {
                         <div className="font-medium text-sm truncate">{model.family_name} {model.model_name}</div>
                         <div className="text-xs text-subtle">{model.brand_name}</div>
                       </div>
-                      <Badge size="xs" className="bg-fg/10 text-fg/60">{model.variant_count} {t('wizard.colors')}</Badge>
+                      <Badge size="xs" color="default">{model.variant_count} {t('wizard.colors')}</Badge>
                       {model.model_id === localModelId && <Check size={16} className="text-primary shrink-0" />}
                     </button>
                   ))}

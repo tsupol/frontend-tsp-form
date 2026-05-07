@@ -12,7 +12,7 @@ import { useAuth } from '../../contexts/AuthContext';
 // ============================================================================
 
 interface RepairOrder {
-  id: number;
+  repair_order_id: number;
   holding_id: number;
   branch_id: number;
   branch_name: string;
@@ -49,10 +49,10 @@ interface Branch {
 // Status display
 // ============================================================================
 
-const REPAIR_STATUS_COLOR: Record<string, string> = {
-  OPEN: 'bg-warning/15 text-warning',
-  COMPLETED: 'bg-success/15 text-success',
-  CANCELLED: 'bg-fg/10 text-fg/60',
+const REPAIR_STATUS_COLOR: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'default'> = {
+  OPEN: 'warning',
+  COMPLETED: 'success',
+  CANCELLED: 'default',
 };
 
 const REPAIR_STATUS_OPTIONS = [
@@ -128,12 +128,12 @@ export function RepairsPage() {
   useEffect(() => { setPageIndex(0); }, [filterStatus, filterBranchId]);
 
   useEffect(() => {
-    if (selectedId && list.length > 0 && !list.find(o => o.id === selectedId)) {
+    if (selectedId && list.length > 0 && !list.find(o => o.repair_order_id === selectedId)) {
       setSelectedId(null);
     }
   }, [list, selectedId]);
 
-  const selectedOrder = list.find(o => o.id === selectedId) ?? null;
+  const selectedOrder = list.find(o => o.repair_order_id === selectedId) ?? null;
 
   const invalidateList = () => {
     queryClient.invalidateQueries({ queryKey: ['repair-orders'] });
@@ -202,14 +202,14 @@ export function RepairsPage() {
                 data={list}
                 renderRow={(row) => {
                   const order = row.original;
-                  const isSelected = order.id === selectedId;
+                  const isSelected = order.repair_order_id === selectedId;
                   return (
                     <button
-                      key={order.id}
+                      key={order.repair_order_id}
                       className={`w-full text-left px-4 py-2.5 border-b border-line flex items-center gap-3 transition-colors cursor-pointer ${
-                        isSelected ? 'bg-primary/10' : 'hover:bg-surface-hover'
+                        isSelected ? 'bg-item-active-bg text-item-active-fg' : 'hover:bg-surface-hover'
                       }`}
-                      onClick={() => { setSelectedId(order.id); if (isMobile) goTo('detail'); }}
+                      onClick={() => { setSelectedId(order.repair_order_id); if (isMobile) goTo('detail'); }}
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-baseline gap-1.5 min-w-0">
@@ -219,11 +219,11 @@ export function RepairsPage() {
                           {[order.brand_name, order.model_name].filter(Boolean).join(' ')} · {order.asset_code}
                         </div>
                         <div className="flex items-center gap-2 mt-1 -ml-0.5">
-                          <Badge size="xs" className={REPAIR_STATUS_COLOR[order.status] ?? 'bg-fg/10 text-fg/60'}>
+                          <Badge size="xs" color={REPAIR_STATUS_COLOR[order.status] ?? 'default'}>
                             {t(`repair.status_${order.status}`, order.status)}
                           </Badge>
                           {order.result && (
-                            <Badge size="xs" className={order.result === 'FIXED' ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'}>
+                            <Badge size="xs" color={order.result === 'FIXED' ? 'success' : 'danger'}>
                               {t(`repair.result_${order.result}`, order.result)}
                             </Badge>
                           )}
@@ -301,11 +301,11 @@ function RepairDetailPanel({
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
           <span className="font-semibold">{order.repair_no}</span>
-          <Badge size="xs" className={REPAIR_STATUS_COLOR[order.status] ?? 'bg-fg/10 text-fg/60'}>
+          <Badge size="xs" color={REPAIR_STATUS_COLOR[order.status] ?? 'default'}>
             {t(`repair.status_${order.status}`, order.status)}
           </Badge>
           {order.result && (
-            <Badge size="xs" className={order.result === 'FIXED' ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'}>
+            <Badge size="xs" color={order.result === 'FIXED' ? 'success' : 'danger'}>
               {t(`repair.result_${order.result}`, order.result)}
             </Badge>
           )}
@@ -355,7 +355,7 @@ function RepairDetailPanel({
         {order.route_decision && (
           <div>
             <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-1">{t('repair.routeDecision')}</h3>
-            <Badge size="xs" className="bg-info/15 text-info">
+            <Badge size="xs" color="info">
               {t(`repair.route_${order.route_decision}`, order.route_decision.replace(/_/g, ' '))}
             </Badge>
             {order.route_note && <p className="text-sm text-fg/80 mt-1 whitespace-pre-wrap">{order.route_note}</p>}
@@ -454,7 +454,7 @@ function CloseRepairModal({
   const mutation = useMutation({
     mutationFn: () =>
       apiClient.rpc('fn_inv_repair_close', {
-        p_repair_order_id: order.id,
+        p_repair_order_id: order.repair_order_id,
         p_result: result,
         p_note: note || null,
       }),
@@ -560,7 +560,7 @@ function RouteRepairModal({
   const mutation = useMutation({
     mutationFn: () =>
       apiClient.rpc('fn_inv_repair_route', {
-        p_repair_order_id: order.id,
+        p_repair_order_id: order.repair_order_id,
         p_destination: destination,
         p_loaner_action: hasLoaner ? loanerAction : null,
         p_note: note || null,
@@ -601,7 +601,7 @@ function RouteRepairModal({
               <div className="text-xs text-subtle">{order.variant_name} · {order.sku_code}</div>
               {order.serial_no && <div className="text-xs text-fg/50 font-mono mt-0.5">{order.serial_no}</div>}
             </div>
-            <Badge size="xs" className={order.result === 'FIXED' ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'}>
+            <Badge size="xs" color={order.result === 'FIXED' ? 'success' : 'danger'}>
               {t(`repair.result_${order.result}`, order.result ?? '')}
             </Badge>
           </div>

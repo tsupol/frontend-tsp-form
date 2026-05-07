@@ -1003,7 +1003,7 @@ function PasswordModal({ user, open, onClose }: { user: VUser | null; open: bool
   const modeButtonClass = (active: boolean) =>
     `flex-1 py-1.5 text-sm font-medium rounded transition-colors cursor-pointer ${
       active
-        ? 'bg-primary text-on-primary'
+        ? 'bg-primary text-primary-contrast'
         : 'text-control-label hover:bg-surface-hover'
     }`;
 
@@ -1329,7 +1329,7 @@ export function UsersPage() {
       cell: ({ row }) => (
         <div>
           <div className="text-xs font-medium">{row.getValue('username')}</div>
-          <div className="text-[11px] opacity-50">{roleMap.get(row.original.role_code) ?? row.original.role_code}</div>
+          <div className="text-[11px] text-subtler">{roleMap.get(row.original.role_code) ?? row.original.role_code}</div>
         </div>
       ),
     },
@@ -1352,7 +1352,7 @@ export function UsersPage() {
         return (
           <div>
             <div className="text-xs">{company}</div>
-            {branch && <div className="text-[11px] opacity-50">{branch}</div>}
+            {branch && <div className="text-[11px] text-subtler">{branch}</div>}
           </div>
         );
       },

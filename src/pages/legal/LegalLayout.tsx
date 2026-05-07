@@ -33,7 +33,7 @@ export function LegalLayout({ children }: { children: ReactNode }) {
               className={`flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors ${
                 isActive
                   ? 'bg-item-active-bg text-item-active-fg font-medium'
-                  : 'text-fg/70 hover:bg-surface-hover hover:text-fg'
+                  : 'text-fg hover:bg-surface-hover'
               }`}
             >
               <Icon size={15} />

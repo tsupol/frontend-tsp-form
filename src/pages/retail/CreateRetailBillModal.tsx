@@ -623,7 +623,7 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
           {/* Total + change */}
           <div className="flex flex-col items-end pt-2 pb-6 border-t border-line">
             <div className="flex items-baseline gap-3">
-              <span className="text-base text-fg/70">{t('retail.create.total')}</span>
+              <span className="text-base text-subtle">{t('retail.create.total')}</span>
               <span className="heading-3 tabular-nums">{fmtCurrency(total)}</span>
             </div>
             {paymentAmount > total && (

@@ -188,12 +188,9 @@ export function AuditFlagsPage() {
                     >
                       <Lock size={14} className="text-success shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm flex items-center gap-2">
+                        <div className="text-xs font-medium flex items-center gap-2">
                           <DateTime value={r.close_date} showTime={false} />
-                          <span className="text-fg/50 truncate">· {r.branch_name}</span>
-                        </div>
-                        <div className="text-xs text-fg/60 flex items-center gap-2 mt-0.5">
-                          <span>{r.bill_active} {t('accounting.dayClose.bills')}</span>
+                          <span className="text-subtle">· {r.bill_active} {t('accounting.dayClose.bills')}</span>
                           {flagCount > 0 && (
                             <span className="inline-flex items-center gap-1 text-warning">
                               <AlertTriangle size={10} />
@@ -207,6 +204,7 @@ export function AuditFlagsPage() {
                             </span>
                           )}
                         </div>
+                        <div className="text-[11px] text-subtle truncate mt-0.5">{r.branch_name}</div>
                       </div>
                       <div className="text-right shrink-0 text-sm tabular-nums">
                         <div>{fmtCurrency(r.snapshot_cash + r.snapshot_transfer)}</div>

@@ -93,7 +93,7 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
           </div>
           <div className="flex-1 text-left min-w-0 gap-1 flex flex-col">
             <div className="text-sm font-medium truncate leading-tight">{displayName}</div>
-            <div className="text-xs text-muted leading-tight truncate">{subtitle}</div>
+            <div className="text-xs leading-tight text-subtle truncate">{subtitle}</div>
           </div>
           <ChevronsUpDown size={14} className="opacity-50 shrink-0" />
         </button>

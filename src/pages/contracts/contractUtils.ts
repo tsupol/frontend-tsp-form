@@ -2,23 +2,25 @@ import type { TFunction } from 'i18next';
 
 // ── State badge helpers ─────────────────────────────────────────────────────
 
-export function getStateColor(state: string): string {
+export type BadgeColor = 'success' | 'warning' | 'danger' | 'info' | 'primary' | 'default';
+
+export function getStateColor(state: string): BadgeColor {
   switch (state) {
-    case 'DRAFT': return 'bg-fg/10 text-fg/60';
-    case 'SAVING': return 'bg-info/15 text-info';
-    case 'PENDING_APPROVAL': return 'bg-warning/15 text-warning';
-    case 'APPROVED': return 'bg-info/15 text-info';
-    case 'PENDING_PAYMENT': return 'bg-warning/15 text-warning';
-    case 'ACTIVE': return 'bg-success/15 text-success';
-    case 'WAIT_LEGAL_PROCESS': return 'bg-warning/15 text-warning';
-    case 'ON_LEGAL_PROCESS': return 'bg-danger/15 text-danger';
-    case 'ON_COURT_PROCESS': return 'bg-danger/20 text-danger';
-    case 'COMPLETED': return 'bg-primary/15 text-primary';
-    case 'TERMINATED': return 'bg-danger/15 text-danger';
-    case 'VOIDED': return 'bg-fg/10 text-fg/40';
-    case 'CANCELLED': return 'bg-fg/10 text-fg/40';
-    case 'EXPIRED': return 'bg-fg/10 text-fg/40';
-    default: return 'bg-fg/10 text-fg/60';
+    case 'DRAFT': return 'default';
+    case 'SAVING': return 'info';
+    case 'PENDING_APPROVAL': return 'warning';
+    case 'APPROVED': return 'info';
+    case 'PENDING_PAYMENT': return 'warning';
+    case 'ACTIVE': return 'success';
+    case 'WAIT_LEGAL_PROCESS': return 'warning';
+    case 'ON_LEGAL_PROCESS': return 'danger';
+    case 'ON_COURT_PROCESS': return 'danger';
+    case 'COMPLETED': return 'primary';
+    case 'TERMINATED': return 'danger';
+    case 'VOIDED': return 'default';
+    case 'CANCELLED': return 'default';
+    case 'EXPIRED': return 'default';
+    default: return 'default';
   }
 }
 

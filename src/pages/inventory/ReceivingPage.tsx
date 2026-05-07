@@ -80,10 +80,10 @@ interface Branch {
 // Status display
 // ============================================================================
 
-const RECEIPT_STATUS_COLOR: Record<string, string> = {
-  DRAFT: 'bg-fg/10 text-fg/60',
-  CONFIRMED: 'bg-success/15 text-success',
-  CANCELLED: 'bg-danger/15 text-danger',
+const RECEIPT_STATUS_COLOR: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'default'> = {
+  DRAFT: 'default',
+  CONFIRMED: 'success',
+  CANCELLED: 'danger',
 };
 
 const RECEIPT_STATUS_OPTIONS = [
@@ -225,29 +225,27 @@ export function ReceivingPage() {
                   return (
                     <button
                       key={receipt.id}
-                      className={`w-full text-left px-4 py-2.5 border-b border-line flex items-center gap-3 transition-colors cursor-pointer ${
-                        isSelected ? 'bg-primary/10' : 'hover:bg-surface-hover'
+                      className={`w-full text-left px-4 py-2.5 border-b border-line flex items-start gap-3 transition-colors cursor-pointer ${
+                        isSelected ? 'bg-item-active-bg text-item-active-fg' : 'hover:bg-surface-hover'
                       }`}
                       onClick={() => { setSelectedId(receipt.id); if (isMobile) goTo('detail'); }}
                     >
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline gap-1.5 min-w-0">
+                        <div className="flex items-center gap-2 min-w-0">
                           <span className="font-medium text-sm truncate">{receipt.receipt_no}</span>
-                          <span className="text-xs text-subtle truncate">· {receipt.po_no}</span>
-                        </div>
-                        <div className="text-xs text-subtle truncate">{receipt.supplier_name} · {receipt.branch_name}</div>
-                        <div className="flex items-center gap-2 mt-1 -ml-0.5">
-                          <Badge size="xs" className={RECEIPT_STATUS_COLOR[receipt.status] ?? 'bg-fg/10 text-fg/60'}>
+                          <Badge size="xs" color={RECEIPT_STATUS_COLOR[receipt.status] ?? 'default'}>
                             {t(`receiving.status_${receipt.status}`, receipt.status)}
                           </Badge>
-                          <span className="text-xs text-subtle">
-                            {receipt.line_count} {t('receiving.lines')} · {fmtNum(receipt.total_qty)} pcs
-                          </span>
                         </div>
+                        <div className="text-[11px] text-subtle truncate mt-0.5">{receipt.po_no}</div>
+                        <div className="text-[11px] text-subtle truncate mt-0.5">{receipt.supplier_name} · {receipt.branch_name}</div>
                       </div>
                       <div className="text-right shrink-0">
                         <div className="text-sm font-medium tabular-nums">{fmtCurrency(receipt.total_amount)}</div>
-                        <div className="text-xs text-subtle"><DateTime value={receipt.created_at} /></div>
+                        <div className="text-xs text-subtle mt-0.5"><DateTime value={receipt.created_at} /></div>
+                        <div className="text-[11px] text-subtle mt-0.5">
+                          {receipt.line_count} {t('receiving.lines')} · {fmtNum(receipt.total_qty)} pcs
+                        </div>
                       </div>
                     </button>
                   );
@@ -325,7 +323,7 @@ function ReceiptDetailPanel({
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
           <span className="font-semibold">{detail.receipt_no}</span>
-          <Badge size="xs" className={RECEIPT_STATUS_COLOR[detail.status] ?? 'bg-fg/10 text-fg/60'}>
+          <Badge size="xs" color={RECEIPT_STATUS_COLOR[detail.status] ?? 'default'}>
             {t(`receiving.status_${detail.status}`, detail.status)}
           </Badge>
         </div>
@@ -356,7 +354,7 @@ function ReceiptDetailPanel({
       </div>
 
       {detail.notes && (
-        <div className="flex-none px-4 py-2 border-b border-line text-xs text-fg/70 italic">{detail.notes}</div>
+        <div className="flex-none px-4 py-2 border-b border-line text-xs text-subtle italic">{detail.notes}</div>
       )}
 
       {/* Lines */}
@@ -378,7 +376,7 @@ function ReceiptDetailPanel({
               </div>
               <div className="text-xs text-subtle">{line.brand_name} · {line.family_name}</div>
               {line.is_unmatched && (
-                <Badge size="xs" className="bg-warning/15 text-warning mt-1">{t('receiving.unmatched')}</Badge>
+                <Badge size="xs" color="warning" className="mt-1">{t('receiving.unmatched')}</Badge>
               )}
             </div>
             <div className="text-right shrink-0">

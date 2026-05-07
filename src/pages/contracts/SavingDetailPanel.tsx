@@ -165,7 +165,7 @@ export function SavingDetailPanel({ contractId, isMobile }: { contractId: number
           >
             {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
           </button>
-          <Badge size="xs" className={getStateColor(contract.state)}>
+          <Badge size="xs" color={getStateColor(contract.state)}>
             {getStateLabel(contract.state, t)}
           </Badge>
           {contract.commercial_model && (
@@ -182,7 +182,7 @@ export function SavingDetailPanel({ contractId, isMobile }: { contractId: number
             className={`py-2 px-3 text-sm font-medium transition-colors cursor-pointer border-b-2 whitespace-nowrap ${
               activeTab === tab
                 ? 'border-primary text-primary'
-                : 'border-transparent text-fg/50 hover:text-fg/80'
+                : 'border-transparent text-fg'
             }`}
             onClick={() => setActiveTab(tab)}
           >

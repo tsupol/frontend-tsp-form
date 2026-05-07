@@ -1,6 +1,5 @@
 @layer theme, base, components, utilities;
 @import "tailwindcss";
-@import "./app-theme.css";
 
 @theme static {
     /* ── Semantic colors (dark theme defaults — Radix-inspired) ─────── */
@@ -228,9 +227,9 @@
 /* ── Light theme ──────────────────────────────────────────────────── */
 
 [data-theme="light"] {
-    --color-fg: #1c2024;
+    --color-fg: #111;
     --color-fg-contrast: #ffffff;
-    --color-bg: #fcfcfd;
+    --color-bg: #f3f3f6;
     --color-bg-contrast: #1c2024;
 
     --color-line: rgba(0, 0, 0, 0.12);
@@ -263,7 +262,7 @@
     --color-info-hover: #0891b2;
     --color-info-fade: #0e7490;
 
-    --color-scrollbar-track: rgba(0, 0, 0, 0.04);
+    /*--color-scrollbar-track: rgba(0, 0, 0, 0.04);*/
     --color-scrollbar-thumb: rgba(0, 0, 0, 0.12);
     --color-control-bg: #ffffff;
     --color-control-placeholder: #80838d;

@@ -121,7 +121,7 @@ function ReferenceRow({ reference, onDeleted }: { reference: CustomerReference; 
       <div className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-surface-hover transition-colors" onClick={() => setExpanded(!expanded)}>
         {expanded ? <ChevronDown size={14} className="text-subtle shrink-0" /> : <ChevronRight size={14} className="text-subtle shrink-0" />}
         <span className="font-medium text-sm flex-1 truncate">{reference.name} {reference.last_name}</span>
-        {reference.relation && <Badge size="xs" className="bg-fg/10 text-fg/60">{reference.relation}</Badge>}
+        {reference.relation && <Badge size="xs" color="default">{reference.relation}</Badge>}
         <button
           className="p-1 rounded hover:bg-danger/10 cursor-pointer text-control-label hover:text-danger shrink-0 bg-transparent border-none"
           onClick={(e) => { e.stopPropagation(); handleDelete(); }}

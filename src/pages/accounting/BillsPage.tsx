@@ -177,7 +177,7 @@ export function BillsPage() {
                     className={`flex-1 py-2 text-sm font-medium transition-colors cursor-pointer border-b-2 ${
                       statusFilter === s
                         ? 'border-primary text-primary'
-                        : 'border-transparent text-fg/50 hover:text-fg/80'
+                        : 'border-transparent text-fg'
                     }`}
                     onClick={() => { setStatusFilter(s); setPageIndex(0); }}
                   >

@@ -200,7 +200,7 @@ export function PriceCheckPage() {
               </div>
 
               {/* List */}
-              <div className="flex-1 overflow-auto better-scroll">
+              <div className="data-table-content better-scroll">
                 {/* Search results */}
                 {isSearching && (
                   modelsLoading ? (
@@ -366,8 +366,8 @@ function ModelItem({ model, isSelected, onClick, onRemove }: {
 
       {/* Sliding content */}
       <button
-        className={`w-full text-left px-4 py-2.5 flex items-center gap-3 cursor-pointer relative bg-surface group ${
-          isSelected ? 'bg-primary/10' : 'hover:bg-surface-hover'
+        className={`w-full text-left px-4 py-2.5 flex items-center gap-3 cursor-pointer relative group ${
+          isSelected ? 'bg-item-active-bg text-item-active-fg' : 'bg-bg hover:bg-surface-hover'
         }`}
         style={{
           transform: `translateX(${offsetX}px)`,

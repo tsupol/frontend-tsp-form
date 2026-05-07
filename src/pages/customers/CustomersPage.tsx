@@ -238,7 +238,7 @@ export function CustomersPage() {
                     className="w-full"
                   />
                 </div>
-                <div className={`flex-1 overflow-auto better-scroll ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
+                <div className={`data-table-content better-scroll ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
                   {customers.length === 0 ? (
                     <div className="p-8 text-center text-subtler">{t('customer.noCustomers')}</div>
                   ) : (

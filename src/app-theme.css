@@ -1,7 +1,14 @@
-/* App-specific Tailwind theme tokens — NOT part of tsp-form theme copy */
+/* App-specific Tailwind theme tokens — NOT part of tsp-form theme copy.
+   This file imports index.css first then declares overrides AFTER, so
+   anything redefined here wins (later @theme tokens win, later unlayered
+   rules win on cascade). main.tsx must import THIS file, not index.css. */
+
+@import "./index.css";
 
 @theme static {
     /* Panel header height */
+
+    --spacing-side-menu: 240px;
     --spacing-panel-header-h: 2.792rem;
 
     /* Info section content row height */
@@ -14,6 +21,14 @@
     --color-qty: #c2c7d7;          /* quantity / count values */
     --color-muted: #99999999;
 
+    /* ── Primary (overrides index.css) ──────────────────────────────── */
+    --color-primary: #2333d6;
+    --color-primary-hover: #3e4ee0;
+    --color-primary-active: #1a28ad;
+    --color-primary-fade: #6e7be8;
+    --color-primary-contrast: #ffffff;
+    --color-primary-light: rgba(35, 51, 214, 0.1);
+
     /* Primary used as TEXT color (text-primary) — kept separate from
        --color-primary so we can lighten text without changing button bg */
     --color-primary-text: #5a78ee; /* lighter + slightly bluer than --color-primary */
@@ -24,8 +39,14 @@
     --color-subtler: #a0a3ab;
     --color-figure: #4a4d55;
     --color-qty: #555960;
+    --color-bg: #f3f3f6;
 
-    --color-primary-text: #2333d6; /* light theme: same as --color-primary, readable on white */
+    --color-primary-hover: #1a28ad;
+    --color-primary-active: #131e85;
+    --color-primary-fade: #131e85;
+
+    --color-primary-text: #2333d6;
+
 }
 
 /* Redirect Tailwind's .text-primary utility to use --color-primary-text.

@@ -573,8 +573,8 @@ function CreateModelModal({ open, onClose, holdingId, families }: {
                               onClick={() => toggleVariantOption(axis.attribute_code, opt.option_code)}
                               className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
                                 selected
-                                  ? 'bg-primary text-on-primary border-primary'
-                                  : 'border-line text-fg/70 hover:bg-surface-hover'
+                                  ? 'bg-primary text-primary-contrast border-primary'
+                                  : 'border-line text-fg hover:bg-surface-hover'
                               }`}
                             >
                               {opt.option_label}
@@ -730,7 +730,7 @@ function VariantSubRow({ variants }: { variants: ModelVariant[] }) {
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
                 <div className="font-medium text-sm truncate">{v.name}</div>
-                <div className="text-[11px] font-mono text-control-label truncate opacity-70 mt-0.5">{v.sku_code}</div>
+                <div className="text-[11px] font-mono text-subtle truncate mt-0.5">{v.sku_code}</div>
               </div>
               <Badge size="sm" color={v.is_active ? 'success' : 'danger'}>
                 {v.is_active ? t('brandsModels.active') : t('brandsModels.inactive')}
@@ -1103,7 +1103,7 @@ export function ModelsPage() {
                               )}
                             </div>
                             <div className="flex items-center gap-2 text-[11px] text-control-label">
-                              <span className="truncate opacity-60">{model.brand_name}</span>
+                              <span className="truncate">{model.brand_name}</span>
                               <span className="flex-1" />
                               {model.variant_count > 0 && (
                                 <span className="shrink-0">{model.variant_count} {t('models.variants').toLowerCase()}</span>
@@ -1151,7 +1151,7 @@ export function ModelsPage() {
                             {selectedModel.is_active ? t('brandsModels.active') : t('brandsModels.inactive')}
                           </Badge>
                         </div>
-                        <div className="text-[11px] text-control-label opacity-60 mt-0.5 truncate">
+                        <div className="text-[11px] text-subtle mt-0.5 truncate">
                           {selectedModel.brand_name} · {selectedModel.model_code}
                         </div>
                       </div>

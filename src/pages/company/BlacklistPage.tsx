@@ -360,7 +360,7 @@ export function BlacklistPage() {
       cell: ({ row }) => (
         <div>
           <div className="text-xs font-medium">{row.original.customer_name}</div>
-          <div className="text-[11px] opacity-50 tabular-nums">{row.original.national_id}</div>
+          <div className="text-[11px] text-subtle tabular-nums">{row.original.national_id}</div>
         </div>
       ),
     },
@@ -371,7 +371,7 @@ export function BlacklistPage() {
         <div>
           <div className="text-xs font-medium">{row.original.reason}</div>
           {row.original.contract_code_display && (
-            <div className="text-[11px] opacity-50">{row.original.contract_code_display}</div>
+            <div className="text-[11px] text-subtler">{row.original.contract_code_display}</div>
           )}
         </div>
       ),
@@ -385,7 +385,7 @@ export function BlacklistPage() {
             {row.original.is_active ? t('settings.blacklist.statusActive') : t('settings.blacklist.statusLifted')}
           </Badge>
           {row.original.expires_at && (
-            <div className="text-[11px] opacity-50 mt-0.5">{t('settings.blacklist.expiresAt')}: {formatExpiry(row.original.expires_at)}</div>
+            <div className="text-[11px] text-subtler mt-0.5">{t('settings.blacklist.expiresAt')}: {formatExpiry(row.original.expires_at)}</div>
           )}
         </div>
       ),

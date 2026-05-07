@@ -378,7 +378,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
               <span className="text-sm font-medium text-info truncate">{baseModelName}</span>
               {suffix && <span className="text-sm font-semibold truncate">{suffix}</span>}
             </div>
-            <div className="text-[11px] text-control-label truncate opacity-60 mt-0.5">{modelCode}</div>
+            <div className="text-[11px] text-subtle truncate mt-0.5">{modelCode}</div>
           </div>
 
           <div className="space-y-4">
@@ -1065,7 +1065,7 @@ export function Fin2RatesPage() {
                               <div className="flex items-baseline gap-1.5 min-w-0">
                                 <ModelName brand={model.brand_name} family={model.family_name} model={model.name} />
                               </div>
-                              <div className="text-[11px] text-control-label truncate opacity-60">{model.code}</div>
+                              <div className="text-[11px] text-subtle truncate">{model.code}</div>
                             </div>
 
                             {/* Active term badges */}

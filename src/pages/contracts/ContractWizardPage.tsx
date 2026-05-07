@@ -285,7 +285,7 @@ function WorkspaceContent() {
                 </div>
                 <div className="mobile-header-end min-w-nav">
                   {data.contractCode && (
-                    <Badge size="sm" className="bg-fg/10 text-fg/60 font-mono mr-2">{data.contractCode}</Badge>
+                    <Badge size="sm" color="default" className="font-mono mr-2">{data.contractCode}</Badge>
                   )}
                 </div>
               </MobileHeader>
@@ -296,7 +296,7 @@ function WorkspaceContent() {
               <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
                 <h1 className="heading-2 shrink-0">{t('wizard.title')}</h1>
                 {data.contractCode && (
-                  <Badge size="sm" className="bg-fg/10 text-fg/60 font-mono">{data.contractCode}</Badge>
+                  <Badge size="sm" color="default" className="font-mono">{data.contractCode}</Badge>
                 )}
               </div>
             )}

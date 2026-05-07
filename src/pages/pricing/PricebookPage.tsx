@@ -458,7 +458,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
               <span className="text-sm font-medium text-info truncate">{baseModelName}</span>
               {suffix && <span className="text-sm font-semibold truncate">{suffix}</span>}
             </div>
-            <div className="text-[11px] text-control-label truncate opacity-60 mt-0.5">{modelCode}</div>
+            <div className="text-[11px] text-subtle truncate mt-0.5">{modelCode}</div>
           </div>
 
           <div className="space-y-4">
@@ -1112,7 +1112,7 @@ export function PricebookPage() {
                                 </Tooltip>
                               )}
                             </div>
-                            <div className="text-[11px] text-control-label truncate opacity-60">{model.code}</div>
+                            <div className="text-[11px] text-subtle truncate">{model.code}</div>
                           </div>
 
                           <div className="shrink-0 w-16 xl:w-24 text-right hidden sm:block">

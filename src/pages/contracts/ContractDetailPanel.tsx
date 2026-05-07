@@ -251,7 +251,7 @@ function ScrollableTabs<T extends string>({ tabs, activeTab, onTabChange, render
             className={`py-2 px-3 text-sm font-medium transition-colors cursor-pointer border-b-2 whitespace-nowrap ${
               activeTab === tab
                 ? 'border-primary text-primary'
-                : 'border-transparent text-fg/50 hover:text-fg/80'
+                : 'border-transparent text-fg'
             }`}
             onClick={() => onTabChange(tab)}
           >
@@ -363,11 +363,11 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
           >
             {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
           </button>
-          <Badge size="xs" className={getStateColor(contract.state)}>
+          <Badge size="xs" color={getStateColor(contract.state)}>
             {getStateLabel(contract.state, t)}
           </Badge>
           {contract.is_paused && (
-            <Badge size="xs" className="bg-warning/15 text-warning">{t('contract.paused')}</Badge>
+            <Badge size="xs" color="warning">{t('contract.paused')}</Badge>
           )}
           {contract.commercial_model && (
             <span className="text-xs text-subtle">{contract.commercial_model}</span>
@@ -779,7 +779,7 @@ function MoneyTab({ contractId, contract, t }: {
             <span className="inline-flex items-center gap-1.5">
               {t(`contract.moneySection_${s}`)}
               {c != null && c > 0 && (
-                <Badge size="xs" className={isActive ? 'bg-primary/15 text-primary' : 'bg-fg/10 text-fg/70'}>
+                <Badge size="xs" color={isActive ? 'primary' : 'default'}>
                   {c}
                 </Badge>
               )}
@@ -799,12 +799,11 @@ function MoneyTab({ contractId, contract, t }: {
 
 // ── Installments Tab ─────────────────────────────────────────────────────────
 
-function getInstallmentStatusColor(status: string): string {
+function getInstallmentStatusColor(status: string): 'success' | 'warning' | 'danger' | 'info' | 'default' {
   switch (status) {
-    case 'PAID': return 'bg-success/15 text-success';
-    case 'PENDING': return 'bg-warning/15 text-warning';
-    case 'DEFERRED': return 'bg-fg/10 text-fg/50';
-    default: return 'bg-fg/10 text-fg/60';
+    case 'PAID': return 'success';
+    case 'PENDING': return 'warning';
+    default: return 'default';
   }
 }
 
@@ -843,7 +842,7 @@ function InstallmentsTab({ contractId, t }: { contractId: number; t: ReturnType<
                 <td className="px-3 py-2 text-right tabular-nums">{fmtCurrency(inst.due_amount)}</td>
                 <td className="px-3 py-2 text-right tabular-nums">{fmtCurrency(inst.paid_amount)}</td>
                 <td className="px-3 py-2">
-                  <Badge size="xs" className={getInstallmentStatusColor(inst.status)}>
+                  <Badge size="xs" color={getInstallmentStatusColor(inst.status)}>
                     {t(`contract.installmentStatus_${inst.status}`, { defaultValue: inst.status })}
                   </Badge>
                   {inst.paid_at && (
@@ -1386,10 +1385,10 @@ function PaymentsTab({ contractId, t }: { contractId: number; t: ReturnType<type
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-sm">{p.code_display ?? p.code}</span>
                   {p.charge_types?.map(ct => (
-                    <Badge key={ct} size="xs" className="bg-fg/10 text-fg/60">{ct}</Badge>
+                    <Badge key={ct} size="xs" color="default">{ct}</Badge>
                   ))}
                   {p.is_reversal && (
-                    <Badge size="xs" className="bg-danger/15 text-danger">VOID</Badge>
+                    <Badge size="xs" color="danger">VOID</Badge>
                   )}
                 </div>
                 <span className="font-medium text-sm tabular-nums">{fmtCurrency(p.amount)}</span>

@@ -87,7 +87,7 @@ export function BillReconcilePanel({ branchId, billDate }: Props) {
             className={`flex-1 py-2 text-xs font-medium transition-colors cursor-pointer border-b-2 ${
               typeFilter === type
                 ? 'border-primary text-primary'
-                : 'border-transparent text-fg/50 hover:text-fg/80'
+                : 'border-transparent text-fg'
             }`}
             onClick={() => setTypeFilter(type)}
           >
@@ -109,19 +109,19 @@ export function BillReconcilePanel({ branchId, billDate }: Props) {
               key={status || '__all'}
               className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer border ${
                 active
-                  ? 'bg-primary text-on-primary border-primary'
-                  : 'border-line text-fg/70 hover:bg-surface-hover'
+                  ? 'bg-primary text-primary-contrast border-primary'
+                  : 'border-line text-fg hover:bg-surface-hover'
               }`}
               onClick={() => setStatusFilter(status)}
             >
-              {label} <span className={active ? 'opacity-80' : 'opacity-50'}>({statusCount(status)})</span>
+              {label} <span className={active ? '' : 'text-subtle'}>({statusCount(status)})</span>
             </button>
           );
         })}
       </div>
 
       {/* Bill rows */}
-      <div className={`flex-1 min-h-0 overflow-auto better-scroll ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
+      <div className={`data-table-content better-scroll ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
         {bills.length === 0 ? (
           <div className="p-8 text-center text-subtler text-sm">
             {t('accounting.dayClose.noBillsForDay')}

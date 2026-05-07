@@ -114,13 +114,13 @@ interface Company {
   name: string;
 }
 
-const STATUS_COLOR: Record<string, string> = {
-  DRAFT: 'bg-fg/10 text-fg/60',
-  PENDING_APPROVAL: 'bg-warning/15 text-warning',
-  APPROVED: 'bg-success/15 text-success',
-  COMPLETED: 'bg-info/15 text-info',
-  REJECTED: 'bg-danger/15 text-danger',
-  CANCELLED: 'bg-fg/10 text-fg/50',
+const STATUS_COLOR: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'default'> = {
+  DRAFT: 'default',
+  PENDING_APPROVAL: 'warning',
+  APPROVED: 'success',
+  COMPLETED: 'info',
+  REJECTED: 'danger',
+  CANCELLED: 'default',
 };
 
 // ============================================================================
@@ -312,8 +312,8 @@ export function PurchaseOrdersPage() {
                   return (
                     <button
                       key={po.po_id}
-                      className={`w-full text-left px-4 py-2.5 border-b border-line flex items-center gap-3 cursor-pointer transition-colors ${
-                        isSelected ? 'bg-primary/10' : 'hover:bg-surface-hover'
+                      className={`w-full text-left px-4 py-2.5 border-b border-line flex items-start gap-3 cursor-pointer transition-colors ${
+                        isSelected ? 'bg-item-active-bg text-item-active-fg' : 'hover:bg-surface-hover'
                       }`}
                       onClick={() => {
                         setSelectedPoId(po.po_id);
@@ -321,26 +321,22 @@ export function PurchaseOrdersPage() {
                       }}
                     >
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline gap-1.5 min-w-0">
+                        <div className="flex items-center gap-2 min-w-0">
                           <span className="font-medium text-sm truncate">{po.po_no}</span>
-                          {po.supplier_name && (
-                            <span className="text-xs text-subtle truncate">· {po.supplier_name}</span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge size="xs" className={STATUS_COLOR[po.status] ?? 'bg-fg/10 text-fg/60'}>
+                          <Badge size="xs" color={STATUS_COLOR[po.status] ?? 'default'}>
                             {statusLabel(po.status)}
                           </Badge>
-                          <Badge size="xs" className="bg-fg/10 text-fg/60">
+                          <Badge size="xs" color="default">
                             {ownershipLabel(po.ownership)}
                           </Badge>
-                          <span className="text-xs text-subtle">
-                            {po.total_lines} {t('po.lines')}
-                          </span>
                         </div>
+                        {po.supplier_name && (
+                          <div className="text-[11px] text-subtle truncate mt-0.5">{po.supplier_name}</div>
+                        )}
                       </div>
                       <div className="text-right shrink-0">
                         <div className="text-xs text-subtle"><DateTime value={po.created_at} /></div>
+                        <div className="text-[11px] text-subtle mt-0.5">{po.total_lines} {t('po.lines')}</div>
                       </div>
                     </button>
                   );
@@ -483,10 +479,10 @@ function PoDetailPanel({
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
           <span className="font-semibold">{detail.po_no}</span>
-          <Badge size="xs" className={STATUS_COLOR[detail.status] ?? 'bg-fg/10 text-fg/60'}>
+          <Badge size="xs" color={STATUS_COLOR[detail.status] ?? 'default'}>
             {statusLabel(detail.status)}
           </Badge>
-          <Badge size="xs" className="bg-fg/10 text-fg/60">{ownershipLabel(detail.ownership)}</Badge>
+          <Badge size="xs" color="default">{ownershipLabel(detail.ownership)}</Badge>
         </div>
       )}
 
@@ -542,7 +538,7 @@ function PoDetailPanel({
       </div>
 
       {detail.notes && (
-        <div className="flex-none px-4 py-2 border-b border-line text-xs text-fg/70 italic">
+        <div className="flex-none px-4 py-2 border-b border-line text-xs text-subtle italic">
           {detail.notes}
         </div>
       )}

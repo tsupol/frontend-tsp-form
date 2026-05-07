@@ -230,7 +230,7 @@ export function ContractSearchPage() {
                     className={`flex-1 py-2 text-sm font-medium transition-colors cursor-pointer border-b-2 ${
                       scope === s
                         ? 'border-primary text-primary'
-                        : 'border-transparent text-fg/50 hover:text-fg/80'
+                        : 'border-transparent text-fg'
                     }`}
                     onClick={() => setScope(s)}
                   >
@@ -289,7 +289,7 @@ export function ContractSearchPage() {
               </div>
 
               {/* Contract list */}
-              <div className={`flex-1 overflow-auto better-scroll ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
+              <div className={`data-table-content better-scroll ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
                 {contracts.length === 0 ? (
                   <div className="p-8 text-center text-subtler">{t('common.noData')}</div>
                 ) : (
@@ -307,7 +307,7 @@ export function ContractSearchPage() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 min-w-0">
                               <span className="font-medium text-sm truncate">{contract.code_display ?? contract.code}</span>
-                              <Badge size="xs" className={getStateColor(contract.state)}>
+                              <Badge size="xs" color={getStateColor(contract.state)}>
                                 {getStateLabel(contract.state, t)}
                               </Badge>
                             </div>

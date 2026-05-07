@@ -704,7 +704,7 @@ function AssetDetailPanel({
           <div className="text-xs text-subtle mb-1">{t('asset.identifiers')}</div>
           {asset.identifiers.map((id, i) => (
             <div key={i} className="flex items-center gap-2">
-              <Badge size="xs" className="bg-fg/10 text-fg/60">{id.type}</Badge>
+              <Badge size="xs" color="default">{id.type}</Badge>
               <span className="text-sm font-mono">{id.value}</span>
               {!id.is_active && <span className="text-xs text-danger">(inactive)</span>}
             </div>

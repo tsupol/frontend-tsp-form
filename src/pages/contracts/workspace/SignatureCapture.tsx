@@ -165,7 +165,7 @@ export function SignatureCapture({ fileUrl, uploading, disabled, cacheBust = 0, 
             className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded transition-colors ${
               mode === id
                 ? 'bg-item-active-bg text-item-active-fg font-medium'
-                : 'text-fg/70 hover:text-fg'
+                : 'text-subtle hover:text-fg'
             }`}
           >
             <Icon size={14} />

@@ -77,21 +77,21 @@ interface Branch {
 // Status display
 // ============================================================================
 
-const TRANSFER_STATUS_COLOR: Record<string, string> = {
-  DRAFT: 'bg-fg/10 text-fg/60',
-  APPROVED: 'bg-success/15 text-success',
-  IN_TRANSIT: 'bg-info/15 text-info',
-  COMPLETED: 'bg-fg/10 text-fg/60',
-  CANCELLED: 'bg-danger/15 text-danger',
-  DISPUTED: 'bg-warning/15 text-warning',
+const TRANSFER_STATUS_COLOR: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'default'> = {
+  DRAFT: 'default',
+  APPROVED: 'success',
+  IN_TRANSIT: 'info',
+  COMPLETED: 'default',
+  CANCELLED: 'danger',
+  DISPUTED: 'warning',
 };
 
-const LINE_STATUS_COLOR: Record<string, string> = {
-  PENDING: 'bg-warning/15 text-warning',
-  SHIPPED: 'bg-info/15 text-info',
-  RECEIVED: 'bg-success/15 text-success',
-  RECEIVED_DAMAGED: 'bg-danger/15 text-danger',
-  NOT_RECEIVED: 'bg-danger/15 text-danger',
+const LINE_STATUS_COLOR: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'default'> = {
+  PENDING: 'warning',
+  SHIPPED: 'info',
+  RECEIVED: 'success',
+  RECEIVED_DAMAGED: 'danger',
+  NOT_RECEIVED: 'danger',
 };
 
 const TRANSFER_STATUS_OPTIONS = [
@@ -241,27 +241,27 @@ export function TransfersPage() {
                   return (
                     <button
                       key={order.id}
-                      className={`w-full text-left px-4 py-2.5 border-b border-line flex items-center gap-3 transition-colors cursor-pointer ${
-                        isSelected ? 'bg-primary/10' : 'hover:bg-surface-hover'
+                      className={`w-full text-left px-4 py-2.5 border-b border-line flex items-start gap-3 transition-colors cursor-pointer ${
+                        isSelected ? 'bg-item-active-bg text-item-active-fg' : 'hover:bg-surface-hover'
                       }`}
                       onClick={() => { setSelectedId(order.id); if (isMobile) goTo('detail'); }}
                     >
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm truncate">{order.transfer_no}</div>
-                        <div className="text-xs text-subtle truncate">
-                          {order.from_branch_name} → {order.to_branch_name ?? `Branch #${order.to_branch_id}`}
-                        </div>
-                        <div className="flex items-center gap-2 mt-1 -ml-0.5">
-                          <Badge size="xs" className={TRANSFER_STATUS_COLOR[order.status] ?? 'bg-fg/10 text-fg/60'}>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="font-medium text-sm truncate">{order.transfer_no}</span>
+                          <Badge size="xs" color={TRANSFER_STATUS_COLOR[order.status] ?? 'default'}>
                             {t(`transfer.status_${order.status}`, order.status)}
                           </Badge>
-                          <span className="text-xs text-subtle">
-                            {order.c_total_lines} {t('transfer.lines')}
-                          </span>
+                        </div>
+                        <div className="text-[11px] text-subtle truncate mt-0.5">
+                          {order.from_branch_name} → {order.to_branch_name ?? `Branch #${order.to_branch_id}`}
                         </div>
                       </div>
-                      <div className="text-right shrink-0 text-xs text-subtle">
-                        <DateTime value={order.created_at} />
+                      <div className="text-right shrink-0">
+                        <div className="text-xs text-subtle"><DateTime value={order.created_at} /></div>
+                        <div className="text-[11px] text-subtle mt-0.5">
+                          {fmtNum(order.c_total_lines ?? 0)} {t('transfer.lines')}
+                        </div>
                       </div>
                     </button>
                   );
@@ -342,7 +342,7 @@ function TransferDetailPanel({
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
           <span className="font-semibold">{order.transfer_no}</span>
-          <Badge size="xs" className={TRANSFER_STATUS_COLOR[order.status] ?? 'bg-fg/10 text-fg/60'}>
+          <Badge size="xs" color={TRANSFER_STATUS_COLOR[order.status] ?? 'default'}>
             {t(`transfer.status_${order.status}`, order.status)}
           </Badge>
         </div>
@@ -390,7 +390,7 @@ function TransferDetailPanel({
       </div>
 
       {order.notes && (
-        <div className="flex-none px-4 py-2 border-b border-line text-xs text-fg/70 italic">{order.notes}</div>
+        <div className="flex-none px-4 py-2 border-b border-line text-xs text-subtle italic">{order.notes}</div>
       )}
 
       {order.dispute_note && (
@@ -427,7 +427,7 @@ function TransferDetailPanel({
                 {line.receive_note && <div className="text-xs text-fg/50 mt-0.5 italic">{line.receive_note}</div>}
               </div>
               <div className="shrink-0 flex flex-col items-end gap-1">
-                <Badge size="xs" className={LINE_STATUS_COLOR[line.status] ?? 'bg-fg/10 text-fg/60'}>
+                <Badge size="xs" color={LINE_STATUS_COLOR[line.status] ?? 'default'}>
                   {t(`transfer.lineStatus_${line.status}`, line.status)}
                 </Badge>
                 {line.line_type === 'LOT' && line.qty_requested !== null && (
