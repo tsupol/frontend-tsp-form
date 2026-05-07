@@ -149,7 +149,7 @@ export function LoginPage() {
           </div>
 
           <div className="flex justify-center">
-            <Button type="submit" color="primary" disabled={isPending} className="px-10">
+            <Button type="submit" color="primary" size="lg" disabled={isPending} className="px-14">
               {isPending ? t('auth.loggingIn') : t('auth.login')}
             </Button>
           </div>

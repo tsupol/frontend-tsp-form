@@ -63,6 +63,10 @@
     "noMismatches": "ยอดบิลตรงทั้งหมด",
     "trend7d": "รายได้ — 7 วันล่าสุด",
     "trend7dHint": "จากประวัติปิดวัน (expected_amount)",
+    "delta": {
+      "vsLastWeek": "เทียบวันเดียวกันสัปดาห์ก่อน",
+      "noBaseline": "ไม่มีฐานเทียบ (สัปดาห์ก่อนยังไม่ปิดวัน)"
+    },
     "branchLeaderboard": "ยอดสาขาวันนี้",
     "branchLeaderboardHint": "เรียงตามยอดรับรวม",
     "flag": {
@@ -684,6 +688,11 @@
     "roundingRequired": "กรุณากรอกหน่วยปัดเศษ",
     "maxDiscount": "ส่วนลดสูงสุด %",
     "maxDiscountRequired": "กรุณากรอกส่วนลดสูงสุด",
+    "rateDetails": "รายละเอียดอัตรา",
+    "down": "ดาวน์",
+    "interest": "ดอกเบี้ย",
+    "rounding": "ปัดเศษ",
+    "maxDisc": "ส่วนลดสูงสุด",
     "saveSuccess": "บันทึกบัตรอัตราสำเร็จ",
     "activate": "เปิดใช้งาน",
     "deactivate": "ปิดใช้งาน",

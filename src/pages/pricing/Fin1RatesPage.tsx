@@ -280,10 +280,10 @@ function Fin1Modal({ open, onClose, categories, onSuccess }: {
           </div>
         </div>
         <div className="modal-footer">
-          <Button variant="outline" size="sm" onClick={handleClose} type="button">
+          <Button variant="outline" onClick={handleClose} type="button">
             {t('common.cancel')}
           </Button>
-          <Button color="primary" size="sm" type="submit" disabled={isSaving}>
+          <Button color="primary" type="submit" disabled={isSaving}>
             {isSaving ? t('pricing.saving') : t('common.save')}
           </Button>
         </div>
@@ -383,44 +383,28 @@ export function Fin1RatesPage() {
       accessorKey: 'term_months',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('fin1.termMonths')} />,
       cell: ({ row }) => (
-        <span className="text-sm tabular-nums">{t('pricing.termMonths', { months: row.original.term_months })}</span>
+        <div className="flex flex-col items-start gap-1">
+          <Badge size="xs" color={row.original.is_active ? 'success' : 'default'}>
+            {row.original.is_active ? t('fin1.statusActive') : t('fin1.statusInactive')}
+          </Badge>
+          <span className="text-sm tabular-nums">{t('pricing.termMonths', { months: row.original.term_months })}</span>
+        </div>
       ),
     },
     {
-      accessorKey: 'down_percent',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('fin1.downPercent')} />,
+      id: 'rate_details',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('fin1.rateDetails')} />,
       cell: ({ row }) => (
-        <span className="text-sm tabular-nums">{row.original.down_percent}%</span>
-      ),
-    },
-    {
-      accessorKey: 'interest_percent_total',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('fin1.interestPercent')} />,
-      cell: ({ row }) => (
-        <span className="text-sm tabular-nums">{row.original.interest_percent_total}%</span>
-      ),
-    },
-    {
-      accessorKey: 'rounding_unit',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('fin1.roundingUnit')} />,
-      cell: ({ row }) => (
-        <span className="text-sm tabular-nums">{row.original.rounding_unit}</span>
-      ),
-    },
-    {
-      accessorKey: 'max_discount_percent',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('fin1.maxDiscount')} />,
-      cell: ({ row }) => (
-        <span className="text-sm tabular-nums">{row.original.max_discount_percent}%</span>
-      ),
-    },
-    {
-      accessorKey: 'is_active',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('fin1.status')} />,
-      cell: ({ row }) => (
-        <Badge size="sm" color={row.original.is_active ? 'success' : 'default'}>
-          {row.original.is_active ? t('fin1.statusActive') : t('fin1.statusInactive')}
-        </Badge>
+        <div className="grid grid-cols-[auto_1fr_auto_1fr] gap-x-3 gap-y-0.5 text-sm">
+          <span className="text-[11px] text-control-label">{t('fin1.down')}</span>
+          <span className="tabular-nums">{row.original.down_percent}%</span>
+          <span className="text-[11px] text-control-label">{t('fin1.interest')}</span>
+          <span className="tabular-nums">{row.original.interest_percent_total}%</span>
+          <span className="text-[11px] text-control-label">{t('fin1.rounding')}</span>
+          <span className="tabular-nums">{row.original.rounding_unit}</span>
+          <span className="text-[11px] text-control-label">{t('fin1.maxDisc')}</span>
+          <span className="tabular-nums">{row.original.max_discount_percent}%</span>
+        </div>
       ),
     },
   ];

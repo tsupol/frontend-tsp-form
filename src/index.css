@@ -49,14 +49,14 @@
 
     --spacing-line: 1px;
 
-    /* ── Primary (Blue) ───────────────────────────────────────────────── */
+    /* ── Primary (Emerald — matches NNF brand mark) ───────────────────── */
 
-    --color-primary: #2563eb;
-    --color-primary-hover: #3b82f6;
-    --color-primary-active: #1d4ed8;
-    --color-primary-fade: #60a5fa;
+    --color-primary: #047857;
+    --color-primary-hover: #059669;
+    --color-primary-active: #065f46;
+    --color-primary-fade: #34d399;
     --color-primary-contrast: #ffffff;
-    --color-primary-light: rgba(37, 99, 235, 0.1);
+    --color-primary-light: rgba(4, 120, 87, 0.1);
 
     /* ── Secondary (Teal) ─────────────────────────────────────────────── */
 
@@ -242,9 +242,9 @@
     --color-surface-elevated: #ffffff;
     --color-select-highlight: #e8e8ec;
 
-    --color-primary-hover: #1d4ed8;
-    --color-primary-active: #1e40af;
-    --color-primary-fade: #1e40af;
+    --color-primary-hover: #065f46;
+    --color-primary-active: #064e3b;
+    --color-primary-fade: #064e3b;
 
     --color-secondary-hover: #7c3aed;
     --color-secondary-active: #6d28d9;

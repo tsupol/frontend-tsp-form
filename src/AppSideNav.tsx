@@ -380,10 +380,11 @@ export const AppSideNav = () => {
           if (mobile !== isMobile) setTimeout(() => setIsMobile(mobile), 0);
           return (
             <div key="title" className="flex items-center pointer-events-auto w-side-menu p-2 transition-all" style={{ transform: collapsed && !mobile ? 'translateX(calc(-1 * var(--spacing-side-menu) + var(--spacing-side-menu-min)))' : 'translateX(0)' }}>
-              <div className="flex items-center flex-1 cursor-pointer pl-2"
+              <div className="flex items-center gap-2 flex-1 cursor-pointer pl-2"
                    style={{ opacity: collapsed ? 0 : 1, transition: 'opacity 0.3s ease' }}
                    onClick={() => handleToggle()}>
-                <span className="font-semibold">{t('nav.userArea')}</span>
+                <img src="/nnf-favicon.svg" alt="" className="w-6 h-6 rounded shrink-0" />
+                <span className="font-semibold" style={{ transform: 'translateY(var(--text-shift-y, 0px))' }}>{t('nav.userArea')}</span>
               </div>
               <button
                 className="hover:bg-surface w-8 h-8 shrink-0 cursor-pointer rounded-lg transition-all flex justify-center items-center"

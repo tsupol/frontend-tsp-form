@@ -63,6 +63,10 @@
     "noMismatches": "All bills reconciled",
     "trend7d": "Revenue — last 7 days",
     "trend7dHint": "From day-close history (expected_amount)",
+    "delta": {
+      "vsLastWeek": "vs same day last week",
+      "noBaseline": "No baseline (last week not closed)"
+    },
     "branchLeaderboard": "Branches today",
     "branchLeaderboardHint": "Ranked by received total",
     "flag": {
@@ -684,6 +688,11 @@
     "roundingRequired": "Rounding unit is required",
     "maxDiscount": "Max Discount %",
     "maxDiscountRequired": "Max discount is required",
+    "rateDetails": "Rate Details",
+    "down": "Down",
+    "interest": "Interest",
+    "rounding": "Rounding",
+    "maxDisc": "Max Disc",
     "saveSuccess": "Rate card saved",
     "activate": "Activate",
     "deactivate": "Deactivate",
