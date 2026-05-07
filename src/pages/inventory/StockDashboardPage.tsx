@@ -325,7 +325,7 @@ export function StockDashboardPage() {
                       >
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1 -ml-0.5">
-                            <Badge size="xs" className={getBucketColor(row.current_bucket)}>
+                            <Badge size="xs" color={getBucketColor(row.current_bucket)}>
                               {getBucketLabel(row.current_bucket, t)}
                             </Badge>
                           </div>
@@ -398,7 +398,7 @@ function DetailPanel({
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
           <span className="font-semibold">{row.branch_name}</span>
-          <Badge size="xs" className={getBucketColor(row.current_bucket)}>
+          <Badge size="xs" color={getBucketColor(row.current_bucket)}>
             {getBucketLabel(row.current_bucket, t)}
           </Badge>
         </div>

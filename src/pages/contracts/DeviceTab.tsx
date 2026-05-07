@@ -108,7 +108,7 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
             <h3 className="text-sm font-semibold">{t('contract.device_primary')}</h3>
           </div>
           {primaryBucket && (
-            <Badge size="xs" className={getBucketColor(primaryBucket)}>
+            <Badge size="xs" color={getBucketColor(primaryBucket)}>
               {getBucketLabel(primaryBucket, t)}
             </Badge>
           )}
@@ -212,7 +212,7 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
             <h3 className="text-sm font-semibold">{t('contract.device_loaner')}</h3>
           </div>
           {hasLoaner && loanerAsset && (
-            <Badge size="xs" className={getBucketColor(loanerAsset.current_bucket)}>
+            <Badge size="xs" color={getBucketColor(loanerAsset.current_bucket)}>
               {getBucketLabel(loanerAsset.current_bucket, t)}
             </Badge>
           )}

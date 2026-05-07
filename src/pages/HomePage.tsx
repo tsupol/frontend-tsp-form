@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from 'tsp-form';
@@ -14,6 +15,27 @@ const CHART_BASELINE = 40;
 export function HomePage() {
   const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
+  const [chartReady, setChartReady] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const start = () => {
+      if (cancelled) return;
+      // Defer to next frame so SVG layout + paint settle before keyframes start.
+      requestAnimationFrame(() => {
+        if (!cancelled) setChartReady(true);
+      });
+    };
+    const fonts = (document as Document & { fonts?: { ready: Promise<unknown> } }).fonts;
+    if (fonts?.ready) {
+      fonts.ready.then(start, start);
+    } else {
+      start();
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div className="relative min-h-screen flex flex-col bg-bg">
@@ -77,7 +99,7 @@ export function HomePage() {
 
               {BAR_HEIGHTS.map((h, i) => {
                 const x = i * (BAR_WIDTH + BAR_GAP);
-                const delay = i * 0.12;
+                const delay = i * 0.18;
                 return (
                   <rect
                     key={i}
@@ -90,7 +112,11 @@ export function HomePage() {
                     style={{
                       transformBox: 'fill-box',
                       transformOrigin: 'bottom',
-                      animation: `bar-rise 4.5s ${delay}s cubic-bezier(0.22, 1, 0.36, 1) infinite`,
+                      transform: 'scaleY(0)',
+                      opacity: 0,
+                      animation: chartReady
+                        ? `bar-rise 7s ${delay}s cubic-bezier(0.22, 1, 0.36, 1) infinite`
+                        : 'none',
                     }}
                   />
                 );
@@ -100,9 +126,9 @@ export function HomePage() {
           <style>{`
             @keyframes bar-rise {
               0% { transform: scaleY(0); opacity: 0; }
-              8% { transform: scaleY(1); opacity: 1; }
-              85% { transform: scaleY(1); opacity: 1; }
-              95% { transform: scaleY(1); opacity: 0; }
+              18% { transform: scaleY(1); opacity: 1; }
+              82% { transform: scaleY(1); opacity: 1; }
+              94% { transform: scaleY(1); opacity: 0; }
               100% { transform: scaleY(0); opacity: 0; }
             }
           `}</style>

@@ -592,7 +592,7 @@ export function AssetsPage() {
                           {asset.brand_name} {asset.family_name} · {asset.variant_name}
                         </div>
                         <div className="flex items-center gap-2 mt-1 -ml-0.5">
-                          <Badge size="xs" className={getBucketColor(asset.current_bucket)}>
+                          <Badge size="xs" color={getBucketColor(asset.current_bucket)}>
                             {getBucketLabel(asset.current_bucket, t)}
                           </Badge>
                           <span className={`text-xs ${getConditionTextColor(asset.condition_grade)}`}>
@@ -677,7 +677,7 @@ function AssetDetailPanel({
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
           <span className="font-semibold">{asset.asset_code}</span>
-          <Badge size="xs" className={getBucketColor(asset.current_bucket)}>
+          <Badge size="xs" color={getBucketColor(asset.current_bucket)}>
             {getBucketLabel(asset.current_bucket, t)}
           </Badge>
           <span className={`text-xs ${getConditionTextColor(asset.condition_grade)}`}>
@@ -796,7 +796,7 @@ function AssetDetailPanel({
                   {(txn.bucket_from || txn.bucket_to) && (
                     <div className="flex items-center gap-1.5 mt-1">
                       {txn.bucket_from && (
-                        <Badge size="xs" className={getBucketColor(txn.bucket_from)}>
+                        <Badge size="xs" color={getBucketColor(txn.bucket_from)}>
                           {getBucketLabel(txn.bucket_from, t)}
                         </Badge>
                       )}
@@ -804,7 +804,7 @@ function AssetDetailPanel({
                         <span className="text-xs text-subtle">→</span>
                       )}
                       {txn.bucket_to && (
-                        <Badge size="xs" className={getBucketColor(txn.bucket_to)}>
+                        <Badge size="xs" color={getBucketColor(txn.bucket_to)}>
                           {getBucketLabel(txn.bucket_to, t)}
                         </Badge>
                       )}
