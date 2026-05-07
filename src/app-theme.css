@@ -16,7 +16,7 @@
 
     /* Primary used as TEXT color (text-primary) — kept separate from
        --color-primary so we can lighten text without changing button bg */
-    --color-primary-text: #6a63d8; /* dark theme: slightly lighter than --color-primary for contrast on dark bg */
+    --color-primary-text: #5a78ee; /* lighter + slightly bluer than --color-primary */
 }
 
 [data-theme="light"] {
@@ -25,10 +25,13 @@
     --color-figure: #4a4d55;
     --color-qty: #555960;
 
-    --color-primary-text: #3f37c9; /* light theme: same as --color-primary, readable on white */
+    --color-primary-text: #2333d6; /* light theme: same as --color-primary, readable on white */
 }
 
-/* Redirect Tailwind's .text-primary utility to use --color-primary-text */
-.text-primary {
-    color: var(--color-primary-text) !important;
+/* Redirect Tailwind's .text-primary utility to use --color-primary-text.
+   Wrapped in utilities layer so it overrides Tailwind's generated rule. */
+@layer utilities {
+    .text-primary {
+        color: var(--color-primary-text);
+    }
 }
