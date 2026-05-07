@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { apiClient, ApiError } from '../../lib/api';
+import { useAuth } from '../../contexts/AuthContext';
+import { defaultScopeFor, scopeKey, scopeQuery } from '../../lib/scope';
 import { DateTime } from '../../components/DateTime';
 import { toLocalDateStr, parseLocalDate, makeDatePickerFormat, fmtCurrency } from '../../lib/format';
 import {
@@ -39,6 +41,28 @@ export function DayClosePage() {
     queryKey: ['branches-active'],
     queryFn: () => apiClient.get<Branch[]>('/v_branches?is_active=is.true&order=name'),
   });
+
+  // Per-branch unclosed-day counts for the picker. Same view used by the global
+  // nav badge (cached); here we want the per-branch rollup rows specifically,
+  // not the company/holding aggregates — filter `branch_id=not.is.null`.
+  const { user } = useAuth();
+  const showBranchBadges = branches.length > 1;
+  const scope = defaultScopeFor(user);
+  const sk = scopeKey(scope);
+  const sq = scopeQuery(scope);
+  const { data: unclosedByBranch = [] } = useQuery({
+    queryKey: ['nav', 'unclosed-by-branch', sk],
+    queryFn: () => apiClient.get<{ branch_id: number; unclosed_day_count: number }[]>(
+      `/v_dashboard_unclosed_summary?branch_id=not.is.null&select=branch_id,unclosed_day_count${sq}`,
+    ),
+    enabled: showBranchBadges,
+    refetchInterval: 60_000,
+  });
+  const unclosedCountByBranch = useMemo(() => {
+    const m = new Map<number, number>();
+    for (const r of unclosedByBranch) m.set(r.branch_id, r.unclosed_day_count);
+    return m;
+  }, [unclosedByBranch]);
 
   const effectiveBranchId = branchId || (branches[0]?.id ? String(branches[0].id) : '');
 
@@ -245,6 +269,17 @@ export function DayClosePage() {
                     options={branches.map(b => ({ label: b.name, value: String(b.id) }))}
                     size="sm"
                     showChevron
+                    renderOption={showBranchBadges ? (opt) => {
+                      const count = unclosedCountByBranch.get(Number(opt.value)) ?? 0;
+                      return (
+                        <div className="flex items-center justify-between gap-2 min-w-0 w-full">
+                          <span className="truncate">{opt.label}</span>
+                          {count > 0 && (
+                            <Badge color="warning" size="xs">{count > 99 ? '99+' : count}</Badge>
+                          )}
+                        </div>
+                      );
+                    } : undefined}
                   />
                 </div>
                 <div className="flex-1 min-w-0">

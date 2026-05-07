@@ -29,9 +29,8 @@
     --color-primary-contrast: #ffffff;
     --color-primary-light: rgba(35, 51, 214, 0.1);
 
-    /* Primary used as TEXT color (text-primary) — kept separate from
-       --color-primary so we can lighten text without changing button bg */
-    --color-primary-text: #5a78ee; /* lighter + slightly bluer than --color-primary */
+    --color-primary-text: #5a78ee;
+    --color-warning-text: var(--color-warning);
 }
 
 [data-theme="light"] {
@@ -46,6 +45,7 @@
     --color-primary-fade: #131e85;
 
     --color-primary-text: #2333d6;
+    --color-warning-text: #d7800c;
 
 }
 
@@ -54,5 +54,8 @@
 @layer utilities {
     .text-primary {
         color: var(--color-primary-text);
+    }
+    .text-warning {
+        color: var(--color-warning-text);
     }
 }

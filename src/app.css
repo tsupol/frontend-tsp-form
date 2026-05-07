@@ -77,3 +77,10 @@ input[type="number"
     height: 2.25rem;
     align-items: center;
 }
+
+/* When a side-menu parent item carries a count badge, suppress its expand
+   chevron so the badge sits in the same x-column as leaf-item badges.
+   Click-to-expand and hover-flyout still work — the chevron was only a hint. */
+.side-menu-item:has(> .badge) .side-menu-item-chevron {
+    display: none;
+}
