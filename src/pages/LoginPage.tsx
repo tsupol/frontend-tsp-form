@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
-import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button, Input, FormErrorMessage } from 'tsp-form';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { ApiError } from '../lib/api';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
@@ -74,21 +74,32 @@ export function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-bg sm:bg-surface">
-      <div className="w-full max-w-md p-6 sm:border sm:border-line sm:bg-bg sm:rounded-lg">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="heading-1">{t('auth.login')}</h1>
-          <LanguageSwitcher />
+    <div className="min-h-screen flex flex-col bg-bg sm:bg-surface">
+      <header className="px-4 sm:px-8 pt-6 sm:pt-8 pb-2 flex justify-center sm:justify-start">
+        <div className="flex items-center gap-3">
+          <img src="/nnf-favicon.svg" alt="" className="w-8 h-8 rounded-md" />
+          <h1 className="heading-2" style={{ transform: 'translateY(var(--text-shift-y, 0px))' }}>{t('public.title')}</h1>
         </div>
+      </header>
+
+      <div className="flex-1 flex items-center justify-center px-4 py-6 sm:py-10">
+        <div className="w-full max-w-md p-6 sm:p-10 md:p-12 sm:border sm:border-line sm:bg-bg sm:rounded-xl sm:shadow-sm">
+          <div className="flex justify-between items-center mb-10">
+            <h2 className="heading-1">{t('auth.login')}</h2>
+            <LanguageSwitcher />
+          </div>
 
         {reasonRef.current === 'session_expired' && (
-          <div className="mb-4 p-3 bg-warning/10 border border-warning/30 rounded text-sm text-warning">
-            <div>{t('auth.sessionExpired')}</div>
-            {errorCodeRef.current && (
-              <div className="mt-1 text-xs opacity-75">
-                [{errorCodeRef.current}] {errorMsgRef.current}
-              </div>
-            )}
+          <div className="alert alert-warning mb-8">
+            <AlertTriangle size={18} />
+            <div>
+              <div className="alert-description">{t('auth.sessionExpired')}</div>
+              {errorCodeRef.current && (
+                <div className="mt-1 text-xs opacity-75">
+                  [{errorCodeRef.current}] {errorMsgRef.current}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -99,8 +110,8 @@ export function LoginPage() {
           }}
         />
 
-        <form onSubmit={handleSubmit(onSubmit)}>
-          <div className="grid gap-5 pb-8">
+        <form onSubmit={handleSubmit(onSubmit)} className="mt-8">
+          <div className="grid gap-7 pb-10">
             <div className="flex flex-col">
               <label className="form-label" htmlFor="username">
                 {t('auth.username')}
@@ -131,20 +142,19 @@ export function LoginPage() {
             </div>
 
             {errorMessage && (
-              <div className="text-danger text-sm">{errorMessage}</div>
+              <div className="alert alert-danger">
+                <div className="alert-description">{errorMessage}</div>
+              </div>
             )}
           </div>
 
-          <Button type="submit" variant="outline" disabled={isPending} className="w-full">
-            {isPending ? t('auth.loggingIn') : t('auth.login')}
-          </Button>
-
-          <div className="text-center text-sm mt-4">
-            <Link to="/" className="text-primary hover:underline">
-              {t('nav.home')}
-            </Link>
+          <div className="flex justify-center">
+            <Button type="submit" color="primary" disabled={isPending} className="px-10">
+              {isPending ? t('auth.loggingIn') : t('auth.login')}
+            </Button>
           </div>
         </form>
+        </div>
       </div>
     </div>
   );

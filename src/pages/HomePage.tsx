@@ -19,18 +19,15 @@ export function HomePage() {
     <div className="relative min-h-screen flex flex-col bg-bg">
       <header className="relative border-b border-line p-4">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
-          <h1 className="heading-2">{t('public.title')}</h1>
+          <div className="flex items-center gap-3">
+            <img src="/nnf-favicon.svg" alt="" className="w-8 h-8 rounded-md" />
+            <h1 className="heading-2" style={{ transform: 'translateY(var(--text-shift-y, 0px))' }}>{t('public.title')}</h1>
+          </div>
           <div className="flex gap-2 items-center">
             <LanguageSwitcher />
-            {isAuthenticated ? (
-              <Link to="/admin">
-                <Button variant="outline" size="sm">{t('nav.userArea')}</Button>
-              </Link>
-            ) : (
-              <Link to="/login">
-                <Button variant="outline" size="sm">{t('auth.login')}</Button>
-              </Link>
-            )}
+            <Link to={isAuthenticated ? '/admin' : '/login'}>
+              <Button variant="outline" size="sm">{t('public.signIn')}</Button>
+            </Link>
           </div>
         </div>
       </header>

@@ -331,7 +331,8 @@
     "title": "NNF System",
     "headline": "Run your branches, contracts and inventory in one place",
     "description": "Enterprise management platform",
-    "scope": "Contracts • Branches • Inventory • Finance"
+    "scope": "Contracts • Branches • Inventory • Finance",
+    "signIn": "Sign in"
   },
   "device": {
     "title": "Device Validation",
