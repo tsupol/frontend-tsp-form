@@ -73,6 +73,7 @@ interface WorkbenchRow {
   sku_code: string;
   item_name: string;
   finance_model: string;
+  is_contractable: boolean;
   cost_price: number | null;
   retail_price: number | null;
   term_months: number | null;
@@ -226,6 +227,16 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, [isDirtyRef]);
+
+  // Whether the selected model is contractable. FIN2 only applies to contractable
+  // models — non-contractable models hide the FIN2 tab entirely (and the tab bar,
+  // since FIN1 would be the only tab left).
+  const isContractable = workbenchRows.some(r => r.is_contractable);
+
+  // Once we know the model isn't contractable, ensure the active tab isn't FIN2.
+  useEffect(() => {
+    if (!isContractable && activeTab === 'fin2') setActiveTab('fin1');
+  }, [isContractable, activeTab]);
 
   // FIN1 rows (deduplicated)
   const fin1Rows = useMemo(() => {
@@ -523,25 +534,37 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
               </div>
             </div>
 
-            {/* Tab bar */}
-            <div className="flex border-b border-line">
-              <button
-                className={`px-3 py-1.5 text-xs font-medium cursor-pointer transition-colors ${activeTab === 'fin1' ? 'border-b-2 border-primary text-primary' : 'text-control-label hover:text-fg'}`}
-                onClick={() => setActiveTab('fin1')}
-              >
-                FIN1
-              </button>
-              <button
-                className={`px-3 py-1.5 text-xs font-medium cursor-pointer transition-colors ${activeTab === 'fin2' ? 'border-b-2 border-primary text-primary' : 'text-control-label hover:text-fg'}`}
-                onClick={() => setActiveTab('fin2')}
-              >
-                FIN2
-              </button>
-            </div>
+            {/* Tab bar — only shown for contractable models (FIN2 doesn't apply otherwise) */}
+            {isContractable && (
+              <div className="flex border-b border-line">
+                <button
+                  className={`px-3 py-1.5 text-xs font-medium cursor-pointer transition-colors ${activeTab === 'fin1' ? 'border-b-2 border-primary text-primary' : 'text-control-label hover:text-fg'}`}
+                  onClick={() => setActiveTab('fin1')}
+                >
+                  FIN1
+                </button>
+                <button
+                  className={`px-3 py-1.5 text-xs font-medium cursor-pointer transition-colors ${activeTab === 'fin2' ? 'border-b-2 border-primary text-primary' : 'text-control-label hover:text-fg'}`}
+                  onClick={() => setActiveTab('fin2')}
+                >
+                  FIN2
+                </button>
+              </div>
+            )}
 
-            {/* FIN2 tab */}
-            {activeTab === 'fin2' && (
+            {/* FIN2 tab — only when contractable */}
+            {isContractable && activeTab === 'fin2' && (
               <div>
+                {fin2Rows.length === 0 && (
+                  <div className="alert alert-warning mb-3">
+                    <AlertTriangle size={14} />
+                    <div className="alert-description text-xs">
+                      {canManageTerms
+                        ? t('pricing.fin2EmptyAdmin')
+                        : t('pricing.fin2EmptyStaff')}
+                    </div>
+                  </div>
+                )}
                 <div className="space-y-2">
                   {fin2Rows.map((row) => {
                     const term = row.term_months!;
@@ -631,8 +654,8 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
               </div>
             )}
 
-            {/* FIN1 tab */}
-            {activeTab === 'fin1' && (
+            {/* FIN1 tab — always shown (default when not contractable) */}
+            {(!isContractable || activeTab === 'fin1') && (
               <div>
                 {fin1Rows.length > 0 ? (
                   <table className="w-full text-xs">

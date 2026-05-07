@@ -94,26 +94,50 @@ export function PaymentSubmissionsPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
+  const { user } = useAuth();
+
+  // Branch users see only their own branch — no picker, filter is hardcoded.
+  // Higher roles get a picker scoped to their company (CA) or holding (HA/SYSTEM_DEV).
+  const isBranchUser = user?.role_code === 'BRANCH_STAFF' || user?.role_code === 'BRANCH_MANAGER';
+  const lockedBranchId = isBranchUser ? user?.branch_id ?? null : null;
 
   const [statusFilter, setStatusFilter] = useState<SubmissionStatus | null>('PENDING_REVIEW');
+  const [branchFilter, setBranchFilter] = useState<number | null>(null);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
   const [selected, setSelected] = useState<SubmissionRow | null>(null);
 
-  useEffect(() => { setPageIndex(0); }, [statusFilter]);
+  useEffect(() => { setPageIndex(0); }, [statusFilter, branchFilter]);
+
+  // Branch list for the picker — only fetched when the picker is visible.
+  // Scope by the user's natural workspace; RLS enforces holding boundary.
+  const branchScopeParam =
+    user?.role_code === 'COMPANY_ADMIN' && user.company_id != null
+      ? `&company_id=eq.${user.company_id}`
+      : '';
+  const { data: branchOptions = [] } = useQuery({
+    queryKey: ['branches', 'submissions-filter', branchScopeParam],
+    queryFn: () => apiClient.get<{ id: number; name: string }[]>(
+      `/v_branches?is_active=is.true&branch_type=eq.INTERNAL&select=id,name&order=name${branchScopeParam}`,
+    ),
+    enabled: !isBranchUser,
+    staleTime: 5 * 60 * 1000,
+  });
 
   const queryUrl = useMemo(() => {
     const params: string[] = [];
     if (statusFilter) params.push(`status=eq.${statusFilter}`);
+    const effectiveBranch = lockedBranchId ?? branchFilter;
+    if (effectiveBranch != null) params.push(`branch_id=eq.${effectiveBranch}`);
     params.push(statusFilter === 'PENDING_REVIEW'
       ? 'order=submitted_at.asc'  // oldest first — review queue
       : 'order=reviewed_at.desc.nullslast');
     return `/v_payment_submissions?${params.join('&')}`;
-  }, [statusFilter]);
+  }, [statusFilter, branchFilter, lockedBranchId]);
 
   const { data, isFetching } = useQuery({
-    queryKey: ['payment-submissions', statusFilter, pageIndex, pageSize],
+    queryKey: ['payment-submissions', statusFilter, branchFilter, lockedBranchId, pageIndex, pageSize],
     queryFn: () => apiClient.getPaginated<SubmissionRow>(
       queryUrl,
       { page: pageIndex + 1, pageSize },
@@ -246,6 +270,19 @@ export function PaymentSubmissionsPage() {
               clearable
             />
           </div>
+          {!isBranchUser && (
+            <div className="flex-1 min-w-0 max-w-[16rem]">
+              <Select
+                options={branchOptions.map(b => ({ value: String(b.id), label: b.name }))}
+                value={branchFilter != null ? String(branchFilter) : null}
+                onChange={val => setBranchFilter(val ? Number(val) : null)}
+                placeholder={t('paymentSubmissions.allBranches')}
+                size="sm"
+                showChevron
+                clearable
+              />
+            </div>
+          )}
         </div>
 
         <DataTable<SubmissionRow>
@@ -577,18 +614,19 @@ function SubmissionReviewDrawer({
               )}
             </div>
 
-            {errorMessage && (
-              <div className="alert alert-danger animate-pop-in">
-                <XCircle size={16} />
-                <div><div className="alert-description text-xs">{errorMessage}</div></div>
-              </div>
-            )}
           </div>
         </div>
 
         {(isPending || isRejected) && (
           <div className="drawer-footer border-t border-line sticky bottom-0 bg-bg">
             <div className="space-y-2 w-full">
+              {errorMessage && (
+                <div className="alert alert-danger animate-pop-in">
+                  <XCircle size={16} />
+                  <div><div className="alert-description text-xs">{errorMessage}</div></div>
+                </div>
+              )}
+
               {isPending && canApprove && (
                 <div>
                   <div className="form-label mb-1">{t('paymentSubmissions.bankAccount')}</div>

@@ -48,14 +48,14 @@
 
     --spacing-line: 1px;
 
-    /* ── Primary (Royal blue) ─────────────────────────────────────────── */
+    /* ── Primary (Blue) ───────────────────────────────────────────────── */
 
-    --color-primary: #2333d6;
-    --color-primary-hover: #3e4ee0;
-    --color-primary-active: #1a28ad;
-    --color-primary-fade: #6e7be8;
+    --color-primary: #2563eb;
+    --color-primary-hover: #3b82f6;
+    --color-primary-active: #1d4ed8;
+    --color-primary-fade: #60a5fa;
     --color-primary-contrast: #ffffff;
-    --color-primary-light: rgba(35, 51, 214, 0.1);
+    --color-primary-light: rgba(37, 99, 235, 0.1);
 
     /* ── Secondary (Teal) ─────────────────────────────────────────────── */
 
@@ -149,6 +149,10 @@
     --color-button-default-bg: #212225;
     --color-button-default-border: #43484e;
     --color-button-outline-border: #43484e;
+    --color-button-default-hover-bg: #2e3135;
+    --color-button-default-hover-fg: var(--color-fg);
+    --color-button-ghost-hover-bg: #2e3135;
+    --color-button-ghost-hover-fg: var(--color-fg);
 
     /* added */
     --spacing-nav: 3rem;
@@ -215,7 +219,8 @@
     /* pagination */
     --color-pagination-border: transparent;
     --color-pagination-bg: transparent;
-    --color-pagination-hover-bg: var(--color-surface-elevated);
+    --color-pagination-hover-bg: var(--color-button-ghost-hover-bg, var(--color-surface-elevated));
+    --color-pagination-hover-fg: var(--color-button-ghost-hover-fg, var(--color-fg));
     --color-pagination-hover-border: transparent;
     --color-pagination-active-bg: var(--color-button-default-bg);
     --color-pagination-active-fg: var(--color-fg);
@@ -227,7 +232,7 @@
 /* ── Light theme ──────────────────────────────────────────────────── */
 
 [data-theme="light"] {
-    --color-fg: #111;
+    --color-fg: #1c2024;
     --color-fg-contrast: #ffffff;
     --color-bg: #f3f3f6;
     --color-bg-contrast: #1c2024;
@@ -241,9 +246,9 @@
     --color-surface-elevated: #ffffff;
     --color-select-highlight: #e8e8ec;
 
-    --color-primary-hover: #1a28ad;
-    --color-primary-active: #131e85;
-    --color-primary-fade: #131e85;
+    --color-primary-hover: #1d4ed8;
+    --color-primary-active: #1e40af;
+    --color-primary-fade: #1e40af;
 
     --color-secondary-hover: #7c3aed;
     --color-secondary-active: #6d28d9;
@@ -262,7 +267,7 @@
     --color-info-hover: #0891b2;
     --color-info-fade: #0e7490;
 
-    /*--color-scrollbar-track: rgba(0, 0, 0, 0.04);*/
+    --color-scrollbar-track: rgba(0, 0, 0, 0.04);
     --color-scrollbar-thumb: rgba(0, 0, 0, 0.12);
     --color-control-bg: #ffffff;
     --color-control-placeholder: #80838d;
@@ -270,9 +275,13 @@
     --color-fg-muted: #60646c;
 
     /* default button */
-    --color-button-default-bg: #ffffff;
-    --color-button-default-border: #cdced6;
+    --color-button-default-bg: #eeeef1;
+    --color-button-default-border: #c4c6cf;
     --color-button-outline-border: #cdced6;
+    --color-button-default-hover-bg: #d9d9e0;
+    --color-button-default-hover-fg: #1c2024;
+    --color-button-ghost-hover-bg: #e0e1e6;
+    --color-button-ghost-hover-fg: #1c2024;
 
     /* side menu */
     --color-side-menu-bg: #f0f0f3;
@@ -295,6 +304,5 @@
 
     /* skeleton */
     --color-skeleton: #e0e1e6;
-
 }
 

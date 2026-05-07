@@ -49,7 +49,7 @@ import { useAuth } from './contexts/AuthContext';
 import { useTheme } from './contexts/ThemeContext';
 import { useNavGuard } from './contexts/NavGuardContext';
 import { isLocalDev } from './lib/devEnv';
-import { defaultScopeFor, scopeQuery, scopeKey } from './lib/scope';
+import { defaultScopeFor, scopeQueryRollup, scopeKey } from './lib/scope';
 
 const lgQuery = window.matchMedia('(min-width: 1024px)');
 const subscribeLg = (cb: () => void) => { lgQuery.addEventListener('change', cb); return () => lgQuery.removeEventListener('change', cb); };
@@ -159,33 +159,51 @@ export const AppSideNav = () => {
   // Side-menu badges always use the user's default scope (independent of any
   // dashboard scope picker). Backend RLS leaks on these views — must send the
   // explicit scope filter, see UI_FEEDBACK/2026-05-06_dashboard_endpoints.md.
+  // Uses GROUPING SETS rollup views; query keys match DashboardPage so React
+  // Query dedupes to a single fetch when both badge and dashboard are mounted.
   const scope = defaultScopeFor(user);
   const sk = scopeKey(scope);
-  const sq = scopeQuery(scope);
+  const sqr = scopeQueryRollup(scope);
 
-  const { data: approvalsCountData } = useQuery({
-    queryKey: ['nav', 'pending-approvals-count', sk],
-    queryFn: () => apiClient.getPaginated<unknown>(
-      `/v_pending_approvals?status=eq.PENDING&select=type${sq}`,
-      { page: 1, pageSize: 1 },
+  const { data: approvalsRows } = useQuery({
+    queryKey: ['nav', 'pending-approvals-summary', sk],
+    queryFn: () => apiClient.get<{ pending_count: number }[]>(
+      `/v_dashboard_pending_approvals_summary?select=pending_count,pending_amount${sqr}`,
     ),
     enabled: canApprove,
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
   });
-  const pendingApprovals = approvalsCountData?.totalCount ?? 0;
+  const pendingApprovals = approvalsRows?.[0]?.pending_count ?? 0;
 
-  const { data: slipsCountData } = useQuery({
-    queryKey: ['nav', 'pending-submissions-count', sk],
-    queryFn: () => apiClient.getPaginated<unknown>(
-      `/v_payment_submissions?status=eq.PENDING_REVIEW&select=id${sq}`,
-      { page: 1, pageSize: 1 },
+  const { data: slipsRows } = useQuery({
+    queryKey: ['nav', 'pending-submissions-summary', sk],
+    queryFn: () => apiClient.get<{ pending_count: number }[]>(
+      `/v_dashboard_payment_submissions_summary?select=pending_count,pending_amount${sqr}`,
     ),
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
     retry: false, // 403 until BE re-grants — don't loop
   });
-  const pendingSlips = slipsCountData?.totalCount ?? 0;
+  const pendingSlips = slipsRows?.[0]?.pending_count ?? 0;
+
+  // Unclosed-days badge for the Accounting parent item.
+  // For branch users (BS/BM) the badge counts unclosed days (their branch only).
+  // For CA/HA/SYSTEM_DEV it counts branches with unclosed days — keeps the
+  // signal "things you should act on" consistent across roles.
+  const isBranchUser = role === 'BRANCH_STAFF' || role === 'BRANCH_MANAGER';
+  const { data: unclosedRows } = useQuery({
+    queryKey: ['nav', 'unclosed-summary', sk],
+    queryFn: () => apiClient.get<{ unclosed_day_count: number; unclosed_branch_count: number }[]>(
+      `/v_dashboard_unclosed_summary?select=unclosed_day_count,unclosed_branch_count${sqr}`,
+    ),
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+  });
+  const unclosedRow = unclosedRows?.[0];
+  const unclosedCount = isBranchUser
+    ? (unclosedRow?.unclosed_day_count ?? 0)
+    : (unclosedRow?.unclosed_branch_count ?? 0);
 
   // Render an icon with an optional count badge.
   // - Expanded: inline Badge to the right of the label (returned via `badge`).
@@ -313,11 +331,18 @@ export const AppSideNav = () => {
       path: '/admin/payment-submissions',
     },
     {
-      key: 'accounting', icon: <BookOpen size="1rem" />, label: t('nav.accounting'),
+      key: 'accounting',
+      ...iconWithCount(<BookOpen size="1rem" />, unclosedCount),
+      label: t('nav.accounting'),
       path: '/admin/accounting/day-close',
       children: [
         { type: 'group', key: 'grp-acc-close', label: t('accounting.groupDayClose') },
-        { key: 'day-close', icon: <CalendarCheck size="1rem" />, label: t('nav.dayClose'), path: '/admin/accounting/day-close' },
+        {
+          key: 'day-close',
+          ...iconWithCount(<CalendarCheck size="1rem" />, unclosedCount),
+          label: t('nav.dayClose'),
+          path: '/admin/accounting/day-close',
+        },
         ...(['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
           { key: 'audit-flags', icon: <ShieldAlert size="1rem" />, label: t('nav.auditFlags'), path: '/admin/accounting/audit-flags' },
         ] : []),

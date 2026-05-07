@@ -15,6 +15,7 @@ import {
   AlertCircle,
   CalendarX,
   XCircle,
+  Smartphone,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../lib/api';
 import { fmtCurrency } from '../lib/format';
@@ -24,6 +25,7 @@ import { DashboardScopePicker } from '../components/DashboardScopePicker';
 import {
   defaultScopeFor,
   scopeQuery,
+  scopeQueryRollup,
   scopeKey,
   todaySummaryView,
   type Scope,
@@ -36,6 +38,36 @@ import {
 } from './accounting/accountingTypes';
 
 const APPROVER_ROLES = new Set(['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV']);
+
+// Dashboard summary views (GROUPING SETS rollup) — see UI_SUMMARY/95.
+// One row per scope level; sqr filter picks the row matching the current scope.
+interface PendingSummaryRow {
+  pending_count: number;
+  pending_amount: number;
+}
+
+interface ReconSummaryRow {
+  mismatch_count: number;
+  mismatch_amount: number;
+}
+
+interface UnclosedSummaryRow {
+  unclosed_day_count: number;
+  unclosed_branch_count: number;
+  unclosed_amount: number;
+  max_days_overdue: number;
+}
+
+// v_contracts_pending_device_bind — contracts with state IN (ACTIVE, WAIT_LEGAL_PROCESS,
+// ON_LEGAL_PROCESS) AND device_id IS NULL. days_pending = today - activated_at.
+interface PendingDeviceBindRow {
+  id: number;
+  code_display: string;
+  customer_name: string | null;
+  model_name: string | null;
+  branch_name: string | null;
+  days_pending: number;
+}
 
 // Today rollup — superset of fields across branch/company/holding views.
 // Holding view returns a narrow subset; missing fields read as undefined.
@@ -75,6 +107,8 @@ export function DashboardPage() {
   const [scope, setScope] = useState<Scope>(() => defaultScopeFor(user));
   const sk = scopeKey(scope);
   const sq = scopeQuery(scope);
+  // GROUPING SETS rollup filter for v_dashboard_*_summary views.
+  const sqr = scopeQueryRollup(scope);
 
   // ── Today's pulse — view chosen by scope ──────────────────────────────
   // Branch view: filter bill_date=eq.today. Company/holding views filter is_today server-side.
@@ -93,36 +127,36 @@ export function DashboardPage() {
   // determines what's available — branch/company show breakdown, holding shows totals.
   const todayRow = todayQuery.data?.[0] ?? (todayQuery.isSuccess ? zerosFor(scope) : undefined);
 
-  // ── Action band — count-only via getPaginated.totalCount ─────────────
-  // Each card uses the same query keys as the side-menu badges → React Query dedupes.
+  // ── Action band — single-row dashboard summary views (GROUPING SETS) ──
+  // Each view returns one row per (holding, company, branch) level. The sqr
+  // filter (`...&company_id=is.null&branch_id=is.null` etc.) picks the right
+  // rollup row for the current scope. Empty array = no pending items.
+  // Same query keys as side-menu badges → React Query dedupes.
 
   const unclosedQuery = useQuery({
-    queryKey: ['dashboard', 'count', 'unclosed', sk],
+    queryKey: ['nav', 'unclosed-summary', sk],
     queryFn: () =>
-      apiClient.getPaginated<unknown>(
-        `/v_branch_daily_unclosed?select=branch_id${sq}`,
-        { page: 1, pageSize: 1 },
+      apiClient.get<UnclosedSummaryRow[]>(
+        `/v_dashboard_unclosed_summary?select=unclosed_day_count,unclosed_branch_count,unclosed_amount,max_days_overdue${sqr}`,
       ),
     refetchInterval: 60_000,
   });
 
   const approvalsQuery = useQuery({
-    queryKey: ['nav', 'pending-approvals-count', sk],
+    queryKey: ['nav', 'pending-approvals-summary', sk],
     queryFn: () =>
-      apiClient.getPaginated<unknown>(
-        `/v_pending_approvals?status=eq.PENDING&select=type${sq}`,
-        { page: 1, pageSize: 1 },
+      apiClient.get<PendingSummaryRow[]>(
+        `/v_dashboard_pending_approvals_summary?select=pending_count,pending_amount${sqr}`,
       ),
     enabled: canApprove,
     refetchInterval: 60_000,
   });
 
   const submissionsQuery = useQuery({
-    queryKey: ['nav', 'pending-submissions-count', sk],
+    queryKey: ['nav', 'pending-submissions-summary', sk],
     queryFn: () =>
-      apiClient.getPaginated<unknown>(
-        `/v_payment_submissions?status=eq.PENDING_REVIEW&select=id${sq}`,
-        { page: 1, pageSize: 1 },
+      apiClient.get<PendingSummaryRow[]>(
+        `/v_dashboard_payment_submissions_summary?select=pending_count,pending_amount${sqr}`,
       ),
     refetchInterval: 60_000,
     retry: false, // 403 is permanent until BE fixes GRANT — don't retry
@@ -133,20 +167,40 @@ export function DashboardPage() {
   // `.claude/todo-audit-flags-page.md` for the future dedicated page plan.
 
   const reconQuery = useQuery({
-    queryKey: ['dashboard', 'count', 'recon', sk],
+    queryKey: ['nav', 'recon-summary', sk],
     queryFn: () =>
-      apiClient.getPaginated<unknown>(
-        `/v_bill_payment_reconciliation?has_mismatch=eq.true&select=bill_id${sq}`,
-        { page: 1, pageSize: 1 },
+      apiClient.get<ReconSummaryRow[]>(
+        `/v_dashboard_recon_summary?select=mismatch_count,mismatch_amount${sqr}`,
       ),
     refetchInterval: 60_000,
   });
 
+  const unclosedRow = unclosedQuery.data?.[0];
+  const approvalsRow = approvalsQuery.data?.[0];
+  const submissionsRow = submissionsQuery.data?.[0];
+  const reconRow = reconQuery.data?.[0];
+
   const actionCount =
-    (unclosedQuery.data?.totalCount ?? 0) +
-    (canApprove ? (approvalsQuery.data?.totalCount ?? 0) : 0) +
-    (submissionsQuery.data?.totalCount ?? 0) +
-    (reconQuery.data?.totalCount ?? 0);
+    (unclosedRow?.unclosed_day_count ?? 0) +
+    (canApprove ? (approvalsRow?.pending_count ?? 0) : 0) +
+    (submissionsRow?.pending_count ?? 0) +
+    (reconRow?.mismatch_count ?? 0);
+
+  // ── Pending tasks: contracts awaiting device bind ────────────────────
+  // Plain (non-rollup) view, scoped via standard sq filter. One round-trip
+  // gets totalCount + the first few rows for an inline preview.
+  const deviceBindQuery = useQuery({
+    queryKey: ['dashboard', 'pending-device-bind', sk],
+    queryFn: () =>
+      apiClient.getPaginated<PendingDeviceBindRow>(
+        `/v_contracts_pending_device_bind?select=id,code_display,customer_name,model_name,branch_name,days_pending&order=days_pending.desc${sq}`,
+        { page: 1, pageSize: 5 },
+      ),
+    refetchInterval: 60_000,
+  });
+  const deviceBindCount = deviceBindQuery.data?.totalCount ?? 0;
+  const deviceBindRows = deviceBindQuery.data?.data ?? [];
+  const deviceBindMaxDays = deviceBindRows[0]?.days_pending ?? 0;
 
   // ── Same-day-last-week comparison for the Income card delta ──────────
   // Sum expected_amount across whatever close rows fall under our scope on that day.
@@ -248,7 +302,19 @@ export function DashboardPage() {
             <CountCard
               icon={<CalendarX size={20} />}
               title={t('dashboard.unclosedDays')}
-              query={unclosedQuery}
+              count={unclosedRow?.unclosed_day_count ?? 0}
+              isLoading={unclosedQuery.isLoading}
+              isError={unclosedQuery.isError}
+              error={unclosedQuery.error}
+              subtitle={
+                (unclosedRow?.max_days_overdue ?? 0) > 0
+                  ? t('dashboard.unclosedSubtitle', {
+                      branches: unclosedRow!.unclosed_branch_count ?? 0,
+                      maxDays: unclosedRow!.max_days_overdue ?? 0,
+                      amount: fmtCurrency(unclosedRow!.unclosed_amount),
+                    })
+                  : undefined
+              }
               to="/admin/accounting/day-close"
               emptyText={t('dashboard.allClosed')}
             />
@@ -257,7 +323,15 @@ export function DashboardPage() {
               <CountCard
                 icon={<ShieldCheck size={20} />}
                 title={t('dashboard.pendingApprovals')}
-                query={approvalsQuery}
+                count={approvalsRow?.pending_count ?? 0}
+                isLoading={approvalsQuery.isLoading}
+                isError={approvalsQuery.isError}
+                error={approvalsQuery.error}
+                subtitle={
+                  (approvalsRow?.pending_count ?? 0) > 0
+                    ? fmtCurrency(approvalsRow!.pending_amount)
+                    : undefined
+                }
                 to="/admin/approvals"
                 emptyText={t('dashboard.noApprovals')}
               />
@@ -266,7 +340,15 @@ export function DashboardPage() {
             <CountCard
               icon={<Receipt size={20} />}
               title={t('dashboard.pendingSlips')}
-              query={submissionsQuery}
+              count={submissionsRow?.pending_count ?? 0}
+              isLoading={submissionsQuery.isLoading}
+              isError={submissionsQuery.isError}
+              error={submissionsQuery.error}
+              subtitle={
+                (submissionsRow?.pending_count ?? 0) > 0
+                  ? fmtCurrency(submissionsRow!.pending_amount)
+                  : undefined
+              }
               to="/admin/payment-submissions"
               emptyText={t('dashboard.noSlips')}
             />
@@ -274,13 +356,37 @@ export function DashboardPage() {
             <CountCard
               icon={<AlertCircle size={20} />}
               title={t('dashboard.reconMismatches')}
-              query={reconQuery}
+              count={reconRow?.mismatch_count ?? 0}
+              isLoading={reconQuery.isLoading}
+              isError={reconQuery.isError}
+              error={reconQuery.error}
+              subtitle={
+                (reconRow?.mismatch_count ?? 0) > 0
+                  ? fmtCurrency(reconRow!.mismatch_amount)
+                  : undefined
+              }
               to="/admin/accounting/bills"
               emptyText={t('dashboard.noMismatches')}
               dangerWhenNonZero
             />
           </div>
         </section>
+
+        {/* ── Pending tasks ─────────────────────────────────────────────── */}
+        {!deviceBindQuery.isError && (deviceBindQuery.isLoading || deviceBindCount > 0) && (
+          <section className="mb-6">
+            <h2 className="text-sm font-semibold text-control-label mb-3 uppercase tracking-wide">
+              {t('dashboard.pendingTasks')}
+            </h2>
+            <PendingDeviceBindCard
+              count={deviceBindCount}
+              maxDays={deviceBindMaxDays}
+              rows={deviceBindRows}
+              isLoading={deviceBindQuery.isLoading}
+              t={t}
+            />
+          </section>
+        )}
 
         {/* ── Today KPIs ───────────────────────────────────────────────── */}
         <section className="mb-6">
@@ -410,16 +516,19 @@ export function DashboardPage() {
 interface CountCardProps {
   icon: React.ReactNode;
   title: string;
-  query: { data?: { totalCount: number }; isLoading: boolean; isError: boolean; error: unknown };
+  count: number;
+  isLoading: boolean;
+  isError: boolean;
+  error: unknown;
+  subtitle?: string;
   to?: string;
   emptyText: string;
   dangerWhenNonZero?: boolean;
 }
 
-function CountCard({ icon, title, query, to, emptyText, dangerWhenNonZero }: CountCardProps) {
-  const count = query.data?.totalCount ?? 0;
+function CountCard({ icon, title, count, isLoading, isError, error, subtitle, to, emptyText, dangerWhenNonZero }: CountCardProps) {
   const tone: 'ok' | 'warning' | 'danger' =
-    query.isError ? 'danger'
+    isError ? 'danger'
     : count === 0 ? 'ok'
     : dangerWhenNonZero ? 'danger'
     : 'warning';
@@ -440,14 +549,14 @@ function CountCard({ icon, title, query, to, emptyText, dangerWhenNonZero }: Cou
         <span className={iconColor}>{icon}</span>
         <h3 className="text-sm font-semibold">{title}</h3>
       </div>
-      {to && !query.isError && <ChevronRight size={16} className="text-control-label" />}
+      {to && !isError && <ChevronRight size={16} className="text-control-label" />}
     </div>
   );
 
   let body: React.ReactNode;
-  if (query.isError) {
-    body = <ErrorBody error={query.error} />;
-  } else if (query.isLoading) {
+  if (isError) {
+    body = <ErrorBody error={error} />;
+  } else if (isLoading) {
     body = (
       <div className="flex items-baseline gap-2">
         <span className="text-2xl font-semibold text-control-label">—</span>
@@ -458,6 +567,9 @@ function CountCard({ icon, title, query, to, emptyText, dangerWhenNonZero }: Cou
       <>
         <div className="flex items-baseline gap-2 mb-1">
           <span className="text-2xl font-semibold tabular-nums">{count}</span>
+          {subtitle && count > 0 && (
+            <span className="text-xs text-control-label tabular-nums truncate">{subtitle}</span>
+          )}
         </div>
         {count === 0 && (
           <div className="text-xs text-control-label flex items-center gap-1">
@@ -469,7 +581,7 @@ function CountCard({ icon, title, query, to, emptyText, dangerWhenNonZero }: Cou
     );
   }
 
-  if (to && !query.isError) {
+  if (to && !isError) {
     return (
       <Link to={to} className={`${cls} hover:shadow-sm transition-shadow no-underline text-current`}>
         {header}
@@ -482,6 +594,74 @@ function CountCard({ icon, title, query, to, emptyText, dangerWhenNonZero }: Cou
       {header}
       {body}
     </div>
+  );
+}
+
+// Card for "contracts pending device bind". Shows count + max days plus a
+// preview list of the oldest few. Drills into the contracts search page —
+// currently with no built-in pending_device filter, so users will land on the
+// full list (TODO: add filter once available).
+function PendingDeviceBindCard({
+  count,
+  maxDays,
+  rows,
+  isLoading,
+  t,
+}: {
+  count: number;
+  maxDays: number;
+  rows: PendingDeviceBindRow[];
+  isLoading: boolean;
+  t: (k: string, opts?: Record<string, unknown>) => string;
+}) {
+  const tone = maxDays >= 7 ? 'danger' : 'warning';
+  const toneClass =
+    tone === 'danger'
+      ? 'border-danger/40 bg-danger/5'
+      : 'border-warning/40 bg-warning/5';
+  const iconColor = tone === 'danger' ? 'text-danger' : 'text-warning';
+
+  return (
+    <Link
+      to="/admin/contracts/search"
+      className={`block border ${toneClass} rounded-lg p-4 hover:shadow-sm transition-shadow no-underline text-current`}
+    >
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="flex items-center gap-2">
+          <Smartphone size={20} className={iconColor} />
+          <h3 className="text-sm font-semibold">{t('dashboard.pendingDeviceBind')}</h3>
+        </div>
+        <ChevronRight size={16} className="text-control-label" />
+      </div>
+      <div className="flex items-baseline gap-2 mb-3">
+        <span className="text-2xl font-semibold tabular-nums">{isLoading ? '—' : count}</span>
+        {!isLoading && maxDays > 0 && (
+          <span className="text-xs text-control-label tabular-nums">
+            {t('dashboard.overdueDays', { count: maxDays })}
+          </span>
+        )}
+      </div>
+      {rows.length > 0 && (
+        <ul className="divide-y divide-line border-t border-line">
+          {rows.map((r) => (
+            <li key={r.id} className="py-1.5 flex items-center justify-between gap-3 text-sm">
+              <span className="truncate min-w-0">
+                <span className="font-medium">{r.code_display}</span>
+                {r.customer_name && (
+                  <span className="text-control-label"> · {r.customer_name}</span>
+                )}
+                {r.model_name && (
+                  <span className="text-control-label"> · {r.model_name}</span>
+                )}
+              </span>
+              <span className="text-xs text-control-label tabular-nums whitespace-nowrap">
+                {t('dashboard.overdueDays', { count: r.days_pending })}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Link>
   );
 }
 

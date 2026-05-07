@@ -45,6 +45,26 @@ export function scopeQuery(scope: Scope): string {
   }
 }
 
+/**
+ * Scope filter for GROUPING SETS rollup views (e.g. v_dashboard_*_summary).
+ * These views return one row per (holding, company, branch) level — caller must
+ * filter `is.null` on every level *below* the chosen scope to pick a single row.
+ *
+ *   HA  → ?holding_id=eq.X&company_id=is.null&branch_id=is.null
+ *   CA  → ?company_id=eq.X&branch_id=is.null
+ *   BM  → ?branch_id=eq.X
+ *
+ * Do NOT use this for non-rollup views (v_branch_today_summary etc.) — use scopeQuery instead.
+ */
+export function scopeQueryRollup(scope: Scope): string {
+  switch (scope.kind) {
+    case 'branch':  return `&branch_id=eq.${scope.branchId}`;
+    case 'company': return `&company_id=eq.${scope.companyId}&branch_id=is.null`;
+    case 'holding': return `&holding_id=eq.${scope.holdingId}&company_id=is.null&branch_id=is.null`;
+    case 'all':     return `&company_id=is.null&branch_id=is.null`;
+  }
+}
+
 /** Stable cache-key fragment for React Query. */
 export function scopeKey(scope: Scope): string {
   switch (scope.kind) {
