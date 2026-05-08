@@ -1,14 +1,16 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Select, MaskedInput } from 'tsp-form';
-import { Star, Plus, Trash2, XCircle, Loader2, CheckCircle, AlertTriangle, ChevronsRight } from 'lucide-react';
+import { Star, Plus, Trash2, XCircle, Loader2, CheckCircle, AlertTriangle, ChevronsRight, Link2, FileText } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { fmtCurrency } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
 import type { PaymentMethod, PaymentLine, BankAccount, BillOpenResult } from './WorkspaceTypes';
 import { ERROR_TO_MODAL } from './WorkspaceTypes';
+import { BillReceipt } from './BillReceipt';
+import { BillCart } from './BillCart';
 
 const BASE_PAYMENT_METHODS = [
   { value: 'CASH', label: 'Cash' },
@@ -28,17 +30,76 @@ interface ReadinessResult {
   errors: Array<{ code: string; detail?: Record<string, unknown> }>;
 }
 
-export function PanelReviewPay({ onClose }: { onClose: () => void }) {
+export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { data, updateData, contract, invalidateContract, setOpenModal } = useWorkspace();
   const savingBalance = contract?.saving_balance ?? 0;
   const score = contract?.staff_confidence_score ?? null;
 
-  // Bill preview from contract pricing
+  // Confirm-payment state (declared early — auto-open effect below references readinessErrors)
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [readinessErrors, setReadinessErrors] = useState<Array<{ code: string }>>([]);
+
+  // Bill preview from contract pricing — used only before bill is opened.
   const downPayment = contract?.down_payment ?? 0;
   const insuranceDeposit = contract?.insurance_deposit ?? 0;
-  const totalAmount = downPayment + insuranceDeposit;
+  const previewTotal = downPayment + insuranceDeposit;
+
+  // Live bill (after fn_bill_contract_open) — gives us the canonical total
+  // including any user-added accessory/gift lines.
+  const queryClient = useQueryClient();
+  const { data: liveBill } = useQuery({
+    queryKey: ['bill-detail', data.billId],
+    queryFn: () => apiClient.get<Array<{ bill_id: number; total_amount: number; status: string }>>(
+      `/v_bill_detail?bill_id=eq.${data.billId}&select=bill_id,total_amount,status`,
+    ).then(rows => rows[0] ?? null),
+    enabled: data.billId != null && data.billId > 0,
+    staleTime: 0,
+  });
+
+  const totalAmount = liveBill?.total_amount ?? previewTotal;
+
+  // Auto-open the CONTRACT_OPEN bill once the contract is validate-ready.
+  // Doc 33: bill_open transitions DRAFT → PENDING_PAYMENT and creates the
+  // canonical bill that the cart edits live against.
+  const autoOpenInFlight = useRef(false);
+  const [autoOpenError, setAutoOpenError] = useState('');
+  useEffect(() => {
+    if (data.billConfirmed) return;
+    if (data.billId != null && data.billId > 0) return;
+    if (!data.contractId || !score) return;
+    if (autoOpenInFlight.current) return;
+    autoOpenInFlight.current = true;
+    (async () => {
+      try {
+        const readiness = await apiClient.rpc<ReadinessResult>('fn_contract_validate_ready', {
+          p_contract_id: data.contractId,
+        });
+        if (!readiness.ready) {
+          setReadinessErrors(readiness.errors);
+          autoOpenInFlight.current = false;
+          return;
+        }
+        const bill = await apiClient.rpc<BillOpenResult>('fn_bill_contract_open', {
+          p_contract_id: data.contractId,
+        });
+        updateData({ billId: bill.bill_id, billCode: bill.bill_code, billData: bill });
+        invalidateContract();
+      } catch (err) {
+        if (err instanceof ApiError) {
+          const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+            || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+          setAutoOpenError(tr || err.message);
+        } else {
+          setAutoOpenError(err instanceof Error ? err.message : String(err));
+        }
+        autoOpenInFlight.current = false;
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.contractId, data.billId, data.billConfirmed, score]);
 
   // ── Confidence score ────────────────────────────────────────────────
   const [scoreSaving, setScoreSaving] = useState(false);
@@ -81,6 +142,17 @@ export function PanelReviewPay({ onClose }: { onClose: () => void }) {
     const defaultMethod: PaymentMethod = savingBalance > 0 && savingBalance >= totalAmount ? 'SAVING_WALLET' : 'CASH';
     return [{ method: defaultMethod, amount: totalAmount, bank_account_id: null }];
   });
+  // Track whether the user has manually edited the payment row(s). While
+  // untouched, we keep the single default line's amount in sync with the live
+  // bill total — so adding accessories/gifts in the cart auto-rebalances.
+  const userEditedPayments = useRef(false);
+  useEffect(() => {
+    if (userEditedPayments.current) return;
+    if (payments.length !== 1) return;
+    if (payments[0].amount === totalAmount) return;
+    setPayments([{ ...payments[0], amount: totalAmount }]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [totalAmount]);
 
   const { data: bankAccounts } = useQuery({
     queryKey: ['bank-accounts-active'],
@@ -97,6 +169,7 @@ export function PanelReviewPay({ onClose }: { onClose: () => void }) {
   const isBalanced = totalAmount > 0 && Math.abs(totalPayment - totalAmount) < 0.01;
 
   const updatePayment = (idx: number, updates: Partial<PaymentLine>) => {
+    userEditedPayments.current = true;
     setPayments(prev => prev.map((p, i) => {
       if (i !== idx) return p;
       const merged = { ...p, ...updates };
@@ -112,59 +185,34 @@ export function PanelReviewPay({ onClose }: { onClose: () => void }) {
     }));
   };
 
-  // ── Confirm & Activate ──────────────────────────────────────────────
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [readinessErrors, setReadinessErrors] = useState<Array<{ code: string }>>([]);
-
-  const canConfirm = !!score && isBalanced && totalAmount > 0;
+  // ── Confirm Payment ─────────────────────────────────────────────────
+  const canConfirm = !!score && isBalanced && totalAmount > 0 && data.billId != null && data.billId > 0;
 
   const handleConfirm = async () => {
-    if (!canConfirm || !data.contractId) return;
+    if (!canConfirm || !data.contractId || !data.billId) return;
     setLoading(true);
     setError('');
-    setReadinessErrors([]);
 
     try {
-      // 1. Validate readiness
-      const readiness = await apiClient.rpc<ReadinessResult>('fn_contract_validate_ready', {
-        p_contract_id: data.contractId,
-      });
-
-      if (!readiness.ready) {
-        setReadinessErrors(readiness.errors);
-        setLoading(false);
-        return;
-      }
-
-      // 2. Create bill
-      let billId = data.billId;
-      if (!billId) {
-        const bill = await apiClient.rpc<BillOpenResult>('fn_bill_contract_open', {
-          p_contract_id: data.contractId,
-        });
-        billId = bill.bill_id;
-        updateData({ billId: bill.bill_id, billCode: bill.bill_code, billData: bill });
-      }
-
-      // 3. Add payments
+      // Bill is already open (auto-opened on entry); just record payments and confirm.
       for (const payment of payments) {
         await apiClient.rpc('fn_bill_payment_add', {
-          p_bill_id: billId,
+          p_bill_id: data.billId,
           p_method: payment.method,
           p_amount: payment.amount,
           p_bank_account_id: payment.method === 'TRANSFER' ? payment.bank_account_id : null,
         });
       }
 
-      // 4. Confirm → activate
+      // Confirm → activate (server cascades activation; see CT-2605-000015-2 trace)
       await apiClient.rpc('fn_bill_payment_confirm', {
-        p_bill_id: billId,
+        p_bill_id: data.billId,
         p_contract_id: data.contractId,
       });
 
+      updateData({ billConfirmed: true });
       invalidateContract();
-      navigate(`/admin/contracts/search/${data.contractId}`);
+      // Stay on panel — user previews / prints the receipt before pairing the device.
     } catch (err) {
       if (err instanceof ApiError) {
         const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
@@ -177,6 +225,43 @@ export function PanelReviewPay({ onClose }: { onClose: () => void }) {
       setLoading(false);
     }
   };
+
+  // ── Post-confirm: section state IS the printable receipt. ─────────────
+  // Footer buttons are conditional navigation (no auto-redirect).
+  if (data.billConfirmed && data.billId) {
+    // 1st-hand catalog (NEW path) leaves the contract ACTIVE without a device.
+    // USED auto-binds in fn_bill_contract_open, so it lands here with device_id set.
+    const needsBindDevice = contract != null && contract.device_id == null;
+
+    return (
+      <div className="flex flex-col h-full">
+        <div className="flex-1 overflow-y-auto better-scroll p-4">
+          <BillReceipt billId={data.billId} />
+        </div>
+        <div className="shrink-0 border-t border-line bg-bg px-4 py-3 flex justify-end gap-2 print:hidden">
+          {needsBindDevice && data.contractId && (
+            <Button
+              color="primary"
+              startIcon={<Link2 size={16} />}
+              onClick={() => navigate(`/admin/contracts/pending-pairing/${data.contractId}`)}
+            >
+              {t('wizard.action_bindDevice')}
+            </Button>
+          )}
+          {data.contractId && (
+            <Button
+              variant={needsBindDevice ? 'outline' : 'solid'}
+              color={needsBindDevice ? undefined : 'primary'}
+              startIcon={<FileText size={16} />}
+              onClick={() => navigate(`/admin/contracts/search/${data.contractId}`)}
+            >
+              {t('wizard.action_viewInContract')}
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full max-w-2xl">
@@ -226,31 +311,49 @@ export function PanelReviewPay({ onClose }: { onClose: () => void }) {
           )}
         </div>
 
-        {/* ── Section 2: Bill Preview ──────────────────────────── */}
+        {/* ── Section 2: Cart ──────────────────────────────────── */}
         <div>
           <label className="form-label">{t('workspace.billPreview')}</label>
-          <div className="border border-line rounded-md overflow-hidden">
-            <table className="w-full text-sm">
-              <tbody className="divide-y divide-line">
-                {downPayment > 0 && (
-                  <tr>
-                    <td className="px-3 py-2">{t('contract.downPayment')}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{fmtCurrency(downPayment)}</td>
+          {data.billId && data.billId > 0 ? (
+            <BillCart
+              billId={data.billId}
+              branchId={contract?.branch_id ?? null}
+              onChange={() => queryClient.invalidateQueries({ queryKey: ['bill-detail', data.billId] })}
+            />
+          ) : autoOpenError ? (
+            <div className="alert alert-danger">
+              <XCircle size={14} />
+              <span>{autoOpenError}</span>
+            </div>
+          ) : score ? (
+            <div className="flex items-center gap-2 text-sm text-subtle p-3 border border-line rounded-md">
+              <Loader2 size={14} className="animate-spin" />
+              <span>{t('workspace.openingBill', { defaultValue: 'Opening bill…' })}</span>
+            </div>
+          ) : (
+            <div className="border border-line rounded-md overflow-hidden">
+              <table className="w-full text-sm">
+                <tbody className="divide-y divide-line">
+                  {downPayment > 0 && (
+                    <tr>
+                      <td className="px-3 py-2">{t('contract.downPayment')}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{fmtCurrency(downPayment)}</td>
+                    </tr>
+                  )}
+                  {insuranceDeposit > 0 && (
+                    <tr>
+                      <td className="px-3 py-2">{t('contract.insuranceDeposit')}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{fmtCurrency(insuranceDeposit)}</td>
+                    </tr>
+                  )}
+                  <tr className="bg-surface font-medium">
+                    <td className="px-3 py-2">{t('workspace.total')}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{fmtCurrency(previewTotal)}</td>
                   </tr>
-                )}
-                {insuranceDeposit > 0 && (
-                  <tr>
-                    <td className="px-3 py-2">{t('contract.insuranceDeposit')}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{fmtCurrency(insuranceDeposit)}</td>
-                  </tr>
-                )}
-                <tr className="bg-surface font-medium">
-                  <td className="px-3 py-2">{t('workspace.total')}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{fmtCurrency(totalAmount)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {/* ── Section 3: Payment Methods ───────────────────────── */}
@@ -290,7 +393,7 @@ export function PanelReviewPay({ onClose }: { onClose: () => void }) {
                     />
                   </div>
                   {payments.length > 1 && (
-                    <Button size="sm" className="btn-icon-sm shrink-0" onClick={() => setPayments(prev => prev.filter((_, i) => i !== idx))}>
+                    <Button size="sm" className="btn-icon-sm shrink-0" onClick={() => { userEditedPayments.current = true; setPayments(prev => prev.filter((_, i) => i !== idx)); }}>
                       <Trash2 size={14} />
                     </Button>
                   )}
@@ -313,6 +416,7 @@ export function PanelReviewPay({ onClose }: { onClose: () => void }) {
             ))}
             <Button size="sm" onClick={() => {
               const remaining = totalAmount - totalPayment;
+              userEditedPayments.current = true;
               setPayments(prev => [...prev, { method: 'CASH', amount: remaining > 0 ? remaining : 0, bank_account_id: null }]);
             }} startIcon={<Plus size={14} />}>
               {t('wizard.addPayment')}
@@ -363,7 +467,6 @@ export function PanelReviewPay({ onClose }: { onClose: () => void }) {
 
       {/* ── Footer ───────────────────────────────────────────── */}
       <div className="shrink-0 border-t border-line bg-bg px-4 py-3 flex justify-end gap-2">
-        <Button variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
         <Button
           color="primary"
           onClick={handleConfirm}

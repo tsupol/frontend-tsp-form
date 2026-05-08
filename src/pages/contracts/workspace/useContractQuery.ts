@@ -73,6 +73,9 @@ export interface ContractServerState {
   shipping_method: string | null;
   tracking_number: string | null;
 
+  // Device binding
+  device_id: number | null;
+
   // Used asset
   is_used_asset: boolean;
   target_asset_id: number | null;

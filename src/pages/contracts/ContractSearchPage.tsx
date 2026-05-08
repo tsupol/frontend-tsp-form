@@ -4,12 +4,13 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Badge, Input, Select, Button, DataTableFooter } from 'tsp-form';
 import { useAuth } from '../../contexts/AuthContext';
-import { ArrowLeft, ArrowRightFromLine, Search, FileText, SlidersHorizontal, Plus } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, Search, SlidersHorizontal, Plus } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency } from '../../lib/format';
 import { getStateColor, getStateLabel, SCOPE_OPTIONS, SCOPE_TO_STATES, STATE_OPTIONS, type ContractScope } from './contractUtils';
 import { ContractDetailPanel } from './ContractDetailPanel';
+import { ContractDetailSlot } from './ContractDetailSlot';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -367,18 +368,9 @@ export function ContractSearchPage() {
               )}
             </PageNavPanel>
 
-            <PageNavPanel id="detail" className={isMobile ? '' : 'flex-1 min-w-0 flex flex-col'}>
-              {selectedId ? (
-                <ContractDetailPanel contractId={selectedId} isMobile={isMobile} />
-              ) : (
-                <div className="flex-1 h-full flex items-center justify-center text-subtler">
-                  <div className="text-center">
-                    <FileText size={32} className="mx-auto mb-2 opacity-40" />
-                    {t('contract.selectToView')}
-                  </div>
-                </div>
-              )}
-            </PageNavPanel>
+            <ContractDetailSlot isMobile={isMobile} hasSelection={selectedId != null}>
+              {selectedId && <ContractDetailPanel contractId={selectedId} isMobile={isMobile} />}
+            </ContractDetailSlot>
           </div>
         </>
       )}

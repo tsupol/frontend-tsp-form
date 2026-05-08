@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UploadedImage } from 'tsp-form';
-import { CheckCircle, XCircle, CreditCard, FileImage, Trash2, Upload } from 'lucide-react';
+import { CheckCircle, XCircle, CreditCard, FileImage, Trash2, Upload, Info } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { uploadToS3, deleteFromS3 } from '../../../lib/upload';
 import { config } from '../../../config/config';
@@ -335,6 +335,11 @@ function GalleryUpload({ label, media, uploading, onUpload, onDetach, cacheBust 
         <FileImage size={14} />
         <label className="form-label mb-0">{label} ({media.length})</label>
         {uploading && <span className="text-xs text-subtle">{t('common.loading')}</span>}
+      </div>
+
+      <div className="alert alert-info mb-2">
+        <Info size={14} />
+        <div className="alert-description">{t('workspace.docEvidenceHint')}</div>
       </div>
 
       <input

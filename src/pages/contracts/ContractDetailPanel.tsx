@@ -14,6 +14,7 @@ import { getStateColor, getStateLabel } from './contractUtils';
 import { ContractActionButtons } from './ContractActions';
 import { WalletsTab } from './wallet/WalletsTab';
 import { DeviceTab } from './DeviceTab';
+import { BillReceipt } from './workspace/BillReceipt';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { CustomerPickerModal } from './CustomerPickerModal';
 import { BranchPinInput } from '../../components/BranchPinInput';
@@ -195,9 +196,9 @@ type DetailTab = 'overview' | 'money' | 'device' | 'customers' | 'notes';
 
 const TABS: DetailTab[] = ['overview', 'money', 'device', 'customers', 'notes'];
 
-type MoneySection = 'installments' | 'txns' | 'payments' | 'wallets';
+type MoneySection = 'installments' | 'txns' | 'payments' | 'wallets' | 'bills';
 
-const MONEY_SECTIONS: MoneySection[] = ['installments', 'txns', 'payments', 'wallets'];
+const MONEY_SECTIONS: MoneySection[] = ['installments', 'wallets', 'bills', 'txns', 'payments'];
 
 // ── Scrollable Tabs ─────────────────────────────────────────────────────────
 
@@ -753,6 +754,19 @@ function MoneyTab({ contractId, contract, t }: {
     staleTime: 30 * 1000,
   });
 
+  // Bills count — INVOICE only (CREDIT_NOTE/JOURNAL aren't customer-facing).
+  const { data: billCount } = useQuery({
+    queryKey: ['contract-bills-count', contractId],
+    queryFn: async () => {
+      const res = await apiClient.getPaginated<{ id: number }>(
+        `/v_bills?contract_id=eq.${contractId}&bill_type=eq.INVOICE`,
+        { page: 1, pageSize: 1 },
+      );
+      return res.totalCount;
+    },
+    staleTime: 30 * 1000,
+  });
+
   const walletNonEmptyCount = [
     contract.saving_balance,
     contract.credit_balance,
@@ -764,6 +778,7 @@ function MoneyTab({ contractId, contract, t }: {
     txns: txnCount ?? null,
     payments: paymentCount ?? null,
     wallets: walletNonEmptyCount,
+    bills: billCount ?? null,
   };
 
   return (
@@ -792,6 +807,7 @@ function MoneyTab({ contractId, contract, t }: {
         {section === 'txns' && <TxnsTab contractId={contractId} t={t} />}
         {section === 'payments' && <PaymentsTab contractId={contractId} t={t} />}
         {section === 'wallets' && <WalletsTab contract={contract} />}
+        {section === 'bills' && <BillsTab contractId={contractId} t={t} />}
       </div>
     </div>
   );
@@ -1347,6 +1363,106 @@ function NotesTab({ contractId, t, dirtyRef }: {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Bills Tab ────────────────────────────────────────────────────────────────
+
+interface BillRow {
+  id: number;
+  code_display: string;
+  bill_purpose: string;
+  bill_purpose_label: string | null;
+  bill_type: string;
+  bill_type_label_short: string | null;
+  total_amount: number;
+  paid_amount: number;
+  status: string;
+  bill_date: string;
+  is_cancelled: boolean;
+}
+
+function getBillStatusColor(status: string, isCancelled: boolean): 'success' | 'warning' | 'danger' | 'default' {
+  if (isCancelled) return 'danger';
+  switch (status) {
+    case 'PAID': return 'success';
+    case 'OPEN': return 'warning';
+    case 'VOIDED': return 'danger';
+    default: return 'default';
+  }
+}
+
+function BillsTab({ contractId, t }: { contractId: number; t: ReturnType<typeof useTranslation>['t'] }) {
+  const [openBillId, setOpenBillId] = useState<number | null>(null);
+
+  const { data: bills, isLoading } = useQuery({
+    queryKey: ['contract-bills', contractId],
+    queryFn: () => apiClient.get<BillRow[]>(
+      `/v_bills?contract_id=eq.${contractId}&bill_type=eq.INVOICE&order=created_at.desc`,
+    ),
+  });
+
+  if (isLoading) return <div className="p-8 text-center text-subtler">{t('common.loading')}</div>;
+  if (!bills || bills.length === 0) return <div className="p-8 text-center text-subtler">{t('common.noData')}</div>;
+
+  return (
+    <div className="p-4">
+      <div className="border border-line rounded-md overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-line bg-surface">
+              <th className="text-left px-3 py-2 font-medium text-subtle">{t('contract.billCode')}</th>
+              <th className="text-left px-3 py-2 font-medium text-subtle">{t('contract.billPurpose')}</th>
+              <th className="text-left px-3 py-2 font-medium text-subtle">{t('contract.billDate')}</th>
+              <th className="text-right px-3 py-2 font-medium text-subtle">{t('contract.amount')}</th>
+              <th className="text-left px-3 py-2 font-medium text-subtle">{t('common.status')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {bills.map(bill => (
+              <tr
+                key={bill.id}
+                className={`border-b border-line last:border-b-0 cursor-pointer hover:bg-surface-hover transition-colors ${
+                  bill.is_cancelled ? 'opacity-60' : ''
+                }`}
+                onClick={() => setOpenBillId(bill.id)}
+              >
+                <td className="px-3 py-2 font-mono text-xs">{bill.code_display}</td>
+                <td className="px-3 py-2">
+                  <div>{bill.bill_purpose_label ?? bill.bill_purpose}</div>
+                  {bill.bill_type_label_short && (
+                    <div className="text-xs text-subtle">{bill.bill_type_label_short}</div>
+                  )}
+                </td>
+                <td className="px-3 py-2 text-xs text-subtle">
+                  <DateTime value={bill.bill_date} showTime={false} />
+                </td>
+                <td className="px-3 py-2 text-right tabular-nums">{fmtCurrency(bill.total_amount)}</td>
+                <td className="px-3 py-2">
+                  <Badge size="xs" color={getBillStatusColor(bill.status, bill.is_cancelled)}>
+                    {bill.is_cancelled
+                      ? t('contract.billStatus_CANCELLED', { defaultValue: 'Cancelled' })
+                      : t(`contract.billStatus_${bill.status}`, { defaultValue: bill.status })}
+                  </Badge>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <Modal
+        open={openBillId != null}
+        onClose={() => setOpenBillId(null)}
+        maxWidth="26rem"
+        width="100%"
+        ariaLabel={t('wizard.receipt_title')}
+      >
+        <div className="modal-content py-6 px-4" style={{ background: 'color-mix(in srgb, var(--color-fg) 6%, transparent)' }}>
+          {openBillId != null && <BillReceipt billId={openBillId} />}
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -157,6 +157,23 @@ function WorkspaceContent() {
         const isActive = c.state === 'ACTIVE' || c.state === 'COMPLETED' || c.state === 'TERMINATED';
         const isPendingPayment = c.state === 'PENDING_PAYMENT';
 
+        // For activated/pending contracts, fetch the CONTRACT_OPEN bill so the
+        // receipt branch in PanelReviewPay can render. Without this, billId stays
+        // null on reload and the wizard falls back to the (stale) form state.
+        let resolvedBillId: number | null = null;
+        let resolvedBillCode = '';
+        if (isActive || isPendingPayment) {
+          try {
+            const bills = await apiClient.get<Array<{ id: number; code_display: string }>>(
+              `/v_bills?contract_id=eq.${c.id}&bill_purpose=eq.CONTRACT_OPEN&select=id,code_display&order=created_at.desc&limit=1`,
+            );
+            if (bills[0]) {
+              resolvedBillId = bills[0].id;
+              resolvedBillCode = bills[0].code_display;
+            }
+          } catch {}
+        }
+
         updateData({
           contractId: c.id,
           contractCode: c.code_display || c.code,
@@ -181,8 +198,15 @@ function WorkspaceContent() {
           hasSignature,
           evidenceCount,
           ...(isActive ? { billConfirmed: true } : {}),
-          ...(isPendingPayment ? { billId: -1 } : {}), // signal that bill exists, actual ID fetched when needed
+          ...(resolvedBillId != null ? { billId: resolvedBillId, billCode: resolvedBillCode } : {}),
         });
+
+        // When resuming a contract that's already past the form stage (PENDING_PAYMENT
+        // or activated), default the right panel to Review & Pay so the user lands on
+        // the receipt / payment step instead of the (already-filled) Customer card.
+        if (isActive || isPendingPayment) {
+          setOpenModal('reviewPay');
+        }
       } catch {
         // ignore load errors
       }
@@ -329,7 +353,7 @@ function WorkspaceContent() {
                     <CardDocuments onEdit={() => handleEditOpen('documents')} active={isCardActive('documents')} shake={shakingCards.has('documents')} />
 
                     {!data.billConfirmed && data.contractId && <CardReviewPay onEdit={reviewPayReady ? () => handleEditOpen('reviewPay') : undefined} active={isCardActive('reviewPay')} disabled={!reviewPayReady} />}
-                    {data.billConfirmed && <CardPostPayment />}
+                    {data.billConfirmed && <CardPostPayment onEdit={() => handleEditOpen('reviewPay')} active={isCardActive('reviewPay')} />}
                   </div>
                 </div>
 

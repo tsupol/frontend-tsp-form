@@ -37,7 +37,7 @@ import {
   // Fanout child icons — Company
   MapPin, KeyRound, Landmark, CalendarDays, AlertTriangle, ShieldBan, Cloud,
   // Fanout child icons — Contracts
-  Search, PiggyBank,
+  Search, PiggyBank, Link2,
   // Fanout child icons — Commission
   UserCheck, ClipboardCheck,
   // Fanout child icons — Accounting
@@ -49,7 +49,7 @@ import { useAuth } from './contexts/AuthContext';
 import { useTheme } from './contexts/ThemeContext';
 import { useNavGuard } from './contexts/NavGuardContext';
 import { isLocalDev } from './lib/devEnv';
-import { defaultScopeFor, scopeQueryRollup, scopeKey } from './lib/scope';
+import { defaultScopeFor, scopeQuery, scopeQueryRollup, scopeKey } from './lib/scope';
 
 const lgQuery = window.matchMedia('(min-width: 1024px)');
 const subscribeLg = (cb: () => void) => { lgQuery.addEventListener('change', cb); return () => lgQuery.removeEventListener('change', cb); };
@@ -205,6 +205,19 @@ export const AppSideNav = () => {
     ? (unclosedRow?.unclosed_day_count ?? 0)
     : (unclosedRow?.unclosed_branch_count ?? 0);
 
+  // Pending-pairing badge — ACTIVE contracts that are not yet bound to a device
+  // OR are bound but not yet handed over. Uses the canonical action-required view.
+  const { data: pairingCountData } = useQuery({
+    queryKey: ['nav', 'pending-pairing-count', sk],
+    queryFn: () => apiClient.getPaginated<{ contract_id: number }>(
+      `/v_branch_action_required?action_type=in.(PENDING_DEVICE_BIND,PENDING_DELIVERY)&select=contract_id${scopeQuery(scope)}`,
+      { page: 1, pageSize: 1 },
+    ),
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+  });
+  const pendingPairingCount = pairingCountData?.totalCount ?? 0;
+
   // Render an icon with an optional count badge.
   // - Expanded: inline Badge to the right of the label (returned via `badge`).
   // - Collapsed: a small dot pinned to the top-right of the icon (returned via `icon` wrapper).
@@ -314,6 +327,7 @@ export const AppSideNav = () => {
       children: [
         { key: 'contract-search', icon: <Search size="1rem" />, label: t('nav.contractSearch'), path: '/admin/contracts/search' },
         { key: 'saving-contracts', icon: <PiggyBank size="1rem" />, label: t('nav.savingContracts'), path: '/admin/contracts/saving' },
+        { key: 'pending-pairing', ...iconWithCount(<Link2 size="1rem" />, pendingPairingCount), label: t('nav.pendingPairing'), path: '/admin/contracts/pending-pairing' },
       ],
     },
     ...(canApprove

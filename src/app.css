@@ -84,3 +84,95 @@ input[type="number"
 .side-menu-item:has(> .badge) .side-menu-item-chevron {
     display: none;
 }
+
+/* ── Bill receipt: 80mm thermal layout (Thai POS standard) ─────────────────
+   The receipt always renders at a fixed 72.1mm content width (80mm paper
+   minus typical 4mm/3.9mm side gutters). On screen it sits in a card; on
+   print it takes over the page via @page size:80mm auto.
+   Reference: Thai POS norm — 80mm paper, ~72mm printable area. */
+.bill-receipt {
+    width: 72.1mm;
+    background: var(--color-bg);
+    color: var(--color-fg);
+    font-size: 11px;
+    line-height: 1.35;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Sarabun", sans-serif;
+}
+
+.bill-receipt-screen {
+    /* On-screen affordance: paper-like card so the user knows this is what prints. */
+    margin: 0 auto;
+    padding: 6mm 4mm;
+    background: #fff;
+    color: #111;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.08);
+    border-radius: 2px;
+}
+
+[data-theme="dark"] .bill-receipt-screen {
+    /* Keep the receipt itself paper-white even in dark mode — it's a document. */
+    background: #fff;
+    color: #111;
+}
+
+.bill-receipt .receipt-mono { font-variant-numeric: tabular-nums; }
+.bill-receipt .receipt-divider {
+    border: 0;
+    border-top: 1px dashed currentColor;
+    opacity: 0.5;
+    margin: 4px 0;
+}
+.bill-receipt .receipt-rule {
+    border: 0;
+    border-top: 1px solid currentColor;
+    margin: 4px 0;
+}
+.bill-receipt .receipt-watermark {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    color: rgba(220, 38, 38, 0.18);
+    transform: rotate(-18deg);
+}
+
+/* Print: isolate the bill receipt — hide everything outside it,
+   and force 80mm continuous-feed paper with zero margin (thermal printers
+   handle their own gutter). */
+@media print {
+    @page {
+        size: 80mm auto;
+        margin: 0;
+    }
+    html, body {
+        background: #fff !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    body * {
+        visibility: hidden;
+    }
+    .bill-receipt, .bill-receipt * {
+        visibility: visible;
+    }
+    .bill-receipt {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 72.1mm;
+        padding: 3mm 3.95mm;
+        background: #fff !important;
+        color: #000 !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+        font-size: 11px;
+    }
+    .bill-receipt .receipt-watermark {
+        color: rgba(0, 0, 0, 0.22);
+    }
+}

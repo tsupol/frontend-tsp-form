@@ -7,6 +7,7 @@ import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { fmtCurrency } from '../../lib/format';
 import { SavingDetailPanel } from './SavingDetailPanel';
+import { ContractDetailSlot } from './ContractDetailSlot';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -235,18 +236,9 @@ export function SavingContractsPage() {
               )}
             </PageNavPanel>
 
-            <PageNavPanel id="detail" className={isMobile ? '' : 'flex-1 flex flex-col'}>
-              {selectedId ? (
-                <SavingDetailPanel contractId={selectedId} isMobile={isMobile} />
-              ) : (
-                <div className="flex-1 h-full flex items-center justify-center text-subtler">
-                  <div className="text-center">
-                    <PiggyBank size={32} className="mx-auto mb-2 opacity-40" />
-                    {t('contract.selectToView')}
-                  </div>
-                </div>
-              )}
-            </PageNavPanel>
+            <ContractDetailSlot isMobile={isMobile} hasSelection={selectedId != null} emptyIcon={PiggyBank} wide>
+              {selectedId && <SavingDetailPanel contractId={selectedId} isMobile={isMobile} />}
+            </ContractDetailSlot>
           </div>
         </>
       )}

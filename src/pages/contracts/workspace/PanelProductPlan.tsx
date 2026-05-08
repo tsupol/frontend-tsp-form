@@ -859,7 +859,18 @@ export function PanelProductPlan({ onClose }: Props) {
         </div>
       )}
 
-      {/* Quote tables for USED are rendered by the same block above */}
+      {/* USED — no plans available (backend returned 0 quotes for both FIN1+FIN2).
+          Usually means missing fin1_rate_cards for the asset's category, or no
+          used_asset_profit_rates seeded for FIN2 USED. */}
+      {mode === 'used' && localTargetAssetId && usedFin1Data && usedFin2Data && dedupedQuotes.length === 0 && (
+        <div className="alert alert-warning">
+          <AlertTriangle size={16} />
+          <div>
+            <div className="alert-title">{t('priceCheck.usedNoPlans')}</div>
+            <div className="alert-description">{t('priceCheck.usedNoPlansDesc')}</div>
+          </div>
+        </div>
+      )}
 
       {/* ── Selected plan summary ────────────────────────────────────── */}
       {localQuote && (
