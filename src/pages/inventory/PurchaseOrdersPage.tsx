@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
 import {
@@ -6,7 +7,7 @@ import {
   DataTable, useSnackbarContext,
 } from 'tsp-form';
 import {
-  ArrowLeft, ArrowRightFromLine, ClipboardList, CheckCircle, XCircle, Plus, Trash2, Search,
+  ArrowLeft, ArrowRightFromLine, ClipboardList, CheckCircle, XCircle, Plus, Trash2, Search, PackagePlus,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
@@ -141,7 +142,13 @@ export function PurchaseOrdersPage() {
   const [filterOwnership, setFilterOwnership] = useState<string | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
-  const [selectedPoId, setSelectedPoId] = useState<number | null>(null);
+  const navigate = useNavigate();
+  const { poId: poIdParam } = useParams<{ poId?: string }>();
+  const selectedPoId = poIdParam ? Number(poIdParam) : null;
+  const setSelectedPoId = (id: number | null) => {
+    if (id) navigate(`/admin/inventory/po/${id}`, { replace: true });
+    else navigate('/admin/inventory/po', { replace: true });
+  };
   const [createOpen, setCreateOpen] = useState(false);
 
   // ── Ref data ────────────────────────────────────────────────────────
@@ -177,6 +184,18 @@ export function PurchaseOrdersPage() {
     return r ? (isThai ? r.name_th : r.name_en) : code;
   };
 
+  const { data: allBranches } = useQuery({
+    queryKey: ['branches', 'all'],
+    queryFn: () => apiClient.get<{ id: number; name: string }[]>('/v_branches?order=name'),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const branchNameMap = useMemo(() => {
+    const m = new Map<number, string>();
+    (allBranches ?? []).forEach(b => m.set(b.id, b.name));
+    return m;
+  }, [allBranches]);
+
   // ── PO list (PURCHASE only) ─────────────────────────────────────────
   const { data: listData, isFetching } = useQuery({
     queryKey: ['purchase-orders', filterStatus, filterOwnership, pageIndex, pageSize],
@@ -203,14 +222,10 @@ export function PurchaseOrdersPage() {
 
   useEffect(() => { setPageIndex(0); }, [filterStatus, filterOwnership]);
 
-  useEffect(() => {
-    // Only clear selection after a settled fetch — guard against race when a fresh
-    // PO was just created and the list refetch hasn't returned yet.
-    if (isFetching) return;
-    if (selectedPoId && poList.length > 0 && !poList.find(p => p.po_id === selectedPoId)) {
-      setSelectedPoId(null);
-    }
-  }, [poList, selectedPoId, isFetching]);
+  // Don't auto-clear the selection based on list membership: the user can deep-link
+  // to /po/:id, and the list may be filtered / paginated so the row isn't visible.
+  // The detail query drives the panel — if /v_po_detail returns nothing, the empty
+  // state shows naturally.
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
@@ -323,20 +338,32 @@ export function PurchaseOrdersPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 min-w-0">
                           <span className="font-medium text-sm truncate">{po.po_no}</span>
+                        </div>
+                        <div className="flex items-center gap-2 min-w-0 mt-0.5">
                           <Badge size="xs" color={STATUS_COLOR[po.status] ?? 'default'}>
                             {statusLabel(po.status)}
                           </Badge>
-                          <Badge size="xs" color="default">
+                          <Badge
+                            size="xs"
+                            variant="outline"
+                            color={po.ownership === 'HOLDING' ? 'info' : po.ownership === 'COMPANY' ? 'secondary' : 'default'}
+                          >
                             {ownershipLabel(po.ownership)}
                           </Badge>
                         </div>
-                        {po.supplier_name && (
-                          <div className="text-[11px] text-subtle truncate mt-0.5">{po.supplier_name}</div>
-                        )}
                       </div>
-                      <div className="text-right shrink-0">
-                        <div className="text-xs text-subtle"><DateTime value={po.created_at} /></div>
-                        <div className="text-[11px] text-subtle mt-0.5">{po.total_lines} {t('po.lines')}</div>
+                      <div className="text-right shrink-0 min-w-0">
+                        <div className="text-xs text-subtle">
+                          <DateTime value={po.created_at} />
+                        </div>
+                        <div className="text-[11px] text-subtle mt-0.5 truncate">
+                          {[
+                            po.branch_id != null ? branchNameMap.get(po.branch_id) : null,
+                            po.supplier_name,
+                          ].filter(Boolean).join(' · ')}
+                          {' '}
+                          <span className="text-fg">({po.total_lines})</span>
+                        </div>
                       </div>
                     </button>
                   );
@@ -366,6 +393,17 @@ export function PurchaseOrdersPage() {
                   onRefresh={invalidate}
                   addSnackbar={addSnackbar}
                 />
+              ) : selectedPoId && detailFetching ? (
+                <div className="flex-1 h-full flex items-center justify-center text-subtler">
+                  {t('common.loading')}
+                </div>
+              ) : selectedPoId ? (
+                <div className="flex-1 h-full flex items-center justify-center text-subtler">
+                  <div className="text-center">
+                    <ClipboardList size={32} className="mx-auto mb-2 opacity-40" />
+                    {t('po.notAccessible', { defaultValue: 'This PO is not accessible from your account.' })}
+                  </div>
+                </div>
               ) : (
                 <div className="flex-1 h-full flex items-center justify-center text-subtler">
                   <div className="text-center">
@@ -431,14 +469,18 @@ function PoDetailPanel({
   const { user } = useAuth();
   const [actionModal, setActionModal] = useState<ActionKind | null>(null);
   const [addLineOpen, setAddLineOpen] = useState(false);
+  const [createReceiptOpen, setCreateReceiptOpen] = useState(false);
 
   // Project policy (per owner 2026-05-02):
   // - BM can create/edit/submit/cancel PO — auto-routed to PENDING_APPROVAL on submit
   // - C_A / C_I / H_A can do everything; their submit auto-approves
   // - Approve / reject / close are company+ (no BM)
+  // - Receive (create receipt) is BS/BM at the receiving branch
+  const isBS = user?.role_code === 'BRANCH_STAFF';
   const isBM = user?.role_code === 'BRANCH_MANAGER';
   const isCompanyPlus = ['COMPANY_ADMIN', 'COMPANY_INVENTORY', 'HOLDING_ADMIN'].includes(user?.role_code ?? '');
   const canWrite = isBM || isCompanyPlus;
+  const canReceive = isBS || isBM;
   const lines = detail.lines ?? [];
 
   const isDraft = detail.status === 'DRAFT';
@@ -454,6 +496,7 @@ function PoDetailPanel({
   const canRevertFromPending = isPending && canWrite;
   const canRevertFromRejected = isRejected && canWrite;
   const canClose = isApproved && isCompanyPlus;
+  const canCreateReceipt = isApproved && canReceive;
 
   const handleSuccess = (key: string) => {
     setActionModal(null);
@@ -574,36 +617,46 @@ function PoDetailPanel({
       </div>
 
       {/* Actions: destructive on left (outline), primary on right */}
-      {(canSubmit || canApprove || canReject || canRevertFromPending || canRevertFromRejected || canClose || canCancel) && (
+      {(canSubmit || canApprove || canReject || canRevertFromPending || canRevertFromRejected || canClose || canCancel || canCreateReceipt) && (
         <div className="flex-none px-4 py-3 border-t border-line flex flex-wrap gap-2 items-center">
           {canCancel && (
-            <Button variant="outline" color="danger" onClick={() => setActionModal('cancel')}>
+            <Button size="sm" variant="outline" color="danger" onClick={() => setActionModal('cancel')}>
               {t('po.cancel')}
             </Button>
           )}
           <div className="ml-auto flex flex-wrap gap-2">
             {(canRevertFromPending || canRevertFromRejected) && (
-              <Button variant="outline" onClick={() => setActionModal('revert')}>
+              <Button size="sm" variant="outline" onClick={() => setActionModal('revert')}>
                 {t('po.revertDraft')}
               </Button>
             )}
             {canReject && (
-              <Button variant="outline" color="danger" onClick={() => setActionModal('reject')}>
+              <Button size="sm" variant="outline" color="danger" onClick={() => setActionModal('reject')}>
                 {t('po.reject')}
               </Button>
             )}
             {canSubmit && (
-              <Button color="primary" onClick={() => setActionModal('submit')}>
+              <Button size="sm" color="primary" onClick={() => setActionModal('submit')}>
                 {t('po.submit')}
               </Button>
             )}
             {canApprove && (
-              <Button color="primary" onClick={() => setActionModal('approve')}>
+              <Button size="sm" color="primary" onClick={() => setActionModal('approve')}>
                 {t('po.approve')}
               </Button>
             )}
+            {canCreateReceipt && (
+              <Button
+                size="sm"
+                color="primary"
+                startIcon={<PackagePlus size={14} />}
+                onClick={() => setCreateReceiptOpen(true)}
+              >
+                {t('po.createReceipt')}
+              </Button>
+            )}
             {canClose && (
-              <Button color="primary" onClick={() => setActionModal('close')}>
+              <Button size="sm" color="primary" onClick={() => setActionModal('close')}>
                 {t('po.close')}
               </Button>
             )}
@@ -626,6 +679,12 @@ function PoDetailPanel({
           setAddLineOpen(false);
           onRefresh();
         }}
+      />
+
+      <CreateReceiptModal
+        open={createReceiptOpen}
+        onClose={() => setCreateReceiptOpen(false)}
+        po={detail}
       />
     </div>
   );
@@ -1230,6 +1289,161 @@ function ProductPickerModal({
         </div>
         <div className="modal-footer">
           <Button variant="outline" onClick={onClose}>{t('common.cancel')}</Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ============================================================================
+// Create Receipt modal — opens from APPROVED PO footer (BS/BM)
+// Picks a branch in same company, calls fn_receipt_create, then routes to
+// /admin/inventory/receiving/:receiptId so the user can add lines + confirm.
+// ============================================================================
+
+interface ReceiptBranch {
+  id: number;
+  name: string;
+  company_id: number;
+  branch_type: string;
+}
+
+function CreateReceiptModal({
+  open,
+  onClose,
+  po,
+}: {
+  open: boolean;
+  onClose: () => void;
+  po: PoDetail;
+}) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { addSnackbar } = useSnackbarContext();
+  const queryClient = useQueryClient();
+
+  const { data: branches } = useQuery({
+    queryKey: ['branches', 'receivable', po.company_id],
+    queryFn: () =>
+      apiClient.get<ReceiptBranch[]>(
+        `/v_branches?company_id=eq.${po.company_id}&is_active=is.true&order=name`,
+      ),
+    enabled: open,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const eligible = useMemo(
+    () => (branches ?? []).filter(b => !['EXTERNAL', 'DEAL_PARTNER'].includes(b.branch_type)),
+    [branches],
+  );
+
+  const [branchId, setBranchId] = useState<number | null>(null);
+  const [error, setError] = useState('');
+
+  // Pre-select the user's branch if it's eligible for this PO's company
+  useEffect(() => {
+    if (!open) return;
+    setError('');
+    const userBranchEligible = user?.branch_id && eligible.find(b => b.id === user.branch_id);
+    setBranchId(userBranchEligible ? user.branch_id! : eligible[0]?.id ?? null);
+  }, [open, eligible, user?.branch_id]);
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      apiClient.rpc<{ receipt_id: number }>('fn_receipt_create', {
+        p_po_id: po.po_id,
+        p_branch_id: branchId,
+      }),
+    onSuccess: (data) => {
+      onClose();
+      // Invalidate receiving + PO caches so list/detail reflect the new draft.
+      queryClient.invalidateQueries({ queryKey: ['receipts'] });
+      queryClient.invalidateQueries({ queryKey: ['receipt-detail'] });
+      queryClient.invalidateQueries({ queryKey: ['po-detail'] });
+      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+      addSnackbar({
+        message: (
+          <div className="alert alert-success">
+            <CheckCircle size={16} />
+            <span>{t('po.createReceiptSuccess')}</span>
+          </div>
+        ),
+      });
+      navigate(`/admin/inventory/receiving/${data.receipt_id}`);
+    },
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        const translated =
+          (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') ||
+          (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setError(translated || err.message);
+      } else {
+        setError(String(err));
+      }
+    },
+  });
+
+  const branchOptions = useMemo(
+    () => eligible.map(b => ({ value: String(b.id), label: b.name })),
+    [eligible],
+  );
+
+  const canSubmit = !!branchId && !mutation.isPending;
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
+      <div className="flex flex-col overflow-hidden">
+        <div className="modal-header">
+          <h2 className="modal-title">{t('po.createReceipt')}</h2>
+          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+        </div>
+        <div className="modal-content">
+          <p className="text-sm text-subtle mb-4">{t('po.createReceiptIntro')}</p>
+
+          {error && (
+            <div className="alert alert-danger mb-4 animate-pop-in">
+              <XCircle size={16} />
+              <span>{error}</span>
+            </div>
+          )}
+          <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
+            <div className="text-[11px] uppercase tracking-wider text-subtle mb-1">{t('po.receivingFor')}</div>
+            <div className="font-medium text-sm">{po.po_no}</div>
+            {po.supplier_name && <div className="text-xs text-subtle">{po.supplier_name}</div>}
+            <div className="text-xs text-subtle">
+              {po.c_total_lines} {t('po.lines')} · {fmtNum(po.c_total_qty)} pcs · {fmtCurrency(po.c_total_amount)}
+            </div>
+          </div>
+
+          <div className="form-grid">
+            <div className="flex flex-col">
+              <label className="form-label">{t('po.receiveBranch')} *</label>
+              <Select
+                options={branchOptions}
+                value={branchId !== null ? String(branchId) : null}
+                onChange={(v) => setBranchId(v ? Number(v) : null)}
+                placeholder={t('po.selectBranch')}
+                searchable
+              />
+              <div className="text-xs text-subtle mt-1">{t('po.receiveBranchHint')}</div>
+              {eligible.length === 0 && branches && (
+                <div className="text-xs text-danger mt-1">{t('po.noEligibleBranch')}</div>
+              )}
+            </div>
+          </div>
+
+          <div className="alert alert-info mt-4">
+            <span className="text-xs">{t('po.createReceiptNextSteps')}</span>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <Button variant="outline" onClick={onClose} disabled={mutation.isPending}>
+            {t('common.cancel')}
+          </Button>
+          <Button color="primary" onClick={() => mutation.mutate()} disabled={!canSubmit}>
+            {mutation.isPending ? t('common.saving') : t('po.createReceiptConfirm')}
+          </Button>
         </div>
       </div>
     </Modal>

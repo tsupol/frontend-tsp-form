@@ -25,6 +25,7 @@ import { DealPartnerRatesPage } from './pages/pricing/DealPartnerRatesPage';
 import { InventoryLayout } from './pages/inventory/InventoryLayout';
 import { StockDashboardPage } from './pages/inventory/StockDashboardPage';
 import { ReceivingPage } from './pages/inventory/ReceivingPage';
+import { LotsPage } from './pages/inventory/LotsPage';
 import { AssetsPage } from './pages/inventory/AssetsPage';
 import { PurchaseOrdersPage } from './pages/inventory/PurchaseOrdersPage';
 import { TransfersPage } from './pages/inventory/TransfersPage';
@@ -295,7 +296,7 @@ function App() {
         }
       />
       <Route
-        path="/admin/inventory/assets"
+        path="/admin/inventory/assets/:assetId?"
         element={
           <ProtectedRoute>
             <AdminLayout>
@@ -305,7 +306,7 @@ function App() {
         }
       />
       <Route
-        path="/admin/inventory/po"
+        path="/admin/inventory/po/:poId?"
         element={
           <ProtectedRoute>
             <AdminLayout>
@@ -315,7 +316,7 @@ function App() {
         }
       />
       <Route
-        path="/admin/inventory/receiving"
+        path="/admin/inventory/receiving/:receiptId?"
         element={
           <ProtectedRoute>
             <AdminLayout>
@@ -325,7 +326,17 @@ function App() {
         }
       />
       <Route
-        path="/admin/inventory/transfers"
+        path="/admin/inventory/lots/:lotId?"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <InventoryLayout><LotsPage /></InventoryLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/inventory/transfers/:transferId?"
         element={
           <ProtectedRoute>
             <AdminLayout>
@@ -335,7 +346,7 @@ function App() {
         }
       />
       <Route
-        path="/admin/inventory/repairs"
+        path="/admin/inventory/repairs/:repairId?"
         element={
           <ProtectedRoute>
             <AdminLayout>
@@ -345,7 +356,7 @@ function App() {
         }
       />
       <Route
-        path="/admin/inventory/buyback"
+        path="/admin/inventory/buyback/:poId?"
         element={
           <ProtectedRoute>
             <AdminLayout>

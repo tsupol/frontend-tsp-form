@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Modal, TextArea, DataTable, useSnackbarContext } from 'tsp-form';
@@ -95,11 +96,18 @@ export function RepairsPage() {
   const isBranchUser = ['BRANCH_STAFF', 'BRANCH_MANAGER'].includes(user?.role_code ?? '');
   const defaultBranchId = isBranchUser && user?.branch_id ? user.branch_id : null;
 
+  const navigate = useNavigate();
+  const { repairId: repairIdParam } = useParams<{ repairId?: string }>();
+  const selectedId = repairIdParam ? Number(repairIdParam) : null;
+  const setSelectedId = (id: number | null) => {
+    if (id) navigate(`/admin/inventory/repairs/${id}`, { replace: true });
+    else navigate('/admin/inventory/repairs', { replace: true });
+  };
+
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
   const [filterBranchId, setFilterBranchId] = useState<number | null>(defaultBranchId);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const { data: branches } = useQuery({
     queryKey: ['branches'],
@@ -127,13 +135,14 @@ export function RepairsPage() {
 
   useEffect(() => { setPageIndex(0); }, [filterStatus, filterBranchId]);
 
-  useEffect(() => {
-    if (selectedId && list.length > 0 && !list.find(o => o.repair_order_id === selectedId)) {
-      setSelectedId(null);
-    }
-  }, [list, selectedId]);
+  // Fallback fetch so direct deep-links (id not on current page) still resolve.
+  const { data: detailFallback } = useQuery({
+    queryKey: ['repair-order-detail', selectedId],
+    queryFn: () => apiClient.get<RepairOrder[]>(`/v_repair_orders?repair_order_id=eq.${selectedId}`).then(r => r[0] ?? null),
+    enabled: !!selectedId && !list.find(o => o.repair_order_id === selectedId),
+  });
 
-  const selectedOrder = list.find(o => o.repair_order_id === selectedId) ?? null;
+  const selectedOrder = list.find(o => o.repair_order_id === selectedId) ?? detailFallback ?? null;
 
   const invalidateList = () => {
     queryClient.invalidateQueries({ queryKey: ['repair-orders'] });
@@ -227,11 +236,11 @@ export function RepairsPage() {
                               {t(`repair.result_${order.result}`, order.result)}
                             </Badge>
                           )}
-                          <span className="text-xs text-subtle">{order.branch_name}</span>
                         </div>
                       </div>
-                      <div className="text-right shrink-0 text-xs text-subtle">
-                        <DateTime value={order.created_at} />
+                      <div className="text-right shrink-0">
+                        <div className="text-xs text-subtle"><DateTime value={order.created_at} /></div>
+                        <div className="text-[11px] text-subtle mt-0.5 truncate">{order.branch_name}</div>
                       </div>
                     </button>
                   );

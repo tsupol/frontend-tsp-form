@@ -35,7 +35,8 @@
     "select": "เลือก",
     "saved": "บันทึกแล้ว",
     "continue": "ดำเนินการต่อ",
-    "back": "ย้อนกลับ"
+    "back": "ย้อนกลับ",
+    "change": "เปลี่ยน"
   },
   "dashboard": {
     "actionRequired": "ต้องดำเนินการ",
@@ -173,6 +174,7 @@
     "dealPartnerRates": "อัตรา Deal Partner",
     "inventory": "คลังสินค้า",
     "stock": "ภาพรวมสต็อก",
+    "lots": "Lot",
     "assets": "สินทรัพย์",
     "purchaseOrders": "ใบสั่งซื้อ",
     "receiving": "รับสินค้า",
@@ -966,10 +968,30 @@
     "writeOffSuccess": "ตัดบัญชีสินทรัพย์แล้ว",
     "internalUseSuccess": "มอบหมายใช้ภายในแล้ว"
   },
+  "lot": {
+    "search": "ค้นหาด้วยรหัส lot, SKU, รุ่น, PO",
+    "allBuckets": "ทุกสถานะ",
+    "allPoTypes": "ทุกประเภท PO",
+    "selectToView": "เลือก lot เพื่อดูรายละเอียด",
+    "qty": "จำนวน (คงเหลือ / รับ)",
+    "onHand": "คงเหลือ / รับ",
+    "consumed": "ใช้ไป",
+    "consumedSuffix": "ใช้ไป",
+    "unitCost": "ทุน/หน่วย",
+    "onHandValue": "มูลค่าคงเหลือ",
+    "branch": "สาขา",
+    "created": "สร้างเมื่อ",
+    "closed": "ปิดแล้ว",
+    "closedAt": "ปิดเมื่อ",
+    "remaining": "คงเหลือ",
+    "units": "ชิ้น",
+    "from": "ที่มา"
+  },
   "po": {
     "allStatuses": "ทุกสถานะ",
     "allOwnership": "ทุกประเภทเจ้าของ",
     "selectToView": "เลือก PO เพื่อดูรายละเอียด",
+    "notAccessible": "ไม่สามารถเข้าถึง PO นี้จากบัญชีของคุณได้",
     "lines": "รายการ",
     "noLines": "ยังไม่มีรายการ — เพิ่มรายการแรก",
     "addLine": "เพิ่มรายการ",
@@ -1039,7 +1061,17 @@
     "costInvalid": "ราคาทุนต้องเป็นเลข ≥ 0",
     "companyRequired": "ต้องเลือกบริษัท",
     "ownershipRequired": "ต้องเลือกประเภทเจ้าของ (HOLDING หรือ COMPANY)",
-    "supplierRequired": "ต้องระบุผู้จัดจำหน่าย"
+    "supplierRequired": "ต้องระบุผู้จัดจำหน่าย",
+    "createReceipt": "สร้างใบรับสินค้า",
+    "createReceiptConfirm": "สร้างใบรับ (ร่าง)",
+    "createReceiptIntro": "ขั้นตอนนี้สร้างใบรับสินค้าแบบร่างสำหรับ PO นี้ เมื่อสร้างแล้วให้เพิ่มรายการที่รับจริงและยืนยัน — สต็อกจะถูกบันทึกเฉพาะใบที่ยืนยันแล้ว",
+    "createReceiptNextSteps": "ขั้นถัดไป: เพิ่มรายการของแต่ละชิ้นที่รับ (ตรงกับรายการใน PO หรือแบบไม่ตรง) แล้วยืนยันเพื่อสร้าง stock lot",
+    "createReceiptSuccess": "สร้างใบรับ (ร่าง) แล้ว — เพิ่มรายการแล้วยืนยัน",
+    "receivingFor": "รับสำหรับ",
+    "receiveBranch": "สาขาที่รับ",
+    "receiveBranchHint": "สาขาที่ของจะมาถึงจริง ต้องอยู่ในบริษัทเดียวกับ PO",
+    "selectBranch": "เลือกสาขา",
+    "noEligibleBranch": "ไม่มีสาขาที่รับของได้สำหรับบริษัทของ PO นี้"
   },
   "receiving": {
     "title": "รับสินค้า",
@@ -1060,7 +1092,28 @@
     "confirmReceiptMessage": "ยืนยันใบรับสินค้านี้? ระบบจะสร้าง Lot สินค้าจากรายการรับ",
     "cancelReceiptMessage": "ยกเลิกใบรับสินค้านี้? ไม่สามารถย้อนกลับได้",
     "confirmSuccess": "ยืนยันรับสินค้าแล้ว — สร้าง Lot แล้ว",
-    "cancelSuccess": "ยกเลิกใบรับสินค้าแล้ว"
+    "cancelSuccess": "ยกเลิกใบรับสินค้าแล้ว",
+    "createNew": "สร้างใบรับใหม่",
+    "createSuccess": "สร้างใบรับสินค้าแล้ว — เพิ่มรายการแล้วยืนยัน",
+    "selectPo": "เลือก PO ที่อนุมัติแล้ว",
+    "receiveBranch": "สาขาที่รับ",
+    "selectBranch": "เลือกสาขา",
+    "noEligibleBranch": "ไม่มีสาขาที่รับของได้สำหรับบริษัทของ PO นี้",
+    "poProgress": "รับแล้ว {{received}} จาก {{total}}",
+    "addLine": "เพิ่มรายการ",
+    "matchedMode": "ตรงกับ PO",
+    "unmatchedMode": "ไม่ตรงกัน",
+    "poLine": "รายการใน PO",
+    "selectPoLine": "เลือกรายการใน PO",
+    "product": "สินค้า",
+    "searchProduct": "ค้นหาด้วยชื่อ, SKU หรือรุ่น",
+    "qty": "จำนวน",
+    "unitCost": "ราคาทุน/หน่วย",
+    "optional": "ไม่บังคับ",
+    "inheritFromPo": "ใช้ราคาจาก PO",
+    "lineTotal": "รวม",
+    "confirmRemoveLine": "ลบรายการนี้?",
+    "viewLot": "Lot #{{id}}"
   },
   "paymentSubmissions": {
     "title": "ตรวจสลิปโอนเงิน",
@@ -2577,7 +2630,33 @@
       "voidReasonPlaceholder": "ระบุเหตุผลที่ยกเลิกบิล",
       "pin": "PIN สาขา",
       "confirmVoid": "ยืนยันยกเลิก",
-      "actionSuccess": "อัปเดตบิลสำเร็จ"
+      "actionSuccess": "อัปเดตบิลสำเร็จ",
+      "print": "พิมพ์",
+      "moreActions": "เพิ่มเติม",
+      "notWired": "ยังไม่ได้ wire ในหน้านี้",
+      "category": {
+        "PAYMENT": "การชำระ",
+        "LINE": "รายการ",
+        "APPROVAL": "อนุมัติ",
+        "LIFECYCLE": "ยกเลิก/Void",
+        "PRINT": "พิมพ์"
+      },
+      "actionLabel": {
+        "ADD_PAYMENT": "รับชำระเงิน",
+        "CONFIRM_PAYMENT": "ยืนยันชำระครบ",
+        "VOID_PAYMENT": "ยกเลิกการรับชำระ",
+        "ADD_LINE": "เพิ่มรายการ",
+        "EDIT_LINE": "แก้ไขรายการ",
+        "REMOVE_LINE": "ลบรายการ",
+        "CONVERT_TO_GIFT": "แปลงเป็นของแถม",
+        "SUBMIT_APPROVAL": "ส่งขออนุมัติ",
+        "REVIEW_APPROVAL": "อนุมัติ/ปฏิเสธ",
+        "CANCEL_APPROVAL": "ยกเลิกการขออนุมัติ",
+        "CANCEL_BILL": "ยกเลิกบิล",
+        "VOID_BILL": "Void บิล (PAID)",
+        "REVERSE_BILL": "ทำใบลดหนี้ (Reverse)",
+        "PRINT": "พิมพ์ใบเสร็จ"
+      }
     },
     "daily": {
       "description": "แยกรายรับรายจ่ายตามประเภท ดูได้หลังปิดวัน",

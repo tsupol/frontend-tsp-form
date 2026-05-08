@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Modal, TextArea, DataTable, useSnackbarContext } from 'tsp-form';
@@ -87,7 +88,7 @@ const BUYBACK_STATUS_COLOR: Record<string, 'success' | 'warning' | 'danger' | 'i
   PENDING_APPROVAL: 'warning',
   APPROVED: 'success',
   REJECTED: 'danger',
-  COMPLETED: 'default',
+  COMPLETED: 'success',
   CANCELLED: 'danger',
 };
 
@@ -125,11 +126,18 @@ export function BuybackPage() {
   const isBranchUser = ['BRANCH_STAFF', 'BRANCH_MANAGER'].includes(user?.role_code ?? '');
   const defaultBranchId = isBranchUser && user?.branch_id ? user.branch_id : null;
 
+  const navigate = useNavigate();
+  const { poId: poIdParam } = useParams<{ poId?: string }>();
+  const selectedId = poIdParam ? Number(poIdParam) : null;
+  const setSelectedId = (id: number | null) => {
+    if (id) navigate(`/admin/inventory/buyback/${id}`, { replace: true });
+    else navigate('/admin/inventory/buyback', { replace: true });
+  };
+
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
   const [filterBranchId, setFilterBranchId] = useState<number | null>(defaultBranchId);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const { data: branches } = useQuery({
     queryKey: ['branches'],
@@ -166,12 +174,6 @@ export function BuybackPage() {
   });
 
   useEffect(() => { setPageIndex(0); }, [filterStatus, filterBranchId]);
-
-  useEffect(() => {
-    if (selectedId && list.length > 0 && !list.find(o => o.id === selectedId)) {
-      setSelectedId(null);
-    }
-  }, [list, selectedId]);
 
   const selectedListItem = list.find(o => o.id === selectedId) ?? null;
 
@@ -259,10 +261,10 @@ export function BuybackPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-baseline gap-1.5 min-w-0">
                           <span className="font-medium text-sm truncate">{order.po_no}</span>
-                          <span className="text-xs text-subtle truncate">· {order.supplier_name}</span>
                         </div>
+                        <div className="text-xs text-subtle truncate">{order.supplier_name}</div>
                         {productLine && (
-                          <div className="text-xs text-subtle truncate">
+                          <div className="text-xs text-subtle truncate mt-0.5">
                             {productLine}{ps?.item_condition ? ` · ${ps.item_condition}` : ''}
                           </div>
                         )}
@@ -275,14 +277,16 @@ export function BuybackPage() {
                               {ps.asset_match_result}
                             </Badge>
                           )}
-                          <span className="text-xs text-subtle">
-                            {order.c_total_lines} {t('buyback.items')}
-                          </span>
                         </div>
                       </div>
                       <div className="text-right shrink-0">
                         <div className="text-sm font-medium tabular-nums">{fmtCurrency(order.total_price)}</div>
-                        <div className="text-xs text-subtle"><DateTime value={order.created_at} /></div>
+                        <div className="text-xs text-subtle">
+                          <DateTime value={order.created_at} /> ({order.c_total_lines})
+                        </div>
+                        {order.branch_name && (
+                          <div className="text-[11px] text-subtle mt-0.5 truncate">{order.branch_name}</div>
+                        )}
                       </div>
                     </button>
                   );

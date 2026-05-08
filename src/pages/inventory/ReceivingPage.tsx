@@ -1,8 +1,10 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Modal, DataTable, useSnackbarContext } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, PackagePlus, CheckCircle, XCircle } from 'lucide-react';
+import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Modal, Input, NumberSpinner, DataTable, useSnackbarContext } from 'tsp-form';
+import { ArrowLeft, ArrowRightFromLine, PackagePlus, CheckCircle, XCircle, Plus, Trash2, Search, ExternalLink } from 'lucide-react';
+import { CurrencyInput } from '../../components/CurrencyInput';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency } from '../../lib/format';
@@ -51,7 +53,7 @@ interface ReceiptDetail {
   notes: string | null;
   created_by: number;
   created_at: string;
-  lines: ReceiptLine[];
+  lines: ReceiptLine[] | null;
 }
 
 interface ReceiptLine {
@@ -102,14 +104,23 @@ export function ReceivingPage() {
   const { addSnackbar } = useSnackbarContext();
   const { user } = useAuth();
 
+  const navigate = useNavigate();
+  const { receiptId: receiptIdParam } = useParams<{ receiptId?: string }>();
+  const selectedId = receiptIdParam ? Number(receiptIdParam) : null;
+  const setSelectedId = (id: number | null) => {
+    if (id) navigate(`/admin/inventory/receiving/${id}`, { replace: true });
+    else navigate('/admin/inventory/receiving', { replace: true });
+  };
+
   const isBranchUser = ['BRANCH_STAFF', 'BRANCH_MANAGER'].includes(user?.role_code ?? '');
   const defaultBranchId = isBranchUser && user?.branch_id ? user.branch_id : null;
+  const canCreate = isBranchUser;
 
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
   const [filterBranchId, setFilterBranchId] = useState<number | null>(defaultBranchId);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const { data: branches } = useQuery({
     queryKey: ['branches'],
@@ -144,12 +155,6 @@ export function ReceivingPage() {
 
   useEffect(() => { setPageIndex(0); }, [filterStatus, filterBranchId]);
 
-  useEffect(() => {
-    if (selectedId && list.length > 0 && !list.find(r => r.id === selectedId)) {
-      setSelectedId(null);
-    }
-  }, [list, selectedId]);
-
   const selectedReceipt = list.find(r => r.id === selectedId) ?? null;
 
   const invalidate = () => {
@@ -178,13 +183,24 @@ export function ReceivingPage() {
               <div className="mobile-header-title mobile-header-title-truncate">
                 {isRoot ? t('nav.receiving') : selectedReceipt?.receipt_no ?? ''}
               </div>
-              <div className="mobile-header-end w-12" />
+              <div className="mobile-header-end w-nav" />
             </MobileHeader>
           )}
 
           {!isMobile && (
             <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
               <h1 className="heading-2 shrink-0">{t('nav.receiving')}</h1>
+              {canCreate && (
+                <Button
+                  color="primary"
+                  size="sm"
+                  startIcon={<Plus size={16} />}
+                  onClick={() => setCreateOpen(true)}
+                  className="ml-auto"
+                >
+                  {t('receiving.createNew')}
+                </Button>
+              )}
             </div>
           )}
 
@@ -214,6 +230,14 @@ export function ReceivingPage() {
                       clearable
                     />
                   </div>
+                  {canCreate && isMobile && (
+                    <Button
+                      color="primary"
+                      size="sm"
+                      startIcon={<Plus size={16} />}
+                      onClick={() => setCreateOpen(true)}
+                    />
+                  )}
                 </div>
               </div>
 
@@ -281,6 +305,27 @@ export function ReceivingPage() {
               )}
             </PageNavPanel>
           </div>
+
+          <CreateReceiptModal
+            open={createOpen}
+            onClose={() => setCreateOpen(false)}
+            onCreated={(newReceiptId) => {
+              setCreateOpen(false);
+              setFilterStatus(null);
+              setPageIndex(0);
+              invalidate();
+              setSelectedId(newReceiptId);
+              if (isMobile) goTo('detail');
+              addSnackbar({
+                message: (
+                  <div className="alert alert-success">
+                    <CheckCircle size={16} />
+                    <span>{t('receiving.createSuccess')}</span>
+                  </div>
+                ),
+              });
+            }}
+          />
         </>
       )}
     </PageNav>
@@ -306,11 +351,15 @@ function ReceiptDetailPanel({
   onRefresh: () => void;
   addSnackbar: (opts: { message: React.ReactNode }) => void;
 }) {
+  const { user } = useAuth();
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [addLineOpen, setAddLineOpen] = useState(false);
 
   const isDraft = detail.status === 'DRAFT';
-  const hasLines = detail.lines.length > 0;
+  const lines = detail.lines ?? [];
+  const hasLines = lines.length > 0;
+  const canEdit = isDraft && ['BRANCH_STAFF', 'BRANCH_MANAGER'].includes(user?.role_code ?? '');
 
   return (
     <div className="relative flex flex-col h-full">
@@ -342,7 +391,7 @@ function ReceiptDetailPanel({
         <div>
           <div className="text-xs text-subtle">{t('receiving.totalAmount')}</div>
           <div className="font-semibold text-sm tabular-nums">
-            {fmtCurrency(detail.lines.reduce((sum, l) => sum + l.line_total, 0))}
+            {fmtCurrency(lines.reduce((sum, l) => sum + l.line_total, 0))}
           </div>
         </div>
       </div>
@@ -359,49 +408,51 @@ function ReceiptDetailPanel({
 
       {/* Lines */}
       <div className="flex-1 overflow-auto better-scroll">
-        <div className="px-4 pt-3 pb-1">
+        <div className="px-4 pt-3 pb-1 flex items-center justify-between">
           <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider">
-            {t('receiving.lines')} ({detail.lines.length})
+            {t('receiving.lines')} ({lines.length})
           </h3>
+          {canEdit && (
+            <Button
+              size="sm"
+              variant="outline"
+              startIcon={<Plus size={14} />}
+              onClick={() => setAddLineOpen(true)}
+            >
+              {t('receiving.addLine')}
+            </Button>
+          )}
         </div>
-        {detail.lines.length === 0 && (
+        {lines.length === 0 && (
           <div className="p-8 text-center text-subtler">{t('common.noData')}</div>
         )}
-        {detail.lines.map((line) => (
-          <div key={line.receipt_line_id} className="px-4 py-2.5 border-b border-line flex items-center gap-3">
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium truncate">{line.model_name}</div>
-              <div className="text-xs text-subtle truncate">
-                {line.variant_name} · {line.sku_code}
-              </div>
-              <div className="text-xs text-subtle">{line.brand_name} · {line.family_name}</div>
-              {line.is_unmatched && (
-                <Badge size="xs" color="warning" className="mt-1">{t('receiving.unmatched')}</Badge>
-              )}
-            </div>
-            <div className="text-right shrink-0">
-              <div className="text-sm font-medium tabular-nums">{fmtNum(line.qty_received)} pcs</div>
-              <div className="text-xs text-subtle tabular-nums">@ {fmtCurrency(line.unit_cost)}</div>
-              <div className="text-xs font-medium tabular-nums">{fmtCurrency(line.line_total)}</div>
-            </div>
-          </div>
+        {lines.map((line) => (
+          <ReceiptLineRow
+            key={line.receipt_line_id}
+            line={line}
+            canEdit={canEdit}
+            onChanged={onRefresh}
+            t={t}
+          />
         ))}
       </div>
 
       {/* Action buttons for DRAFT receipts */}
       {isDraft && (
-        <div className="flex-none px-4 py-3 border-t border-line flex gap-2">
-          <Button color="danger" onClick={() => setCancelModalOpen(true)}>
+        <div className="flex-none px-4 py-3 border-t border-line flex flex-wrap gap-2 items-center">
+          <Button size="sm" variant="outline" color="danger" onClick={() => setCancelModalOpen(true)}>
             {t('receiving.cancelReceipt')}
           </Button>
-          <Button
-            color="primary"
-            className="flex-1"
-            onClick={() => setConfirmModalOpen(true)}
-            disabled={!hasLines}
-          >
-            {t('receiving.confirmReceipt')}
-          </Button>
+          <div className="ml-auto flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              color="primary"
+              onClick={() => setConfirmModalOpen(true)}
+              disabled={!hasLines}
+            >
+              {t('receiving.confirmReceipt')}
+            </Button>
+          </div>
         </div>
       )}
 
@@ -444,6 +495,81 @@ function ReceiptDetailPanel({
           });
         }}
       />
+
+      <AddReceiptLineModal
+        open={addLineOpen}
+        onClose={() => setAddLineOpen(false)}
+        detail={detail}
+        onAdded={() => {
+          setAddLineOpen(false);
+          onRefresh();
+        }}
+      />
+    </div>
+  );
+}
+
+// ============================================================================
+// Single receipt line row (with delete button when DRAFT)
+// ============================================================================
+
+function ReceiptLineRow({
+  line,
+  canEdit,
+  onChanged,
+  t,
+}: {
+  line: ReceiptLine;
+  canEdit: boolean;
+  onChanged: () => void;
+  t: ReturnType<typeof useTranslation>['t'];
+}) {
+  const removeMutation = useMutation({
+    mutationFn: () =>
+      apiClient.rpc('fn_receipt_remove_line', { p_receipt_line_id: line.receipt_line_id }),
+    onSuccess: onChanged,
+  });
+
+  return (
+    <div className="px-4 py-2.5 border-b border-line flex items-center gap-3">
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium truncate">{line.model_name}</div>
+        <div className="text-xs text-subtle truncate">
+          {line.variant_name} · {line.sku_code}
+        </div>
+        <div className="text-xs text-subtle">{line.brand_name} · {line.family_name}</div>
+        <div className="flex items-center gap-2 mt-1">
+          {line.is_unmatched && (
+            <Badge size="xs" color="warning">{t('receiving.unmatched')}</Badge>
+          )}
+          {line.stock_lot_id && (
+            <Link
+              to={`/admin/inventory/lots/${line.stock_lot_id}`}
+              className="inline-flex items-center gap-1 text-xs text-primary hover:underline tabular-nums"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {t('receiving.viewLot', { id: line.stock_lot_id })}
+              <ExternalLink size={12} />
+            </Link>
+          )}
+        </div>
+      </div>
+      <div className="text-right shrink-0">
+        <div className="text-sm font-medium tabular-nums">{fmtNum(line.qty_received)} pcs</div>
+        <div className="text-xs text-subtle tabular-nums">@ {fmtCurrency(line.unit_cost)}</div>
+        <div className="text-xs font-medium tabular-nums">{fmtCurrency(line.line_total)}</div>
+      </div>
+      {canEdit && (
+        <Button
+          size="sm"
+          variant="ghost"
+          startIcon={<Trash2 size={14} />}
+          onClick={() => {
+            if (confirm(t('receiving.confirmRemoveLine'))) removeMutation.mutate();
+          }}
+          disabled={removeMutation.isPending}
+        />
+      )}
     </div>
   );
 }
@@ -485,8 +611,9 @@ function ConfirmReceiptModal({
     },
   });
 
-  const totalQty = detail.lines.reduce((sum, l) => sum + l.qty_received, 0);
-  const totalAmount = detail.lines.reduce((sum, l) => sum + l.line_total, 0);
+  const lines = detail.lines ?? [];
+  const totalQty = lines.reduce((sum, l) => sum + l.qty_received, 0);
+  const totalAmount = lines.reduce((sum, l) => sum + l.line_total, 0);
 
   return (
     <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
@@ -507,7 +634,7 @@ function ConfirmReceiptModal({
             <div className="text-xs text-subtle">{t('receiving.poRef')}: {detail.po_no}</div>
             <div className="text-xs text-subtle">{detail.branch_name} · {detail.supplier_name}</div>
             <div className="text-xs text-subtle mt-1">
-              {detail.lines.length} {t('receiving.lines')} · {fmtNum(totalQty)} pcs · {fmtCurrency(totalAmount)}
+              {lines.length} {t('receiving.lines')} · {fmtNum(totalQty)} pcs · {fmtCurrency(totalAmount)}
             </div>
           </div>
           <p className="text-sm text-subtle">{t('receiving.confirmReceiptMessage')}</p>
@@ -597,5 +724,495 @@ function CancelReceiptModal({
         </div>
       </div>
     </Modal>
+  );
+}
+
+// ============================================================================
+// Create Receipt modal — pick an APPROVED PO + branch, then fn_receipt_create
+// ============================================================================
+
+interface PoOption {
+  po_id: number;
+  po_no: string;
+  company_id: number;
+  supplier_name: string | null;
+  c_total_qty: number;
+  c_received_qty: number;
+}
+
+interface BranchOption {
+  id: number;
+  name: string;
+  company_id: number;
+  branch_type: string;
+}
+
+function CreateReceiptModal({
+  open,
+  onClose,
+  onCreated,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCreated: (receiptId: number) => void;
+}) {
+  const { t } = useTranslation();
+  const { user } = useAuth();
+  const [poId, setPoId] = useState<number | null>(null);
+  const [branchId, setBranchId] = useState<number | null>(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!open) return;
+    setPoId(null);
+    setBranchId(null);
+    setError('');
+  }, [open]);
+
+  const { data: pos } = useQuery({
+    queryKey: ['pos-approved-receivable'],
+    queryFn: () =>
+      apiClient.get<PoOption[]>(
+        '/v_purchase_orders?po_type=eq.PURCHASE&status=eq.APPROVED&order=created_at.desc'
+        + '&select=po_id,po_no,company_id,supplier_name,c_total_qty,c_received_qty',
+      ),
+    enabled: open,
+    staleTime: 60 * 1000,
+  });
+
+  const { data: branches } = useQuery({
+    queryKey: ['branches', 'all'],
+    queryFn: () => apiClient.get<BranchOption[]>('/v_branches?is_active=is.true&order=name'),
+    enabled: open,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const selectedPo = useMemo(() => pos?.find(p => p.po_id === poId) ?? null, [pos, poId]);
+
+  const eligibleBranches = useMemo(() => {
+    if (!branches || !selectedPo) return [];
+    return branches.filter(b =>
+      b.company_id === selectedPo.company_id
+      && !['EXTERNAL', 'DEAL_PARTNER'].includes(b.branch_type),
+    );
+  }, [branches, selectedPo]);
+
+  // Pre-pick user's branch when eligible
+  useEffect(() => {
+    if (!selectedPo) { setBranchId(null); return; }
+    const userBranchEligible = user?.branch_id && eligibleBranches.find(b => b.id === user.branch_id);
+    setBranchId(userBranchEligible ? user.branch_id! : eligibleBranches[0]?.id ?? null);
+  }, [selectedPo, eligibleBranches, user?.branch_id]);
+
+  const poOptions = useMemo(
+    () => (pos ?? []).map(p => ({
+      value: String(p.po_id),
+      label: `${p.po_no}${p.supplier_name ? ' · ' + p.supplier_name : ''}`,
+    })),
+    [pos],
+  );
+
+  const branchOptions = useMemo(
+    () => eligibleBranches.map(b => ({ value: String(b.id), label: b.name })),
+    [eligibleBranches],
+  );
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      apiClient.rpc<{ receipt_id: number }>('fn_receipt_create', {
+        p_po_id: poId,
+        p_branch_id: branchId,
+      }),
+    onSuccess: (data) => onCreated(data.receipt_id),
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        const translated =
+          (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') ||
+          (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setError(translated || err.message);
+      } else {
+        setError(String(err));
+      }
+    },
+  });
+
+  const canSubmit = !!poId && !!branchId && !mutation.isPending;
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="32rem" width="100%">
+      <div className="flex flex-col overflow-hidden">
+        <div className="modal-header">
+          <h2 className="modal-title">{t('receiving.createNew')}</h2>
+          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+        </div>
+        <div className="modal-content">
+          {error && (
+            <div className="alert alert-danger mb-4 animate-pop-in">
+              <XCircle size={16} />
+              <span>{error}</span>
+            </div>
+          )}
+          <div className="form-grid">
+            <div className="flex flex-col">
+              <label className="form-label">{t('receiving.poRef')}</label>
+              <Select
+                options={poOptions}
+                value={poId !== null ? String(poId) : null}
+                onChange={(v) => setPoId(v ? Number(v) : null)}
+                placeholder={t('receiving.selectPo')}
+                searchable
+              />
+              {selectedPo && (
+                <div className="text-xs text-subtle mt-1">
+                  {t('receiving.poProgress', {
+                    received: fmtNum(selectedPo.c_received_qty),
+                    total: fmtNum(selectedPo.c_total_qty),
+                  })}
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col">
+              <label className="form-label">{t('receiving.receiveBranch')}</label>
+              <Select
+                options={branchOptions}
+                value={branchId !== null ? String(branchId) : null}
+                onChange={(v) => setBranchId(v ? Number(v) : null)}
+                placeholder={t('receiving.selectBranch')}
+                disabled={!selectedPo}
+                searchable
+              />
+              {selectedPo && eligibleBranches.length === 0 && (
+                <div className="text-xs text-danger mt-1">{t('receiving.noEligibleBranch')}</div>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <Button variant="outline" onClick={onClose} disabled={mutation.isPending}>
+            {t('common.cancel')}
+          </Button>
+          <Button color="primary" onClick={() => mutation.mutate()} disabled={!canSubmit}>
+            {mutation.isPending ? t('common.saving') : t('receiving.createNew')}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ============================================================================
+// Add Receipt Line modal — Matched (pick PO line) or Unmatched (variant search)
+// ============================================================================
+
+interface PoLineOption {
+  po_line_id: number;
+  model_id: number;
+  model_name: string;
+  variant_id: number;
+  variant_name: string;
+  variant_sku_code: string;
+  brand_name: string;
+  family_name: string;
+  qty: number;
+  unit_cost: number;
+}
+
+interface VariantSearchRow {
+  variant_id: number;
+  model_id: number;
+  brand_name: string;
+  family_name: string;
+  model_name: string;
+  sku_code: string;
+  item_name: string;
+}
+
+function AddReceiptLineModal({
+  open,
+  onClose,
+  detail,
+  onAdded,
+}: {
+  open: boolean;
+  onClose: () => void;
+  detail: ReceiptDetail;
+  onAdded: () => void;
+}) {
+  const { t } = useTranslation();
+  const [mode, setMode] = useState<'matched' | 'unmatched'>('matched');
+  const [poLineId, setPoLineId] = useState<number | null>(null);
+  const [variant, setVariant] = useState<VariantSearchRow | null>(null);
+  const [qty, setQty] = useState<number | ''>(1);
+  const [unitCost, setUnitCost] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!open) return;
+    setMode('matched');
+    setPoLineId(null);
+    setVariant(null);
+    setQty(1);
+    setUnitCost('');
+    setError('');
+  }, [open]);
+
+  // Fetch PO lines for matched mode
+  const { data: poLines } = useQuery({
+    queryKey: ['po-lines-for-receipt', detail.po_id],
+    queryFn: () =>
+      apiClient.get<PoLineOption[]>(
+        `/v_po_lines?po_id=eq.${detail.po_id}&order=po_line_id`
+        + '&select=po_line_id,model_id,model_name,variant_id,variant_name,variant_sku_code,brand_name,family_name,qty,unit_cost',
+      ),
+    enabled: open,
+    staleTime: 30 * 1000,
+  });
+
+  const poLineOptions = useMemo(
+    () => (poLines ?? []).map(l => ({
+      value: String(l.po_line_id),
+      label: `${l.brand_name} ${l.model_name} · ${l.variant_name} (${fmtNum(l.qty)} pcs)`,
+    })),
+    [poLines],
+  );
+
+  const selectedPoLine = useMemo(
+    () => poLines?.find(l => l.po_line_id === poLineId) ?? null,
+    [poLines, poLineId],
+  );
+
+  // Inherit unit cost from picked PO line in matched mode
+  useEffect(() => {
+    if (mode === 'matched' && selectedPoLine && !unitCost) {
+      setUnitCost(String(selectedPoLine.unit_cost));
+    }
+  }, [mode, selectedPoLine, unitCost]);
+
+  const mutation = useMutation({
+    mutationFn: () => {
+      const params: Record<string, unknown> = {
+        p_receipt_id: detail.receipt_id,
+        p_qty_received: typeof qty === 'number' ? qty : 0,
+        p_unit_cost: unitCost ? Number(unitCost) : null,
+      };
+      if (mode === 'matched') {
+        params.p_po_line_id = poLineId;
+        params.p_model_id = null;
+        params.p_variant_id = null;
+      } else {
+        params.p_po_line_id = null;
+        params.p_model_id = variant?.model_id;
+        params.p_variant_id = variant?.variant_id;
+      }
+      return apiClient.rpc('fn_receipt_add_line', params);
+    },
+    onSuccess: onAdded,
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        const translated =
+          (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') ||
+          (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setError(translated || err.message);
+      } else {
+        setError(String(err));
+      }
+    },
+  });
+
+  const qtyNum = typeof qty === 'number' ? qty : 0;
+  const qtyValid = qtyNum > 0;
+  const canSubmit =
+    qtyValid
+    && !mutation.isPending
+    && (mode === 'matched' ? !!poLineId : !!variant && !!unitCost);
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="32rem" width="100%">
+      <div className="flex flex-col overflow-hidden">
+        <div className="modal-header">
+          <h2 className="modal-title">{t('receiving.addLine')}</h2>
+          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+        </div>
+        <div className="modal-content">
+          {error && (
+            <div className="alert alert-danger mb-4 animate-pop-in">
+              <XCircle size={16} />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {/* Mode toggle */}
+          <div className="flex gap-2 mb-4">
+            <Button
+              size="sm"
+              variant={mode === 'matched' ? 'solid' : 'outline'}
+              color={mode === 'matched' ? 'primary' : 'default'}
+              onClick={() => { setMode('matched'); setVariant(null); }}
+              className="flex-1"
+            >
+              {t('receiving.matchedMode')}
+            </Button>
+            <Button
+              size="sm"
+              variant={mode === 'unmatched' ? 'solid' : 'outline'}
+              color={mode === 'unmatched' ? 'primary' : 'default'}
+              onClick={() => { setMode('unmatched'); setPoLineId(null); }}
+              className="flex-1"
+            >
+              {t('receiving.unmatchedMode')}
+            </Button>
+          </div>
+
+          <div className="form-grid">
+            {mode === 'matched' ? (
+              <div className="flex flex-col">
+                <label className="form-label">{t('receiving.poLine')}</label>
+                <Select
+                  options={poLineOptions}
+                  value={poLineId !== null ? String(poLineId) : null}
+                  onChange={(v) => {
+                    const id = v ? Number(v) : null;
+                    setPoLineId(id);
+                    setUnitCost(''); // reset so the picked line's cost auto-fills
+                  }}
+                  placeholder={t('receiving.selectPoLine')}
+                  searchable
+                />
+              </div>
+            ) : (
+              <div className="flex flex-col">
+                <label className="form-label">{t('receiving.product')}</label>
+                {variant ? (
+                  <div className="px-3 py-2.5 rounded-md bg-surface border border-line flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">
+                        {[variant.brand_name, variant.family_name, variant.model_name].filter(Boolean).join(' ')}
+                      </div>
+                      <div className="text-xs text-subtle truncate">
+                        {variant.item_name} · {variant.sku_code}
+                      </div>
+                    </div>
+                    <Button size="sm" variant="ghost" onClick={() => setVariant(null)}>
+                      {t('common.change')}
+                    </Button>
+                  </div>
+                ) : (
+                  <VariantPickerInline onPick={setVariant} t={t} />
+                )}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <div className="shrink-0 flex flex-col">
+                <label className="form-label">{t('receiving.qty')}</label>
+                <NumberSpinner
+                  value={qty}
+                  onChange={setQty}
+                  min={1}
+                />
+              </div>
+              <div className="flex-1 min-w-0 flex flex-col">
+                <label className="form-label">
+                  {t('receiving.unitCost')}
+                  {mode === 'matched' && (
+                    <span className="text-subtle font-normal ml-1">({t('receiving.optional')})</span>
+                  )}
+                </label>
+                <CurrencyInput
+                  value={unitCost}
+                  onChange={(raw) => setUnitCost(raw)}
+                  placeholder={mode === 'matched' ? t('receiving.inheritFromPo') : ''}
+                  className="w-full"
+                />
+              </div>
+            </div>
+
+            {qtyValid && unitCost && (
+              <div className="text-sm text-subtle">
+                {t('receiving.lineTotal')}:{' '}
+                <span className="font-semibold text-fg tabular-nums">
+                  {fmtCurrency(qtyNum * Number(unitCost))}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="modal-footer">
+          <Button variant="outline" onClick={onClose} disabled={mutation.isPending}>
+            {t('common.cancel')}
+          </Button>
+          <Button color="primary" onClick={() => mutation.mutate()} disabled={!canSubmit}>
+            {mutation.isPending ? t('common.saving') : t('receiving.addLine')}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ============================================================================
+// Inline variant search (for unmatched receipt lines)
+// ============================================================================
+
+function VariantPickerInline({
+  onPick,
+  t,
+}: {
+  onPick: (row: VariantSearchRow) => void;
+  t: ReturnType<typeof useTranslation>['t'];
+}) {
+  const [keyword, setKeyword] = useState('');
+  const [debounced, setDebounced] = useState('');
+
+  useEffect(() => {
+    const tm = setTimeout(() => setDebounced(keyword.trim()), 300);
+    return () => clearTimeout(tm);
+  }, [keyword]);
+
+  const { data: results, isFetching } = useQuery({
+    queryKey: ['variant-search-receipt', debounced],
+    queryFn: () => {
+      const base = '/v_product_variant_search?variant_is_active=eq.true&order=brand_name,family_name,model_name&limit=20';
+      if (!debounced) return apiClient.get<VariantSearchRow[]>(base);
+      const filter = `&or=(item_name.ilike.*${encodeURIComponent(debounced)}*,sku_code.ilike.*${encodeURIComponent(debounced)}*,model_name.ilike.*${encodeURIComponent(debounced)}*)`;
+      return apiClient.get<VariantSearchRow[]>(base + filter);
+    },
+    placeholderData: keepPreviousData,
+  });
+
+  return (
+    <div>
+      <Input
+        value={keyword}
+        onChange={(e) => setKeyword(e.target.value)}
+        placeholder={t('receiving.searchProduct')}
+        startIcon={<Search size={16} />}
+        className="w-full"
+        autoFocus
+      />
+      <div className="mt-2 max-h-56 overflow-auto better-scroll border border-line rounded-md">
+        {isFetching && (results ?? []).length === 0 && (
+          <div className="p-3 text-xs text-subtle text-center">{t('common.loading')}</div>
+        )}
+        {!isFetching && (results ?? []).length === 0 && (
+          <div className="p-3 text-xs text-subtler text-center">{t('common.noData')}</div>
+        )}
+        {(results ?? []).map((row) => (
+          <button
+            key={row.variant_id}
+            type="button"
+            className="w-full text-left px-3 py-2 border-b border-line hover:bg-surface-hover cursor-pointer"
+            onClick={() => onPick(row)}
+          >
+            <div className="text-sm font-medium truncate">
+              {[row.brand_name, row.family_name, row.model_name].filter(Boolean).join(' ')}
+            </div>
+            <div className="text-xs text-subtle truncate">
+              {row.item_name} · {row.sku_code}
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }

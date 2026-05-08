@@ -35,7 +35,8 @@
     "select": "Select",
     "saved": "Saved",
     "continue": "Continue",
-    "back": "Back"
+    "back": "Back",
+    "change": "Change"
   },
   "dashboard": {
     "actionRequired": "Action required",
@@ -173,6 +174,7 @@
     "dealPartnerRates": "Deal Partner Rates",
     "inventory": "Inventory",
     "stock": "Stock Dashboard",
+    "lots": "Lots",
     "assets": "Assets",
     "purchaseOrders": "Purchase Orders",
     "receiving": "Receiving",
@@ -966,10 +968,30 @@
     "writeOffSuccess": "Asset written off",
     "internalUseSuccess": "Asset assigned for internal use"
   },
+  "lot": {
+    "search": "Search by lot code, SKU, model, PO",
+    "allBuckets": "All buckets",
+    "allPoTypes": "All PO types",
+    "selectToView": "Select a lot to view details",
+    "qty": "Qty (on hand / received)",
+    "onHand": "On hand / received",
+    "consumed": "Consumed",
+    "consumedSuffix": "consumed",
+    "unitCost": "Unit cost",
+    "onHandValue": "Value on hand",
+    "branch": "Branch",
+    "created": "Created",
+    "closed": "Closed",
+    "closedAt": "Closed at",
+    "remaining": "Remaining",
+    "units": "units",
+    "from": "From"
+  },
   "po": {
     "allStatuses": "All statuses",
     "allOwnership": "All ownership",
     "selectToView": "Select a PO to view details",
+    "notAccessible": "This PO is not accessible from your account.",
     "lines": "lines",
     "noLines": "No lines yet — add the first line",
     "addLine": "Add line",
@@ -1039,7 +1061,17 @@
     "costInvalid": "Cost must be a non-negative number",
     "companyRequired": "Company is required",
     "ownershipRequired": "Ownership is required (HOLDING or COMPANY)",
-    "supplierRequired": "Supplier is required"
+    "supplierRequired": "Supplier is required",
+    "createReceipt": "Create Receipt",
+    "createReceiptConfirm": "Create draft receipt",
+    "createReceiptIntro": "This creates an empty draft receipt for this PO. After creating it you'll add the items received and confirm — only confirmed receipts post to stock.",
+    "createReceiptNextSteps": "Next: add lines for each item received (matched to PO lines, or unmatched for substitutions), then confirm to create stock lots.",
+    "createReceiptSuccess": "Draft receipt created — add lines, then confirm",
+    "receivingFor": "Receiving for",
+    "receiveBranch": "Receiving branch",
+    "receiveBranchHint": "Branch where the goods are physically arriving. Must be in the PO's company.",
+    "selectBranch": "Select branch",
+    "noEligibleBranch": "No eligible branch for this PO's company"
   },
   "receiving": {
     "title": "Receiving",
@@ -1060,7 +1092,28 @@
     "confirmReceiptMessage": "Confirm this receipt? Stock lots will be created from the receipt lines.",
     "cancelReceiptMessage": "Cancel this receipt? This cannot be undone.",
     "confirmSuccess": "Receipt confirmed — stock lots created",
-    "cancelSuccess": "Receipt cancelled"
+    "cancelSuccess": "Receipt cancelled",
+    "createNew": "New Receipt",
+    "createSuccess": "Receipt created — add lines, then confirm",
+    "selectPo": "Select an approved PO",
+    "receiveBranch": "Receiving branch",
+    "selectBranch": "Select branch",
+    "noEligibleBranch": "No eligible branch for this PO's company",
+    "poProgress": "Received {{received}} of {{total}}",
+    "addLine": "Add line",
+    "matchedMode": "Matched (PO line)",
+    "unmatchedMode": "Unmatched",
+    "poLine": "PO line",
+    "selectPoLine": "Select PO line",
+    "product": "Product",
+    "searchProduct": "Search by name, SKU, or model",
+    "qty": "Qty",
+    "unitCost": "Unit cost",
+    "optional": "optional",
+    "inheritFromPo": "Inherits from PO line",
+    "lineTotal": "Line total",
+    "confirmRemoveLine": "Remove this line?",
+    "viewLot": "Lot #{{id}}"
   },
   "paymentSubmissions": {
     "title": "Slips to Review",
@@ -2577,7 +2630,33 @@
       "voidReasonPlaceholder": "Why is this bill being voided?",
       "pin": "Branch PIN",
       "confirmVoid": "Confirm void",
-      "actionSuccess": "Bill updated successfully"
+      "actionSuccess": "Bill updated successfully",
+      "print": "Print",
+      "moreActions": "More",
+      "notWired": "Not yet wired in this page",
+      "category": {
+        "PAYMENT": "Payment",
+        "LINE": "Line items",
+        "APPROVAL": "Approval",
+        "LIFECYCLE": "Lifecycle",
+        "PRINT": "Print"
+      },
+      "actionLabel": {
+        "ADD_PAYMENT": "Add payment",
+        "CONFIRM_PAYMENT": "Confirm payment",
+        "VOID_PAYMENT": "Void payment",
+        "ADD_LINE": "Add line",
+        "EDIT_LINE": "Edit line",
+        "REMOVE_LINE": "Remove line",
+        "CONVERT_TO_GIFT": "Convert to gift",
+        "SUBMIT_APPROVAL": "Submit for approval",
+        "REVIEW_APPROVAL": "Review approval",
+        "CANCEL_APPROVAL": "Cancel approval",
+        "CANCEL_BILL": "Cancel bill",
+        "VOID_BILL": "Void bill",
+        "REVERSE_BILL": "Reverse (credit note)",
+        "PRINT": "Print"
+      }
     },
     "daily": {
       "description": "Income and expense breakdown by transaction type. Available after day close.",

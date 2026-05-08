@@ -12,6 +12,8 @@ import contractActionsEn from './locales/contractActions.en.json';
 import contractActionsTh from './locales/contractActions.th.json';
 import assetActionsEn from './locales/assetActions.en.json';
 import assetActionsTh from './locales/assetActions.th.json';
+import lotActionsEn from './locales/lotActions.en.json';
+import lotActionsTh from './locales/lotActions.th.json';
 
 const resources = {
   en: {
@@ -20,6 +22,7 @@ const resources = {
     billActions: billActionsEn,
     contractActions: contractActionsEn,
     assetActions: assetActionsEn,
+    lotActions: lotActionsEn,
   },
   th: {
     translation: th,
@@ -27,6 +30,7 @@ const resources = {
     billActions: billActionsTh,
     contractActions: contractActionsTh,
     assetActions: assetActionsTh,
+    lotActions: lotActionsTh,
   },
 };
 

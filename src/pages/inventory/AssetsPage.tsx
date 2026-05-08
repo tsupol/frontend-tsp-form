@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, Modal, TextArea, DataTable, PopOver, Tooltip, useSnackbarContext } from 'tsp-form';
 import { ArrowLeft, ArrowRightFromLine, Box, Search, SlidersHorizontal, CheckCircle, XCircle, ChevronDown, ShoppingCart, ExternalLink, Wrench } from 'lucide-react';
@@ -372,7 +372,16 @@ export function AssetsPage() {
   const [filtersExpanded, setFiltersExpanded] = useState(isBranchUser);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const navigate = useNavigate();
+  const { assetId: assetIdParam } = useParams<{ assetId?: string }>();
+  const selectedId = assetIdParam ? Number(assetIdParam) : null;
+  const setSelectedId = (id: number | null) => {
+    // Preserve ?view=sale (or any other query string) when changing selection.
+    const qs = searchParams.toString();
+    const suffix = qs ? `?${qs}` : '';
+    if (id) navigate(`/admin/inventory/assets/${id}${suffix}`, { replace: true });
+    else navigate(`/admin/inventory/assets${suffix}`, { replace: true });
+  };
 
   // Debounce search
   useEffect(() => {
@@ -442,13 +451,14 @@ export function AssetsPage() {
 
   useEffect(() => { setPageIndex(0); }, [debouncedSearch, filterBucket, filterBranchId, filterCondition, filterBrand, filterFamily]);
 
-  useEffect(() => {
-    if (selectedId && list.length > 0 && !list.find(a => a.asset_id === selectedId)) {
-      setSelectedId(null);
-    }
-  }, [list, selectedId]);
+  // Fallback fetch so direct deep-links (id not on current page) still resolve.
+  const { data: detailFallback } = useQuery({
+    queryKey: ['asset-detail-fallback', selectedId],
+    queryFn: () => apiClient.get<Asset[]>(`/v_assets?asset_id=eq.${selectedId}`).then(r => r[0] ?? null),
+    enabled: !!selectedId && !list.find(a => a.asset_id === selectedId),
+  });
 
-  const selectedAsset = list.find(a => a.asset_id === selectedId) ?? null;
+  const selectedAsset = list.find(a => a.asset_id === selectedId) ?? detailFallback ?? null;
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['assets'] });
@@ -598,12 +608,12 @@ export function AssetsPage() {
                           <span className={`text-xs ${getConditionTextColor(asset.condition_grade)}`}>
                             {getConditionLabel(asset.condition_grade, t)}
                           </span>
-                          <span className="text-xs text-subtle">{asset.branch_name}</span>
                         </div>
                       </div>
                       <div className="text-right shrink-0">
                         <div className="text-sm font-medium tabular-nums">{fmtCurrency(asset.current_cost_basis)}</div>
                         <div className="text-xs text-subtle"><DateTime value={asset.created_at} /></div>
+                        <div className="text-xs text-subtle truncate">{asset.branch_name}</div>
                       </div>
                     </button>
                   );

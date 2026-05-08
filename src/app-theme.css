@@ -59,3 +59,10 @@
         color: var(--color-warning-text);
     }
 }
+
+@layer components {
+    .btn-outline-primary {
+        --color-text: var(--color-primary-text);
+        --color-border: var(--color-primary-text);
+    }
+}

@@ -35,6 +35,7 @@ export interface BillAction {
   creates_credit_note: boolean;
   target_status: string | null;
   sort_order: number;
+  required_permission?: string | null;
 }
 
 export interface BillActionsResponse {

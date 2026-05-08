@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Modal, TextArea, DataTable, useSnackbarContext } from 'tsp-form';
@@ -81,7 +82,7 @@ const TRANSFER_STATUS_COLOR: Record<string, 'success' | 'warning' | 'danger' | '
   DRAFT: 'default',
   APPROVED: 'success',
   IN_TRANSIT: 'info',
-  COMPLETED: 'default',
+  COMPLETED: 'success',
   CANCELLED: 'danger',
   DISPUTED: 'warning',
 };
@@ -122,11 +123,18 @@ export function TransfersPage() {
   const isBranchUser = ['BRANCH_STAFF', 'BRANCH_MANAGER'].includes(user?.role_code ?? '');
   const defaultBranchId = isBranchUser && user?.branch_id ? user.branch_id : null;
 
+  const navigate = useNavigate();
+  const { transferId: transferIdParam } = useParams<{ transferId?: string }>();
+  const selectedId = transferIdParam ? Number(transferIdParam) : null;
+  const setSelectedId = (id: number | null) => {
+    if (id) navigate(`/admin/inventory/transfers/${id}`, { replace: true });
+    else navigate('/admin/inventory/transfers', { replace: true });
+  };
+
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
   const [filterBranchId, setFilterBranchId] = useState<number | null>(defaultBranchId);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const { data: branches } = useQuery({
     queryKey: ['branches'],
@@ -161,13 +169,14 @@ export function TransfersPage() {
 
   useEffect(() => { setPageIndex(0); }, [filterStatus, filterBranchId]);
 
-  useEffect(() => {
-    if (selectedId && list.length > 0 && !list.find(o => o.id === selectedId)) {
-      setSelectedId(null);
-    }
-  }, [list, selectedId]);
+  // Fallback fetch so direct deep-links (id not on current page) still resolve.
+  const { data: detailFallback } = useQuery({
+    queryKey: ['transfer-order-detail', selectedId],
+    queryFn: () => apiClient.get<TransferOrder[]>(`/v_transfer_orders?id=eq.${selectedId}`).then(r => r[0] ?? null),
+    enabled: !!selectedId && !list.find(o => o.id === selectedId),
+  });
 
-  const selectedOrder = list.find(o => o.id === selectedId) ?? null;
+  const selectedOrder = list.find(o => o.id === selectedId) ?? detailFallback ?? null;
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['transfer-orders'] });
@@ -249,19 +258,18 @@ export function TransfersPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 min-w-0">
                           <span className="font-medium text-sm truncate">{order.transfer_no}</span>
-                          <Badge size="xs" color={TRANSFER_STATUS_COLOR[order.status] ?? 'default'}>
-                            {t(`transfer.status_${order.status}`, order.status)}
-                          </Badge>
                         </div>
                         <div className="text-[11px] text-subtle truncate mt-0.5">
                           {order.from_branch_name} → {order.to_branch_name ?? `Branch #${order.to_branch_id}`}
                         </div>
                       </div>
-                      <div className="text-right shrink-0">
-                        <div className="text-xs text-subtle"><DateTime value={order.created_at} /></div>
-                        <div className="text-[11px] text-subtle mt-0.5">
-                          {fmtNum(order.c_total_lines ?? 0)} {t('transfer.lines')}
+                      <div className="text-right shrink-0 flex flex-col items-end">
+                        <div className="text-xs text-subtle">
+                          <DateTime value={order.created_at} /> ({fmtNum(order.c_total_lines ?? 0)})
                         </div>
+                        <Badge size="xs" color={TRANSFER_STATUS_COLOR[order.status] ?? 'default'} className="mt-0.5">
+                          {t(`transfer.status_${order.status}`, order.status)}
+                        </Badge>
                       </div>
                     </button>
                   );

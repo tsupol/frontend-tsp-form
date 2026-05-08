@@ -1,20 +1,22 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
-  PageNav, PageNavPanel, MobileHeader, DataTable,
+  PageNav, PageNavPanel, MobileHeader, DataTable, PopOver, Tooltip,
   Select, Badge, Button, Input, MaskedInput, Modal, useSnackbarContext,
 } from 'tsp-form';
 import {
-  ArrowRightFromLine, ArrowLeft, Plus, Trash2, XCircle, CheckCircle, Ban,
+  ArrowRightFromLine, ArrowLeft, Plus, Trash2, XCircle, CheckCircle, Ban, Printer,
+  Wrench, ChevronDown,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { fmtCurrency } from '../../lib/format';
 import { type Branch, type BillRow, type BillDetail } from './accountingTypes';
-import { useBillActions } from '../../hooks/useBillActions';
+import { useBillActions, type BillAction, type BillActionCode } from '../../hooks/useBillActions';
+import { BillReceipt } from '../contracts/workspace/BillReceipt';
 
 /* ── Types ── */
 
@@ -309,7 +311,8 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
   });
 
   // Available actions (drives button visibility — replaces local isOpen heuristic)
-  const { isAvailable: isActionAvailable } = useBillActions(billId);
+  const { isAvailable: isActionAvailable, data: actionsData } = useBillActions(billId);
+  const allActions = actionsData?.actions ?? [];
 
   // Bank accounts for transfer
   const { data: bankAccounts } = useQuery({
@@ -333,6 +336,9 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
   const [voidPin, setVoidPin] = useState('');
   const [voiding, setVoiding] = useState(false);
   const [voidError, setVoidError] = useState('');
+
+  // Print preview state
+  const [printOpen, setPrintOpen] = useState(false);
 
   const detail = details?.[0];
 
@@ -439,12 +445,8 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
 
   // BE evaluator currently still reports VOID_BILL/REVERSE_BILL as available on already-cancelled
   // bills (it doesn't check is_voided). Gate FE-side defensively to avoid double-cancel attempts.
-  const hasLifecycleActions =
-    !isCancelled && (
-      isActionAvailable('CANCEL_BILL') ||
-      isActionAvailable('VOID_BILL') ||
-      isActionAvailable('REVERSE_BILL')
-    );
+  // Used by BillActionBar to suppress lifecycle actions on already-voided bills.
+  const suppressLifecycle = isCancelled;
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -665,22 +667,26 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
 
       </div>{/* /scroll content */}
 
-      {/* ── Sticky lifecycle action footer (cancel / void / reverse — driven by BE) ── */}
-      {hasLifecycleActions && (
-        <div className="flex-none border-t border-line flex items-center gap-2 justify-end px-4 py-3">
-          {(isActionAvailable('CANCEL_BILL') || isActionAvailable('VOID_BILL')) && (
-            <Button
-              size="sm"
-              color="danger"
-              variant="outline"
-              onClick={() => { setVoidOpen(true); setVoidError(''); setVoidReason(''); setVoidPin(''); }}
-              startIcon={<Ban size={14} />}
-            >
-              {t('accounting.bills.voidBill')}
-            </Button>
-          )}
+      {/* ── Sticky BE-driven action footer (PAYMENT/LINE/APPROVAL/LIFECYCLE + Print) ── */}
+      <BillActionBar
+        actions={allActions}
+        suppressLifecycle={suppressLifecycle}
+        onPrint={() => setPrintOpen(true)}
+        onVoidOrCancel={() => { setVoidOpen(true); setVoidError(''); setVoidReason(''); setVoidPin(''); }}
+      />
+
+      {/* ── Print Preview Modal ── */}
+      <Modal
+        open={printOpen}
+        onClose={() => setPrintOpen(false)}
+        maxWidth="26rem"
+        width="100%"
+        ariaLabel={t('wizard.receipt_title')}
+      >
+        <div className="modal-content py-6 px-4" style={{ background: 'color-mix(in srgb, var(--color-fg) 6%, transparent)' }}>
+          <BillReceipt billId={billId} />
         </div>
-      )}
+      </Modal>
 
       {/* ── Void Modal ── */}
       <Modal open={voidOpen} onClose={() => !voiding && setVoidOpen(false)} maxWidth="24rem" width="100%">
@@ -720,3 +726,196 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
   );
 }
 
+/* ── Action Bar ─────────────────────────────────────────────────────────────
+   Mirrors AssetActionBar: BE-driven primary buttons + grouped-secondary
+   PopOver. Print is a permanent FE-only entry slotted under a synthetic
+   PRINT category. Wired actions today: VOID_BILL, CANCEL_BILL (open the
+   void modal). Everything else gets the "not yet wired" Wrench icon and
+   tooltip — capability is visible, behaviour is clearly TODO. */
+
+const BILL_CATEGORY_ORDER = ['PAYMENT', 'LINE', 'APPROVAL', 'LIFECYCLE', 'PRINT'];
+
+// Per-status: which actions get rendered as primary buttons (first row).
+// The rest collapse under "More". Empty array → everything goes under More.
+const PRIMARY_BY_STATUS: Record<string, BillActionCode[]> = {
+  OPEN: ['CANCEL_BILL'],
+  PARTIAL: ['CANCEL_BILL'],
+  PAID: ['VOID_BILL', 'REVERSE_BILL'],
+  VOIDED: [],
+};
+
+// Action codes that are actually wired in this page right now.
+// Anything else listed by the BE renders disabled with a Wrench tooltip.
+const WIRED_ACTIONS: ReadonlySet<BillActionCode> = new Set<BillActionCode>([
+  'CANCEL_BILL',
+  'VOID_BILL',
+]);
+
+interface BillActionBarProps {
+  actions: BillAction[];
+  suppressLifecycle: boolean;
+  onPrint: () => void;
+  onVoidOrCancel: () => void;
+}
+
+function BillActionBar({ actions, suppressLifecycle, onPrint, onVoidOrCancel }: BillActionBarProps) {
+  const { t } = useTranslation();
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreTriggerRef = useRef<HTMLButtonElement>(null);
+
+  // Filter BE actions: hide permission_denied (don't tease the user with things
+  // they can't do at all), and suppress LIFECYCLE on already-voided bills.
+  const visibleBeActions = actions
+    .filter(a => a.blocking_reason !== 'permission_denied')
+    .filter(a => !(suppressLifecycle && a.category === 'LIFECYCLE'))
+    .slice()
+    .sort((a, b) => a.sort_order - b.sort_order);
+
+  // Synthetic PRINT entry — not from BE, always available.
+  const printAction: BillAction & { __synthetic: true } = {
+    action_code: 'PRINT' as BillActionCode,
+    category: 'PRINT' as never, // synthetic category
+    rpc_name: '',
+    is_available: true,
+    blocking_reason: null,
+    require_pin: false,
+    creates_credit_note: false,
+    target_status: null,
+    sort_order: 999,
+    __synthetic: true,
+  };
+
+  const allEntries: BillAction[] = [...visibleBeActions, printAction];
+
+  // Determine current status from actions (if any action's required_statuses
+  // didn't match → we're not in that state). Easier: use the first available
+  // LIFECYCLE-category action's predicate. Actually simplest: derive from the
+  // BE response's is_available across known status-keyed actions. We just need
+  // a key into PRIMARY_BY_STATUS — fall back to OPEN if we can't tell.
+  const inferredStatus =
+    actions.find(a => a.action_code === 'CONFIRM_PAYMENT' && a.is_available) ? 'PARTIAL'
+    : actions.find(a => a.action_code === 'VOID_BILL' && a.is_available) ? 'PAID'
+    : actions.find(a => a.action_code === 'CANCEL_BILL' && a.is_available) ? 'OPEN'
+    : 'VOIDED';
+
+  const primaryCodes = new Set<string>(['PRINT', ...(PRIMARY_BY_STATUS[inferredStatus] ?? [])]);
+  const primaryActions = allEntries.filter(a => primaryCodes.has(a.action_code));
+  const secondaryActions = allEntries.filter(a => !primaryCodes.has(a.action_code));
+
+  const groupedSecondary = secondaryActions.reduce<Record<string, BillAction[]>>((acc, a) => {
+    (acc[a.category] ||= []).push(a);
+    return acc;
+  }, {});
+  const sortedCategories = Object.keys(groupedSecondary).sort((a, b) => {
+    const ai = BILL_CATEGORY_ORDER.indexOf(a);
+    const bi = BILL_CATEGORY_ORDER.indexOf(b);
+    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+  });
+
+  if (allEntries.length === 0) return null;
+
+  const handleClick = (a: BillAction) => {
+    setMoreOpen(false);
+    if (a.action_code === ('PRINT' as BillActionCode)) {
+      onPrint();
+      return;
+    }
+    if (a.action_code === 'VOID_BILL' || a.action_code === 'CANCEL_BILL') {
+      onVoidOrCancel();
+      return;
+    }
+    // Other actions: not wired yet — buttons are disabled, this never fires.
+  };
+
+  const renderActionButton = (a: BillAction, primary = false) => {
+    const isSynthetic = a.action_code === ('PRINT' as BillActionCode);
+    const wired = isSynthetic || WIRED_ACTIONS.has(a.action_code);
+    const label = t(`accounting.bills.actionLabel.${a.action_code}`, {
+      defaultValue: a.action_code,
+    });
+
+    let endIcon: React.ReactNode = undefined;
+    const lines: string[] = [label];
+    if (!wired) {
+      endIcon = <Wrench size={12} />;
+      lines.push(t('accounting.bills.notWired'));
+    }
+    if (!a.is_available && a.blocking_reason) {
+      lines.push(t(`blockingReason.${a.blocking_reason}`, { ns: 'apiErrors', defaultValue: a.blocking_reason }));
+    }
+
+    const tooltipContent: React.ReactNode = lines.length === 1
+      ? lines[0]
+      : (
+        <div className="flex flex-col gap-0.5">
+          {lines.map((line, i) => (
+            <div key={i} className={i === 0 ? 'font-medium' : 'text-xs opacity-90'}>{line}</div>
+          ))}
+        </div>
+      );
+
+    // Color: lifecycle danger actions render danger; print is plain.
+    const isDanger = a.action_code === 'VOID_BILL' || a.action_code === 'CANCEL_BILL' || a.action_code === 'REVERSE_BILL';
+    const isPrint = isSynthetic;
+    const startIcon = isPrint ? <Printer size={14} /> : isDanger ? <Ban size={14} /> : undefined;
+
+    return (
+      <Tooltip key={a.action_code} content={tooltipContent} placement="top">
+        <Button
+          variant={primary && !isDanger ? undefined : 'outline'}
+          size="sm"
+          color={isDanger ? 'danger' : undefined}
+          disabled={!a.is_available || !wired}
+          startIcon={startIcon}
+          endIcon={endIcon}
+          onClick={() => handleClick(a)}
+        >
+          {label}
+        </Button>
+      </Tooltip>
+    );
+  };
+
+  return (
+    <div className="flex-none px-4 py-3 border-t border-line flex flex-wrap items-center gap-2">
+      {primaryActions.map(a => renderActionButton(a, true))}
+      {secondaryActions.length > 0 && (
+        <Button
+          ref={moreTriggerRef}
+          variant="outline"
+          size="sm"
+          endIcon={<ChevronDown size={14} />}
+          onClick={() => setMoreOpen(v => !v)}
+        >
+          {t('accounting.bills.moreActions')}
+        </Button>
+      )}
+      <PopOver
+        isOpen={moreOpen}
+        onClose={() => setMoreOpen(false)}
+        triggerRef={moreTriggerRef}
+        placement="top"
+        align="end"
+        maxWidth="32rem"
+        maxHeight="60vh"
+      >
+        <div className="flex flex-col gap-3 p-3">
+          {sortedCategories.map(cat => {
+            const items = groupedSecondary[cat];
+            if (!items || items.length === 0) return null;
+            return (
+              <div key={cat} className="flex flex-col gap-1.5">
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-subtle">
+                  {t(`accounting.bills.category.${cat}`, { defaultValue: cat })}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {items.map(a => renderActionButton(a))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </PopOver>
+    </div>
+  );
+}
