@@ -1641,6 +1641,7 @@
     "billStatus_OPEN": "รอชำระ",
     "billStatus_VOIDED": "ยกเลิก",
     "billStatus_CANCELLED": "ยกเลิก",
+    "openInBills": "เปิดในหน้าบิล",
     "tab_device": "เครื่อง",
     "device_primary": "เครื่องหลัก",
     "device_loaner": "เครื่องสำรอง",

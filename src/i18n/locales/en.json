@@ -1641,6 +1641,7 @@
     "billStatus_OPEN": "Pending",
     "billStatus_VOIDED": "Voided",
     "billStatus_CANCELLED": "Cancelled",
+    "openInBills": "Open in Bills",
     "tab_device": "Device",
     "device_primary": "Primary device",
     "device_loaner": "Loaner device",

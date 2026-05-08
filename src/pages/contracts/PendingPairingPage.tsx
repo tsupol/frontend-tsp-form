@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Badge, Select, DataTableFooter } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, Link2, Truck, Phone } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, Link2, Truck } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { defaultScopeFor, scopeQuery } from '../../lib/scope';
@@ -220,16 +220,10 @@ export function PendingPairingPage() {
                               </Badge>
                             )}
                           </div>
-                          <div className="text-sm truncate">
-                            {row.customer_name ?? t('contract.noCustomer')}
+                          <div className="flex items-center justify-between gap-2 text-sm">
+                            <span className="truncate">{row.customer_name ?? t('contract.noCustomer')}</span>
+                            <span className="text-xs text-subtle shrink-0">{row.branch_name}</span>
                           </div>
-                          {row.customer_tel && (
-                            <div className="flex items-center gap-1 text-xs text-subtle">
-                              <Phone size={11} />
-                              <span>{row.customer_tel}</span>
-                            </div>
-                          )}
-                          <div className="text-xs text-subtle">{row.branch_name}</div>
                         </button>
                       );
                     })}

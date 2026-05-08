@@ -2,7 +2,8 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Badge, Button, Input, Select, Modal, TextArea, Tooltip, useSnackbarContext } from 'tsp-form';
-import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Upload, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Upload, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { ApiError } from '../../lib/api';
 import { uploadToS3 } from '../../lib/upload';
@@ -1394,6 +1395,7 @@ function getBillStatusColor(status: string, isCancelled: boolean): 'success' | '
 }
 
 function BillsTab({ contractId, t }: { contractId: number; t: ReturnType<typeof useTranslation>['t'] }) {
+  const navigate = useNavigate();
   const [openBillId, setOpenBillId] = useState<number | null>(null);
 
   const { data: bills, isLoading } = useQuery({
@@ -1407,50 +1409,62 @@ function BillsTab({ contractId, t }: { contractId: number; t: ReturnType<typeof 
   if (!bills || bills.length === 0) return <div className="p-8 text-center text-subtler">{t('common.noData')}</div>;
 
   return (
-    <div className="p-4">
-      <div className="border border-line rounded-md overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-line bg-surface">
-              <th className="text-left px-3 py-2 font-medium text-subtle">{t('contract.billCode')}</th>
-              <th className="text-left px-3 py-2 font-medium text-subtle">{t('contract.billPurpose')}</th>
-              <th className="text-left px-3 py-2 font-medium text-subtle">{t('contract.billDate')}</th>
-              <th className="text-right px-3 py-2 font-medium text-subtle">{t('contract.amount')}</th>
-              <th className="text-left px-3 py-2 font-medium text-subtle">{t('common.status')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {bills.map(bill => (
-              <tr
-                key={bill.id}
-                className={`border-b border-line last:border-b-0 cursor-pointer hover:bg-surface-hover transition-colors ${
-                  bill.is_cancelled ? 'opacity-60' : ''
-                }`}
-                onClick={() => setOpenBillId(bill.id)}
-              >
-                <td className="px-3 py-2 font-mono text-xs">{bill.code_display}</td>
-                <td className="px-3 py-2">
-                  <div>{bill.bill_purpose_label ?? bill.bill_purpose}</div>
-                  {bill.bill_type_label_short && (
-                    <div className="text-xs text-subtle">{bill.bill_type_label_short}</div>
-                  )}
-                </td>
-                <td className="px-3 py-2 text-xs text-subtle">
-                  <DateTime value={bill.bill_date} showTime={false} />
-                </td>
-                <td className="px-3 py-2 text-right tabular-nums">{fmtCurrency(bill.total_amount)}</td>
-                <td className="px-3 py-2">
-                  <Badge size="xs" color={getBillStatusColor(bill.status, bill.is_cancelled)}>
-                    {bill.is_cancelled
-                      ? t('contract.billStatus_CANCELLED', { defaultValue: 'Cancelled' })
-                      : t(`contract.billStatus_${bill.status}`, { defaultValue: bill.status })}
-                  </Badge>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+    <div className="p-4 flex flex-col gap-2">
+      {bills.map(bill => (
+        <div
+          key={bill.id}
+          className={`border border-line rounded-md px-4 py-3 ${bill.is_cancelled ? 'opacity-60' : ''}`}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="font-mono text-xs text-subtle">{bill.code_display}</span>
+              <Badge size="xs" color={getBillStatusColor(bill.status, bill.is_cancelled)}>
+                {bill.is_cancelled
+                  ? t('contract.billStatus_CANCELLED', { defaultValue: 'Cancelled' })
+                  : t(`contract.billStatus_${bill.status}`, { defaultValue: bill.status })}
+              </Badge>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              <Tooltip content={t('wizard.receipt_print')}>
+                <Button
+                  variant="outline"
+                  color="default"
+                  size="sm"
+                  className="btn-icon-xs"
+                  onClick={() => setOpenBillId(bill.id)}
+                  aria-label={t('wizard.receipt_print')}
+                >
+                  <Printer size={14} />
+                </Button>
+              </Tooltip>
+              <Tooltip content={t('contract.openInBills', { defaultValue: 'Open in Bills' })}>
+                <Button
+                  variant="outline"
+                  color="default"
+                  size="sm"
+                  className="btn-icon-xs"
+                  onClick={() => navigate(`/admin/accounting/bills/${bill.id}`)}
+                  aria-label={t('contract.openInBills', { defaultValue: 'Open in Bills' })}
+                >
+                  <ExternalLink size={14} />
+                </Button>
+              </Tooltip>
+            </div>
+          </div>
+          <div className="flex items-center justify-between gap-3 mt-2">
+            <div className="min-w-0">
+              <div className="text-sm">{bill.bill_purpose_label ?? bill.bill_purpose}</div>
+              {bill.bill_type_label_short && (
+                <div className="text-xs text-subtle">{bill.bill_type_label_short}</div>
+              )}
+            </div>
+            <div className="text-right shrink-0">
+              <div className="text-sm font-medium tabular-nums">{fmtCurrency(bill.total_amount)}</div>
+              <div className="text-xs text-subtle"><DateTime value={bill.bill_date} showTime={false} /></div>
+            </div>
+          </div>
+        </div>
+      ))}
 
       <Modal
         open={openBillId != null}
