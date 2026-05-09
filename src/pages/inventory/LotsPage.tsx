@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
 import {
-  PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, Modal, TextArea, NumberSpinner,
+  PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, Modal, TextArea,
   DataTable, PopOver, Tooltip, useSnackbarContext,
 } from 'tsp-form';
 import {
@@ -116,21 +116,14 @@ const SIMPLE_ACTIONS: Record<string, LotSimpleActionConfig> = {
     color: 'primary',
     successKey: 'success.convert_to_asset',
   },
-  LOT_STOCK_ADJUST_LOSS: {
-    rpc: 'fn_inv_stock_adjust_loss',
-    color: 'danger',
-    successKey: 'success.adjust_loss',
-  },
 };
 
 // Up to 3 actions surfaced inline as primary; rest go behind "More".
 const PRIMARY_BY_BUCKET: Record<string, string[]> = {
   ON_HAND_AVAILABLE: ['LOT_CONVERT_TO_ASSET', 'LOT_TRANSFER_CREATE'],
-  INBOUND_APPROVED_AWAITING_BRANCH_CONFIRM: ['LOT_RECEIVE'],
-  QUARANTINED: ['LOT_QUARANTINE_RELEASE'],
 };
 
-const CATEGORY_ORDER = ['INBOUND', 'CONVERSION', 'TRANSFER', 'BUCKET_MOVE', 'ADJUSTMENT', 'SALE', 'LIFECYCLE'];
+const CATEGORY_ORDER = ['CONVERSION', 'TRANSFER'];
 
 // ============================================================================
 // Component
@@ -666,14 +659,6 @@ interface IdRow {
   value: string;
 }
 
-interface AdjustReason {
-  code: string;
-  name_th: string;
-  name_en: string;
-  direction: string;
-  sort_order: number;
-}
-
 function LotActionModal({
   open,
   action,
@@ -687,23 +672,15 @@ function LotActionModal({
   lot: Lot;
   onSuccess: (msgKey: string) => void;
 }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const config = action ? SIMPLE_ACTIONS[action.action_code] : null;
-  const isThai = i18n.language === 'th';
 
   const isConvert = action?.action_code === 'LOT_CONVERT_TO_ASSET';
-  const isAdjustLoss = action?.action_code === 'LOT_STOCK_ADJUST_LOSS';
 
   // Convert-specific state — inputs for one unit at a time.
   const [identifiers, setIdentifiers] = useState<IdRow[]>([{ type: 'SERIAL_NO', value: '' }]);
   const [conditionGrade, setConditionGrade] = useState<string>('NEW');
   const [physicalColor, setPhysicalColor] = useState('');
-
-  // Adjust-loss state
-  const [lossQty, setLossQty] = useState<number | ''>(1);
-  const [reasonCode, setReasonCode] = useState<string>('');
-
-  // Shared
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
 
@@ -712,60 +689,29 @@ function LotActionModal({
       setIdentifiers([{ type: 'SERIAL_NO', value: '' }]);
       setConditionGrade('NEW');
       setPhysicalColor('');
-      setLossQty(1);
-      setReasonCode('');
       setNote('');
       setError('');
     }
   }, [open, action]);
 
-  // Load adjustment reasons (LOSS + BOTH directions) only when relevant.
-  const { data: reasons = [] } = useQuery({
-    queryKey: ['adjustment-reasons', 'loss'],
-    queryFn: () => apiClient.get<AdjustReason[]>(
-      '/v_ref_adjustment_reasons?direction=in.(LOSS,BOTH)&is_active=is.true&order=sort_order',
-    ),
-    enabled: open && isAdjustLoss,
-    staleTime: 60 * 60 * 1000,
-  });
-
-  const reasonOptions = useMemo(
-    () => reasons.map(r => ({ value: r.code, label: isThai ? r.name_th : r.name_en })),
-    [reasons, isThai],
-  );
-
   const filledIds = identifiers.filter(i => i.type && i.value.trim());
-  const lossQtyNum = typeof lossQty === 'number' ? lossQty : 0;
 
   const mutation = useMutation({
     mutationFn: () => {
       if (!action || !config) return Promise.reject(new Error('No action'));
-      let params: Record<string, unknown>;
-
-      if (action.action_code === 'LOT_CONVERT_TO_ASSET') {
-        // PostgREST overload: send every key, null for blanks.
-        params = {
-          p_lot_id: lot.lot_id,
-          p_variant_id: null,
-          p_identifiers: filledIds.map(i => ({ type: i.type, value: i.value.trim() })),
-          p_condition_grade: conditionGrade || null,
-          p_physical_color: physicalColor.trim() || null,
-          p_dedupe_key: `lot-convert-${lot.lot_id}-${Date.now()}`,
-          p_branch_id: lot.branch_id,
-        };
-      } else if (action.action_code === 'LOT_STOCK_ADJUST_LOSS') {
-        params = {
-          p_lot_id: lot.lot_id,
-          p_qty_loss: lossQtyNum,
-          p_reason_code: reasonCode,
-          p_note: note.trim() || null,
-          p_dedupe_key: `lot-adjust-loss-${lot.lot_id}-${Date.now()}`,
-          p_branch_id: lot.branch_id,
-        };
-      } else {
+      if (action.action_code !== 'LOT_CONVERT_TO_ASSET') {
         return Promise.reject(new Error('Action not wired'));
       }
-
+      // PostgREST overload: send every key, null for blanks.
+      const params = {
+        p_lot_id: lot.lot_id,
+        p_variant_id: null as number | null,
+        p_identifiers: filledIds.map(i => ({ type: i.type, value: i.value.trim() })),
+        p_condition_grade: conditionGrade || null,
+        p_physical_color: physicalColor.trim() || null,
+        p_dedupe_key: `lot-convert-${lot.lot_id}-${Date.now()}`,
+        p_branch_id: lot.branch_id,
+      };
       return apiClient.rpc(config.rpc, params);
     },
     onSuccess: () => onSuccess(config!.successKey),
@@ -781,9 +727,7 @@ function LotActionModal({
     },
   });
 
-  const convertValid = isConvert && filledIds.length > 0 && !!conditionGrade;
-  const lossValid = isAdjustLoss && lossQtyNum > 0 && lossQtyNum <= lot.qty_on_hand && !!reasonCode;
-  const canSubmit = (convertValid || lossValid) && !mutation.isPending;
+  const canSubmit = isConvert && filledIds.length > 0 && !!conditionGrade && !mutation.isPending;
   const label = action ? t(action.action_code, { ns: 'lotActions', defaultValue: action.action_code }) : '';
 
   return (
@@ -896,52 +840,6 @@ function LotActionModal({
                   </div>
                 </div>
               </>
-            )}
-
-            {isAdjustLoss && (
-              <div className="form-grid gap-4">
-                <div className="flex gap-3">
-                  <div className="shrink-0 flex flex-col">
-                    <label className="form-label">
-                      {t('adjustLoss.qty', { ns: 'lotActions', defaultValue: 'Qty to remove' })} *
-                    </label>
-                    <NumberSpinner
-                      value={lossQty}
-                      onChange={setLossQty}
-                      min={1}
-                      max={lot.qty_on_hand}
-                    />
-                    <div className="text-xs text-subtle mt-1 tabular-nums">
-                      {t('lot.remaining')}: {fmtNum(lot.qty_on_hand)}
-                    </div>
-                  </div>
-                  <div className="flex-1 min-w-0 flex flex-col">
-                    <label className="form-label">
-                      {t('adjustLoss.reason', { ns: 'lotActions', defaultValue: 'Reason' })} *
-                    </label>
-                    <Select
-                      options={reasonOptions}
-                      value={reasonCode || null}
-                      onChange={(v) => setReasonCode((v as string) || '')}
-                      placeholder={t('adjustLoss.selectReason', { ns: 'lotActions', defaultValue: 'Select reason' })}
-                      searchable
-                      showChevron
-                    />
-                  </div>
-                </div>
-                <div className="flex flex-col">
-                  <label className="form-label">{t('adjustLoss.note', { ns: 'lotActions', defaultValue: 'Note' })}</label>
-                  <TextArea
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                    rows={2}
-                    placeholder={t('adjustLoss.notePlaceholder', { ns: 'lotActions', defaultValue: 'Optional context for the adjustment' })}
-                  />
-                </div>
-                <div className="alert alert-warning">
-                  <span className="text-xs">{t('adjustLoss.note_no_journal', { ns: 'lotActions', defaultValue: 'This is a non-monetary stock correction. For losses that need to hit accounting, use Stock Loss (journal) instead.' })}</span>
-                </div>
-              </div>
             )}
           </div>
           <div className="modal-footer">

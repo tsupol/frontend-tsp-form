@@ -132,6 +132,14 @@ interface AssetActionsResponse {
 // Curated set of action codes that belong on the AssetsPage footer.
 // Excluded: contract-tied cmd_* actions (driven from contract closure modal),
 // transfer confirm/cancel (live in TransfersPage), admin-only ASSET_APPROVE.
+// Curated set of action codes that belong on the AssetsPage footer.
+// Excluded: contract-tied cmd_* actions (driven from contract closure modal),
+// transfer confirm/cancel (live in TransfersPage), admin-only ASSET_APPROVE.
+//
+// Cleanup 2026-05-09 — backend dropped 5 action_codes (DELIVERED note):
+//   ASSET_SELL_EXTERNAL → ASSET_SELL  (canonical, fn_inv_sell_asset)
+//   ASSET_WRITE_OFF / _REVERSE       → use ASSET_WRITE_OFF_JOURNAL
+//   ASSET_DISPOSE / _REVERSE         → use ASSET_DISPOSAL
 const FOOTER_ACTION_ALLOWLIST: ReadonlySet<string> = new Set([
   // BUCKET_MOVE — same-branch reversible moves
   'ASSET_QUARANTINE_ADMIT',
@@ -141,14 +149,10 @@ const FOOTER_ACTION_ALLOWLIST: ReadonlySet<string> = new Set([
   // REPAIR
   'ASSET_REPAIR_REQUEST',
   // LIFECYCLE
-  'ASSET_WRITE_OFF',
   'ASSET_WRITE_OFF_JOURNAL',
-  'ASSET_WRITE_OFF_REVERSE',
-  'ASSET_DISPOSE',
-  'ASSET_DISPOSE_REVERSE',
   // SALE
   'ASSET_SELL_AT_COST',
-  'ASSET_SELL_EXTERNAL',
+  'ASSET_SELL',
   'ASSET_DISPOSAL',
   // ADJUSTMENT
   'ASSET_REVALUE',
@@ -184,10 +188,14 @@ type SimpleActionConfig = {
   successKey: string;
 };
 
-const SALE_TYPE_OPTIONS = [
-  { value: 'RETAIL', label: 'Retail' },
-  { value: 'B2B', label: 'B2B (External)' },
-  { value: 'B2C', label: 'B2C (External)' },
+const SELL_REASON_OPTIONS = [
+  { value: 'OUTRIGHT_SALE', label: 'Outright sale' },
+  { value: 'BUYBACK_REVERSAL_SALE', label: 'Buyback reversal sale' },
+];
+
+const SELL_CHANNEL_OPTIONS = [
+  { value: 'CASH', label: 'Cash' },
+  { value: 'TRANSFER', label: 'Bank transfer' },
 ];
 
 const QUARANTINE_REASON_OPTIONS = [
@@ -226,25 +234,6 @@ const SIMPLE_ACTIONS: Record<string, SimpleActionConfig> = {
     rpc: 'fn_inv_repair_request',
     successKey: 'success.repair_request',
   },
-  ASSET_DISPOSE: {
-    rpc: 'fn_inv_dispose',
-    color: 'danger',
-    successKey: 'success.dispose',
-  },
-  ASSET_DISPOSE_REVERSE: {
-    rpc: 'fn_inv_dispose_reverse',
-    successKey: 'success.dispose_reverse',
-  },
-  ASSET_WRITE_OFF: {
-    rpc: 'fn_inv_write_off',
-    color: 'danger',
-    hasReason: { options: WRITE_OFF_REASON_OPTIONS, required: true },
-    successKey: 'success.write_off',
-  },
-  ASSET_WRITE_OFF_REVERSE: {
-    rpc: 'fn_inv_write_off_reverse',
-    successKey: 'success.write_off_reverse',
-  },
   ASSET_WRITE_OFF_JOURNAL: {
     rpc: 'fn_inv_write_off_journal',
     color: 'danger',
@@ -263,16 +252,15 @@ const SIMPLE_ACTIONS: Record<string, SimpleActionConfig> = {
     rpc: 'fn_inv_internal_use_release',
     successKey: 'success.internal_use_release',
   },
-  ASSET_SELL_EXTERNAL: {
-    rpc: 'fn_inv_sell_external',
+  ASSET_SELL: {
+    rpc: 'fn_inv_sell_asset',
     color: 'primary',
-    paramShape: 'asset_no_dedupe',
     extraFields: [
-      { kind: 'select', name: 'p_sale_type', labelKey: 'sellExternal.saleType', options: SALE_TYPE_OPTIONS, required: true, default: 'RETAIL' },
-      { kind: 'text', name: 'p_external_buyer_name', labelKey: 'sellExternal.buyerName' },
-      { kind: 'text', name: 'p_external_buyer_ref', labelKey: 'sellExternal.buyerRef' },
+      { kind: 'select', name: 'p_reason_code', labelKey: 'sell.reason', options: SELL_REASON_OPTIONS, required: true, default: 'OUTRIGHT_SALE' },
+      { kind: 'number', name: 'p_sale_price', labelKey: 'sell.salePrice', required: true, min: 0, step: 0.01 },
+      { kind: 'select', name: 'p_channel', labelKey: 'sell.channel', options: SELL_CHANNEL_OPTIONS, required: true, default: 'CASH' },
     ],
-    successKey: 'success.sell_external',
+    successKey: 'success.sell',
   },
   ASSET_SELL_AT_COST: {
     rpc: 'fn_inv_sell_at_cost',
@@ -316,15 +304,14 @@ const SIMPLE_ACTIONS: Record<string, SimpleActionConfig> = {
 
 // Up to 4 actions surfaced inline as primary buttons; rest go behind "More actions".
 const PRIMARY_BY_BUCKET: Record<string, string[]> = {
-  ON_HAND_AVAILABLE: ['ASSET_SELL_EXTERNAL', 'ASSET_QUARANTINE_ADMIT', 'ASSET_REPAIR_REQUEST', 'ASSET_INTERNAL_USE_ASSIGN'],
-  QUARANTINED: ['ASSET_QUARANTINE_RELEASE', 'ASSET_SELL_EXTERNAL', 'ASSET_REPAIR_REQUEST', 'ASSET_WRITE_OFF_JOURNAL'],
+  ON_HAND_AVAILABLE: ['ASSET_SELL', 'ASSET_QUARANTINE_ADMIT', 'ASSET_REPAIR_REQUEST', 'ASSET_INTERNAL_USE_ASSIGN'],
+  QUARANTINED: ['ASSET_QUARANTINE_RELEASE', 'ASSET_SELL', 'ASSET_REPAIR_REQUEST', 'ASSET_WRITE_OFF_JOURNAL'],
   IN_REPAIR: [],
   IN_USE_INTERNAL: ['ASSET_INTERNAL_USE_RELEASE'],
   WITH_CUSTOMER_ACTIVE: ['ASSET_REPAIR_REQUEST'],
   REPOSSESSED_PENDING_CLEARANCE: ['ASSET_QUARANTINE_ADMIT'],
-  DAMAGED_SCRAP_PENDING: ['ASSET_DISPOSAL', 'ASSET_DISPOSE'],
-  DISPOSED_SOLD_SCRAP: ['ASSET_DISPOSE_REVERSE'],
-  WRITTEN_OFF: ['ASSET_WRITE_OFF_REVERSE'],
+  DAMAGED_SCRAP_PENDING: ['ASSET_DISPOSAL'],
+  // DISPOSED_SOLD_SCRAP / WRITTEN_OFF — no reverse RPCs anymore (terminal).
 };
 
 const CATEGORY_ORDER = ['BUCKET_MOVE', 'REPAIR', 'SALE', 'LIFECYCLE', 'ADJUSTMENT', 'INBOUND'];
