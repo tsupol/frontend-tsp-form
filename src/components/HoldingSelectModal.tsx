@@ -50,7 +50,7 @@ export function HoldingSelectModal({ open }: HoldingSelectModalProps) {
         <h2 className="modal-title">{t('holding.selectTitle')}</h2>
       </div>
       <div className="modal-content">
-        <p className="text-sm text-fg/60 mb-4">{t('holding.selectDescription')}</p>
+        <p className="text-sm text-subtle mb-4">{t('holding.selectDescription')}</p>
 
         {error && (
           <div className="alert alert-danger mb-4">{error}</div>
@@ -67,7 +67,7 @@ export function HoldingSelectModal({ open }: HoldingSelectModalProps) {
                 className="w-full text-left p-4 rounded border border-border hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer"
               >
                 <div className="font-medium">{holding.name}</div>
-                <div className="text-sm text-fg/60">{holding.code}</div>
+                <div className="text-sm text-subtle">{holding.code}</div>
               </button>
             ))}
           </div>

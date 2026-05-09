@@ -446,13 +446,13 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
       {/* Loading overlay — preserves old content underneath */}
       {isLoading && modelId && (
         <div className="absolute inset-0 bg-bg/60 z-10 flex items-center justify-center rounded-lg">
-          <Loader2 size={20} className="animate-spin text-control-label" />
+          <Loader2 size={20} className="animate-spin text-subtle" />
         </div>
       )}
 
       {/* ── No model selected — placeholder ── */}
       {!modelId && (
-        <div className="flex flex-col items-center justify-center py-10 text-center text-sm text-control-label gap-3">
+        <div className="flex flex-col items-center justify-center py-10 text-center text-sm text-subtle gap-3">
           <div>
             <div className="font-medium">{t('pricing.selectToEdit')}</div>
           </div>
@@ -483,7 +483,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
 
             {/* Pricebook Rates */}
             <div>
-              <h3 className="text-xs font-semibold text-control-label uppercase tracking-wider mb-3">{t('pricing.pricebookSection')}</h3>
+              <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-3">{t('pricing.pricebookSection')}</h3>
               <div className="space-y-3">
                 <div className="flex flex-col">
                   <label className="form-label text-xs" htmlFor="ed-retail">{t('pricing.retailPrice')}</label>
@@ -511,7 +511,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                 </div>
                 {retailPrice && costPrice && (
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-control-label">{t('pricing.margin')}</span>
+                    <span className="text-subtle">{t('pricing.margin')}</span>
                     <span className="font-medium tabular-nums">
                       {(() => {
                         const r = parseFloat(retailPrice);
@@ -538,13 +538,13 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
             {isContractable && (
               <div className="flex border-b border-line">
                 <button
-                  className={`px-3 py-1.5 text-xs font-medium cursor-pointer transition-colors ${activeTab === 'fin1' ? 'border-b-2 border-primary text-primary' : 'text-control-label hover:text-fg'}`}
+                  className={`px-3 py-1.5 text-xs font-medium cursor-pointer transition-colors ${activeTab === 'fin1' ? 'border-b-2 border-primary text-primary' : 'text-subtle hover:text-fg'}`}
                   onClick={() => setActiveTab('fin1')}
                 >
                   FIN1
                 </button>
                 <button
-                  className={`px-3 py-1.5 text-xs font-medium cursor-pointer transition-colors ${activeTab === 'fin2' ? 'border-b-2 border-primary text-primary' : 'text-control-label hover:text-fg'}`}
+                  className={`px-3 py-1.5 text-xs font-medium cursor-pointer transition-colors ${activeTab === 'fin2' ? 'border-b-2 border-primary text-primary' : 'text-subtle hover:text-fg'}`}
                   onClick={() => setActiveTab('fin2')}
                 >
                   FIN2
@@ -597,7 +597,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="btn-icon-sm text-control-label hover:text-danger"
+                              className="btn-icon-sm text-subtle hover:text-danger"
                               disabled={busy || isRemovingTerm === term}
                               onClick={() => handleRemoveTerm(term)}
                             >
@@ -661,9 +661,9 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-line">
-                        <th className="py-1.5 text-left font-medium text-control-label">{t('pricing.termMonths', { months: '' }).replace(' ', '')}</th>
-                        <th className="py-1.5 text-right font-medium text-control-label">{t('pricing.downPercent')}</th>
-                        <th className="py-1.5 text-right font-medium text-control-label">{t('pricing.installment')}</th>
+                        <th className="py-1.5 text-left font-medium text-subtle">{t('pricing.termMonths', { months: '' }).replace(' ', '')}</th>
+                        <th className="py-1.5 text-right font-medium text-subtle">{t('pricing.downPercent')}</th>
+                        <th className="py-1.5 text-right font-medium text-subtle">{t('pricing.installment')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -677,7 +677,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                     </tbody>
                   </table>
                 ) : (
-                  <div className="text-xs text-control-label py-3">{t('pricing.noRateCard')}</div>
+                  <div className="text-xs text-subtle py-3">{t('pricing.noRateCard')}</div>
                 )}
               </div>
             )}
@@ -1021,7 +1021,7 @@ export function PricebookPage() {
                       disabled={!filterFamily}
                     />
                   </div>
-                  <label className="hidden xl:flex items-center gap-1.5 text-xs text-control-label cursor-pointer shrink-0">
+                  <label className="hidden xl:flex items-center gap-1.5 text-xs text-subtle cursor-pointer shrink-0">
                     <Switch
                       checked={filterNeedsSetup}
                       onChange={(e) => { setFilterNeedsSetup(e.target.checked); setPageIndex(0); }}
@@ -1077,7 +1077,7 @@ export function PricebookPage() {
                           clearable
                           disabled={!filterFamily}
                         />
-                        <label className="flex items-center gap-1.5 text-xs text-control-label cursor-pointer">
+                        <label className="flex items-center gap-1.5 text-xs text-subtle cursor-pointer">
                           <Switch
                             checked={filterNeedsSetup}
                             onChange={(e) => { setFilterNeedsSetup(e.target.checked); setPageIndex(0); }}
@@ -1139,24 +1139,24 @@ export function PricebookPage() {
                           </div>
 
                           <div className="shrink-0 w-16 xl:w-24 text-right hidden sm:block">
-                            <div className={`text-sm tabular-nums ${rp === null ? 'text-control-label' : ''}`}>
+                            <div className={`text-sm tabular-nums ${rp === null ? 'text-subtle' : ''}`}>
                               {formatTHB(rp)}
                             </div>
-                            <div className="text-[10px] text-control-label">{t('pricing.retailPrice')}</div>
+                            <div className="text-[10px] text-subtle">{t('pricing.retailPrice')}</div>
                           </div>
 
                           <div className="shrink-0 w-16 xl:w-24 text-right hidden sm:block">
-                            <div className={`text-sm tabular-nums ${cp === null ? 'text-control-label' : ''}`}>
+                            <div className={`text-sm tabular-nums ${cp === null ? 'text-subtle' : ''}`}>
                               {formatTHB(cp)}
                             </div>
-                            <div className="text-[10px] text-control-label">{t('pricing.costPrice')}</div>
+                            <div className="text-[10px] text-subtle">{t('pricing.costPrice')}</div>
                           </div>
 
                           <div className="shrink-0 w-14 xl:w-18 text-right hidden lg:block">
-                            <div className="text-sm tabular-nums text-control-label">
+                            <div className="text-sm tabular-nums text-subtle">
                               {calcMargin(rp, cp)}
                             </div>
-                            <div className="text-[10px] text-control-label">{t('pricing.margin')}</div>
+                            <div className="text-[10px] text-subtle">{t('pricing.margin')}</div>
                           </div>
 
                           {fin2Terms.length > 0 && (
@@ -1166,7 +1166,7 @@ export function PricebookPage() {
                                   const hasProfit = ft.profit !== null;
                                   return (
                                     <div key={ft.term_months} className="flex items-center gap-1">
-                                      <span className={`text-[11px] tabular-nums ${hasProfit ? '' : 'text-control-label'}`}>
+                                      <span className={`text-[11px] tabular-nums ${hasProfit ? '' : 'text-subtle'}`}>
                                         {hasProfit ? formatTHB(ft.profit) : '—'}
                                       </span>
                                       <span className={`text-[10px] tabular-nums px-1.5 py-0.5 rounded ${hasProfit ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>{ft.term_months}m</span>
@@ -1190,7 +1190,7 @@ export function PricebookPage() {
                     }}
                     className={`flex-1 min-h-0 panel-datatable ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
                     noResults={
-                      <div className="p-8 text-center text-control-label">
+                      <div className="p-8 text-center text-subtle">
                         {t('pricing.empty')}
                       </div>
                     }

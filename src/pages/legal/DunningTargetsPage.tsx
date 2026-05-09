@@ -288,7 +288,7 @@ export function DunningTargetsPage() {
                       endIcon={<Calendar size={14} />}
                     />
                   </div>
-                  <div className="hidden xl:flex items-center gap-1.5 text-control-label flex-1 min-w-0" style={{ maxWidth: '12rem' }}>
+                  <div className="hidden xl:flex items-center gap-1.5 text-subtle flex-1 min-w-0" style={{ maxWidth: '12rem' }}>
                     <ChevronsUpDown size={14} className="shrink-0" />
                     <div className="flex-1">
                       <Select

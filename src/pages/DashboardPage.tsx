@@ -273,7 +273,7 @@ export function DashboardPage() {
         <div className="mb-4 flex-none max-md:hidden flex items-end justify-between gap-3">
           <div>
             <h1 className="heading-2">{t('nav.dashboard')}</h1>
-            <div className="text-control-label text-sm">
+            <div className="text-subtle text-sm">
               <DateTime value={new Date().toISOString()} showTime={false} />
             </div>
           </div>
@@ -294,7 +294,7 @@ export function DashboardPage() {
 
         {/* ── Action band ──────────────────────────────────────────────── */}
         <section className="mb-6">
-          <h2 className="text-sm font-semibold text-control-label mb-3 uppercase tracking-wide">
+          <h2 className="text-sm font-semibold text-subtle mb-3 uppercase tracking-wide">
             {t('dashboard.actionRequired')}
           </h2>
 
@@ -375,7 +375,7 @@ export function DashboardPage() {
         {/* ── Pending tasks ─────────────────────────────────────────────── */}
         {!deviceBindQuery.isError && (deviceBindQuery.isLoading || deviceBindCount > 0) && (
           <section className="mb-6">
-            <h2 className="text-sm font-semibold text-control-label mb-3 uppercase tracking-wide">
+            <h2 className="text-sm font-semibold text-subtle mb-3 uppercase tracking-wide">
               {t('dashboard.pendingTasks')}
             </h2>
             <PendingDeviceBindCard
@@ -390,9 +390,9 @@ export function DashboardPage() {
 
         {/* ── Today KPIs ───────────────────────────────────────────────── */}
         <section className="mb-6">
-          <h2 className="text-sm font-semibold text-control-label mb-3 uppercase tracking-wide">
+          <h2 className="text-sm font-semibold text-subtle mb-3 uppercase tracking-wide">
             {t('dashboard.todayPulse')}
-            <span className="ml-2 normal-case font-normal text-control-label">
+            <span className="ml-2 normal-case font-normal text-subtle">
               · {scopeLabel(scope, t)}
             </span>
           </h2>
@@ -467,9 +467,9 @@ export function DashboardPage() {
           <section>
             <div className="border border-line bg-surface rounded-lg p-4">
               <h3 className="text-sm font-semibold mb-1">{t('dashboard.branchLeaderboard')}</h3>
-              <div className="text-xs text-control-label mb-3">{t('dashboard.branchLeaderboardHint')}</div>
+              <div className="text-xs text-subtle mb-3">{t('dashboard.branchLeaderboardHint')}</div>
               {(leaderboardQuery.data ?? []).length === 0 ? (
-                <div className="text-sm text-control-label py-6 text-center">
+                <div className="text-sm text-subtle py-6 text-center">
                   {t('common.noData')}
                 </div>
               ) : (
@@ -491,7 +491,7 @@ export function DashboardPage() {
                         <div className="h-1.5 bg-line rounded-sm overflow-hidden">
                           <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
                         </div>
-                        <div className="text-xs text-control-label mt-1">
+                        <div className="text-xs text-subtle mt-1">
                           {t('dashboard.kpi.cashTransferWallet', {
                             cash: fmtCurrency(b.received_cash),
                             transfer: fmtCurrency(b.received_transfer),
@@ -549,7 +549,7 @@ function CountCard({ icon, title, count, isLoading, isError, error, subtitle, to
         <span className={iconColor}>{icon}</span>
         <h3 className="text-sm font-semibold">{title}</h3>
       </div>
-      {to && !isError && <ChevronRight size={16} className="text-control-label" />}
+      {to && !isError && <ChevronRight size={16} className="text-subtle" />}
     </div>
   );
 
@@ -559,7 +559,7 @@ function CountCard({ icon, title, count, isLoading, isError, error, subtitle, to
   } else if (isLoading) {
     body = (
       <div className="flex items-baseline gap-2">
-        <span className="text-2xl font-semibold text-control-label">—</span>
+        <span className="text-2xl font-semibold text-subtle">—</span>
       </div>
     );
   } else {
@@ -568,11 +568,11 @@ function CountCard({ icon, title, count, isLoading, isError, error, subtitle, to
         <div className="flex items-baseline gap-2 mb-1">
           <span className="text-2xl font-semibold tabular-nums">{count}</span>
           {subtitle && count > 0 && (
-            <span className="text-xs text-control-label tabular-nums truncate">{subtitle}</span>
+            <span className="text-xs text-subtle tabular-nums truncate">{subtitle}</span>
           )}
         </div>
         {count === 0 && (
-          <div className="text-xs text-control-label flex items-center gap-1">
+          <div className="text-xs text-subtle flex items-center gap-1">
             <CheckCircle2 size={14} className="text-success" />
             {emptyText}
           </div>
@@ -631,12 +631,12 @@ function PendingDeviceBindCard({
           <Smartphone size={20} className={iconColor} />
           <h3 className="text-sm font-semibold">{t('dashboard.pendingDeviceBind')}</h3>
         </div>
-        <ChevronRight size={16} className="text-control-label" />
+        <ChevronRight size={16} className="text-subtle" />
       </div>
       <div className="flex items-baseline gap-2 mb-3">
         <span className="text-2xl font-semibold tabular-nums">{isLoading ? '—' : count}</span>
         {!isLoading && maxDays > 0 && (
-          <span className="text-xs text-control-label tabular-nums">
+          <span className="text-xs text-subtle tabular-nums">
             {t('dashboard.overdueDays', { count: maxDays })}
           </span>
         )}
@@ -648,13 +648,13 @@ function PendingDeviceBindCard({
               <span className="truncate min-w-0">
                 <span className="font-medium">{r.code_display}</span>
                 {r.customer_name && (
-                  <span className="text-control-label"> · {r.customer_name}</span>
+                  <span className="text-subtle"> · {r.customer_name}</span>
                 )}
                 {r.model_name && (
-                  <span className="text-control-label"> · {r.model_name}</span>
+                  <span className="text-subtle"> · {r.model_name}</span>
                 )}
               </span>
-              <span className="text-xs text-control-label tabular-nums whitespace-nowrap">
+              <span className="text-xs text-subtle tabular-nums whitespace-nowrap">
                 {t('dashboard.overdueDays', { count: r.days_pending })}
               </span>
             </li>
@@ -708,7 +708,7 @@ function BreakdownCard({ icon, title, rows, footer }: { icon: React.ReactNode; t
         <h3 className="text-sm font-semibold">{title}</h3>
       </div>
       {rows.length === 0 ? (
-        <div className="text-xs text-control-label">—</div>
+        <div className="text-xs text-subtle">—</div>
       ) : (
         <>
           <ul className="divide-y divide-line">
@@ -723,13 +723,13 @@ function BreakdownCard({ icon, title, rows, footer }: { icon: React.ReactNode; t
             const amountOnly = r.count === undefined && r.amount !== undefined;
             return (
               <li key={r.label} className={`py-1.5 flex items-center justify-between gap-3 text-sm ${rowCls}`}>
-                <span className="truncate text-control-label">{r.label}</span>
+                <span className="truncate text-subtle">{r.label}</span>
                 <span className="flex items-baseline gap-2 whitespace-nowrap">
                   {r.count !== undefined && (
                     <span className={`tabular-nums ${toneCls}`}>{r.count}</span>
                   )}
                   {r.amount !== undefined && (
-                    <span className={`tabular-nums ${amountOnly ? toneCls : 'text-xs text-control-label'}`}>
+                    <span className={`tabular-nums ${amountOnly ? toneCls : 'text-xs text-subtle'}`}>
                       {fmtCurrency(r.amount)}
                     </span>
                   )}
@@ -754,13 +754,13 @@ function DeltaLine({
 }) {
   if (!delta) {
     return (
-      <div className="text-xs text-control-label">{t('dashboard.delta.noBaseline')}</div>
+      <div className="text-xs text-subtle">{t('dashboard.delta.noBaseline')}</div>
     );
   }
   const sign = delta.pct >= 0 ? '+' : '';
   const tone = delta.pct >= 0 ? 'text-success' : 'text-danger';
   return (
-    <div className="text-xs text-control-label flex items-center justify-between gap-2">
+    <div className="text-xs text-subtle flex items-center justify-between gap-2">
       <span>{t('dashboard.delta.vsLastWeek')}</span>
       <span className="flex items-baseline gap-2 whitespace-nowrap">
         <span className={`tabular-nums font-medium ${tone}`}>{sign}{delta.pct.toFixed(1)}%</span>

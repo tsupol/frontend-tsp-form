@@ -253,7 +253,7 @@ export function DayClosePage() {
           {!isMobile && (
             <div key="header" className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
               <h1 className="heading-2 shrink-0">{t('nav.dayClose')}</h1>
-              <p className="text-sm text-fg/60 truncate">{t('accounting.dayClose.description')}</p>
+              <p className="text-sm text-subtle truncate">{t('accounting.dayClose.description')}</p>
             </div>
           )}
 
@@ -325,7 +325,7 @@ export function DayClosePage() {
                   <Sparkles size={16} className="text-primary shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-sm">{t('accounting.dayClose.todayLabel')}</div>
-                    <div className="text-xs text-fg/60">
+                    <div className="text-xs text-subtle">
                       {summary
                         ? t('accounting.dayClose.readyToClose', { count: summary.bill_count })
                         : t('accounting.dayClose.noActivityYet')}
@@ -356,7 +356,7 @@ export function DayClosePage() {
                         <DateTime value={u.bill_date} showTime={false} />
                         <Badge color="warning" size="sm">{t('accounting.dayClose.unclosedBadge')}</Badge>
                       </div>
-                      <div className="text-xs text-fg/60">
+                      <div className="text-xs text-subtle">
                         {t('accounting.dayClose.unclosedDesc', { count: u.bill_count, days: u.days_overdue })}
                       </div>
                     </div>
@@ -392,7 +392,7 @@ export function DayClosePage() {
                         <div className="font-medium text-sm">
                           <DateTime value={h.close_date} showTime={false} />
                         </div>
-                        <div className="text-xs text-fg/60 flex items-center gap-2">
+                        <div className="text-xs text-subtle flex items-center gap-2">
                           <span>{h.bill_count} {t('accounting.dayClose.bills')}</span>
                           {flags.length > 0 && (
                             <span className="inline-flex items-center gap-1 text-warning">
@@ -782,12 +782,12 @@ function CloseDayModal({
         <div className="mt-3 text-sm space-y-1">
           {closingDate !== today && (
             <div>
-              <span className="text-fg/60">{t('accounting.dayClose.closeForDate')}:</span>{' '}
+              <span className="text-subtle">{t('accounting.dayClose.closeForDate')}:</span>{' '}
               <span className="font-semibold"><DateTime value={closingDate} showTime={false} /></span>
             </div>
           )}
           <div>
-            <span className="text-fg/60">{t('accounting.dayClose.expected')}:</span>{' '}
+            <span className="text-subtle">{t('accounting.dayClose.expected')}:</span>{' '}
             <span className="font-semibold tabular-nums">{fmtCurrency(expected)}</span>
           </div>
         </div>
@@ -840,7 +840,7 @@ function Stat({ label, value, tone }: { label: string; value: React.ReactNode; t
   const toneClass = tone === 'danger' ? 'text-danger' : tone === 'warning' ? 'text-warning' : '';
   return (
     <div>
-      <dt className="text-xs text-fg/60">{label}</dt>
+      <dt className="text-xs text-subtle">{label}</dt>
       <dd className={`text-base font-semibold tabular-nums ${toneClass}`}>{value}</dd>
     </div>
   );

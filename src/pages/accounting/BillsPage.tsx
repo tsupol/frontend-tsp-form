@@ -164,7 +164,7 @@ export function BillsPage() {
               {pendingCount > 0 && (
                 <Badge color="danger" size="sm">{pendingCount} {t('accounting.bills.pendingLabel')}</Badge>
               )}
-              <p className="text-sm text-fg/60 truncate">{t('accounting.bills.description')}</p>
+              <p className="text-sm text-subtle truncate">{t('accounting.bills.description')}</p>
             </div>
           )}
 
@@ -242,7 +242,7 @@ export function BillsPage() {
                           <Badge color={typeColor} size="sm">{b.bill_type}</Badge>
                           <Badge color={statusColor} size="sm">{cancelled ? 'VOIDED' : b.status}</Badge>
                         </div>
-                        <div className="text-xs text-fg/60 flex items-center gap-1.5">
+                        <div className="text-xs text-subtle flex items-center gap-1.5">
                           <span>{b.bill_purpose.replace(/_/g, ' ')}</span>
                           {b.customer_name && <span>· {b.customer_name}</span>}
                           {b.contract_code && <span className="font-mono">· {b.contract_code}</span>}

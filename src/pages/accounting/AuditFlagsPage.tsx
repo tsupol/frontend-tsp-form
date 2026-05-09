@@ -116,7 +116,7 @@ export function AuditFlagsPage() {
           {!isMobile && (
             <div key="header" className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
               <h1 className="heading-2 shrink-0">{t('nav.auditFlags')}</h1>
-              <p className="text-sm text-fg/60 truncate">{t('accounting.auditFlags.description')}</p>
+              <p className="text-sm text-subtle truncate">{t('accounting.auditFlags.description')}</p>
             </div>
           )}
 
@@ -271,7 +271,7 @@ function AuditDetail({ row, onOpenDayClose }: { row: DayCloseAuditRow; onOpenDay
         <span className="font-semibold">
           <DateTime value={row.close_date} showTime={false} />
         </span>
-        <span className="text-fg/60">· {row.branch_name}</span>
+        <span className="text-subtle">· {row.branch_name}</span>
         <Badge color="success" size="sm">{t('accounting.dayClose.closedBadge')}</Badge>
         <div className="ml-auto">
           <Button size="sm" variant="outline" startIcon={<ExternalLink size={14} />} onClick={onOpenDayClose}>

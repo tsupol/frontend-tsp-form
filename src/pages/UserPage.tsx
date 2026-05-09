@@ -145,7 +145,7 @@ function ProfileCard() {
         <div className="text-center">
           <div className="font-semibold text-lg">{loading ? '-' : displayName}</div>
           {profile?.role_code && (
-            <div className="text-sm text-control-label">{profile.role_code}</div>
+            <div className="text-sm text-subtle">{profile.role_code}</div>
           )}
         </div>
       </div>
@@ -166,7 +166,7 @@ function ProfileCard() {
         <div className="space-y-3 mb-5">
           {personalFields.map(({ label, value }) => (
             <div key={label}>
-              <div className="text-sm text-control-label">{label}</div>
+              <div className="text-sm text-subtle">{label}</div>
               <div className="mt-0.5">{value}</div>
             </div>
           ))}
@@ -178,7 +178,7 @@ function ProfileCard() {
       <div className="space-y-3">
         {infoFields.map(({ label, value }) => (
           <div key={label}>
-            <div className="text-sm text-control-label">{label}</div>
+            <div className="text-sm text-subtle">{label}</div>
             <div className="mt-0.5 text-base">{value ?? '-'}</div>
           </div>
         ))}
@@ -449,7 +449,7 @@ function TokenDebugPanel() {
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-lg font-semibold">Token Debug</h2>
         <div className="flex items-center gap-2">
-          <span className="text-sm text-control-label">Auto Refresh</span>
+          <span className="text-sm text-subtle">Auto Refresh</span>
           <Switch checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)} />
         </div>
       </div>
@@ -463,28 +463,28 @@ function TokenDebugPanel() {
 
       <div className="space-y-4 font-mono text-sm">
         <div>
-          <div className="text-control-label">Access Token</div>
+          <div className="text-subtle">Access Token</div>
           <div className="mt-1 break-all bg-surface-shallow p-2 rounded">
             {truncate(tokenInfo.accessToken, 60)}
           </div>
         </div>
 
         <div>
-          <div className="text-control-label">Refresh Token</div>
+          <div className="text-subtle">Refresh Token</div>
           <div className="mt-1 break-all bg-surface-shallow p-2 rounded">
             {truncate(tokenInfo.refreshToken, 60)}
           </div>
         </div>
 
         <div>
-          <div className="text-control-label">Expires At (raw)</div>
+          <div className="text-subtle">Expires At (raw)</div>
           <div className="mt-1 text-xs bg-surface-shallow p-2 rounded">
             {tokenInfo.expiresAtRaw ?? '-'}
           </div>
         </div>
 
         <div>
-          <div className="text-control-label">Expires At (parsed)</div>
+          <div className="text-subtle">Expires At (parsed)</div>
           <div className="mt-1">
             {tokenInfo.expiresAt && !isNaN(tokenInfo.expiresAt.getTime())
               ? <DateTime value={tokenInfo.expiresAt.toISOString()} />
@@ -493,7 +493,7 @@ function TokenDebugPanel() {
         </div>
 
         <div>
-          <div className="text-control-label">Time Remaining</div>
+          <div className="text-subtle">Time Remaining</div>
           <div className={`mt-1 text-lg font-bold ${
             tokenInfo.isExpired ? 'text-danger' :
             isNearExpiry ? 'text-warning' :
@@ -505,7 +505,7 @@ function TokenDebugPanel() {
 
         {lastRefreshTime && (
           <div>
-            <div className="text-control-label">Last Refresh</div>
+            <div className="text-subtle">Last Refresh</div>
             <div className="mt-1 text-success">
               {lastRefreshTime.toLocaleTimeString()}
             </div>

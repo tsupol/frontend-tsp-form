@@ -357,12 +357,12 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
     <div className="flex flex-col relative">
       {isLoading && modelId && (
         <div className="absolute inset-0 bg-bg/60 z-10 flex items-center justify-center rounded-lg">
-          <Loader2 size={20} className="animate-spin text-control-label" />
+          <Loader2 size={20} className="animate-spin text-subtle" />
         </div>
       )}
 
       {!modelId && (
-        <div className="flex flex-col items-center justify-center py-10 text-center text-sm text-control-label gap-3">
+        <div className="flex flex-col items-center justify-center py-10 text-center text-sm text-subtle gap-3">
           <div>
             <div className="font-medium">{t('fin2.selectToEdit')}</div>
           </div>
@@ -389,14 +389,14 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
               </div>
             )}
 
-            <h3 className="text-xs font-semibold text-control-label uppercase tracking-wider mb-3">{t('pricing.fin2Profit')}</h3>
+            <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-3">{t('pricing.fin2Profit')}</h3>
 
             {/* Existing terms */}
             <div className="space-y-3">
               {fin2Rows.length === 0 && !isLoading && (
                 <div className="rounded-lg border border-dashed border-line px-4 py-6 text-center">
                   <div className="text-sm font-medium">{t('fin2.empty')}</div>
-                  <div className="text-xs text-control-label mt-1">
+                  <div className="text-xs text-subtle mt-1">
                     {canManageTerms ? t('fin2.emptyAdminHint') : t('fin2.emptyStaffHint')}
                   </div>
                 </div>
@@ -432,7 +432,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="btn-icon-sm text-control-label hover:text-danger"
+                          className="btn-icon-sm text-subtle hover:text-danger"
                           disabled={busy || isRemovingTerm === term}
                           onClick={() => handleRemoveTerm(term)}
                         >
@@ -467,7 +467,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                       }}
                     />
                     {!fin2EffectiveDates[term] && (
-                      <div className="text-[10px] text-control-label">{t('fin2.effectiveFrom')}: {t('fin2.now')}</div>
+                      <div className="text-[10px] text-subtle">{t('fin2.effectiveFrom')}: {t('fin2.now')}</div>
                     )}
                   </div>
                 );
@@ -535,7 +535,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                     }}
                   />
                   {!newTermEffective && (
-                    <div className="text-[10px] text-control-label mt-0.5">{t('fin2.now')}</div>
+                    <div className="text-[10px] text-subtle mt-0.5">{t('fin2.now')}</div>
                   )}
                 </div>
                 <Button
@@ -948,7 +948,7 @@ export function Fin2RatesPage() {
                       showChevron
                     />
                   </div>
-                  <div className="hidden xl:flex items-center gap-1.5 text-control-label flex-1 min-w-0" style={{ maxWidth: '12rem' }}>
+                  <div className="hidden xl:flex items-center gap-1.5 text-subtle flex-1 min-w-0" style={{ maxWidth: '12rem' }}>
                     <ChevronsUpDown size={14} className="shrink-0" />
                     <div className="flex-1">
                       <Select
@@ -1076,7 +1076,7 @@ export function Fin2RatesPage() {
                                     const hasActive = term.activeRate !== null;
                                     return (
                                       <div key={term.term_months} className="flex items-center gap-1">
-                                        <span className={`text-[11px] tabular-nums ${hasActive ? '' : 'text-control-label'}`}>
+                                        <span className={`text-[11px] tabular-nums ${hasActive ? '' : 'text-subtle'}`}>
                                           {hasActive ? formatTHB(term.activeRate!.value) : '—'}
                                         </span>
                                         <span className={`text-[10px] tabular-nums px-1.5 py-0.5 rounded ${hasActive ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>
@@ -1088,7 +1088,7 @@ export function Fin2RatesPage() {
                                 </div>
                               </div>
                             ) : (
-                              <span className="shrink-0 text-xs text-control-label hidden sm:block">{t('fin2.noActiveRates')}</span>
+                              <span className="shrink-0 text-xs text-subtle hidden sm:block">{t('fin2.noActiveRates')}</span>
                             )}
                           </div>
 
@@ -1106,7 +1106,7 @@ export function Fin2RatesPage() {
                     }}
                     className={`flex-1 min-h-0 panel-datatable ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
                     noResults={
-                      <div className="p-8 text-center text-control-label">
+                      <div className="p-8 text-center text-subtle">
                         {t('fin2.empty')}
                       </div>
                     }

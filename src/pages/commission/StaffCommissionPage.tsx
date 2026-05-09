@@ -336,14 +336,14 @@ export function StaffCommissionPage() {
               onPageChange={({ pageIndex: pi, pageSize: ps }) => { setPageIndex(pi); setPageSize(ps); }}
               tableClassName="[&_tbody_tr]:cursor-pointer"
               className={`flex-1 min-h-0 hidden md:flex ${balanceFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
-              noResults={<div className="p-8 text-center text-control-label">{t('commission.noData')}</div>}
+              noResults={<div className="p-8 text-center text-subtle">{t('commission.noData')}</div>}
             />
 
             {/* Mobile cards */}
             <div className={`flex-1 min-h-0 flex flex-col md:hidden ${balanceFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
               <div className="flex-1 overflow-auto better-scroll pb-8">
                 {balanceList.length === 0 ? (
-                  <div className="p-8 text-center text-control-label">{t('commission.noData')}</div>
+                  <div className="p-8 text-center text-subtle">{t('commission.noData')}</div>
                 ) : (
                   <div className="flex flex-col divide-y divide-line">
                     {balanceList.map(row => (
@@ -356,7 +356,7 @@ export function StaffCommissionPage() {
                           <span className="font-medium text-sm">{row.username}</span>
                           <span className={`tabular-nums font-semibold ${row.balance < 0 ? 'text-danger' : ''}`}>{fmt(row.balance)}</span>
                         </div>
-                        <div className="flex gap-4 mt-1 text-xs text-control-label tabular-nums">
+                        <div className="flex gap-4 mt-1 text-xs text-subtle tabular-nums">
                           <span className="text-success">+{fmt(row.total_granted)}</span>
                           <span>−{fmt(row.total_withdrawn)}</span>
                         </div>
@@ -395,21 +395,21 @@ export function StaffCommissionPage() {
               rowCount={monthlyTotal}
               onPageChange={({ pageIndex: pi, pageSize: ps }) => { setMonthlyPageIndex(pi); setMonthlyPageSize(ps); }}
               className={`flex-1 min-h-0 hidden md:flex ${monthlyFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
-              noResults={<div className="p-8 text-center text-control-label">{t('commission.noData')}</div>}
+              noResults={<div className="p-8 text-center text-subtle">{t('commission.noData')}</div>}
             />
 
             {/* Mobile cards */}
             <div className={`flex-1 min-h-0 flex flex-col md:hidden ${monthlyFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
               <div className="flex-1 overflow-auto better-scroll pb-8">
                 {monthlyList.length === 0 ? (
-                  <div className="p-8 text-center text-control-label">{t('commission.noData')}</div>
+                  <div className="p-8 text-center text-subtle">{t('commission.noData')}</div>
                 ) : (
                   <div className="flex flex-col divide-y divide-line">
                     {monthlyList.map((row, i) => (
                       <div key={i} className="px-1 py-3">
                         <div className="flex items-center justify-between">
                           <span className="font-medium text-sm">{row.user_name}</span>
-                          <span className="tabular-nums text-xs text-control-label">{row.month?.slice(0, 7)}</span>
+                          <span className="tabular-nums text-xs text-subtle">{row.month?.slice(0, 7)}</span>
                         </div>
                         <div className="flex gap-4 mt-1 text-xs tabular-nums">
                           <span className="text-success">+{fmt(row.granted)}</span>
@@ -515,7 +515,7 @@ function UserLedgerDrawer({ user: u, open, onClose, ledgerData, ledgerTotal, led
             {/* Ledger entries */}
             <div className={`space-y-0 divide-y divide-line ${ledgerFetching ? 'opacity-60' : ''}`}>
               {ledgerData.length === 0 ? (
-                <div className="py-8 text-center text-control-label text-sm">{t('commission.noData')}</div>
+                <div className="py-8 text-center text-subtle text-sm">{t('commission.noData')}</div>
               ) : (
                 ledgerData.map(entry => (
                   <div key={entry.id} className="py-2.5">
@@ -523,18 +523,18 @@ function UserLedgerDrawer({ user: u, open, onClose, ledgerData, ledgerTotal, led
                       <Badge size="sm" color={getTxnColor(entry.txn_type)}>
                         {t(`commission.txn${entry.txn_type === 'GRANT' ? 'Grant' : entry.txn_type === 'WITHDRAW' ? 'Withdraw' : 'Adjust'}`)}
                       </Badge>
-                      <DateTime value={entry.created_at} className="text-xs text-control-label" />
+                      <DateTime value={entry.created_at} className="text-xs text-subtle" />
                     </div>
                     <div className="flex items-center justify-between mt-1">
-                      <span className="text-sm text-control-label truncate">{entry.contract_code_display ?? '—'}</span>
+                      <span className="text-sm text-subtle truncate">{entry.contract_code_display ?? '—'}</span>
                       <div className="text-right tabular-nums">
                         <span className={`font-medium ${entry.amount > 0 ? 'text-success' : entry.amount < 0 ? 'text-danger' : ''}`}>
                           {entry.amount > 0 ? '+' : ''}{fmt(entry.amount)}
                         </span>
-                        <span className="text-xs text-control-label ml-2">→ {fmt(entry.running_balance)}</span>
+                        <span className="text-xs text-subtle ml-2">→ {fmt(entry.running_balance)}</span>
                       </div>
                     </div>
-                    {entry.note && <div className="text-xs text-control-label mt-0.5 truncate">{entry.note}</div>}
+                    {entry.note && <div className="text-xs text-subtle mt-0.5 truncate">{entry.note}</div>}
                     {entry.created_by_name && <div className="text-[11px] text-subtle mt-0.5">{entry.created_by_name}</div>}
                   </div>
                 ))
@@ -562,7 +562,7 @@ function UserLedgerDrawer({ user: u, open, onClose, ledgerData, ledgerTotal, led
 function DetailRow({ label, value, bold, color }: { label: string; value: string; bold?: boolean; color?: string }) {
   return (
     <div className="flex justify-between">
-      <span className="text-control-label text-xs">{label}</span>
+      <span className="text-subtle text-xs">{label}</span>
       <span className={`tabular-nums text-xs ${bold ? 'font-semibold' : ''} ${color ?? ''}`}>{value}</span>
     </div>
   );

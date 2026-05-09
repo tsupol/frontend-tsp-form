@@ -42,16 +42,16 @@ export function BranchBalancePage() {
         <div className="flex items-center justify-between mb-4 max-md:hidden">
           <div>
             <h1 className="heading-2">{t('nav.branchBalance')}</h1>
-            <p className="text-sm text-fg/60 mt-1">{t('accounting.balance.description')}</p>
+            <p className="text-sm text-subtle mt-1">{t('accounting.balance.description')}</p>
           </div>
         </div>
 
         {isLoading && (
-          <div className="text-control-label p-8 text-center">{t('common.loading')}</div>
+          <div className="text-subtle p-8 text-center">{t('common.loading')}</div>
         )}
 
         {!isLoading && rows.length === 0 && (
-          <div className="text-control-label p-8 text-center">{t('accounting.empty')}</div>
+          <div className="text-subtle p-8 text-center">{t('accounting.empty')}</div>
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -61,7 +61,7 @@ export function BranchBalancePage() {
               <div key={r.branch_id} className="border border-line rounded-lg p-4">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-base font-semibold">{branchName}</h3>
-                  <div className="text-xs text-fg/60">
+                  <div className="text-xs text-subtle">
                     {r.active_contracts} {t('accounting.balance.active')}
                     {r.paused_contracts > 0 ? ` · ${r.paused_contracts} ${t('accounting.balance.paused')}` : ''}
                   </div>
@@ -88,7 +88,7 @@ export function BranchBalancePage() {
 function Item({ label, value, tone }: { label: string; value: string; tone?: 'danger' }) {
   return (
     <div>
-      <dt className="text-xs text-fg/60">{label}</dt>
+      <dt className="text-xs text-subtle">{label}</dt>
       <dd className={`font-semibold tabular-nums ${tone === 'danger' ? 'text-danger' : ''}`}>{value}</dd>
     </div>
   );

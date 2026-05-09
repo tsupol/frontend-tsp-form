@@ -109,7 +109,7 @@ export function CashFlowPage() {
         <div className="flex items-center justify-between mb-4 flex-none max-md:hidden">
           <div>
             <h1 className="heading-2">{t('nav.cashFlow')}</h1>
-            <p className="text-sm text-fg/60 mt-1">{t('accounting.cashflow.description')}</p>
+            <p className="text-sm text-subtle mt-1">{t('accounting.cashflow.description')}</p>
           </div>
           <Button startIcon={<Download size={16} />} onClick={handleExport}>
             {t('accounting.exportCsv')}
@@ -159,7 +159,7 @@ export function CashFlowPage() {
 
         {rows.length > 0 && (
           <div className="flex-none border border-line rounded-lg p-3 mb-4">
-            <div className="text-xs text-fg/60">{t('accounting.cashflow.grandTotal')}</div>
+            <div className="text-xs text-subtle">{t('accounting.cashflow.grandTotal')}</div>
             <div className="text-lg font-semibold tabular-nums">{fmtCurrency(grand)}</div>
           </div>
         )}
@@ -171,7 +171,7 @@ export function CashFlowPage() {
           onSortingChange={setSorting}
           className="flex-1 min-h-0 hidden md:flex"
           noResults={
-            <div className="p-8 text-center text-control-label">
+            <div className="p-8 text-center text-subtle">
               {isLoading ? t('common.loading') : t('accounting.cashflow.empty')}
             </div>
           }
@@ -180,7 +180,7 @@ export function CashFlowPage() {
         <div className="flex-1 min-h-0 flex flex-col md:hidden">
           <div className="flex-1 overflow-auto better-scroll pb-8">
             {rows.length === 0 ? (
-              <div className="p-8 text-center text-control-label">
+              <div className="p-8 text-center text-subtle">
                 {isLoading ? t('common.loading') : t('accounting.cashflow.empty')}
               </div>
             ) : (
@@ -192,7 +192,7 @@ export function CashFlowPage() {
                       <span className="tabular-nums font-semibold">{fmtCurrency(r.total_in)}</span>
                     </div>
                     {r.account_number && (
-                      <div className="text-xs text-fg/60 tabular-nums mt-0.5">{r.account_number}</div>
+                      <div className="text-xs text-subtle tabular-nums mt-0.5">{r.account_number}</div>
                     )}
                   </div>
                 ))}

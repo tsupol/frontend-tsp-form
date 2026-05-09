@@ -16,7 +16,7 @@ export function ContractsLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-dvh overflow-hidden">
       <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-48 border-r border-line p-4 pt-8">
-        <span className="text-xs font-semibold text-control-label uppercase tracking-wider mb-2 px-2">
+        <span className="text-xs font-semibold text-subtle uppercase tracking-wider mb-2 px-2">
           {t('nav.contracts')}
         </span>
         {navItems.map(({ path, labelKey, icon: Icon }) => (

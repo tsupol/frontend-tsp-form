@@ -140,15 +140,15 @@ export function Step1DeviceInfo() {
         </div>
 
         {hasSim && formattedImei && !errors.imei && (
-          <div className="text-sm text-control-label mt-2">
+          <div className="text-sm text-subtle mt-2">
             {t('device.formatted')}: <span className="font-mono">{formattedImei}</span>
           </div>
         )}
 
-        <div className="text-xs text-control-label mt-3">
+        <div className="text-xs text-subtle mt-3">
           {t('device.imeiHint')}
         </div>
-        <div className="text-xs text-control-label mt-1">
+        <div className="text-xs text-subtle mt-1">
           {t('register.imeiSearchHint')}
         </div>
       </div>
@@ -171,10 +171,10 @@ export function Step1DeviceInfo() {
           <FormErrorMessage error={errors.serial} />
         </div>
 
-        <div className="text-xs text-control-label mt-3">
+        <div className="text-xs text-subtle mt-3">
           {t('device.serialHint')}
         </div>
-        <div className="text-xs text-control-label mt-1">
+        <div className="text-xs text-subtle mt-1">
           {t('common.example')}: <span className="font-mono">C39XJZZ1GRY3</span>
         </div>
       </div>

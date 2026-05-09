@@ -66,9 +66,9 @@ export function EnrollmentPage() {
         {/* Initial state - no enrollment yet */}
         {!enrollment && !loading && !error && (
           <div className="border border-line bg-surface p-6 rounded-lg text-center">
-            <QrCode size={64} className="text-control-label mx-auto mb-4" />
+            <QrCode size={64} className="text-subtle mx-auto mb-4" />
             <h2 className="font-semibold mb-2">{t('enrollment.title')}</h2>
-            <p className="text-sm text-control-label mb-6">
+            <p className="text-sm text-subtle mb-6">
               {t('enrollment.description')}
             </p>
             <Button variant="outline" startIcon={<QrCode size={16} />} onClick={fetchEnrollment}>
@@ -113,19 +113,19 @@ export function EnrollmentPage() {
               />
             </div>
 
-            <p className="text-sm text-control-label mb-4">
+            <p className="text-sm text-subtle mb-4">
               {t('enrollment.scanDescription')}
             </p>
 
             {/* Timer */}
             <div className="flex items-center justify-center gap-2 text-sm mb-4">
-              <Clock size={16} className="text-control-label" />
-              <span className="text-control-label">{t('enrollment.expiresIn')}:</span>
+              <Clock size={16} className="text-subtle" />
+              <span className="text-subtle">{t('enrollment.expiresIn')}:</span>
               <span className="font-mono font-semibold">{timeRemaining}</span>
             </div>
 
             {/* Direct link for testing */}
-            <div className="text-xs text-control-label mb-4">
+            <div className="text-xs text-subtle mb-4">
               <a
                 href={`${ENROLL_BASE_URL}?id=${enrollment.enrollment_id}`}
                 target="_blank"

@@ -134,7 +134,7 @@ export function ApprovalsPage() {
       cell: ({ row }) => (
         <div>
           <div className="text-sm font-medium truncate">{row.original.display_label}</div>
-          <div className="text-xs text-control-label truncate">{row.original.customer_name}</div>
+          <div className="text-xs text-subtle truncate">{row.original.customer_name}</div>
         </div>
       ),
     },
@@ -144,7 +144,7 @@ export function ApprovalsPage() {
       cell: ({ row }) => (
         <div>
           <div className="text-sm truncate">{row.original.branch_name ?? '—'}</div>
-          <div className="text-xs text-control-label truncate">{row.original.requested_by_name ?? ''}</div>
+          <div className="text-xs text-subtle truncate">{row.original.requested_by_name ?? ''}</div>
         </div>
       ),
       className: 'max-lg:hidden',
@@ -162,7 +162,7 @@ export function ApprovalsPage() {
         <div className="text-right">
           <div className="tabular-nums font-medium">{formatNumber(row.original.amount)}</div>
           {row.original.discount_percent != null && (
-            <div className="text-xs text-control-label tabular-nums">{row.original.discount_percent}%</div>
+            <div className="text-xs text-subtle tabular-nums">{row.original.discount_percent}%</div>
           )}
         </div>
       ),
@@ -181,7 +181,7 @@ export function ApprovalsPage() {
     {
       accessorKey: 'requested_at',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('approvals.requestedAt')} />,
-      cell: ({ row }) => <DateTime value={row.original.requested_at} showTime={false} className="text-xs text-control-label" />,
+      cell: ({ row }) => <DateTime value={row.original.requested_at} showTime={false} className="text-xs text-subtle" />,
       className: 'w-24 max-md:hidden',
     },
   ], [t]);
@@ -280,14 +280,14 @@ export function ApprovalsPage() {
           onPageChange={({ pageIndex: pi, pageSize: ps }) => { setPageIndex(pi); setPageSize(ps); }}
           tableClassName="[&_tbody_tr]:cursor-pointer"
           className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
-          noResults={<div className="p-8 text-center text-control-label">{t('approvals.empty')}</div>}
+          noResults={<div className="p-8 text-center text-subtle">{t('approvals.empty')}</div>}
         />
 
         {/* Mobile cards */}
         <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
           <div className="flex-1 overflow-auto better-scroll pb-8">
             {rows.length === 0 ? (
-              <div className="p-8 text-center text-control-label">{t('approvals.empty')}</div>
+              <div className="p-8 text-center text-subtle">{t('approvals.empty')}</div>
             ) : (
               <div className="flex flex-col divide-y divide-line">
                 {rows.map(row => (
@@ -301,10 +301,10 @@ export function ApprovalsPage() {
                         <Badge size="sm" color={typeColor(row.type)}>{t(`approvals.type_${row.type}`)}</Badge>
                         <Badge size="sm" color={statusColor(row.status)}>{t(`approvals.status_${row.status}`)}</Badge>
                       </div>
-                      <DateTime value={row.requested_at} showTime={false} className="text-[11px] text-control-label" />
+                      <DateTime value={row.requested_at} showTime={false} className="text-[11px] text-subtle" />
                     </div>
                     <div className="text-sm font-medium mt-1 truncate">{row.display_label}</div>
-                    <div className="text-xs text-control-label truncate">
+                    <div className="text-xs text-subtle truncate">
                       {row.customer_name ?? '—'} · {row.branch_name ?? '—'}
                     </div>
                     <div className="flex items-center justify-between mt-1 text-sm tabular-nums">
@@ -539,7 +539,7 @@ function DetailRow({ label, value, mono, children }: {
 }) {
   return (
     <div className="flex items-start justify-between gap-4">
-      <span className="text-control-label shrink-0">{label}</span>
+      <span className="text-subtle shrink-0">{label}</span>
       {children ?? <span className={`text-right ${mono ? 'tabular-nums' : ''}`}>{value}</span>}
     </div>
   );

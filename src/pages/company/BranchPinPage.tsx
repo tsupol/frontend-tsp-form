@@ -314,7 +314,7 @@ function ChangeLogTab({ branches, onSetPin }: { branches: Branch[]; onSetPin: (b
         }}
         className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
         noResults={
-          <div className="p-8 text-center text-control-label">
+          <div className="p-8 text-center text-subtle">
             {isLoading ? t('common.loading') : t('settings.pin.noChangeLogs')}
           </div>
         }
@@ -324,7 +324,7 @@ function ChangeLogTab({ branches, onSetPin }: { branches: Branch[]; onSetPin: (b
       <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
         <div className="flex-1 overflow-auto better-scroll pb-8">
           {rows.length === 0 ? (
-            <div className="p-8 text-center text-control-label">
+            <div className="p-8 text-center text-subtle">
               {isLoading ? t('common.loading') : t('settings.pin.noChangeLogs')}
             </div>
           ) : (
@@ -340,7 +340,7 @@ function ChangeLogTab({ branches, onSetPin }: { branches: Branch[]; onSetPin: (b
                           : row.action}
                       </Badge>
                     </div>
-                    <div className="text-xs text-fg/60 mt-0.5">{row.set_by_name}</div>
+                    <div className="text-xs text-subtle mt-0.5">{row.set_by_name}</div>
                     <div className="text-xs text-fg/40 mt-0.5 tabular-nums">{formatBangkokTime(row.set_at)}</div>
                   </div>
                   <Button
@@ -574,7 +574,7 @@ function UsageLogTab({ branches, permissionOptions }: { branches: Branch[]; perm
         }}
         className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
         noResults={
-          <div className="p-8 text-center text-control-label">
+          <div className="p-8 text-center text-subtle">
             {isLoading ? t('common.loading') : t('settings.pin.noLogs')}
           </div>
         }
@@ -584,7 +584,7 @@ function UsageLogTab({ branches, permissionOptions }: { branches: Branch[]; perm
       <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
         <div className="flex-1 overflow-auto better-scroll pb-8">
           {logs.length === 0 ? (
-            <div className="p-8 text-center text-control-label">
+            <div className="p-8 text-center text-subtle">
               {isLoading ? t('common.loading') : t('settings.pin.noLogs')}
             </div>
           ) : (
@@ -598,7 +598,7 @@ function UsageLogTab({ branches, permissionOptions }: { branches: Branch[]; perm
                         {log.success ? t('settings.pin.success') : t('settings.pin.failed')}
                       </Badge>
                     </div>
-                    <div className="text-xs text-fg/60 mt-0.5">{log.branch_name} · {log.permission_code}</div>
+                    <div className="text-xs text-subtle mt-0.5">{log.branch_name} · {log.permission_code}</div>
                     <div className="text-xs text-fg/40 mt-0.5 tabular-nums">{formatBangkokTime(log.used_at)}</div>
                   </div>
                 </div>
@@ -697,7 +697,7 @@ export function BranchPinPage() {
         <div className="flex items-center justify-between mb-4 flex-none max-md:hidden">
           <div>
             <h1 className="heading-2">{t('settings.pin.title')}</h1>
-            <p className="text-sm text-fg/60 mt-1">{t('settings.pin.description')}</p>
+            <p className="text-sm text-subtle mt-1">{t('settings.pin.description')}</p>
           </div>
           <Button color="primary" startIcon={<KeyRound size={16} />} onClick={() => openSetPin()}>
             {t('settings.pin.setPin')}
@@ -708,14 +708,14 @@ export function BranchPinPage() {
         <div className="flex items-center gap-1 border-b border-line mb-4 flex-none">
           <button
             type="button"
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px cursor-pointer ${tab === 'change' ? 'border-primary text-primary' : 'border-transparent text-control-label hover:text-fg'}`}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px cursor-pointer ${tab === 'change' ? 'border-primary text-primary' : 'border-transparent text-subtle hover:text-fg'}`}
             onClick={() => setTab('change')}
           >
             {t('settings.pin.tabChange')}
           </button>
           <button
             type="button"
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px cursor-pointer ${tab === 'usage' ? 'border-primary text-primary' : 'border-transparent text-control-label hover:text-fg'}`}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px cursor-pointer ${tab === 'usage' ? 'border-primary text-primary' : 'border-transparent text-subtle hover:text-fg'}`}
             onClick={() => setTab('usage')}
           >
             {t('settings.pin.tabUsage')}

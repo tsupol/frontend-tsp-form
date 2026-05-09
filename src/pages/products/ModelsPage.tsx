@@ -451,7 +451,7 @@ function CreateModelModal({ open, onClose, holdingId, families }: {
                       {preview.variants.map((v) => (
                         <div key={v.generated_sku_code} className="text-xs flex items-baseline gap-2">
                           <span className="font-mono shrink-0">{v.generated_sku_code}</span>
-                          <span className="text-control-label truncate">{v.generated_variant_name}</span>
+                          <span className="text-subtle truncate">{v.generated_variant_name}</span>
                         </div>
                       ))}
                     </div>
@@ -493,12 +493,12 @@ function CreateModelModal({ open, onClose, holdingId, families }: {
 
             {/* Hint when no family selected */}
             {!selectedFamilyId && (
-              <div className="text-xs text-control-label">{t('models.selectFamilyFirst')}</div>
+              <div className="text-xs text-subtle">{t('models.selectFamilyFirst')}</div>
             )}
 
             {/* Loading config */}
             {selectedFamilyId && configLoading && (
-              <div className="text-xs text-control-label">{t('common.loading')}</div>
+              <div className="text-xs text-subtle">{t('common.loading')}</div>
             )}
 
             {/* Model name */}
@@ -520,7 +520,7 @@ function CreateModelModal({ open, onClose, holdingId, families }: {
 
                 {/* Axes hint or selects */}
                 {axes.length === 0 && (
-                  <div className="text-xs text-control-label">{t('models.noAxesHint')}</div>
+                  <div className="text-xs text-subtle">{t('models.noAxesHint')}</div>
                 )}
 
                 {axes.map((axis) => {
@@ -600,14 +600,14 @@ function CreateModelModal({ open, onClose, holdingId, families }: {
                             }`}
                           >
                             <div className="flex items-center justify-between gap-2">
-                              <div className="text-[11px] text-control-label">
+                              <div className="text-[11px] text-subtle">
                                 {isDup ? t('models.duplicateVariant') : ''}
                               </div>
                               <Button
                                 type="button"
                                 variant="ghost"
                                 size="sm"
-                                className="btn-icon-sm text-control-label hover:text-danger"
+                                className="btn-icon-sm text-subtle hover:text-danger"
                                 onClick={() => removeVariant(v.client_id)}
                                 startIcon={<XCircle size={14} />}
                               />
@@ -708,7 +708,7 @@ function VariantSubRow({ variants }: { variants: ModelVariant[] }) {
 
   if (variants.length === 0) {
     return (
-      <div className="px-4 pb-6 text-center text-control-label text-xs">
+      <div className="px-4 pb-6 text-center text-subtle text-xs">
         {t('models.noVariantsFound')}
       </div>
     );
@@ -742,7 +742,7 @@ function VariantSubRow({ variants }: { variants: ModelVariant[] }) {
                 {attrEntries.map(([key, val]) => (
                   <span
                     key={key}
-                    className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-fg/5 text-control-label"
+                    className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-fg/5 text-subtle"
                   >
                     <span className="opacity-70">{key}:</span>
                     <span className="font-medium text-fg">{String(val)}</span>
@@ -1102,7 +1102,7 @@ export function ModelsPage() {
                                 <> <span className="font-semibold">{model.model_name_suffix}</span></>
                               )}
                             </div>
-                            <div className="flex items-center gap-2 text-[11px] text-control-label">
+                            <div className="flex items-center gap-2 text-[11px] text-subtle">
                               <span className="truncate">{model.brand_name}</span>
                               <span className="flex-1" />
                               {model.variant_count > 0 && (
@@ -1128,7 +1128,7 @@ export function ModelsPage() {
                     }}
                     className={`flex-1 min-h-0 panel-datatable ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
                     noResults={
-                      <div className="p-8 text-center text-control-label">
+                      <div className="p-8 text-center text-subtle">
                         {t('models.noModels')}
                       </div>
                     }
@@ -1142,7 +1142,7 @@ export function ModelsPage() {
                       {/* Detail header */}
                       <div className="flex-none px-4 py-3 border-b border-line">
                         <div className="flex items-baseline gap-1.5 flex-wrap">
-                          <span className="text-xs text-control-label truncate">{selectedModel.family_name}</span>
+                          <span className="text-xs text-subtle truncate">{selectedModel.family_name}</span>
                           <span className="text-sm font-medium text-info truncate">{selectedModel.base_model_name}</span>
                           {selectedModel.model_name_suffix && (
                             <span className="text-sm font-semibold truncate">{selectedModel.model_name_suffix}</span>
@@ -1159,7 +1159,7 @@ export function ModelsPage() {
                       {/* Variants section */}
                       <div className="flex-1 min-h-0">
                         <div className="px-4 py-3">
-                          <h3 className="text-xs font-semibold text-control-label uppercase tracking-wider mb-2">
+                          <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-2">
                             {t('models.variants')} ({selectedModel.variant_count})
                           </h3>
                         </div>
@@ -1167,7 +1167,7 @@ export function ModelsPage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="flex-1 h-full flex items-center justify-center text-control-label p-8 text-center">
+                    <div className="flex-1 h-full flex items-center justify-center text-subtle p-8 text-center">
                       <div>{t('models.selectToView', { defaultValue: 'Select a model to view details' })}</div>
                     </div>
                   )}

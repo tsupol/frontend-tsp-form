@@ -628,7 +628,7 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
             </div>
             {paymentAmount > total && (
               <div className="flex items-baseline gap-3 text-sm mt-1">
-                <span className="text-fg/60">{t('retail.create.change')}</span>
+                <span className="text-subtle">{t('retail.create.change')}</span>
                 <span className="font-medium tabular-nums text-success">{fmtCurrency(change)}</span>
               </div>
             )}
@@ -741,7 +741,7 @@ function ProductPickerModal({ open, branchId, onClose, onPick }: {
                   <div key={v.variant_id} className="flex items-center gap-3 py-2.5">
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate">{v.full_name}</div>
-                      <div className="text-xs text-fg/60 flex items-center gap-2">
+                      <div className="text-xs text-subtle flex items-center gap-2">
                         <span>{t('retail.create.stock')}: {v.qty}</span>
                         <span className="font-medium tabular-nums">{fmtCurrency(v.retail_price)}</span>
                       </div>

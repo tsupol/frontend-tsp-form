@@ -274,7 +274,7 @@ function ConfirmRemoveModal({ open, onClose, holiday }: {
       <div className="modal-content">
         <p className="text-sm">{t('settings.holidays.confirmRemoveMessage')}</p>
         {holiday && (
-          <div className="mt-2 text-sm text-fg/60">
+          <div className="mt-2 text-sm text-subtle">
             <div>{holiday.company_name} — {formatDate(holiday.holiday_date)}</div>
             <div>{holiday.description}</div>
           </div>
@@ -430,7 +430,7 @@ export function HolidaysPage() {
         <div className="flex items-center justify-between mb-4 flex-none max-md:hidden">
           <div>
             <h1 className="heading-2">{t('settings.holidays.title')}</h1>
-            <p className="text-sm text-fg/60 mt-1">{t('settings.holidays.description')}</p>
+            <p className="text-sm text-subtle mt-1">{t('settings.holidays.description')}</p>
           </div>
           <Button color="primary" startIcon={<Plus size={16} />} onClick={() => setCreateOpen(true)}>
             {t('settings.holidays.addHoliday')}
@@ -523,7 +523,7 @@ export function HolidaysPage() {
           }}
           className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
           noResults={
-            <div className="p-8 text-center text-control-label">
+            <div className="p-8 text-center text-subtle">
               {isLoading ? t('common.loading') : t('settings.holidays.empty')}
             </div>
           }
@@ -533,7 +533,7 @@ export function HolidaysPage() {
         <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
           <div className="flex-1 overflow-auto better-scroll pb-8">
             {holidays.length === 0 ? (
-              <div className="p-8 text-center text-control-label">
+              <div className="p-8 text-center text-subtle">
                 {isLoading ? t('common.loading') : t('settings.holidays.empty')}
               </div>
             ) : (
@@ -545,7 +545,7 @@ export function HolidaysPage() {
                   >
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm truncate">{formatDate(holiday.holiday_date)}</div>
-                      <div className="text-xs text-fg/60 mt-0.5">{holiday.description}</div>
+                      <div className="text-xs text-subtle mt-0.5">{holiday.description}</div>
                       <div className="text-xs text-fg/40 mt-0.5">{holiday.company_name}</div>
                     </div>
                     <RowActions

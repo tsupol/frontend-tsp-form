@@ -469,9 +469,9 @@ function ContactRow({ contact, onDeleted }: { contact: CustomerContact; onDelete
         {contact.is_primary && <Star size={12} className="text-warning fill-warning" />}
         <Badge size="xs" color="info">{contact.contact_type}</Badge>
         <span className="tabular-nums">{contact.value}</span>
-        {contact.label && <span className="text-control-label text-xs">({contact.label})</span>}
+        {contact.label && <span className="text-subtle text-xs">({contact.label})</span>}
       </div>
-      <button className="p-1 rounded hover:bg-surface-hover cursor-pointer text-control-label hover:text-danger" onClick={handleDelete} disabled={deleting}>
+      <button className="p-1 rounded hover:bg-surface-hover cursor-pointer text-subtle hover:text-danger" onClick={handleDelete} disabled={deleting}>
         <Trash2 size={13} />
       </button>
     </div>

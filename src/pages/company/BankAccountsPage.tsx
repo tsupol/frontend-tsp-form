@@ -478,7 +478,7 @@ export function BankAccountsPage() {
         <div className="flex items-center justify-between mb-4 flex-none max-md:hidden">
           <div>
             <h1 className="heading-2">{t('settings.bankAccounts.title')}</h1>
-            <p className="text-sm text-fg/60 mt-1">{t('settings.bankAccounts.description')}</p>
+            <p className="text-sm text-subtle mt-1">{t('settings.bankAccounts.description')}</p>
           </div>
           <Button color="primary" startIcon={<Plus size={16} />} onClick={() => setCreateOpen(true)}>
             {t('settings.bankAccounts.addAccount')}
@@ -517,7 +517,7 @@ export function BankAccountsPage() {
           }}
           className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
           noResults={
-            <div className="p-8 text-center text-control-label">
+            <div className="p-8 text-center text-subtle">
               {isLoading ? t('common.loading') : t('settings.bankAccounts.empty')}
             </div>
           }
@@ -527,7 +527,7 @@ export function BankAccountsPage() {
         <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
           <div className="flex-1 overflow-auto better-scroll pb-8">
             {filtered.length === 0 ? (
-              <div className="p-8 text-center text-control-label">
+              <div className="p-8 text-center text-subtle">
                 {isLoading ? t('common.loading') : t('settings.bankAccounts.empty')}
               </div>
             ) : (
@@ -543,7 +543,7 @@ export function BankAccountsPage() {
                         {account.is_default && <Badge color="primary" size="sm">Default</Badge>}
                         {!account.is_active && <Badge color="default" size="sm">{t('common.inactive')}</Badge>}
                       </div>
-                      <div className="text-xs text-fg/60 tabular-nums mt-0.5">{account.account_number} · {account.account_name}</div>
+                      <div className="text-xs text-subtle tabular-nums mt-0.5">{account.account_number} · {account.account_name}</div>
                       <div className="text-xs text-fg/40 mt-0.5">{account.branch_name}</div>
                     </div>
                     <RowActions

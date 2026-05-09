@@ -159,7 +159,7 @@ export function SavingDetailPanel({ contractId, isMobile }: { contractId: number
           <button
             type="button"
             onClick={() => handleCopyCode(contract.code_display ?? contract.code)}
-            className="p-1 rounded hover:bg-surface-hover transition-colors cursor-pointer text-fg/60 hover:text-fg"
+            className="p-1 rounded hover:bg-surface-hover transition-colors cursor-pointer text-subtle hover:text-fg"
             aria-label={t('common.copy')}
             title={copied ? t('common.copied') : t('common.copy')}
           >

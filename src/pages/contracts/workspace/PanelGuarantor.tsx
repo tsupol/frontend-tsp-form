@@ -543,7 +543,7 @@ function GuarantorRow({ guarantor, contractId, expanded, onToggle, onRemove, rem
               onClick={() => setConfirmRemove(false)}>{t('common.cancel')}</button>
           </div>
         ) : (
-          <button className="p-1.5 rounded hover:bg-danger/10 cursor-pointer text-control-label hover:text-danger transition-colors bg-transparent border-none"
+          <button className="p-1.5 rounded hover:bg-danger/10 cursor-pointer text-subtle hover:text-danger transition-colors bg-transparent border-none"
             onClick={(e) => { e.stopPropagation(); setConfirmRemove(true); }} title={t('common.remove')}>
             <Trash2 size={14} />
           </button>

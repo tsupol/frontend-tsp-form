@@ -343,7 +343,7 @@ export function DealPartnerRatesPage() {
       accessorKey: 'note',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.note')} />,
       cell: ({ row }) => (
-        <span className="text-sm text-control-label truncate max-w-40 block">{row.original.note ?? '—'}</span>
+        <span className="text-sm text-subtle truncate max-w-40 block">{row.original.note ?? '—'}</span>
       ),
       className: 'max-md:hidden',
     },
@@ -360,7 +360,7 @@ export function DealPartnerRatesPage() {
       header: () => null,
       cell: ({ row }: { row: { original: DealPartnerRate } }) => (
         <button
-          className="flex items-center justify-center w-8 h-8 rounded hover:bg-surface-hover cursor-pointer text-control-label hover:text-fg"
+          className="flex items-center justify-center w-8 h-8 rounded hover:bg-surface-hover cursor-pointer text-subtle hover:text-fg"
           onClick={() => handleEdit(row.original)}
           aria-label={t('common.edit')}
         >
@@ -420,14 +420,14 @@ export function DealPartnerRatesPage() {
           rowCount={totalCount}
           onPageChange={({ pageIndex: pi, pageSize: ps }) => { setPageIndex(pi); setPageSize(ps); }}
           className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
-          noResults={<div className="p-8 text-center text-control-label">{t('dealPartnerRate.empty')}</div>}
+          noResults={<div className="p-8 text-center text-subtle">{t('dealPartnerRate.empty')}</div>}
         />
 
         {/* Mobile cards */}
         <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
           <div className="flex-1 overflow-auto better-scroll pb-8">
             {rates.length === 0 ? (
-              <div className="p-8 text-center text-control-label">{t('dealPartnerRate.empty')}</div>
+              <div className="p-8 text-center text-subtle">{t('dealPartnerRate.empty')}</div>
             ) : (
               <div className="flex flex-col divide-y divide-line">
                 {paginatedRates.map(rate => (
@@ -439,7 +439,7 @@ export function DealPartnerRatesPage() {
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="font-medium truncate">{rate.branch_name ?? scopeLabel(rate.scope_level)}</div>
-                        {rate.company_name && <div className="text-xs text-control-label">{rate.company_name}</div>}
+                        {rate.company_name && <div className="text-xs text-subtle">{rate.company_name}</div>}
                       </div>
                       <Badge size="sm" color={rate.is_active ? 'success' : 'default'}>
                         {rate.is_active ? t('dealPartnerRate.activeLabel') : t('dealPartnerRate.inactiveLabel')}
@@ -449,7 +449,7 @@ export function DealPartnerRatesPage() {
                       <Badge size="xs" color="info">{scopeLabel(rate.scope_level)}</Badge>
                       <span className="tabular-nums font-medium">{rate.rate_percent}%</span>
                     </div>
-                    {rate.note && <div className="text-xs text-control-label mt-1 truncate">{rate.note}</div>}
+                    {rate.note && <div className="text-xs text-subtle mt-1 truncate">{rate.note}</div>}
                   </div>
                 ))}
               </div>

@@ -230,7 +230,7 @@ export function BranchLedgerPage() {
         <div className="flex items-center justify-between mb-4 flex-none max-md:hidden">
           <div>
             <h1 className="heading-2">{t('nav.branchLedger')}</h1>
-            <p className="text-sm text-fg/60 mt-1">{t('accounting.ledger.description')}</p>
+            <p className="text-sm text-subtle mt-1">{t('accounting.ledger.description')}</p>
           </div>
         </div>
 
@@ -401,7 +401,7 @@ export function BranchLedgerPage() {
           onPageChange={({ pageIndex: pi, pageSize: ps }) => { setPageIndex(pi); setPageSize(ps); }}
           className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
           noResults={
-            <div className="p-8 text-center text-control-label">
+            <div className="p-8 text-center text-subtle">
               {isLoading ? t('common.loading') : t('accounting.ledger.empty')}
             </div>
           }
@@ -411,7 +411,7 @@ export function BranchLedgerPage() {
         <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
           <div className="flex-1 overflow-auto better-scroll pb-8">
             {rows.length === 0 ? (
-              <div className="p-8 text-center text-control-label">
+              <div className="p-8 text-center text-subtle">
                 {isLoading ? t('common.loading') : t('accounting.ledger.empty')}
               </div>
             ) : (
@@ -429,7 +429,7 @@ export function BranchLedgerPage() {
                         {r.direction === 'IN' ? '+' : '-'}{fmtCurrency(r.direction === 'IN' ? r.amount_in : r.amount_out)}
                       </span>
                     </div>
-                    <div className="text-xs text-fg/60 mt-0.5">
+                    <div className="text-xs text-subtle mt-0.5">
                       <DateTime value={r.txn_time} /> · {t(`accounting.ledger.ch_${r.channel}`, { defaultValue: r.channel })}{r.bank_name ? ` · ${r.bank_name}` : ''}
                     </div>
                     <div className="text-xs font-mono text-fg/50 mt-0.5">

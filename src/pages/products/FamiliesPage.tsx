@@ -1005,7 +1005,7 @@ function EditFamilyAttrModal({ rule, attrName, open, onClose }: {
           <h2 className="modal-title">
             {t('familyAttributes.editAttribute')}
             {attrName && (
-              <span className="text-sm font-normal text-control-label ml-2">
+              <span className="text-sm font-normal text-subtle ml-2">
                 — {attrName}
               </span>
             )}
@@ -1236,7 +1236,7 @@ function ManageFamilyAttributesModal({ family, open, onClose, holdingId }: {
         return (
           <div>
             <span className="text-xs font-medium">{attr?.attribute_name ?? '—'}</span>
-            <span className="text-xs text-control-label ml-1.5">({attr?.attribute_code ?? '—'})</span>
+            <span className="text-xs text-subtle ml-1.5">({attr?.attribute_code ?? '—'})</span>
           </div>
         );
       },
@@ -1312,7 +1312,7 @@ function ManageFamilyAttributesModal({ family, open, onClose, holdingId }: {
             <h2 className="modal-title">
               {t('familyAttributes.title')}
               {family && (
-                <span className="text-sm font-normal text-control-label ml-2">
+                <span className="text-sm font-normal text-subtle ml-2">
                   — {family.display_name}
                 </span>
               )}
@@ -1330,7 +1330,7 @@ function ManageFamilyAttributesModal({ family, open, onClose, holdingId }: {
               columns={columns}
               className={isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}
               noResults={
-                <div className="p-8 text-center text-control-label">
+                <div className="p-8 text-center text-subtle">
                   {t('familyAttributes.noAttributes')}
                 </div>
               }
@@ -1676,7 +1676,7 @@ export function FamiliesPage() {
             }}
             className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
             noResults={
-              <div className="p-8 text-center text-control-label">
+              <div className="p-8 text-center text-subtle">
                 {t('brandsModels.noFamilies')}
               </div>
             }
@@ -1688,7 +1688,7 @@ export function FamiliesPage() {
           <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
             <div className="flex-1 overflow-auto better-scroll pb-8">
               {families.length === 0 ? (
-                <div className="p-8 text-center text-control-label">
+                <div className="p-8 text-center text-subtle">
                   {t('brandsModels.noFamilies')}
                 </div>
               ) : (
@@ -1697,10 +1697,10 @@ export function FamiliesPage() {
                     <div key={family.id} className="flex items-center gap-3 px-1 py-3">
                       <div className="flex-1 min-w-0">
                         <div className="font-medium truncate">{family.family_code}</div>
-                        <div className="text-sm text-control-label truncate">{family.display_name}</div>
+                        <div className="text-sm text-subtle truncate">{family.display_name}</div>
                         <div className="flex items-center gap-2 mt-1">
                           <Badge size="sm" className="capitalize">{family.brand_name}</Badge>
-                          <span className="text-xs text-control-label truncate">{family.category_name}</span>
+                          <span className="text-xs text-subtle truncate">{family.category_name}</span>
                         </div>
                       </div>
                       <div className="shrink-0">

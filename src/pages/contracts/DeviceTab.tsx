@@ -319,7 +319,7 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
                     {ro.loaner_asset_code && <> · {t('contract.device_loaner')}: {ro.loaner_asset_code}</>}
                   </div>
                   {ro.repair_note && (
-                    <div className="text-xs text-fg/60 italic mt-1 truncate">{ro.repair_note}</div>
+                    <div className="text-xs text-subtle italic mt-1 truncate">{ro.repair_note}</div>
                   )}
                 </div>
                 <div className="text-xs text-subtle shrink-0 text-right">

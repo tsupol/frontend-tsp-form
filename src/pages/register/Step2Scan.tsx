@@ -32,7 +32,7 @@ export function Step2Scan() {
           </div>
         </div>
 
-        <p className="text-sm text-control-label">
+        <p className="text-sm text-subtle">
           {t('register.scanDescription')}
         </p>
       </div>
@@ -41,17 +41,17 @@ export function Step2Scan() {
       <div className="border border-line bg-surface-shallow p-4 rounded-lg text-sm">
         <div className="space-y-2">
           <div className="flex justify-between">
-            <span className="text-control-label">{t('device.serial')}:</span>
+            <span className="text-subtle">{t('device.serial')}:</span>
             <span className="font-mono">{data.serial}</span>
           </div>
           {data.imei && (
             <div className="flex justify-between">
-              <span className="text-control-label">{t('device.imei')}:</span>
+              <span className="text-subtle">{t('device.imei')}:</span>
               <span className="font-mono">{data.imei}</span>
             </div>
           )}
           <div className="flex justify-between">
-            <span className="text-control-label">{t('register.deviceType')}:</span>
+            <span className="text-subtle">{t('register.deviceType')}:</span>
             <span>{t(data.deviceType === 'with-sim' ? 'register.withSim' : 'register.withoutSim')}</span>
           </div>
         </div>

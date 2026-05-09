@@ -243,7 +243,7 @@ function DetailRow({ label, value, mono, children }: {
 }) {
   return (
     <div className="flex items-start justify-between gap-4">
-      <span className="text-control-label shrink-0">{label}</span>
+      <span className="text-subtle shrink-0">{label}</span>
       {children ?? <span className={`text-right ${mono ? 'tabular-nums' : ''}`}>{value}</span>}
     </div>
   );
@@ -401,7 +401,7 @@ export function DiscountApprovalsPage() {
             <span className={isExcess ? 'text-danger font-medium' : ''}>
               {formatPercent(req.requested_discount_percent)}
             </span>
-            <span className="text-control-label"> / {formatPercent(req.max_discount_percent)}</span>
+            <span className="text-subtle"> / {formatPercent(req.max_discount_percent)}</span>
           </div>
         );
       },
@@ -437,7 +437,7 @@ export function DiscountApprovalsPage() {
       accessorKey: 'requested_at',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('discount.requestedAt')} />,
       cell: ({ row }) => (
-        <DateTime value={row.original.requested_at} showTime={false} className="text-xs text-control-label" />
+        <DateTime value={row.original.requested_at} showTime={false} className="text-xs text-subtle" />
       ),
       className: 'w-24',
     },
@@ -594,7 +594,7 @@ export function DiscountApprovalsPage() {
           tableClassName="[&_tbody_tr]:cursor-pointer"
           className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
           noResults={
-            <div className="p-8 text-center text-control-label">
+            <div className="p-8 text-center text-subtle">
               {t('discount.noRequests')}
             </div>
           }
@@ -604,7 +604,7 @@ export function DiscountApprovalsPage() {
         <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
           <div className="flex-1 overflow-auto better-scroll pb-8">
             {requests.length === 0 ? (
-              <div className="p-8 text-center text-control-label">
+              <div className="p-8 text-center text-subtle">
                 {t('discount.noRequests')}
               </div>
             ) : (
@@ -629,10 +629,10 @@ export function DiscountApprovalsPage() {
                             <Badge size="sm" color="danger">{t('discount.expired')}</Badge>
                           )}
                         </div>
-                        <DateTime value={req.requested_at} showTime={false} className="text-[11px] text-control-label" />
+                        <DateTime value={req.requested_at} showTime={false} className="text-[11px] text-subtle" />
                       </div>
                       {(company || branch) && (
-                        <div className="text-xs text-control-label mt-1 truncate">
+                        <div className="text-xs text-subtle mt-1 truncate">
                           {[company, branch].filter(Boolean).join(' / ')}
                         </div>
                       )}
@@ -641,12 +641,12 @@ export function DiscountApprovalsPage() {
                           <span className={isExcess ? 'text-danger font-medium' : ''}>
                             {formatPercent(req.requested_discount_percent)}
                           </span>
-                          <span className="text-control-label"> / {formatPercent(req.max_discount_percent)}</span>
+                          <span className="text-subtle"> / {formatPercent(req.max_discount_percent)}</span>
                         </div>
                         <span>{formatNumber(req.discount_amount)}</span>
                       </div>
                       {req.requested_reason && (
-                        <div className="text-[11px] text-control-label mt-0.5 truncate">{req.requested_reason}</div>
+                        <div className="text-[11px] text-subtle mt-0.5 truncate">{req.requested_reason}</div>
                       )}
                     </div>
                   );

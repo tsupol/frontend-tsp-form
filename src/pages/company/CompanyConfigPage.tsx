@@ -126,7 +126,7 @@ export function CompanyConfigPage() {
         <div className="flex items-center justify-between mb-4 flex-none max-md:hidden">
           <div>
             <h1 className="heading-2">{t('settings.config.title')}</h1>
-            <p className="text-sm text-fg/60 mt-1">{t('settings.config.description')}</p>
+            <p className="text-sm text-subtle mt-1">{t('settings.config.description')}</p>
           </div>
         </div>
 
@@ -162,7 +162,7 @@ export function CompanyConfigPage() {
           }}
           className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
           noResults={
-            <div className="p-8 text-center text-control-label">
+            <div className="p-8 text-center text-subtle">
               {isLoading ? t('common.loading') : t('settings.config.empty')}
             </div>
           }
@@ -172,7 +172,7 @@ export function CompanyConfigPage() {
         <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
           <div className="flex-1 overflow-auto better-scroll pb-8">
             {filtered.length === 0 ? (
-              <div className="p-8 text-center text-control-label">
+              <div className="p-8 text-center text-subtle">
                 {isLoading ? t('common.loading') : t('settings.config.empty')}
               </div>
             ) : (
@@ -186,29 +186,29 @@ export function CompanyConfigPage() {
                     <div className="font-medium text-sm">{config.company_name}</div>
                     <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
                       <div>
-                        <div className="text-[10px] text-control-label">{t('settings.config.gracePeriodDays')}</div>
+                        <div className="text-[10px] text-subtle">{t('settings.config.gracePeriodDays')}</div>
                         <div className="tabular-nums font-medium">{config.grace_period_days}d</div>
                       </div>
                       <div>
-                        <div className="text-[10px] text-control-label">{t('settings.config.lateFeePerDay')}</div>
+                        <div className="text-[10px] text-subtle">{t('settings.config.lateFeePerDay')}</div>
                         <div className="tabular-nums font-medium">฿{config.late_fee_per_day}</div>
                       </div>
                       <div>
-                        <div className="text-[10px] text-control-label">{t('settings.config.lateFeeSplit')}</div>
+                        <div className="text-[10px] text-subtle">{t('settings.config.lateFeeSplit')}</div>
                         <div className="tabular-nums font-medium">{config.late_fee_split_holding}/{config.late_fee_split_company}</div>
                       </div>
                     </div>
                     <div className="grid grid-cols-3 gap-2 mt-1 text-sm">
                       <div>
-                        <div className="text-[10px] text-control-label">{t('settings.config.draftExpiryDays')}</div>
+                        <div className="text-[10px] text-subtle">{t('settings.config.draftExpiryDays')}</div>
                         <div className="tabular-nums font-medium">{config.draft_expiry_days}d</div>
                       </div>
                       <div>
-                        <div className="text-[10px] text-control-label">{t('settings.config.colPause')}</div>
+                        <div className="text-[10px] text-subtle">{t('settings.config.colPause')}</div>
                         <div className="tabular-nums font-medium">{config.pause_enabled ? config.pause_max_deferred : <span className="text-fg/40">{t('common.disabled')}</span>}</div>
                       </div>
                       <div>
-                        <div className="text-[10px] text-control-label">{t('settings.config.commMinActiveDays')}</div>
+                        <div className="text-[10px] text-subtle">{t('settings.config.commMinActiveDays')}</div>
                         <div className="tabular-nums font-medium">{config.comm_min_active_days}d</div>
                       </div>
                     </div>

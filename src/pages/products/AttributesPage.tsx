@@ -1005,7 +1005,7 @@ function ManageOptionsModal({ attribute, open, onClose, holdingId }: {
             <h2 className="modal-title">
               {t('attributes.options')}
               {attribute && (
-                <span className="text-sm font-normal text-control-label ml-2">
+                <span className="text-sm font-normal text-subtle ml-2">
                   — {attribute.attribute_name}
                 </span>
               )}
@@ -1047,7 +1047,7 @@ function ManageOptionsModal({ attribute, open, onClose, holdingId }: {
               }}
               className={isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}
               noResults={
-                <div className="p-8 text-center text-control-label">
+                <div className="p-8 text-center text-subtle">
                   {t('attributes.noOptions')}
                 </div>
               }
@@ -1345,7 +1345,7 @@ export function AttributesPage() {
             }}
             className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
             noResults={
-              <div className="p-8 text-center text-control-label">
+              <div className="p-8 text-center text-subtle">
                 {t('attributes.noAttributes')}
               </div>
             }
@@ -1356,7 +1356,7 @@ export function AttributesPage() {
           <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
             <div className="flex-1 overflow-auto better-scroll pb-8">
               {attributes.length === 0 ? (
-                <div className="p-8 text-center text-control-label">
+                <div className="p-8 text-center text-subtle">
                   {t('attributes.noAttributes')}
                 </div>
               ) : (
@@ -1365,12 +1365,12 @@ export function AttributesPage() {
                     <div key={attr.id} className="flex items-center gap-3 px-1 py-3">
                       <div className="flex-1 min-w-0">
                         <div className="font-medium truncate">{attr.attribute_code}</div>
-                        <div className="text-sm text-control-label truncate">{attr.attribute_name}</div>
+                        <div className="text-sm text-subtle truncate">{attr.attribute_name}</div>
                         <div className="flex items-center gap-1.5 mt-1">
                           <Badge size="sm">{
                             { TEXT: t('attributes.dataTypeText'), INTEGER: t('attributes.dataTypeInteger'), DECIMAL: t('attributes.dataTypeDecimal'), BOOLEAN: t('attributes.dataTypeBoolean') }[attr.data_type] ?? attr.data_type
                           }</Badge>
-                          {attr.unit && <span className="text-xs text-control-label">{attr.unit}</span>}
+                          {attr.unit && <span className="text-xs text-subtle">{attr.unit}</span>}
                         </div>
                       </div>
                       <div className="shrink-0">

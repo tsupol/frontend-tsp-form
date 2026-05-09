@@ -283,7 +283,7 @@ function PolicyModal({ open, onClose, editPolicy, onSuccess }: {
             {/* Scope indicator in edit mode */}
             {editPolicy && (
               <div className="flex items-center gap-2">
-                <span className="text-sm text-control-label">{t('discount.scope')}:</span>
+                <span className="text-sm text-subtle">{t('discount.scope')}:</span>
                 <Badge size="sm" color={scopeBadgeColor(getScopeLabel(editPolicy))}>
                   {t(`discount.scope${getScopeLabel(editPolicy)}`)}
                 </Badge>
@@ -291,7 +291,7 @@ function PolicyModal({ open, onClose, editPolicy, onSuccess }: {
                   <span className="text-sm">{editPolicy.company_name}</span>
                 )}
                 {editPolicy.branch_name && (
-                  <span className="text-sm text-control-label">/ {editPolicy.branch_name}</span>
+                  <span className="text-sm text-subtle">/ {editPolicy.branch_name}</span>
                 )}
               </div>
             )}
@@ -541,7 +541,7 @@ export function DiscountPoliciesPage() {
         return (
           <div>
             <Badge size="sm" color={scopeBadgeColor(scope)}>{t(`discount.scope${scope}`)}</Badge>
-            <div className="text-xs text-control-label mt-0.5 truncate">
+            <div className="text-xs text-subtle mt-0.5 truncate">
               {p.branch_name ?? p.company_name ?? '—'}
             </div>
           </div>
@@ -555,8 +555,8 @@ export function DiscountPoliciesPage() {
         const p = row.original;
         return (
           <div className="tabular-nums text-sm">
-            <div><span className="text-[10px] text-control-label uppercase">Retail</span> {p.retail_max_discount_percent}%</div>
-            <div><span className="text-[10px] text-control-label">FIN1</span> {p.fin1_max_discount_percent}% · <span className="text-[10px] text-control-label">FIN2</span> {p.fin2_max_discount_percent}%</div>
+            <div><span className="text-[10px] text-subtle uppercase">Retail</span> {p.retail_max_discount_percent}%</div>
+            <div><span className="text-[10px] text-subtle">FIN1</span> {p.fin1_max_discount_percent}% · <span className="text-[10px] text-subtle">FIN2</span> {p.fin2_max_discount_percent}%</div>
           </div>
         );
       },
@@ -567,9 +567,9 @@ export function DiscountPoliciesPage() {
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('discount.effectivePeriod')} />,
       cell: ({ row }) => {
         const p = row.original;
-        if (!p.effective_from && !p.effective_to) return <span className="text-sm text-control-label">—</span>;
+        if (!p.effective_from && !p.effective_to) return <span className="text-sm text-subtle">—</span>;
         return (
-          <div className="text-xs text-control-label">
+          <div className="text-xs text-subtle">
             {p.effective_from && <DateTime value={p.effective_from} showTime={false} />}
             {p.effective_from && p.effective_to && <span> — </span>}
             {p.effective_to && <DateTime value={p.effective_to} showTime={false} />}
@@ -595,7 +595,7 @@ export function DiscountPoliciesPage() {
       header: () => null,
       cell: ({ row }) => (
         <button
-          className="flex items-center justify-center w-8 h-8 rounded hover:bg-surface-hover cursor-pointer text-control-label hover:text-fg"
+          className="flex items-center justify-center w-8 h-8 rounded hover:bg-surface-hover cursor-pointer text-subtle hover:text-fg"
           onClick={() => handleEdit(row.original)}
           aria-label={t('common.edit')}
         >
@@ -758,7 +758,7 @@ export function DiscountPoliciesPage() {
           }}
           className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
           noResults={
-            <div className="p-8 text-center text-control-label">
+            <div className="p-8 text-center text-subtle">
               {t('discount.noPolicies')}
             </div>
           }
@@ -768,7 +768,7 @@ export function DiscountPoliciesPage() {
         <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
           <div className="flex-1 overflow-auto better-scroll pb-8">
             {filteredPolicies.length === 0 ? (
-              <div className="p-8 text-center text-control-label">
+              <div className="p-8 text-center text-subtle">
                 {t('discount.noPolicies')}
               </div>
             ) : (
@@ -796,24 +796,24 @@ export function DiscountPoliciesPage() {
                         }
                       </div>
                       {policy.branch_name && (
-                        <div className="text-xs text-control-label mt-0.5 ml-1">{policy.branch_name}</div>
+                        <div className="text-xs text-subtle mt-0.5 ml-1">{policy.branch_name}</div>
                       )}
                       <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
                         <div>
-                          <div className="text-[10px] text-control-label">Retail</div>
+                          <div className="text-[10px] text-subtle">Retail</div>
                           <div className="tabular-nums font-medium">{policy.retail_max_discount_percent}%</div>
                         </div>
                         <div>
-                          <div className="text-[10px] text-control-label">FIN1</div>
+                          <div className="text-[10px] text-subtle">FIN1</div>
                           <div className="tabular-nums font-medium">{policy.fin1_max_discount_percent}%</div>
                         </div>
                         <div>
-                          <div className="text-[10px] text-control-label">FIN2</div>
+                          <div className="text-[10px] text-subtle">FIN2</div>
                           <div className="tabular-nums font-medium">{policy.fin2_max_discount_percent}%</div>
                         </div>
                       </div>
                       {(policy.effective_from || policy.effective_to) && (
-                        <div className="text-[11px] text-control-label mt-1">
+                        <div className="text-[11px] text-subtle mt-1">
                           {policy.effective_from && <DateTime value={policy.effective_from} />}
                           {policy.effective_from && policy.effective_to && ' — '}
                           {policy.effective_to && <DateTime value={policy.effective_to} />}

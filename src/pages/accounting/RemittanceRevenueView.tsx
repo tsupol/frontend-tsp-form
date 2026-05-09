@@ -160,7 +160,7 @@ export function RemittanceRevenueView({ titleKey, descriptionKey, viewEndpoint, 
         <div className="flex items-center justify-between mb-4 flex-none max-md:hidden">
           <div>
             <h1 className="heading-2">{t(titleKey)}</h1>
-            <p className="text-sm text-fg/60 mt-1">{t(descriptionKey)}</p>
+            <p className="text-sm text-subtle mt-1">{t(descriptionKey)}</p>
           </div>
           <Button color="primary" startIcon={<Download size={16} />} onClick={handleExport} disabled={exporting}>
             {exporting ? t('common.loading') : t('accounting.exportCsv')}
@@ -234,7 +234,7 @@ export function RemittanceRevenueView({ titleKey, descriptionKey, viewEndpoint, 
           }}
           className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
           noResults={
-            <div className="p-8 text-center text-control-label">
+            <div className="p-8 text-center text-subtle">
               {isLoading ? t('common.loading') : t('accounting.empty')}
             </div>
           }
@@ -244,7 +244,7 @@ export function RemittanceRevenueView({ titleKey, descriptionKey, viewEndpoint, 
         <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
           <div className="flex-1 overflow-auto better-scroll pb-8">
             {rows.length === 0 ? (
-              <div className="p-8 text-center text-control-label">
+              <div className="p-8 text-center text-subtle">
                 {isLoading ? t('common.loading') : t('accounting.empty')}
               </div>
             ) : (
@@ -255,7 +255,7 @@ export function RemittanceRevenueView({ titleKey, descriptionKey, viewEndpoint, 
                       <span className="font-medium text-sm">{r.charge_name_th}</span>
                       <span className="tabular-nums font-semibold">{fmtCurrency(r.amount)}</span>
                     </div>
-                    <div className="text-xs text-fg/60 mt-0.5">
+                    <div className="text-xs text-subtle mt-0.5">
                       <DateTime value={r.bill_date} showTime={false} /> · {r.branch_name}
                     </div>
                     <div className="text-xs font-mono text-fg/50 mt-0.5">

@@ -463,7 +463,7 @@ function ToggleModal({ open, onClose, account }: {
             <div><div className="alert-description">{errorMessage}</div></div>
           </div>
         )}
-        <div className="text-sm text-control-label mb-2 font-mono">{account.apple_id}</div>
+        <div className="text-sm text-subtle mb-2 font-mono">{account.apple_id}</div>
         {hasBoundDevices && (
           <div className="alert alert-warning mb-3">
             <AlertTriangle size={18} />
@@ -650,7 +650,7 @@ function TabButton({ active, onClick, icon, children }: {
       className={`flex items-center gap-1.5 px-4 py-2 text-sm cursor-pointer transition-colors border-b-2 ${
         active
           ? 'border-primary text-primary'
-          : 'border-transparent text-control-label hover:text-fg hover:bg-surface-hover'
+          : 'border-transparent text-subtle hover:text-fg hover:bg-surface-hover'
       }`}
     >
       {icon}
@@ -662,7 +662,7 @@ function TabButton({ active, onClick, icon, children }: {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1">
-      <div className="text-[11px] uppercase tracking-wide text-control-label">{label}</div>
+      <div className="text-[11px] uppercase tracking-wide text-subtle">{label}</div>
       <div className="text-sm">{children}</div>
     </div>
   );
@@ -677,13 +677,13 @@ function HistoryTab({ account, rows, loading, error }: {
   const { t } = useTranslation();
 
   if (loading) {
-    return <div className="p-8 text-center text-control-label text-sm">{t('common.loading')}</div>;
+    return <div className="p-8 text-center text-subtle text-sm">{t('common.loading')}</div>;
   }
   if (error) {
     return <div className="p-8 text-center text-danger text-sm">{t('common.error')}</div>;
   }
   if (rows.length === 0) {
-    return <div className="p-8 text-center text-control-label text-sm">{t('settings.icloud.noHistory')}</div>;
+    return <div className="p-8 text-center text-subtle text-sm">{t('settings.icloud.noHistory')}</div>;
   }
 
   return (
@@ -715,22 +715,22 @@ function HistoryTab({ account, rows, loading, error }: {
             </div>
             <div className="flex-1 min-w-0 text-sm">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-control-label text-xs">{t('settings.icloud.asset')}</span>
+                <span className="text-subtle text-xs">{t('settings.icloud.asset')}</span>
                 <span className="font-mono text-xs">#{row.asset_id}</span>
               </div>
               {isAssign && wasReceiver && row.old_apple_id && (
-                <div className="text-xs text-control-label mt-0.5">
+                <div className="text-xs text-subtle mt-0.5">
                   {t('settings.icloud.fromAccount')} <span className="font-mono">{row.old_apple_id}</span>
                 </div>
               )}
               {isAssign && wasGiver && row.new_apple_id && (
-                <div className="text-xs text-control-label mt-0.5">
+                <div className="text-xs text-subtle mt-0.5">
                   {t('settings.icloud.toAccount')} <span className="font-mono">{row.new_apple_id}</span>
                 </div>
               )}
               {row.reason && (
                 <div className="text-xs mt-0.5">
-                  <span className="text-control-label">{t('settings.icloud.reason')}: </span>{row.reason}
+                  <span className="text-subtle">{t('settings.icloud.reason')}: </span>{row.reason}
                 </div>
               )}
               <div className="text-[11px] text-subtle mt-1 flex items-center gap-2">
@@ -1020,7 +1020,7 @@ export function ICloudPoolPage() {
                   }}
                   className={`flex-1 min-h-0 panel-datatable ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
                   noResults={
-                    <div className="p-8 text-center text-control-label">
+                    <div className="p-8 text-center text-subtle">
                       {isLoading ? t('common.loading') : t('settings.icloud.empty')}
                     </div>
                   }
@@ -1039,7 +1039,7 @@ export function ICloudPoolPage() {
                     onToggle={() => setToggleOpen(true)}
                   />
                 ) : (
-                  <div className="flex-1 h-full flex items-center justify-center text-control-label p-8 text-center">
+                  <div className="flex-1 h-full flex items-center justify-center text-subtle p-8 text-center">
                     {t('settings.icloud.selectToView')}
                   </div>
                 )}

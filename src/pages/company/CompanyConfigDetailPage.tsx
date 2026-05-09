@@ -157,7 +157,7 @@ export function CompanyConfigDetailPage() {
           <div className="mobile-header-end w-nav" />
         </MobileHeader>
         <div className="page-content">
-          <div className="p-8 text-center text-control-label">
+          <div className="p-8 text-center text-subtle">
             {isLoading ? t('common.loading') : t('settings.config.empty')}
           </div>
         </div>
@@ -188,7 +188,7 @@ export function CompanyConfigDetailPage() {
         {/* Desktop header */}
         <div className="flex items-center gap-3 mb-6 max-md:hidden">
           <button
-            className="flex items-center gap-1 text-sm text-fg/60 hover:text-fg transition-colors cursor-pointer"
+            className="flex items-center gap-1 text-sm text-subtle hover:text-fg transition-colors cursor-pointer"
             onClick={goBack}
           >
             <ArrowLeft size={14} />

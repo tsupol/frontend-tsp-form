@@ -123,7 +123,7 @@ export const AutocompleteInput = forwardRef<HTMLInputElement, AutocompleteInputP
               </div>
             ))
           ) : (
-            <div className="px-4 py-2 text-sm text-control-label">{noResultsText}</div>
+            <div className="px-4 py-2 text-sm text-subtle">{noResultsText}</div>
           )}
         </div>
       </PopOver>

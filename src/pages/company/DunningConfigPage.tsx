@@ -247,7 +247,7 @@ export function DunningConfigPage() {
         <div className="flex items-center justify-between mb-6 max-md:hidden">
           <div>
             <h1 className="heading-2">{t('settings.dunning.title')}</h1>
-            <p className="text-sm text-fg/60 mt-1">{t('settings.dunning.description')}</p>
+            <p className="text-sm text-subtle mt-1">{t('settings.dunning.description')}</p>
           </div>
           <Button variant="ghost" size="sm" startIcon={<ExternalLink size={14} />} onClick={() => navigate('/admin/legal/dunning')}>
             {t('settings.dunning.viewTargets')}

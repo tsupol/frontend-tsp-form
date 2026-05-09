@@ -520,7 +520,7 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
 function SectionHeader({ title, action }: { title: string; action?: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between mb-2 mt-2">
-      <h3 className="text-xs font-semibold text-control-label uppercase tracking-wider">{title}</h3>
+      <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider">{title}</h3>
       {action}
     </div>
   );
@@ -572,7 +572,7 @@ function ContactRow({ contact, onDeleted }: { contact: CustomerContact; onDelete
         <span className="tabular-nums">{contact.value}</span>
         {contact.label && <span className="text-subtle text-xs">({contact.label})</span>}
       </div>
-      <Button variant="ghost" className="btn-icon-xs text-control-label hover:text-danger" onClick={handleDelete} disabled={deleting} startIcon={<Trash2 size={12} />} />
+      <Button variant="ghost" className="btn-icon-xs text-subtle hover:text-danger" onClick={handleDelete} disabled={deleting} startIcon={<Trash2 size={12} />} />
     </div>
   );
 }

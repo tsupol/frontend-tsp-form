@@ -135,11 +135,11 @@ export function HomePage() {
         </div>
 
         <section className="text-center">
-          <p className="text-base sm:text-lg text-control-label font-light mb-2">
+          <p className="text-base sm:text-lg text-subtle font-light mb-2">
             {t('public.description')}
           </p>
           <p
-            className="text-xs sm:text-sm text-control-label/80"
+            className="text-xs sm:text-sm text-subtle/80"
             style={{ letterSpacing: '0.08em' }}
           >
             {t('public.scope')}

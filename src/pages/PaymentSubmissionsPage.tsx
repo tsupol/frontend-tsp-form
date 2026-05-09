@@ -161,7 +161,7 @@ export function PaymentSubmissionsPage() {
         <div>
           <DateTime value={row.original.submitted_at} className="text-xs" />
           {row.original.submit_channel && (
-            <div className="text-[11px] text-control-label">{row.original.submit_channel}</div>
+            <div className="text-[11px] text-subtle">{row.original.submit_channel}</div>
           )}
         </div>
       ),
@@ -173,7 +173,7 @@ export function PaymentSubmissionsPage() {
       cell: ({ row }) => (
         <div>
           <div className="text-sm font-medium truncate">{row.original.contract_code_display}</div>
-          <div className="text-xs text-control-label truncate">{row.original.customer_name ?? '—'}</div>
+          <div className="text-xs text-subtle truncate">{row.original.customer_name ?? '—'}</div>
         </div>
       ),
     },
@@ -191,7 +191,7 @@ export function PaymentSubmissionsPage() {
       cell: ({ row }) => (
         <div className="text-xs">
           <div className="truncate">{row.original.sender_account_name ?? '—'}</div>
-          <div className="text-control-label truncate">
+          <div className="text-subtle truncate">
             {row.original.sender_bank ?? '—'}
             {row.original.sender_account_no ? ` · ${row.original.sender_account_no}` : ''}
           </div>
@@ -303,14 +303,14 @@ export function PaymentSubmissionsPage() {
           onPageChange={({ pageIndex: pi, pageSize: ps }) => { setPageIndex(pi); setPageSize(ps); }}
           tableClassName="[&_tbody_tr]:cursor-pointer"
           className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
-          noResults={<div className="p-8 text-center text-control-label">{t('paymentSubmissions.empty')}</div>}
+          noResults={<div className="p-8 text-center text-subtle">{t('paymentSubmissions.empty')}</div>}
         />
 
         {/* Mobile cards */}
         <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
           <div className="flex-1 overflow-auto better-scroll pb-8">
             {rows.length === 0 ? (
-              <div className="p-8 text-center text-control-label">{t('paymentSubmissions.empty')}</div>
+              <div className="p-8 text-center text-subtle">{t('paymentSubmissions.empty')}</div>
             ) : (
               <div className="flex flex-col divide-y divide-line">
                 {rows.map(row => (
@@ -323,14 +323,14 @@ export function PaymentSubmissionsPage() {
                       <Badge size="sm" color={statusColor(row.status)}>
                         {t(`paymentSubmissions.status_${row.status}`)}
                       </Badge>
-                      <DateTime value={row.submitted_at} showTime className="text-[11px] text-control-label" />
+                      <DateTime value={row.submitted_at} showTime className="text-[11px] text-subtle" />
                     </div>
                     <div className="text-sm font-medium mt-1 truncate">{row.contract_code_display}</div>
-                    <div className="text-xs text-control-label truncate">
+                    <div className="text-xs text-subtle truncate">
                       {row.customer_name ?? '—'} · {row.branch_name ?? '—'}
                     </div>
                     <div className="flex items-center justify-between mt-1 text-sm tabular-nums">
-                      <span className="text-xs text-control-label truncate">
+                      <span className="text-xs text-subtle truncate">
                         {row.sender_bank ?? ''} {row.sender_account_no ?? ''}
                       </span>
                       <span className="font-medium">{fmtCurrency(row.amount)}</span>
@@ -522,11 +522,11 @@ function SubmissionReviewDrawer({
             <div>
               <div className="form-label mb-1">{t('paymentSubmissions.slipImage')}</div>
               {slipsFetching ? (
-                <div className="border border-line rounded-lg h-48 flex items-center justify-center text-control-label text-sm">
+                <div className="border border-line rounded-lg h-48 flex items-center justify-center text-subtle text-sm">
                   {t('common.loading')}
                 </div>
               ) : slipMedia.length === 0 ? (
-                <div className="border border-line rounded-lg h-48 flex flex-col items-center justify-center gap-2 text-control-label text-sm">
+                <div className="border border-line rounded-lg h-48 flex flex-col items-center justify-center gap-2 text-subtle text-sm">
                   <ImageOff size={24} />
                   <span>{t('paymentSubmissions.noSlip')}</span>
                 </div>
@@ -547,7 +547,7 @@ function SubmissionReviewDrawer({
                         {thumb ? (
                           <img src={thumb} alt="slip" className="w-full h-full object-cover" />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center text-control-label">
+                          <div className="w-full h-full flex items-center justify-center text-subtle">
                             <ImageOff size={20} />
                           </div>
                         )}
@@ -580,13 +580,13 @@ function SubmissionReviewDrawer({
               </DetailRow>
               <DetailRow label={t('paymentSubmissions.transactionRef')} value={row.transaction_ref ?? '—'} />
               <hr className="border-line my-2" />
-              <div className="text-xs uppercase text-control-label tracking-wide mt-2">
+              <div className="text-xs uppercase text-subtle tracking-wide mt-2">
                 {t('paymentSubmissions.sender')}
               </div>
               <DetailRow label={t('paymentSubmissions.accountName')} value={row.sender_account_name ?? '—'} />
               <DetailRow label={t('paymentSubmissions.bank')} value={row.sender_bank ?? '—'} />
               <DetailRow label={t('paymentSubmissions.accountNumber')} value={row.sender_account_no ?? '—'} />
-              <div className="text-xs uppercase text-control-label tracking-wide mt-2">
+              <div className="text-xs uppercase text-subtle tracking-wide mt-2">
                 {t('paymentSubmissions.receiver')}
               </div>
               <DetailRow label={t('paymentSubmissions.accountName')} value={row.receiver_account_name ?? '—'} />
@@ -731,7 +731,7 @@ function DetailRow({ label, value, mono, children }: {
 }) {
   return (
     <div className="flex items-start justify-between gap-4">
-      <span className="text-control-label shrink-0">{label}</span>
+      <span className="text-subtle shrink-0">{label}</span>
       {children ?? <span className={`text-right ${mono ? 'tabular-nums' : ''}`}>{value}</span>}
     </div>
   );

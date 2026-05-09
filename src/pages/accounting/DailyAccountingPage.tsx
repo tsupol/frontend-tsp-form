@@ -107,7 +107,7 @@ export function DailyAccountingPage() {
         <div className="flex items-center justify-between mb-4 flex-none max-md:hidden">
           <div>
             <h1 className="heading-2">{t('nav.dailyAccounting')}</h1>
-            <p className="text-sm text-fg/60 mt-1">{t('accounting.daily.description')}</p>
+            <p className="text-sm text-subtle mt-1">{t('accounting.daily.description')}</p>
           </div>
           <Button startIcon={<Download size={16} />} onClick={handleExport}>
             {t('accounting.exportCsv')}
@@ -158,11 +158,11 @@ export function DailyAccountingPage() {
         {rows.length > 0 && (
           <div className="flex-none grid grid-cols-2 gap-3 mb-4">
             <div className="border border-line rounded-lg p-3">
-              <div className="text-xs text-fg/60">{t('accounting.daily.totalIn')}</div>
+              <div className="text-xs text-subtle">{t('accounting.daily.totalIn')}</div>
               <div className="text-lg font-semibold tabular-nums text-success">{fmtCurrency(totalIn)}</div>
             </div>
             <div className="border border-line rounded-lg p-3">
-              <div className="text-xs text-fg/60">{t('accounting.daily.totalOut')}</div>
+              <div className="text-xs text-subtle">{t('accounting.daily.totalOut')}</div>
               <div className="text-lg font-semibold tabular-nums text-danger">{fmtCurrency(totalOut)}</div>
             </div>
           </div>
@@ -175,7 +175,7 @@ export function DailyAccountingPage() {
           onSortingChange={setSorting}
           className="flex-1 min-h-0 hidden md:flex"
           noResults={
-            <div className="p-8 text-center text-control-label">
+            <div className="p-8 text-center text-subtle">
               {isLoading ? t('common.loading') : t('accounting.daily.empty')}
             </div>
           }
@@ -184,7 +184,7 @@ export function DailyAccountingPage() {
         <div className="flex-1 min-h-0 flex flex-col md:hidden">
           <div className="flex-1 overflow-auto better-scroll pb-8">
             {rows.length === 0 ? (
-              <div className="p-8 text-center text-control-label">
+              <div className="p-8 text-center text-subtle">
                 {isLoading ? t('common.loading') : t('accounting.daily.empty')}
               </div>
             ) : (
@@ -195,7 +195,7 @@ export function DailyAccountingPage() {
                       <span className="font-medium">{r.category_th}</span>
                       <span className="tabular-nums font-semibold">{fmtCurrency(r.total_amount)}</span>
                     </div>
-                    <div className="text-xs text-fg/60 mt-0.5">{r.direction} · {r.txn_count} txn</div>
+                    <div className="text-xs text-subtle mt-0.5">{r.direction} · {r.txn_count} txn</div>
                   </div>
                 ))}
               </div>

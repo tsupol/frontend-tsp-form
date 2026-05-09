@@ -1004,7 +1004,7 @@ function PasswordModal({ user, open, onClose }: { user: VUser | null; open: bool
     `flex-1 py-1.5 text-sm font-medium rounded transition-colors cursor-pointer ${
       active
         ? 'bg-primary text-primary-contrast'
-        : 'text-control-label hover:bg-surface-hover'
+        : 'text-subtle hover:bg-surface-hover'
     }`;
 
   return (
@@ -1329,7 +1329,7 @@ export function UsersPage() {
       cell: ({ row }) => (
         <div>
           <div className="text-xs font-medium">{row.getValue('username')}</div>
-          <div className="text-[11px] text-subtler">{roleMap.get(row.original.role_code) ?? row.original.role_code}</div>
+          <div className="text-[11px] text-subtle">{roleMap.get(row.original.role_code) ?? row.original.role_code}</div>
         </div>
       ),
     },
@@ -1352,7 +1352,7 @@ export function UsersPage() {
         return (
           <div>
             <div className="text-xs">{company}</div>
-            {branch && <div className="text-[11px] text-subtler">{branch}</div>}
+            {branch && <div className="text-[11px] text-subtle">{branch}</div>}
           </div>
         );
       },
@@ -1620,7 +1620,7 @@ export function UsersPage() {
           </div>
           {selectedCount > 0 && (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-control-label">
+              <span className="text-xs text-subtle">
                 {t('users.selectedCount', { count: selectedCount })}
               </span>
               <Button variant="outline" size="sm" startIcon={<Ban size={14} />} onClick={() => setBulkAction({ action: 'deactivate', users: getSelectedUsers() })}>
@@ -1672,7 +1672,7 @@ export function UsersPage() {
             onRowSelectionChange={setRowSelection}
             className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
             noResults={
-              <div className="p-8 text-center text-control-label">
+              <div className="p-8 text-center text-subtle">
                 {t('users.empty')}
               </div>
             }
@@ -1684,7 +1684,7 @@ export function UsersPage() {
           <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
             <div className="flex-1 overflow-auto better-scroll pb-8">
               {users.length === 0 ? (
-                <div className="p-8 text-center text-control-label">
+                <div className="p-8 text-center text-subtle">
                   {t('users.empty')}
                 </div>
               ) : (
@@ -1693,11 +1693,11 @@ export function UsersPage() {
                     <div key={user.id} className="flex items-center gap-3 px-1 py-3">
                       <div className="flex-1 min-w-0">
                         <div className="font-medium truncate">{user.username}</div>
-                        <div className="text-sm text-control-label truncate">{roleMap.get(user.role_code) ?? user.role_code}</div>
+                        <div className="text-sm text-subtle truncate">{roleMap.get(user.role_code) ?? user.role_code}</div>
                         <div className="flex items-center gap-2 mt-1">
                           <Badge size="sm" className="capitalize">{user.role_scope}</Badge>
                           {user.company_name && (
-                            <span className="text-xs text-control-label truncate">{user.company_name}</span>
+                            <span className="text-xs text-subtle truncate">{user.company_name}</span>
                           )}
                         </div>
                       </div>

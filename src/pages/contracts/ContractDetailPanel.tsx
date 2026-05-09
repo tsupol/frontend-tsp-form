@@ -243,7 +243,7 @@ function ScrollableTabs<T extends string>({ tabs, activeTab, onTabChange, render
           className="absolute left-0 top-0 bottom-0 z-10 w-7 flex items-center justify-center bg-bg border-r border-line cursor-pointer border-y-0 border-l-0"
           onClick={() => scroll('left')}
         >
-          <ChevronLeft size={14} className="text-fg/60" />
+          <ChevronLeft size={14} className="text-subtle" />
         </button>
       )}
       <div ref={scrollRef} className="flex px-2 overflow-x-auto hidden-scroll">
@@ -266,7 +266,7 @@ function ScrollableTabs<T extends string>({ tabs, activeTab, onTabChange, render
           className="absolute right-0 top-0 bottom-0 z-10 w-7 flex items-center justify-center bg-bg border-l border-line cursor-pointer border-y-0 border-r-0"
           onClick={() => scroll('right')}
         >
-          <ChevronRight size={14} className="text-fg/60" />
+          <ChevronRight size={14} className="text-subtle" />
         </button>
       )}
     </div>
@@ -359,7 +359,7 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
           <button
             type="button"
             onClick={() => handleCopyCode(contract.code_display ?? contract.code)}
-            className="p-1 rounded hover:bg-surface-hover transition-colors cursor-pointer text-fg/60 hover:text-fg"
+            className="p-1 rounded hover:bg-surface-hover transition-colors cursor-pointer text-subtle hover:text-fg"
             aria-label={t('common.copy')}
             title={copied ? t('common.copied') : t('common.copy')}
           >
@@ -540,7 +540,7 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
                 <button
                   type="button"
                   onClick={() => copyValue('customer', contract.customer_name!)}
-                  className="p-0.5 rounded hover:bg-surface-hover transition-colors cursor-pointer text-fg/60 hover:text-fg"
+                  className="p-0.5 rounded hover:bg-surface-hover transition-colors cursor-pointer text-subtle hover:text-fg"
                   aria-label={t('common.copy')}
                   title={copiedField === 'customer' ? t('common.copied') : t('common.copy')}
                 >
@@ -665,7 +665,7 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
             <button
               type="button"
               onClick={() => setDeliveryModalOpen(true)}
-              className="p-1 rounded hover:bg-surface-hover transition-colors cursor-pointer text-fg/60 hover:text-fg bg-transparent border-none"
+              className="p-1 rounded hover:bg-surface-hover transition-colors cursor-pointer text-subtle hover:text-fg bg-transparent border-none"
               title={t('common.edit')}
             >
               <Pencil size={13} />

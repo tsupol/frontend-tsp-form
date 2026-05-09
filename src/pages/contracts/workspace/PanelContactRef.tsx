@@ -99,8 +99,8 @@ function ContactRow({ contact, onDeleted }: { contact: CustomerContact; onDelete
       <Badge size="xs" color="info">{contact.contact_type}</Badge>
       <span className="tabular-nums flex-1">{contact.value}</span>
       {contact.is_primary && <Star size={12} className="text-warning fill-warning shrink-0" />}
-      {contact.label && <span className="text-control-label text-xs shrink-0">({contact.label})</span>}
-      <button className="p-1 rounded hover:bg-surface-hover cursor-pointer text-control-label hover:text-danger shrink-0 bg-transparent border-none" onClick={handleDelete} disabled={deleting}><Trash2 size={13} /></button>
+      {contact.label && <span className="text-subtle text-xs shrink-0">({contact.label})</span>}
+      <button className="p-1 rounded hover:bg-surface-hover cursor-pointer text-subtle hover:text-danger shrink-0 bg-transparent border-none" onClick={handleDelete} disabled={deleting}><Trash2 size={13} /></button>
     </div>
   );
 }
@@ -123,7 +123,7 @@ function ReferenceRow({ reference, onDeleted }: { reference: CustomerReference; 
         <span className="font-medium text-sm flex-1 truncate">{reference.name} {reference.last_name}</span>
         {reference.relation && <Badge size="xs" color="default">{reference.relation}</Badge>}
         <button
-          className="p-1 rounded hover:bg-danger/10 cursor-pointer text-control-label hover:text-danger shrink-0 bg-transparent border-none"
+          className="p-1 rounded hover:bg-danger/10 cursor-pointer text-subtle hover:text-danger shrink-0 bg-transparent border-none"
           onClick={(e) => { e.stopPropagation(); handleDelete(); }}
           disabled={deleting}
         >

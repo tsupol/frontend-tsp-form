@@ -163,7 +163,7 @@ function BillRowItem({ bill, expanded, onToggle }: { bill: BillRow; expanded: bo
             <Badge color={typeColor} size="sm">{bill.bill_type_label_short || bill.bill_type}</Badge>
             <Badge color={statusColor} size="sm">{displayStatus}</Badge>
           </div>
-          <div className="text-xs text-fg/60 truncate mt-0.5">
+          <div className="text-xs text-subtle truncate mt-0.5">
             {bill.customer_name || bill.primary_description || '—'}
             {bill.contract_code && <span className="font-mono ml-1.5">· {bill.contract_code}</span>}
           </div>

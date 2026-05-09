@@ -161,7 +161,7 @@ export function HoldingsPage() {
         <div className="flex items-center justify-between mb-4 flex-none max-md:hidden">
           <div>
             <h1 className="heading-2">{t('settings.holdings')}</h1>
-            <p className="text-sm text-fg/60 mt-1">{t('settings.holdingsDesc')}</p>
+            <p className="text-sm text-subtle mt-1">{t('settings.holdingsDesc')}</p>
           </div>
           <Button size="sm" color="primary" startIcon={<Plus size={16} />} onClick={openCreate}>
             {t('org.addHolding')}
@@ -180,14 +180,14 @@ export function HoldingsPage() {
           sorting={sorting}
           onSortingChange={setSorting}
           className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
-          noResults={<div className="p-8 text-center text-control-label">{isLoading ? t('common.loading') : t('common.noData')}</div>}
+          noResults={<div className="p-8 text-center text-subtle">{isLoading ? t('common.loading') : t('common.noData')}</div>}
         />
 
         {/* Mobile cards */}
         <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60' : ''}`}>
           <div className="flex-1 overflow-auto better-scroll pb-8">
             {filtered.length === 0 ? (
-              <div className="p-8 text-center text-control-label">{isLoading ? t('common.loading') : t('common.noData')}</div>
+              <div className="p-8 text-center text-subtle">{isLoading ? t('common.loading') : t('common.noData')}</div>
             ) : (
               <div className="flex flex-col divide-y divide-line">
                 {filtered.map(h => (

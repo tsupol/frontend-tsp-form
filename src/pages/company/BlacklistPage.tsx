@@ -285,7 +285,7 @@ function LiftBlacklistModal({ open, onClose, entry }: {
             </div>
           )}
           {entry && (
-            <div className="text-sm text-fg/60 mb-4">
+            <div className="text-sm text-subtle mb-4">
               {entry.customer_name} ({entry.national_id})
             </div>
           )}
@@ -435,7 +435,7 @@ export function BlacklistPage() {
         <div className="flex items-center justify-between mb-4 flex-none max-md:hidden">
           <div>
             <h1 className="heading-2">{t('settings.blacklist.title')}</h1>
-            <p className="text-sm text-fg/60 mt-1">{t('settings.blacklist.description')}</p>
+            <p className="text-sm text-subtle mt-1">{t('settings.blacklist.description')}</p>
           </div>
           <Button color="primary" startIcon={<Plus size={16} />} onClick={() => setCreateOpen(true)}>
             {t('settings.blacklist.addToBlacklist')}
@@ -474,7 +474,7 @@ export function BlacklistPage() {
           }}
           className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
           noResults={
-            <div className="p-8 text-center text-control-label">
+            <div className="p-8 text-center text-subtle">
               {isLoading ? t('common.loading') : t('settings.blacklist.empty')}
             </div>
           }
@@ -484,7 +484,7 @@ export function BlacklistPage() {
         <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
           <div className="flex-1 overflow-auto better-scroll pb-8">
             {entries.length === 0 ? (
-              <div className="p-8 text-center text-control-label">
+              <div className="p-8 text-center text-subtle">
                 {isLoading ? t('common.loading') : t('settings.blacklist.empty')}
               </div>
             ) : (
@@ -501,7 +501,7 @@ export function BlacklistPage() {
                           {entry.is_active ? t('settings.blacklist.statusActive') : t('settings.blacklist.statusLifted')}
                         </Badge>
                       </div>
-                      <div className="text-xs text-fg/60 tabular-nums mt-0.5">{entry.national_id}</div>
+                      <div className="text-xs text-subtle tabular-nums mt-0.5">{entry.national_id}</div>
                       <div className="text-xs text-fg/40 mt-0.5">{entry.reason}</div>
                     </div>
                     <RowActions

@@ -246,7 +246,7 @@ export function EnrollRedirectPage() {
         <div className="max-w-sm w-full text-center">
           <AlertCircle size={64} className="text-danger mx-auto mb-4" />
           <h1 className="heading-2 mb-2">{t('enrollRedirect.invalidLink')}</h1>
-          <p className="text-control-label">{t('enrollRedirect.invalidLinkDesc')}</p>
+          <p className="text-subtle">{t('enrollRedirect.invalidLinkDesc')}</p>
         </div>
       </div>
     );
@@ -265,7 +265,7 @@ export function EnrollRedirectPage() {
           <h1 className="heading-2 mb-2">
             {downloaded ? t('enrollRedirect.profileDownloaded') : t('enrollRedirect.readyToInstall')}
           </h1>
-          <p className="text-control-label mb-6">
+          <p className="text-subtle mb-6">
             {downloaded ? t('enrollRedirect.profileDownloadedDesc') : t('enrollRedirect.readyToInstallDesc')}
           </p>
 
@@ -310,7 +310,7 @@ export function EnrollRedirectPage() {
           )}
 
           {downloaded && (
-            <p className="text-sm text-control-label">
+            <p className="text-sm text-subtle">
               {t('enrollRedirect.goToSettings')}
             </p>
           )}
@@ -336,7 +336,7 @@ export function EnrollRedirectPage() {
         <div className="max-w-sm w-full text-center">
           <AlertCircle size={64} className="text-warning mx-auto mb-4" />
           <h1 className="heading-2 mb-2">{t('enrollRedirect.safariRequired')}</h1>
-          <p className="text-control-label mb-6">{t('enrollRedirect.safariRequiredDesc')}</p>
+          <p className="text-subtle mb-6">{t('enrollRedirect.safariRequiredDesc')}</p>
 
           <Button
             variant="outline"
@@ -347,7 +347,7 @@ export function EnrollRedirectPage() {
             {t('enrollRedirect.openInSafari')}
           </Button>
 
-          <div className="text-sm text-control-label space-y-2">
+          <div className="text-sm text-subtle space-y-2">
             <p className="font-medium">{t('enrollRedirect.manualSteps')}</p>
             <ol className="text-left list-decimal list-inside space-y-1">
               <li>{t('enrollRedirect.step1')}</li>
@@ -366,7 +366,7 @@ export function EnrollRedirectPage() {
       <div className="max-w-sm w-full text-center">
         <AlertCircle size={64} className="text-warning mx-auto mb-4" />
         <h1 className="heading-2 mb-2">{t('enrollRedirect.iosOnly')}</h1>
-        <p className="text-control-label">{t('enrollRedirect.iosOnlyDesc')}</p>
+        <p className="text-subtle">{t('enrollRedirect.iosOnlyDesc')}</p>
       </div>
     </div>
   );

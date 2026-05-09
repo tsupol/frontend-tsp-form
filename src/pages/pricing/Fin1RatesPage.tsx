@@ -165,7 +165,7 @@ function Fin1Modal({ open, onClose, categories, onSuccess }: {
                       renderOption={(opt) => (
                         <div>
                           <div className="text-sm">{opt.label}</div>
-                          <div className="text-[11px] text-control-label">{categoryCodes.get(opt.value)}</div>
+                          <div className="text-[11px] text-subtle">{categoryCodes.get(opt.value)}</div>
                         </div>
                       )}
                     />
@@ -366,7 +366,7 @@ export function Fin1RatesPage() {
       cell: ({ row }) => (
         <div>
           <div className="text-sm font-medium">{row.original.category_name}</div>
-          <div className="text-[11px] text-control-label">{row.original.category_code}</div>
+          <div className="text-[11px] text-subtle">{row.original.category_code}</div>
         </div>
       ),
     },
@@ -375,7 +375,7 @@ export function Fin1RatesPage() {
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('fin1.model')} />,
       cell: ({ row }) => (
         <span className="text-sm">
-          {row.original.model_name ?? <span className="text-control-label">{t('fin1.categoryDefault')}</span>}
+          {row.original.model_name ?? <span className="text-subtle">{t('fin1.categoryDefault')}</span>}
         </span>
       ),
     },
@@ -396,13 +396,13 @@ export function Fin1RatesPage() {
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('fin1.rateDetails')} />,
       cell: ({ row }) => (
         <div className="grid grid-cols-[auto_1fr_auto_1fr] gap-x-3 gap-y-0.5 text-sm">
-          <span className="text-[11px] text-control-label">{t('fin1.down')}</span>
+          <span className="text-[11px] text-subtle">{t('fin1.down')}</span>
           <span className="tabular-nums">{row.original.down_percent}%</span>
-          <span className="text-[11px] text-control-label">{t('fin1.interest')}</span>
+          <span className="text-[11px] text-subtle">{t('fin1.interest')}</span>
           <span className="tabular-nums">{row.original.interest_percent_total}%</span>
-          <span className="text-[11px] text-control-label">{t('fin1.rounding')}</span>
+          <span className="text-[11px] text-subtle">{t('fin1.rounding')}</span>
           <span className="tabular-nums">{row.original.rounding_unit}</span>
-          <span className="text-[11px] text-control-label">{t('fin1.maxDisc')}</span>
+          <span className="text-[11px] text-subtle">{t('fin1.maxDisc')}</span>
           <span className="tabular-nums">{row.original.max_discount_percent}%</span>
         </div>
       ),
@@ -462,7 +462,7 @@ export function Fin1RatesPage() {
           }}
           className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
           noResults={
-            <div className="p-8 text-center text-control-label">
+            <div className="p-8 text-center text-subtle">
               {t('fin1.empty')}
             </div>
           }
@@ -472,7 +472,7 @@ export function Fin1RatesPage() {
         <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
           <div className="flex-1 overflow-auto better-scroll pb-8">
             {rateCards.length === 0 ? (
-              <div className="p-8 text-center text-control-label">
+              <div className="p-8 text-center text-subtle">
                 {t('fin1.empty')}
               </div>
             ) : (
@@ -482,7 +482,7 @@ export function Fin1RatesPage() {
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="font-medium truncate">{card.category_name}</div>
-                        <div className="text-xs text-control-label">
+                        <div className="text-xs text-subtle">
                           {card.category_code}
                           {card.model_name && <span> &middot; {card.model_name}</span>}
                         </div>
@@ -498,19 +498,19 @@ export function Fin1RatesPage() {
                     </div>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-control-label">{t('fin1.downPercent')}</span>
+                        <span className="text-subtle">{t('fin1.downPercent')}</span>
                         <span className="tabular-nums">{card.down_percent}%</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-control-label">{t('fin1.interestPercent')}</span>
+                        <span className="text-subtle">{t('fin1.interestPercent')}</span>
                         <span className="tabular-nums">{card.interest_percent_total}%</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-control-label">{t('fin1.roundingUnit')}</span>
+                        <span className="text-subtle">{t('fin1.roundingUnit')}</span>
                         <span className="tabular-nums">{card.rounding_unit}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-control-label">{t('fin1.maxDiscount')}</span>
+                        <span className="text-subtle">{t('fin1.maxDiscount')}</span>
                         <span className="tabular-nums">{card.max_discount_percent}%</span>
                       </div>
                     </div>

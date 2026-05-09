@@ -616,7 +616,7 @@ export function BrandsPage() {
             }}
             className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
             noResults={
-              <div className="p-8 text-center text-control-label">
+              <div className="p-8 text-center text-subtle">
                 {t('brandsModels.noBrands')}
               </div>
             }
@@ -628,7 +628,7 @@ export function BrandsPage() {
           <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
             <div className="flex-1 overflow-auto better-scroll pb-8">
               {brands.length === 0 ? (
-                <div className="p-8 text-center text-control-label">
+                <div className="p-8 text-center text-subtle">
                   {t('brandsModels.noBrands')}
                 </div>
               ) : (
@@ -637,7 +637,7 @@ export function BrandsPage() {
                     <div key={brand.id} className="flex items-center gap-3 px-1 py-3">
                       <div className="flex-1 min-w-0">
                         <div className="font-medium truncate">{brand.code}</div>
-                        <div className="text-sm text-control-label truncate">{brand.name}</div>
+                        <div className="text-sm text-subtle truncate">{brand.name}</div>
                       </div>
                       <div className="shrink-0">
                         <Badge size="sm" color={brand.is_active ? 'success' : 'danger'}>

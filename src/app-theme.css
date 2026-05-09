@@ -34,8 +34,8 @@
 }
 
 [data-theme="light"] {
-    --color-subtle: #70737c;
-    --color-subtler: #a0a3ab;
+    --color-subtle: #555;
+    --color-subtler: #999;
     --color-figure: #4a4d55;
     --color-qty: #555960;
     --color-bg: #f3f3f6;

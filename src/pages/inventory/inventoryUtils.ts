@@ -55,7 +55,7 @@ export const CONDITION_CONFIG: Record<string, { labelKey: string; textColor: str
   NEW: { labelKey: 'inventory.conditionNEW', textColor: 'text-success' },
   REFURBISHED: { labelKey: 'inventory.conditionREFURBISHED', textColor: 'text-info' },
   USED_A: { labelKey: 'inventory.conditionUSED_A', textColor: 'text-warning' },
-  USED_B: { labelKey: 'inventory.conditionUSED_B', textColor: 'text-fg/60' },
+  USED_B: { labelKey: 'inventory.conditionUSED_B', textColor: 'text-subtle' },
 };
 
 export function getConditionLabel(condition: string, t: (key: string) => string): string {
@@ -64,7 +64,7 @@ export function getConditionLabel(condition: string, t: (key: string) => string)
 }
 
 export function getConditionTextColor(condition: string): string {
-  return CONDITION_CONFIG[condition]?.textColor ?? 'text-fg/60';
+  return CONDITION_CONFIG[condition]?.textColor ?? 'text-subtle';
 }
 
 export const CONDITION_OPTIONS = [

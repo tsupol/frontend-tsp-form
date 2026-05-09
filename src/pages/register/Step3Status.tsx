@@ -42,7 +42,7 @@ export function Step3Status() {
           <Skeleton variant="text" width="80%" height={16} className="mx-auto" />
         </div>
 
-        <div className="text-center text-sm text-control-label">
+        <div className="text-center text-sm text-subtle">
           <Clock size={16} className="inline mr-2" />
           {t('register.processing')}
         </div>
@@ -73,7 +73,7 @@ export function Step3Status() {
           {config.icon}
         </div>
         <h2 className="text-xl font-semibold mb-2">{config.title}</h2>
-        <p className="text-control-label">{config.description}</p>
+        <p className="text-subtle">{config.description}</p>
       </div>
 
       <div className="flex gap-3">
