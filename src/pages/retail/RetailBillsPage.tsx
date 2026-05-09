@@ -13,6 +13,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { DateTime } from '../../components/DateTime';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { fmtCurrency } from '../../lib/format';
+import { buildBillActionToast, hasBill, type StandardBillResponse } from '../../lib/billActionToast';
 import { CreateRetailBillModal } from './CreateRetailBillModal';
 import { useBillActions, type BillAction, type BillBlockingReason } from '../../hooks/useBillActions';
 
@@ -672,22 +673,23 @@ function VoidBillModal({
   const valid = reason.trim().length > 0 && pin.length === 6;
 
   const mutation = useMutation({
-    mutationFn: () => apiClient.rpc('fn_bill_cancel', {
+    mutationFn: () => apiClient.rpc<Partial<StandardBillResponse>>('fn_bill_cancel', {
       p_bill_id: billId,
       p_branch_id: branchId,
       p_pin: pin,
       p_reason: reason.trim(),
     }),
-    onSuccess: () => {
-      addSnackbar({
-        type: 'success',
-        message: (
+    onSuccess: (result) => {
+      // Retail void on a PAID bill mints a CREDIT_NOTE — surface its code if so.
+      const message = hasBill(result) && result.bill_type === 'CREDIT_NOTE'
+        ? buildBillActionToast(result, t)
+        : (
           <div className="alert alert-success">
             <CheckCircle size={16} />
             <span className="alert-description">{t('retail.bills.voidSuccess')}</span>
           </div>
-        ),
-      });
+        );
+      addSnackbar({ type: 'success', message });
       onSuccess();
     },
     onError: (err) => {

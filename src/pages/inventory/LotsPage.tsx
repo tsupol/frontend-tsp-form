@@ -3,16 +3,18 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
 import {
-  PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, Modal, TextArea,
+  PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, Modal, TextArea, NumberSpinner,
   DataTable, PopOver, Tooltip, useSnackbarContext,
 } from 'tsp-form';
 import {
-  ArrowLeft, ArrowRightFromLine, Boxes, Search, CheckCircle, XCircle, ChevronDown, Wrench, Plus, Trash2, ExternalLink,
+  ArrowLeft, ArrowRight, ArrowRightFromLine, Boxes, Search, CheckCircle, XCircle, ChevronDown, Wrench, Plus, Trash2, ExternalLink, SlidersHorizontal,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
+import { CopyButton } from '../../components/CopyButton';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { getBucketLabel, getBucketColor, fmtNum } from './inventoryUtils';
 
 // ============================================================================
@@ -116,6 +118,16 @@ const SIMPLE_ACTIONS: Record<string, LotSimpleActionConfig> = {
     color: 'primary',
     successKey: 'success.convert_to_asset',
   },
+  LOT_TRANSFER_CREATE: {
+    rpc: 'fn_inv_transfer_create',
+    color: 'primary',
+    successKey: 'success.transfer_create',
+  },
+  LOT_TRANSFER_ADD_LINE: {
+    rpc: 'fn_inv_transfer_add_line',
+    color: 'primary',
+    successKey: 'success.transfer_add_line',
+  },
 };
 
 // Up to 3 actions surfaced inline as primary; rest go behind "More".
@@ -151,8 +163,24 @@ export function LotsPage() {
   const [filterBucket, setFilterBucket] = useState<string | null>('ON_HAND_AVAILABLE');
   const [filterBranchId, setFilterBranchId] = useState<number | null>(defaultBranchId);
   const [filterPoType, setFilterPoType] = useState<string | null>(null);
+  const [filterPopoverOpen, setFilterPopoverOpen] = useState(false);
+  const filterTriggerRef = useRef<HTMLButtonElement>(null);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
+
+  const PO_TYPE_OPTIONS = [
+    { value: 'PURCHASE', label: 'Purchase' },
+    { value: 'BUYBACK', label: 'Buyback' },
+    { value: 'ADJUSTMENT', label: 'Adjustment' },
+    { value: 'DEAL_PARTNER', label: 'Deal Partner' },
+  ];
+
+  const isMdOrBelow = useMediaQuery('(max-width: 767px)');
+  const isLgOrBelow = useMediaQuery('(max-width: 1023px)');
+  const hiddenActiveFilters = [
+    isMdOrBelow && filterBranchId != null,
+    isLgOrBelow && filterPoType != null,
+  ].filter(Boolean).length;
 
   useEffect(() => {
     const tm = setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -205,6 +233,8 @@ export function LotsPage() {
     queryClient.invalidateQueries({ queryKey: ['lots'] });
     queryClient.invalidateQueries({ queryKey: ['lot-detail'] });
     queryClient.invalidateQueries({ queryKey: ['lot-actions'] });
+    queryClient.invalidateQueries({ queryKey: ['lot-open-transfers'] });
+    queryClient.invalidateQueries({ queryKey: ['lot-assets'] });
   };
 
   return (
@@ -240,62 +270,117 @@ export function LotsPage() {
             </div>
           )}
 
+          {/* ── Filter bar — full-width, spans both panels (pricebook pattern) ── */}
+          {(isRoot || !isMobile) && (
+            <div className="flex-none p-2 border-b border-line">
+              <div className="flex items-center gap-2 w-full">
+                <div className="flex-1 min-w-0">
+                  <Input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder={t('lot.search')}
+                    size="sm"
+                    startIcon={<Search size={16} />}
+                  />
+                </div>
+                <div className="flex-1 min-w-0 hidden sm:block">
+                  <Select
+                    options={BUCKET_OPTIONS}
+                    value={filterBucket}
+                    onChange={(val) => setFilterBucket((val as string) || null)}
+                    placeholder={t('lot.allBuckets')}
+                    size="sm"
+                    showChevron
+                    clearable
+                  />
+                </div>
+                <div className="flex-1 min-w-0 hidden md:block">
+                  <Select
+                    options={branchOptions}
+                    value={filterBranchId !== null ? String(filterBranchId) : null}
+                    onChange={(val) => setFilterBranchId(val ? Number(val) : null)}
+                    placeholder={t('inventory.allBranches')}
+                    size="sm"
+                    showChevron
+                    clearable
+                  />
+                </div>
+                <div className="flex-1 min-w-0 hidden lg:block">
+                  <Select
+                    options={PO_TYPE_OPTIONS}
+                    value={filterPoType}
+                    onChange={(val) => setFilterPoType((val as string) || null)}
+                    placeholder={t('lot.allPoTypes')}
+                    size="sm"
+                    showChevron
+                    clearable
+                  />
+                </div>
+                <PopOver
+                  isOpen={filterPopoverOpen}
+                  onClose={() => setFilterPopoverOpen(false)}
+                  triggerRef={filterTriggerRef}
+                  placement="bottom"
+                  align="end"
+                  maxWidth="320px"
+                >
+                  <div className="flex flex-col gap-3 p-3">
+                    <div className="text-xs font-medium text-subtle uppercase tracking-wide">{t('common.filters')}</div>
+                    <div className="sm:hidden flex flex-col gap-2">
+                      <Select
+                        options={BUCKET_OPTIONS}
+                        value={filterBucket}
+                        onChange={(val) => setFilterBucket((val as string) || null)}
+                        placeholder={t('lot.allBuckets')}
+                        size="sm"
+                        showChevron
+                        clearable
+                      />
+                    </div>
+                    <div className="md:hidden flex flex-col gap-2">
+                      <Select
+                        options={branchOptions}
+                        value={filterBranchId !== null ? String(filterBranchId) : null}
+                        onChange={(val) => setFilterBranchId(val ? Number(val) : null)}
+                        placeholder={t('inventory.allBranches')}
+                        size="sm"
+                        showChevron
+                        clearable
+                      />
+                    </div>
+                    <div className="lg:hidden flex flex-col gap-2">
+                      <Select
+                        options={PO_TYPE_OPTIONS}
+                        value={filterPoType}
+                        onChange={(val) => setFilterPoType((val as string) || null)}
+                        placeholder={t('lot.allPoTypes')}
+                        size="sm"
+                        showChevron
+                        clearable
+                      />
+                    </div>
+                  </div>
+                </PopOver>
+                <Button
+                  ref={filterTriggerRef}
+                  size="sm"
+                  variant="outline"
+                  className={`relative btn-icon-sm shrink-0 lg:hidden ${hiddenActiveFilters > 0 ? 'text-primary' : ''}`}
+                  onClick={() => setFilterPopoverOpen((v) => !v)}
+                >
+                  <SlidersHorizontal size={14} />
+                  {hiddenActiveFilters > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 bg-primary text-white text-xs rounded-full w-4 h-4 flex items-center justify-center leading-none">
+                      {hiddenActiveFilters}
+                    </span>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+
           <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
             <PageNavPanel id="list" className={isMobile ? '' : 'w-1/2 xl:w-5/12 border-r border-line flex flex-col'}>
-              <div className="flex-none flex flex-col gap-2 p-2 border-b border-line">
-                <div className="flex gap-2 w-full">
-                  <div className="flex-[3] min-w-0">
-                    <Input
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      placeholder={t('lot.search')}
-                      size="sm"
-                      startIcon={<Search size={16} />}
-                    />
-                  </div>
-                  <div className="flex-[2] min-w-0">
-                    <Select
-                      options={BUCKET_OPTIONS}
-                      value={filterBucket}
-                      onChange={(val) => setFilterBucket((val as string) || null)}
-                      placeholder={t('lot.allBuckets')}
-                      size="sm"
-                      showChevron
-                      clearable
-                    />
-                  </div>
-                </div>
-                <div className="flex gap-2 w-full">
-                  <div className="flex-[2] min-w-0">
-                    <Select
-                      options={branchOptions}
-                      value={filterBranchId !== null ? String(filterBranchId) : null}
-                      onChange={(val) => setFilterBranchId(val ? Number(val) : null)}
-                      placeholder={t('inventory.allBranches')}
-                      size="sm"
-                      showChevron
-                      clearable
-                    />
-                  </div>
-                  <div className="flex-[2] min-w-0">
-                    <Select
-                      options={[
-                        { value: 'PURCHASE', label: 'Purchase' },
-                        { value: 'BUYBACK', label: 'Buyback' },
-                        { value: 'ADJUSTMENT', label: 'Adjustment' },
-                        { value: 'DEAL_PARTNER', label: 'Deal Partner' },
-                      ]}
-                      value={filterPoType}
-                      onChange={(val) => setFilterPoType((val as string) || null)}
-                      placeholder={t('lot.allPoTypes')}
-                      size="sm"
-                      showChevron
-                      clearable
-                    />
-                  </div>
-                </div>
-              </div>
-
               <DataTable<Lot>
                 data={list}
                 renderRow={(row) => {
@@ -374,6 +459,23 @@ export function LotsPage() {
 // Detail panel
 // ============================================================================
 
+interface OpenTransferLine {
+  id: number;
+  transfer_order_id: number;
+  to_branch_name: string | null;
+  qty_requested: number | null;
+  status: string;
+}
+
+interface TransferNo {
+  transfer_order_id: number;
+  transfer_no: string;
+}
+
+interface AssetFromLot {
+  asset_id: number;
+}
+
 function LotDetailPanel({
   lot,
   loading,
@@ -390,9 +492,92 @@ function LotDetailPanel({
   addSnackbar: (opts: { message: React.ReactNode }) => void;
 }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [activeAction, setActiveAction] = useState<BackendLotAction | null>(null);
 
-  const handleSuccess = (key: string) => {
+  // Open (not-yet-received) transfer lines that move this lot
+  const { data: openTransfers = [] } = useQuery({
+    queryKey: ['lot-open-transfers', lot.lot_id],
+    queryFn: () => apiClient.get<OpenTransferLine[]>(
+      `/v_transfer_lines?stock_lot_id=eq.${lot.lot_id}&status=neq.RECEIVED`
+      + '&select=id,transfer_order_id,to_branch_name,qty_requested,status&order=created_at.desc',
+    ),
+    staleTime: 30 * 1000,
+  });
+
+  // Resolve transfer_no for each open transfer (v_transfer_lines doesn't carry it).
+  const transferIds = useMemo(
+    () => Array.from(new Set(openTransfers.map(tl => tl.transfer_order_id))),
+    [openTransfers],
+  );
+  const { data: transferNos = [] } = useQuery({
+    queryKey: ['lot-open-transfer-nos', lot.lot_id, transferIds.join(',')],
+    queryFn: () => apiClient.get<TransferNo[]>(
+      `/v_transfer_orders?transfer_order_id=in.(${transferIds.join(',')})`
+      + '&select=transfer_order_id,transfer_no',
+    ),
+    enabled: transferIds.length > 0,
+    staleTime: 60 * 1000,
+  });
+  const transferNoById = useMemo(
+    () => new Map(transferNos.map(t => [t.transfer_order_id, t.transfer_no])),
+    [transferNos],
+  );
+
+  // Assets registered from this lot — count only (full list lives on AssetsPage)
+  const { data: assetCountData } = useQuery({
+    queryKey: ['lot-assets', lot.lot_id],
+    queryFn: () => apiClient.getPaginated<AssetFromLot>(
+      `/v_assets?source_lot_id=eq.${lot.lot_id}&order=created_at.desc&select=asset_id`,
+      { page: 1, pageSize: 1 },
+    ),
+    staleTime: 30 * 1000,
+  });
+  const assetCount = assetCountData?.totalCount ?? 0;
+
+  // Track transfer-line ids we've already shown so animations only fire for
+  // newly added items after a user action — not on initial mount/page revisit.
+  // Reset whenever the lot changes so a different lot's existing transfers
+  // don't get treated as fresh.
+  const seenTransferIds = useRef<Set<number>>(new Set());
+  const [freshTransferIds, setFreshTransferIds] = useState<Set<number>>(new Set());
+  const firstSeenForLot = useRef<number | null>(null);
+  useEffect(() => {
+    // Lot changed → reset trackers and treat the next-arrived list as initial.
+    if (firstSeenForLot.current !== lot.lot_id) {
+      seenTransferIds.current = new Set();
+      setFreshTransferIds(new Set());
+      firstSeenForLot.current = null;
+    }
+  }, [lot.lot_id]);
+  useEffect(() => {
+    // First non-empty list after a lot switch → mark all current ids as seen
+    // (no animation on initial view).
+    if (firstSeenForLot.current === lot.lot_id) return;
+    if (openTransfers.length === 0) return;
+    openTransfers.forEach(tl => seenTransferIds.current.add(tl.id));
+    firstSeenForLot.current = lot.lot_id;
+  }, [openTransfers, lot.lot_id]);
+  // After a user action, any id not yet in `seenTransferIds` is fresh.
+  useEffect(() => {
+    if (firstSeenForLot.current !== lot.lot_id) return;
+    const newlyAdded = openTransfers
+      .map(tl => tl.id)
+      .filter(id => !seenTransferIds.current.has(id));
+    if (newlyAdded.length === 0) return;
+    newlyAdded.forEach(id => seenTransferIds.current.add(id));
+    setFreshTransferIds(prev => {
+      const next = new Set(prev);
+      newlyAdded.forEach(id => next.add(id));
+      return next;
+    });
+    const timer = setTimeout(() => {
+      setFreshTransferIds(new Set());
+    }, 1100);
+    return () => clearTimeout(timer);
+  }, [openTransfers, lot.lot_id]);
+
+  const handleSuccess = (key: string, navigateTo?: string) => {
     setActiveAction(null);
     onRefresh();
     addSnackbar({
@@ -403,6 +588,7 @@ function LotDetailPanel({
         </div>
       ),
     });
+    if (navigateTo) navigate(navigateTo);
   };
 
   return (
@@ -416,6 +602,7 @@ function LotDetailPanel({
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
           <span className="font-semibold">{lot.lot_code}</span>
+          <CopyButton value={lot.lot_code} />
           <Badge size="xs" color={getBucketColor(lot.current_bucket)}>
             {getBucketLabel(lot.current_bucket, t)}
           </Badge>
@@ -441,9 +628,12 @@ function LotDetailPanel({
       {/* Quantity + value — two prominent stats */}
       <div className="flex-none grid grid-cols-2 gap-3 px-4 py-3 border-b border-line bg-surface">
         <div>
-          <div className="text-xs text-subtle">{t('lot.onHand')}</div>
+          <div className="text-xs">
+            <span className="text-fg">{t('lot.onHandLabel')}</span>
+            <span className="text-subtle"> / {t('lot.receivedLabel')}</span>
+          </div>
           <div className="font-semibold text-base tabular-nums">
-            {fmtNum(lot.qty_on_hand)}
+            <span className="text-fg">{fmtNum(lot.qty_on_hand)}</span>
             <span className="text-subtle font-normal text-sm"> / {fmtNum(lot.qty_received)}</span>
           </div>
           <div className="text-xs text-subtle tabular-nums">
@@ -474,6 +664,21 @@ function LotDetailPanel({
         </div>
       )}
 
+      {/* Assets registered from this lot — surface conversion history */}
+      {assetCount > 0 && (
+        <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-2 text-sm">
+          <span className="text-xs text-subtle shrink-0">{t('lot.assets')}</span>
+          <Badge size="xs" color="default">{assetCount}</Badge>
+          <Link
+            to={`/admin/inventory/assets?source_lot_id=${lot.lot_id}`}
+            className="inline-flex items-center gap-1 text-primary hover:underline font-medium ml-auto"
+          >
+            {t('lot.viewAllAssets')}
+            <ExternalLink size={12} />
+          </Link>
+        </div>
+      )}
+
       {/* Branch + timestamps — quiet metadata footer */}
       <div className="flex-none px-4 py-2 border-b border-line flex flex-wrap gap-x-4 gap-y-1 text-xs text-subtle">
         <span><span className="text-subtler">{t('lot.branch')}:</span> {branchName || '—'}</span>
@@ -482,6 +687,40 @@ function LotDetailPanel({
           <span><span className="text-subtler">{t('lot.closedAt')}:</span> <DateTime value={lot.closed_at} /></span>
         )}
       </div>
+
+      {/* Open transfers — last content row, just above the action bar */}
+      {openTransfers.length > 0 && (
+        <div className="flex-none px-4 py-2.5 border-b border-line">
+          <div className="text-xs font-semibold text-subtle uppercase tracking-wider mb-2">
+            {t('lot.inTransfer')} ({openTransfers.length})
+          </div>
+          <div className="flex flex-col gap-2.5">
+            {openTransfers.map((tl) => {
+              const transferNo = transferNoById.get(tl.transfer_order_id);
+              const isFresh = freshTransferIds.has(tl.id);
+              return (
+                <div key={tl.id} className={`flex flex-col gap-0.5 ${isFresh ? 'animate-pop-highlight' : ''}`}>
+                  <div className="flex items-center gap-2">
+                    <Link
+                      to={`/admin/inventory/transfers/${tl.transfer_order_id}`}
+                      className="inline-flex items-center gap-1 text-primary hover:underline text-xs font-medium tabular-nums"
+                    >
+                      {transferNo ?? `#${tl.transfer_order_id}`}
+                      <ExternalLink size={11} />
+                    </Link>
+                    <Badge size="xs" color="warning" className="ml-auto">{tl.status}</Badge>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[11px] text-subtle">
+                    <ArrowRight size={10} className="opacity-60" />
+                    <span>{tl.to_branch_name ?? '?'}</span>
+                    <span className="tabular-nums ml-auto">{fmtNum(tl.qty_requested ?? 0)} {t('lot.units')}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Spacer */}
       <div className="flex-1" />
@@ -659,6 +898,26 @@ interface IdRow {
   value: string;
 }
 
+interface BranchOption {
+  id: number;
+  name: string;
+  company_id: number;
+  branch_type: string;
+}
+
+interface DraftTransfer {
+  transfer_order_id: number;
+  transfer_no: string;
+  to_branch_name: string | null;
+  total_lines: number;
+  created_at: string;
+}
+
+const TRANSFER_MODE_OPTIONS = [
+  { value: 'FREE_TRANSFER', label: 'Free transfer' },
+  { value: 'COST_PRICE_INTERNAL', label: 'Cost-price internal sale' },
+];
+
 function LotActionModal({
   open,
   action,
@@ -670,17 +929,29 @@ function LotActionModal({
   action: BackendLotAction | null;
   onClose: () => void;
   lot: Lot;
-  onSuccess: (msgKey: string) => void;
+  onSuccess: (msgKey: string, navigateTo?: string) => void;
 }) {
   const { t } = useTranslation();
   const config = action ? SIMPLE_ACTIONS[action.action_code] : null;
 
   const isConvert = action?.action_code === 'LOT_CONVERT_TO_ASSET';
+  const isTransferCreate = action?.action_code === 'LOT_TRANSFER_CREATE';
+  const isTransferAddLine = action?.action_code === 'LOT_TRANSFER_ADD_LINE';
 
-  // Convert-specific state — inputs for one unit at a time.
+  // Convert-specific state
   const [identifiers, setIdentifiers] = useState<IdRow[]>([{ type: 'SERIAL_NO', value: '' }]);
   const [conditionGrade, setConditionGrade] = useState<string>('NEW');
   const [physicalColor, setPhysicalColor] = useState('');
+
+  // Transfer-create state
+  const [toBranchId, setToBranchId] = useState<number | null>(null);
+  const [transferMode, setTransferMode] = useState<string>('FREE_TRANSFER');
+  const [transferQty, setTransferQty] = useState<number | ''>(1);
+
+  // Transfer-add-line state
+  const [pickedTransferId, setPickedTransferId] = useState<number | null>(null);
+
+  // Shared
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
 
@@ -689,32 +960,106 @@ function LotActionModal({
       setIdentifiers([{ type: 'SERIAL_NO', value: '' }]);
       setConditionGrade('NEW');
       setPhysicalColor('');
+      setToBranchId(null);
+      setTransferMode('FREE_TRANSFER');
+      setTransferQty(1);
+      setPickedTransferId(null);
       setNote('');
       setError('');
     }
   }, [open, action]);
 
+  // Branch picker — same company, not the source branch, INTERNAL only.
+  const { data: branches = [] } = useQuery({
+    queryKey: ['branches', 'transfer-target', lot.company_id],
+    queryFn: () =>
+      apiClient.get<BranchOption[]>(
+        `/v_branches?company_id=eq.${lot.company_id}&is_active=is.true&order=name`,
+      ),
+    enabled: open && isTransferCreate,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const branchOptions = useMemo(
+    () => branches
+      .filter(b => b.id !== lot.branch_id && !['EXTERNAL', 'DEAL_PARTNER'].includes(b.branch_type))
+      .map(b => ({ value: String(b.id), label: b.name })),
+    [branches, lot.branch_id],
+  );
+
+  // DRAFT transfers from this lot's branch — for Add-line.
+  const { data: draftTransfers = [] } = useQuery({
+    queryKey: ['transfer-orders', 'draft', lot.branch_id],
+    queryFn: () =>
+      apiClient.get<DraftTransfer[]>(
+        `/v_transfer_orders?from_branch_id=eq.${lot.branch_id}&status=eq.DRAFT&order=created_at.desc`,
+      ),
+    enabled: open && isTransferAddLine,
+    staleTime: 30 * 1000,
+  });
+
+  const transferOptions = useMemo(
+    () => draftTransfers.map(tr => ({
+      value: String(tr.transfer_order_id),
+      label: `${tr.transfer_no} → ${tr.to_branch_name ?? '?'} (${tr.total_lines} lines)`,
+    })),
+    [draftTransfers],
+  );
+
   const filledIds = identifiers.filter(i => i.type && i.value.trim());
+  const transferQtyNum = typeof transferQty === 'number' ? transferQty : 0;
 
   const mutation = useMutation({
-    mutationFn: () => {
-      if (!action || !config) return Promise.reject(new Error('No action'));
-      if (action.action_code !== 'LOT_CONVERT_TO_ASSET') {
-        return Promise.reject(new Error('Action not wired'));
+    mutationFn: async () => {
+      if (!action || !config) throw new Error('No action');
+
+      if (action.action_code === 'LOT_CONVERT_TO_ASSET') {
+        const params = {
+          p_lot_id: lot.lot_id,
+          p_variant_id: null as number | null,
+          p_identifiers: filledIds.map(i => ({ type: i.type, value: i.value.trim() })),
+          p_condition_grade: conditionGrade || null,
+          p_physical_color: physicalColor.trim() || null,
+          p_dedupe_key: `lot-convert-${lot.lot_id}-${Date.now()}`,
+          p_branch_id: lot.branch_id,
+        };
+        return { resp: await apiClient.rpc(config.rpc, params), navigateTo: undefined as string | undefined };
       }
-      // PostgREST overload: send every key, null for blanks.
-      const params = {
-        p_lot_id: lot.lot_id,
-        p_variant_id: null as number | null,
-        p_identifiers: filledIds.map(i => ({ type: i.type, value: i.value.trim() })),
-        p_condition_grade: conditionGrade || null,
-        p_physical_color: physicalColor.trim() || null,
-        p_dedupe_key: `lot-convert-${lot.lot_id}-${Date.now()}`,
-        p_branch_id: lot.branch_id,
-      };
-      return apiClient.rpc(config.rpc, params);
+
+      if (action.action_code === 'LOT_TRANSFER_CREATE') {
+        // Two-step: create the transfer, then add this lot as line 1.
+        const created = await apiClient.rpc<{ transfer_order_id: number }>('fn_inv_transfer_create', {
+          p_to_branch_id: toBranchId,
+          p_transfer_mode: transferMode,
+          p_notes: note.trim() || null,
+          p_branch_id: lot.branch_id,
+        });
+        await apiClient.rpc('fn_inv_transfer_add_line', {
+          p_transfer_order_id: created.transfer_order_id,
+          p_line_type: 'LOT',
+          p_stock_lot_id: lot.lot_id,
+          p_asset_id: null,
+          p_qty_requested: transferQtyNum,
+        });
+        return { resp: created, navigateTo: undefined as string | undefined };
+      }
+
+      if (action.action_code === 'LOT_TRANSFER_ADD_LINE') {
+        await apiClient.rpc('fn_inv_transfer_add_line', {
+          p_transfer_order_id: pickedTransferId,
+          p_line_type: 'LOT',
+          p_stock_lot_id: lot.lot_id,
+          p_asset_id: null,
+          p_qty_requested: transferQtyNum,
+        });
+        // Don't navigate — the new line will appear in the lot's "In transfer"
+        // section automatically (cache invalidates).
+        return { resp: null, navigateTo: undefined as string | undefined };
+      }
+
+      throw new Error('Action not wired');
     },
-    onSuccess: () => onSuccess(config!.successKey),
+    onSuccess: ({ navigateTo }) => onSuccess(config!.successKey, navigateTo),
     onError: (err) => {
       if (err instanceof ApiError) {
         const translated =
@@ -727,7 +1072,10 @@ function LotActionModal({
     },
   });
 
-  const canSubmit = isConvert && filledIds.length > 0 && !!conditionGrade && !mutation.isPending;
+  const convertValid = isConvert && filledIds.length > 0 && !!conditionGrade;
+  const transferCreateValid = isTransferCreate && !!toBranchId && !!transferMode && transferQtyNum > 0 && transferQtyNum <= lot.qty_on_hand;
+  const transferAddLineValid = isTransferAddLine && !!pickedTransferId && transferQtyNum > 0 && transferQtyNum <= lot.qty_on_hand;
+  const canSubmit = (convertValid || transferCreateValid || transferAddLineValid) && !mutation.isPending;
   const label = action ? t(action.action_code, { ns: 'lotActions', defaultValue: action.action_code }) : '';
 
   return (
@@ -840,6 +1188,105 @@ function LotActionModal({
                   </div>
                 </div>
               </>
+            )}
+
+            {isTransferCreate && (
+              <div className="form-grid gap-4">
+                <div className="flex flex-col">
+                  <label className="form-label">
+                    {t('transfer.toBranch', { ns: 'lotActions', defaultValue: 'Destination branch' })} *
+                  </label>
+                  <Select
+                    options={branchOptions}
+                    value={toBranchId !== null ? String(toBranchId) : null}
+                    onChange={(v) => setToBranchId(v ? Number(v) : null)}
+                    placeholder={t('transfer.selectBranch', { ns: 'lotActions', defaultValue: 'Select destination' })}
+                    searchable
+                    showChevron
+                  />
+                  {branches.length > 0 && branchOptions.length === 0 && (
+                    <div className="text-xs text-danger mt-1">
+                      {t('transfer.noEligibleBranch', { ns: 'lotActions', defaultValue: 'No eligible destination branch in this company' })}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-3">
+                  <div className="shrink-0 flex flex-col">
+                    <label className="form-label">
+                      {t('transfer.qty', { ns: 'lotActions', defaultValue: 'Qty' })} *
+                    </label>
+                    <NumberSpinner
+                      value={transferQty}
+                      onChange={setTransferQty}
+                      min={1}
+                      max={lot.qty_on_hand}
+                    />
+                    <div className="text-xs text-subtle mt-1 tabular-nums">
+                      {t('lot.remaining')}: {fmtNum(lot.qty_on_hand)}
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0 flex flex-col">
+                    <label className="form-label">
+                      {t('transfer.mode', { ns: 'lotActions', defaultValue: 'Transfer mode' })} *
+                    </label>
+                    <Select
+                      options={TRANSFER_MODE_OPTIONS}
+                      value={transferMode}
+                      onChange={(v) => setTransferMode((v as string) || '')}
+                      showChevron
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col">
+                  <label className="form-label">{t('transfer.note', { ns: 'lotActions', defaultValue: 'Note' })}</label>
+                  <TextArea
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    rows={2}
+                    placeholder={t('transfer.notePlaceholder', { ns: 'lotActions', defaultValue: 'Optional context' })}
+                  />
+                </div>
+              </div>
+            )}
+
+            {isTransferAddLine && (
+              <div className="form-grid gap-4">
+                <div className="flex flex-col">
+                  <label className="form-label">
+                    {t('transfer.pickDraft', { ns: 'lotActions', defaultValue: 'Add to which draft transfer?' })} *
+                  </label>
+                  <Select
+                    options={transferOptions}
+                    value={pickedTransferId !== null ? String(pickedTransferId) : null}
+                    onChange={(v) => setPickedTransferId(v ? Number(v) : null)}
+                    placeholder={t('transfer.selectDraft', { ns: 'lotActions', defaultValue: 'Select a draft transfer' })}
+                    searchable
+                    showChevron
+                  />
+                  {draftTransfers.length === 0 && (
+                    <div className="text-xs text-subtle mt-1">
+                      {t('transfer.noDrafts', { ns: 'lotActions', defaultValue: 'No draft transfers from this branch — use "Create transfer" instead.' })}
+                    </div>
+                  )}
+                </div>
+
+                <div className="shrink-0 flex flex-col">
+                  <label className="form-label">
+                    {t('transfer.qty', { ns: 'lotActions', defaultValue: 'Qty' })} *
+                  </label>
+                  <NumberSpinner
+                    value={transferQty}
+                    onChange={setTransferQty}
+                    min={1}
+                    max={lot.qty_on_hand}
+                  />
+                  <div className="text-xs text-subtle mt-1 tabular-nums">
+                    {t('lot.remaining')}: {fmtNum(lot.qty_on_hand)}
+                  </div>
+                </div>
+              </div>
             )}
           </div>
           <div className="modal-footer">

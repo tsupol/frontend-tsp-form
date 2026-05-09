@@ -27,9 +27,12 @@ const TODAY_KEY = '__today__';
 export function DayClosePage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { branchId: urlBranchId, date: urlDate } = useParams<{ branchId?: string; date?: string }>();
   const today = todayISO();
-  const [branchId, setBranchId] = useState<string>(urlBranchId ?? '');
+  const isBranchUser = ['BRANCH_STAFF', 'BRANCH_MANAGER'].includes(user?.role_code ?? '');
+  const userBranchId = isBranchUser && user?.branch_id ? String(user.branch_id) : '';
+  const [branchId, setBranchId] = useState<string>(urlBranchId ?? userBranchId);
   const [selectedDate, setSelectedDate] = useState<string>(urlDate ?? today);
   const [isTypingDate, setIsTypingDate] = useState(false);
   const [pageIndex, setPageIndex] = useState(0);
@@ -45,7 +48,6 @@ export function DayClosePage() {
   // Per-branch unclosed-day counts for the picker. Same view used by the global
   // nav badge (cached); here we want the per-branch rollup rows specifically,
   // not the company/holding aggregates — filter `branch_id=not.is.null`.
-  const { user } = useAuth();
   const showBranchBadges = branches.length > 1;
   const scope = defaultScopeFor(user);
   const sk = scopeKey(scope);
@@ -64,7 +66,7 @@ export function DayClosePage() {
     return m;
   }, [unclosedByBranch]);
 
-  const effectiveBranchId = branchId || (branches[0]?.id ? String(branches[0].id) : '');
+  const effectiveBranchId = branchId || userBranchId || (branches[0]?.id ? String(branches[0].id) : '');
 
   // Sync state ← URL: when params change, mirror them to state
   useEffect(() => {

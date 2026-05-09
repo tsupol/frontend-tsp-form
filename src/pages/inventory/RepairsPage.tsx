@@ -1,11 +1,12 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Modal, TextArea, DataTable, useSnackbarContext } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, Wrench, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, Wrench, CheckCircle, XCircle, ExternalLink } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
+import { CopyButton } from '../../components/CopyButton';
 import { useAuth } from '../../contexts/AuthContext';
 
 // ============================================================================
@@ -310,6 +311,7 @@ function RepairDetailPanel({
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
           <span className="font-semibold">{order.repair_no}</span>
+          <CopyButton value={order.repair_no} />
           <Badge size="xs" color={REPAIR_STATUS_COLOR[order.status] ?? 'default'}>
             {t(`repair.status_${order.status}`, order.status)}
           </Badge>
@@ -324,7 +326,13 @@ function RepairDetailPanel({
       <div className="flex-none grid grid-cols-2 gap-3 px-4 py-3 border-b border-line bg-surface">
         <div>
           <div className="text-xs text-subtle">{t('repair.asset')}</div>
-          <div className="font-semibold text-sm">{order.asset_code}</div>
+          <Link
+            to={`/admin/inventory/assets/${order.asset_id}`}
+            className="inline-flex items-center gap-1 font-semibold text-sm text-primary hover:underline"
+          >
+            {order.asset_code}
+            <ExternalLink size={12} />
+          </Link>
           <div className="text-xs text-subtle">
             {[order.brand_name, order.family_name, order.model_name].filter(Boolean).join(' > ')}
           </div>
@@ -341,7 +349,13 @@ function RepairDetailPanel({
       {order.loaner_asset_id && (
         <div className="flex-none px-4 py-2.5 border-b border-line">
           <div className="text-xs text-subtle mb-0.5">{t('repair.loaner')}</div>
-          <div className="text-sm font-medium">{order.loaner_asset_code}</div>
+          <Link
+            to={`/admin/inventory/assets/${order.loaner_asset_id}`}
+            className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+          >
+            {order.loaner_asset_code}
+            <ExternalLink size={11} />
+          </Link>
           {order.loaner_serial_no && <div className="text-xs text-fg/50 font-mono">{order.loaner_serial_no}</div>}
         </div>
       )}

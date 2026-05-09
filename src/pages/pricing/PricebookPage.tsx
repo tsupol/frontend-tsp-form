@@ -7,6 +7,7 @@ import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useFormSnapshot } from '../../hooks/useFormSnapshot';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { ModelName } from '../../components/ModelName';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -805,7 +806,16 @@ export function PricebookPage() {
   const filteredFamilies = filterBrand ? families.filter(f => String(f.brand_id) === filterBrand) : families;
   const familyOptions = filteredFamilies.map((f) => ({ value: String(f.id), label: f.display_name }));
   const baseModelOptions = baseModels.map((name) => ({ value: name, label: name }));
-  const activeFilterCount = [filterBrand, filterFamily, filterBaseModel, filterNeedsSetup].filter(Boolean).length;
+  const isSmOrBelow = useMediaQuery('(max-width: 639px)');
+  const isMdOrBelow = useMediaQuery('(max-width: 767px)');
+  const isLgOrBelow = useMediaQuery('(max-width: 1023px)');
+  const isXlOrBelow = useMediaQuery('(max-width: 1279px)');
+  const hiddenActiveFilters = [
+    isSmOrBelow && !!filterBrand,
+    isMdOrBelow && !!filterFamily,
+    isLgOrBelow && !!filterBaseModel,
+    isXlOrBelow && !!filterNeedsSetup,
+  ].filter(Boolean).length;
 
   // Fetch models via fuzzy-search RPC (handles both empty and non-empty queries via fast path)
   const { data: searchData, isError, error, isFetching } = useQuery({
@@ -1039,9 +1049,9 @@ export function PricebookPage() {
                       trigger={
                         <Button variant="outline" size="sm" className="relative btn-icon-sm" onClick={() => setFilterOpen(!filterOpen)}>
                           <SlidersHorizontal size={16} />
-                          {activeFilterCount > 0 && (
+                          {hiddenActiveFilters > 0 && (
                             <span className="absolute -top-1.5 -right-1.5 bg-primary text-white text-xs rounded-full w-4 h-4 flex items-center justify-center leading-none">
-                              {activeFilterCount}
+                              {hiddenActiveFilters}
                             </span>
                           )}
                         </Button>

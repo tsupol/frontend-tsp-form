@@ -1,12 +1,14 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSearchParams, useParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, Modal, TextArea, DataTable, PopOver, Tooltip, useSnackbarContext } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, Box, Search, SlidersHorizontal, CheckCircle, XCircle, ChevronDown, ShoppingCart, ExternalLink, Wrench } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, Box, Search, SlidersHorizontal, XCircle, ChevronDown, ShoppingCart, ExternalLink, Wrench } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
+import { CopyButton } from '../../components/CopyButton';
 import { fmtCurrency } from '../../lib/format';
+import { buildBillActionToast, type StandardBillResponse } from '../../lib/billActionToast';
 import { useAuth } from '../../contexts/AuthContext';
 import { getBucketLabel, getBucketColor, getConditionLabel, getConditionTextColor, CONDITION_OPTIONS } from './inventoryUtils';
 
@@ -342,9 +344,21 @@ export function AssetsPage() {
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
   const { user } = useAuth();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const view = searchParams.get('view');
   const isSaleView = view === 'sale';
+
+  // Source filters (deep-link from lot/PO detail pages)
+  const sourceLotIdParam = searchParams.get('source_lot_id');
+  const sourcePoIdParam = searchParams.get('source_po_id');
+  const sourceLotId = sourceLotIdParam ? Number(sourceLotIdParam) : null;
+  const sourcePoId = sourcePoIdParam ? Number(sourcePoIdParam) : null;
+  const clearSourceFilter = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('source_lot_id');
+    next.delete('source_po_id');
+    setSearchParams(next, { replace: true });
+  };
 
   const isBranchUser = ['BRANCH_STAFF', 'BRANCH_MANAGER'].includes(user?.role_code ?? '');
   const defaultBranchId = isBranchUser && user?.branch_id ? user.branch_id : null;
@@ -356,14 +370,15 @@ export function AssetsPage() {
   const [filterCondition, setFilterCondition] = useState<string | null>(null);
   const [filterBrand, setFilterBrand] = useState<string>('');
   const [filterFamily, setFilterFamily] = useState<string>('');
-  const [filtersExpanded, setFiltersExpanded] = useState(isBranchUser);
+  const [filterPopoverOpen, setFilterPopoverOpen] = useState(false);
+  const filterTriggerRef = useRef<HTMLButtonElement>(null);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
   const navigate = useNavigate();
   const { assetId: assetIdParam } = useParams<{ assetId?: string }>();
   const selectedId = assetIdParam ? Number(assetIdParam) : null;
   const setSelectedId = (id: number | null) => {
-    // Preserve ?view=sale (or any other query string) when changing selection.
+    // Preserve ?view=sale and other query params when changing selection.
     const qs = searchParams.toString();
     const suffix = qs ? `?${qs}` : '';
     if (id) navigate(`/admin/inventory/assets/${id}${suffix}`, { replace: true });
@@ -415,10 +430,12 @@ export function AssetsPage() {
   const extraFilterCount = [filterBrand, filterFamily, filterCondition].filter(Boolean).length;
 
   const { data: listData, isFetching } = useQuery({
-    queryKey: ['assets', isSaleView, debouncedSearch, filterBucket, filterBranchId, filterCondition, filterBrand, filterFamily, pageIndex, pageSize],
+    queryKey: ['assets', isSaleView, debouncedSearch, filterBucket, filterBranchId, filterCondition, filterBrand, filterFamily, sourceLotId, sourcePoId, pageIndex, pageSize],
     queryFn: () => {
       let url = '/v_assets?order=created_at.desc';
       if (isSaleView) url += '&is_sellable=eq.true';
+      if (sourceLotId) url += `&source_lot_id=eq.${sourceLotId}`;
+      if (sourcePoId) url += `&source_po_id=eq.${sourcePoId}`;
       if (filterBucket) url += `&current_bucket=eq.${filterBucket}`;
       if (filterBranchId) url += `&branch_id=eq.${filterBranchId}`;
       if (filterCondition === 'USED') url += `&condition_grade=in.(USED_A,USED_B)`;
@@ -436,7 +453,7 @@ export function AssetsPage() {
   const list = listData?.data ?? [];
   const totalCount = listData?.totalCount ?? 0;
 
-  useEffect(() => { setPageIndex(0); }, [debouncedSearch, filterBucket, filterBranchId, filterCondition, filterBrand, filterFamily]);
+  useEffect(() => { setPageIndex(0); }, [debouncedSearch, filterBucket, filterBranchId, filterCondition, filterBrand, filterFamily, sourceLotId, sourcePoId]);
 
   // Fallback fetch so direct deep-links (id not on current page) still resolve.
   const { data: detailFallback } = useQuery({
@@ -486,74 +503,126 @@ export function AssetsPage() {
             </div>
           )}
 
-          <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
-            <PageNavPanel id="list" className={isMobile ? '' : 'w-1/2 xl:w-5/12 border-r border-line flex flex-col'}>
-              <div className="flex-none flex flex-col gap-2 p-2 border-b border-line">
-                <div className="flex gap-2 w-full">
-                  <div className="flex-[2] min-w-0">
-                    <Input
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      placeholder={t('asset.search')}
-                      size="sm"
-                      startIcon={<Search size={16} />}
-                    />
-                  </div>
-                  <div className="flex-[2] min-w-0">
-                    <Select
-                      options={BUCKET_OPTIONS}
-                      value={filterBucket}
-                      onChange={(val) => setFilterBucket((val as string) || null)}
-                      placeholder={t('asset.allStatuses')}
-                      size="sm"
-                      showChevron
-                      clearable
-                    />
-                  </div>
-                  <div className="flex-[2] min-w-0">
-                    <Select
-                      options={branchOptions}
-                      value={filterBranchId !== null ? String(filterBranchId) : null}
-                      onChange={(val) => setFilterBranchId(val ? Number(val) : null)}
-                      placeholder={t('asset.allBranches')}
-                      size="sm"
-                      showChevron
-                      clearable
-                    />
-                  </div>
-                  <Button
-                    size="sm"
-                    className={`btn-icon-sm shrink-0 ${filtersExpanded || extraFilterCount > 0 ? 'text-primary' : ''}`}
-                    onClick={() => setFiltersExpanded(!filtersExpanded)}
-                  >
-                    <SlidersHorizontal size={14} />
-                  </Button>
+          {/* ── Filter bar — full-width, spans both panels (pricebook pattern) ── */}
+          {(isRoot || !isMobile) && (
+            <div className="flex-none flex flex-col gap-2 p-2 border-b border-line">
+              {(sourceLotId || sourcePoId) && (
+                <div className="flex items-center gap-2">
+                  <Badge size="sm" color="primary">
+                    <span className="inline-flex items-center gap-1">
+                      {sourceLotId
+                        ? <>{t('asset.filteredBySourceLot')}: <span className="tabular-nums">#{sourceLotId}</span></>
+                        : <>{t('asset.filteredBySourcePo')}: <span className="tabular-nums">#{sourcePoId}</span></>}
+                      <button
+                        type="button"
+                        aria-label="Clear source filter"
+                        onClick={clearSourceFilter}
+                        className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-sm hover:bg-fg/20 cursor-pointer"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  </Badge>
                 </div>
-                {filtersExpanded && (
-                  <div className="flex gap-2 w-full">
-                    <div className="flex-1 min-w-0">
+              )}
+              <div className="flex items-center gap-2 w-full">
+                <div className="flex-1 min-w-0">
+                  <Input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder={t('asset.search')}
+                    size="sm"
+                    startIcon={<Search size={16} />}
+                  />
+                </div>
+                <div className="flex-1 min-w-0 hidden sm:block">
+                  <Select
+                    options={BUCKET_OPTIONS}
+                    value={filterBucket}
+                    onChange={(val) => setFilterBucket((val as string) || null)}
+                    placeholder={t('asset.allStatuses')}
+                    size="sm"
+                    showChevron
+                    clearable
+                  />
+                </div>
+                <div className="flex-1 min-w-0 hidden md:block">
+                  <Select
+                    options={branchOptions}
+                    value={filterBranchId !== null ? String(filterBranchId) : null}
+                    onChange={(val) => setFilterBranchId(val ? Number(val) : null)}
+                    placeholder={t('asset.allBranches')}
+                    size="sm"
+                    showChevron
+                    clearable
+                  />
+                </div>
+                <div className="flex-1 min-w-0 hidden lg:block">
+                  <Select
+                    options={CONDITION_OPTIONS}
+                    value={filterCondition}
+                    onChange={(val) => setFilterCondition((val as string) || null)}
+                    placeholder={t('asset.allConditions')}
+                    size="sm"
+                    showChevron
+                    clearable
+                  />
+                </div>
+                <div className="flex-1 min-w-0 hidden xl:block">
+                  <Select
+                    options={brandOptions}
+                    value={filterBrand || null}
+                    onChange={(val) => { setFilterBrand((val as string) || ''); setPageIndex(0); }}
+                    placeholder={t('asset.allBrands')}
+                    size="sm"
+                    showChevron
+                    clearable
+                  />
+                </div>
+                <div className="flex-1 min-w-0 hidden 2xl:block">
+                  <Select
+                    options={familyOptions}
+                    value={filterFamily || null}
+                    onChange={(val) => { setFilterFamily((val as string) || ''); setPageIndex(0); }}
+                    placeholder={t('asset.allFamilies')}
+                    size="sm"
+                    showChevron
+                    clearable
+                  />
+                </div>
+                <PopOver
+                  isOpen={filterPopoverOpen}
+                  onClose={() => setFilterPopoverOpen(false)}
+                  triggerRef={filterTriggerRef}
+                  placement="bottom"
+                  align="end"
+                  maxWidth="320px"
+                >
+                  <div className="flex flex-col gap-3 p-3">
+                    <div className="text-xs font-medium text-subtle uppercase tracking-wide">{t('common.filters')}</div>
+                    <div className="sm:hidden flex flex-col gap-2">
                       <Select
-                        options={brandOptions}
-                        value={filterBrand || null}
-                        onChange={(val) => { setFilterBrand((val as string) || ''); setPageIndex(0); }}
-                        placeholder={t('asset.allBrands')}
+                        options={BUCKET_OPTIONS}
+                        value={filterBucket}
+                        onChange={(val) => setFilterBucket((val as string) || null)}
+                        placeholder={t('asset.allStatuses')}
                         size="sm"
                         showChevron
                         clearable
                       />
                     </div>
-                    <div className="flex-1 min-w-0">
+                    <div className="md:hidden flex flex-col gap-2">
                       <Select
-                        options={familyOptions}
-                        value={filterFamily || null}
-                        onChange={(val) => { setFilterFamily((val as string) || ''); setPageIndex(0); }}
-                        placeholder={t('asset.allFamilies')}
+                        options={branchOptions}
+                        value={filterBranchId !== null ? String(filterBranchId) : null}
+                        onChange={(val) => setFilterBranchId(val ? Number(val) : null)}
+                        placeholder={t('asset.allBranches')}
                         size="sm"
                         showChevron
                         clearable
                       />
                     </div>
-                    <div className="flex-1 min-w-0">
+                    <div className="lg:hidden flex flex-col gap-2">
                       <Select
                         options={CONDITION_OPTIONS}
                         value={filterCondition}
@@ -564,10 +633,50 @@ export function AssetsPage() {
                         clearable
                       />
                     </div>
+                    <div className="xl:hidden flex flex-col gap-2">
+                      <Select
+                        options={brandOptions}
+                        value={filterBrand || null}
+                        onChange={(val) => { setFilterBrand((val as string) || ''); setPageIndex(0); }}
+                        placeholder={t('asset.allBrands')}
+                        size="sm"
+                        showChevron
+                        clearable
+                      />
+                    </div>
+                    <div className="2xl:hidden flex flex-col gap-2">
+                      <Select
+                        options={familyOptions}
+                        value={filterFamily || null}
+                        onChange={(val) => { setFilterFamily((val as string) || ''); setPageIndex(0); }}
+                        placeholder={t('asset.allFamilies')}
+                        size="sm"
+                        showChevron
+                        clearable
+                      />
+                    </div>
                   </div>
-                )}
+                </PopOver>
+                <Button
+                  ref={filterTriggerRef}
+                  size="sm"
+                  variant="outline"
+                  className={`relative btn-icon-sm shrink-0 ${extraFilterCount > 0 ? 'text-primary' : ''}`}
+                  onClick={() => setFilterPopoverOpen((v) => !v)}
+                >
+                  <SlidersHorizontal size={14} />
+                  {extraFilterCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 bg-primary text-white text-xs rounded-full w-4 h-4 flex items-center justify-center leading-none">
+                      {extraFilterCount}
+                    </span>
+                  )}
+                </Button>
               </div>
+            </div>
+          )}
 
+          <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
+            <PageNavPanel id="list" className={isMobile ? '' : 'w-1/2 xl:w-5/12 border-r border-line flex flex-col'}>
               <DataTable<Asset>
                 data={list}
                 renderRow={(row) => {
@@ -674,6 +783,7 @@ function AssetDetailPanel({
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
           <span className="font-semibold">{asset.asset_code}</span>
+          <CopyButton value={asset.asset_code} />
           <Badge size="xs" color={getBucketColor(asset.current_bucket)}>
             {getBucketLabel(asset.current_bucket, t)}
           </Badge>
@@ -759,9 +869,25 @@ function AssetDetailPanel({
         {(asset.source_po_id || asset.source_lot_id) && (
           <div>
             <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-1">{t('asset.source')}</h3>
-            <div className="flex gap-4 text-xs">
-              {asset.source_po_id && <span>{t('asset.sourcePO')}: #{asset.source_po_id}</span>}
-              {asset.source_lot_id && <span>{t('asset.sourceLot')}: #{asset.source_lot_id}</span>}
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+              {asset.source_po_id && (
+                <Link
+                  to={`/admin/inventory/po/${asset.source_po_id}`}
+                  className="inline-flex items-center gap-1 text-primary hover:underline"
+                >
+                  {t('asset.sourcePO')}: #{asset.source_po_id}
+                  <ExternalLink size={11} />
+                </Link>
+              )}
+              {asset.source_lot_id && (
+                <Link
+                  to={`/admin/inventory/lots/${asset.source_lot_id}`}
+                  className="inline-flex items-center gap-1 text-primary hover:underline"
+                >
+                  {t('asset.sourceLot')}: #{asset.source_lot_id}
+                  <ExternalLink size={11} />
+                </Link>
+              )}
             </div>
           </div>
         )}
@@ -829,16 +955,13 @@ function AssetDetailPanel({
         onClose={() => setActiveAction(null)}
         asset={asset}
         t={t}
-        onSuccess={(msgKey) => {
+        onSuccess={(msgKey, response) => {
           setActiveAction(null);
           onRefresh();
           addSnackbar({
-            message: (
-              <div className="alert alert-success">
-                <CheckCircle size={16} />
-                <span>{t(msgKey, { ns: 'assetActions' })}</span>
-              </div>
-            ),
+            message: buildBillActionToast(response, t, {
+              actionLabel: t(msgKey, { ns: 'assetActions' }),
+            }),
           });
         }}
       />
@@ -1002,7 +1125,7 @@ function AssetActionModal({
   onClose: () => void;
   asset: Asset;
   t: ReturnType<typeof useTranslation>['t'];
-  onSuccess: (msgKey: string) => void;
+  onSuccess: (msgKey: string, response: Partial<StandardBillResponse>) => void;
 }) {
   const [reason, setReason] = useState<string | null>(null);
   const [note, setNote] = useState('');
@@ -1104,9 +1227,9 @@ function AssetActionModal({
         delete params[config.arrayPriceField.from];
       }
 
-      return apiClient.rpc(config.rpc, params);
+      return apiClient.rpc<Partial<StandardBillResponse>>(config.rpc, params);
     },
-    onSuccess: () => onSuccess(config!.successKey),
+    onSuccess: (data) => onSuccess(config!.successKey, data),
     onError: (err) => {
       if (err instanceof ApiError) {
         const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';

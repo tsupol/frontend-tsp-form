@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -6,6 +6,7 @@ import { Button, Modal, Input, Select, TextArea, MaskedInput, Badge, Tooltip, Po
 import { CheckCircle, XCircle, Pencil, Plus, Trash2, Loader2, ChevronsRight, ChevronDown, ExternalLink, Wrench } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { fmtCurrency } from '../../lib/format';
+import { buildBillActionToast, type StandardBillResponse } from '../../lib/billActionToast';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { DateTime } from '../../components/DateTime';
 import { CompleteContractModal } from './CompleteContractModal';
@@ -733,12 +734,12 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   const isAppointmentCancel = activeAction === 'appointment_cancel';
   const isRefundVoid = activeAction === 'settlement_refund_void';
 
-  const handleSuccess = (msgKey: string) => {
+  const handleSuccess = (msgKey: string, override?: ReactNode) => {
     setActiveAction(null);
     onRefresh();
     queryClient.invalidateQueries({ queryKey: ['contract-actions', contract.id] });
     addSnackbar({
-      message: (
+      message: override ?? (
         <div className="alert alert-success">
           <CheckCircle size={16} />
           <span>{t(msgKey)}</span>
@@ -2018,7 +2019,7 @@ function PayInstallmentModal({ open, contract, onClose, onSuccess }: {
   open: boolean;
   contract: ContractForActions;
   onClose: () => void;
-  onSuccess: (msgKey: string) => void;
+  onSuccess: (msgKey: string, override?: ReactNode) => void;
 }) {
   const { t } = useTranslation();
 
@@ -2115,18 +2116,21 @@ function PayInstallmentModal({ open, contract, onClose, onSuccess }: {
   };
 
   const mutation = useMutation({
-    mutationFn: async () => {
-      await apiClient.rpc('fn_contract_installment_pay', {
-        p_contract_id: contract.id,
-        p_amount: parsedAmount,
-        p_channel: channel,
-        p_branch_id: contract.branch_id,
-        p_bank_account_id: channel === 'TRANSFER' && bankAccountId ? Number(bankAccountId) : null,
-        p_reference: reference.trim() || null,
-        p_note: note.trim() || null,
-      });
-    },
-    onSuccess: () => onSuccess('contract.action_pay_installment_success'),
+    mutationFn: () => apiClient.rpc<Partial<StandardBillResponse>>('fn_contract_installment_pay', {
+      p_contract_id: contract.id,
+      p_amount: parsedAmount,
+      p_channel: channel,
+      p_branch_id: contract.branch_id,
+      p_bank_account_id: channel === 'TRANSFER' && bankAccountId ? Number(bankAccountId) : null,
+      p_reference: reference.trim() || null,
+      p_note: note.trim() || null,
+    }),
+    onSuccess: (result) => onSuccess(
+      'contract.action_pay_installment_success',
+      buildBillActionToast(result, t, {
+        actionLabel: t('contract.action_pay_installment_success'),
+      }),
+    ),
     onError: setApiError,
   });
 

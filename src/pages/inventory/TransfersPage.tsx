@@ -1,11 +1,13 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Modal, TextArea, DataTable, useSnackbarContext } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, ArrowLeftRight, CheckCircle, XCircle } from 'lucide-react';
+import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Modal, TextArea, NumberSpinner, DataTable, useSnackbarContext } from 'tsp-form';
+import { ArrowLeft, ArrowRightFromLine, ArrowLeftRight, CheckCircle, XCircle, Trash2, ExternalLink } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { DateTime } from '../../components/DateTime';
+import { CopyButton } from '../../components/CopyButton';
 import { fmtNum } from './inventoryUtils';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -14,7 +16,7 @@ import { useAuth } from '../../contexts/AuthContext';
 // ============================================================================
 
 interface TransferOrder {
-  id: number;
+  transfer_order_id: number;
   holding_id: number;
   company_id: number;
   from_branch_id: number;
@@ -22,20 +24,16 @@ interface TransferOrder {
   to_branch_id: number;
   to_branch_name: string | null;
   transfer_no: string;
-  code_display: string | null;
   transfer_mode: string;
   status: string;
-  notes: string | null;
-  dispute_note: string | null;
-  c_total_lines: number;
-  c_received_lines: number;
+  total_lines: number;
+  received_lines: number;
   approved_at: string | null;
-  approved_by: number | null;
   dispatched_at: string | null;
   completed_at: string | null;
-  approved_by_name: string | null;
-  created_by_name: string | null;
-  created_by: number | null;
+  dispute_note: string | null;
+  dispute_resolved_at: string | null;
+  dispute_resolved_by: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -172,11 +170,11 @@ export function TransfersPage() {
   // Fallback fetch so direct deep-links (id not on current page) still resolve.
   const { data: detailFallback } = useQuery({
     queryKey: ['transfer-order-detail', selectedId],
-    queryFn: () => apiClient.get<TransferOrder[]>(`/v_transfer_orders?id=eq.${selectedId}`).then(r => r[0] ?? null),
-    enabled: !!selectedId && !list.find(o => o.id === selectedId),
+    queryFn: () => apiClient.get<TransferOrder[]>(`/v_transfer_orders?transfer_order_id=eq.${selectedId}`).then(r => r[0] ?? null),
+    enabled: !!selectedId && !list.find(o => o.transfer_order_id === selectedId),
   });
 
-  const selectedOrder = list.find(o => o.id === selectedId) ?? detailFallback ?? null;
+  const selectedOrder = list.find(o => o.transfer_order_id === selectedId) ?? detailFallback ?? null;
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['transfer-orders'] });
@@ -246,14 +244,14 @@ export function TransfersPage() {
                 data={list}
                 renderRow={(row) => {
                   const order = row.original;
-                  const isSelected = order.id === selectedId;
+                  const isSelected = order.transfer_order_id === selectedId;
                   return (
                     <button
-                      key={order.id}
+                      key={order.transfer_order_id}
                       className={`w-full text-left px-4 py-2.5 border-b border-line flex items-start gap-3 transition-colors cursor-pointer ${
                         isSelected ? 'bg-item-active-bg text-item-active-fg' : 'hover:bg-surface-hover'
                       }`}
-                      onClick={() => { setSelectedId(order.id); if (isMobile) goTo('detail'); }}
+                      onClick={() => { setSelectedId(order.transfer_order_id); if (isMobile) goTo('detail'); }}
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 min-w-0">
@@ -265,7 +263,7 @@ export function TransfersPage() {
                       </div>
                       <div className="text-right shrink-0 flex flex-col items-end">
                         <div className="text-xs text-subtle">
-                          <DateTime value={order.created_at} /> ({fmtNum(order.c_total_lines ?? 0)})
+                          <DateTime value={order.created_at} /> ({fmtNum(order.total_lines ?? 0)})
                         </div>
                         <Badge size="xs" color={TRANSFER_STATUS_COLOR[order.status] ?? 'default'} className="mt-0.5">
                           {t(`transfer.status_${order.status}`, order.status)}
@@ -334,9 +332,12 @@ function TransferDetailPanel({
   addSnackbar: (opts: { message: React.ReactNode }) => void;
 }) {
   const [approveModalOpen, setApproveModalOpen] = useState(false);
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [receiveLine, setReceiveLine] = useState<TransferLine | null>(null);
 
   const canApprove = order.status === 'DRAFT';
+  const canEditLines = order.status === 'DRAFT';
+  const canCancel = order.status === 'DRAFT' || order.status === 'APPROVED';
   const canReceive = order.status === 'IN_TRANSIT' || order.status === 'DISPUTED';
 
   return (
@@ -350,6 +351,7 @@ function TransferDetailPanel({
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
           <span className="font-semibold">{order.transfer_no}</span>
+          <CopyButton value={order.transfer_no} />
           <Badge size="xs" color={TRANSFER_STATUS_COLOR[order.status] ?? 'default'}>
             {t(`transfer.status_${order.status}`, order.status)}
           </Badge>
@@ -372,18 +374,18 @@ function TransferDetailPanel({
       </div>
 
       {/* Progress */}
-      {order.status !== 'DRAFT' && order.status !== 'CANCELLED' && order.c_total_lines > 0 && (
+      {order.status !== 'DRAFT' && order.status !== 'CANCELLED' && order.total_lines > 0 && (
         <div className="flex-none px-4 py-2.5 border-b border-line">
           <div className="flex items-center justify-between text-xs mb-1">
             <span className="text-subtle">{t('transfer.receivingProgress')}</span>
             <span className="tabular-nums font-medium">
-              {fmtNum(order.c_received_lines)} / {fmtNum(order.c_total_lines)}
+              {fmtNum(order.received_lines)} / {fmtNum(order.total_lines)}
             </span>
           </div>
           <div className="h-1.5 bg-fg/10 rounded-full overflow-hidden">
             <div
               className="h-full bg-primary rounded-full transition-all"
-              style={{ width: `${order.c_total_lines > 0 ? (order.c_received_lines / order.c_total_lines) * 100 : 0}%` }}
+              style={{ width: `${order.total_lines > 0 ? (order.received_lines / order.total_lines) * 100 : 0}%` }}
             />
           </div>
         </div>
@@ -391,15 +393,11 @@ function TransferDetailPanel({
 
       {/* Timestamps */}
       <div className="flex-none px-4 py-2 border-b border-line flex flex-wrap gap-x-6 gap-y-1 text-xs text-subtle">
-        <span>{t('transfer.created')}: <DateTime value={order.created_at} />{order.created_by_name && ` · ${order.created_by_name}`}</span>
-        {order.approved_at && <span>{t('transfer.approved')}: <DateTime value={order.approved_at} />{order.approved_by_name && ` · ${order.approved_by_name}`}</span>}
+        <span>{t('transfer.created')}: <DateTime value={order.created_at} /></span>
+        {order.approved_at && <span>{t('transfer.approved')}: <DateTime value={order.approved_at} /></span>}
         {order.dispatched_at && <span>{t('transfer.dispatched')}: <DateTime value={order.dispatched_at} /></span>}
         {order.completed_at && <span>{t('transfer.completed')}: <DateTime value={order.completed_at} /></span>}
       </div>
-
-      {order.notes && (
-        <div className="flex-none px-4 py-2 border-b border-line text-xs text-subtle italic">{order.notes}</div>
-      )}
 
       {order.dispute_note && (
         <div className="flex-none px-4 py-2 border-b border-line">
@@ -420,44 +418,34 @@ function TransferDetailPanel({
         {lines.length === 0 && !loading && (
           <div className="p-8 text-center text-subtler">{t('common.noData')}</div>
         )}
-        {lines.map((line) => {
-          const isPending = line.status === 'PENDING' || line.status === 'SHIPPED';
-          return (
-            <div key={line.id} className="px-4 py-2.5 border-b border-line flex items-center gap-3">
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium truncate">
-                  {line.line_type === 'ASSET' ? (line.asset_code ?? `Asset #${line.asset_id}`) : `Lot #${line.stock_lot_id}`}
-                </div>
-                <div className="text-xs text-subtle truncate">
-                  {[line.brand_name, line.model_name].filter(Boolean).join(' ')} · {line.variant_name ?? line.sku_code ?? ''}
-                </div>
-                {line.serial_no && <div className="text-xs text-fg/50 font-mono">{line.serial_no}</div>}
-                {line.receive_note && <div className="text-xs text-fg/50 mt-0.5 italic">{line.receive_note}</div>}
-              </div>
-              <div className="shrink-0 flex flex-col items-end gap-1">
-                <Badge size="xs" color={LINE_STATUS_COLOR[line.status] ?? 'default'}>
-                  {t(`transfer.lineStatus_${line.status}`, line.status)}
-                </Badge>
-                {line.line_type === 'LOT' && line.qty_requested !== null && (
-                  <span className="text-xs tabular-nums text-subtle">{line.qty_requested} pcs</span>
-                )}
-                {canReceive && isPending && (
-                  <Button size="sm" color="primary" onClick={() => setReceiveLine(line)}>
-                    {t('transfer.receive')}
-                  </Button>
-                )}
-              </div>
-            </div>
-          );
-        })}
+        {lines.map((line) => (
+          <TransferLineRow
+            key={line.id}
+            line={line}
+            canEdit={canEditLines}
+            canReceive={canReceive}
+            onReceive={() => setReceiveLine(line)}
+            onChanged={onRefresh}
+            t={t}
+          />
+        ))}
       </div>
 
       {/* Action buttons */}
-      {canApprove && (
-        <div className="flex-none px-4 py-3 border-t border-line">
-          <Button color="primary" className="w-full" onClick={() => setApproveModalOpen(true)}>
-            {t('transfer.approveTransfer')}
-          </Button>
+      {(canApprove || canCancel) && (
+        <div className="flex-none px-4 py-3 border-t border-line flex flex-wrap gap-2 items-center">
+          {canCancel && (
+            <Button size="sm" variant="outline" color="danger" onClick={() => setCancelModalOpen(true)}>
+              {t('transfer.cancelTransfer')}
+            </Button>
+          )}
+          <div className="ml-auto flex flex-wrap gap-2">
+            {canApprove && (
+              <Button size="sm" color="primary" onClick={() => setApproveModalOpen(true)}>
+                {t('transfer.approveTransfer')}
+              </Button>
+            )}
+          </div>
         </div>
       )}
 
@@ -474,6 +462,25 @@ function TransferDetailPanel({
               <div className="alert alert-success">
                 <CheckCircle size={16} />
                 <span>{t('transfer.approveSuccess')}</span>
+              </div>
+            ),
+          });
+        }}
+      />
+
+      <CancelTransferModal
+        open={cancelModalOpen}
+        onClose={() => setCancelModalOpen(false)}
+        order={order}
+        t={t}
+        onSuccess={() => {
+          setCancelModalOpen(false);
+          onRefresh();
+          addSnackbar({
+            message: (
+              <div className="alert alert-success">
+                <CheckCircle size={16} />
+                <span>{t('transfer.cancelSuccess')}</span>
               </div>
             ),
           });
@@ -529,7 +536,7 @@ function ApproveTransferModal({
   const mutation = useMutation({
     mutationFn: () =>
       apiClient.rpc('fn_inv_transfer_approve', {
-        p_transfer_order_id: order.id,
+        p_transfer_order_id: order.transfer_order_id,
         p_note: note || null,
       }),
     onSuccess,
@@ -560,7 +567,7 @@ function ApproveTransferModal({
           <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
             <div className="font-medium text-sm">{order.transfer_no}</div>
             <div className="text-xs text-subtle">{order.from_branch_name} → {order.to_branch_name}</div>
-            <div className="text-xs text-subtle">{order.c_total_lines} {t('transfer.lines')}</div>
+            <div className="text-xs text-subtle">{order.total_lines} {t('transfer.lines')}</div>
           </div>
           <div className="form-grid gap-4">
             <div className="flex flex-col">
@@ -695,6 +702,246 @@ function ReceiveLineModal({
             disabled={!action || (needsNote && !note.trim()) || mutation.isPending}
           >
             {mutation.isPending ? t('common.loading') : t('transfer.confirmReceive')}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ============================================================================
+// Transfer line row — handles edit qty + remove when DRAFT
+// ============================================================================
+
+function TransferLineRow({
+  line,
+  canEdit,
+  canReceive,
+  onReceive,
+  onChanged,
+  t,
+}: {
+  line: TransferLine;
+  canEdit: boolean;
+  canReceive: boolean;
+  onReceive: () => void;
+  onChanged: () => void;
+  t: ReturnType<typeof useTranslation>['t'];
+}) {
+  const [editingQty, setEditingQty] = useState<number | ''>(line.qty_requested ?? 1);
+  const [isEditing, setIsEditing] = useState(false);
+  const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
+
+  const updateMutation = useMutation({
+    mutationFn: () =>
+      apiClient.rpc('fn_inv_transfer_update_line', {
+        p_transfer_line_id: line.id,
+        p_qty_requested: typeof editingQty === 'number' ? editingQty : 0,
+      }),
+    onSuccess: () => {
+      setIsEditing(false);
+      onChanged();
+    },
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: () =>
+      apiClient.rpc('fn_inv_transfer_remove_line', { p_transfer_line_id: line.id }),
+    onSuccess: onChanged,
+  });
+
+  const isPending = line.status === 'PENDING' || line.status === 'SHIPPED';
+  // Only LOT lines support qty editing — assets are always qty 1.
+  const canEditQty = canEdit && line.line_type === 'LOT';
+
+  return (
+    <div className="px-4 py-2.5 border-b border-line">
+      <div className="flex items-center gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium truncate">
+            {line.line_type === 'ASSET' && line.asset_id ? (
+              <Link
+                to={`/admin/inventory/assets/${line.asset_id}`}
+                className="inline-flex items-center gap-1 text-primary hover:underline"
+              >
+                {line.asset_code ?? `Asset #${line.asset_id}`}
+                <ExternalLink size={11} />
+              </Link>
+            ) : line.line_type === 'LOT' && line.stock_lot_id ? (
+              <Link
+                to={`/admin/inventory/lots/${line.stock_lot_id}`}
+                className="inline-flex items-center gap-1 text-primary hover:underline"
+              >
+                Lot #{line.stock_lot_id}
+                <ExternalLink size={11} />
+              </Link>
+            ) : (
+              <span>{line.line_type === 'ASSET' ? `Asset #${line.asset_id}` : `Lot #${line.stock_lot_id}`}</span>
+            )}
+          </div>
+          <div className="text-xs text-subtle truncate">
+            {[line.brand_name, line.model_name].filter(Boolean).join(' ')}
+            {(line.variant_name || line.sku_code) && ` · ${line.variant_name ?? line.sku_code}`}
+          </div>
+          {line.serial_no && <div className="text-xs text-fg/50 font-mono">{line.serial_no}</div>}
+          {line.receive_note && <div className="text-xs text-fg/50 mt-0.5 italic">{line.receive_note}</div>}
+        </div>
+        <div className="shrink-0 flex flex-col items-end gap-1">
+          <Badge size="xs" color={LINE_STATUS_COLOR[line.status] ?? 'default'}>
+            {t(`transfer.lineStatus_${line.status}`, line.status)}
+          </Badge>
+          {line.line_type === 'LOT' && line.qty_requested !== null && !isEditing && (
+            <span
+              className={`text-xs tabular-nums ${canEditQty ? 'cursor-pointer text-primary hover:underline' : 'text-subtle'}`}
+              onClick={() => canEditQty && setIsEditing(true)}
+              title={canEditQty ? t('transfer.editQty') : undefined}
+            >
+              {line.qty_requested} pcs
+            </span>
+          )}
+          {canReceive && isPending && (
+            <Button size="sm" color="primary" onClick={onReceive}>
+              {t('transfer.receive')}
+            </Button>
+          )}
+        </div>
+        {canEdit && !isEditing && (
+          <Button
+            size="sm"
+            variant="ghost"
+            startIcon={<Trash2 size={14} />}
+            onClick={() => setConfirmRemoveOpen(true)}
+            disabled={removeMutation.isPending}
+          />
+        )}
+      </div>
+
+      {/* Inline edit — second row, full width */}
+      {isEditing && (
+        <div className="mt-2 flex items-center justify-end gap-1">
+          <NumberSpinner
+            scale="sm"
+            value={editingQty}
+            onChange={setEditingQty}
+            min={1}
+            className="w-24"
+          />
+          <Button
+            size="sm"
+            color="primary"
+            onClick={() => updateMutation.mutate()}
+            disabled={updateMutation.isPending || typeof editingQty !== 'number' || editingQty < 1}
+          >
+            {t('common.save')}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setEditingQty(line.qty_requested ?? 1);
+              setIsEditing(false);
+            }}
+          >
+            {t('common.cancel')}
+          </Button>
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={confirmRemoveOpen}
+        onClose={() => setConfirmRemoveOpen(false)}
+        onConfirm={() => { setConfirmRemoveOpen(false); removeMutation.mutate(); }}
+        message={t('transfer.confirmRemoveLine')}
+        confirmLabel={t('common.delete')}
+        pending={removeMutation.isPending}
+      />
+    </div>
+  );
+}
+
+// ============================================================================
+// Cancel Transfer Modal
+// ============================================================================
+
+function CancelTransferModal({
+  open,
+  onClose,
+  order,
+  t,
+  onSuccess,
+}: {
+  open: boolean;
+  onClose: () => void;
+  order: TransferOrder;
+  t: ReturnType<typeof useTranslation>['t'];
+  onSuccess: () => void;
+}) {
+  const [note, setNote] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (open) { setNote(''); setError(''); }
+  }, [open]);
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      apiClient.rpc('fn_inv_transfer_cancel', {
+        p_transfer_order_id: order.transfer_order_id,
+        p_note: note.trim() || null,
+      }),
+    onSuccess,
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        const translated =
+          (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') ||
+          (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setError(translated || err.message);
+      } else {
+        setError(String(err));
+      }
+    },
+  });
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
+      <div className="flex flex-col overflow-hidden">
+        <div className="modal-header">
+          <h2 className="modal-title">{t('transfer.cancelTransfer')}</h2>
+          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+        </div>
+        <div className="modal-content">
+          {error && (
+            <div className="alert alert-danger mb-4 animate-pop-in">
+              <XCircle size={16} />
+              <span>{error}</span>
+            </div>
+          )}
+          <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
+            <div className="font-medium text-sm">{order.transfer_no}</div>
+            <div className="text-xs text-subtle">
+              {order.from_branch_name} → {order.to_branch_name ?? '?'}
+            </div>
+            <div className="text-xs text-subtle">{order.total_lines} {t('transfer.lines')}</div>
+          </div>
+          <p className="text-sm text-subtle mb-4">{t('transfer.cancelTransferMessage')}</p>
+          <div className="flex flex-col">
+            <label className="form-label">{t('transfer.cancelReason')}</label>
+            <TextArea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder={t('transfer.cancelReasonPlaceholder')}
+              rows={3}
+            />
+          </div>
+        </div>
+        <div className="modal-footer">
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button
+            color="danger"
+            onClick={() => mutation.mutate()}
+            disabled={mutation.isPending}
+          >
+            {mutation.isPending ? t('common.loading') : t('transfer.cancelTransfer')}
           </Button>
         </div>
       </div>

@@ -939,6 +939,8 @@
     "source": "Source",
     "sourcePO": "From PO",
     "sourceLot": "From Lot",
+    "filteredBySourceLot": "From lot",
+    "filteredBySourcePo": "From PO",
     "registered": "Registered",
     "updated": "Updated",
     "registeredBy": "Registered by",
@@ -975,6 +977,8 @@
     "selectToView": "Select a lot to view details",
     "qty": "Qty (on hand / received)",
     "onHand": "On hand / received",
+    "onHandLabel": "On hand",
+    "receivedLabel": "received",
     "consumed": "Consumed",
     "consumedSuffix": "consumed",
     "unitCost": "Unit cost",
@@ -985,7 +989,12 @@
     "closedAt": "Closed at",
     "remaining": "Remaining",
     "units": "units",
-    "from": "From"
+    "from": "From",
+    "inTransfer": "In transfer",
+    "viewTransfer": "View transfer",
+    "assets": "Assets",
+    "more": "more",
+    "viewAllAssets": "View all assets"
   },
   "po": {
     "allStatuses": "All statuses",
@@ -1316,6 +1325,13 @@
     "completed": "Completed",
     "approveTransfer": "Approve Transfer",
     "approveSuccess": "Transfer approved successfully",
+    "cancelTransfer": "Cancel Transfer",
+    "cancelTransferMessage": "Cancel this transfer? Lines will be returned to source stock.",
+    "cancelReason": "Cancel reason",
+    "cancelReasonPlaceholder": "Optional cancellation reason...",
+    "cancelSuccess": "Transfer cancelled",
+    "editQty": "Click to edit qty",
+    "confirmRemoveLine": "Remove this line?",
     "receive": "Receive",
     "receiveLine": "Receive Line",
     "receiveAction": "Action",
@@ -2758,5 +2774,12 @@
       "totalRows": "Rows",
       "totalAmount": "Total Amount"
     }
+  },
+  "billToast": {
+    "INVOICE": "Receipt {{code}} (฿{{amount}})",
+    "CREDIT_NOTE": "Credit note {{code}} (฿{{amount}})",
+    "JOURNAL": "Journal {{code}}",
+    "cnSuffix": "Credit note {{code}} issued",
+    "done": "Done"
   }
 }

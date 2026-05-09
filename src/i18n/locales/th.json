@@ -939,6 +939,8 @@
     "source": "แหล่งที่มา",
     "sourcePO": "จาก PO",
     "sourceLot": "จาก Lot",
+    "filteredBySourceLot": "จาก lot",
+    "filteredBySourcePo": "จาก PO",
     "registered": "ลงทะเบียน",
     "updated": "อัปเดต",
     "registeredBy": "ลงทะเบียนโดย",
@@ -975,6 +977,8 @@
     "selectToView": "เลือก lot เพื่อดูรายละเอียด",
     "qty": "จำนวน (คงเหลือ / รับ)",
     "onHand": "คงเหลือ / รับ",
+    "onHandLabel": "คงเหลือ",
+    "receivedLabel": "รับ",
     "consumed": "ใช้ไป",
     "consumedSuffix": "ใช้ไป",
     "unitCost": "ทุน/หน่วย",
@@ -985,7 +989,12 @@
     "closedAt": "ปิดเมื่อ",
     "remaining": "คงเหลือ",
     "units": "ชิ้น",
-    "from": "ที่มา"
+    "from": "ที่มา",
+    "inTransfer": "อยู่ระหว่างโอน",
+    "viewTransfer": "ดูใบโอน",
+    "assets": "Asset",
+    "more": "อีก",
+    "viewAllAssets": "ดู asset ทั้งหมด"
   },
   "po": {
     "allStatuses": "ทุกสถานะ",
@@ -1316,6 +1325,13 @@
     "completed": "เสร็จสิ้นเมื่อ",
     "approveTransfer": "อนุมัติการโอน",
     "approveSuccess": "อนุมัติการโอนสำเร็จ",
+    "cancelTransfer": "ยกเลิกการโอน",
+    "cancelTransferMessage": "ยกเลิกการโอนนี้? รายการจะถูกคืนเข้าสต๊อกต้นทาง",
+    "cancelReason": "เหตุผลที่ยกเลิก",
+    "cancelReasonPlaceholder": "ระบุเหตุผล (ไม่บังคับ)...",
+    "cancelSuccess": "ยกเลิกการโอนแล้ว",
+    "editQty": "คลิกเพื่อแก้ไขจำนวน",
+    "confirmRemoveLine": "ลบรายการนี้?",
     "receive": "รับ",
     "receiveLine": "รับรายการ",
     "receiveAction": "การดำเนินการ",
@@ -2758,5 +2774,12 @@
       "totalRows": "รายการ",
       "totalAmount": "ยอดรวม"
     }
+  },
+  "billToast": {
+    "INVOICE": "ใบเสร็จ {{code}} (฿{{amount}})",
+    "CREDIT_NOTE": "ใบลดหนี้ {{code}} (฿{{amount}})",
+    "JOURNAL": "บันทึกบัญชี {{code}}",
+    "cnSuffix": "ออกใบลดหนี้ {{code}}",
+    "done": "เรียบร้อย"
   }
 }

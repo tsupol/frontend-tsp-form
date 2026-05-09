@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
@@ -14,6 +14,7 @@ import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { fmtCurrency } from '../../lib/format';
+import { buildBillActionToast, hasBill, type StandardBillResponse } from '../../lib/billActionToast';
 import { type Branch, type BillRow, type BillDetail } from './accountingTypes';
 import { useBillActions, type BillAction, type BillActionCode } from '../../hooks/useBillActions';
 import { BillReceipt } from '../contracts/workspace/BillReceipt';
@@ -276,10 +277,10 @@ export function BillsPage() {
               {selectedBillId && (
                 <BillDetailPanel
                   billId={selectedBillId}
-                  onBillChanged={() => {
+                  onBillChanged={(message) => {
                     queryClient.invalidateQueries({ queryKey: ['accounting'] });
                     addSnackbar({
-                      message: <div className="alert alert-success"><CheckCircle size={16} /><span className="alert-description">{t('accounting.bills.actionSuccess')}</span></div>,
+                      message: message ?? <div className="alert alert-success"><CheckCircle size={16} /><span className="alert-description">{t('accounting.bills.actionSuccess')}</span></div>,
                       type: 'success',
                     });
                   }}
@@ -300,7 +301,7 @@ const PAYMENT_METHOD_OPTIONS = [
   { value: 'TRANSFER', label: 'Bank Transfer' },
 ];
 
-function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChanged: () => void }) {
+function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChanged: (message?: ReactNode) => void }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
 
@@ -418,7 +419,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
     setVoiding(true);
     setVoidError('');
     try {
-      await apiClient.rpc('fn_bill_cancel', {
+      const result = await apiClient.rpc<Partial<StandardBillResponse>>('fn_bill_cancel', {
         p_bill_id: billId,
         p_reason: voidReason.trim(),
         p_pin: voidPin,
@@ -429,7 +430,11 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
       setVoidPin('');
       queryClient.invalidateQueries({ queryKey: ['accounting', 'bill-detail', billId] });
       queryClient.invalidateQueries({ queryKey: ['bill-actions', billId] });
-      onBillChanged();
+      // If a CREDIT_NOTE was minted (cancelling a PAID bill), surface its code in the toast.
+      const enriched = hasBill(result) && result.bill_type === 'CREDIT_NOTE'
+        ? buildBillActionToast(result, t)
+        : undefined;
+      onBillChanged(enriched);
     } catch (err) {
       if (err instanceof ApiError) {
         const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')

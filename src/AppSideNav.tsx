@@ -31,7 +31,7 @@ import {
   // Fanout child icons — Pricing
   TrendingUp, Percent, Handshake,
   // Fanout child icons — Inventory
-  BarChart3, ClipboardList, PackagePlus, ArrowLeftRight, Wrench, RotateCcw, ShoppingCart,
+  BarChart3, Boxes, ClipboardList, PackagePlus, ArrowLeftRight, Wrench, RotateCcw, ShoppingCart,
   // Retail
   Store,
   // Fanout child icons — Company
@@ -285,6 +285,7 @@ export const AppSideNav = () => {
       children: [
         { type: 'group', key: 'grp-stock', label: t('nav.groupStock') },
         { key: 'stock', icon: <BarChart3 size="1rem" />, label: t('nav.stock'), path: '/admin/inventory/stock' },
+        { key: 'lots', icon: <Boxes size="1rem" />, label: t('nav.lots'), path: '/admin/inventory/lots' },
         { key: 'assets', icon: <Box size="1rem" />, label: t('nav.assets'), path: '/admin/inventory/assets' },
         { type: 'group', key: 'grp-procurement', label: t('nav.groupProcurement') },
         { key: 'po', icon: <ClipboardList size="1rem" />, label: t('nav.purchaseOrders'), path: '/admin/inventory/po' },

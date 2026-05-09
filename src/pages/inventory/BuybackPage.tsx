@@ -6,6 +6,7 @@ import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Modal, Text
 import { ArrowLeft, ArrowRightFromLine, RotateCcw, CheckCircle, XCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
+import { CopyButton } from '../../components/CopyButton';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -400,6 +401,7 @@ function BuybackDetailPanel({
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
           <span className="font-semibold">{detail.po_no}</span>
+          <CopyButton value={detail.po_no} />
           <Badge size="xs" color={BUYBACK_STATUS_COLOR[detail.status] ?? 'default'}>
             {t(`buyback.status_${detail.status}`, detail.status)}
           </Badge>

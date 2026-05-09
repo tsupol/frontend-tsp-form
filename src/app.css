@@ -60,6 +60,22 @@ input[type="number"
     animation: pop-in 200ms ease-out;
 }
 
+/* Slide + flash for "this is fresh, look at me" rows.
+   No scale — scaling caused the parent to need a scrollbar at peak. */
+@keyframes pop-highlight {
+    0%   { opacity: 0; transform: translateY(-4px); background-color: var(--color-primary-light); }
+    25%  { opacity: 1; transform: translateY(0); background-color: var(--color-primary-light); }
+    100% { opacity: 1; transform: translateY(0); background-color: transparent; }
+}
+
+.animate-pop-highlight {
+    animation: pop-highlight 1000ms ease-out;
+    border-radius: 4px;
+    /* slight padding so the highlight box has room around the content */
+    margin: -2px -6px;
+    padding: 2px 6px;
+}
+
 @keyframes fade-in {
     from { opacity: 0; }
     to { opacity: 1; }

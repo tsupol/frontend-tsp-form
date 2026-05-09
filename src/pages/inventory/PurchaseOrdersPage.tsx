@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { CopyButton } from '../../components/CopyButton';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { fmtNum } from './inventoryUtils';
@@ -522,6 +524,7 @@ function PoDetailPanel({
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
           <span className="font-semibold">{detail.po_no}</span>
+          <CopyButton value={detail.po_no} />
           <Badge size="xs" color={STATUS_COLOR[detail.status] ?? 'default'}>
             {statusLabel(detail.status)}
           </Badge>
@@ -704,6 +707,7 @@ function PoLineRow({
   onChanged: () => void;
 }) {
   const { t } = useTranslation();
+  const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
   const removeMutation = useMutation({
     mutationFn: () => apiClient.rpc('fn_po_remove_line', { p_po_line_id: line.line_id }),
     onSuccess: onChanged,
@@ -729,12 +733,18 @@ function PoLineRow({
           size="sm"
           variant="ghost"
           startIcon={<Trash2 size={14} />}
-          onClick={() => {
-            if (confirm(t('po.confirmRemoveLine'))) removeMutation.mutate();
-          }}
+          onClick={() => setConfirmRemoveOpen(true)}
           disabled={removeMutation.isPending}
         />
       )}
+      <ConfirmDialog
+        open={confirmRemoveOpen}
+        onClose={() => setConfirmRemoveOpen(false)}
+        onConfirm={() => { setConfirmRemoveOpen(false); removeMutation.mutate(); }}
+        message={t('po.confirmRemoveLine')}
+        confirmLabel={t('common.delete')}
+        pending={removeMutation.isPending}
+      />
     </div>
   );
 }

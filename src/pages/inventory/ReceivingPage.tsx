@@ -5,8 +5,10 @@ import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tansta
 import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Modal, Input, NumberSpinner, DataTable, useSnackbarContext } from 'tsp-form';
 import { ArrowLeft, ArrowRightFromLine, PackagePlus, CheckCircle, XCircle, Plus, Trash2, Search, ExternalLink } from 'lucide-react';
 import { CurrencyInput } from '../../components/CurrencyInput';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
+import { CopyButton } from '../../components/CopyButton';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { fmtNum } from './inventoryUtils';
@@ -372,6 +374,7 @@ function ReceiptDetailPanel({
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
           <span className="font-semibold">{detail.receipt_no}</span>
+          <CopyButton value={detail.receipt_no} />
           <Badge size="xs" color={RECEIPT_STATUS_COLOR[detail.status] ?? 'default'}>
             {t(`receiving.status_${detail.status}`, detail.status)}
           </Badge>
@@ -524,6 +527,7 @@ function ReceiptLineRow({
   onChanged: () => void;
   t: ReturnType<typeof useTranslation>['t'];
 }) {
+  const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
   const removeMutation = useMutation({
     mutationFn: () =>
       apiClient.rpc('fn_receipt_remove_line', { p_receipt_line_id: line.receipt_line_id }),
@@ -564,12 +568,18 @@ function ReceiptLineRow({
           size="sm"
           variant="ghost"
           startIcon={<Trash2 size={14} />}
-          onClick={() => {
-            if (confirm(t('receiving.confirmRemoveLine'))) removeMutation.mutate();
-          }}
+          onClick={() => setConfirmRemoveOpen(true)}
           disabled={removeMutation.isPending}
         />
       )}
+      <ConfirmDialog
+        open={confirmRemoveOpen}
+        onClose={() => setConfirmRemoveOpen(false)}
+        onConfirm={() => { setConfirmRemoveOpen(false); removeMutation.mutate(); }}
+        message={t('receiving.confirmRemoveLine')}
+        confirmLabel={t('common.delete')}
+        pending={removeMutation.isPending}
+      />
     </div>
   );
 }
