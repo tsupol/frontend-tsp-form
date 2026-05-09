@@ -24,7 +24,7 @@ export function CallCenterLayout({ children }: { children: ReactNode }) {
               `flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors ${
                 isActive
                   ? 'bg-item-active-bg text-item-active-fg font-medium'
-                  : 'text-fg hover:bg-surface-hover'
+                  : 'text-item-fg hover:bg-item-hover-bg hover:text-item-hover-fg'
               }`
             }
           >
