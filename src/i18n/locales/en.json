@@ -1071,6 +1071,7 @@
     "companyRequired": "Company is required",
     "ownershipRequired": "Ownership is required (HOLDING or COMPANY)",
     "supplierRequired": "Supplier is required",
+    "receipts": "Receipts",
     "createReceipt": "Create Receipt",
     "createReceiptConfirm": "Create draft receipt",
     "createReceiptIntro": "This creates an empty draft receipt for this PO. After creating it you'll add the items received and confirm — only confirmed receipts post to stock.",

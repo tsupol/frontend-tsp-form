@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
 import {
@@ -7,7 +7,7 @@ import {
   DataTable, useSnackbarContext,
 } from 'tsp-form';
 import {
-  ArrowLeft, ArrowRightFromLine, ClipboardList, CheckCircle, XCircle, Plus, Trash2, Search, PackagePlus,
+  ArrowLeft, ArrowRightFromLine, ClipboardList, CheckCircle, XCircle, Plus, Trash2, Search, PackagePlus, ExternalLink,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
@@ -90,6 +90,22 @@ interface PoDetail {
   created_at: string;
   lines: PoDetailLine[] | null;
 }
+
+interface PoReceiptLink {
+  id: number;
+  receipt_no: string;
+  status: string;
+  branch_name: string;
+  line_count: number;
+  total_qty: number;
+  created_at: string;
+}
+
+const RECEIPT_STATUS_COLOR: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'default'> = {
+  DRAFT: 'default',
+  CONFIRMED: 'success',
+  CANCELLED: 'danger',
+};
 
 interface RefRow {
   code: string;
@@ -490,6 +506,17 @@ function PoDetailPanel({
   const isApproved = detail.status === 'APPROVED';
   const isRejected = detail.status === 'REJECTED';
 
+  // Receipts created from this PO — cross-links to /admin/inventory/receiving/:id
+  const { data: poReceipts = [] } = useQuery({
+    queryKey: ['po-receipts', detail.po_id],
+    queryFn: () => apiClient.get<PoReceiptLink[]>(
+      `/v_receipts?po_id=eq.${detail.po_id}`
+      + '&select=id,receipt_no,status,branch_name,line_count,total_qty,created_at'
+      + '&order=created_at.desc',
+    ),
+    staleTime: 30 * 1000,
+  });
+
   const canEdit = isDraft && canWrite;
   const canSubmit = isDraft && canWrite;
   const canCancel = (isDraft || isPending || isApproved) && canWrite;
@@ -586,6 +613,39 @@ function PoDetailPanel({
       {detail.notes && (
         <div className="flex-none px-4 py-2 border-b border-line text-xs text-subtle italic">
           {detail.notes}
+        </div>
+      )}
+
+      {/* Receipts created from this PO — cross-links */}
+      {poReceipts.length > 0 && (
+        <div className="flex-none px-4 py-2.5 border-b border-line">
+          <div className="text-xs font-semibold text-subtle uppercase tracking-wider mb-2">
+            {t('po.receipts')} ({poReceipts.length})
+          </div>
+          <div className="flex flex-col gap-2.5">
+            {poReceipts.map((r) => (
+              <div key={r.id} className="flex flex-col gap-0.5">
+                <div className="flex items-center gap-2">
+                  <Link
+                    to={`/admin/inventory/receiving/${r.id}`}
+                    className="inline-flex items-center gap-1 text-primary hover:underline text-xs font-medium tabular-nums"
+                  >
+                    {r.receipt_no}
+                    <ExternalLink size={11} />
+                  </Link>
+                  <Badge size="xs" color={RECEIPT_STATUS_COLOR[r.status] ?? 'default'} className="ml-auto">
+                    {t(`receiving.status_${r.status}`, { defaultValue: r.status })}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-1.5 text-[11px] text-subtle">
+                  <span>{r.branch_name}</span>
+                  <span className="tabular-nums ml-auto">
+                    {r.line_count} {t('receiving.lines')} · {fmtNum(r.total_qty)} pcs
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -1307,8 +1367,8 @@ function ProductPickerModal({
 
 // ============================================================================
 // Create Receipt modal — opens from APPROVED PO footer (BS/BM)
-// Picks a branch in same company, calls fn_receipt_create, then routes to
-// /admin/inventory/receiving/:receiptId so the user can add lines + confirm.
+// Picks a branch in same company, calls fn_receipt_create. The new draft is
+// surfaced as a cross-link in the PO detail panel (no redirect).
 // ============================================================================
 
 interface ReceiptBranch {
@@ -1328,7 +1388,6 @@ function CreateReceiptModal({
   po: PoDetail;
 }) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const { user } = useAuth();
   const { addSnackbar } = useSnackbarContext();
   const queryClient = useQueryClient();
@@ -1372,6 +1431,7 @@ function CreateReceiptModal({
       queryClient.invalidateQueries({ queryKey: ['receipt-detail'] });
       queryClient.invalidateQueries({ queryKey: ['po-detail'] });
       queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['po-receipts', po.po_id] });
       addSnackbar({
         message: (
           <div className="alert alert-success">
@@ -1380,7 +1440,6 @@ function CreateReceiptModal({
           </div>
         ),
       });
-      navigate(`/admin/inventory/receiving/${data.receipt_id}`);
     },
     onError: (err) => {
       if (err instanceof ApiError) {

@@ -384,7 +384,13 @@ function ReceiptDetailPanel({
       <div className="flex-none grid grid-cols-3 gap-3 px-4 py-3 border-b border-line bg-surface">
         <div>
           <div className="text-xs text-subtle">{t('receiving.poRef')}</div>
-          <div className="font-semibold text-sm">{detail.po_no}</div>
+          <Link
+            to={`/admin/inventory/po/${detail.po_id}`}
+            className="inline-flex items-center gap-1 font-semibold text-sm text-primary hover:underline"
+          >
+            {detail.po_no}
+            <ExternalLink size={12} />
+          </Link>
           <div className="text-xs text-subtle">{detail.supplier_name}</div>
         </div>
         <div>
