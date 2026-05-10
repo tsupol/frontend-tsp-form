@@ -283,7 +283,7 @@ export function TransfersPage() {
               />
             </PageNavPanel>
 
-            <PageNavPanel id="detail" className={isMobile ? '' : 'flex-1 flex flex-col'}>
+            <PageNavPanel id="detail" className={isMobile ? '' : 'flex-1 min-w-0 flex flex-col'}>
               {selectedOrder ? (
                 <TransferDetailPanel
                   order={selectedOrder}
@@ -783,8 +783,8 @@ function TransferLineRow({
             {[line.brand_name, line.model_name].filter(Boolean).join(' ')}
             {(line.variant_name || line.sku_code) && ` · ${line.variant_name ?? line.sku_code}`}
           </div>
-          {line.serial_no && <div className="text-xs text-fg/50 font-mono">{line.serial_no}</div>}
-          {line.receive_note && <div className="text-xs text-fg/50 mt-0.5 italic">{line.receive_note}</div>}
+          {line.serial_no && <div className="text-xs text-fg/50 font-mono truncate">{line.serial_no}</div>}
+          {line.receive_note && <div className="text-xs text-fg/50 mt-0.5 italic truncate">{line.receive_note}</div>}
         </div>
         <div className="shrink-0 flex flex-col items-end gap-1">
           <Badge size="xs" color={LINE_STATUS_COLOR[line.status] ?? 'default'}>
