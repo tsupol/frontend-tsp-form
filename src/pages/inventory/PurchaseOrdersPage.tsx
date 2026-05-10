@@ -1424,7 +1424,7 @@ function CreateReceiptModal({
         p_po_id: po.po_id,
         p_branch_id: branchId,
       }),
-    onSuccess: (data) => {
+    onSuccess: () => {
       onClose();
       // Invalidate receiving + PO caches so list/detail reflect the new draft.
       queryClient.invalidateQueries({ queryKey: ['receipts'] });
