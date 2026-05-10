@@ -7,12 +7,13 @@ import {
   DataTable, useSnackbarContext,
 } from 'tsp-form';
 import {
-  ArrowLeft, ArrowRightFromLine, ClipboardList, CheckCircle, XCircle, Plus, Trash2, Search, PackagePlus, ExternalLink,
+  ArrowLeft, ArrowRightFromLine, ClipboardList, CheckCircle, XCircle, Plus, Trash2, Search, PackagePlus, ExternalLink, ChevronsRight,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { CopyButton } from '../../components/CopyButton';
+import { CurrencyInput } from '../../components/CurrencyInput';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { fmtNum } from './inventoryUtils';
@@ -738,6 +739,7 @@ function PoDetailPanel({
         open={addLineOpen}
         onClose={() => setAddLineOpen(false)}
         poId={detail.po_id}
+        companyId={detail.company_id}
         onAdded={() => {
           setAddLineOpen(false);
           onRefresh();
@@ -1139,11 +1141,13 @@ function AddLineModal({
   open,
   onClose,
   poId,
+  companyId,
   onAdded,
 }: {
   open: boolean;
   onClose: () => void;
   poId: number;
+  companyId: number;
   onAdded: () => void;
 }) {
   const { t } = useTranslation();
@@ -1157,22 +1161,41 @@ function AddLineModal({
     if (open) { setPicked(null); setQty('1'); setUnitCost(''); setError(''); setPickerOpen(false); }
   }, [open]);
 
+  // Catalog cost for the picked variant — used by the auto-fill end-icon and
+  // shown as a hint on the picked-product card.
+  const { data: pricebookRows } = useQuery({
+    queryKey: ['pricebook-cost', picked?.variant_id, companyId],
+    queryFn: () =>
+      apiClient.get<{ variant_id: number; company_id: number | null; cost_price: number | null }[]>(
+        `/v_effective_pricebook?variant_id=eq.${picked!.variant_id}&select=variant_id,company_id,cost_price`,
+      ),
+    enabled: open && !!picked,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Prefer the company-specific row, fall back to the holding-wide row.
+  const catalogCost = useMemo<number | null>(() => {
+    if (!pricebookRows || pricebookRows.length === 0) return null;
+    const specific = pricebookRows.find(r => r.company_id === companyId);
+    const fallback = pricebookRows.find(r => r.company_id === null);
+    return (specific ?? fallback)?.cost_price ?? null;
+  }, [pricebookRows, companyId]);
+
   const mutation = useMutation({
     mutationFn: async () => {
       if (!picked) throw new ApiError({ code: 'CLIENT.PICK_REQUIRED', message: t('po.pickProductFirst'), isAuthError: false });
       const qtyNum = Number(qty);
       if (!qtyNum || qtyNum <= 0) throw new ApiError({ code: 'CLIENT.QTY_INVALID', message: t('po.qtyInvalid'), isAuthError: false });
+      if (!unitCost.trim()) throw new ApiError({ code: 'CLIENT.COST_REQUIRED', message: t('po.unitCostRequired'), isAuthError: false });
+      const costNum = Number(unitCost);
+      if (Number.isNaN(costNum) || costNum < 0) throw new ApiError({ code: 'CLIENT.COST_INVALID', message: t('po.costInvalid'), isAuthError: false });
       const params: Record<string, unknown> = {
         p_po_id: poId,
         p_model_id: picked.model_id,
         p_variant_id: picked.variant_id,
         p_qty: qtyNum,
+        p_unit_cost: costNum,
       };
-      const costNum = unitCost.trim() ? Number(unitCost) : null;
-      if (costNum !== null) {
-        if (Number.isNaN(costNum) || costNum < 0) throw new ApiError({ code: 'CLIENT.COST_INVALID', message: t('po.costInvalid'), isAuthError: false });
-        params.p_unit_cost = costNum;
-      }
       return apiClient.rpc('fn_po_add_line', params);
     },
     onSuccess: onAdded,
@@ -1221,6 +1244,12 @@ function AddLineModal({
                     <div className="text-xs text-subtle truncate">
                       {picked.item_name} · {picked.sku_code}
                     </div>
+                    <div className="text-xs text-subtle mt-0.5">
+                      {t('po.catalogCost')}:{' '}
+                      <span className="tabular-nums font-medium text-fg">
+                        {catalogCost !== null ? fmtCurrency(catalogCost) : t('po.catalogCostUnavailable')}
+                      </span>
+                    </div>
                   </div>
                   <button
                     type="button"
@@ -1244,13 +1273,16 @@ function AddLineModal({
                 />
               </div>
               <div className="flex flex-col flex-1">
-                <label className="form-label">{t('po.unitCost')}</label>
-                <Input
-                  type="number"
+                <label className="form-label">{t('po.unitCost')} *</label>
+                <CurrencyInput
                   value={unitCost}
-                  onChange={(e) => setUnitCost(e.target.value)}
-                  placeholder={t('po.unitCostHint')}
+                  onChange={(raw) => setUnitCost(raw)}
+                  placeholder="0.00"
                   className="w-full"
+                  endIcon={catalogCost !== null ? <ChevronsRight size={14} /> : undefined}
+                  onEndIconClick={
+                    catalogCost !== null ? () => setUnitCost(String(catalogCost)) : undefined
+                  }
                 />
               </div>
             </div>

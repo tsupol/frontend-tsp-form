@@ -41,6 +41,25 @@ Every `InputDatePicker` must include:
 
 For `InputDateRangePicker`, use `makeDateRangePickerFormat` and `parseTypedDates` (returns `{ from, to }`).
 
+## Auto-fill end-icon (`>>`)
+
+When an input can be auto-filled from a related value (e.g. catalog price, default amount, suggested value), put a clickable `ChevronsRight` end-icon on the input. Click = fill the field with the suggested value.
+
+- **Icon:** `<ChevronsRight size={14} />` from `lucide-react` — looks like `»`
+- **Usage:**
+  ```tsx
+  <CurrencyInput
+    value={cost}
+    onChange={setCost}
+    endIcon={suggested !== null ? <ChevronsRight size={14} /> : undefined}
+    onEndIconClick={suggested !== null ? () => setCost(String(suggested)) : undefined}
+  />
+  ```
+- **Hide when no suggestion:** pass `undefined` for both `endIcon` and `onEndIconClick` — don't show a disabled icon.
+- **Reference uses:** `DayClosePage`, `ContractActions`, `RetailBillsPage`, `CompleteContractModal`, `CreateRetailBillModal`, `CardPayment`, `PanelReviewPay`, `PurchaseOrdersPage` (add-line modal).
+
+Don't substitute `Wand2`, `Sparkles`, `RefreshCw`, etc. — keep the convention.
+
 ## List row interaction
 
 - **No edit icon button** on desktop list rows — single click opens the editor/detail panel
