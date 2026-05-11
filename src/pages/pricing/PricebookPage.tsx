@@ -539,13 +539,13 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
             {isContractable && (
               <div className="flex border-b border-line">
                 <button
-                  className={`px-3 py-1.5 text-xs font-medium cursor-pointer transition-colors ${activeTab === 'fin1' ? 'border-b-2 border-primary text-primary' : 'text-subtle hover:text-fg'}`}
+                  className={`px-3 py-1.5 text-xs font-medium cursor-pointer transition-colors ${activeTab === 'fin1' ? 'border-b-2 border-primary-fg text-primary-fg' : 'text-subtle hover:text-fg'}`}
                   onClick={() => setActiveTab('fin1')}
                 >
                   FIN1
                 </button>
                 <button
-                  className={`px-3 py-1.5 text-xs font-medium cursor-pointer transition-colors ${activeTab === 'fin2' ? 'border-b-2 border-primary text-primary' : 'text-subtle hover:text-fg'}`}
+                  className={`px-3 py-1.5 text-xs font-medium cursor-pointer transition-colors ${activeTab === 'fin2' ? 'border-b-2 border-primary-fg text-primary-fg' : 'text-subtle hover:text-fg'}`}
                   onClick={() => setActiveTab('fin2')}
                 >
                   FIN2
@@ -1058,7 +1058,7 @@ export function PricebookPage() {
                       }
                     >
                       <div className="flex flex-col gap-3 p-3">
-                        <div className="text-xs font-medium text-muted uppercase tracking-wide">{t('common.filters')}</div>
+                        <div className="text-xs font-medium text-subtle uppercase tracking-wide">{t('common.filters')}</div>
                         <Select
                           options={brandOptions}
                           value={filterBrand || null}
@@ -1179,7 +1179,7 @@ export function PricebookPage() {
                                       <span className={`text-[11px] tabular-nums ${hasProfit ? '' : 'text-subtle'}`}>
                                         {hasProfit ? formatTHB(ft.profit) : '—'}
                                       </span>
-                                      <span className={`text-[10px] tabular-nums px-1.5 py-0.5 rounded ${hasProfit ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>{ft.term_months}m</span>
+                                      <span className={`text-[10px] tabular-nums px-1.5 py-0.5 rounded ${hasProfit ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning-fg'}`}>{ft.term_months}m</span>
                                     </div>
                                   );
                                 })}

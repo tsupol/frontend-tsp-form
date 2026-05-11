@@ -181,7 +181,7 @@ export function SavingDetailPanel({ contractId, isMobile }: { contractId: number
             key={tab}
             className={`py-2 px-3 text-sm font-medium transition-colors cursor-pointer border-b-2 whitespace-nowrap ${
               activeTab === tab
-                ? 'border-primary text-primary'
+                ? 'border-primary-fg text-primary-fg'
                 : 'border-transparent text-fg'
             }`}
             onClick={() => setActiveTab(tab)}
@@ -304,7 +304,7 @@ function SavingOverviewTab({ contract, t }: { contract: ContractDetail; t: Retur
                 key={star}
                 size={14}
                 className={contract.staff_confidence_score != null && star <= contract.staff_confidence_score
-                  ? 'text-warning fill-warning'
+                  ? 'text-warning-fg fill-warning'
                   : 'text-fg/20'
                 }
               />

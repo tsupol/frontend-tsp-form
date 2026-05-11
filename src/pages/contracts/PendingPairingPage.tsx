@@ -164,7 +164,7 @@ export function PendingPairingPage() {
                       onClick={() => setActionType(opt.value)}
                       className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 text-sm transition-colors cursor-pointer border-b-2 ${
                         active
-                          ? 'border-primary text-primary font-medium'
+                          ? 'border-primary-fg text-primary-fg font-medium'
                           : 'border-transparent text-subtle hover:text-fg'
                       }`}
                     >

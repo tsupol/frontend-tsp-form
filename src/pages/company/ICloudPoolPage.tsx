@@ -649,7 +649,7 @@ function TabButton({ active, onClick, icon, children }: {
       onClick={onClick}
       className={`flex items-center gap-1.5 px-4 py-2 text-sm cursor-pointer transition-colors border-b-2 ${
         active
-          ? 'border-primary text-primary'
+          ? 'border-primary-fg text-primary-fg'
           : 'border-transparent text-subtle hover:text-fg hover:bg-surface-hover'
       }`}
     >
@@ -942,7 +942,7 @@ export function ICloudPoolPage() {
                       }
                     >
                       <div className="flex flex-col gap-3 p-3">
-                        <div className="text-xs font-medium text-muted uppercase tracking-wide">{t('common.filters')}</div>
+                        <div className="text-xs font-medium text-subtle uppercase tracking-wide">{t('common.filters')}</div>
                         <Select
                           options={branchOptions}
                           value={branchFilter !== null ? String(branchFilter) : null}

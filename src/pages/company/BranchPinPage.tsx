@@ -522,7 +522,7 @@ function UsageLogTab({ branches, permissionOptions }: { branches: Branch[]; perm
             }
           >
             <div className="flex flex-col gap-3 p-3">
-              <div className="text-xs font-medium text-muted uppercase tracking-wide">{t('common.filters')}</div>
+              <div className="text-xs font-medium text-subtle uppercase tracking-wide">{t('common.filters')}</div>
               <Select
                 options={permissionOptions}
                 value={permissionFilter}
@@ -541,7 +541,7 @@ function UsageLogTab({ branches, permissionOptions }: { branches: Branch[]; perm
                 showChevron
                 clearable
               />
-              <div className="text-xs font-medium text-muted uppercase tracking-wide mt-1">{t('common.sortBy')}</div>
+              <div className="text-xs font-medium text-subtle uppercase tracking-wide mt-1">{t('common.sortBy')}</div>
               <Select
                 options={sortOptions}
                 value={sorting[0]?.id ?? null}
@@ -683,7 +683,7 @@ export function BranchPinPage() {
         </div>
         <div className="mobile-header-end">
           <button
-            className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-primary"
+            className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-primary-fg"
             onClick={() => openSetPin()}
             aria-label={t('settings.pin.setPin')}
           >
@@ -708,14 +708,14 @@ export function BranchPinPage() {
         <div className="flex items-center gap-1 border-b border-line mb-4 flex-none">
           <button
             type="button"
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px cursor-pointer ${tab === 'change' ? 'border-primary text-primary' : 'border-transparent text-subtle hover:text-fg'}`}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px cursor-pointer ${tab === 'change' ? 'border-primary-fg text-primary-fg' : 'border-transparent text-subtle hover:text-fg'}`}
             onClick={() => setTab('change')}
           >
             {t('settings.pin.tabChange')}
           </button>
           <button
             type="button"
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px cursor-pointer ${tab === 'usage' ? 'border-primary text-primary' : 'border-transparent text-subtle hover:text-fg'}`}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px cursor-pointer ${tab === 'usage' ? 'border-primary-fg text-primary-fg' : 'border-transparent text-subtle hover:text-fg'}`}
             onClick={() => setTab('usage')}
           >
             {t('settings.pin.tabUsage')}

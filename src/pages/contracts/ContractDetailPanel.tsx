@@ -252,7 +252,7 @@ function ScrollableTabs<T extends string>({ tabs, activeTab, onTabChange, render
             key={tab}
             className={`py-2 px-3 text-sm font-medium transition-colors cursor-pointer border-b-2 whitespace-nowrap ${
               activeTab === tab
-                ? 'border-primary text-primary'
+                ? 'border-primary-fg text-primary-fg'
                 : 'border-transparent text-fg'
             }`}
             onClick={() => onTabChange(tab)}
@@ -512,12 +512,12 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
         <div className="border rounded-md px-4 py-3 border-warning/30 bg-warning/5">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 min-w-0">
-              <Smartphone size={14} className="text-warning shrink-0" />
+              <Smartphone size={14} className="text-warning-fg shrink-0" />
               <div className="min-w-0">
-                <div className="text-xs font-semibold uppercase tracking-wider text-warning">
+                <div className="text-xs font-semibold uppercase tracking-wider text-warning-fg">
                   {t('contract.deviceNotBound')}
                 </div>
-                <div className="text-sm text-warning/90 mt-0.5">
+                <div className="text-sm text-warning-fg/90 mt-0.5">
                   {t('contract.bindDeviceReminder')}
                 </div>
               </div>
@@ -658,7 +658,7 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
       {isActive && (
         <div className={`border rounded-md px-4 py-3 ${contract.shipped_at ? 'border-line' : 'border-warning/30 bg-warning/5'}`}>
           <div className="flex items-center justify-between mb-2">
-            <h3 className={`text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 ${contract.shipped_at ? 'text-subtle' : 'text-warning'}`}>
+            <h3 className={`text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 ${contract.shipped_at ? 'text-subtle' : 'text-warning-fg'}`}>
               <Truck size={13} />
               {t('contract.shipping')}
             </h3>
@@ -678,7 +678,7 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
               {contract.tracking_number && <InfoCell label={t('contract.trackingNumber')} value={contract.tracking_number} />}
             </div>
           ) : (
-            <div className="text-sm text-warning">{t('contract.deliveryNotRecorded')}</div>
+            <div className="text-sm text-warning-fg">{t('contract.deliveryNotRecorded')}</div>
           )}
         </div>
       )}

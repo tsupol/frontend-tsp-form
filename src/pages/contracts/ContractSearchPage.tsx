@@ -230,7 +230,7 @@ export function ContractSearchPage() {
                     key={s}
                     className={`flex-1 py-2 text-sm font-medium transition-colors cursor-pointer border-b-2 ${
                       scope === s
-                        ? 'border-primary text-primary'
+                        ? 'border-primary-fg text-primary-fg'
                         : 'border-transparent text-fg'
                     }`}
                     onClick={() => setScope(s)}
@@ -255,7 +255,7 @@ export function ContractSearchPage() {
                   </div>
                   <Button
                     size="sm"
-                    className={`btn-icon-sm shrink-0 ${filtersExpanded || extraFilterCount > 0 ? 'text-primary' : ''}`}
+                    className={`btn-icon-sm shrink-0 ${filtersExpanded || extraFilterCount > 0 ? 'text-primary-fg' : ''}`}
                     onClick={() => setFiltersExpanded(!filtersExpanded)}
                   >
                     <SlidersHorizontal size={14} />

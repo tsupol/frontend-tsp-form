@@ -179,7 +179,7 @@ export function BillsPage() {
                     key={s || '__all'}
                     className={`flex-1 py-2 text-sm font-medium transition-colors cursor-pointer border-b-2 ${
                       statusFilter === s
-                        ? 'border-primary text-primary'
+                        ? 'border-primary-fg text-primary-fg'
                         : 'border-transparent text-fg'
                     }`}
                     onClick={() => { setStatusFilter(s); setPageIndex(0); }}
@@ -541,7 +541,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
                 <span className="tabular-nums font-medium shrink-0">
                   {fmtCurrency(line.amount)}
                 </span>
-                <span className={`text-xs shrink-0 font-medium ${line.owner_type === 'HOLDING' ? 'text-primary' : 'text-warning'}`}>
+                <span className={`text-xs shrink-0 font-medium ${line.owner_type === 'HOLDING' ? 'text-primary-fg' : 'text-warning-fg'}`}>
                   {line.owner_type === 'HOLDING' ? '→H' : '→C'}
                 </span>
               </div>
@@ -652,7 +652,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
             isPayBalanced ? 'border-success/30 bg-success/5' : 'border-warning/30 bg-warning/5'
           }`}>
             <span className="text-sm">{t('accounting.bills.payTotal')}</span>
-            <span className={`font-semibold tabular-nums ${isPayBalanced ? 'text-success' : 'text-warning'}`}>
+            <span className={`font-semibold tabular-nums ${isPayBalanced ? 'text-success' : 'text-warning-fg'}`}>
               {fmtCurrency(totalPayment)} / {fmtCurrency(remaining)}
             </span>
           </div>
