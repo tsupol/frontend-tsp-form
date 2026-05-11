@@ -75,7 +75,8 @@ export function BillReconcilePanel({ branchId, billDate }: Props) {
   const allBills = counts.data ?? [];
 
   const typeCount = (type: string) => type ? allBills.filter(b => b.bill_type === type).length : allBills.length;
-  const statusCount = (status: string) => status ? allBills.filter(b => b.status === status).length : allBills.length;
+  const filteredByType = typeFilter ? allBills.filter(b => b.bill_type === typeFilter) : allBills;
+  const statusCount = (status: string) => status ? filteredByType.filter(b => b.status === status).length : filteredByType.length;
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -86,7 +87,7 @@ export function BillReconcilePanel({ branchId, billDate }: Props) {
             key={type || '__all'}
             className={`flex-1 py-2 text-xs font-medium transition-colors cursor-pointer border-b-2 ${
               typeFilter === type
-                ? 'border-primary text-primary'
+                ? 'border-primary-fg text-primary-fg'
                 : 'border-transparent text-fg'
             }`}
             onClick={() => setTypeFilter(type)}
@@ -210,7 +211,7 @@ function BillExpand({ billId }: { billId: number }) {
               <Badge color={LINE_TYPE_COLOR[l.line_type] ?? 'default'} size="sm">{l.line_type}</Badge>
               <span className="flex-1 min-w-0 truncate">{l.description}</span>
               <span className="tabular-nums shrink-0">{fmtCurrency(l.amount)}</span>
-              <span className={`text-[10px] shrink-0 font-medium ${l.owner_type === 'HOLDING' ? 'text-primary' : 'text-warning'}`}>
+              <span className={`text-[10px] shrink-0 font-medium ${l.owner_type === 'HOLDING' ? 'text-primary-fg' : 'text-warning-fg'}`}>
                 {l.owner_type === 'HOLDING' ? '→H' : '→C'}
               </span>
             </div>

@@ -101,40 +101,52 @@ export function RemittanceRevenueView({ titleKey, descriptionKey, viewEndpoint, 
     {
       accessorKey: 'bill_date',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('accounting.rr.date')} />,
-      cell: ({ row }) => <DateTime value={row.original.bill_date} showTime={false} />,
-    },
-    {
-      accessorKey: 'branch_name',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('accounting.branch')} />,
+      cell: ({ row }) => (
+        <div className="flex flex-col gap-0.5 min-w-0">
+          <DateTime value={row.original.bill_date} showTime={false} />
+          <span className="text-xs text-subtle truncate">{row.original.branch_name}</span>
+        </div>
+      ),
+      className: 'w-[22%] min-w-36',
     },
     {
       accessorKey: 'bill_code',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('accounting.rr.billCode')} />,
-      cell: ({ row }) => <span className="font-mono text-xs">{row.original.bill_code}</span>,
-    },
-    {
-      accessorKey: 'contract_code',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('accounting.rr.contractCode')} />,
-      cell: ({ row }) => row.original.contract_code
-        ? <span className="font-mono text-xs">{row.original.contract_code}</span>
-        : <span className="opacity-30">—</span>,
+      cell: ({ row }) => (
+        <div className="flex flex-col gap-0.5 min-w-0">
+          <span className="font-mono text-xs">{row.original.bill_code}</span>
+          {row.original.contract_code
+            ? <span className="font-mono text-xs text-subtle">{row.original.contract_code}</span>
+            : <span className="text-xs opacity-30">—</span>}
+        </div>
+      ),
+      className: 'w-[26%] min-w-44',
     },
     {
       accessorKey: 'charge_name_th',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('accounting.rr.chargeType')} />,
+      cell: ({ row }) => (
+        <div className="flex flex-col gap-0.5 min-w-0">
+          <span className="truncate">{row.original.charge_name_th}</span>
+          {row.original.description && (
+            <span className="text-xs text-subtle truncate">{row.original.description}</span>
+          )}
+        </div>
+      ),
+      className: 'w-[34%] min-w-44',
     },
     {
       accessorKey: 'amount',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('accounting.rr.amount')} />,
-      cell: ({ row }) => <span className="tabular-nums font-medium">{fmtCurrency(row.original.amount)}</span>,
-    },
-    {
-      accessorKey: 'day_closed',
-      header: () => <span>{t('accounting.rr.dayClosed')}</span>,
-      cell: ({ row }) => row.original.day_closed
-        ? <Badge color="success" size="sm">{t('accounting.rr.closed')}</Badge>
-        : <Badge color="default" size="sm">{t('accounting.rr.open')}</Badge>,
-      enableSorting: false,
+      cell: ({ row }) => (
+        <div className="flex flex-col items-end gap-0.5">
+          <span className="tabular-nums font-medium">{fmtCurrency(row.original.amount)}</span>
+          {row.original.day_closed
+            ? <Badge color="success" size="sm">{t('accounting.rr.closed')}</Badge>
+            : <Badge color="default" size="sm">{t('accounting.rr.open')}</Badge>}
+        </div>
+      ),
+      className: 'w-[18%] min-w-28 text-right',
     },
   ];
 
