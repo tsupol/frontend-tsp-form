@@ -359,7 +359,7 @@ function WorkspaceContent() {
 
                 {isMobile && isPostPayment && (
                   <div className="shrink-0 border-t border-line bg-bg px-4 py-3 flex items-center justify-end gap-2">
-                    <Button size="sm" onClick={() => { resetData(); navigate('/admin/contracts/draft'); }}>
+                    <Button size="sm" onClick={() => { resetData(); navigate('/admin/contracts/new'); }}>
                       {t('wizard.newContract')}
                     </Button>
                     <Button size="sm" color="primary" onClick={() => navigate('/admin/contracts/search')}>

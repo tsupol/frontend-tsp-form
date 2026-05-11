@@ -37,7 +37,7 @@ import {
   // Fanout child icons — Company
   MapPin, KeyRound, Landmark, CalendarDays, AlertTriangle, ShieldBan, Cloud,
   // Fanout child icons — Contracts
-  Search, PiggyBank, Link2,
+  Search, PiggyBank, Link2, FileEdit,
   // Fanout child icons — Commission
   UserCheck, ClipboardCheck,
   // Fanout child icons — Accounting
@@ -85,7 +85,7 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
       triggerClassName="w-full"
       trigger={
         <button
-          className={clsx('flex items-center gap-2 py-2.5 transition-all text-item-fg hover:bg-item-hover-bg w-full cursor-pointer', collapsed ? 'px-1.5' : 'px-4')}
+          className={clsx('flex items-center gap-3 py-2.5 transition-all text-item-fg hover:bg-item-hover-bg w-full cursor-pointer', collapsed ? 'px-1.5' : 'px-3')}
           onClick={() => setOpen(!open)}
         >
           <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-primary-contrast text-sm font-semibold shrink-0">
@@ -328,6 +328,7 @@ export const AppSideNav = () => {
       children: [
         { key: 'contract-search', icon: <Search size="1rem" />, label: t('nav.contractSearch'), path: '/admin/contracts/search' },
         { key: 'saving-contracts', icon: <PiggyBank size="1rem" />, label: t('nav.savingContracts'), path: '/admin/contracts/saving' },
+        { key: 'draft-contracts', icon: <FileEdit size="1rem" />, label: t('nav.draftContracts'), path: '/admin/contracts/draft' },
         { key: 'pending-pairing', ...iconWithCount(<Link2 size="1rem" />, pendingPairingCount), label: t('nav.pendingPairing'), path: '/admin/contracts/pending-pairing' },
       ],
     },

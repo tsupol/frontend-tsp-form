@@ -41,6 +41,7 @@ import { PaymentSubmissionsPage } from './pages/PaymentSubmissionsPage';
 import { ContractsLayout } from './pages/contracts/ContractsLayout';
 import { ContractSearchPage } from './pages/contracts/ContractSearchPage';
 import { SavingContractsPage } from './pages/contracts/SavingContractsPage';
+import { DraftContractsPage } from './pages/contracts/DraftContractsPage';
 import { PendingPairingPage } from './pages/contracts/PendingPairingPage';
 import { ContractWizardPage } from './pages/contracts/ContractWizardPage';
 import { CompanyLayout } from './pages/company/CompanyLayout';
@@ -402,6 +403,16 @@ function App() {
         }
       />
       <Route
+        path="/admin/contracts/draft"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <ContractsLayout><DraftContractsPage /></ContractsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/admin/contracts/pending-pairing/:contractId?"
         element={
           <ProtectedRoute>
@@ -412,7 +423,7 @@ function App() {
         }
       />
       <Route
-        path="/admin/contracts/draft/:contractId?"
+        path="/admin/contracts/new/:contractId?"
         element={
           <ProtectedRoute>
             <AdminLayout>

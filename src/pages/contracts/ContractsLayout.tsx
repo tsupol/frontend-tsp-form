@@ -1,13 +1,14 @@
 import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Search, PiggyBank, FilePlus, Link2 } from 'lucide-react';
+import { Search, PiggyBank, FilePlus, Link2, FileEdit } from 'lucide-react';
 
 const navItems = [
   { path: '/admin/contracts/search', labelKey: 'nav.contractSearch', icon: Search },
   { path: '/admin/contracts/saving', labelKey: 'nav.savingContracts', icon: PiggyBank },
+  { path: '/admin/contracts/draft', labelKey: 'nav.draftContracts', icon: FileEdit },
   { path: '/admin/contracts/pending-pairing', labelKey: 'nav.pendingPairing', icon: Link2 },
-  { path: '/admin/contracts/draft', labelKey: 'nav.newContract', icon: FilePlus },
+  { path: '/admin/contracts/new', labelKey: 'nav.newContract', icon: FilePlus },
 ];
 
 export function ContractsLayout({ children }: { children: ReactNode }) {

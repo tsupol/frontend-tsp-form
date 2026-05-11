@@ -861,7 +861,7 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
             color="primary"
             startIcon={<Pencil size={14} />}
             className="self-start"
-            onClick={() => navigate(`/admin/contracts/draft/${contract.id}`)}
+            onClick={() => navigate(`/admin/contracts/new/${contract.id}`)}
           >
             {t('contract.continueDraft')}
           </Button>
@@ -1989,7 +1989,7 @@ function PendingPaymentModal({ open, contract, onClose, onSuccess }: {
               isBalanced ? 'border-success/30 bg-success/5' : 'border-warning/30 bg-warning/5'
             }`}>
               <span className="text-sm">{t('wizard.totalPayment')}</span>
-              <span className={`font-semibold tabular-nums ${isBalanced ? 'text-success' : 'text-warning'}`}>
+              <span className={`font-semibold tabular-nums ${isBalanced ? 'text-success' : 'text-warning-fg'}`}>
                 {fmtCurrency(totalPayment)}
               </span>
             </div>
@@ -2255,7 +2255,7 @@ function PayInstallmentModal({ open, contract, onClose, onSuccess }: {
                 </div>
               )}
               {channel === 'INSURANCE_WALLET' && unpaidCount !== 1 && (
-                <div className="text-xs text-warning mt-1">
+                <div className="text-xs text-warning-fg mt-1">
                   {t('contract.payInstallment_insuranceLastOnly', {
                     defaultValue: 'Insurance wallet can only be used for the last installment',
                   })}
