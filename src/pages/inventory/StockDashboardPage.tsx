@@ -68,6 +68,40 @@ interface Branch {
 }
 
 // ============================================================================
+// Bucket display order
+// ============================================================================
+
+// Priority buckets always shown per branch (even when empty), in this order.
+// Non-priority buckets that have data appear after, alphabetically.
+const PRIORITY_BUCKETS = [
+  'ON_HAND_AVAILABLE',
+  'INBOUND_RECEIVED_UNREGISTERED',
+  'DEPOSITED_BY_CUSTOMER',
+  'QUARANTINED',
+  'WITH_CUSTOMER_ACTIVE',
+] as const;
+
+const BUCKET_ORDER: Record<string, number> = PRIORITY_BUCKETS.reduce(
+  (acc, b, i) => ({ ...acc, [b]: i }),
+  {} as Record<string, number>,
+);
+
+function emptyRow(branch_id: number, branch_name: string, bucket: string): BranchStockSummary {
+  return {
+    branch_id,
+    branch_name,
+    current_bucket: bucket,
+    asset_count: 0,
+    asset_total_value: 0,
+    lot_count: 0,
+    lot_total_qty: 0,
+    lot_total_value: 0,
+    combined_item_count: 0,
+    combined_total_value: 0,
+  };
+}
+
+// ============================================================================
 // Selection key
 // ============================================================================
 
@@ -174,7 +208,8 @@ export function StockDashboardPage() {
     ];
   }, [filteredStockData, stockData]);
 
-  // Group by branch (from filtered data)
+  // Group by branch (from filtered data). Inject zero-rows for priority buckets
+  // not present, then sort: priority order first, then alphabetical for the rest.
   const branchGroups = useMemo(() => {
     if (!filteredStockData.length) return [];
     const map = new Map<number, { branch_id: number; branch_name: string; rows: BranchStockSummary[] }>();
@@ -184,8 +219,26 @@ export function StockDashboardPage() {
       }
       map.get(row.branch_id)!.rows.push(row);
     }
-    return Array.from(map.values());
-  }, [filteredStockData]);
+
+    const onlyOneBucketFilter = filterBucket !== null;
+
+    return Array.from(map.values()).map(g => {
+      // Skip zero-row injection when filtering to a single bucket (would re-introduce hidden ones)
+      if (!onlyOneBucketFilter) {
+        const present = new Set(g.rows.map(r => r.current_bucket));
+        for (const b of PRIORITY_BUCKETS) {
+          if (!present.has(b)) g.rows.push(emptyRow(g.branch_id, g.branch_name, b));
+        }
+      }
+      g.rows.sort((a, b) => {
+        const ai = BUCKET_ORDER[a.current_bucket] ?? 999;
+        const bi = BUCKET_ORDER[b.current_bucket] ?? 999;
+        if (ai !== bi) return ai - bi;
+        return a.current_bucket.localeCompare(b.current_bucket);
+      });
+      return g;
+    });
+  }, [filteredStockData, filterBucket]);
 
   // Bucket options for filter (from all stockData, not filtered)
   const bucketOptions = useMemo(() => {
@@ -328,13 +381,16 @@ export function StockDashboardPage() {
                   {group.rows.map((row, idx) => {
                     const key = `${row.branch_id}-${row.current_bucket}-${idx}`;
                     const isSelected = !!selected && selKey(selected) === selKey({ branchId: row.branch_id, bucket: row.current_bucket });
+                    const isEmpty = row.combined_item_count === 0;
                     return (
                       <button
                         key={key}
                         className={`w-full text-left px-4 py-2.5 border-b border-line flex items-center gap-3 transition-colors cursor-pointer ${
                           isSelected
                             ? 'bg-item-active-bg text-item-active-fg'
-                            : 'hover:bg-surface-hover'
+                            : isEmpty
+                              ? 'text-subtler opacity-60 hover:opacity-100 hover:bg-surface-hover'
+                              : 'hover:bg-surface-hover'
                         }`}
                         onClick={() => {
                           setSelected({ branchId: row.branch_id, bucket: row.current_bucket });
@@ -352,10 +408,12 @@ export function StockDashboardPage() {
                             <span>{t('inventory.lots')}: <span className="text-sm text-qty">{fmtNum(row.lot_total_qty)}</span></span>
                           </div>
                         </div>
-                        <div className="text-right shrink-0">
-                          <div className="text-sm font-medium text-qty tabular-nums">{fmtNum(row.combined_item_count)}</div>
-                          <div className="text-xs text-figure tabular-nums">{fmtCurrency(row.combined_total_value)}</div>
-                        </div>
+                        {!isEmpty && (
+                          <div className="text-right shrink-0">
+                            <div className="text-sm font-medium text-qty tabular-nums">{fmtNum(row.combined_item_count)}</div>
+                            <div className="text-xs text-figure tabular-nums">{fmtCurrency(row.combined_total_value)}</div>
+                          </div>
+                        )}
                       </button>
                     );
                   })}
