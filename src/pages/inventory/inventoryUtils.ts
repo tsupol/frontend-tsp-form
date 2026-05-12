@@ -54,7 +54,7 @@ export function getBucketColor(bucket: string): BucketBadgeColor {
 export const CONDITION_CONFIG: Record<string, { labelKey: string; textColor: string }> = {
   NEW: { labelKey: 'inventory.conditionNEW', textColor: 'text-success' },
   REFURBISHED: { labelKey: 'inventory.conditionREFURBISHED', textColor: 'text-info' },
-  USED_A: { labelKey: 'inventory.conditionUSED_A', textColor: 'text-warning' },
+  USED_A: { labelKey: 'inventory.conditionUSED_A', textColor: 'text-warning-fg' },
   USED_B: { labelKey: 'inventory.conditionUSED_B', textColor: 'text-subtle' },
 };
 

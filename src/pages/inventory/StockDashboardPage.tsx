@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Badge, Select } from 'tsp-form';
@@ -79,6 +80,16 @@ function selKey(s: Selection): string {
   return `${s.branchId}-${s.bucket}`;
 }
 
+function parseSelectionParam(raw: string | undefined): Selection | null {
+  if (!raw) return null;
+  const dash = raw.indexOf('-');
+  if (dash <= 0) return null;
+  const branchId = Number(raw.slice(0, dash));
+  const bucket = raw.slice(dash + 1);
+  if (!Number.isFinite(branchId) || !bucket) return null;
+  return { branchId, bucket };
+}
+
 // ============================================================================
 // Component
 // ============================================================================
@@ -90,7 +101,14 @@ export function StockDashboardPage() {
   const isBranchUser = ['BRANCH_STAFF', 'BRANCH_MANAGER'].includes(user?.role_code ?? '');
   const defaultBranchId = isBranchUser && user?.branch_id ? user.branch_id : null;
 
-  const [selected, setSelected] = useState<Selection | null>(null);
+  const navigate = useNavigate();
+  const { selection: selectionParam } = useParams<{ selection?: string }>();
+  const selected = useMemo(() => parseSelectionParam(selectionParam), [selectionParam]);
+  const setSelected = (s: Selection | null) => {
+    if (s) navigate(`/admin/inventory/stock/${selKey(s)}`, { replace: true });
+    else navigate('/admin/inventory/stock', { replace: true });
+  };
+
   const [filterBranchId, setFilterBranchId] = useState<number | null>(defaultBranchId);
   const [filterBucket, setFilterBucket] = useState<string | null>(null);
 
@@ -150,7 +168,7 @@ export function StockDashboardPage() {
     };
     return [
       { key: 'available', ...aggregate(['ON_HAND_AVAILABLE']), icon: Package, color: 'text-success' },
-      { key: 'quarantine', ...aggregate(['QUARANTINED']), icon: ShieldAlert, color: 'text-warning' },
+      { key: 'quarantine', ...aggregate(['QUARANTINED']), icon: ShieldAlert, color: 'text-warning-fg' },
       { key: 'inRepair', ...aggregate(['IN_REPAIR']), icon: Wrench, color: 'text-danger' },
       { key: 'inTransit', ...aggregate(['IN_TRANSIT_INBOUND', 'IN_TRANSIT_OUTBOUND']), icon: Truck, color: 'text-info' },
     ];
@@ -309,13 +327,13 @@ export function StockDashboardPage() {
                   </div>
                   {group.rows.map((row, idx) => {
                     const key = `${row.branch_id}-${row.current_bucket}-${idx}`;
-                    const isSelected = selected && selKey(selected) === key;
+                    const isSelected = !!selected && selKey(selected) === selKey({ branchId: row.branch_id, bucket: row.current_bucket });
                     return (
                       <button
                         key={key}
                         className={`w-full text-left px-4 py-2.5 border-b border-line flex items-center gap-3 transition-colors cursor-pointer ${
                           isSelected
-                            ? 'bg-primary/10'
+                            ? 'bg-item-active-bg text-item-active-fg'
                             : 'hover:bg-surface-hover'
                         }`}
                         onClick={() => {
