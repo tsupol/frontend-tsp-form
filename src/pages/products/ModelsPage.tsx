@@ -460,7 +460,7 @@ function CreateModelModal({ open, onClose, holdingId, families }: {
                 {preview.warnings && preview.warnings.length > 0 && (
                   <div className="mt-2 pt-2 border-t border-info/20 flex flex-col gap-1">
                     {preview.warnings.map((w, i) => (
-                      <div key={i} className="text-xs text-warning">⚠ {w}</div>
+                      <div key={i} className="text-xs text-warning-fg">⚠ {w}</div>
                     ))}
                   </div>
                 )}
@@ -1031,7 +1031,7 @@ export function ModelsPage() {
                       }
                     >
                       <div className="flex flex-col gap-3 p-3">
-                        <div className="text-xs font-medium text-muted uppercase tracking-wide">{t('common.filters')}</div>
+                        <div className="text-xs font-medium text-subtle uppercase tracking-wide">{t('common.filters')}</div>
                         <Select
                           options={brandOptions}
                           value={filterBrand || null}

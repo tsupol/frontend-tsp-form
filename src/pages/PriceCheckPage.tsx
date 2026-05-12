@@ -584,7 +584,7 @@ function Fin2Calculator({ fin2Rows, fin2Terms, t }: {
             <span className="text-right tabular-nums">{fmt(result.downAmount)}</span>
             <div className="col-span-2 border-t border-line my-1" />
             <span className="font-medium">{t('priceCheck.installment')}</span>
-            <span className="text-right tabular-nums text-primary font-semibold text-base">{fmt(result.installment)}</span>
+            <span className="text-right tabular-nums text-primary-fg font-semibold text-base">{fmt(result.installment)}</span>
           </div>
         </div>
       )}
@@ -627,7 +627,7 @@ function PricingTable({ rows, terms, type, t }: {
                 <td className="text-right px-4 py-2.5 tabular-nums">
                   {fmt(row.down_amount)} <span className="text-subtle text-xs">({row.down_percent}%)</span>
                 </td>
-                <td className="text-right px-4 py-2.5 tabular-nums text-primary font-semibold">
+                <td className="text-right px-4 py-2.5 tabular-nums text-primary-fg font-semibold">
                   {fmt(row.installment_amount)}
                 </td>
                 <td className="text-right px-4 py-2.5 tabular-nums text-subtle max-sm:hidden">

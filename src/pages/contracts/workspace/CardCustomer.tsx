@@ -33,7 +33,7 @@ export function CardCustomer({ onEdit, active, shake }: { onEdit?: () => void; a
         <div className="flex flex-col gap-1">
           <div className="font-medium">{contract.customer_name ?? ''}</div>
           {missing.length > 0 && (
-            <div className="flex items-center gap-1.5 text-xs text-warning">
+            <div className="flex items-center gap-1.5 text-xs text-warning-fg">
               <AlertTriangle size={12} className="shrink-0" />
               <span>{missing.join(', ')}</span>
             </div>

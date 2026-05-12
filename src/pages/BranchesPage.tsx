@@ -236,7 +236,7 @@ export function BranchesPage() {
         </div>
         <div className="mobile-header-title mobile-header-title-truncate">{t('branches.title')}</div>
         <div className="mobile-header-end">
-          <button className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-primary" onClick={openCreate}>
+          <button className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-primary-fg" onClick={openCreate}>
             <Plus size={20} />
           </button>
         </div>
@@ -309,7 +309,7 @@ export function BranchesPage() {
                 }
               >
                 <div className="flex flex-col gap-3 p-3">
-                  <div className="text-xs font-medium text-muted uppercase tracking-wide">{t('common.filters')}</div>
+                  <div className="text-xs font-medium text-subtle uppercase tracking-wide">{t('common.filters')}</div>
                   {isHoldingLevel && companies.length > 1 && (
                     <Select
                       options={companies.map(c => ({ value: String(c.id), label: c.name }))}
@@ -332,7 +332,7 @@ export function BranchesPage() {
                     clearable
                     searchable={false}
                   />
-                  <div className="text-xs font-medium text-muted uppercase tracking-wide mt-1">{t('common.sortBy')}</div>
+                  <div className="text-xs font-medium text-subtle uppercase tracking-wide mt-1">{t('common.sortBy')}</div>
                   <Select
                     options={[
                       { value: 'code', label: t('org.code') },

@@ -332,7 +332,7 @@ export function DunningConfigPage() {
                       <Badge size="sm" color="default">{CHANNEL_LABELS[row.channel] ?? row.channel}</Badge>
                     )}
                     {row.dirty && (
-                      <span className="text-xs text-primary">{t('settings.dunning.modified')}</span>
+                      <span className="text-xs text-primary-fg">{t('settings.dunning.modified')}</span>
                     )}
                     <div className="ml-auto flex items-center gap-2">
                       <Switch

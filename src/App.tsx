@@ -287,7 +287,7 @@ function App() {
 
       {/* Inventory */}
       <Route
-        path="/admin/inventory/stock"
+        path="/admin/inventory/stock/:selection?"
         element={
           <ProtectedRoute>
             <AdminLayout>

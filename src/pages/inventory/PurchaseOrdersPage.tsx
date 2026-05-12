@@ -629,7 +629,7 @@ function PoDetailPanel({
                 <div className="flex items-center gap-2">
                   <Link
                     to={`/admin/inventory/receiving/${r.id}`}
-                    className="inline-flex items-center gap-1 text-primary hover:underline text-xs font-medium tabular-nums"
+                    className="inline-flex items-center gap-1 text-primary-fg hover:underline text-xs font-medium tabular-nums"
                   >
                     {r.receipt_no}
                     <ExternalLink size={11} />
@@ -1253,7 +1253,7 @@ function AddLineModal({
                   </div>
                   <button
                     type="button"
-                    className="text-xs text-primary cursor-pointer bg-transparent border-none p-0 shrink-0"
+                    className="text-xs text-primary-fg cursor-pointer bg-transparent border-none p-0 shrink-0"
                     onClick={() => setPickerOpen(true)}
                   >
                     {t('po.changeProduct')}

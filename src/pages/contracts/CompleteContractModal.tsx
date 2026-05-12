@@ -595,7 +595,7 @@ function WalletGateRow({
         cleared ? 'border-line bg-surface' : 'border-warning/30 bg-warning/5'
       }`}
     >
-      <Icon size={18} className={cleared ? 'text-fg/40' : 'text-warning'} />
+      <Icon size={18} className={cleared ? 'text-fg/40' : 'text-warning-fg'} />
       <span className="text-sm flex-1">{t(WALLET_LABEL_KEY[walletType])}</span>
       {cleared ? (
         <span className="flex items-center gap-1.5 text-xs text-success">
@@ -681,7 +681,7 @@ function ConfirmView({
             </span>
           </>
         ) : (
-          <span className="font-medium text-warning">
+          <span className="font-medium text-warning-fg">
             {t('contract.terminate_warning', {
               defaultValue: 'Terminating returns the device to inventory.',
             })}
@@ -947,7 +947,7 @@ function PayoffView({
         isBalanced ? 'border-success/30 bg-success/5' : 'border-warning/30 bg-warning/5'
       }`}>
         <span className="text-sm">{t('wizard.totalPayment', { defaultValue: 'Total Payment' })}</span>
-        <span className={`font-semibold tabular-nums ${isBalanced ? 'text-success' : 'text-warning'}`}>
+        <span className={`font-semibold tabular-nums ${isBalanced ? 'text-success' : 'text-warning-fg'}`}>
           {fmtCurrency(totalPayment)} / {fmtCurrency(billTotal)}
         </span>
       </div>

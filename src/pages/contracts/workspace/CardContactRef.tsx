@@ -25,11 +25,11 @@ export function CardContactRef({ onEdit, active, shake }: { onEdit?: () => void;
         <div className="text-subtle text-xs">{t('workspace.needCustomerFirst')}</div>
       ) : (
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-          <span className={`inline-flex items-center gap-1 ${contactCount > 0 ? '' : 'text-warning'}`}>
+          <span className={`inline-flex items-center gap-1 ${contactCount > 0 ? '' : 'text-warning-fg'}`}>
             {contactCount > 0 ? <CheckCircle size={12} className="text-success" /> : <AlertTriangle size={12} />}
             {t('workspace.contacts')}: {contactCount}
           </span>
-          <span className={`inline-flex items-center gap-1 ${refCount > 0 ? '' : 'text-warning'}`}>
+          <span className={`inline-flex items-center gap-1 ${refCount > 0 ? '' : 'text-warning-fg'}`}>
             {refCount > 0 ? <CheckCircle size={12} className="text-success" /> : <AlertTriangle size={12} />}
             {t('workspace.references')}: {refCount}
           </span>

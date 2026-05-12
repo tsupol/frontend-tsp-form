@@ -34,7 +34,7 @@ export function CardDocuments({ onEdit, active, shake }: { onEdit?: () => void; 
       ) : (
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
           {items.map(item => (
-            <span key={item.label} className={`inline-flex items-center gap-1 ${!item.done && item.required ? 'text-warning' : !item.done ? 'text-subtle' : ''}`}>
+            <span key={item.label} className={`inline-flex items-center gap-1 ${!item.done && item.required ? 'text-warning-fg' : !item.done ? 'text-subtle' : ''}`}>
               {item.done
                 ? <CheckCircle size={12} className="text-success" />
                 : <AlertTriangle size={12} />

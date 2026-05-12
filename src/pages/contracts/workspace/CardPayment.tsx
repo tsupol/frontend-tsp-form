@@ -135,7 +135,7 @@ export function CardPayment() {
   return (
     <div className="border border-primary/30 rounded-lg bg-primary/3">
       <div className="flex items-center gap-2 px-4 py-3 border-b border-primary/20">
-        <CreditCard size={16} className="text-primary shrink-0" />
+        <CreditCard size={16} className="text-primary-fg shrink-0" />
         <span className="font-medium text-sm flex-1">{t('workspace.cardPayment')}</span>
         {data.billCode && <span className="text-xs font-mono text-subtle">{data.billCode}</span>}
       </div>
@@ -236,7 +236,7 @@ export function CardPayment() {
           isBalanced ? 'border-success/30 bg-success/5' : 'border-warning/30 bg-warning/5'
         }`}>
           <span className="text-sm">{t('wizard.totalPayment')}</span>
-          <span className={`font-semibold tabular-nums ${isBalanced ? 'text-success' : 'text-warning'}`}>
+          <span className={`font-semibold tabular-nums ${isBalanced ? 'text-success' : 'text-warning-fg'}`}>
             {fmtCurrency(totalPayment)}
           </span>
         </div>

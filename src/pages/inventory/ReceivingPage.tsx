@@ -386,7 +386,7 @@ function ReceiptDetailPanel({
           <div className="text-xs text-subtle">{t('receiving.poRef')}</div>
           <Link
             to={`/admin/inventory/po/${detail.po_id}`}
-            className="inline-flex items-center gap-1 font-semibold text-sm text-primary hover:underline"
+            className="inline-flex items-center gap-1 font-semibold text-sm text-primary-fg hover:underline"
           >
             {detail.po_no}
             <ExternalLink size={12} />
@@ -555,7 +555,7 @@ function ReceiptLineRow({
           {line.stock_lot_id && (
             <Link
               to={`/admin/inventory/lots/${line.stock_lot_id}`}
-              className="inline-flex items-center gap-1 text-xs text-primary hover:underline tabular-nums"
+              className="inline-flex items-center gap-1 text-xs text-primary-fg hover:underline tabular-nums"
               onClick={(e) => e.stopPropagation()}
             >
               {t('receiving.viewLot', { id: line.stock_lot_id })}

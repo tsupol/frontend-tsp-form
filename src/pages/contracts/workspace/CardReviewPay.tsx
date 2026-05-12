@@ -26,7 +26,7 @@ export function CardReviewPay({ onEdit, active, disabled }: { onEdit?: () => voi
       onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') onEdit?.(); } : undefined}
     >
       <div className="flex items-center gap-2 px-4 py-3">
-        <CreditCard size={16} className="text-primary shrink-0" />
+        <CreditCard size={16} className="text-primary-fg shrink-0" />
         <span className="font-medium text-sm flex-1">{t('workspace.cardReviewPay')}</span>
       </div>
       <div className="px-4 pb-3 text-sm flex flex-col gap-1.5">
@@ -36,11 +36,11 @@ export function CardReviewPay({ onEdit, active, disabled }: { onEdit?: () => voi
           {score ? (
             <div className="flex items-center gap-0.5">
               {[1, 2, 3, 4, 5].map(n => (
-                <Star key={n} size={12} className={n <= score ? 'text-warning fill-warning' : 'text-fg/15'} />
+                <Star key={n} size={12} className={n <= score ? 'text-warning-fg fill-warning' : 'text-fg/15'} />
               ))}
             </div>
           ) : (
-            <span className="text-xs text-warning">{t('workspace.notRated')}</span>
+            <span className="text-xs text-warning-fg">{t('workspace.notRated')}</span>
           )}
         </div>
         {/* Bill preview */}

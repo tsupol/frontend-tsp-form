@@ -56,6 +56,12 @@
     --color-primary-fade: #60a5fa;
     --color-primary-contrast: #ffffff;
     --color-primary-light: rgba(37, 99, 235, 0.1);
+    --color-primary-fg: var(--color-primary);
+    --color-secondary-fg: var(--color-secondary);
+    --color-success-fg: var(--color-success);
+    --color-danger-fg: var(--color-danger);
+    --color-warning-fg: var(--color-warning);
+    --color-info-fg: var(--color-info);
 
     /* ── Secondary (Teal) ─────────────────────────────────────────────── */
 
@@ -210,8 +216,9 @@
     --text-small: 0.8125rem;
     --text-small--line-height: 1.5;
 
-    /* Muted text — used by library components (slider, image-uploader) */
-    --color-fg-muted: #8b8d98;
+    /* Subtle text — used by library components (slider, image-uploader, etc.) */
+    --color-subtle: #999999;
+    --color-subtler: #70737c;
 
     /* Section spacing */
     --spacing-section: 2rem;
@@ -272,7 +279,8 @@
     --color-control-bg: #ffffff;
     --color-control-placeholder: #80838d;
     --color-control-label: #60646c;
-    --color-fg-muted: #60646c;
+    --color-subtle: #555;
+    --color-subtler: #999;
 
     /* default button */
     --color-button-default-bg: #eeeef1;
@@ -304,5 +312,15 @@
 
     /* skeleton */
     --color-skeleton: #e0e1e6;
-}
 
+    /* badge — light theme has near-white surface so the color-mix defaults
+       look washed out. Stronger tinted backgrounds with darker text. */
+    --color-badge-default-bg: #d9d9e0;
+    --color-badge-default-fg: #1c2024;
+    --color-badge-warning-bg: #fde68a;
+    --color-badge-warning-fg: #78350f;
+    --color-badge-success-bg: #bbf7d0;
+    --color-badge-success-fg: #14532d;
+    --color-badge-info-bg: #bae6fd;
+    --color-badge-info-fg: #0c4a6e;
+}

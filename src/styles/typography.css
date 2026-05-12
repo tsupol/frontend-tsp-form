@@ -31,10 +31,6 @@
         font-weight: var(--text-h4--font-weight);
     }
 
-    .text-muted {
-        color: var(--color-fg-muted);
-    }
-
     .text-small {
         font-size: var(--text-small);
         line-height: var(--text-small--line-height);

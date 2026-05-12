@@ -539,7 +539,7 @@ function CountCard({ icon, title, count, isLoading, isError, error, subtitle, to
       : tone === 'warning'
         ? 'border-warning/40 bg-warning/5'
         : 'border-line bg-surface';
-  const iconColor = tone === 'danger' ? 'text-danger' : tone === 'warning' ? 'text-warning' : 'text-success';
+  const iconColor = tone === 'danger' ? 'text-danger' : tone === 'warning' ? 'text-warning-fg' : 'text-success';
 
   const cls = `block border ${toneClass} rounded-lg p-4`;
 
@@ -619,7 +619,7 @@ function PendingDeviceBindCard({
     tone === 'danger'
       ? 'border-danger/40 bg-danger/5'
       : 'border-warning/40 bg-warning/5';
-  const iconColor = tone === 'danger' ? 'text-danger' : 'text-warning';
+  const iconColor = tone === 'danger' ? 'text-danger' : 'text-warning-fg';
 
   return (
     <Link
@@ -716,7 +716,7 @@ function BreakdownCard({ icon, title, rows, footer }: { icon: React.ReactNode; t
             const toneCls =
               r.tone === 'success' ? 'text-success'
               : r.tone === 'info' ? 'text-info'
-              : r.tone === 'warning' ? 'text-warning'
+              : r.tone === 'warning' ? 'text-warning-fg'
               : r.tone === 'danger' ? 'text-danger'
               : '';
             const rowCls = r.emphasize ? 'font-semibold' : '';

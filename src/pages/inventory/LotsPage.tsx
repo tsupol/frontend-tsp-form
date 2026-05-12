@@ -365,7 +365,7 @@ export function LotsPage() {
                   ref={filterTriggerRef}
                   size="sm"
                   variant="outline"
-                  className={`relative btn-icon-sm shrink-0 lg:hidden ${hiddenActiveFilters > 0 ? 'text-primary' : ''}`}
+                  className={`relative btn-icon-sm shrink-0 lg:hidden ${hiddenActiveFilters > 0 ? 'text-primary-fg' : ''}`}
                   onClick={() => setFilterPopoverOpen((v) => !v)}
                 >
                   <SlidersHorizontal size={14} />
@@ -656,7 +656,7 @@ function LotDetailPanel({
           <Badge size="xs" color="default">{lot.po_type}</Badge>
           <Link
             to={`/admin/inventory/po/${lot.po_id}`}
-            className="inline-flex items-center gap-1 text-primary hover:underline font-medium"
+            className="inline-flex items-center gap-1 text-primary-fg hover:underline font-medium"
           >
             {lot.po_no}
             <ExternalLink size={12} />
@@ -671,7 +671,7 @@ function LotDetailPanel({
           <Badge size="xs" color="default">{assetCount}</Badge>
           <Link
             to={`/admin/inventory/assets?source_lot_id=${lot.lot_id}`}
-            className="inline-flex items-center gap-1 text-primary hover:underline font-medium ml-auto"
+            className="inline-flex items-center gap-1 text-primary-fg hover:underline font-medium ml-auto"
           >
             {t('lot.viewAllAssets')}
             <ExternalLink size={12} />
@@ -703,7 +703,7 @@ function LotDetailPanel({
                   <div className="flex items-center gap-2">
                     <Link
                       to={`/admin/inventory/transfers/${tl.transfer_order_id}`}
-                      className="inline-flex items-center gap-1 text-primary hover:underline text-xs font-medium tabular-nums"
+                      className="inline-flex items-center gap-1 text-primary-fg hover:underline text-xs font-medium tabular-nums"
                     >
                       {transferNo ?? `#${tl.transfer_order_id}`}
                       <ExternalLink size={11} />

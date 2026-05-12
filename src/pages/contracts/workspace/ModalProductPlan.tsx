@@ -251,7 +251,7 @@ export function ModalProductPlan({ open, onClose }: Props) {
                         <div className="text-xs text-subtle">{model.brand_name}</div>
                       </div>
                       <Badge size="xs" color="default">{model.variant_count} {t('wizard.colors')}</Badge>
-                      {model.model_id === localModelId && <Check size={16} className="text-primary shrink-0" />}
+                      {model.model_id === localModelId && <Check size={16} className="text-primary-fg shrink-0" />}
                     </button>
                   ))}
                 </div>
@@ -283,7 +283,7 @@ export function ModalProductPlan({ open, onClose }: Props) {
                         onClick={() => handleSelectVariant(variant)}
                       >
                         <div className="flex items-center gap-2">
-                          {localVariantId === variant.variant_id && <Check size={14} className="text-primary shrink-0" />}
+                          {localVariantId === variant.variant_id && <Check size={14} className="text-primary-fg shrink-0" />}
                           <span className="text-sm font-medium">{variant.item_name}</span>
                         </div>
                       </button>
@@ -359,7 +359,7 @@ export function ModalProductPlan({ open, onClose }: Props) {
           {/* Selected plan summary */}
           {localQuote && (
             <div className="border border-primary/30 rounded-lg p-4 bg-primary/5">
-              <div className="text-xs text-primary font-medium mb-1">{t('wizard.selectedPlan')}</div>
+              <div className="text-xs text-primary-fg font-medium mb-1">{t('wizard.selectedPlan')}</div>
               <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
                 <span><span className="text-subtle">{t('wizard.financeModel')}:</span> {localQuote.finance_model}</span>
                 <span><span className="text-subtle">{t('contract.termMonths')}:</span> {localQuote.term_months} {t('contract.months')}</span>
@@ -414,7 +414,7 @@ function QuoteTable({ rows, terms, isSelected, onSelect, t, fmt }: {
                   onClick={() => onSelect(row)}
                 >
                   <td className="px-2 py-2.5 text-center">
-                    {selected && <Check size={14} className="text-primary inline" />}
+                    {selected && <Check size={14} className="text-primary-fg inline" />}
                   </td>
                   {i === 0 && (
                     <td className="px-4 py-2.5 font-medium" rowSpan={termRows.length}>
@@ -424,7 +424,7 @@ function QuoteTable({ rows, terms, isSelected, onSelect, t, fmt }: {
                   <td className="text-right px-4 py-2.5 tabular-nums">
                     {fmt(row.down_amount)} <span className="text-subtle text-xs">({row.down_percent}%)</span>
                   </td>
-                  <td className="text-right px-4 py-2.5 tabular-nums text-primary font-semibold">
+                  <td className="text-right px-4 py-2.5 tabular-nums text-primary-fg font-semibold">
                     {fmt(row.installment_amount)}
                   </td>
                   <td className="text-right px-4 py-2.5 tabular-nums text-subtle max-sm:hidden">

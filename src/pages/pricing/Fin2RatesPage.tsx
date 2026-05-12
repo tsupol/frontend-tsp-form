@@ -980,7 +980,7 @@ export function Fin2RatesPage() {
                       }
                     >
                       <div className="flex flex-col gap-3 p-3">
-                        <div className="text-xs font-medium text-muted uppercase tracking-wide">{t('common.filters')}</div>
+                        <div className="text-xs font-medium text-subtle uppercase tracking-wide">{t('common.filters')}</div>
                         <Select
                           options={brandOptions}
                           value={filterBrand || null}
@@ -1016,7 +1016,7 @@ export function Fin2RatesPage() {
                           size="sm"
                           showChevron
                         />
-                        <div className="text-xs font-medium text-muted uppercase tracking-wide">{t('common.sortBy')}</div>
+                        <div className="text-xs font-medium text-subtle uppercase tracking-wide">{t('common.sortBy')}</div>
                         <Select
                           options={sortOptions}
                           value={sortBy}
@@ -1079,7 +1079,7 @@ export function Fin2RatesPage() {
                                         <span className={`text-[11px] tabular-nums ${hasActive ? '' : 'text-subtle'}`}>
                                           {hasActive ? formatTHB(term.activeRate!.value) : '—'}
                                         </span>
-                                        <span className={`text-[10px] tabular-nums px-1.5 py-0.5 rounded ${hasActive ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>
+                                        <span className={`text-[10px] tabular-nums px-1.5 py-0.5 rounded ${hasActive ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning-fg'}`}>
                                           {term.term_months}m
                                         </span>
                                       </div>

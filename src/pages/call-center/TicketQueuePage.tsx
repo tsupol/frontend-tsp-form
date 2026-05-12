@@ -254,10 +254,10 @@ function eventIcon(eventType: string) {
   switch (eventType) {
     case 'CREATED': return <CirclePlus size={16} className="text-subtle" />;
     case 'TAKEN': return <UserPlus size={16} className="text-info" />;
-    case 'TAKEN_OVER': return <UserPlus size={16} className="text-warning" />;
+    case 'TAKEN_OVER': return <UserPlus size={16} className="text-warning-fg" />;
     case 'RESULT_SET': return <PhoneCall size={16} className="text-success" />;
     case 'NOTE_ADDED': return <StickyNote size={16} className="text-subtle" />;
-    case 'REVERTED': return <Undo2 size={16} className="text-warning" />;
+    case 'REVERTED': return <Undo2 size={16} className="text-warning-fg" />;
     case 'AUTO_CLOSED': return <Zap size={16} className="text-subtle" />;
     case 'STAGE_CHANGED': return <GitBranchPlus size={16} className="text-info" />;
     default: return <Clock size={16} className="text-subtle" />;
@@ -891,7 +891,7 @@ export function TicketQueuePage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className={`btn-icon-sm shrink-0 md:hidden ${filtersExpanded ? 'text-primary' : ''}`}
+                  className={`btn-icon-sm shrink-0 md:hidden ${filtersExpanded ? 'text-primary-fg' : ''}`}
                   startIcon={<SlidersHorizontal size={14} />}
                   onClick={() => setFiltersExpanded(!filtersExpanded)}
                 />
@@ -944,7 +944,7 @@ export function TicketQueuePage() {
                         <div className="flex items-center gap-2">
                           {ticket.is_mine && (
                             <Tooltip content={t('callCenter.assignedToMe')}>
-                              <User size={12} className="text-primary shrink-0" />
+                              <User size={12} className="text-primary-fg shrink-0" />
                             </Tooltip>
                           )}
                           <span className="font-medium text-xs truncate">{ticket.ticket_code}</span>

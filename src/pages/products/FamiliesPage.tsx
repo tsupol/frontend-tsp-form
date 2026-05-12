@@ -1588,7 +1588,7 @@ export function FamiliesPage() {
                 }
               >
                 <div className="flex flex-col gap-3 p-3">
-                  <div className="text-xs font-medium text-muted uppercase tracking-wide">{t('common.filters')}</div>
+                  <div className="text-xs font-medium text-subtle uppercase tracking-wide">{t('common.filters')}</div>
                   <Select
                     options={brandFilterOptions}
                     value={brandFilter ? String(brandFilter) : null}
@@ -1601,7 +1601,7 @@ export function FamiliesPage() {
                     showChevron
                     clearable
                   />
-                  <div className="text-xs font-medium text-muted uppercase tracking-wide mt-1">{t('common.sortBy')}</div>
+                  <div className="text-xs font-medium text-subtle uppercase tracking-wide mt-1">{t('common.sortBy')}</div>
                   <Select
                     options={[
                       { value: 'family_code', label: t('brandsModels.familyCode') },

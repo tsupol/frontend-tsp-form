@@ -1517,7 +1517,7 @@ export function UsersPage() {
                 }
               >
                 <div className="flex flex-col gap-3 p-3">
-                  <div className="text-xs font-medium text-muted uppercase tracking-wide">{t('common.filters')}</div>
+                  <div className="text-xs font-medium text-subtle uppercase tracking-wide">{t('common.filters')}</div>
                   {/* Only show filters that are hidden at current breakpoint — but since
                       we can't detect breakpoint in JS, show all filters in the popover.
                       Duplicate state is fine since they share the same state variables. */}
@@ -1578,7 +1578,7 @@ export function UsersPage() {
                     loading={filterBranchesLoading}
                     disabled={!filterCompany}
                   />
-                  <div className="text-xs font-medium text-muted uppercase tracking-wide mt-1">{t('common.sortBy')}</div>
+                  <div className="text-xs font-medium text-subtle uppercase tracking-wide mt-1">{t('common.sortBy')}</div>
                   <Select
                     options={[
                       { value: 'username', label: t('users.username') },

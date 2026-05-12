@@ -292,7 +292,7 @@ function CreditSplitInfo({
         <span className="tabular-nums font-medium text-fg">{fmtCurrency(holding)}</span>
       </div>
       {onlyHolding && (
-        <div className="flex items-center gap-1.5 mt-1.5 text-warning">
+        <div className="flex items-center gap-1.5 mt-1.5 text-warning-fg">
           <Lock size={12} />
           <span>{t('wallet.credit_locked_hint')}</span>
         </div>

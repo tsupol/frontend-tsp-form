@@ -493,7 +493,7 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
                           {line.description || previewLine?.description || line.charge_type}
                         </div>
                         {previewLine?.capability.requires_approval && (
-                          <div className="text-xs text-warning flex items-center gap-1 mt-0.5">
+                          <div className="text-xs text-warning-fg flex items-center gap-1 mt-0.5">
                             <AlertCircle size={12} />
                             {t('retail.create.requiresApproval')}
                           </div>

@@ -122,7 +122,7 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
                   <div className="text-xs text-subtle">{t('contract.assetCode')}</div>
                   <Link
                     to={`/admin/inventory/assets?asset_id=${contract.device_id}`}
-                    className="text-sm font-medium text-primary hover:underline inline-flex items-center gap-1"
+                    className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1"
                   >
                     {primaryAsset?.asset_code ?? `#${contract.device_id}`}
                     <ExternalLink size={11} />
@@ -226,7 +226,7 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
                   <div className="text-xs text-subtle">{t('contract.assetCode')}</div>
                   <Link
                     to={`/admin/inventory/assets?asset_id=${contract.loaner_device_id}`}
-                    className="text-sm font-medium text-primary hover:underline inline-flex items-center gap-1"
+                    className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1"
                   >
                     {loanerAsset?.asset_code ?? `#${contract.loaner_device_id}`}
                     <ExternalLink size={11} />
@@ -297,7 +297,7 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
                   <div className="flex items-center gap-2">
                     <Link
                       to={`/admin/inventory/repairs?repair_id=${ro.id}`}
-                      className="text-sm font-medium text-primary hover:underline"
+                      className="text-sm font-medium text-primary-fg hover:underline"
                     >
                       {ro.repair_no}
                     </Link>

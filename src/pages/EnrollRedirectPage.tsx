@@ -260,7 +260,7 @@ export function EnrollRedirectPage() {
           {downloaded ? (
             <CheckCircle size={64} className="text-success mx-auto mb-4" />
           ) : (
-            <Smartphone size={64} className="text-primary mx-auto mb-4" />
+            <Smartphone size={64} className="text-primary-fg mx-auto mb-4" />
           )}
           <h1 className="heading-2 mb-2">
             {downloaded ? t('enrollRedirect.profileDownloaded') : t('enrollRedirect.readyToInstall')}
@@ -334,7 +334,7 @@ export function EnrollRedirectPage() {
     return (
       <div className="min-h-screen bg-bg flex items-center justify-center p-4">
         <div className="max-w-sm w-full text-center">
-          <AlertCircle size={64} className="text-warning mx-auto mb-4" />
+          <AlertCircle size={64} className="text-warning-fg mx-auto mb-4" />
           <h1 className="heading-2 mb-2">{t('enrollRedirect.safariRequired')}</h1>
           <p className="text-subtle mb-6">{t('enrollRedirect.safariRequiredDesc')}</p>
 
@@ -364,7 +364,7 @@ export function EnrollRedirectPage() {
   return (
     <div className="min-h-screen bg-bg flex items-center justify-center p-4">
       <div className="max-w-sm w-full text-center">
-        <AlertCircle size={64} className="text-warning mx-auto mb-4" />
+        <AlertCircle size={64} className="text-warning-fg mx-auto mb-4" />
         <h1 className="heading-2 mb-2">{t('enrollRedirect.iosOnly')}</h1>
         <p className="text-subtle">{t('enrollRedirect.iosOnlyDesc')}</p>
       </div>

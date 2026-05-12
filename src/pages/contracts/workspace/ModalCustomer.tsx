@@ -399,7 +399,7 @@ function ExpandableSection({ title, done, expanded, onToggle, warning, children 
         {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         {done ? <CheckCircle size={14} className="text-success" /> : <span className="w-3.5 h-3.5 rounded-full border-2 border-fg/30 shrink-0" />}
         <span className="flex-1">{title}</span>
-        {warning && <span className="text-xs text-warning">{warning}</span>}
+        {warning && <span className="text-xs text-warning-fg">{warning}</span>}
       </button>
       {expanded && (
         <div className="px-4 pb-3 border-t border-line pt-3">
@@ -466,7 +466,7 @@ function ContactRow({ contact, onDeleted }: { contact: CustomerContact; onDelete
   return (
     <div className="flex items-center justify-between py-1.5 text-sm">
       <div className="flex items-center gap-2">
-        {contact.is_primary && <Star size={12} className="text-warning fill-warning" />}
+        {contact.is_primary && <Star size={12} className="text-warning-fg fill-warning" />}
         <Badge size="xs" color="info">{contact.contact_type}</Badge>
         <span className="tabular-nums">{contact.value}</span>
         {contact.label && <span className="text-subtle text-xs">({contact.label})</span>}

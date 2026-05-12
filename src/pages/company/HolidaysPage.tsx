@@ -416,7 +416,7 @@ export function HolidaysPage() {
         </div>
         <div className="mobile-header-end">
           <button
-            className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-primary"
+            className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-primary-fg"
             onClick={() => setCreateOpen(true)}
             aria-label={t('settings.holidays.addHoliday')}
           >
@@ -480,7 +480,7 @@ export function HolidaysPage() {
               }
             >
               <div className="flex flex-col gap-3 p-3">
-                <div className="text-xs font-medium text-muted uppercase tracking-wide">{t('common.filters')}</div>
+                <div className="text-xs font-medium text-subtle uppercase tracking-wide">{t('common.filters')}</div>
                 <Select
                   options={companyOptions}
                   value={companyFilter !== null ? String(companyFilter) : null}
@@ -490,7 +490,7 @@ export function HolidaysPage() {
                   showChevron
                   clearable
                 />
-                <div className="text-xs font-medium text-muted uppercase tracking-wide mt-1">{t('common.sortBy')}</div>
+                <div className="text-xs font-medium text-subtle uppercase tracking-wide mt-1">{t('common.sortBy')}</div>
                 <Select
                   options={sortOptions}
                   value={sorting[0]?.id ?? null}

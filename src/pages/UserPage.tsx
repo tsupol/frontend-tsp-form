@@ -496,7 +496,7 @@ function TokenDebugPanel() {
           <div className="text-subtle">Time Remaining</div>
           <div className={`mt-1 text-lg font-bold ${
             tokenInfo.isExpired ? 'text-danger' :
-            isNearExpiry ? 'text-warning' :
+            isNearExpiry ? 'text-warning-fg' :
             'text-success'
           }`}>
             {tokenInfo.timeRemaining}

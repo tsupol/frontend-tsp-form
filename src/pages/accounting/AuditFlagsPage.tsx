@@ -192,7 +192,7 @@ export function AuditFlagsPage() {
                           <DateTime value={r.close_date} showTime={false} />
                           <span className="text-subtle">· {r.bill_active} {t('accounting.dayClose.bills')}</span>
                           {flagCount > 0 && (
-                            <span className="inline-flex items-center gap-1 text-warning">
+                            <span className="inline-flex items-center gap-1 text-warning-fg">
                               <AlertTriangle size={10} />
                               {flagCount}
                             </span>
@@ -209,7 +209,7 @@ export function AuditFlagsPage() {
                       <div className="text-right shrink-0 text-sm tabular-nums">
                         <div>{fmtCurrency(r.snapshot_cash + r.snapshot_transfer)}</div>
                         {r.voided_amount > 0 && (
-                          <div className="text-xs text-warning">−{fmtCurrency(r.voided_amount)}</div>
+                          <div className="text-xs text-warning-fg">−{fmtCurrency(r.voided_amount)}</div>
                         )}
                       </div>
                     </button>
@@ -374,7 +374,7 @@ function AuditDetail({ row, onOpenDayClose }: { row: DayCloseAuditRow; onOpenDay
 }
 
 function Stat({ label, value, tone }: { label: string; value: React.ReactNode; tone?: 'danger' | 'warning' }) {
-  const toneClass = tone === 'danger' ? 'text-danger' : tone === 'warning' ? 'text-warning' : '';
+  const toneClass = tone === 'danger' ? 'text-danger' : tone === 'warning' ? 'text-warning-fg' : '';
   return (
     <div>
       <dt className="text-xs text-subtle">{label}</dt>

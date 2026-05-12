@@ -130,7 +130,7 @@ export function EnrollmentPage() {
                 href={`${ENROLL_BASE_URL}?id=${enrollment.enrollment_id}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="underline hover:text-primary"
+                className="underline hover:text-primary-fg"
               >
                 {t('enrollment.directLink')}
               </a>

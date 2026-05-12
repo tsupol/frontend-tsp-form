@@ -686,7 +686,7 @@ export function PanelProductPlan({ onClose }: Props) {
           </div>
           {contract?.state === 'SAVING' && (
             <div className="px-4 pb-3">
-              <div className="flex items-center gap-1.5 text-xs text-warning">
+              <div className="flex items-center gap-1.5 text-xs text-warning-fg">
                 <AlertTriangle size={12} />
                 <span>{t('wizard.softTargetWarning')}</span>
               </div>
@@ -700,14 +700,14 @@ export function PanelProductPlan({ onClose }: Props) {
         <>
           <div className="flex gap-2">
             <button
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-colors cursor-pointer ${sourceTab === 'instock' ? 'border-primary bg-primary/5 text-primary' : 'border-line hover:border-fg/30 bg-transparent text-fg'}`}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-colors cursor-pointer ${sourceTab === 'instock' ? 'border-primary bg-primary/5 text-primary-fg' : 'border-line hover:border-fg/30 bg-transparent text-fg'}`}
               onClick={() => handleSwitchTab('instock')}
             >
               <Package size={18} />
               <span className="font-medium text-sm">{t('wizard.tabInStock')}</span>
             </button>
             <button
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-colors cursor-pointer ${sourceTab === 'catalog' ? 'border-primary bg-primary/5 text-primary' : 'border-line hover:border-fg/30 bg-transparent text-fg'}`}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-colors cursor-pointer ${sourceTab === 'catalog' ? 'border-primary bg-primary/5 text-primary-fg' : 'border-line hover:border-fg/30 bg-transparent text-fg'}`}
               onClick={() => handleSwitchTab('catalog')}
             >
               <BookOpen size={18} />
@@ -798,7 +798,7 @@ export function PanelProductPlan({ onClose }: Props) {
           <label className="form-label">{t('wizard.selectColor')}</label>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {variants.map(v => (
-              <button key={v.variant_id} className={`text-left px-3 py-2.5 rounded-lg border transition-colors cursor-pointer font-medium ${localVariantId === v.variant_id ? 'border-primary bg-primary/5 text-primary' : 'border-line hover:border-fg/30'}`} onClick={() => handleSelectVariant(v)}>
+              <button key={v.variant_id} className={`text-left px-3 py-2.5 rounded-lg border transition-colors cursor-pointer font-medium ${localVariantId === v.variant_id ? 'border-primary bg-primary/5 text-primary-fg' : 'border-line hover:border-fg/30'}`} onClick={() => handleSelectVariant(v)}>
                 <span className="text-sm">{colorLabel(v)}</span>
               </button>
             ))}
@@ -875,7 +875,7 @@ export function PanelProductPlan({ onClose }: Props) {
       {/* ── Selected plan summary ────────────────────────────────────── */}
       {localQuote && (
         <div className="border border-primary/30 rounded-lg p-4 bg-primary/5">
-          <div className="text-xs text-primary font-medium mb-2">{t('wizard.selectedPlan')}</div>
+          <div className="text-xs text-primary-fg font-medium mb-2">{t('wizard.selectedPlan')}</div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div>
               <div className="text-xs text-subtle">{t('wizard.financeModel')}</div>
@@ -891,7 +891,7 @@ export function PanelProductPlan({ onClose }: Props) {
             </div>
             <div>
               <div className="text-xs text-subtle">{t('contract.installmentAmount')}</div>
-              <div className="text-sm font-medium text-primary">{fmtCurrency(localQuote.installment_amount)}</div>
+              <div className="text-sm font-medium text-primary-fg">{fmtCurrency(localQuote.installment_amount)}</div>
             </div>
           </div>
         </div>
@@ -948,7 +948,7 @@ function QuoteTable({ rows, terms, type, isSelected, onSelect, t }: {
                 <tr key={`${term}-${row.down_percent}`} className={`cursor-pointer transition-colors ${selected ? 'bg-primary/10' : 'hover:bg-surface-hover'}`} onClick={() => onSelect(row)}>
                   <td className="px-4 py-2.5 font-medium">{term} {t('priceCheck.months')}</td>
                   <td className="text-right px-4 py-2.5 tabular-nums">{fmt(row.down_amount)} <span className="text-subtle text-xs">({row.down_percent}%)</span></td>
-                  <td className="text-right px-4 py-2.5 tabular-nums text-primary font-semibold">{fmt(row.installment_amount)}</td>
+                  <td className="text-right px-4 py-2.5 tabular-nums text-primary-fg font-semibold">{fmt(row.installment_amount)}</td>
                   <td className="text-right px-4 py-2.5 tabular-nums text-subtle max-sm:hidden">{fmt(row.total_amount)}</td>
                   <td className="text-right px-4 py-2.5 tabular-nums text-subtle max-sm:hidden">
                     {type === 'fin1'
@@ -1135,7 +1135,7 @@ function Fin2Calculator({ fin2Rows, fin2Terms, t, onUse }: {
             })()}
             <div className="col-span-2 border-t border-line my-1" />
             <span className="font-medium">{t('priceCheck.installment')}</span>
-            <span className="text-right tabular-nums text-primary font-semibold text-base">{fmt(result.installment)}</span>
+            <span className="text-right tabular-nums text-primary-fg font-semibold text-base">{fmt(result.installment)}</span>
           </div>
 
           <div className="flex justify-end mt-3">

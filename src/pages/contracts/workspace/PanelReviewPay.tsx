@@ -283,7 +283,7 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
                   disabled={scoreSaving}
                   title={t(SCORE_TOOLTIPS[n])}
                 >
-                  <Star size={28} className={filled ? 'text-warning fill-warning' : 'text-fg/20'} />
+                  <Star size={28} className={filled ? 'text-warning-fg fill-warning' : 'text-fg/20'} />
                 </button>
               );
             })}
@@ -304,7 +304,7 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
           )}
 
           {!score && (
-            <div className="flex items-center gap-1.5 text-xs text-warning mt-2">
+            <div className="flex items-center gap-1.5 text-xs text-warning-fg mt-2">
               <AlertTriangle size={12} />
               <span>{t('workspace.confidenceRequired')}</span>
             </div>
@@ -428,7 +428,7 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
             isBalanced ? 'border-success/30 bg-success/5' : 'border-warning/30 bg-warning/5'
           }`}>
             <span className="text-sm">{t('wizard.totalPayment')}</span>
-            <span className={`font-semibold tabular-nums ${isBalanced ? 'text-success' : 'text-warning'}`}>
+            <span className={`font-semibold tabular-nums ${isBalanced ? 'text-success' : 'text-warning-fg'}`}>
               {fmtCurrency(totalPayment)}
             </span>
           </div>

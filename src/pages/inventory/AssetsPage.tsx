@@ -661,7 +661,7 @@ export function AssetsPage() {
                   ref={filterTriggerRef}
                   size="sm"
                   variant="outline"
-                  className={`relative btn-icon-sm shrink-0 ${extraFilterCount > 0 ? 'text-primary' : ''}`}
+                  className={`relative btn-icon-sm shrink-0 ${extraFilterCount > 0 ? 'text-primary-fg' : ''}`}
                   onClick={() => setFilterPopoverOpen((v) => !v)}
                 >
                   <SlidersHorizontal size={14} />
@@ -873,7 +873,7 @@ function AssetDetailPanel({
               {asset.source_po_id && (
                 <Link
                   to={`/admin/inventory/po/${asset.source_po_id}`}
-                  className="inline-flex items-center gap-1 text-primary hover:underline"
+                  className="inline-flex items-center gap-1 text-primary-fg hover:underline"
                 >
                   {t('asset.sourcePO')}: #{asset.source_po_id}
                   <ExternalLink size={11} />
@@ -882,7 +882,7 @@ function AssetDetailPanel({
               {asset.source_lot_id && (
                 <Link
                   to={`/admin/inventory/lots/${asset.source_lot_id}`}
-                  className="inline-flex items-center gap-1 text-primary hover:underline"
+                  className="inline-flex items-center gap-1 text-primary-fg hover:underline"
                 >
                   {t('asset.sourceLot')}: #{asset.source_lot_id}
                   <ExternalLink size={11} />

@@ -151,7 +151,7 @@ export function HoldingsPage() {
         </div>
         <div className="mobile-header-title mobile-header-title-truncate">{t('settings.holdings')}</div>
         <div className="mobile-header-end">
-          <button className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-primary" onClick={openCreate}>
+          <button className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-primary-fg" onClick={openCreate}>
             <Plus size={20} />
           </button>
         </div>

@@ -421,7 +421,7 @@ export function BlacklistPage() {
         </div>
         <div className="mobile-header-end">
           <button
-            className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-primary"
+            className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-primary-fg"
             onClick={() => setCreateOpen(true)}
             aria-label={t('settings.blacklist.addToBlacklist')}
           >

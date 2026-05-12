@@ -54,10 +54,10 @@ export function CardProductPlan({ onEdit, active, shake }: { onEdit?: () => void
               <span>{contract.value_month} {t('contract.months')}</span>
               {contract.down_payment != null && <span>{t('contract.downPayment')} {fmtCurrency(contract.down_payment)}</span>}
               <span>{t('contract.installmentAmount')} {fmtCurrency(contract.installment_amount!)}</span>
-              {isFinancialLocked && <Lock size={12} className="text-warning" />}
+              {isFinancialLocked && <Lock size={12} className="text-warning-fg" />}
             </div>
           ) : missing.length > 0 && (
-            <div className="flex items-center gap-1.5 text-xs text-warning">
+            <div className="flex items-center gap-1.5 text-xs text-warning-fg">
               <AlertTriangle size={12} className="shrink-0" />
               <span>{missing.join(', ')}</span>
             </div>

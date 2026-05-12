@@ -19,7 +19,7 @@ const STATUS_ICON: Record<CardStatus, ReactNode> = {
   complete: <CheckCircle size={16} className="text-success shrink-0" />,
   partial: <Circle size={16} className="text-fg/30 shrink-0" />,
   empty: <Circle size={16} className="text-fg/30 shrink-0" />,
-  warning: <AlertTriangle size={16} className="text-warning shrink-0" />,
+  warning: <AlertTriangle size={16} className="text-warning-fg shrink-0" />,
   locked: <Lock size={16} className="text-fg/20 shrink-0" />,
 };
 

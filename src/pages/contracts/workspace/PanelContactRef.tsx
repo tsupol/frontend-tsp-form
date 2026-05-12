@@ -98,7 +98,7 @@ function ContactRow({ contact, onDeleted }: { contact: CustomerContact; onDelete
     <div className="flex items-center gap-2 px-3 py-2 border border-success/30 rounded-lg text-sm">
       <Badge size="xs" color="info">{contact.contact_type}</Badge>
       <span className="tabular-nums flex-1">{contact.value}</span>
-      {contact.is_primary && <Star size={12} className="text-warning fill-warning shrink-0" />}
+      {contact.is_primary && <Star size={12} className="text-warning-fg fill-warning shrink-0" />}
       {contact.label && <span className="text-subtle text-xs shrink-0">({contact.label})</span>}
       <button className="p-1 rounded hover:bg-surface-hover cursor-pointer text-subtle hover:text-danger shrink-0 bg-transparent border-none" onClick={handleDelete} disabled={deleting}><Trash2 size={13} /></button>
     </div>

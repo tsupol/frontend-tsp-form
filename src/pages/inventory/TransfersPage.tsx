@@ -762,7 +762,7 @@ function TransferLineRow({
             {line.line_type === 'ASSET' && line.asset_id ? (
               <Link
                 to={`/admin/inventory/assets/${line.asset_id}`}
-                className="inline-flex items-center gap-1 text-primary hover:underline"
+                className="inline-flex items-center gap-1 text-primary-fg hover:underline"
               >
                 {line.asset_code ?? `Asset #${line.asset_id}`}
                 <ExternalLink size={11} />
@@ -770,7 +770,7 @@ function TransferLineRow({
             ) : line.line_type === 'LOT' && line.stock_lot_id ? (
               <Link
                 to={`/admin/inventory/lots/${line.stock_lot_id}`}
-                className="inline-flex items-center gap-1 text-primary hover:underline"
+                className="inline-flex items-center gap-1 text-primary-fg hover:underline"
               >
                 Lot #{line.stock_lot_id}
                 <ExternalLink size={11} />
@@ -792,7 +792,7 @@ function TransferLineRow({
           </Badge>
           {line.line_type === 'LOT' && line.qty_requested !== null && !isEditing && (
             <span
-              className={`text-xs tabular-nums ${canEditQty ? 'cursor-pointer text-primary hover:underline' : 'text-subtle'}`}
+              className={`text-xs tabular-nums ${canEditQty ? 'cursor-pointer text-primary-fg hover:underline' : 'text-subtle'}`}
               onClick={() => canEditQty && setIsEditing(true)}
               title={canEditQty ? t('transfer.editQty') : undefined}
             >

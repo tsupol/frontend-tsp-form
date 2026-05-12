@@ -342,7 +342,7 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
                           <div className="font-medium text-sm">{c.full_name}</div>
                           <div className="text-xs text-subtle">{c.id_type}: {c.id_number} {c.tel ? `· ${c.tel}` : ''}</div>
                         </div>
-                        {selectedCustomer?.id === c.id && <CheckCircle size={14} className="text-primary" />}
+                        {selectedCustomer?.id === c.id && <CheckCircle size={14} className="text-primary-fg" />}
                       </button>
                     ))}
                   </div>
@@ -372,7 +372,7 @@ function SectionHeader({ label, done, expanded, onToggle }: {
         onClick={onToggle}
       >
         {expanded ? <ChevronDown size={13} className="text-subtle" /> : <ChevronRight size={13} className="text-subtle" />}
-        {done ? <CheckCircle size={13} className="text-success" /> : <AlertTriangle size={13} className="text-warning" />}
+        {done ? <CheckCircle size={13} className="text-success" /> : <AlertTriangle size={13} className="text-warning-fg" />}
         <span>{label}</span>
       </button>
     </>
@@ -527,7 +527,7 @@ function GuarantorRow({ guarantor, contractId, expanded, onToggle, onRemove, rem
         {expanded ? <ChevronDown size={14} className="text-subtle shrink-0" /> : <ChevronRight size={14} className="text-subtle shrink-0" />}
         {isComplete
           ? <CheckCircle size={14} className="text-success shrink-0" />
-          : <AlertTriangle size={14} className="text-warning shrink-0" />
+          : <AlertTriangle size={14} className="text-warning-fg shrink-0" />
         }
         <div className="flex-1 min-w-0">
           <div className="font-medium text-sm truncate">{guarantor.fullName}</div>

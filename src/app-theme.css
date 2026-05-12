@@ -6,22 +6,16 @@
 @import "./index.css";
 
 @theme static {
-    /* Panel header height */
-
+    /* Layout */
     --spacing-side-menu: 240px;
     --spacing-panel-header-h: 2.792rem;
-
-    /* Info section content row height */
     --spacing-info-content-h: 1.708rem;
 
-    /* Text colors for non-form data display */
-    --color-subtle: #999999;       /* labels, secondary text */
-    --color-subtler: #70737c;      /* empty states, placeholders */
+    /* App-specific text tokens (not in library) */
     --color-figure: #aabde8;       /* money / currency values */
     --color-qty: #c2c7d7;          /* quantity / count values */
-    --color-muted: #99999999;
 
-    /* ── Primary (overrides index.css) ──────────────────────────────── */
+    /* ── Primary (overrides library) ────────────────────────────────── */
     --color-primary: #2333d6;
     --color-primary-hover: #3e4ee0;
     --color-primary-active: #1a28ad;
@@ -29,13 +23,13 @@
     --color-primary-contrast: #ffffff;
     --color-primary-light: rgba(35, 51, 214, 0.1);
 
-    --color-primary-text: #5a78ee;
-    --color-warning-text: var(--color-warning);
+    /* Readable on-page text variant (library defaults *-fg to the solid
+       hue; override here so .text-primary-fg renders the lighter shade). */
+    --color-primary-fg: #5a78ee;
+    /* --color-warning-fg falls through to library default (= --color-warning) */
 }
 
 [data-theme="light"] {
-    --color-subtle: #555;
-    --color-subtler: #999;
     --color-figure: #4a4d55;
     --color-qty: #555960;
     --color-bg: #f3f3f6;
@@ -44,25 +38,13 @@
     --color-primary-active: #131e85;
     --color-primary-fade: #131e85;
 
-    --color-primary-text: #2333d6;
-    --color-warning-text: #d7800c;
-
-}
-
-/* Redirect Tailwind's .text-primary utility to use --color-primary-text.
-   Wrapped in utilities layer so it overrides Tailwind's generated rule. */
-@layer utilities {
-    .text-primary {
-        color: var(--color-primary-text);
-    }
-    .text-warning {
-        color: var(--color-warning-text);
-    }
+    --color-primary-fg: #2333d6;
+    --color-warning-fg: #d7800c;
 }
 
 @layer components {
     .btn-outline-primary {
-        --color-text: var(--color-primary-text);
-        --color-border: var(--color-primary-text);
+        --color-text: var(--color-primary-fg);
+        --color-border: var(--color-primary-fg);
     }
 }

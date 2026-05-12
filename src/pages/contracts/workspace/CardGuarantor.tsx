@@ -87,19 +87,19 @@ export function CardGuarantor({ onEdit, active, shake }: { onEdit?: () => void; 
                 <div className="flex items-center gap-2 text-sm">
                   {complete
                     ? <CheckCircle size={14} className="text-success shrink-0" />
-                    : <AlertTriangle size={14} className="text-warning shrink-0" />
+                    : <AlertTriangle size={14} className="text-warning-fg shrink-0" />
                   }
                   <span className="truncate">{g.fullName}</span>
                 </div>
                 {missing.length > 0 && (
-                  <div className="text-xs text-warning" style={{ marginLeft: '22px' }}>{missing.join(', ')}</div>
+                  <div className="text-xs text-warning-fg" style={{ marginLeft: '22px' }}>{missing.join(', ')}</div>
                 )}
               </div>
             );
           })}
         </div>
       ) : (
-        <div className="text-warning flex items-center gap-2 text-xs">
+        <div className="text-warning-fg flex items-center gap-2 text-xs">
           <AlertTriangle size={14} />
           <span>{t('workspace.guarantorRequired')}</span>
         </div>

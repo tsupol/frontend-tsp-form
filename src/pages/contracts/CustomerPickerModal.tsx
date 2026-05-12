@@ -292,7 +292,7 @@ export function CustomerPickerModal({ open, title, excludeCustomerIds = [], onCl
                         <div className="font-medium text-sm">{c.full_name}</div>
                         <div className="text-xs text-subtle">{c.id_type}: {c.id_number} {c.tel ? `· ${c.tel}` : ''}</div>
                       </div>
-                      {selected?.id === c.id && <CheckCircle size={14} className="text-primary" />}
+                      {selected?.id === c.id && <CheckCircle size={14} className="text-primary-fg" />}
                     </button>
                   ))}
                 </div>

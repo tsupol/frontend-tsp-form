@@ -567,7 +567,7 @@ function ContactRow({ contact, onDeleted }: { contact: CustomerContact; onDelete
   return (
     <div className="flex items-center justify-between px-3 py-2 text-sm">
       <div className="flex items-center gap-2">
-        {contact.is_primary && <Star size={12} className="text-warning fill-warning" />}
+        {contact.is_primary && <Star size={12} className="text-warning-fg fill-warning" />}
         <Badge size="xs" color="info">{contact.contact_type}</Badge>
         <span className="tabular-nums">{contact.value}</span>
         {contact.label && <span className="text-subtle text-xs">({contact.label})</span>}

@@ -525,7 +525,7 @@ export function DiscountApprovalsPage() {
               }
             >
               <div className="flex flex-col gap-3 p-3">
-                <div className="text-xs font-medium text-muted uppercase tracking-wide">{t('common.filters')}</div>
+                <div className="text-xs font-medium text-subtle uppercase tracking-wide">{t('common.filters')}</div>
                 <Select
                   options={companyOptions}
                   value={companyFilter !== null ? String(companyFilter) : null}
@@ -544,7 +544,7 @@ export function DiscountApprovalsPage() {
                   showChevron
                   clearable
                 />
-                <div className="text-xs font-medium text-muted uppercase tracking-wide mt-1">{t('common.sortBy')}</div>
+                <div className="text-xs font-medium text-subtle uppercase tracking-wide mt-1">{t('common.sortBy')}</div>
                 <Select
                   options={[
                     { value: 'requested_at', label: t('discount.requestedAt') },

@@ -543,7 +543,7 @@ export function BrandsPage() {
                 }
               >
                 <div className="flex flex-col gap-3 p-3">
-                  <div className="text-xs font-medium text-muted uppercase tracking-wide">{t('common.sortBy')}</div>
+                  <div className="text-xs font-medium text-subtle uppercase tracking-wide">{t('common.sortBy')}</div>
                   <Select
                     options={[
                       { value: 'code', label: t('brandsModels.brandCode') },

@@ -509,7 +509,7 @@ export function LegalCasesPage() {
                           <span className="text-subtle">{t('legal.contract')}</span>
                           {customer?.contract_code && caseData.ref_contract_source !== 'legacy' ? (
                             <button
-                              className="font-medium text-primary hover:underline cursor-pointer bg-transparent border-none p-0 flex items-center gap-1"
+                              className="font-medium text-primary-fg hover:underline cursor-pointer bg-transparent border-none p-0 flex items-center gap-1"
                               onClick={() => goToContract(caseData.ref_contract_id)}
                             >
                               {customer.contract_code}
@@ -565,7 +565,7 @@ export function LegalCasesPage() {
                             {customer.cus_facebook && customer.cus_facebook !== '-' && (
                               <div className="flex justify-between">
                                 <span className="text-subtle">Facebook</span>
-                                <a href={customer.cus_facebook} target="_blank" rel="noopener noreferrer" className="text-primary text-xs truncate max-w-48">{customer.cus_facebook}</a>
+                                <a href={customer.cus_facebook} target="_blank" rel="noopener noreferrer" className="text-primary-fg text-xs truncate max-w-48">{customer.cus_facebook}</a>
                               </div>
                             )}
 

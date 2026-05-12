@@ -324,7 +324,7 @@ export function DayClosePage() {
                   }`}
                   onClick={() => selectDate(today, isMobile ? goTo : undefined)}
                 >
-                  <Sparkles size={16} className="text-primary shrink-0" />
+                  <Sparkles size={16} className="text-primary-fg shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-sm">{t('accounting.dayClose.todayLabel')}</div>
                     <div className="text-xs text-subtle">
@@ -352,7 +352,7 @@ export function DayClosePage() {
                     }`}
                     onClick={() => selectDate(key, isMobile ? goTo : undefined)}
                   >
-                    <Clock size={16} className="text-warning shrink-0" />
+                    <Clock size={16} className="text-warning-fg shrink-0" />
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm flex items-center gap-2">
                         <DateTime value={u.bill_date} showTime={false} />
@@ -397,7 +397,7 @@ export function DayClosePage() {
                         <div className="text-xs text-subtle flex items-center gap-2">
                           <span>{h.bill_count} {t('accounting.dayClose.bills')}</span>
                           {flags.length > 0 && (
-                            <span className="inline-flex items-center gap-1 text-warning">
+                            <span className="inline-flex items-center gap-1 text-warning-fg">
                               <AlertTriangle size={10} />
                               {flags.length}
                             </span>
@@ -407,7 +407,7 @@ export function DayClosePage() {
                       <div className="text-right shrink-0 text-sm tabular-nums">
                         <div>{fmtCurrency(h.expected_amount)}</div>
                         {h.shortage > 0 && <div className="text-xs text-danger">-{fmtCurrency(h.shortage)}</div>}
-                        {h.overage > 0 && <div className="text-xs text-warning">+{fmtCurrency(h.overage)}</div>}
+                        {h.overage > 0 && <div className="text-xs text-warning-fg">+{fmtCurrency(h.overage)}</div>}
                       </div>
                     </button>
                   );
@@ -455,7 +455,7 @@ export function DayClosePage() {
                 <ReconcileBody
                   branchId={effectiveBranchId}
                   billDate={selectedUnclosed.bill_date}
-                  headerIcon={<Clock size={18} className="text-warning shrink-0" />}
+                  headerIcon={<Clock size={18} className="text-warning-fg shrink-0" />}
                   headerLabel={<DateTime value={selectedUnclosed.bill_date} showTime={false} />}
                   headerBadge={<Badge color="warning" size="sm">{t('accounting.dayClose.unclosedBadge')}</Badge>}
                   summary={unclosedSummary}
@@ -481,7 +481,7 @@ export function DayClosePage() {
                 <ReconcileBody
                   branchId={effectiveBranchId}
                   billDate={today}
-                  headerIcon={<Sparkles size={18} className="text-primary shrink-0" />}
+                  headerIcon={<Sparkles size={18} className="text-primary-fg shrink-0" />}
                   headerLabel={t('accounting.dayClose.todayLabel')}
                   headerBadge={null}
                   summary={summary ?? null}
@@ -821,7 +821,7 @@ function CloseDayModal({
           {actualAmount && (
             <div className="text-sm">
               <span className="text-subtle">{t('accounting.dayClose.difference')}: </span>
-              <span className={`font-semibold tabular-nums ${diff < 0 ? 'text-danger' : diff > 0 ? 'text-warning' : 'text-success'}`}>
+              <span className={`font-semibold tabular-nums ${diff < 0 ? 'text-danger' : diff > 0 ? 'text-warning-fg' : 'text-success'}`}>
                 {diff >= 0 ? '+' : ''}{fmtCurrency(diff)}
               </span>
             </div>
@@ -839,7 +839,7 @@ function CloseDayModal({
 }
 
 function Stat({ label, value, tone }: { label: string; value: React.ReactNode; tone?: 'danger' | 'warning' }) {
-  const toneClass = tone === 'danger' ? 'text-danger' : tone === 'warning' ? 'text-warning' : '';
+  const toneClass = tone === 'danger' ? 'text-danger' : tone === 'warning' ? 'text-warning-fg' : '';
   return (
     <div>
       <dt className="text-xs text-subtle">{label}</dt>

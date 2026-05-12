@@ -328,7 +328,7 @@ function RepairDetailPanel({
           <div className="text-xs text-subtle">{t('repair.asset')}</div>
           <Link
             to={`/admin/inventory/assets/${order.asset_id}`}
-            className="inline-flex items-center gap-1 font-semibold text-sm text-primary hover:underline"
+            className="inline-flex items-center gap-1 font-semibold text-sm text-primary-fg hover:underline"
           >
             {order.asset_code}
             <ExternalLink size={12} />
@@ -351,7 +351,7 @@ function RepairDetailPanel({
           <div className="text-xs text-subtle mb-0.5">{t('repair.loaner')}</div>
           <Link
             to={`/admin/inventory/assets/${order.loaner_asset_id}`}
-            className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+            className="inline-flex items-center gap-1 text-sm font-medium text-primary-fg hover:underline"
           >
             {order.loaner_asset_code}
             <ExternalLink size={11} />

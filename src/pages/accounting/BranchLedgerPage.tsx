@@ -334,7 +334,7 @@ export function BranchLedgerPage() {
             >
               <div className="flex flex-col gap-3 p-3">
                 <div className="sm:hidden">
-                  <div className="text-xs font-medium text-muted uppercase tracking-wide mb-1">{t('common.search')}</div>
+                  <div className="text-xs font-medium text-subtle uppercase tracking-wide mb-1">{t('common.search')}</div>
                   <Input
                     value={searchInput}
                     onChange={(e) => handleSearch(e.target.value)}
@@ -343,7 +343,7 @@ export function BranchLedgerPage() {
                     className="w-full"
                   />
                 </div>
-                <div className="text-xs font-medium text-muted uppercase tracking-wide">{t('common.filters')}</div>
+                <div className="text-xs font-medium text-subtle uppercase tracking-wide">{t('common.filters')}</div>
                 <Select
                   value={direction || null}
                   onChange={(v) => { setDirection((v as string) ?? ''); resetPage(); }}
@@ -362,7 +362,7 @@ export function BranchLedgerPage() {
                   showChevron
                   clearable
                 />
-                <div className="text-xs font-medium text-muted uppercase tracking-wide mt-1">{t('common.sortBy')}</div>
+                <div className="text-xs font-medium text-subtle uppercase tracking-wide mt-1">{t('common.sortBy')}</div>
                 <Select
                   options={[
                     { value: 'txn_time', label: t('accounting.ledger.time') },

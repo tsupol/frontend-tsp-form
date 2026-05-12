@@ -563,7 +563,7 @@ function SubmissionReviewDrawer({
               <DetailRow label={t('paymentSubmissions.contract')}>
                 <Link
                   to={`/admin/contracts/search/${row.contract_id}`}
-                  className="text-primary inline-flex items-center gap-1 no-underline hover:underline"
+                  className="text-primary-fg inline-flex items-center gap-1 no-underline hover:underline"
                   onClick={onClose}
                 >
                   {row.contract_code_display}
