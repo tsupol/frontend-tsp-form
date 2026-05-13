@@ -133,7 +133,7 @@ const ACTION_CONFIGS: Record<ContractAction, ActionConfig> = {
   void: {
     rpc: 'fn_contract_void',
     color: 'danger',
-    needsPin: false,
+    needsPin: true,
     needsNote: true,
     needsReason: false,
     needsBranch: false,

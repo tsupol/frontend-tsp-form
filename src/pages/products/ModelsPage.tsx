@@ -717,9 +717,24 @@ function VariantSubRow({ variants }: { variants: ModelVariant[] }) {
   return (
     <div className="px-4 pb-4 flex flex-col gap-2">
       {variants.map((v) => {
-        const attrEntries = v.attributes
-          ? Object.entries(v.attributes).filter(([, val]) => val !== null && val !== '' && val !== undefined)
-          : [];
+        const attrEntries: [string, string][] = [];
+        if (v.attributes) {
+          for (const [key, val] of Object.entries(v.attributes)) {
+            if (val === null || val === '' || val === undefined) continue;
+            // option_set is a nested object of axis_code → option_value — flatten its entries
+            if (key === 'option_set' && typeof val === 'object' && !Array.isArray(val)) {
+              for (const [axisCode, axisVal] of Object.entries(val as Record<string, unknown>)) {
+                if (axisVal === null || axisVal === '' || axisVal === undefined) continue;
+                if (typeof axisVal === 'object') continue;
+                attrEntries.push([axisCode, String(axisVal)]);
+              }
+              continue;
+            }
+            // Skip any other nested object/array values — would render as "[object Object]"
+            if (typeof val === 'object') continue;
+            attrEntries.push([key, String(val)]);
+          }
+        }
         return (
           <div
             key={v.variant_id}
