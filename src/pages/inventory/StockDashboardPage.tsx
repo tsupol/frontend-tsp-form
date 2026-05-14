@@ -404,16 +404,26 @@ export function StockDashboardPage() {
                             </Badge>
                           </div>
                           <div className="flex gap-4 text-xs text-subtle">
-                            <span>{t('inventory.assets')}: <span className="text-sm text-qty">{fmtNum(row.asset_count)}</span></span>
-                            <span>{t('inventory.lots')}: <span className="text-sm text-qty">{fmtNum(row.lot_total_qty)}</span></span>
+                            {isEmpty ? (
+                              <span className="text-sm text-subtler">—</span>
+                            ) : (
+                              <>
+                                <span>{t('inventory.assets')}: <span className="text-sm text-qty">{fmtNum(row.asset_count)}</span></span>
+                                <span>{t('inventory.lots')}: <span className="text-sm text-qty">{fmtNum(row.lot_total_qty)}</span></span>
+                              </>
+                            )}
                           </div>
                         </div>
-                        {!isEmpty && (
-                          <div className="text-right shrink-0">
-                            <div className="text-sm font-medium text-qty tabular-nums">{fmtNum(row.combined_item_count)}</div>
-                            <div className="text-xs text-figure tabular-nums">{fmtCurrency(row.combined_total_value)}</div>
+                        <div className="text-right shrink-0">
+                          <div className="text-sm font-medium text-qty tabular-nums">
+                            {isEmpty ? '—' : fmtNum(row.combined_item_count)}
                           </div>
-                        )}
+                          {!isEmpty && (
+                            <div className="text-xs text-figure tabular-nums">
+                              {fmtCurrency(row.combined_total_value)}
+                            </div>
+                          )}
+                        </div>
                       </button>
                     );
                   })}
