@@ -2,9 +2,10 @@ import { useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { UploadedImage } from 'tsp-form';
 import { CheckCircle, Upload } from 'lucide-react';
-import { config } from '../../../config/config';
+import { useMediaUrl } from '../../../hooks/useMediaUrl';
+import type { Privacy } from '../../../lib/upload';
 
-export function SingleUpload({ icon, label, fileUrl, uploading, onUpload, disabled, cacheBust = 0 }: {
+export function SingleUpload({ icon, label, fileUrl, uploading, onUpload, disabled, cacheBust = 0, privacy = 'private' }: {
   icon: React.ReactNode;
   label: string;
   fileUrl: string | null;
@@ -12,7 +13,9 @@ export function SingleUpload({ icon, label, fileUrl, uploading, onUpload, disabl
   onUpload: (imgs: UploadedImage[]) => void;
   disabled?: boolean;
   cacheBust?: number;
+  privacy?: Privacy;
 }) {
+  const { url: displayUrl } = useMediaUrl(fileUrl, privacy, cacheBust);
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -103,11 +106,15 @@ export function SingleUpload({ icon, label, fileUrl, uploading, onUpload, disabl
           onDragOver={handleDragOver}
           title={t('workspace.clickToReplace')}
         >
-          <img
-            src={`${config.s3BaseUrl}${fileUrl}?v=${cacheBust}`}
-            alt=""
-            className="w-full h-auto rounded-lg"
-          />
+          {displayUrl ? (
+            <img
+              src={displayUrl}
+              alt=""
+              className="w-full h-auto rounded-lg"
+            />
+          ) : (
+            <div className="w-full h-40 bg-surface-shallow animate-pulse rounded-lg" />
+          )}
           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
             <span className="text-white text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5">
               <Upload size={14} />

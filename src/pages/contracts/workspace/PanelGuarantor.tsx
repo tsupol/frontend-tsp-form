@@ -5,7 +5,7 @@ import { Input, Select, Button, InputDatePicker, MaskedInput, useSnackbarContext
 import type { UploadedImage } from 'tsp-form';
 import { ShieldAlert, CheckCircle, XCircle, Keyboard, Search, Loader2, Trash2, AlertTriangle, CreditCard, PenLine, ChevronDown, ChevronRight, Plus } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
-import { uploadToS3 } from '../../../lib/upload';
+import { uploadFromImage } from '../../../lib/upload';
 import { toLocalDateStr, parseLocalDate, makeDatePickerFormat } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
 import { PanelSection } from './PanelSection';
@@ -486,13 +486,16 @@ function GuarantorRow({ guarantor, contractId, expanded, onToggle, onRemove, rem
 
   // ── Uploads ─────────────────────────────────────────────────────────
   const uploadIdCard = async (images: UploadedImage[]) => {
-    if (images.length === 0) return;
+    if (images.length === 0 || !guarantor.customerId) return;
     setUploading('ID_CARD');
     try {
-      const img = images[0];
-      const ts = Date.now();
-      const key = `uploads/customers/${guarantor.customerId}/id-card-${ts}.webp`;
-      await uploadToS3(img.file, key);
+      const results = await uploadFromImage({
+        type: 'customer_id_card',
+        image: images[0],
+        params: { customer_id: guarantor.customerId },
+      });
+      const key = results.lg?.key ?? Object.values(results)[0]?.key;
+      if (!key) throw new Error('Upload returned no key');
       await apiClient.rpc('fn_customer_document_upload', {
         p_customer_id: guarantor.customerId, p_doc_type: 'ID_CARD_FRONT', p_file_url: `/${key}`,
       });
@@ -503,13 +506,16 @@ function GuarantorRow({ guarantor, contractId, expanded, onToggle, onRemove, rem
   };
 
   const uploadSignature = async (images: UploadedImage[]) => {
-    if (!contractId || images.length === 0) return;
+    if (!contractId || images.length === 0 || !guarantor.customerId) return;
     setUploading('SIGNATURE');
     try {
-      const img = images[0];
-      const ts = Date.now();
-      const key = `uploads/contracts/${contractId}/signature-${guarantor.customerId}-${ts}.webp`;
-      await uploadToS3(img.file, key);
+      const results = await uploadFromImage({
+        type: 'contract_signature',
+        image: images[0],
+        params: { contract_id: contractId, customer_id: guarantor.customerId },
+      });
+      const key = results.sm?.key ?? Object.values(results)[0]?.key;
+      if (!key) throw new Error('Upload returned no key');
       await apiClient.rpc('fn_contract_document_upload', {
         p_contract_id: contractId, p_doc_type: 'SIGNATURE_PAD', p_file_url: `/${key}`,
         p_customer_id: guarantor.customerId,

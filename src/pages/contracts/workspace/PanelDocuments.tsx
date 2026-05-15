@@ -4,8 +4,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UploadedImage } from 'tsp-form';
 import { CheckCircle, XCircle, CreditCard, FileImage, Trash2, Upload, Info } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
-import { uploadToS3, deleteFromS3 } from '../../../lib/upload';
-import { config } from '../../../config/config';
+import { uploadFromImage, deleteMedia } from '../../../lib/upload';
+import { useMediaUrl } from '../../../hooks/useMediaUrl';
 import { useWorkspace } from './WorkspaceContext';
 import { useAuth } from '../../../contexts/AuthContext';
 import { SingleUpload } from './SingleUpload';
@@ -89,10 +89,13 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
     setUploading('ID_CARD');
     setError('');
     try {
-      const img = images[0];
-      const ts = Date.now();
-      const key = `uploads/customers/${customerId}/id-card-${ts}.webp`;
-      await uploadToS3(img.file, key);
+      const results = await uploadFromImage({
+        type: 'customer_id_card',
+        image: images[0],
+        params: { customer_id: customerId },
+      });
+      const key = results.lg?.key ?? Object.values(results)[0]?.key;
+      if (!key) throw new Error('Upload returned no key');
       await apiClient.rpc('fn_customer_document_upload', {
         p_customer_id: customerId,
         p_doc_type: 'ID_CARD_FRONT',
@@ -118,10 +121,13 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
     setUploading('SIGNATURE');
     setError('');
     try {
-      const img = images[0];
-      const ts = Date.now();
-      const key = `uploads/contracts/${contractId}/signature-${customerId}-${ts}.webp`;
-      await uploadToS3(img.file, key);
+      const results = await uploadFromImage({
+        type: 'contract_signature',
+        image: images[0],
+        params: { contract_id: contractId, customer_id: customerId },
+      });
+      const key = results.sm?.key ?? Object.values(results)[0]?.key;
+      if (!key) throw new Error('Upload returned no key');
       await apiClient.rpc('fn_contract_document_upload', {
         p_contract_id: contractId,
         p_doc_type: 'SIGNATURE_PAD',
@@ -142,7 +148,7 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
     } finally { setUploading(''); }
   };
 
-  // ── Gallery upload (contract photos — stays on entity_media) ────────
+  // ── Gallery upload (contract evidence photos) ───────────────────────
   const uploadGallery = async (images: UploadedImage[]) => {
     if (!contractId || images.length === 0 || !user) return;
     setUploading('ATTACHMENT');
@@ -150,18 +156,25 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
     try {
       for (let i = 0; i < images.length; i++) {
         const img = images[i];
-        const ts = Date.now();
-        const key = `uploads/contracts/${contractId}/attachment-${ts}-${i}.webp`;
-        await uploadToS3(img.file, key);
+        const results = await uploadFromImage({
+          type: 'contract_evidence',
+          image: img,
+          idx: attachments.length + i,
+          params: { contract_id: contractId },
+        });
+        const primary = results.sm?.key ?? Object.values(results)[0]?.key;
+        if (!primary) throw new Error('Upload returned no key');
         await apiClient.rpc('fn_media_attach', {
           p_holding_id: user.holding_id,
-          p_storage_path: `/${key}`,
-          p_variants_json: null,
+          p_storage_path: `/${primary}`,
+          p_variants_json: Object.fromEntries(
+            Object.entries(results).map(([s, r]) => [s, `/${r.key}`]),
+          ),
           p_media_type: 'IMAGE',
           p_access_level: 'CONFIDENTIAL',
           p_mime_type: 'image/webp',
-          p_file_size_bytes: img.file.size,
-          p_original_filename: img.originalFile?.name ?? img.file.name,
+          p_file_size_bytes: img.file?.size ?? img.originalSize,
+          p_original_filename: img.originalFile?.name ?? img.file?.name ?? '',
           p_entity_type: 'CONTRACT',
           p_entity_id: contractId,
           p_usage_type: 'ATTACHMENT',
@@ -185,7 +198,9 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
     const media = attachments.find(m => m.entity_media_id === entityMediaId);
     try {
       await apiClient.rpc('fn_media_detach', { p_entity_media_id: entityMediaId });
-      if (media?.storage_path) deleteFromS3([media.storage_path]).catch(() => {});
+      if (media?.storage_path) {
+        deleteMedia({ private: [media.storage_path] }).catch(() => {});
+      }
       queryClient.invalidateQueries({ queryKey: ['contract-media', contractId] });
       invalidateDocs();
     } catch {}
@@ -365,16 +380,7 @@ function GalleryUpload({ label, media, uploading, onUpload, onDetach, cacheBust 
         {media.length > 0 && (
           <div className="grid grid-cols-4 gap-2 p-2">
             {media.map(m => (
-              <div key={m.entity_media_id} className="relative group aspect-square rounded overflow-hidden border border-line">
-                <img src={`${config.s3BaseUrl}${m.storage_path}?v=${cacheBust}`} alt="" className="w-full h-full object-cover" />
-                <button
-                  data-delete
-                  className="absolute top-0.5 right-0.5 p-0.5 rounded bg-danger/80 text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                  onClick={(e) => { e.stopPropagation(); onDetach(m.entity_media_id); }}
-                >
-                  <Trash2 size={12} />
-                </button>
-              </div>
+              <GalleryThumb key={m.entity_media_id} media={m} cacheBust={cacheBust} onDetach={onDetach} />
             ))}
           </div>
         )}
@@ -388,3 +394,22 @@ function GalleryUpload({ label, media, uploading, onUpload, onDetach, cacheBust 
   );
 }
 
+function GalleryThumb({ media, cacheBust, onDetach }: {
+  media: EntityMedia;
+  cacheBust: number;
+  onDetach: (id: number) => void;
+}) {
+  const { url } = useMediaUrl(media.storage_path, 'private', cacheBust);
+  return (
+    <div className="relative group aspect-square rounded overflow-hidden border border-line">
+      {url ? <img src={url} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-surface-shallow animate-pulse" />}
+      <button
+        data-delete
+        className="absolute top-0.5 right-0.5 p-0.5 rounded bg-danger/80 text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+        onClick={(e) => { e.stopPropagation(); onDetach(media.entity_media_id); }}
+      >
+        <Trash2 size={12} />
+      </button>
+    </div>
+  );
+}

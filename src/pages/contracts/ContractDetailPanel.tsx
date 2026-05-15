@@ -6,7 +6,8 @@ import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCi
 import { useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { ApiError } from '../../lib/api';
-import { uploadToS3 } from '../../lib/upload';
+import { uploadFromImage, getUploadSpec, specToResize } from '../../lib/upload';
+import { useMediaUrl } from '../../hooks/useMediaUrl';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
@@ -19,7 +20,6 @@ import { BillReceipt } from './workspace/BillReceipt';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { CustomerPickerModal } from './CustomerPickerModal';
 import { BranchPinInput } from '../../components/BranchPinInput';
-import { config } from '../../config/config';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -448,17 +448,36 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
 
 // ── Media thumbnail helper ───────────────────────────────────────────────────
 
+function DeliveryPhotoThumb({ media }: { media: EntityMedia }) {
+  const src = media.storage_path.sm || media.storage_path.md || media.storage_path.original;
+  const { url } = useMediaUrl(src ?? null, 'private');
+  if (!src) return null;
+  return url ? (
+    <img
+      src={url}
+      alt={media.caption ?? ''}
+      className="w-20 h-20 object-cover rounded border border-line"
+    />
+  ) : (
+    <div className="w-20 h-20 bg-surface-shallow animate-pulse rounded border border-line" />
+  );
+}
+
 function MediaThumbnail({ media }: { media: EntityMedia }) {
   const src = media.storage_path.sm || media.storage_path.md || media.storage_path.original;
+  const { url } = useMediaUrl(src ?? null, 'private');
   if (!src) return null;
-  const fullUrl = `${config.s3BaseUrl}${src}`;
   return (
     <div className="relative group">
-      <img
-        src={fullUrl}
-        alt={media.caption ?? media.usage_type}
-        className="w-16 h-16 object-cover rounded border border-line"
-      />
+      {url ? (
+        <img
+          src={url}
+          alt={media.caption ?? media.usage_type}
+          className="w-16 h-16 object-cover rounded border border-line"
+        />
+      ) : (
+        <div className="w-16 h-16 bg-surface-shallow animate-pulse rounded border border-line" />
+      )}
       {media.caption && (
         <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] px-1 py-0.5 rounded-b truncate">
           {media.caption}
@@ -1617,38 +1636,61 @@ function DeliveryModal({ open, contract, onClose, onSuccess }: {
     if (!file || !user) return;
     setUploading(true);
     try {
-      const ts = Date.now();
-      const key = `uploads/contracts/${contract.id}/attachment-${ts}.webp`;
-      // Resize before upload
+      const spec = await getUploadSpec('contract_evidence');
+      // Build resized variants matching the spec's sizes.
+      const resize = specToResize(spec)!;
       const img = new Image();
       const url = URL.createObjectURL(file);
-      const resized = await new Promise<File>((resolve) => {
-        img.onload = () => {
+      const variants = await new Promise<Record<string, File>>((resolve) => {
+        img.onload = async () => {
           URL.revokeObjectURL(url);
-          const maxW = 1280, maxH = 1280;
-          let w = img.width, h = img.height;
-          if (w > maxW || h > maxH) {
-            const ratio = Math.min(maxW / w, maxH / h);
-            w = Math.round(w * ratio); h = Math.round(h * ratio);
+          const out: Record<string, File> = {};
+          for (const sz of spec.sizes) {
+            const maxW = sz.width, maxH = sz.width;
+            let w = img.width, h = img.height;
+            if (w > maxW || h > maxH) {
+              const ratio = Math.min(maxW / w, maxH / h);
+              w = Math.round(w * ratio); h = Math.round(h * ratio);
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
+            const blob: Blob | null = await new Promise((res) => canvas.toBlob(res, 'image/webp', spec.quality));
+            if (blob) out[sz.label] = new File([blob], file.name, { type: 'image/webp' });
           }
-          const canvas = document.createElement('canvas');
-          canvas.width = w; canvas.height = h;
-          canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
-          canvas.toBlob((blob) => {
-            resolve(new File([blob!], file.name, { type: 'image/webp' }));
-          }, 'image/webp', 0.85);
+          resolve(out);
         };
         img.src = url;
       });
-      await uploadToS3(resized, key);
+      void resize;
+
+      const fakeImage = {
+        id: Math.random().toString(36).slice(2),
+        originalFile: file,
+        originalWidth: img.width, originalHeight: img.height, originalSize: file.size,
+        file: variants.sm ?? variants.md ?? Object.values(variants)[0],
+        variants: Object.fromEntries(
+          Object.entries(variants).map(([k, f]) => [k, { file: f, preview: '', width: 0, height: 0, size: f.size }]),
+        ),
+      };
+      const results = await uploadFromImage({
+        type: 'contract_evidence',
+        image: fakeImage as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+        idx: photos.length,
+        params: { contract_id: contract.id },
+      });
+      const primary = results.sm?.key ?? Object.values(results)[0]?.key;
+      if (!primary) throw new Error('Upload returned no key');
       await apiClient.rpc('fn_media_attach', {
         p_holding_id: user.holding_id,
-        p_storage_path: `/${key}`,
-        p_variants_json: null,
+        p_storage_path: `/${primary}`,
+        p_variants_json: Object.fromEntries(
+          Object.entries(results).map(([s, r]) => [s, `/${r.key}`]),
+        ),
         p_media_type: 'IMAGE',
         p_access_level: 'CONFIDENTIAL',
         p_mime_type: 'image/webp',
-        p_file_size_bytes: resized.size,
+        p_file_size_bytes: (variants.sm ?? Object.values(variants)[0]).size,
         p_original_filename: file.name,
         p_entity_type: 'CONTRACT',
         p_entity_id: contract.id,
@@ -1696,18 +1738,9 @@ function DeliveryModal({ open, contract, onClose, onSuccess }: {
               {t('contract.deliveryPhotos')}
             </label>
             <div className="flex flex-wrap gap-2 mt-2">
-              {photos.map(m => {
-                const src = m.storage_path.sm || m.storage_path.md || m.storage_path.original;
-                if (!src) return null;
-                return (
-                  <img
-                    key={m.entity_media_id}
-                    src={`${config.s3BaseUrl}${src}`}
-                    alt={m.caption ?? ''}
-                    className="w-20 h-20 object-cover rounded border border-line"
-                  />
-                );
-              })}
+              {photos.map(m => (
+                <DeliveryPhotoThumb key={m.entity_media_id} media={m} />
+              ))}
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleUploadPhoto} />
               <button
                 type="button"

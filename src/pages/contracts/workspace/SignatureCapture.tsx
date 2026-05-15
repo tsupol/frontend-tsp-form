@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from 'tsp-form';
 import type { UploadedImage } from 'tsp-form';
 import { CheckCircle, PenLine, Upload, Camera, Eraser, Undo2, Save } from 'lucide-react';
-import { config } from '../../../config/config';
+import { useMediaUrl } from '../../../hooks/useMediaUrl';
 import { SignaturePad, type SignaturePadHandle } from '../../../components/SignaturePad';
 
 type SigMode = 'draw' | 'upload' | 'camera';
@@ -60,6 +60,7 @@ async function resizePhotoToWebp(file: File): Promise<UploadedImage> {
 
 export function SignatureCapture({ fileUrl, uploading, disabled, cacheBust = 0, onUpload }: Props) {
   const { t } = useTranslation();
+  const { url: displayUrl } = useMediaUrl(fileUrl, 'private', cacheBust);
   const [mode, setMode] = useState<SigMode>('draw');
   const [editing, setEditing] = useState(false);
   const [sigEmpty, setSigEmpty] = useState(true);
@@ -120,11 +121,15 @@ export function SignatureCapture({ fileUrl, uploading, disabled, cacheBust = 0, 
         <div
           className="border border-line rounded-lg overflow-hidden bg-white aspect-[2/1] w-full max-w-md flex items-center justify-center"
         >
-          <img
-            src={`${config.s3BaseUrl}${fileUrl}?v=${cacheBust}`}
-            alt=""
-            className="max-w-full max-h-full object-contain"
-          />
+          {displayUrl ? (
+            <img
+              src={displayUrl}
+              alt=""
+              className="max-w-full max-h-full object-contain"
+            />
+          ) : (
+            <div className="w-full h-full bg-surface-shallow animate-pulse" />
+          )}
         </div>
         <div>
           <Button

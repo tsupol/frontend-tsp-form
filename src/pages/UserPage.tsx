@@ -1,16 +1,17 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, KeyRound, CheckCircle, XCircle, Camera } from 'lucide-react';
-import { Button, Switch, Input, FormErrorMessage, ImageUploader, useSnackbarContext } from 'tsp-form';
-import type { UploadedImage } from 'tsp-form';
+import { Eye, EyeOff, KeyRound, CheckCircle, XCircle, Camera, Upload } from 'lucide-react';
+import { Button, Switch, Input, FormErrorMessage, Modal, ImageCropper, Slider, useSnackbarContext } from 'tsp-form';
+import type { ImageCropperRef } from 'tsp-form';
 import { useAuth } from '../contexts/AuthContext';
 import { DateTime } from '../components/DateTime';
 import { authService } from '../lib/auth';
 import type { UserProfile, MeProfileResponse } from '../lib/auth';
 import { apiClient, ApiError } from '../lib/api';
-import { config, imageConfig } from '../config/config';
+import { uploadImage, publicMediaUrl } from '../lib/upload';
+import { useUploadSpec } from '../hooks/useMediaUrl';
 
 const EXPIRED_GRACE_PERIOD_MS = 5000;
 
@@ -20,18 +21,7 @@ function profileImageUrl(profileImage: Record<string, string> | null | undefined
   if (!profileImage) return null;
   const path = profileImage.sm ?? profileImage.md ?? profileImage.original ?? Object.values(profileImage)[0];
   if (!path) return null;
-  return `${config.s3BaseUrl}${path.startsWith('/') ? '' : '/'}${path}`;
-}
-
-async function uploadToS3(file: File, key: string): Promise<string> {
-  const form = new FormData();
-  form.append('file', file);
-  form.append('key', key);
-
-  const res = await fetch(`${config.uploadUrl}/upload/s3`, { method: 'POST', body: form });
-  const json = await res.json();
-  if (!json.success) throw new Error(json.error?.message ?? 'Upload failed');
-  return json.data.key;
+  return publicMediaUrl(path);
 }
 
 // ── Profile Card (image + info) ──────────────────────────────────────
@@ -44,6 +34,15 @@ function ProfileCard() {
   const [currentImage, setCurrentImage] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const { spec } = useUploadSpec('user_profile');
+
+  // Avatar crop modal
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cropperRef = useRef<ImageCropperRef>(null);
+  const [avatarModalOpen, setAvatarModalOpen] = useState(false);
+  const [cropFile, setCropFile] = useState<File | null>(null);
+  const [cropSourceSize, setCropSourceSize] = useState<{ w: number; h: number } | null>(null);
+  const [cropZoom, setCropZoom] = useState(1);
 
   useEffect(() => {
     let cancelled = false;
@@ -63,51 +62,82 @@ function ProfileCard() {
     return () => { cancelled = true; };
   }, []);
 
-  const handleUpload = async (images: UploadedImage[]) => {
-    if (!images.length || !user) return;
-    const img = images[0];
-
-    setUploading(true);
-    try {
-      const s3Key = imageConfig.userProfile.path(user.user_id);
-      await uploadToS3(img.file, s3Key);
-
-      const dbPath = `/${s3Key}`;
-      await apiClient.rpc('me_profile_image_set', {
-        p_profile_image: { [imageConfig.userProfile.dbKey]: dbPath },
-      });
-
-      setCurrentImage(img.preview);
-
-      addSnackbar({
-        message: (
-          <div className="alert alert-success">
-            <CheckCircle size={18} />
-            <div><div className="alert-title">{t('profile.uploadSuccess')}</div></div>
-          </div>
-        ),
-        type: 'success',
-        duration: 3000,
-      });
-    } catch (err) {
-      const msg = err instanceof ApiError
-        ? (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') || err.message
-        : err instanceof Error ? err.message : t('profile.uploadFailed');
-
-      addSnackbar({
-        message: (
-          <div className="alert alert-danger">
-            <XCircle size={18} />
-            <div><div className="alert-title">{msg}</div></div>
-          </div>
-        ),
-        type: 'error',
-        duration: 5000,
-      });
-    } finally {
-      setUploading(false);
-    }
+  const closeAvatarModal = () => {
+    setAvatarModalOpen(false);
+    setCropFile(null);
+    setCropSourceSize(null);
   };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (!f) return;
+    setCropFile(f);
+    // Read intrinsic size so we can clamp output width (no upscaling).
+    const img = new Image();
+    const url = URL.createObjectURL(f);
+    img.onload = () => {
+      setCropSourceSize({ w: img.width, h: img.height });
+      URL.revokeObjectURL(url);
+    };
+    img.src = url;
+  };
+
+  const handleCropAndUpload = useCallback(() => {
+    if (!spec || !user) return;
+    cropperRef.current?.crop(async (_blob, file) => {
+      setUploading(true);
+      try {
+        const result = await uploadImage({
+          type: 'user_profile',
+          file,
+          params: { user_id: user.user_id },
+          size: spec.sizes[0].label,
+        });
+
+        await apiClient.rpc('me_profile_image_set', {
+          p_profile_image: { [spec.sizes[0].label]: `/${result.key}` },
+        });
+
+        setCurrentImage(URL.createObjectURL(file));
+        closeAvatarModal();
+
+        addSnackbar({
+          message: (
+            <div className="alert alert-success">
+              <CheckCircle size={18} />
+              <div><div className="alert-title">{t('profile.uploadSuccess')}</div></div>
+            </div>
+          ),
+          type: 'success',
+          duration: 3000,
+        });
+      } catch (err) {
+        const msg = err instanceof ApiError
+          ? (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') || err.message
+          : err instanceof Error ? err.message : t('profile.uploadFailed');
+
+        addSnackbar({
+          message: (
+            <div className="alert alert-danger">
+              <XCircle size={18} />
+              <div><div className="alert-title">{msg}</div></div>
+            </div>
+          ),
+          type: 'error',
+          duration: 5000,
+        });
+      } finally {
+        setUploading(false);
+      }
+    });
+  }, [spec, user, addSnackbar, t]);
+
+  // Cap output width to source's smaller dimension so we never upscale.
+  const specWidth = spec?.sizes[0]?.width ?? 320;
+  const outputWidth = cropSourceSize
+    ? Math.min(specWidth, Math.min(cropSourceSize.w, cropSourceSize.h))
+    : specWidth;
 
   const displayName = profile
     ? [profile.firstname, profile.lastname].filter(Boolean).join(' ') || profile.nickname || profile.username
@@ -133,7 +163,12 @@ function ProfileCard() {
     <div className="border border-line bg-surface p-6 rounded-lg">
       {/* Avatar + name */}
       <div className="flex flex-col items-center gap-3 mb-5">
-        <div className="relative w-28 h-28 rounded-full overflow-hidden bg-surface-shallow border-2 border-line flex items-center justify-center shrink-0">
+        <button
+          type="button"
+          className="relative w-28 h-28 rounded-full overflow-hidden bg-surface-shallow border-2 border-line flex items-center justify-center shrink-0 cursor-pointer group p-0"
+          onClick={() => { setCropFile(null); setAvatarModalOpen(true); }}
+          disabled={!spec}
+        >
           {loading ? (
             <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
           ) : currentImage ? (
@@ -141,22 +176,16 @@ function ProfileCard() {
           ) : (
             <Camera size={32} className="text-fg-muted" />
           )}
-        </div>
+          <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+            <Camera size={20} className="text-white" />
+          </div>
+        </button>
         <div className="text-center">
           <div className="font-semibold text-lg">{loading ? '-' : displayName}</div>
           {profile?.role_code && (
             <div className="text-sm text-subtle">{profile.role_code}</div>
           )}
         </div>
-      </div>
-
-      {/* Upload */}
-      <div className="mb-5">
-        <ImageUploader
-          onUpload={handleUpload}
-          resizeOptions={imageConfig.userProfile.resize}
-          disabled={uploading}
-        />
       </div>
 
       <hr className="border-line mb-5" />
@@ -184,6 +213,75 @@ function ProfileCard() {
         ))}
 
       </div>
+
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFileSelect}
+        className="hidden"
+      />
+
+      {/* Avatar crop modal */}
+      <Modal open={avatarModalOpen} onClose={closeAvatarModal} maxWidth="400px">
+        <div className="modal-header">
+          <h2 className="modal-title">{t('profile.avatar')}</h2>
+          <button type="button" className="modal-close-btn" onClick={closeAvatarModal} aria-label="Close">×</button>
+        </div>
+        <div className="modal-content">
+          {!cropFile ? (
+            <div className="flex flex-col items-center gap-4">
+              {currentImage ? (
+                <img src={currentImage} alt="" className="w-32 h-32 rounded-full object-cover" />
+              ) : (
+                <div className="w-32 h-32 rounded-full bg-surface-shallow flex items-center justify-center">
+                  <Camera size={32} className="text-fg-muted" />
+                </div>
+              )}
+              <Button variant="outline" startIcon={<Upload size={16} />} onClick={() => fileInputRef.current?.click()}>
+                {t('profile.changeAvatar', { defaultValue: 'Change avatar' })}
+              </Button>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-4">
+              <ImageCropper
+                ref={cropperRef}
+                src={cropFile}
+                aspectRatio={1}
+                maxZoom={1.5}
+                viewportWidth={280}
+                outputType={spec?.content_type ?? 'image/webp'}
+                outputQuality={spec?.quality ?? 0.85}
+                outputWidth={outputWidth}
+                onZoomChange={setCropZoom}
+                className="[&_.image-cropper-viewport]:rounded-full"
+              />
+              <div className="w-full max-w-[280px]">
+                <Slider
+                  min={Math.round((cropperRef.current?.minZoom ?? 0.1) * 1000)}
+                  max={Math.round((cropperRef.current?.maxZoom ?? 1.5) * 1000)}
+                  step={1}
+                  value={Math.round(cropZoom * 1000)}
+                  onChange={(v) => cropperRef.current?.setZoom(Number(v) / 1000)}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="modal-footer">
+          {!cropFile ? (
+            <Button variant="ghost" onClick={closeAvatarModal}>{t('common.cancel')}</Button>
+          ) : (
+            <>
+              <Button variant="ghost" onClick={() => setCropFile(null)}>{t('common.back', { defaultValue: 'Back' })}</Button>
+              <Button color="primary" onClick={handleCropAndUpload} disabled={uploading || !spec}>
+                {uploading ? t('common.loading') : t('common.save')}
+              </Button>
+            </>
+          )}
+        </div>
+      </Modal>
     </div>
   );
 }

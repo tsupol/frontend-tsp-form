@@ -5,8 +5,8 @@ import { ImageUploader } from 'tsp-form';
 import type { UploadedImage } from 'tsp-form';
 import { CheckCircle, XCircle, CreditCard } from 'lucide-react';
 import { apiClient } from '../../../lib/api';
-import { uploadToS3 } from '../../../lib/upload';
-import { imageConfig } from '../../../config/config';
+import { uploadFromImage } from '../../../lib/upload';
+import { useUploadSpec } from '../../../hooks/useMediaUrl';
 import { useWorkspace } from './WorkspaceContext';
 
 interface Props {
@@ -18,6 +18,7 @@ export function ModalDocuments({ open, onClose }: Props) {
   const { t } = useTranslation();
   const { data: workspace, updateData } = useWorkspace();
   const contractId = workspace.contractId;
+  const customerId = workspace.customerId;
 
   const [idPhotoUploaded, setIdPhotoUploaded] = useState(workspace.hasIdPhoto);
   const [signatureUploaded, setSignatureUploaded] = useState(workspace.hasSignature);
@@ -25,25 +26,32 @@ export function ModalDocuments({ open, onClose }: Props) {
   const [uploading, setUploading] = useState('');
   const [error, setError] = useState('');
 
+  const idCard = useUploadSpec('customer_id_card');
+  const signature = useUploadSpec('contract_signature');
+  const evidence = useUploadSpec('contract_evidence');
+
+  const toPaths = (results: Record<string, { key: string }>) => {
+    const out: Record<string, string> = {};
+    for (const [size, r] of Object.entries(results)) out[size] = `/${r.key}`;
+    return out;
+  };
 
   const handleIdPhotoUpload = async (images: UploadedImage[]) => {
-    if (!contractId || images.length === 0) return;
+    if (!contractId || !customerId || images.length === 0) return;
     setUploading('idPhoto');
     setError('');
     try {
-      const img = images[0];
-      const ts = Date.now();
-      const smKey = `uploads/contracts/${contractId}/id-card-${ts}-sm.webp`;
-      const lgKey = `uploads/contracts/${contractId}/id-card-${ts}-lg.webp`;
-
-      await uploadToS3(img.file, smKey);
-      await uploadToS3(img.originalFile ?? img.file, lgKey);
+      const results = await uploadFromImage({
+        type: 'customer_id_card',
+        image: images[0],
+        params: { customer_id: customerId },
+      });
 
       await apiClient.rpc('fn_media_upload', {
-        p_entity_type: 'CONTRACT',
-        p_entity_id: contractId,
+        p_entity_type: 'CUSTOMER',
+        p_entity_id: customerId,
         p_usage_type: 'ID_CARD',
-        p_storage_path: { sm: `/${smKey}`, lg: `/${lgKey}` },
+        p_storage_path: toPaths(results),
       });
 
       setIdPhotoUploaded(true);
@@ -62,23 +70,21 @@ export function ModalDocuments({ open, onClose }: Props) {
   };
 
   const handleSignatureUpload = async (images: UploadedImage[]) => {
-    if (!contractId || images.length === 0) return;
+    if (!contractId || !customerId || images.length === 0) return;
     setUploading('signature');
     setError('');
     try {
-      const img = images[0];
-      const ts = Date.now();
-      const smKey = `uploads/contracts/${contractId}/signature-${ts}-sm.webp`;
-      const lgKey = `uploads/contracts/${contractId}/signature-${ts}-lg.webp`;
-
-      await uploadToS3(img.file, smKey);
-      await uploadToS3(img.originalFile ?? img.file, lgKey);
+      const results = await uploadFromImage({
+        type: 'contract_signature',
+        image: images[0],
+        params: { contract_id: contractId, customer_id: customerId },
+      });
 
       await apiClient.rpc('fn_media_upload', {
         p_entity_type: 'CONTRACT',
         p_entity_id: contractId,
         p_usage_type: 'SIGNATURE',
-        p_storage_path: { sm: `/${smKey}`, lg: `/${lgKey}` },
+        p_storage_path: toPaths(results),
       });
 
       setSignatureUploaded(true);
@@ -96,19 +102,18 @@ export function ModalDocuments({ open, onClose }: Props) {
     setError('');
     try {
       for (let i = 0; i < images.length; i++) {
-        const img = images[i];
-        const ts = Date.now();
-        const smKey = `uploads/contracts/${contractId}/evidence-${ts}-${i}-sm.webp`;
-        const lgKey = `uploads/contracts/${contractId}/evidence-${ts}-${i}-lg.webp`;
-
-        await uploadToS3(img.file, smKey);
-        await uploadToS3(img.originalFile ?? img.file, lgKey);
+        const results = await uploadFromImage({
+          type: 'contract_evidence',
+          image: images[i],
+          idx: evidenceCount + i,
+          params: { contract_id: contractId },
+        });
 
         await apiClient.rpc('fn_media_upload', {
           p_entity_type: 'CONTRACT',
           p_entity_id: contractId,
           p_usage_type: 'EVIDENCE',
-          p_storage_path: { sm: `/${smKey}`, lg: `/${lgKey}` },
+          p_storage_path: toPaths(results),
         });
       }
 
@@ -122,11 +127,7 @@ export function ModalDocuments({ open, onClose }: Props) {
     }
   };
 
-
-
   if (!contractId) return null;
-
-  const smResize = imageConfig.customerIdCard.sizes.sm.resize;
 
   return (
     <Modal open={open} onClose={onClose} maxWidth="40rem" width="100%">
@@ -147,9 +148,10 @@ export function ModalDocuments({ open, onClose }: Props) {
               {uploading === 'idPhoto' && <span className="text-xs text-subtle">{t('common.loading')}</span>}
             </div>
             <ImageUploader
-              resizeOptions={smResize}
+              resizeOptions={idCard.resize}
+              sizes={idCard.sizes}
               onUpload={handleIdPhotoUpload}
-              disabled={uploading === 'idPhoto'}
+              disabled={uploading === 'idPhoto' || !idCard.spec || !customerId}
               placeholder={
                 <div className="flex flex-col items-center gap-2 py-6 text-subtle">
                   <CreditCard size={24} className="opacity-40" />
@@ -169,9 +171,10 @@ export function ModalDocuments({ open, onClose }: Props) {
               {uploading === 'signature' && <span className="text-xs text-subtle">{t('common.loading')}</span>}
             </div>
             <ImageUploader
-              resizeOptions={smResize}
+              resizeOptions={signature.resize}
+              sizes={signature.sizes}
               onUpload={handleSignatureUpload}
-              disabled={uploading === 'signature'}
+              disabled={uploading === 'signature' || !signature.spec || !customerId}
             />
           </div>
 
@@ -185,9 +188,12 @@ export function ModalDocuments({ open, onClose }: Props) {
               {uploading === 'evidence' && <span className="text-xs text-subtle">{t('common.loading')}</span>}
             </div>
             <ImageUploader
-              resizeOptions={smResize}
+              resizeOptions={evidence.resize}
+              sizes={evidence.sizes}
               onUpload={handleEvidenceUpload}
-              disabled={uploading === 'evidence'}
+              disabled={uploading === 'evidence' || !evidence.spec}
+              multiple
+              maxFiles={evidence.spec?.max_files}
             />
           </div>
 
