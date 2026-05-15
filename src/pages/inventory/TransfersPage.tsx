@@ -10,6 +10,7 @@ import { DateTime } from '../../components/DateTime';
 import { CopyButton } from '../../components/CopyButton';
 import { fmtNum } from './inventoryUtils';
 import { useAuth } from '../../contexts/AuthContext';
+import { ActionDoneView } from '../contracts/ActionDoneView';
 
 // ============================================================================
 // Types (verified against live API 2026-03-24)
@@ -600,6 +601,14 @@ function ApproveTransferModal({
 // Receive Line Modal
 // ============================================================================
 
+interface ReceiveLineResult {
+  transfer_line_id: number;
+  action: string;
+  to_bucket: string;
+  txn_id: number;
+  order_completed: boolean;
+}
+
 function ReceiveLineModal({
   open,
   onClose,
@@ -611,25 +620,31 @@ function ReceiveLineModal({
   onClose: () => void;
   line: TransferLine | null;
   t: ReturnType<typeof useTranslation>['t'];
+  /** Called when the user dismisses the done view — parent should refresh data. */
   onSuccess: () => void;
 }) {
+  const [view, setView] = useState<'form' | 'done'>('form');
   const [action, setAction] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
+  const [result, setResult] = useState<ReceiveLineResult | null>(null);
 
   useEffect(() => {
-    if (open) { setAction(null); setNote(''); setError(''); }
+    if (open) { setView('form'); setAction(null); setNote(''); setError(''); setResult(null); }
   }, [open]);
 
   const mutation = useMutation({
     mutationFn: () =>
-      apiClient.rpc('fn_inv_transfer_confirm_receive', {
+      apiClient.rpc<ReceiveLineResult>('fn_inv_transfer_confirm_receive', {
         p_transfer_line_id: line!.id,
         p_action: action,
         p_note: note || null,
         p_dedupe_key: `recv-${line!.id}-${Date.now()}`,
       }),
-    onSuccess,
+    onSuccess: (data) => {
+      setResult(data);
+      setView('done');
+    },
     onError: (err) => {
       if (err instanceof ApiError) {
         const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
@@ -644,13 +659,49 @@ function ReceiveLineModal({
 
   const needsNote = action === 'RECEIVED_DAMAGED' || action === 'NOT_RECEIVED';
 
+  const handleDoneClose = () => {
+    onSuccess();
+  };
+
+  // Tone based on the receive outcome
+  const tone = result?.action === 'RECEIVED'
+    ? 'success'
+    : result?.action === 'RECEIVED_DAMAGED'
+      ? 'warning'
+      : 'danger';
+
   return (
-    <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
+    <Modal open={open} onClose={view === 'done' ? handleDoneClose : onClose} maxWidth="28rem" width="100%">
       <div className="flex flex-col overflow-hidden">
         <div className="modal-header">
-          <h2 className="modal-title">{t('transfer.receiveLine')}</h2>
-          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+          <h2 className="modal-title">
+            {view === 'done'
+              ? t('transfer.receiveLineDoneTitle', { defaultValue: 'Receipt recorded' })
+              : t('transfer.receiveLine')}
+          </h2>
+          <button type="button" className="modal-close-btn" onClick={view === 'done' ? handleDoneClose : onClose} aria-label="Close">&times;</button>
         </div>
+        {view === 'done' && result && (
+          <ActionDoneView
+            headline={t('transfer.receiveLineDoneHeadline', { defaultValue: 'Receipt recorded' })}
+            contractCode={line.line_type === 'ASSET' ? (line.asset_code ?? `line #${result.transfer_line_id}`) : `Lot #${line.stock_lot_id}`}
+            tone={tone}
+            detailRows={[
+              { label: t('transfer.receiveAction', { defaultValue: 'Action' }), value: result.action },
+              { label: t('transfer.toBucket', { defaultValue: 'Destination bucket' }), value: result.to_bucket, emphasis: true },
+            ]}
+            extras={
+              result.order_completed && (
+                <div className="alert alert-success">
+                  <CheckCircle size={16} />
+                  <span>{t('transfer.orderCompleted', { defaultValue: 'All lines received — transfer order marked COMPLETED.' })}</span>
+                </div>
+              )
+            }
+            onClose={handleDoneClose}
+          />
+        )}
+        {view === 'form' && <>
         <div className="modal-content">
           {error && (
             <div className="alert alert-danger mb-4 animate-pop-in">
@@ -704,6 +755,7 @@ function ReceiveLineModal({
             {mutation.isPending ? t('common.loading') : t('transfer.confirmReceive')}
           </Button>
         </div>
+        </>}
       </div>
     </Modal>
   );

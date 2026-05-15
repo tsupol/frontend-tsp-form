@@ -12,6 +12,7 @@ import { CopyButton } from '../../components/CopyButton';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { fmtNum } from './inventoryUtils';
+import { ActionDoneView } from '../contracts/ActionDoneView';
 
 // ============================================================================
 // Types (verified against live API 2026-03-25)
@@ -312,20 +313,12 @@ export function ReceivingPage() {
             open={createOpen}
             onClose={() => setCreateOpen(false)}
             onCreated={(newReceiptId) => {
+              // User clicked "Open receipt" in done view — select & navigate. Modal handles its own invalidation + close.
               setCreateOpen(false);
               setFilterStatus(null);
               setPageIndex(0);
-              invalidate();
               setSelectedId(newReceiptId);
               if (isMobile) goTo('detail');
-              addSnackbar({
-                message: (
-                  <div className="alert alert-success">
-                    <CheckCircle size={16} />
-                    <span>{t('receiving.createSuccess')}</span>
-                  </div>
-                ),
-              });
             }}
           />
         </>
@@ -594,6 +587,22 @@ function ReceiptLineRow({
 // Confirm Receipt Modal
 // ============================================================================
 
+interface ConfirmReceiptResult {
+  receipt_id: number;
+  status: 'CONFIRMED';
+  lots_created: number;
+  lot_ids?: number[];
+  total_qty: number;
+  total_amount: number;
+  po_progress?: {
+    po_total_qty: number;
+    po_received_qty: number;
+    po_total_amount: number;
+    po_received_amount: number;
+    percent_received: number | null;
+  };
+}
+
 function ConfirmReceiptModal({
   open,
   onClose,
@@ -605,18 +614,29 @@ function ConfirmReceiptModal({
   onClose: () => void;
   detail: ReceiptDetail;
   t: ReturnType<typeof useTranslation>['t'];
+  /** Called when user dismisses the done view — parent should refresh detail/list. */
   onSuccess: () => void;
 }) {
+  const [view, setView] = useState<'form' | 'done'>('form');
   const [error, setError] = useState('');
+  const [result, setResult] = useState<ConfirmReceiptResult | null>(null);
 
   useEffect(() => {
-    if (open) setError('');
+    if (open) {
+      setView('form');
+      setError('');
+      setResult(null);
+    }
   }, [open]);
 
   const mutation = useMutation({
     mutationFn: () =>
-      apiClient.rpc('fn_receipt_confirm', { p_receipt_id: detail.receipt_id }),
-    onSuccess,
+      apiClient.rpc<ConfirmReceiptResult>('fn_receipt_confirm', { p_receipt_id: detail.receipt_id }),
+    onSuccess: (data) => {
+      setResult(data);
+      setView('done');
+      // Caller's onSuccess handles invalidation when the user dismisses (modal close calls onSuccess)
+    },
     onError: (err) => {
       if (err instanceof ApiError) {
         const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
@@ -631,13 +651,55 @@ function ConfirmReceiptModal({
   const totalQty = lines.reduce((sum, l) => sum + l.qty_received, 0);
   const totalAmount = lines.reduce((sum, l) => sum + l.line_total, 0);
 
+  // When user dismisses the done view, fire onSuccess so parent invalidates queries
+  const handleDoneClose = () => {
+    onSuccess();
+  };
+
   return (
-    <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
+    <Modal open={open} onClose={view === 'done' ? handleDoneClose : onClose} maxWidth="28rem" width="100%">
       <div className="flex flex-col overflow-hidden">
         <div className="modal-header">
-          <h2 className="modal-title">{t('receiving.confirmReceipt')}</h2>
-          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+          <h2 className="modal-title">
+            {view === 'done'
+              ? t('receiving.confirmDoneTitle', { defaultValue: 'Receipt confirmed' })
+              : t('receiving.confirmReceipt')}
+          </h2>
+          <button type="button" className="modal-close-btn" onClick={view === 'done' ? handleDoneClose : onClose} aria-label="Close">&times;</button>
         </div>
+        {view === 'done' && result && (
+          <ActionDoneView
+            headline={t('receiving.confirmDoneHeadline', { defaultValue: 'Stock added' })}
+            contractCode={detail.receipt_no}
+            tone="success"
+            stateTransition={{ from: 'DRAFT', to: result.status, toColor: 'success' }}
+            detailRows={[
+              { label: t('receiving.lotsCreated', { defaultValue: 'Lots created' }), value: String(result.lots_created), emphasis: true },
+              { label: t('receiving.totalQty', { defaultValue: 'Total qty' }), value: fmtNum(result.total_qty) },
+              { label: t('receiving.totalAmount', { defaultValue: 'Total amount' }), value: fmtCurrency(result.total_amount) },
+            ]}
+            extras={
+              result.po_progress && (
+                <div className="px-3 py-2.5 rounded-md bg-info/5 border border-info/20">
+                  <div className="text-xs text-subtle mb-1">
+                    {t('receiving.poProgressLabel', { defaultValue: 'PO progress' })}: {detail.po_no}
+                  </div>
+                  <div className="text-sm tabular-nums">
+                    {fmtNum(result.po_progress.po_received_qty)} / {fmtNum(result.po_progress.po_total_qty)} pcs
+                    {result.po_progress.percent_received != null && (
+                      <span className="text-xs text-subtle ml-2">({result.po_progress.percent_received}%)</span>
+                    )}
+                  </div>
+                  <div className="text-xs text-subtle tabular-nums mt-0.5">
+                    {fmtCurrency(result.po_progress.po_received_amount)} / {fmtCurrency(result.po_progress.po_total_amount)}
+                  </div>
+                </div>
+              )
+            }
+            onClose={handleDoneClose}
+          />
+        )}
+        {view === 'form' && <>
         <div className="modal-content">
           {error && (
             <div className="alert alert-danger mb-4 animate-pop-in">
@@ -665,6 +727,7 @@ function ConfirmReceiptModal({
             {mutation.isPending ? t('common.loading') : t('receiving.confirmReceipt')}
           </Button>
         </div>
+        </>}
       </div>
     </Modal>
   );
@@ -770,19 +833,25 @@ function CreateReceiptModal({
 }: {
   open: boolean;
   onClose: () => void;
+  /** Called when user clicks "Open receipt" in done view. Done (primary) just calls onClose. */
   onCreated: (receiptId: number) => void;
 }) {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [view, setView] = useState<'form' | 'done'>('form');
   const [poId, setPoId] = useState<number | null>(null);
   const [branchId, setBranchId] = useState<number | null>(null);
   const [error, setError] = useState('');
+  const [result, setResult] = useState<{ receipt_id: number; code_display: string; status: string } | null>(null);
 
   useEffect(() => {
     if (!open) return;
+    setView('form');
     setPoId(null);
     setBranchId(null);
     setError('');
+    setResult(null);
   }, [open]);
 
   const { data: pos } = useQuery({
@@ -835,11 +904,17 @@ function CreateReceiptModal({
 
   const mutation = useMutation({
     mutationFn: () =>
-      apiClient.rpc<{ receipt_id: number }>('fn_receipt_create', {
+      apiClient.rpc<{ receipt_id: number; code_display: string; status: string }>('fn_receipt_create', {
         p_po_id: poId,
         p_branch_id: branchId,
       }),
-    onSuccess: (data) => onCreated(data.receipt_id),
+    onSuccess: (data) => {
+      setResult(data);
+      setView('done');
+      queryClient.invalidateQueries({ queryKey: ['receipts'] });
+      queryClient.invalidateQueries({ queryKey: ['receipt-detail'] });
+      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+    },
     onError: (err) => {
       if (err instanceof ApiError) {
         const translated =
@@ -854,13 +929,38 @@ function CreateReceiptModal({
 
   const canSubmit = !!poId && !!branchId && !mutation.isPending;
 
+  const branchName = useMemo(() => branches?.find(b => b.id === branchId)?.name ?? '', [branches, branchId]);
+  const poNo = useMemo(() => selectedPo?.po_no ?? '', [selectedPo]);
+
   return (
     <Modal open={open} onClose={onClose} maxWidth="32rem" width="100%">
       <div className="flex flex-col overflow-hidden">
         <div className="modal-header">
-          <h2 className="modal-title">{t('receiving.createNew')}</h2>
+          <h2 className="modal-title">
+            {view === 'done'
+              ? t('receiving.createDoneTitle', { defaultValue: 'Receipt created' })
+              : t('receiving.createNew')}
+          </h2>
           <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
         </div>
+        {view === 'done' && result && (
+          <ActionDoneView
+            headline={t('receiving.createDoneHeadline', { defaultValue: 'Receipt created' })}
+            contractCode={result.code_display}
+            tone="success"
+            detailRows={[
+              { label: t('receiving.poRef', { defaultValue: 'PO' }), value: poNo },
+              { label: t('receiving.receiveBranch', { defaultValue: 'Receive at branch' }), value: branchName },
+              { label: t('po.status', { defaultValue: 'Status' }), value: result.status },
+            ]}
+            secondaryAction={{
+              label: t('receiving.openReceipt', { defaultValue: 'Open receipt' }),
+              onClick: () => { onCreated(result.receipt_id); },
+            }}
+            onClose={onClose}
+          />
+        )}
+        {view === 'form' && <>
         <div className="modal-content">
           {error && (
             <div className="alert alert-danger mb-4 animate-pop-in">
@@ -911,6 +1011,7 @@ function CreateReceiptModal({
             {mutation.isPending ? t('common.saving') : t('receiving.createNew')}
           </Button>
         </div>
+        </>}
       </div>
     </Modal>
   );

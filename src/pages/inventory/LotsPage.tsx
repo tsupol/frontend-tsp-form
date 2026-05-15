@@ -16,6 +16,7 @@ import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { getBucketLabel, getBucketColor, fmtNum } from './inventoryUtils';
+import { ActionDoneView } from '../contracts/ActionDoneView';
 
 // ============================================================================
 // Types — verified against live API 2026-05-08
@@ -730,9 +731,10 @@ function LotDetailPanel({
       <LotActionModal
         open={!!activeAction}
         action={activeAction}
-        onClose={() => setActiveAction(null)}
+        onClose={() => { setActiveAction(null); onRefresh(); }}
         lot={lot}
         onSuccess={handleSuccess}
+        onRefresh={onRefresh}
       />
     </div>
   );
@@ -918,25 +920,51 @@ const TRANSFER_MODE_OPTIONS = [
   { value: 'COST_PRICE_INTERNAL', label: 'Cost-price internal sale' },
 ];
 
+interface ConvertResult {
+  asset_id: number;
+  asset_code: string;
+  bucket: string;
+  lot_remaining_qty: number;
+  lot_status: 'ACTIVE' | 'DEPLETED';
+}
+
+interface TransferCreateResult {
+  transfer_order_id: number;
+  transfer_no: string;
+  order_status: 'DRAFT';
+}
+
+type LotActionResult =
+  | { kind: 'convert'; data: ConvertResult }
+  | { kind: 'transfer_create'; data: TransferCreateResult };
+
 function LotActionModal({
   open,
   action,
   onClose,
   lot,
   onSuccess,
+  onRefresh,
 }: {
   open: boolean;
   action: BackendLotAction | null;
   onClose: () => void;
   lot: Lot;
   onSuccess: (msgKey: string, navigateTo?: string) => void;
+  /** Called when the user dismisses the done view — parent should refresh data (snackbar already suppressed in done flow). */
+  onRefresh: () => void;
 }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const config = action ? SIMPLE_ACTIONS[action.action_code] : null;
 
   const isConvert = action?.action_code === 'LOT_CONVERT_TO_ASSET';
   const isTransferCreate = action?.action_code === 'LOT_TRANSFER_CREATE';
   const isTransferAddLine = action?.action_code === 'LOT_TRANSFER_ADD_LINE';
+  const hasDoneView = isConvert || isTransferCreate;
+
+  const [view, setView] = useState<'form' | 'done'>('form');
+  const [result, setResult] = useState<LotActionResult | null>(null);
 
   // Convert-specific state
   const [identifiers, setIdentifiers] = useState<IdRow[]>([{ type: 'SERIAL_NO', value: '' }]);
@@ -957,6 +985,8 @@ function LotActionModal({
 
   useEffect(() => {
     if (open) {
+      setView('form');
+      setResult(null);
       setIdentifiers([{ type: 'SERIAL_NO', value: '' }]);
       setConditionGrade('NEW');
       setPhysicalColor('');
@@ -1023,12 +1053,13 @@ function LotActionModal({
           p_dedupe_key: `lot-convert-${lot.lot_id}-${Date.now()}`,
           p_branch_id: lot.branch_id,
         };
-        return { resp: await apiClient.rpc(config.rpc, params), navigateTo: undefined as string | undefined };
+        const data = await apiClient.rpc<ConvertResult>(config.rpc, params);
+        return { kind: 'convert' as const, data, navigateTo: undefined as string | undefined };
       }
 
       if (action.action_code === 'LOT_TRANSFER_CREATE') {
         // Two-step: create the transfer, then add this lot as line 1.
-        const created = await apiClient.rpc<{ transfer_order_id: number }>('fn_inv_transfer_create', {
+        const created = await apiClient.rpc<TransferCreateResult>('fn_inv_transfer_create', {
           p_to_branch_id: toBranchId,
           p_transfer_mode: transferMode,
           p_notes: note.trim() || null,
@@ -1041,7 +1072,7 @@ function LotActionModal({
           p_asset_id: null,
           p_qty_requested: transferQtyNum,
         });
-        return { resp: created, navigateTo: undefined as string | undefined };
+        return { kind: 'transfer_create' as const, data: created, navigateTo: undefined as string | undefined };
       }
 
       if (action.action_code === 'LOT_TRANSFER_ADD_LINE') {
@@ -1054,12 +1085,25 @@ function LotActionModal({
         });
         // Don't navigate — the new line will appear in the lot's "In transfer"
         // section automatically (cache invalidates).
-        return { resp: null, navigateTo: undefined as string | undefined };
+        return { kind: 'add_line' as const, data: null, navigateTo: undefined as string | undefined };
       }
 
       throw new Error('Action not wired');
     },
-    onSuccess: ({ navigateTo }) => onSuccess(config!.successKey, navigateTo),
+    onSuccess: (res) => {
+      if (res.kind === 'convert') {
+        setResult({ kind: 'convert', data: res.data });
+        setView('done');
+        onRefresh();
+      } else if (res.kind === 'transfer_create') {
+        setResult({ kind: 'transfer_create', data: res.data });
+        setView('done');
+        onRefresh();
+      } else {
+        // add_line — keep current snackbar flow
+        onSuccess(config!.successKey, res.navigateTo);
+      }
+    },
     onError: (err) => {
       if (err instanceof ApiError) {
         const translated =
@@ -1078,14 +1122,62 @@ function LotActionModal({
   const canSubmit = (convertValid || transferCreateValid || transferAddLineValid) && !mutation.isPending;
   const label = action ? t(action.action_code, { ns: 'lotActions', defaultValue: action.action_code }) : '';
 
+  const branchNameForTransfer = useMemo(
+    () => branches.find(b => b.id === toBranchId)?.name ?? `#${toBranchId}`,
+    [branches, toBranchId],
+  );
+
   return (
     <Modal open={open && !!action && !!config} onClose={onClose} maxWidth="32rem" width="100%">
       {action && config ? (
         <div className="flex flex-col overflow-hidden">
           <div className="modal-header">
-            <h2 className="modal-title">{label}</h2>
+            <h2 className="modal-title">
+              {view === 'done' && result?.kind === 'convert'
+                ? t('convert.doneTitle', { ns: 'lotActions', defaultValue: 'Asset registered' })
+                : view === 'done' && result?.kind === 'transfer_create'
+                  ? t('transfer.doneTitle', { ns: 'lotActions', defaultValue: 'Transfer created' })
+                  : label}
+            </h2>
             <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
           </div>
+
+          {view === 'done' && result?.kind === 'convert' && (
+            <ActionDoneView
+              headline={t('convert.doneHeadline', { ns: 'lotActions', defaultValue: 'Asset registered' })}
+              contractCode={result.data.asset_code}
+              tone="success"
+              detailRows={[
+                { label: t('convert.assetBucket', { ns: 'lotActions', defaultValue: 'Bucket' }), value: result.data.bucket },
+                { label: t('lot.remaining'), value: fmtNum(result.data.lot_remaining_qty) },
+                { label: t('lot.status', { defaultValue: 'Lot status' }), value: result.data.lot_status },
+              ]}
+              onClose={onClose}
+            />
+          )}
+
+          {view === 'done' && result?.kind === 'transfer_create' && (
+            <ActionDoneView
+              headline={t('transfer.doneHeadline', { ns: 'lotActions', defaultValue: 'Transfer order created' })}
+              contractCode={result.data.transfer_no}
+              tone="success"
+              detailRows={[
+                { label: t('transfer.toBranch', { ns: 'lotActions', defaultValue: 'Destination branch' }), value: branchNameForTransfer },
+                { label: t('po.status', { defaultValue: 'Status' }), value: result.data.order_status },
+              ]}
+              secondaryAction={{
+                label: t('transfer.openTransfer', { ns: 'lotActions', defaultValue: 'Open transfer' }),
+                onClick: () => {
+                  onClose();
+                  navigate(`/admin/inventory/transfers/${result.data.transfer_order_id}`);
+                },
+              }}
+              onClose={onClose}
+            />
+          )}
+
+          {view === 'form' && (
+          <>
           <div className="modal-content">
             {error && (
               <div className="alert alert-danger mb-4 animate-pop-in">
@@ -1299,6 +1391,8 @@ function LotActionModal({
               {mutation.isPending ? t('common.loading') : label}
             </Button>
           </div>
+          </>
+          )}
         </div>
       ) : null}
     </Modal>

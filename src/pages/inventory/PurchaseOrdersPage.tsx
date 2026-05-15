@@ -1450,8 +1450,16 @@ function CreateReceiptModal({
 }) {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const { addSnackbar } = useSnackbarContext();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [view, setView] = useState<'form' | 'done'>('form');
+  const [result, setResult] = useState<{ receipt_id: number; code_display: string; status: string } | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setView('form');
+    setResult(null);
+  }, [open]);
 
   const { data: branches } = useQuery({
     queryKey: ['branches', 'receivable', po.company_id],
@@ -1481,26 +1489,19 @@ function CreateReceiptModal({
 
   const mutation = useMutation({
     mutationFn: () =>
-      apiClient.rpc<{ receipt_id: number }>('fn_receipt_create', {
+      apiClient.rpc<{ receipt_id: number; code_display: string; status: string }>('fn_receipt_create', {
         p_po_id: po.po_id,
         p_branch_id: branchId,
       }),
-    onSuccess: () => {
-      onClose();
+    onSuccess: (data) => {
+      setResult(data);
+      setView('done');
       // Invalidate receiving + PO caches so list/detail reflect the new draft.
       queryClient.invalidateQueries({ queryKey: ['receipts'] });
       queryClient.invalidateQueries({ queryKey: ['receipt-detail'] });
       queryClient.invalidateQueries({ queryKey: ['po-detail'] });
       queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
       queryClient.invalidateQueries({ queryKey: ['po-receipts', po.po_id] });
-      addSnackbar({
-        message: (
-          <div className="alert alert-success">
-            <CheckCircle size={16} />
-            <span>{t('po.createReceiptSuccess')}</span>
-          </div>
-        ),
-      });
     },
     onError: (err) => {
       if (err instanceof ApiError) {
@@ -1520,14 +1521,40 @@ function CreateReceiptModal({
   );
 
   const canSubmit = !!branchId && !mutation.isPending;
+  const branchName = useMemo(() => branches?.find(b => b.id === branchId)?.name ?? '', [branches, branchId]);
 
   return (
     <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
       <div className="flex flex-col overflow-hidden">
         <div className="modal-header">
-          <h2 className="modal-title">{t('po.createReceipt')}</h2>
+          <h2 className="modal-title">
+            {view === 'done'
+              ? t('po.createReceiptDoneTitle', { defaultValue: 'Receipt created' })
+              : t('po.createReceipt')}
+          </h2>
           <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
         </div>
+        {view === 'done' && result && (
+          <ActionDoneView
+            headline={t('po.createReceiptDoneHeadline', { defaultValue: 'Receipt created' })}
+            contractCode={result.code_display}
+            tone="success"
+            detailRows={[
+              { label: t('po.poRef', { defaultValue: 'PO' }), value: po.po_no },
+              { label: t('po.receiveBranch', { defaultValue: 'Receive at branch' }), value: branchName },
+              { label: t('po.status', { defaultValue: 'Status' }), value: result.status },
+            ]}
+            secondaryAction={{
+              label: t('po.openReceipt', { defaultValue: 'Open receipt' }),
+              onClick: () => {
+                onClose();
+                navigate(`/admin/inventory/receiving/${result.receipt_id}`);
+              },
+            }}
+            onClose={onClose}
+          />
+        )}
+        {view === 'form' && <>
         <div className="modal-content">
           <p className="text-sm text-subtle mb-4">{t('po.createReceiptIntro')}</p>
 
@@ -1575,6 +1602,7 @@ function CreateReceiptModal({
             {mutation.isPending ? t('common.saving') : t('po.createReceiptConfirm')}
           </Button>
         </div>
+        </>}
       </div>
     </Modal>
   );
