@@ -17,6 +17,7 @@ import { CurrencyInput } from '../../components/CurrencyInput';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { fmtNum } from './inventoryUtils';
+import { ActionDoneView } from '../contracts/ActionDoneView';
 
 // ============================================================================
 // Types — verified against live API 2026-05-02
@@ -438,23 +439,13 @@ export function PurchaseOrdersPage() {
             open={createOpen}
             onClose={() => setCreateOpen(false)}
             onCreated={(newPoId) => {
+              // User clicked "Open PO" in done view — select & navigate. Modal handles its own invalidation + close.
               setCreateOpen(false);
-              // Clear filters so the new DRAFT PO is visible in the list,
-              // then select it so the detail panel opens.
               setFilterStatus(null);
               setFilterOwnership(null);
               setPageIndex(0);
-              invalidate();
               setSelectedPoId(newPoId);
               if (isMobile) goTo('detail');
-              addSnackbar({
-                message: (
-                  <div className="alert alert-success">
-                    <CheckCircle size={16} />
-                    <span>{t('po.createSuccess')}</span>
-                  </div>
-                ),
-              });
             }}
           />
         </>
@@ -973,6 +964,12 @@ function PoActionModal({
 // Create PO modal — fn_po_create with required p_ownership
 // ============================================================================
 
+interface CreatePoResult {
+  po_id: number;
+  po_no: string;
+  status: string;
+}
+
 function CreatePoModal({
   open,
   onClose,
@@ -980,18 +977,22 @@ function CreatePoModal({
 }: {
   open: boolean;
   onClose: () => void;
+  /** Called when user clicks "Open PO" in the done view — parent should select/navigate. Done (primary) just calls onClose without this. */
   onCreated: (poId: number) => void;
 }) {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const isThai = i18n.language === 'th';
 
+  const [view, setView] = useState<'form' | 'done'>('form');
   const [companyId, setCompanyId] = useState<number | null>(null);
   const [ownership, setOwnership] = useState<string | null>(null);
   const [supplierName, setSupplierName] = useState('');
   const [supplierRef, setSupplierRef] = useState('');
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
+  const [result, setResult] = useState<CreatePoResult | null>(null);
 
   const { data: companies } = useQuery({
     queryKey: ['companies'],
@@ -1019,8 +1020,10 @@ function CreatePoModal({
   // Auto-pick company for company-scoped users
   useEffect(() => {
     if (!open) return;
+    setView('form');
     setSupplierName(''); setSupplierRef(''); setNote(''); setError('');
     setOwnership(null);
+    setResult(null);
     if (user?.company_id) {
       setCompanyId(user.company_id);
     } else {
@@ -1033,7 +1036,7 @@ function CreatePoModal({
       if (!companyId) throw new ApiError({ code: 'CLIENT.COMPANY_REQUIRED', message: t('po.companyRequired'), isAuthError: false });
       if (!ownership) throw new ApiError({ code: 'INV.PO.OWNERSHIP_REQUIRED', message: t('po.ownershipRequired'), isAuthError: false });
       if (!supplierName.trim()) throw new ApiError({ code: 'CLIENT.SUPPLIER_REQUIRED', message: t('po.supplierRequired'), isAuthError: false });
-      const res = await apiClient.rpc<{ po_id: number; po_no: string; status: string }>('fn_po_create', {
+      const res = await apiClient.rpc<CreatePoResult>('fn_po_create', {
         p_company_id: companyId,
         p_ownership: ownership,
         p_supplier_name: supplierName.trim(),
@@ -1043,7 +1046,10 @@ function CreatePoModal({
       return res;
     },
     onSuccess: (data) => {
-      onCreated(data.po_id);
+      setResult(data);
+      setView('done');
+      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['po-detail'] });
     },
     onError: (err) => {
       if (err instanceof ApiError) {
@@ -1059,9 +1065,31 @@ function CreatePoModal({
     <Modal open={open} onClose={onClose} maxWidth="32rem" width="100%">
       <div className="flex flex-col overflow-hidden">
         <div className="modal-header">
-          <h2 className="modal-title">{t('po.createNew')}</h2>
+          <h2 className="modal-title">
+            {view === 'done'
+              ? t('po.createDoneTitle', { defaultValue: 'PO created' })
+              : t('po.createNew')}
+          </h2>
           <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
         </div>
+        {view === 'done' && result && (
+          <ActionDoneView
+            headline={t('po.createDoneHeadline', { defaultValue: 'Purchase order created' })}
+            contractCode={result.po_no}
+            tone="success"
+            detailRows={[
+              { label: t('po.status', { defaultValue: 'Status' }), value: result.status },
+              { label: t('po.ownership', { defaultValue: 'Ownership' }), value: ownership ?? '' },
+              { label: t('po.supplier', { defaultValue: 'Supplier' }), value: supplierName },
+            ]}
+            secondaryAction={{
+              label: t('po.openPo', { defaultValue: 'Open PO' }),
+              onClick: () => { onCreated(result.po_id); },
+            }}
+            onClose={onClose}
+          />
+        )}
+        {view === 'form' && <>
         <div className="modal-content">
           {error && (
             <div className="alert alert-danger mb-4 animate-pop-in">
@@ -1128,6 +1156,7 @@ function CreatePoModal({
             {mutation.isPending ? t('common.loading') : t('po.create')}
           </Button>
         </div>
+        </>}
       </div>
     </Modal>
   );

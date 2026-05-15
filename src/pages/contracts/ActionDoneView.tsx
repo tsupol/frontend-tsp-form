@@ -23,10 +23,16 @@ export interface ActionDoneStateTransition {
   fromColor?: BadgeColor;
 }
 
+export interface ActionDoneSecondaryAction {
+  label: string;
+  /** Called BEFORE onClose so the parent can navigate/select. The done view itself does not call onClose after — the secondary's onClick should call onClose if it wants to dismiss. */
+  onClick: () => void;
+}
+
 export interface ActionDoneViewProps {
   /** Big bold headline (e.g. "Payment recorded", "Contract terminated"). */
   headline: string;
-  /** Contract code shown under the headline. */
+  /** Subtitle shown under the headline — typically a contract code, PO code, or asset code. */
   contractCode: string;
   /** Action tone — drives icon + accent color. Default: success. */
   tone?: ActionDoneTone;
@@ -38,6 +44,8 @@ export interface ActionDoneViewProps {
   extras?: ReactNode;
   /** If set, a secondary "View bill" button opens a nested receipt modal for this bill id. */
   billId?: number | null;
+  /** Optional explicit secondary button (e.g. "Open PO", "View asset"). Rendered to the left of Done. Ignored if billId is also set — billId takes precedence. */
+  secondaryAction?: ActionDoneSecondaryAction;
   /** Done button label override. Default: t('common.done'). */
   doneLabel?: string;
   /** Done button color override. Default: 'primary'. */
@@ -78,6 +86,7 @@ export function ActionDoneView({
   detailRows,
   extras,
   billId,
+  secondaryAction,
   doneLabel,
   doneColor = 'primary',
   onClose,
@@ -130,9 +139,13 @@ export function ActionDoneView({
       </div>
 
       <div className="modal-footer">
-        {billId != null && (
+        {billId != null ? (
           <Button variant="outline" onClick={() => setShowBill(true)}>
             {t('contract.action_viewBill', { defaultValue: 'View bill' })}
+          </Button>
+        ) : secondaryAction && (
+          <Button variant="outline" onClick={secondaryAction.onClick}>
+            {secondaryAction.label}
           </Button>
         )}
         <Button color={doneColor} onClick={onClose}>
