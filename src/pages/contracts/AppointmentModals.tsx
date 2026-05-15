@@ -6,6 +6,8 @@ import { XCircle, Keyboard } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { makeDatePickerFormat } from '../../lib/format';
 import { DateTime } from '../../components/DateTime';
+import { ActionDoneView } from './ActionDoneView';
+import { useContractInvalidate } from './useContractInvalidate';
 
 // Backend RPCs:
 //   fn_contract_appointment_create(p_contract_id, p_promise_date, p_installment_id?, p_note?)
@@ -188,17 +190,28 @@ export function AppointmentCreateModal({
   );
 }
 
+interface AppointmentCancelResult {
+  id: number;
+  status: 'CANCELLED';
+}
+
 export function AppointmentCancelModal({
-  open, onClose, onSuccess, contractId,
+  open, onClose, onSuccess: _onSuccess, contractId,
 }: {
   open: boolean;
   onClose: () => void;
+  /** Unused — done view replaces snackbar. Kept for prop-shape parity. */
   onSuccess: (msgKey: string) => void;
   contractId: number;
 }) {
   const { t } = useTranslation();
+  const invalidate = useContractInvalidate(contractId);
+  const [view, setView] = useState<'form' | 'done'>('form');
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
+  const [result, setResult] = useState<AppointmentCancelResult | null>(null);
+  // Snapshot the appointment that was cancelled (RPC only returns id + status)
+  const [cancelledSnapshot, setCancelledSnapshot] = useState<ContractAppointment | null>(null);
 
   // Find the active appointment for this contract (RPC takes appointment_id, not contract_id)
   const { data: activeAppt, isLoading } = useQuery({
@@ -215,8 +228,11 @@ export function AppointmentCancelModal({
 
   useEffect(() => {
     if (open) {
+      setView('form');
       setNote('');
       setError('');
+      setResult(null);
+      setCancelledSnapshot(null);
     }
   }, [open]);
 
@@ -225,9 +241,14 @@ export function AppointmentCancelModal({
       if (!activeAppt) return Promise.reject(new Error('No active appointment'));
       const params: Record<string, unknown> = { p_appointment_id: activeAppt.id };
       if (note.trim()) params.p_note = note.trim();
-      return apiClient.rpc('fn_contract_appointment_cancel', params);
+      return apiClient.rpc<AppointmentCancelResult>('fn_contract_appointment_cancel', params);
     },
-    onSuccess: () => onSuccess('contract.action_appointment_cancel_success'),
+    onSuccess: (res) => {
+      setCancelledSnapshot(activeAppt ?? null);
+      setResult(res);
+      setView('done');
+      invalidate();
+    },
     onError: (err) => setApiError(err, t, setError),
   });
 
@@ -237,56 +258,84 @@ export function AppointmentCancelModal({
     <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
       <div className="flex flex-col overflow-hidden">
         <div className="modal-header">
-          <h2 className="modal-title">{t('contract.action_appointment_cancel')}</h2>
+          <h2 className="modal-title">
+            {view === 'done'
+              ? t('contract.action_appointment_cancel_done_title', { defaultValue: 'Appointment cancelled' })
+              : t('contract.action_appointment_cancel')}
+          </h2>
           <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
         </div>
-        <div className="modal-content">
-          {error && (
-            <div className="alert alert-danger mb-4 animate-pop-in">
-              <XCircle size={16} />
-              <span>{error}</span>
-            </div>
-          )}
 
-          {isLoading ? (
-            <div className="text-sm text-subtle">{t('common.loading')}</div>
-          ) : activeAppt ? (
-            <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
-              <div className="text-sm">
-                {t('contract.appointment_promiseDate')}: <DateTime value={activeAppt.promise_date} showTime={false} />
-              </div>
-              {activeAppt.note && <div className="text-xs text-subtle mt-1">{activeAppt.note}</div>}
-            </div>
-          ) : (
-            <div className="alert alert-warning mb-4">
-              <span>{t('contract.appointment_noneActive')}</span>
-            </div>
-          )}
+        {view === 'form' && (
+          <>
+            <div className="modal-content">
+              {error && (
+                <div className="alert alert-danger mb-4 animate-pop-in">
+                  <XCircle size={16} />
+                  <span>{error}</span>
+                </div>
+              )}
 
-          {activeAppt && (
-            <div className="form-grid">
-              <div className="flex flex-col">
-                <label className="form-label">{t('contract.note')}</label>
-                <TextArea
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  placeholder={t('contract.notePlaceholder')}
-                  rows={3}
-                />
-              </div>
+              {isLoading ? (
+                <div className="text-sm text-subtle">{t('common.loading')}</div>
+              ) : activeAppt ? (
+                <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
+                  <div className="text-sm">
+                    {t('contract.appointment_promiseDate')}: <DateTime value={activeAppt.promise_date} showTime={false} />
+                  </div>
+                  {activeAppt.note && <div className="text-xs text-subtle mt-1">{activeAppt.note}</div>}
+                </div>
+              ) : (
+                <div className="alert alert-warning mb-4">
+                  <span>{t('contract.appointment_noneActive')}</span>
+                </div>
+              )}
+
+              {activeAppt && (
+                <div className="form-grid">
+                  <div className="flex flex-col">
+                    <label className="form-label">{t('contract.note')}</label>
+                    <TextArea
+                      value={note}
+                      onChange={(e) => setNote(e.target.value)}
+                      placeholder={t('contract.notePlaceholder')}
+                      rows={3}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-        <div className="modal-footer">
-          <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button
-            color="danger"
-            onClick={() => mutation.mutate()}
-            disabled={!canSubmit}
-          >
-            {mutation.isPending ? t('common.loading') : t('contract.action_appointment_cancel')}
-          </Button>
-        </div>
+            <div className="modal-footer">
+              <Button onClick={onClose}>{t('common.cancel')}</Button>
+              <Button
+                color="danger"
+                onClick={() => mutation.mutate()}
+                disabled={!canSubmit}
+              >
+                {mutation.isPending ? t('common.loading') : t('contract.action_appointment_cancel')}
+              </Button>
+            </div>
+          </>
+        )}
+
+        {view === 'done' && result && (
+          <ActionDoneView
+            headline={t('contract.action_appointment_cancel_done_headline', { defaultValue: 'Appointment cancelled' })}
+            contractCode={`#${result.id}`}
+            tone="neutral"
+            detailRows={cancelledSnapshot ? [
+              {
+                label: t('contract.appointment_promiseDate'),
+                value: <DateTime value={cancelledSnapshot.promise_date} showTime={false} />,
+              },
+              ...(cancelledSnapshot.note ? [{
+                label: t('contract.note'),
+                value: cancelledSnapshot.note,
+              }] : []),
+            ] : undefined}
+            onClose={onClose}
+          />
+        )}
       </div>
     </Modal>
   );

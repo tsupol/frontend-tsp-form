@@ -1068,6 +1068,15 @@ interface VRole {
   name: string;
 }
 
+// Actions that present a stay-open done view instead of auto-closing + snackbar
+const DONE_VIEW_ACTIONS: ReadonlySet<ContractAction> = new Set([
+  'cancel',
+  'void',
+  'transfer_accept',
+  'transfer_cancel',
+  'unbind_device',
+]);
+
 function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
   open: boolean;
   action: ContractAction | null;
@@ -1076,7 +1085,9 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
   onSuccess: (msgKey: string) => void;
 }) {
   const { t } = useTranslation();
+  const invalidate = useContractInvalidate(contract.id);
 
+  const [view, setView] = useState<'form' | 'done'>('form');
   const [pin, setPin] = useState('');
   const [note, setNote] = useState('');
   const [reason, setReason] = useState('');
@@ -1087,12 +1098,15 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
   const [newOwnerId, setNewOwnerId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [errorKey, setErrorKey] = useState(0);
+  const [result, setResult] = useState<Record<string, unknown> | null>(null);
 
   const config = action ? ACTION_CONFIGS[action] : null;
+  const hasDoneView = !!action && DONE_VIEW_ACTIONS.has(action);
 
   // Reset form on open
   useEffect(() => {
     if (open) {
+      setView('form');
       setPin('');
       setNote('');
       setReason('');
@@ -1102,6 +1116,7 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
       setAmount('');
       setNewOwnerId(null);
       setError('');
+      setResult(null);
     }
   }, [open, action]);
 
@@ -1184,9 +1199,17 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
       if (config.needsAmount && amount) params.p_amount = Number(amount);
       if (config.needsNewOwner && newOwnerId) params.p_new_owner_id = Number(newOwnerId);
 
-      return apiClient.rpc(config.rpc, params);
+      return apiClient.rpc<Record<string, unknown>>(config.rpc, params);
     },
-    onSuccess: () => onSuccess(config!.successKey),
+    onSuccess: (res) => {
+      if (hasDoneView) {
+        setResult(res);
+        setView('done');
+        invalidate();
+      } else {
+        onSuccess(config!.successKey);
+      }
+    },
     onError: (err) => {
       if (err instanceof ApiError) {
         const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
@@ -1219,6 +1242,20 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
             <h2 className="modal-title">{t(`contract.action_${action}`)}</h2>
             <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
           </div>
+          {view === 'done' && action && result && (
+            <ContractActionDoneView
+              action={action}
+              result={result}
+              contractCode={contract.code_display ?? contract.code}
+              contractState={contract.state}
+              formCtx={{
+                toBranchName: branches?.find(b => b.id === Number(toBranchId))?.name,
+                fromBranchName: branches?.find(b => b.id === contract.branch_id)?.name,
+              }}
+              onClose={onClose}
+            />
+          )}
+          {view === 'form' && <>
           <div className="modal-content">
             {error && (
               <div key={errorKey} className="alert alert-danger mb-4 animate-pop-in">
@@ -1363,10 +1400,196 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
               {mutation.isPending ? t('common.loading') : t(`contract.action_${action}`)}
             </Button>
           </div>
+          </>}
         </div>
       )}
     </Modal>
   );
+}
+
+// ── ContractActionDoneView: per-action done-view builder ─────────────────────
+
+interface ContractActionFormCtx {
+  toBranchName?: string;
+  fromBranchName?: string;
+}
+
+interface AssetMovementForAction {
+  txn_id?: number;
+  asset_id?: number;
+  asset_code?: string | null;
+  from_bucket?: string | null;
+  to_bucket?: string | null;
+  to_owner_type?: string | null;
+}
+
+function ContractActionDoneView({
+  action,
+  result,
+  contractCode,
+  contractState,
+  formCtx,
+  onClose,
+}: {
+  action: ContractAction;
+  result: Record<string, unknown>;
+  contractCode: string;
+  contractState: string;
+  formCtx: ContractActionFormCtx;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+
+  // Per-action done-view configuration
+  switch (action) {
+    case 'cancel': {
+      return (
+        <ActionDoneView
+          headline={t('contract.action_cancel_done_headline', { defaultValue: 'Contract cancelled' })}
+          contractCode={contractCode}
+          tone="warning"
+          stateTransition={{ from: contractState, to: String(result.state ?? 'CANCELLED'), toColor: 'warning' }}
+          detailRows={[
+            { label: t('contract.action_cancel_done_state', { defaultValue: 'State' }), value: String(result.state ?? 'CANCELLED') },
+          ]}
+          onClose={onClose}
+        />
+      );
+    }
+
+    case 'void': {
+      const reversed = (result.reversed_bill ?? null) as { bill_id?: number; bill_code?: string; total_amount?: number } | null;
+      const rows: ActionDoneDetailRow[] = [];
+      if (reversed?.bill_code) {
+        rows.push({ label: t('contract.action_void_done_reversedBill', { defaultValue: 'Reversed bill' }), value: reversed.bill_code });
+      }
+      if (reversed?.total_amount != null) {
+        rows.push({ label: t('contract.action_void_done_reversedAmount', { defaultValue: 'Reversed amount' }), value: fmtCurrency(reversed.total_amount), emphasis: true });
+      }
+      if (result.close_reason) {
+        rows.push({ label: t('contract.action_void_done_closeReason', { defaultValue: 'Close reason' }), value: String(result.close_reason) });
+      }
+      return (
+        <ActionDoneView
+          headline={t('contract.action_void_done_headline', { defaultValue: 'Contract voided' })}
+          contractCode={contractCode}
+          tone="danger"
+          stateTransition={{ from: contractState, to: String(result.state ?? 'VOIDED'), toColor: 'danger' }}
+          detailRows={rows}
+          billId={reversed?.bill_id ?? null}
+          onClose={onClose}
+        />
+      );
+    }
+
+    case 'transfer_accept': {
+      const fromBranchName = formCtx.fromBranchName ?? `#${result.from_branch_id ?? '?'}`;
+      const toBranchName = formCtx.toBranchName ?? `#${result.to_branch_id ?? '?'}`;
+      const deviceTransferred = !!result.device_transferred;
+      const movements = (result.asset_movements ?? null) as AssetMovementForAction[] | null;
+      const notice = result.notice ? String(result.notice) : null;
+      return (
+        <ActionDoneView
+          headline={t('contract.action_transfer_accept_done_headline', { defaultValue: 'Transfer accepted' })}
+          contractCode={contractCode}
+          tone="success"
+          stateTransition={{ from: fromBranchName, to: toBranchName, toColor: 'success' }}
+          extras={
+            <>
+              {notice && (
+                <div className="px-3 py-2.5 rounded-md bg-info/5 border border-info/20 text-sm">{notice}</div>
+              )}
+              {movements && movements.length > 0 && (
+                <div className="mt-3 px-3 py-2.5 rounded-md bg-info/5 border border-info/20">
+                  <div className="text-xs text-subtle mb-1.5">
+                    {t('contract.action_transfer_accept_done_device', { defaultValue: 'Device' })}
+                  </div>
+                  {movements.map((m, i) => (
+                    <div key={m.txn_id ?? i} className="flex items-center gap-2 text-sm">
+                      <span className="font-medium">{m.asset_code ?? `asset #${m.asset_id}`}</span>
+                      {m.from_bucket && m.to_bucket && (
+                        <>
+                          <span className="text-xs text-subtle">{m.from_bucket}</span>
+                          <ArrowRight size={12} className="text-subtle" />
+                          <span className="text-xs">{m.to_bucket}</span>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {!notice && !movements && deviceTransferred && (
+                <div className="px-3 py-2 rounded-md bg-info/5 border border-info/20 text-sm">
+                  {t('contract.action_transfer_accept_done_deviceTransferred', { defaultValue: 'Device ownership transferred to new branch.' })}
+                </div>
+              )}
+            </>
+          }
+          onClose={onClose}
+        />
+      );
+    }
+
+    case 'transfer_cancel': {
+      return (
+        <ActionDoneView
+          headline={t('contract.action_transfer_cancel_done_headline', { defaultValue: 'Transfer cancelled' })}
+          contractCode={contractCode}
+          tone="neutral"
+          extras={
+            <div className="alert alert-info">
+              <Info size={16} />
+              <span className="text-xs">
+                {t('contract.action_transfer_cancel_done_hint', {
+                  defaultValue: 'The pending transfer was cancelled. The contract remains at its current branch.',
+                })}
+              </span>
+            </div>
+          }
+          onClose={onClose}
+        />
+      );
+    }
+
+    case 'unbind_device': {
+      const movements = (result.asset_movements ?? null) as AssetMovementForAction[] | null;
+      return (
+        <ActionDoneView
+          headline={t('contract.action_unbind_device_done_headline', { defaultValue: 'Device unbound' })}
+          contractCode={contractCode}
+          tone="neutral"
+          detailRows={result.reason ? [
+            { label: t('contract.reason', { defaultValue: 'Reason' }), value: String(result.reason) },
+          ] : undefined}
+          extras={
+            movements && movements.length > 0 ? (
+              <div className="px-3 py-2.5 rounded-md bg-info/5 border border-info/20">
+                <div className="text-xs text-subtle mb-1.5">
+                  {t('contract.action_unbind_device_done_device', { defaultValue: 'Device returned to inventory' })}
+                </div>
+                {movements.map((m, i) => (
+                  <div key={m.txn_id ?? i} className="flex items-center gap-2 text-sm">
+                    <span className="font-medium">{m.asset_code ?? `asset #${m.asset_id}`}</span>
+                    {m.from_bucket && m.to_bucket && (
+                      <>
+                        <span className="text-xs text-subtle">{m.from_bucket}</span>
+                        <ArrowRight size={12} className="text-subtle" />
+                        <span className="text-xs">{m.to_bucket}</span>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : null
+          }
+          onClose={onClose}
+        />
+      );
+    }
+
+    default:
+      return null;
+  }
 }
 
 // ── Saving Deposit Modal ─────────────────────────────────────────────────

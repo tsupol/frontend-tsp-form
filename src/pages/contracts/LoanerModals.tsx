@@ -4,6 +4,8 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { Button, Modal, Select, TextArea } from 'tsp-form';
 import { XCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import { ActionDoneView } from './ActionDoneView';
+import { useContractInvalidate } from './useContractInvalidate';
 
 interface LoanerAssetOption {
   asset_id: number;
@@ -151,34 +153,50 @@ export function BindLoanerModal({
 // Note: loaner asset stays in LOANED_OUT bucket until fn_inv_repair_route
 //       returns it to ON_HAND_AVAILABLE (RETURN) or WITH_CUSTOMER_ACTIVE (SWAP).
 
+interface UnbindLoanerResult {
+  contract_id: number;
+  loaner_device_id: number;
+  unbound: boolean;
+}
+
 export function UnbindLoanerModal({
-  open, onClose, onSuccess,
+  open, onClose, onSuccess: _onSuccess,
   contractId,
   loanerAssetCode,
 }: {
   open: boolean;
   onClose: () => void;
+  /** Parent's onSuccess (snackbar+close) — unused now; done view replaces it. Kept for prop-shape parity. */
   onSuccess: (msgKey: string) => void;
   contractId: number;
   loanerAssetCode?: string | null;
 }) {
   const { t } = useTranslation();
+  const invalidate = useContractInvalidate(contractId);
+  const [view, setView] = useState<'form' | 'done'>('form');
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
+  const [result, setResult] = useState<UnbindLoanerResult | null>(null);
 
   useEffect(() => {
     if (open) {
+      setView('form');
       setNote('');
       setError('');
+      setResult(null);
     }
   }, [open]);
 
   const mutation = useMutation({
-    mutationFn: () => apiClient.rpc('fn_contract_unbind_loaner', {
+    mutationFn: () => apiClient.rpc<UnbindLoanerResult>('fn_contract_unbind_loaner', {
       p_contract_id: contractId,
       p_note: note.trim() || undefined,
     }),
-    onSuccess: () => onSuccess('contract.action_unbind_loaner_success'),
+    onSuccess: (res) => {
+      setResult(res);
+      setView('done');
+      invalidate();
+    },
     onError: (err) => setApiError(err, t, setError),
   });
 
@@ -186,41 +204,65 @@ export function UnbindLoanerModal({
     <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
       <div className="flex flex-col overflow-hidden">
         <div className="modal-header">
-          <h2 className="modal-title">{t('contract.action_unbind_loaner')}</h2>
+          <h2 className="modal-title">
+            {view === 'done'
+              ? t('contract.action_unbind_loaner_done_title', { defaultValue: 'Loaner returned' })
+              : t('contract.action_unbind_loaner')}
+          </h2>
           <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
         </div>
-        <div className="modal-content">
-          {error && (
-            <div className="alert alert-danger mb-4 animate-pop-in">
-              <XCircle size={16} />
-              <span>{error}</span>
-            </div>
-          )}
 
-          {loanerAssetCode && (
-            <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
-              <div className="text-xs text-subtle">{t('contract.bindLoaner_currentLoaner')}</div>
-              <div className="font-medium text-sm">{loanerAssetCode}</div>
-            </div>
-          )}
+        {view === 'form' && (
+          <>
+            <div className="modal-content">
+              {error && (
+                <div className="alert alert-danger mb-4 animate-pop-in">
+                  <XCircle size={16} />
+                  <span>{error}</span>
+                </div>
+              )}
 
-          <div className="form-grid">
-            <div className="flex flex-col">
-              <label className="form-label">{t('contract.note')}</label>
-              <TextArea value={note} onChange={(e) => setNote(e.target.value)} rows={3} />
+              {loanerAssetCode && (
+                <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
+                  <div className="text-xs text-subtle">{t('contract.bindLoaner_currentLoaner')}</div>
+                  <div className="font-medium text-sm">{loanerAssetCode}</div>
+                </div>
+              )}
+
+              <div className="form-grid">
+                <div className="flex flex-col">
+                  <label className="form-label">{t('contract.note')}</label>
+                  <TextArea value={note} onChange={(e) => setNote(e.target.value)} rows={3} />
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-        <div className="modal-footer">
-          <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button
-            color="danger"
-            onClick={() => mutation.mutate()}
-            disabled={mutation.isPending}
-          >
-            {mutation.isPending ? t('common.loading') : t('contract.action_unbind_loaner')}
-          </Button>
-        </div>
+            <div className="modal-footer">
+              <Button onClick={onClose}>{t('common.cancel')}</Button>
+              <Button
+                color="danger"
+                onClick={() => mutation.mutate()}
+                disabled={mutation.isPending}
+              >
+                {mutation.isPending ? t('common.loading') : t('contract.action_unbind_loaner')}
+              </Button>
+            </div>
+          </>
+        )}
+
+        {view === 'done' && result && (
+          <ActionDoneView
+            headline={t('contract.action_unbind_loaner_done_headline', { defaultValue: 'Loaner returned' })}
+            contractCode={loanerAssetCode ?? `loaner #${result.loaner_device_id}`}
+            tone="neutral"
+            detailRows={[
+              {
+                label: t('contract.action_unbind_loaner_done_returned', { defaultValue: 'Returned to inventory' }),
+                value: loanerAssetCode ?? `#${result.loaner_device_id}`,
+              },
+            ]}
+            onClose={onClose}
+          />
+        )}
       </div>
     </Modal>
   );
