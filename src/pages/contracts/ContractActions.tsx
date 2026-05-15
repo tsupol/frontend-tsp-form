@@ -13,8 +13,9 @@ import { BindLoanerModal, UnbindLoanerModal } from './LoanerModals';
 import { RepairRequestModal } from './RepairRequestModal';
 import { AppointmentCreateModal, AppointmentCancelModal } from './AppointmentModals';
 import { RefundVoidModal } from './RefundVoidModal';
-import { BillReceipt } from './workspace/BillReceipt';
 import { TransferBranchModal } from './TransferBranchModal';
+import { ActionDoneView, type ActionDoneDetailRow } from './ActionDoneView';
+import { useContractInvalidate } from './useContractInvalidate';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -2053,7 +2054,7 @@ function PayInstallmentModal({ open, contract, onClose }: {
   onSuccess?: (msgKey: string, override?: ReactNode) => void;
 }) {
   const { t } = useTranslation();
-  const queryClient = useQueryClient();
+  const invalidate = useContractInvalidate(contract.id);
 
   const outstanding = contract.outstanding_amount ?? 0;
   const nextDue = contract.next_due_amount ?? contract.installment_amount ?? 0;
@@ -2078,7 +2079,6 @@ function PayInstallmentModal({ open, contract, onClose }: {
     paidCount: number;
     totalInstallments: number;
   } | null>(null);
-  const [showBill, setShowBill] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -2092,7 +2092,6 @@ function PayInstallmentModal({ open, contract, onClose }: {
       setView('form');
       setResult(null);
       setBeforeSnapshot(null);
-      setShowBill(false);
     }
   }, [open, nextDue, outstanding]);
 
@@ -2190,13 +2189,7 @@ function PayInstallmentModal({ open, contract, onClose }: {
       });
       setResult(res);
       setView('done');
-      // Refresh everything the contract panel and pages depend on
-      queryClient.invalidateQueries({ queryKey: ['contract-detail', contract.id] });
-      queryClient.invalidateQueries({ queryKey: ['contract-search'] });
-      queryClient.invalidateQueries({ queryKey: ['contract-installments', contract.id] });
-      queryClient.invalidateQueries({ queryKey: ['contract-txns', contract.id] });
-      queryClient.invalidateQueries({ queryKey: ['contract-payments', contract.id] });
-      queryClient.invalidateQueries({ queryKey: ['contract-actions', contract.id] });
+      invalidate();
     },
     onError: setApiError,
   });
@@ -2381,12 +2374,19 @@ function PayInstallmentModal({ open, contract, onClose }: {
           )}
 
           {view === 'done' && result && (
-            <PayInstallmentDoneView
-              result={result}
-              channel={channel}
-              before={beforeSnapshot}
-              after={contractAfter}
-              contractCodeDisplay={contract.code_display ?? contract.code}
+            <ActionDoneView
+              headline={t('contract.payInstallment_doneHeadline', { defaultValue: 'Payment recorded' })}
+              contractCode={contract.code_display ?? contract.code}
+              billId={result.bill_id}
+              detailRows={buildPayInstallmentDetailRows(result, channel, t)}
+              extras={
+                <PayInstallmentAfterSummary
+                  result={result}
+                  before={beforeSnapshot}
+                  after={contractAfter}
+                />
+              }
+              onClose={onClose}
             />
           )}
 
@@ -2402,50 +2402,44 @@ function PayInstallmentModal({ open, contract, onClose }: {
               </Button>
             </div>
           )}
-
-          {view === 'done' && (
-            <div className="modal-footer">
-              <Button variant="outline" onClick={() => setShowBill(true)}>
-                {t('contract.payInstallment_viewBill', { defaultValue: 'View bill' })}
-              </Button>
-              <Button color="primary" onClick={onClose}>
-                {t('common.done', { defaultValue: 'Done' })}
-              </Button>
-            </div>
-          )}
-        </div>
-      </Modal>
-
-      {/* Nested receipt modal (stacked on top of done view) */}
-      <Modal
-        open={showBill}
-        onClose={() => setShowBill(false)}
-        maxWidth="26rem"
-        width="100%"
-        ariaLabel={t('wizard.receipt_title')}
-      >
-        <div className="modal-content py-6 px-4" style={{ background: 'color-mix(in srgb, var(--color-fg) 6%, transparent)' }}>
-          {result && <BillReceipt billId={result.bill_id} />}
         </div>
       </Modal>
     </>
   );
 }
 
-// ── Pay Installment: Done view ────────────────────────────────────────────────
+// ── Pay Installment: detail rows + after-summary block ────────────────────────
 
-function PayInstallmentDoneView({
-  result,
-  channel,
+function buildPayInstallmentDetailRows(
+  result: PayInstallmentResult,
+  channel: InstallmentChannel,
+  t: ReturnType<typeof useTranslation>['t'],
+): ActionDoneDetailRow[] {
+  const rows: ActionDoneDetailRow[] = [
+    { label: t('contract.payInstallment_doneBill', { defaultValue: 'Bill' }), value: result.bill_code },
+    { label: t('contract.payInstallment_doneAmount', { defaultValue: 'Amount paid' }), value: fmtCurrency(result.amount), emphasis: true },
+    { label: t('contract.payInstallment_doneChannel', { defaultValue: 'Channel' }), value: t(`paymentMethod.${channel}`, { defaultValue: channel }) },
+  ];
+  if (result.credit_used > 0) {
+    rows.push({ label: t('contract.payInstallment_doneCreditUsed', { defaultValue: 'Credit auto-applied' }), value: fmtCurrency(result.credit_used) });
+  }
+  if (result.days_early != null && result.days_early > 0) {
+    rows.push({
+      label: t('contract.payInstallment_doneDaysEarly', { defaultValue: 'Paid early' }),
+      value: t('contract.payInstallment_doneDaysEarlyValue', { count: result.days_early, defaultValue: '{{count}} days' }),
+    });
+  }
+  return rows;
+}
+
+function PayInstallmentAfterSummary({
+  result: _result,
   before,
   after,
-  contractCodeDisplay,
 }: {
   result: PayInstallmentResult;
-  channel: InstallmentChannel;
   before: { outstanding: number; creditBalance: number; paidCount: number; totalInstallments: number } | null;
   after: ContractAfterPay | null | undefined;
-  contractCodeDisplay: string;
 }) {
   const { t } = useTranslation();
 
@@ -2462,49 +2456,8 @@ function PayInstallmentDoneView({
     before != null && newCredit != null ? newCredit - before.creditBalance : null;
 
   return (
-    <div className="modal-content">
-      <div className="flex flex-col items-center gap-2 pt-4 pb-2">
-        <CheckCircle size={48} className="text-success" />
-        <div className="text-lg font-semibold">
-          {t('contract.payInstallment_doneHeadline', { defaultValue: 'Payment recorded' })}
-        </div>
-        <div className="text-sm text-subtle">{contractCodeDisplay}</div>
-      </div>
-
-      {/* Receipt-style detail rows */}
-      <div className="mt-4 rounded-md border border-line overflow-hidden">
-        <DoneRow
-          label={t('contract.payInstallment_doneBill', { defaultValue: 'Bill' })}
-          value={result.bill_code}
-        />
-        <DoneRow
-          label={t('contract.payInstallment_doneAmount', { defaultValue: 'Amount paid' })}
-          value={fmtCurrency(result.amount)}
-          emphasis
-        />
-        <DoneRow
-          label={t('contract.payInstallment_doneChannel', { defaultValue: 'Channel' })}
-          value={t(`paymentMethod.${channel}`, { defaultValue: channel })}
-        />
-        {result.credit_used > 0 && (
-          <DoneRow
-            label={t('contract.payInstallment_doneCreditUsed', { defaultValue: 'Credit auto-applied' })}
-            value={fmtCurrency(result.credit_used)}
-          />
-        )}
-        {result.days_early != null && result.days_early > 0 && (
-          <DoneRow
-            label={t('contract.payInstallment_doneDaysEarly', { defaultValue: 'Paid early' })}
-            value={t('contract.payInstallment_doneDaysEarlyValue', {
-              count: result.days_early,
-              defaultValue: '{{count}} days',
-            })}
-          />
-        )}
-      </div>
-
-      {/* Before/after summary */}
-      <div className="mt-4 grid grid-cols-2 gap-3">
+    <>
+      <div className="grid grid-cols-2 gap-3">
         <div className="px-3 py-2.5 rounded-md bg-surface border border-line">
           <div className="text-xs text-subtle">{t('contract.outstanding')}</div>
           <div className="text-base font-semibold tabular-nums">
@@ -2549,15 +2502,6 @@ function PayInstallmentDoneView({
           <span>{t('contract.payInstallment_donePaidOff', { defaultValue: 'Contract fully paid — ready to complete.' })}</span>
         </div>
       )}
-    </div>
-  );
-}
-
-function DoneRow({ label, value, emphasis }: { label: string; value: string; emphasis?: boolean }) {
-  return (
-    <div className="flex items-center justify-between px-3 py-2 border-b border-line last:border-b-0">
-      <span className="text-sm text-subtle">{label}</span>
-      <span className={`text-sm tabular-nums ${emphasis ? 'font-semibold' : ''}`}>{value}</span>
-    </div>
+    </>
   );
 }

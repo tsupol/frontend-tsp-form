@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { Badge, Button, Modal, MaskedInput, Select, TextArea, Tooltip, useSnackbarContext } from 'tsp-form';
 import { CheckCircle, XCircle, PiggyBank, CreditCard, ShieldCheck, ArrowRight, ChevronsRight, Loader2, Plus, Trash2 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
@@ -9,7 +9,8 @@ import { fmtCurrency } from '../../lib/format';
 import { useWalletAvailable } from './wallet/useWallet';
 import { WalletActionForm } from './wallet/WalletActionModal';
 import type { WalletType, WalletAction } from './wallet/types';
-import { BillReceipt } from './workspace/BillReceipt';
+import { ActionDoneView, type ActionDoneDetailRow } from './ActionDoneView';
+import { useContractInvalidate } from './useContractInvalidate';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -175,7 +176,7 @@ type ReturnCondition = typeof RETURN_CONDITIONS[number];
 export function CompleteContractModal({ open, contract, action, onClose, onSuccess }: Props) {
   const { t } = useTranslation();
   const { addSnackbar } = useSnackbarContext();
-  const queryClient = useQueryClient();
+  const invalidate = useContractInvalidate(contract.id);
 
   const isEarlyPayoff = action.kind === 'complete' && action.closeReason === 'EARLY_PAYOFF';
   const initialView: View = isEarlyPayoff ? 'payoff' : 'wallets';
@@ -199,7 +200,6 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
   const [payoffBill, setPayoffBill] = useState<PayoffBillInfo | null>(null);
   const [completeResult, setCompleteResult] = useState<CompleteResult | TerminateResult | null>(null);
   const [beforeSnapshot, setBeforeSnapshot] = useState<CompleteBeforeSnapshot | null>(null);
-  const [showBill, setShowBill] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -216,7 +216,6 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
       setStep('');
       setPayoffBill(null);
       setCompleteResult(null);
-      setShowBill(false);
       setBeforeSnapshot(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -357,13 +356,7 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
     onSuccess: (result) => {
       setCompleteResult(result);
       setView('done');
-      // Invalidate so the contract panel behind reflects the new state when modal closes
-      queryClient.invalidateQueries({ queryKey: ['contract-detail', contract.id] });
-      queryClient.invalidateQueries({ queryKey: ['contract-search'] });
-      queryClient.invalidateQueries({ queryKey: ['contract-installments', contract.id] });
-      queryClient.invalidateQueries({ queryKey: ['contract-txns', contract.id] });
-      queryClient.invalidateQueries({ queryKey: ['contract-payments', contract.id] });
-      queryClient.invalidateQueries({ queryKey: ['contract-actions', contract.id] });
+      invalidate();
       // Note: parent onSuccess (which would add a snackbar) is intentionally not called.
       // The done view replaces that feedback — parent state is refreshed via invalidation.
     },
@@ -389,7 +382,6 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
   };
 
   return (
-    <>
     <Modal open={open} onClose={onClose} maxWidth="32rem" width="100%">
       <div className="flex flex-col overflow-hidden">
         <div className="modal-header">
@@ -536,27 +528,12 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
               payoffBill={payoffBill}
               before={beforeSnapshot}
               contractCodeDisplay={contract.code_display ?? contract.code}
-              onViewBill={() => setShowBill(true)}
               onClose={onClose}
             />
           )}
         </div>
       </div>
     </Modal>
-
-    {/* Nested receipt modal (stacked on top of done view) */}
-    <Modal
-      open={showBill}
-      onClose={() => setShowBill(false)}
-      maxWidth="26rem"
-      width="100%"
-      ariaLabel={t('wizard.receipt_title')}
-    >
-      <div className="modal-content py-6 px-4" style={{ background: 'color-mix(in srgb, var(--color-fg) 6%, transparent)' }}>
-        {payoffBill && <BillReceipt billId={payoffBill.bill_id} />}
-      </div>
-    </Modal>
-    </>
   );
 }
 
@@ -568,7 +545,6 @@ function DoneView({
   payoffBill,
   before,
   contractCodeDisplay,
-  onViewBill,
   onClose,
 }: {
   action: ClosureAction;
@@ -576,7 +552,8 @@ function DoneView({
   payoffBill: PayoffBillInfo | null;
   before: CompleteBeforeSnapshot | null;
   contractCodeDisplay: string;
-  onViewBill: () => void;
+  /** Unused — ActionDoneView's billId triggers the nested receipt modal. Kept for back-compat. */
+  onViewBill?: () => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -588,125 +565,109 @@ function DoneView({
   const insuranceApplied = isComplete ? (completeResult as CompleteResult).insurance_applied : null;
   const insuranceAmount = insuranceApplied?.applied_amount ?? 0;
 
+  // Build detail rows
+  const rows: ActionDoneDetailRow[] = [];
+  if (isEarlyPayoff && payoffBill) {
+    rows.push(
+      { label: t('contract.complete_done_bill', { defaultValue: 'Payoff bill' }), value: payoffBill.bill_code },
+      { label: t('contract.complete_done_payoffTotal', { defaultValue: 'Total paid' }), value: fmtCurrency(payoffBill.bill_total), emphasis: true },
+      { label: t('contract.complete_done_installmentsCleared', { defaultValue: 'Installments cleared' }), value: String(payoffBill.installments_count) },
+    );
+  } else if (isComplete && (completeResult as CompleteResult).early_payoff_amount != null) {
+    rows.push({
+      label: t('contract.complete_done_earlyPayoffAmount', { defaultValue: 'Early payoff amount' }),
+      value: fmtCurrency((completeResult as CompleteResult).early_payoff_amount ?? 0),
+      emphasis: true,
+    });
+  }
+  if (insuranceAmount > 0) {
+    rows.push({
+      label: t('contract.complete_done_insuranceApplied', { defaultValue: 'Insurance auto-applied' }),
+      value: fmtCurrency(insuranceAmount),
+    });
+  }
+  if (!isComplete && (completeResult as TerminateResult).return_condition) {
+    const rc = (completeResult as TerminateResult).return_condition!;
+    rows.push({
+      label: t('contract.return_condition', { defaultValue: 'Return condition' }),
+      value: t(`contract.return_condition_${rc}`, { defaultValue: rc }),
+    });
+  }
+  rows.push({
+    label: t('contract.complete_done_closeReason', { defaultValue: 'Close reason' }),
+    value: t(
+      isComplete
+        ? `contract.complete_reason_${(completeResult as CompleteResult).close_reason === 'EARLY_PAYOFF' ? 'earlyPayoff' : 'normal'}`
+        : `contract.terminate_reason_${completeResult.close_reason}`,
+      { defaultValue: completeResult.close_reason }
+    ),
+  });
+
   return (
-    <>
-      <div className="flex flex-col items-center gap-2 pt-2 pb-2 text-center">
-        <CheckCircle size={48} className="text-success" />
-        <div className="text-lg font-semibold">
-          {t(doneTitleKey(action), { defaultValue: 'Done' })}
-        </div>
-        <div className="text-sm text-subtle">{contractCodeDisplay}</div>
-      </div>
-
-      {/* State transition badge */}
-      <div className="mt-3 flex items-center justify-center gap-2 text-sm">
-        <Badge color="info" size="sm">{oldState}</Badge>
-        <ArrowRight size={14} className="text-subtle" />
-        <Badge color={newState === 'COMPLETED' ? 'success' : 'warning'} size="sm">{newState}</Badge>
-      </div>
-
-      {/* Detail rows */}
-      <div className="mt-4 rounded-md border border-line overflow-hidden">
-        {isEarlyPayoff && payoffBill && (
-          <>
-            <DoneDetailRow
-              label={t('contract.complete_done_bill', { defaultValue: 'Payoff bill' })}
-              value={payoffBill.bill_code}
-            />
-            <DoneDetailRow
-              label={t('contract.complete_done_payoffTotal', { defaultValue: 'Total paid' })}
-              value={fmtCurrency(payoffBill.bill_total)}
-              emphasis
-            />
-            <DoneDetailRow
-              label={t('contract.complete_done_installmentsCleared', { defaultValue: 'Installments cleared' })}
-              value={String(payoffBill.installments_count)}
-            />
-          </>
-        )}
-        {isComplete && (completeResult as CompleteResult).early_payoff_amount != null && !payoffBill && (
-          <DoneDetailRow
-            label={t('contract.complete_done_earlyPayoffAmount', { defaultValue: 'Early payoff amount' })}
-            value={fmtCurrency((completeResult as CompleteResult).early_payoff_amount ?? 0)}
-            emphasis
-          />
-        )}
-        {insuranceAmount > 0 && (
-          <DoneDetailRow
-            label={t('contract.complete_done_insuranceApplied', { defaultValue: 'Insurance auto-applied' })}
-            value={fmtCurrency(insuranceAmount)}
-          />
-        )}
-        {!isComplete && (completeResult as TerminateResult).return_condition && (
-          <DoneDetailRow
-            label={t('contract.return_condition', { defaultValue: 'Return condition' })}
-            value={t(`contract.return_condition_${(completeResult as TerminateResult).return_condition}`, {
-              defaultValue: (completeResult as TerminateResult).return_condition ?? '',
-            })}
-          />
-        )}
-        <DoneDetailRow
-          label={t('contract.complete_done_closeReason', { defaultValue: 'Close reason' })}
-          value={t(
-            isComplete
-              ? `contract.complete_reason_${(completeResult as CompleteResult).close_reason === 'EARLY_PAYOFF' ? 'earlyPayoff' : 'normal'}`
-              : `contract.terminate_reason_${completeResult.close_reason}`,
-            { defaultValue: completeResult.close_reason }
-          )}
+    <ActionDoneView
+      headline={t(doneTitleKey(action), { defaultValue: 'Done' })}
+      contractCode={contractCodeDisplay}
+      tone={newState === 'COMPLETED' ? 'success' : 'warning'}
+      stateTransition={{
+        from: oldState,
+        to: newState,
+        toColor: newState === 'COMPLETED' ? 'success' : 'warning',
+      }}
+      detailRows={rows}
+      billId={isEarlyPayoff && payoffBill ? payoffBill.bill_id : null}
+      extras={
+        <DeviceMovementsBlock
+          movements={movements}
+          deviceOwnershipTransferred={
+            isComplete && (completeResult as CompleteResult).device_ownership_transferred
+          }
         />
-      </div>
-
-      {/* Asset movement summary — what happened to the device */}
-      {movements && movements.length > 0 && (
-        <div className="mt-3 px-3 py-2.5 rounded-md bg-info/5 border border-info/20">
-          <div className="text-xs text-subtle mb-1.5">
-            {t('contract.complete_done_deviceMovement', { defaultValue: 'Device' })}
-          </div>
-          {movements.map((m, i) => (
-            <div key={m.txn_id ?? i} className="flex items-center gap-2 text-sm">
-              <span className="font-medium">{m.asset_code ?? `asset #${m.asset_id}`}</span>
-              {m.from_bucket && m.to_bucket && (
-                <>
-                  <span className="text-xs text-subtle">{m.from_bucket}</span>
-                  <ArrowRight size={12} className="text-subtle" />
-                  <span className="text-xs">{m.to_bucket}</span>
-                </>
-              )}
-              {m.to_owner_type && (
-                <Badge color="info" size="sm">{m.to_owner_type}</Badge>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-      {isComplete && (completeResult as CompleteResult).device_ownership_transferred && (!movements || movements.length === 0) && (
-        <div className="mt-3 px-3 py-2 rounded-md bg-info/5 border border-info/20 text-sm">
-          {t('contract.complete_done_deviceOwnershipTransferred', { defaultValue: 'Device ownership transferred to customer.' })}
-        </div>
-      )}
-
-      {/* Footer */}
-      <div className="mt-5 flex items-center justify-end gap-2">
-        {isEarlyPayoff && payoffBill && (
-          <Button variant="outline" onClick={onViewBill}>
-            {t('contract.complete_done_viewBill', { defaultValue: 'View bill' })}
-          </Button>
-        )}
-        <Button color="primary" onClick={onClose}>
-          {t('common.done', { defaultValue: 'Done' })}
-        </Button>
-      </div>
-    </>
+      }
+      onClose={onClose}
+    />
   );
 }
 
-function DoneDetailRow({ label, value, emphasis }: { label: string; value: string; emphasis?: boolean }) {
-  return (
-    <div className="flex items-center justify-between px-3 py-2 border-b border-line last:border-b-0">
-      <span className="text-sm text-subtle">{label}</span>
-      <span className={`text-sm tabular-nums ${emphasis ? 'font-semibold' : ''}`}>{value}</span>
-    </div>
-  );
+function DeviceMovementsBlock({
+  movements,
+  deviceOwnershipTransferred,
+}: {
+  movements: AssetMovement[] | null;
+  deviceOwnershipTransferred: boolean;
+}) {
+  const { t } = useTranslation();
+  if (movements && movements.length > 0) {
+    return (
+      <div className="px-3 py-2.5 rounded-md bg-info/5 border border-info/20">
+        <div className="text-xs text-subtle mb-1.5">
+          {t('contract.complete_done_deviceMovement', { defaultValue: 'Device' })}
+        </div>
+        {movements.map((m, i) => (
+          <div key={m.txn_id ?? i} className="flex items-center gap-2 text-sm">
+            <span className="font-medium">{m.asset_code ?? `asset #${m.asset_id}`}</span>
+            {m.from_bucket && m.to_bucket && (
+              <>
+                <span className="text-xs text-subtle">{m.from_bucket}</span>
+                <ArrowRight size={12} className="text-subtle" />
+                <span className="text-xs">{m.to_bucket}</span>
+              </>
+            )}
+            {m.to_owner_type && (
+              <Badge color="info" size="sm">{m.to_owner_type}</Badge>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  }
+  if (deviceOwnershipTransferred) {
+    return (
+      <div className="px-3 py-2 rounded-md bg-info/5 border border-info/20 text-sm">
+        {t('contract.complete_done_deviceOwnershipTransferred', { defaultValue: 'Device ownership transferred to customer.' })}
+      </div>
+    );
+  }
+  return null;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

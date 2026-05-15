@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Badge, Button, Input, Modal, Select, TextArea } from 'tsp-form';
-import { ArrowRight, CheckCircle, Info, XCircle } from 'lucide-react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { Button, Input, Modal, Select } from 'tsp-form';
+import { Info, XCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { BranchPinInput } from '../../components/BranchPinInput';
+import { ActionDoneView } from './ActionDoneView';
+import { useContractInvalidate } from './useContractInvalidate';
 
 interface ContractForTransfer {
   id: number;
@@ -38,7 +40,7 @@ interface Props {
 
 export function TransferBranchModal({ open, contract, onClose }: Props) {
   const { t } = useTranslation();
-  const queryClient = useQueryClient();
+  const invalidate = useContractInvalidate(contract.id);
 
   const [view, setView] = useState<'form' | 'done'>('form');
   const [toBranchId, setToBranchId] = useState<string | null>(null);
@@ -110,9 +112,7 @@ export function TransferBranchModal({ open, contract, onClose }: Props) {
     onSuccess: (res) => {
       setResult(res);
       setView('done');
-      queryClient.invalidateQueries({ queryKey: ['contract-detail', contract.id] });
-      queryClient.invalidateQueries({ queryKey: ['contract-search'] });
-      queryClient.invalidateQueries({ queryKey: ['contract-actions', contract.id] });
+      invalidate();
     },
     onError: setApiError,
   });
@@ -201,59 +201,44 @@ export function TransferBranchModal({ open, contract, onClose }: Props) {
         )}
 
         {view === 'done' && result && (
-          <>
-            <div className="modal-content">
-              <div className="flex flex-col items-center gap-2 pt-2 pb-2 text-center">
-                <CheckCircle size={48} className="text-success" />
-                <div className="text-lg font-semibold">
-                  {t('contract.transferBranch_doneHeadline', { defaultValue: 'Transfer initiated' })}
+          <ActionDoneView
+            headline={t('contract.transferBranch_doneHeadline', { defaultValue: 'Transfer initiated' })}
+            contractCode={contract.code_display ?? contract.code}
+            tone="warning"
+            stateTransition={{
+              from: fromBranchName || `#${contract.branch_id}`,
+              to: `${toBranchName} · ${t('contract.transferBranch_donePending', { defaultValue: 'Pending' })}`,
+              toColor: 'warning',
+            }}
+            extras={
+              <>
+                {result.notice && (
+                  <div className="px-3 py-2.5 rounded-md bg-info/5 border border-info/20 text-sm">
+                    {result.notice}
+                  </div>
+                )}
+                {!result.notice && result.has_device && result.device_identifier && (
+                  <div className="px-3 py-2.5 rounded-md bg-info/5 border border-info/20 text-sm">
+                    {t('contract.transferBranch_doneDeviceWillFollow', {
+                      device: result.device_identifier,
+                      branch: toBranchName,
+                      defaultValue: 'Device {{device}} will move to {{branch}} on acceptance.',
+                    })}
+                  </div>
+                )}
+                <div className="mt-3 alert alert-warning">
+                  <Info size={16} />
+                  <span className="text-xs">
+                    {t('contract.transferBranch_doneNextStep', {
+                      branch: toBranchName,
+                      defaultValue: 'Staff at {{branch}} must accept this transfer. Until then, the contract stays editable here.',
+                    })}
+                  </span>
                 </div>
-                <div className="text-sm text-subtle">{contract.code_display ?? contract.code}</div>
-              </div>
-
-              {/* Branch transition: from → to (PENDING) */}
-              <div className="mt-3 flex items-center justify-center gap-2 flex-wrap">
-                <Badge color="info" size="sm">{fromBranchName || `#${contract.branch_id}`}</Badge>
-                <ArrowRight size={14} className="text-subtle" />
-                <Badge color="warning" size="sm">
-                  {toBranchName} · {t('contract.transferBranch_donePending', { defaultValue: 'Pending' })}
-                </Badge>
-              </div>
-
-              {/* Device follow notice — server-supplied (Thai) */}
-              {result.notice && (
-                <div className="mt-4 px-3 py-2.5 rounded-md bg-info/5 border border-info/20 text-sm">
-                  {result.notice}
-                </div>
-              )}
-              {!result.notice && result.has_device && result.device_identifier && (
-                <div className="mt-4 px-3 py-2.5 rounded-md bg-info/5 border border-info/20 text-sm">
-                  {t('contract.transferBranch_doneDeviceWillFollow', {
-                    device: result.device_identifier,
-                    branch: toBranchName,
-                    defaultValue: 'Device {{device}} will move to {{branch}} on acceptance.',
-                  })}
-                </div>
-              )}
-
-              {/* Next-step hint */}
-              <div className="mt-3 alert alert-warning">
-                <Info size={16} />
-                <span className="text-xs">
-                  {t('contract.transferBranch_doneNextStep', {
-                    branch: toBranchName,
-                    defaultValue: 'Staff at {{branch}} must accept this transfer. Until then, the contract stays editable here.',
-                  })}
-                </span>
-              </div>
-            </div>
-
-            <div className="modal-footer">
-              <Button color="primary" onClick={onClose}>
-                {t('common.done', { defaultValue: 'Done' })}
-              </Button>
-            </div>
-          </>
+              </>
+            }
+            onClose={onClose}
+          />
         )}
       </div>
     </Modal>
