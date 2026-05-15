@@ -6,7 +6,6 @@ import { Button, Modal, Input, Select, TextArea, MaskedInput, Badge, Tooltip, Po
 import { CheckCircle, XCircle, Pencil, Plus, Trash2, Loader2, ChevronsRight, ChevronDown, ExternalLink, Wrench } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { fmtCurrency } from '../../lib/format';
-import { buildBillActionToast, type StandardBillResponse } from '../../lib/billActionToast';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { DateTime } from '../../components/DateTime';
 import { CompleteContractModal } from './CompleteContractModal';
@@ -14,6 +13,8 @@ import { BindLoanerModal, UnbindLoanerModal } from './LoanerModals';
 import { RepairRequestModal } from './RepairRequestModal';
 import { AppointmentCreateModal, AppointmentCancelModal } from './AppointmentModals';
 import { RefundVoidModal } from './RefundVoidModal';
+import { BillReceipt } from './workspace/BillReceipt';
+import { TransferBranchModal } from './TransferBranchModal';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -733,6 +734,7 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   const isAppointmentCreate = activeAction === 'appointment_create';
   const isAppointmentCancel = activeAction === 'appointment_cancel';
   const isRefundVoid = activeAction === 'settlement_refund_void';
+  const isTransferBranch = activeAction === 'transfer_branch';
 
   const handleSuccess = (msgKey: string, override?: ReactNode) => {
     setActiveAction(null);
@@ -784,12 +786,12 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
     .sort((a, b) => a.sort_order - b.sort_order);
 
   const primaryCodes = getPrimaryActionCodes(contract);
-  const primarySet = new Set(primaryCodes);
   // Preserve primaryCodes order so RESUME/PAY_INSTALLMENT etc. appear left-to-right consistently
   const primaryActions = primaryCodes
     .map(c => allowedActions.find(a => a.action_code === c))
     .filter((a): a is BackendContractAction => !!a);
-  const secondaryActions = allowedActions.filter(a => !primarySet.has(a.action_code));
+  // More menu shows every action — primaries are also listed here so staff have one consistent place to find any action
+  const secondaryActions = allowedActions;
 
   const groupedSecondary = secondaryActions.reduce<Record<string, BackendContractAction[]>>((acc, a) => {
     const cat = CATEGORY_OVERRIDE[a.action_code] ?? a.category;
@@ -1023,8 +1025,13 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
         onClose={() => setActiveAction(null)}
         onSuccess={handleSuccess}
       />
+      <TransferBranchModal
+        open={isTransferBranch}
+        contract={contract}
+        onClose={() => setActiveAction(null)}
+      />
       <ContractActionModal
-        open={!!activeAction && !isSavingDeposit && !isCancelSaving && !isEarlyPayoff && !isContinuePay && !isVoidBill && !isPayInstallment && !isComplete && !isTerminate && !isBindLoaner && !isUnbindLoaner && !isRepairRequest && !isAppointmentCreate && !isAppointmentCancel && !isRefundVoid}
+        open={!!activeAction && !isSavingDeposit && !isCancelSaving && !isEarlyPayoff && !isContinuePay && !isVoidBill && !isPayInstallment && !isComplete && !isTerminate && !isBindLoaner && !isUnbindLoaner && !isRepairRequest && !isAppointmentCreate && !isAppointmentCancel && !isRefundVoid && !isTransferBranch}
         action={activeAction}
         contract={contract}
         onClose={() => setActiveAction(null)}
@@ -2015,13 +2022,38 @@ function PendingPaymentModal({ open, contract, onClose, onSuccess }: {
 
 type InstallmentChannel = 'CASH' | 'TRANSFER' | 'SAVING_WALLET' | 'CREDIT_WALLET' | 'INSURANCE_WALLET';
 
-function PayInstallmentModal({ open, contract, onClose, onSuccess }: {
+interface PayInstallmentResult {
+  bill_payment_id: number;
+  bill_id: number;
+  bill_code: string;
+  bill_type: 'INVOICE';
+  bill_purpose: string;
+  total_amount: number;
+  amount: number;
+  credit_used: number;
+  days_early: number | null;
+}
+
+interface ContractAfterPay {
+  id: number;
+  outstanding_amount: number | null;
+  credit_balance: number | null;
+  paid_installment_count: number | null;
+  total_installments: number | null;
+  next_due_amount: number | null;
+  next_due_date: string | null;
+  state: string;
+}
+
+function PayInstallmentModal({ open, contract, onClose }: {
   open: boolean;
   contract: ContractForActions;
   onClose: () => void;
-  onSuccess: (msgKey: string, override?: ReactNode) => void;
+  /** Unused by this modal — success is shown in-modal. Kept for prop-shape parity with other action modals. */
+  onSuccess?: (msgKey: string, override?: ReactNode) => void;
 }) {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
 
   const outstanding = contract.outstanding_amount ?? 0;
   const nextDue = contract.next_due_amount ?? contract.installment_amount ?? 0;
@@ -2030,6 +2062,7 @@ function PayInstallmentModal({ open, contract, onClose, onSuccess }: {
   const insuranceBalance = contract.insurance_balance ?? 0;
   const unpaidCount = Math.max(0, (contract.total_installments ?? 0) - (contract.paid_installment_count ?? 0));
 
+  const [view, setView] = useState<'form' | 'done'>('form');
   const [amount, setAmount] = useState('');
   const [channel, setChannel] = useState<InstallmentChannel>('CASH');
   const [bankAccountId, setBankAccountId] = useState<string | null>(null);
@@ -2037,6 +2070,15 @@ function PayInstallmentModal({ open, contract, onClose, onSuccess }: {
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
   const [errorKey, setErrorKey] = useState(0);
+  const [result, setResult] = useState<PayInstallmentResult | null>(null);
+  // Snapshot the contract state at submit time so the done view can show before→after deltas
+  const [beforeSnapshot, setBeforeSnapshot] = useState<{
+    outstanding: number;
+    creditBalance: number;
+    paidCount: number;
+    totalInstallments: number;
+  } | null>(null);
+  const [showBill, setShowBill] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -2047,8 +2089,22 @@ function PayInstallmentModal({ open, contract, onClose, onSuccess }: {
       setReference('');
       setNote('');
       setError('');
+      setView('form');
+      setResult(null);
+      setBeforeSnapshot(null);
+      setShowBill(false);
     }
   }, [open, nextDue, outstanding]);
+
+  // After success, re-fetch the contract row to show new outstanding / credit / paid count
+  const { data: contractAfter } = useQuery({
+    queryKey: ['contract-after-pay', contract.id, result?.bill_id],
+    queryFn: () => apiClient.get<ContractAfterPay[]>(
+      `/v_contracts?id=eq.${contract.id}&select=id,outstanding_amount,credit_balance,paid_installment_count,total_installments,next_due_amount,next_due_date,state`,
+    ).then(rows => rows[0] ?? null),
+    enabled: view === 'done' && result != null,
+    staleTime: 0,
+  });
 
   const { data: bankAccounts } = useQuery({
     queryKey: ['bank-accounts-active'],
@@ -2116,7 +2172,7 @@ function PayInstallmentModal({ open, contract, onClose, onSuccess }: {
   };
 
   const mutation = useMutation({
-    mutationFn: () => apiClient.rpc<Partial<StandardBillResponse>>('fn_contract_installment_pay', {
+    mutationFn: () => apiClient.rpc<PayInstallmentResult>('fn_contract_installment_pay', {
       p_contract_id: contract.id,
       p_amount: parsedAmount,
       p_channel: channel,
@@ -2125,12 +2181,23 @@ function PayInstallmentModal({ open, contract, onClose, onSuccess }: {
       p_reference: reference.trim() || null,
       p_note: note.trim() || null,
     }),
-    onSuccess: (result) => onSuccess(
-      'contract.action_pay_installment_success',
-      buildBillActionToast(result, t, {
-        actionLabel: t('contract.action_pay_installment_success'),
-      }),
-    ),
+    onSuccess: (res) => {
+      setBeforeSnapshot({
+        outstanding,
+        creditBalance,
+        paidCount: contract.paid_installment_count ?? 0,
+        totalInstallments: contract.total_installments ?? 0,
+      });
+      setResult(res);
+      setView('done');
+      // Refresh everything the contract panel and pages depend on
+      queryClient.invalidateQueries({ queryKey: ['contract-detail', contract.id] });
+      queryClient.invalidateQueries({ queryKey: ['contract-search'] });
+      queryClient.invalidateQueries({ queryKey: ['contract-installments', contract.id] });
+      queryClient.invalidateQueries({ queryKey: ['contract-txns', contract.id] });
+      queryClient.invalidateQueries({ queryKey: ['contract-payments', contract.id] });
+      queryClient.invalidateQueries({ queryKey: ['contract-actions', contract.id] });
+    },
     onError: setApiError,
   });
 
@@ -2141,182 +2208,356 @@ function PayInstallmentModal({ open, contract, onClose, onSuccess }: {
     return true;
   })();
 
-  return (
-    <Modal open={open} onClose={onClose} maxWidth="30rem" width="100%">
-      <div className="flex flex-col overflow-hidden">
-        <div className="modal-header">
-          <h2 className="modal-title">{t('contract.payInstallment_title')}</h2>
-          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
-        </div>
-        <div className="modal-content">
-          {error && (
-            <div key={errorKey} className="alert alert-danger mb-4 animate-pop-in">
-              <XCircle size={16} />
-              <span>{error}</span>
-            </div>
-          )}
+  const titleKey = view === 'done' ? 'contract.payInstallment_doneTitle' : 'contract.payInstallment_title';
 
-          {/* Contract info summary */}
-          <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
-            <div className="font-medium text-sm">{contract.code_display ?? contract.code}</div>
-            <div className="text-xs text-subtle">{contract.state} · {contract.commercial_model ?? ''}</div>
+  return (
+    <>
+      <Modal open={open} onClose={onClose} maxWidth="30rem" width="100%">
+        <div className="flex flex-col overflow-hidden">
+          <div className="modal-header">
+            <h2 className="modal-title">{t(titleKey, { defaultValue: view === 'done' ? 'Payment recorded' : 'Pay Installment' })}</h2>
+            <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
           </div>
 
-          {/* Outstanding summary */}
-          <div className="mb-4 grid grid-cols-2 gap-3">
-            <div className="px-3 py-2.5 rounded-md bg-warning/10 border border-warning/20">
-              <div className="text-xs text-subtle">{t('contract.outstanding')}</div>
-              <div className="text-base font-semibold tabular-nums">{fmtCurrency(outstanding)}</div>
-              <div className="text-xs text-subtle mt-0.5">
-                {contract.paid_installment_count ?? 0}/{contract.total_installments ?? 0} {t('contract.payInstallment_paid')}
-              </div>
-            </div>
-            <div className="px-3 py-2.5 rounded-md bg-info/10 border border-info/20">
-              <div className="text-xs text-subtle">{t('contract.payInstallment_nextDue')}</div>
-              <div className="text-base font-semibold tabular-nums">{fmtCurrency(nextDue)}</div>
-              {contract.next_due_date && (
-                <div className="text-xs text-subtle mt-0.5">
-                  <DateTime value={contract.next_due_date} showTime={false} />
+          {view === 'form' && (
+            <div className="modal-content">
+              {error && (
+                <div key={errorKey} className="alert alert-danger mb-4 animate-pop-in">
+                  <XCircle size={16} />
+                  <span>{error}</span>
                 </div>
               )}
-            </div>
-          </div>
 
-          {/* Wallet balances */}
-          {(creditBalance > 0 || savingBalance > 0 || insuranceBalance > 0) && (
-            <div className="mb-4">
-              <div className="text-xs text-subtle mb-1">{t('contract.payInstallment_walletsAvailable')}</div>
-              <div className="flex flex-wrap gap-2">
-                {creditBalance > 0 && (
-                  <Badge color="info" size="sm">
-                    {t('paymentMethod.CREDIT_WALLET')}: {fmtCurrency(creditBalance)}
-                  </Badge>
-                )}
-                {savingBalance > 0 && (
-                  <Badge color="info" size="sm">
-                    {t('paymentMethod.SAVING_WALLET')}: {fmtCurrency(savingBalance)}
-                  </Badge>
-                )}
-                {insuranceBalance > 0 && (
-                  <Badge color="info" size="sm">
-                    {t('paymentMethod.INSURANCE_WALLET')}: {fmtCurrency(insuranceBalance)}
-                  </Badge>
-                )}
+              {/* Contract info summary */}
+              <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
+                <div className="font-medium text-sm">{contract.code_display ?? contract.code}</div>
+                <div className="text-xs text-subtle">{contract.state} · {contract.commercial_model ?? ''}</div>
               </div>
-            </div>
-          )}
 
-          <div className="form-grid">
-            <div className="flex flex-col">
-              <label className="form-label">{t('contract.payInstallment_channel')} / {t('contract.amount')} *</label>
-              <div className="input-group">
-                <div className="w-40 shrink-0">
-                  <Select
-                    options={channelOptions}
-                    value={channel}
-                    onChange={(val) => {
-                      setChannel(val as InstallmentChannel);
-                      setBankAccountId(null);
-                    }}
-                    searchable={false}
+              {/* Outstanding summary */}
+              <div className="mb-4 grid grid-cols-2 gap-3">
+                <div className="px-3 py-2.5 rounded-md bg-warning/10 border border-warning/20">
+                  <div className="text-xs text-subtle">{t('contract.outstanding')}</div>
+                  <div className="text-base font-semibold tabular-nums">{fmtCurrency(outstanding)}</div>
+                  <div className="text-xs text-subtle mt-0.5">
+                    {contract.paid_installment_count ?? 0}/{contract.total_installments ?? 0} {t('contract.payInstallment_paid')}
+                  </div>
+                </div>
+                <div className="px-3 py-2.5 rounded-md bg-info/10 border border-info/20">
+                  <div className="text-xs text-subtle">{t('contract.payInstallment_nextDue')}</div>
+                  <div className="text-base font-semibold tabular-nums">{fmtCurrency(nextDue)}</div>
+                  {contract.next_due_date && (
+                    <div className="text-xs text-subtle mt-0.5">
+                      <DateTime value={contract.next_due_date} showTime={false} />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Wallet balances */}
+              {(creditBalance > 0 || savingBalance > 0 || insuranceBalance > 0) && (
+                <div className="mb-4">
+                  <div className="text-xs text-subtle mb-1">{t('contract.payInstallment_walletsAvailable')}</div>
+                  <div className="flex flex-wrap gap-2">
+                    {creditBalance > 0 && (
+                      <Badge color="info" size="sm">
+                        {t('paymentMethod.CREDIT_WALLET')}: {fmtCurrency(creditBalance)}
+                      </Badge>
+                    )}
+                    {savingBalance > 0 && (
+                      <Badge color="info" size="sm">
+                        {t('paymentMethod.SAVING_WALLET')}: {fmtCurrency(savingBalance)}
+                      </Badge>
+                    )}
+                    {insuranceBalance > 0 && (
+                      <Badge color="info" size="sm">
+                        {t('paymentMethod.INSURANCE_WALLET')}: {fmtCurrency(insuranceBalance)}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="form-grid">
+                <div className="flex flex-col">
+                  <label className="form-label">{t('contract.payInstallment_channel')} / {t('contract.amount')} *</label>
+                  <div className="input-group">
+                    <div className="w-40 shrink-0">
+                      <Select
+                        options={channelOptions}
+                        value={channel}
+                        onChange={(val) => {
+                          setChannel(val as InstallmentChannel);
+                          setBankAccountId(null);
+                        }}
+                        searchable={false}
+                      />
+                    </div>
+                    <div className="input-group-divider" />
+                    <MaskedInput
+                      mask="number"
+                      decimalScale={2}
+                      value={amount}
+                      onChange={(raw) => setAmount(raw)}
+                      placeholder="0.00"
+                      className="w-full"
+                      autoFocus
+                      endIcon={<ChevronsRight size={14} />}
+                      onEndIconClick={() => {
+                        const fill = nextDue > 0 ? nextDue : (outstanding > 0 ? outstanding : 0);
+                        if (fill > 0) setAmount(String(fill));
+                      }}
+                    />
+                  </div>
+                  {walletExceeded && (
+                    <div className="text-xs text-danger mt-1">
+                      {t('contract.payInstallment_walletExceeded', {
+                        balance: fmtCurrency(walletBalance),
+                        defaultValue: 'Amount exceeds wallet balance ({{balance}})',
+                      })}
+                    </div>
+                  )}
+                  {(channel === 'CASH' || channel === 'TRANSFER') && autoCredit > 0 && (
+                    <div className="text-xs text-subtle mt-1">
+                      {t('contract.payInstallment_autoCreditHint', {
+                        credit: fmtCurrency(autoCredit),
+                        cash: fmtCurrency(cashRequired),
+                        defaultValue: 'Credit auto-applied: {{credit}} → cash required: {{cash}}',
+                      })}
+                    </div>
+                  )}
+                  {channel === 'INSURANCE_WALLET' && unpaidCount !== 1 && (
+                    <div className="text-xs text-warning-fg mt-1">
+                      {t('contract.payInstallment_insuranceLastOnly', {
+                        defaultValue: 'Insurance wallet can only be used for the last installment',
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {channel === 'TRANSFER' && (
+                  <div className="flex flex-col">
+                    <label className="form-label">{t('wizard.bankAccount')} *</label>
+                    <Select
+                      options={bankOptions}
+                      value={bankAccountId}
+                      onChange={(val) => setBankAccountId((val as string) || null)}
+                      placeholder={t('wizard.selectBankAccount')}
+                      showChevron
+                      searchable
+                    />
+                  </div>
+                )}
+
+                <div className="flex flex-col">
+                  <label className="form-label">{t('contract.payInstallment_reference')}</label>
+                  <Input
+                    value={reference}
+                    onChange={(e) => setReference(e.target.value)}
+                    placeholder={t('contract.payInstallment_referencePlaceholder', {
+                      defaultValue: 'Slip number / reference (optional)',
+                    })}
+                    className="w-full"
                   />
                 </div>
-                <div className="input-group-divider" />
-                <MaskedInput
-                  mask="number"
-                  decimalScale={2}
-                  value={amount}
-                  onChange={(raw) => setAmount(raw)}
-                  placeholder="0.00"
-                  className="w-full"
-                  autoFocus
-                  endIcon={<ChevronsRight size={14} />}
-                  onEndIconClick={() => {
-                    const fill = nextDue > 0 ? nextDue : (outstanding > 0 ? outstanding : 0);
-                    if (fill > 0) setAmount(String(fill));
-                  }}
-                />
+
+                <div className="flex flex-col">
+                  <label className="form-label">{t('contract.note')}</label>
+                  <TextArea
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder={t('contract.notePlaceholder')}
+                    rows={2}
+                  />
+                </div>
               </div>
-              {walletExceeded && (
-                <div className="text-xs text-danger mt-1">
-                  {t('contract.payInstallment_walletExceeded', {
-                    balance: fmtCurrency(walletBalance),
-                    defaultValue: 'Amount exceeds wallet balance ({{balance}})',
-                  })}
-                </div>
-              )}
-              {(channel === 'CASH' || channel === 'TRANSFER') && autoCredit > 0 && (
-                <div className="text-xs text-subtle mt-1">
-                  {t('contract.payInstallment_autoCreditHint', {
-                    credit: fmtCurrency(autoCredit),
-                    cash: fmtCurrency(cashRequired),
-                    defaultValue: 'Credit auto-applied: {{credit}} → cash required: {{cash}}',
-                  })}
-                </div>
-              )}
-              {channel === 'INSURANCE_WALLET' && unpaidCount !== 1 && (
-                <div className="text-xs text-warning-fg mt-1">
-                  {t('contract.payInstallment_insuranceLastOnly', {
-                    defaultValue: 'Insurance wallet can only be used for the last installment',
-                  })}
-                </div>
-              )}
-            </div>
 
-            {channel === 'TRANSFER' && (
-              <div className="flex flex-col">
-                <label className="form-label">{t('wizard.bankAccount')} *</label>
-                <Select
-                  options={bankOptions}
-                  value={bankAccountId}
-                  onChange={(val) => setBankAccountId((val as string) || null)}
-                  placeholder={t('wizard.selectBankAccount')}
-                  showChevron
-                  searchable
-                />
+              <div className="alert alert-info mt-4">
+                <span className="text-xs">{t('contract.payInstallment_fifoHint', {
+                  defaultValue: 'Overpayment goes to credit · Underpayment is partial (FIFO oldest first)',
+                })}</span>
               </div>
-            )}
-
-            <div className="flex flex-col">
-              <label className="form-label">{t('contract.payInstallment_reference')}</label>
-              <Input
-                value={reference}
-                onChange={(e) => setReference(e.target.value)}
-                placeholder={t('contract.payInstallment_referencePlaceholder', {
-                  defaultValue: 'Slip number / reference (optional)',
-                })}
-                className="w-full"
-              />
             </div>
+          )}
 
-            <div className="flex flex-col">
-              <label className="form-label">{t('contract.note')}</label>
-              <TextArea
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder={t('contract.notePlaceholder')}
-                rows={2}
-              />
+          {view === 'done' && result && (
+            <PayInstallmentDoneView
+              result={result}
+              channel={channel}
+              before={beforeSnapshot}
+              after={contractAfter}
+              contractCodeDisplay={contract.code_display ?? contract.code}
+            />
+          )}
+
+          {view === 'form' && (
+            <div className="modal-footer">
+              <Button onClick={onClose}>{t('common.cancel')}</Button>
+              <Button
+                color="primary"
+                onClick={() => mutation.mutate()}
+                disabled={!canSubmit || mutation.isPending}
+              >
+                {mutation.isPending ? t('common.loading') : t('contract.action_pay_installment')}
+              </Button>
             </div>
-          </div>
+          )}
 
-          <div className="alert alert-info mt-4">
-            <span className="text-xs">{t('contract.payInstallment_fifoHint', {
-              defaultValue: 'Overpayment goes to credit · Underpayment is partial (FIFO oldest first)',
-            })}</span>
-          </div>
+          {view === 'done' && (
+            <div className="modal-footer">
+              <Button variant="outline" onClick={() => setShowBill(true)}>
+                {t('contract.payInstallment_viewBill', { defaultValue: 'View bill' })}
+              </Button>
+              <Button color="primary" onClick={onClose}>
+                {t('common.done', { defaultValue: 'Done' })}
+              </Button>
+            </div>
+          )}
         </div>
-        <div className="modal-footer">
-          <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button
-            color="primary"
-            onClick={() => mutation.mutate()}
-            disabled={!canSubmit || mutation.isPending}
-          >
-            {mutation.isPending ? t('common.loading') : t('contract.action_pay_installment')}
-          </Button>
+      </Modal>
+
+      {/* Nested receipt modal (stacked on top of done view) */}
+      <Modal
+        open={showBill}
+        onClose={() => setShowBill(false)}
+        maxWidth="26rem"
+        width="100%"
+        ariaLabel={t('wizard.receipt_title')}
+      >
+        <div className="modal-content py-6 px-4" style={{ background: 'color-mix(in srgb, var(--color-fg) 6%, transparent)' }}>
+          {result && <BillReceipt billId={result.bill_id} />}
+        </div>
+      </Modal>
+    </>
+  );
+}
+
+// ── Pay Installment: Done view ────────────────────────────────────────────────
+
+function PayInstallmentDoneView({
+  result,
+  channel,
+  before,
+  after,
+  contractCodeDisplay,
+}: {
+  result: PayInstallmentResult;
+  channel: InstallmentChannel;
+  before: { outstanding: number; creditBalance: number; paidCount: number; totalInstallments: number } | null;
+  after: ContractAfterPay | null | undefined;
+  contractCodeDisplay: string;
+}) {
+  const { t } = useTranslation();
+
+  const newOutstanding = after?.outstanding_amount ?? null;
+  const newCredit = after?.credit_balance ?? null;
+  const newPaidCount = after?.paid_installment_count ?? null;
+  const totalInstallments = after?.total_installments ?? before?.totalInstallments ?? 0;
+  const isLoadingAfter = after === undefined;
+  const paidOff = newOutstanding === 0 && (newPaidCount ?? 0) >= totalInstallments && totalInstallments > 0;
+
+  const installmentsCleared =
+    before != null && newPaidCount != null ? Math.max(0, newPaidCount - before.paidCount) : null;
+  const creditDelta =
+    before != null && newCredit != null ? newCredit - before.creditBalance : null;
+
+  return (
+    <div className="modal-content">
+      <div className="flex flex-col items-center gap-2 pt-4 pb-2">
+        <CheckCircle size={48} className="text-success" />
+        <div className="text-lg font-semibold">
+          {t('contract.payInstallment_doneHeadline', { defaultValue: 'Payment recorded' })}
+        </div>
+        <div className="text-sm text-subtle">{contractCodeDisplay}</div>
+      </div>
+
+      {/* Receipt-style detail rows */}
+      <div className="mt-4 rounded-md border border-line overflow-hidden">
+        <DoneRow
+          label={t('contract.payInstallment_doneBill', { defaultValue: 'Bill' })}
+          value={result.bill_code}
+        />
+        <DoneRow
+          label={t('contract.payInstallment_doneAmount', { defaultValue: 'Amount paid' })}
+          value={fmtCurrency(result.amount)}
+          emphasis
+        />
+        <DoneRow
+          label={t('contract.payInstallment_doneChannel', { defaultValue: 'Channel' })}
+          value={t(`paymentMethod.${channel}`, { defaultValue: channel })}
+        />
+        {result.credit_used > 0 && (
+          <DoneRow
+            label={t('contract.payInstallment_doneCreditUsed', { defaultValue: 'Credit auto-applied' })}
+            value={fmtCurrency(result.credit_used)}
+          />
+        )}
+        {result.days_early != null && result.days_early > 0 && (
+          <DoneRow
+            label={t('contract.payInstallment_doneDaysEarly', { defaultValue: 'Paid early' })}
+            value={t('contract.payInstallment_doneDaysEarlyValue', {
+              count: result.days_early,
+              defaultValue: '{{count}} days',
+            })}
+          />
+        )}
+      </div>
+
+      {/* Before/after summary */}
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <div className="px-3 py-2.5 rounded-md bg-surface border border-line">
+          <div className="text-xs text-subtle">{t('contract.outstanding')}</div>
+          <div className="text-base font-semibold tabular-nums">
+            {isLoadingAfter ? <span className="text-subtle">…</span> : fmtCurrency(newOutstanding ?? 0)}
+          </div>
+          {before != null && newOutstanding != null && (
+            <div className="text-xs text-subtle mt-0.5">
+              {t('contract.payInstallment_doneFrom', { defaultValue: 'from' })} {fmtCurrency(before.outstanding)}
+            </div>
+          )}
+        </div>
+        <div className="px-3 py-2.5 rounded-md bg-surface border border-line">
+          <div className="text-xs text-subtle">{t('contract.payInstallment_paid')}</div>
+          <div className="text-base font-semibold tabular-nums">
+            {isLoadingAfter ? <span className="text-subtle">…</span> : `${newPaidCount ?? 0}/${totalInstallments}`}
+          </div>
+          {installmentsCleared != null && installmentsCleared > 0 && (
+            <div className="text-xs text-success mt-0.5">
+              +{installmentsCleared} {t('contract.payInstallment_doneCleared', { defaultValue: 'cleared' })}
+            </div>
+          )}
         </div>
       </div>
-    </Modal>
+
+      {creditDelta != null && creditDelta !== 0 && (
+        <div className="mt-3 px-3 py-2.5 rounded-md bg-info/5 border border-info/20 flex items-center justify-between">
+          <span className="text-sm">{t('paymentMethod.CREDIT_WALLET')}</span>
+          <span className="text-sm tabular-nums">
+            {fmtCurrency(before?.creditBalance ?? 0)}
+            {' → '}
+            <span className="font-semibold">{fmtCurrency(newCredit ?? 0)}</span>
+            <span className={`ml-2 text-xs ${creditDelta > 0 ? 'text-success' : 'text-subtle'}`}>
+              ({creditDelta > 0 ? '+' : ''}{fmtCurrency(creditDelta)})
+            </span>
+          </span>
+        </div>
+      )}
+
+      {paidOff && (
+        <div className="alert alert-success mt-4">
+          <CheckCircle size={16} />
+          <span>{t('contract.payInstallment_donePaidOff', { defaultValue: 'Contract fully paid — ready to complete.' })}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DoneRow({ label, value, emphasis }: { label: string; value: string; emphasis?: boolean }) {
+  return (
+    <div className="flex items-center justify-between px-3 py-2 border-b border-line last:border-b-0">
+      <span className="text-sm text-subtle">{label}</span>
+      <span className={`text-sm tabular-nums ${emphasis ? 'font-semibold' : ''}`}>{value}</span>
+    </div>
   );
 }
