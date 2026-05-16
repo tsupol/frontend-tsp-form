@@ -3,9 +3,8 @@ import { useTranslation } from 'react-i18next';
 import type { UploadedImage } from 'tsp-form';
 import { CheckCircle, Upload } from 'lucide-react';
 import { useMediaUrl } from '../../../hooks/useMediaUrl';
-import type { Privacy } from '../../../lib/upload';
 
-export function SingleUpload({ icon, label, fileUrl, uploading, onUpload, disabled, cacheBust = 0, privacy = 'private' }: {
+export function SingleUpload({ icon, label, fileUrl, uploading, onUpload, disabled, cacheBust = 0 }: {
   icon: React.ReactNode;
   label: string;
   fileUrl: string | null;
@@ -13,9 +12,8 @@ export function SingleUpload({ icon, label, fileUrl, uploading, onUpload, disabl
   onUpload: (imgs: UploadedImage[]) => void;
   disabled?: boolean;
   cacheBust?: number;
-  privacy?: Privacy;
 }) {
-  const { url: displayUrl } = useMediaUrl(fileUrl, privacy, cacheBust);
+  const { url: displayUrl } = useMediaUrl(fileUrl, cacheBust);
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
 

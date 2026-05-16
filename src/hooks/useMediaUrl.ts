@@ -1,14 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ResizeOptions } from 'tsp-form';
-import {
-  getUploadSpec,
-  privateMediaUrl,
-  publicMediaUrl,
-  specToResize,
-  specToSizes,
-  type Privacy,
-  type UploadSpec,
-} from '../lib/upload';
+import { getUploadSpec, privateMediaUrl, specToResize, specToSizes, type UploadSpec } from '../lib/upload';
+import { getMediaPrivacy, publicMediaUrl } from '../lib/mediaPath';
 
 interface State {
   url: string | null;
@@ -18,20 +11,19 @@ interface State {
 
 /**
  * Resolve a storage key to a displayable URL.
- * - `public`: returns the direct R2 public URL synchronously.
- * - `private`: fetches a presigned URL (cached ~3.5h).
+ * Privacy is derived from the key prefix:
+ *   - "uploads/..." → public, returns the direct R2 URL synchronously
+ *   - "private/..." → private, fetches a presigned URL (cached ~3.5h)
  *
- * Pass `null`/`undefined` key to disable. Pass `cacheBust` to force a remount
+ * Pass `null`/`undefined` to disable. Pass `cacheBust` to force a remount
  * when the underlying file changed.
  */
-export function useMediaUrl(
-  key: string | null | undefined,
-  privacy: Privacy = 'private',
-  cacheBust: number = 0,
-): State {
+export function useMediaUrl(key: string | null | undefined, cacheBust: number = 0): State {
   const [state, setState] = useState<State>(() => {
     if (!key) return { url: null, loading: false, error: null };
+    const privacy = getMediaPrivacy(key);
     if (privacy === 'public') return { url: publicMediaUrl(key), loading: false, error: null };
+    if (privacy === null) return { url: null, loading: false, error: 'unknown_prefix' };
     return { url: null, loading: true, error: null };
   });
 
@@ -40,8 +32,13 @@ export function useMediaUrl(
       setState({ url: null, loading: false, error: null });
       return;
     }
+    const privacy = getMediaPrivacy(key);
     if (privacy === 'public') {
       setState({ url: publicMediaUrl(key), loading: false, error: null });
+      return;
+    }
+    if (privacy === null) {
+      setState({ url: null, loading: false, error: 'unknown_prefix' });
       return;
     }
 
@@ -57,7 +54,7 @@ export function useMediaUrl(
     return () => {
       cancelled = true;
     };
-  }, [key, privacy, cacheBust]);
+  }, [key, cacheBust]);
 
   return state;
 }
@@ -78,4 +75,3 @@ export function useUploadSpec(type: string): UseUploadSpec {
   }, [type]);
   return { spec, resize: specToResize(spec), sizes: specToSizes(spec) };
 }
-

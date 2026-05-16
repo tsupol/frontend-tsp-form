@@ -199,7 +199,7 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
     try {
       await apiClient.rpc('fn_media_detach', { p_entity_media_id: entityMediaId });
       if (media?.storage_path) {
-        deleteMedia({ private: [media.storage_path] }).catch(() => {});
+        deleteMedia([media.storage_path]).catch(() => {});
       }
       queryClient.invalidateQueries({ queryKey: ['contract-media', contractId] });
       invalidateDocs();
@@ -399,7 +399,7 @@ function GalleryThumb({ media, cacheBust, onDetach }: {
   cacheBust: number;
   onDetach: (id: number) => void;
 }) {
-  const { url } = useMediaUrl(media.storage_path, 'private', cacheBust);
+  const { url } = useMediaUrl(media.storage_path, cacheBust);
   return (
     <div className="relative group aspect-square rounded overflow-hidden border border-line">
       {url ? <img src={url} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-surface-shallow animate-pulse" />}

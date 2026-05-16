@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
-import { FlaskConical, PenLine } from 'lucide-react';
+import { FlaskConical, PenLine, Image } from 'lucide-react';
 
 const navItems = [
   { path: '/dev/signature', label: 'Signature Pad', icon: PenLine },
+  { path: '/dev/media', label: 'Media Viewer', icon: Image },
 ];
 
 export function DevLayout({ children }: { children: ReactNode }) {

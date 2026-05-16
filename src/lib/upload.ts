@@ -1,7 +1,7 @@
 import type { ResizeOptions, UploadedImage } from 'tsp-form';
 import { config } from '../config/config';
+import { normalizeKey, type MediaPrivacy } from './mediaPath';
 
-export type Privacy = 'public' | 'private';
 export type ResizeMode = 'contain' | 'cover';
 
 export interface SizeSpec {
@@ -11,7 +11,7 @@ export interface SizeSpec {
 
 export interface UploadSpec {
   type: string;
-  privacy: Privacy;
+  privacy: MediaPrivacy;
   content_type: string;
   resize_mode: ResizeMode;
   aspect_ratio?: string;
@@ -24,7 +24,7 @@ export interface UploadSpec {
 export interface UploadResult {
   key: string;
   bucket: string;
-  privacy: Privacy;
+  privacy: MediaPrivacy;
   url?: string;
 }
 
@@ -105,31 +105,19 @@ export async function uploadImageMulti(opts: MultiUploadOpts): Promise<Record<st
 }
 
 // ── Delete ────────────────────────────────────────────────────────────
-export interface DeleteKeys {
-  public?: string[];
-  private?: string[];
-}
-
-function stripLead(keys?: string[]): string[] | undefined {
-  if (!keys) return undefined;
-  return keys.map((k) => k.replace(/^\//, ''));
-}
-
-export async function deleteMedia(keys: DeleteKeys): Promise<void> {
-  const body: DeleteKeys = {};
-  if (keys.public?.length) body.public = stripLead(keys.public);
-  if (keys.private?.length) body.private = stripLead(keys.private);
-  if (!body.public && !body.private) return;
+export async function deleteMedia(keys: string[]): Promise<void> {
+  const normalized = keys.map(normalizeKey).filter((k) => k.length > 0);
+  if (normalized.length === 0) return;
   await call('/media', {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ keys: normalized }),
   });
 }
 
-// ── Media URL resolution ──────────────────────────────────────────────
-// Public: returns direct R2 public URL synchronously.
-// Private: returns presigned URL (server call), cached with TTL.
+// ── Private URL resolution (presigned) ────────────────────────────────
+// Public keys are resolved synchronously via publicMediaUrl() in mediaPath.ts.
+// Only private keys need to hit misc-go for a presigned URL.
 interface PresignCacheEntry {
   url: string;
   expiresAt: number;
@@ -138,13 +126,8 @@ const presignCache = new Map<string, PresignCacheEntry>();
 const presignInFlight = new Map<string, Promise<string>>();
 const CACHE_TTL_MS = 3.5 * 60 * 60 * 1000; // 3.5h, slightly below backend's 4h
 
-export function publicMediaUrl(key: string): string {
-  const k = key.replace(/^\//, '');
-  return `${config.r2PublicUrl}/${k}`;
-}
-
 export async function privateMediaUrl(key: string): Promise<string> {
-  const k = key.replace(/^\//, '');
+  const k = normalizeKey(key);
   const cached = presignCache.get(k);
   if (cached && cached.expiresAt > Date.now()) return cached.url;
 
@@ -153,7 +136,7 @@ export async function privateMediaUrl(key: string): Promise<string> {
 
   inFlight = (async () => {
     const data = await call<{ url: string; expires_in: number }>(
-      `/media/url?key=${encodeURIComponent(k)}&privacy=private`,
+      `/media/url?key=${encodeURIComponent(k)}`,
     );
     presignCache.set(k, {
       url: data.url,
@@ -168,8 +151,7 @@ export async function privateMediaUrl(key: string): Promise<string> {
 }
 
 export function invalidateMediaUrl(key: string) {
-  const k = key.replace(/^\//, '');
-  presignCache.delete(k);
+  presignCache.delete(normalizeKey(key));
 }
 
 // ── tsp-form ImageUploader bridge ─────────────────────────────────────

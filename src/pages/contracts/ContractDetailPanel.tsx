@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Badge, Button, Input, Select, Modal, TextArea, Tooltip, useSnackbarContext } from 'tsp-form';
-import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Upload, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Upload, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, FileText, Wrench } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { ApiError } from '../../lib/api';
@@ -20,6 +20,7 @@ import { BillReceipt } from './workspace/BillReceipt';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { CustomerPickerModal } from './CustomerPickerModal';
 import { BranchPinInput } from '../../components/BranchPinInput';
+import { MediaLightbox, MediaThumbButton } from '../../components/MediaLightbox';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -450,7 +451,7 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
 
 function DeliveryPhotoThumb({ media }: { media: EntityMedia }) {
   const src = media.storage_path.sm || media.storage_path.md || media.storage_path.original;
-  const { url } = useMediaUrl(src ?? null, 'private');
+  const { url } = useMediaUrl(src ?? null);
   if (!src) return null;
   return url ? (
     <img
@@ -465,7 +466,7 @@ function DeliveryPhotoThumb({ media }: { media: EntityMedia }) {
 
 function MediaThumbnail({ media }: { media: EntityMedia }) {
   const src = media.storage_path.sm || media.storage_path.md || media.storage_path.original;
-  const { url } = useMediaUrl(src ?? null, 'private');
+  const { url } = useMediaUrl(src ?? null);
   if (!src) return null;
   return (
     <div className="relative group">
@@ -516,6 +517,66 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
     contract.device_id == null &&
     !contract.is_used_asset;
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [lightboxKey, setLightboxKey] = useState<string | null>(null);
+  const [lightboxAlt, setLightboxAlt] = useState<string>('');
+  const [printingPdf, setPrintingPdf] = useState(false);
+  const { addSnackbar } = useSnackbarContext();
+
+  // ID card (primary customer)
+  const { data: idCardDocs = [] } = useQuery({
+    queryKey: ['customer-documents-id-card', contract.customer_id],
+    queryFn: () => apiClient.get<Array<{ id: number; file_url: string }>>(
+      `/v_customer_documents?customer_id=eq.${contract.customer_id}&doc_type=eq.ID_CARD_FRONT&is_active=eq.true`,
+    ),
+    enabled: contract.customer_id != null,
+  });
+
+  // Signature (per contract)
+  const { data: signatureDocs = [] } = useQuery({
+    queryKey: ['contract-documents-signature', contract.id],
+    queryFn: () => apiClient.get<Array<{ id: number; file_url: string; customer_id: number }>>(
+      `/v_contract_documents?contract_id=eq.${contract.id}&doc_type=eq.SIGNATURE_PAD`,
+    ),
+  });
+
+  // Generated contract PDF (per contract)
+  const { data: contractPdfDocs = [] } = useQuery({
+    queryKey: ['contract-documents-pdf', contract.id],
+    queryFn: () => apiClient.get<Array<{ id: number; file_url: string }>>(
+      `/v_contract_documents?contract_id=eq.${contract.id}&doc_type=eq.CONTRACT_PDF`,
+    ),
+  });
+
+  const hasContractPdf = contractPdfDocs.length > 0;
+  const idCardKey = idCardDocs[0]?.file_url ?? null;
+  const signatureKey = signatureDocs[0]?.file_url ?? null;
+
+  // TODO(BE): fn_contract_export_pdf — server-side render per UI_SUMMARY/33_CONTRACT_OPEN_FLOW.md §3g.
+  // Until this RPC exists, the button shows a snackbar pointing at the missing endpoint.
+  const handlePrintPdf = async () => {
+    setPrintingPdf(true);
+    try {
+      await apiClient.rpc<{ media_id: number; file_url: string }>('fn_contract_export_pdf', {
+        p_contract_id: contract.id,
+      });
+      queryClient.invalidateQueries({ queryKey: ['contract-documents-pdf', contract.id] });
+      addSnackbar({ message: t('contract.contractPdfGenerated', { defaultValue: 'Contract PDF generated' }) });
+    } catch (err) {
+      if (err instanceof ApiError && (err.httpStatus === 404 || err.code === 'PGRST202')) {
+        addSnackbar({
+          message: t('contract.contractPdfPending', {
+            defaultValue: 'Server-side PDF generation (fn_contract_export_pdf) not implemented yet.',
+          }),
+        });
+      } else {
+        addSnackbar({
+          message: err instanceof Error ? err.message : t('common.error'),
+        });
+      }
+    } finally {
+      setPrintingPdf(false);
+    }
+  };
 
   const copyValue = (field: string, value: string) => {
     navigator.clipboard.writeText(value).then(() => {
@@ -588,6 +649,97 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
           </div>
         )}
       </div>
+
+      {/* Documents — ID card, signature, contract PDF */}
+      <div className="border border-line rounded-md px-4 py-3">
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider">
+            {t('contract.documents', { defaultValue: 'Documents' })}
+          </h3>
+          <Tooltip
+            content={
+              hasContractPdf
+                ? t('contract.contractPdfRegenerate', { defaultValue: 'Regenerate contract PDF' })
+                : t('contract.contractPdfNotYet', { defaultValue: 'Contract PDF not generated yet' })
+            }
+            placement="top"
+          >
+            <Button
+              size="sm"
+              variant="outline"
+              startIcon={printingPdf ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />}
+              endIcon={<Wrench size={14} />}
+              onClick={handlePrintPdf}
+              disabled={printingPdf}
+            >
+              {hasContractPdf
+                ? t('contract.regenerateContractPdf', { defaultValue: 'Regenerate PDF' })
+                : t('contract.printContractPdf', { defaultValue: 'Print contract PDF' })}
+            </Button>
+          </Tooltip>
+        </div>
+        <div className="flex flex-wrap gap-4">
+          <div className="flex flex-col gap-1">
+            <div className="text-xs text-subtle">{t('contract.idCard', { defaultValue: 'ID card' })}</div>
+            {idCardKey ? (
+              <MediaThumbButton
+                mediaKey={idCardKey}
+                alt={t('contract.idCard', { defaultValue: 'ID card' })}
+                onClick={() => {
+                  setLightboxKey(idCardKey);
+                  setLightboxAlt(t('contract.idCard', { defaultValue: 'ID card' }));
+                }}
+              />
+            ) : (
+              <div className="w-20 h-20 rounded border border-dashed border-line flex items-center justify-center text-subtler">
+                <IdCard size={20} />
+              </div>
+            )}
+          </div>
+          <div className="flex flex-col gap-1">
+            <div className="text-xs text-subtle">{t('contract.signature', { defaultValue: 'Signature' })}</div>
+            {signatureKey ? (
+              <MediaThumbButton
+                mediaKey={signatureKey}
+                alt={t('contract.signature', { defaultValue: 'Signature' })}
+                onClick={() => {
+                  setLightboxKey(signatureKey);
+                  setLightboxAlt(t('contract.signature', { defaultValue: 'Signature' }));
+                }}
+              />
+            ) : (
+              <div className="w-20 h-20 rounded border border-dashed border-line flex items-center justify-center text-subtler">
+                <Pencil size={20} />
+              </div>
+            )}
+          </div>
+          <div className="flex flex-col gap-1">
+            <div className="text-xs text-subtle">{t('contract.contractPdf', { defaultValue: 'Contract PDF' })}</div>
+            {hasContractPdf ? (
+              <a
+                href={contractPdfDocs[0].file_url}
+                target="_blank"
+                rel="noreferrer"
+                className="w-20 h-20 rounded border border-line flex items-center justify-center bg-surface-shallow hover:bg-surface-hover transition-colors"
+                aria-label={t('contract.openContractPdf', { defaultValue: 'Open contract PDF' })}
+              >
+                <FileText size={28} className="text-primary" />
+              </a>
+            ) : (
+              <div className="w-20 h-20 rounded border border-dashed border-line flex items-center justify-center text-subtler">
+                <FileText size={20} />
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <MediaLightbox
+        open={lightboxKey != null}
+        onClose={() => setLightboxKey(null)}
+        mediaKey={lightboxKey}
+        alt={lightboxAlt}
+      />
 
       {/* Financial summary */}
       <div className="border border-line rounded-md px-4 py-3">

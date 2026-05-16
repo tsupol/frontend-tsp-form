@@ -60,7 +60,7 @@ async function resizePhotoToWebp(file: File): Promise<UploadedImage> {
 
 export function SignatureCapture({ fileUrl, uploading, disabled, cacheBust = 0, onUpload }: Props) {
   const { t } = useTranslation();
-  const { url: displayUrl } = useMediaUrl(fileUrl, 'private', cacheBust);
+  const { url: displayUrl } = useMediaUrl(fileUrl, cacheBust);
   const [mode, setMode] = useState<SigMode>('draw');
   const [editing, setEditing] = useState(false);
   const [sigEmpty, setSigEmpty] = useState(true);

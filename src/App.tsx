@@ -71,6 +71,7 @@ import { AuditFlagsPage } from './pages/accounting/AuditFlagsPage';
 import { RetailBillsPage } from './pages/retail/RetailBillsPage';
 import { DevLayout } from './pages/dev/DevLayout';
 import { DevSignaturePage } from './pages/dev/DevSignaturePage';
+import { DevMediaPage } from './pages/dev/DevMediaPage';
 import { isLocalDev } from './lib/devEnv';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -443,6 +444,16 @@ function App() {
               <ProtectedRoute>
                 <AdminLayout>
                   <DevLayout><DevSignaturePage /></DevLayout>
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dev/media"
+            element={
+              <ProtectedRoute>
+                <AdminLayout>
+                  <DevLayout><DevMediaPage /></DevLayout>
                 </AdminLayout>
               </ProtectedRoute>
             }
