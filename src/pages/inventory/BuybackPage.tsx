@@ -9,6 +9,8 @@ import { DateTime } from '../../components/DateTime';
 import { CopyButton } from '../../components/CopyButton';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
+import { BranchPinInput } from '../../components/BranchPinInput';
+import { ActionDoneView } from '../contracts/ActionDoneView';
 
 // ============================================================================
 // Types — uses dedicated v_buyback_list / v_buyback_detail views
@@ -353,7 +355,7 @@ function BuybackDetailPanel({
   addSnackbar: (opts: { message: React.ReactNode }) => void;
 }) {
   const [actionModal, setActionModal] = useState<'submit' | 'revert' | 'approve' | 'reject' | null>(null);
-  const [intakeError, setIntakeError] = useState('');
+  const [intakeOpen, setIntakeOpen] = useState(false);
 
   const lines = detail.lines ?? [];
   const totalPrice = lines.reduce((sum, l) => sum + (l.buyback_price ?? l.unit_cost), 0);
@@ -362,33 +364,6 @@ function BuybackDetailPanel({
   const canRevert = detail.status === 'PENDING_APPROVAL';
   const canDecide = detail.status === 'PENDING_APPROVAL';
   const canIntake = detail.status === 'APPROVED';
-
-  const intakeMutation = useMutation({
-    mutationFn: () =>
-      apiClient.rpc('fn_inv_buyback_confirm_intake', {
-        p_po_id: detail.po_id,
-        p_lines: lines.map(l => ({ po_line_id: l.po_line_id })),
-      }),
-    onSuccess: () => {
-      onRefresh();
-      addSnackbar({
-        message: (
-          <div className="alert alert-success">
-            <CheckCircle size={16} />
-            <span>{t('buyback.intakeSuccess')}</span>
-          </div>
-        ),
-      });
-    },
-    onError: (err) => {
-      if (err instanceof ApiError) {
-        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
-        setIntakeError(translated || err.message);
-      } else {
-        setIntakeError(String(err));
-      }
-    },
-  });
 
   return (
     <div className="relative flex flex-col h-full">
@@ -434,15 +409,6 @@ function BuybackDetailPanel({
       {detail.notes && (
         <div className="flex-none px-4 py-2 border-b border-line text-xs text-subtle whitespace-pre-line">
           {detail.notes}
-        </div>
-      )}
-
-      {intakeError && (
-        <div className="flex-none px-4 py-2">
-          <div className="alert alert-danger animate-pop-in">
-            <XCircle size={16} />
-            <span>{intakeError}</span>
-          </div>
         </div>
       )}
 
@@ -526,10 +492,9 @@ function BuybackDetailPanel({
             <Button
               color="primary"
               className="flex-1"
-              onClick={() => intakeMutation.mutate()}
-              disabled={intakeMutation.isPending}
+              onClick={() => setIntakeOpen(true)}
             >
-              {intakeMutation.isPending ? t('common.loading') : t('buyback.confirmIntake')}
+              {t('buyback.confirmIntake')}
             </Button>
           )}
         </div>
@@ -559,7 +524,158 @@ function BuybackDetailPanel({
           });
         }}
       />
+
+      <BuybackIntakeModal
+        open={intakeOpen}
+        onClose={() => { setIntakeOpen(false); onRefresh(); }}
+        detail={detail}
+      />
     </div>
+  );
+}
+
+// ============================================================================
+// Confirm Intake Modal (PIN + done view)
+// ============================================================================
+
+interface BuybackIntakeResult {
+  asset_id: number;
+  asset_code: string;
+  bucket: string;
+  match_result: 'NO_MATCH' | 'MATCH_REACQUIRABLE' | string;
+  txn_id: number;
+}
+
+function BuybackIntakeModal({
+  open,
+  onClose,
+  detail,
+}: {
+  open: boolean;
+  onClose: () => void;
+  detail: BuybackDetail;
+}) {
+  const { t } = useTranslation();
+  // BUYBACK is always single-line per the flow spec — take the first line
+  const line = detail.lines?.[0] ?? null;
+  const [view, setView] = useState<'form' | 'done'>('form');
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState('');
+  const [result, setResult] = useState<BuybackIntakeResult | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      setView('form');
+      setPin('');
+      setError('');
+      setResult(null);
+    }
+  }, [open]);
+
+  const mutation = useMutation({
+    mutationFn: () => {
+      if (!line) throw new Error('No line');
+      return apiClient.rpc<BuybackIntakeResult>('fn_inv_buyback_confirm_intake', {
+        p_po_line_id: line.po_line_id,
+        p_pin: pin,
+        p_dedupe_key: `buyback-intake-${line.po_line_id}-${Date.now()}`,
+        p_branch_id: null,
+      });
+    },
+    onSuccess: (data) => {
+      setResult(data);
+      setView('done');
+    },
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setError(translated || err.message);
+      } else {
+        setError(String(err));
+      }
+    },
+  });
+
+  const canSubmit = !!line && pin.length === 6 && !mutation.isPending;
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
+      <div className="flex flex-col overflow-hidden">
+        <div className="modal-header">
+          <h2 className="modal-title">
+            {view === 'done'
+              ? t('buyback.intakeDoneTitle', { defaultValue: 'Asset taken into stock' })
+              : t('buyback.confirmIntake', { defaultValue: 'Confirm intake' })}
+          </h2>
+          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+        </div>
+        {view === 'done' && result && (
+          <ActionDoneView
+            headline={
+              result.match_result === 'MATCH_REACQUIRABLE'
+                ? t('buyback.intakeDoneReacquired', { defaultValue: 'Asset re-acquired' })
+                : t('buyback.intakeDoneNew', { defaultValue: 'Asset registered' })
+            }
+            contractCode={result.asset_code}
+            tone="success"
+            detailRows={[
+              { label: t('buyback.intakeBucket', { defaultValue: 'Bucket' }), value: result.bucket, emphasis: true },
+              {
+                label: t('buyback.intakeMatchResult', { defaultValue: 'Match' }),
+                value: result.match_result === 'MATCH_REACQUIRABLE'
+                  ? t('buyback.intakeMatchReacquired', { defaultValue: 'Re-acquired (was previously ours)' })
+                  : t('buyback.intakeMatchNew', { defaultValue: 'New to system' }),
+              },
+            ]}
+            onClose={onClose}
+          />
+        )}
+        {view === 'form' && <>
+          <div className="modal-content">
+            {error && (
+              <div className="alert alert-danger mb-4 animate-pop-in">
+                <XCircle size={16} />
+                <span>{error}</span>
+              </div>
+            )}
+            {!line ? (
+              <div className="alert alert-warning">
+                <span>{t('buyback.intakeNoLine', { defaultValue: 'No line to intake.' })}</span>
+              </div>
+            ) : (
+              <>
+                <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
+                  <div className="font-medium text-sm">{detail.po_no}</div>
+                  <div className="text-xs text-subtle">
+                    {[line.brand_name, line.model_name, line.variant_name].filter(Boolean).join(' · ')}
+                  </div>
+                  <div className="text-xs text-subtle tabular-nums mt-1">
+                    {fmtCurrency(line.buyback_price ?? line.unit_cost)}
+                  </div>
+                </div>
+                <p className="text-sm text-subtle mb-4">
+                  {t('buyback.intakeHint', {
+                    defaultValue: 'Confirms the buyback, registers the asset into stock at this branch, and locks the buyback record.',
+                  })}
+                </p>
+                <BranchPinInput value={pin} onChange={setPin} required />
+              </>
+            )}
+          </div>
+          <div className="modal-footer">
+            <Button onClick={onClose} disabled={mutation.isPending}>{t('common.cancel')}</Button>
+            <Button
+              color="primary"
+              onClick={() => mutation.mutate()}
+              disabled={!canSubmit}
+            >
+              {mutation.isPending ? t('common.loading') : t('buyback.confirmIntake', { defaultValue: 'Confirm intake' })}
+            </Button>
+          </div>
+        </>}
+      </div>
+    </Modal>
   );
 }
 
