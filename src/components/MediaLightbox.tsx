@@ -1,6 +1,4 @@
-import { useRef } from 'react';
-import { Modal } from 'tsp-form';
-import QuickPinchZoom, { make3dTransformValue } from 'react-quick-pinch-zoom';
+import { Modal, ImageZoomPan } from 'tsp-form';
 import { useMediaUrl } from '../hooks/useMediaUrl';
 
 interface Props {
@@ -11,14 +9,7 @@ interface Props {
 }
 
 export function MediaLightbox({ open, onClose, mediaKey, alt }: Props) {
-  const imgRef = useRef<HTMLImageElement>(null);
   const { url, loading } = useMediaUrl(mediaKey ?? null);
-
-  const onUpdate = ({ x, y, scale }: { x: number; y: number; scale: number }) => {
-    const el = imgRef.current;
-    if (!el) return;
-    el.style.setProperty('transform', make3dTransformValue({ x, y, scale }));
-  };
 
   return (
     <Modal open={open} onClose={onClose} maxWidth="48rem" width="100%">
@@ -33,19 +24,11 @@ export function MediaLightbox({ open, onClose, mediaKey, alt }: Props) {
             ×
           </button>
         </div>
-        <div className="flex items-center justify-center min-h-[60vh] max-h-[80vh] overflow-hidden">
+        <div className="aspect-[4/3] flex items-center justify-center">
           {loading || !url ? (
             <div className="text-white/60 text-sm">Loading…</div>
           ) : (
-            <QuickPinchZoom onUpdate={onUpdate} doubleTapZoomOutOnMaxScale>
-              <img
-                ref={imgRef}
-                src={url}
-                alt={alt ?? ''}
-                className="max-w-full max-h-[80vh] object-contain select-none"
-                draggable={false}
-              />
-            </QuickPinchZoom>
+            <ImageZoomPan src={url} alt={alt ?? ''} className="h-full w-full" imageFit="contain" rubberBand />
           )}
         </div>
       </div>
