@@ -2,7 +2,8 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Badge, Button, Input, Select, Modal, TextArea, Tooltip, useSnackbarContext } from 'tsp-form';
-import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Upload, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, FileText, Wrench } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Upload, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, FileText } from 'lucide-react';
+import { useGenerateContractPdf } from './useGenerateContractPdf';
 import { useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { ApiError } from '../../lib/api';
@@ -519,8 +520,8 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [lightboxKey, setLightboxKey] = useState<string | null>(null);
   const [lightboxAlt, setLightboxAlt] = useState<string>('');
-  const [printingPdf, setPrintingPdf] = useState(false);
   const { addSnackbar } = useSnackbarContext();
+  const { generating: printingPdf, generate: generateContractPdf } = useGenerateContractPdf();
 
   // ID card (primary customer)
   const { data: idCardDocs = [] } = useQuery({
@@ -551,30 +552,14 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
   const idCardKey = idCardDocs[0]?.file_url ?? null;
   const signatureKey = signatureDocs[0]?.file_url ?? null;
 
-  // TODO(BE): fn_contract_export_pdf — server-side render per UI_SUMMARY/33_CONTRACT_OPEN_FLOW.md §3g.
-  // Until this RPC exists, the button shows a snackbar pointing at the missing endpoint.
+  // Client-side PDF generation (pdfmake + Sarabun Thai font). Downloads
+  // CT-XXXX.pdf to the user's machine; backend storage will come later when
+  // fn_contract_export_pdf lands.
   const handlePrintPdf = async () => {
-    setPrintingPdf(true);
     try {
-      await apiClient.rpc<{ media_id: number; file_url: string }>('fn_contract_export_pdf', {
-        p_contract_id: contract.id,
-      });
-      queryClient.invalidateQueries({ queryKey: ['contract-documents-pdf', contract.id] });
-      addSnackbar({ message: t('contract.contractPdfGenerated', { defaultValue: 'Contract PDF generated' }) });
+      await generateContractPdf(contract);
     } catch (err) {
-      if (err instanceof ApiError && (err.httpStatus === 404 || err.code === 'PGRST202')) {
-        addSnackbar({
-          message: t('contract.contractPdfPending', {
-            defaultValue: 'Server-side PDF generation (fn_contract_export_pdf) not implemented yet.',
-          }),
-        });
-      } else {
-        addSnackbar({
-          message: err instanceof Error ? err.message : t('common.error'),
-        });
-      }
-    } finally {
-      setPrintingPdf(false);
+      addSnackbar({ message: err instanceof Error ? err.message : t('common.error') });
     }
   };
 
@@ -657,24 +642,17 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
             {t('contract.documents', { defaultValue: 'Documents' })}
           </h3>
           <Tooltip
-            content={
-              hasContractPdf
-                ? t('contract.contractPdfRegenerate', { defaultValue: 'Regenerate contract PDF' })
-                : t('contract.contractPdfNotYet', { defaultValue: 'Contract PDF not generated yet' })
-            }
+            content={t('contract.downloadContractPdf', { defaultValue: 'Download contract PDF' })}
             placement="top"
           >
             <Button
               size="sm"
               variant="outline"
               startIcon={printingPdf ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />}
-              endIcon={<Wrench size={14} />}
               onClick={handlePrintPdf}
               disabled={printingPdf}
             >
-              {hasContractPdf
-                ? t('contract.regenerateContractPdf', { defaultValue: 'Regenerate PDF' })
-                : t('contract.printContractPdf', { defaultValue: 'Print contract PDF' })}
+              {t('contract.printContractPdf', { defaultValue: 'Print contract PDF' })}
             </Button>
           </Tooltip>
         </div>
