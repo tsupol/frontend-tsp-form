@@ -101,13 +101,14 @@ input[type="number"
     display: none;
 }
 
-/* ── Bill receipt: 80mm thermal layout (Thai POS standard) ─────────────────
-   The receipt always renders at a fixed 72.1mm content width (80mm paper
-   minus typical 4mm/3.9mm side gutters). On screen it sits in a card; on
-   print it takes over the page via @page size:80mm auto.
-   Reference: Thai POS norm — 80mm paper, ~72mm printable area. */
+/* ── Bill receipt: 80mm thermal layout (Xprinter XP-80C) ──────────────────
+   Target printer: Xprinter XP-80C — 80mm paper roll, 72mm printable width
+   (per spec sheet: 576 dots @ 8 dots/mm). Content renders at exactly 72mm
+   so nothing clips at the rightmost column.
+   On screen it sits in a card; on print it takes over the page via
+   @page size: 80mm auto (continuous feed). */
 .bill-receipt {
-    width: 72.1mm;
+    width: 72mm;
     background: var(--color-bg);
     color: var(--color-fg);
     font-size: 11px;
@@ -180,8 +181,8 @@ input[type="number"
         position: absolute;
         left: 0;
         top: 0;
-        width: 72.1mm;
-        padding: 3mm 3.95mm;
+        width: 72mm;
+        padding: 3mm 4mm;
         background: #fff !important;
         color: #000 !important;
         box-shadow: none !important;

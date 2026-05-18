@@ -961,7 +961,6 @@ function LotActionModal({
   const isConvert = action?.action_code === 'LOT_CONVERT_TO_ASSET';
   const isTransferCreate = action?.action_code === 'LOT_TRANSFER_CREATE';
   const isTransferAddLine = action?.action_code === 'LOT_TRANSFER_ADD_LINE';
-  const hasDoneView = isConvert || isTransferCreate;
 
   const [view, setView] = useState<'form' | 'done'>('form');
   const [result, setResult] = useState<LotActionResult | null>(null);

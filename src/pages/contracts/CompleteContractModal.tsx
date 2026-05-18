@@ -173,7 +173,7 @@ type ReturnCondition = typeof RETURN_CONDITIONS[number];
 
 // ── Modal ────────────────────────────────────────────────────────────────────
 
-export function CompleteContractModal({ open, contract, action, onClose, onSuccess }: Props) {
+export function CompleteContractModal({ open, contract, action, onClose, onSuccess: _onSuccess }: Props) {
   const { t } = useTranslation();
   const { addSnackbar } = useSnackbarContext();
   const invalidate = useContractInvalidate(contract.id);
@@ -684,12 +684,6 @@ function doneTitleKey(action: ClosureAction): string {
   return 'contract.complete_done_title';
 }
 
-function successMsgKey(action: ClosureAction): string {
-  if (action.kind === 'terminate') return 'contract.action_terminate_success';
-  return action.closeReason === 'EARLY_PAYOFF'
-    ? 'contract.action_early_payoff_success'
-    : 'contract.action_complete_success';
-}
 
 function gateHintKey(action: ClosureAction): string {
   return action.kind === 'terminate'
