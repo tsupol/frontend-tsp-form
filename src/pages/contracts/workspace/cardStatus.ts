@@ -2,6 +2,7 @@ import type { CardStatus } from './WorkspaceTypes';
 import type { ContractServerState } from './useContractQuery';
 import type { CustomerSummary } from './useCustomerSummary';
 import type { ContractDocSummary } from './useContractDocuments';
+import type { ContractSignatory } from './useContractSignatories';
 import { getAge } from '../../../lib/format';
 
 // ── Card status derivation ──────────────────────────────────────────────
@@ -12,6 +13,7 @@ export function getCardStatus(
   customer: CustomerSummary | null | undefined,
   docs: ContractDocSummary | null | undefined,
   guarantors: { count: number; allComplete: boolean },
+  signatories?: ContractSignatory[] | null,
 ): CardStatus {
   switch (card) {
     case 'productPlan':
@@ -48,6 +50,19 @@ export function getCardStatus(
       if (customer.hasIdPhoto && docs.hasSignature) return 'complete';
       if (customer.hasIdPhoto || docs.hasSignature || docs.evidenceCount > 0) return 'partial';
       return 'empty';
+
+    case 'signatory': {
+      if (!contract?.id) return 'locked';
+      const list = signatories ?? [];
+      const has = (s: 'LESSOR' | 'WITNESS_1' | 'WITNESS_2') => list.some(x => x.slot === s);
+      const lessor = has('LESSOR');
+      const w1 = has('WITNESS_1');
+      const w2 = has('WITNESS_2');
+      const count = (lessor ? 1 : 0) + (w1 ? 1 : 0) + (w2 ? 1 : 0);
+      if (count === 3) return 'complete';
+      if (count > 0) return 'partial';
+      return 'empty';
+    }
 
     default:
       return 'empty';

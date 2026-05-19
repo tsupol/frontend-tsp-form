@@ -12,6 +12,8 @@ import { useContractDocuments, useInvalidateDocs } from './useContractDocuments'
 import type { ContractDocSummary } from './useContractDocuments';
 import { useContractGuarantors, useInvalidateGuarantors } from './useContractGuarantors';
 import type { GuarantorRow } from './useContractGuarantors';
+import { useContractSignatories, useInvalidateSignatories } from './useContractSignatories';
+import type { ContractSignatory } from './useContractSignatories';
 import { getCardStatus as deriveCardStatus } from './cardStatus';
 
 // ── Default state ────────────────────────────────────────────────────────
@@ -68,12 +70,14 @@ interface WorkspaceContextValue {
   customer: CustomerSummary | null;
   docs: ContractDocSummary | null;
   guarantorList: GuarantorRow[];
+  signatories: ContractSignatory[];
 
   // Invalidation helpers — call after RPCs instead of updateData
   invalidateContract: () => void;
   invalidateCustomer: () => void;
   invalidateDocs: () => void;
   invalidateGuarantors: () => void;
+  invalidateSignatories: () => void;
   invalidateAll: () => void;
 
   // Financial lock flag (from server)
@@ -163,11 +167,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const guarantorsQuery = useContractGuarantors(data.contractId);
   const guarantorList = guarantorsQuery.data ?? [];
 
+  const signatoriesQuery = useContractSignatories(data.contractId);
+  const signatories = signatoriesQuery.data ?? [];
+
   // Invalidation helpers
   const _invalidateContract = useInvalidateContract();
   const _invalidateCustomer = useInvalidateCustomer();
   const _invalidateDocs = useInvalidateDocs();
   const _invalidateGuarantors = useInvalidateGuarantors();
+  const _invalidateSignatories = useInvalidateSignatories();
 
   const invalidateContract = useCallback(() => {
     _invalidateContract(data.contractId);
@@ -185,12 +193,17 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     _invalidateGuarantors(data.contractId);
   }, [_invalidateGuarantors, data.contractId]);
 
+  const invalidateSignatories = useCallback(() => {
+    _invalidateSignatories({ contractId: data.contractId });
+  }, [_invalidateSignatories, data.contractId]);
+
   const invalidateAll = useCallback(() => {
     invalidateContract();
     invalidateCustomer();
     invalidateDocs();
     invalidateGuarantors();
-  }, [invalidateContract, invalidateCustomer, invalidateDocs, invalidateGuarantors]);
+    invalidateSignatories();
+  }, [invalidateContract, invalidateCustomer, invalidateDocs, invalidateGuarantors, invalidateSignatories]);
 
   const isFinancialLocked = contract?.is_financial_locked ?? false;
 
@@ -333,8 +346,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     return deriveCardStatus(card, contract, customer, docs, {
       count: guarantorCount,
       allComplete: guarantorsAllComplete,
-    });
-  }, [contract, customer, docs, guarantorCount, guarantorsAllComplete]);
+    }, signatories);
+  }, [contract, customer, docs, guarantorCount, guarantorsAllComplete, signatories]);
 
   // Phase flags
   const isPreDraft = !data.contractId;
@@ -353,10 +366,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     customer,
     docs,
     guarantorList,
+    signatories,
     invalidateContract,
     invalidateCustomer,
     invalidateDocs,
     invalidateGuarantors,
+    invalidateSignatories,
     invalidateAll,
     isFinancialLocked,
     // Modal
@@ -375,7 +390,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     pendingModal,
     confirmPanelSwitch,
     cancelPanelSwitch,
-  }), [data, updateData, resetData, contract, contractLoading, customer, docs, guarantorList, invalidateContract, invalidateCustomer, invalidateDocs, invalidateGuarantors, invalidateAll, isFinancialLocked, openModal, setOpenModal, getCardStatus, isPreDraft, isPreBill, isPostBill, isPostPayment, isReadOnly, readinessKey, triggerReadinessRefetch, setPanelDirty, pendingModal, confirmPanelSwitch, cancelPanelSwitch]);
+  }), [data, updateData, resetData, contract, contractLoading, customer, docs, guarantorList, signatories, invalidateContract, invalidateCustomer, invalidateDocs, invalidateGuarantors, invalidateSignatories, invalidateAll, isFinancialLocked, openModal, setOpenModal, getCardStatus, isPreDraft, isPreBill, isPostBill, isPostPayment, isReadOnly, readinessKey, triggerReadinessRefetch, setPanelDirty, pendingModal, confirmPanelSwitch, cancelPanelSwitch]);
 
   return (
     <WorkspaceContext.Provider value={value}>

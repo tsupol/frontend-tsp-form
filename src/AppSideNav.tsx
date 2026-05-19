@@ -310,6 +310,7 @@ export const AppSideNav = () => {
           { key: 'branches', icon: <MapPin size="1rem" />, label: t('nav.branches'), path: '/admin/company/branches' },
         ] : []),
         { key: 'pin', icon: <KeyRound size="1rem" />, label: t('nav.branchPin'), path: '/admin/company/pin' },
+        { key: 'signatories', icon: <PenLine size="1rem" />, label: t('nav.signatories'), path: '/admin/company/signatories' },
         { type: 'group', key: 'grp-finance', label: t('nav.groupFinance') },
         { key: 'bank-accounts', icon: <Landmark size="1rem" />, label: t('nav.bankAccounts'), path: '/admin/company/bank-accounts' },
         { key: 'company-config', icon: <Building2 size="1rem" />, label: t('nav.companyConfig'), path: '/admin/company/config' },

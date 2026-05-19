@@ -7,6 +7,8 @@ export type ModalId =
   | 'contactRef'
   | 'guarantor'
   | 'documents'
+  | 'signatory'
+  | 'handover'
   | 'payment'
   | 'reviewPay'
   | null;
@@ -202,6 +204,8 @@ export const ERROR_TO_MODAL: Record<string, ModalId> = {
   'CONTRACT.VALIDATION.SNAPSHOT_REQUIRED': 'productPlan',
   'CONTRACT.STATE.DISCOUNT_APPROVAL_REQUIRED': null,
   'CONTRACT.STATE.DEAL_PARTNER_APPROVAL_REQUIRED': null,
+  'CONTRACT.VALIDATION.SIGNATORY_INCOMPLETE': 'signatory',
+  'CONTRACT.VALIDATION.NO_BRANCH_DEFAULT_SIGNATORY': 'signatory',
 };
 
 // ── Brand/Family lookups ─────────────────────────────────────────────────

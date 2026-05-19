@@ -4,10 +4,12 @@ import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-quer
 import { Badge, Button, Input, Select, Modal, TextArea, Tooltip, useSnackbarContext } from 'tsp-form';
 import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Upload, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, FileText } from 'lucide-react';
 import { useGenerateContractPdf } from './useGenerateContractPdf';
+import { GenerateContractPdfModal } from './GenerateContractPdfModal';
 import { useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { ApiError } from '../../lib/api';
 import { uploadFromImage, getUploadSpec, specToResize } from '../../lib/upload';
+import { toStoragePath } from '../../lib/mediaPath';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiClient } from '../../lib/api';
@@ -520,8 +522,8 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [lightboxKey, setLightboxKey] = useState<string | null>(null);
   const [lightboxAlt, setLightboxAlt] = useState<string>('');
-  const { addSnackbar } = useSnackbarContext();
-  const { generating: printingPdf, generate: generateContractPdf } = useGenerateContractPdf();
+  const { generating: printingPdf } = useGenerateContractPdf();
+  const [pdfModalOpen, setPdfModalOpen] = useState(false);
 
   // ID card (primary customer)
   const { data: idCardDocs = [] } = useQuery({
@@ -555,12 +557,8 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
   // Client-side PDF generation (pdfmake + Sarabun Thai font). Downloads
   // CT-XXXX.pdf to the user's machine; backend storage will come later when
   // fn_contract_export_pdf lands.
-  const handlePrintPdf = async () => {
-    try {
-      await generateContractPdf(contract);
-    } catch (err) {
-      addSnackbar({ message: err instanceof Error ? err.message : t('common.error') });
-    }
+  const handlePrintPdf = () => {
+    setPdfModalOpen(true);
   };
 
   const copyValue = (field: string, value: string) => {
@@ -852,6 +850,12 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
           setDeliveryModalOpen(false);
           queryClient.invalidateQueries({ queryKey: ['contract-detail', contract.id] });
         }}
+      />
+
+      <GenerateContractPdfModal
+        open={pdfModalOpen}
+        onClose={() => setPdfModalOpen(false)}
+        contract={contract}
       />
     </div>
   );
@@ -1811,12 +1815,12 @@ function DeliveryModal({ open, contract, onClose, onSuccess }: {
       });
       const primary = results.sm?.key ?? Object.values(results)[0]?.key;
       if (!primary) throw new Error('Upload returned no key');
+      // Private media — backend chk_media_variants_keys requires variant
+      // values to be PUBLIC paths regardless of access_level, so pass null.
       await apiClient.rpc('fn_media_attach', {
         p_holding_id: user.holding_id,
-        p_storage_path: `/${primary}`,
-        p_variants_json: Object.fromEntries(
-          Object.entries(results).map(([s, r]) => [s, `/${r.key}`]),
-        ),
+        p_storage_path: toStoragePath(primary),
+        p_variants_json: null,
         p_media_type: 'IMAGE',
         p_access_level: 'CONFIDENTIAL',
         p_mime_type: 'image/webp',
@@ -1825,6 +1829,8 @@ function DeliveryModal({ open, contract, onClose, onSuccess }: {
         p_entity_type: 'CONTRACT',
         p_entity_id: contract.id,
         p_usage_type: 'ATTACHMENT',
+        p_sort_order: 0,
+        p_caption: null,
       });
       refetchPhotos();
     } catch {

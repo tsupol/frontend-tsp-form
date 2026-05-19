@@ -14,6 +14,10 @@ import { CardSaving } from './workspace/CardSaving';
 import { CardCustomer } from './workspace/CardCustomer';
 import { CardGuarantor } from './workspace/CardGuarantor';
 import { CardDocuments } from './workspace/CardDocuments';
+import { CardSignatory } from './workspace/CardSignatory';
+import { CardHandover } from './workspace/CardHandover';
+import { PanelSignatory } from './workspace/PanelSignatory';
+import { PanelHandover } from './workspace/PanelHandover';
 
 import { CardReviewPay } from './workspace/CardReviewPay';
 import { PanelReviewPay } from './workspace/PanelReviewPay';
@@ -263,6 +267,8 @@ function WorkspaceContent() {
     contactRef: t('workspace.cardContactRef'),
     guarantor: t('workspace.cardGuarantor'),
     documents: t('workspace.cardDocuments'),
+    signatory: t('workspace.cardSignatory'),
+    handover: t('workspace.cardHandover'),
   };
 
   return (
@@ -284,7 +290,7 @@ function WorkspaceContent() {
         const isCardActive = (id: ModalId) => openModal === id && !(isMobile && isRoot);
 
         // Review & Pay card: always visible once draft exists, but disabled until all cards complete
-        const requiredCards = ['productPlan', 'customer', 'contactRef', 'guarantor', 'documents'] as const;
+        const requiredCards = ['productPlan', 'customer', 'contactRef', 'guarantor', 'documents', 'signatory'] as const;
         const allCardsComplete = data.contractId != null && requiredCards.every(id => getCardStatus(id) === 'complete');
         const reviewPayReady = allCardsComplete || !!data.billId;
 
@@ -351,6 +357,8 @@ function WorkspaceContent() {
                     <CardContactRef onEdit={() => handleEditOpen('contactRef')} active={isCardActive('contactRef')} shake={shakingCards.has('contactRef')} />
                     <CardGuarantor onEdit={() => handleEditOpen('guarantor')} active={isCardActive('guarantor')} shake={shakingCards.has('guarantor')} />
                     <CardDocuments onEdit={() => handleEditOpen('documents')} active={isCardActive('documents')} shake={shakingCards.has('documents')} />
+                    <CardSignatory onEdit={() => handleEditOpen('signatory')} active={isCardActive('signatory')} shake={shakingCards.has('signatory')} />
+                    <CardHandover onEdit={() => handleEditOpen('handover')} active={isCardActive('handover')} shake={shakingCards.has('handover')} />
 
                     {!data.billConfirmed && data.contractId && <CardReviewPay onEdit={reviewPayReady ? () => handleEditOpen('reviewPay') : undefined} active={isCardActive('reviewPay')} disabled={!reviewPayReady} />}
                     {data.billConfirmed && <CardPostPayment onEdit={() => handleEditOpen('reviewPay')} active={isCardActive('reviewPay')} />}
@@ -378,6 +386,8 @@ function WorkspaceContent() {
                   {openModal === 'contactRef' && <PanelContactRef onClose={handleEditClose} />}
                   {openModal === 'guarantor' && <PanelGuarantor onClose={handleEditClose} />}
                   {openModal === 'documents' && <PanelDocuments onClose={handleEditClose} />}
+                  {openModal === 'signatory' && <PanelSignatory onClose={handleEditClose} />}
+                  {openModal === 'handover' && <PanelHandover onClose={handleEditClose} />}
                   {openModal === 'reviewPay' && <PanelReviewPay onClose={handleEditClose} />}
                   {!openModal && !isMobile && (
                     <div className="flex items-center justify-center h-full text-subtle text-sm">

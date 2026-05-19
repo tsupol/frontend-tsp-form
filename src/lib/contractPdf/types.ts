@@ -40,7 +40,8 @@ export interface ContractPdfInput {
   deviceModel: string;        // "iPhone 17"
   deviceColor: string;        // "ม่วง"
   deviceStorage: string;      // "256 GB"
-  deviceImei: string;         // "358883220481763"
+  deviceImei: string;         // "358883220481763" — empty if none
+  deviceSerial: string;       // "F2LZK1ABCD" — empty if none
   deviceBattery: string;      // "100%"
   deviceBoxNote: string;      // "มีกล่อง"
   deviceChargerBlockNote: string; // "ชุดชาร์จ"
@@ -63,6 +64,17 @@ export interface ContractPdfInput {
   lessorSignatureDataUrl: string | null;
   witness1SignatureDataUrl: string | null;
   witness2SignatureDataUrl: string | null;
+
+  // Override names for lessor / witnesses (empty string → fall back to constants.ts)
+  lessorName: string;
+  witness1Name: string;
+  witness2Name: string;
+
+  // Bank / company config — pulled from BE; builder falls back to constants if empty
+  bankName: string;
+  bankAccountNumber: string;
+  bankAccountName: string;
+  lateFeePerDay: number | null;
 
   // ID-card image embedded on page 3 above the "สำเนาถูกต้อง" heading
   lesseeIdCardDataUrl: string | null;

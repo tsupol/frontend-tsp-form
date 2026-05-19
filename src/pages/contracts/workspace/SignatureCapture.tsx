@@ -119,7 +119,7 @@ export function SignatureCapture({ fileUrl, uploading, disabled, cacheBust = 0, 
           {uploading && <span className="text-xs text-subtle">{t('common.loading')}</span>}
         </div>
         <div
-          className="border border-line rounded-lg overflow-hidden bg-white aspect-[2/1] w-full max-w-md flex items-center justify-center"
+          className="border border-line rounded-lg overflow-hidden bg-white aspect-[3/1] w-full flex items-center justify-center"
         >
           {displayUrl ? (
             <img
@@ -181,7 +181,7 @@ export function SignatureCapture({ fileUrl, uploading, disabled, cacheBust = 0, 
 
       {mode === 'draw' && (
         <div className="flex flex-col gap-2">
-          <div className="border border-line rounded-lg overflow-hidden bg-white aspect-[2/1] w-full max-w-md">
+          <div className="border border-line rounded-lg overflow-hidden bg-white aspect-[3/1] w-full">
             <SignaturePad ref={padRef} onChange={setSigEmpty} />
           </div>
           <div className="flex flex-wrap gap-2">
@@ -214,7 +214,7 @@ export function SignatureCapture({ fileUrl, uploading, disabled, cacheBust = 0, 
       {mode === 'upload' && (
         <div className="flex flex-col items-start gap-2">
           <div
-            className="flex items-center justify-center gap-2 py-4 px-6 border-2 border-dashed border-line rounded-lg cursor-pointer hover:border-primary hover:bg-surface-hover transition-colors text-subtle text-sm w-full max-w-md"
+            className="flex items-center justify-center gap-2 py-4 px-6 border-2 border-dashed border-line rounded-lg cursor-pointer hover:border-primary hover:bg-surface-hover transition-colors text-subtle text-sm w-full"
             onClick={() => !disabled && !uploading && uploadInputRef.current?.click()}
           >
             <Upload size={16} className="opacity-50" />
@@ -233,7 +233,7 @@ export function SignatureCapture({ fileUrl, uploading, disabled, cacheBust = 0, 
 
       {mode === 'camera' && (
         <div className="flex flex-col items-start gap-2">
-          <div className="flex items-center justify-center gap-3 border-2 border-dashed border-line rounded-lg py-6 w-full max-w-md">
+          <div className="flex items-center justify-center gap-3 border-2 border-dashed border-line rounded-lg py-6 w-full">
             <Button
               color="primary"
               onClick={() => cameraInputRef.current?.click()}

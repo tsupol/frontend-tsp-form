@@ -19,3 +19,18 @@ export function getMediaPrivacy(key: string): MediaPrivacy | null {
 export function publicMediaUrl(key: string): string {
   return `${config.r2PublicUrl}/${normalizeKey(key)}`;
 }
+
+/**
+ * Format a storage key into the canonical shape expected by the backend's
+ * core.is_media_path_* validators:
+ *   - private keys:        "private/..."     (no leading slash)
+ *   - public uploads keys: "/uploads/..."    (leading slash)
+ *   - media/ keys:         "media/..."       (no leading slash)
+ * The R2 upload service returns keys without a leading slash; this function
+ * applies the slash only where the backend expects it.
+ */
+export function toStoragePath(key: string): string {
+  const k = normalizeKey(key);
+  if (k.startsWith('uploads/')) return `/${k}`;
+  return k;
+}

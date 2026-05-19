@@ -23,14 +23,25 @@ import type { ContractPdfInput } from './types';
 const FS_HEADER = 8.5;
 const FS_BODY = 9;
 const FS_SMALL = 8;
-const SIG_W = 160;
+const SIG_W = 150;
 const SIG_H = 50;
 
 function fullName(prefix: string, first: string, last: string): string {
   return `${prefix} ${first} ${last}`.replace(/\s+/g, ' ').trim();
 }
 
-function lessorFullName(): string {
+// Combine serial + IMEI for the "หมายเลขเครื่อง/หมายเลข IMEI" blank.
+// Serial first (the physical engraving on the device), IMEI second.
+// Empty when neither is present — the underline still renders blank.
+function deviceIdentifier(imei: string, serial: string): string {
+  const parts: string[] = [];
+  if (serial) parts.push(`หมายเลขเครื่อง ${serial}`);
+  if (imei) parts.push(`หมายเลข IMEI ${imei}`);
+  return parts.join(' / ');
+}
+
+function lessorFullName(input?: { lessorName?: string }): string {
+  if (input?.lessorName && input.lessorName.trim()) return input.lessorName.trim();
   return fullName(LESSOR.prefix, LESSOR.firstName, LESSOR.lastName);
 }
 
@@ -59,10 +70,13 @@ function headerStrip(input: ContractPdfInput, pageLabel: string): Content {
   };
 }
 
-function paymentFooterLines(): Content {
+function paymentFooterLines(input: ContractPdfInput): Content {
+  const bank = (input.bankName && input.bankAccountNumber && input.bankAccountName)
+    ? { bankName: input.bankName, accountNumber: input.bankAccountNumber, accountName: input.bankAccountName }
+    : BANK;
   return {
     stack: [
-      { text: FOOTER_PAYMENT_NOTE(BANK), fontSize: FS_SMALL, alignment: 'center', bold: true, margin: [0, 8, 0, 2] },
+      { text: FOOTER_PAYMENT_NOTE(bank), fontSize: FS_SMALL, alignment: 'center', bold: true, margin: [0, 8, 0, 2] },
       { text: FOOTER_RETURN_NOTE, fontSize: FS_SMALL, alignment: 'center', bold: true },
     ],
   };
@@ -119,7 +133,7 @@ function buildPage1(input: ContractPdfInput): Content[] {
     {
       text: [
         'ระหว่าง ข้าพเจ้า ',
-        blank(lessorFullName(), { bold: true }),
+        blank(lessorFullName(input), { bold: true }),
         ' บัตรประชาชนเลขที่ ',
         blank(LESSOR.idNumber),
         ' ที่อยู่ตามบัตรประชาชน ',
@@ -148,8 +162,8 @@ function buildPage1(input: ContractPdfInput): Content[] {
         blank(input.deviceColor),
         ' ความจุตัวเครื่อง ',
         blank(input.deviceStorage),
-        ' หมายเลขเครื่อง/หมายเลข IMEI ',
-        blank(input.deviceImei),
+        ' ',
+        blank(deviceIdentifier(input.deviceImei, input.deviceSerial)),
         ' สุขภาพแบตเตอรี่ ',
         blank(input.deviceBattery),
         ' ของ "ผู้ให้เช่า" ให้กับ "ผู้เช่า" โดย "ผู้เช่า" ได้ชำระเงินค่าเปิดใช้เครื่อง ค่าดำเนินการระบบติดตามระยะไกล และค่าความเสื่อมสภาพขณะใช้งานทรัพย์สิน ให้แก่ "ผู้ให้เช่า" ในวันทำสัญญานี้เป็นเงิน ',
@@ -181,31 +195,36 @@ function buildPage1(input: ContractPdfInput): Content[] {
     { text: [{ text: 'ข้อ 3. ', bold: true }, CLAUSE_3], fontSize: FS_BODY, margin: [0, 0, 0, 3] },
     { text: [{ text: 'ข้อ 4. ', bold: true }, CLAUSE_4], fontSize: FS_BODY, margin: [0, 0, 0, 3] },
     { text: [{ text: 'ข้อ 5. ', bold: true }, CLAUSE_5_INTRO], fontSize: FS_BODY, margin: [0, 0, 0, 1] },
-    {
-      ul: [
-        `ไม่เกิน ${CLAUSE_5_LATE_FEE_BAHT} บาท ต่อวันหรือต่อรอบการทวงถาม กรณีค้างชำระหนึ่งเดือน`,
-        `ไม่เกิน ${CLAUSE_5_LATE_FEE_BAHT} บาท ต่อวันหรือต่อรอบการทวงถาม กรณีค้างชำระมากกว่าหนึ่งเดือน`,
-      ],
-      fontSize: FS_BODY,
-      margin: [12, 0, 0, 3],
-    },
+    (() => {
+      const lateFee = input.lateFeePerDay ?? CLAUSE_5_LATE_FEE_BAHT;
+      return {
+        ul: [
+          `ไม่เกิน ${lateFee} บาท ต่อวันหรือต่อรอบการทวงถาม กรณีค้างชำระหนึ่งเดือน`,
+          `ไม่เกิน ${lateFee} บาท ต่อวันหรือต่อรอบการทวงถาม กรณีค้างชำระมากกว่าหนึ่งเดือน`,
+        ],
+        fontSize: FS_BODY,
+        margin: [12, 0, 0, 3],
+      };
+    })(),
     { text: [{ text: 'ข้อ 6. ', bold: true }, CLAUSE_6], fontSize: FS_BODY, margin: [0, 0, 0, 3] },
     { text: [{ text: 'ข้อ 7. ', bold: true }, CLAUSE_7], fontSize: FS_BODY, margin: [0, 0, 0, 3] },
     { text: [{ text: 'ข้อ 8. ', bold: true }, CLAUSE_8], fontSize: FS_BODY, margin: [0, 0, 0, 4] },
     { text: 'คู่สัญญาได้อ่านและเข้าใจข้อความดีแล้ว จึงได้ลงลายมือชื่อไว้เป็นสำคัญต่อหน้าพยาน', fontSize: FS_BODY, alignment: 'center', margin: [0, 2, 0, 0] },
     signatureRow(
       signatureCell('ผู้เช่า', lessee, input.lesseeSignatureDataUrl),
-      signatureCell('ผู้ให้เช่า', lessorFullName(), input.lessorSignatureDataUrl),
+      signatureCell('ผู้ให้เช่า', lessorFullName(input), input.lessorSignatureDataUrl),
     ),
-    paymentFooterLines(),
+    paymentFooterLines(input),
   ];
 }
 
 // ── Page 2 — schedule, contacts, signatures ─────────────────────────────────
 function buildPage2(input: ContractPdfInput): Content[] {
   const lesseeFull = fullName(input.lesseePrefix, input.lesseeFirstName, input.lesseeLastName);
-  const witness1 = fullName(WITNESSES[0].prefix, WITNESSES[0].firstName, WITNESSES[0].lastName);
-  const witness2 = fullName(WITNESSES[1].prefix, WITNESSES[1].firstName, WITNESSES[1].lastName);
+  const witness1 = (input.witness1Name && input.witness1Name.trim())
+    || fullName(WITNESSES[0].prefix, WITNESSES[0].firstName, WITNESSES[0].lastName);
+  const witness2 = (input.witness2Name && input.witness2Name.trim())
+    || fullName(WITNESSES[1].prefix, WITNESSES[1].firstName, WITNESSES[1].lastName);
 
   // Two-column schedule layout to mirror the original — left col rows 1-6, right rows 7-12
   const half = Math.ceil(input.installments.length / 2);
@@ -258,7 +277,7 @@ function buildPage2(input: ContractPdfInput): Content[] {
     },
     {
       text: [
-        'หมายเลขเครื่อง/หมายเลข IMEI ', blank(input.deviceImei),
+        blank(deviceIdentifier(input.deviceImei, input.deviceSerial)),
         ' กล่องตัวเครื่อง ', blank(input.deviceBoxNote),
         ' ชุดชาร์จ ', blank(input.deviceChargerBlockNote),
         ' สายชาร์จ ', blank(input.deviceChargerCableNote),
@@ -338,13 +357,13 @@ function buildPage2(input: ContractPdfInput): Content[] {
     { text: 'คู่สัญญาได้อ่านและเข้าใจข้อความดีแล้ว จึงได้ลงลายมือชื่อไว้เป็นสำคัญต่อหน้าพยาน', fontSize: FS_BODY, alignment: 'center', margin: [0, 0, 0, 0] },
     signatureRow(
       signatureCell('ผู้เช่า', lesseeFull, input.lesseeSignatureDataUrl),
-      signatureCell('ผู้ให้เช่า', lessorFullName(), input.lessorSignatureDataUrl),
+      signatureCell('ผู้ให้เช่า', lessorFullName(input), input.lessorSignatureDataUrl),
     ),
     signatureRow(
       signatureCell('พยาน', witness1, input.witness1SignatureDataUrl),
       signatureCell('พยาน', witness2, input.witness2SignatureDataUrl),
     ),
-    paymentFooterLines(),
+    paymentFooterLines(input),
   ];
 }
 
@@ -379,7 +398,7 @@ function buildPage3(input: ContractPdfInput): Content[] {
     },
     {
       text: [
-        'หมายเลขเครื่อง/หมายเลข IMEI ', blank(input.deviceImei),
+        blank(deviceIdentifier(input.deviceImei, input.deviceSerial)),
         ' สุขภาพแบตเตอรี่ ', blank(input.deviceBattery),
       ],
       fontSize: FS_BODY, margin: [0, 0, 0, 4],

@@ -33,7 +33,7 @@ export function DevSignaturePage() {
       </div>
 
       <div className="flex flex-col gap-3">
-        <div className="border border-line rounded-lg overflow-hidden bg-white aspect-[2/1] w-full">
+        <div className="border border-line rounded-lg overflow-hidden bg-white aspect-[3/1] w-full">
           <SignaturePad ref={padRef} onChange={setIsEmpty} />
         </div>
 
@@ -58,7 +58,7 @@ export function DevSignaturePage() {
               {savedSize != null ? `${(savedSize / 1024).toFixed(1)} KB` : ''}
             </span>
           </div>
-          <div className="border border-line rounded-lg overflow-hidden bg-white aspect-[2/1] w-full flex items-center justify-center">
+          <div className="border border-line rounded-lg overflow-hidden bg-white aspect-[3/1] w-full flex items-center justify-center">
             <img src={savedDataUrl} alt="Saved signature" className="max-w-full max-h-full" />
           </div>
         </div>

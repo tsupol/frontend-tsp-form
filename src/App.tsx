@@ -53,6 +53,7 @@ import { DunningConfigPage } from './pages/company/DunningConfigPage';
 import { BlacklistPage } from './pages/company/BlacklistPage';
 import { ICloudPoolPage } from './pages/company/ICloudPoolPage';
 import { BranchPinPage } from './pages/company/BranchPinPage';
+import { SignatoriesPage } from './pages/company/SignatoriesPage';
 import { BranchesPage } from './pages/BranchesPage';
 import { SettingsLayout } from './pages/settings/SettingsLayout';
 import { HoldingsPage } from './pages/settings/HoldingsPage';
@@ -610,6 +611,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <CompanyLayout><BranchPinPage /></CompanyLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/company/signatories"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <CompanyLayout><SignatoriesPage /></CompanyLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

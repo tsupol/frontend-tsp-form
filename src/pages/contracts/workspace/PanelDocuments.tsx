@@ -5,6 +5,7 @@ import type { UploadedImage } from 'tsp-form';
 import { CheckCircle, XCircle, CreditCard, FileImage, Trash2, Upload, Info } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { uploadFromImage, deleteMedia } from '../../../lib/upload';
+import { toStoragePath } from '../../../lib/mediaPath';
 import { useMediaUrl } from '../../../hooks/useMediaUrl';
 import { useWorkspace } from './WorkspaceContext';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -164,12 +165,12 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
         });
         const primary = results.sm?.key ?? Object.values(results)[0]?.key;
         if (!primary) throw new Error('Upload returned no key');
+        // Private media — backend chk_media_variants_keys requires variant
+        // values to be PUBLIC paths regardless of access_level, so pass null.
         await apiClient.rpc('fn_media_attach', {
           p_holding_id: user.holding_id,
-          p_storage_path: `/${primary}`,
-          p_variants_json: Object.fromEntries(
-            Object.entries(results).map(([s, r]) => [s, `/${r.key}`]),
-          ),
+          p_storage_path: toStoragePath(primary),
+          p_variants_json: null,
           p_media_type: 'IMAGE',
           p_access_level: 'CONFIDENTIAL',
           p_mime_type: 'image/webp',
@@ -179,6 +180,7 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
           p_entity_id: contractId,
           p_usage_type: 'ATTACHMENT',
           p_sort_order: attachments.length + i,
+          p_caption: null,
         });
       }
       queryClient.invalidateQueries({ queryKey: ['contract-media', contractId] });
