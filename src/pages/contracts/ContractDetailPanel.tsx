@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Badge, Button, Input, Select, Modal, TextArea, Tooltip, useSnackbarContext } from 'tsp-form';
-import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Upload, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, FileText } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Upload, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, AlertTriangle } from 'lucide-react';
 import { useGenerateContractPdf } from './useGenerateContractPdf';
 import { GenerateContractPdfModal } from './GenerateContractPdfModal';
 import { useNavigate } from 'react-router-dom';
@@ -524,6 +524,8 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
   const [lightboxAlt, setLightboxAlt] = useState<string>('');
   const { generating: printingPdf } = useGenerateContractPdf();
   const [pdfModalOpen, setPdfModalOpen] = useState(false);
+  const [printBlockOpen, setPrintBlockOpen] = useState(false);
+  const [printBlockReasons, setPrintBlockReasons] = useState<string[]>([]);
 
   // ID card (primary customer)
   const { data: idCardDocs = [] } = useQuery({
@@ -542,22 +544,39 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
     ),
   });
 
-  // Generated contract PDF (per contract)
-  const { data: contractPdfDocs = [] } = useQuery({
-    queryKey: ['contract-documents-pdf', contract.id],
-    queryFn: () => apiClient.get<Array<{ id: number; file_url: string }>>(
-      `/v_contract_documents?contract_id=eq.${contract.id}&doc_type=eq.CONTRACT_PDF`,
-    ),
-  });
-
-  const hasContractPdf = contractPdfDocs.length > 0;
   const idCardKey = idCardDocs[0]?.file_url ?? null;
   const signatureKey = signatureDocs[0]?.file_url ?? null;
+
+  // Asset readiness — needed to gate the Print button on:
+  //   1. device bound to the contract
+  //   2. if Apple → iCloud assigned
+  const { data: printAsset } = useQuery({
+    queryKey: ['contract-print-asset', contract.device_id],
+    queryFn: () => apiClient.get<Array<{ brand_name: string; icloud_account_id: number | null }>>(
+      `/v_assets?asset_id=eq.${contract.device_id}&select=brand_name,icloud_account_id&limit=1`,
+    ).then(rows => rows[0] ?? null),
+    enabled: contract.device_id != null,
+    staleTime: 30 * 1000,
+  });
+
+  const printReadiness = (() => {
+    const reasons: string[] = [];
+    if (contract.device_id == null) reasons.push(t('contract.printBlock_noDevice'));
+    if (printAsset?.brand_name === 'Apple' && printAsset.icloud_account_id == null) {
+      reasons.push(t('contract.printBlock_noIcloud'));
+    }
+    return { ready: reasons.length === 0, reasons };
+  })();
 
   // Client-side PDF generation (pdfmake + Sarabun Thai font). Downloads
   // CT-XXXX.pdf to the user's machine; backend storage will come later when
   // fn_contract_export_pdf lands.
   const handlePrintPdf = () => {
+    if (!printReadiness.ready) {
+      setPrintBlockReasons(printReadiness.reasons);
+      setPrintBlockOpen(true);
+      return;
+    }
     setPdfModalOpen(true);
   };
 
@@ -633,20 +652,23 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
         )}
       </div>
 
-      {/* Documents — ID card, signature, contract PDF */}
+      {/* Documents — ID card, signature */}
       <div className="border border-line rounded-md px-4 py-3">
         <div className="flex items-center justify-between gap-2 mb-3">
           <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider">
             {t('contract.documents', { defaultValue: 'Documents' })}
           </h3>
           <Tooltip
-            content={t('contract.downloadContractPdf', { defaultValue: 'Download contract PDF' })}
+            content={printReadiness.ready
+              ? t('contract.downloadContractPdf', { defaultValue: 'Download contract PDF' })
+              : printReadiness.reasons.join(' · ')}
             placement="top"
           >
             <Button
               size="sm"
               variant="outline"
               startIcon={printingPdf ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />}
+              endIcon={!printReadiness.ready && !printingPdf ? <AlertTriangle size={14} className="text-warning-fg" /> : undefined}
               onClick={handlePrintPdf}
               disabled={printingPdf}
             >
@@ -686,24 +708,6 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
             ) : (
               <div className="w-20 h-20 rounded border border-dashed border-line flex items-center justify-center text-subtler">
                 <Pencil size={20} />
-              </div>
-            )}
-          </div>
-          <div className="flex flex-col gap-1">
-            <div className="text-xs text-subtle">{t('contract.contractPdf', { defaultValue: 'Contract PDF' })}</div>
-            {hasContractPdf ? (
-              <a
-                href={contractPdfDocs[0].file_url}
-                target="_blank"
-                rel="noreferrer"
-                className="w-20 h-20 rounded border border-line flex items-center justify-center bg-surface-shallow hover:bg-surface-hover transition-colors"
-                aria-label={t('contract.openContractPdf', { defaultValue: 'Open contract PDF' })}
-              >
-                <FileText size={28} className="text-primary" />
-              </a>
-            ) : (
-              <div className="w-20 h-20 rounded border border-dashed border-line flex items-center justify-center text-subtler">
-                <FileText size={20} />
               </div>
             )}
           </div>
@@ -857,6 +861,26 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
         onClose={() => setPdfModalOpen(false)}
         contract={contract}
       />
+
+      <Modal open={printBlockOpen} onClose={() => setPrintBlockOpen(false)} maxWidth="28rem" width="100%">
+        <div className="modal-header">
+          <h2 className="modal-title">{t('contract.printBlock_title')}</h2>
+        </div>
+        <div className="modal-content">
+          <div className="alert alert-warning mb-3">
+            <AlertTriangle size={16} />
+            <span>{t('contract.printBlock_intro')}</span>
+          </div>
+          <ul className="list-disc pl-5 text-sm flex flex-col gap-1">
+            {printBlockReasons.map((r, i) => (
+              <li key={i}>{r}</li>
+            ))}
+          </ul>
+        </div>
+        <div className="modal-footer">
+          <Button color="primary" onClick={() => setPrintBlockOpen(false)}>{t('common.close')}</Button>
+        </div>
+      </Modal>
     </div>
   );
 }

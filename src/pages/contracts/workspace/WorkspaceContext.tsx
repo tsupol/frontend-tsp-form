@@ -296,7 +296,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const lastAttachedRef = useRef<number | null>(null);
   useEffect(() => {
     if (!data.contractId || !data.customerId) return;
-    if (contract?.customer_id === data.customerId) {
+    if (!contract) return;
+    if (contract.customer_id === data.customerId) {
       lastAttachedRef.current = data.customerId;
       return;
     }
@@ -311,7 +312,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       .catch(() => {
         lastAttachedRef.current = null;
       });
-  }, [data.contractId, data.customerId, contract?.customer_id, invalidateContract]);
+  }, [data.contractId, data.customerId, contract, invalidateContract]);
 
   // ── Guarantor completeness (server-derived) ──────────────────────────
   const guarantorCount = guarantorList.length;
