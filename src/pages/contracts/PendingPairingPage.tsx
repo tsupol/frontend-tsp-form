@@ -232,24 +232,26 @@ export function PendingPairingPage() {
                       return (
                         <button
                           key={row.contract_id}
-                          className={`w-full text-left px-4 py-2.5 border-b border-line flex flex-col gap-1.5 transition-colors cursor-pointer ${
+                          className={`w-full text-left px-4 py-2.5 border-b border-line flex items-center gap-3 transition-colors cursor-pointer ${
                             isSelected ? 'bg-primary-soft' : 'hover:bg-surface-hover'
                           }`}
                           onClick={() => { setSelectedId(row.contract_id); if (isMobile) goTo('detail'); }}
                         >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-medium text-sm truncate">
-                              {row.contract_code_display ?? row.contract_code}
-                            </span>
-                            {row.deadline && (
-                              <Badge size="xs" color="warning">
-                                <DateTime value={row.deadline} showTime={false} />
-                              </Badge>
-                            )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="font-medium text-sm truncate">{row.contract_code_display ?? row.contract_code}</span>
+                            </div>
+                            <div className="text-xs text-subtle truncate mt-0.5">
+                              {row.customer_name ?? t('contract.noCustomer')}
+                            </div>
+                            <div className="flex items-center gap-3 mt-1 text-xs text-subtle">
+                              <span>{row.branch_name}</span>
+                            </div>
                           </div>
-                          <div className="flex items-center justify-between gap-2 text-sm">
-                            <span className="truncate">{row.customer_name ?? t('contract.noCustomer')}</span>
-                            <span className="text-xs text-subtle shrink-0">{row.branch_name}</span>
+                          <div className="text-right shrink-0">
+                            {row.deadline && (
+                              <div className="text-xs text-subtle"><DateTime value={row.deadline} showTime={false} /></div>
+                            )}
                           </div>
                         </button>
                       );

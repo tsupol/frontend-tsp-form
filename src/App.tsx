@@ -43,6 +43,7 @@ import { ContractSearchPage } from './pages/contracts/ContractSearchPage';
 import { SavingContractsPage } from './pages/contracts/SavingContractsPage';
 import { DraftContractsPage } from './pages/contracts/DraftContractsPage';
 import { PendingPairingPage } from './pages/contracts/PendingPairingPage';
+import { PendingPaymentPage } from './pages/contracts/PendingPaymentPage';
 import { ContractWizardPage } from './pages/contracts/ContractWizardPage';
 import { CompanyLayout } from './pages/company/CompanyLayout';
 import { CompanyConfigRoot } from './pages/company/CompanyConfigRoot';
@@ -420,6 +421,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <ContractsLayout><PendingPairingPage /></ContractsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/contracts/pending-payment/:contractId?"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <ContractsLayout><PendingPaymentPage /></ContractsLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

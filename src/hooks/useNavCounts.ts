@@ -89,6 +89,17 @@ export function useNavCounts() {
   });
   const draftContractsCount = draftCountData?.totalCount ?? 0;
 
+  const { data: pendingPaymentCountData } = useQuery({
+    queryKey: ['nav', 'pending-payment-count', sk],
+    queryFn: () => apiClient.getPaginated<{ id: number }>(
+      `/v_contract_detail?state=eq.PENDING_PAYMENT&select=id${sq}`,
+      { page: 1, pageSize: 1 },
+    ),
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+  });
+  const pendingPaymentCount = pendingPaymentCountData?.totalCount ?? 0;
+
   return {
     pendingApprovals,
     pendingSlips,
@@ -96,5 +107,6 @@ export function useNavCounts() {
     pendingPairingCount,
     savingContractsCount,
     draftContractsCount,
+    pendingPaymentCount,
   };
 }

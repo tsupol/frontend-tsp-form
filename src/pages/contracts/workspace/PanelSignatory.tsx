@@ -51,7 +51,7 @@ export function PanelSignatory({ onClose: _onClose }: Props) {
     WITNESS_1: null,
     WITNESS_2: null,
   });
-  const [busy, setBusy] = useState<SignatorySlot | null>(null);
+  const [busy, setBusy] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
 
   // Pre-fill: if no binding yet but a default exists → show "use default" pre-selected
@@ -121,69 +121,44 @@ export function PanelSignatory({ onClose: _onClose }: Props) {
     return bookRaw.find(s => s.signatory_id === Number(val))?.signature_media_id ?? null;
   };
 
-  const handleSave = async (slotDef: SlotDef) => {
-    if (!contractId) return;
-    const { signatory_id, sendNull } = resolveSelected(slotDef.slot);
-    if (!sendNull && signatory_id == null) return;
-    setBusy(slotDef.slot);
-    setError('');
-    try {
-      await apiClient.rpc('fn_contract_signatory_bind', {
-        p_contract_id: contractId,
-        p_slot: slotDef.slot,
-        p_signatory_id: sendNull ? null : signatory_id,
-      });
-      invalidateSignatories();
-    } catch (err) {
-      if (err instanceof ApiError) {
-        const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
-        setError(tr || err.message);
-      } else {
-        setError(err instanceof Error ? err.message : String(err));
-      }
-    } finally {
-      setBusy(null);
-    }
-  };
-
   const handleBindAll = async () => {
     if (!contractId) return;
     setError('');
-    for (const slotDef of SLOTS) {
-      const bound = signatories.find(x => x.slot === slotDef.slot);
-      const sel = resolveSelected(slotDef.slot);
-      // Skip if nothing selected
-      if (!sel.sendNull && sel.signatory_id == null) continue;
-      // Skip if already bound to same target
-      if (bound) {
-        if (sel.sendNull) {
-          const def = defaultsRaw.find(d => d.slot === slotDef.slot);
-          if (def && def.signatory_id === bound.signatory_id) continue;
-        } else if (sel.signatory_id === bound.signatory_id) {
-          continue;
+    setBusy(true);
+    try {
+      for (const slotDef of SLOTS) {
+        const bound = signatories.find(x => x.slot === slotDef.slot);
+        const sel = resolveSelected(slotDef.slot);
+        if (!sel.sendNull && sel.signatory_id == null) continue;
+        if (bound) {
+          if (sel.sendNull) {
+            const def = defaultsRaw.find(d => d.slot === slotDef.slot);
+            if (def && def.signatory_id === bound.signatory_id) continue;
+          } else if (sel.signatory_id === bound.signatory_id) {
+            continue;
+          }
+        }
+        try {
+          await apiClient.rpc('fn_contract_signatory_bind', {
+            p_contract_id: contractId,
+            p_slot: slotDef.slot,
+            p_signatory_id: sel.sendNull ? null : sel.signatory_id,
+          });
+        } catch (err) {
+          if (err instanceof ApiError) {
+            const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+              || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+            setError(tr || err.message);
+          } else {
+            setError(err instanceof Error ? err.message : String(err));
+          }
+          break;
         }
       }
-      setBusy(slotDef.slot);
-      try {
-        await apiClient.rpc('fn_contract_signatory_bind', {
-          p_contract_id: contractId,
-          p_slot: slotDef.slot,
-          p_signatory_id: sel.sendNull ? null : sel.signatory_id,
-        });
-      } catch (err) {
-        if (err instanceof ApiError) {
-          const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-            || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
-          setError(tr || err.message);
-        } else {
-          setError(err instanceof Error ? err.message : String(err));
-        }
-        break;
-      }
+      invalidateSignatories();
+    } finally {
+      setBusy(false);
     }
-    setBusy(null);
-    invalidateSignatories();
   };
 
   if (!branchId) {
@@ -252,15 +227,12 @@ export function PanelSignatory({ onClose: _onClose }: Props) {
                 {previewMediaId != null && (
                   <SignatureThumb mediaId={previewMediaId} size={28} />
                 )}
-                <Button
-                  size="sm"
-                  color={boundMatches ? undefined : 'primary'}
-                  onClick={() => handleSave(slotDef)}
-                  disabled={busy === slotDef.slot || (!sel.sendNull && sel.signatory_id == null) || !!boundMatches}
-                  startIcon={busy === slotDef.slot ? <Loader2 size={14} className="animate-spin" /> : (boundMatches ? <CheckCircle size={14} className="text-success" /> : undefined)}
-                >
-                  {boundMatches ? t('workspace.signatoryBound') : t('common.save')}
-                </Button>
+                {boundMatches && (
+                  <span className="inline-flex items-center gap-1 text-success text-xs whitespace-nowrap">
+                    <CheckCircle size={14} />
+                    {t('workspace.signatoryBound')}
+                  </span>
+                )}
               </div>
               {bound && (
                 <div className="text-xs text-subtle">
@@ -280,8 +252,13 @@ export function PanelSignatory({ onClose: _onClose }: Props) {
       </div>
 
       <div className="shrink-0 border-t border-line bg-bg px-4 py-3 flex justify-end gap-2">
-        <Button color="primary" onClick={handleBindAll} disabled={busy !== null}>
-          {busy !== null ? t('common.saving') : t('common.save')}
+        <Button
+          color="primary"
+          onClick={handleBindAll}
+          disabled={busy}
+          startIcon={busy ? <Loader2 size={14} className="animate-spin" /> : undefined}
+        >
+          {busy ? t('common.saving') : t('common.save')}
         </Button>
       </div>
     </div>

@@ -669,13 +669,15 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
               <MediaThumbButton
                 mediaKey={idCardKey}
                 alt={t('contract.idCard', { defaultValue: 'ID card' })}
+                className="w-32 aspect-[4/3] rounded border border-line overflow-hidden cursor-zoom-in hover:opacity-80 transition-opacity bg-surface-shallow"
+                fit="contain"
                 onClick={() => {
                   setLightboxKey(idCardKey);
                   setLightboxAlt(t('contract.idCard', { defaultValue: 'ID card' }));
                 }}
               />
             ) : (
-              <div className="w-20 h-20 rounded border border-dashed border-line flex items-center justify-center text-subtler">
+              <div className="w-32 aspect-[4/3] rounded border border-dashed border-line flex items-center justify-center text-subtler">
                 <IdCard size={20} />
               </div>
             )}
@@ -686,13 +688,15 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
               <MediaThumbButton
                 mediaKey={signatureKey}
                 alt={t('contract.signature', { defaultValue: 'Signature' })}
+                className="w-32 aspect-[4/3] rounded border border-line overflow-hidden cursor-zoom-in hover:opacity-80 transition-opacity bg-surface-shallow"
+                fit="contain"
                 onClick={() => {
                   setLightboxKey(signatureKey);
                   setLightboxAlt(t('contract.signature', { defaultValue: 'Signature' }));
                 }}
               />
             ) : (
-              <div className="w-20 h-20 rounded border border-dashed border-line flex items-center justify-center text-subtler">
+              <div className="w-32 aspect-[4/3] rounded border border-dashed border-line flex items-center justify-center text-subtler">
                 <Pencil size={20} />
               </div>
             )}

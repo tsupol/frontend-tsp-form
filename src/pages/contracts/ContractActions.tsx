@@ -2183,6 +2183,15 @@ function PendingPaymentModal({ open, contract, onClose, onSuccess }: {
                         onChange={(raw) => updatePayment(idx, { amount: parseFloat(raw) || 0 })}
                         size="sm"
                         className="w-full"
+                        endIcon={<ChevronsRight size={14} />}
+                        onEndIconClick={() => {
+                          const otherTotal = payments.reduce((sum, p, i) => i === idx ? sum : sum + (p.amount || 0), 0);
+                          const remaining = Math.max(0, totalAmount - otherTotal);
+                          const fill = payment.method === 'SAVING_WALLET'
+                            ? Math.min(savingBalance, remaining)
+                            : remaining;
+                          updatePayment(idx, { amount: fill });
+                        }}
                       />
                     </div>
                     {payments.length > 1 && (

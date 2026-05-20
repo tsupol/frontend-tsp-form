@@ -35,7 +35,7 @@ import {
   // Fanout child icons — Company
   MapPin, KeyRound, Landmark, CalendarDays, AlertTriangle, ShieldBan, Cloud,
   // Fanout child icons — Contracts
-  Search, PiggyBank, Link2, FileEdit, FilePlus,
+  Search, PiggyBank, Link2, FileEdit, FilePlus, CreditCard,
   // Fanout child icons — Commission
   UserCheck, ClipboardCheck,
   // Fanout child icons — Accounting
@@ -161,6 +161,7 @@ export const AppSideNav = () => {
     pendingPairingCount,
     savingContractsCount,
     draftContractsCount,
+    pendingPaymentCount,
   } = useNavCounts();
 
   // Render an icon with an optional count badge.
@@ -275,6 +276,7 @@ export const AppSideNav = () => {
         { key: 'contract-search', icon: <Search size="1rem" />, label: t('nav.contractSearch'), path: '/admin/contracts/search' },
         { key: 'saving-contracts', ...iconWithCount(<PiggyBank size="1rem" />, savingContractsCount), label: t('nav.savingContracts'), path: '/admin/contracts/saving' },
         { key: 'draft-contracts', ...iconWithCount(<FileEdit size="1rem" />, draftContractsCount), label: t('nav.draftContracts'), path: '/admin/contracts/draft' },
+        { key: 'pending-payment', ...iconWithCount(<CreditCard size="1rem" />, pendingPaymentCount), label: t('nav.pendingPayment'), path: '/admin/contracts/pending-payment' },
         { key: 'pending-pairing', ...iconWithCount(<Link2 size="1rem" />, pendingPairingCount), label: t('nav.pendingPairing'), path: '/admin/contracts/pending-pairing' },
         {
           key: 'new-contract',

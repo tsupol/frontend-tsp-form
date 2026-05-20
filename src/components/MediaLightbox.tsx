@@ -40,12 +40,15 @@ interface MediaThumbButtonProps {
   mediaKey: string | null;
   alt?: string;
   className?: string;
+  /** How to fit the image inside the button. Default 'cover' (crops to fill). */
+  fit?: 'cover' | 'contain';
   onClick: () => void;
 }
 
-export function MediaThumbButton({ mediaKey, alt, className, onClick }: MediaThumbButtonProps) {
+export function MediaThumbButton({ mediaKey, alt, className, fit = 'cover', onClick }: MediaThumbButtonProps) {
   const { url } = useMediaUrl(mediaKey ?? null);
   if (!mediaKey) return null;
+  const fitClass = fit === 'contain' ? 'object-contain' : 'object-cover';
   return (
     <button
       type="button"
@@ -54,7 +57,7 @@ export function MediaThumbButton({ mediaKey, alt, className, onClick }: MediaThu
       aria-label={alt ?? 'View image'}
     >
       {url ? (
-        <img src={url} alt={alt ?? ''} className="w-full h-full object-cover" />
+        <img src={url} alt={alt ?? ''} className={`w-full h-full ${fitClass}`} />
       ) : (
         <div className="w-full h-full animate-pulse bg-surface-shallow" />
       )}
