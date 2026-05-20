@@ -423,7 +423,7 @@ export function LegalCasesPage() {
                       <button
                         key={c.id}
                         className={`w-full text-left px-4 py-2.5 transition-colors cursor-pointer ${
-                          c.id === selectedCaseId ? 'bg-primary/10' : 'hover:bg-surface-hover'
+                          c.id === selectedCaseId ? 'bg-primary-soft' : 'hover:bg-surface-hover'
                         }`}
                         onClick={() => { setSelectedCaseId(c.id); if (isMobile) goTo('detail'); }}
                       >

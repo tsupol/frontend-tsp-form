@@ -984,7 +984,7 @@ export function ICloudPoolPage() {
                       <button
                         key={a.id}
                         className={`w-full text-left px-4 py-2.5 border-b border-line flex items-start gap-3 cursor-pointer transition-colors ${
-                          isSelected ? 'bg-primary/10' : 'hover:bg-surface-hover'
+                          isSelected ? 'bg-primary-soft' : 'hover:bg-surface-hover'
                         }`}
                         onClick={() => handleRowSelect(a.id)}
                       >

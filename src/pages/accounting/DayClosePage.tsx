@@ -320,7 +320,7 @@ export function DayClosePage() {
               {showTodayEntry && (
                 <button
                   className={`flex-none w-full text-left px-4 py-3 border-b border-line flex items-center gap-3 transition-colors cursor-pointer ${
-                    selectedIsToday ? 'bg-primary/10' : 'hover:bg-surface-hover'
+                    selectedIsToday ? 'bg-primary-soft' : 'hover:bg-surface-hover'
                   }`}
                   onClick={() => selectDate(today, isMobile ? goTo : undefined)}
                 >
@@ -385,7 +385,7 @@ export function DayClosePage() {
                     <button
                       key={h.id}
                       className={`w-full text-left px-4 py-3 border-b border-line flex items-center gap-3 transition-colors cursor-pointer ${
-                        isSelected ? 'bg-primary/10' : 'hover:bg-surface-hover'
+                        isSelected ? 'bg-primary-soft' : 'hover:bg-surface-hover'
                       }`}
                       onClick={() => selectDate(h.close_date, isMobile ? goTo : undefined)}
                     >

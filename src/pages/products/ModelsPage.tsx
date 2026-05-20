@@ -1104,7 +1104,7 @@ export function ModelsPage() {
                       return (
                         <div
                           className={`flex items-center gap-3 px-3 py-2 border-b border-line hover:bg-surface-hover transition-colors cursor-pointer ${
-                            isSelected ? 'bg-primary/10' : ''
+                            isSelected ? 'bg-primary-soft' : ''
                           }`}
                           onClick={() => handleRowSelect(model.model_id)}
                         >

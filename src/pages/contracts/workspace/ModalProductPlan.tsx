@@ -242,7 +242,7 @@ export function ModalProductPlan({ open, onClose }: Props) {
                     <button
                       key={model.model_id}
                       className={`w-full text-left px-4 py-2.5 flex items-center gap-3 cursor-pointer transition-colors ${
-                        model.model_id === localModelId ? 'bg-primary/10' : 'hover:bg-surface-hover'
+                        model.model_id === localModelId ? 'bg-primary-soft' : 'hover:bg-surface-hover'
                       }`}
                       onClick={() => handleSelectModel(model)}
                     >
@@ -277,7 +277,7 @@ export function ModalProductPlan({ open, onClose }: Props) {
                         key={variant.variant_id}
                         className={`text-left px-3 py-2.5 rounded-lg border transition-colors cursor-pointer ${
                           localVariantId === variant.variant_id
-                            ? 'border-primary bg-primary/5'
+                            ? 'border-primary bg-primary-soft'
                             : 'border-line hover:border-fg/30'
                         }`}
                         onClick={() => handleSelectVariant(variant)}
@@ -358,7 +358,7 @@ export function ModalProductPlan({ open, onClose }: Props) {
 
           {/* Selected plan summary */}
           {localQuote && (
-            <div className="border border-primary/30 rounded-lg p-4 bg-primary/5">
+            <div className="border border-primary rounded-lg p-4 bg-primary-soft">
               <div className="text-xs text-primary-fg font-medium mb-1">{t('wizard.selectedPlan')}</div>
               <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
                 <span><span className="text-subtle">{t('wizard.financeModel')}:</span> {localQuote.finance_model}</span>
@@ -410,7 +410,7 @@ function QuoteTable({ rows, terms, isSelected, onSelect, t, fmt }: {
               return (
                 <tr
                   key={`${term}-${row.down_percent}`}
-                  className={`cursor-pointer transition-colors ${selected ? 'bg-primary/10' : 'hover:bg-surface-hover'}`}
+                  className={`cursor-pointer transition-colors ${selected ? 'bg-primary-soft' : 'hover:bg-surface-hover'}`}
                   onClick={() => onSelect(row)}
                 >
                   <td className="px-2 py-2.5 text-center">

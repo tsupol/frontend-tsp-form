@@ -385,7 +385,7 @@ export function DunningTargetsPage() {
                         <button
                           key={item.contract_id}
                           className={`w-full text-left px-4 py-2.5 transition-colors cursor-pointer ${
-                            item.contract_id === selectedId ? 'bg-primary/10' : 'hover:bg-surface-hover'
+                            item.contract_id === selectedId ? 'bg-primary-soft' : 'hover:bg-surface-hover'
                           }`}
                           onClick={() => handleSelect(item)}
                         >

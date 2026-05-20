@@ -1,11 +1,13 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Badge, Button } from 'tsp-form';
-import { Smartphone, ExternalLink, Wrench, ArrowDownToLine, ArrowUpFromLine, Link2, Link2Off } from 'lucide-react';
+import { Badge, Button, useSnackbarContext } from 'tsp-form';
+import { Smartphone, ExternalLink, Wrench, ArrowDownToLine, ArrowUpFromLine, Link2, Link2Off, Cloud, CloudOff, CheckCircle } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { getBucketLabel, getBucketColor } from '../inventory/inventoryUtils';
+import { AssignIcloudModal, ReleaseIcloudModal } from './IcloudModals';
 
 interface ContractForDevice {
   id: number;
@@ -29,8 +31,11 @@ interface AssetSummary {
   imei: string | null;
   model_name: string;
   variant_name: string;
+  brand_name: string;
   branch_id: number;
   branch_name: string;
+  icloud_account_id: number | null;
+  icloud_apple_id: string | null;
 }
 
 interface RepairOrder {
@@ -62,12 +67,15 @@ interface DeviceTabProps {
 
 export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
   const { t } = useTranslation();
+  const { addSnackbar } = useSnackbarContext();
+  const [icloudAssignOpen, setIcloudAssignOpen] = useState(false);
+  const [icloudReleaseOpen, setIcloudReleaseOpen] = useState(false);
 
   // Loaner asset lookup (only when bound)
   const { data: loanerAsset } = useQuery({
     queryKey: ['asset-summary', contract.loaner_device_id],
     queryFn: () => apiClient.get<AssetSummary[]>(
-      `/v_assets?asset_id=eq.${contract.loaner_device_id}&select=asset_id,asset_code,current_bucket,condition_grade,serial_no,imei,model_name,variant_name,branch_id,branch_name&limit=1`,
+      `/v_assets?asset_id=eq.${contract.loaner_device_id}&select=asset_id,asset_code,current_bucket,condition_grade,serial_no,imei,model_name,variant_name,brand_name,branch_id,branch_name,icloud_account_id,icloud_apple_id&limit=1`,
     ).then(rows => rows[0] ?? null),
     enabled: contract.loaner_device_id != null,
     staleTime: 30 * 1000,
@@ -77,7 +85,7 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
   const { data: primaryAsset } = useQuery({
     queryKey: ['asset-summary', contract.device_id],
     queryFn: () => apiClient.get<AssetSummary[]>(
-      `/v_assets?asset_id=eq.${contract.device_id}&select=asset_id,asset_code,current_bucket,condition_grade,serial_no,imei,model_name,variant_name,branch_id,branch_name&limit=1`,
+      `/v_assets?asset_id=eq.${contract.device_id}&select=asset_id,asset_code,current_bucket,condition_grade,serial_no,imei,model_name,variant_name,brand_name,branch_id,branch_name,icloud_account_id,icloud_apple_id&limit=1`,
     ).then(rows => rows[0] ?? null),
     enabled: contract.device_id != null,
     staleTime: 30 * 1000,
@@ -121,7 +129,7 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
                 <div>
                   <div className="text-xs text-subtle">{t('contract.assetCode')}</div>
                   <Link
-                    to={`/admin/inventory/assets?asset_id=${contract.device_id}`}
+                    to={`/admin/inventory/assets/${contract.device_id}`}
                     className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1"
                   >
                     {primaryAsset?.asset_code ?? `#${contract.device_id}`}
@@ -145,6 +153,65 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
                   </div>
                 )}
               </div>
+
+              {/* iCloud — Apple-only */}
+              {primaryAsset?.brand_name === 'Apple' && (
+                <div className="flex items-center gap-2 pt-2 border-t border-line mt-2">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    {primaryAsset.icloud_account_id ? (
+                      <>
+                        <Cloud size={14} className="text-success shrink-0" />
+                        <div className="min-w-0">
+                          <div className="text-xs text-subtle">iCloud</div>
+                          <div className="text-sm font-mono truncate">{primaryAsset.icloud_apple_id ?? '—'}</div>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <CloudOff size={14} className="text-subtle shrink-0" />
+                        <div>
+                          <div className="text-xs text-subtle">iCloud</div>
+                          <div className="text-sm text-subtle">{t('contract.icloud_notAssigned')}</div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  {isActive && (
+                    <div className="flex gap-2 shrink-0">
+                      {primaryAsset.icloud_account_id == null ? (
+                        <Button
+                          size="sm"
+                          color="primary"
+                          startIcon={<Cloud size={14} />}
+                          onClick={() => setIcloudAssignOpen(true)}
+                        >
+                          {t('contract.icloud_assign')}
+                        </Button>
+                      ) : (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            startIcon={<Cloud size={14} />}
+                            onClick={() => setIcloudAssignOpen(true)}
+                          >
+                            {t('contract.icloud_change')}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            color="danger"
+                            startIcon={<CloudOff size={14} />}
+                            onClick={() => setIcloudReleaseOpen(true)}
+                          >
+                            {t('contract.icloud_release')}
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {isActive && (
                 <div className="flex flex-wrap gap-2 pt-2 border-t border-line mt-2">
@@ -225,7 +292,7 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
                 <div>
                   <div className="text-xs text-subtle">{t('contract.assetCode')}</div>
                   <Link
-                    to={`/admin/inventory/assets?asset_id=${contract.loaner_device_id}`}
+                    to={`/admin/inventory/assets/${contract.loaner_device_id}`}
                     className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1"
                   >
                     {loanerAsset?.asset_code ?? `#${contract.loaner_device_id}`}
@@ -329,6 +396,48 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
             ))}
           </div>
         </section>
+      )}
+
+      {/* iCloud assign/release modals */}
+      {primaryAsset && (
+        <>
+          <AssignIcloudModal
+            open={icloudAssignOpen}
+            onClose={() => setIcloudAssignOpen(false)}
+            onSuccess={() => {
+              setIcloudAssignOpen(false);
+              addSnackbar({
+                message: (
+                  <div className="alert alert-success">
+                    <CheckCircle size={16} />
+                    <span>{t('contract.icloud_assignSuccess')}</span>
+                  </div>
+                ),
+                type: 'success',
+              });
+            }}
+            assetId={primaryAsset.asset_id}
+            branchId={primaryAsset.branch_id}
+            currentAccountId={primaryAsset.icloud_account_id}
+          />
+          <ReleaseIcloudModal
+            open={icloudReleaseOpen}
+            onClose={() => setIcloudReleaseOpen(false)}
+            onSuccess={() => {
+              setIcloudReleaseOpen(false);
+              addSnackbar({
+                message: (
+                  <div className="alert alert-success">
+                    <CheckCircle size={16} />
+                    <span>{t('contract.icloud_releaseSuccess')}</span>
+                  </div>
+                ),
+                type: 'success',
+              });
+            }}
+            assetId={primaryAsset.asset_id}
+          />
+        </>
       )}
     </div>
   );

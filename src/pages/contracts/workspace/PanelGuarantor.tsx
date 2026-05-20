@@ -337,7 +337,7 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
                 {searchResults.length > 0 ? (
                   <div className="border border-line rounded-lg divide-y divide-line overflow-hidden max-h-48 overflow-y-auto better-scroll">
                     {searchResults.map(c => (
-                      <button key={c.id} className={`w-full text-left px-4 py-2.5 hover:bg-surface-hover transition-colors cursor-pointer flex items-center justify-between ${selectedCustomer?.id === c.id ? 'bg-primary/5 border-l-2 border-l-primary' : ''}`} onClick={() => handleSelectCustomer(c)}>
+                      <button key={c.id} className={`w-full text-left px-4 py-2.5 hover:bg-surface-hover transition-colors cursor-pointer flex items-center justify-between ${selectedCustomer?.id === c.id ? 'bg-primary-soft border-l-2 border-l-primary' : ''}`} onClick={() => handleSelectCustomer(c)}>
                         <div>
                           <div className="font-medium text-sm">{c.full_name}</div>
                           <div className="text-xs text-subtle">{c.id_type}: {c.id_number} {c.tel ? `· ${c.tel}` : ''}</div>

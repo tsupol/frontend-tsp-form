@@ -371,7 +371,7 @@ function GalleryUpload({ label, media, uploading, onUpload, onDetach, cacheBust 
 
       <div
         className={`border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
-          dragging ? 'border-primary bg-primary/5' : 'border-line hover:border-primary/40'
+          dragging ? 'border-primary bg-primary-soft' : 'border-line hover:border-primary'
         }`}
         onClick={handleClick}
         onDrop={handleDrop}

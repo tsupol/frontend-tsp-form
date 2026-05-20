@@ -161,7 +161,7 @@ export function DraftContractsPage() {
                         <button
                           key={contract.id}
                           className={`w-full text-left px-4 py-2.5 border-b border-line flex flex-col gap-1.5 transition-colors cursor-pointer ${
-                            isSelected ? 'bg-primary/10' : 'hover:bg-surface-hover'
+                            isSelected ? 'bg-primary-soft' : 'hover:bg-surface-hover'
                           }`}
                           onClick={() => { setSelectedId(contract.id); if (isMobile) goTo('detail'); }}
                         >

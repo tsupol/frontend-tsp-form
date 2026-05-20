@@ -133,8 +133,8 @@ export function CardPayment() {
   const displayLines = existingBill?.lines ?? previewLines;
 
   return (
-    <div className="border border-primary/30 rounded-lg bg-primary/3">
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-primary/20">
+    <div className="border border-primary rounded-lg bg-primary-soft">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-primary">
         <CreditCard size={16} className="text-primary-fg shrink-0" />
         <span className="font-medium text-sm flex-1">{t('workspace.cardPayment')}</span>
         {data.billCode && <span className="text-xs font-mono text-subtle">{data.billCode}</span>}

@@ -284,7 +284,7 @@ export function CustomerPickerModal({ open, title, excludeCustomerIds = [], onCl
                     <button
                       key={c.id}
                       className={`w-full text-left px-4 py-2.5 hover:bg-surface-hover transition-colors cursor-pointer flex items-center justify-between bg-transparent border-none ${
-                        selected?.id === c.id ? 'bg-primary/5 border-l-2 border-l-primary' : ''
+                        selected?.id === c.id ? 'bg-primary-soft border-l-2 border-l-primary' : ''
                       }`}
                       onClick={() => handleSelectExisting(c)}
                     >

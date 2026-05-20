@@ -1129,7 +1129,7 @@ export function PricebookPage() {
 
                       return (
                         <div
-                          className={`flex items-center gap-3 px-3 py-2.5 border-b border-line hover:bg-surface-hover transition-colors select-none cursor-pointer ${isSelected ? 'bg-primary/5' : ''}`}
+                          className={`flex items-center gap-3 px-3 py-2.5 border-b border-line hover:bg-surface-hover transition-colors select-none cursor-pointer ${isSelected ? 'bg-primary-soft' : ''}`}
                           onClick={() => handleRowSelect(model.id)}
                         >
                           <div className="flex-1 min-w-0">

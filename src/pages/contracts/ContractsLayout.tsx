@@ -32,7 +32,7 @@ export function ContractsLayout({ children }: { children: ReactNode }) {
                 ? `flex items-center gap-2 px-2 py-2 rounded-md text-sm font-medium transition-colors ${
                     isActive
                       ? 'bg-primary text-primary-contrast'
-                      : 'text-primary-fg hover:bg-primary/10'
+                      : 'text-primary-fg hover:bg-primary-soft'
                   }`
                 : `flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors ${
                     isActive

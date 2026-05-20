@@ -64,7 +64,7 @@ export function HoldingSelectModal({ open }: HoldingSelectModalProps) {
               <button
                 key={holding.holding_id}
                 onClick={() => handleSelect(holding.holding_id)}
-                className="w-full text-left p-4 rounded border border-border hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer"
+                className="w-full text-left p-4 rounded border border-border hover:border-primary hover:bg-primary-soft transition-colors cursor-pointer"
               >
                 <div className="font-medium">{holding.name}</div>
                 <div className="text-sm text-subtle">{holding.code}</div>

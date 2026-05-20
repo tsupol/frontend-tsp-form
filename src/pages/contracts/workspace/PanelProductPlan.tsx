@@ -700,14 +700,14 @@ export function PanelProductPlan({ onClose }: Props) {
         <>
           <div className="flex gap-2">
             <button
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-colors cursor-pointer ${sourceTab === 'instock' ? 'border-primary bg-primary/5 text-primary-fg' : 'border-line hover:border-fg/30 bg-transparent text-fg'}`}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-colors cursor-pointer ${sourceTab === 'instock' ? 'border-primary bg-primary-soft text-primary-fg' : 'border-line hover:border-fg/30 bg-transparent text-fg'}`}
               onClick={() => handleSwitchTab('instock')}
             >
               <Package size={18} />
               <span className="font-medium text-sm">{t('wizard.tabInStock')}</span>
             </button>
             <button
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-colors cursor-pointer ${sourceTab === 'catalog' ? 'border-primary bg-primary/5 text-primary-fg' : 'border-line hover:border-fg/30 bg-transparent text-fg'}`}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-colors cursor-pointer ${sourceTab === 'catalog' ? 'border-primary bg-primary-soft text-primary-fg' : 'border-line hover:border-fg/30 bg-transparent text-fg'}`}
               onClick={() => handleSwitchTab('catalog')}
             >
               <BookOpen size={18} />
@@ -798,7 +798,7 @@ export function PanelProductPlan({ onClose }: Props) {
           <label className="form-label">{t('wizard.selectColor')}</label>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {variants.map(v => (
-              <button key={v.variant_id} className={`text-left px-3 py-2.5 rounded-lg border transition-colors cursor-pointer font-medium ${localVariantId === v.variant_id ? 'border-primary bg-primary/5 text-primary-fg' : 'border-line hover:border-fg/30'}`} onClick={() => handleSelectVariant(v)}>
+              <button key={v.variant_id} className={`text-left px-3 py-2.5 rounded-lg border transition-colors cursor-pointer font-medium ${localVariantId === v.variant_id ? 'border-primary bg-primary-soft text-primary-fg' : 'border-line hover:border-fg/30'}`} onClick={() => handleSelectVariant(v)}>
                 <span className="text-sm">{colorLabel(v)}</span>
               </button>
             ))}
@@ -872,9 +872,13 @@ export function PanelProductPlan({ onClose }: Props) {
         </div>
       )}
 
-      {/* ── Selected plan summary ────────────────────────────────────── */}
-      {localQuote && (
-        <div className="border border-primary/30 rounded-lg p-4 bg-primary/5">
+      {saveError && <div className="alert alert-danger"><XCircle size={16} /><span>{saveError}</span></div>}
+    </div>
+
+    {/* Footer — selected plan summary doubles as the sticky action bar */}
+    {localQuote ? (
+      <div className="shrink-0 border-t border-primary bg-primary-soft px-4 py-3 flex flex-col gap-3">
+        <div>
           <div className="text-xs text-primary-fg font-medium mb-2">{t('wizard.selectedPlan')}</div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div>
@@ -895,23 +899,23 @@ export function PanelProductPlan({ onClose }: Props) {
             </div>
           </div>
         </div>
-      )}
-
-      {saveError && <div className="alert alert-danger"><XCircle size={16} /><span>{saveError}</span></div>}
-    </div>
-
-    {/* Footer — sticky bottom */}
-    <div className="shrink-0 border-t border-line bg-bg px-4 py-3 flex justify-end gap-2">
-      <Button variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
-      <Button
-        color={saved ? 'success' : 'primary'}
-        onClick={handleConfirm}
-        disabled={!canConfirm}
-        startIcon={saved ? <CheckCircle size={16} /> : undefined}
-      >
-        {saving ? t('common.saving') : saved ? t('common.saved') : t('common.confirm')}
-      </Button>
-    </div>
+        <div className="flex justify-end">
+          <Button
+            size="sm"
+            color={saved ? 'success' : 'primary'}
+            onClick={handleConfirm}
+            disabled={!canConfirm}
+            startIcon={saved ? <CheckCircle size={14} /> : undefined}
+          >
+            {saving ? t('common.saving') : saved ? t('common.saved') : t('common.confirm')}
+          </Button>
+        </div>
+      </div>
+    ) : (
+      <div className="shrink-0 border-t border-danger bg-danger-soft px-4 py-4 text-center text-sm text-danger-fg">
+        {t('wizard.pleaseSelectPlan')}
+      </div>
+    )}
     </div>
   );
 }
@@ -945,7 +949,7 @@ function QuoteTable({ rows, terms, type, isSelected, onSelect, t }: {
             return termRows.map((row) => {
               const selected = isSelected(row, finModel);
               return (
-                <tr key={`${term}-${row.down_percent}`} className={`cursor-pointer transition-colors ${selected ? 'bg-primary/10' : 'hover:bg-surface-hover'}`} onClick={() => onSelect(row)}>
+                <tr key={`${term}-${row.down_percent}`} className={`cursor-pointer transition-colors ${selected ? 'bg-primary-soft' : 'hover:bg-surface-hover'}`} onClick={() => onSelect(row)}>
                   <td className="px-4 py-2.5 font-medium">{term} {t('priceCheck.months')}</td>
                   <td className="text-right px-4 py-2.5 tabular-nums">{fmt(row.down_amount)} <span className="text-subtle text-xs">({row.down_percent}%)</span></td>
                   <td className="text-right px-4 py-2.5 tabular-nums text-primary-fg font-semibold">{fmt(row.installment_amount)}</td>

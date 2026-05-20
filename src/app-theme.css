@@ -27,6 +27,12 @@
        hue; override here so .text-primary-fg renders the lighter shade). */
     --color-primary-fg: #5a78ee;
     /* --color-warning-fg falls through to library default (= --color-warning) */
+
+    /* Soft tinted surface for selected/active cards — same formula as the
+       Badge bg, so primary-tinted regions read consistently. Theme-aware via
+       --color-surface (adapts to light/dark automatically). */
+    --color-primary-soft: color-mix(in srgb, var(--color-primary) 15%, var(--color-bg));
+    --color-danger-soft: color-mix(in srgb, var(--color-danger) 15%, var(--color-bg));
 }
 
 [data-theme="light"] {

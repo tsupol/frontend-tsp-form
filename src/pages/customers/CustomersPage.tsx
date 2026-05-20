@@ -247,7 +247,7 @@ export function CustomersPage() {
                         <button
                           key={c.id}
                           className={`w-full text-left px-4 py-2.5 border-b border-line transition-colors cursor-pointer ${
-                            c.id === selectedId ? 'bg-primary/10' : 'hover:bg-surface-hover'
+                            c.id === selectedId ? 'bg-primary-soft' : 'hover:bg-surface-hover'
                           }`}
                           onClick={() => handleSelect(c)}
                         >

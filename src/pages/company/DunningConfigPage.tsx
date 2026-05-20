@@ -309,7 +309,7 @@ export function DunningConfigPage() {
                   key={row._key}
                   className={`border rounded-lg p-4 transition-colors ${
                     !row.is_active ? 'border-line/50 opacity-60' :
-                    row.dirty ? 'border-primary/40 bg-primary/3' :
+                    row.dirty ? 'border-primary bg-primary-soft' :
                     'border-line'
                   }`}
                 >

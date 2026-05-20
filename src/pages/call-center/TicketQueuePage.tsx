@@ -933,7 +933,7 @@ export function TicketQueuePage() {
                     return (
                       <div
                         className={`px-4 py-2 border-b border-line transition-colors cursor-pointer ${
-                          isSelected ? 'bg-primary/10' : 'hover:bg-surface-hover'
+                          isSelected ? 'bg-primary-soft' : 'hover:bg-surface-hover'
                         }`}
                         onClick={() => {
                           setSelectedTicketId(ticket.id);

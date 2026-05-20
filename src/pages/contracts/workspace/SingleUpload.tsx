@@ -97,7 +97,7 @@ export function SingleUpload({ icon, label, fileUrl, uploading, onUpload, disabl
 
       {fileUrl ? (
         <div
-          className="relative group cursor-pointer rounded-lg border-2 border-transparent hover:border-primary/40 transition-colors overflow-hidden"
+          className="relative group cursor-pointer rounded-lg border-2 border-transparent hover:border-primary transition-colors overflow-hidden"
           style={{ maxWidth: '20rem' }}
           onClick={handleClick}
           onDrop={handleDrop}
