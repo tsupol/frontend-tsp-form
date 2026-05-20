@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, Select, Button, MobileHeader, Badge, Modal } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, XCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, XCircle, Loader2, Copy, Check } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavGuard } from '../../contexts/NavGuardContext';
@@ -11,6 +11,7 @@ import { useNavGuard } from '../../contexts/NavGuardContext';
 import { WorkspaceProvider, useWorkspace } from './workspace/WorkspaceContext';
 import { CardProductPlan } from './workspace/CardProductPlan';
 import { CardSaving } from './workspace/CardSaving';
+import { CardInsurance } from './workspace/CardInsurance';
 import { CardCustomer } from './workspace/CardCustomer';
 import { CardGuarantor } from './workspace/CardGuarantor';
 import { CardDocuments } from './workspace/CardDocuments';
@@ -27,6 +28,7 @@ import { PanelCustomer } from './workspace/PanelCustomer';
 import { PanelGuarantor } from './workspace/PanelGuarantor';
 import { PanelDocuments } from './workspace/PanelDocuments';
 import { PanelSaving } from './workspace/PanelSaving';
+import { PanelInsurance } from './workspace/PanelInsurance';
 import { CardContactRef } from './workspace/CardContactRef';
 import { PanelContactRef } from './workspace/PanelContactRef';
 import type { ModalId } from './workspace/WorkspaceTypes';
@@ -45,6 +47,14 @@ function WorkspaceContent() {
   const loadedRef = useRef(false);
   const { data, updateData, resetData, openModal, setOpenModal, isPostPayment, getCardStatus, panelDirtyRef, pendingModal, confirmPanelSwitch, cancelPanelSwitch } = useWorkspace();
   const [shakingCards] = useState<Set<string>>(new Set());
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyCode = (code: string) => {
+    navigator.clipboard.writeText(code).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
 
   const needsBranchSelect = !user?.branch_id;
 
@@ -264,6 +274,7 @@ function WorkspaceContent() {
     productPlan: t('workspace.cardProduct'),
     customer: t('workspace.cardCustomer'),
     saving: t('workspace.cardSaving'),
+    insurance: t('workspace.cardInsurance'),
     contactRef: t('workspace.cardContactRef'),
     guarantor: t('workspace.cardGuarantor'),
     documents: t('workspace.cardDocuments'),
@@ -326,7 +337,18 @@ function WorkspaceContent() {
               <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
                 <h1 className="heading-2 shrink-0">{t('wizard.title')}</h1>
                 {data.contractCode && (
-                  <Badge size="sm" color="default" className="font-mono">{data.contractCode}</Badge>
+                  <div className="flex items-center gap-1">
+                    <Badge size="sm" color="default" className="font-mono">{data.contractCode}</Badge>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyCode(data.contractCode!)}
+                      className="p-1 rounded hover:bg-surface-hover transition-colors cursor-pointer text-subtle hover:text-fg"
+                      aria-label={t('common.copy')}
+                      title={copied ? t('common.copied') : t('common.copy')}
+                    >
+                      {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
+                    </button>
+                  </div>
                 )}
               </div>
             )}
@@ -354,6 +376,7 @@ function WorkspaceContent() {
                     <CardCustomer onEdit={() => handleEditOpen('customer')} active={isCardActive('customer')} shake={shakingCards.has('customer')} />
                     <CardProductPlan onEdit={() => handleEditOpen('productPlan')} active={isCardActive('productPlan')} shake={shakingCards.has('productPlan')} />
                     <CardSaving onEdit={() => handleEditOpen('saving')} active={isCardActive('saving')} shake={shakingCards.has('saving')} />
+                    <CardInsurance onEdit={() => handleEditOpen('insurance')} active={isCardActive('insurance')} shake={shakingCards.has('insurance')} />
                     <CardContactRef onEdit={() => handleEditOpen('contactRef')} active={isCardActive('contactRef')} shake={shakingCards.has('contactRef')} />
                     <CardGuarantor onEdit={() => handleEditOpen('guarantor')} active={isCardActive('guarantor')} shake={shakingCards.has('guarantor')} />
                     <CardDocuments onEdit={() => handleEditOpen('documents')} active={isCardActive('documents')} shake={shakingCards.has('documents')} />
@@ -382,6 +405,7 @@ function WorkspaceContent() {
                 <div className="flex-1 overflow-y-auto better-scroll">
                   {openModal === 'productPlan' && <PanelProductPlan onClose={handleEditClose} />}
                   {openModal === 'saving' && <PanelSaving onClose={handleEditClose} />}
+                  {openModal === 'insurance' && <PanelInsurance onClose={handleEditClose} />}
                   {openModal === 'customer' && <PanelCustomer onClose={handleEditClose} />}
                   {openModal === 'contactRef' && <PanelContactRef onClose={handleEditClose} />}
                   {openModal === 'guarantor' && <PanelGuarantor onClose={handleEditClose} />}

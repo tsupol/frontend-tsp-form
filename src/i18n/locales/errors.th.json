@@ -192,6 +192,7 @@
   "SALE.VALIDATION.NOT_INSTALLMENT_MODEL": "ใช้ได้เฉพาะแผนผ่อนชำระเท่านั้น",
   "SALE.VALIDATION.USED_ASSET_UNSUPPORTED": "ไม่รองรับการตั้ง rate สำหรับสัญญาเครื่องมือสอง",
   "SALE.VALIDATION.INSURANCE_FIN2_ONLY": "เงินประกันใช้ได้เฉพาะสัญญา FIN2",
+  "SALE.VALIDATION.NO_OPEN_AMOUNT": "ตั้งเงินดาวน์หรือเงินประกันก่อนเปิดบิล",
   "SALE.VALIDATION.SAVING_TARGET_INVALID": "ยอดเป้าหมายออมไม่ถูกต้อง",
   "SALE.VALIDATION.STAFF_SCORE_INVALID": "คะแนนพนักงานต้องอยู่ระหว่าง 1 ถึง 3",
   "SALE.VALIDATION.AMOUNT_MUST_BE_POSITIVE": "จำนวนเงินต้องมากกว่าศูนย์",

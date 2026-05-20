@@ -3,6 +3,7 @@
 export type ModalId =
   | 'productPlan'
   | 'saving'
+  | 'insurance'
   | 'customer'
   | 'contactRef'
   | 'guarantor'
@@ -206,6 +207,7 @@ export const ERROR_TO_MODAL: Record<string, ModalId> = {
   'CONTRACT.STATE.DEAL_PARTNER_APPROVAL_REQUIRED': null,
   'CONTRACT.VALIDATION.SIGNATORY_INCOMPLETE': 'signatory',
   'CONTRACT.VALIDATION.NO_BRANCH_DEFAULT_SIGNATORY': 'signatory',
+  'SALE.VALIDATION.NO_OPEN_AMOUNT': 'productPlan',
 };
 
 // ── Brand/Family lookups ─────────────────────────────────────────────────

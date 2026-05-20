@@ -260,7 +260,10 @@ export function PanelProductPlan({ onClose }: Props) {
     setLocalModelId(contract.model_id);
     setLocalModelName(contract.model_name ?? '');
     setLocalVariantName(contract.variant_name ?? '');
-    // We don't have full UsedAsset from contract, but we have enough to display
+
+    apiClient.get<StockAsset[]>(`/v_assets?asset_id=eq.${contract.target_asset_id}&limit=1`)
+      .then(rows => { if (rows[0]) setSelectedAsset(rows[0]); })
+      .catch(() => {});
   }, [contract?.is_used_asset, contract?.target_asset_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── NEW: Variants from selected model ───────────────────────────────
@@ -280,35 +283,45 @@ export function PanelProductPlan({ onClose }: Props) {
 
   const { data: quoteData } = useQuery({
     queryKey: ['quote-calc', localModelId],
-    queryFn: () => apiClient.rpc<QuoteResponse>('fn_quote_calculate', { p_model_id: localModelId }),
+    queryFn: () => apiClient.rpc<QuoteResponse>('fn_quote_calculate', { p_model_id: localModelId, p_variant_id: null, p_term_months: null, p_down_percent: null, p_down_amount: 0 }),
     staleTime: 2 * 60 * 1000,
     enabled: !!localModelId && mode === 'new',
   });
 
-  // ── USED: Quotes via fn_pricing_calculate_used ────────────────────
+  // ── USED: Quotes via fn_quote_calculate_used (FIN1+FIN2 in one call) ──
 
-  interface UsedQuoteResponse {
-    quotes: { cost_price: number; down_amount: number; term_months: number; retail_price: number; total_amount: number; profit_percent: number; financed_amount: number; installment_amount: number }[];
-    resolved_cost: number;
-    resolved_retail: number;
+  interface UsedQuoteRow {
     commercial_model: string;
+    term_months: number;
+    down_percent: number | null;
+    down_amount: number;
+    retail_price: number;
+    total_amount: number;
+    financed_amount: number;
+    installment_amount: number;
+    cost_price: number;
+    interest_percent: number | null;
+    profit_percent: number | null;
+    rate_card_id: number | null;
   }
 
-  const { data: usedFin1Data } = useQuery({
-    queryKey: ['used-pricing', localTargetAssetId, 'FIN1'],
-    queryFn: () => apiClient.rpc<UsedQuoteResponse>('fn_pricing_calculate_used', {
-      p_asset_id: localTargetAssetId,
-      p_commercial_model: 'FIN1',
-    }),
-    staleTime: 2 * 60 * 1000,
-    enabled: !!localTargetAssetId && mode === 'used',
-  });
+  interface UsedQuoteResponse {
+    asset_id: number;
+    cost_price: number;
+    suggested_retail: number;
+    retail_markup_percent: number;
+    quote_count: number;
+    unconfigured_finance_models: string[];
+    quotes: UsedQuoteRow[];
+  }
 
-  const { data: usedFin2Data } = useQuery({
-    queryKey: ['used-pricing', localTargetAssetId, 'FIN2'],
-    queryFn: () => apiClient.rpc<UsedQuoteResponse>('fn_pricing_calculate_used', {
+  const { data: usedQuoteData } = useQuery({
+    queryKey: ['used-quote', localTargetAssetId],
+    queryFn: () => apiClient.rpc<UsedQuoteResponse>('fn_quote_calculate_used', {
       p_asset_id: localTargetAssetId,
-      p_commercial_model: 'FIN2',
+      p_term_months: null,
+      p_down_percent: null,
+      p_down_amount: 0,
     }),
     staleTime: 2 * 60 * 1000,
     enabled: !!localTargetAssetId && mode === 'used',
@@ -318,25 +331,21 @@ export function PanelProductPlan({ onClose }: Props) {
 
   const dedupedQuotes = useMemo(() => {
     if (mode === 'used') {
-      // Map used pricing responses to PricingRow
       const rows: PricingRow[] = [];
-      for (const src of [usedFin1Data, usedFin2Data]) {
-        if (!src?.quotes) continue;
-        for (const q of src.quotes) {
-          rows.push({
-            finance_model: src.commercial_model,
-            term_months: q.term_months,
-            down_percent: 0,
-            down_amount: q.down_amount,
-            retail_price: q.retail_price,
-            installment_amount: q.installment_amount,
-            total_amount: q.total_amount,
-            financed_amount: q.financed_amount,
-            cost_price: q.cost_price,
-            interest_percent_total: null,
-            fin2_profit_amount: q.profit_percent != null ? q.cost_price * q.profit_percent / 100 : null,
-          });
-        }
+      for (const q of usedQuoteData?.quotes ?? []) {
+        rows.push({
+          finance_model: q.commercial_model,
+          term_months: q.term_months,
+          down_percent: q.down_percent ?? 0,
+          down_amount: q.down_amount,
+          retail_price: q.retail_price,
+          installment_amount: q.installment_amount,
+          total_amount: q.total_amount,
+          financed_amount: q.financed_amount,
+          cost_price: q.cost_price,
+          interest_percent_total: q.interest_percent,
+          fin2_profit_amount: q.profit_percent != null ? q.cost_price * q.profit_percent / 100 : null,
+        });
       }
       return rows;
     }
@@ -362,15 +371,19 @@ export function PanelProductPlan({ onClose }: Props) {
       }
     }
     return Array.from(seen.values());
-  }, [mode, quoteData, usedFin1Data, usedFin2Data]);
+  }, [mode, quoteData, usedQuoteData]);
 
   const fin1Rows = useMemo(() => dedupedQuotes.filter(r => r.finance_model === 'FIN1'), [dedupedQuotes]);
   const fin2Rows = useMemo(() => dedupedQuotes.filter(r => r.finance_model === 'FIN2'), [dedupedQuotes]);
-  const unconfiguredFinanceModels = quoteData?.unconfigured_finance_models ?? [];
-  const fin2Unconfigured = mode === 'new' && unconfiguredFinanceModels.includes('FIN2');
+  const unconfiguredFinanceModels = mode === 'used'
+    ? (usedQuoteData?.unconfigured_finance_models ?? [])
+    : (quoteData?.unconfigured_finance_models ?? []);
+  const fin2Unconfigured = unconfiguredFinanceModels.includes('FIN2');
   const fin1Terms = useMemo(() => [...new Set(fin1Rows.map(r => r.term_months))].sort((a, b) => a - b), [fin1Rows]);
   const fin2Terms = useMemo(() => [...new Set(fin2Rows.map(r => r.term_months))].sort((a, b) => a - b), [fin2Rows]);
-  const retailPrice = (mode === 'used' ? usedFin1Data?.resolved_retail : dedupedQuotes[0]?.retail_price) ?? dedupedQuotes[0]?.retail_price;
+  const retailPrice = mode === 'used'
+    ? (usedQuoteData?.suggested_retail ?? dedupedQuotes[0]?.retail_price)
+    : dedupedQuotes[0]?.retail_price;
 
   // ── Handlers: NEW ───────────────────────────────────────────────────
 
@@ -670,7 +683,7 @@ export function PanelProductPlan({ onClose }: Props) {
           <div className="flex items-center px-4 py-3 gap-3">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="font-medium">{selectedAsset?.asset_code ?? contract?.target_asset_identifier ?? `#${localTargetAssetId}`}</span>
+                <span className="font-medium">{selectedAsset?.asset_code ?? `#${localTargetAssetId}`}</span>
                 {(selectedAsset?.condition_grade ?? contract?.target_asset_condition_grade) && (
                   <span className={`text-xs font-medium ${getConditionTextColor(selectedAsset?.condition_grade ?? contract?.target_asset_condition_grade ?? '')}`}>
                     {getConditionLabel(selectedAsset?.condition_grade ?? contract?.target_asset_condition_grade ?? '', t)}
@@ -862,7 +875,7 @@ export function PanelProductPlan({ onClose }: Props) {
       {/* USED — no plans available (backend returned 0 quotes for both FIN1+FIN2).
           Usually means missing fin1_rate_cards for the asset's category, or no
           used_asset_profit_rates seeded for FIN2 USED. */}
-      {mode === 'used' && localTargetAssetId && usedFin1Data && usedFin2Data && dedupedQuotes.length === 0 && (
+      {mode === 'used' && localTargetAssetId && usedQuoteData && dedupedQuotes.length === 0 && (
         <div className="alert alert-warning">
           <AlertTriangle size={16} />
           <div>

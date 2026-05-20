@@ -65,22 +65,25 @@ export function PanelHandover({ onClose: _onClose }: Props) {
   return (
     <div className="flex flex-col h-full max-w-xl">
       <div className="flex-1 overflow-y-auto better-scroll p-4 flex flex-col gap-5">
-        <div className="flex flex-col gap-3">
-          <LabeledCheckbox
-            label={t('workspace.handoverHasBox')}
-            checked={hasBox}
-            onChange={e => setHasBox(e.target.checked)}
-          />
-          <LabeledCheckbox
-            label={t('workspace.handoverHasChargerSet')}
-            checked={hasChargerSet}
-            onChange={e => setHasChargerSet(e.target.checked)}
-          />
-          <LabeledCheckbox
-            label={t('workspace.handoverHasChargerCable')}
-            checked={hasChargerCable}
-            onChange={e => setHasChargerCable(e.target.checked)}
-          />
+        <div className="flex flex-col">
+          <label className="form-label mb-3">{t('workspace.handoverIncludedItems')}</label>
+          <div className="flex flex-col gap-3">
+            <LabeledCheckbox
+              label={t('workspace.handoverHasBox')}
+              checked={hasBox}
+              onChange={e => setHasBox(e.target.checked)}
+            />
+            <LabeledCheckbox
+              label={t('workspace.handoverHasChargerSet')}
+              checked={hasChargerSet}
+              onChange={e => setHasChargerSet(e.target.checked)}
+            />
+            <LabeledCheckbox
+              label={t('workspace.handoverHasChargerCable')}
+              checked={hasChargerCable}
+              onChange={e => setHasChargerCable(e.target.checked)}
+            />
+          </div>
         </div>
 
         <div className="flex flex-col">

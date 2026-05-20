@@ -192,6 +192,7 @@
   "SALE.VALIDATION.NOT_INSTALLMENT_MODEL": "This action is only available for installment plans",
   "SALE.VALIDATION.USED_ASSET_UNSUPPORTED": "Rate setting is not supported for used asset contracts",
   "SALE.VALIDATION.INSURANCE_FIN2_ONLY": "Insurance deposit is only available for FIN2 contracts",
+  "SALE.VALIDATION.NO_OPEN_AMOUNT": "Set a down payment or insurance deposit before opening the bill",
   "SALE.VALIDATION.SAVING_TARGET_INVALID": "Saving target amount is invalid",
   "SALE.VALIDATION.STAFF_SCORE_INVALID": "Staff score must be between 1 and 3",
   "SALE.VALIDATION.AMOUNT_MUST_BE_POSITIVE": "Amount must be greater than zero",

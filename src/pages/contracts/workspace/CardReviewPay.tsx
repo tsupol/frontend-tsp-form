@@ -17,8 +17,8 @@ export function CardReviewPay({ onEdit, active, disabled }: { onEdit?: () => voi
     <div
       className={`border rounded-lg transition-colors ${
         disabled ? 'border-line/50 bg-surface/50 opacity-50' :
-        active ? 'border-primary bg-primary-soft' :
-        'border-primary bg-primary-soft hover:border-primary cursor-pointer'
+        active ? 'border-warning bg-warning/10' :
+        'border-warning/40 bg-warning/5 hover:border-warning/60 cursor-pointer'
       }`}
       onClick={clickable ? onEdit : undefined}
       role={clickable ? 'button' : undefined}
@@ -26,7 +26,7 @@ export function CardReviewPay({ onEdit, active, disabled }: { onEdit?: () => voi
       onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') onEdit?.(); } : undefined}
     >
       <div className="flex items-center gap-2 px-4 py-3">
-        <CreditCard size={16} className="text-primary-fg shrink-0" />
+        <CreditCard size={16} className="text-warning-fg shrink-0" />
         <span className="font-medium text-sm flex-1">{t('workspace.cardReviewPay')}</span>
       </div>
       <div className="px-4 pb-3 text-sm flex flex-col gap-1.5">

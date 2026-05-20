@@ -110,7 +110,7 @@ export function ModalProductPlan({ open, onClose }: Props) {
   // Get quotes for selected model
   const { data: quoteData } = useQuery({
     queryKey: ['wizard-quotes', localModelId],
-    queryFn: () => apiClient.rpc<QuoteResponse>('fn_quote_calculate', { p_model_id: localModelId }),
+    queryFn: () => apiClient.rpc<QuoteResponse>('fn_quote_calculate', { p_model_id: localModelId, p_variant_id: null, p_term_months: null, p_down_percent: null, p_down_amount: 0 }),
     staleTime: 2 * 60 * 1000,
     enabled: !!localModelId,
   });

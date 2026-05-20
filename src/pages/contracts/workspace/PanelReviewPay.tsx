@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Select, MaskedInput } from 'tsp-form';
-import { Star, Plus, Trash2, XCircle, Loader2, CheckCircle, AlertTriangle, ChevronsRight, Link2, FileText } from 'lucide-react';
+import { Star, Plus, Trash2, XCircle, Loader2, CheckCircle, AlertTriangle, ChevronsRight, Link2, FileText, CreditCard, Clock } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { fmtCurrency } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
@@ -61,45 +61,65 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
 
   const totalAmount = liveBill?.total_amount ?? previewTotal;
 
-  // Auto-open the CONTRACT_OPEN bill once the contract is validate-ready.
-  // Doc 33: bill_open transitions DRAFT → PENDING_PAYMENT and creates the
-  // canonical bill that the cart edits live against.
-  const autoOpenInFlight = useRef(false);
-  const [autoOpenError, setAutoOpenError] = useState('');
+  // Read-only readiness check — surfaces missing items before user clicks Activate.
+  // bill_open itself re-validates server-side, so this is purely UX.
+  const { data: readiness } = useQuery({
+    queryKey: ['contract-readiness', data.contractId],
+    queryFn: () => apiClient.rpc<ReadinessResult>('fn_contract_validate_ready', {
+      p_contract_id: data.contractId,
+    }),
+    enabled: !!data.contractId && !data.billId && !data.billConfirmed,
+    staleTime: 0,
+  });
   useEffect(() => {
-    if (data.billConfirmed) return;
-    if (data.billId != null && data.billId > 0) return;
-    if (!data.contractId || !score) return;
-    if (autoOpenInFlight.current) return;
-    autoOpenInFlight.current = true;
-    (async () => {
-      try {
-        const readiness = await apiClient.rpc<ReadinessResult>('fn_contract_validate_ready', {
-          p_contract_id: data.contractId,
-        });
-        if (!readiness.ready) {
-          setReadinessErrors(readiness.errors);
-          autoOpenInFlight.current = false;
-          return;
+    if (readiness && !readiness.ready) setReadinessErrors(readiness.errors);
+    else if (readiness?.ready) setReadinessErrors([]);
+  }, [readiness]);
+
+  // ── Manual activate — opens the CONTRACT_OPEN bill on explicit user click.
+  // Doc 33: bill_open transitions DRAFT → PENDING_PAYMENT and creates the
+  // canonical bill. After this, contract is financially locked until pay or void.
+  const [activating, setActivating] = useState(false);
+  const [activateError, setActivateError] = useState('');
+  const activate = async (): Promise<boolean> => {
+    if (!data.contractId) return false;
+    setActivating(true);
+    setActivateError('');
+    setReadinessErrors([]);
+    try {
+      const bill = await apiClient.rpc<BillOpenResult>('fn_bill_contract_open', {
+        p_contract_id: data.contractId,
+      });
+      updateData({ billId: bill.bill_id, billCode: bill.bill_code, billData: bill });
+      invalidateContract();
+      return true;
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setActivateError(tr || err.message);
+        // If backend returned a readiness-style error, also surface it inline so
+        // the user can jump to the relevant card.
+        if (err.code && ERROR_TO_MODAL[err.code]) {
+          setReadinessErrors([{ code: err.code }]);
         }
-        const bill = await apiClient.rpc<BillOpenResult>('fn_bill_contract_open', {
-          p_contract_id: data.contractId,
-        });
-        updateData({ billId: bill.bill_id, billCode: bill.bill_code, billData: bill });
-        invalidateContract();
-      } catch (err) {
-        if (err instanceof ApiError) {
-          const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-            || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
-          setAutoOpenError(tr || err.message);
-        } else {
-          setAutoOpenError(err instanceof Error ? err.message : String(err));
-        }
-        autoOpenInFlight.current = false;
+      } else {
+        setActivateError(err instanceof Error ? err.message : String(err));
       }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data.contractId, data.billId, data.billConfirmed, score]);
+      return false;
+    } finally {
+      setActivating(false);
+    }
+  };
+
+  const handleActivatePayLater = async () => {
+    const ok = await activate();
+    if (ok && data.contractId) {
+      // Pay-later: leave contract in PENDING_PAYMENT and exit to the contract page,
+      // where the existing "continue payment" modal handles payment.
+      navigate(`/admin/contracts/search/${data.contractId}`);
+    }
+  };
 
   // ── Confidence score ────────────────────────────────────────────────
   const [scoreSaving, setScoreSaving] = useState(false);
@@ -311,7 +331,7 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
           )}
         </div>
 
-        {/* ── Section 2: Cart ──────────────────────────────────── */}
+        {/* ── Section 2: Cart / Preview ────────────────────────── */}
         <div>
           <label className="form-label">{t('workspace.billPreview')}</label>
           {data.billId && data.billId > 0 ? (
@@ -320,16 +340,6 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
               branchId={contract?.branch_id ?? null}
               onChange={() => queryClient.invalidateQueries({ queryKey: ['bill-detail', data.billId] })}
             />
-          ) : autoOpenError ? (
-            <div className="alert alert-danger">
-              <XCircle size={14} />
-              <span>{autoOpenError}</span>
-            </div>
-          ) : score ? (
-            <div className="flex items-center gap-2 text-sm text-subtle p-3 border border-line rounded-md">
-              <Loader2 size={14} className="animate-spin" />
-              <span>{t('workspace.openingBill', { defaultValue: 'Opening bill…' })}</span>
-            </div>
           ) : (
             <div className="border border-line rounded-md overflow-hidden">
               <table className="w-full text-sm">
@@ -356,7 +366,8 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
           )}
         </div>
 
-        {/* ── Section 3: Payment Methods ───────────────────────── */}
+        {/* ── Section 3: Payment Methods (only after bill is opened) ── */}
+        {data.billId && data.billId > 0 && (
         <div>
           <label className="form-label">{t('wizard.paymentMethods')}</label>
           <div className="flex flex-col gap-3">
@@ -433,6 +444,15 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
             </span>
           </div>
         </div>
+        )}
+
+        {/* ── Pre-bill: activate consequence callout ───────────── */}
+        {!data.billId && (
+          <div className="alert alert-warning">
+            <AlertTriangle size={16} />
+            <span className="text-xs">{t('wizard.activateConsequence')}</span>
+          </div>
+        )}
 
         {/* ── Readiness errors ─────────────────────────────────── */}
         {readinessErrors.length > 0 && (
@@ -456,7 +476,15 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
           </div>
         )}
 
-        {/* ── Error ────────────────────────────────────────────── */}
+        {/* ── Activate error (non-readiness backend error) ─────── */}
+        {activateError && !readinessErrors.length && (
+          <div className="alert alert-danger">
+            <XCircle size={16} />
+            <div><div className="alert-description">{activateError}</div></div>
+          </div>
+        )}
+
+        {/* ── Pay / confirm error ──────────────────────────────── */}
         {error && (
           <div className="alert alert-danger">
             <XCircle size={16} />
@@ -467,14 +495,34 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
 
       {/* ── Footer ───────────────────────────────────────────── */}
       <div className="shrink-0 border-t border-line bg-bg px-4 py-3 flex justify-end gap-2">
-        <Button
-          color="primary"
-          onClick={handleConfirm}
-          disabled={!canConfirm || loading}
-          startIcon={loading ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
-        >
-          {loading ? t('common.loading') : t('wizard.confirmPayment')}
-        </Button>
+        {!data.billId ? (
+          <>
+            <Button
+              onClick={handleActivatePayLater}
+              disabled={!score || activating}
+              startIcon={activating ? <Loader2 size={16} className="animate-spin" /> : <Clock size={16} />}
+            >
+              {t('wizard.activatePayLater')}
+            </Button>
+            <Button
+              color="primary"
+              onClick={activate}
+              disabled={!score || activating}
+              startIcon={activating ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}
+            >
+              {activating ? t('wizard.activating') : t('wizard.activateAndPay')}
+            </Button>
+          </>
+        ) : (
+          <Button
+            color="primary"
+            onClick={handleConfirm}
+            disabled={!canConfirm || loading}
+            startIcon={loading ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
+          >
+            {loading ? t('common.loading') : t('wizard.confirmPayment')}
+          </Button>
+        )}
       </div>
     </div>
   );
