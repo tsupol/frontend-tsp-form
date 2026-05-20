@@ -1,15 +1,13 @@
 import { useMemo, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
 import { Badge } from 'tsp-form';
 import {
   CalendarCheck, BookOpen, Wallet, Scale, ArrowUpRight, Coins, List, Receipt, ShieldAlert,
 } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { apiClient } from '../../lib/api';
-import { defaultScopeFor, scopeKey, scopeQueryRollup } from '../../lib/scope';
+import { useNavCounts } from '../../hooks/useNavCounts';
 
 type NavItem =
   | { type: 'link'; path: string; labelKey: string; icon: typeof BookOpen; badge?: number }
@@ -21,25 +19,7 @@ export function AccountingLayout({ children }: { children: ReactNode }) {
   const navGuard = useNavGuard();
   const { user } = useAuth();
   const canSeeAudit = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(user?.role_code ?? '');
-
-  // Unclosed-days badge for the Day Close item. Same query key as AppSideNav
-  // so React Query dedupes to one fetch when both are mounted.
-  const isBranchUser = user?.role_code === 'BRANCH_STAFF' || user?.role_code === 'BRANCH_MANAGER';
-  const scope = defaultScopeFor(user);
-  const sk = scopeKey(scope);
-  const sqr = scopeQueryRollup(scope);
-  const { data: unclosedRows } = useQuery({
-    queryKey: ['nav', 'unclosed-summary', sk],
-    queryFn: () => apiClient.get<{ unclosed_day_count: number; unclosed_branch_count: number }[]>(
-      `/v_dashboard_unclosed_summary?select=unclosed_day_count,unclosed_branch_count${sqr}`,
-    ),
-    refetchInterval: 60_000,
-    refetchOnWindowFocus: true,
-  });
-  const unclosedRow = unclosedRows?.[0];
-  const unclosedCount = isBranchUser
-    ? (unclosedRow?.unclosed_day_count ?? 0)
-    : (unclosedRow?.unclosed_branch_count ?? 0);
+  const { unclosedCount } = useNavCounts();
 
   const navItems: NavItem[] = useMemo(() => [
     { type: 'group', labelKey: 'accounting.groupDayClose' },

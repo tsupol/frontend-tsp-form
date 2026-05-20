@@ -114,6 +114,29 @@ export function PendingPairingPage() {
   const totalCount = listData?.totalCount ?? 0;
   const totalPages = Math.ceil(totalCount / pageSize);
 
+  // Per-tab counts. Honors the active branch filter so the badges match what
+  // the user would see if they switched tabs.
+  const { data: tabCountsData } = useQuery({
+    queryKey: ['pending-pairing', 'tab-counts', filterBranchId, scope],
+    queryFn: () => {
+      const branchFilter = filterBranchId ? `&branch_id=eq.${filterBranchId}` : scopeQuery(scope);
+      return Promise.all([
+        apiClient.getPaginated<{ contract_id: number }>(
+          `/v_branch_action_required?action_type=eq.PENDING_DEVICE_BIND&select=contract_id${branchFilter}`,
+          { page: 1, pageSize: 1 },
+        ),
+        apiClient.getPaginated<{ contract_id: number }>(
+          `/v_branch_action_required?action_type=eq.PENDING_DELIVERY&select=contract_id${branchFilter}`,
+          { page: 1, pageSize: 1 },
+        ),
+      ]).then(([bind, delivery]) => ({
+        PENDING_DEVICE_BIND: bind.totalCount ?? 0,
+        PENDING_DELIVERY: delivery.totalCount ?? 0,
+      }));
+    },
+    refetchInterval: 60_000,
+  });
+
   const tabOptions: { value: PairingActionType; label: string; icon: typeof Link2 }[] = [
     { value: 'PENDING_DEVICE_BIND', label: t('contract.pendingPairing.tab_bind'), icon: Link2 },
     { value: 'PENDING_DELIVERY', label: t('contract.pendingPairing.tab_delivery'), icon: Truck },
@@ -158,6 +181,7 @@ export function PendingPairingPage() {
                 {tabOptions.map(opt => {
                   const Icon = opt.icon;
                   const active = opt.value === actionType;
+                  const count = tabCountsData?.[opt.value] ?? 0;
                   return (
                     <button
                       key={opt.value}
@@ -170,6 +194,9 @@ export function PendingPairingPage() {
                     >
                       <Icon size={14} />
                       {opt.label}
+                      {count > 0 && (
+                        <Badge size="xs" color="warning">{count > 99 ? '99+' : count}</Badge>
+                      )}
                     </button>
                   );
                 })}
@@ -199,13 +226,13 @@ export function PendingPairingPage() {
                       : t('contract.pendingPairing.empty_delivery')}
                   </div>
                 ) : (
-                  <div className="flex flex-col divide-y divide-line">
+                  <div className="flex flex-col">
                     {list.map(row => {
                       const isSelected = row.contract_id === selectedId;
                       return (
                         <button
                           key={row.contract_id}
-                          className={`w-full text-left px-4 py-2.5 flex flex-col gap-1.5 transition-colors cursor-pointer ${
+                          className={`w-full text-left px-4 py-2.5 border-b border-line flex flex-col gap-1.5 transition-colors cursor-pointer ${
                             isSelected ? 'bg-primary/10' : 'hover:bg-surface-hover'
                           }`}
                           onClick={() => { setSelectedId(row.contract_id); if (isMobile) goTo('detail'); }}

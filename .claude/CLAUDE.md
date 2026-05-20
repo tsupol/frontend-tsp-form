@@ -20,6 +20,7 @@
 - **Stale backend docs** — `UI_SUMMARY/` docs can drift from the running API. Before trusting documented flows/RPCs, check `.claude/stale-backend-docs.md` for known discrepancies. Full findings are filed in `D:/dev/nnf/UI_FEEDBACK/YYYY-MM-DD_topic.md`.
 - **Playwright MCP** — before using Playwright, read `.claude/playwright-guide.md` for login shortcuts and performance rules (use `browser_run_code` to batch actions, `browser_snapshot` not screenshots)
 - **Action button end-icons** — backend-driven action footers (Contract, Asset) use `ExternalLink` for actions that live elsewhere and `Wrench` for not-yet-wired actions, with stacked tooltip lines. See `.claude/action-button-end-icons.md` before adding/wiring any action button.
+- **Dual nav menus** — each section's fan-out lives in both `src/AppSideNav.tsx` (global) and `src/pages/<section>/<Section>Layout.tsx` (page sub-nav). Update both when changing items/labels/icons/badges. Count badges share queries via `src/hooks/useNavCounts.ts`.
 
 ## tsp-form Component Usage
 

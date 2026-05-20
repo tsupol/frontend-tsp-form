@@ -736,15 +736,15 @@ export function PanelProductPlan({ onClose }: Props) {
                   />
                 </div>
               </div>
-              <div className="border border-line rounded-lg overflow-hidden h-48 overflow-y-auto better-scroll">
+              <div className="border border-line rounded-lg overflow-hidden h-48 data-table-content better-scroll">
                 {assetSearching ? (
                   <div className="flex items-center justify-center h-full text-subtle text-sm">{t('common.loading')}</div>
                 ) : assets.length === 0 ? (
                   <div className="flex items-center justify-center h-full text-subtle text-sm">{t('wizard.noAssetsFound')}</div>
                 ) : (
-                  <div className="flex flex-col divide-y divide-line">
+                  <div className="flex flex-col">
                     {assets.map(asset => (
-                      <button key={asset.asset_id} className="w-full text-left px-4 py-2.5 cursor-pointer transition-colors hover:bg-surface-hover" onClick={() => handleSelectAsset(asset)}>
+                      <button key={asset.asset_id} className="w-full text-left px-4 py-2.5 border-b border-line cursor-pointer transition-colors hover:bg-surface-hover" onClick={() => handleSelectAsset(asset)}>
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-sm">{asset.asset_code}</span>
                           <span className={`text-xs font-medium ${getConditionTextColor(asset.condition_grade)}`}>
@@ -769,7 +769,7 @@ export function PanelProductPlan({ onClose }: Props) {
           {sourceTab === 'catalog' && (
             <>
               <Input ref={searchRef} value={search} onChange={(e) => handleSearchInput(e.target.value)} placeholder={t('wizard.searchProductPlaceholder')} startIcon={<Search size={16} />} className="w-full" size="sm" />
-              <div className="border border-line rounded-lg overflow-hidden h-48 overflow-y-auto better-scroll">
+              <div className="border border-line rounded-lg overflow-hidden h-48 data-table-content better-scroll">
                 {!shouldSearch ? (
                   <div className="flex items-center justify-center h-full text-subtle text-sm">{t('wizard.typeToSearch')}</div>
                 ) : searching ? (
@@ -777,9 +777,9 @@ export function PanelProductPlan({ onClose }: Props) {
                 ) : models.length === 0 ? (
                   <div className="flex items-center justify-center h-full text-subtle text-sm">{t('wizard.noModelsFound')}</div>
                 ) : (
-                  <div className="flex flex-col divide-y divide-line">
+                  <div className="flex flex-col">
                     {models.map(model => (
-                      <button key={model.model_id} className={`w-full text-left px-4 py-2.5 cursor-pointer transition-colors hover:bg-surface-hover`} onClick={() => handleSelectModel(model)}>
+                      <button key={model.model_id} className={`w-full text-left px-4 py-2.5 border-b border-line cursor-pointer transition-colors hover:bg-surface-hover`} onClick={() => handleSelectModel(model)}>
                         <div className="font-medium text-sm truncate">{model.family_name} {model.model_name}</div>
                         <div className="text-xs text-subtle">{model.brand_name}</div>
                       </button>

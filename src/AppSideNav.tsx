@@ -2,9 +2,7 @@ import { SideMenu, SideMenuItems, type SideMenuItemData, PopOver, MenuItem, SubM
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useState, useSyncExternalStore } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { clsx } from 'clsx';
-import { apiClient } from './lib/api';
 import {
   ArrowLeftFromLine,
   ArrowRightFromLine,
@@ -37,7 +35,7 @@ import {
   // Fanout child icons — Company
   MapPin, KeyRound, Landmark, CalendarDays, AlertTriangle, ShieldBan, Cloud,
   // Fanout child icons — Contracts
-  Search, PiggyBank, Link2, FileEdit,
+  Search, PiggyBank, Link2, FileEdit, FilePlus,
   // Fanout child icons — Commission
   UserCheck, ClipboardCheck,
   // Fanout child icons — Accounting
@@ -49,7 +47,7 @@ import { useAuth } from './contexts/AuthContext';
 import { useTheme } from './contexts/ThemeContext';
 import { useNavGuard } from './contexts/NavGuardContext';
 import { isLocalDev } from './lib/devEnv';
-import { defaultScopeFor, scopeQuery, scopeQueryRollup, scopeKey } from './lib/scope';
+import { useNavCounts } from './hooks/useNavCounts';
 
 const lgQuery = window.matchMedia('(min-width: 1024px)');
 const subscribeLg = (cb: () => void) => { lgQuery.addEventListener('change', cb); return () => lgQuery.removeEventListener('change', cb); };
@@ -156,67 +154,14 @@ export const AppSideNav = () => {
   const role = user?.role_code ?? '';
   const canApprove = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
 
-  // Side-menu badges always use the user's default scope (independent of any
-  // dashboard scope picker). Backend RLS leaks on these views — must send the
-  // explicit scope filter, see UI_FEEDBACK/2026-05-06_dashboard_endpoints.md.
-  // Uses GROUPING SETS rollup views; query keys match DashboardPage so React
-  // Query dedupes to a single fetch when both badge and dashboard are mounted.
-  const scope = defaultScopeFor(user);
-  const sk = scopeKey(scope);
-  const sqr = scopeQueryRollup(scope);
-
-  const { data: approvalsRows } = useQuery({
-    queryKey: ['nav', 'pending-approvals-summary', sk],
-    queryFn: () => apiClient.get<{ pending_count: number }[]>(
-      `/v_dashboard_pending_approvals_summary?select=pending_count,pending_amount${sqr}`,
-    ),
-    enabled: canApprove,
-    refetchInterval: 60_000,
-    refetchOnWindowFocus: true,
-  });
-  const pendingApprovals = approvalsRows?.[0]?.pending_count ?? 0;
-
-  const { data: slipsRows } = useQuery({
-    queryKey: ['nav', 'pending-submissions-summary', sk],
-    queryFn: () => apiClient.get<{ pending_count: number }[]>(
-      `/v_dashboard_payment_submissions_summary?select=pending_count,pending_amount${sqr}`,
-    ),
-    refetchInterval: 60_000,
-    refetchOnWindowFocus: true,
-    retry: false, // 403 until BE re-grants — don't loop
-  });
-  const pendingSlips = slipsRows?.[0]?.pending_count ?? 0;
-
-  // Unclosed-days badge for the Accounting parent item.
-  // For branch users (BS/BM) the badge counts unclosed days (their branch only).
-  // For CA/HA/SYSTEM_DEV it counts branches with unclosed days — keeps the
-  // signal "things you should act on" consistent across roles.
-  const isBranchUser = role === 'BRANCH_STAFF' || role === 'BRANCH_MANAGER';
-  const { data: unclosedRows } = useQuery({
-    queryKey: ['nav', 'unclosed-summary', sk],
-    queryFn: () => apiClient.get<{ unclosed_day_count: number; unclosed_branch_count: number }[]>(
-      `/v_dashboard_unclosed_summary?select=unclosed_day_count,unclosed_branch_count${sqr}`,
-    ),
-    refetchInterval: 60_000,
-    refetchOnWindowFocus: true,
-  });
-  const unclosedRow = unclosedRows?.[0];
-  const unclosedCount = isBranchUser
-    ? (unclosedRow?.unclosed_day_count ?? 0)
-    : (unclosedRow?.unclosed_branch_count ?? 0);
-
-  // Pending-pairing badge — ACTIVE contracts that are not yet bound to a device
-  // OR are bound but not yet handed over. Uses the canonical action-required view.
-  const { data: pairingCountData } = useQuery({
-    queryKey: ['nav', 'pending-pairing-count', sk],
-    queryFn: () => apiClient.getPaginated<{ contract_id: number }>(
-      `/v_branch_action_required?action_type=in.(PENDING_DEVICE_BIND,PENDING_DELIVERY)&select=contract_id${scopeQuery(scope)}`,
-      { page: 1, pageSize: 1 },
-    ),
-    refetchInterval: 60_000,
-    refetchOnWindowFocus: true,
-  });
-  const pendingPairingCount = pairingCountData?.totalCount ?? 0;
+  const {
+    pendingApprovals,
+    pendingSlips,
+    unclosedCount,
+    pendingPairingCount,
+    savingContractsCount,
+    draftContractsCount,
+  } = useNavCounts();
 
   // Render an icon with an optional count badge.
   // - Expanded: inline Badge to the right of the label (returned via `badge`).
@@ -328,9 +273,15 @@ export const AppSideNav = () => {
       path: '/admin/contracts',
       children: [
         { key: 'contract-search', icon: <Search size="1rem" />, label: t('nav.contractSearch'), path: '/admin/contracts/search' },
-        { key: 'saving-contracts', icon: <PiggyBank size="1rem" />, label: t('nav.savingContracts'), path: '/admin/contracts/saving' },
-        { key: 'draft-contracts', icon: <FileEdit size="1rem" />, label: t('nav.draftContracts'), path: '/admin/contracts/draft' },
+        { key: 'saving-contracts', ...iconWithCount(<PiggyBank size="1rem" />, savingContractsCount), label: t('nav.savingContracts'), path: '/admin/contracts/saving' },
+        { key: 'draft-contracts', ...iconWithCount(<FileEdit size="1rem" />, draftContractsCount), label: t('nav.draftContracts'), path: '/admin/contracts/draft' },
         { key: 'pending-pairing', ...iconWithCount(<Link2 size="1rem" />, pendingPairingCount), label: t('nav.pendingPairing'), path: '/admin/contracts/pending-pairing' },
+        {
+          key: 'new-contract',
+          icon: <FilePlus size="1rem" className="text-primary-fg" />,
+          label: <span className="text-primary-fg font-medium">{t('nav.newContract')}</span>,
+          path: '/admin/contracts/new',
+        },
       ],
     },
     ...(canApprove

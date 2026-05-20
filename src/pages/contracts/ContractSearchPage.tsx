@@ -294,13 +294,13 @@ export function ContractSearchPage() {
                 {contracts.length === 0 ? (
                   <div className="p-8 text-center text-subtler">{t('common.noData')}</div>
                 ) : (
-                  <div className="flex flex-col divide-y divide-line">
+                  <div className="flex flex-col">
                     {contracts.map(contract => {
                       const isSelected = contract.id === selectedId;
                       return (
                         <button
                           key={contract.id}
-                          className={`w-full text-left px-4 py-2.5 flex items-center gap-3 transition-colors cursor-pointer ${
+                          className={`w-full text-left px-4 py-2.5 border-b border-line flex items-center gap-3 transition-colors cursor-pointer ${
                             isSelected ? 'bg-primary/10' : 'hover:bg-surface-hover'
                           }`}
                           onClick={() => { setSelectedId(contract.id); if (isMobile) goTo('detail'); }}
