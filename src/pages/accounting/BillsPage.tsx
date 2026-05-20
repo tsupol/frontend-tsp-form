@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
@@ -8,7 +9,7 @@ import {
 } from 'tsp-form';
 import {
   ArrowRightFromLine, ArrowLeft, Plus, Trash2, XCircle, CheckCircle, Ban, Printer,
-  Wrench, ChevronDown,
+  Wrench, ChevronDown, Copy,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
@@ -232,26 +233,28 @@ export function BillsPage() {
                   return (
                     <button
                       key={b.id}
-                      className={`w-full text-left px-4 py-3 border-b border-line flex items-center gap-3 transition-colors cursor-pointer ${
+                      className={`w-full text-left px-4 py-3 border-b border-line flex flex-col gap-1 transition-colors cursor-pointer ${
                         isSelected ? 'bg-primary-soft' : 'hover:bg-surface-hover'
                       }`}
                       onClick={() => selectBill(b.id, isMobile ? goTo : undefined)}
                     >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <span className="font-mono text-sm font-medium">{b.code_display}</span>
-                          <Badge color={typeColor} size="sm">{b.bill_type}</Badge>
-                          <Badge color={statusColor} size="sm">{cancelled ? 'VOIDED' : b.status}</Badge>
-                        </div>
-                        <div className="text-xs text-subtle flex items-center gap-1.5">
-                          <span>{b.bill_purpose.replace(/_/g, ' ')}</span>
-                          {b.customer_name && <span>· {b.customer_name}</span>}
-                          {b.contract_code && <span className="font-mono">· {b.contract_code}</span>}
-                        </div>
+                      {/* Line 1: code + badges ............... amount */}
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-mono text-sm font-medium truncate">{b.code_display}</span>
+                        <Badge color={typeColor} size="sm">{b.bill_type}</Badge>
+                        <Badge color={statusColor} size="sm">{cancelled ? 'VOIDED' : b.status}</Badge>
+                        <span className="ml-auto text-sm font-medium tabular-nums shrink-0">{fmtCurrency(b.total_amount)}</span>
                       </div>
-                      <div className="text-right shrink-0">
-                        <div className="text-sm font-medium tabular-nums">{fmtCurrency(b.total_amount)}</div>
-                        <div className="text-xs text-fg/50"><DateTime value={b.bill_date} showTime={false} /></div>
+                      {/* Line 2: purpose · customer · contract ........... date */}
+                      <div className="flex items-center gap-1.5 text-xs text-subtle min-w-0">
+                        <span className="truncate">
+                          <span className="text-primary-fg">
+                            {t(`accounting.bills.purposeLabel.${b.bill_purpose}`, { defaultValue: b.bill_purpose.replace(/_/g, ' ') })}
+                          </span>
+                          {b.customer_name && <> · <span className="text-fg">{b.customer_name}</span></>}
+                          {b.contract_code && <> · <span className="font-mono">{b.contract_code}</span></>}
+                        </span>
+                        <span className="ml-auto text-fg/50 shrink-0"><DateTime value={b.bill_date} showTime={false} /></span>
                       </div>
                     </button>
                   );
@@ -304,6 +307,7 @@ const PAYMENT_METHOD_OPTIONS = [
 function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChanged: (message?: ReactNode) => void }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const { addSnackbar } = useSnackbarContext();
 
   // Detail query
   const { data: details, isLoading } = useQuery({
@@ -338,8 +342,42 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
   const [voiding, setVoiding] = useState(false);
   const [voidError, setVoidError] = useState('');
 
-  // Print preview state
-  const [printOpen, setPrintOpen] = useState(false);
+  // Print: render receipt off-screen in this page and call window.print().
+  // No modal — tsp-form Modal portals into a fixed/overflow-hidden container
+  // that doesn't translate to the @page box, so the receipt gets clipped.
+  const [printReady, setPrintReady] = useState(false);
+  const handlePrint = useCallback(async () => {
+    // Warm both queries the receipt depends on before mounting it, so the
+    // printable content is already painted when we open the print dialog.
+    try {
+      const billRows = await queryClient.fetchQuery({
+        queryKey: ['bill-detail', billId],
+        queryFn: () => apiClient.get<BillDetail[]>(`/v_bill_detail?bill_id=eq.${billId}`).then(rows => rows[0] ?? null),
+      });
+      const branchId = (billRows as BillDetail | null)?.branch_id;
+      if (branchId != null) {
+        await queryClient.fetchQuery({
+          queryKey: ['branch-info', branchId],
+          queryFn: () => apiClient.get(`/v_branches?id=eq.${branchId}&select=id,name,address`).then((rows: unknown) => (rows as unknown[])[0] ?? null),
+        });
+      }
+    } catch {
+      // Fall through — receipt will show its loading state and still print empty if data fails.
+    }
+    setPrintReady(true);
+    // Two RAFs to let React commit + browser paint, then open the print dialog.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      window.print();
+      setPrintReady(false);
+    }));
+  }, [billId, queryClient]);
+
+  const copyBillCode = useCallback((code: string) => {
+    navigator.clipboard?.writeText(code).then(
+      () => addSnackbar({ message: t('common.copied', { defaultValue: 'Copied' }) }),
+      () => {},
+    );
+  }, [addSnackbar, t]);
 
   const detail = details?.[0];
 
@@ -458,9 +496,20 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
       {/* Desktop header strip — code + status badge + secondary meta */}
       <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
         <span className="font-semibold font-mono">{detail.bill_code_display}</span>
+        <button
+          type="button"
+          className="p-1 rounded hover:bg-surface-hover transition-colors cursor-pointer text-subtle hover:text-fg"
+          onClick={() => copyBillCode(detail.bill_code_display)}
+          aria-label={t('common.copy', { defaultValue: 'Copy' })}
+          title={t('common.copy', { defaultValue: 'Copy' })}
+        >
+          <Copy size={14} />
+        </button>
         <Badge color={statusColor} size="sm">{displayStatus}</Badge>
         <span className="text-xs text-subtle">
-          {detail.bill_type} · {detail.bill_purpose.replace(/_/g, ' ')}
+          {t(`accounting.bills.typeLabel.${detail.bill_type}`, { defaultValue: detail.bill_type })}
+          {' · '}
+          {t(`accounting.bills.purposeLabel.${detail.bill_purpose}`, { defaultValue: detail.bill_purpose.replace(/_/g, ' ') })}
         </span>
       </div>
 
@@ -676,22 +725,20 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
       <BillActionBar
         actions={allActions}
         suppressLifecycle={suppressLifecycle}
-        onPrint={() => setPrintOpen(true)}
+        onPrint={handlePrint}
         onVoidOrCancel={() => { setVoidOpen(true); setVoidError(''); setVoidReason(''); setVoidPin(''); }}
       />
 
-      {/* ── Print Preview Modal ── */}
-      <Modal
-        open={printOpen}
-        onClose={() => setPrintOpen(false)}
-        maxWidth="26rem"
-        width="100%"
-        ariaLabel={t('wizard.receipt_title')}
-      >
-        <div className="modal-content py-6 px-4" style={{ background: 'color-mix(in srgb, var(--color-fg) 6%, transparent)' }}>
-          <BillReceipt billId={billId} />
-        </div>
-      </Modal>
+      {/* ── Print render — portaled into body so no panel ancestor becomes the
+           positioning context for .bill-receipt (the print rule sets it to
+           position:absolute and expects the page as its containing block).
+           Hidden on screen via .print-only-receipt rule in app.css. */}
+      {printReady && createPortal(
+        <div className="print-only-receipt" aria-hidden>
+          <BillReceipt billId={billId} hidePrintButton />
+        </div>,
+        document.body,
+      )}
 
       {/* ── Void Modal ── */}
       <Modal open={voidOpen} onClose={() => !voiding && setVoidOpen(false)} maxWidth="24rem" width="100%">

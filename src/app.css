@@ -158,6 +158,19 @@ input[type="number"
     transform: rotate(-18deg);
 }
 
+/* Screen: hide off-page print-only receipt while it's mounted briefly during
+   the print flow. The wrapper uses display:contents (no box), so we can't
+   position it off-screen — hide via visibility on the receipt itself. */
+@media screen {
+    .print-only-receipt .bill-receipt {
+        position: absolute;
+        left: -10000px;
+        top: 0;
+        visibility: hidden;
+        pointer-events: none;
+    }
+}
+
 /* Print: isolate the bill receipt — hide everything outside it,
    and force 80mm continuous-feed paper with zero margin (thermal printers
    handle their own gutter). */
