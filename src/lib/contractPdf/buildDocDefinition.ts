@@ -11,10 +11,11 @@
 //   - All Thai text needs the `Sarabun` default font (see fonts.ts).
 
 import type { TDocumentDefinitions, Content, Column } from 'pdfmake/interfaces';
+type InlineRun = string | { text: string | InlineRun[]; [k: string]: unknown };
 import { fmtCurrency } from '../format';
-import { LESSOR, WITNESSES, BANK,
+import { LESSOR,
   CLAUSE_2_1_BODY, CLAUSE_2_1_FOOTNOTE, CLAUSE_3, CLAUSE_4,
-  CLAUSE_5_INTRO, CLAUSE_5_LATE_FEE_BAHT, CLAUSE_6, CLAUSE_7, CLAUSE_8,
+  CLAUSE_5_INTRO, CLAUSE_5_LATE_FEE_BAHT, buildClause6, CLAUSE_7, CLAUSE_8,
   FOOTER_PAYMENT_NOTE, FOOTER_RETURN_NOTE,
 } from './constants';
 import type { ContractPdfInput } from './types';
@@ -23,8 +24,8 @@ import type { ContractPdfInput } from './types';
 const FS_HEADER = 8.5;
 const FS_BODY = 9;
 const FS_SMALL = 8;
-const SIG_W = 150;
-const SIG_H = 50;
+const SIG_W = 210;
+const SIG_H = 70;
 
 function fullName(prefix: string, first: string, last: string): string {
   return `${prefix} ${first} ${last}`.replace(/\s+/g, ' ').trim();
@@ -56,6 +57,14 @@ function blank(value: string, opts: { width?: number; bold?: boolean } = {}): Co
   };
 }
 
+// Inline "สุขภาพแบตเตอรี่ {value}" fragment — when battery is blank, omit
+// both the label and the blank so the surrounding sentence reads naturally
+// instead of leaving a stray label with an empty underline.
+function batteryFragment(value: string): InlineRun[] {
+  if (!value || !value.trim()) return [];
+  return [' สุขภาพแบตเตอรี่ ', blank(value) as InlineRun];
+}
+
 function headerStrip(input: ContractPdfInput, pageLabel: string): Content {
   const assetCode = input.assetSeq
     ? `รหัสทรัพย์สิน: ${input.assetCode} / ${input.assetSeq}`
@@ -71,9 +80,11 @@ function headerStrip(input: ContractPdfInput, pageLabel: string): Content {
 }
 
 function paymentFooterLines(input: ContractPdfInput): Content {
-  const bank = (input.bankName && input.bankAccountNumber && input.bankAccountName)
-    ? { bankName: input.bankName, accountNumber: input.bankAccountNumber, accountName: input.bankAccountName }
-    : BANK;
+  const bank = {
+    bankName: input.bankName,
+    accountNumber: input.bankAccountNumber,
+    accountName: input.bankAccountName,
+  };
   return {
     stack: [
       { text: FOOTER_PAYMENT_NOTE(bank), fontSize: FS_SMALL, alignment: 'center', bold: true, margin: [0, 8, 0, 2] },
@@ -96,14 +107,25 @@ function paymentFooterLines(input: ContractPdfInput): Content {
 // We avoid negative margins because they desync left/right when only one
 // side has an image.
 function signatureCell(role: string, name: string, dataUrl: string | null): Column {
+  // Reserve a fixed-height slot so the underline + role text line up between
+  // left/right cells whether or not a signature exists.
   const sigSlot: Content = dataUrl
     ? { image: dataUrl, width: SIG_W, height: SIG_H, alignment: 'center' }
     : { canvas: [{ type: 'rect', x: 0, y: 0, w: 1, h: SIG_H, color: 'white', lineColor: 'white' }], alignment: 'center' };
+  // Draw a thin horizontal rule across the cell width as the underline,
+  // anchored just below the signature slot. SIG_LINE_W must match the
+  // signatureRow layout width — using SIG_W keeps the line under any drawn
+  // signature image.
   return {
     width: '*',
     stack: [
       sigSlot,
-      { text: `ลงชื่อ ......................................... ${role}`, fontSize: FS_SMALL, alignment: 'center', margin: [0, 2, 0, 0] },
+      {
+        canvas: [{ type: 'line', x1: 0, y1: 0, x2: SIG_W, y2: 0, lineWidth: 0.5, lineColor: '#000' }],
+        alignment: 'center',
+        margin: [0, 0, 0, 1],
+      },
+      { text: `ลงชื่อ ${role}`, fontSize: FS_SMALL, alignment: 'center' },
       { text: `(${name})`, fontSize: FS_SMALL, alignment: 'center' },
     ],
   };
@@ -164,8 +186,7 @@ function buildPage1(input: ContractPdfInput): Content[] {
         blank(input.deviceStorage),
         ' ',
         blank(deviceIdentifier(input.deviceImei, input.deviceSerial)),
-        ' สุขภาพแบตเตอรี่ ',
-        blank(input.deviceBattery),
+        ...batteryFragment(input.deviceBattery),
         ' ของ "ผู้ให้เช่า" ให้กับ "ผู้เช่า" โดย "ผู้เช่า" ได้ชำระเงินค่าเปิดใช้เครื่อง ค่าดำเนินการระบบติดตามระยะไกล และค่าความเสื่อมสภาพขณะใช้งานทรัพย์สิน ให้แก่ "ผู้ให้เช่า" ในวันทำสัญญานี้เป็นเงิน ',
         blank(`${fmtCurrency(input.upfrontAmount)} บาท`, { bold: true }),
       ],
@@ -194,19 +215,29 @@ function buildPage1(input: ContractPdfInput): Content[] {
     { text: CLAUSE_2_1_FOOTNOTE, fontSize: FS_SMALL, bold: true, margin: [0, 0, 0, 3] },
     { text: [{ text: 'ข้อ 3. ', bold: true }, CLAUSE_3], fontSize: FS_BODY, margin: [0, 0, 0, 3] },
     { text: [{ text: 'ข้อ 4. ', bold: true }, CLAUSE_4], fontSize: FS_BODY, margin: [0, 0, 0, 3] },
-    { text: [{ text: 'ข้อ 5. ', bold: true }, CLAUSE_5_INTRO], fontSize: FS_BODY, margin: [0, 0, 0, 1] },
     (() => {
       const lateFee = input.lateFeePerDay ?? CLAUSE_5_LATE_FEE_BAHT;
-      return {
-        ul: [
-          `ไม่เกิน ${lateFee} บาท ต่อวันหรือต่อรอบการทวงถาม กรณีค้างชำระหนึ่งเดือน`,
-          `ไม่เกิน ${lateFee} บาท ต่อวันหรือต่อรอบการทวงถาม กรณีค้างชำระมากกว่าหนึ่งเดือน`,
-        ],
-        fontSize: FS_BODY,
-        margin: [12, 0, 0, 3],
-      };
+      const grace = input.gracePeriodDays;
+      const maxDays = input.lateFeeMaxDays;
+      const graceSuffix = grace != null && grace > 0
+        ? ` โดยจะเริ่มคิดค่าธรรมเนียมหลังพ้น ${grace} วันนับจากวันครบกำหนดชำระ`
+        : '';
+      const maxSuffix = maxDays != null && maxDays > 0
+        ? ` (สูงสุดไม่เกิน ${maxDays} วัน)`
+        : '';
+      return [
+        { text: [{ text: 'ข้อ 5. ', bold: true }, CLAUSE_5_INTRO + graceSuffix], fontSize: FS_BODY, margin: [0, 0, 0, 1] as [number, number, number, number] },
+        {
+          ul: [
+            `ไม่เกิน ${lateFee} บาท ต่อวันหรือต่อรอบการทวงถาม กรณีค้างชำระหนึ่งเดือน${maxSuffix}`,
+            `ไม่เกิน ${lateFee} บาท ต่อวันหรือต่อรอบการทวงถาม กรณีค้างชำระมากกว่าหนึ่งเดือน${maxSuffix}`,
+          ],
+          fontSize: FS_BODY,
+          margin: [12, 0, 0, 3] as [number, number, number, number],
+        },
+      ];
     })(),
-    { text: [{ text: 'ข้อ 6. ', bold: true }, CLAUSE_6], fontSize: FS_BODY, margin: [0, 0, 0, 3] },
+    { text: [{ text: 'ข้อ 6. ', bold: true }, buildClause6(input.repoThresholdDays)], fontSize: FS_BODY, margin: [0, 0, 0, 3] },
     { text: [{ text: 'ข้อ 7. ', bold: true }, CLAUSE_7], fontSize: FS_BODY, margin: [0, 0, 0, 3] },
     { text: [{ text: 'ข้อ 8. ', bold: true }, CLAUSE_8], fontSize: FS_BODY, margin: [0, 0, 0, 4] },
     { text: 'คู่สัญญาได้อ่านและเข้าใจข้อความดีแล้ว จึงได้ลงลายมือชื่อไว้เป็นสำคัญต่อหน้าพยาน', fontSize: FS_BODY, alignment: 'center', margin: [0, 2, 0, 0] },
@@ -226,6 +257,27 @@ function buildPage2(input: ContractPdfInput): Content[] {
   const witness2 = (input.witness2Name && input.witness2Name.trim())
     || fullName(WITNESSES[1].prefix, WITNESSES[1].firstName, WITNESSES[1].lastName);
 
+  // Reference list — omit ref2 row entirely when blank.
+  const hasRef2 = !!(input.ref2Name?.trim() || input.ref2Tel?.trim() || input.ref2Relation?.trim());
+  const refBlocks: Content[] = [
+    {
+      text: [
+        `ญาติผู้เช่า${hasRef2 ? ' 1' : ''} ชื่อ `, blank(input.ref1Name || ' '),
+        ' เบอร์ติดต่อ ', blank(input.ref1Tel || ' '),
+        ' ความเกี่ยวข้องเป็น ', blank(input.ref1Relation || ' '),
+      ],
+      fontSize: FS_BODY, margin: [0, 0, 0, hasRef2 ? 2 : 6],
+    },
+    ...(hasRef2 ? [{
+      text: [
+        `ญาติผู้เช่า 2 ชื่อ `, blank(input.ref2Name || ' '),
+        ' เบอร์ติดต่อ ', blank(input.ref2Tel || ' '),
+        ' ความเกี่ยวข้องเป็น ', blank(input.ref2Relation || ' '),
+      ],
+      fontSize: FS_BODY, margin: [0, 0, 0, 6] as [number, number, number, number],
+    } as Content] : []),
+  ];
+
   // Two-column schedule layout to mirror the original — left col rows 1-6, right rows 7-12
   const half = Math.ceil(input.installments.length / 2);
   const leftRows = input.installments.slice(0, half);
@@ -233,30 +285,34 @@ function buildPage2(input: ContractPdfInput): Content[] {
   while (leftRows.length < rightRows.length) leftRows.push({ payNo: 0, amount: 0, dueDateBE: '' });
   while (rightRows.length < leftRows.length) rightRows.push({ payNo: 0, amount: 0, dueDateBE: '' });
 
-  const scheduleHeader: Content = {
-    columns: [
-      { text: 'งวดที่', fontSize: FS_SMALL, bold: true, width: 40 },
-      { text: 'จำนวนเงิน (บาท)', fontSize: FS_SMALL, bold: true, alignment: 'center', width: '*' },
-      { text: 'วันที่ชำระ', fontSize: FS_SMALL, bold: true, alignment: 'center', width: '*' },
-      { text: 'ผู้รับเงิน', fontSize: FS_SMALL, bold: true, alignment: 'center', width: '*' },
-    ],
-    margin: [0, 0, 0, 2],
-  };
-
   const scheduleColumn = (rows: typeof leftRows): Column => ({
     width: '*',
-    stack: [
-      scheduleHeader,
-      ...rows.map((row, i): Content => ({
-        columns: [
-          { text: row.payNo ? String(row.payNo) : '', fontSize: FS_SMALL, width: 40 },
-          { text: row.amount ? fmtCurrency(row.amount) : '', fontSize: FS_SMALL, alignment: 'center', width: '*' },
-          { text: row.dueDateBE, fontSize: FS_SMALL, alignment: 'center', width: '*' },
-          { text: '', fontSize: FS_SMALL, width: '*' },
+    table: {
+      widths: [32, '*', '*'],
+      headerRows: 1,
+      body: [
+        [
+          { text: 'งวดที่', fontSize: FS_SMALL, bold: true, alignment: 'center', margin: [0, 2, 0, 2] },
+          { text: 'จำนวนเงิน (บาท)', fontSize: FS_SMALL, bold: true, alignment: 'right', margin: [0, 2, 4, 2] },
+          { text: 'วันที่ชำระ', fontSize: FS_SMALL, bold: true, alignment: 'center', margin: [0, 2, 0, 2] },
         ],
-        margin: [0, i === 0 ? 0 : 1, 0, 1],
-      })),
-    ],
+        ...rows.map((row): Content[] => [
+          { text: row.payNo ? String(row.payNo) : '', fontSize: FS_SMALL, alignment: 'center', margin: [0, 1.5, 0, 1.5] },
+          { text: row.amount ? fmtCurrency(row.amount) : '', fontSize: FS_SMALL, alignment: 'right', margin: [0, 1.5, 4, 1.5] },
+          { text: row.dueDateBE, fontSize: FS_SMALL, alignment: 'center', margin: [0, 1.5, 0, 1.5] },
+        ]),
+      ],
+    },
+    layout: {
+      hLineWidth: () => 0.5,
+      vLineWidth: () => 0.5,
+      hLineColor: () => '#000',
+      vLineColor: () => '#000',
+      paddingLeft: () => 4,
+      paddingRight: () => 4,
+      paddingTop: () => 0,
+      paddingBottom: () => 0,
+    },
   });
 
   return [
@@ -270,7 +326,7 @@ function buildPage2(input: ContractPdfInput): Content[] {
         ' รุ่น ', blank(input.deviceModel),
         ' สี ', blank(input.deviceColor),
         ' ความจุตัวเครื่อง ', blank(input.deviceStorage),
-        ' สุขภาพแบตเตอรี่ ', blank(input.deviceBattery),
+        ...batteryFragment(input.deviceBattery),
       ],
       fontSize: FS_BODY,
       margin: [0, 0, 0, 2],
@@ -291,42 +347,7 @@ function buildPage2(input: ContractPdfInput): Content[] {
       text: ['ข้าพเจ้า ', blank(lesseeFull), ' เบอร์ติดต่อ ', blank(input.lesseeTel)],
       fontSize: FS_BODY, margin: [0, 0, 0, 2],
     },
-    {
-      text: [
-        `ญาติผู้เช่า 1 ชื่อ `, blank(input.ref1Name || ' '),
-        ' เบอร์ติดต่อ ', blank(input.ref1Tel || ' '),
-        ' ความเกี่ยวข้องเป็น ', blank(input.ref1Relation || ' '),
-      ],
-      fontSize: FS_BODY, margin: [0, 0, 0, 2],
-    },
-    {
-      text: [
-        `ญาติผู้เช่า 2 ชื่อ `, blank(input.ref2Name || ' '),
-        ' เบอร์ติดต่อ ', blank(input.ref2Tel || ' '),
-        ' ความเกี่ยวข้องเป็น ', blank(input.ref2Relation || ' '),
-      ],
-      fontSize: FS_BODY, margin: [0, 0, 0, 6],
-    },
-
-    {
-      table: {
-        widths: ['*', '*', '*'],
-        body: [
-          [
-            { text: 'Apple ID "ผู้เช่า"', fontSize: FS_SMALL, bold: true, alignment: 'center' },
-            { text: 'รหัสผ่าน', fontSize: FS_SMALL, bold: true, alignment: 'center' },
-            { text: 'รหัสล็อคหน้าจอ', fontSize: FS_SMALL, bold: true, alignment: 'center' },
-          ],
-          [
-            { text: input.appleId || ' ', fontSize: FS_SMALL, alignment: 'center' },
-            { text: input.applePassword || ' ', fontSize: FS_SMALL, alignment: 'center' },
-            { text: input.passcode || ' ', fontSize: FS_SMALL, alignment: 'center' },
-          ],
-        ],
-      },
-      layout: 'lightHorizontalLines',
-      margin: [0, 0, 0, 8],
-    },
+    ...refBlocks,
 
     { text: 'ตารางการชำระค่าเช่าและค่าบริการดูแลรายเดือนของทุกๆ เดือน', fontSize: 11, bold: true, alignment: 'center', margin: [0, 0, 0, 4] },
     {
@@ -381,7 +402,7 @@ function buildPage3(input: ContractPdfInput): Content[] {
     {
       columns: [
         { text: '', width: '*' },
-        signatureCell('', lesseeFull, input.lesseeSignatureDataUrl),
+        { ...signatureCell('', lesseeFull, input.lesseeSignatureDataUrl), width: SIG_W },
         { text: '', width: '*' },
       ],
       margin: [0, 0, 0, 20],
@@ -399,7 +420,7 @@ function buildPage3(input: ContractPdfInput): Content[] {
     {
       text: [
         blank(deviceIdentifier(input.deviceImei, input.deviceSerial)),
-        ' สุขภาพแบตเตอรี่ ', blank(input.deviceBattery),
+        ...batteryFragment(input.deviceBattery),
       ],
       fontSize: FS_BODY, margin: [0, 0, 0, 4],
     },

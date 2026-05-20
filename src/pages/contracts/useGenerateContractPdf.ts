@@ -19,6 +19,7 @@ import { apiClient } from '../../lib/api';
 import { fetchImageAsDataUrl } from '../../lib/contractPdf/imageDataUrl';
 import { toDateBE, toLongDateBE } from '../../lib/contractPdf/dateBE';
 import { downloadContractPdf } from '../../lib/contractPdf/generate';
+import { CLAUSE_6_REPO_THRESHOLD_DAYS } from '../../lib/contractPdf/constants';
 import type { ContractPdfInput } from '../../lib/contractPdf/types';
 
 interface ContractMin {
@@ -168,10 +169,7 @@ export interface PdfOverrides {
   witness2MediaId?: number | null;
   witness2Name?: string;
 
-  // Apple ID / device fields (no BE columns — render-only)
-  appleId?: string;
-  applePassword?: string;
-  passcode?: string;
+  // Device fields (no BE columns — render-only)
   battery?: string;
 
   // Handover ticks (UI may pre-set these from v_contract_handover; up to caller
@@ -179,6 +177,16 @@ export interface PdfOverrides {
   hasBox?: boolean;
   hasChargerSet?: boolean;
   hasChargerCable?: boolean;
+
+  // Clause 6 repo threshold — UI override. Defaults to CLAUSE_6_REPO_THRESHOLD_DAYS
+  // until BE adds `repo_threshold_days` to company_config.
+  repoThresholdDays?: number;
+}
+
+export class PdfPrerequisiteError extends Error {
+  constructor(public readonly reason: 'no_bank_account' | 'no_lessor' | 'no_witnesses') {
+    super(`pdf prerequisite missing: ${reason}`);
+  }
 }
 
 interface BuildOptions {
@@ -212,9 +220,9 @@ async function buildInput(contract: ContractMin, opts: BuildOptions = {}): Promi
     apiClient.get<BankAccountRow[]>(
       `/v_bank_accounts?branch_id=eq.${contract.branch_id}&is_active=is.true&order=is_default.desc&select=bank_name,account_number,account_name&limit=1`,
     ).catch(() => [] as BankAccountRow[]),
-    apiClient.get<Array<{ late_fee_per_day: number | null }>>(
-      `/v_company_config?select=late_fee_per_day&limit=1`,
-    ).catch(() => [] as Array<{ late_fee_per_day: number | null }>),
+    apiClient.get<Array<{ late_fee_per_day: number | null; late_fee_max_days: number | null; grace_period_days: number | null }>>(
+      `/v_company_config?select=late_fee_per_day,late_fee_max_days,grace_period_days&limit=1`,
+    ).catch(() => [] as Array<{ late_fee_per_day: number | null; late_fee_max_days: number | null; grace_period_days: number | null }>),
   ]);
 
   const customer = customers[0];
@@ -260,15 +268,26 @@ async function buildInput(contract: ContractMin, opts: BuildOptions = {}): Promi
   const hasBox = ov.hasBox ?? handover?.has_box ?? true;
   const hasChargerSet = ov.hasChargerSet ?? handover?.has_charger_set ?? true;
   const hasChargerCable = ov.hasChargerCable ?? handover?.has_charger_cable ?? true;
-  const passcode = ov.passcode ?? handover?.device_unlock_code ?? '';
 
   // Battery: override > asset.battery_health > legacy fallback
   const batteryAuto = asset?.battery_health != null ? `${asset.battery_health}%` : '';
   const battery = ov.battery ?? batteryAuto ?? opts.blankBattery ?? '';
 
-  // Bank + late fee from BE; fall back to constants in the builder if empty
+  // Bank — required, no fallback. Surface a typed error so the UI can route
+  // staff to /admin/company/bank-accounts instead of printing a blank footer.
   const bank = bankAccounts[0] ?? null;
+  if (!bank) throw new PdfPrerequisiteError('no_bank_account');
   const lateFeePerDay = companyCfg[0]?.late_fee_per_day ?? null;
+  const lateFeeMaxDays = companyCfg[0]?.late_fee_max_days ?? null;
+  const gracePeriodDays = companyCfg[0]?.grace_period_days ?? null;
+
+  // Signatory snapshot — required. Lessor name comes from the bound LESSOR
+  // signatory (after override). Witnesses must both be present.
+  const lessorName = ov.lessorName || lessorNameAuto;
+  const witness1Name = ov.witness1Name || witness1NameAuto;
+  const witness2Name = ov.witness2Name || witness2NameAuto;
+  if (!lessorName.trim()) throw new PdfPrerequisiteError('no_lessor');
+  if (!witness1Name.trim() || !witness2Name.trim()) throw new PdfPrerequisiteError('no_witnesses');
 
   const ref1 = references[0] ?? null;
   const ref2 = references[1] ?? null;
@@ -307,10 +326,6 @@ async function buildInput(contract: ContractMin, opts: BuildOptions = {}): Promi
     ref2Tel: ref2?.tel ?? '',
     ref2Relation: ref2?.relation ?? '',
 
-    appleId: ov.appleId ?? '',
-    applePassword: ov.applePassword ?? '',
-    passcode,
-
     deviceCategory: asset?.family_name ?? 'มือถือ',
     deviceBrand: asset?.brand_name ?? '',
     deviceModel: asset?.model_name ?? contract.model_name ?? '',
@@ -338,14 +353,17 @@ async function buildInput(contract: ContractMin, opts: BuildOptions = {}): Promi
     lessorSignatureDataUrl: lessorSig,
     witness1SignatureDataUrl: w1Sig,
     witness2SignatureDataUrl: w2Sig,
-    lessorName: ov.lessorName || lessorNameAuto,
-    witness1Name: ov.witness1Name || witness1NameAuto,
-    witness2Name: ov.witness2Name || witness2NameAuto,
+    lessorName,
+    witness1Name,
+    witness2Name,
 
-    bankName: bank?.bank_name ?? '',
-    bankAccountNumber: bank?.account_number ?? '',
-    bankAccountName: bank?.account_name ?? '',
+    bankName: bank.bank_name,
+    bankAccountNumber: bank.account_number,
+    bankAccountName: bank.account_name,
     lateFeePerDay: lateFeePerDay,
+    lateFeeMaxDays: lateFeeMaxDays,
+    gracePeriodDays: gracePeriodDays,
+    repoThresholdDays: ov.repoThresholdDays ?? CLAUSE_6_REPO_THRESHOLD_DAYS,
   };
 }
 

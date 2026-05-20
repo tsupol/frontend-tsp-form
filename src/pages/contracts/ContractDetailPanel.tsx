@@ -547,24 +547,10 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
   const idCardKey = idCardDocs[0]?.file_url ?? null;
   const signatureKey = signatureDocs[0]?.file_url ?? null;
 
-  // Asset readiness — needed to gate the Print button on:
-  //   1. device bound to the contract
-  //   2. if Apple → iCloud assigned
-  const { data: printAsset } = useQuery({
-    queryKey: ['contract-print-asset', contract.device_id],
-    queryFn: () => apiClient.get<Array<{ brand_name: string; icloud_account_id: number | null }>>(
-      `/v_assets?asset_id=eq.${contract.device_id}&select=brand_name,icloud_account_id&limit=1`,
-    ).then(rows => rows[0] ?? null),
-    enabled: contract.device_id != null,
-    staleTime: 30 * 1000,
-  });
-
+  // Print button requires a bound device. iCloud is no longer required.
   const printReadiness = (() => {
     const reasons: string[] = [];
     if (contract.device_id == null) reasons.push(t('contract.printBlock_noDevice'));
-    if (printAsset?.brand_name === 'Apple' && printAsset.icloud_account_id == null) {
-      reasons.push(t('contract.printBlock_noIcloud'));
-    }
     return { ready: reasons.length === 0, reasons };
   })();
 

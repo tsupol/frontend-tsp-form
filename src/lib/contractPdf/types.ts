@@ -29,11 +29,6 @@ export interface ContractPdfInput {
   ref2Tel: string;
   ref2Relation: string;
 
-  // Apple ID / passcode panel — left blank for non-iOS devices
-  appleId: string;
-  applePassword: string;
-  passcode: string;
-
   // Device
   deviceCategory: string;     // "มือถือ"
   deviceBrand: string;        // "Apple"
@@ -75,6 +70,9 @@ export interface ContractPdfInput {
   bankAccountNumber: string;
   bankAccountName: string;
   lateFeePerDay: number | null;
+  lateFeeMaxDays: number | null;
+  gracePeriodDays: number | null;
+  repoThresholdDays: number;
 
   // ID-card image embedded on page 3 above the "สำเนาถูกต้อง" heading
   lesseeIdCardDataUrl: string | null;

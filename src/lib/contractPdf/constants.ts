@@ -1,7 +1,7 @@
-// Hardcoded lessor / witness / bank info for the contract PDF.
-// TODO(BE): move these into a per-holding/per-branch settings table so the PDF
-// can pull real data instead of constants. For now they mirror the sample
-// contract the customer is currently printing manually.
+// Hardcoded lessor identity for the contract PDF.
+// TODO(BE): pending sale.branch_lessor_profile (filed 2026-05-20_lessor_legal_identity_missing.md).
+// Lessor name comes from the bound signatory; id_number + address still
+// fall back to this constant until BE adds them.
 
 export interface LessorProfile {
   prefix: string;          // "นาย" / "น.ส." / "นาง"
@@ -9,12 +9,6 @@ export interface LessorProfile {
   lastName: string;
   idNumber: string;        // 13-digit citizen ID
   address: string;         // full address line as printed
-}
-
-export interface Witness {
-  prefix: string;
-  firstName: string;
-  lastName: string;
 }
 
 export interface BankAccount {
@@ -29,17 +23,6 @@ export const LESSOR: LessorProfile = {
   lastName: 'บูรณัติ',
   idNumber: '3730600572721',
   address: '107 ม.7 ต.คลองใหม่ อ.สามพราน จ.นครปฐม',
-};
-
-export const WITNESSES: [Witness, Witness] = [
-  { prefix: 'น.ส.', firstName: 'ขวัญทนิชาญ์', lastName: 'เอืออนันต์รัฐกิจ' },
-  { prefix: 'นาย', firstName: 'ศักดินคร', lastName: 'พวงจันทร์' },
-];
-
-export const BANK: BankAccount = {
-  bankName: 'กสิกรไทย',
-  accountNumber: '216-2-78186-6',
-  accountName: 'นายศักดิ์นคร พวงจันทร์',
 };
 
 // Body copy of clauses 2.1 and 7 (long paragraphs). Pulled verbatim from the
@@ -71,8 +54,12 @@ export const CLAUSE_5_INTRO =
   'หาก "ผู้เช่า" ผิดนัดชำระค่าเช่าและค่าบริการดูแลรายเดือน (มียอดค้างชำระ) "ผู้เช่า" ยินยอมให้ "ผู้ให้เช่า" เก็บค่าธรรมเนียม หรือค่าใช้จ่ายใดๆ ดังนี้';
 export const CLAUSE_5_LATE_FEE_BAHT = 50;
 
-export const CLAUSE_6 =
-  'หาก "ผู้เช่า" ผิดนัดชำระค่าเช่าและค่าบริการดูแลรายเดือน (มียอดค้างชำระ) และไม่สามารถติดต่อได้ และไม่มียอดชำระเกิน 15 วัน ' +
+// Default repo threshold (clause 6). TODO(BE): pull `repo_threshold_days` from
+// company_config when added (filed 2026-05-20_clause6_repo_threshold_config.md).
+export const CLAUSE_6_REPO_THRESHOLD_DAYS = 15;
+
+export const buildClause6 = (repoThresholdDays: number): string =>
+  `หาก "ผู้เช่า" ผิดนัดชำระค่าเช่าและค่าบริการดูแลรายเดือน (มียอดค้างชำระ) และไม่สามารถติดต่อได้ และไม่มียอดชำระเกิน ${repoThresholdDays} วัน ` +
   'นับจากวันครบกำหนดของทุกๆ เดือนตามที่ลงไว้ในสัญญาฉบับนี้ "ผู้เช่า" ยินยอมให้ "ผู้ให้เช่า" เรียกคืนหรือติดตามทรัพย์สินคืนได้ทันที "ผู้เช่า" ยินยอมให้ ' +
   '"ผู้ให้เช่า" โพสข้อความและรูปถ่ายของ "ผู้เช่า" หรือกล่าวถึง หรือโพสในทำนอง ติดตาม ตามหา หรือโพสทวงถามยอดที่ค้างชำระในช่องทางออนไลน์ และหรือ ' +
   'สื่อโซเชียลมีเดียทุกประเภท';
