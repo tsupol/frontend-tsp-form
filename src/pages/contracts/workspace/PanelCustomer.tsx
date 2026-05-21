@@ -96,7 +96,7 @@ interface Props { onClose: () => void }
 
 export function PanelCustomer({ onClose: _onClose }: Props) {
   const { t, i18n } = useTranslation();
-  const { data: workspace, updateData, invalidateContract, invalidateCustomer, setPanelDirty } = useWorkspace();
+  const { data: workspace, contract, updateData, invalidateContract, invalidateCustomer, setPanelDirty } = useWorkspace();
 
   // Form fields
   const [idType, setIdType] = useState<'CITIZEN_ID' | 'PASSPORT'>('CITIZEN_ID');
@@ -231,7 +231,7 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
         return;
       }
       // No changes — just attach
-      doAttach(selectedCustomer.id, selectedCustomer.full_name);
+      void doAttach(selectedCustomer.id, selectedCustomer.full_name);
       return;
     }
 
@@ -256,10 +256,7 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
       });
       setResult(res);
       if (res.action !== 'BLOCK') {
-        doAttach(res.customer_id, res.full_name);
-        // Update snapshot so subsequent clicks don't re-confirm
-        setSelectedCustomer(null);
-        originalRef.current = null;
+        await doAttach(res.customer_id, res.full_name);
       }
     } catch (err) {
       if (err instanceof ApiError) {
@@ -275,21 +272,44 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
     await doRegister(); // fn_customer_register_or_update handles both create and update by id_number
   };
 
-  const doAttach = (custId: number, custName: string) => {
-    // updateData still needed for customerId — triggers draft auto-creation
-    updateData({
-      customerId: custId,
-      customerName: custName,
-      customerDateOfBirth: dateOfBirth || null,
-      customerResult: result ?? {
-        customer_id: custId, is_new: false, id_type: idType, id_number: idNumber,
-        full_name: custName, is_blacklisted: false, blacklist_reasons: [],
-        has_overdue: false, overdue_contract_count: 0, active_contract_count: 0, action: 'OK',
-      },
-    });
-    invalidateContract();
-    invalidateCustomer();
-    setPanelDirty(false);
+  // Attach the picked customer to the contract. When no contractId exists yet,
+  // WorkspaceContext will create a draft from the customerId we set on data;
+  // when one does, we call the attach RPC directly so failures surface here
+  // instead of being swallowed by the background effect.
+  const doAttach = async (custId: number, custName: string) => {
+    setApiError('');
+    try {
+      if (workspace.contractId && contract?.customer_id !== custId) {
+        setSubmitting(true);
+        await apiClient.rpc('fn_contract_attach_customer', {
+          p_contract_id: workspace.contractId,
+          p_customer_id: custId,
+        });
+      }
+      updateData({
+        customerId: custId,
+        customerName: custName,
+        customerDateOfBirth: dateOfBirth || null,
+        customerResult: result ?? {
+          customer_id: custId, is_new: false, id_type: idType, id_number: idNumber,
+          full_name: custName, is_blacklisted: false, blacklist_reasons: [],
+          has_overdue: false, overdue_contract_count: 0, active_contract_count: 0, action: 'OK',
+        },
+      });
+      invalidateContract();
+      invalidateCustomer();
+      setSelectedCustomer(null);
+      originalRef.current = null;
+      setPanelDirty(false);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setApiError(translated || err.code || err.message);
+      } else setApiError(String(err));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleAddressSuccess = (_type: 'HOME' | 'WORK' | 'SHIPPING') => {

@@ -290,30 +290,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     createDraft();
   }, [data.customerId, data.contractId, data.draftError, data.branchId, data.modelId, data.variantId, data.selectedQuote, user]);
 
-  // ── Customer attachment (when local customerId differs from server) ──
-  // Server contract is the source of truth — only call attach when local
-  // customerId diverges from contract.customer_id, then re-fetch so cards update.
-  const lastAttachedRef = useRef<number | null>(null);
-  useEffect(() => {
-    if (!data.contractId || !data.customerId) return;
-    if (!contract) return;
-    if (contract.customer_id === data.customerId) {
-      lastAttachedRef.current = data.customerId;
-      return;
-    }
-    if (lastAttachedRef.current === data.customerId) return;
-    lastAttachedRef.current = data.customerId;
-
-    apiClient.rpc('fn_contract_attach_customer', {
-      p_contract_id: data.contractId,
-      p_customer_id: data.customerId,
-    })
-      .then(() => invalidateContract())
-      .catch(() => {
-        lastAttachedRef.current = null;
-      });
-  }, [data.contractId, data.customerId, contract, invalidateContract]);
-
   // ── Guarantor completeness (server-derived) ──────────────────────────
   const guarantorCount = guarantorList.length;
   const guarantorIds = useMemo(() => guarantorList.map(g => g.customer_id), [guarantorList]);
