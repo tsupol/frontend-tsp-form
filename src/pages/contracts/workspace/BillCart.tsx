@@ -1,28 +1,50 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Button, MaskedInput, Modal, PopOver, Input } from 'tsp-form';
-import { Plus, Trash2, Loader2, Truck, Gift, ShoppingBag } from 'lucide-react';
-import { apiClient, ApiError } from '../../../lib/api';
+import { Plus, Trash2, Truck, Gift, ShoppingBag } from 'lucide-react';
+import { apiClient } from '../../../lib/api';
 import { fmtCurrency } from '../../../lib/format';
 import { SellableVariantPickerModal, type SellableVariant } from '../../../components/SellableVariantPickerModal';
 
-interface BillLine {
-  line_id: number;
-  line_type: string;
+/* ─────────────────────────────────────────────────────────────────────────────
+   ⚠️  CLIENT-SIDE DRAFT CART — DO NOT WIRE THIS TO LIVE BILL RPCs.
+
+   The cart in PanelReviewPay holds line items entirely in client state until
+   the user explicitly clicks "Confirm & Activate". Confirm runs the full
+   server sequence in one handler:
+
+     fn_bill_contract_open
+       → loop fn_bill_line_item_add (+ fn_bill_line_convert_to_gift for gifts)
+       → loop fn_bill_payment_add
+       → fn_bill_payment_confirm   (server cascades activation)
+
+   This is intentional. The backend has NO "open bill with extra lines" or
+   "batch line add" RPC. The previous approach auto-opened the bill on panel
+   mount, which silently flipped the contract from DRAFT to PENDING_PAYMENT
+   just by viewing the screen — that is wrong. Opening the bill is a real
+   state change and MUST be user-driven.
+
+   DO NOT:
+     • Call fn_bill_contract_open from this component or PanelReviewPay's
+       mount effect.
+     • Call fn_bill_line_item_add / _remove from here.
+     • Add a useEffect that fires any state-changing RPC.
+
+   If a future backend change adds a true "open bill with lines" RPC, swap
+   the Confirm sequence in PanelReviewPay — keep the cart client-side here.
+   ──────────────────────────────────────────────────────────────────────── */
+
+export interface DraftCartLine {
+  id: string;
   charge_type: string;
+  line_type: string;
   description: string;
   amount: number;
   quantity: number;
-  ref_type: string | null;
-  ref_id: number | null;
-}
-
-interface BillDetail {
-  bill_id: number;
-  total_amount: number;
-  status: string;
-  line_items: BillLine[];
+  variant_id: number | null;
+  /** True for charge_type='GIFT': add as ACCESSORY_SALE then convert to gift. */
+  as_gift: boolean;
 }
 
 interface AddableRow {
@@ -34,48 +56,32 @@ interface AddableRow {
 }
 
 interface Props {
-  billId: number;
   branchId: number | null;
-  onChange?: () => void;
+  /** Auto / system lines from contract pricing (down payment, insurance) — shown read-only. */
+  systemLines: Array<{ key: string; description: string; amount: number }>;
+  lines: DraftCartLine[];
+  onChange: (next: DraftCartLine[]) => void;
 }
 
-// Lines added automatically by fn_bill_contract_open — UI cannot remove.
-const AUTO_CHARGE_TYPES = new Set(['DOWN_PAYMENT', 'INSURANCE_DEPOSIT']);
-// Paired-discount lines — hidden in the list (shown inline under their parent GIFT row).
-const PAIRED_DISCOUNT_TYPES = new Set(['GIFT_DISCOUNT']);
-// Charge types that pick a variant via the sellable modal.
 const SELLABLE_CHARGE_TYPES = new Set(['ACCESSORY_SALE', 'GIFT']);
 
-const CHARGE_ICONS: Record<string, JSX.Element> = {
+const CHARGE_ICONS: Record<string, ReactNode> = {
   ACCESSORY_SALE: <ShoppingBag size={14} />,
   GIFT: <Gift size={14} />,
   SHIPPING_FEE: <Truck size={14} />,
 };
 
-/**
- * Editable cart for a CONTRACT_OPEN bill. Lines come from v_bill_detail; the
- * Add menu is driven by v_bill_line_addable_by_purpose so any future
- * MANUAL charge_type (shipping, accessory, gift, …) shows up automatically.
- */
-export function BillCart({ billId, branchId, onChange }: Props) {
+let cartIdCounter = 0;
+const nextCartId = () => `cart-${Date.now()}-${++cartIdCounter}`;
+
+export function BillCart({ branchId, systemLines, lines, onChange }: Props) {
   const { t, i18n } = useTranslation();
-  const queryClient = useQueryClient();
 
   const [addOpen, setAddOpen] = useState(false);
   const [sellablePick, setSellablePick] = useState<{ chargeType: string; lineType: string; name: string } | null>(null);
   const [freeForm, setFreeForm] = useState<{ chargeType: string; lineType: string; name: string } | null>(null);
   const [freeFormDesc, setFreeFormDesc] = useState('');
   const [freeFormAmount, setFreeFormAmount] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-
-  const { data: bill, isLoading } = useQuery({
-    queryKey: ['bill-detail', billId],
-    queryFn: () => apiClient.get<BillDetail[]>(
-      `/v_bill_detail?bill_id=eq.${billId}`,
-    ).then(rows => rows[0] ?? null),
-    staleTime: 0,
-  });
 
   const { data: addable = [] } = useQuery({
     queryKey: ['bill-addable', 'CONTRACT_OPEN'],
@@ -85,26 +91,11 @@ export function BillCart({ billId, branchId, onChange }: Props) {
     staleTime: 5 * 60 * 1000,
   });
 
-  const refresh = () => {
-    queryClient.invalidateQueries({ queryKey: ['bill-detail', billId] });
-    onChange?.();
-  };
-
-  const handleApiError = (err: unknown) => {
-    if (err instanceof ApiError) {
-      const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-        || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
-      setError(tr || err.message);
-    } else {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-  };
-
-  const chargeLabel = (row: AddableRow) => (i18n.language === 'th' ? row.name_th : row.name_en) || row.charge_type;
+  const chargeLabel = (row: { name_th: string; name_en: string; charge_type: string }) =>
+    (i18n.language === 'th' ? row.name_th : row.name_en) || row.charge_type;
 
   const handlePickType = (row: AddableRow) => {
     setAddOpen(false);
-    setError('');
     if (SELLABLE_CHARGE_TYPES.has(row.charge_type)) {
       setSellablePick({ chargeType: row.charge_type, lineType: row.line_type, name: chargeLabel(row) });
     } else {
@@ -114,103 +105,70 @@ export function BillCart({ billId, branchId, onChange }: Props) {
     }
   };
 
-  const handleSellablePick = async (variant: SellableVariant, qty: number) => {
+  const handleSellablePick = (variant: SellableVariant, qty: number) => {
     if (!sellablePick) return;
-    const { chargeType } = sellablePick;
-    const asGift = chargeType === 'GIFT';
-    setBusy(true);
-    setError('');
-    try {
-      const added = await apiClient.rpc<{ line_item_id: number }>(
-        'fn_bill_line_item_add',
-        {
-          p_bill_id: billId,
-          p_line_type: 'REVENUE',
-          p_charge_type: 'ACCESSORY_SALE',
-          p_description: variant.full_name,
-          p_amount: asGift ? 0 : variant.retail_price * qty,
-          p_quantity: qty,
-          p_variant_id: variant.variant_id,
-        },
-      );
-      if (asGift) {
-        await apiClient.rpc('fn_bill_line_convert_to_gift', { p_line_id: added.line_item_id });
-      }
-      setSellablePick(null);
-      refresh();
-    } catch (err) {
-      handleApiError(err);
-    } finally {
-      setBusy(false);
-    }
+    const asGift = sellablePick.chargeType === 'GIFT';
+    onChange([
+      ...lines,
+      {
+        id: nextCartId(),
+        charge_type: 'ACCESSORY_SALE',
+        line_type: 'REVENUE',
+        description: variant.full_name,
+        amount: asGift ? 0 : variant.retail_price * qty,
+        quantity: qty,
+        variant_id: variant.variant_id,
+        as_gift: asGift,
+      },
+    ]);
+    setSellablePick(null);
   };
 
-  const handleFreeFormSubmit = async () => {
+  const handleFreeFormSubmit = () => {
     if (!freeForm) return;
     const amount = parseFloat(freeFormAmount) || 0;
     if (!freeFormDesc.trim() || amount <= 0) return;
-    setBusy(true);
-    setError('');
-    try {
-      await apiClient.rpc('fn_bill_line_item_add', {
-        p_bill_id: billId,
-        p_line_type: freeForm.lineType,
-        p_charge_type: freeForm.chargeType,
-        p_description: freeFormDesc.trim(),
-        p_amount: amount,
-        p_quantity: 1,
-        p_variant_id: null,
-      });
-      setFreeForm(null);
-      setFreeFormDesc('');
-      setFreeFormAmount('');
-      refresh();
-    } catch (err) {
-      handleApiError(err);
-    } finally {
-      setBusy(false);
-    }
+    onChange([
+      ...lines,
+      {
+        id: nextCartId(),
+        charge_type: freeForm.chargeType,
+        line_type: freeForm.lineType,
+        description: freeFormDesc.trim(),
+        amount,
+        quantity: 1,
+        variant_id: null,
+        as_gift: false,
+      },
+    ]);
+    setFreeForm(null);
+    setFreeFormDesc('');
+    setFreeFormAmount('');
   };
 
-  const handleRemove = async (lineId: number) => {
-    setBusy(true);
-    setError('');
-    try {
-      await apiClient.rpc('fn_bill_line_item_remove', { p_line_item_id: lineId });
-      refresh();
-    } catch (err) {
-      handleApiError(err);
-    } finally {
-      setBusy(false);
-    }
+  const handleRemove = (id: string) => {
+    onChange(lines.filter(l => l.id !== id));
   };
 
-  if (isLoading || !bill) {
-    return (
-      <div className="flex items-center justify-center p-4 text-subtle">
-        <Loader2 size={16} className="animate-spin mr-2" />
-        {t('common.loading')}
-      </div>
-    );
-  }
-
-  const lines = bill.line_items ?? [];
-  const visibleLines = lines.filter(l => !PAIRED_DISCOUNT_TYPES.has(l.charge_type));
-  const findPairedDiscount = (giftLineId: number) =>
-    lines.find(l => l.charge_type === 'GIFT_DISCOUNT' && l.ref_id === giftLineId);
+  const total = systemLines.reduce((sum, l) => sum + l.amount, 0)
+    + lines.reduce((sum, l) => sum + (l.as_gift ? 0 : l.amount), 0);
 
   return (
     <div className="flex flex-col gap-3">
       <div className="border border-line rounded-md overflow-hidden">
         <table className="w-full text-sm">
           <tbody className="divide-y divide-line">
-            {visibleLines.map(line => {
-              const isAuto = AUTO_CHARGE_TYPES.has(line.charge_type);
-              const isGift = line.charge_type === 'GIFT';
-              const pairedDiscount = isGift ? findPairedDiscount(line.line_id) : undefined;
-              const icon = CHARGE_ICONS[line.charge_type];
+            {systemLines.map(l => (
+              <tr key={l.key} className="bg-surface/40">
+                <td className="px-3 py-2">{l.description}</td>
+                <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">{fmtCurrency(l.amount)}</td>
+                <td className="px-3 py-2 w-10" />
+              </tr>
+            ))}
+            {lines.map(line => {
+              const icon = CHARGE_ICONS[line.as_gift ? 'GIFT' : line.charge_type];
               return (
-                <tr key={line.line_id} className={isAuto ? 'bg-surface/40' : ''}>
+                <tr key={line.id}>
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-2">
                       {icon && <span className="text-info shrink-0">{icon}</span>}
@@ -219,36 +177,32 @@ export function BillCart({ billId, branchId, onChange }: Props) {
                         <span className="text-xs text-subtle">× {line.quantity}</span>
                       )}
                     </div>
-                    {pairedDiscount && (
-                      <div className="flex items-center gap-2 text-xs text-subtle mt-0.5 ml-5">
-                        <span>{pairedDiscount.description}</span>
-                      </div>
+                    {line.as_gift && (
+                      <div className="text-xs text-subtle ml-5 mt-0.5">{t('workspace.cart_giveAsGift')}</div>
                     )}
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
-                    <div>{fmtCurrency(line.amount)}</div>
-                    {pairedDiscount && (
-                      <div className="text-xs text-subtle">{fmtCurrency(pairedDiscount.amount)}</div>
+                    {line.as_gift ? (
+                      <span className="text-subtle">{fmtCurrency(0)}</span>
+                    ) : (
+                      fmtCurrency(line.amount)
                     )}
                   </td>
                   <td className="px-3 py-2 w-10">
-                    {!isAuto && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="btn-icon-sm"
-                        onClick={() => handleRemove(line.line_id)}
-                        disabled={busy}
-                        startIcon={<Trash2 size={14} />}
-                      />
-                    )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="btn-icon-sm"
+                      onClick={() => handleRemove(line.id)}
+                      startIcon={<Trash2 size={14} />}
+                    />
                   </td>
                 </tr>
               );
             })}
             <tr className="bg-surface font-medium">
               <td className="px-3 py-2">{t('workspace.total')}</td>
-              <td className="px-3 py-2 text-right tabular-nums">{fmtCurrency(bill.total_amount)}</td>
+              <td className="px-3 py-2 text-right tabular-nums">{fmtCurrency(total)}</td>
               <td />
             </tr>
           </tbody>
@@ -265,7 +219,6 @@ export function BillCart({ billId, branchId, onChange }: Props) {
               color="primary"
               startIcon={<Plus size={14} />}
               onClick={() => setAddOpen(v => !v)}
-              disabled={busy}
             >
               {t('workspace.cart_addLine')}
             </Button>
@@ -288,14 +241,7 @@ export function BillCart({ billId, branchId, onChange }: Props) {
             ))}
           </div>
         </PopOver>
-        {busy && <Loader2 size={16} className="animate-spin text-subtle ml-1" />}
       </div>
-
-      {error && (
-        <div className="alert alert-danger">
-          <span>{error}</span>
-        </div>
-      )}
 
       <SellableVariantPickerModal
         open={sellablePick != null}
@@ -341,8 +287,8 @@ export function BillCart({ billId, branchId, onChange }: Props) {
           <Button
             color="primary"
             onClick={handleFreeFormSubmit}
-            disabled={busy || !freeFormDesc.trim() || !(parseFloat(freeFormAmount) > 0)}
-            startIcon={busy ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+            disabled={!freeFormDesc.trim() || !(parseFloat(freeFormAmount) > 0)}
+            startIcon={<Plus size={14} />}
           >
             {t('common.add')}
           </Button>

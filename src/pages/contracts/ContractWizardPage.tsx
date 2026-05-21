@@ -48,6 +48,18 @@ function WorkspaceContent() {
   const { data, updateData, resetData, openModal, setOpenModal, isPostPayment, getCardStatus, panelDirtyRef, pendingModal, confirmPanelSwitch, cancelPanelSwitch } = useWorkspace();
   const [shakingCards] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState(false);
+  const reviewPayCardRef = useRef<HTMLDivElement | null>(null);
+
+  // When Review & Pay becomes the active panel, scroll the left summary list
+  // so its card is in view. Slight delay so the panel transition / layout
+  // settles before the smooth scroll starts.
+  useEffect(() => {
+    if (openModal !== 'reviewPay') return;
+    const timer = setTimeout(() => {
+      reviewPayCardRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [openModal]);
 
   const handleCopyCode = (code: string) => {
     navigator.clipboard.writeText(code).then(() => {
@@ -220,6 +232,19 @@ function WorkspaceContent() {
         // the receipt / payment step instead of the (already-filled) Customer card.
         if (isActive || isPendingPayment) {
           setOpenModal('reviewPay');
+        } else {
+          // Still in DRAFT/SAVING — if the contract is already validate-ready
+          // (nothing blocking activation), jump straight to Review & Pay so
+          // the user can finalize without hunting for the section.
+          try {
+            const readiness = await apiClient.rpc<{ ready: boolean }>(
+              'fn_contract_validate_ready',
+              { p_contract_id: c.id },
+            );
+            if (readiness?.ready) setOpenModal('reviewPay');
+          } catch {
+            // readiness check is best-effort — silent on failure
+          }
         }
       } catch {
         // ignore load errors
@@ -383,8 +408,10 @@ function WorkspaceContent() {
                     <CardSignatory onEdit={() => handleEditOpen('signatory')} active={isCardActive('signatory')} shake={shakingCards.has('signatory')} />
                     <CardHandover onEdit={() => handleEditOpen('handover')} active={isCardActive('handover')} shake={shakingCards.has('handover')} />
 
-                    {!data.billConfirmed && data.contractId && <CardReviewPay onEdit={reviewPayReady ? () => handleEditOpen('reviewPay') : undefined} active={isCardActive('reviewPay')} disabled={!reviewPayReady} />}
-                    {data.billConfirmed && <CardPostPayment onEdit={() => handleEditOpen('reviewPay')} active={isCardActive('reviewPay')} />}
+                    <div ref={reviewPayCardRef}>
+                      {!data.billConfirmed && data.contractId && <CardReviewPay onEdit={reviewPayReady ? () => handleEditOpen('reviewPay') : undefined} active={isCardActive('reviewPay')} disabled={!reviewPayReady} />}
+                      {data.billConfirmed && <CardPostPayment onEdit={() => handleEditOpen('reviewPay')} active={isCardActive('reviewPay')} />}
+                    </div>
                   </div>
                 </div>
 
