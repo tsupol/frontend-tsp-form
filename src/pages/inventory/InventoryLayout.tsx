@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { BarChart3, Box, Boxes, ClipboardList, PackagePlus, ArrowLeftRight, Wrench, RotateCcw, ShoppingCart } from 'lucide-react';
 
 type NavItem =
-  | { type: 'link'; path: string; labelKey: string; icon: typeof BarChart3 }
+  | { type: 'link'; path: string; labelKey: string; icon: typeof BarChart3; iconClassName?: string }
   | { type: 'group'; labelKey: string };
 
 const navItems: NavItem[] = [
@@ -19,14 +19,12 @@ const navItems: NavItem[] = [
   { type: 'link', path: '/admin/inventory/transfers', labelKey: 'nav.transfers', icon: ArrowLeftRight },
   { type: 'link', path: '/admin/inventory/repairs', labelKey: 'nav.repairs', icon: Wrench },
   { type: 'link', path: '/admin/inventory/buyback', labelKey: 'nav.buyback', icon: RotateCcw },
-  { type: 'link', path: '/admin/inventory/assets?view=sale', labelKey: 'nav.sale', icon: ShoppingCart },
+  { type: 'link', path: '/admin/inventory/ready-to-sell', labelKey: 'nav.readyToSell', icon: ShoppingCart, iconClassName: 'text-success' },
 ];
 
 export function InventoryLayout({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const location = useLocation();
-  const currentSearch = location.search;
-  const currentView = new URLSearchParams(currentSearch).get('view');
 
   return (
     <div className="flex h-dvh">
@@ -39,25 +37,19 @@ export function InventoryLayout({ children }: { children: ReactNode }) {
               </span>
             );
           }
-          const { path, labelKey, icon: Icon } = item;
-          const [pathOnly, query] = path.split('?');
-          const linkView = new URLSearchParams(query ?? '').get('view');
-          const pathMatches = location.pathname.startsWith(pathOnly);
-          const isActive = linkView
-            ? pathMatches && currentView === linkView
-            : pathMatches && !currentView;
+          const { path, labelKey, icon: Icon, iconClassName } = item;
+          const isActive = location.pathname.startsWith(path);
           return (
             <NavLink
               key={path}
               to={path}
-              end={!!linkView}
               className={`flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors ${
                 isActive
                   ? 'bg-item-active-bg text-item-active-fg font-medium'
                   : 'text-item-fg hover:bg-item-hover-bg hover:text-item-hover-fg'
               }`}
             >
-              <Icon size={15} />
+              <Icon size={15} className={iconClassName} />
               {t(labelKey)}
             </NavLink>
           );

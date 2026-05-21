@@ -369,7 +369,18 @@ function App() {
           </ProtectedRoute>
         }
       />
-      <Route path="/admin/inventory/sale" element={<Navigate to="/admin/inventory/assets?view=sale" replace />} />
+      <Route
+        path="/admin/inventory/ready-to-sell/:assetId?"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <InventoryLayout><AssetsPage variant="ready-to-sell" /></InventoryLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route path="/admin/inventory/sale" element={<Navigate to="/admin/inventory/ready-to-sell" replace />} />
+      <Route path="/admin/inventory/assets/sale" element={<Navigate to="/admin/inventory/ready-to-sell" replace />} />
 
       {/* Price Check */}
       <Route
