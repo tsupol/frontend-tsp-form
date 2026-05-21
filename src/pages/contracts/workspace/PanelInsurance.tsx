@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MaskedInput } from 'tsp-form';
-import { Shield, Loader2, Check, XCircle } from 'lucide-react';
+import { Shield, Loader2, Check, XCircle, Info } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { useWorkspace } from './WorkspaceContext';
 
@@ -69,10 +69,12 @@ export function PanelInsurance({ onClose: _onClose }: Props) {
   }, []);
 
   const disabled = isReadOnly || isFinancialLocked || !data.contractId;
+  const downPayment = contract?.down_payment ?? 0;
+  const showZeroDownNote = isFin2 && downPayment === 0;
 
   return (
-    <div className="p-4 flex flex-col">
-      <div className={`rounded-lg px-4 py-3 border mb-4 ${current > 0 ? 'border-info/30 bg-info/5' : 'border-line bg-surface'}`}>
+    <div className="p-4 flex flex-col gap-3">
+      <div className={`rounded-lg px-4 py-3 border ${current > 0 ? 'border-info/30 bg-info/5' : 'border-line bg-surface'}`}>
         <div className="text-xs text-subtle mb-1">{t('workspace.insuranceAmount')}</div>
         <div className="flex items-center gap-2">
           <Shield size={18} className={current > 0 ? 'text-info' : 'text-fg/30'} />
@@ -82,18 +84,38 @@ export function PanelInsurance({ onClose: _onClose }: Props) {
         </div>
       </div>
 
+      <div className="alert alert-info">
+        <Info size={16} />
+        <div>
+          <div className="alert-description">{t('workspace.insuranceHint')}</div>
+        </div>
+      </div>
+
       {!isFin2 ? (
-        <div className="alert alert-warning">
-          <span>{t('workspace.insuranceFin1Only')}</span>
+        <div className="alert alert-info">
+          <Info size={16} />
+          <div>
+            <div className="alert-description">{t('workspace.insuranceFin1Only')}</div>
+          </div>
         </div>
       ) : (
         <>
+          {showZeroDownNote && (
+            <div className="alert alert-info">
+              <Info size={16} />
+              <div>
+                <div className="alert-description">{t('workspace.insuranceZeroDownNote')}</div>
+              </div>
+            </div>
+          )}
+
           {error && (
-            <div className="alert alert-danger mb-3">
+            <div className="alert alert-danger">
               <XCircle size={16} />
               <span>{error}</span>
             </div>
           )}
+
           <div className="flex flex-col">
             <label className="form-label">{t('workspace.insuranceAmount')}</label>
             <MaskedInput
@@ -107,10 +129,10 @@ export function PanelInsurance({ onClose: _onClose }: Props) {
               disabled={disabled}
               endIcon={saving ? <Loader2 size={14} className="animate-spin text-subtle" /> : saved ? <Check size={14} className="text-success" /> : undefined}
             />
-            <span className="text-xs text-subtle mt-1">{t('workspace.insuranceHint')}</span>
           </div>
+
           {!data.contractId && (
-            <div className="text-sm text-subtle mt-3">{t('workspace.insuranceNeedDraft')}</div>
+            <div className="text-sm text-subtle">{t('workspace.insuranceNeedDraft')}</div>
           )}
         </>
       )}
