@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
   DataTable, DataTableColumnHeader, DataTableFooter, MobileHeader,
-  Badge, Select, Button, Drawer, TextArea, Modal,
+  Badge, Select, Button, Drawer, TextArea,
   useSnackbarContext,
   type ColumnDef, type RowExpansionState, type SortingState,
 } from 'tsp-form';
@@ -20,6 +20,8 @@ import { apiClient, ApiError } from '../lib/api';
 import { DateTime } from '../components/DateTime';
 import { fmtCurrency } from '../lib/format';
 import { useAuth } from '../contexts/AuthContext';
+import { MediaLightbox, MediaThumbButton } from '../components/MediaLightbox';
+import { normalizeKey } from '../lib/mediaPath';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -62,8 +64,8 @@ interface EntityMedia {
   entity_type: string;
   entity_id: number;
   usage_type: string;
-  storage_path: Record<string, string>;
-  caption: string | null;
+  storage_path: string;
+  variants_json: Record<string, string> | null;
   created_at: string;
 }
 
@@ -391,7 +393,7 @@ function SubmissionReviewDrawer({
   const [bankAccountId, setBankAccountId] = useState<string>('');
   const [busy, setBusy] = useState<'approve' | 'reject' | 'reopen' | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
-  const [zoomedSrc, setZoomedSrc] = useState<string | null>(null);
+  const [zoomedKey, setZoomedKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -533,25 +535,17 @@ function SubmissionReviewDrawer({
               ) : (
                 <div className="flex gap-2 flex-wrap">
                   {slipMedia.map((m) => {
-                    const thumb = m.storage_path.sm || m.storage_path.thumb || m.storage_path.md
-                      || m.storage_path.medium || m.storage_path.original;
-                    const full = m.storage_path.original || m.storage_path.medium
-                      || m.storage_path.md || thumb;
+                    const v = m.variants_json ?? {};
+                    const thumbKey = v.sm || v.thumb || v.md || v.medium || v.original || m.storage_path;
+                    const fullKey = v.original || v.lg || v.md || v.medium || m.storage_path;
                     return (
-                      <button
+                      <MediaThumbButton
                         key={m.entity_media_id}
-                        type="button"
+                        mediaKey={normalizeKey(thumbKey)}
+                        alt="slip"
                         className="w-32 h-32 border border-line rounded-md overflow-hidden bg-surface cursor-zoom-in p-0"
-                        onClick={() => setZoomedSrc(full)}
-                      >
-                        {thumb ? (
-                          <img src={thumb} alt="slip" className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-subtle">
-                            <ImageOff size={20} />
-                          </div>
-                        )}
-                      </button>
+                        onClick={() => setZoomedKey(normalizeKey(fullKey))}
+                      />
                     );
                   })}
                 </div>
@@ -703,22 +697,12 @@ function SubmissionReviewDrawer({
         )}
       </Drawer>
 
-      {/* Image zoom modal */}
-      <Modal
-        open={!!zoomedSrc}
-        onClose={() => setZoomedSrc(null)}
-        ariaLabel={t('paymentSubmissions.slipImage')}
-      >
-        <div className="modal-content flex items-center justify-center bg-black/90">
-          {zoomedSrc && (
-            <img
-              src={zoomedSrc}
-              alt="slip"
-              className="max-w-full max-h-[85vh] object-contain"
-            />
-          )}
-        </div>
-      </Modal>
+      <MediaLightbox
+        open={!!zoomedKey}
+        onClose={() => setZoomedKey(null)}
+        mediaKey={zoomedKey}
+        alt="slip"
+      />
     </>
   );
 }
