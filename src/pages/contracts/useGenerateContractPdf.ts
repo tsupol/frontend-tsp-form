@@ -184,8 +184,10 @@ export interface PdfOverrides {
 }
 
 export class PdfPrerequisiteError extends Error {
-  constructor(public readonly reason: 'no_bank_account' | 'no_lessor' | 'no_witnesses') {
+  readonly reason: 'no_bank_account' | 'no_lessor' | 'no_witnesses';
+  constructor(reason: 'no_bank_account' | 'no_lessor' | 'no_witnesses') {
     super(`pdf prerequisite missing: ${reason}`);
+    this.reason = reason;
   }
 }
 

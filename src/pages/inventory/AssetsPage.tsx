@@ -351,15 +351,18 @@ export function AssetsPage() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Source filters (deep-link from lot/PO detail pages)
+  // Source filters (deep-link from lot/PO/branch-stock detail pages)
   const sourceLotIdParam = searchParams.get('source_lot_id');
   const sourcePoIdParam = searchParams.get('source_po_id');
+  const variantIdParam = searchParams.get('variant_id');
   const sourceLotId = sourceLotIdParam ? Number(sourceLotIdParam) : null;
   const sourcePoId = sourcePoIdParam ? Number(sourcePoIdParam) : null;
+  const variantId = variantIdParam ? Number(variantIdParam) : null;
   const clearSourceFilter = () => {
     const next = new URLSearchParams(searchParams);
     next.delete('source_lot_id');
     next.delete('source_po_id');
+    next.delete('variant_id');
     setSearchParams(next, { replace: true });
   };
 
@@ -376,7 +379,7 @@ export function AssetsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterBucket, setFilterBucket] = useState<string | null>(initialBucket);
   const [filterBranchId, setFilterBranchId] = useState<number | null>(initialBranchId);
-  const [filterCondition, setFilterCondition] = useState<string | null>(null);
+  const [filterCondition, setFilterCondition] = useState<string | null>(searchParams.get('condition'));
   const [filterBrand, setFilterBrand] = useState<string>('');
   const [filterFamily, setFilterFamily] = useState<string>('');
   const [filterPopoverOpen, setFilterPopoverOpen] = useState(false);
@@ -448,11 +451,12 @@ export function AssetsPage() {
   );
 
   const { data: listData, isFetching } = useQuery({
-    queryKey: ['assets', debouncedSearch, filterBucket, filterBranchId, filterCondition, filterBrand, filterFamily, sourceLotId, sourcePoId, pageIndex, pageSize],
+    queryKey: ['assets', debouncedSearch, filterBucket, filterBranchId, filterCondition, filterBrand, filterFamily, sourceLotId, sourcePoId, variantId, pageIndex, pageSize],
     queryFn: () => {
       let url = '/v_assets?order=created_at.desc';
       if (sourceLotId) url += `&source_lot_id=eq.${sourceLotId}`;
       if (sourcePoId) url += `&source_po_id=eq.${sourcePoId}`;
+      if (variantId) url += `&variant_id=eq.${variantId}`;
       if (filterBucket) url += `&current_bucket=eq.${filterBucket}`;
       if (filterBranchId) url += `&branch_id=eq.${filterBranchId}`;
       if (filterCondition === 'USED') url += `&condition_grade=in.(USED_A,USED_B)`;
@@ -474,7 +478,7 @@ export function AssetsPage() {
   // v_branch_sellable_stock filters is_sellable=true AND is_contractable=false
   // internally; v_branch_contractable_stock filters is_contractable=true AND
   // bucket=ON_HAND_AVAILABLE. Aggregate `qty` / `asset_count` client-side.
-  useEffect(() => { setPageIndex(0); }, [debouncedSearch, filterBucket, filterBranchId, filterCondition, filterBrand, filterFamily, sourceLotId, sourcePoId]);
+  useEffect(() => { setPageIndex(0); }, [debouncedSearch, filterBucket, filterBranchId, filterCondition, filterBrand, filterFamily, sourceLotId, sourcePoId, variantId]);
 
   // Sync bucket from URL on searchParams change (back/forward, dashboard
   // drill-down). URL is source of truth for this one key.
@@ -552,13 +556,15 @@ export function AssetsPage() {
           {/* ── Filter bar — full-width, spans both panels (pricebook pattern) ── */}
           {(isRoot || !isMobile) && (
             <div className="flex-none flex flex-col gap-2 p-2 border-b border-line">
-              {(sourceLotId || sourcePoId) && (
+              {(sourceLotId || sourcePoId || variantId) && (
                 <div className="flex items-center gap-2">
                   <Badge size="sm" color="primary">
                     <span className="inline-flex items-center gap-1">
                       {sourceLotId
                         ? <>{t('asset.filteredBySourceLot')}: <span className="tabular-nums">#{sourceLotId}</span></>
-                        : <>{t('asset.filteredBySourcePo')}: <span className="tabular-nums">#{sourcePoId}</span></>}
+                        : sourcePoId
+                          ? <>{t('asset.filteredBySourcePo')}: <span className="tabular-nums">#{sourcePoId}</span></>
+                          : <>{t('asset.filteredByVariant', { defaultValue: 'Variant' })}: <span>{list[0] ? [list[0].brand_name, list[0].model_name, list[0].variant_name].filter(Boolean).join(' · ') : `#${variantId}`}</span></>}
                       <button
                         type="button"
                         aria-label="Clear source filter"

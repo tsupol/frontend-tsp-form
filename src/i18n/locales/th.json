@@ -846,6 +846,13 @@
     "scopeHolding": "ต่อ Holding",
     "selectBranch": "เลือกสาขา"
   },
+  "branchStock": {
+    "retailTab": "ขายปลีก",
+    "leaseTab": "เช่าซื้อ",
+    "search": "ค้นหาด้วยชื่อ รุ่น หรือรุ่นย่อย",
+    "each": "ต่อหน่วย",
+    "units": "เครื่อง"
+  },
   "inventory": {
     "title": "ภาพรวมสต็อก",
     "available": "พร้อมขาย",
@@ -2007,7 +2014,11 @@
     "payInstallment_walletExceeded": "จำนวนเกินยอดในกระเป๋า ({{balance}})",
     "payInstallment_autoCreditHint": "หักเครดิตอัตโนมัติ: {{credit}} → ต้องจ่ายจริง: {{cash}}",
     "payInstallment_insuranceLastOnly": "เงินประกันใช้ได้เฉพาะงวดสุดท้ายเท่านั้น",
-    "payInstallment_fifoHint": "จ่ายเกิน → เข้าเครดิต · จ่ายไม่ครบ → จ่ายบางส่วน (FIFO หักงวดเก่าก่อน)"
+    "payInstallment_fifoHint": "จ่ายเกิน → เข้าเครดิต · จ่ายไม่ครบ → จ่ายบางส่วน (FIFO หักงวดเก่าก่อน)",
+    "payInstallment_slip": "สลิปการโอน",
+    "payInstallment_slipPlaceholder": "อัปโหลดรูปสลิป",
+    "payInstallment_slipUploaded": "อัปโหลดสลิปแล้ว",
+    "payInstallment_slipCaption": "สลิป"
   },
   "wizard": {
     "title": "เปิดสัญญาใหม่",

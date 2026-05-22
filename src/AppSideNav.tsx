@@ -240,7 +240,12 @@ export const AppSideNav = () => {
         { key: 'transfers', icon: <ArrowLeftRight size="1rem" />, label: t('nav.transfers'), path: '/admin/inventory/transfers' },
         { key: 'repairs', icon: <Wrench size="1rem" />, label: t('nav.repairs'), path: '/admin/inventory/repairs' },
         { key: 'buyback', icon: <RotateCcw size="1rem" />, label: t('nav.buyback'), path: '/admin/inventory/buyback' },
-        { key: 'branch-stock', icon: <ShoppingCart size="1rem" />, label: t('nav.branchStock'), path: '/admin/inventory/branch-stock' },
+        {
+          key: 'branch-stock',
+          icon: <ShoppingCart size="1rem" className="text-primary-fg" />,
+          label: <span className="text-primary-fg font-medium">{t('nav.branchStock')}</span>,
+          path: '/admin/inventory/branch-stock',
+        },
       ],
     },
     {

@@ -169,7 +169,7 @@ export function BillReceipt({ billId, hidePrintButton }: BillReceiptProps) {
       {/* Meta — single column, label/value */}
       <div className="flex flex-col gap-0.5">
         <MetaRow label={t('wizard.receipt_billNo')} value={<span className="receipt-mono">{bill.bill_code_display}</span>} />
-        <MetaRow label={t('wizard.receipt_date')} value={<DateTime value={bill.created_at} showTime={true} />} />
+        <MetaRow label={t('wizard.receipt_date')} value={<DateTime value={bill.bill_date} showTime={false} />} />
         {bill.contract_code && (
           <MetaRow
             label={t('wizard.receipt_contract')}

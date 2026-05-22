@@ -5,6 +5,7 @@ import { BarChart3, Box, Boxes, ClipboardList, PackagePlus, ArrowLeftRight, Wren
 
 type NavItem =
   | { type: 'link'; path: string; labelKey: string; icon: typeof BarChart3; iconClassName?: string }
+  | { type: 'highlight'; path: string; labelKey: string; icon: typeof BarChart3 }
   | { type: 'group'; labelKey: string };
 
 const navItems: NavItem[] = [
@@ -19,7 +20,7 @@ const navItems: NavItem[] = [
   { type: 'link', path: '/admin/inventory/transfers', labelKey: 'nav.transfers', icon: ArrowLeftRight },
   { type: 'link', path: '/admin/inventory/repairs', labelKey: 'nav.repairs', icon: Wrench },
   { type: 'link', path: '/admin/inventory/buyback', labelKey: 'nav.buyback', icon: RotateCcw },
-  { type: 'link', path: '/admin/inventory/branch-stock', labelKey: 'nav.branchStock', icon: ShoppingCart },
+  { type: 'highlight', path: '/admin/inventory/branch-stock', labelKey: 'nav.branchStock', icon: ShoppingCart },
 ];
 
 export function InventoryLayout({ children }: { children: ReactNode }) {
@@ -37,8 +38,24 @@ export function InventoryLayout({ children }: { children: ReactNode }) {
               </span>
             );
           }
-          const { path, labelKey, icon: Icon, iconClassName } = item;
+          const path = item.path;
+          const Icon = item.icon;
           const isActive = location.pathname.startsWith(path);
+          if (item.type === 'highlight') {
+            return (
+              <NavLink
+                key={path}
+                to={path}
+                className={`flex items-center gap-2 px-2 py-2 rounded-md text-sm font-medium text-primary-fg transition-colors ${
+                  isActive ? 'bg-item-active-bg' : 'hover:bg-item-hover-bg'
+                }`}
+              >
+                <Icon size={15} />
+                {t(item.labelKey)}
+              </NavLink>
+            );
+          }
+          const iconClassName = item.iconClassName;
           return (
             <NavLink
               key={path}
@@ -50,7 +67,7 @@ export function InventoryLayout({ children }: { children: ReactNode }) {
               }`}
             >
               <Icon size={15} className={iconClassName} />
-              {t(labelKey)}
+              {t(item.labelKey)}
             </NavLink>
           );
         })}

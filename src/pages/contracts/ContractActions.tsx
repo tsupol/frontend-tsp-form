@@ -2,12 +2,17 @@ import { useState, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button, Modal, Input, Select, TextArea, MaskedInput, Badge, Tooltip, PopOver, useSnackbarContext } from 'tsp-form';
-import { CheckCircle, XCircle, Pencil, Plus, Trash2, Loader2, ChevronsRight, ChevronDown, ExternalLink, Wrench, ArrowRight, Info } from 'lucide-react';
+import { Button, Modal, Input, Select, TextArea, MaskedInput, Badge, Tooltip, PopOver, ImageUploader, useSnackbarContext } from 'tsp-form';
+import type { UploadedImage } from 'tsp-form';
+import { CheckCircle, XCircle, X, Pencil, Plus, Trash2, Loader2, ChevronsRight, ChevronDown, ExternalLink, Wrench, ArrowRight, Info, Receipt } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { fmtCurrency } from '../../lib/format';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { DateTime } from '../../components/DateTime';
+import { useAuth } from '../../contexts/AuthContext';
+import { useUploadSpec } from '../../hooks/useMediaUrl';
+import { uploadFromImage, deleteMedia } from '../../lib/upload';
+import { toStoragePath } from '../../lib/mediaPath';
 import { CompleteContractModal } from './CompleteContractModal';
 import { BindLoanerModal, UnbindLoanerModal } from './LoanerModals';
 import { RepairRequestModal } from './RepairRequestModal';
@@ -2286,7 +2291,10 @@ function PayInstallmentModal({ open, contract, onClose }: {
   onSuccess?: (msgKey: string, override?: ReactNode) => void;
 }) {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const invalidate = useContractInvalidate(contract.id);
+  const slipSpec = useUploadSpec('contract_payment_slip');
 
   const outstanding = contract.outstanding_amount ?? 0;
   const nextDue = contract.next_due_amount ?? contract.installment_amount ?? 0;
@@ -2304,6 +2312,11 @@ function PayInstallmentModal({ open, contract, onClose }: {
   const [error, setError] = useState('');
   const [errorKey, setErrorKey] = useState(0);
   const [result, setResult] = useState<PayInstallmentResult | null>(null);
+  /** R2 key of the slip the user uploaded in this modal session, before fn_media_attach. */
+  const [slipKey, setSlipKey] = useState<string | null>(null);
+  const [slipFile, setSlipFile] = useState<File | null>(null);
+  const [slipPreviewUrl, setSlipPreviewUrl] = useState<string | null>(null);
+  const [slipUploading, setSlipUploading] = useState(false);
   // Snapshot the contract state at submit time so the done view can show before→after deltas
   const [beforeSnapshot, setBeforeSnapshot] = useState<{
     outstanding: number;
@@ -2324,8 +2337,91 @@ function PayInstallmentModal({ open, contract, onClose }: {
       setView('form');
       setResult(null);
       setBeforeSnapshot(null);
+      setSlipKey(null);
+      setSlipFile(null);
+      setSlipPreviewUrl(null);
+      setSlipUploading(false);
     }
   }, [open, nextDue, outstanding]);
+
+  const setApiError = (err: unknown) => {
+    if (err instanceof ApiError) {
+      const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+        || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+      setError(translated || err.message);
+    } else {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+    setErrorKey(k => k + 1);
+  };
+
+  // Existing slip count drives the next ALBUM idx + sort_order.
+  const { data: slipCount = 0 } = useQuery({
+    queryKey: ['entity-media-count', 'CONTRACT', contract.id, 'PAYMENT_SLIP'],
+    queryFn: async () => {
+      const rows = await apiClient.get<{ entity_media_id: number }[]>(
+        `/v_entity_media?entity_type=eq.CONTRACT&entity_id=eq.${contract.id}&usage_type=eq.PAYMENT_SLIP&is_active=is.true&select=entity_media_id`,
+      );
+      return rows.length;
+    },
+    enabled: open,
+    staleTime: 0,
+  });
+
+  const handleSlipUpload = async (images: UploadedImage[]) => {
+    if (images.length === 0) return;
+    // Replace any previous orphan upload in this session before re-uploading.
+    if (slipKey) {
+      deleteMedia([slipKey]).catch(() => {});
+    }
+    if (slipPreviewUrl) {
+      URL.revokeObjectURL(slipPreviewUrl);
+    }
+    setSlipUploading(true);
+    setError('');
+    try {
+      const img = images[0];
+      const results = await uploadFromImage({
+        type: 'contract_payment_slip',
+        image: img,
+        idx: slipCount,
+        params: { contract_id: contract.id },
+      });
+      const key = results.lg?.key ?? Object.values(results)[0]?.key;
+      if (!key) throw new Error('Upload returned no key');
+      const file = img.file ?? img.originalFile ?? null;
+      setSlipKey(key);
+      setSlipFile(file);
+      setSlipPreviewUrl(img.preview ?? (file ? URL.createObjectURL(file) : null));
+    } catch (err) {
+      setApiError(err);
+      setSlipKey(null);
+      setSlipFile(null);
+      setSlipPreviewUrl(null);
+    } finally {
+      setSlipUploading(false);
+    }
+  };
+
+  const handleSlipClear = () => {
+    if (slipKey) {
+      deleteMedia([slipKey]).catch(() => {});
+    }
+    if (slipPreviewUrl) {
+      URL.revokeObjectURL(slipPreviewUrl);
+    }
+    setSlipKey(null);
+    setSlipFile(null);
+    setSlipPreviewUrl(null);
+  };
+
+  const handleCloseWithCleanup = () => {
+    // If the user uploaded a slip but never submitted, the R2 object is an orphan.
+    if (view === 'form' && slipKey) {
+      deleteMedia([slipKey]).catch(() => {});
+    }
+    onClose();
+  };
 
   // After success, re-fetch the contract row to show new outstanding / credit / paid count
   const { data: contractAfter } = useQuery({
@@ -2391,17 +2487,6 @@ function PayInstallmentModal({ open, contract, onClose }: {
     : 0;
   const cashRequired = Math.max(0, parsedAmount - autoCredit);
 
-  const setApiError = (err: unknown) => {
-    if (err instanceof ApiError) {
-      const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-        || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
-      setError(translated || err.message);
-    } else {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-    setErrorKey(k => k + 1);
-  };
-
   const mutation = useMutation({
     mutationFn: () => apiClient.rpc<PayInstallmentResult>('fn_contract_installment_pay', {
       p_contract_id: contract.id,
@@ -2412,13 +2497,42 @@ function PayInstallmentModal({ open, contract, onClose }: {
       p_reference: reference.trim() || null,
       p_note: note.trim() || null,
     }),
-    onSuccess: (res) => {
+    onSuccess: async (res) => {
       setBeforeSnapshot({
         outstanding,
         creditBalance,
         paidCount: contract.paid_installment_count ?? 0,
         totalInstallments: contract.total_installments ?? 0,
       });
+
+      // Attach slip (if uploaded) to the contract as a PAYMENT_SLIP album entry.
+      // Payment is already recorded — if attach fails we surface a non-fatal warning
+      // but still proceed to the done view; the user can re-upload via the documents panel.
+      if (slipKey && user?.holding_id) {
+        try {
+          await apiClient.rpc('fn_media_attach', {
+            p_holding_id: user.holding_id,
+            p_storage_path: toStoragePath(slipKey),
+            p_variants_json: null,
+            p_media_type: 'IMAGE',
+            p_access_level: 'CONFIDENTIAL',
+            p_mime_type: 'image/webp',
+            p_file_size_bytes: slipFile?.size ?? null,
+            p_original_filename: slipFile?.name ?? null,
+            p_entity_type: 'CONTRACT',
+            p_entity_id: contract.id,
+            p_usage_type: 'PAYMENT_SLIP',
+            p_sort_order: slipCount,
+            p_caption: `${t('contract.payInstallment_slipCaption', { defaultValue: 'Slip' })} · ${fmtCurrency(parsedAmount)}${res.bill_code ? ` · ${res.bill_code}` : ''}`,
+          });
+          queryClient.invalidateQueries({ queryKey: ['entity-media', 'CONTRACT', contract.id, 'PAYMENT_SLIP'] });
+          queryClient.invalidateQueries({ queryKey: ['contract-media', contract.id] });
+        } catch (err) {
+          // Don't block the success view — payment is final, slip is recoverable.
+          console.error('Slip attach failed after successful payment:', err);
+        }
+      }
+
       setResult(res);
       setView('done');
       invalidate();
@@ -2437,11 +2551,11 @@ function PayInstallmentModal({ open, contract, onClose }: {
 
   return (
     <>
-      <Modal open={open} onClose={onClose} maxWidth="30rem" width="100%">
+      <Modal open={open} onClose={handleCloseWithCleanup} maxWidth="30rem" width="100%">
         <div className="flex flex-col overflow-hidden">
           <div className="modal-header">
             <h2 className="modal-title">{t(titleKey, { defaultValue: view === 'done' ? 'Payment recorded' : 'Pay Installment' })}</h2>
-            <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+            <button type="button" className="modal-close-btn" onClick={handleCloseWithCleanup} aria-label="Close">&times;</button>
           </div>
 
           {view === 'form' && (
@@ -2595,13 +2709,59 @@ function PayInstallmentModal({ open, contract, onClose }: {
                     rows={2}
                   />
                 </div>
-              </div>
 
-              <div className="alert alert-info mt-4">
-                <span className="text-xs">{t('contract.payInstallment_fifoHint', {
-                  defaultValue: 'Overpayment goes to credit · Underpayment is partial (FIFO oldest first)',
-                })}</span>
+                <div className="flex flex-col">
+                  <label className="form-label">
+                    {t('contract.payInstallment_slip', { defaultValue: 'Payment slip' })}
+                    <span className="text-xs text-subtle ml-1">({t('common.optional')})</span>
+                  </label>
+                  {slipKey && slipPreviewUrl ? (
+                    <div className="h-24 rounded-md border border-line overflow-hidden bg-surface flex items-center justify-center gap-2 p-2">
+                      <img
+                        src={slipPreviewUrl}
+                        alt={t('contract.payInstallment_slip', { defaultValue: 'Payment slip' })}
+                        className="max-h-full w-auto object-contain block rounded"
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        startIcon={<X size={14} />}
+                        onClick={handleSlipClear}
+                        disabled={slipUploading || mutation.isPending}
+                      >
+                        {t('common.remove')}
+                      </Button>
+                    </div>
+                  ) : (
+                    <ImageUploader
+                      resizeOptions={slipSpec.resize}
+                      sizes={slipSpec.sizes}
+                      onUpload={handleSlipUpload}
+                      disabled={slipUploading || mutation.isPending || !slipSpec.spec}
+                      className="!min-h-24 !border !border-solid !border-line !rounded-md"
+                      placeholder={
+                        <div className="flex flex-col items-center justify-center gap-1 text-subtle">
+                          <Receipt size={20} className="opacity-60" />
+                          <span className="text-xs">
+                            {slipUploading
+                              ? t('common.loading')
+                              : t('contract.payInstallment_slipPlaceholder', { defaultValue: 'Upload payment slip image' })}
+                          </span>
+                        </div>
+                      }
+                    />
+                  )}
+                </div>
               </div>
+            </div>
+          )}
+
+          {view === 'form' && (
+            <div className="border-t border-line shrink-0 px-4 py-2.5 flex items-center gap-2 text-info-fg">
+              <Info size={14} className="shrink-0" />
+              <span className="text-xs">{t('contract.payInstallment_fifoHint', {
+                defaultValue: 'Overpayment goes to credit · Underpayment is partial (FIFO oldest first)',
+              })}</span>
             </div>
           )}
 
@@ -2624,11 +2784,11 @@ function PayInstallmentModal({ open, contract, onClose }: {
 
           {view === 'form' && (
             <div className="modal-footer">
-              <Button onClick={onClose}>{t('common.cancel')}</Button>
+              <Button onClick={handleCloseWithCleanup}>{t('common.cancel')}</Button>
               <Button
                 color="primary"
                 onClick={() => mutation.mutate()}
-                disabled={!canSubmit || mutation.isPending}
+                disabled={!canSubmit || mutation.isPending || slipUploading}
               >
                 {mutation.isPending ? t('common.loading') : t('contract.action_pay_installment')}
               </Button>

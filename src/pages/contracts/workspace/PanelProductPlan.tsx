@@ -113,7 +113,7 @@ interface Props {
   onClose: () => void;
 }
 
-export function PanelProductPlan({ onClose }: Props) {
+export function PanelProductPlan(_props: Props) {
   const { t } = useTranslation();
   const { data: wizardData, contract, invalidateContract } = useWorkspace();
 

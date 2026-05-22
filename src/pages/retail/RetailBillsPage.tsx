@@ -368,7 +368,7 @@ function RetailBillDetail({ billId, isMobile }: { billId: number; isMobile: bool
 
       {/* Timestamps */}
       <div className="flex-none px-4 py-2 border-b border-line flex flex-wrap gap-x-6 gap-y-1 text-xs text-subtle">
-        <span>{t('retail.bills.billDate')}: <DateTime value={detail.bill_date ?? detail.created_at} showTime={false} /></span>
+        <span>{t('retail.bills.billDate')}: <DateTime value={detail.bill_date} showTime={false} /></span>
         {detail.created_at && (
           <span>{t('retail.bills.createdAt')}: <DateTime value={detail.created_at} /></span>
         )}

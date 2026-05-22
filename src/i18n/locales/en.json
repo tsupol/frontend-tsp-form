@@ -846,6 +846,13 @@
     "scopeHolding": "Per Holding",
     "selectBranch": "Select branch"
   },
+  "branchStock": {
+    "retailTab": "Retail",
+    "leaseTab": "Lease",
+    "search": "Search by name, model, variant",
+    "each": "each",
+    "units": "units"
+  },
   "inventory": {
     "title": "Stock Dashboard",
     "available": "Available",
@@ -2007,7 +2014,11 @@
     "payInstallment_walletExceeded": "Amount exceeds wallet balance ({{balance}})",
     "payInstallment_autoCreditHint": "Credit auto-applied: {{credit}} → cash required: {{cash}}",
     "payInstallment_insuranceLastOnly": "Insurance wallet can only be used for the last installment",
-    "payInstallment_fifoHint": "Overpayment goes to credit · Underpayment is partial (FIFO oldest first)"
+    "payInstallment_fifoHint": "Overpayment goes to credit · Underpayment is partial (FIFO oldest first)",
+    "payInstallment_slip": "Payment slip",
+    "payInstallment_slipPlaceholder": "Upload payment slip image",
+    "payInstallment_slipUploaded": "Slip uploaded",
+    "payInstallment_slipCaption": "Slip"
   },
   "wizard": {
     "title": "Open Contract",

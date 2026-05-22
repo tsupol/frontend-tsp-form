@@ -252,10 +252,8 @@ function buildPage1(input: ContractPdfInput): Content[] {
 // ── Page 2 — schedule, contacts, signatures ─────────────────────────────────
 function buildPage2(input: ContractPdfInput): Content[] {
   const lesseeFull = fullName(input.lesseePrefix, input.lesseeFirstName, input.lesseeLastName);
-  const witness1 = (input.witness1Name && input.witness1Name.trim())
-    || fullName(WITNESSES[0].prefix, WITNESSES[0].firstName, WITNESSES[0].lastName);
-  const witness2 = (input.witness2Name && input.witness2Name.trim())
-    || fullName(WITNESSES[1].prefix, WITNESSES[1].firstName, WITNESSES[1].lastName);
+  const witness1 = input.witness1Name.trim();
+  const witness2 = input.witness2Name.trim();
 
   // Reference list — omit ref2 row entirely when blank.
   const hasRef2 = !!(input.ref2Name?.trim() || input.ref2Tel?.trim() || input.ref2Relation?.trim());
@@ -394,6 +392,8 @@ function buildPage3(input: ContractPdfInput): Content[] {
   const idCardBlock: Content = input.lesseeIdCardDataUrl
     ? { image: input.lesseeIdCardDataUrl, width: 320, alignment: 'center', margin: [0, 8, 0, 12] }
     : { text: '', margin: [0, 0, 0, 0] };
+  const centeredSigCell = signatureCell('', lesseeFull, input.lesseeSignatureDataUrl);
+  (centeredSigCell as { width: number | string }).width = SIG_W;
   return [
     { text: '', pageBreak: 'before' },
     headerStrip(input, 'หน้า 3 / 3'),
@@ -402,7 +402,7 @@ function buildPage3(input: ContractPdfInput): Content[] {
     {
       columns: [
         { text: '', width: '*' },
-        { ...signatureCell('', lesseeFull, input.lesseeSignatureDataUrl), width: SIG_W },
+        centeredSigCell,
         { text: '', width: '*' },
       ],
       margin: [0, 0, 0, 20],

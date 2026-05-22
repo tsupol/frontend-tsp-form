@@ -211,13 +211,15 @@ export function PaymentSubmissionsPage() {
     },
     {
       accessorKey: 'status',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('common.status')} />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('common.status')} className="justify-end" />,
       cell: ({ row }) => (
-        <Badge size="sm" color={statusColor(row.original.status)}>
-          {t(`paymentSubmissions.status_${row.original.status}`)}
-        </Badge>
+        <div className="flex justify-end">
+          <Badge size="sm" color={statusColor(row.original.status)}>
+            {t(`paymentSubmissions.status_${row.original.status}`)}
+          </Badge>
+        </div>
       ),
-      className: 'w-32',
+      className: 'w-32 text-right',
     },
   ], [t]);
 
