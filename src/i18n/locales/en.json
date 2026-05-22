@@ -1045,7 +1045,7 @@
     "cancelReason": "Cancel Reason",
     "cancelReasonPlaceholder": "Optional cancellation reason...",
     "selectReason": "Select reason",
-    "submitDispatchHint": "Branch managers send for approval. Company admins/inventory auto-approve immediately.",
+    "submitDispatchHint": "Branch roles send for approval. Company and holding roles approve immediately.",
     "confirmSubmit": "Submit this PO for approval?",
     "confirmApprove": "Approve this purchase order?",
     "confirmReject": "Reject this purchase order?",

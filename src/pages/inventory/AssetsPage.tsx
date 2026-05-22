@@ -312,7 +312,7 @@ const SIMPLE_ACTIONS: Record<string, SimpleActionConfig> = {
 
 // Up to 4 actions surfaced inline as primary buttons; rest go behind "More actions".
 const PRIMARY_BY_BUCKET: Record<string, string[]> = {
-  ON_HAND_AVAILABLE: ['ASSET_SELL', 'ASSET_QUARANTINE_ADMIT', 'ASSET_REPAIR_REQUEST', 'ASSET_INTERNAL_USE_ASSIGN'],
+  ON_HAND_AVAILABLE: ['ASSET_SELL', 'ASSET_QUARANTINE_ADMIT', 'ASSET_REPAIR_REQUEST'],
   QUARANTINED: ['ASSET_QUARANTINE_RELEASE', 'ASSET_SELL', 'ASSET_REPAIR_REQUEST', 'ASSET_WRITE_OFF_JOURNAL'],
   IN_REPAIR: [],
   IN_USE_INTERNAL: ['ASSET_INTERNAL_USE_RELEASE'],
@@ -370,10 +370,16 @@ export function AssetsPage({ variant = 'all' }: { variant?: AssetsPageVariant } 
   // "what can I sell right here today", so cross-branch noise hurts more than it helps.
   const defaultBranchId = (isBranchUser || isReadyToSell) && user?.branch_id ? user.branch_id : null;
 
+  // Honor ?branch_id and ?bucket params (from Stock dashboard "View all" links)
+  const initialBranchId = searchParams.get('branch_id')
+    ? Number(searchParams.get('branch_id'))
+    : defaultBranchId;
+  const initialBucket = searchParams.get('bucket');
+
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [filterBucket, setFilterBucket] = useState<string | null>(null);
-  const [filterBranchId, setFilterBranchId] = useState<number | null>(defaultBranchId);
+  const [filterBucket, setFilterBucket] = useState<string | null>(initialBucket);
+  const [filterBranchId, setFilterBranchId] = useState<number | null>(initialBranchId);
   const [filterCondition, setFilterCondition] = useState<string | null>(null);
   const [filterBrand, setFilterBrand] = useState<string>('');
   const [filterFamily, setFilterFamily] = useState<string>('');

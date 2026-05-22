@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
 import {
@@ -91,14 +91,21 @@ interface Branch {
 // Bucket filter options (lots are mostly On-Hand / Quarantined / In-Transit)
 // ============================================================================
 
+// Bucket options listed in workflow order. Only buckets where `applies_to`
+// includes lots (BOTH) — asset-only buckets are excluded.
 const BUCKET_OPTIONS = [
+  { value: 'INBOUND_RECEIVED_UNREGISTERED', label: 'Unregistered' },
   { value: 'ON_HAND_AVAILABLE', label: 'Available' },
   { value: 'QUARANTINED', label: 'Quarantined' },
   { value: 'IN_TRANSIT_OUTBOUND', label: 'In Transit (Out)' },
   { value: 'IN_TRANSIT_INBOUND', label: 'In Transit (In)' },
-  { value: 'INBOUND_APPROVED_AWAITING_BRANCH_CONFIRM', label: 'Inbound (Awaiting Confirm)' },
-  { value: 'INBOUND_RECEIVED_UNREGISTERED', label: 'Inbound (Unregistered)' },
+  { value: 'SOLD_B2B_EXTERNAL', label: 'Sold B2B' },
   { value: 'WRITTEN_OFF', label: 'Written off' },
+];
+
+const CONTRACTABLE_OPTIONS = [
+  { value: 'true', label: 'Contractable' },
+  { value: 'false', label: 'Accessory' },
 ];
 
 // ============================================================================
@@ -131,10 +138,10 @@ const SIMPLE_ACTIONS: Record<string, LotSimpleActionConfig> = {
   },
 };
 
-// Up to 3 actions surfaced inline as primary; rest go behind "More".
-const PRIMARY_BY_BUCKET: Record<string, string[]> = {
-  ON_HAND_AVAILABLE: ['LOT_CONVERT_TO_ASSET', 'LOT_TRANSFER_CREATE'],
-};
+// Action codes promoted to inline primary buttons when the backend reports
+// them as available for this lot. Order here is render order. Anything not
+// listed (or listed but blocked) falls into the "More" menu.
+const PRIMARY_ACTION_CODES = ['LOT_CONVERT_TO_ASSET', 'LOT_TRANSFER_CREATE'];
 
 const CATEGORY_ORDER = ['CONVERSION', 'TRANSFER'];
 
@@ -159,11 +166,19 @@ export function LotsPage() {
   const isBranchUser = ['BRANCH_STAFF', 'BRANCH_MANAGER'].includes(user?.role_code ?? '');
   const defaultBranchId = isBranchUser && user?.branch_id ? user.branch_id : null;
 
+  // Honor ?branch_id and ?bucket params (from Stock dashboard "View all" links)
+  const [searchParams] = useSearchParams();
+  const initialBranchId = searchParams.get('branch_id')
+    ? Number(searchParams.get('branch_id'))
+    : defaultBranchId;
+  const initialBucket = searchParams.get('bucket');
+
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [filterBucket, setFilterBucket] = useState<string | null>('ON_HAND_AVAILABLE');
-  const [filterBranchId, setFilterBranchId] = useState<number | null>(defaultBranchId);
+  const [filterBucket, setFilterBucket] = useState<string | null>(initialBucket);
+  const [filterBranchId, setFilterBranchId] = useState<number | null>(initialBranchId);
   const [filterPoType, setFilterPoType] = useState<string | null>(null);
+  const [filterContractable, setFilterContractable] = useState<string | null>(null);
   const [filterPopoverOpen, setFilterPopoverOpen] = useState(false);
   const filterTriggerRef = useRef<HTMLButtonElement>(null);
   const [pageIndex, setPageIndex] = useState(0);
@@ -178,9 +193,11 @@ export function LotsPage() {
 
   const isMdOrBelow = useMediaQuery('(max-width: 767px)');
   const isLgOrBelow = useMediaQuery('(max-width: 1023px)');
+  const isXlOrBelow = useMediaQuery('(max-width: 1279px)');
   const hiddenActiveFilters = [
     isMdOrBelow && filterBranchId != null,
     isLgOrBelow && filterPoType != null,
+    isXlOrBelow && filterContractable != null,
   ].filter(Boolean).length;
 
   useEffect(() => {
@@ -199,12 +216,13 @@ export function LotsPage() {
   );
 
   const { data: listData, isFetching } = useQuery({
-    queryKey: ['lots', debouncedSearch, filterBucket, filterBranchId, filterPoType, pageIndex, pageSize],
+    queryKey: ['lots', debouncedSearch, filterBucket, filterBranchId, filterPoType, filterContractable, pageIndex, pageSize],
     queryFn: () => {
       let url = '/v_stock_lots?order=created_at.desc';
       if (filterBucket) url += `&current_bucket=eq.${filterBucket}`;
       if (filterBranchId) url += `&branch_id=eq.${filterBranchId}`;
       if (filterPoType) url += `&po_type=eq.${filterPoType}`;
+      if (filterContractable) url += `&is_contractable=is.${filterContractable}`;
       if (debouncedSearch) {
         url += `&or=(lot_code.ilike.*${encodeURIComponent(debouncedSearch)}*,variant_sku_code.ilike.*${encodeURIComponent(debouncedSearch)}*,model_name.ilike.*${encodeURIComponent(debouncedSearch)}*,po_no.ilike.*${encodeURIComponent(debouncedSearch)}*)`;
       }
@@ -216,7 +234,7 @@ export function LotsPage() {
   const list = listData?.data ?? [];
   const totalCount = listData?.totalCount ?? 0;
 
-  useEffect(() => { setPageIndex(0); }, [debouncedSearch, filterBucket, filterBranchId, filterPoType]);
+  useEffect(() => { setPageIndex(0); }, [debouncedSearch, filterBucket, filterBranchId, filterPoType, filterContractable]);
 
   // Detail uses the same view (no v_lot_detail exists). Fetch by id even if
   // not in the current page, so direct deep-link `/lots/123` still works.
@@ -236,6 +254,7 @@ export function LotsPage() {
     queryClient.invalidateQueries({ queryKey: ['lot-actions'] });
     queryClient.invalidateQueries({ queryKey: ['lot-open-transfers'] });
     queryClient.invalidateQueries({ queryKey: ['lot-assets'] });
+    queryClient.invalidateQueries({ queryKey: ['assets'] });
   };
 
   return (
@@ -317,6 +336,17 @@ export function LotsPage() {
                     clearable
                   />
                 </div>
+                <div className="flex-1 min-w-0 hidden xl:block">
+                  <Select
+                    options={CONTRACTABLE_OPTIONS}
+                    value={filterContractable}
+                    onChange={(val) => setFilterContractable((val as string) || null)}
+                    placeholder={t('lot.allTypes', { defaultValue: 'All types' })}
+                    size="sm"
+                    showChevron
+                    clearable
+                  />
+                </div>
                 <PopOver
                   isOpen={filterPopoverOpen}
                   onClose={() => setFilterPopoverOpen(false)}
@@ -360,13 +390,24 @@ export function LotsPage() {
                         clearable
                       />
                     </div>
+                    <div className="xl:hidden flex flex-col gap-2">
+                      <Select
+                        options={CONTRACTABLE_OPTIONS}
+                        value={filterContractable}
+                        onChange={(val) => setFilterContractable((val as string) || null)}
+                        placeholder={t('lot.allTypes', { defaultValue: 'All types' })}
+                        size="sm"
+                        showChevron
+                        clearable
+                      />
+                    </div>
                   </div>
                 </PopOver>
                 <Button
                   ref={filterTriggerRef}
                   size="sm"
                   variant="outline"
-                  className={`relative btn-icon-sm shrink-0 lg:hidden ${hiddenActiveFilters > 0 ? 'text-primary-fg' : ''}`}
+                  className={`relative btn-icon-sm shrink-0 xl:hidden ${hiddenActiveFilters > 0 ? 'text-primary-fg' : ''}`}
                   onClick={() => setFilterPopoverOpen((v) => !v)}
                 >
                   <SlidersHorizontal size={14} />
@@ -477,6 +518,12 @@ interface AssetFromLot {
   asset_id: number;
 }
 
+interface ReceiptFromLot {
+  receipt_id: number;
+  receipt_no: string;
+  code_display: string | null;
+}
+
 function LotDetailPanel({
   lot,
   loading,
@@ -535,6 +582,18 @@ function LotDetailPanel({
     staleTime: 30 * 1000,
   });
   const assetCount = assetCountData?.totalCount ?? 0;
+
+  // Source receipt — only PURCHASE lots have one. Filter the parent
+  // v_receipt_detail by the stock_lot_id embedded in any lines[] element.
+  const { data: sourceReceipt } = useQuery({
+    queryKey: ['lot-source-receipt', lot.lot_id],
+    queryFn: () => apiClient.get<ReceiptFromLot[]>(
+      `/v_receipt_detail?lines=cs.${encodeURIComponent(`[{"stock_lot_id":${lot.lot_id}}]`)}`
+      + '&select=receipt_id,receipt_no,code_display',
+    ).then(rows => rows[0] ?? null),
+    enabled: lot.po_type === 'PURCHASE',
+    staleTime: 5 * 60 * 1000,
+  });
 
   // Track transfer-line ids we've already shown so animations only fire for
   // newly added items after a user action — not on initial mount/page revisit.
@@ -650,18 +709,32 @@ function LotDetailPanel({
         </div>
       </div>
 
-      {/* Provenance — PO/Receipt cross-links with icon */}
+      {/* Provenance — PO + Receipt cross-links */}
       {lot.po_no && lot.po_id && (
-        <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-2 text-sm">
-          <span className="text-xs text-subtle shrink-0">{t('lot.from')}</span>
-          <Badge size="xs" color="default">{lot.po_type}</Badge>
-          <Link
-            to={`/admin/inventory/po/${lot.po_id}`}
-            className="inline-flex items-center gap-1 text-primary-fg hover:underline font-medium"
-          >
-            {lot.po_no}
-            <ExternalLink size={12} />
-          </Link>
+        <div className="flex-none px-4 py-2.5 border-b border-line flex flex-col gap-1.5 text-sm">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-subtle shrink-0">{t('lot.from')}</span>
+            <Badge size="xs" color="default">{lot.po_type}</Badge>
+            <Link
+              to={`/admin/inventory/po/${lot.po_id}`}
+              className="inline-flex items-center gap-1 text-primary-fg hover:underline font-medium"
+            >
+              {lot.po_no}
+              <ExternalLink size={12} />
+            </Link>
+          </div>
+          {sourceReceipt && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-subtle shrink-0">{t('lot.receipt', { defaultValue: 'Receipt' })}</span>
+              <Link
+                to={`/admin/inventory/receiving/${sourceReceipt.receipt_id}`}
+                className="inline-flex items-center gap-1 text-primary-fg hover:underline font-medium"
+              >
+                {sourceReceipt.code_display ?? sourceReceipt.receipt_no}
+                <ExternalLink size={12} />
+              </Link>
+            </div>
+          )}
         </div>
       )}
 
@@ -672,7 +745,7 @@ function LotDetailPanel({
           <Badge size="xs" color="default">{assetCount}</Badge>
           <Link
             to={`/admin/inventory/assets?source_lot_id=${lot.lot_id}`}
-            className="inline-flex items-center gap-1 text-primary-fg hover:underline font-medium ml-auto"
+            className="inline-flex items-center gap-1 text-primary-fg hover:underline font-medium"
           >
             {t('lot.viewAllAssets')}
             <ExternalLink size={12} />
@@ -768,11 +841,13 @@ function LotActionBar({
     .slice()
     .sort((a, b) => a.sort_order - b.sort_order);
 
-  const primaryCodes = PRIMARY_BY_BUCKET[lot.current_bucket] ?? [];
-  const primarySet = new Set(primaryCodes);
-  const primaryActions = primaryCodes
-    .map(c => allActions.find(a => a.action_code === c))
+  // Promote only actions the backend reports as actually available for this
+  // lot — don't surface convert on a non-contractable lot, etc. Blocked/disabled
+  // variants still appear in the "More" menu so the user can hover for the reason.
+  const primaryActions = PRIMARY_ACTION_CODES
+    .map(c => allActions.find(a => a.action_code === c && a.is_available))
     .filter((a): a is BackendLotAction => !!a);
+  const primarySet = new Set(primaryActions.map(a => a.action_code));
   const secondaryActions = allActions.filter(a => !primarySet.has(a.action_code));
 
   const groupedSecondary = secondaryActions.reduce<Record<string, BackendLotAction[]>>((acc, a) => {
@@ -1045,7 +1120,7 @@ function LotActionModal({
       if (action.action_code === 'LOT_CONVERT_TO_ASSET') {
         const params = {
           p_lot_id: lot.lot_id,
-          p_variant_id: null as number | null,
+          p_variant_id: lot.variant_id,
           p_identifiers: filledIds.map(i => ({ type: i.type, value: i.value.trim() })),
           p_condition_grade: conditionGrade || null,
           p_physical_color: physicalColor.trim() || null,
@@ -1151,6 +1226,13 @@ function LotActionModal({
                 { label: t('lot.remaining'), value: fmtNum(result.data.lot_remaining_qty) },
                 { label: t('lot.status', { defaultValue: 'Lot status' }), value: result.data.lot_status },
               ]}
+              secondaryAction={{
+                label: t('convert.openAsset', { ns: 'lotActions', defaultValue: 'Open asset' }),
+                onClick: () => {
+                  onClose();
+                  navigate(`/admin/inventory/assets/${result.data.asset_id}`);
+                },
+              }}
               onClose={onClose}
             />
           )}

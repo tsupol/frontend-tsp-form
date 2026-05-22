@@ -592,6 +592,17 @@ interface ConfirmReceiptResult {
   status: 'CONFIRMED';
   lots_created: number;
   lot_ids?: number[];
+  lots?: Array<{
+    lot_id: number;
+    model_id: number;
+    variant_id: number;
+    qty: number;
+    unit_cost: number;
+    line_total: number;
+    owner_type: string;
+    owner_id: number;
+    branch_id: number;
+  }>;
   total_qty: number;
   total_amount: number;
   po_progress?: {
@@ -620,6 +631,7 @@ function ConfirmReceiptModal({
   const [view, setView] = useState<'form' | 'done'>('form');
   const [error, setError] = useState('');
   const [result, setResult] = useState<ConfirmReceiptResult | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (open) {
@@ -628,6 +640,11 @@ function ConfirmReceiptModal({
       setResult(null);
     }
   }, [open]);
+
+  const lineByVariant = useMemo(
+    () => new Map((detail.lines ?? []).map(l => [l.variant_id, l])),
+    [detail.lines],
+  );
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -679,22 +696,76 @@ function ConfirmReceiptModal({
               { label: t('receiving.totalAmount', { defaultValue: 'Total amount' }), value: fmtCurrency(result.total_amount) },
             ]}
             extras={
-              result.po_progress && (
-                <div className="px-3 py-2.5 rounded-md bg-info/5 border border-info/20">
-                  <div className="text-xs text-subtle mb-1">
-                    {t('receiving.poProgressLabel', { defaultValue: 'PO progress' })}: {detail.po_no}
+              <div className="flex flex-col gap-3">
+                {result.lots && result.lots.length > 0 && (
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wider text-subtle mb-2">
+                      {t('receiving.newLots', { defaultValue: 'New lots' })}
+                    </div>
+                    <div className="flex flex-col rounded-md border border-line overflow-hidden">
+                      {result.lots.map((lot) => {
+                        const line = lineByVariant.get(lot.variant_id);
+                        return (
+                          <button
+                            key={lot.lot_id}
+                            type="button"
+                            className="text-left px-3 py-2 border-b border-line last:border-b-0 hover:bg-surface-hover cursor-pointer flex items-center gap-3 bg-transparent"
+                            onClick={() => {
+                              handleDoneClose();
+                              navigate(`/admin/inventory/lots/${lot.lot_id}`);
+                            }}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium truncate">
+                                {line
+                                  ? [line.brand_name, line.family_name, line.model_name].filter(Boolean).join(' ')
+                                  : `Lot #${lot.lot_id}`}
+                              </div>
+                              {line && (
+                                <div className="text-xs text-subtle truncate">
+                                  {line.variant_name} · {line.sku_code}
+                                </div>
+                              )}
+                            </div>
+                            <div className="text-right shrink-0">
+                              <div className="text-sm tabular-nums">{fmtNum(lot.qty)}</div>
+                              <div className="text-xs text-subtle tabular-nums">{fmtCurrency(lot.line_total)}</div>
+                            </div>
+                            <ExternalLink size={14} className="shrink-0 text-subtle" />
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <div className="text-sm tabular-nums">
-                    {fmtNum(result.po_progress.po_received_qty)} / {fmtNum(result.po_progress.po_total_qty)} pcs
-                    {result.po_progress.percent_received != null && (
-                      <span className="text-xs text-subtle ml-2">({result.po_progress.percent_received}%)</span>
-                    )}
+                )}
+                {result.po_progress && (
+                  <div className="px-3 py-2.5 rounded-md bg-info/5 border border-info/20">
+                    <div className="text-xs text-subtle mb-1">
+                      {t('receiving.poProgressLabel', { defaultValue: 'PO progress' })}: {detail.po_no}
+                    </div>
+                    <div className="text-sm tabular-nums">
+                      {fmtNum(result.po_progress.po_received_qty)} / {fmtNum(result.po_progress.po_total_qty)} pcs
+                      {result.po_progress.percent_received != null && (
+                        <span className="text-xs text-subtle ml-2">({result.po_progress.percent_received}%)</span>
+                      )}
+                    </div>
+                    <div className="text-xs text-subtle tabular-nums mt-0.5">
+                      {fmtCurrency(result.po_progress.po_received_amount)} / {fmtCurrency(result.po_progress.po_total_amount)}
+                    </div>
                   </div>
-                  <div className="text-xs text-subtle tabular-nums mt-0.5">
-                    {fmtCurrency(result.po_progress.po_received_amount)} / {fmtCurrency(result.po_progress.po_total_amount)}
-                  </div>
-                </div>
-              )
+                )}
+              </div>
+            }
+            secondaryAction={
+              result.lots && result.lots.length > 0
+                ? {
+                    label: t('receiving.viewAllLots', { defaultValue: 'View all lots from this PO' }),
+                    onClick: () => {
+                      handleDoneClose();
+                      navigate(`/admin/inventory/lots?po_id=${detail.po_id}`);
+                    },
+                  }
+                : undefined
             }
             onClose={handleDoneClose}
           />
@@ -814,9 +885,13 @@ interface PoOption {
   po_id: number;
   po_no: string;
   company_id: number;
+  company_name: string | null;
   supplier_name: string | null;
   c_total_qty: number;
   c_received_qty: number;
+  status: string;
+  ownership: string;
+  created_at: string;
 }
 
 interface BranchOption {
@@ -858,8 +933,8 @@ function CreateReceiptModal({
     queryKey: ['pos-approved-receivable'],
     queryFn: () =>
       apiClient.get<PoOption[]>(
-        '/v_purchase_orders?po_type=eq.PURCHASE&status=eq.APPROVED&order=created_at.desc'
-        + '&select=po_id,po_no,company_id,supplier_name,c_total_qty,c_received_qty',
+        '/v_po_detail?po_type=eq.PURCHASE&status=eq.APPROVED&order=created_at.desc'
+        + '&select=po_id,po_no,company_id,company_name,supplier_name,c_total_qty,c_received_qty,status,ownership,created_at',
       ),
     enabled: open,
     staleTime: 60 * 1000,
@@ -894,6 +969,11 @@ function CreateReceiptModal({
       value: String(p.po_id),
       label: `${p.po_no}${p.supplier_name ? ' · ' + p.supplier_name : ''}`,
     })),
+    [pos],
+  );
+
+  const poById = useMemo(
+    () => new Map((pos ?? []).map(p => [p.po_id, p])),
     [pos],
   );
 
@@ -977,6 +1057,44 @@ function CreateReceiptModal({
                 onChange={(v) => setPoId(v ? Number(v) : null)}
                 placeholder={t('receiving.selectPo')}
                 searchable
+                renderOption={(opt) => {
+                  const p = poById.get(Number(opt.value));
+                  if (!p) return opt.label;
+                  const receivedPct = p.c_total_qty > 0
+                    ? Math.round((p.c_received_qty / p.c_total_qty) * 100)
+                    : 0;
+                  const isPartial = p.c_received_qty > 0 && p.c_received_qty < p.c_total_qty;
+                  return (
+                    <div className="flex flex-col gap-1 w-full min-w-0 py-0.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-sm">{p.po_no}</span>
+                        <Badge
+                          size="xs"
+                          variant="outline"
+                          color={p.ownership === 'HOLDING' ? 'info' : p.ownership === 'COMPANY' ? 'secondary' : 'default'}
+                        >
+                          {p.ownership}
+                        </Badge>
+                        {isPartial && (
+                          <Badge size="xs" color="warning">
+                            {t('receiving.partial', { defaultValue: 'Partial' })} {receivedPct}%
+                          </Badge>
+                        )}
+                        <span className="text-fg text-xs tabular-nums ml-auto">
+                          {fmtNum(p.c_received_qty)}/{fmtNum(p.c_total_qty)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-[11px] text-subtle min-w-0">
+                        <span className="truncate">
+                          {[p.company_name, p.supplier_name].filter(Boolean).join(' · ')}
+                        </span>
+                        <span className="shrink-0 ml-auto">
+                          <DateTime value={p.created_at} />
+                        </span>
+                      </div>
+                    </div>
+                  );
+                }}
               />
               {selectedPo && (
                 <div className="text-xs text-subtle mt-1">

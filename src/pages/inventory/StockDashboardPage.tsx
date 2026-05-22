@@ -1,10 +1,10 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Badge, Select } from 'tsp-form';
 import { apiClient } from '../../lib/api';
-import { Package, ShieldAlert, Wrench, Truck, ArrowLeft, ArrowRightFromLine } from 'lucide-react';
+import { Package, ShieldAlert, Wrench, Truck, ArrowLeft, ArrowRightFromLine, ExternalLink } from 'lucide-react';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { getBucketLabel, getBucketColor, fmtNum } from './inventoryUtils';
@@ -518,9 +518,18 @@ function DetailPanel({
         {/* Asset breakdown */}
         {assets.length > 0 && (
           <div>
-            <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-2">
-              {t('inventory.assets')} ({assets.length})
-            </h3>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider">
+                {t('inventory.assets')} ({assets.length})
+              </h3>
+              <Link
+                to={`/admin/inventory/assets?branch_id=${row.branch_id}&bucket=${row.current_bucket}`}
+                className="inline-flex items-center gap-1 text-xs text-primary-fg hover:underline font-medium"
+              >
+                {t('inventory.viewAll', { defaultValue: 'View all' })}
+                <ExternalLink size={11} />
+              </Link>
+            </div>
             <div className="border border-line rounded-md overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
@@ -552,9 +561,18 @@ function DetailPanel({
         {/* Lot breakdown */}
         {lots.length > 0 && (
           <div>
-            <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-2">
-              {t('inventory.lots')} ({lots.length})
-            </h3>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider">
+                {t('inventory.lots')} ({lots.length})
+              </h3>
+              <Link
+                to={`/admin/inventory/lots?branch_id=${row.branch_id}&bucket=${row.current_bucket}`}
+                className="inline-flex items-center gap-1 text-xs text-primary-fg hover:underline font-medium"
+              >
+                {t('inventory.viewAll', { defaultValue: 'View all' })}
+                <ExternalLink size={11} />
+              </Link>
+            </div>
             <div className="border border-line rounded-md overflow-hidden">
               <table className="w-full text-sm">
                 <thead>

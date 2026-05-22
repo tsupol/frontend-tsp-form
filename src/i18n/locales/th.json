@@ -1045,7 +1045,7 @@
     "cancelReason": "เหตุผลยกเลิก",
     "cancelReasonPlaceholder": "เหตุผลการยกเลิก (ไม่บังคับ)...",
     "selectReason": "เลือกเหตุผล",
-    "submitDispatchHint": "ผู้จัดการสาขาจะส่งให้บริษัทอนุมัติ. ผู้ดูแลบริษัท / Inventory จะอนุมัติอัตโนมัติ",
+    "submitDispatchHint": "ผู้ใช้ระดับสาขาจะส่งให้อนุมัติ ผู้ใช้ระดับบริษัทและ holding จะอนุมัติทันที",
     "confirmSubmit": "ส่ง PO นี้?",
     "confirmApprove": "อนุมัติใบสั่งซื้อนี้?",
     "confirmReject": "ปฏิเสธใบสั่งซื้อนี้?",
