@@ -27,6 +27,8 @@ export interface ActionDoneSecondaryAction {
   label: string;
   /** Called BEFORE onClose so the parent can navigate/select. The done view itself does not call onClose after — the secondary's onClick should call onClose if it wants to dismiss. */
   onClick: () => void;
+  startIcon?: ReactNode;
+  endIcon?: ReactNode;
 }
 
 export interface ActionDoneViewProps {
@@ -144,7 +146,12 @@ export function ActionDoneView({
             {t('contract.action_viewBill', { defaultValue: 'View bill' })}
           </Button>
         ) : secondaryAction && (
-          <Button variant="outline" onClick={secondaryAction.onClick}>
+          <Button
+            variant="outline"
+            onClick={secondaryAction.onClick}
+            startIcon={secondaryAction.startIcon}
+            endIcon={secondaryAction.endIcon}
+          >
             {secondaryAction.label}
           </Button>
         )}

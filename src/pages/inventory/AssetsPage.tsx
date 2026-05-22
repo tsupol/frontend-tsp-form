@@ -3,14 +3,14 @@ import { useTranslation } from 'react-i18next';
 import { useSearchParams, useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, Modal, TextArea, DataTable, PopOver, Tooltip, useSnackbarContext } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, Box, Search, SlidersHorizontal, XCircle, ChevronDown, ShoppingCart, ExternalLink, Wrench } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, Box, Search, SlidersHorizontal, XCircle, ChevronDown, ExternalLink, Wrench } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { CopyButton } from '../../components/CopyButton';
 import { fmtCurrency } from '../../lib/format';
 import { buildBillActionToast, type StandardBillResponse } from '../../lib/billActionToast';
 import { useAuth } from '../../contexts/AuthContext';
-import { getBucketLabel, getBucketColor, getConditionLabel, getConditionTextColor, CONDITION_OPTIONS } from './inventoryUtils';
+import { getBucketLabel, getBucketColor, getConditionLabel, getConditionTextColor, CONDITION_OPTIONS, fmtNum } from './inventoryUtils';
 
 // ============================================================================
 // Types (verified against live API 2026-03-25)
@@ -88,7 +88,6 @@ interface FamilyLookup {
 // Page variants
 // ============================================================================
 
-export type AssetsPageVariant = 'all' | 'ready-to-sell';
 
 // ============================================================================
 // Bucket filter options
@@ -345,13 +344,12 @@ const CATEGORY_OVERRIDE: Record<string, string> = {};
 // Component
 // ============================================================================
 
-export function AssetsPage({ variant = 'all' }: { variant?: AssetsPageVariant } = {}) {
+export function AssetsPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const isReadyToSell = variant === 'ready-to-sell';
 
   // Source filters (deep-link from lot/PO detail pages)
   const sourceLotIdParam = searchParams.get('source_lot_id');
@@ -366,9 +364,7 @@ export function AssetsPage({ variant = 'all' }: { variant?: AssetsPageVariant } 
   };
 
   const isBranchUser = ['BRANCH_STAFF', 'BRANCH_MANAGER'].includes(user?.role_code ?? '');
-  // Ready-to-Sell view defaults to the user's branch when known — the page is about
-  // "what can I sell right here today", so cross-branch noise hurts more than it helps.
-  const defaultBranchId = (isBranchUser || isReadyToSell) && user?.branch_id ? user.branch_id : null;
+  const defaultBranchId = isBranchUser && user?.branch_id ? user.branch_id : null;
 
   // Honor ?branch_id and ?bucket params (from Stock dashboard "View all" links)
   const initialBranchId = searchParams.get('branch_id')
@@ -393,9 +389,8 @@ export function AssetsPage({ variant = 'all' }: { variant?: AssetsPageVariant } 
   const setSelectedId = (id: number | null) => {
     const qs = searchParams.toString();
     const suffix = qs ? `?${qs}` : '';
-    const basePath = isReadyToSell ? '/admin/inventory/ready-to-sell' : '/admin/inventory/assets';
-    if (id) navigate(`${basePath}/${id}${suffix}`, { replace: true });
-    else navigate(`${basePath}${suffix}`, { replace: true });
+    if (id) navigate(`/admin/inventory/assets/${id}${suffix}`, { replace: true });
+    else navigate(`/admin/inventory/assets${suffix}`, { replace: true });
   };
 
   // Debounce search
@@ -443,16 +438,12 @@ export function AssetsPage({ variant = 'all' }: { variant?: AssetsPageVariant } 
   const extraFilterCount = [filterBrand, filterFamily, filterCondition].filter(Boolean).length;
 
   const { data: listData, isFetching } = useQuery({
-    queryKey: ['assets', isReadyToSell, debouncedSearch, filterBucket, filterBranchId, filterCondition, filterBrand, filterFamily, sourceLotId, sourcePoId, pageIndex, pageSize],
+    queryKey: ['assets', debouncedSearch, filterBucket, filterBranchId, filterCondition, filterBrand, filterFamily, sourceLotId, sourcePoId, pageIndex, pageSize],
     queryFn: () => {
       let url = '/v_assets?order=created_at.desc';
-      // Ready-to-Sell view: only sellable assets, only the Available bucket.
-      // Bucket filter is hidden in this view, so we hard-code ON_HAND_AVAILABLE for
-      // a "what's sittable on the shelf today" feel instead of mixing in quarantined.
-      if (isReadyToSell) url += '&is_sellable=eq.true&current_bucket=eq.ON_HAND_AVAILABLE';
       if (sourceLotId) url += `&source_lot_id=eq.${sourceLotId}`;
       if (sourcePoId) url += `&source_po_id=eq.${sourcePoId}`;
-      if (filterBucket && !isReadyToSell) url += `&current_bucket=eq.${filterBucket}`;
+      if (filterBucket) url += `&current_bucket=eq.${filterBucket}`;
       if (filterBranchId) url += `&branch_id=eq.${filterBranchId}`;
       if (filterCondition === 'USED') url += `&condition_grade=in.(USED_A,USED_B)`;
       else if (filterCondition) url += `&condition_grade=eq.${filterCondition}`;
@@ -468,6 +459,23 @@ export function AssetsPage({ variant = 'all' }: { variant?: AssetsPageVariant } 
 
   const list = listData?.data ?? [];
   const totalCount = listData?.totalCount ?? 0;
+
+  // Available pill count — sums asset_count across branches the user can see,
+  // scoped to the current branch filter if set.
+  const { data: availableCounts } = useQuery({
+    queryKey: ['asset-available-count', filterBranchId],
+    queryFn: () => {
+      let url = '/v_branch_stock_summary?current_bucket=eq.ON_HAND_AVAILABLE&select=asset_count';
+      if (filterBranchId) url += `&branch_id=eq.${filterBranchId}`;
+      return apiClient.get<Array<{ asset_count: number }>>(url);
+    },
+    staleTime: 30 * 1000,
+  });
+
+  const availableAssetCount = useMemo(
+    () => (availableCounts ?? []).reduce((sum, r) => sum + r.asset_count, 0),
+    [availableCounts],
+  );
 
   useEffect(() => { setPageIndex(0); }, [debouncedSearch, filterBucket, filterBranchId, filterCondition, filterBrand, filterFamily, sourceLotId, sourcePoId]);
 
@@ -504,7 +512,7 @@ export function AssetsPage({ variant = 'all' }: { variant?: AssetsPageVariant } 
                 )}
               </div>
               <div className="mobile-header-title mobile-header-title-truncate">
-                {isRoot ? t(isReadyToSell ? 'nav.readyToSell' : 'nav.assets') : selectedAsset?.asset_code ?? ''}
+                {isRoot ? t('nav.assets') : selectedAsset?.asset_code ?? ''}
               </div>
               <div className="mobile-header-end w-12" />
             </MobileHeader>
@@ -513,9 +521,22 @@ export function AssetsPage({ variant = 'all' }: { variant?: AssetsPageVariant } 
           {!isMobile && (
             <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
               <h1 className="heading-2 shrink-0 flex items-center gap-2">
-                {isReadyToSell && <ShoppingCart size={18} className="text-success" />}
-                {t(isReadyToSell ? 'nav.readyToSell' : 'nav.assets')}
+                {t('nav.assets')}
               </h1>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFilterBucket(filterBucket === 'ON_HAND_AVAILABLE' ? null : 'ON_HAND_AVAILABLE')}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-colors cursor-pointer ${
+                    filterBucket === 'ON_HAND_AVAILABLE'
+                      ? 'bg-primary-soft text-primary-fg border-primary'
+                      : 'border-line hover:bg-surface-hover bg-transparent'
+                  }`}
+                >
+                  <span>{t('inventory.available', { defaultValue: 'Available' })}</span>
+                  <span className="tabular-nums opacity-80">{fmtNum(availableAssetCount)}</span>
+                </button>
+              </div>
             </div>
           )}
 
@@ -551,19 +572,17 @@ export function AssetsPage({ variant = 'all' }: { variant?: AssetsPageVariant } 
                     startIcon={<Search size={16} />}
                   />
                 </div>
-                {!isReadyToSell && (
-                  <div className="flex-1 min-w-0 hidden sm:block">
-                    <Select
-                      options={BUCKET_OPTIONS}
-                      value={filterBucket}
-                      onChange={(val) => setFilterBucket((val as string) || null)}
-                      placeholder={t('asset.allStatuses')}
-                      size="sm"
-                      showChevron
-                      clearable
-                    />
-                  </div>
-                )}
+                <div className="flex-1 min-w-0 hidden sm:block">
+                  <Select
+                    options={BUCKET_OPTIONS}
+                    value={filterBucket}
+                    onChange={(val) => setFilterBucket((val as string) || null)}
+                    placeholder={t('asset.allStatuses')}
+                    size="sm"
+                    showChevron
+                    clearable
+                  />
+                </div>
                 <div className="flex-1 min-w-0 hidden md:block">
                   <Select
                     options={branchOptions}
@@ -618,19 +637,17 @@ export function AssetsPage({ variant = 'all' }: { variant?: AssetsPageVariant } 
                 >
                   <div className="flex flex-col gap-3 p-3">
                     <div className="text-xs font-medium text-subtle uppercase tracking-wide">{t('common.filters')}</div>
-                    {!isReadyToSell && (
-                      <div className="sm:hidden flex flex-col gap-2">
-                        <Select
-                          options={BUCKET_OPTIONS}
-                          value={filterBucket}
-                          onChange={(val) => setFilterBucket((val as string) || null)}
-                          placeholder={t('asset.allStatuses')}
-                          size="sm"
-                          showChevron
-                          clearable
-                        />
-                      </div>
-                    )}
+                    <div className="sm:hidden flex flex-col gap-2">
+                      <Select
+                        options={BUCKET_OPTIONS}
+                        value={filterBucket}
+                        onChange={(val) => setFilterBucket((val as string) || null)}
+                        placeholder={t('asset.allStatuses')}
+                        size="sm"
+                        showChevron
+                        clearable
+                      />
+                    </div>
                     <div className="md:hidden flex flex-col gap-2">
                       <Select
                         options={branchOptions}

@@ -29,7 +29,7 @@ import {
   // Fanout child icons — Pricing
   TrendingUp, Percent, Handshake,
   // Fanout child icons — Inventory
-  BarChart3, Boxes, ClipboardList, PackagePlus, ArrowLeftRight, Wrench, RotateCcw, ShoppingCart,
+  BarChart3, Boxes, ClipboardList, PackagePlus, ArrowLeftRight, Wrench, RotateCcw, ShoppingCart, ExternalLink,
   // Retail
   Store,
   // Fanout child icons — Company
@@ -240,7 +240,17 @@ export const AppSideNav = () => {
         { key: 'transfers', icon: <ArrowLeftRight size="1rem" />, label: t('nav.transfers'), path: '/admin/inventory/transfers' },
         { key: 'repairs', icon: <Wrench size="1rem" />, label: t('nav.repairs'), path: '/admin/inventory/repairs' },
         { key: 'buyback', icon: <RotateCcw size="1rem" />, label: t('nav.buyback'), path: '/admin/inventory/buyback' },
-        { key: 'ready-to-sell', icon: <ShoppingCart size="1rem" className="text-success" />, label: t('nav.readyToSell'), path: '/admin/inventory/ready-to-sell' },
+        {
+          key: 'ready-to-sell',
+          icon: <ShoppingCart size="1rem" className="text-primary-fg" />,
+          label: (
+            <span className="text-primary-fg font-medium inline-flex items-center gap-1.5">
+              {t('nav.readyToSell')}
+              <ExternalLink size={12} />
+            </span>
+          ),
+          path: '/admin/inventory/assets?bucket=ON_HAND_AVAILABLE',
+        },
       ],
     },
     {

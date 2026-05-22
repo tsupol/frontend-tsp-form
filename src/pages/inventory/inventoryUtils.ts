@@ -48,6 +48,20 @@ export function getBucketColor(bucket: string): BucketBadgeColor {
 }
 
 // ============================================================================
+// Lot status display config (lot.status — returned by convert / split RPCs)
+// ============================================================================
+
+export const LOT_STATUS_CONFIG: Record<string, { labelKey: string }> = {
+  ACTIVE: { labelKey: 'inventory.lotStatusActive' },
+  DEPLETED: { labelKey: 'inventory.lotStatusDepleted' },
+};
+
+export function getLotStatusLabel(status: string, t: (key: string) => string): string {
+  const cfg = LOT_STATUS_CONFIG[status];
+  return cfg ? t(cfg.labelKey) : status;
+}
+
+// ============================================================================
 // Condition display config
 // ============================================================================
 

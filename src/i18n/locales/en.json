@@ -890,6 +890,8 @@
     "conditionREFURBISHED": "Refurbished",
     "conditionUSED_A": "Used A",
     "conditionUSED_B": "Used B",
+    "lotStatusActive": "Active",
+    "lotStatusDepleted": "Depleted",
     "txnASSET_CREATE_FROM_LOT": "Created from Lot",
     "txnASSET_RECEIVE_PER_ITEM": "Received",
     "txnASSET_RECEIVE_REACQUIRE": "Reacquired",
@@ -998,7 +1000,9 @@
     "viewTransfer": "View transfer",
     "assets": "Assets",
     "more": "more",
-    "viewAllAssets": "View all assets"
+    "viewAllAssets": "View all assets",
+    "status": "Lot status",
+    "receipt": "Receipt"
   },
   "po": {
     "allStatuses": "All statuses",

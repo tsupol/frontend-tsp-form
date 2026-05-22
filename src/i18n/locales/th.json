@@ -890,6 +890,8 @@
     "conditionREFURBISHED": "รีเฟอร์บิช",
     "conditionUSED_A": "มือสอง A",
     "conditionUSED_B": "มือสอง B",
+    "lotStatusActive": "ใช้งานอยู่",
+    "lotStatusDepleted": "หมดแล้ว",
     "txnASSET_CREATE_FROM_LOT": "สร้างจาก Lot",
     "txnASSET_RECEIVE_PER_ITEM": "รับเข้า",
     "txnASSET_RECEIVE_REACQUIRE": "รับคืนเข้าระบบ",
@@ -998,7 +1000,9 @@
     "viewTransfer": "ดูใบโอน",
     "assets": "Asset",
     "more": "อีก",
-    "viewAllAssets": "ดู asset ทั้งหมด"
+    "viewAllAssets": "ดู asset ทั้งหมด",
+    "status": "สถานะ lot",
+    "receipt": "ใบรับของ"
   },
   "po": {
     "allStatuses": "ทุกสถานะ",

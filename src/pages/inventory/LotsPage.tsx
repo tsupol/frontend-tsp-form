@@ -15,7 +15,7 @@ import { CopyButton } from '../../components/CopyButton';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
-import { getBucketLabel, getBucketColor, fmtNum } from './inventoryUtils';
+import { getBucketLabel, getBucketColor, getLotStatusLabel, fmtNum } from './inventoryUtils';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 
 // ============================================================================
@@ -1222,12 +1222,13 @@ function LotActionModal({
               contractCode={result.data.asset_code}
               tone="success"
               detailRows={[
-                { label: t('convert.assetBucket', { ns: 'lotActions', defaultValue: 'Bucket' }), value: result.data.bucket },
+                { label: t('convert.assetBucket', { ns: 'lotActions', defaultValue: 'Bucket' }), value: getBucketLabel(result.data.bucket, t) },
                 { label: t('lot.remaining'), value: fmtNum(result.data.lot_remaining_qty) },
-                { label: t('lot.status', { defaultValue: 'Lot status' }), value: result.data.lot_status },
+                { label: t('lot.status', { defaultValue: 'Lot status' }), value: getLotStatusLabel(result.data.lot_status, t) },
               ]}
               secondaryAction={{
                 label: t('convert.openAsset', { ns: 'lotActions', defaultValue: 'Open asset' }),
+                endIcon: <ExternalLink size={14} />,
                 onClick: () => {
                   onClose();
                   navigate(`/admin/inventory/assets/${result.data.asset_id}`);
