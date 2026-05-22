@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
@@ -71,14 +71,34 @@ export function BillsPage() {
   const { billId: billIdParam } = useParams<{ billId?: string }>();
   const selectedBillId = billIdParam ? Number(billIdParam) : null;
 
-  const setSelectedBillId = useCallback((id: number | null) => {
-    if (id) navigate(`/admin/accounting/bills/${id}`, { replace: true });
-    else navigate('/admin/accounting/bills', { replace: true });
-  }, [navigate]);
+  // URL-driven filters: ?branch_id=&status=&type= so deep links work
+  // (e.g. day-close's "ดูบิลค้างชำระ" link).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const branchId = searchParams.get('branch_id') ?? '';
+  const statusFilter = searchParams.get('status') ?? '';
+  const typeFilter = searchParams.get('type') ?? '';
 
-  const [branchId, setBranchId] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<string>('');
-  const [typeFilter, setTypeFilter] = useState<string>('');
+  const updateFilters = useCallback((patch: Partial<{ branch_id: string; status: string; type: string }>) => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      for (const [k, v] of Object.entries(patch)) {
+        if (v) next.set(k, v); else next.delete(k);
+      }
+      return next;
+    }, { replace: true });
+    setPageIndex(0);
+  }, [setSearchParams]);
+
+  const preserveSearch = useCallback(() => {
+    const qs = searchParams.toString();
+    return qs ? `?${qs}` : '';
+  }, [searchParams]);
+
+  const setSelectedBillId = useCallback((id: number | null) => {
+    if (id) navigate(`/admin/accounting/bills/${id}${preserveSearch()}`, { replace: true });
+    else navigate(`/admin/accounting/bills${preserveSearch()}`, { replace: true });
+  }, [navigate, preserveSearch]);
+
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(25);
 
@@ -94,7 +114,12 @@ export function BillsPage() {
   const params = new URLSearchParams();
   if (branchId) params.set('branch_id', `eq.${branchId}`);
   params.set('order', 'created_at.desc');
-  if (statusFilter) params.set('status', `eq.${statusFilter}`);
+  if (statusFilter === 'OPEN') {
+    // OPEN tab = all pending bills (matches v_bills_pending: OPEN ∪ PARTIAL)
+    params.set('status', 'in.(OPEN,PARTIAL)');
+  } else if (statusFilter) {
+    params.set('status', `eq.${statusFilter}`);
+  }
   if (typeFilter) params.set('bill_type', `eq.${typeFilter}`);
 
   const { data: billsData, isFetching } = useQuery({
@@ -183,7 +208,7 @@ export function BillsPage() {
                         ? 'border-primary-fg text-primary-fg'
                         : 'border-transparent text-fg'
                     }`}
-                    onClick={() => { setStatusFilter(s); setPageIndex(0); }}
+                    onClick={() => updateFilters({ status: s })}
                   >
                     {t(`accounting.bills.tab_${s || 'ALL'}`)}
                     {s === 'OPEN' && pendingCount > 0 && (
@@ -198,7 +223,7 @@ export function BillsPage() {
                 <div className="flex-1 min-w-0">
                   <Select
                     value={branchId || null}
-                    onChange={(v) => { setBranchId((v as string) ?? ''); setPageIndex(0); }}
+                    onChange={(v) => updateFilters({ branch_id: (v as string) ?? '' })}
                     placeholder={t('accounting.branch')}
                     options={branches.map(b => ({ label: b.name, value: String(b.id) }))}
                     size="sm"
@@ -209,7 +234,7 @@ export function BillsPage() {
                 <div className="flex-1 min-w-0">
                   <Select
                     value={typeFilter || null}
-                    onChange={(v) => { setTypeFilter((v as string) ?? ''); setPageIndex(0); }}
+                    onChange={(v) => updateFilters({ type: (v as string) ?? '' })}
                     options={TYPE_OPTIONS}
                     size="sm"
                     showChevron

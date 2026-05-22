@@ -294,7 +294,7 @@ async function buildInput(contract: ContractMin, opts: BuildOptions = {}): Promi
   const ref1 = references[0] ?? null;
   const ref2 = references[1] ?? null;
 
-  const monthly = contract.snapshot_installment_amount ?? contract.installment_amount ?? 0;
+  const monthly = contract.installment_amount ?? 0;
   const term = contract.snapshot_term_months ?? contract.total_installments ?? installments.length;
   const upfront = (contract.down_payment ?? 0) + (contract.insurance_deposit ?? 0);
 

@@ -467,12 +467,13 @@ export function DayClosePage() {
                       ? {
                           title: t('accounting.dayClose.notAllowedTitle'),
                           desc: closeCheck.message ?? closeCheck.reason ?? '',
+                          reason: closeCheck.reason,
                         }
                       : null
                   }
                   canClose={canCloseSelected}
                   onOpenClose={() => setCloseModalOpen(true)}
-                  onViewBills={() => navigate('/admin/accounting/bills')}
+                  onViewBills={() => navigate(`/admin/accounting/bills?status=OPEN${effectiveBranchId ? `&branch_id=${effectiveBranchId}` : ''}`)}
                 />
               )}
 
@@ -498,12 +499,13 @@ export function DayClosePage() {
                         ? {
                             title: t('accounting.dayClose.notAllowedTitle'),
                             desc: closeCheck.message ?? closeCheck.reason ?? '',
+                            reason: closeCheck.reason,
                           }
                         : null
                   }
                   canClose={canCloseSelected}
                   onOpenClose={() => setCloseModalOpen(true)}
-                  onViewBills={() => navigate('/admin/accounting/bills')}
+                  onViewBills={() => navigate(`/admin/accounting/bills?status=OPEN${effectiveBranchId ? `&branch_id=${effectiveBranchId}` : ''}`)}
                 />
               )}
 
@@ -547,13 +549,17 @@ function ReconcileBody({
   summaryFetched: boolean;
   fallbackBillCount: number;
   fallbackTotalAmount: number;
-  blockMessage: { title: string; desc: string } | null;
+  blockMessage: { title: string; desc: string; reason?: string } | null;
   canClose: boolean;
   onOpenClose: () => void;
   onViewBills: () => void;
 }) {
   const { t } = useTranslation();
   const hasPending = (summary?.pending_bill_count ?? 0) > 0;
+  // Danger alert from HAS_OPEN_BILLS already conveys the pending-bills situation.
+  // Suppress the warning in that case to avoid two alerts saying the same thing.
+  const blockIsOpenBills = blockMessage?.reason === 'HAS_OPEN_BILLS';
+  const showPendingWarning = hasPending && !blockIsOpenBills;
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -585,7 +591,7 @@ function ReconcileBody({
       )}
 
       {/* Block / pending alerts */}
-      {(blockMessage || hasPending) && (
+      {(blockMessage || showPendingWarning) && (
         <div className="flex-none px-4 pt-3 flex flex-col gap-2">
           {blockMessage && (
             <div className="alert alert-danger">
@@ -593,10 +599,18 @@ function ReconcileBody({
               <div>
                 <div className="alert-title">{blockMessage.title}</div>
                 <div className="alert-description">{blockMessage.desc}</div>
+                {blockIsOpenBills && (
+                  <button
+                    className="text-sm underline mt-1 cursor-pointer bg-transparent border-none text-current"
+                    onClick={onViewBills}
+                  >
+                    {t('accounting.dayClose.viewBills')}
+                  </button>
+                )}
               </div>
             </div>
           )}
-          {hasPending && summary && (
+          {showPendingWarning && summary && (
             <div className="alert alert-warning">
               <AlertTriangle size={18} />
               <div>
