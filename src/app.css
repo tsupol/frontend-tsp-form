@@ -183,17 +183,30 @@ input[type="number"
         background: #fff !important;
         margin: 0 !important;
         padding: 0 !important;
+        height: auto !important;
     }
+    /* Hide siblings of the receipt's ancestor chain via visibility, but keep
+       the receipt itself in normal flow (no position:absolute). Reason: when
+       the receipt was absolutely positioned, the body's content height
+       resolved to ~0, so `@page size: 80mm auto` produced a tiny page box
+       and drivers clipped the output to a couple of lines / centered the
+       strip on the real paper. In normal flow the page height matches the
+       receipt's real height. */
     body * {
         visibility: hidden;
     }
     .bill-receipt, .bill-receipt * {
         visibility: visible;
     }
+    /* Collapse anything not on the path to .bill-receipt to zero size so it
+       doesn't push the receipt down the page. We don't display:none the
+       whole tree because that would also hide the receipt's ancestors and
+       block it from rendering. */
+    body > *:not(:has(.bill-receipt)) {
+        display: none !important;
+    }
     .bill-receipt {
-        position: absolute;
-        left: 0;
-        top: 0;
+        margin: 0 !important;
         width: 72mm;
         padding: 3mm 4mm;
         background: #fff !important;
