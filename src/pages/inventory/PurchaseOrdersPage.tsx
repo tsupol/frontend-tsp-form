@@ -1340,8 +1340,35 @@ function AddLineModal({
 }
 
 // ============================================================================
-// Product picker — search + select variant (contract-wizard style)
+// Product picker — fn_product_search (fuzzy/trigram), grouped model -> variant.
+// User searches by model concept ("iphone 17 pro"); variants render under the
+// model header so picking color/storage is the final tap. Single variant pick
+// returns a flat VariantSearchRow to keep the Add-Line modal contract unchanged.
 // ============================================================================
+
+interface ProductSearchVariant {
+  variant_id: number;
+  sku_code: string;
+  name: string;
+  is_active: boolean;
+}
+
+interface ProductSearchModel {
+  model_id: number;
+  model_code: string;
+  model_name: string;
+  brand_name: string | null;
+  family_name: string | null;
+  is_contractable: boolean;
+  is_active: boolean;
+  variants: ProductSearchVariant[];
+}
+
+interface ProductSearchResponse {
+  total: number;
+  has_more: boolean;
+  rows: ProductSearchModel[];
+}
 
 function ProductPickerModal({
   open,
@@ -1355,9 +1382,16 @@ function ProductPickerModal({
   const { t } = useTranslation();
   const [keyword, setKeyword] = useState('');
   const [debounced, setDebounced] = useState('');
+  const [selectedModelId, setSelectedModelId] = useState<number | null>(null);
+  const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null);
 
   useEffect(() => {
-    if (open) { setKeyword(''); setDebounced(''); }
+    if (open) {
+      setKeyword('');
+      setDebounced('');
+      setSelectedModelId(null);
+      setSelectedVariantId(null);
+    }
   }, [open]);
 
   useEffect(() => {
@@ -1366,17 +1400,55 @@ function ProductPickerModal({
   }, [keyword]);
 
   const { data: results, isFetching } = useQuery({
-    queryKey: ['variant-search', debounced],
-    queryFn: () => {
-      const term = debounced;
-      const base = `/v_product_variant_search?variant_is_active=eq.true&order=brand_name,family_name,model_name&limit=30`;
-      if (!term) return apiClient.get<VariantSearchRow[]>(base);
-      const filter = `&or=(item_name.ilike.*${encodeURIComponent(term)}*,sku_code.ilike.*${encodeURIComponent(term)}*,model_name.ilike.*${encodeURIComponent(term)}*)`;
-      return apiClient.get<VariantSearchRow[]>(base + filter);
-    },
+    queryKey: ['product-search', debounced],
+    queryFn: () =>
+      apiClient.rpc<ProductSearchResponse>('fn_product_search', {
+        p_q: debounced,
+        p_is_active: true,
+        p_limit: 20,
+      }),
     enabled: open,
     placeholderData: keepPreviousData,
   });
+
+  const models = results?.rows ?? [];
+  const selectedModel = useMemo(
+    () => models.find(m => m.model_id === selectedModelId) ?? null,
+    [models, selectedModelId],
+  );
+  const activeVariants = useMemo(
+    () => selectedModel?.variants.filter(v => v.is_active) ?? [],
+    [selectedModel],
+  );
+
+  // Auto-select first variant when model changes.
+  useEffect(() => {
+    if (activeVariants.length === 0) {
+      setSelectedVariantId(null);
+      return;
+    }
+    if (!activeVariants.some(v => v.variant_id === selectedVariantId)) {
+      setSelectedVariantId(activeVariants[0].variant_id);
+    }
+  }, [activeVariants, selectedVariantId]);
+
+  const selectedVariant = activeVariants.find(v => v.variant_id === selectedVariantId) ?? null;
+  const canConfirm = !!selectedModel && !!selectedVariant;
+
+  const handleConfirm = () => {
+    if (!selectedModel || !selectedVariant) return;
+    onPick({
+      variant_id: selectedVariant.variant_id,
+      model_id: selectedModel.model_id,
+      brand_name: selectedModel.brand_name ?? '',
+      family_name: selectedModel.family_name ?? '',
+      model_name: selectedModel.model_name,
+      model_code: selectedModel.model_code,
+      sku_code: selectedVariant.sku_code,
+      item_name: selectedVariant.name,
+      manufacturer_color: null,
+    });
+  };
 
   return (
     <Modal open={open} onClose={onClose} maxWidth="36rem" width="100%">
@@ -1395,31 +1467,97 @@ function ProductPickerModal({
             autoFocus
           />
           <div className="mt-3 h-80 overflow-auto better-scroll border border-line rounded-md">
-            {isFetching && (results ?? []).length === 0 && (
+            {isFetching && models.length === 0 && (
               <div className="p-3 text-xs text-subtle text-center">{t('common.loading')}</div>
             )}
-            {!isFetching && (results ?? []).length === 0 && (
+            {!isFetching && models.length === 0 && (
               <div className="p-3 text-xs text-subtler text-center">{t('common.noData')}</div>
             )}
-            {(results ?? []).map((row) => (
-              <button
-                key={row.variant_id}
-                type="button"
-                className="w-full text-left px-3 py-2 border-b border-line hover:bg-surface-hover cursor-pointer"
-                onClick={() => onPick(row)}
-              >
-                <div className="text-sm font-medium truncate">
-                  {[row.brand_name, row.family_name, row.model_name].filter(Boolean).join(' ')}
+            {models.map((model) => {
+              const activeCount = model.variants.filter(v => v.is_active).length;
+              if (activeCount === 0) return null;
+              const isSelected = model.model_id === selectedModelId;
+              return (
+                <div
+                  key={model.model_id}
+                  className={`border-b border-line last:border-b-0 ${isSelected ? 'bg-item-active-bg' : ''}`}
+                >
+                  {isSelected ? (
+                    <div className="px-3 py-2 flex items-center gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate text-item-active-fg">
+                          {[model.brand_name, model.family_name, model.model_name].filter(Boolean).join(' ')}
+                        </div>
+                        <div className="text-[11px] text-subtler font-mono truncate">{model.model_code}</div>
+                      </div>
+                      {model.is_contractable && (
+                        <Badge size="xs" color="info">{t('po.contractable', { defaultValue: 'Contractable' })}</Badge>
+                      )}
+                      <button
+                        type="button"
+                        className="shrink-0 p-1 rounded hover:bg-surface-hover cursor-pointer bg-transparent border-none text-current"
+                        onClick={() => { setSelectedModelId(null); setSelectedVariantId(null); }}
+                        aria-label={t('common.clear', { defaultValue: 'Clear' })}
+                      >
+                        <XCircle size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="w-full text-left px-3 py-2 hover:bg-surface-hover cursor-pointer flex items-center gap-2"
+                      onClick={() => setSelectedModelId(model.model_id)}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">
+                          {[model.brand_name, model.family_name, model.model_name].filter(Boolean).join(' ')}
+                        </div>
+                        <div className="text-[11px] text-subtler font-mono truncate">{model.model_code}</div>
+                      </div>
+                      {model.is_contractable && (
+                        <Badge size="xs" color="info">{t('po.contractable', { defaultValue: 'Contractable' })}</Badge>
+                      )}
+                      <span className="text-[11px] text-subtler shrink-0">
+                        {activeCount} {t('po.variants', { defaultValue: 'variants' })}
+                      </span>
+                    </button>
+                  )}
                 </div>
-                <div className="text-xs text-subtle truncate">
-                  {row.item_name} · {row.sku_code}
-                </div>
-              </button>
-            ))}
+              );
+            })}
           </div>
+          {selectedModel && (
+            <div className="sticky bottom-0 -mx-4 mt-3 px-4 pt-3 pb-1 bg-bg border-t border-line">
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-subtle mb-2">
+                {t('po.pickVariant', { defaultValue: 'Select variant' })}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {activeVariants.map((variant) => {
+                  const isActive = variant.variant_id === selectedVariantId;
+                  return (
+                    <Button
+                      key={variant.variant_id}
+                      size="sm"
+                      variant={isActive ? undefined : 'outline'}
+                      color={isActive ? 'primary' : undefined}
+                      onClick={() => setSelectedVariantId(variant.variant_id)}
+                    >
+                      {variant.name}
+                    </Button>
+                  );
+                })}
+              </div>
+              {selectedVariant && (
+                <div className="text-[11px] text-subtler font-mono mt-2 truncate">{selectedVariant.sku_code}</div>
+              )}
+            </div>
+          )}
         </div>
         <div className="modal-footer">
           <Button variant="outline" onClick={onClose}>{t('common.cancel')}</Button>
+          <Button color="primary" onClick={handleConfirm} disabled={!canConfirm}>
+            {t('po.useVariant', { defaultValue: 'Use this variant' })}
+          </Button>
         </div>
       </div>
     </Modal>
