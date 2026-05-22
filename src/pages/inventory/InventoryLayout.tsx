@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { NavLink, useLocation, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { BarChart3, Box, Boxes, ClipboardList, PackagePlus, ArrowLeftRight, Wrench, RotateCcw, ShoppingCart, ExternalLink } from 'lucide-react';
+import { BarChart3, Box, Boxes, ClipboardList, PackagePlus, ArrowLeftRight, Wrench, RotateCcw, ShoppingCart, Smartphone, ExternalLink } from 'lucide-react';
 
 type NavItem =
   | { type: 'link'; path: string; labelKey: string; icon: typeof BarChart3; iconClassName?: string }
@@ -20,7 +20,8 @@ const navItems: NavItem[] = [
   { type: 'link', path: '/admin/inventory/transfers', labelKey: 'nav.transfers', icon: ArrowLeftRight },
   { type: 'link', path: '/admin/inventory/repairs', labelKey: 'nav.repairs', icon: Wrench },
   { type: 'link', path: '/admin/inventory/buyback', labelKey: 'nav.buyback', icon: RotateCcw },
-  { type: 'shortcut', path: '/admin/inventory/assets?bucket=ON_HAND_AVAILABLE', labelKey: 'nav.readyToSell', icon: ShoppingCart },
+  { type: 'shortcut', path: '/admin/inventory/assets?bucket=ON_HAND_AVAILABLE&is_sellable=true&is_contractable=false', labelKey: 'nav.navRetail', icon: ShoppingCart },
+  { type: 'shortcut', path: '/admin/inventory/assets?bucket=ON_HAND_AVAILABLE&is_contractable=true', labelKey: 'nav.navLease', icon: Smartphone },
 ];
 
 export function InventoryLayout({ children }: { children: ReactNode }) {

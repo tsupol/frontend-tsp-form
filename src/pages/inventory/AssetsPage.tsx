@@ -366,16 +366,21 @@ export function AssetsPage() {
   const isBranchUser = ['BRANCH_STAFF', 'BRANCH_MANAGER'].includes(user?.role_code ?? '');
   const defaultBranchId = isBranchUser && user?.branch_id ? user.branch_id : null;
 
-  // Honor ?branch_id and ?bucket params (from Stock dashboard "View all" links)
+  // Honor ?branch_id, ?bucket, ?is_contractable, ?is_sellable params
+  // (Stock dashboard "View all" links + Retail/Lease side-nav shortcuts).
   const initialBranchId = searchParams.get('branch_id')
     ? Number(searchParams.get('branch_id'))
     : defaultBranchId;
   const initialBucket = searchParams.get('bucket');
+  const initialContractable = searchParams.get('is_contractable');
+  const initialSellable = searchParams.get('is_sellable');
 
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterBucket, setFilterBucket] = useState<string | null>(initialBucket);
   const [filterBranchId, setFilterBranchId] = useState<number | null>(initialBranchId);
+  const [filterContractable, setFilterContractable] = useState<string | null>(initialContractable);
+  const [filterSellable, setFilterSellable] = useState<string | null>(initialSellable);
   const [filterCondition, setFilterCondition] = useState<string | null>(null);
   const [filterBrand, setFilterBrand] = useState<string>('');
   const [filterFamily, setFilterFamily] = useState<string>('');
@@ -438,13 +443,15 @@ export function AssetsPage() {
   const extraFilterCount = [filterBrand, filterFamily, filterCondition].filter(Boolean).length;
 
   const { data: listData, isFetching } = useQuery({
-    queryKey: ['assets', debouncedSearch, filterBucket, filterBranchId, filterCondition, filterBrand, filterFamily, sourceLotId, sourcePoId, pageIndex, pageSize],
+    queryKey: ['assets', debouncedSearch, filterBucket, filterBranchId, filterCondition, filterBrand, filterFamily, filterContractable, filterSellable, sourceLotId, sourcePoId, pageIndex, pageSize],
     queryFn: () => {
       let url = '/v_assets?order=created_at.desc';
       if (sourceLotId) url += `&source_lot_id=eq.${sourceLotId}`;
       if (sourcePoId) url += `&source_po_id=eq.${sourcePoId}`;
       if (filterBucket) url += `&current_bucket=eq.${filterBucket}`;
       if (filterBranchId) url += `&branch_id=eq.${filterBranchId}`;
+      if (filterContractable) url += `&is_contractable=is.${filterContractable}`;
+      if (filterSellable) url += `&is_sellable=is.${filterSellable}`;
       if (filterCondition === 'USED') url += `&condition_grade=in.(USED_A,USED_B)`;
       else if (filterCondition) url += `&condition_grade=eq.${filterCondition}`;
       if (filterBrand) url += `&brand_name=eq.${encodeURIComponent(filterBrand)}`;
@@ -460,24 +467,55 @@ export function AssetsPage() {
   const list = listData?.data ?? [];
   const totalCount = listData?.totalCount ?? 0;
 
-  // Available pill count — sums asset_count across branches the user can see,
-  // scoped to the current branch filter if set.
-  const { data: availableCounts } = useQuery({
-    queryKey: ['asset-available-count', filterBranchId],
+  // Pill counts. v_branch_stock_summary aggregates by bucket only, so split
+  // by is_contractable / is_sellable is done via head-only paginated reads
+  // on v_assets. Cheap (Prefer: count=exact, pageSize=1) and respects the
+  // current branch filter.
+  const { data: retailCount } = useQuery({
+    queryKey: ['asset-pill-count', 'retail', filterBranchId],
     queryFn: () => {
-      let url = '/v_branch_stock_summary?current_bucket=eq.ON_HAND_AVAILABLE&select=asset_count';
+      let url = '/v_assets?current_bucket=eq.ON_HAND_AVAILABLE&is_sellable=is.true&is_contractable=is.false&select=asset_id';
       if (filterBranchId) url += `&branch_id=eq.${filterBranchId}`;
-      return apiClient.get<Array<{ asset_count: number }>>(url);
+      return apiClient.getPaginated<{ asset_id: number }>(url, { page: 1, pageSize: 1 });
+    },
+    staleTime: 30 * 1000,
+  });
+  const { data: leaseCount } = useQuery({
+    queryKey: ['asset-pill-count', 'lease', filterBranchId],
+    queryFn: () => {
+      let url = '/v_assets?current_bucket=eq.ON_HAND_AVAILABLE&is_contractable=is.true&select=asset_id';
+      if (filterBranchId) url += `&branch_id=eq.${filterBranchId}`;
+      return apiClient.getPaginated<{ asset_id: number }>(url, { page: 1, pageSize: 1 });
     },
     staleTime: 30 * 1000,
   });
 
-  const availableAssetCount = useMemo(
-    () => (availableCounts ?? []).reduce((sum, r) => sum + r.asset_count, 0),
-    [availableCounts],
-  );
+  const retailAssetCount = retailCount?.totalCount ?? 0;
+  const leaseAssetCount = leaseCount?.totalCount ?? 0;
 
-  useEffect(() => { setPageIndex(0); }, [debouncedSearch, filterBucket, filterBranchId, filterCondition, filterBrand, filterFamily, sourceLotId, sourcePoId]);
+  // Active state for each pill — matches the URL/filter combo it sets.
+  const isRetailActive = filterBucket === 'ON_HAND_AVAILABLE'
+    && filterSellable === 'true' && filterContractable === 'false';
+  const isLeaseActive = filterBucket === 'ON_HAND_AVAILABLE'
+    && filterContractable === 'true' && !filterSellable;
+
+  const togglePill = (target: 'retail' | 'lease') => {
+    if (target === 'retail') {
+      if (isRetailActive) {
+        setFilterBucket(null); setFilterSellable(null); setFilterContractable(null);
+      } else {
+        setFilterBucket('ON_HAND_AVAILABLE'); setFilterSellable('true'); setFilterContractable('false');
+      }
+    } else {
+      if (isLeaseActive) {
+        setFilterBucket(null); setFilterSellable(null); setFilterContractable(null);
+      } else {
+        setFilterBucket('ON_HAND_AVAILABLE'); setFilterContractable('true'); setFilterSellable(null);
+      }
+    }
+  };
+
+  useEffect(() => { setPageIndex(0); }, [debouncedSearch, filterBucket, filterBranchId, filterCondition, filterBrand, filterFamily, filterContractable, filterSellable, sourceLotId, sourcePoId]);
 
   // Fallback fetch so direct deep-links (id not on current page) still resolve.
   const { data: detailFallback } = useQuery({
@@ -526,15 +564,27 @@ export function AssetsPage() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setFilterBucket(filterBucket === 'ON_HAND_AVAILABLE' ? null : 'ON_HAND_AVAILABLE')}
+                  onClick={() => togglePill('retail')}
                   className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-colors cursor-pointer ${
-                    filterBucket === 'ON_HAND_AVAILABLE'
+                    isRetailActive
                       ? 'bg-primary-soft text-primary-fg border-primary'
                       : 'border-line hover:bg-surface-hover bg-transparent'
                   }`}
                 >
-                  <span>{t('inventory.available', { defaultValue: 'Available' })}</span>
-                  <span className="tabular-nums opacity-80">{fmtNum(availableAssetCount)}</span>
+                  <span>{t('inventory.pillRetail', { defaultValue: 'Retail' })}</span>
+                  <span className="tabular-nums opacity-80">{fmtNum(retailAssetCount)}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => togglePill('lease')}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-colors cursor-pointer ${
+                    isLeaseActive
+                      ? 'bg-primary-soft text-primary-fg border-primary'
+                      : 'border-line hover:bg-surface-hover bg-transparent'
+                  }`}
+                >
+                  <span>{t('inventory.pillLease', { defaultValue: 'Lease' })}</span>
+                  <span className="tabular-nums opacity-80">{fmtNum(leaseAssetCount)}</span>
                 </button>
               </div>
             </div>
