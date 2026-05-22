@@ -526,7 +526,7 @@ function DetailPanel({
                 to={`/admin/inventory/assets?branch_id=${row.branch_id}&bucket=${row.current_bucket}`}
                 className="inline-flex items-center gap-1 text-xs text-primary-fg hover:underline font-medium"
               >
-                {t('inventory.viewAll', { defaultValue: 'View all' })}
+                {t('inventory.viewAll')}
                 <ExternalLink size={11} />
               </Link>
             </div>
@@ -569,7 +569,7 @@ function DetailPanel({
                 to={`/admin/inventory/lots?branch_id=${row.branch_id}&bucket=${row.current_bucket}`}
                 className="inline-flex items-center gap-1 text-xs text-primary-fg hover:underline font-medium"
               >
-                {t('inventory.viewAll', { defaultValue: 'View all' })}
+                {t('inventory.viewAll')}
                 <ExternalLink size={11} />
               </Link>
             </div>

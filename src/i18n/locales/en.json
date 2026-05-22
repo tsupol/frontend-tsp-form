@@ -882,6 +882,7 @@
     "variant": "Variant",
     "count": "Count",
     "avgValue": "Avg Value",
+    "viewAll": "View all",
     "noStockData": "No stock data available",
     "selectToView": "Select a branch status to view details",
     "allBranches": "All branches",
