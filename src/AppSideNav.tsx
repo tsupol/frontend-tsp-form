@@ -29,7 +29,7 @@ import {
   // Fanout child icons — Pricing
   TrendingUp, Percent, Handshake,
   // Fanout child icons — Inventory
-  BarChart3, Boxes, ClipboardList, PackagePlus, ArrowLeftRight, Wrench, RotateCcw, ShoppingCart, ExternalLink,
+  BarChart3, Boxes, ClipboardList, PackagePlus, ArrowLeftRight, Wrench, RotateCcw, ShoppingCart,
   // Retail
   Store,
   // Fanout child icons — Company
@@ -240,17 +240,7 @@ export const AppSideNav = () => {
         { key: 'transfers', icon: <ArrowLeftRight size="1rem" />, label: t('nav.transfers'), path: '/admin/inventory/transfers' },
         { key: 'repairs', icon: <Wrench size="1rem" />, label: t('nav.repairs'), path: '/admin/inventory/repairs' },
         { key: 'buyback', icon: <RotateCcw size="1rem" />, label: t('nav.buyback'), path: '/admin/inventory/buyback' },
-        {
-          key: 'inv-branch-stock',
-          icon: <ShoppingCart size="1rem" className="text-primary-fg" />,
-          label: (
-            <span className="text-primary-fg font-medium inline-flex items-center gap-1.5">
-              {t('nav.branchStock')}
-              <ExternalLink size={12} />
-            </span>
-          ),
-          path: '/admin/inventory/branch-stock',
-        },
+        { key: 'branch-stock', icon: <ShoppingCart size="1rem" />, label: t('nav.branchStock'), path: '/admin/inventory/branch-stock' },
       ],
     },
     {

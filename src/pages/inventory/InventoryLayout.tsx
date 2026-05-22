@@ -1,11 +1,10 @@
 import type { ReactNode } from 'react';
-import { NavLink, useLocation, Link } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { BarChart3, Box, Boxes, ClipboardList, PackagePlus, ArrowLeftRight, Wrench, RotateCcw, ShoppingCart, ExternalLink } from 'lucide-react';
+import { BarChart3, Box, Boxes, ClipboardList, PackagePlus, ArrowLeftRight, Wrench, RotateCcw, ShoppingCart } from 'lucide-react';
 
 type NavItem =
   | { type: 'link'; path: string; labelKey: string; icon: typeof BarChart3; iconClassName?: string }
-  | { type: 'shortcut'; path: string; labelKey: string; icon: typeof BarChart3 }
   | { type: 'group'; labelKey: string };
 
 const navItems: NavItem[] = [
@@ -20,7 +19,7 @@ const navItems: NavItem[] = [
   { type: 'link', path: '/admin/inventory/transfers', labelKey: 'nav.transfers', icon: ArrowLeftRight },
   { type: 'link', path: '/admin/inventory/repairs', labelKey: 'nav.repairs', icon: Wrench },
   { type: 'link', path: '/admin/inventory/buyback', labelKey: 'nav.buyback', icon: RotateCcw },
-  { type: 'shortcut', path: '/admin/inventory/branch-stock', labelKey: 'nav.branchStock', icon: ShoppingCart },
+  { type: 'link', path: '/admin/inventory/branch-stock', labelKey: 'nav.branchStock', icon: ShoppingCart },
 ];
 
 export function InventoryLayout({ children }: { children: ReactNode }) {
@@ -36,20 +35,6 @@ export function InventoryLayout({ children }: { children: ReactNode }) {
               <span key={item.labelKey} className={`text-[11px] text-subtle uppercase tracking-wider px-2 ${i > 0 ? 'mt-3 mb-1' : 'mb-1'}`}>
                 {t(item.labelKey)}
               </span>
-            );
-          }
-          if (item.type === 'shortcut') {
-            const { path, labelKey, icon: Icon } = item;
-            return (
-              <Link
-                key={path}
-                to={path}
-                className="flex items-center gap-2 px-2 py-2 rounded-md text-sm font-medium text-primary-fg hover:bg-item-hover-bg transition-colors"
-              >
-                <Icon size={15} />
-                <span className="flex-1">{t(labelKey)}</span>
-                <ExternalLink size={12} />
-              </Link>
             );
           }
           const { path, labelKey, icon: Icon, iconClassName } = item;
