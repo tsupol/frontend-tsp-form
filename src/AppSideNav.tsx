@@ -29,7 +29,7 @@ import {
   // Fanout child icons — Pricing
   TrendingUp, Percent, Handshake,
   // Fanout child icons — Inventory
-  BarChart3, Boxes, ClipboardList, PackagePlus, ArrowLeftRight, Wrench, RotateCcw, ShoppingCart, Smartphone, ExternalLink,
+  BarChart3, Boxes, ClipboardList, PackagePlus, ArrowLeftRight, Wrench, RotateCcw, ShoppingCart, ExternalLink,
   // Retail
   Store,
   // Fanout child icons — Company
@@ -241,26 +241,15 @@ export const AppSideNav = () => {
         { key: 'repairs', icon: <Wrench size="1rem" />, label: t('nav.repairs'), path: '/admin/inventory/repairs' },
         { key: 'buyback', icon: <RotateCcw size="1rem" />, label: t('nav.buyback'), path: '/admin/inventory/buyback' },
         {
-          key: 'inv-retail',
+          key: 'inv-branch-stock',
           icon: <ShoppingCart size="1rem" className="text-primary-fg" />,
           label: (
             <span className="text-primary-fg font-medium inline-flex items-center gap-1.5">
-              {t('nav.navRetail')}
+              {t('nav.branchStock')}
               <ExternalLink size={12} />
             </span>
           ),
-          path: '/admin/inventory/assets?bucket=ON_HAND_AVAILABLE&is_sellable=true&is_contractable=false',
-        },
-        {
-          key: 'inv-lease',
-          icon: <Smartphone size="1rem" className="text-primary-fg" />,
-          label: (
-            <span className="text-primary-fg font-medium inline-flex items-center gap-1.5">
-              {t('nav.navLease')}
-              <ExternalLink size={12} />
-            </span>
-          ),
-          path: '/admin/inventory/assets?bucket=ON_HAND_AVAILABLE&is_contractable=true',
+          path: '/admin/inventory/branch-stock',
         },
       ],
     },

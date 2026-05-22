@@ -24,6 +24,7 @@ import { DiscountPoliciesPage } from './pages/pricing/DiscountPoliciesPage';
 import { DealPartnerRatesPage } from './pages/pricing/DealPartnerRatesPage';
 import { InventoryLayout } from './pages/inventory/InventoryLayout';
 import { StockDashboardPage } from './pages/inventory/StockDashboardPage';
+import { BranchStockPage } from './pages/inventory/BranchStockPage';
 import { ReceivingPage } from './pages/inventory/ReceivingPage';
 import { LotsPage } from './pages/inventory/LotsPage';
 import { AssetsPage } from './pages/inventory/AssetsPage';
@@ -295,6 +296,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <InventoryLayout><StockDashboardPage /></InventoryLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/inventory/branch-stock"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <InventoryLayout><BranchStockPage /></InventoryLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

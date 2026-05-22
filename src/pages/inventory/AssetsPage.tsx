@@ -10,7 +10,7 @@ import { CopyButton } from '../../components/CopyButton';
 import { fmtCurrency } from '../../lib/format';
 import { buildBillActionToast, type StandardBillResponse } from '../../lib/billActionToast';
 import { useAuth } from '../../contexts/AuthContext';
-import { getBucketLabel, getBucketColor, getConditionLabel, getConditionTextColor, CONDITION_VALUES, fmtNum, codeDisplay } from './inventoryUtils';
+import { getBucketLabel, getBucketColor, getConditionLabel, getConditionTextColor, CONDITION_VALUES, codeDisplay } from './inventoryUtils';
 
 // ============================================================================
 // Types (verified against live API 2026-03-25)
@@ -366,21 +366,16 @@ export function AssetsPage() {
   const isBranchUser = ['BRANCH_STAFF', 'BRANCH_MANAGER'].includes(user?.role_code ?? '');
   const defaultBranchId = isBranchUser && user?.branch_id ? user.branch_id : null;
 
-  // Honor ?branch_id, ?bucket, ?is_contractable, ?is_sellable params
-  // (Stock dashboard "View all" links + Retail/Lease side-nav shortcuts).
+  // Honor ?branch_id and ?bucket params (Stock dashboard "View all" links).
   const initialBranchId = searchParams.get('branch_id')
     ? Number(searchParams.get('branch_id'))
     : defaultBranchId;
   const initialBucket = searchParams.get('bucket');
-  const initialContractable = searchParams.get('is_contractable');
-  const initialSellable = searchParams.get('is_sellable');
 
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterBucket, setFilterBucket] = useState<string | null>(initialBucket);
   const [filterBranchId, setFilterBranchId] = useState<number | null>(initialBranchId);
-  const [filterContractable, setFilterContractable] = useState<string | null>(initialContractable);
-  const [filterSellable, setFilterSellable] = useState<string | null>(initialSellable);
   const [filterCondition, setFilterCondition] = useState<string | null>(null);
   const [filterBrand, setFilterBrand] = useState<string>('');
   const [filterFamily, setFilterFamily] = useState<string>('');
@@ -453,15 +448,13 @@ export function AssetsPage() {
   );
 
   const { data: listData, isFetching } = useQuery({
-    queryKey: ['assets', debouncedSearch, filterBucket, filterBranchId, filterCondition, filterBrand, filterFamily, filterContractable, filterSellable, sourceLotId, sourcePoId, pageIndex, pageSize],
+    queryKey: ['assets', debouncedSearch, filterBucket, filterBranchId, filterCondition, filterBrand, filterFamily, sourceLotId, sourcePoId, pageIndex, pageSize],
     queryFn: () => {
       let url = '/v_assets?order=created_at.desc';
       if (sourceLotId) url += `&source_lot_id=eq.${sourceLotId}`;
       if (sourcePoId) url += `&source_po_id=eq.${sourcePoId}`;
       if (filterBucket) url += `&current_bucket=eq.${filterBucket}`;
       if (filterBranchId) url += `&branch_id=eq.${filterBranchId}`;
-      if (filterContractable) url += `&is_contractable=is.${filterContractable}`;
-      if (filterSellable) url += `&is_sellable=is.${filterSellable}`;
       if (filterCondition === 'USED') url += `&condition_grade=in.(USED_A,USED_B)`;
       else if (filterCondition) url += `&condition_grade=eq.${filterCondition}`;
       if (filterBrand) url += `&brand_name=eq.${encodeURIComponent(filterBrand)}`;
@@ -481,73 +474,20 @@ export function AssetsPage() {
   // v_branch_sellable_stock filters is_sellable=true AND is_contractable=false
   // internally; v_branch_contractable_stock filters is_contractable=true AND
   // bucket=ON_HAND_AVAILABLE. Aggregate `qty` / `asset_count` client-side.
-  const { data: retailRows } = useQuery({
-    queryKey: ['asset-pill-count', 'retail', filterBranchId],
-    queryFn: () => {
-      let url = '/v_branch_sellable_stock?select=qty';
-      if (filterBranchId) url += `&branch_id=eq.${filterBranchId}`;
-      return apiClient.get<Array<{ qty: number }>>(url);
-    },
-    staleTime: 30 * 1000,
-  });
-  const { data: leaseRows } = useQuery({
-    queryKey: ['asset-pill-count', 'lease', filterBranchId],
-    queryFn: () => {
-      let url = '/v_branch_contractable_stock?select=asset_count';
-      if (filterBranchId) url += `&branch_id=eq.${filterBranchId}`;
-      return apiClient.get<Array<{ asset_count: number }>>(url);
-    },
-    staleTime: 30 * 1000,
-  });
+  useEffect(() => { setPageIndex(0); }, [debouncedSearch, filterBucket, filterBranchId, filterCondition, filterBrand, filterFamily, sourceLotId, sourcePoId]);
 
-  const retailAssetCount = useMemo(
-    () => (retailRows ?? []).reduce((sum, r) => sum + (r.qty ?? 0), 0),
-    [retailRows],
-  );
-  const leaseAssetCount = useMemo(
-    () => (leaseRows ?? []).reduce((sum, r) => sum + (r.asset_count ?? 0), 0),
-    [leaseRows],
-  );
-
-  // Active state for each pill — matches the URL/filter combo it sets.
-  const isRetailActive = filterBucket === 'ON_HAND_AVAILABLE'
-    && filterSellable === 'true' && filterContractable === 'false';
-  const isLeaseActive = filterBucket === 'ON_HAND_AVAILABLE'
-    && filterContractable === 'true' && !filterSellable;
-
-  // Single writer for the three URL-backed filter keys. Keeps URL and
-  // local state in sync regardless of where the change originated
-  // (pill button, side-nav shortcut, or the bucket Select).
-  const writeFilterTriple = (bucket: string | null, contractable: string | null, sellable: string | null) => {
-    const next = new URLSearchParams(searchParams);
-    if (bucket) next.set('bucket', bucket); else next.delete('bucket');
-    if (contractable) next.set('is_contractable', contractable); else next.delete('is_contractable');
-    if (sellable) next.set('is_sellable', sellable); else next.delete('is_sellable');
-    setSearchParams(next, { replace: true });
-  };
-
-  const togglePill = (target: 'retail' | 'lease') => {
-    if (target === 'retail') {
-      if (isRetailActive) writeFilterTriple(null, null, null);
-      else writeFilterTriple('ON_HAND_AVAILABLE', 'false', 'true');
-    } else {
-      if (isLeaseActive) writeFilterTriple(null, null, null);
-      else writeFilterTriple('ON_HAND_AVAILABLE', 'true', null);
-    }
-  };
-
-  useEffect(() => { setPageIndex(0); }, [debouncedSearch, filterBucket, filterBranchId, filterCondition, filterBrand, filterFamily, filterContractable, filterSellable, sourceLotId, sourcePoId]);
-
-  // Sync pill-related state from URL on every searchParams change so that
-  // clicking a side-nav shortcut (Retail / Lease) while already on this
-  // page actually updates the filters. URL is the source of truth for
-  // these three keys; the page-internal Selects also write to state so
-  // the Select can stay uncontrolled-by-URL when the user picks manually.
+  // Sync bucket from URL on searchParams change (back/forward, dashboard
+  // drill-down). URL is source of truth for this one key.
   useEffect(() => {
     setFilterBucket(searchParams.get('bucket'));
-    setFilterContractable(searchParams.get('is_contractable'));
-    setFilterSellable(searchParams.get('is_sellable'));
   }, [searchParams]);
+
+  // Available pill writes to URL too, so the URL/state stay aligned.
+  const writeBucket = (bucket: string | null) => {
+    const next = new URLSearchParams(searchParams);
+    if (bucket) next.set('bucket', bucket); else next.delete('bucket');
+    setSearchParams(next, { replace: true });
+  };
 
   // Fallback fetch so direct deep-links (id not on current page) still resolve.
   const { data: detailFallback } = useQuery({
@@ -596,27 +536,14 @@ export function AssetsPage() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => togglePill('retail')}
+                  onClick={() => writeBucket(filterBucket === 'ON_HAND_AVAILABLE' ? null : 'ON_HAND_AVAILABLE')}
                   className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-colors cursor-pointer ${
-                    isRetailActive
+                    filterBucket === 'ON_HAND_AVAILABLE'
                       ? 'bg-primary-soft text-primary-fg border-primary'
                       : 'border-line hover:bg-surface-hover bg-transparent'
                   }`}
                 >
-                  <span>{t('inventory.pillRetail', { defaultValue: 'Retail' })}</span>
-                  <span className="tabular-nums opacity-80">{fmtNum(retailAssetCount)}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => togglePill('lease')}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-colors cursor-pointer ${
-                    isLeaseActive
-                      ? 'bg-primary-soft text-primary-fg border-primary'
-                      : 'border-line hover:bg-surface-hover bg-transparent'
-                  }`}
-                >
-                  <span>{t('inventory.pillLease', { defaultValue: 'Lease' })}</span>
-                  <span className="tabular-nums opacity-80">{fmtNum(leaseAssetCount)}</span>
+                  <span>{t('inventory.available', { defaultValue: 'Available' })}</span>
                 </button>
               </div>
             </div>
@@ -658,7 +585,7 @@ export function AssetsPage() {
                   <Select
                     options={bucketOptions}
                     value={filterBucket}
-                    onChange={(val) => writeFilterTriple((val as string) || null, filterContractable, filterSellable)}
+                    onChange={(val) => writeBucket((val as string) || null)}
                     placeholder={t('asset.allStatuses')}
                     size="sm"
                     showChevron
@@ -723,7 +650,7 @@ export function AssetsPage() {
                       <Select
                         options={bucketOptions}
                         value={filterBucket}
-                        onChange={(val) => writeFilterTriple((val as string) || null, filterContractable, filterSellable)}
+                        onChange={(val) => writeBucket((val as string) || null)}
                         placeholder={t('asset.allStatuses')}
                         size="sm"
                         showChevron
