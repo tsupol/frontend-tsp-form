@@ -6,7 +6,7 @@ import { Badge, Button, useSnackbarContext } from 'tsp-form';
 import { Smartphone, ExternalLink, Wrench, ArrowDownToLine, ArrowUpFromLine, Link2, Link2Off, Cloud, CloudOff, CheckCircle } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
-import { getBucketLabel, getBucketColor } from '../inventory/inventoryUtils';
+import { getBucketLabel, getBucketColor, codeDisplay } from '../inventory/inventoryUtils';
 import { AssignIcloudModal, ReleaseIcloudModal } from './IcloudModals';
 
 interface ContractForDevice {
@@ -25,6 +25,7 @@ interface ContractForDevice {
 interface AssetSummary {
   asset_id: number;
   asset_code: string;
+  asset_code_display: string | null;
   current_bucket: string;
   condition_grade: string | null;
   serial_no: string | null;
@@ -45,7 +46,9 @@ interface RepairOrder {
   result: string | null;
   route_decision: string | null;
   asset_code: string;
+  asset_code_display: string | null;
   loaner_asset_code: string | null;
+  loaner_asset_code_display: string | null;
   repair_note: string | null;
   created_at: string;
   completed_at: string | null;
@@ -75,7 +78,7 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
   const { data: loanerAsset } = useQuery({
     queryKey: ['asset-summary', contract.loaner_device_id],
     queryFn: () => apiClient.get<AssetSummary[]>(
-      `/v_assets?asset_id=eq.${contract.loaner_device_id}&select=asset_id,asset_code,current_bucket,condition_grade,serial_no,imei,model_name,variant_name,brand_name,branch_id,branch_name,icloud_account_id,icloud_apple_id&limit=1`,
+      `/v_assets?asset_id=eq.${contract.loaner_device_id}&select=asset_id,asset_code,asset_code_display,current_bucket,condition_grade,serial_no,imei,model_name,variant_name,brand_name,branch_id,branch_name,icloud_account_id,icloud_apple_id&limit=1`,
     ).then(rows => rows[0] ?? null),
     enabled: contract.loaner_device_id != null,
     staleTime: 30 * 1000,
@@ -85,7 +88,7 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
   const { data: primaryAsset } = useQuery({
     queryKey: ['asset-summary', contract.device_id],
     queryFn: () => apiClient.get<AssetSummary[]>(
-      `/v_assets?asset_id=eq.${contract.device_id}&select=asset_id,asset_code,current_bucket,condition_grade,serial_no,imei,model_name,variant_name,brand_name,branch_id,branch_name,icloud_account_id,icloud_apple_id&limit=1`,
+      `/v_assets?asset_id=eq.${contract.device_id}&select=asset_id,asset_code,asset_code_display,current_bucket,condition_grade,serial_no,imei,model_name,variant_name,brand_name,branch_id,branch_name,icloud_account_id,icloud_apple_id&limit=1`,
     ).then(rows => rows[0] ?? null),
     enabled: contract.device_id != null,
     staleTime: 30 * 1000,
@@ -132,7 +135,7 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
                     to={`/admin/inventory/assets/${contract.device_id}`}
                     className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1"
                   >
-                    {primaryAsset?.asset_code ?? `#${contract.device_id}`}
+                    {primaryAsset ? codeDisplay(primaryAsset.asset_code_display, primaryAsset.asset_code) : `#${contract.device_id}`}
                     <ExternalLink size={11} />
                   </Link>
                 </div>
@@ -295,7 +298,7 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
                     to={`/admin/inventory/assets/${contract.loaner_device_id}`}
                     className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1"
                   >
-                    {loanerAsset?.asset_code ?? `#${contract.loaner_device_id}`}
+                    {loanerAsset ? codeDisplay(loanerAsset.asset_code_display, loanerAsset.asset_code) : `#${contract.loaner_device_id}`}
                     <ExternalLink size={11} />
                   </Link>
                 </div>
@@ -382,8 +385,8 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
                     )}
                   </div>
                   <div className="text-xs text-subtle mt-0.5">
-                    {ro.asset_code}
-                    {ro.loaner_asset_code && <> · {t('contract.device_loaner')}: {ro.loaner_asset_code}</>}
+                    {codeDisplay(ro.asset_code_display, ro.asset_code)}
+                    {ro.loaner_asset_code && <> · {t('contract.device_loaner')}: {codeDisplay(ro.loaner_asset_code_display, ro.loaner_asset_code)}</>}
                   </div>
                   {ro.repair_note && (
                     <div className="text-xs text-subtle italic mt-1 truncate">{ro.repair_note}</div>

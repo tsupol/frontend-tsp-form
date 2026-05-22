@@ -8,6 +8,7 @@ import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { CopyButton } from '../../components/CopyButton';
 import { fmtCurrency } from '../../lib/format';
+import { codeDisplay } from './inventoryUtils';
 import { useAuth } from '../../contexts/AuthContext';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { ActionDoneView } from '../contracts/ActionDoneView';
@@ -203,7 +204,7 @@ export function BuybackPage() {
                 )}
               </div>
               <div className="mobile-header-title mobile-header-title-truncate">
-                {isRoot ? t('nav.buyback') : selectedListItem?.po_no ?? ''}
+                {isRoot ? t('nav.buyback') : codeDisplay(selectedListItem?.code_display, selectedListItem?.po_no)}
               </div>
               <div className="mobile-header-end w-12" />
             </MobileHeader>
@@ -263,7 +264,7 @@ export function BuybackPage() {
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-baseline gap-1.5 min-w-0">
-                          <span className="font-medium text-sm truncate">{order.po_no}</span>
+                          <span className="font-medium text-sm truncate">{codeDisplay(order.code_display, order.po_no)}</span>
                         </div>
                         <div className="text-xs text-subtle truncate">{order.supplier_name}</div>
                         {productLine && (
@@ -375,7 +376,7 @@ function BuybackDetailPanel({
 
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
-          <span className="font-semibold">{detail.po_no}</span>
+          <span className="font-semibold">{codeDisplay(detail.code_display, detail.po_no)}</span>
           <CopyButton value={detail.po_no} />
           <Badge size="xs" color={BUYBACK_STATUS_COLOR[detail.status] ?? 'default'}>
             {t(`buyback.status_${detail.status}`, detail.status)}
@@ -646,7 +647,7 @@ function BuybackIntakeModal({
             ) : (
               <>
                 <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
-                  <div className="font-medium text-sm">{detail.po_no}</div>
+                  <div className="font-medium text-sm">{codeDisplay(detail.code_display, detail.po_no)}</div>
                   <div className="text-xs text-subtle">
                     {[line.brand_name, line.model_name, line.variant_name].filter(Boolean).join(' · ')}
                   </div>
@@ -760,7 +761,7 @@ function BuybackActionModal({
             </div>
           )}
           <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
-            <div className="font-medium text-sm">{detail.po_no}</div>
+            <div className="font-medium text-sm">{codeDisplay(detail.code_display, detail.po_no)}</div>
             <div className="text-xs text-subtle">{detail.supplier_name}</div>
             <div className="text-xs text-subtle">{detail.c_total_lines} {t('buyback.items')} · {fmtCurrency(totalPrice)}</div>
           </div>

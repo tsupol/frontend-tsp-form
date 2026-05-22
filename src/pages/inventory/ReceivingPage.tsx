@@ -11,7 +11,7 @@ import { DateTime } from '../../components/DateTime';
 import { CopyButton } from '../../components/CopyButton';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
-import { fmtNum } from './inventoryUtils';
+import { fmtNum, codeDisplay } from './inventoryUtils';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 
 // ============================================================================
@@ -28,6 +28,7 @@ interface Receipt {
   branch_name: string;
   po_id: number;
   po_no: string;
+  po_code_display: string | null;
   supplier_name: string;
   status: string;
   posted_at: string | null;
@@ -49,6 +50,7 @@ interface ReceiptDetail {
   branch_name: string;
   po_id: number;
   po_no: string;
+  po_code_display: string | null;
   supplier_name: string;
   ownership: string;
   status: string;
@@ -184,7 +186,7 @@ export function ReceivingPage() {
                 )}
               </div>
               <div className="mobile-header-title mobile-header-title-truncate">
-                {isRoot ? t('nav.receiving') : selectedReceipt?.receipt_no ?? ''}
+                {isRoot ? t('nav.receiving') : codeDisplay(selectedReceipt?.code_display, selectedReceipt?.receipt_no)}
               </div>
               <div className="mobile-header-end w-nav" />
             </MobileHeader>
@@ -259,12 +261,12 @@ export function ReceivingPage() {
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className="font-medium text-sm truncate">{receipt.receipt_no}</span>
+                          <span className="font-medium text-sm truncate">{codeDisplay(receipt.code_display, receipt.receipt_no)}</span>
                           <Badge size="xs" color={RECEIPT_STATUS_COLOR[receipt.status] ?? 'default'}>
                             {t(`receiving.status_${receipt.status}`, receipt.status)}
                           </Badge>
                         </div>
-                        <div className="text-[11px] text-subtle truncate mt-0.5">{receipt.po_no}</div>
+                        <div className="text-[11px] text-subtle truncate mt-0.5">{codeDisplay(receipt.po_code_display, receipt.po_no)}</div>
                         <div className="text-[11px] text-subtle truncate mt-0.5">{receipt.supplier_name} · {receipt.branch_name}</div>
                       </div>
                       <div className="text-right shrink-0">
@@ -366,7 +368,7 @@ function ReceiptDetailPanel({
 
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
-          <span className="font-semibold">{detail.receipt_no}</span>
+          <span className="font-semibold">{codeDisplay(detail.code_display, detail.receipt_no)}</span>
           <CopyButton value={detail.receipt_no} />
           <Badge size="xs" color={RECEIPT_STATUS_COLOR[detail.status] ?? 'default'}>
             {t(`receiving.status_${detail.status}`, detail.status)}
@@ -381,7 +383,7 @@ function ReceiptDetailPanel({
             to={`/admin/inventory/po/${detail.po_id}`}
             className="inline-flex items-center gap-1 font-semibold text-sm text-primary-fg hover:underline"
           >
-            {detail.po_no}
+            {codeDisplay(detail.po_code_display, detail.po_no)}
             <ExternalLink size={12} />
           </Link>
           <div className="text-xs text-subtle">{detail.supplier_name}</div>
@@ -687,7 +689,7 @@ function ConfirmReceiptModal({
         {view === 'done' && result && (
           <ActionDoneView
             headline={t('receiving.confirmDoneHeadline', { defaultValue: 'Stock added' })}
-            contractCode={detail.receipt_no}
+            contractCode={codeDisplay(detail.code_display, detail.receipt_no)}
             tone="success"
             stateTransition={{ from: 'DRAFT', to: result.status, toColor: 'success' }}
             detailRows={[
@@ -741,7 +743,7 @@ function ConfirmReceiptModal({
                 {result.po_progress && (
                   <div className="px-3 py-2.5 rounded-md bg-info/5 border border-info/20">
                     <div className="text-xs text-subtle mb-1">
-                      {t('receiving.poProgressLabel', { defaultValue: 'PO progress' })}: {detail.po_no}
+                      {t('receiving.poProgressLabel', { defaultValue: 'PO progress' })}: {codeDisplay(detail.po_code_display, detail.po_no)}
                     </div>
                     <div className="text-sm tabular-nums">
                       {fmtNum(result.po_progress.po_received_qty)} / {fmtNum(result.po_progress.po_total_qty)} pcs
@@ -779,8 +781,8 @@ function ConfirmReceiptModal({
             </div>
           )}
           <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
-            <div className="font-medium text-sm">{detail.receipt_no}</div>
-            <div className="text-xs text-subtle">{t('receiving.poRef')}: {detail.po_no}</div>
+            <div className="font-medium text-sm">{codeDisplay(detail.code_display, detail.receipt_no)}</div>
+            <div className="text-xs text-subtle">{t('receiving.poRef')}: {codeDisplay(detail.po_code_display, detail.po_no)}</div>
             <div className="text-xs text-subtle">{detail.branch_name} · {detail.supplier_name}</div>
             <div className="text-xs text-subtle mt-1">
               {lines.length} {t('receiving.lines')} · {fmtNum(totalQty)} pcs · {fmtCurrency(totalAmount)}
@@ -856,8 +858,8 @@ function CancelReceiptModal({
             </div>
           )}
           <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
-            <div className="font-medium text-sm">{detail.receipt_no}</div>
-            <div className="text-xs text-subtle">{t('receiving.poRef')}: {detail.po_no}</div>
+            <div className="font-medium text-sm">{codeDisplay(detail.code_display, detail.receipt_no)}</div>
+            <div className="text-xs text-subtle">{t('receiving.poRef')}: {codeDisplay(detail.po_code_display, detail.po_no)}</div>
             <div className="text-xs text-subtle">{detail.branch_name}</div>
           </div>
           <p className="text-sm text-subtle">{t('receiving.cancelReceiptMessage')}</p>
@@ -884,6 +886,7 @@ function CancelReceiptModal({
 interface PoOption {
   po_id: number;
   po_no: string;
+  code_display: string | null;
   company_id: number;
   company_name: string | null;
   supplier_name: string | null;
@@ -934,7 +937,7 @@ function CreateReceiptModal({
     queryFn: () =>
       apiClient.get<PoOption[]>(
         '/v_po_detail?po_type=eq.PURCHASE&status=eq.APPROVED&order=created_at.desc'
-        + '&select=po_id,po_no,company_id,company_name,supplier_name,c_total_qty,c_received_qty,status,ownership,created_at',
+        + '&select=po_id,po_no,code_display,company_id,company_name,supplier_name,c_total_qty,c_received_qty,status,ownership,created_at',
       ),
     enabled: open,
     staleTime: 60 * 1000,
@@ -967,7 +970,7 @@ function CreateReceiptModal({
   const poOptions = useMemo(
     () => (pos ?? []).map(p => ({
       value: String(p.po_id),
-      label: `${p.po_no}${p.supplier_name ? ' · ' + p.supplier_name : ''}`,
+      label: `${codeDisplay(p.code_display, p.po_no)}${p.supplier_name ? ' · ' + p.supplier_name : ''}`,
     })),
     [pos],
   );
@@ -1010,7 +1013,7 @@ function CreateReceiptModal({
   const canSubmit = !!poId && !!branchId && !mutation.isPending;
 
   const branchName = useMemo(() => branches?.find(b => b.id === branchId)?.name ?? '', [branches, branchId]);
-  const poNo = useMemo(() => selectedPo?.po_no ?? '', [selectedPo]);
+  const poNo = useMemo(() => codeDisplay(selectedPo?.code_display, selectedPo?.po_no), [selectedPo]);
 
   return (
     <Modal open={open} onClose={onClose} maxWidth="32rem" width="100%">
@@ -1067,7 +1070,7 @@ function CreateReceiptModal({
                   return (
                     <div className="flex flex-col gap-1 w-full min-w-0 py-0.5">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-sm">{p.po_no}</span>
+                        <span className="font-medium text-sm">{codeDisplay(p.code_display, p.po_no)}</span>
                         <Badge
                           size="xs"
                           variant="outline"

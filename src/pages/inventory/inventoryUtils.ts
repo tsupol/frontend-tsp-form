@@ -70,6 +70,8 @@ export const CONDITION_CONFIG: Record<string, { labelKey: string; textColor: str
   REFURBISHED: { labelKey: 'inventory.conditionREFURBISHED', textColor: 'text-info' },
   USED_A: { labelKey: 'inventory.conditionUSED_A', textColor: 'text-warning-fg' },
   USED_B: { labelKey: 'inventory.conditionUSED_B', textColor: 'text-subtle' },
+  // Synthetic combined value used as a filter shortcut for USED_A + USED_B.
+  USED: { labelKey: 'inventory.conditionUSED', textColor: 'text-warning-fg' },
 };
 
 export function getConditionLabel(condition: string, t: (key: string) => string): string {
@@ -81,13 +83,7 @@ export function getConditionTextColor(condition: string): string {
   return CONDITION_CONFIG[condition]?.textColor ?? 'text-subtle';
 }
 
-export const CONDITION_OPTIONS = [
-  { value: 'NEW', label: 'New' },
-  { value: 'REFURBISHED', label: 'Refurbished' },
-  { value: 'USED', label: 'Used (A+B)' },
-  { value: 'USED_A', label: 'Used A' },
-  { value: 'USED_B', label: 'Used B' },
-];
+export const CONDITION_VALUES = ['NEW', 'REFURBISHED', 'USED', 'USED_A', 'USED_B'];
 
 // ============================================================================
 // Formatting
@@ -97,4 +93,11 @@ export function fmtNum(n: number | null | undefined): string {
   if (n == null) return '0';
   return n.toLocaleString();
 }
+
+// Prefer the backend-formatted display code (e.g. `AT-2604-000105-4`) and
+// fall back to the raw code (e.g. `AT26040001054`) when the view doesn't
+// yet expose a display column. Once backend fills the gap (PO, transfer),
+// the UI picks it up automatically.
+export const codeDisplay = (display?: string | null, raw?: string | null): string =>
+  display ?? raw ?? '';
 

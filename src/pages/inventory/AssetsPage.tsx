@@ -10,7 +10,7 @@ import { CopyButton } from '../../components/CopyButton';
 import { fmtCurrency } from '../../lib/format';
 import { buildBillActionToast, type StandardBillResponse } from '../../lib/billActionToast';
 import { useAuth } from '../../contexts/AuthContext';
-import { getBucketLabel, getBucketColor, getConditionLabel, getConditionTextColor, CONDITION_OPTIONS, fmtNum } from './inventoryUtils';
+import { getBucketLabel, getBucketColor, getConditionLabel, getConditionTextColor, CONDITION_VALUES, fmtNum, codeDisplay } from './inventoryUtils';
 
 // ============================================================================
 // Types (verified against live API 2026-03-25)
@@ -24,7 +24,7 @@ interface Asset {
   branch_id: number;
   branch_name: string;
   asset_code: string;
-  code_display: string | null;
+  asset_code_display: string | null;
   current_bucket: string;
   condition_grade: string;
   original_cost_basis: number;
@@ -93,18 +93,18 @@ interface FamilyLookup {
 // Bucket filter options
 // ============================================================================
 
-const BUCKET_OPTIONS = [
-  { value: 'ON_HAND_AVAILABLE', label: 'Available' },
-  { value: 'QUARANTINED', label: 'Quarantined' },
-  { value: 'IN_REPAIR', label: 'In Repair' },
-  { value: 'IN_USE_INTERNAL', label: 'Internal Use' },
-  { value: 'IN_TRANSIT_OUTBOUND', label: 'In Transit (Out)' },
-  { value: 'IN_TRANSIT_INBOUND', label: 'In Transit (In)' },
-  { value: 'WITH_CUSTOMER_ACTIVE', label: 'With Customer' },
-  { value: 'LOANED_OUT', label: 'Loaned Out' },
-  { value: 'OWNERSHIP_TRANSFERRED', label: 'Transferred' },
-  { value: 'DISPOSED_SOLD_SCRAP', label: 'Disposed' },
-  { value: 'WRITTEN_OFF', label: 'Written Off' },
+const BUCKET_VALUES = [
+  'ON_HAND_AVAILABLE',
+  'QUARANTINED',
+  'IN_REPAIR',
+  'IN_USE_INTERNAL',
+  'IN_TRANSIT_OUTBOUND',
+  'IN_TRANSIT_INBOUND',
+  'WITH_CUSTOMER_ACTIVE',
+  'LOANED_OUT',
+  'OWNERSHIP_TRANSFERRED',
+  'DISPOSED_SOLD_SCRAP',
+  'WRITTEN_OFF',
 ];
 
 // ============================================================================
@@ -345,7 +345,7 @@ const CATEGORY_OVERRIDE: Record<string, string> = {};
 // ============================================================================
 
 export function AssetsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
   const { user } = useAuth();
@@ -442,6 +442,16 @@ export function AssetsPage() {
 
   const extraFilterCount = [filterBrand, filterFamily, filterCondition].filter(Boolean).length;
 
+  const bucketOptions = useMemo(
+    () => BUCKET_VALUES.map(v => ({ value: v, label: getBucketLabel(v, t) })),
+    [t, i18n.language],
+  );
+
+  const conditionOptions = useMemo(
+    () => CONDITION_VALUES.map(v => ({ value: v, label: getConditionLabel(v, t) })),
+    [t, i18n.language],
+  );
+
   const { data: listData, isFetching } = useQuery({
     queryKey: ['assets', debouncedSearch, filterBucket, filterBranchId, filterCondition, filterBrand, filterFamily, filterContractable, filterSellable, sourceLotId, sourcePoId, pageIndex, pageSize],
     queryFn: () => {
@@ -467,31 +477,37 @@ export function AssetsPage() {
   const list = listData?.data ?? [];
   const totalCount = listData?.totalCount ?? 0;
 
-  // Pill counts. v_branch_stock_summary aggregates by bucket only, so split
-  // by is_contractable / is_sellable is done via head-only paginated reads
-  // on v_assets. Cheap (Prefer: count=exact, pageSize=1) and respects the
-  // current branch filter.
-  const { data: retailCount } = useQuery({
+  // Pill counts via the dedicated branch-stock views (backend-defined scope).
+  // v_branch_sellable_stock filters is_sellable=true AND is_contractable=false
+  // internally; v_branch_contractable_stock filters is_contractable=true AND
+  // bucket=ON_HAND_AVAILABLE. Aggregate `qty` / `asset_count` client-side.
+  const { data: retailRows } = useQuery({
     queryKey: ['asset-pill-count', 'retail', filterBranchId],
     queryFn: () => {
-      let url = '/v_assets?current_bucket=eq.ON_HAND_AVAILABLE&is_sellable=is.true&is_contractable=is.false&select=asset_id';
+      let url = '/v_branch_sellable_stock?select=qty';
       if (filterBranchId) url += `&branch_id=eq.${filterBranchId}`;
-      return apiClient.getPaginated<{ asset_id: number }>(url, { page: 1, pageSize: 1 });
+      return apiClient.get<Array<{ qty: number }>>(url);
     },
     staleTime: 30 * 1000,
   });
-  const { data: leaseCount } = useQuery({
+  const { data: leaseRows } = useQuery({
     queryKey: ['asset-pill-count', 'lease', filterBranchId],
     queryFn: () => {
-      let url = '/v_assets?current_bucket=eq.ON_HAND_AVAILABLE&is_contractable=is.true&select=asset_id';
+      let url = '/v_branch_contractable_stock?select=asset_count';
       if (filterBranchId) url += `&branch_id=eq.${filterBranchId}`;
-      return apiClient.getPaginated<{ asset_id: number }>(url, { page: 1, pageSize: 1 });
+      return apiClient.get<Array<{ asset_count: number }>>(url);
     },
     staleTime: 30 * 1000,
   });
 
-  const retailAssetCount = retailCount?.totalCount ?? 0;
-  const leaseAssetCount = leaseCount?.totalCount ?? 0;
+  const retailAssetCount = useMemo(
+    () => (retailRows ?? []).reduce((sum, r) => sum + (r.qty ?? 0), 0),
+    [retailRows],
+  );
+  const leaseAssetCount = useMemo(
+    () => (leaseRows ?? []).reduce((sum, r) => sum + (r.asset_count ?? 0), 0),
+    [leaseRows],
+  );
 
   // Active state for each pill — matches the URL/filter combo it sets.
   const isRetailActive = filterBucket === 'ON_HAND_AVAILABLE'
@@ -566,7 +582,7 @@ export function AssetsPage() {
                 )}
               </div>
               <div className="mobile-header-title mobile-header-title-truncate">
-                {isRoot ? t('nav.assets') : selectedAsset?.asset_code ?? ''}
+                {isRoot ? t('nav.assets') : codeDisplay(selectedAsset?.asset_code_display, selectedAsset?.asset_code)}
               </div>
               <div className="mobile-header-end w-12" />
             </MobileHeader>
@@ -640,7 +656,7 @@ export function AssetsPage() {
                 </div>
                 <div className="flex-1 min-w-0 hidden sm:block">
                   <Select
-                    options={BUCKET_OPTIONS}
+                    options={bucketOptions}
                     value={filterBucket}
                     onChange={(val) => writeFilterTriple((val as string) || null, filterContractable, filterSellable)}
                     placeholder={t('asset.allStatuses')}
@@ -662,7 +678,7 @@ export function AssetsPage() {
                 </div>
                 <div className="flex-1 min-w-0 hidden lg:block">
                   <Select
-                    options={CONDITION_OPTIONS}
+                    options={conditionOptions}
                     value={filterCondition}
                     onChange={(val) => setFilterCondition((val as string) || null)}
                     placeholder={t('asset.allConditions')}
@@ -705,7 +721,7 @@ export function AssetsPage() {
                     <div className="text-xs font-medium text-subtle uppercase tracking-wide">{t('common.filters')}</div>
                     <div className="sm:hidden flex flex-col gap-2">
                       <Select
-                        options={BUCKET_OPTIONS}
+                        options={bucketOptions}
                         value={filterBucket}
                         onChange={(val) => writeFilterTriple((val as string) || null, filterContractable, filterSellable)}
                         placeholder={t('asset.allStatuses')}
@@ -727,7 +743,7 @@ export function AssetsPage() {
                     </div>
                     <div className="lg:hidden flex flex-col gap-2">
                       <Select
-                        options={CONDITION_OPTIONS}
+                        options={conditionOptions}
                         value={filterCondition}
                         onChange={(val) => setFilterCondition((val as string) || null)}
                         placeholder={t('asset.allConditions')}
@@ -795,7 +811,7 @@ export function AssetsPage() {
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-baseline gap-1.5 min-w-0">
-                          <span className="font-medium text-sm truncate">{asset.asset_code}</span>
+                          <span className="font-medium text-sm truncate">{codeDisplay(asset.asset_code_display, asset.asset_code)}</span>
                         </div>
                         <div className="text-xs text-subtle truncate">
                           {asset.brand_name} {asset.family_name} · {asset.variant_name}
@@ -885,7 +901,7 @@ function AssetDetailPanel({
       {/* Desktop header */}
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
-          <span className="font-semibold">{asset.asset_code}</span>
+          <span className="font-semibold">{codeDisplay(asset.asset_code_display, asset.asset_code)}</span>
           <CopyButton value={asset.asset_code} />
           <Badge size="xs" color={getBucketColor(asset.current_bucket)}>
             {getBucketLabel(asset.current_bucket, t)}
@@ -1369,7 +1385,7 @@ function AssetActionModal({
             </div>
           )}
           <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
-            <div className="font-medium text-sm">{asset.asset_code}</div>
+            <div className="font-medium text-sm">{codeDisplay(asset.asset_code_display, asset.asset_code)}</div>
             <div className="text-xs text-subtle">
               {[asset.brand_name, asset.family_name, asset.model_name].filter(Boolean).join(' > ')}
             </div>

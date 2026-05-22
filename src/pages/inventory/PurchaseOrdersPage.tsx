@@ -16,7 +16,7 @@ import { CopyButton } from '../../components/CopyButton';
 import { CurrencyInput } from '../../components/CurrencyInput';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
-import { fmtNum } from './inventoryUtils';
+import { fmtNum, codeDisplay } from './inventoryUtils';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 
 // ============================================================================
@@ -33,6 +33,7 @@ import { ActionDoneView } from '../contracts/ActionDoneView';
 interface PoListRow {
   po_id: number;
   po_no: string;
+  code_display: string | null;
   holding_id: number;
   company_id: number;
   branch_id: number | null;
@@ -276,7 +277,7 @@ export function PurchaseOrdersPage() {
                 )}
               </div>
               <div className="mobile-header-title mobile-header-title-truncate">
-                {isRoot ? t('nav.purchaseOrders') : poDetail?.po_no ?? ''}
+                {isRoot ? t('nav.purchaseOrders') : codeDisplay(poDetail?.code_display, poDetail?.po_no)}
               </div>
               <div className="mobile-header-end w-nav" />
             </MobileHeader>
@@ -357,7 +358,7 @@ export function PurchaseOrdersPage() {
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className="font-medium text-sm truncate">{po.po_no}</span>
+                          <span className="font-medium text-sm truncate">{codeDisplay(po.code_display, po.po_no)}</span>
                         </div>
                         <div className="flex items-center gap-2 min-w-0 mt-0.5">
                           <Badge size="xs" color={STATUS_COLOR[po.status] ?? 'default'}>
@@ -542,7 +543,7 @@ function PoDetailPanel({
 
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
-          <span className="font-semibold">{detail.po_no}</span>
+          <span className="font-semibold">{codeDisplay(detail.code_display, detail.po_no)}</span>
           <CopyButton value={detail.po_no} />
           <Badge size="xs" color={STATUS_COLOR[detail.status] ?? 'default'}>
             {statusLabel(detail.status)}
@@ -914,7 +915,7 @@ function PoActionModal({
             </div>
           )}
           <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
-            <div className="font-medium text-sm">{po.po_no}</div>
+            <div className="font-medium text-sm">{codeDisplay(po.code_display, po.po_no)}</div>
             {po.supplier_name && <div className="text-xs text-subtle">{po.supplier_name}</div>}
             <div className="text-xs text-subtle">
               {po.c_total_lines} {t('po.lines')} · {fmtNum(po.c_total_qty)} pcs · {fmtCurrency(po.c_total_amount)}
@@ -1678,7 +1679,7 @@ function CreateReceiptModal({
             contractCode={result.code_display}
             tone="success"
             detailRows={[
-              { label: t('po.poRef', { defaultValue: 'PO' }), value: po.po_no },
+              { label: t('po.poRef', { defaultValue: 'PO' }), value: codeDisplay(po.code_display, po.po_no) },
               { label: t('po.receiveBranch', { defaultValue: 'Receive at branch' }), value: branchName },
               { label: t('po.status', { defaultValue: 'Status' }), value: result.status },
             ]}
@@ -1704,7 +1705,7 @@ function CreateReceiptModal({
           )}
           <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
             <div className="text-[11px] uppercase tracking-wider text-subtle mb-1">{t('po.receivingFor')}</div>
-            <div className="font-medium text-sm">{po.po_no}</div>
+            <div className="font-medium text-sm">{codeDisplay(po.code_display, po.po_no)}</div>
             {po.supplier_name && <div className="text-xs text-subtle">{po.supplier_name}</div>}
             <div className="text-xs text-subtle">
               {po.c_total_lines} {t('po.lines')} · {fmtNum(po.c_total_qty)} pcs · {fmtCurrency(po.c_total_amount)}

@@ -8,6 +8,7 @@ import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { CopyButton } from '../../components/CopyButton';
 import { useAuth } from '../../contexts/AuthContext';
+import { codeDisplay } from './inventoryUtils';
 
 // ============================================================================
 // Types (verified against live API 2026-03-24)
@@ -20,6 +21,7 @@ interface RepairOrder {
   branch_name: string;
   asset_id: number;
   asset_code: string;
+  asset_code_display: string | null;
   serial_no: string | null;
   variant_id: number;
   variant_name: string;
@@ -29,6 +31,7 @@ interface RepairOrder {
   brand_name: string | null;
   loaner_asset_id: number | null;
   loaner_asset_code: string | null;
+  loaner_asset_code_display: string | null;
   loaner_serial_no: string | null;
   repair_no: string;
   status: string;
@@ -226,7 +229,7 @@ export function RepairsPage() {
                           <span className="font-medium text-sm truncate">{order.repair_no}</span>
                         </div>
                         <div className="text-xs text-subtle truncate">
-                          {[order.brand_name, order.model_name].filter(Boolean).join(' ')} · {order.asset_code}
+                          {[order.brand_name, order.model_name].filter(Boolean).join(' ')} · {codeDisplay(order.asset_code_display, order.asset_code)}
                         </div>
                         <div className="flex items-center gap-2 mt-1 -ml-0.5">
                           <Badge size="xs" color={REPAIR_STATUS_COLOR[order.status] ?? 'default'}>
@@ -330,7 +333,7 @@ function RepairDetailPanel({
             to={`/admin/inventory/assets/${order.asset_id}`}
             className="inline-flex items-center gap-1 font-semibold text-sm text-primary-fg hover:underline"
           >
-            {order.asset_code}
+            {codeDisplay(order.asset_code_display, order.asset_code)}
             <ExternalLink size={12} />
           </Link>
           <div className="text-xs text-subtle">
@@ -353,7 +356,7 @@ function RepairDetailPanel({
             to={`/admin/inventory/assets/${order.loaner_asset_id}`}
             className="inline-flex items-center gap-1 text-sm font-medium text-primary-fg hover:underline"
           >
-            {order.loaner_asset_code}
+            {codeDisplay(order.loaner_asset_code_display, order.loaner_asset_code)}
             <ExternalLink size={11} />
           </Link>
           {order.loaner_serial_no && <div className="text-xs text-fg/50 font-mono">{order.loaner_serial_no}</div>}
@@ -507,7 +510,7 @@ function CloseRepairModal({
             </div>
           )}
           <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
-            <div className="font-medium text-sm">{order.asset_code}</div>
+            <div className="font-medium text-sm">{codeDisplay(order.asset_code_display, order.asset_code)}</div>
             <div className="text-xs text-subtle">
               {[order.brand_name, order.family_name, order.model_name].filter(Boolean).join(' > ')}
             </div>
@@ -617,7 +620,7 @@ function RouteRepairModal({
           )}
           <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line flex items-center justify-between">
             <div>
-              <div className="font-medium text-sm">{order.asset_code}</div>
+              <div className="font-medium text-sm">{codeDisplay(order.asset_code_display, order.asset_code)}</div>
               <div className="text-xs text-subtle">
                 {[order.brand_name, order.family_name, order.model_name].filter(Boolean).join(' > ')}
               </div>
@@ -642,7 +645,7 @@ function RouteRepairModal({
             {hasLoaner && (
               <div className="flex flex-col">
                 <label className="form-label">{t('repair.loanerAction')}</label>
-                <div className="text-xs text-subtle mb-1">{order.loaner_asset_code}</div>
+                <div className="text-xs text-subtle mb-1">{codeDisplay(order.loaner_asset_code_display, order.loaner_asset_code)}</div>
                 <Select
                   options={LOANER_ACTION_OPTIONS}
                   value={loanerAction}

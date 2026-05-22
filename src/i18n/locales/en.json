@@ -893,6 +893,7 @@
     "conditionREFURBISHED": "Refurbished",
     "conditionUSED_A": "Used A",
     "conditionUSED_B": "Used B",
+    "conditionUSED": "Used (A+B)",
     "lotStatusActive": "Active",
     "lotStatusDepleted": "Depleted",
     "pillRetail": "Retail",
@@ -1007,7 +1008,10 @@
     "more": "more",
     "viewAllAssets": "View all assets",
     "status": "Lot status",
-    "receipt": "Receipt"
+    "receipt": "Receipt",
+    "contractable": "Contractable",
+    "accessory": "Accessory",
+    "allTypes": "All types"
   },
   "po": {
     "allStatuses": "All statuses",

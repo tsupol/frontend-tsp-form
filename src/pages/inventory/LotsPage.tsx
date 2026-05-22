@@ -15,7 +15,7 @@ import { CopyButton } from '../../components/CopyButton';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
-import { getBucketLabel, getBucketColor, getLotStatusLabel, fmtNum } from './inventoryUtils';
+import { getBucketLabel, getBucketColor, getLotStatusLabel, fmtNum, codeDisplay } from './inventoryUtils';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 
 // ============================================================================
@@ -36,6 +36,7 @@ interface Lot {
   company_id: number;
   branch_id: number;
   lot_code: string;
+  lot_code_display: string | null;
   current_bucket: string;
   qty_received: number;
   qty_on_hand: number;
@@ -53,6 +54,7 @@ interface Lot {
   brand_name: string;
   po_id: number | null;
   po_no: string | null;
+  po_code_display: string | null;
   po_type: string | null;
   source_lot_id: number | null;
   created_at: string;
@@ -91,22 +93,19 @@ interface Branch {
 // Bucket filter options (lots are mostly On-Hand / Quarantined / In-Transit)
 // ============================================================================
 
-// Bucket options listed in workflow order. Only buckets where `applies_to`
-// includes lots (BOTH) — asset-only buckets are excluded.
-const BUCKET_OPTIONS = [
-  { value: 'INBOUND_RECEIVED_UNREGISTERED', label: 'Unregistered' },
-  { value: 'ON_HAND_AVAILABLE', label: 'Available' },
-  { value: 'QUARANTINED', label: 'Quarantined' },
-  { value: 'IN_TRANSIT_OUTBOUND', label: 'In Transit (Out)' },
-  { value: 'IN_TRANSIT_INBOUND', label: 'In Transit (In)' },
-  { value: 'SOLD_B2B_EXTERNAL', label: 'Sold B2B' },
-  { value: 'WRITTEN_OFF', label: 'Written off' },
+// Bucket values listed in workflow order. Only buckets where `applies_to`
+// includes lots (BOTH) — asset-only buckets are excluded. Labels resolved
+// via getBucketLabel(value, t) so language switches live.
+const BUCKET_VALUES = [
+  'INBOUND_RECEIVED_UNREGISTERED',
+  'ON_HAND_AVAILABLE',
+  'QUARANTINED',
+  'IN_TRANSIT_OUTBOUND',
+  'IN_TRANSIT_INBOUND',
+  'SOLD_B2B_EXTERNAL',
+  'WRITTEN_OFF',
 ];
 
-const CONTRACTABLE_OPTIONS = [
-  { value: 'true', label: 'Contractable' },
-  { value: 'false', label: 'Accessory' },
-];
 
 // ============================================================================
 // Wired actions catalog. Only LOT_CONVERT_TO_ASSET is fully wired today;
@@ -150,7 +149,7 @@ const CATEGORY_ORDER = ['CONVERSION', 'TRANSFER'];
 // ============================================================================
 
 export function LotsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
   const { user } = useAuth();
@@ -190,6 +189,19 @@ export function LotsPage() {
     { value: 'ADJUSTMENT', label: 'Adjustment' },
     { value: 'DEAL_PARTNER', label: 'Deal Partner' },
   ];
+
+  const bucketOptions = useMemo(
+    () => BUCKET_VALUES.map(v => ({ value: v, label: getBucketLabel(v, t) })),
+    [t, i18n.language],
+  );
+
+  const contractableOptions = useMemo(
+    () => [
+      { value: 'true', label: t('lot.contractable', { defaultValue: 'Contractable' }) },
+      { value: 'false', label: t('lot.accessory', { defaultValue: 'Accessory' }) },
+    ],
+    [t, i18n.language],
+  );
 
   const isMdOrBelow = useMediaQuery('(max-width: 767px)');
   const isLgOrBelow = useMediaQuery('(max-width: 1023px)');
@@ -275,7 +287,7 @@ export function LotsPage() {
                 )}
               </div>
               <div className="mobile-header-title mobile-header-title-truncate">
-                {isRoot ? t('nav.lots') : selectedLot?.lot_code ?? ''}
+                {isRoot ? t('nav.lots') : codeDisplay(selectedLot?.lot_code_display, selectedLot?.lot_code)}
               </div>
               <div className="mobile-header-end w-nav" />
             </MobileHeader>
@@ -305,7 +317,7 @@ export function LotsPage() {
                 </div>
                 <div className="flex-1 min-w-0 hidden sm:block">
                   <Select
-                    options={BUCKET_OPTIONS}
+                    options={bucketOptions}
                     value={filterBucket}
                     onChange={(val) => setFilterBucket((val as string) || null)}
                     placeholder={t('lot.allBuckets')}
@@ -338,7 +350,7 @@ export function LotsPage() {
                 </div>
                 <div className="flex-1 min-w-0 hidden xl:block">
                   <Select
-                    options={CONTRACTABLE_OPTIONS}
+                    options={contractableOptions}
                     value={filterContractable}
                     onChange={(val) => setFilterContractable((val as string) || null)}
                     placeholder={t('lot.allTypes', { defaultValue: 'All types' })}
@@ -359,7 +371,7 @@ export function LotsPage() {
                     <div className="text-xs font-medium text-subtle uppercase tracking-wide">{t('common.filters')}</div>
                     <div className="sm:hidden flex flex-col gap-2">
                       <Select
-                        options={BUCKET_OPTIONS}
+                        options={bucketOptions}
                         value={filterBucket}
                         onChange={(val) => setFilterBucket((val as string) || null)}
                         placeholder={t('lot.allBuckets')}
@@ -392,7 +404,7 @@ export function LotsPage() {
                     </div>
                     <div className="xl:hidden flex flex-col gap-2">
                       <Select
-                        options={CONTRACTABLE_OPTIONS}
+                        options={contractableOptions}
                         value={filterContractable}
                         onChange={(val) => setFilterContractable((val as string) || null)}
                         placeholder={t('lot.allTypes', { defaultValue: 'All types' })}
@@ -438,7 +450,7 @@ export function LotsPage() {
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className="font-medium text-sm truncate">{lot.lot_code}</span>
+                          <span className="font-medium text-sm truncate">{codeDisplay(lot.lot_code_display, lot.lot_code)}</span>
                           <Badge size="xs" color={getBucketColor(lot.current_bucket)}>
                             {getBucketLabel(lot.current_bucket, t)}
                           </Badge>
@@ -661,7 +673,7 @@ function LotDetailPanel({
 
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
-          <span className="font-semibold">{lot.lot_code}</span>
+          <span className="font-semibold">{codeDisplay(lot.lot_code_display, lot.lot_code)}</span>
           <CopyButton value={lot.lot_code} />
           <Badge size="xs" color={getBucketColor(lot.current_bucket)}>
             {getBucketLabel(lot.current_bucket, t)}
@@ -719,7 +731,7 @@ function LotDetailPanel({
               to={`/admin/inventory/po/${lot.po_id}`}
               className="inline-flex items-center gap-1 text-primary-fg hover:underline font-medium"
             >
-              {lot.po_no}
+              {codeDisplay(lot.po_code_display, lot.po_no)}
               <ExternalLink size={12} />
             </Link>
           </div>
@@ -1268,7 +1280,7 @@ function LotActionModal({
               </div>
             )}
             <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
-              <div className="font-medium text-sm">{lot.lot_code}</div>
+              <div className="font-medium text-sm">{codeDisplay(lot.lot_code_display, lot.lot_code)}</div>
               <div className="text-xs text-subtle truncate">
                 {[lot.brand_name, lot.family_name, lot.model_name].filter(Boolean).join(' ')} · {lot.variant_name}
               </div>

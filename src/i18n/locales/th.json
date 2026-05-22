@@ -893,6 +893,7 @@
     "conditionREFURBISHED": "รีเฟอร์บิช",
     "conditionUSED_A": "มือสอง A",
     "conditionUSED_B": "มือสอง B",
+    "conditionUSED": "มือสอง (A+B)",
     "lotStatusActive": "ใช้งานอยู่",
     "lotStatusDepleted": "หมดแล้ว",
     "pillRetail": "ขายปลีก",
@@ -1007,7 +1008,10 @@
     "more": "อีก",
     "viewAllAssets": "ดู asset ทั้งหมด",
     "status": "สถานะ lot",
-    "receipt": "ใบรับของ"
+    "receipt": "ใบรับของ",
+    "contractable": "สินค้าผ่อน",
+    "accessory": "อุปกรณ์เสริม",
+    "allTypes": "ทุกประเภท"
   },
   "po": {
     "allStatuses": "ทุกสถานะ",
