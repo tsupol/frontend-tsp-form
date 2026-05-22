@@ -499,23 +499,39 @@ export function AssetsPage() {
   const isLeaseActive = filterBucket === 'ON_HAND_AVAILABLE'
     && filterContractable === 'true' && !filterSellable;
 
+  // Single writer for the three URL-backed filter keys. Keeps URL and
+  // local state in sync regardless of where the change originated
+  // (pill button, side-nav shortcut, or the bucket Select).
+  const writeFilterTriple = (bucket: string | null, contractable: string | null, sellable: string | null) => {
+    const next = new URLSearchParams(searchParams);
+    if (bucket) next.set('bucket', bucket); else next.delete('bucket');
+    if (contractable) next.set('is_contractable', contractable); else next.delete('is_contractable');
+    if (sellable) next.set('is_sellable', sellable); else next.delete('is_sellable');
+    setSearchParams(next, { replace: true });
+  };
+
   const togglePill = (target: 'retail' | 'lease') => {
     if (target === 'retail') {
-      if (isRetailActive) {
-        setFilterBucket(null); setFilterSellable(null); setFilterContractable(null);
-      } else {
-        setFilterBucket('ON_HAND_AVAILABLE'); setFilterSellable('true'); setFilterContractable('false');
-      }
+      if (isRetailActive) writeFilterTriple(null, null, null);
+      else writeFilterTriple('ON_HAND_AVAILABLE', 'false', 'true');
     } else {
-      if (isLeaseActive) {
-        setFilterBucket(null); setFilterSellable(null); setFilterContractable(null);
-      } else {
-        setFilterBucket('ON_HAND_AVAILABLE'); setFilterContractable('true'); setFilterSellable(null);
-      }
+      if (isLeaseActive) writeFilterTriple(null, null, null);
+      else writeFilterTriple('ON_HAND_AVAILABLE', 'true', null);
     }
   };
 
   useEffect(() => { setPageIndex(0); }, [debouncedSearch, filterBucket, filterBranchId, filterCondition, filterBrand, filterFamily, filterContractable, filterSellable, sourceLotId, sourcePoId]);
+
+  // Sync pill-related state from URL on every searchParams change so that
+  // clicking a side-nav shortcut (Retail / Lease) while already on this
+  // page actually updates the filters. URL is the source of truth for
+  // these three keys; the page-internal Selects also write to state so
+  // the Select can stay uncontrolled-by-URL when the user picks manually.
+  useEffect(() => {
+    setFilterBucket(searchParams.get('bucket'));
+    setFilterContractable(searchParams.get('is_contractable'));
+    setFilterSellable(searchParams.get('is_sellable'));
+  }, [searchParams]);
 
   // Fallback fetch so direct deep-links (id not on current page) still resolve.
   const { data: detailFallback } = useQuery({
@@ -626,7 +642,7 @@ export function AssetsPage() {
                   <Select
                     options={BUCKET_OPTIONS}
                     value={filterBucket}
-                    onChange={(val) => setFilterBucket((val as string) || null)}
+                    onChange={(val) => writeFilterTriple((val as string) || null, filterContractable, filterSellable)}
                     placeholder={t('asset.allStatuses')}
                     size="sm"
                     showChevron
@@ -691,7 +707,7 @@ export function AssetsPage() {
                       <Select
                         options={BUCKET_OPTIONS}
                         value={filterBucket}
-                        onChange={(val) => setFilterBucket((val as string) || null)}
+                        onChange={(val) => writeFilterTriple((val as string) || null, filterContractable, filterSellable)}
                         placeholder={t('asset.allStatuses')}
                         size="sm"
                         showChevron
