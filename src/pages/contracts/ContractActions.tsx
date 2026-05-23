@@ -2854,17 +2854,19 @@ function PayInstallmentModal({ open, contract, onClose }: {
 // (same media-type spec, same R2 cleanup discipline). If/when the backend
 // ships a real `ATTACH_PAYMENT_SLIP` action, this should be removed and
 // wired through the normal allowlist.
-function AttachSlipModal({ open, contract, onClose, onSuccess }: {
+function AttachSlipModal({ open, contract, onClose }: {
   open: boolean;
   contract: ContractForActions;
   onClose: () => void;
-  onSuccess: (msgKey: string, override?: ReactNode) => void;
+  /** Unused by this modal — success is shown in-modal. Kept for prop-shape parity with other action modals. */
+  onSuccess?: (msgKey: string, override?: ReactNode) => void;
 }) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const slipSpec = useUploadSpec('contract_payment_slip');
 
+  const [view, setView] = useState<'form' | 'done'>('form');
   const [slipKey, setSlipKey] = useState<string | null>(null);
   const [slipFile, setSlipFile] = useState<File | null>(null);
   const [slipPreviewUrl, setSlipPreviewUrl] = useState<string | null>(null);
@@ -2872,15 +2874,22 @@ function AttachSlipModal({ open, contract, onClose, onSuccess }: {
   const [caption, setCaption] = useState('');
   const [error, setError] = useState('');
   const [errorKey, setErrorKey] = useState(0);
+  // Snapshot at submit time so the done view can render the attached slip + caption
+  // after the working copies (slipKey/slipPreviewUrl) are cleared.
+  const [attachedPreviewUrl, setAttachedPreviewUrl] = useState<string | null>(null);
+  const [attachedCaption, setAttachedCaption] = useState('');
 
   useEffect(() => {
     if (open) {
+      setView('form');
       setSlipKey(null);
       setSlipFile(null);
       setSlipPreviewUrl(null);
       setSlipUploading(false);
       setCaption('');
       setError('');
+      setAttachedPreviewUrl(null);
+      setAttachedCaption('');
     }
   }, [open]);
 
@@ -2954,11 +2963,16 @@ function AttachSlipModal({ open, contract, onClose, onSuccess }: {
   };
 
   const handleCloseWithCleanup = () => {
-    if (slipKey) {
+    // Form view: if the user uploaded a slip but never submitted, the R2 object is an orphan.
+    // Done view: the file is now owned by the media row — don't delete from R2.
+    if (view === 'form' && slipKey) {
       deleteMedia([slipKey]).catch(() => {});
     }
     if (slipPreviewUrl) {
       URL.revokeObjectURL(slipPreviewUrl);
+    }
+    if (attachedPreviewUrl && attachedPreviewUrl !== slipPreviewUrl) {
+      URL.revokeObjectURL(attachedPreviewUrl);
     }
     onClose();
   };
@@ -2988,123 +3002,156 @@ function AttachSlipModal({ open, contract, onClose, onSuccess }: {
       });
     },
     onSuccess: () => {
-      // Clear without R2 delete — the file is now owned by the media row.
+      // Stash preview + caption for the done view, then clear the working copies.
+      // The blob URL is reused as-is — only revoked on modal close.
+      setAttachedPreviewUrl(slipPreviewUrl);
+      setAttachedCaption(caption.trim());
       setSlipKey(null);
       setSlipFile(null);
-      if (slipPreviewUrl) URL.revokeObjectURL(slipPreviewUrl);
       setSlipPreviewUrl(null);
       queryClient.invalidateQueries({ queryKey: ['entity-media', 'CONTRACT', contract.id, 'PAYMENT_SLIP'] });
       queryClient.invalidateQueries({ queryKey: ['entity-media-count', 'CONTRACT', contract.id, 'PAYMENT_SLIP'] });
       queryClient.invalidateQueries({ queryKey: ['contract-media', contract.id] });
-      onClose();
-      onSuccess('contract.attachSlip_success');
+      setView('done');
     },
     onError: setApiError,
   });
 
   const canSubmit = !!slipKey && !slipUploading && !mutation.isPending;
 
+  const titleKey = view === 'done' ? 'contract.attachSlip_doneTitle' : 'contract.attachSlip_title';
+
   return (
     <Modal open={open} onClose={handleCloseWithCleanup} maxWidth="28rem" width="100%">
       <div className="flex flex-col overflow-hidden">
         <div className="modal-header">
-          <h2 className="modal-title">{t('contract.attachSlip_title', { defaultValue: 'Attach Payment Slip' })}</h2>
+          <h2 className="modal-title">
+            {t(titleKey, {
+              defaultValue: view === 'done' ? 'Slip attached' : 'Attach Payment Slip',
+            })}
+          </h2>
           <button type="button" className="modal-close-btn" onClick={handleCloseWithCleanup} aria-label="Close">&times;</button>
         </div>
 
-        <div className="modal-content">
-          {error && (
-            <div key={errorKey} className="alert alert-danger mb-4 animate-pop-in">
-              <XCircle size={16} />
-              <span>{error}</span>
+        {view === 'form' && (
+          <div className="modal-content">
+            {error && (
+              <div key={errorKey} className="alert alert-danger mb-4 animate-pop-in">
+                <XCircle size={16} />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
+              <div className="font-medium text-sm">{contract.code_display ?? contract.code}</div>
+              <div className="text-xs text-subtle">{contract.state} · {contract.commercial_model ?? ''}</div>
             </div>
-          )}
 
-          <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
-            <div className="font-medium text-sm">{contract.code_display ?? contract.code}</div>
-            <div className="text-xs text-subtle">{contract.state} · {contract.commercial_model ?? ''}</div>
-          </div>
-
-          <div className="form-grid">
-            <div className="flex flex-col">
-              <label className="form-label">
-                {t('contract.payInstallment_slip', { defaultValue: 'Payment slip' })} *
-              </label>
-              {slipKey && slipPreviewUrl ? (
-                <div className="h-24 rounded-md border border-line overflow-hidden bg-surface flex items-center justify-center gap-2 p-2">
-                  <img
-                    src={slipPreviewUrl}
-                    alt={t('contract.payInstallment_slip', { defaultValue: 'Payment slip' })}
-                    className="max-h-full w-auto object-contain block rounded"
+            <div className="form-grid">
+              <div className="flex flex-col">
+                <label className="form-label">
+                  {t('contract.payInstallment_slip', { defaultValue: 'Payment slip' })} *
+                </label>
+                {slipKey && slipPreviewUrl ? (
+                  <div className="h-24 rounded-md border border-line overflow-hidden bg-surface flex items-center justify-center gap-2 p-2">
+                    <img
+                      src={slipPreviewUrl}
+                      alt={t('contract.payInstallment_slip', { defaultValue: 'Payment slip' })}
+                      className="max-h-full w-auto object-contain block rounded"
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      startIcon={<X size={14} />}
+                      onClick={handleSlipClear}
+                      disabled={slipUploading || mutation.isPending}
+                    >
+                      {t('common.remove')}
+                    </Button>
+                  </div>
+                ) : (
+                  <ImageUploader
+                    resizeOptions={slipSpec.resize}
+                    sizes={slipSpec.sizes}
+                    onUpload={handleSlipUpload}
+                    disabled={slipUploading || mutation.isPending || !slipSpec.spec}
+                    className="!min-h-24 !border !border-solid !border-line !rounded-md"
+                    placeholder={
+                      <div className="flex flex-col items-center justify-center gap-1 text-subtle">
+                        <Receipt size={20} className="opacity-60" />
+                        <span className="text-xs">
+                          {slipUploading
+                            ? t('common.loading')
+                            : t('contract.payInstallment_slipPlaceholder', { defaultValue: 'Upload payment slip image' })}
+                        </span>
+                      </div>
+                    }
                   />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    startIcon={<X size={14} />}
-                    onClick={handleSlipClear}
-                    disabled={slipUploading || mutation.isPending}
-                  >
-                    {t('common.remove')}
-                  </Button>
-                </div>
-              ) : (
-                <ImageUploader
-                  resizeOptions={slipSpec.resize}
-                  sizes={slipSpec.sizes}
-                  onUpload={handleSlipUpload}
-                  disabled={slipUploading || mutation.isPending || !slipSpec.spec}
-                  className="!min-h-24 !border !border-solid !border-line !rounded-md"
-                  placeholder={
-                    <div className="flex flex-col items-center justify-center gap-1 text-subtle">
-                      <Receipt size={20} className="opacity-60" />
-                      <span className="text-xs">
-                        {slipUploading
-                          ? t('common.loading')
-                          : t('contract.payInstallment_slipPlaceholder', { defaultValue: 'Upload payment slip image' })}
-                      </span>
-                    </div>
-                  }
-                />
-              )}
-            </div>
+                )}
+              </div>
 
-            <div className="flex flex-col">
-              <label className="form-label">
-                {t('contract.attachSlip_caption', { defaultValue: 'Caption' })}
-                <span className="text-xs text-subtle ml-1">({t('common.optional')})</span>
-              </label>
-              <Input
-                value={caption}
-                onChange={(e) => setCaption(e.target.value)}
-                placeholder={t('contract.attachSlip_captionPlaceholder', {
-                  defaultValue: 'e.g. slip for installment 3, ref number, etc.',
-                })}
-                className="w-full"
-              />
+              <div className="flex flex-col">
+                <label className="form-label">
+                  {t('contract.attachSlip_caption', { defaultValue: 'Caption' })}
+                  <span className="text-xs text-subtle ml-1">({t('common.optional')})</span>
+                </label>
+                <Input
+                  value={caption}
+                  onChange={(e) => setCaption(e.target.value)}
+                  placeholder={t('contract.attachSlip_captionPlaceholder', {
+                    defaultValue: 'e.g. slip for installment 3, ref number, etc.',
+                  })}
+                  className="w-full"
+                />
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
-        <div className="border-t border-line shrink-0 px-4 py-2.5 flex items-center gap-2 text-info-fg">
-          <Info size={14} className="shrink-0" />
-          <span className="text-xs">{t('contract.attachSlip_hint', {
-            defaultValue: 'Attach a slip image to this contract without recording a payment',
-          })}</span>
-        </div>
+        {view === 'form' && (
+          <div className="border-t border-line shrink-0 px-4 py-2.5 flex items-center gap-2 text-info-fg">
+            <Info size={14} className="shrink-0" />
+            <span className="text-xs">{t('contract.attachSlip_hint', {
+              defaultValue: 'Attach a slip image to this contract without recording a payment',
+            })}</span>
+          </div>
+        )}
 
-        <div className="modal-footer">
-          <Button onClick={handleCloseWithCleanup}>{t('common.cancel')}</Button>
-          <Button
-            color="primary"
-            onClick={() => mutation.mutate()}
-            disabled={!canSubmit}
-            startIcon={<Paperclip size={14} />}
-          >
-            {mutation.isPending
-              ? t('common.loading')
-              : t('contract.attachSlip_submit', { defaultValue: 'Attach Slip' })}
-          </Button>
-        </div>
+        {view === 'form' && (
+          <div className="modal-footer">
+            <Button onClick={handleCloseWithCleanup}>{t('common.cancel')}</Button>
+            <Button
+              color="primary"
+              onClick={() => mutation.mutate()}
+              disabled={!canSubmit}
+              startIcon={<Paperclip size={14} />}
+            >
+              {mutation.isPending
+                ? t('common.loading')
+                : t('contract.attachSlip_submit', { defaultValue: 'Attach Slip' })}
+            </Button>
+          </div>
+        )}
+
+        {view === 'done' && (
+          <ActionDoneView
+            headline={t('contract.attachSlip_doneHeadline', { defaultValue: 'Slip attached' })}
+            contractCode={contract.code_display ?? contract.code}
+            detailRows={attachedCaption ? [
+              { label: t('contract.attachSlip_caption', { defaultValue: 'Caption' }), value: attachedCaption },
+            ] : undefined}
+            extras={attachedPreviewUrl && (
+              <div className="rounded-md border border-line overflow-hidden bg-surface p-2 flex items-center justify-center">
+                <img
+                  src={attachedPreviewUrl}
+                  alt={t('contract.payInstallment_slip', { defaultValue: 'Payment slip' })}
+                  className="max-h-48 w-auto object-contain block rounded"
+                />
+              </div>
+            )}
+            onClose={handleCloseWithCleanup}
+          />
+        )}
       </div>
     </Modal>
   );

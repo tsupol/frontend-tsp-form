@@ -2022,6 +2022,8 @@
     "payInstallment_slipCaption": "Slip",
     "attachSlip_action": "Attach Slip",
     "attachSlip_title": "Attach Payment Slip",
+    "attachSlip_doneTitle": "Slip Attached",
+    "attachSlip_doneHeadline": "Slip attached to contract",
     "attachSlip_hint": "Attach a slip image to this contract without recording a payment",
     "attachSlip_caption": "Caption",
     "attachSlip_captionPlaceholder": "e.g. slip for installment 3, ref number, etc.",

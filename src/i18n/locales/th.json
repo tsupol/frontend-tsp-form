@@ -2022,6 +2022,8 @@
     "payInstallment_slipCaption": "สลิป",
     "attachSlip_action": "แนบสลิป",
     "attachSlip_title": "แนบสลิปการโอน",
+    "attachSlip_doneTitle": "แนบสลิปเรียบร้อย",
+    "attachSlip_doneHeadline": "แนบสลิปเข้ากับสัญญาแล้ว",
     "attachSlip_hint": "แนบรูปสลิปเข้ากับสัญญานี้โดยไม่บันทึกชำระเงิน",
     "attachSlip_caption": "ข้อความกำกับรูป",
     "attachSlip_captionPlaceholder": "เช่น สลิปงวด 3, เลขอ้างอิง ฯลฯ",
