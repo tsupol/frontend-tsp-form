@@ -36,7 +36,8 @@
     "saved": "บันทึกแล้ว",
     "continue": "ดำเนินการต่อ",
     "back": "ย้อนกลับ",
-    "change": "เปลี่ยน"
+    "change": "เปลี่ยน",
+    "optional": "ไม่บังคับ"
   },
   "dashboard": {
     "actionRequired": "ต้องดำเนินการ",
@@ -2018,7 +2019,15 @@
     "payInstallment_slip": "สลิปการโอน",
     "payInstallment_slipPlaceholder": "อัปโหลดรูปสลิป",
     "payInstallment_slipUploaded": "อัปโหลดสลิปแล้ว",
-    "payInstallment_slipCaption": "สลิป"
+    "payInstallment_slipCaption": "สลิป",
+    "attachSlip_action": "แนบสลิป",
+    "attachSlip_title": "แนบสลิปการโอน",
+    "attachSlip_hint": "แนบรูปสลิปเข้ากับสัญญานี้โดยไม่บันทึกชำระเงิน",
+    "attachSlip_caption": "ข้อความกำกับรูป",
+    "attachSlip_captionPlaceholder": "เช่น สลิปงวด 3, เลขอ้างอิง ฯลฯ",
+    "attachSlip_submit": "แนบสลิป",
+    "attachSlip_success": "แนบสลิปเรียบร้อย",
+    "attachSlip_needSlip": "กรุณาอัปโหลดรูปสลิป"
   },
   "wizard": {
     "title": "เปิดสัญญาใหม่",

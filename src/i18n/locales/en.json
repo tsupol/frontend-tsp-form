@@ -36,7 +36,8 @@
     "saved": "Saved",
     "continue": "Continue",
     "back": "Back",
-    "change": "Change"
+    "change": "Change",
+    "optional": "optional"
   },
   "dashboard": {
     "actionRequired": "Action required",
@@ -2018,7 +2019,15 @@
     "payInstallment_slip": "Payment slip",
     "payInstallment_slipPlaceholder": "Upload payment slip image",
     "payInstallment_slipUploaded": "Slip uploaded",
-    "payInstallment_slipCaption": "Slip"
+    "payInstallment_slipCaption": "Slip",
+    "attachSlip_action": "Attach Slip",
+    "attachSlip_title": "Attach Payment Slip",
+    "attachSlip_hint": "Attach a slip image to this contract without recording a payment",
+    "attachSlip_caption": "Caption",
+    "attachSlip_captionPlaceholder": "e.g. slip for installment 3, ref number, etc.",
+    "attachSlip_submit": "Attach Slip",
+    "attachSlip_success": "Slip attached",
+    "attachSlip_needSlip": "Please upload a slip image"
   },
   "wizard": {
     "title": "Open Contract",

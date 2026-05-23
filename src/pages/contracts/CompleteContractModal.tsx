@@ -234,7 +234,7 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
   };
 
   // ── Early-payoff: preview + bank accounts (only when entering payoff view) ──
-  const { data: preview, isFetching: previewLoading } = useQuery({
+  const { data: preview, isFetching: previewLoading, error: previewError } = useQuery({
     queryKey: ['payoff-preview', contract.id],
     queryFn: () => apiClient.rpc<PayoffPreview>('fn_bill_early_payoff_preview', {
       p_contract_id: contract.id,
@@ -242,6 +242,15 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
     enabled: open && isEarlyPayoff,
     staleTime: 30 * 1000,
   });
+
+  // Surface preview errors (e.g. 403 permission denied) in the top alert.
+  // Without this, `previewLoading` flips to false but `preview` stays undefined
+  // so PayoffView would spin forever.
+  useEffect(() => {
+    if (previewError) {
+      setApiError(previewError);
+    }
+  }, [previewError]);
 
   const { data: bankAccounts } = useQuery({
     queryKey: ['bank-accounts-active'],
@@ -1053,11 +1062,23 @@ function PayoffView({
     : step === 'confirm' ? t('contract.earlyPayoff_stepConfirm', { defaultValue: 'Confirming...' })
     : '';
 
-  if (previewLoading || !preview) {
+  if (previewLoading) {
     return (
       <div className="flex items-center gap-2 py-8 justify-center text-subtle">
         <Loader2 size={18} className="animate-spin" />
         <span>{t('common.loading')}</span>
+      </div>
+    );
+  }
+  // Preview failed (error already shown in top alert by parent) — render a
+  // bare Cancel so the user can dismiss the modal instead of being stuck
+  // staring at a spinner.
+  if (!preview) {
+    return (
+      <div className="flex justify-end">
+        <Button variant="outline" onClick={onCancel} disabled={isPending}>
+          {t('common.cancel')}
+        </Button>
       </div>
     );
   }

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, Modal, Input, Select, TextArea, MaskedInput, Badge, Tooltip, PopOver, ImageUploader, useSnackbarContext } from 'tsp-form';
 import type { UploadedImage } from 'tsp-form';
-import { CheckCircle, XCircle, X, Pencil, Plus, Trash2, Loader2, ChevronsRight, ChevronDown, ExternalLink, Wrench, ArrowRight, Info, Receipt } from 'lucide-react';
+import { CheckCircle, XCircle, X, Pencil, Plus, Trash2, Loader2, ChevronsRight, ChevronDown, ExternalLink, Wrench, ArrowRight, Info, Receipt, Paperclip } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { fmtCurrency } from '../../lib/format';
 import { BranchPinInput } from '../../components/BranchPinInput';
@@ -703,6 +703,13 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [activeAction, setActiveAction] = useState<ContractAction | null>(null);
+  // Ad-hoc requirement (2026-05-23): attach-slip is a plain FE-only action — there is
+  // NO matching row in `sale.ref_contract_actions`, so it doesn't come back from
+  // `fn_contract_available_actions` and isn't part of the curated BE-controlled grid.
+  // We render it as a separate inline button in the footer below. If/when backend
+  // ships an `ATTACH_PAYMENT_SLIP` action with proper state + permission guards,
+  // remove this standalone button and route it through the normal allowlist instead.
+  const [attachSlipOpen, setAttachSlipOpen] = useState(false);
   const { addSnackbar } = useSnackbarContext();
 
   useEffect(() => {
@@ -898,6 +905,28 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
         {showActionGrid && (
           <div className="flex flex-wrap items-center gap-2">
             {primaryActions.map(a => renderActionButton(a, true))}
+            {/*
+              Ad-hoc FE-only quick action — NOT driven by `fn_contract_available_actions`.
+              This intentionally breaks the BE-controlled action footer pattern because
+              `sale.ref_contract_actions` has no row for slip attachment (slip is just a
+              media link via `fn_media_attach`, with no per-contract state/permission
+              evaluator). See .claude/contract-actions-allowlist.md and Decision #110
+              in nnf UI_SUMMARY/kb_export/02_decisions.md (PAYMENT_SLIP at CONTRACT level).
+              Limited to non-terminal states only — matches where the user is plausibly
+              still receiving customer slips.
+            */}
+            {(contract.state === 'ACTIVE'
+              || contract.state === 'WAIT_LEGAL_PROCESS'
+              || contract.state === 'ON_LEGAL_PROCESS') && (
+              <Button
+                variant="outline"
+                size="sm"
+                startIcon={<Paperclip size={14} />}
+                onClick={() => setAttachSlipOpen(true)}
+              >
+                {t('contract.attachSlip_action', { defaultValue: 'Attach Slip' })}
+              </Button>
+            )}
             {secondaryActions.length > 0 && (
               <Button
                 ref={moreTriggerRef}
@@ -1041,6 +1070,12 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
         action={activeAction}
         contract={contract}
         onClose={() => setActiveAction(null)}
+        onSuccess={handleSuccess}
+      />
+      <AttachSlipModal
+        open={attachSlipOpen}
+        contract={contract}
+        onClose={() => setAttachSlipOpen(false)}
         onSuccess={handleSuccess}
       />
     </>
@@ -2797,6 +2832,281 @@ function PayInstallmentModal({ open, contract, onClose }: {
         </div>
       </Modal>
     </>
+  );
+}
+
+// ── Attach Slip (ad-hoc FE-only action) ──────────────────────────────────────
+//
+// AD-HOC REQUIREMENT (2026-05-23):
+// This modal lets a user attach a payment-slip image directly to the contract
+// WITHOUT recording any payment. It calls `fn_media_attach` against
+// (CONTRACT, PAYMENT_SLIP) — that's it.
+//
+// This deliberately breaks the BE-controlled contract-action pattern used by
+// the rest of the footer:
+//   - There is NO matching row in `sale.ref_contract_actions`, so the action
+//     does not appear in `fn_contract_available_actions` and is not subject
+//     to the catalog's state/permission/balance guards.
+//   - There is no `blocking_reason` evaluator — visibility is decided by the
+//     frontend (contract state ∈ {ACTIVE, WAIT_LEGAL_PROCESS, ON_LEGAL_PROCESS}).
+//
+// The slip-upload logic mirrors the slip section of `PayInstallmentModal`
+// (same media-type spec, same R2 cleanup discipline). If/when the backend
+// ships a real `ATTACH_PAYMENT_SLIP` action, this should be removed and
+// wired through the normal allowlist.
+function AttachSlipModal({ open, contract, onClose, onSuccess }: {
+  open: boolean;
+  contract: ContractForActions;
+  onClose: () => void;
+  onSuccess: (msgKey: string, override?: ReactNode) => void;
+}) {
+  const { t } = useTranslation();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const slipSpec = useUploadSpec('contract_payment_slip');
+
+  const [slipKey, setSlipKey] = useState<string | null>(null);
+  const [slipFile, setSlipFile] = useState<File | null>(null);
+  const [slipPreviewUrl, setSlipPreviewUrl] = useState<string | null>(null);
+  const [slipUploading, setSlipUploading] = useState(false);
+  const [caption, setCaption] = useState('');
+  const [error, setError] = useState('');
+  const [errorKey, setErrorKey] = useState(0);
+
+  useEffect(() => {
+    if (open) {
+      setSlipKey(null);
+      setSlipFile(null);
+      setSlipPreviewUrl(null);
+      setSlipUploading(false);
+      setCaption('');
+      setError('');
+    }
+  }, [open]);
+
+  const { data: slipCount = 0 } = useQuery({
+    queryKey: ['entity-media-count', 'CONTRACT', contract.id, 'PAYMENT_SLIP'],
+    queryFn: async () => {
+      const rows = await apiClient.get<{ entity_media_id: number }[]>(
+        `/v_entity_media?entity_type=eq.CONTRACT&entity_id=eq.${contract.id}&usage_type=eq.PAYMENT_SLIP&is_active=is.true&select=entity_media_id`,
+      );
+      return rows.length;
+    },
+    enabled: open,
+    staleTime: 0,
+  });
+
+  const setApiError = (err: unknown) => {
+    if (err instanceof ApiError) {
+      const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+        || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+      setError(translated || err.message);
+    } else {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+    setErrorKey(k => k + 1);
+  };
+
+  const handleSlipUpload = async (images: UploadedImage[]) => {
+    if (images.length === 0) return;
+    if (slipKey) {
+      deleteMedia([slipKey]).catch(() => {});
+    }
+    if (slipPreviewUrl) {
+      URL.revokeObjectURL(slipPreviewUrl);
+    }
+    setSlipUploading(true);
+    setError('');
+    try {
+      const img = images[0];
+      const results = await uploadFromImage({
+        type: 'contract_payment_slip',
+        image: img,
+        idx: slipCount,
+        params: { contract_id: contract.id },
+      });
+      const key = results.lg?.key ?? Object.values(results)[0]?.key;
+      if (!key) throw new Error('Upload returned no key');
+      const file = img.file ?? img.originalFile ?? null;
+      setSlipKey(key);
+      setSlipFile(file);
+      setSlipPreviewUrl(img.preview ?? (file ? URL.createObjectURL(file) : null));
+    } catch (err) {
+      setApiError(err);
+      setSlipKey(null);
+      setSlipFile(null);
+      setSlipPreviewUrl(null);
+    } finally {
+      setSlipUploading(false);
+    }
+  };
+
+  const handleSlipClear = () => {
+    if (slipKey) {
+      deleteMedia([slipKey]).catch(() => {});
+    }
+    if (slipPreviewUrl) {
+      URL.revokeObjectURL(slipPreviewUrl);
+    }
+    setSlipKey(null);
+    setSlipFile(null);
+    setSlipPreviewUrl(null);
+  };
+
+  const handleCloseWithCleanup = () => {
+    if (slipKey) {
+      deleteMedia([slipKey]).catch(() => {});
+    }
+    if (slipPreviewUrl) {
+      URL.revokeObjectURL(slipPreviewUrl);
+    }
+    onClose();
+  };
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      if (!slipKey) {
+        throw new Error(t('contract.attachSlip_needSlip', { defaultValue: 'Please upload a slip image' }));
+      }
+      if (!user?.holding_id) {
+        throw new Error('Missing holding context');
+      }
+      await apiClient.rpc('fn_media_attach', {
+        p_holding_id: user.holding_id,
+        p_storage_path: toStoragePath(slipKey),
+        p_variants_json: null,
+        p_media_type: 'IMAGE',
+        p_access_level: 'CONFIDENTIAL',
+        p_mime_type: 'image/webp',
+        p_file_size_bytes: slipFile?.size ?? null,
+        p_original_filename: slipFile?.name ?? null,
+        p_entity_type: 'CONTRACT',
+        p_entity_id: contract.id,
+        p_usage_type: 'PAYMENT_SLIP',
+        p_sort_order: slipCount,
+        p_caption: caption.trim() || t('contract.payInstallment_slipCaption', { defaultValue: 'Slip' }),
+      });
+    },
+    onSuccess: () => {
+      // Clear without R2 delete — the file is now owned by the media row.
+      setSlipKey(null);
+      setSlipFile(null);
+      if (slipPreviewUrl) URL.revokeObjectURL(slipPreviewUrl);
+      setSlipPreviewUrl(null);
+      queryClient.invalidateQueries({ queryKey: ['entity-media', 'CONTRACT', contract.id, 'PAYMENT_SLIP'] });
+      queryClient.invalidateQueries({ queryKey: ['entity-media-count', 'CONTRACT', contract.id, 'PAYMENT_SLIP'] });
+      queryClient.invalidateQueries({ queryKey: ['contract-media', contract.id] });
+      onClose();
+      onSuccess('contract.attachSlip_success');
+    },
+    onError: setApiError,
+  });
+
+  const canSubmit = !!slipKey && !slipUploading && !mutation.isPending;
+
+  return (
+    <Modal open={open} onClose={handleCloseWithCleanup} maxWidth="28rem" width="100%">
+      <div className="flex flex-col overflow-hidden">
+        <div className="modal-header">
+          <h2 className="modal-title">{t('contract.attachSlip_title', { defaultValue: 'Attach Payment Slip' })}</h2>
+          <button type="button" className="modal-close-btn" onClick={handleCloseWithCleanup} aria-label="Close">&times;</button>
+        </div>
+
+        <div className="modal-content">
+          {error && (
+            <div key={errorKey} className="alert alert-danger mb-4 animate-pop-in">
+              <XCircle size={16} />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
+            <div className="font-medium text-sm">{contract.code_display ?? contract.code}</div>
+            <div className="text-xs text-subtle">{contract.state} · {contract.commercial_model ?? ''}</div>
+          </div>
+
+          <div className="form-grid">
+            <div className="flex flex-col">
+              <label className="form-label">
+                {t('contract.payInstallment_slip', { defaultValue: 'Payment slip' })} *
+              </label>
+              {slipKey && slipPreviewUrl ? (
+                <div className="h-24 rounded-md border border-line overflow-hidden bg-surface flex items-center justify-center gap-2 p-2">
+                  <img
+                    src={slipPreviewUrl}
+                    alt={t('contract.payInstallment_slip', { defaultValue: 'Payment slip' })}
+                    className="max-h-full w-auto object-contain block rounded"
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    startIcon={<X size={14} />}
+                    onClick={handleSlipClear}
+                    disabled={slipUploading || mutation.isPending}
+                  >
+                    {t('common.remove')}
+                  </Button>
+                </div>
+              ) : (
+                <ImageUploader
+                  resizeOptions={slipSpec.resize}
+                  sizes={slipSpec.sizes}
+                  onUpload={handleSlipUpload}
+                  disabled={slipUploading || mutation.isPending || !slipSpec.spec}
+                  className="!min-h-24 !border !border-solid !border-line !rounded-md"
+                  placeholder={
+                    <div className="flex flex-col items-center justify-center gap-1 text-subtle">
+                      <Receipt size={20} className="opacity-60" />
+                      <span className="text-xs">
+                        {slipUploading
+                          ? t('common.loading')
+                          : t('contract.payInstallment_slipPlaceholder', { defaultValue: 'Upload payment slip image' })}
+                      </span>
+                    </div>
+                  }
+                />
+              )}
+            </div>
+
+            <div className="flex flex-col">
+              <label className="form-label">
+                {t('contract.attachSlip_caption', { defaultValue: 'Caption' })}
+                <span className="text-xs text-subtle ml-1">({t('common.optional')})</span>
+              </label>
+              <Input
+                value={caption}
+                onChange={(e) => setCaption(e.target.value)}
+                placeholder={t('contract.attachSlip_captionPlaceholder', {
+                  defaultValue: 'e.g. slip for installment 3, ref number, etc.',
+                })}
+                className="w-full"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="border-t border-line shrink-0 px-4 py-2.5 flex items-center gap-2 text-info-fg">
+          <Info size={14} className="shrink-0" />
+          <span className="text-xs">{t('contract.attachSlip_hint', {
+            defaultValue: 'Attach a slip image to this contract without recording a payment',
+          })}</span>
+        </div>
+
+        <div className="modal-footer">
+          <Button onClick={handleCloseWithCleanup}>{t('common.cancel')}</Button>
+          <Button
+            color="primary"
+            onClick={() => mutation.mutate()}
+            disabled={!canSubmit}
+            startIcon={<Paperclip size={14} />}
+          >
+            {mutation.isPending
+              ? t('common.loading')
+              : t('contract.attachSlip_submit', { defaultValue: 'Attach Slip' })}
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
