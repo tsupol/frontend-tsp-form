@@ -1192,7 +1192,9 @@
     "reopenSuccess": "Slip reopened for re-review.",
     "status_PENDING_REVIEW": "Pending review",
     "status_APPROVED": "Approved",
-    "status_REJECTED": "Rejected"
+    "status_REJECTED": "Rejected",
+    "by": "by",
+    "byCustomer": "Customer"
   },
   "approvals": {
     "title": "Approvals",
@@ -2020,16 +2022,18 @@
     "payInstallment_slipPlaceholder": "Upload payment slip image",
     "payInstallment_slipUploaded": "Slip uploaded",
     "payInstallment_slipCaption": "Slip",
-    "attachSlip_action": "Attach Slip",
-    "attachSlip_title": "Attach Payment Slip",
-    "attachSlip_doneTitle": "Slip Attached",
-    "attachSlip_doneHeadline": "Slip attached to contract",
-    "attachSlip_hint": "Attach a slip image to this contract without recording a payment",
-    "attachSlip_caption": "Caption",
-    "attachSlip_captionPlaceholder": "e.g. slip for installment 3, ref number, etc.",
-    "attachSlip_submit": "Attach Slip",
-    "attachSlip_success": "Slip attached",
-    "attachSlip_needSlip": "Please upload a slip image"
+    "attachSlip_action": "Submit Slip",
+    "attachSlip_title": "Submit Slip for Review",
+    "attachSlip_doneTitle": "Slip Submitted",
+    "attachSlip_doneHeadline": "Slip sent to review queue",
+    "attachSlip_hint": "Records a slip the customer sent → enters review queue, BM approves before a bill is created",
+    "attachSlip_notePlaceholder": "e.g. customer sent via LINE, ref number, etc.",
+    "attachSlip_submit": "Submit for Review",
+    "attachSlip_success": "Slip submitted for review",
+    "attachSlip_needSlip": "Please upload a slip image",
+    "attachSlip_needAmount": "Please enter the amount",
+    "attachSlip_submissionId": "Submission #",
+    "attachSlip_viewQueue": "Open review queue"
   },
   "wizard": {
     "title": "Open Contract",
@@ -2690,6 +2694,7 @@
       "confirmTitle": "Confirm Day Close",
       "confirmMessage": "This action is permanent and cannot be undone. Please verify the amounts below.",
       "closeSuccess": "Day closed successfully",
+      "doneTitle": "Day Closed",
       "flagVoidHigh": "void %",
       "flagVoidAmountHigh": "void ฿",
       "flagRefundHigh": "refund %",

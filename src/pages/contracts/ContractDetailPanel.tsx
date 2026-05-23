@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { ApiError } from '../../lib/api';
 import { uploadFromImage, getUploadSpec, specToResize } from '../../lib/upload';
-import { toStoragePath } from '../../lib/mediaPath';
+import { toStoragePath, normalizeKey } from '../../lib/mediaPath';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiClient } from '../../lib/api';
@@ -184,14 +184,17 @@ interface Payment {
 
 interface EntityMedia {
   entity_media_id: number;
+  media_id: number;
   entity_type: string;
   entity_id: number;
   usage_type: string;
-  display_mode: string;
+  display_mode?: string;
   sort_order: number;
-  caption: string | null;
-  is_active: boolean;
-  storage_path: Record<string, string>;
+  caption?: string | null;
+  is_active?: boolean;
+  // Backend changed 2026-04-14: storage_path is a text key, variants live in variants_json.
+  storage_path: string;
+  variants_json: Record<string, string> | null;
   created_at: string;
 }
 
@@ -453,7 +456,8 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
 // ── Media thumbnail helper ───────────────────────────────────────────────────
 
 function DeliveryPhotoThumb({ media }: { media: EntityMedia }) {
-  const src = media.storage_path.sm || media.storage_path.md || media.storage_path.original;
+  const v = media.variants_json ?? {};
+  const src = v.sm || v.thumb || v.md || v.medium || v.lg || v.original || media.storage_path;
   const { url } = useMediaUrl(src ?? null);
   if (!src) return null;
   return url ? (
@@ -467,23 +471,30 @@ function DeliveryPhotoThumb({ media }: { media: EntityMedia }) {
   );
 }
 
-function MediaThumbnail({ media }: { media: EntityMedia }) {
-  const src = media.storage_path.sm || media.storage_path.md || media.storage_path.original;
-  const { url } = useMediaUrl(src ?? null);
-  if (!src) return null;
+function pickThumbKey(media: EntityMedia): string | null {
+  const v = media.variants_json ?? {};
+  return v.sm || v.thumb || v.md || v.medium || v.lg || v.original || media.storage_path || null;
+}
+
+function pickFullKey(media: EntityMedia): string | null {
+  const v = media.variants_json ?? {};
+  return v.original || v.lg || v.md || v.medium || media.storage_path || null;
+}
+
+function MediaThumbnail({ media, onClick }: { media: EntityMedia; onClick?: () => void }) {
+  const thumbKey = pickThumbKey(media);
+  if (!thumbKey) return null;
   return (
     <div className="relative group">
-      {url ? (
-        <img
-          src={url}
-          alt={media.caption ?? media.usage_type}
-          className="w-16 h-16 object-cover rounded border border-line"
-        />
-      ) : (
-        <div className="w-16 h-16 bg-surface-shallow animate-pulse rounded border border-line" />
-      )}
+      <MediaThumbButton
+        mediaKey={normalizeKey(thumbKey)}
+        alt={media.caption ?? media.usage_type}
+        className="w-16 h-16 rounded border border-line overflow-hidden cursor-zoom-in hover:opacity-80 transition-opacity bg-surface-shallow p-0"
+        fit="cover"
+        onClick={onClick ?? (() => {})}
+      />
       {media.caption && (
-        <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] px-1 py-0.5 rounded-b truncate">
+        <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] px-1 py-0.5 rounded-b truncate pointer-events-none">
           {media.caption}
         </div>
       )}
@@ -492,13 +503,33 @@ function MediaThumbnail({ media }: { media: EntityMedia }) {
 }
 
 function MediaRow({ label, media }: { label: string; media: EntityMedia[] }) {
+  const [lightboxKey, setLightboxKey] = useState<string | null>(null);
+  const [lightboxAlt, setLightboxAlt] = useState<string>('');
   if (media.length === 0) return null;
   return (
     <div>
       <div className="text-xs text-subtle mb-1">{label}</div>
       <div className="flex gap-2 flex-wrap">
-        {media.map(m => <MediaThumbnail key={m.entity_media_id} media={m} />)}
+        {media.map(m => {
+          const fullKey = pickFullKey(m);
+          return (
+            <MediaThumbnail
+              key={m.entity_media_id}
+              media={m}
+              onClick={fullKey ? () => {
+                setLightboxKey(normalizeKey(fullKey));
+                setLightboxAlt(m.caption ?? m.usage_type);
+              } : undefined}
+            />
+          );
+        })}
       </div>
+      <MediaLightbox
+        open={lightboxKey != null}
+        onClose={() => setLightboxKey(null)}
+        mediaKey={lightboxKey}
+        alt={lightboxAlt}
+      />
     </div>
   );
 }
@@ -1656,7 +1687,9 @@ function PaymentsTab({ contractId, t }: { contractId: number; t: ReturnType<type
     queryFn: () => apiClient.get<Payment[]>(`/v_payments?contract_id=eq.${contractId}&order=created_at.desc`),
   });
 
-  // Payment slips for this contract
+  // Payment slips for this contract.
+  // Note: v_entity_media is filtered to active rows by default in the view, but
+  // we still ask explicitly for clarity if/when that changes.
   const { data: paymentSlips = [] } = useQuery({
     queryKey: ['entity-media', 'CONTRACT', contractId, 'PAYMENT_SLIP'],
     queryFn: () => apiClient.get<EntityMedia[]>(

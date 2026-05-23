@@ -18,7 +18,7 @@ import {
 import { Link } from 'react-router-dom';
 import { apiClient, ApiError } from '../lib/api';
 import { DateTime } from '../components/DateTime';
-import { fmtCurrency } from '../lib/format';
+import { fmtCurrency, formatSmart } from '../lib/format';
 import { useAuth } from '../contexts/AuthContext';
 import { MediaLightbox, MediaThumbButton } from '../components/MediaLightbox';
 import { normalizeKey } from '../lib/mediaPath';
@@ -57,6 +57,9 @@ interface SubmissionRow {
   transaction_ref: string | null;
   ocr_source: string | null;
   allowed_actions: string[];
+  submitted_by: number | null;
+  submitter_username: string | null;
+  is_staff_submitted: boolean;
 }
 
 interface EntityMedia {
@@ -93,7 +96,7 @@ const statusColor = (s: SubmissionStatus): 'warning' | 'success' | 'danger' => {
 // ── Page ───────────────────────────────────────────────────────────────────
 
 export function PaymentSubmissionsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
   const { user } = useAuth();
@@ -102,6 +105,11 @@ export function PaymentSubmissionsPage() {
   // Higher roles get a picker scoped to their company (CA) or holding (HA/SYSTEM_DEV).
   const isBranchUser = user?.role_code === 'BRANCH_STAFF' || user?.role_code === 'BRANCH_MANAGER';
   const lockedBranchId = isBranchUser ? user?.branch_id ?? null : null;
+  // RLS on v_payment_submissions is holding-wide (see UI_SUMMARY/64 §Visibility).
+  // Company-tier users must filter by company themselves; otherwise they see
+  // submissions from every company in the holding.
+  const isCompanyTier = user?.role_code === 'COMPANY_ADMIN' || user?.role_code === 'ACCOUNTANT';
+  const lockedCompanyId = isCompanyTier ? user?.company_id ?? null : null;
 
   const [statusFilter, setStatusFilter] = useState<SubmissionStatus | null>('PENDING_REVIEW');
   const [branchFilter, setBranchFilter] = useState<number | null>(null);
@@ -131,12 +139,14 @@ export function PaymentSubmissionsPage() {
     const params: string[] = [];
     if (statusFilter) params.push(`status=eq.${statusFilter}`);
     const effectiveBranch = lockedBranchId ?? branchFilter;
-    if (effectiveBranch != null) params.push(`branch_id=eq.${effectiveBranch}`);
-    params.push(statusFilter === 'PENDING_REVIEW'
-      ? 'order=submitted_at.asc'  // oldest first — review queue
-      : 'order=reviewed_at.desc.nullslast');
+    if (effectiveBranch != null) {
+      params.push(`branch_id=eq.${effectiveBranch}`);
+    } else if (lockedCompanyId != null) {
+      params.push(`company_id=eq.${lockedCompanyId}`);
+    }
+    params.push('order=submitted_at.desc');
     return `/v_payment_submissions?${params.join('&')}`;
-  }, [statusFilter, branchFilter, lockedBranchId]);
+  }, [statusFilter, branchFilter, lockedBranchId, lockedCompanyId]);
 
   const { data, isFetching } = useQuery({
     queryKey: ['payment-submissions', statusFilter, branchFilter, lockedBranchId, pageIndex, pageSize],
@@ -149,9 +159,32 @@ export function PaymentSubmissionsPage() {
   const rows = data?.data ?? [];
   const totalCount = data?.totalCount ?? 0;
 
+  // Pending-count pill badge — scoped to the same filters as the list,
+  // so the badge reflects "what you'd see if you switched to Pending Review".
+  const effectiveBranchForCount = lockedBranchId ?? branchFilter;
+  const { data: pendingCountData } = useQuery({
+    queryKey: ['payment-submissions-pending-count', effectiveBranchForCount, lockedCompanyId],
+    queryFn: () => {
+      const params: string[] = ['status=eq.PENDING_REVIEW', 'select=id'];
+      if (effectiveBranchForCount != null) {
+        params.push(`branch_id=eq.${effectiveBranchForCount}`);
+      } else if (lockedCompanyId != null) {
+        params.push(`company_id=eq.${lockedCompanyId}`);
+      }
+      return apiClient.getPaginated<{ id: number }>(
+        `/v_payment_submissions?${params.join('&')}`,
+        { page: 1, pageSize: 1 },
+      );
+    },
+    staleTime: 30 * 1000,
+  });
+  const pendingCount = pendingCountData?.totalCount ?? 0;
+
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['payment-submissions'] });
+    queryClient.invalidateQueries({ queryKey: ['payment-submissions-pending-count'] });
     queryClient.invalidateQueries({ queryKey: ['nav', 'pending-approvals-count'] });
+    queryClient.invalidateQueries({ queryKey: ['nav', 'pending-submissions-summary'] });
     queryClient.invalidateQueries({ queryKey: ['dashboard'] });
   };
 
@@ -159,15 +192,28 @@ export function PaymentSubmissionsPage() {
     {
       accessorKey: 'submitted_at',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('paymentSubmissions.submittedAt')} />,
-      cell: ({ row }) => (
-        <div>
-          <DateTime value={row.original.submitted_at} className="text-xs" />
-          {row.original.submit_channel && (
-            <div className="text-[11px] text-subtle">{row.original.submit_channel}</div>
-          )}
-        </div>
-      ),
-      className: 'w-36',
+      cell: ({ row }) => {
+        const r = row.original;
+        const byLabel = r.is_staff_submitted
+          ? `${t('paymentSubmissions.by')} ${r.submitter_username ?? '—'}`
+          : t('paymentSubmissions.byCustomer');
+        return (
+          <div>
+            <div className="text-xs">{formatSmart(r.submitted_at, i18n.language)}</div>
+            <div className="flex items-center gap-1 mt-0.5">
+              {r.submit_channel && (
+                <Badge size="xs" variant="outline" color="default">
+                  {r.submit_channel}
+                </Badge>
+              )}
+              <Badge size="xs" color={r.is_staff_submitted ? 'info' : 'default'}>
+                {byLabel}
+              </Badge>
+            </div>
+          </div>
+        );
+      },
+      className: 'w-40',
     },
     {
       accessorKey: 'contract_code_display',
@@ -214,7 +260,7 @@ export function PaymentSubmissionsPage() {
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('common.status')} className="justify-end" />,
       cell: ({ row }) => (
         <div className="flex justify-end">
-          <Badge size="sm" color={statusColor(row.original.status)}>
+          <Badge size="xs" color={statusColor(row.original.status)}>
             {t(`paymentSubmissions.status_${row.original.status}`)}
           </Badge>
         </div>
@@ -234,8 +280,10 @@ export function PaymentSubmissionsPage() {
     }
   };
 
-  const statusOptions: { value: SubmissionStatus; label: string }[] = [
-    { value: 'PENDING_REVIEW', label: t('paymentSubmissions.status_PENDING_REVIEW') },
+  // Status pills replace the status Select — quick shortcut + pending count visibility.
+  // Pending first (most actionable), then Approved, then Rejected.
+  const statusPills: { value: SubmissionStatus; label: string; showCount?: boolean }[] = [
+    { value: 'PENDING_REVIEW', label: t('paymentSubmissions.status_PENDING_REVIEW'), showCount: true },
     { value: 'APPROVED', label: t('paymentSubmissions.status_APPROVED') },
     { value: 'REJECTED', label: t('paymentSubmissions.status_REJECTED') },
   ];
@@ -261,18 +309,30 @@ export function PaymentSubmissionsPage() {
           <h1 className="heading-2">{t('paymentSubmissions.title')}</h1>
         </div>
 
-        <div className="flex items-center gap-2 pb-4 flex-none">
-          <div className="flex-1 min-w-0 max-w-[16rem]">
-            <Select
-              options={statusOptions}
-              value={statusFilter}
-              onChange={val => setStatusFilter((val as SubmissionStatus) || null)}
-              placeholder={t('paymentSubmissions.allStatuses')}
-              size="sm"
-              showChevron
-              searchable={false}
-              clearable
-            />
+        <div className="flex items-center gap-2 pb-4 flex-none flex-wrap">
+          <div className="flex items-center gap-1.5">
+            {statusPills.map(pill => {
+              const active = statusFilter === pill.value;
+              return (
+                <button
+                  key={pill.value}
+                  type="button"
+                  onClick={() => setStatusFilter(pill.value)}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-colors cursor-pointer ${
+                    active
+                      ? 'bg-primary-soft text-primary-fg border-primary'
+                      : 'border-line hover:bg-surface-hover bg-transparent'
+                  }`}
+                >
+                  <span>{pill.label}</span>
+                  {pill.showCount && pendingCount > 0 && (
+                    <Badge size="xs" color={active ? 'primary' : 'warning'}>
+                      {pendingCount}
+                    </Badge>
+                  )}
+                </button>
+              );
+            })}
           </div>
           {!isBranchUser && (
             <div className="flex-1 min-w-0 max-w-[16rem]">
@@ -324,14 +384,26 @@ export function PaymentSubmissionsPage() {
                     onClick={() => setSelected(row)}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <Badge size="sm" color={statusColor(row.status)}>
+                      <Badge size="xs" color={statusColor(row.status)}>
                         {t(`paymentSubmissions.status_${row.status}`)}
                       </Badge>
-                      <DateTime value={row.submitted_at} showTime className="text-[11px] text-subtle" />
+                      <span className="text-[11px] text-subtle">{formatSmart(row.submitted_at, i18n.language)}</span>
                     </div>
                     <div className="text-sm font-medium mt-1 truncate">{row.contract_code_display}</div>
                     <div className="text-xs text-subtle truncate">
                       {row.customer_name ?? '—'} · {row.branch_name ?? '—'}
+                    </div>
+                    <div className="flex items-center gap-1 mt-1">
+                      {row.submit_channel && (
+                        <Badge size="xs" variant="outline" color="default">
+                          {row.submit_channel}
+                        </Badge>
+                      )}
+                      <Badge size="xs" color={row.is_staff_submitted ? 'info' : 'default'}>
+                        {row.is_staff_submitted
+                          ? `${t('paymentSubmissions.by')} ${row.submitter_username ?? '—'}`
+                          : t('paymentSubmissions.byCustomer')}
+                      </Badge>
                     </div>
                     <div className="flex items-center justify-between mt-1 text-sm tabular-nums">
                       <span className="text-xs text-subtle truncate">

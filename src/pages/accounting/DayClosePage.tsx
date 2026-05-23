@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
   PageNav, PageNavPanel, MobileHeader, Button, Select, Badge, TextArea,
-  DataTable, InputDatePicker, MaskedInput, Modal, useSnackbarContext,
+  DataTable, InputDatePicker, MaskedInput, Modal,
 } from 'tsp-form';
 import {
   ArrowRightFromLine, ArrowLeft, CalendarCheck, AlertTriangle, CheckCircle2, Lock, Sparkles, Keyboard, XCircle, Clock, ChevronsRight,
@@ -20,6 +20,7 @@ import {
   todayISO, netCash, netTransfer, netTotal,
 } from './accountingTypes';
 import { BillReconcilePanel } from './BillReconcilePanel';
+import { ActionDoneView, type ActionDoneDetailRow } from '../contracts/ActionDoneView';
 
 const UNCLOSED_PREFIX = '__unclosed__';
 const TODAY_KEY = '__today__';
@@ -731,18 +732,25 @@ function CloseDayModal({
 }) {
   const { t } = useTranslation();
   const today = todayISO();
-  const { addSnackbar } = useSnackbarContext();
+  const [view, setView] = useState<'form' | 'done'>('form');
   const [actualAmount, setActualAmount] = useState<string>('');
   const [note, setNote] = useState<string>('');
   const [closing, setClosing] = useState(false);
   const [error, setError] = useState('');
+  // Snapshot at submit time so the done view reflects what was actually closed,
+  // even if the form fields are reset before the user dismisses.
+  const [closedAmount, setClosedAmount] = useState<number>(0);
+  const [closedNote, setClosedNote] = useState<string>('');
 
   // Reset on open
   useEffect(() => {
     if (open) {
+      setView('form');
       setActualAmount('');
       setNote('');
       setError('');
+      setClosedAmount(0);
+      setClosedNote('');
     }
   }, [open]);
 
@@ -751,23 +759,25 @@ function CloseDayModal({
     return actual - expected;
   }, [actualAmount, expected]);
 
+  const closedDiff = closedAmount - expected;
+
   const handleClose = async () => {
     setClosing(true);
     setError('');
     const start = Date.now();
     try {
+      const actual = parseFloat(actualAmount || '0');
       await apiClient.rpc('fn_day_close_create', {
         p_branch_id: Number(branchId),
         p_close_date: closingDate,
-        p_actual_amount: parseFloat(actualAmount || '0'),
+        p_actual_amount: actual,
         p_note: note || null,
       });
-      addSnackbar({
-        message: <div className="alert alert-success"><CheckCircle2 size={16} /><span className="alert-description">{t('accounting.dayClose.closeSuccess')}</span></div>,
-        type: 'success',
-      });
+      // Stash for the done view, then switch.
+      setClosedAmount(actual);
+      setClosedNote(note);
       onSuccess();
-      onClose();
+      setView('done');
     } catch (err) {
       if (err instanceof ApiError) {
         const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
@@ -783,71 +793,119 @@ function CloseDayModal({
     }
   };
 
+  const doneRows: ActionDoneDetailRow[] = [
+    {
+      label: t('accounting.dayClose.closeForDate'),
+      value: <DateTime value={closingDate} showTime={false} />,
+    },
+    {
+      label: t('accounting.dayClose.expected'),
+      value: fmtCurrency(expected),
+    },
+    {
+      label: t('accounting.dayClose.actualAmount'),
+      value: fmtCurrency(closedAmount),
+      emphasis: true,
+    },
+    {
+      label: t('accounting.dayClose.difference'),
+      value: (
+        <span className={`tabular-nums ${closedDiff < 0 ? 'text-danger' : closedDiff > 0 ? 'text-warning-fg' : 'text-success'}`}>
+          {closedDiff >= 0 ? '+' : ''}{fmtCurrency(closedDiff)}
+        </span>
+      ),
+    },
+    ...(closedNote ? [{
+      label: t('accounting.dayClose.noteOptional').replace(/\s*\(.*\)$/, ''),
+      value: closedNote,
+    }] : []),
+  ];
+
   return (
     <Modal open={open} onClose={() => !closing && onClose()} maxWidth="26rem" width="100%">
-      <div className="modal-header"><h2 className="modal-title">{t('accounting.dayClose.confirmTitle')}</h2></div>
-      <div className="modal-content">
-        {error && (
-          <div className="alert alert-danger mb-4 animate-pop-in">
-            <XCircle size={18} />
-            <div><div className="alert-description">{error}</div></div>
-          </div>
-        )}
-        <p className="text-sm text-subtle">{t('accounting.dayClose.confirmMessage')}</p>
-
-        <div className="mt-3 text-sm space-y-1">
-          {closingDate !== today && (
-            <div>
-              <span className="text-subtle">{t('accounting.dayClose.closeForDate')}:</span>{' '}
-              <span className="font-semibold"><DateTime value={closingDate} showTime={false} /></span>
-            </div>
-          )}
-          <div>
-            <span className="text-subtle">{t('accounting.dayClose.expected')}:</span>{' '}
-            <span className="font-semibold tabular-nums">{fmtCurrency(expected)}</span>
-          </div>
-        </div>
-
-        <div className="form-grid mt-4">
-          <div className="flex flex-col">
-            <label className="form-label">{t('accounting.dayClose.actualAmount')}</label>
-            <MaskedInput
-              mask="number"
-              decimalScale={2}
-              value={actualAmount}
-              onChange={(raw) => setActualAmount(raw)}
-              className="w-full"
-              size="sm"
-              endIcon={<ChevronsRight size={14} />}
-              onEndIconClick={() => setActualAmount(String(expected ?? 0))}
-            />
-          </div>
-          <div className="flex flex-col">
-            <label className="form-label">{t('accounting.dayClose.noteOptional')}</label>
-            <TextArea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              className="w-full"
-              size="sm"
-              rows={3}
-            />
-          </div>
-          {actualAmount && (
-            <div className="text-sm">
-              <span className="text-subtle">{t('accounting.dayClose.difference')}: </span>
-              <span className={`font-semibold tabular-nums ${diff < 0 ? 'text-danger' : diff > 0 ? 'text-warning-fg' : 'text-success'}`}>
-                {diff >= 0 ? '+' : ''}{fmtCurrency(diff)}
-              </span>
-            </div>
-          )}
-        </div>
+      <div className="modal-header">
+        <h2 className="modal-title">
+          {view === 'done'
+            ? t('accounting.dayClose.doneTitle', { defaultValue: 'Day Closed' })
+            : t('accounting.dayClose.confirmTitle')}
+        </h2>
       </div>
-      <div className="modal-footer">
-        <Button onClick={onClose} disabled={closing}>{t('common.cancel')}</Button>
-        <Button color="primary" onClick={handleClose} disabled={closing || !actualAmount}>
-          {closing ? t('common.loading') : t('accounting.dayClose.closeDay')}
-        </Button>
-      </div>
+
+      {view === 'form' && (
+        <>
+          <div className="modal-content">
+            {error && (
+              <div className="alert alert-danger mb-4 animate-pop-in">
+                <XCircle size={18} />
+                <div><div className="alert-description">{error}</div></div>
+              </div>
+            )}
+            <p className="text-sm text-subtle">{t('accounting.dayClose.confirmMessage')}</p>
+
+            <div className="mt-3 text-sm space-y-1">
+              {closingDate !== today && (
+                <div>
+                  <span className="text-subtle">{t('accounting.dayClose.closeForDate')}:</span>{' '}
+                  <span className="font-semibold"><DateTime value={closingDate} showTime={false} /></span>
+                </div>
+              )}
+              <div>
+                <span className="text-subtle">{t('accounting.dayClose.expected')}:</span>{' '}
+                <span className="font-semibold tabular-nums">{fmtCurrency(expected)}</span>
+              </div>
+            </div>
+
+            <div className="form-grid mt-4">
+              <div className="flex flex-col">
+                <label className="form-label">{t('accounting.dayClose.actualAmount')}</label>
+                <MaskedInput
+                  mask="number"
+                  decimalScale={2}
+                  value={actualAmount}
+                  onChange={(raw) => setActualAmount(raw)}
+                  className="w-full"
+                  size="sm"
+                  endIcon={<ChevronsRight size={14} />}
+                  onEndIconClick={() => setActualAmount(String(expected ?? 0))}
+                />
+              </div>
+              <div className="flex flex-col">
+                <label className="form-label">{t('accounting.dayClose.noteOptional')}</label>
+                <TextArea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  className="w-full"
+                  size="sm"
+                  rows={3}
+                />
+              </div>
+              {actualAmount && (
+                <div className="text-sm">
+                  <span className="text-subtle">{t('accounting.dayClose.difference')}: </span>
+                  <span className={`font-semibold tabular-nums ${diff < 0 ? 'text-danger' : diff > 0 ? 'text-warning-fg' : 'text-success'}`}>
+                    {diff >= 0 ? '+' : ''}{fmtCurrency(diff)}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="modal-footer">
+            <Button onClick={onClose} disabled={closing}>{t('common.cancel')}</Button>
+            <Button color="primary" onClick={handleClose} disabled={closing || !actualAmount}>
+              {closing ? t('common.loading') : t('accounting.dayClose.closeDay')}
+            </Button>
+          </div>
+        </>
+      )}
+
+      {view === 'done' && (
+        <ActionDoneView
+          headline={t('accounting.dayClose.closeSuccess')}
+          contractCode={t('accounting.dayClose.title', { defaultValue: 'Day Close' })}
+          detailRows={doneRows}
+          onClose={onClose}
+        />
+      )}
     </Modal>
   );
 }

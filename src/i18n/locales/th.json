@@ -1192,7 +1192,9 @@
     "reopenSuccess": "เปิดสลิปกลับมารอตรวจอีกครั้ง",
     "status_PENDING_REVIEW": "รอตรวจ",
     "status_APPROVED": "อนุมัติแล้ว",
-    "status_REJECTED": "ปฏิเสธแล้ว"
+    "status_REJECTED": "ปฏิเสธแล้ว",
+    "by": "โดย",
+    "byCustomer": "ลูกค้า"
   },
   "approvals": {
     "title": "รายการอนุมัติ",
@@ -2020,16 +2022,18 @@
     "payInstallment_slipPlaceholder": "อัปโหลดรูปสลิป",
     "payInstallment_slipUploaded": "อัปโหลดสลิปแล้ว",
     "payInstallment_slipCaption": "สลิป",
-    "attachSlip_action": "แนบสลิป",
-    "attachSlip_title": "แนบสลิปการโอน",
-    "attachSlip_doneTitle": "แนบสลิปเรียบร้อย",
-    "attachSlip_doneHeadline": "แนบสลิปเข้ากับสัญญาแล้ว",
-    "attachSlip_hint": "แนบรูปสลิปเข้ากับสัญญานี้โดยไม่บันทึกชำระเงิน",
-    "attachSlip_caption": "ข้อความกำกับรูป",
-    "attachSlip_captionPlaceholder": "เช่น สลิปงวด 3, เลขอ้างอิง ฯลฯ",
-    "attachSlip_submit": "แนบสลิป",
-    "attachSlip_success": "แนบสลิปเรียบร้อย",
-    "attachSlip_needSlip": "กรุณาอัปโหลดรูปสลิป"
+    "attachSlip_action": "ส่งสลิปแทนลูกค้า",
+    "attachSlip_title": "ส่งสลิปแทนลูกค้า",
+    "attachSlip_doneTitle": "ส่งสลิปเข้าคิวตรวจแล้ว",
+    "attachSlip_doneHeadline": "ส่งสลิปเข้าคิวตรวจแล้ว",
+    "attachSlip_hint": "บันทึกสลิปที่ลูกค้าส่งมา → เข้าคิว \"รอตรวจ\" ให้ BM อนุมัติก่อนสร้างบิล",
+    "attachSlip_notePlaceholder": "เช่น ลูกค้าส่งทาง LINE, เลขอ้างอิง ฯลฯ",
+    "attachSlip_submit": "ส่งเข้าคิวตรวจ",
+    "attachSlip_success": "ส่งสลิปเข้าคิวตรวจแล้ว",
+    "attachSlip_needSlip": "กรุณาอัปโหลดรูปสลิป",
+    "attachSlip_needAmount": "กรุณาระบุยอดเงิน",
+    "attachSlip_submissionId": "หมายเลขรายการ",
+    "attachSlip_viewQueue": "ไปที่คิวตรวจสลิป"
   },
   "wizard": {
     "title": "เปิดสัญญาใหม่",
@@ -2690,6 +2694,7 @@
       "confirmTitle": "ยืนยันการปิดวัน",
       "confirmMessage": "การปิดวันเป็นการดำเนินการถาวร ไม่สามารถย้อนกลับได้ กรุณาตรวจสอบยอดด้านล่าง",
       "closeSuccess": "ปิดวันสำเร็จ",
+      "doneTitle": "ปิดวันเรียบร้อย",
       "flagVoidHigh": "void %",
       "flagVoidAmountHigh": "void ฿",
       "flagRefundHigh": "คืนเงิน %",

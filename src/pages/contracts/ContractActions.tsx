@@ -703,12 +703,12 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [activeAction, setActiveAction] = useState<ContractAction | null>(null);
-  // Ad-hoc requirement (2026-05-23): attach-slip is a plain FE-only action — there is
-  // NO matching row in `sale.ref_contract_actions`, so it doesn't come back from
-  // `fn_contract_available_actions` and isn't part of the curated BE-controlled grid.
-  // We render it as a separate inline button in the footer below. If/when backend
-  // ships an `ATTACH_PAYMENT_SLIP` action with proper state + permission guards,
-  // remove this standalone button and route it through the normal allowlist instead.
+  // Staff-on-behalf slip submission (per UI_SUMMARY/64 §6). Records a slip the
+  // customer sent (LINE / phone / in person) into the PENDING_REVIEW queue so a
+  // BM approves it later — which then fires the real payment via
+  // fn_contract_installment_pay. This is NOT in `sale.ref_contract_actions` so it
+  // doesn't come back from `fn_contract_available_actions`; rendered as a
+  // standalone inline button in the footer.
   const [attachSlipOpen, setAttachSlipOpen] = useState(false);
   const { addSnackbar } = useSnackbarContext();
 
@@ -906,14 +906,12 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
           <div className="flex flex-wrap items-center gap-2">
             {primaryActions.map(a => renderActionButton(a, true))}
             {/*
-              Ad-hoc FE-only quick action — NOT driven by `fn_contract_available_actions`.
-              This intentionally breaks the BE-controlled action footer pattern because
-              `sale.ref_contract_actions` has no row for slip attachment (slip is just a
-              media link via `fn_media_attach`, with no per-contract state/permission
-              evaluator). See .claude/contract-actions-allowlist.md and Decision #110
-              in nnf UI_SUMMARY/kb_export/02_decisions.md (PAYMENT_SLIP at CONTRACT level).
-              Limited to non-terminal states only — matches where the user is plausibly
-              still receiving customer slips.
+              Staff-on-behalf slip submission. Calls fn_payment_submission_create
+              with submit_channel='WEB' (per 2026-05-21 backend update) — the row
+              lands in /admin/payment-submissions for BM to approve. NOT in
+              `sale.ref_contract_actions` so it's not part of the BE-controlled
+              grid; rendered as a standalone inline button. Limited to non-terminal
+              states where customer slips can still come in.
             */}
             {(contract.state === 'ACTIVE'
               || contract.state === 'WAIT_LEGAL_PROCESS'
@@ -924,7 +922,7 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
                 startIcon={<Paperclip size={14} />}
                 onClick={() => setAttachSlipOpen(true)}
               >
-                {t('contract.attachSlip_action', { defaultValue: 'Attach Slip' })}
+                {t('contract.attachSlip_action', { defaultValue: 'Submit Slip' })}
               </Button>
             )}
             {secondaryActions.length > 0 && (
@@ -2395,7 +2393,7 @@ function PayInstallmentModal({ open, contract, onClose }: {
     queryKey: ['entity-media-count', 'CONTRACT', contract.id, 'PAYMENT_SLIP'],
     queryFn: async () => {
       const rows = await apiClient.get<{ entity_media_id: number }[]>(
-        `/v_entity_media?entity_type=eq.CONTRACT&entity_id=eq.${contract.id}&usage_type=eq.PAYMENT_SLIP&is_active=is.true&select=entity_media_id`,
+        `/v_entity_media?entity_type=eq.CONTRACT&entity_id=eq.${contract.id}&usage_type=eq.PAYMENT_SLIP&select=entity_media_id`,
       );
       return rows.length;
     },
@@ -2837,23 +2835,23 @@ function PayInstallmentModal({ open, contract, onClose }: {
 
 // ── Attach Slip (ad-hoc FE-only action) ──────────────────────────────────────
 //
-// AD-HOC REQUIREMENT (2026-05-23):
-// This modal lets a user attach a payment-slip image directly to the contract
-// WITHOUT recording any payment. It calls `fn_media_attach` against
-// (CONTRACT, PAYMENT_SLIP) — that's it.
+// Staff-on-behalf slip submission (UI_SUMMARY/64 §6 + UI_FEEDBACK 2026-05-21).
 //
-// This deliberately breaks the BE-controlled contract-action pattern used by
-// the rest of the footer:
-//   - There is NO matching row in `sale.ref_contract_actions`, so the action
-//     does not appear in `fn_contract_available_actions` and is not subject
-//     to the catalog's state/permission/balance guards.
-//   - There is no `blocking_reason` evaluator — visibility is decided by the
-//     frontend (contract state ∈ {ACTIVE, WAIT_LEGAL_PROCESS, ON_LEGAL_PROCESS}).
+// Use case: customer sent a slip via LINE / phone / in person — staff types it
+// in for them. The slip enters PENDING_REVIEW; a BM at the contract's branch
+// approves it later, which fires fn_contract_installment_pay and records the
+// actual payment. No money is moved by this modal alone.
 //
-// The slip-upload logic mirrors the slip section of `PayInstallmentModal`
-// (same media-type spec, same R2 cleanup discipline). If/when the backend
-// ships a real `ATTACH_PAYMENT_SLIP` action, this should be removed and
-// wired through the normal allowlist.
+// Pipeline:
+//   1. fn_media_attach — register the slip image (also links it to CONTRACT/
+//      PAYMENT_SLIP so it's visible on the contract's slip strip).
+//   2. fn_payment_submission_create with p_media_id + p_submit_channel='WEB';
+//      backend auto-fills submitted_by from JWT.user_id, creates a second
+//      entity_media link as PAYMENT_SUBMISSION/PAYMENT_SLIP, and returns
+//      submission_id.
+//
+// This is NOT in `sale.ref_contract_actions` — rendered as a standalone inline
+// button in the footer, visibility decided FE-side by contract state.
 function AttachSlipModal({ open, contract, onClose }: {
   open: boolean;
   contract: ContractForActions;
@@ -2863,6 +2861,7 @@ function AttachSlipModal({ open, contract, onClose }: {
 }) {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const slipSpec = useUploadSpec('contract_payment_slip');
 
@@ -2871,13 +2870,15 @@ function AttachSlipModal({ open, contract, onClose }: {
   const [slipFile, setSlipFile] = useState<File | null>(null);
   const [slipPreviewUrl, setSlipPreviewUrl] = useState<string | null>(null);
   const [slipUploading, setSlipUploading] = useState(false);
-  const [caption, setCaption] = useState('');
+  const [amount, setAmount] = useState('');
+  const [note, setNote] = useState('');
   const [error, setError] = useState('');
   const [errorKey, setErrorKey] = useState(0);
-  // Snapshot at submit time so the done view can render the attached slip + caption
+  // Snapshot at submit time so the done view can render the submitted slip + amount
   // after the working copies (slipKey/slipPreviewUrl) are cleared.
-  const [attachedPreviewUrl, setAttachedPreviewUrl] = useState<string | null>(null);
-  const [attachedCaption, setAttachedCaption] = useState('');
+  const [submittedPreviewUrl, setSubmittedPreviewUrl] = useState<string | null>(null);
+  const [submittedAmount, setSubmittedAmount] = useState<number>(0);
+  const [submittedSubmissionId, setSubmittedSubmissionId] = useState<number | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -2886,10 +2887,12 @@ function AttachSlipModal({ open, contract, onClose }: {
       setSlipFile(null);
       setSlipPreviewUrl(null);
       setSlipUploading(false);
-      setCaption('');
+      setAmount('');
+      setNote('');
       setError('');
-      setAttachedPreviewUrl(null);
-      setAttachedCaption('');
+      setSubmittedPreviewUrl(null);
+      setSubmittedAmount(0);
+      setSubmittedSubmissionId(null);
     }
   }, [open]);
 
@@ -2897,7 +2900,7 @@ function AttachSlipModal({ open, contract, onClose }: {
     queryKey: ['entity-media-count', 'CONTRACT', contract.id, 'PAYMENT_SLIP'],
     queryFn: async () => {
       const rows = await apiClient.get<{ entity_media_id: number }[]>(
-        `/v_entity_media?entity_type=eq.CONTRACT&entity_id=eq.${contract.id}&usage_type=eq.PAYMENT_SLIP&is_active=is.true&select=entity_media_id`,
+        `/v_entity_media?entity_type=eq.CONTRACT&entity_id=eq.${contract.id}&usage_type=eq.PAYMENT_SLIP&select=entity_media_id`,
       );
       return rows.length;
     },
@@ -2971,53 +2974,94 @@ function AttachSlipModal({ open, contract, onClose }: {
     if (slipPreviewUrl) {
       URL.revokeObjectURL(slipPreviewUrl);
     }
-    if (attachedPreviewUrl && attachedPreviewUrl !== slipPreviewUrl) {
-      URL.revokeObjectURL(attachedPreviewUrl);
+    if (submittedPreviewUrl && submittedPreviewUrl !== slipPreviewUrl) {
+      URL.revokeObjectURL(submittedPreviewUrl);
     }
     onClose();
   };
 
+  const parsedAmount = Number(amount) || 0;
+
+  // Staff-on-behalf slip submission flow (per UI_SUMMARY/64 §6 + 2026-05-21 feedback):
+  //   Step 1: fn_media_attach — register the media; we link to CONTRACT/PAYMENT_SLIP
+  //           so the slip is also reachable from the contract's slips strip.
+  //   Step 2: fn_payment_submission_create with the resulting media_id; the RPC
+  //           creates a payment_submission row (status=PENDING_REVIEW) and links
+  //           the media a second time as PAYMENT_SUBMISSION/PAYMENT_SLIP.
+  //           submit_channel='WEB' marks this as staff-entered; backend fills
+  //           submitted_by from JWT.user_id automatically.
   const mutation = useMutation({
     mutationFn: async () => {
       if (!slipKey) {
         throw new Error(t('contract.attachSlip_needSlip', { defaultValue: 'Please upload a slip image' }));
       }
+      if (parsedAmount <= 0) {
+        throw new Error(t('contract.attachSlip_needAmount', { defaultValue: 'Please enter the amount' }));
+      }
       if (!user?.holding_id) {
         throw new Error('Missing holding context');
       }
-      await apiClient.rpc('fn_media_attach', {
-        p_holding_id: user.holding_id,
-        p_storage_path: toStoragePath(slipKey),
-        p_variants_json: null,
-        p_media_type: 'IMAGE',
-        p_access_level: 'CONFIDENTIAL',
-        p_mime_type: 'image/webp',
-        p_file_size_bytes: slipFile?.size ?? null,
-        p_original_filename: slipFile?.name ?? null,
-        p_entity_type: 'CONTRACT',
-        p_entity_id: contract.id,
-        p_usage_type: 'PAYMENT_SLIP',
-        p_sort_order: slipCount,
-        p_caption: caption.trim() || t('contract.payInstallment_slipCaption', { defaultValue: 'Slip' }),
-      });
+      const mediaRes = await apiClient.rpc<{ media_id: number; entity_media_id: number }>(
+        'fn_media_attach',
+        {
+          p_holding_id: user.holding_id,
+          p_storage_path: toStoragePath(slipKey),
+          p_variants_json: null,
+          p_media_type: 'IMAGE',
+          p_access_level: 'CONFIDENTIAL',
+          p_mime_type: 'image/webp',
+          p_file_size_bytes: slipFile?.size ?? null,
+          p_original_filename: slipFile?.name ?? null,
+          p_entity_type: 'CONTRACT',
+          p_entity_id: contract.id,
+          p_usage_type: 'PAYMENT_SLIP',
+          p_sort_order: slipCount,
+          p_caption: t('contract.payInstallment_slipCaption', { defaultValue: 'Slip' }),
+        },
+      );
+      const submission = await apiClient.rpc<{ submission_id: number }>(
+        'fn_payment_submission_create',
+        {
+          p_contract_id: contract.id,
+          p_amount: parsedAmount,
+          p_media_id: mediaRes.media_id,
+          p_note: note.trim() || null,
+          p_submit_channel: 'WEB',
+          // PostgREST RPC overload: send all keys; null for unused fields.
+          p_transfer_at: null,
+          p_sender_account_name: null,
+          p_sender_bank: null,
+          p_sender_account_no: null,
+          p_receiver_account_name: null,
+          p_receiver_bank: null,
+          p_receiver_account_no: null,
+          p_transaction_ref: null,
+          p_ocr_source: 'MANUAL',
+        },
+      );
+      return submission;
     },
-    onSuccess: () => {
-      // Stash preview + caption for the done view, then clear the working copies.
+    onSuccess: (res) => {
+      // Stash preview + amount for the done view, then clear the working copies.
       // The blob URL is reused as-is — only revoked on modal close.
-      setAttachedPreviewUrl(slipPreviewUrl);
-      setAttachedCaption(caption.trim());
+      setSubmittedPreviewUrl(slipPreviewUrl);
+      setSubmittedAmount(parsedAmount);
+      setSubmittedSubmissionId(res.submission_id ?? null);
       setSlipKey(null);
       setSlipFile(null);
       setSlipPreviewUrl(null);
       queryClient.invalidateQueries({ queryKey: ['entity-media', 'CONTRACT', contract.id, 'PAYMENT_SLIP'] });
       queryClient.invalidateQueries({ queryKey: ['entity-media-count', 'CONTRACT', contract.id, 'PAYMENT_SLIP'] });
       queryClient.invalidateQueries({ queryKey: ['contract-media', contract.id] });
+      queryClient.invalidateQueries({ queryKey: ['payment-submissions'] });
+      queryClient.invalidateQueries({ queryKey: ['payment-submissions-pending-count'] });
+      queryClient.invalidateQueries({ queryKey: ['nav', 'pending-submissions-summary'] });
       setView('done');
     },
     onError: setApiError,
   });
 
-  const canSubmit = !!slipKey && !slipUploading && !mutation.isPending;
+  const canSubmit = !!slipKey && parsedAmount > 0 && !slipUploading && !mutation.isPending;
 
   const titleKey = view === 'done' ? 'contract.attachSlip_doneTitle' : 'contract.attachSlip_title';
 
@@ -3027,7 +3071,7 @@ function AttachSlipModal({ open, contract, onClose }: {
         <div className="modal-header">
           <h2 className="modal-title">
             {t(titleKey, {
-              defaultValue: view === 'done' ? 'Slip attached' : 'Attach Payment Slip',
+              defaultValue: view === 'done' ? 'Slip submitted for review' : 'Submit Slip for Review',
             })}
           </h2>
           <button type="button" className="modal-close-btn" onClick={handleCloseWithCleanup} aria-label="Close">&times;</button>
@@ -3091,17 +3135,29 @@ function AttachSlipModal({ open, contract, onClose }: {
               </div>
 
               <div className="flex flex-col">
+                <label className="form-label">{t('contract.amount')} *</label>
+                <MaskedInput
+                  mask="number"
+                  decimalScale={2}
+                  value={amount}
+                  onChange={(raw) => setAmount(raw)}
+                  placeholder="0.00"
+                  className="w-full"
+                />
+              </div>
+
+              <div className="flex flex-col">
                 <label className="form-label">
-                  {t('contract.attachSlip_caption', { defaultValue: 'Caption' })}
+                  {t('contract.note')}
                   <span className="text-xs text-subtle ml-1">({t('common.optional')})</span>
                 </label>
-                <Input
-                  value={caption}
-                  onChange={(e) => setCaption(e.target.value)}
-                  placeholder={t('contract.attachSlip_captionPlaceholder', {
-                    defaultValue: 'e.g. slip for installment 3, ref number, etc.',
+                <TextArea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder={t('contract.attachSlip_notePlaceholder', {
+                    defaultValue: 'e.g. customer sent via LINE, ref number, etc.',
                   })}
-                  className="w-full"
+                  rows={2}
                 />
               </div>
             </div>
@@ -3135,20 +3191,32 @@ function AttachSlipModal({ open, contract, onClose }: {
 
         {view === 'done' && (
           <ActionDoneView
-            headline={t('contract.attachSlip_doneHeadline', { defaultValue: 'Slip attached' })}
+            headline={t('contract.attachSlip_doneHeadline', { defaultValue: 'Slip submitted for review' })}
             contractCode={contract.code_display ?? contract.code}
-            detailRows={attachedCaption ? [
-              { label: t('contract.attachSlip_caption', { defaultValue: 'Caption' }), value: attachedCaption },
-            ] : undefined}
-            extras={attachedPreviewUrl && (
+            detailRows={[
+              { label: t('contract.amount'), value: fmtCurrency(submittedAmount), emphasis: true },
+              ...(submittedSubmissionId != null ? [{
+                label: t('contract.attachSlip_submissionId', { defaultValue: 'Submission #' }),
+                value: String(submittedSubmissionId),
+              }] : []),
+            ]}
+            extras={submittedPreviewUrl && (
               <div className="rounded-md border border-line overflow-hidden bg-surface p-2 flex items-center justify-center">
                 <img
-                  src={attachedPreviewUrl}
+                  src={submittedPreviewUrl}
                   alt={t('contract.payInstallment_slip', { defaultValue: 'Payment slip' })}
                   className="max-h-48 w-auto object-contain block rounded"
                 />
               </div>
             )}
+            secondaryAction={{
+              label: t('contract.attachSlip_viewQueue', { defaultValue: 'Open review queue' }),
+              endIcon: <ExternalLink size={12} />,
+              onClick: () => {
+                handleCloseWithCleanup();
+                navigate('/admin/payment-submissions');
+              },
+            }}
             onClose={handleCloseWithCleanup}
           />
         )}
