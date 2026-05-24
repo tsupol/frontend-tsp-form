@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { BarChart3, Box, Boxes, ClipboardList, PackagePlus, ArrowLeftRight, Wrench, RotateCcw, ShoppingCart } from 'lucide-react';
+import { BarChart3, Box, Boxes, ClipboardList, PackagePlus, ArrowLeftRight, Wrench, RotateCcw, ShoppingCart, Barcode } from 'lucide-react';
 
 type NavItem =
   | { type: 'link'; path: string; labelKey: string; icon: typeof BarChart3; iconClassName?: string }
@@ -20,6 +20,7 @@ const navItems: NavItem[] = [
   { type: 'link', path: '/admin/inventory/transfers', labelKey: 'nav.transfers', icon: ArrowLeftRight },
   { type: 'link', path: '/admin/inventory/repairs', labelKey: 'nav.repairs', icon: Wrench },
   { type: 'link', path: '/admin/inventory/buyback', labelKey: 'nav.buyback', icon: RotateCcw },
+  { type: 'link', path: '/admin/inventory/barcodes', labelKey: 'nav.barcodes', icon: Barcode },
   { type: 'highlight', path: '/admin/inventory/branch-stock', labelKey: 'nav.branchStock', icon: ShoppingCart },
 ];
 

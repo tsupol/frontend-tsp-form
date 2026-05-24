@@ -1,4 +1,9 @@
 {
+  "barcode.not_found": "Barcode not found",
+  "barcode.duplicate": "This barcode is already attached to another variant",
+  "barcode.invalid": "Invalid barcode format",
+  "barcode.variant_required": "Variant is required",
+  "barcode.contractable_not_allowed": "Contractable items use per-asset labels, not product barcodes",
   "blockingReason.status_not_allowed": "Not allowed in the current status",
   "blockingReason.state_not_allowed": "Not allowed in the current state",
   "blockingReason.bill_purpose_not_match": "Not supported for this bill type",

@@ -1,4 +1,9 @@
 {
+  "barcode.not_found": "ไม่พบบาร์โค้ดในระบบ",
+  "barcode.duplicate": "บาร์โค้ดนี้ถูกผูกกับสินค้าตัวอื่นแล้ว",
+  "barcode.invalid": "รูปแบบบาร์โค้ดไม่ถูกต้อง",
+  "barcode.variant_required": "ต้องระบุรุ่นย่อย",
+  "barcode.contractable_not_allowed": "สินค้าทำสัญญาใช้ป้ายต่อเครื่อง ไม่ใช่บาร์โค้ดรุ่น",
   "blockingReason.status_not_allowed": "สถานะปัจจุบันไม่สามารถทำรายการนี้ได้",
   "blockingReason.state_not_allowed": "สถานะปัจจุบันไม่สามารถทำรายการนี้ได้",
   "blockingReason.bill_purpose_not_match": "ประเภทบิลไม่รองรับการทำรายการนี้",

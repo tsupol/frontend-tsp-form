@@ -32,6 +32,7 @@ import { PurchaseOrdersPage } from './pages/inventory/PurchaseOrdersPage';
 import { TransfersPage } from './pages/inventory/TransfersPage';
 import { RepairsPage } from './pages/inventory/RepairsPage';
 import { BuybackPage } from './pages/inventory/BuybackPage';
+import { BarcodesPage } from './pages/inventory/BarcodesPage';
 import { PriceCheckPage } from './pages/PriceCheckPage';
 import { LegalLayout } from './pages/legal/LegalLayout';
 import { DunningTargetsPage } from './pages/legal/DunningTargetsPage';
@@ -376,6 +377,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <InventoryLayout><BuybackPage /></InventoryLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/inventory/barcodes"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <InventoryLayout><BarcodesPage /></InventoryLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
