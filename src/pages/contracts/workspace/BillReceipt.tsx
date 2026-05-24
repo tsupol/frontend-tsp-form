@@ -6,6 +6,22 @@ import { apiClient } from '../../../lib/api';
 import { DateTime } from '../../../components/DateTime';
 import { fmtCurrency } from '../../../lib/format';
 
+function fmtReceiptDate(value: string | null, lang: string, withTime: boolean): string {
+  if (!value) return '—';
+  const locale = lang === 'th' ? 'th-TH-u-ca-gregory' : 'en-GB';
+  const opts: Intl.DateTimeFormatOptions = {
+    timeZone: 'Asia/Bangkok',
+    day: 'numeric',
+    month: 'short',
+    year: '2-digit',
+  };
+  if (withTime) {
+    opts.hour = '2-digit';
+    opts.minute = '2-digit';
+  }
+  return new Date(value).toLocaleString(locale, opts);
+}
+
 interface BillLine {
   line_id: number;
   description: string;
@@ -88,7 +104,7 @@ const BILL_TYPE_TITLE_KEY: Record<string, string> = {
  * bills get a VOIDED watermark and cancel info.
  */
 export function BillReceipt({ billId, hidePrintButton }: BillReceiptProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const { data: bill, isLoading } = useQuery({
     queryKey: ['bill-detail', billId],
@@ -169,7 +185,12 @@ export function BillReceipt({ billId, hidePrintButton }: BillReceiptProps) {
       {/* Meta — single column, label/value */}
       <div className="flex flex-col gap-0.5">
         <MetaRow label={t('wizard.receipt_billNo')} value={<span className="receipt-mono">{bill.bill_code_display}</span>} />
-        <MetaRow label={t('wizard.receipt_date')} value={<DateTime value={bill.bill_date} showTime={false} />} />
+        <div className="flex gap-2 text-[11px]">
+          <span className="opacity-70 shrink-0">{t('wizard.receipt_date')}:</span>
+          <span className="flex-1 min-w-0">{fmtReceiptDate(bill.bill_date, i18n.language, false)}</span>
+          <span className="opacity-70 shrink-0">{t('wizard.receipt_createdAt', { defaultValue: 'Created' })}:</span>
+          <span className="shrink-0">{fmtReceiptDate(bill.created_at, i18n.language, true)}</span>
+        </div>
         {bill.contract_code && (
           <MetaRow
             label={t('wizard.receipt_contract')}

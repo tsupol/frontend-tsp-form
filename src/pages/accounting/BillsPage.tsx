@@ -643,6 +643,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
                   </Badge>
                   <span className="flex-1 min-w-0 truncate text-subtle">
                     {pay.bank_name ? `${pay.bank_name} ${pay.account_number ?? ''}` : pay.code_display}
+                    {pay.reference && <span className="opacity-70"> · {pay.reference}</span>}
                   </span>
                   <span className="tabular-nums font-medium shrink-0">
                     {fmtCurrency(pay.amount)}

@@ -1,7 +1,10 @@
-import { useState, type ReactNode } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { Badge, Button, Modal } from 'tsp-form';
-import { AlertTriangle, ArrowRight, CheckCircle, Info, XOctagon } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { Badge, Button } from 'tsp-form';
+import { AlertTriangle, ArrowRight, CheckCircle, Info, Printer, XOctagon } from 'lucide-react';
+import { apiClient } from '../../lib/api';
 import { BillReceipt } from './workspace/BillReceipt';
 
 export type ActionDoneTone = 'success' | 'warning' | 'danger' | 'neutral';
@@ -94,7 +97,34 @@ export function ActionDoneView({
   onClose,
 }: ActionDoneViewProps) {
   const { t } = useTranslation();
-  const [showBill, setShowBill] = useState(false);
+  const queryClient = useQueryClient();
+  const [printReady, setPrintReady] = useState(false);
+
+  // Direct print — no preview modal. Same portal pattern as BillsPage/ContractDetailPanel
+  // so the @page box gets the receipt unscaled and unclipped.
+  const handlePrintBill = useCallback(async () => {
+    if (billId == null) return;
+    try {
+      const billRows = await queryClient.fetchQuery({
+        queryKey: ['bill-detail', billId],
+        queryFn: () => apiClient.get<unknown[]>(`/v_bill_detail?bill_id=eq.${billId}`).then(rows => rows[0] ?? null),
+      });
+      const branchId = (billRows as { branch_id?: number } | null)?.branch_id;
+      if (branchId != null) {
+        await queryClient.fetchQuery({
+          queryKey: ['branch-info', branchId],
+          queryFn: () => apiClient.get(`/v_branches?id=eq.${branchId}&select=id,name,address`).then((rows: unknown) => (rows as unknown[])[0] ?? null),
+        });
+      }
+    } catch {
+      // Fall through — receipt will show its loading state and still print empty if data fails.
+    }
+    setPrintReady(true);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      window.print();
+      setPrintReady(false);
+    }));
+  }, [billId, queryClient]);
 
   const Icon = TONE_ICON[tone];
   const iconClass = TONE_COLOR_CLASS[tone];
@@ -142,8 +172,8 @@ export function ActionDoneView({
 
       <div className="modal-footer">
         {billId != null ? (
-          <Button variant="outline" onClick={() => setShowBill(true)}>
-            {t('contract.action_viewBill', { defaultValue: 'View bill' })}
+          <Button variant="outline" startIcon={<Printer size={16} />} onClick={handlePrintBill}>
+            {t('wizard.receipt_print')}
           </Button>
         ) : secondaryAction && (
           <Button
@@ -160,19 +190,11 @@ export function ActionDoneView({
         </Button>
       </div>
 
-      {/* Nested receipt modal */}
-      {billId != null && (
-        <Modal
-          open={showBill}
-          onClose={() => setShowBill(false)}
-          maxWidth="26rem"
-          width="100%"
-          ariaLabel={t('wizard.receipt_title')}
-        >
-          <div className="modal-content py-6 px-4" style={{ background: 'color-mix(in srgb, var(--color-fg) 6%, transparent)' }}>
-            <BillReceipt billId={billId} />
-          </div>
-        </Modal>
+      {printReady && billId != null && createPortal(
+        <div className="print-only-receipt" aria-hidden>
+          <BillReceipt billId={billId} hidePrintButton />
+        </div>,
+        document.body,
       )}
     </>
   );

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Badge, Button, Input, Select, Modal, TextArea, Tooltip, useSnackbarContext } from 'tsp-form';
@@ -1594,7 +1595,7 @@ function getBillStatusColor(status: string, isCancelled: boolean): 'success' | '
 
 function BillsTab({ contractId, t }: { contractId: number; t: ReturnType<typeof useTranslation>['t'] }) {
   const navigate = useNavigate();
-  const [openBillId, setOpenBillId] = useState<number | null>(null);
+  const queryClient = useQueryClient();
 
   const { data: bills, isLoading } = useQuery({
     queryKey: ['contract-bills', contractId],
@@ -1602,6 +1603,36 @@ function BillsTab({ contractId, t }: { contractId: number; t: ReturnType<typeof 
       `/v_bills?contract_id=eq.${contractId}&bill_type=eq.INVOICE&order=created_at.desc`,
     ),
   });
+
+  // Print: render receipt off-screen and call window.print().
+  // No modal — tsp-form Modal portals into a fixed/overflow-hidden container
+  // that doesn't translate to the @page box, so the receipt gets clipped.
+  const [printBillId, setPrintBillId] = useState<number | null>(null);
+  const [printReady, setPrintReady] = useState(false);
+  const handlePrint = useCallback(async (billId: number) => {
+    setPrintBillId(billId);
+    try {
+      const billRows = await queryClient.fetchQuery({
+        queryKey: ['bill-detail', billId],
+        queryFn: () => apiClient.get<unknown[]>(`/v_bill_detail?bill_id=eq.${billId}`).then(rows => rows[0] ?? null),
+      });
+      const branchId = (billRows as { branch_id?: number } | null)?.branch_id;
+      if (branchId != null) {
+        await queryClient.fetchQuery({
+          queryKey: ['branch-info', branchId],
+          queryFn: () => apiClient.get(`/v_branches?id=eq.${branchId}&select=id,name,address`).then((rows: unknown) => (rows as unknown[])[0] ?? null),
+        });
+      }
+    } catch {
+      // Fall through — receipt will show its loading state and still print empty if data fails.
+    }
+    setPrintReady(true);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      window.print();
+      setPrintReady(false);
+      setPrintBillId(null);
+    }));
+  }, [queryClient]);
 
   if (isLoading) return <div className="p-8 text-center text-subtler">{t('common.loading')}</div>;
   if (!bills || bills.length === 0) return <div className="p-8 text-center text-subtler">{t('common.noData')}</div>;
@@ -1629,7 +1660,7 @@ function BillsTab({ contractId, t }: { contractId: number; t: ReturnType<typeof 
                   color="default"
                   size="sm"
                   className="btn-icon-xs"
-                  onClick={() => setOpenBillId(bill.id)}
+                  onClick={() => handlePrint(bill.id)}
                   aria-label={t('wizard.receipt_print')}
                 >
                   <Printer size={14} />
@@ -1664,17 +1695,12 @@ function BillsTab({ contractId, t }: { contractId: number; t: ReturnType<typeof 
         </div>
       ))}
 
-      <Modal
-        open={openBillId != null}
-        onClose={() => setOpenBillId(null)}
-        maxWidth="26rem"
-        width="100%"
-        ariaLabel={t('wizard.receipt_title')}
-      >
-        <div className="modal-content py-6 px-4" style={{ background: 'color-mix(in srgb, var(--color-fg) 6%, transparent)' }}>
-          {openBillId != null && <BillReceipt billId={openBillId} />}
-        </div>
-      </Modal>
+      {printReady && printBillId != null && createPortal(
+        <div className="print-only-receipt" aria-hidden>
+          <BillReceipt billId={printBillId} hidePrintButton />
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }
