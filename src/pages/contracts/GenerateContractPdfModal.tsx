@@ -3,9 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Modal, Button, Select, Input, MaskedInput, LabeledCheckbox, useSnackbarContext } from 'tsp-form';
-import { Loader2, Printer, XCircle, AlertTriangle, ExternalLink } from 'lucide-react';
+import { Loader2, Printer, XCircle, AlertTriangle, ExternalLink, Eye } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useGenerateContractPdf, type PdfOverrides } from './useGenerateContractPdf';
+import { ContractPreviewModal } from './ContractPreviewModal';
 import { CLAUSE_6_REPO_THRESHOLD_DAYS } from '../../lib/contractPdf/constants';
 import {
   useBranchSignatories,
@@ -169,32 +170,18 @@ export function GenerateContractPdfModal({ open, onClose, contract }: Props) {
   const noBankAccount = bankAccount === null;
   const blocked = lessorPoolEmpty || witnessPoolShort || signatoryPicksIncomplete || witnessDup || noBankAccount;
 
-  const handleGenerate = async () => {
-    if (!contract || !contractId) return;
-    if (blocked) return;
+  // Preview state — opened on top of this modal; this modal stays mounted.
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewOverrides, setPreviewOverrides] = useState<PdfOverrides | null>(null);
+  const [persisting, setPersisting] = useState(false);
 
-    // 1. Persist handover (upsert) — keeps the contract record in sync with what
-    //    we're about to print.
-    try {
-      await apiClient.rpc('fn_contract_set_handover', {
-        p_contract_id: contractId,
-        p_has_box: hasBox,
-        p_has_charger_set: hasChargerSet,
-        p_has_charger_cable: hasChargerCable,
-        p_device_unlock_code: passcode.trim() || null,
-      });
-      invalidateHandover(contractId);
-    } catch (err) {
-      surfaceError(err, t, addSnackbar);
-      return;
-    }
-
-    // 2. Build overrides for render
+  // Build overrides from current modal state. Shared by Print and Preview.
+  const buildOverrides = (): PdfOverrides => {
     const lessor = findSig(sigPick.LESSOR);
     const w1 = findSig(sigPick.WITNESS_1);
     const w2 = findSig(sigPick.WITNESS_2);
     const parsedRepo = parseInt(repoThreshold, 10);
-    const overrides: PdfOverrides = {
+    return {
       lessorMediaId: lessor?.signature_media_id ?? null,
       lessorName: lessor ? `${lessor.first_name} ${lessor.last_name}` : '',
       witness1MediaId: w1?.signature_media_id ?? null,
@@ -207,13 +194,51 @@ export function GenerateContractPdfModal({ open, onClose, contract }: Props) {
       hasChargerCable,
       repoThresholdDays: Number.isFinite(parsedRepo) && parsedRepo > 0 ? parsedRepo : CLAUSE_6_REPO_THRESHOLD_DAYS,
     };
+  };
 
+  // Persist handover (upsert) so the contract record matches what we're about
+  // to render/print. Used by both Print and Preview.
+  const persistHandover = async (): Promise<boolean> => {
+    if (!contractId) return false;
+    setPersisting(true);
     try {
-      await generate(contract, overrides);
+      await apiClient.rpc('fn_contract_set_handover', {
+        p_contract_id: contractId,
+        p_has_box: hasBox,
+        p_has_charger_set: hasChargerSet,
+        p_has_charger_cable: hasChargerCable,
+        p_device_unlock_code: passcode.trim() || null,
+      });
+      invalidateHandover(contractId);
+      return true;
+    } catch (err) {
+      surfaceError(err, t, addSnackbar);
+      return false;
+    } finally {
+      setPersisting(false);
+    }
+  };
+
+  const handleGenerate = async () => {
+    if (!contract || !contractId) return;
+    if (blocked) return;
+    const ok = await persistHandover();
+    if (!ok) return;
+    try {
+      await generate(contract, buildOverrides());
       onClose();
     } catch (err) {
       surfaceError(err, t, addSnackbar);
     }
+  };
+
+  const handlePreview = async () => {
+    if (!contract || !contractId) return;
+    if (blocked) return;
+    const ok = await persistHandover();
+    if (!ok) return;
+    setPreviewOverrides(buildOverrides());
+    setPreviewOpen(true);
   };
 
   return (
@@ -349,16 +374,30 @@ export function GenerateContractPdfModal({ open, onClose, contract }: Props) {
         </div>
       </div>
       <div className="modal-footer">
-        <Button onClick={onClose} disabled={generating}>{t('common.cancel')}</Button>
+        <Button onClick={onClose} disabled={generating || persisting}>{t('common.cancel')}</Button>
         <Button
-          color="primary"
           onClick={handleGenerate}
-          disabled={generating || blocked}
+          disabled={generating || persisting || blocked}
           startIcon={generating ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />}
         >
           {generating ? t('common.loading') : t('contract.printContractPdf', { defaultValue: 'Print contract PDF' })}
         </Button>
+        <Button
+          color="primary"
+          onClick={handlePreview}
+          disabled={generating || persisting || blocked}
+          startIcon={persisting ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />}
+        >
+          {persisting ? t('common.loading') : t('contract.previewContract', { defaultValue: 'Preview' })}
+        </Button>
       </div>
+
+      <ContractPreviewModal
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        contract={contract}
+        overrides={previewOverrides ?? {}}
+      />
     </Modal>
   );
 }
