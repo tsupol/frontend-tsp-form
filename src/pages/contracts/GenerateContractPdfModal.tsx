@@ -3,9 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Modal, Button, Select, Input, MaskedInput, LabeledCheckbox, useSnackbarContext } from 'tsp-form';
-import { Loader2, Printer, XCircle, AlertTriangle, ExternalLink, Eye } from 'lucide-react';
+import { Loader2, Printer, XCircle, AlertTriangle, ExternalLink, Eye, Server } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useGenerateContractPdf, type PdfOverrides } from './useGenerateContractPdf';
+import { useGenerateContractPdfServer } from './useGenerateContractPdfServer';
 import { ContractPreviewModal } from './ContractPreviewModal';
 import { CLAUSE_6_REPO_THRESHOLD_DAYS } from '../../lib/contractPdf/constants';
 import {
@@ -61,6 +62,7 @@ export function GenerateContractPdfModal({ open, onClose, contract }: Props) {
   const { t } = useTranslation();
   const { addSnackbar } = useSnackbarContext();
   const { generating, generate } = useGenerateContractPdf();
+  const { generating: generatingServer, generate: generateServer } = useGenerateContractPdfServer();
   const branchId = contract?.branch_id ?? null;
   const contractId = contract?.id ?? null;
 
@@ -232,6 +234,19 @@ export function GenerateContractPdfModal({ open, onClose, contract }: Props) {
     }
   };
 
+  const handleGenerateServer = async () => {
+    if (!contract || !contractId) return;
+    if (blocked) return;
+    const ok = await persistHandover();
+    if (!ok) return;
+    try {
+      await generateServer(contract, buildOverrides());
+      onClose();
+    } catch (err) {
+      surfaceError(err, t, addSnackbar);
+    }
+  };
+
   const handlePreview = async () => {
     if (!contract || !contractId) return;
     if (blocked) return;
@@ -374,18 +389,25 @@ export function GenerateContractPdfModal({ open, onClose, contract }: Props) {
         </div>
       </div>
       <div className="modal-footer">
-        <Button onClick={onClose} disabled={generating || persisting}>{t('common.cancel')}</Button>
+        <Button onClick={onClose} disabled={generating || generatingServer || persisting}>{t('common.cancel')}</Button>
         <Button
           onClick={handleGenerate}
-          disabled={generating || persisting || blocked}
+          disabled={generating || generatingServer || persisting || blocked}
           startIcon={generating ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />}
         >
-          {generating ? t('common.loading') : t('contract.printContractPdf', { defaultValue: 'Print contract PDF' })}
+          {generating ? t('common.loading') : t('contract.printContractPdfFe', { defaultValue: 'Print (FE)' })}
+        </Button>
+        <Button
+          onClick={handleGenerateServer}
+          disabled={generating || generatingServer || persisting || blocked}
+          startIcon={generatingServer ? <Loader2 size={14} className="animate-spin" /> : <Server size={14} />}
+        >
+          {generatingServer ? t('common.loading') : t('contract.printContractPdfServer', { defaultValue: 'Print (Server)' })}
         </Button>
         <Button
           color="primary"
           onClick={handlePreview}
-          disabled={generating || persisting || blocked}
+          disabled={generating || generatingServer || persisting || blocked}
           startIcon={persisting ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />}
         >
           {persisting ? t('common.loading') : t('contract.previewContract', { defaultValue: 'Preview' })}
