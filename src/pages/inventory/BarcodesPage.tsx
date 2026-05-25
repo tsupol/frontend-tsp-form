@@ -1,13 +1,13 @@
-import { useState, useEffect, useRef, useCallback, type KeyboardEvent } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
-  DataTable, Button, Input, Select, Badge, Modal, MobileHeader,
-  PopOver, MenuItem, MenuSeparator, useSnackbarContext,
+  DataTable, Button, Input, Badge, Modal, MobileHeader,
+  PopOver, MenuItem, MenuSeparator, LabeledCheckbox, useSnackbarContext,
 } from 'tsp-form';
 import {
   Barcode, Plus, Search, ArrowRightFromLine, ScanLine, CheckCircle, XCircle,
-  MoreHorizontal, ShieldOff, ShieldCheck, AlertCircle, Wand2, X,
+  MoreHorizontal, ShieldOff, ShieldCheck, AlertCircle, X,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
@@ -48,27 +48,26 @@ interface BarcodeSearchResult {
   brand_name: string | null;
 }
 
-interface ProductSearchRow {
-  model_id: number;
-  model_name: string;
-  brand_name: string;
-  family_name: string;
-}
-
-interface ProductSearchResponse {
-  total: number;
-  rows: ProductSearchRow[];
-}
-
-interface VariantRow {
+interface ProductSearchVariant {
   variant_id: number;
   sku_code: string;
   name: string;
   is_active: boolean;
 }
 
-interface ModelDetailRow {
-  variants: VariantRow[];
+interface ProductSearchRow {
+  model_id: number;
+  model_code: string;
+  model_name: string;
+  brand_name: string | null;
+  family_name: string | null;
+  is_active: boolean;
+  variants: ProductSearchVariant[];
+}
+
+interface ProductSearchResponse {
+  total: number;
+  rows: ProductSearchRow[];
 }
 
 // ── Source label ─────────────────────────────────────────────────────────────
@@ -512,7 +511,6 @@ function RegisterBarcodeModal({ open, onClose, initialBarcode, onSuccess }: Regi
   const [modelQuery, setModelQuery] = useState('');
   const [debouncedModelQuery, setDebouncedModelQuery] = useState('');
   const [selectedModelId, setSelectedModelId] = useState<number | null>(null);
-  const [selectedModelName, setSelectedModelName] = useState<string>('');
   const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -524,7 +522,6 @@ function RegisterBarcodeModal({ open, onClose, initialBarcode, onSuccess }: Regi
       setModelQuery('');
       setDebouncedModelQuery('');
       setSelectedModelId(null);
-      setSelectedModelName('');
       setSelectedVariantId(null);
     }
   }, [open, initialBarcode]);
@@ -537,33 +534,35 @@ function RegisterBarcodeModal({ open, onClose, initialBarcode, onSuccess }: Regi
   const { data: modelSearch, isFetching: modelsFetching } = useQuery({
     queryKey: ['barcode-register-models', debouncedModelQuery],
     queryFn: () => apiClient.rpc<ProductSearchResponse>('fn_product_search', {
-      p_q: debouncedModelQuery || null,
-      p_brand_id: null,
-      p_family_id: null,
-      p_base_model_name: null,
+      p_q: debouncedModelQuery,
       p_is_active: true,
       p_limit: 20,
-      p_offset: 0,
     }),
-    enabled: open && debouncedModelQuery.length > 0 && !selectedModelId,
+    enabled: open,
+    placeholderData: keepPreviousData,
   });
 
-  const { data: modelDetail } = useQuery({
-    queryKey: ['barcode-register-variants', selectedModelId],
-    queryFn: async () => {
-      const rows = await apiClient.get<ModelDetailRow[]>(
-        `/v_ref_model_detail?model_id=eq.${selectedModelId}&limit=1`,
-      );
-      return Array.isArray(rows) ? rows[0] ?? { variants: [] } : { variants: [] };
-    },
-    enabled: !!selectedModelId,
-  });
-
-  const variants = modelDetail?.variants ?? [];
+  const models = modelSearch?.rows ?? [];
+  const selectedModel = useMemo(
+    () => models.find(m => m.model_id === selectedModelId) ?? null,
+    [models, selectedModelId],
+  );
+  const activeVariants = useMemo(
+    () => selectedModel?.variants.filter(v => v.is_active) ?? [],
+    [selectedModel],
+  );
 
   useEffect(() => {
-    if (variants.length === 1) setSelectedVariantId(variants[0].variant_id);
-  }, [variants]);
+    if (activeVariants.length === 0) {
+      setSelectedVariantId(null);
+      return;
+    }
+    if (!activeVariants.some(v => v.variant_id === selectedVariantId)) {
+      setSelectedVariantId(activeVariants[0].variant_id);
+    }
+  }, [activeVariants, selectedVariantId]);
+
+  const selectedVariant = activeVariants.find(v => v.variant_id === selectedVariantId) ?? null;
 
   const handleGenerate = () => {
     const code = generateEan13();
@@ -618,7 +617,7 @@ function RegisterBarcodeModal({ open, onClose, initialBarcode, onSuccess }: Regi
   };
 
   return (
-    <Modal open={open} onClose={onClose} maxWidth="32rem" width="100%">
+    <Modal open={open} onClose={onClose} maxWidth="36rem" width="100%">
       <div className="modal-header">
         <h2 className="modal-title">{t('barcodes.registerTitle')}</h2>
         <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">×</button>
@@ -645,19 +644,19 @@ function RegisterBarcodeModal({ open, onClose, initialBarcode, onSuccess }: Regi
         <div className="form-grid">
           <div className="flex flex-col">
             <label className="form-label">{t('barcodes.barcode')} *</label>
-            <div className="flex items-center gap-2">
+            <div className="input-group">
               <Input
                 value={barcode}
                 onChange={(e) => { setBarcode(e.target.value); setBarcodeType(detectBarcodeType(e.target.value)); }}
                 placeholder="200xxxxxxxxxx"
+                size="md"
                 className="w-full font-mono"
                 autoFocus
               />
+              <div className="input-group-divider" />
               <Button
                 type="button"
-                variant="outline"
-                size="sm"
-                startIcon={<Wand2 size={14} />}
+                size="md"
                 onClick={handleGenerate}
               >
                 {t('barcodes.generate')}
@@ -666,86 +665,101 @@ function RegisterBarcodeModal({ open, onClose, initialBarcode, onSuccess }: Regi
           </div>
 
           <div className="flex flex-col">
-            <label className="form-label">{t('barcodes.type')}</label>
-            <div style={{ width: '14rem' }}>
-              <Select
-                options={[
-                  { value: 'UPCA', label: 'UPC-A (12)' },
-                  { value: 'EAN13', label: 'EAN-13 (13)' },
-                  { value: 'EAN8', label: 'EAN-8 (8)' },
-                ]}
-                value={barcodeType}
-                onChange={(v) => setBarcodeType(v as string)}
-                searchable={false}
-              />
-            </div>
-          </div>
-
-          <div className="flex flex-col">
-            <label className="form-label">{t('barcodes.pickModel')}</label>
+            <label className="form-label">{t('barcodes.pickModel')} *</label>
             <Input
-              value={selectedModelId ? selectedModelName : modelQuery}
-              onChange={(e) => {
-                setModelQuery(e.target.value);
-                setSelectedModelId(null);
-                setSelectedModelName('');
-                setSelectedVariantId(null);
-              }}
+              value={modelQuery}
+              onChange={(e) => setModelQuery(e.target.value)}
               placeholder={t('barcodes.search')}
               className="w-full"
               startIcon={<Search size={16} />}
             />
-            {debouncedModelQuery && !selectedModelId && (
-              <div className="mt-1 max-h-48 overflow-auto better-scroll border border-line rounded">
-                {modelsFetching ? (
-                  <div className="p-3 text-sm text-subtle">{t('common.loading')}</div>
-                ) : (modelSearch?.rows ?? []).length === 0 ? (
-                  <div className="p-3 text-sm text-subtle">{t('common.noData')}</div>
-                ) : (
-                  (modelSearch?.rows ?? []).map((m) => (
-                    <button
-                      type="button"
-                      key={m.model_id}
-                      className="w-full text-left px-3 py-2 hover:bg-surface-hover cursor-pointer bg-transparent border-0 border-b border-line"
-                      onClick={() => {
-                        setSelectedModelId(m.model_id);
-                        setSelectedModelName(m.model_name);
-                        setModelQuery('');
-                      }}
-                    >
-                      <div className="text-sm font-medium">{m.model_name}</div>
-                      <div className="text-xs text-subtle">
-                        {[m.brand_name, m.family_name].filter(Boolean).join(' · ')}
+            <div className="mt-3 h-60 overflow-auto better-scroll border border-line rounded-md">
+              {modelsFetching && models.length === 0 && (
+                <div className="p-3 text-xs text-subtle text-center">{t('common.loading')}</div>
+              )}
+              {!modelsFetching && models.length === 0 && (
+                <div className="p-3 text-xs text-subtler text-center">{t('common.noData')}</div>
+              )}
+              {models.map((model) => {
+                const activeCount = model.variants.filter(v => v.is_active).length;
+                if (activeCount === 0) return null;
+                const isSelected = model.model_id === selectedModelId;
+                return (
+                  <div
+                    key={model.model_id}
+                    className={`border-b border-line last:border-b-0 ${isSelected ? 'bg-item-active-bg' : ''}`}
+                  >
+                    {isSelected ? (
+                      <div className="px-3 py-2 flex items-center gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate text-item-active-fg">
+                            {[model.brand_name, model.family_name, model.model_name].filter(Boolean).join(' ')}
+                          </div>
+                          <div className="text-[11px] text-subtler font-mono truncate">{model.model_code}</div>
+                        </div>
+                        <button
+                          type="button"
+                          className="shrink-0 p-1 rounded hover:bg-surface-hover cursor-pointer bg-transparent border-none text-current"
+                          onClick={() => { setSelectedModelId(null); setSelectedVariantId(null); }}
+                          aria-label={t('common.clear', { defaultValue: 'Clear' })}
+                        >
+                          <XCircle size={16} />
+                        </button>
                       </div>
-                    </button>
-                  ))
+                    ) : (
+                      <button
+                        type="button"
+                        className="w-full text-left px-3 py-2 hover:bg-surface-hover cursor-pointer flex items-center gap-2 bg-transparent border-0"
+                        onClick={() => setSelectedModelId(model.model_id)}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">
+                            {[model.brand_name, model.family_name, model.model_name].filter(Boolean).join(' ')}
+                          </div>
+                          <div className="text-[11px] text-subtler font-mono truncate">{model.model_code}</div>
+                        </div>
+                        <span className="text-[11px] text-subtler shrink-0">
+                          {activeCount} {t('barcodes.variantsCount', { defaultValue: 'variants' })}
+                        </span>
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {selectedModel && (
+              <div className="mt-3 pt-3 border-t border-line">
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-subtle mb-2">
+                  {t('barcodes.pickVariant', { defaultValue: 'Select variant' })}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {activeVariants.map((variant) => {
+                    const isActive = variant.variant_id === selectedVariantId;
+                    return (
+                      <Button
+                        key={variant.variant_id}
+                        size="sm"
+                        variant={isActive ? undefined : 'outline'}
+                        color={isActive ? 'primary' : undefined}
+                        onClick={() => setSelectedVariantId(variant.variant_id)}
+                      >
+                        {variant.name}
+                      </Button>
+                    );
+                  })}
+                </div>
+                {selectedVariant && (
+                  <div className="text-[11px] text-subtler font-mono mt-2 truncate">{selectedVariant.sku_code}</div>
                 )}
               </div>
             )}
           </div>
 
-          {selectedModelId && variants.length > 0 && (
-            <div className="flex flex-col">
-              <label className="form-label">{t('barcodes.variant')} *</label>
-              <Select
-                options={variants.map(v => ({ value: String(v.variant_id), label: `${v.sku_code} — ${v.name}` }))}
-                value={selectedVariantId !== null ? String(selectedVariantId) : null}
-                onChange={(v) => setSelectedVariantId(v ? Number(v as string) : null)}
-                placeholder={t('barcodes.variant')}
-                searchable
-                showChevron
-              />
-            </div>
-          )}
-
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={isPrimary}
-              onChange={(e) => setIsPrimary(e.target.checked)}
-            />
-            <span className="text-sm">{t('barcodes.primaryHint')}</span>
-          </label>
+          <LabeledCheckbox
+            label={t('barcodes.primaryHint')}
+            checked={isPrimary}
+            onChange={(e) => setIsPrimary(e.target.checked)}
+          />
         </div>
       </div>
       <div className="modal-footer">
