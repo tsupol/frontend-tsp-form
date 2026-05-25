@@ -102,11 +102,12 @@ export function BarcodesPage() {
   const handlePrint = useCallback((row: BarcodeRow) => {
     setPrintRow(row);
     // Two rAFs — React commits, browser paints, then we open the print dialog
-    // with the sticker fully rendered. Mirrors the BillsPage print pattern.
+    // with the sticker fully rendered. Same 76×26mm page as the asset sticker
+    // so both labels share printer-side defaults.
     requestAnimationFrame(() => requestAnimationFrame(() => {
       const styleEl = document.createElement('style');
       styleEl.id = 'sticker-print-page';
-      styleEl.textContent = '@media print { @page { size: 50mm 30mm; margin: 0; } }';
+      styleEl.textContent = '@media print { @page { size: 76mm 26mm; margin: 0; } }';
       document.head.appendChild(styleEl);
       try {
         window.print();
@@ -142,8 +143,11 @@ export function BarcodesPage() {
       const params: string[] = ['order=created_at.desc'];
       if (activeSearch) {
         const term = encodeURIComponent(activeSearch);
+        // family_name / brand_name carry the human label ("iPhone 11", "Apple")
+        // — model_name is just the suffix ("Base 64GB"), so a search like
+        // "iphone 11" must hit family_name to return anything useful.
         params.push(
-          `or=(barcode.ilike.*${term}*,sku_code.ilike.*${term}*,variant_name.ilike.*${term}*,model_name.ilike.*${term}*)`,
+          `or=(barcode.ilike.*${term}*,sku_code.ilike.*${term}*,variant_name.ilike.*${term}*,model_name.ilike.*${term}*,family_name.ilike.*${term}*,brand_name.ilike.*${term}*)`,
         );
       }
       return apiClient.getPaginated<BarcodeRow>(`/v_barcode_list?${params.join('&')}`, {
@@ -765,7 +769,7 @@ function BarcodeSvg({ value, type }: { value: string; type: string | null }) {
   return <svg ref={ref} className="max-w-full" />;
 }
 
-// ── Print sticker (XP-420B 50×30mm) ──────────────────────────────────────────
+// ── Print sticker (XP-420B 76×26mm — shared with asset sticker) ──────────────
 
 function BarcodeSticker({ row }: { row: BarcodeRow }) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -776,24 +780,35 @@ function BarcodeSticker({ row }: { row: BarcodeRow }) {
         format: jsbarcodeFormat(row.barcode_type, row.barcode),
         // Wider narrow-bar — see AssetSticker for the 203-DPI rationale.
         width: 2.2,
-        height: 70,
+        height: 60,
         displayValue: true,
-        fontSize: 9,
+        fontSize: 11,
+        textMargin: 1,
         margin: 0,
         background: '#ffffff',
         lineColor: '#000000',
       });
       svgRef.current.setAttribute('shape-rendering', 'crispEdges');
+      // Stretch X and Y independently — bar-width ratios stay correct.
+      svgRef.current.setAttribute('preserveAspectRatio', 'none');
     } catch {
       if (svgRef.current) svgRef.current.innerHTML = '';
     }
   }, [row]);
 
+  const headline = [row.brand_name, row.family_name].filter(Boolean).join(' ');
+
   return (
     <div className="barcode-sticker">
-      <div className="sticker-title">{row.model_name ?? '—'}</div>
-      {row.variant_name && <div className="sticker-subtitle">{row.variant_name}</div>}
-      <svg ref={svgRef} />
+      <div className="barcode-sticker-left">
+        {headline && <div className="barcode-sticker-title">{headline}</div>}
+        {row.variant_name && (
+          <div className="barcode-sticker-line barcode-sticker-line-sub">
+            <span>{row.variant_name}</span>
+          </div>
+        )}
+      </div>
+      <svg ref={svgRef} className="barcode-sticker-barcode" />
     </div>
   );
 }

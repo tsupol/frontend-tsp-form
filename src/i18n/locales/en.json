@@ -1507,6 +1507,8 @@
   },
   "settings": {
     "title": "Settings",
+    "printer": "Printer",
+    "printerDesc": "Sticker printer paper size and exposure",
     "holdings": "Holdings",
     "holdingsDesc": "Manage holding companies",
     "holding": "Holding",

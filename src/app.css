@@ -256,50 +256,64 @@ input[type="number"
     }
 }
 
-/* Barcode sticker — XP-420B 50×30mm thermal label.
-   On screen the wrapper hides it; on print the @media print isolation above
-   collapses everything else so only the sticker renders on a 50×30mm page. */
+/* Barcode sticker — XP-420B 76×26mm thermal label.
+   Same dimensions and grid as .asset-sticker so both labels share printer
+   settings. Two-column layout: left (product names) wider, right (sku +
+   type) narrower; barcode SVG spans the bottom row. */
 .barcode-sticker {
     box-sizing: border-box;
-    width: 50mm;
-    height: 30mm;
-    padding: 1mm 1.5mm;
+    width: 76mm;
+    height: 26mm;
+    padding: 2mm 2mm 1mm 2mm;
     background: #fff;
     color: #000;
     /* Tahoma ships on Windows + has Thai glyphs and is well-hinted at small
        sizes — sharper on 203-DPI thermal heads than Segoe UI / system-ui. */
     font-family: Tahoma, Arial, Helvetica, sans-serif;
     font-weight: 700;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    row-gap: 0.5mm;
+    overflow: hidden;
+}
+.barcode-sticker .barcode-sticker-left {
     display: flex;
     flex-direction: column;
-    align-items: center;
     justify-content: flex-start;
-    gap: 0.5mm;
+    gap: 0.3mm;
+    min-width: 0;
     overflow: hidden;
 }
-.barcode-sticker .sticker-title {
-    font-size: 9pt;
-    font-weight: 600;
+.barcode-sticker .barcode-sticker-title {
+    font-size: 9.5pt;
+    font-weight: 700;
     line-height: 1.05;
-    text-align: center;
-    width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.barcode-sticker .sticker-subtitle {
-    font-size: 7.5pt;
+.barcode-sticker .barcode-sticker-line {
+    display: flex;
+    align-items: baseline;
+    gap: 0.8mm;
+    font-size: 9.5pt;
     line-height: 1.05;
-    text-align: center;
     width: 100%;
+}
+.barcode-sticker .barcode-sticker-line-sub {
+    font-size: 8.5pt;
+}
+.barcode-sticker .barcode-sticker-line > span {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    min-width: 0;
 }
-.barcode-sticker svg {
-    width: 100%;
-    height: auto;
-    max-height: 15mm;
+.barcode-sticker .barcode-sticker-barcode {
+    justify-self: center;
+    align-self: end;
+    width: 72mm;
+    height: 12mm;
     shape-rendering: crispEdges;
     image-rendering: pixelated;
 }
@@ -328,9 +342,10 @@ input[type="number"
     box-sizing: border-box;
     width: 76mm;
     height: 26mm;
-    /* Top/right/bottom/left — extra top + left to compensate for the XP-420B
-       physical print-area offset from the label edge. */
-    padding: 2mm 1.5mm 1mm 2.5mm;
+    /* Symmetric L/R padding — the printer's expose settings (0.08 in / 2 mm
+       both sides) locate the printable area on the physical label, so the
+       sticker box already matches the printable rectangle. */
+    padding: 2mm 2mm 1mm 2mm;
     background: #fff;
     color: #000;
     /* Tahoma ships on Windows + has Thai glyphs and is well-hinted at small

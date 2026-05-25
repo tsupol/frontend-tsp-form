@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { User, Building2, Store } from 'lucide-react';
+import { User, Building2, Store, Printer } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -15,6 +15,7 @@ export function SettingsLayout({ children }: { children: ReactNode }) {
 
   const navItems = [
     { path: '/admin/settings/profile', labelKey: 'nav.profile', icon: User },
+    { path: '/admin/settings/printer', labelKey: 'settings.printer', icon: Printer },
     ...(canManageOrg ? [
       { path: '/admin/settings/holdings', labelKey: 'settings.holdings', icon: Building2 },
       { path: '/admin/settings/companies', labelKey: 'settings.companies', icon: Store },

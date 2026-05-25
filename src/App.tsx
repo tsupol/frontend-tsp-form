@@ -61,6 +61,7 @@ import { BranchesPage } from './pages/BranchesPage';
 import { SettingsLayout } from './pages/settings/SettingsLayout';
 import { HoldingsPage } from './pages/settings/HoldingsPage';
 import { CompaniesPage } from './pages/settings/CompaniesPage';
+import { PrinterSetupPage } from './pages/settings/PrinterSetupPage';
 import { CustomersPage } from './pages/customers/CustomersPage';
 import { AccountingLayout } from './pages/accounting/AccountingLayout';
 import { DayClosePage } from './pages/accounting/DayClosePage';
@@ -157,6 +158,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <SettingsLayout><CompaniesPage /></SettingsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/settings/printer"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <SettingsLayout><PrinterSetupPage /></SettingsLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
