@@ -175,6 +175,10 @@ input[type="number"
    and force 80mm continuous-feed paper with zero margin (thermal printers
    handle their own gutter). */
 @media print {
+    /* Default page — bill receipt's 80mm continuous-feed thermal. Barcode
+       sticker print flow injects its own @page (50×30mm) dynamically at
+       print time so this default doesn't apply there. Only one in-app
+       print flow is ever active at a time. */
     @page {
         size: 80mm auto;
         margin: 0;
@@ -185,24 +189,17 @@ input[type="number"
         padding: 0 !important;
         height: auto !important;
     }
-    /* Hide siblings of the receipt's ancestor chain via visibility, but keep
-       the receipt itself in normal flow (no position:absolute). Reason: when
-       the receipt was absolutely positioned, the body's content height
-       resolved to ~0, so `@page size: 80mm auto` produced a tiny page box
-       and drivers clipped the output to a couple of lines / centered the
-       strip on the real paper. In normal flow the page height matches the
-       receipt's real height. */
-    body * {
+    /* Bill receipt print — only applies when a .bill-receipt is mounted.
+       Scoping with body:has() prevents these rules from blanking other
+       print flows (e.g. barcode sticker) that don't include a receipt. */
+    body:has(.bill-receipt) * {
         visibility: hidden;
     }
-    .bill-receipt, .bill-receipt * {
+    body:has(.bill-receipt) .bill-receipt,
+    body:has(.bill-receipt) .bill-receipt * {
         visibility: visible;
     }
-    /* Collapse anything not on the path to .bill-receipt to zero size so it
-       doesn't push the receipt down the page. We don't display:none the
-       whole tree because that would also hide the receipt's ancestors and
-       block it from rendering. */
-    body > *:not(:has(.bill-receipt)) {
+    body:has(.bill-receipt) > *:not(:has(.bill-receipt)) {
         display: none !important;
     }
     .bill-receipt {
@@ -217,5 +214,185 @@ input[type="number"
     }
     .bill-receipt .receipt-watermark {
         color: rgba(0, 0, 0, 0.22);
+    }
+
+    /* Barcode sticker print — XP-420B label printer, 50×30mm.
+       Isolation matches the bill pattern. @page size is injected dynamically
+       by the print handler so we don't fight the bill receipt's @page. */
+    body:has(.barcode-sticker) * {
+        visibility: hidden;
+    }
+    body:has(.barcode-sticker) .barcode-sticker,
+    body:has(.barcode-sticker) .barcode-sticker * {
+        visibility: visible;
+    }
+    body:has(.barcode-sticker) > *:not(:has(.barcode-sticker)) {
+        display: none !important;
+    }
+
+    /* Asset sticker print — XP-420B label printer, 75×25mm.
+       Same pattern as .barcode-sticker; @page injected dynamically. */
+    body:has(.asset-sticker) * {
+        visibility: hidden;
+    }
+    body:has(.asset-sticker) .asset-sticker,
+    body:has(.asset-sticker) .asset-sticker * {
+        visibility: visible;
+    }
+    body:has(.asset-sticker) > *:not(:has(.asset-sticker)) {
+        display: none !important;
+    }
+    .asset-sticker {
+        margin: 0 !important;
+    }
+}
+
+/* Barcode sticker — XP-420B 50×30mm thermal label.
+   On screen the wrapper hides it; on print the @media print isolation above
+   collapses everything else so only the sticker renders on a 50×30mm page. */
+.barcode-sticker {
+    box-sizing: border-box;
+    width: 50mm;
+    height: 30mm;
+    padding: 1mm 1.5mm;
+    background: #fff;
+    color: #000;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Sarabun", sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.5mm;
+    overflow: hidden;
+}
+.barcode-sticker .sticker-title {
+    font-size: 9pt;
+    font-weight: 600;
+    line-height: 1.05;
+    text-align: center;
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.barcode-sticker .sticker-subtitle {
+    font-size: 7.5pt;
+    line-height: 1.05;
+    text-align: center;
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.barcode-sticker svg {
+    width: 100%;
+    height: auto;
+    max-height: 15mm;
+}
+
+/* Screen: hide the portaled sticker while it's mounted briefly during the
+   print flow. Mirrors .print-only-receipt. */
+@media screen {
+    .print-only-sticker .barcode-sticker {
+        position: absolute;
+        left: -10000px;
+        top: 0;
+        visibility: hidden;
+        pointer-events: none;
+    }
+}
+@media print {
+    .barcode-sticker {
+        margin: 0 !important;
+    }
+}
+
+/* Asset sticker — XP-420B 75×25mm thermal label.
+   Two-column layout: left (code, model, variant, barcode) wider, right
+   (external ref, condition, serial, imei) narrower. */
+.asset-sticker {
+    box-sizing: border-box;
+    width: 76mm;
+    height: 26mm;
+    /* Top/right/bottom/left — extra top + left to compensate for the XP-420B
+       physical print-area offset from the label edge. */
+    padding: 2mm 1.5mm 1mm 3.5mm;
+    background: #fff;
+    color: #000;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Sarabun", sans-serif;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5mm;
+    overflow: hidden;
+}
+.asset-sticker .asset-sticker-left {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 0.3mm;
+    min-width: 0;
+    overflow: hidden;
+}
+.asset-sticker .asset-sticker-right {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 0.4mm;
+    font-size: 8pt;
+    line-height: 1.1;
+    min-width: 0;
+    overflow: hidden;
+}
+.asset-sticker .asset-sticker-right > div {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+.asset-sticker .asset-sticker-tag {
+    font-size: 7.5pt;
+    font-weight: 600;
+    opacity: 0.7;
+    margin-right: 0.3mm;
+}
+.asset-sticker .asset-sticker-code {
+    font-size: 9.5pt;
+    font-weight: 700;
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.asset-sticker .asset-sticker-line {
+    display: flex;
+    align-items: baseline;
+    gap: 0.8mm;
+    font-size: 9.5pt;
+    line-height: 1.05;
+    width: 100%;
+}
+.asset-sticker .asset-sticker-line-sub {
+    font-size: 8.5pt;
+}
+.asset-sticker .asset-sticker-line > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+.asset-sticker .asset-sticker-barcode {
+    width: 100%;
+    height: auto;
+    max-height: 11mm;
+    margin-top: 2mm;
+}
+@media screen {
+    .print-only-asset-sticker .asset-sticker {
+        position: absolute;
+        left: -10000px;
+        top: 0;
+        visibility: hidden;
+        pointer-events: none;
     }
 }

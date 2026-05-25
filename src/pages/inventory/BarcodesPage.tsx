@@ -1,16 +1,20 @@
 import { useState, useEffect, useMemo, useRef, useCallback, type KeyboardEvent } from 'react';
+import { createPortal } from 'react-dom';
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
   DataTable, Button, Input, Badge, Modal, MobileHeader,
-  PopOver, MenuItem, MenuSeparator, LabeledCheckbox, useSnackbarContext,
+  PopOver, MenuItem, LabeledCheckbox, useSnackbarContext,
 } from 'tsp-form';
 import {
-  Barcode, Plus, Search, ArrowRightFromLine, ScanLine, CheckCircle, XCircle,
-  MoreHorizontal, ShieldOff, ShieldCheck, AlertCircle, X,
+  Barcode, Plus, Search, ArrowRightFromLine, CheckCircle, XCircle,
+  MoreHorizontal, ShieldOff, ShieldCheck, AlertCircle, Eye, ExternalLink, Printer, X,
 } from 'lucide-react';
+import JsBarcode from 'jsbarcode';
 import { apiClient, ApiError } from '../../lib/api';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { DateTime } from '../../components/DateTime';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 // v_barcode_list columns (verified against the view DDL):
@@ -33,19 +37,8 @@ interface BarcodeRow {
   model_name: string | null;
   family_name: string | null;
   brand_name: string | null;
-}
-
-interface BarcodeSearchResult {
-  barcode_id: number;
-  barcode: string;
-  barcode_type: string | null;
-  variant_id: number;
-  sku_code: string | null;
-  sku_name: string | null;
-  model_id: number | null;
-  model_name: string | null;
-  family_name: string | null;
-  brand_name: string | null;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
 interface ProductSearchVariant {
@@ -81,22 +74,6 @@ function sourceLabel(t: ReturnType<typeof useTranslation>['t'], src: string | nu
   }
 }
 
-// ── EAN-13 generator (store-internal, prefix 200) ────────────────────────────
-// EAN-13 reserves "2"-prefixed codes for store-internal use. Build 12 digits
-// then append the check digit (mod-10 with alternating ×3/×1 weighting).
-function generateEan13(): string {
-  // 200 + 9 random digits = 12; append checksum
-  let body = '200';
-  for (let i = 0; i < 9; i++) body += Math.floor(Math.random() * 10).toString();
-  let sum = 0;
-  for (let i = 0; i < 12; i++) {
-    const d = parseInt(body[i], 10);
-    sum += i % 2 === 0 ? d : d * 3;
-  }
-  const check = (10 - (sum % 10)) % 10;
-  return body + check.toString();
-}
-
 function detectBarcodeType(raw: string): string {
   const d = raw.replace(/\D/g, '');
   if (d.length === 12) return 'UPCA';
@@ -112,32 +89,59 @@ export function BarcodesPage() {
   const { addSnackbar } = useSnackbarContext();
   const isMobile = useMediaQuery('(max-width: 767px)');
 
-  const [scanInput, setScanInput] = useState('');
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [activeSearch, setActiveSearch] = useState('');
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(20);
 
-  const [scanResult, setScanResult] = useState<BarcodeSearchResult | null>(null);
   const [pendingBarcode, setPendingBarcode] = useState<string | null>(null);
+  const [viewRow, setViewRow] = useState<BarcodeRow | null>(null);
+  const [printRow, setPrintRow] = useState<BarcodeRow | null>(null);
   const [registerOpen, setRegisterOpen] = useState(false);
-  const [scanError, setScanError] = useState('');
-  const scanInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    const tm = setTimeout(() => setDebouncedSearch(search.trim()), 300);
-    return () => clearTimeout(tm);
-  }, [search]);
+  const handlePrint = useCallback((row: BarcodeRow) => {
+    setPrintRow(row);
+    // Two rAFs — React commits, browser paints, then we open the print dialog
+    // with the sticker fully rendered. Mirrors the BillsPage print pattern.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const styleEl = document.createElement('style');
+      styleEl.id = 'sticker-print-page';
+      styleEl.textContent = '@media print { @page { size: 50mm 30mm; margin: 0; } }';
+      document.head.appendChild(styleEl);
+      try {
+        window.print();
+      } finally {
+        styleEl.remove();
+        setPrintRow(null);
+      }
+    }));
+  }, []);
 
-  useEffect(() => { setPageIndex(0); }, [debouncedSearch]);
+  const commitSearch = useCallback(() => {
+    const next = searchInput.trim();
+    setActiveSearch(next);
+    setPageIndex(0);
+  }, [searchInput]);
 
-  // Fetch all barcodes
+  const clearSearch = () => {
+    setSearchInput('');
+    setActiveSearch('');
+    setPageIndex(0);
+  };
+
+  const onSearchKey = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      commitSearch();
+    }
+  };
+
   const { data, isFetching } = useQuery({
-    queryKey: ['barcodes-list', pageIndex, pageSize, debouncedSearch],
+    queryKey: ['barcodes-list', pageIndex, pageSize, activeSearch],
     queryFn: () => {
       const params: string[] = ['order=created_at.desc'];
-      if (debouncedSearch) {
-        const term = encodeURIComponent(debouncedSearch);
+      if (activeSearch) {
+        const term = encodeURIComponent(activeSearch);
         params.push(
           `or=(barcode.ilike.*${term}*,sku_code.ilike.*${term}*,variant_name.ilike.*${term}*,model_name.ilike.*${term}*)`,
         );
@@ -152,44 +156,6 @@ export function BarcodesPage() {
 
   const rows = data?.data ?? [];
   const totalCount = data?.totalCount ?? 0;
-
-  // ── Scan handler ───────────────────────────────────────────────────────────
-  const handleScan = useCallback(async (raw: string) => {
-    const code = raw.trim();
-    if (!code) return;
-    setScanError('');
-    setScanResult(null);
-    try {
-      const res = await apiClient.rpc<BarcodeSearchResult>('barcode_search', { p_barcode: code });
-      setScanResult(res);
-      setScanInput('');
-    } catch (err) {
-      if (err instanceof ApiError && (err.code === 'BARCODE.NOT_FOUND' || err.messageKey === 'barcode.not_found')) {
-        setPendingBarcode(code);
-        setRegisterOpen(true);
-        setScanInput('');
-      } else {
-        const msg = err instanceof ApiError
-          ? (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') || err.message
-          : t('barcodes.lookupError');
-        setScanError(msg);
-      }
-    }
-  }, [t]);
-
-  const onScanKey = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleScan(scanInput);
-    }
-  };
-
-  const onScanCleared = () => {
-    setScanResult(null);
-    setScanError('');
-    setScanInput('');
-    scanInputRef.current?.focus();
-  };
 
   // ── Row actions ────────────────────────────────────────────────────────────
   const showErr = (err: unknown) => {
@@ -300,80 +266,32 @@ export function BarcodesPage() {
           </Button>
         </div>
 
-        {/* Scan + search bar */}
+        {/* Search bar */}
         <div className="flex-none pb-3 flex flex-wrap items-center gap-2">
-          <div className="flex-1 min-w-0 max-w-72">
+          <div className="flex-1 min-w-0 max-w-md">
             <div className="input-group">
               <Input
-                ref={scanInputRef}
-                value={scanInput}
-                onChange={(e) => setScanInput(e.target.value)}
-                onKeyDown={onScanKey}
-                placeholder={t('barcodes.scanPlaceholder')}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyDown={onSearchKey}
+                placeholder={t('barcodes.search')}
                 size="sm"
-                endIcon={scanInput ? <X size={14} /> : undefined}
-                onEndIconClick={scanInput ? () => setScanInput('') : undefined}
+                startIcon={<Search size={16} />}
+                endIcon={searchInput ? <X size={14} /> : undefined}
+                onEndIconClick={searchInput ? clearSearch : undefined}
                 className="w-full"
                 autoFocus={!isMobile}
               />
               <div className="input-group-divider" />
               <Button
-                variant="outline"
                 size="sm"
                 className="px-3"
-                startIcon={<ScanLine size={16} />}
-                onClick={() => handleScan(scanInput)}
-                disabled={!scanInput.trim()}
+                onClick={commitSearch}
               >
-                {t('barcodes.scan')}
+                {t('common.search', { defaultValue: 'Search' })}
               </Button>
             </div>
           </div>
-          <div className="flex-1 min-w-0 max-w-64">
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={t('barcodes.search')}
-              size="sm"
-              startIcon={<Search size={16} />}
-              endIcon={search ? <X size={14} /> : undefined}
-              onEndIconClick={search ? () => setSearch('') : undefined}
-              className="w-full"
-            />
-          </div>
-        </div>
-
-        {/* Scan feedback (errors/results) */}
-        <div className="flex-none">
-          {scanError && (
-            <div className="mt-2 alert alert-danger animate-pop-in">
-              <XCircle size={18} />
-              <div><div className="alert-description">{scanError}</div></div>
-            </div>
-          )}
-          {scanResult && (
-            <div className="mt-2 alert alert-success">
-              <CheckCircle size={18} />
-              <div className="flex-1 min-w-0">
-                <div className="alert-title">{t('barcodes.found')}</div>
-                <div className="alert-description">
-                  <span className="font-mono">{scanResult.barcode}</span>
-                  {scanResult.barcode_type ? ` (${scanResult.barcode_type})` : ''}
-                  {' → '}
-                  <span className="font-medium">{scanResult.sku_name ?? scanResult.model_name}</span>
-                  {scanResult.brand_name ? <span className="text-subtle"> · {scanResult.brand_name}</span> : null}
-                  {scanResult.sku_code ? <span className="text-subtle"> · {scanResult.sku_code}</span> : null}
-                </div>
-              </div>
-              <button
-                type="button"
-                className="ml-2 text-xs underline text-subtle hover:text-fg cursor-pointer bg-transparent border-0"
-                onClick={onScanCleared}
-              >
-                {t('common.close')}
-              </button>
-            </div>
-          )}
         </div>
 
         <DataTable<BarcodeRow>
@@ -397,6 +315,9 @@ export function BarcodesPage() {
                     {!r.is_active && (
                       <Badge size="xs" color="default">{t('barcodes.inactive')}</Badge>
                     )}
+                    {r.source && (
+                      <Badge size="xs" variant="outline" color="default">{sourceLabel(t, r.source)}</Badge>
+                    )}
                   </div>
                   <div className="text-xs truncate mt-0.5">
                     <span className="text-subtle">
@@ -410,11 +331,20 @@ export function BarcodesPage() {
                     )}
                   </div>
                 </div>
-                <div className="text-right shrink-0 hidden sm:block">
-                  <div className="text-xs text-subtle">{sourceLabel(t, r.source)}</div>
-                </div>
+                {r.model_id && (
+                  <Link
+                    to={`/admin/products/models/${r.model_id}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="p-1 rounded hover:bg-surface-hover transition-colors cursor-pointer text-current opacity-50 hover:opacity-100 shrink-0"
+                    aria-label={t('barcodes.openModel', { defaultValue: 'Open model' })}
+                  >
+                    <ExternalLink size={16} />
+                  </Link>
+                )}
                 <RowActions
                   row={r}
+                  onView={setViewRow}
+                  onPrint={handlePrint}
                   onSetPrimary={handleSetPrimary}
                   onToggleActive={handleToggleActive}
                 />
@@ -428,7 +358,24 @@ export function BarcodesPage() {
           rowCount={totalCount}
           onPageChange={({ pageIndex: pi, pageSize: ps }) => { setPageIndex(pi); setPageSize(ps); }}
           className={`flex-1 min-h-0 ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
-          noResults={<div className="p-8 text-center text-subtler">{t('barcodes.noBarcodes')}</div>}
+          noResults={
+            activeSearch ? (
+              <div className="p-8 text-center">
+                <div className="text-subtler mb-3">
+                  {t('barcodes.noMatch', { q: activeSearch, defaultValue: `No barcodes match "${activeSearch}"` })}
+                </div>
+                <Button
+                  color="primary"
+                  startIcon={<Plus size={16} />}
+                  onClick={() => { setPendingBarcode(activeSearch); setRegisterOpen(true); }}
+                >
+                  {t('barcodes.registerThis', { defaultValue: 'Register this barcode' })}
+                </Button>
+              </div>
+            ) : (
+              <div className="p-8 text-center text-subtler">{t('barcodes.noBarcodes')}</div>
+            )
+          }
         />
       </div>
 
@@ -440,14 +387,32 @@ export function BarcodesPage() {
           queryClient.invalidateQueries({ queryKey: ['barcodes-list'] });
         }}
       />
+
+      <ViewBarcodeModal
+        open={!!viewRow}
+        row={viewRow}
+        onClose={() => setViewRow(null)}
+      />
+
+      {/* Print sticker — portaled to body so no panel/modal ancestor pushes
+          the sticker down the page during print. Hidden on screen via the
+          .print-only-sticker rule in app.css. */}
+      {printRow && createPortal(
+        <div className="print-only-sticker" aria-hidden>
+          <BarcodeSticker row={printRow} />
+        </div>,
+        document.body,
+      )}
     </>
   );
 }
 
 // ── Row Actions ──────────────────────────────────────────────────────────────
 
-function RowActions({ row, onSetPrimary, onToggleActive }: {
+function RowActions({ row, onView, onPrint, onSetPrimary, onToggleActive }: {
   row: BarcodeRow;
+  onView: (r: BarcodeRow) => void;
+  onPrint: (r: BarcodeRow) => void;
   onSetPrimary: (r: BarcodeRow) => void;
   onToggleActive: (r: BarcodeRow) => void;
 }) {
@@ -471,14 +436,21 @@ function RowActions({ row, onSetPrimary, onToggleActive }: {
       }
     >
       <div className="py-1 min-w-[160px]">
+        <MenuItem
+          icon={<Eye size={14} />}
+          label={t('barcodes.viewDetail', { defaultValue: 'View detail' })}
+          onClick={() => { setOpen(false); onView(row); }}
+        />
+        <MenuItem
+          icon={<Printer size={14} />}
+          label={t('barcodes.printSticker', { defaultValue: 'Print sticker' })}
+          onClick={() => { setOpen(false); onPrint(row); }}
+        />
         {!row.is_primary && row.is_active && (
-          <>
-            <MenuItem
-              label={t('barcodes.setPrimary')}
-              onClick={() => { setOpen(false); onSetPrimary(row); }}
-            />
-            <MenuSeparator />
-          </>
+          <MenuItem
+            label={t('barcodes.setPrimary')}
+            onClick={() => { setOpen(false); onSetPrimary(row); }}
+          />
         )}
         <MenuItem
           icon={row.is_active ? <ShieldOff size={14} /> : <ShieldCheck size={14} />}
@@ -564,12 +536,6 @@ function RegisterBarcodeModal({ open, onClose, initialBarcode, onSuccess }: Regi
 
   const selectedVariant = activeVariants.find(v => v.variant_id === selectedVariantId) ?? null;
 
-  const handleGenerate = () => {
-    const code = generateEan13();
-    setBarcode(code);
-    setBarcodeType('EAN13');
-  };
-
   const onSubmit = async () => {
     setErrorMessage('');
     if (!barcode.trim()) {
@@ -644,24 +610,14 @@ function RegisterBarcodeModal({ open, onClose, initialBarcode, onSuccess }: Regi
         <div className="form-grid">
           <div className="flex flex-col">
             <label className="form-label">{t('barcodes.barcode')} *</label>
-            <div className="input-group">
-              <Input
-                value={barcode}
-                onChange={(e) => { setBarcode(e.target.value); setBarcodeType(detectBarcodeType(e.target.value)); }}
-                placeholder="200xxxxxxxxxx"
-                size="md"
-                className="w-full font-mono"
-                autoFocus
-              />
-              <div className="input-group-divider" />
-              <Button
-                type="button"
-                size="md"
-                onClick={handleGenerate}
-              >
-                {t('barcodes.generate')}
-              </Button>
-            </div>
+            <Input
+              value={barcode}
+              onChange={(e) => { setBarcode(e.target.value); setBarcodeType(detectBarcodeType(e.target.value)); }}
+              placeholder={t('barcodes.barcodePlaceholder')}
+              size="md"
+              className="w-full font-mono"
+              autoFocus
+            />
           </div>
 
           <div className="flex flex-col">
@@ -772,6 +728,141 @@ function RegisterBarcodeModal({ open, onClose, initialBarcode, onSuccess }: Regi
         >
           {isPending ? t('common.loading') : t('barcodes.register')}
         </Button>
+      </div>
+    </Modal>
+  );
+}
+
+// ── View Barcode Modal ───────────────────────────────────────────────────────
+
+function jsbarcodeFormat(barcodeType: string | null, raw: string): string {
+  const t = (barcodeType ?? detectBarcodeType(raw)).toUpperCase();
+  if (t === 'UPCA' || t === 'UPC-A' || t === 'UPC') return 'UPC';
+  if (t === 'EAN8' || t === 'EAN-8') return 'EAN8';
+  return 'EAN13';
+}
+
+function BarcodeSvg({ value, type }: { value: string; type: string | null }) {
+  const ref = useRef<SVGSVGElement>(null);
+  useEffect(() => {
+    if (!ref.current) return;
+    try {
+      JsBarcode(ref.current, value, {
+        format: jsbarcodeFormat(type, value),
+        width: 2,
+        height: 80,
+        displayValue: true,
+        fontSize: 16,
+        margin: 8,
+        background: '#ffffff',
+        lineColor: '#000000',
+      });
+    } catch {
+      // Invalid for selected format — show plain digits as fallback.
+      if (ref.current) ref.current.innerHTML = '';
+    }
+  }, [value, type]);
+  return <svg ref={ref} className="max-w-full" />;
+}
+
+// ── Print sticker (XP-420B 50×30mm) ──────────────────────────────────────────
+
+function BarcodeSticker({ row }: { row: BarcodeRow }) {
+  const svgRef = useRef<SVGSVGElement>(null);
+  useEffect(() => {
+    if (!svgRef.current) return;
+    try {
+      JsBarcode(svgRef.current, row.barcode, {
+        format: jsbarcodeFormat(row.barcode_type, row.barcode),
+        width: 1.6,
+        height: 38,
+        displayValue: true,
+        fontSize: 9,
+        margin: 0,
+        background: '#ffffff',
+        lineColor: '#000000',
+      });
+    } catch {
+      if (svgRef.current) svgRef.current.innerHTML = '';
+    }
+  }, [row]);
+
+  return (
+    <div className="barcode-sticker">
+      <div className="sticker-title">{row.model_name ?? '—'}</div>
+      {row.variant_name && <div className="sticker-subtitle">{row.variant_name}</div>}
+      <svg ref={svgRef} />
+    </div>
+  );
+}
+
+function ViewBarcodeModal({ open, onClose, row }: {
+  open: boolean;
+  onClose: () => void;
+  row: BarcodeRow | null;
+}) {
+  const { t } = useTranslation();
+
+  // Fetch fresh row (timestamps / source flags) when opening.
+  const { data: fresh } = useQuery({
+    queryKey: ['barcode-detail', row?.barcode_id],
+    queryFn: async () => {
+      const rows = await apiClient.get<BarcodeRow[]>(
+        `/v_barcode_list?barcode_id=eq.${row!.barcode_id}&limit=1`,
+      );
+      return Array.isArray(rows) ? rows[0] ?? null : null;
+    },
+    enabled: open && !!row?.barcode_id,
+  });
+
+  const r = fresh ?? row;
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="30rem" width="100%">
+      <div className="modal-header">
+        <h2 className="modal-title">{t('barcodes.viewTitle', { defaultValue: 'Barcode detail' })}</h2>
+        <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">×</button>
+      </div>
+      <div className="modal-content">
+        {r && (
+          <>
+            <div className="flex justify-center p-4 bg-white rounded-md border border-line">
+              <BarcodeSvg value={r.barcode} type={r.barcode_type} />
+            </div>
+
+            <div className="mt-4 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-2 text-sm">
+              <div className="text-subtle">{t('barcodes.type')}</div>
+              <div className="flex items-center gap-2">
+                {r.barcode_type && <Badge size="xs" color="default">{r.barcode_type}</Badge>}
+                {r.is_primary && <Badge size="xs" color="primary">{t('barcodes.primary')}</Badge>}
+                {!r.is_active && <Badge size="xs" color="default">{t('barcodes.inactive')}</Badge>}
+              </div>
+
+              <div className="text-subtle">{t('barcodes.variant')}</div>
+              <div>
+                <div className="font-medium">{r.variant_name ?? '—'}</div>
+                {r.sku_code && <div className="text-xs text-subtler font-mono">{r.sku_code}</div>}
+              </div>
+
+              <div className="text-subtle">{t('barcodes.pickModel')}</div>
+              <div>
+                <div>{r.model_name ?? '—'}</div>
+                <div className="text-xs text-subtle">
+                  {[r.brand_name, r.family_name].filter(Boolean).join(' · ')}
+                </div>
+              </div>
+
+              <div className="text-subtle">{t('barcodes.source', { defaultValue: 'Source' })}</div>
+              <div>{sourceLabel(t, r.source)}</div>
+
+              <div className="text-subtle">{t('common.createdAt', { defaultValue: 'Created' })}</div>
+              <div><DateTime value={r.created_at} showTime /></div>
+            </div>
+          </>
+        )}
+      </div>
+      <div className="modal-footer">
+        <Button type="button" variant="ghost" onClick={onClose}>{t('common.close')}</Button>
       </div>
     </Modal>
   );

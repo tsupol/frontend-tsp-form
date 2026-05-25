@@ -217,6 +217,16 @@ function App() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/admin/products/models/:modelId"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <ProductsLayout><ModelsPage /></ProductsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
 
       {/* Call Center */}
       <Route

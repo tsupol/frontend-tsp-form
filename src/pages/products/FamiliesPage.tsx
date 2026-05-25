@@ -339,6 +339,7 @@ function CreateFamilyModal({ open, onClose, holdingId, brands }: {
               <label className="form-label" htmlFor="cf-code">{t('brandsModels.familyCode')}</label>
               <Input
                 id="cf-code"
+                placeholder={t('brandsModels.familyCodePlaceholder')}
                 error={!!errors.family_code}
                 {...register('family_code', { required: t('brandsModels.familyCode') + ' is required' })}
               />
@@ -348,6 +349,7 @@ function CreateFamilyModal({ open, onClose, holdingId, brands }: {
               <label className="form-label" htmlFor="cf-display">{t('brandsModels.displayName')}</label>
               <Input
                 id="cf-display"
+                placeholder={t('brandsModels.displayNamePlaceholder')}
                 error={!!errors.display_name}
                 {...register('display_name', { required: t('brandsModels.displayName') + ' is required' })}
               />
@@ -357,8 +359,10 @@ function CreateFamilyModal({ open, onClose, holdingId, brands }: {
               <label className="form-label" htmlFor="cf-default">{t('brandsModels.defaultModelName')}</label>
               <Input
                 id="cf-default"
+                placeholder={t('brandsModels.defaultModelNamePlaceholder')}
                 {...register('default_model_name')}
               />
+              <span className="text-xs text-subtle mt-1">{t('brandsModels.defaultModelNameHint')}</span>
             </div>
           </div>
         </div>
@@ -532,6 +536,7 @@ function EditFamilyModal({ family, open, onClose, brands }: {
               <label className="form-label" htmlFor="ef-code">{t('brandsModels.familyCode')}</label>
               <Input
                 id="ef-code"
+                placeholder={t('brandsModels.familyCodePlaceholder')}
                 error={!!errors.family_code}
                 {...register('family_code', { required: t('brandsModels.familyCode') + ' is required' })}
               />
@@ -541,6 +546,7 @@ function EditFamilyModal({ family, open, onClose, brands }: {
               <label className="form-label" htmlFor="ef-display">{t('brandsModels.displayName')}</label>
               <Input
                 id="ef-display"
+                placeholder={t('brandsModels.displayNamePlaceholder')}
                 error={!!errors.display_name}
                 {...register('display_name', { required: t('brandsModels.displayName') + ' is required' })}
               />
@@ -550,8 +556,10 @@ function EditFamilyModal({ family, open, onClose, brands }: {
               <label className="form-label" htmlFor="ef-default">{t('brandsModels.defaultModelName')}</label>
               <Input
                 id="ef-default"
+                placeholder={t('brandsModels.defaultModelNamePlaceholder')}
                 {...register('default_model_name')}
               />
+              <span className="text-xs text-subtle mt-1">{t('brandsModels.defaultModelNameHint')}</span>
             </div>
             <div className="flex items-center justify-between">
               <label className="form-label mb-0" htmlFor="ef-active">{t('brandsModels.active')}</label>

@@ -1,9 +1,11 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams, useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, Modal, TextArea, DataTable, PopOver, Tooltip, useSnackbarContext } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, Box, Search, SlidersHorizontal, XCircle, ChevronDown, ExternalLink, Wrench } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, Box, Search, SlidersHorizontal, XCircle, ChevronDown, ExternalLink, Wrench, Printer } from 'lucide-react';
+import JsBarcode from 'jsbarcode';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { CopyButton } from '../../components/CopyButton';
@@ -48,6 +50,7 @@ interface Asset {
   identifiers: { type: string; value: string; is_active: boolean }[];
   serial_no: string | null;
   imei: string | null;
+  battery_health: number | null;
   has_open_conflict: boolean;
   custodian_user_id: number | null;
   icloud_account_id: number | null;
@@ -820,6 +823,7 @@ function AssetDetailPanel({
   addSnackbar: (opts: { message: React.ReactNode }) => void;
 }) {
   const [activeAction, setActiveAction] = useState<BackendAssetAction | null>(null);
+  const { handlePrint: printAssetSticker, portal: stickerPortal } = useAssetStickerPrint();
 
   const { data: txns } = useQuery({
     queryKey: ['asset-txns', asset.asset_id],
@@ -846,16 +850,27 @@ function AssetDetailPanel({
       )}
 
       {/* Product info */}
-      <div className="flex-none px-4 py-3 border-b border-line bg-surface">
-        <div className="text-xs text-subtle">
-          {[asset.brand_name, asset.family_name, asset.model_name].filter(Boolean).join(' > ')}
+      <div className="flex-none px-4 py-3 border-b border-line bg-surface flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="text-xs text-subtle">
+            {[asset.brand_name, asset.family_name, asset.model_name].filter(Boolean).join(' > ')}
+          </div>
+          <div className="font-semibold text-sm mt-0.5">{asset.variant_name}</div>
+          <div className="text-xs text-subtle">{asset.sku_code}</div>
+          {asset.physical_color && (
+            <div className="text-xs text-subtle mt-0.5">{t('asset.color')}: {asset.physical_color}</div>
+          )}
         </div>
-        <div className="font-semibold text-sm mt-0.5">{asset.variant_name}</div>
-        <div className="text-xs text-subtle">{asset.sku_code}</div>
-        {asset.physical_color && (
-          <div className="text-xs text-subtle mt-0.5">{t('asset.color')}: {asset.physical_color}</div>
-        )}
+        <Button
+          variant="outline"
+          size="sm"
+          startIcon={<Printer size={14} />}
+          onClick={() => printAssetSticker(asset)}
+        >
+          {t('asset.printSticker', { defaultValue: 'Print sticker' })}
+        </Button>
       </div>
+      {stickerPortal}
 
       {/* Identifiers */}
       {asset.identifiers.length > 0 && (
@@ -1438,4 +1453,188 @@ function AssetActionModal({
       ) : null}
     </Modal>
   );
+}
+
+// ============================================================================
+// Asset sticker print — XP-420B 75×25mm thermal label
+// Two columns: left wider (code, family + base_model, suffix + bat% + color,
+// Code128 barcode); right narrower (external_ref, condition, serial, imei).
+// Fields with no value are omitted. Color + condition are always Thai.
+// ============================================================================
+
+interface AssetLabelRow {
+  asset_id: number;
+  external_ref: string | null;
+}
+
+// Variant COLOR option codes → Thai. Keys are uppercased + underscore-joined
+// (e.g. "Mist Blue" → "MIST_BLUE"). Anything missing falls back to the raw
+// English value so we never blank out the sticker.
+const COLOR_TH: Record<string, string> = {
+  BLACK: 'ดำ',
+  WHITE: 'ขาว',
+  SILVER: 'เงิน',
+  GOLD: 'ทอง',
+  ROSE_GOLD: 'ชมพูทอง',
+  BLUE: 'น้ำเงิน',
+  DEEP_BLUE: 'น้ำเงินเข้ม',
+  MIST_BLUE: 'ฟ้าหมอก',
+  RED: 'แดง',
+  GREEN: 'เขียว',
+  SAGE: 'เขียวเซจ',
+  PURPLE: 'ม่วง',
+  YELLOW: 'เหลือง',
+  PINK: 'ชมพู',
+  GRAY: 'เทา',
+  ORANGE: 'ส้ม',
+  COSMIC_ORANGE: 'ส้มคอสมิก',
+  LAVENDER: 'ลาเวนเดอร์',
+  MIDNIGHT: 'มิดไนท์',
+  STARLIGHT: 'สตาร์ไลท์',
+  NATURAL: 'ธรรมชาติ',
+  NATURAL_TITANIUM: 'ไทเทเนียมธรรมชาติ',
+  BLACK_TITANIUM: 'ไทเทเนียมดำ',
+  WHITE_TITANIUM: 'ไทเทเนียมขาว',
+  DESERT_TITANIUM: 'ไทเทเนียมทะเลทราย',
+};
+
+function colorToThai(raw: string | null | undefined): string {
+  if (!raw) return '';
+  const key = raw.trim().toUpperCase().replace(/[\s-]+/g, '_');
+  return COLOR_TH[key] ?? raw;
+}
+
+function AssetSticker({ asset }: { asset: Asset }) {
+  const { t } = useTranslation();
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  // Only external_ref isn't on v_assets; fetch it separately.
+  const { data: label } = useQuery({
+    queryKey: ['asset-label', asset.asset_id],
+    queryFn: async () => {
+      const rows = await apiClient.get<AssetLabelRow[]>(
+        `/v_asset_label?asset_id=eq.${asset.asset_id}&select=asset_id,external_ref&limit=1`,
+      );
+      return Array.isArray(rows) ? rows[0] ?? null : null;
+    },
+    staleTime: 30 * 1000,
+  });
+
+  useEffect(() => {
+    if (!svgRef.current) return;
+    try {
+      JsBarcode(svgRef.current, asset.asset_code, {
+        format: 'CODE128',
+        width: 1.4,
+        height: 30,
+        displayValue: false,
+        margin: 0,
+        background: '#ffffff',
+        lineColor: '#000000',
+      });
+    } catch {
+      if (svgRef.current) svgRef.current.innerHTML = '';
+    }
+  }, [asset.asset_code]);
+
+  // Strip the leading base_model_name from model_name to recover the suffix
+  // ("Pro Max 256GB" → "256GB"). When backend exposes model_name_suffix on
+  // v_assets we can use that directly.
+  const modelNameSuffix = (() => {
+    const base = asset.base_model_name?.trim() ?? '';
+    const full = asset.model_name?.trim() ?? '';
+    if (!base) return full;
+    if (full === base) return '';
+    if (full.toLowerCase().startsWith(base.toLowerCase() + ' ')) {
+      return full.slice(base.length + 1);
+    }
+    return full;
+  })();
+
+  const colorTh = colorToThai(asset.physical_color ?? asset.manufacturer_color);
+  // Condition: always Thai, regardless of current UI locale.
+  const conditionTh = t(`inventory.condition${asset.condition_grade}`, {
+    lng: 'th',
+    defaultValue: asset.condition_grade,
+  });
+
+  return (
+    <div className="asset-sticker">
+      <div className="asset-sticker-left">
+        <div className="asset-sticker-code">{asset.asset_code_display ?? asset.asset_code}</div>
+        <div className="asset-sticker-line">
+          <span>{asset.family_name}</span>
+          {asset.base_model_name && <span>{asset.base_model_name}</span>}
+        </div>
+        <div className="asset-sticker-line asset-sticker-line-sub">
+          {modelNameSuffix && <span>{modelNameSuffix}</span>}
+          {asset.battery_health != null && <span>Bat {asset.battery_health}%</span>}
+          {colorTh && <span>{colorTh}</span>}
+        </div>
+        <svg ref={svgRef} className="asset-sticker-barcode" />
+      </div>
+      <div className="asset-sticker-right">
+        {label?.external_ref && (
+          <div><span className="asset-sticker-tag">EXT</span> {label.external_ref}</div>
+        )}
+        <div>{conditionTh}</div>
+        {asset.serial_no && (
+          <div><span className="asset-sticker-tag">SN</span> {asset.serial_no}</div>
+        )}
+        {asset.imei && (
+          <div><span className="asset-sticker-tag">IMEI</span> {asset.imei}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function useAssetStickerPrint() {
+  const queryClient = useQueryClient();
+  const [printAsset, setPrintAsset] = useState<Asset | null>(null);
+
+  const handlePrint = useCallback(async (asset: Asset) => {
+    // Warm the external_ref query before mounting the sticker so it has data
+    // on first render — otherwise window.print() fires before .asset-sticker
+    // exists in DOM, the body:has(.asset-sticker) isolation rule never
+    // matches, and the whole UI prints.
+    try {
+      await queryClient.fetchQuery({
+        queryKey: ['asset-label', asset.asset_id],
+        queryFn: async () => {
+          const rows = await apiClient.get<AssetLabelRow[]>(
+            `/v_asset_label?asset_id=eq.${asset.asset_id}&select=asset_id,external_ref&limit=1`,
+          );
+          return Array.isArray(rows) ? rows[0] ?? null : null;
+        },
+      });
+    } catch {
+      // Fall through — sticker will print with external_ref blank if needed.
+    }
+    setPrintAsset(asset);
+    // Two rAFs — React commits, browser paints, then open print dialog.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const styleEl = document.createElement('style');
+      styleEl.id = 'asset-sticker-print-page';
+      styleEl.textContent = '@media print { @page { size: 76mm 26mm; margin: 0; } }';
+      document.head.appendChild(styleEl);
+      try {
+        window.print();
+      } finally {
+        styleEl.remove();
+        setPrintAsset(null);
+      }
+    }));
+  }, [queryClient]);
+
+  const portal = printAsset
+    ? createPortal(
+        <div className="print-only-asset-sticker" aria-hidden>
+          <AssetSticker asset={printAsset} />
+        </div>,
+        document.body,
+      )
+    : null;
+
+  return { handlePrint, portal };
 }

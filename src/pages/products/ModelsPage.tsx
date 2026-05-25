@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, DataTable, Badge, Input, Select, Button, Modal, Switch, MobileHeader, PopOver, useSnackbarContext, FormErrorMessage } from 'tsp-form';
@@ -76,6 +77,7 @@ interface BrandLookup {
 interface FamilyLookup {
   id: number;
   brand_id: number;
+  brand_name: string;
   display_name: string;
 }
 
@@ -161,6 +163,7 @@ interface PreviewData {
 }
 
 interface CreateModelForm {
+  brand_id: string;
   family_id: string;
   model_name: string;
   [key: `axis_${string}`]: string;
@@ -171,11 +174,12 @@ interface CreateModelForm {
 
 // ── CreateModelModal ─────────────────────────────────────────────────────────
 
-function CreateModelModal({ open, onClose, holdingId, families }: {
+function CreateModelModal({ open, onClose, holdingId, families, brands }: {
   open: boolean;
   onClose: () => void;
   holdingId: number | null;
   families: FamilyLookup[];
+  brands: BrandLookup[];
 }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -191,10 +195,45 @@ function CreateModelModal({ open, onClose, holdingId, families }: {
 
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
   const { register, handleSubmit, reset, watch, setValue, control, formState: { errors, isDirty } } = useForm<CreateModelForm>({
-    defaultValues: { family_id: '', model_name: '', is_contractable: false, is_sellable: true, is_giftable: false },
+    defaultValues: { brand_id: '', family_id: '', model_name: '', is_contractable: false, is_sellable: true, is_giftable: false },
   });
 
+  const selectedBrandId = watch('brand_id');
   const selectedFamilyId = watch('family_id');
+
+  // Debounced family search — backend ilike kicks in at 2+ chars
+  const [familySearchInput, setFamilySearchInput] = useState('');
+  const [familySearchTerm, setFamilySearchTerm] = useState('');
+  const familySearchTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => {
+    clearTimeout(familySearchTimerRef.current);
+    familySearchTimerRef.current = setTimeout(() => setFamilySearchTerm(familySearchInput.trim()), 250);
+    return () => clearTimeout(familySearchTimerRef.current);
+  }, [familySearchInput]);
+
+  const familySearchEnabled = familySearchTerm.length >= 2;
+
+  const { data: searchedFamilies = [] } = useQuery({
+    queryKey: ['family-search', holdingId, familySearchTerm, selectedBrandId],
+    queryFn: () => {
+      const term = encodeURIComponent(familySearchTerm);
+      const params: string[] = [
+        `holding_id=eq.${holdingId}`,
+        'is_active=is.true',
+        'select=id,brand_id,brand_name,display_name',
+        'limit=20',
+      ];
+      if (selectedBrandId) {
+        params.push(`brand_id=eq.${selectedBrandId}`);
+        params.push(`or=(family_code.ilike.*${term}*,display_name.ilike.*${term}*)`);
+      } else {
+        params.push(`or=(family_code.ilike.*${term}*,display_name.ilike.*${term}*,brand_name.ilike.*${term}*)`);
+      }
+      return apiClient.get<FamilyLookup[]>(`/v_ref_product_family_list?${params.join('&')}`);
+    },
+    enabled: familySearchEnabled && !!holdingId,
+    staleTime: 60 * 1000,
+  });
 
   // Fetch model attribute config when family is selected
   const { data: familyConfig, isFetching: configLoading } = useQuery({
@@ -239,7 +278,34 @@ function CreateModelModal({ open, onClose, holdingId, families }: {
   }, [familyConfig, setValue]);
 
   const axes = familyConfig?.axes ?? [];
-  const familyOptions = families.map(f => ({ value: String(f.id), label: f.display_name }));
+
+  // Build the family options list: baseline lookup (brand-scoped if brand picked)
+  // merged with backend search hits (deduped by id). Brand name is shown in the
+  // label only when no brand is picked, to give context across brands.
+  const brandOptions = brands.map(b => ({ value: String(b.id), label: b.name }));
+  const baselineFamilies = selectedBrandId
+    ? families.filter(f => String(f.brand_id) === selectedBrandId)
+    : families;
+  const familyMap = new Map<number, FamilyLookup>();
+  for (const f of baselineFamilies) familyMap.set(f.id, f);
+  for (const f of searchedFamilies) familyMap.set(f.id, f);
+  const mergedFamilies = Array.from(familyMap.values());
+  const familyOptions = mergedFamilies.map(f => ({
+    value: String(f.id),
+    label: selectedBrandId ? f.display_name : `${f.display_name} — ${f.brand_name}`,
+  }));
+
+  // When brand changes, clear family if it no longer matches the brand.
+  useEffect(() => {
+    if (!selectedBrandId || !selectedFamilyId) return;
+    const fam = mergedFamilies.find(f => String(f.id) === selectedFamilyId);
+    if (fam && String(fam.brand_id) !== selectedBrandId) {
+      setValue('family_id', '', { shouldValidate: true });
+      lastConfigRef.current = null;
+    }
+    // mergedFamilies intentionally omitted — only react to brand/family id changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedBrandId, selectedFamilyId]);
 
   // ── Variant helpers ────────────────────────────────────────────────────────
 
@@ -469,7 +535,24 @@ function CreateModelModal({ open, onClose, holdingId, families }: {
           )}
 
           <div className="form-grid">
-            {/* Family select */}
+            {/* Brand select (optional — narrows family options) */}
+            <div className="flex flex-col">
+              <label className="form-label">{t('models.brand')}</label>
+              <div>
+                <Select
+                  options={brandOptions}
+                  value={selectedBrandId || null}
+                  onChange={(val) => {
+                    setValue('brand_id', (val as string) ?? '', { shouldValidate: true });
+                  }}
+                  placeholder={t('models.selectBrandOptional')}
+                  showChevron
+                  clearable
+                />
+              </div>
+            </div>
+
+            {/* Family select — typing 2+ chars triggers backend ilike search */}
             <div className="flex flex-col">
               <label className="form-label">{t('models.family')}</label>
               <div>
@@ -477,24 +560,27 @@ function CreateModelModal({ open, onClose, holdingId, families }: {
                   options={familyOptions}
                   value={selectedFamilyId || null}
                   onChange={(val) => {
-                    setValue('family_id', (val as string) ?? '', { shouldValidate: true });
+                    const newId = (val as string) ?? '';
+                    setValue('family_id', newId, { shouldValidate: true });
                     setPreview(null);
                     // Reset axis values when family changes
                     lastConfigRef.current = null;
+                    // Auto-fill brand when family is picked and brand is empty
+                    if (newId && !selectedBrandId) {
+                      const fam = mergedFamilies.find(f => String(f.id) === newId);
+                      if (fam) setValue('brand_id', String(fam.brand_id), { shouldValidate: true });
+                    }
                   }}
-                  placeholder={t('models.selectFamily')}
+                  onSearchChange={setFamilySearchInput}
+                  placeholder={t('models.familyPlaceholder')}
                   showChevron
                   error={!!errors.family_id}
                 />
               </div>
               <input type="hidden" {...register('family_id', { required: t('models.selectFamily') })} />
               <FormErrorMessage error={errors.family_id} />
+              <span className="text-xs text-subtle mt-1">{t('models.familySearchHint')}</span>
             </div>
-
-            {/* Hint when no family selected */}
-            {!selectedFamilyId && (
-              <div className="text-xs text-subtle">{t('models.selectFamilyFirst')}</div>
-            )}
 
             {/* Loading config */}
             {selectedFamilyId && configLoading && (
@@ -797,8 +883,13 @@ export function ModelsPage() {
   // Create modal
   const [createOpen, setCreateOpen] = useState(false);
 
-  // Selected model for detail panel
-  const [selectedModelId, setSelectedModelId] = useState<number | null>(null);
+  // Selected model for detail panel — URL is canonical: /admin/products/models/:modelId
+  const navigate = useNavigate();
+  const { modelId: modelIdParam } = useParams<{ modelId?: string }>();
+  const selectedModelId: number | null = modelIdParam ? Number(modelIdParam) : null;
+  const setSelectedModelId = (id: number | null) => {
+    navigate(id != null ? `/admin/products/models/${id}` : '/admin/products/models');
+  };
 
   // Search debounce
   const handleSearch = (value: string) => {
@@ -823,7 +914,7 @@ export function ModelsPage() {
   const { data: families = [] } = useQuery({
     queryKey: ['family-lookup', holdingId],
     queryFn: () => apiClient.get<FamilyLookup[]>(
-      `/v_ref_product_family_list?holding_id=eq.${holdingId}&is_active=is.true&order=display_name`
+      `/v_ref_product_family_list?holding_id=eq.${holdingId}&is_active=is.true&order=display_name&select=id,brand_id,brand_name,display_name`
     ),
     staleTime: 5 * 60 * 1000,
   });
@@ -913,7 +1004,23 @@ export function ModelsPage() {
   }, [searchData, holdingId]);
   const totalCount = searchData?.total ?? 0;
 
-  const selectedModel = selectedModelId ? models.find(m => m.model_id === selectedModelId) ?? null : null;
+  // Fallback fetch — when the route id points to a model that isn't in the
+  // current search page, load it directly so deep links resolve.
+  const inResults = !!selectedModelId && models.some(m => m.model_id === selectedModelId);
+  const { data: fallbackModel } = useQuery({
+    queryKey: ['model-detail-fallback', selectedModelId],
+    queryFn: async () => {
+      const rows = await apiClient.get<Model[]>(
+        `/v_product_model_list?model_id=eq.${selectedModelId}&limit=1`,
+      );
+      return Array.isArray(rows) ? rows[0] ?? null : null;
+    },
+    enabled: !!selectedModelId && !inResults,
+  });
+
+  const selectedModel = selectedModelId
+    ? (models.find(m => m.model_id === selectedModelId) ?? fallbackModel ?? null)
+    : null;
   const detailTitle = selectedModel
     ? (selectedModel.model_name_suffix
         ? `${selectedModel.base_model_name} ${selectedModel.model_name_suffix}`
@@ -1195,6 +1302,7 @@ export function ModelsPage() {
               onClose={() => setCreateOpen(false)}
               holdingId={holdingId}
               families={families}
+              brands={brands}
             />
           </>
         );
