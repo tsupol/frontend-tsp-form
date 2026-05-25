@@ -674,7 +674,7 @@ function LotDetailPanel({
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
           <span className="font-semibold">{codeDisplay(lot.lot_code_display, lot.lot_code)}</span>
-          <CopyButton value={lot.lot_code} />
+          <CopyButton value={codeDisplay(lot.lot_code_display, lot.lot_code)} />
           <Badge size="xs" color={getBucketColor(lot.current_bucket)}>
             {getBucketLabel(lot.current_bucket, t)}
           </Badge>

@@ -369,7 +369,7 @@ function ReceiptDetailPanel({
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
           <span className="font-semibold">{codeDisplay(detail.code_display, detail.receipt_no)}</span>
-          <CopyButton value={detail.receipt_no} />
+          <CopyButton value={codeDisplay(detail.code_display, detail.receipt_no)} />
           <Badge size="xs" color={RECEIPT_STATUS_COLOR[detail.status] ?? 'default'}>
             {t(`receiving.status_${detail.status}`, detail.status)}
           </Badge>

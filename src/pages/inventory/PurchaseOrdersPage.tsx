@@ -544,7 +544,7 @@ function PoDetailPanel({
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
           <span className="font-semibold">{codeDisplay(detail.code_display, detail.po_no)}</span>
-          <CopyButton value={detail.po_no} />
+          <CopyButton value={codeDisplay(detail.code_display, detail.po_no)} />
           <Badge size="xs" color={STATUS_COLOR[detail.status] ?? 'default'}>
             {statusLabel(detail.status)}
           </Badge>

@@ -377,7 +377,7 @@ function BuybackDetailPanel({
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
           <span className="font-semibold">{codeDisplay(detail.code_display, detail.po_no)}</span>
-          <CopyButton value={detail.po_no} />
+          <CopyButton value={codeDisplay(detail.code_display, detail.po_no)} />
           <Badge size="xs" color={BUYBACK_STATUS_COLOR[detail.status] ?? 'default'}>
             {t(`buyback.status_${detail.status}`, detail.status)}
           </Badge>

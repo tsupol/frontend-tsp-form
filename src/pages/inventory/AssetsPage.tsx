@@ -835,7 +835,7 @@ function AssetDetailPanel({
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
           <span className="font-semibold">{codeDisplay(asset.asset_code_display, asset.asset_code)}</span>
-          <CopyButton value={asset.asset_code} />
+          <CopyButton value={codeDisplay(asset.asset_code_display, asset.asset_code)} />
           <Badge size="xs" color={getBucketColor(asset.current_bucket)}>
             {getBucketLabel(asset.current_bucket, t)}
           </Badge>
