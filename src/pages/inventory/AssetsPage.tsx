@@ -1523,15 +1523,29 @@ function AssetSticker({ asset }: { asset: Asset }) {
   useEffect(() => {
     if (!svgRef.current) return;
     try {
-      JsBarcode(svgRef.current, asset.asset_code, {
+      // Strip the fixed "AT" prefix — all asset_codes start with it, and the
+      // numeric tail uniquely identifies the asset. Encoding digits-only
+      // with Code 128 Subset C (2 digits per char) halves the module count
+      // → wider bars + no letter-pattern misreads (T was decoding as G).
+      // Scan handlers must prefix with "AT" when looking up.
+      const digits = asset.asset_code.replace(/^AT/, '');
+      JsBarcode(svgRef.current, digits, {
         format: 'CODE128',
-        width: 1.4,
-        height: 30,
+        width: 2.5,
+        height: 45,
         displayValue: false,
-        margin: 0,
+        margin: 10,
         background: '#ffffff',
         lineColor: '#000000',
       });
+      // Disable edge anti-aliasing so the rasterizer doesn't soften bar edges
+      // into gray gradients — thermal printers darken proportional to gray,
+      // and gray edges turn into faded bars.
+      svgRef.current.setAttribute('shape-rendering', 'crispEdges');
+      // Stretch X and Y independently. Bar widths (the only thing that
+      // matters for Code 128 decoding) stay proportional to each other; the
+      // SVG fills the full sticker width regardless of height clamp.
+      svgRef.current.setAttribute('preserveAspectRatio', 'none');
     } catch {
       if (svgRef.current) svgRef.current.innerHTML = '';
     }
@@ -1571,7 +1585,6 @@ function AssetSticker({ asset }: { asset: Asset }) {
           {asset.battery_health != null && <span>Bat {asset.battery_health}%</span>}
           {colorTh && <span>{colorTh}</span>}
         </div>
-        <svg ref={svgRef} className="asset-sticker-barcode" />
       </div>
       <div className="asset-sticker-right">
         {label?.external_ref && (
@@ -1585,6 +1598,7 @@ function AssetSticker({ asset }: { asset: Asset }) {
           <div><span className="asset-sticker-tag">IMEI</span> {asset.imei}</div>
         )}
       </div>
+      <svg ref={svgRef} className="asset-sticker-barcode" />
     </div>
   );
 }

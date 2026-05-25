@@ -774,14 +774,16 @@ function BarcodeSticker({ row }: { row: BarcodeRow }) {
     try {
       JsBarcode(svgRef.current, row.barcode, {
         format: jsbarcodeFormat(row.barcode_type, row.barcode),
-        width: 1.6,
-        height: 38,
+        // Wider narrow-bar — see AssetSticker for the 203-DPI rationale.
+        width: 2.2,
+        height: 70,
         displayValue: true,
         fontSize: 9,
         margin: 0,
         background: '#ffffff',
         lineColor: '#000000',
       });
+      svgRef.current.setAttribute('shape-rendering', 'crispEdges');
     } catch {
       if (svgRef.current) svgRef.current.innerHTML = '';
     }

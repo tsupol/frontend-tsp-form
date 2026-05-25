@@ -245,6 +245,15 @@ input[type="number"
     .asset-sticker {
         margin: 0 !important;
     }
+
+    /* Thermal-print render hints — suppress subpixel positioning and LCD
+       anti-aliasing which both turn into visible gray softening on the
+       printer head. Applied to both label types. */
+    .asset-sticker, .barcode-sticker {
+        text-rendering: geometricPrecision;
+        -webkit-font-smoothing: none;
+        font-smooth: never;
+    }
 }
 
 /* Barcode sticker — XP-420B 50×30mm thermal label.
@@ -257,7 +266,10 @@ input[type="number"
     padding: 1mm 1.5mm;
     background: #fff;
     color: #000;
-    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Sarabun", sans-serif;
+    /* Tahoma ships on Windows + has Thai glyphs and is well-hinted at small
+       sizes — sharper on 203-DPI thermal heads than Segoe UI / system-ui. */
+    font-family: Tahoma, Arial, Helvetica, sans-serif;
+    font-weight: 700;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -288,6 +300,8 @@ input[type="number"
     width: 100%;
     height: auto;
     max-height: 15mm;
+    shape-rendering: crispEdges;
+    image-rendering: pixelated;
 }
 
 /* Screen: hide the portaled sticker while it's mounted briefly during the
@@ -316,13 +330,19 @@ input[type="number"
     height: 26mm;
     /* Top/right/bottom/left — extra top + left to compensate for the XP-420B
        physical print-area offset from the label edge. */
-    padding: 2mm 1.5mm 1mm 3.5mm;
+    padding: 2mm 1.5mm 1mm 2.5mm;
     background: #fff;
     color: #000;
-    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Sarabun", sans-serif;
+    /* Tahoma ships on Windows + has Thai glyphs and is well-hinted at small
+       sizes — sharper on 203-DPI thermal heads than Segoe UI / system-ui. */
+    font-family: Tahoma, Arial, Helvetica, sans-serif;
+    /* Bold everything for thermal punch; SN / IMEI tags opt out below. */
+    font-weight: 700;
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 1.5mm;
+    grid-template-rows: 1fr auto;
+    column-gap: 1.5mm;
+    row-gap: 0.5mm;
     overflow: hidden;
 }
 .asset-sticker .asset-sticker-left {
@@ -350,8 +370,8 @@ input[type="number"
     font-variant-numeric: tabular-nums;
 }
 .asset-sticker .asset-sticker-tag {
-    font-size: 7.5pt;
-    font-weight: 600;
+    font-size: 6pt;
+    font-weight: 700;
     opacity: 0.7;
     margin-right: 0.3mm;
 }
@@ -382,10 +402,12 @@ input[type="number"
     min-width: 0;
 }
 .asset-sticker .asset-sticker-barcode {
-    width: 100%;
-    height: auto;
-    max-height: 11mm;
-    margin-top: 2mm;
+    grid-column: 1 / -1;
+    justify-self: center;
+    width: 55mm;
+    height: 8mm;
+    shape-rendering: crispEdges;
+    image-rendering: pixelated;
 }
 @media screen {
     .print-only-asset-sticker .asset-sticker {
