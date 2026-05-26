@@ -184,14 +184,9 @@ function CreateModelModal({ open, onClose, holdingId, families, brands }: {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
-  const [isPending, setIsPending] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [errorKey, setErrorKey] = useState(0);
-  const [preview, setPreview] = useState<PreviewData | null>(null);
-
-  // Variants — managed outside react-hook-form (list state is simpler as plain useState)
-  const [variants, setVariants] = useState<VariantInput[]>([]);
 
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
   const { register, handleSubmit, reset, watch, setValue, control, formState: { errors, isDirty } } = useForm<CreateModelForm>({
@@ -201,39 +196,10 @@ function CreateModelModal({ open, onClose, holdingId, families, brands }: {
   const selectedBrandId = watch('brand_id');
   const selectedFamilyId = watch('family_id');
 
-  // Debounced family search — backend ilike kicks in at 2+ chars
-  const [familySearchInput, setFamilySearchInput] = useState('');
-  const [familySearchTerm, setFamilySearchTerm] = useState('');
-  const familySearchTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-  useEffect(() => {
-    clearTimeout(familySearchTimerRef.current);
-    familySearchTimerRef.current = setTimeout(() => setFamilySearchTerm(familySearchInput.trim()), 250);
-    return () => clearTimeout(familySearchTimerRef.current);
-  }, [familySearchInput]);
-
-  const familySearchEnabled = familySearchTerm.length >= 2;
-
-  const { data: searchedFamilies = [] } = useQuery({
-    queryKey: ['family-search', holdingId, familySearchTerm, selectedBrandId],
-    queryFn: () => {
-      const term = encodeURIComponent(familySearchTerm);
-      const params: string[] = [
-        `holding_id=eq.${holdingId}`,
-        'is_active=is.true',
-        'select=id,brand_id,brand_name,display_name',
-        'limit=20',
-      ];
-      if (selectedBrandId) {
-        params.push(`brand_id=eq.${selectedBrandId}`);
-        params.push(`or=(family_code.ilike.*${term}*,display_name.ilike.*${term}*)`);
-      } else {
-        params.push(`or=(family_code.ilike.*${term}*,display_name.ilike.*${term}*,brand_name.ilike.*${term}*)`);
-      }
-      return apiClient.get<FamilyLookup[]>(`/v_ref_product_family_list?${params.join('&')}`);
-    },
-    enabled: familySearchEnabled && !!holdingId,
-    staleTime: 60 * 1000,
-  });
+  // Family search is purely client-side — the families prop already holds the
+  // full active list. Track the typed text so token-AND matching ("iph 11" →
+  // "iPhone 11") works against display_name + brand_name.
+  const [familyQuery, setFamilyQuery] = useState('');
 
   // Fetch model attribute config when family is selected
   const { data: familyConfig, isFetching: configLoading } = useQuery({
@@ -246,20 +212,7 @@ function CreateModelModal({ open, onClose, holdingId, families, brands }: {
     select: (data) => data[0] ?? null,
   });
 
-  // Fetch variant attribute config (separate view, may have axes like COLOR)
-  const { data: variantConfig } = useQuery({
-    queryKey: ['family-variant-attr-config', selectedFamilyId],
-    queryFn: () => apiClient.get<FamilyVariantConfig[]>(
-      `/v_family_variant_attribute_config?family_id=eq.${selectedFamilyId}&holding_id=eq.${holdingId}`
-    ),
-    enabled: !!selectedFamilyId && !!holdingId,
-    staleTime: 5 * 60 * 1000,
-    select: (data) => data[0] ?? null,
-  });
-
-  const variantAxes = variantConfig?.axes ?? [];
-
-  // Set defaults when config loads (and reset variants on family change)
+  // Set defaults when config loads
   const lastConfigRef = useRef<number | null>(null);
   useEffect(() => {
     if (!familyConfig) return;
@@ -274,115 +227,47 @@ function CreateModelModal({ open, onClose, holdingId, families, brands }: {
         setValue(`axis_${axis.attribute_code}` as keyof CreateModelForm, defaultOpt.option_code);
       }
     }
-    setVariants([]);
   }, [familyConfig, setValue]);
 
   const axes = familyConfig?.axes ?? [];
 
-  // Build the family options list: baseline lookup (brand-scoped if brand picked)
-  // merged with backend search hits (deduped by id). Brand name is shown in the
-  // label only when no brand is picked, to give context across brands.
   const brandOptions = brands.map(b => ({ value: String(b.id), label: b.name }));
-  const baselineFamilies = selectedBrandId
-    ? families.filter(f => String(f.brand_id) === selectedBrandId)
-    : families;
-  const familyMap = new Map<number, FamilyLookup>();
-  for (const f of baselineFamilies) familyMap.set(f.id, f);
-  for (const f of searchedFamilies) familyMap.set(f.id, f);
-  const mergedFamilies = Array.from(familyMap.values());
-  const familyOptions = mergedFamilies.map(f => ({
+
+  // Token-AND match over display_name + brand_name, so "iph 11" finds
+  // "iPhone 11" and "apple iph" still narrows by brand.
+  const filteredFamilies = useMemo(() => {
+    const brandScoped = selectedBrandId
+      ? families.filter(f => String(f.brand_id) === selectedBrandId)
+      : families;
+    const tokens = familyQuery.toLowerCase().split(/\s+/).filter(Boolean);
+    if (tokens.length === 0) return brandScoped;
+    return brandScoped.filter(f => {
+      const hay = `${f.display_name} ${f.brand_name}`.toLowerCase();
+      return tokens.every(tok => hay.includes(tok));
+    });
+  }, [families, selectedBrandId, familyQuery]);
+
+  const familyOptions = filteredFamilies.map(f => ({
     value: String(f.id),
     label: selectedBrandId ? f.display_name : `${f.display_name} — ${f.brand_name}`,
   }));
 
-  // When brand changes, clear family if it no longer matches the brand.
+  // When the user changes brand, clear family if it no longer matches. Skip
+  // when brand-changes are triggered by the family-pick auto-fill (which
+  // always sets brand to match, so there's nothing to clear).
+  const lastBrandRef = useRef<string>('');
   useEffect(() => {
+    if (selectedBrandId === lastBrandRef.current) return;
+    lastBrandRef.current = selectedBrandId;
     if (!selectedBrandId || !selectedFamilyId) return;
-    const fam = mergedFamilies.find(f => String(f.id) === selectedFamilyId);
+    const fam = families.find(f => String(f.id) === selectedFamilyId);
     if (fam && String(fam.brand_id) !== selectedBrandId) {
       setValue('family_id', '', { shouldValidate: true });
       lastConfigRef.current = null;
     }
-    // mergedFamilies intentionally omitted — only react to brand/family id changes
+    // families intentionally omitted — only react to brand id changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedBrandId, selectedFamilyId]);
-
-  // ── Variant helpers ────────────────────────────────────────────────────────
-
-  /** Stable key for a variant's option set, used for dedup. */
-  const optionSetKey = (os: Record<string, string>) =>
-    Object.keys(os).sort().map(k => `${k}=${os[k]}`).join('|');
-
-  /** Toggle a single option for a single axis — adds or removes the matching variant row. */
-  const toggleVariantOption = (axisCode: string, optionCode: string) => {
-    setPreview(null);
-    setVariants(prev => {
-      // For single-axis families (the common case), each toggled option = one variant row.
-      // For multi-axis families, the user needs to add a row first then refine — see below.
-      if (variantAxes.length === 1) {
-        const exists = prev.find(v => v.option_set[axisCode] === optionCode);
-        if (exists) {
-          return prev.filter(v => v !== exists);
-        }
-        return [
-          ...prev,
-          {
-            client_id: `v_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-            option_set: { [axisCode]: optionCode },
-          },
-        ];
-      }
-      return prev;
-    });
-  };
-
-  /** True when this option is currently part of any variant row's option_set. */
-  const isOptionSelected = (axisCode: string, optionCode: string) =>
-    variants.some(v => v.option_set[axisCode] === optionCode);
-
-  /** Add a blank row for multi-axis families — user fills in each axis manually. */
-  const addBlankVariant = () => {
-    setPreview(null);
-    setVariants(prev => [
-      ...prev,
-      {
-        client_id: `v_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        option_set: {},
-      },
-    ]);
-  };
-
-  const removeVariant = (clientId: string) => {
-    setPreview(null);
-    setVariants(prev => prev.filter(v => v.client_id !== clientId));
-  };
-
-  const updateVariantAxis = (clientId: string, axisCode: string, optionCode: string) => {
-    setPreview(null);
-    setVariants(prev => prev.map(v =>
-      v.client_id === clientId
-        ? { ...v, option_set: { ...v.option_set, [axisCode]: optionCode } }
-        : v
-    ));
-  };
-
-  /** Detect duplicates by option_set hash — shown as a warning, not a hard block. */
-  const duplicateClientIds = (() => {
-    const seen = new Map<string, string>();
-    const dups = new Set<string>();
-    for (const v of variants) {
-      const key = optionSetKey(v.option_set);
-      if (!key) continue;
-      const existing = seen.get(key);
-      if (existing) {
-        dups.add(existing);
-        dups.add(v.client_id);
-      } else {
-        seen.set(key, v.client_id);
-      }
-    }
-    return dups;
-  })();
 
   const buildPayload = (data: CreateModelForm) => {
     const optionSet: Record<string, string> = {};
@@ -390,14 +275,6 @@ function CreateModelModal({ open, onClose, holdingId, families, brands }: {
       const val = data[`axis_${axis.attribute_code}` as keyof CreateModelForm] as string;
       if (val) optionSet[axis.attribute_code] = val;
     }
-    const variantPayload = variants.map((v, idx) => ({
-      option_set: v.option_set,
-      sort_order: (idx + 1) * 10,
-      ...(v.color_group ? { color_group: v.color_group } : {}),
-      ...(v.manufacturer_color ? { manufacturer_color: v.manufacturer_color } : {}),
-      ...(v.master_color_code ? { master_color_code: v.master_color_code } : {}),
-      attributes: {},
-    }));
     return {
       p_holding_id: holdingId,
       p_company_id: null,
@@ -407,39 +284,15 @@ function CreateModelModal({ open, onClose, holdingId, families, brands }: {
       p_is_contractable: data.is_contractable,
       p_is_sellable: data.is_sellable,
       p_is_giftable: data.is_giftable,
-      p_variants: variantPayload,
+      p_variants: [],
     };
   };
 
-  const onPreview = async (data: CreateModelForm) => {
-    setIsPending(true);
-    setErrorMessage('');
-    setPreview(null);
-    const start = Date.now();
-    try {
-      const result = await apiClient.rpc<PreviewData>('product_create_validate', buildPayload(data));
-      setPreview(result);
-    } catch (err) {
-      if (err instanceof ApiError) {
-        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
-        setErrorMessage(translated || err.message);
-      } else {
-        setErrorMessage(t('common.error'));
-      }
-      setErrorKey(k => k + 1);
-    } finally {
-      const elapsed = Date.now() - start;
-      if (elapsed < 300) await new Promise(r => setTimeout(r, 300 - elapsed));
-      setIsPending(false);
-    }
-  };
-
-  const onConfirmCreate = async () => {
+  const onCreate = async (data: CreateModelForm) => {
     setIsCreating(true);
     setErrorMessage('');
     const start = Date.now();
     try {
-      const data = watch();
       await apiClient.rpc('product_create', buildPayload(data));
       addSnackbar({
         message: (
@@ -469,7 +322,7 @@ function CreateModelModal({ open, onClose, holdingId, families, brands }: {
   };
 
   const handleClose = () => {
-    if (isDirty || variants.length > 0) {
+    if (isDirty) {
       setConfirmCloseOpen(true);
       return;
     }
@@ -479,8 +332,6 @@ function CreateModelModal({ open, onClose, holdingId, families, brands }: {
   const forceClose = () => {
     reset();
     setErrorMessage('');
-    setPreview(null);
-    setVariants([]);
     lastConfigRef.current = null;
     setConfirmCloseOpen(false);
     onClose();
@@ -489,7 +340,7 @@ function CreateModelModal({ open, onClose, holdingId, families, brands }: {
   return (
     <>
     <Modal open={open} onClose={handleClose} maxWidth="32rem" width="100%">
-      <form className="flex flex-col overflow-hidden" onSubmit={handleSubmit(onPreview)}>
+      <form className="flex flex-col overflow-hidden" onSubmit={handleSubmit(onCreate)}>
         <div className="modal-header">
           <h2 className="modal-title">{t('models.addModel')}</h2>
           <button type="button" className="modal-close-btn" onClick={handleClose} aria-label="Close">&times;</button>
@@ -502,40 +353,8 @@ function CreateModelModal({ open, onClose, holdingId, families, brands }: {
             </div>
           )}
 
-          {preview && (
-            <div className="alert alert-info mb-4">
-              <Info size={18} />
-              <div className="min-w-0 flex-1">
-                <div className="alert-title">{t('models.previewCode')}: <span className="font-mono">{preview.generated_model_code}</span></div>
-                <div className="alert-description">{t('models.previewName')}: {preview.generated_model_name}</div>
-                {preview.variants && preview.variants.length > 0 && (
-                  <div className="mt-2 pt-2 border-t border-info/20">
-                    <div className="text-xs font-semibold uppercase tracking-wider mb-1.5 opacity-80">
-                      {t('models.variants')} ({preview.variants.length})
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      {preview.variants.map((v) => (
-                        <div key={v.generated_sku_code} className="text-xs flex items-baseline gap-2">
-                          <span className="font-mono shrink-0">{v.generated_sku_code}</span>
-                          <span className="text-subtle truncate">{v.generated_variant_name}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {preview.warnings && preview.warnings.length > 0 && (
-                  <div className="mt-2 pt-2 border-t border-info/20 flex flex-col gap-1">
-                    {preview.warnings.map((w, i) => (
-                      <div key={i} className="text-xs text-warning-fg">⚠ {w}</div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
           <div className="form-grid">
-            {/* Brand select (optional — narrows family options) */}
+            {/* Brand — clearable; if cleared, family stays selected unless brand mismatch. */}
             <div className="flex flex-col">
               <label className="form-label">{t('models.brand')}</label>
               <div>
@@ -552,7 +371,8 @@ function CreateModelModal({ open, onClose, holdingId, families, brands }: {
               </div>
             </div>
 
-            {/* Family select — typing 2+ chars triggers backend ilike search */}
+            {/* Family — client-side token-AND search over all active families;
+                picking a family auto-fills brand. */}
             <div className="flex flex-col">
               <label className="form-label">{t('models.family')}</label>
               <div>
@@ -561,25 +381,30 @@ function CreateModelModal({ open, onClose, holdingId, families, brands }: {
                   value={selectedFamilyId || null}
                   onChange={(val) => {
                     const newId = (val as string) ?? '';
-                    setValue('family_id', newId, { shouldValidate: true });
-                    setPreview(null);
-                    // Reset axis values when family changes
                     lastConfigRef.current = null;
-                    // Auto-fill brand when family is picked and brand is empty
-                    if (newId && !selectedBrandId) {
-                      const fam = mergedFamilies.find(f => String(f.id) === newId);
-                      if (fam) setValue('brand_id', String(fam.brand_id), { shouldValidate: true });
+                    // Set brand first so the brand-mismatch effect never sees a
+                    // transient state where the new family doesn't match the
+                    // (still-old) brand.
+                    if (newId) {
+                      const fam = families.find(f => String(f.id) === newId);
+                      if (fam) {
+                        const brandStr = String(fam.brand_id);
+                        lastBrandRef.current = brandStr;
+                        setValue('brand_id', brandStr, { shouldValidate: true });
+                      }
                     }
+                    setValue('family_id', newId, { shouldValidate: true });
                   }}
-                  onSearchChange={setFamilySearchInput}
+                  onSearchChange={setFamilyQuery}
+                  filterOptions={false}
                   placeholder={t('models.familyPlaceholder')}
                   showChevron
+                  clearable
                   error={!!errors.family_id}
                 />
               </div>
               <input type="hidden" {...register('family_id', { required: t('models.selectFamily') })} />
               <FormErrorMessage error={errors.family_id} />
-              <span className="text-xs text-subtle mt-1">{t('models.familySearchHint')}</span>
             </div>
 
             {/* Loading config */}
@@ -596,10 +421,6 @@ function CreateModelModal({ open, onClose, holdingId, families, brands }: {
                     id="cm-name"
                     error={!!errors.model_name}
                     {...register('model_name', { required: t('models.modelName') + ' is required' })}
-                    onChange={(e) => {
-                      register('model_name').onChange(e);
-                      setPreview(null);
-                    }}
                   />
                   <FormErrorMessage error={errors.model_name} />
                 </div>
@@ -626,7 +447,6 @@ function CreateModelModal({ open, onClose, holdingId, families, brands }: {
                           value={watch(fieldName) as string || null}
                           onChange={(val) => {
                             setValue(fieldName, (val as string) ?? '', { shouldValidate: true });
-                            setPreview(null);
                           }}
                           placeholder={t('models.selectOption')}
                           showChevron
@@ -638,97 +458,6 @@ function CreateModelModal({ open, onClose, holdingId, families, brands }: {
                     </div>
                   );
                 })}
-
-                {/* Variant axes — render as regular labeled fields, in line with model axes */}
-                {variantAxes.length === 1 && variantAxes[0] && (() => {
-                  const axis = variantAxes[0];
-                  const sortedOptions = [...axis.options].sort((a, b) => a.sort_order - b.sort_order);
-                  return (
-                    <div className="flex flex-col">
-                      <label className="form-label">
-                        {axis.attribute_name}
-                        {axis.unit ? ` (${axis.unit})` : ''}
-                      </label>
-                      <div className="flex flex-wrap gap-1.5">
-                        {sortedOptions.map(opt => {
-                          const selected = isOptionSelected(axis.attribute_code, opt.option_code);
-                          return (
-                            <button
-                              key={opt.option_id}
-                              type="button"
-                              onClick={() => toggleVariantOption(axis.attribute_code, opt.option_code)}
-                              className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
-                                selected
-                                  ? 'bg-primary text-primary-contrast border-primary'
-                                  : 'border-line text-fg hover:bg-surface-hover'
-                              }`}
-                            >
-                              {opt.option_label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {variantAxes.length > 1 && (
-                  <div className="flex flex-col">
-                    <label className="form-label">{t('models.variants')}</label>
-                    <div className="flex flex-col gap-2">
-                      {variants.map((v) => {
-                        const isDup = duplicateClientIds.has(v.client_id);
-                        return (
-                          <div
-                            key={v.client_id}
-                            className={`border rounded-md p-2 flex flex-col gap-2 ${
-                              isDup ? 'border-warning bg-warning/5' : 'border-line'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="text-[11px] text-subtle">
-                                {isDup ? t('models.duplicateVariant') : ''}
-                              </div>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="btn-icon-sm text-subtle hover:text-danger"
-                                onClick={() => removeVariant(v.client_id)}
-                                startIcon={<XCircle size={14} />}
-                              />
-                            </div>
-                            {variantAxes.map(axis => {
-                              const sortedOptions = [...axis.options].sort((a, b) => a.sort_order - b.sort_order);
-                              return (
-                                <div key={axis.attribute_id} className="flex flex-col">
-                                  <label className="form-label text-xs">{axis.attribute_name}</label>
-                                  <Select
-                                    options={sortedOptions.map(o => ({ value: o.option_code, label: o.option_label }))}
-                                    value={v.option_set[axis.attribute_code] || null}
-                                    onChange={(val) => updateVariantAxis(v.client_id, axis.attribute_code, (val as string) ?? '')}
-                                    placeholder={t('models.selectOption')}
-                                    showChevron
-                                    size="sm"
-                                  />
-                                </div>
-                              );
-                            })}
-                          </div>
-                        );
-                      })}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        startIcon={<Plus size={14} />}
-                        onClick={addBlankVariant}
-                      >
-                        {t('models.addVariant')}
-                      </Button>
-                    </div>
-                  </div>
-                )}
 
                 {/* Flags — one row */}
                 <div className="flex items-center gap-4 flex-wrap">
@@ -757,15 +486,9 @@ function CreateModelModal({ open, onClose, holdingId, families, brands }: {
         </div>
         <div className="modal-footer">
           <Button type="button" variant="ghost" onClick={handleClose}>{t('common.cancel')}</Button>
-          {preview ? (
-            <Button type="button" color="primary" disabled={isCreating} onClick={onConfirmCreate}>
-              {isCreating ? t('models.creating') : t('models.confirmCreate')}
-            </Button>
-          ) : (
-            <Button type="submit" color="primary" disabled={isPending || !selectedFamilyId}>
-              {isPending ? t('models.previewing') : t('models.preview')}
-            </Button>
-          )}
+          <Button type="submit" color="primary" disabled={isCreating || !selectedFamilyId}>
+            {isCreating ? t('models.creating') : t('common.create')}
+          </Button>
         </div>
       </form>
     </Modal>
