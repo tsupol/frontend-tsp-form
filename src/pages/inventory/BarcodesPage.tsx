@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
   DataTable, Button, Input, Badge, Modal, MobileHeader,
-  PopOver, MenuItem, LabeledCheckbox, useSnackbarContext,
+  PopOver, MenuItem, useSnackbarContext,
 } from 'tsp-form';
 import {
   Barcode, Plus, Search, ArrowRightFromLine, CheckCircle, XCircle,
@@ -177,27 +177,6 @@ export function BarcodesPage() {
     });
   };
 
-  const handleSetPrimary = async (row: BarcodeRow) => {
-    try {
-      await apiClient.rpc('barcode_update', {
-        p_barcode_id: row.barcode_id,
-        p_barcode: null,
-        p_barcode_type: null,
-        p_is_primary: true,
-      });
-      addSnackbar({
-        message: (
-          <div className="alert alert-success">
-            <CheckCircle size={18} />
-            <div><div className="alert-title">{t('barcodes.updateSuccess')}</div></div>
-          </div>
-        ),
-        type: 'success', duration: 3000,
-      });
-      queryClient.invalidateQueries({ queryKey: ['barcodes-list'] });
-    } catch (err) { showErr(err); }
-  };
-
   const handleToggleActive = async (row: BarcodeRow) => {
     try {
       if (row.is_active) {
@@ -349,7 +328,6 @@ export function BarcodesPage() {
                   row={r}
                   onView={setViewRow}
                   onPrint={handlePrint}
-                  onSetPrimary={handleSetPrimary}
                   onToggleActive={handleToggleActive}
                 />
               </div>
@@ -413,11 +391,10 @@ export function BarcodesPage() {
 
 // ── Row Actions ──────────────────────────────────────────────────────────────
 
-function RowActions({ row, onView, onPrint, onSetPrimary, onToggleActive }: {
+function RowActions({ row, onView, onPrint, onToggleActive }: {
   row: BarcodeRow;
   onView: (r: BarcodeRow) => void;
   onPrint: (r: BarcodeRow) => void;
-  onSetPrimary: (r: BarcodeRow) => void;
   onToggleActive: (r: BarcodeRow) => void;
 }) {
   const { t } = useTranslation();
@@ -450,12 +427,6 @@ function RowActions({ row, onView, onPrint, onSetPrimary, onToggleActive }: {
           label={t('barcodes.printSticker', { defaultValue: 'Print sticker' })}
           onClick={() => { setOpen(false); onPrint(row); }}
         />
-        {!row.is_primary && row.is_active && (
-          <MenuItem
-            label={t('barcodes.setPrimary')}
-            onClick={() => { setOpen(false); onSetPrimary(row); }}
-          />
-        )}
         <MenuItem
           icon={row.is_active ? <ShieldOff size={14} /> : <ShieldCheck size={14} />}
           label={row.is_active ? t('barcodes.disable') : t('barcodes.enable')}
@@ -479,8 +450,6 @@ function RegisterBarcodeModal({ open, onClose, initialBarcode, onSuccess }: Regi
   const { t } = useTranslation();
   const { addSnackbar } = useSnackbarContext();
   const [barcode, setBarcode] = useState(initialBarcode ?? '');
-  const [barcodeType, setBarcodeType] = useState<string>('EAN13');
-  const [isPrimary, setIsPrimary] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
   const [isPending, setIsPending] = useState(false);
 
@@ -489,11 +458,18 @@ function RegisterBarcodeModal({ open, onClose, initialBarcode, onSuccess }: Regi
   const [selectedModelId, setSelectedModelId] = useState<number | null>(null);
   const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null);
 
+  // Backend auto-detects from digit count (8/12/13). Mirror that locally so the
+  // user gets a hint before submit — backend is still the source of truth.
+  const digits = barcode.replace(/\D/g, '');
+  const isDigitsOnly = barcode.length > 0 && digits.length === barcode.length;
+  const detectedType =
+    digits.length === 8 ? 'EAN8' :
+    digits.length === 12 ? 'UPCA' :
+    digits.length === 13 ? 'EAN13' : null;
+
   useEffect(() => {
     if (open) {
       setBarcode(initialBarcode ?? '');
-      setBarcodeType(initialBarcode ? detectBarcodeType(initialBarcode) : 'EAN13');
-      setIsPrimary(true);
       setErrorMessage('');
       setModelQuery('');
       setDebouncedModelQuery('');
@@ -556,8 +532,6 @@ function RegisterBarcodeModal({ open, onClose, initialBarcode, onSuccess }: Regi
       await apiClient.rpc('barcode_create', {
         p_variant_id: selectedVariantId,
         p_barcode: barcode.trim(),
-        p_barcode_type: barcodeType,
-        p_is_primary: isPrimary,
         p_source: 'MANUAL_SCAN',
         p_branch_id: null,
         p_pin: null,
@@ -616,12 +590,29 @@ function RegisterBarcodeModal({ open, onClose, initialBarcode, onSuccess }: Regi
             <label className="form-label">{t('barcodes.barcode')} *</label>
             <Input
               value={barcode}
-              onChange={(e) => { setBarcode(e.target.value); setBarcodeType(detectBarcodeType(e.target.value)); }}
+              onChange={(e) => setBarcode(e.target.value)}
               placeholder={t('barcodes.barcodePlaceholder')}
               size="md"
               className="w-full font-mono"
               autoFocus
+              inputMode="numeric"
             />
+            <div className="mt-1.5 text-xs flex items-center gap-2 min-h-[1.25rem]">
+              {detectedType ? (
+                <>
+                  <Badge size="xs" color="success">{detectedType}</Badge>
+                  <span className="text-subtler">{t('barcodes.detectedHint', { defaultValue: 'detected from length' })}</span>
+                </>
+              ) : barcode ? (
+                <span className="text-warning">
+                  {!isDigitsOnly
+                    ? t('barcodes.digitsOnly', { defaultValue: 'Digits only — 8, 12 or 13 digits.' })
+                    : t('barcodes.lengthHint', { count: digits.length, defaultValue: '{{count}} digits — expected 8 / 12 / 13.' })}
+                </span>
+              ) : (
+                <span className="text-subtler">{t('barcodes.lengthHintEmpty', { defaultValue: 'Enter 8 / 12 / 13 digits — type is auto-detected.' })}</span>
+              )}
+            </div>
           </div>
 
           <div className="flex flex-col">
@@ -715,11 +706,6 @@ function RegisterBarcodeModal({ open, onClose, initialBarcode, onSuccess }: Regi
             )}
           </div>
 
-          <LabeledCheckbox
-            label={t('barcodes.primaryHint')}
-            checked={isPrimary}
-            onChange={(e) => setIsPrimary(e.target.checked)}
-          />
         </div>
       </div>
       <div className="modal-footer">
@@ -728,7 +714,7 @@ function RegisterBarcodeModal({ open, onClose, initialBarcode, onSuccess }: Regi
           type="button"
           color="primary"
           onClick={onSubmit}
-          disabled={isPending || !barcode.trim() || !selectedVariantId}
+          disabled={isPending || !detectedType || !selectedVariantId}
         >
           {isPending ? t('common.loading') : t('barcodes.register')}
         </Button>
