@@ -21,6 +21,7 @@
     --color-primary-active: #1a28ad;
     --color-primary-fade: #6e7be8;
     --color-primary-contrast: #ffffff;
+    --color-badge-outline-default-border: #404040;
     --color-primary-light: rgba(35, 51, 214, 0.1);
 
     /* Readable on-page text variant (library defaults *-fg to the solid
@@ -45,6 +46,8 @@
 
     --color-primary-fg: #2333d6;
     --color-warning-fg: #d7800c;
+
+    --color-badge-outline-default-border: #ccc;
 }
 
 @layer components {

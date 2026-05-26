@@ -55,5 +55,12 @@
   "identifierCorrect.newValue": "ค่าใหม่",
   "identifierCorrect.selectIdentifier": "เลือกเลขประจำเครื่อง",
   "identifierCorrect.noIdentifiers": "เครื่องนี้ไม่มีเลขประจำเครื่องให้แก้ไข",
+  "identifierAdd.addType": "เพิ่ม {{type}}",
+  "identifierAdd.title": "เพิ่ม {{type}}",
+  "identifierAdd.submit": "เพิ่ม",
+  "identifierAdd.note": "หมายเหตุ",
+  "identifierAdd.notePlaceholder": "เหตุผลที่เพิ่มภายหลัง (ไม่บังคับ)",
+  "identifierAdd.valuePlaceholder": "ค่า",
+  "identifierAdd.success": "เพิ่มเลขประจำเครื่องแล้ว",
   "notImplemented": "ยังไม่ได้เชื่อมในหน้านี้"
 }

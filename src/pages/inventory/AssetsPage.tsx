@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useSearchParams, useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, Modal, TextArea, DataTable, PopOver, Tooltip, useSnackbarContext } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, Box, Search, SlidersHorizontal, XCircle, ChevronDown, ExternalLink, Wrench, Printer } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, Box, Search, SlidersHorizontal, XCircle, ChevronDown, ExternalLink, Wrench, Printer, Plus, CheckCircle } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
@@ -823,6 +823,7 @@ function AssetDetailPanel({
   addSnackbar: (opts: { message: React.ReactNode }) => void;
 }) {
   const [activeAction, setActiveAction] = useState<BackendAssetAction | null>(null);
+  const [addIdentifierType, setAddIdentifierType] = useState<string | null>(null);
   const { handlePrint: printAssetSticker, portal: stickerPortal } = useAssetStickerPrint();
 
   const { data: txns } = useQuery({
@@ -872,19 +873,70 @@ function AssetDetailPanel({
       </div>
       {stickerPortal}
 
-      {/* Identifiers */}
-      {asset.identifiers.length > 0 && (
-        <div className="flex-none px-4 py-2.5 border-b border-line">
-          <div className="text-xs text-subtle mb-1">{t('asset.identifiers')}</div>
-          {asset.identifiers.map((id, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <Badge size="xs" color="default">{id.type}</Badge>
-              <span className="text-sm font-mono">{id.value}</span>
-              {!id.is_active && <span className="text-xs text-danger">(inactive)</span>}
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Identifiers — list current + offer to add any missing IMEI/Serial.
+          Uses fn_inv_asset_identifier_add (mig 113) to fill gaps without
+          voiding the asset. For correcting an existing value, use the
+          ASSET_IDENTIFIER_CORRECT action in the footer. */}
+      {(() => {
+        const presentTypes = new Set(
+          asset.identifiers.filter(i => i.is_active).map(i => i.type),
+        );
+        const missingTypes = (['IMEI', 'SERIAL_NO'] as const).filter(
+          tp => !presentTypes.has(tp),
+        );
+        if (asset.identifiers.length === 0 && missingTypes.length === 0) return null;
+        return (
+          <div className="flex-none px-4 py-2.5 border-b border-line">
+            <div className="text-xs text-subtle mb-1">{t('asset.identifiers')}</div>
+            {asset.identifiers.map((id, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <Badge size="xs" color="default">{id.type}</Badge>
+                <span className="text-sm font-mono">{id.value}</span>
+                {!id.is_active && <span className="text-xs text-danger">(inactive)</span>}
+              </div>
+            ))}
+            {missingTypes.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {missingTypes.map(tp => (
+                  <Button
+                    key={tp}
+                    variant="outline"
+                    size="sm"
+                    startIcon={<Plus size={14} />}
+                    onClick={() => setAddIdentifierType(tp)}
+                  >
+                    {t('identifierAdd.addType', {
+                      ns: 'assetActions',
+                      defaultValue: 'Add {{type}}',
+                      type: tp,
+                    })}
+                  </Button>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      <AddIdentifierModal
+        open={!!addIdentifierType}
+        identifierType={addIdentifierType}
+        asset={asset}
+        onClose={() => setAddIdentifierType(null)}
+        onSuccess={() => {
+          setAddIdentifierType(null);
+          onRefresh();
+          addSnackbar({
+            message: (
+              <div className="alert alert-success">
+                <CheckCircle size={16} />
+                <span>{t('identifierAdd.success', { ns: 'assetActions', defaultValue: 'Identifier added' })}</span>
+              </div>
+            ),
+          });
+        }}
+      />
+
 
       {/* Branch & Company */}
       <div className="flex-none grid grid-cols-2 gap-3 px-4 py-3 border-b border-line">
@@ -1652,3 +1704,122 @@ export function useAssetStickerPrint() {
 
   return { handlePrint, portal };
 }
+
+// ============================================================================
+// AddIdentifierModal — wraps fn_inv_asset_identifier_add (mig 113).
+// Used when an asset is missing an IMEI/Serial because admin forgot to scan
+// it during convert. For replacing an existing (mistyped) value use the
+// ASSET_IDENTIFIER_CORRECT action in the footer instead.
+// ============================================================================
+
+function AddIdentifierModal({
+  open,
+  identifierType,
+  asset,
+  onClose,
+  onSuccess,
+}: {
+  open: boolean;
+  identifierType: string | null;
+  asset: Asset;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const { t } = useTranslation();
+  const [value, setValue] = useState('');
+  const [note, setNote] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (open) {
+      setValue('');
+      setNote('');
+      setError('');
+    }
+  }, [open, identifierType]);
+
+  const mutation = useMutation({
+    mutationFn: () => apiClient.rpc<{ asset_id: number; identifier_id: number; identifier_type: string; value: string }>(
+      'fn_inv_asset_identifier_add',
+      {
+        p_asset_id: asset.asset_id,
+        p_identifier_type: identifierType,
+        p_value: value.trim(),
+        p_note: note.trim() || null,
+        p_branch_id: null,
+      },
+    ),
+    onSuccess: () => onSuccess(),
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        const translated =
+          (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') ||
+          (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setError(translated || err.message);
+      } else {
+        setError(String(err));
+      }
+    },
+  });
+
+  const canSubmit = !!identifierType && !!value.trim() && !mutation.isPending;
+
+  const title = identifierType
+    ? t('identifierAdd.title', { ns: 'assetActions', defaultValue: 'Add {{type}}', type: identifierType })
+    : '';
+
+  return (
+    <Modal open={open && !!identifierType} onClose={onClose} maxWidth="28rem" width="100%">
+      <div className="flex flex-col overflow-hidden">
+        <div className="modal-header">
+          <h2 className="modal-title">{title}</h2>
+          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+        </div>
+        <div className="modal-content">
+          {error && (
+            <div className="alert alert-danger mb-4 animate-pop-in">
+              <XCircle size={16} />
+              <span>{error}</span>
+            </div>
+          )}
+          <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
+            <div className="font-medium text-sm font-mono">{codeDisplay(asset.asset_code_display, asset.asset_code)}</div>
+            <div className="text-xs text-subtle truncate">
+              {[asset.brand_name, asset.family_name, asset.model_name].filter(Boolean).join(' ')}
+            </div>
+          </div>
+          <div className="form-grid gap-4">
+            <div className="flex flex-col">
+              <label className="form-label">{identifierType} *</label>
+              <Input
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder={identifierType === 'IMEI' ? '15-digit IMEI' : t('identifierAdd.valuePlaceholder', { ns: 'assetActions', defaultValue: 'Value' })}
+                className="w-full"
+                autoFocus
+              />
+            </div>
+            <div className="flex flex-col">
+              <label className="form-label">{t('identifierAdd.note', { ns: 'assetActions', defaultValue: 'Note' })}</label>
+              <TextArea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                rows={2}
+                placeholder={t('identifierAdd.notePlaceholder', { ns: 'assetActions', defaultValue: 'Why is this being added later? (optional)' })}
+              />
+            </div>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button color="primary" onClick={() => mutation.mutate()} disabled={!canSubmit}>
+            {mutation.isPending
+              ? t('common.loading')
+              : t('identifierAdd.submit', { ns: 'assetActions', defaultValue: 'Add' })}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+

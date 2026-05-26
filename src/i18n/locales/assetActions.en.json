@@ -55,5 +55,12 @@
   "identifierCorrect.newValue": "New value",
   "identifierCorrect.selectIdentifier": "Select identifier",
   "identifierCorrect.noIdentifiers": "This asset has no identifiers to correct.",
+  "identifierAdd.addType": "Add {{type}}",
+  "identifierAdd.title": "Add {{type}}",
+  "identifierAdd.submit": "Add",
+  "identifierAdd.note": "Note",
+  "identifierAdd.notePlaceholder": "Why is this being added later? (optional)",
+  "identifierAdd.valuePlaceholder": "Value",
+  "identifierAdd.success": "Identifier added",
   "notImplemented": "Not yet available in this page"
 }
