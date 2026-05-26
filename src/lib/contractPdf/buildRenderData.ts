@@ -24,6 +24,7 @@ export interface ContractMin {
   down_payment: number | null;
   insurance_deposit: number | null;
   installment_amount: number | null;
+  value_month?: number | null;
   snapshot_installment_amount: number | null;
   snapshot_term_months: number | null;
   total_installments: number | null;
@@ -271,13 +272,33 @@ export async function buildContractRenderData(
   const ref2 = references[1] ?? null;
 
   const monthly = contract.installment_amount ?? 0;
-  const term = contract.snapshot_term_months ?? contract.total_installments ?? installments.length;
+  const term = contract.value_month
+    ?? contract.snapshot_term_months
+    ?? contract.total_installments
+    ?? installments.length;
   const upfront = (contract.down_payment ?? 0) + (contract.insurance_deposit ?? 0);
 
   const contractDateIso = contract.activated_at ?? contract.created_at;
   const dueDay = installments[0]?.due_date
     ? new Date(`${installments[0].due_date}T00:00:00+07:00`).getDate()
     : new Date(`${contractDateIso}`).getDate();
+
+  // Draft contracts have no sale.installment rows yet (those are inserted by
+  // fn_contract_activate). Synthesize a schedule from value_month × installment_amount
+  // so the customer sees the same dates/amounts they'll get post-activation.
+  const installmentRows = installments.length > 0
+    ? installments.map(r => ({
+        payNo: r.pay_no,
+        amount: r.due_amount,
+        dueDateBE: toDateBE(r.due_date),
+      }))
+    : Array.from({ length: term }, (_, i) => {
+        const base = new Date(contractDateIso);
+        const due = new Date(base);
+        due.setMonth(due.getMonth() + i + 1);
+        const iso = `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, '0')}-${String(due.getDate()).padStart(2, '0')}`;
+        return { payNo: i + 1, amount: monthly, dueDateBE: toDateBE(iso) };
+      });
 
   return {
     assetCode: asset?.asset_code ?? '—',
@@ -320,11 +341,7 @@ export async function buildContractRenderData(
     monthlyAmount: monthly,
     termMonths: term,
 
-    installments: installments.map(r => ({
-      payNo: r.pay_no,
-      amount: r.due_amount,
-      dueDateBE: toDateBE(r.due_date),
-    })),
+    installments: installmentRows,
 
     lesseeSignatureDataUrl,
     lesseeIdCardDataUrl,

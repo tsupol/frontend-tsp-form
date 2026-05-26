@@ -48,7 +48,7 @@ export function getCardStatus(
       if (!contract?.id) return 'locked';
       if (!docs || !customer) return 'empty';
       if (customer.hasIdPhoto && docs.hasSignature) return 'complete';
-      if (customer.hasIdPhoto || docs.hasSignature || docs.evidenceCount > 0) return 'partial';
+      if (customer.hasIdPhoto || docs.hasSignature) return 'partial';
       return 'empty';
 
     case 'signatory': {

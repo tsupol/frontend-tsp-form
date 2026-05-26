@@ -75,6 +75,9 @@ export interface ContractServerState {
 
   // Device binding
   device_id: number | null;
+  device_identifier: string | null;
+  total_installments: number | null;
+  activated_at: string | null;
 
   // Used asset
   is_used_asset: boolean;

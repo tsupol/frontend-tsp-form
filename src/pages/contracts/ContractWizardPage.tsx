@@ -326,7 +326,7 @@ function WorkspaceContent() {
         const isCardActive = (id: ModalId) => openModal === id && !(isMobile && isRoot);
 
         // Review & Pay card: always visible once draft exists, but disabled until all cards complete
-        const requiredCards = ['productPlan', 'customer', 'contactRef', 'guarantor', 'documents', 'signatory'] as const;
+        const requiredCards = ['productPlan', 'customer', 'contactRef', 'guarantor', 'signatory', 'documents'] as const;
         const allCardsComplete = data.contractId != null && requiredCards.every(id => getCardStatus(id) === 'complete');
         const reviewPayReady = allCardsComplete || !!data.billId;
 
@@ -404,9 +404,9 @@ function WorkspaceContent() {
                     <CardInsurance onEdit={() => handleEditOpen('insurance')} active={isCardActive('insurance')} shake={shakingCards.has('insurance')} />
                     <CardContactRef onEdit={() => handleEditOpen('contactRef')} active={isCardActive('contactRef')} shake={shakingCards.has('contactRef')} />
                     <CardGuarantor onEdit={() => handleEditOpen('guarantor')} active={isCardActive('guarantor')} shake={shakingCards.has('guarantor')} />
-                    <CardDocuments onEdit={() => handleEditOpen('documents')} active={isCardActive('documents')} shake={shakingCards.has('documents')} />
                     <CardSignatory onEdit={() => handleEditOpen('signatory')} active={isCardActive('signatory')} shake={shakingCards.has('signatory')} />
                     <CardHandover onEdit={() => handleEditOpen('handover')} active={isCardActive('handover')} shake={shakingCards.has('handover')} />
+                    <CardDocuments onEdit={() => handleEditOpen('documents')} active={isCardActive('documents')} shake={shakingCards.has('documents')} />
 
                     <div ref={reviewPayCardRef}>
                       {!data.billConfirmed && data.contractId && <CardReviewPay onEdit={reviewPayReady ? () => handleEditOpen('reviewPay') : undefined} active={isCardActive('reviewPay')} disabled={!reviewPayReady} />}

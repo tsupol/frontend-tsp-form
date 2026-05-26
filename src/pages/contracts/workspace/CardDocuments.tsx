@@ -10,15 +10,11 @@ export function CardDocuments({ onEdit, active, shake }: { onEdit?: () => void; 
 
   const hasIdPhoto = customer?.hasIdPhoto ?? false;
   const hasSignature = docs?.hasSignature ?? false;
-  const evidenceCount = docs?.evidenceCount ?? 0;
 
   const items: Array<{ done: boolean; label: string; required: boolean }> = [
     { done: hasIdPhoto, label: t('workspace.docIdPhoto'), required: true },
     { done: hasSignature, label: t('workspace.docSignature'), required: true },
   ];
-  if (evidenceCount > 0) {
-    items.push({ done: true, label: `${t('workspace.docEvidence')} (${evidenceCount})`, required: false });
-  }
 
   return (
     <SummaryCard
