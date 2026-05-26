@@ -437,7 +437,9 @@
     "noFamilies": "ไม่พบกลุ่มรุ่นสินค้า",
     "noBrands": "ไม่พบแบรนด์",
     "active": "ใช้งาน",
-    "inactive": "ไม่ใช้งาน"
+    "inactive": "ไม่ใช้งาน",
+    "disable": "ปิดใช้งาน",
+    "enable": "เปิดใช้งาน"
   },
   "attributes": {
     "title": "คุณสมบัติสินค้า",
@@ -497,9 +499,7 @@
     "updateSuccess": "อัปเดตคุณสมบัติกลุ่มรุ่นสำเร็จ",
     "noAttributes": "ไม่มีคุณสมบัติที่เชื่อมกับกลุ่มรุ่นนี้",
     "active": "ใช้งาน",
-    "inactive": "ไม่ใช้งาน",
-    "disable": "ปิดใช้งาน",
-    "enable": "เปิดใช้งาน"
+    "inactive": "ไม่ใช้งาน"
   },
   "models": {
     "title": "รุ่นสินค้า",
@@ -561,9 +561,8 @@
     "newColor": "สีใหม่",
     "existingColor": "สีที่มีอยู่",
     "currentVariant": "ตัวเลือกปัจจุบัน",
-    "renameColor": "ชื่อสีใหม่",
-    "renameColorPlaceholder": "เว้นว่างเพื่อคงค่าเดิม",
-    "renameColorHint": "การเปลี่ยนชื่อสีจะสร้าง SKU และชื่อตัวเลือกใหม่ตามไปด้วย",
+    "changeColor": "เปลี่ยนสี",
+    "cancelColorChange": "ใช้สีเดิม",
     "variantCreated": "เพิ่มตัวเลือกแล้ว",
     "variantUpdated": "อัปเดตตัวเลือกแล้ว",
     "variantDisabled": "ปิดใช้งานตัวเลือกแล้ว",

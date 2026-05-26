@@ -437,7 +437,9 @@
     "noFamilies": "No model families found",
     "noBrands": "No brands found",
     "active": "Active",
-    "inactive": "Inactive"
+    "inactive": "Inactive",
+    "disable": "Disable",
+    "enable": "Enable"
   },
   "attributes": {
     "title": "Product Attributes",
@@ -497,9 +499,7 @@
     "updateSuccess": "Family attribute updated",
     "noAttributes": "No attributes linked to this family",
     "active": "Active",
-    "inactive": "Inactive",
-    "disable": "Disable",
-    "enable": "Enable"
+    "inactive": "Inactive"
   },
   "models": {
     "title": "Product Models",
@@ -561,9 +561,8 @@
     "newColor": "New color",
     "existingColor": "Existing color",
     "currentVariant": "Current variant",
-    "renameColor": "New color name",
-    "renameColorPlaceholder": "Leave blank to keep current color",
-    "renameColorHint": "Renaming a color regenerates the SKU and variant name.",
+    "changeColor": "Change color",
+    "cancelColorChange": "Keep current color",
     "variantCreated": "Variant added",
     "variantUpdated": "Variant updated",
     "variantDisabled": "Variant disabled",

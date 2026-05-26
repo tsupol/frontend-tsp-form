@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, DataTable, Badge, Input, Select, Button, Modal, Switch, MobileHeader, PopOver, MenuItem, useSnackbarContext, FormErrorMessage } from 'tsp-form';
-import { Plus, XCircle, CheckCircle, Info, SlidersHorizontal, ArrowRightFromLine, ArrowLeft, MoreHorizontal, Pencil, Power } from 'lucide-react';
+import { Plus, X, XCircle, CheckCircle, Info, SlidersHorizontal, ArrowRightFromLine, ArrowLeft, MoreHorizontal, Pencil, Power } from 'lucide-react';
 import { useForm, Controller } from 'react-hook-form';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -785,12 +785,14 @@ function ColorMatchBadge({ value }: { value: string }) {
   );
 }
 
-function ColorAutocomplete({ id, value, onChange, placeholder, autoFocus }: {
+function ColorAutocomplete({ id, value, onChange, placeholder, autoFocus, endIcon, onEndIconClick }: {
   id?: string;
   value: string;
   onChange: (next: string) => void;
   placeholder?: string;
   autoFocus?: boolean;
+  endIcon?: React.ReactNode;
+  onEndIconClick?: () => void;
 }) {
   const { allColors, trimmed, isKnown } = useColorMatch(value);
   const [open, setOpen] = useState(false);
@@ -873,6 +875,8 @@ function ColorAutocomplete({ id, value, onChange, placeholder, autoFocus }: {
             placeholder={placeholder}
             autoComplete="off"
             autoFocus={autoFocus}
+            endIcon={endIcon}
+            onEndIconClick={onEndIconClick}
             onChange={(e) => {
               onChange(e.target.value);
               setOpen(true);
@@ -1031,24 +1035,51 @@ function EditVariantModal({ open, onClose, variant, onSuccess }: {
 }) {
   const { t } = useTranslation();
   const { addSnackbar } = useSnackbarContext();
-  // Variant doesn't carry manufacturer_color in the list view; let admin type
-  // a new colour name and submit. To "keep as is", they leave it blank.
   const [color, setColor] = useState('');
+  const [editingColor, setEditingColor] = useState(false);
   const [isActive, setIsActive] = useState(true);
   const [isPending, setIsPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // Fetch the current manufacturer_color so we can show it (and pre-fill the
+  // editor). It isn't on the search RPC response.
+  const { data: detail } = useQuery({
+    queryKey: ['variant-detail', variant?.variant_id],
+    queryFn: async () => {
+      const rows = await apiClient.get<{ manufacturer_color: string | null }[]>(
+        `/v_product_variant_list?variant_id=eq.${variant!.variant_id}&select=manufacturer_color&limit=1`,
+      );
+      return Array.isArray(rows) ? rows[0] ?? null : null;
+    },
+    enabled: open && !!variant?.variant_id,
+    staleTime: 30 * 1000,
+  });
+
+  const currentColor = detail?.manufacturer_color?.trim() ?? '';
+
   useEffect(() => {
     if (open && variant) {
       setColor('');
+      setEditingColor(false);
       setIsActive(variant.is_active);
       setErrorMessage('');
     }
   }, [open, variant]);
 
-  if (!variant) return null;
+  const startEditingColor = () => {
+    setColor(currentColor);
+    setEditingColor(true);
+  };
+
+  const cancelEditingColor = () => {
+    setColor('');
+    setEditingColor(false);
+  };
+
+  const colorChanged = editingColor && color.trim() && color.trim() !== currentColor;
 
   const onSubmit = async () => {
+    if (!variant) return;
     setIsPending(true);
     setErrorMessage('');
     try {
@@ -1056,7 +1087,7 @@ function EditVariantModal({ open, onClose, variant, onSuccess }: {
         p_variant_id: variant.variant_id,
         p_is_active: isActive,
       };
-      if (color.trim()) params.p_manufacturer_color = color.trim();
+      if (colorChanged) params.p_manufacturer_color = color.trim();
       await apiClient.rpc('variant_update', params);
       addSnackbar({
         message: (
@@ -1098,21 +1129,42 @@ function EditVariantModal({ open, onClose, variant, onSuccess }: {
         <div className="form-grid">
           <div className="flex flex-col">
             <label className="form-label">{t('models.currentVariant')}</label>
-            <div className="text-sm">{variant.name}</div>
-            <div className="text-[11px] font-mono text-subtle truncate mt-0.5">{variant.sku_code}</div>
-          </div>
-          <div className="flex flex-col">
-            <div className="flex items-center justify-between gap-2">
-              <label className="form-label" htmlFor="ev-color">{t('models.renameColor')}</label>
-              <ColorMatchBadge value={color} />
+            <div className="card py-2">
+              <div className="text-sm">{variant?.name ?? ''}</div>
+              <div className="text-[11px] font-mono text-subtle truncate mt-0.5">{variant?.sku_code ?? ''}</div>
             </div>
-            <ColorAutocomplete
-              id="ev-color"
-              value={color}
-              onChange={setColor}
-              placeholder={t('models.renameColorPlaceholder')}
-            />
           </div>
+
+          <div className="flex flex-col">
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <label className="form-label mb-0" htmlFor="ev-color">{t('models.manufacturerColor')}</label>
+              {editingColor && <ColorMatchBadge value={color} />}
+            </div>
+            {editingColor ? (
+              <ColorAutocomplete
+                id="ev-color"
+                value={color}
+                onChange={setColor}
+                placeholder={t('models.manufacturerColorPlaceholder')}
+                autoFocus
+                endIcon={<X size={14} />}
+                onEndIconClick={cancelEditingColor}
+              />
+            ) : (
+              <div className="card flex items-center justify-between gap-2 py-2">
+                <span className="text-sm">{currentColor || <span className="text-subtler">—</span>}</span>
+                <Button
+                  type="button"
+                  size="sm"
+                  startIcon={<Pencil size={12} />}
+                  onClick={startEditingColor}
+                >
+                  {t('models.changeColor')}
+                </Button>
+              </div>
+            )}
+          </div>
+
           <div className="flex items-center justify-between">
             <label className="form-label mb-0" htmlFor="ev-active">{t('brandsModels.active')}</label>
             <Switch id="ev-active" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
