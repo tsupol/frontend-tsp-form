@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, DataTable, Badge, Input, Select, Button, Modal, Switch, MobileHeader, PopOver, MenuItem, useSnackbarContext, FormErrorMessage } from 'tsp-form';
-import { Plus, X, XCircle, CheckCircle, Info, SlidersHorizontal, ArrowRightFromLine, ArrowLeft, MoreHorizontal, Pencil, Power } from 'lucide-react';
+import { Plus, X, XCircle, CheckCircle, SlidersHorizontal, ArrowRightFromLine, ArrowLeft, MoreHorizontal, Pencil, Power } from 'lucide-react';
 import { useForm, Controller } from 'react-hook-form';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -117,50 +117,6 @@ interface FamilyAttributeConfig {
   axes: Axis[];
 }
 
-/** Variant config shape mirrors model config but axes use use_in_sku_* fields. */
-interface VariantAxis extends Omit<Axis, 'use_in_model_name' | 'use_in_model_code'> {
-  use_in_sku_name: boolean;
-  use_in_sku_code: boolean;
-}
-
-interface FamilyVariantConfig {
-  family_id: number;
-  holding_id: number;
-  company_id: number | null;
-  brand_code: string;
-  brand_name: string;
-  family_code: string;
-  family_name: string;
-  axes: VariantAxis[];
-}
-
-interface VariantInput {
-  /** Stable client-side id for React keys + remove. */
-  client_id: string;
-  option_set: Record<string, string>;
-  manufacturer_color?: string;
-  master_color_code?: string;
-  color_group?: 'STD' | 'SPC';
-}
-
-interface PreviewVariant {
-  sort_order: number;
-  option_set: Record<string, string>;
-  generated_variant_name: string;
-  generated_sku_code: string;
-  color_group?: string;
-  manufacturer_color?: string;
-  master_color_code?: string;
-  attributes?: Record<string, unknown>;
-}
-
-interface PreviewData {
-  generated_model_code: string;
-  generated_model_name: string;
-  generated_item_base_name?: string;
-  variants?: PreviewVariant[];
-  warnings?: string[];
-}
 
 interface CreateModelForm {
   brand_id: string;
