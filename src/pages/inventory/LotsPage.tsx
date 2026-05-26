@@ -7,7 +7,7 @@ import {
   DataTable, PopOver, Tooltip, useSnackbarContext,
 } from 'tsp-form';
 import {
-  ArrowLeft, ArrowRight, ArrowRightFromLine, Boxes, Search, CheckCircle, XCircle, ChevronDown, Wrench, Plus, Trash2, ExternalLink, SlidersHorizontal,
+  ArrowLeft, ArrowRight, ArrowRightFromLine, Boxes, Search, CheckCircle, XCircle, ChevronDown, Wrench, Plus, Trash2, ExternalLink, SlidersHorizontal, AlertCircle, ListChecks,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
@@ -15,7 +15,7 @@ import { CopyButton } from '../../components/CopyButton';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
-import { getBucketLabel, getBucketColor, getLotStatusLabel, fmtNum, codeDisplay } from './inventoryUtils';
+import { getBucketLabel, getBucketColor, fmtNum, codeDisplay } from './inventoryUtils';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 
 // ============================================================================
@@ -960,20 +960,17 @@ function LotActionBar({
 }
 
 // ============================================================================
-// Action modal — only LOT_CONVERT_TO_ASSET is wired today.
-// fn_inv_convert_lot_to_asset signature (verified live 2026-05-08):
-//   p_lot_id, p_variant_id, p_identifiers jsonb, p_condition_grade,
-//   p_physical_color, p_dedupe_key, p_branch_id
-// Each call converts ONE unit; lot.qty_on_hand -= 1.
-// p_identifiers is the identifier set for that single unit (e.g. one phone
-// has both IMEI and SERIAL_NO).
+// Action modal — LOT_CONVERT_TO_ASSET uses the batch RPC pair (mig 112+113):
+//   1. fn_inv_convert_lot_to_asset_batch_validate(p_lot_id, p_devices)
+//        Read-only preview; returns per-row errors + summary.all_valid.
+//   2. fn_inv_convert_lot_to_asset_batch_commit(p_lot_id, p_devices)
+//        Atomic all-or-nothing INSERT after admin confirms.
+// Backend derives variant_id from lot, branch_id from JWT, dedupe_key auto.
+// Each device in p_devices = one phone with its own identifier set.
+// Per-row errors include INV.VALIDATION.IMEI_REQUIRED_FOR_MODEL when the
+// lot's model has requires_imei=true (iPhones, iPad Cellular) but the row
+// lacks an IMEI identifier — the backend is authoritative; UI surfaces it.
 // ============================================================================
-
-const IDENTIFIER_TYPE_OPTIONS = [
-  { value: 'IMEI', label: 'IMEI' },
-  { value: 'SERIAL_NO', label: 'Serial No.' },
-  { value: 'MAC_ADDRESS', label: 'MAC' },
-];
 
 const CONDITION_OPTIONS = [
   { value: 'NEW', label: 'New' },
@@ -982,9 +979,49 @@ const CONDITION_OPTIONS = [
   { value: 'USED_B', label: 'Used B' },
 ];
 
-interface IdRow {
-  type: string;
-  value: string;
+interface DeviceRow {
+  /** Local row id for keying — not sent to backend. */
+  key: string;
+  serial: string;
+  imei: string;
+  condition_grade: string;
+  physical_color: string;
+}
+
+interface BatchRowError {
+  code: string;
+  params?: Record<string, unknown>;
+}
+
+interface BatchRowResult {
+  index: number;
+  valid: boolean;
+  errors: BatchRowError[];
+}
+
+interface BatchValidateData {
+  lot_id: number;
+  lot_qty_on_hand: number;
+  requested_count: number;
+  valid_count: number;
+  all_valid: boolean;
+  blocking_errors: BatchRowError[];
+  rows: BatchRowResult[];
+}
+
+interface BatchCreatedRow {
+  index: number;
+  asset_id: number;
+  asset_code: string;
+  txn_id?: number;
+  lot_remaining_after_row?: number;
+}
+
+interface BatchCommitData {
+  lot_id: number;
+  created_count: number;
+  lot_qty_remaining: number;
+  created: BatchCreatedRow[];
 }
 
 interface BranchOption {
@@ -1007,14 +1044,6 @@ const TRANSFER_MODE_OPTIONS = [
   { value: 'COST_PRICE_INTERNAL', label: 'Cost-price internal sale' },
 ];
 
-interface ConvertResult {
-  asset_id: number;
-  asset_code: string;
-  bucket: string;
-  lot_remaining_qty: number;
-  lot_status: 'ACTIVE' | 'DEPLETED';
-}
-
 interface TransferCreateResult {
   transfer_order_id: number;
   transfer_no: string;
@@ -1022,7 +1051,7 @@ interface TransferCreateResult {
 }
 
 type LotActionResult =
-  | { kind: 'convert'; data: ConvertResult }
+  | { kind: 'convert'; data: BatchCommitData }
   | { kind: 'transfer_create'; data: TransferCreateResult };
 
 function LotActionModal({
@@ -1052,10 +1081,28 @@ function LotActionModal({
   const [view, setView] = useState<'form' | 'done'>('form');
   const [result, setResult] = useState<LotActionResult | null>(null);
 
-  // Convert-specific state
-  const [identifiers, setIdentifiers] = useState<IdRow[]>([{ type: 'SERIAL_NO', value: '' }]);
-  const [conditionGrade, setConditionGrade] = useState<string>('NEW');
-  const [physicalColor, setPhysicalColor] = useState('');
+  // Convert-specific state — one row per device. Backend batch RPC pair.
+  const newDeviceRow = (): DeviceRow => ({
+    key: `dev-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    serial: '',
+    imei: '',
+    condition_grade: 'NEW',
+    physical_color: '',
+  });
+  const [devices, setDevicesState] = useState<DeviceRow[]>([newDeviceRow()]);
+  const [externalRef, setExternalRefState] = useState('');
+  const [validation, setValidation] = useState<BatchValidateData | null>(null);
+
+  // Any edit invalidates the prior batch_validate result — admin must re-validate
+  // before commit. This keeps the Commit button honest.
+  const setDevices: typeof setDevicesState = (next) => {
+    setValidation(null);
+    setDevicesState(next);
+  };
+  const setExternalRef: typeof setExternalRefState = (next) => {
+    setValidation(null);
+    setExternalRefState(next);
+  };
 
   // Transfer-create state
   const [toBranchId, setToBranchId] = useState<number | null>(null);
@@ -1073,9 +1120,9 @@ function LotActionModal({
     if (open) {
       setView('form');
       setResult(null);
-      setIdentifiers([{ type: 'SERIAL_NO', value: '' }]);
-      setConditionGrade('NEW');
-      setPhysicalColor('');
+      setDevices([newDeviceRow()]);
+      setExternalRef('');
+      setValidation(null);
       setToBranchId(null);
       setTransferMode('FREE_TRANSFER');
       setTransferQty(1);
@@ -1122,24 +1169,58 @@ function LotActionModal({
     [draftTransfers],
   );
 
-  const filledIds = identifiers.filter(i => i.type && i.value.trim());
   const transferQtyNum = typeof transferQty === 'number' ? transferQty : 0;
+
+  /** Build p_devices payload from rows. Empty values become missing identifiers
+   *  so the backend can flag IMEI_REQUIRED_FOR_MODEL per-row. Each device sends
+   *  only the identifier types that were actually filled in. */
+  const buildDevicesPayload = () => devices.map(d => {
+    const ids: { type: string; value: string }[] = [];
+    if (d.serial.trim()) ids.push({ type: 'SERIAL_NO', value: d.serial.trim() });
+    if (d.imei.trim()) ids.push({ type: 'IMEI', value: d.imei.trim() });
+    return {
+      identifiers: ids,
+      condition_grade: d.condition_grade || 'NEW',
+      physical_color: d.physical_color.trim() || null,
+      external_ref: externalRef.trim() || null,
+    };
+  });
+
+  /** Row is "ready for submit" only when at least one identifier is filled. */
+  const rowsReady = devices.every(d => d.serial.trim() || d.imei.trim());
+  const filledRowCount = devices.filter(d => d.serial.trim() || d.imei.trim()).length;
+
+  const validateMutation = useMutation({
+    mutationFn: () => apiClient.rpc<BatchValidateData>('fn_inv_convert_lot_to_asset_batch_validate', {
+      p_lot_id: lot.lot_id,
+      p_devices: buildDevicesPayload(),
+    }),
+    onSuccess: (data) => {
+      setValidation(data);
+      setError('');
+    },
+    onError: (err) => {
+      setValidation(null);
+      if (err instanceof ApiError) {
+        const translated =
+          (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') ||
+          (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setError(translated || err.message);
+      } else {
+        setError(String(err));
+      }
+    },
+  });
 
   const mutation = useMutation({
     mutationFn: async () => {
       if (!action || !config) throw new Error('No action');
 
       if (action.action_code === 'LOT_CONVERT_TO_ASSET') {
-        const params = {
-          p_lot_id: lot.lot_id,
-          p_variant_id: lot.variant_id,
-          p_identifiers: filledIds.map(i => ({ type: i.type, value: i.value.trim() })),
-          p_condition_grade: conditionGrade || null,
-          p_physical_color: physicalColor.trim() || null,
-          p_dedupe_key: `lot-convert-${lot.lot_id}-${Date.now()}`,
-          p_branch_id: lot.branch_id,
-        };
-        const data = await apiClient.rpc<ConvertResult>(config.rpc, params);
+        const data = await apiClient.rpc<BatchCommitData>(
+          'fn_inv_convert_lot_to_asset_batch_commit',
+          { p_lot_id: lot.lot_id, p_devices: buildDevicesPayload() },
+        );
         return { kind: 'convert' as const, data, navigateTo: undefined as string | undefined };
       }
 
@@ -1192,6 +1273,23 @@ function LotActionModal({
     },
     onError: (err) => {
       if (err instanceof ApiError) {
+        // BATCH_HAS_ERRORS — race between validate and commit (e.g. IMEI claimed
+        // by another branch). Backend ships the full per-row breakdown in
+        // params.rows[] — surface it the same way the validate response does.
+        if (err.code === 'INV.VALIDATION.BATCH_HAS_ERRORS' && err.messageParams && typeof err.messageParams === 'object') {
+          const p = err.messageParams as Partial<BatchValidateData>;
+          if (Array.isArray(p.rows)) {
+            setValidation({
+              lot_id: p.lot_id ?? lot.lot_id,
+              lot_qty_on_hand: p.lot_qty_on_hand ?? lot.qty_on_hand,
+              requested_count: p.requested_count ?? devices.length,
+              valid_count: p.valid_count ?? 0,
+              all_valid: false,
+              blocking_errors: p.blocking_errors ?? [],
+              rows: p.rows,
+            });
+          }
+        }
         const translated =
           (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') ||
           (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
@@ -1202,7 +1300,9 @@ function LotActionModal({
     },
   });
 
-  const convertValid = isConvert && filledIds.length > 0 && !!conditionGrade;
+  // Commit is only allowed once validate has run AND backend says all_valid.
+  // Re-typing in any row invalidates the prior validation result.
+  const convertValid = isConvert && filledRowCount > 0 && rowsReady && validation?.all_valid === true;
   const transferCreateValid = isTransferCreate && !!toBranchId && !!transferMode && transferQtyNum > 0 && transferQtyNum <= lot.qty_on_hand;
   const transferAddLineValid = isTransferAddLine && !!pickedTransferId && transferQtyNum > 0 && transferQtyNum <= lot.qty_on_hand;
   const canSubmit = (convertValid || transferCreateValid || transferAddLineValid) && !mutation.isPending;
@@ -1228,27 +1328,40 @@ function LotActionModal({
             <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
           </div>
 
-          {view === 'done' && result?.kind === 'convert' && (
-            <ActionDoneView
-              headline={t('convert.doneHeadline', { ns: 'lotActions', defaultValue: 'Asset registered' })}
-              contractCode={result.data.asset_code}
-              tone="success"
-              detailRows={[
-                { label: t('convert.assetBucket', { ns: 'lotActions', defaultValue: 'Bucket' }), value: getBucketLabel(result.data.bucket, t) },
-                { label: t('lot.remaining'), value: fmtNum(result.data.lot_remaining_qty) },
-                { label: t('lot.status', { defaultValue: 'Lot status' }), value: getLotStatusLabel(result.data.lot_status, t) },
-              ]}
-              secondaryAction={{
-                label: t('convert.openAsset', { ns: 'lotActions', defaultValue: 'Open asset' }),
-                endIcon: <ExternalLink size={14} />,
-                onClick: () => {
-                  onClose();
-                  navigate(`/admin/inventory/assets/${result.data.asset_id}`);
-                },
-              }}
-              onClose={onClose}
-            />
-          )}
+          {view === 'done' && result?.kind === 'convert' && (() => {
+            const data = result.data;
+            const isSingle = data.created.length === 1;
+            const firstAsset = data.created[0];
+            // Single device → link to that asset detail. Multi → assets list filtered by lot.
+            const openLabel = isSingle
+              ? t('convert.openAsset', { ns: 'lotActions', defaultValue: 'Open asset' })
+              : t('convert.openAssets', { ns: 'lotActions', defaultValue: 'Open assets list' });
+            const openPath = isSingle
+              ? `/admin/inventory/assets/${firstAsset.asset_id}`
+              : `/admin/inventory/assets?source_lot_id=${lot.lot_id}`;
+            // Headline shows the new asset code on single, the count on batch.
+            const code = isSingle ? firstAsset.asset_code : `${data.created_count} assets`;
+            return (
+              <ActionDoneView
+                headline={t('convert.doneHeadline', { ns: 'lotActions', defaultValue: 'Asset registered' })}
+                contractCode={code}
+                tone="success"
+                detailRows={[
+                  { label: t('convert.createdCount', { ns: 'lotActions', defaultValue: 'Created' }), value: `${fmtNum(data.created_count)} ${t('lot.units')}` },
+                  { label: t('lot.remaining'), value: fmtNum(data.lot_qty_remaining) },
+                ]}
+                secondaryAction={{
+                  label: openLabel,
+                  endIcon: <ExternalLink size={14} />,
+                  onClick: () => {
+                    onClose();
+                    navigate(openPath);
+                  },
+                }}
+                onClose={onClose}
+              />
+            );
+          })()}
 
           {view === 'done' && result?.kind === 'transfer_create' && (
             <ActionDoneView
@@ -1292,84 +1405,128 @@ function LotActionModal({
             {isConvert && (
               <>
                 <div className="mb-4 alert alert-info">
-                  <span>{t('convert.oneUnitNote', { ns: 'lotActions', defaultValue: 'Each conversion registers one unit. Repeat for additional units.' })}</span>
+                  <span>{t('convert.batchNote', { ns: 'lotActions', defaultValue: 'Add one row per device. Validate to preview, then commit — all devices register atomically.' })}</span>
                 </div>
 
+                {validation && validation.blocking_errors.length > 0 && (
+                  <div className="mb-4 alert alert-danger animate-pop-in">
+                    <XCircle size={16} />
+                    <div className="flex-1 min-w-0">
+                      {validation.blocking_errors.map((e, i) => (
+                        <div key={i}>{t(e.code, { ns: 'apiErrors', defaultValue: e.code })}</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {validation && validation.all_valid && (
+                  <div className="mb-4 alert alert-success animate-pop-in">
+                    <CheckCircle size={16} />
+                    <span>{t('convert.allValid', { ns: 'lotActions', defaultValue: 'All {{count}} devices passed validation. Click Commit to register.', count: validation.requested_count })}</span>
+                  </div>
+                )}
+
                 <div className="form-grid gap-4">
-                  <div className="flex flex-col">
-                    <label className="form-label">
-                      {t('convert.identifiers', { ns: 'lotActions', defaultValue: 'Identifiers' })} *
-                    </label>
-                    <div className="flex flex-col gap-2">
-                      {identifiers.map((row, idx) => (
-                        <div key={idx} className="flex gap-2">
-                          <div className="w-32 shrink-0">
-                            <Select
-                              options={IDENTIFIER_TYPE_OPTIONS}
-                              value={row.type}
-                              onChange={(val) => setIdentifiers(prev => prev.map((r, i) => i === idx ? { ...r, type: (val as string) || '' } : r))}
-                              showChevron
-                            />
+                  {devices.map((row, idx) => {
+                    const rowResult = validation?.rows.find(r => r.index === idx) ?? null;
+                    const rowInvalid = rowResult?.valid === false;
+                    return (
+                      <div
+                        key={row.key}
+                        className={`rounded-md border p-3 ${rowInvalid ? 'border-danger bg-danger/5' : 'border-line bg-surface'}`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="text-xs font-medium text-subtle flex items-center gap-1.5">
+                            {rowResult?.valid && <CheckCircle size={14} className="text-success" />}
+                            {rowInvalid && <AlertCircle size={14} className="text-danger" />}
+                            <span>{t('convert.device', { ns: 'lotActions', defaultValue: 'Device' })} #{idx + 1}</span>
                           </div>
-                          <Input
-                            value={row.value}
-                            onChange={(e) => setIdentifiers(prev => prev.map((r, i) => i === idx ? { ...r, value: e.target.value } : r))}
-                            placeholder={row.type === 'IMEI' ? '15-digit IMEI' : t('convert.identifierValue', { ns: 'lotActions', defaultValue: 'Value' })}
-                            className="w-full"
-                          />
-                          {identifiers.length > 1 && (
+                          {devices.length > 1 && (
                             <Button
                               variant="ghost"
                               size="sm"
                               startIcon={<Trash2 size={14} />}
-                              onClick={() => setIdentifiers(prev => prev.filter((_, i) => i !== idx))}
+                              onClick={() => setDevices(devices.filter((_, i) => i !== idx))}
                             />
                           )}
                         </div>
-                      ))}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        startIcon={<Plus size={14} />}
-                        onClick={() => setIdentifiers(prev => [...prev, { type: 'SERIAL_NO', value: '' }])}
-                        className="self-start"
-                      >
-                        {t('convert.addIdentifier', { ns: 'lotActions', defaultValue: 'Add identifier' })}
-                      </Button>
-                    </div>
-                  </div>
 
-                  <div className="flex gap-3">
-                    <div className="flex-1 min-w-0 flex flex-col">
-                      <label className="form-label">
-                        {t('convert.conditionGrade', { ns: 'lotActions', defaultValue: 'Condition' })} *
-                      </label>
-                      <Select
-                        options={CONDITION_OPTIONS}
-                        value={conditionGrade}
-                        onChange={(val) => setConditionGrade((val as string) || '')}
-                        showChevron
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0 flex flex-col">
-                      <label className="form-label">
-                        {t('convert.physicalColor', { ns: 'lotActions', defaultValue: 'Physical color' })}
-                      </label>
-                      <Input
-                        value={physicalColor}
-                        onChange={(e) => setPhysicalColor(e.target.value)}
-                        placeholder={t('convert.physicalColorPlaceholder', { ns: 'lotActions', defaultValue: 'Optional' })}
-                        className="w-full"
-                      />
-                    </div>
-                  </div>
+                        <div className="flex flex-col gap-2">
+                          <div className="flex gap-2">
+                            <div className="flex-1 min-w-0 flex flex-col">
+                              <label className="form-label">{t('convert.serial', { ns: 'lotActions', defaultValue: 'Serial No.' })}</label>
+                              <Input
+                                value={row.serial}
+                                onChange={(e) => setDevices(devices.map((r, i) => i === idx ? { ...r, serial: e.target.value } : r))}
+                                placeholder={t('convert.serialPlaceholder', { ns: 'lotActions', defaultValue: 'Scan or type' })}
+                                className="w-full"
+                              />
+                            </div>
+                            <div className="flex-1 min-w-0 flex flex-col">
+                              <label className="form-label">{t('convert.imei', { ns: 'lotActions', defaultValue: 'IMEI' })}</label>
+                              <Input
+                                value={row.imei}
+                                onChange={(e) => setDevices(devices.map((r, i) => i === idx ? { ...r, imei: e.target.value } : r))}
+                                placeholder="15-digit IMEI"
+                                className="w-full"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex gap-2">
+                            <div className="flex-1 min-w-0 flex flex-col">
+                              <label className="form-label">{t('convert.conditionGrade', { ns: 'lotActions', defaultValue: 'Condition' })}</label>
+                              <Select
+                                options={CONDITION_OPTIONS}
+                                value={row.condition_grade}
+                                onChange={(val) => setDevices(devices.map((r, i) => i === idx ? { ...r, condition_grade: (val as string) || 'NEW' } : r))}
+                                showChevron
+                              />
+                            </div>
+                            <div className="flex-1 min-w-0 flex flex-col">
+                              <label className="form-label">{t('convert.physicalColor', { ns: 'lotActions', defaultValue: 'Physical color' })}</label>
+                              <Input
+                                value={row.physical_color}
+                                onChange={(e) => setDevices(devices.map((r, i) => i === idx ? { ...r, physical_color: e.target.value } : r))}
+                                placeholder={t('convert.physicalColorPlaceholder', { ns: 'lotActions', defaultValue: 'Optional' })}
+                                className="w-full"
+                              />
+                            </div>
+                          </div>
+
+                          {rowInvalid && rowResult && (
+                            <div className="flex flex-col gap-0.5 mt-1">
+                              {rowResult.errors.map((e, ei) => (
+                                <div key={ei} className="text-xs text-danger flex items-start gap-1">
+                                  <XCircle size={12} className="mt-0.5 shrink-0" />
+                                  <span>{t(e.code, { ns: 'apiErrors', defaultValue: e.code })}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    startIcon={<Plus size={14} />}
+                    onClick={() => setDevices([...devices, newDeviceRow()])}
+                    disabled={devices.length >= lot.qty_on_hand}
+                    className="self-start"
+                  >
+                    {t('convert.addDevice', { ns: 'lotActions', defaultValue: 'Add device' })}
+                  </Button>
 
                   <div className="flex flex-col">
-                    <label className="form-label">{t('convert.note', { ns: 'lotActions', defaultValue: 'Note' })}</label>
-                    <TextArea
-                      value={note}
-                      onChange={(e) => setNote(e.target.value)}
-                      rows={2}
+                    <label className="form-label">{t('convert.externalRef', { ns: 'lotActions', defaultValue: 'External reference' })}</label>
+                    <Input
+                      value={externalRef}
+                      onChange={(e) => setExternalRef(e.target.value)}
+                      placeholder={t('convert.externalRefPlaceholder', { ns: 'lotActions', defaultValue: 'Optional PO line / external ID — shared across all devices' })}
+                      className="w-full"
                     />
                   </div>
                 </div>
@@ -1477,12 +1634,28 @@ function LotActionModal({
           </div>
           <div className="modal-footer">
             <Button onClick={onClose}>{t('common.cancel')}</Button>
+            {isConvert && (
+              <Button
+                variant="outline"
+                startIcon={<ListChecks size={16} />}
+                onClick={() => validateMutation.mutate()}
+                disabled={!isConvert || filledRowCount === 0 || !rowsReady || validateMutation.isPending || mutation.isPending}
+              >
+                {validateMutation.isPending
+                  ? t('common.loading')
+                  : t('convert.validate', { ns: 'lotActions', defaultValue: 'Validate' })}
+              </Button>
+            )}
             <Button
               color={config.color}
               onClick={() => mutation.mutate()}
               disabled={!canSubmit}
             >
-              {mutation.isPending ? t('common.loading') : label}
+              {mutation.isPending
+                ? t('common.loading')
+                : isConvert
+                  ? t('convert.commit', { ns: 'lotActions', defaultValue: 'Commit' })
+                  : label}
             </Button>
           </div>
           </>
