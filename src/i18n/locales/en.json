@@ -426,6 +426,8 @@
     "defaultModelName": "Default Model Name",
     "defaultModelNamePlaceholder": "e.g. 16e",
     "defaultModelNameHint": "Pre-fills the model name when adding a new model to this family.",
+    "familyCodeAutoHint": "The family code is generated automatically from the display name.",
+    "brandImmutableHint": "Brand cannot be changed after creation. Create a new family to use a different brand.",
     "brand": "Brand",
     "category": "Category",
     "selectBrand": "Select brand",

@@ -426,6 +426,8 @@
     "defaultModelName": "ชื่อรุ่นเริ่มต้น",
     "defaultModelNamePlaceholder": "เช่น 16e",
     "defaultModelNameHint": "ใช้เป็นค่าเริ่มต้นของชื่อรุ่นเมื่อเพิ่มรุ่นใหม่ในกลุ่มนี้",
+    "familyCodeAutoHint": "รหัส family จะถูกสร้างอัตโนมัติจากชื่อแสดงผล",
+    "brandImmutableHint": "เปลี่ยนแบรนด์ภายหลังไม่ได้ ถ้าต้องใช้แบรนด์อื่น กรุณาสร้าง family ใหม่",
     "brand": "แบรนด์",
     "category": "หมวดหมู่",
     "selectBrand": "เลือกแบรนด์",

@@ -210,15 +210,12 @@ function FamilyRowActions({ family, onEdit, onToggle, onManageAttributes }: {
 interface FamilyFormData {
   brand_id: string;
   category_id: string;
-  family_code: string;
   display_name: string;
-  default_model_name: string;
 }
 
-function CreateFamilyModal({ open, onClose, holdingId, brands }: {
+function CreateFamilyModal({ open, onClose, brands }: {
   open: boolean;
   onClose: () => void;
-  holdingId: number | null;
   brands: Brand[];
 }) {
   const { t } = useTranslation();
@@ -235,7 +232,7 @@ function CreateFamilyModal({ open, onClose, holdingId, brands }: {
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
 
   const { register, handleSubmit, setValue, watch, reset, formState: { errors, isDirty } } = useForm<FamilyFormData>({
-    defaultValues: { brand_id: '', category_id: '', family_code: '', display_name: '', default_model_name: '' },
+    defaultValues: { brand_id: '', category_id: '', display_name: '' },
   });
 
   const brandId = watch('brand_id');
@@ -246,12 +243,10 @@ function CreateFamilyModal({ open, onClose, holdingId, brands }: {
     const start = Date.now();
     try {
       await apiClient.rpc('ref_family_create', {
-        p_holding_id: holdingId,
         p_brand_id: Number(data.brand_id),
         p_category_id: Number(data.category_id),
-        p_family_code: data.family_code,
         p_display_name: data.display_name,
-        p_default_model_name: data.default_model_name || null,
+        p_is_active: true,
       });
       addSnackbar({
         message: (
@@ -336,16 +331,6 @@ function CreateFamilyModal({ open, onClose, holdingId, brands }: {
               <FormErrorMessage error={errors.category_id} />
             </div>
             <div className="flex flex-col">
-              <label className="form-label" htmlFor="cf-code">{t('brandsModels.familyCode')}</label>
-              <Input
-                id="cf-code"
-                placeholder={t('brandsModels.familyCodePlaceholder')}
-                error={!!errors.family_code}
-                {...register('family_code', { required: t('brandsModels.familyCode') + ' is required' })}
-              />
-              <FormErrorMessage error={errors.family_code} />
-            </div>
-            <div className="flex flex-col">
               <label className="form-label" htmlFor="cf-display">{t('brandsModels.displayName')}</label>
               <Input
                 id="cf-display"
@@ -354,15 +339,7 @@ function CreateFamilyModal({ open, onClose, holdingId, brands }: {
                 {...register('display_name', { required: t('brandsModels.displayName') + ' is required' })}
               />
               <FormErrorMessage error={errors.display_name} />
-            </div>
-            <div className="flex flex-col">
-              <label className="form-label" htmlFor="cf-default">{t('brandsModels.defaultModelName')}</label>
-              <Input
-                id="cf-default"
-                placeholder={t('brandsModels.defaultModelNamePlaceholder')}
-                {...register('default_model_name')}
-              />
-              <span className="text-xs text-subtle mt-1">{t('brandsModels.defaultModelNameHint')}</span>
+              <span className="text-xs text-subtle mt-1">{t('brandsModels.familyCodeAutoHint')}</span>
             </div>
           </div>
         </div>
@@ -390,11 +367,8 @@ function CreateFamilyModal({ open, onClose, holdingId, brands }: {
 // ── Edit Family Modal ────────────────────────────────────────────────────────
 
 interface EditFamilyFormData {
-  brand_id: string;
   category_id: string;
-  family_code: string;
   display_name: string;
-  default_model_name: string;
   is_active: boolean;
 }
 
@@ -412,26 +386,22 @@ function EditFamilyModal({ family, open, onClose, brands }: {
   const [errorKey, setErrorKey] = useState(0);
 
   const { data: categories = [] } = useProductCategories();
-  const brandOptions = brands.filter(b => b.is_active).map(b => ({ value: String(b.id), label: b.name }));
   const categoryOptions = categories.map(c => ({ value: String(c.id), label: c.name }));
+  const brandName = brands.find(b => b.id === family?.brand_id)?.name ?? '';
 
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
 
   const { register, handleSubmit, control, setValue, watch, reset, formState: { errors, isDirty } } = useForm<EditFamilyFormData>({
-    defaultValues: { brand_id: '', category_id: '', family_code: '', display_name: '', default_model_name: '', is_active: true },
+    defaultValues: { category_id: '', display_name: '', is_active: true },
   });
 
-  const brandId = watch('brand_id');
   const categoryId = watch('category_id');
 
   useEffect(() => {
     if (family && open) {
       reset({
-        brand_id: String(family.brand_id),
         category_id: String(family.category_id),
-        family_code: family.family_code,
         display_name: family.display_name,
-        default_model_name: family.default_model_name ?? '',
         is_active: family.is_active,
       });
       setErrorMessage('');
@@ -445,11 +415,8 @@ function EditFamilyModal({ family, open, onClose, brands }: {
     try {
       await apiClient.rpc('ref_family_update', {
         p_family_id: family.id,
-        p_brand_id: Number(data.brand_id),
         p_category_id: Number(data.category_id),
-        p_family_code: data.family_code,
         p_display_name: data.display_name,
-        p_default_model_name: data.default_model_name || null,
         p_is_active: data.is_active,
       });
       addSnackbar({
@@ -508,16 +475,8 @@ function EditFamilyModal({ family, open, onClose, brands }: {
           <div className="form-grid">
             <div className="flex flex-col">
               <label className="form-label">{t('brandsModels.brand')}</label>
-              <Select
-                options={brandOptions}
-                value={brandId || null}
-                onChange={(val) => setValue('brand_id', (val as string) ?? '', { shouldValidate: true })}
-                placeholder={t('brandsModels.selectBrand')}
-                showChevron
-                error={!!errors.brand_id}
-              />
-              <input type="hidden" {...register('brand_id', { required: t('brandsModels.selectBrand') })} />
-              <FormErrorMessage error={errors.brand_id} />
+              <div className="text-sm">{brandName || '—'}</div>
+              <span className="text-xs text-subtle mt-1">{t('brandsModels.brandImmutableHint')}</span>
             </div>
             <div className="flex flex-col">
               <label className="form-label">{t('brandsModels.category')}</label>
@@ -533,16 +492,6 @@ function EditFamilyModal({ family, open, onClose, brands }: {
               <FormErrorMessage error={errors.category_id} />
             </div>
             <div className="flex flex-col">
-              <label className="form-label" htmlFor="ef-code">{t('brandsModels.familyCode')}</label>
-              <Input
-                id="ef-code"
-                placeholder={t('brandsModels.familyCodePlaceholder')}
-                error={!!errors.family_code}
-                {...register('family_code', { required: t('brandsModels.familyCode') + ' is required' })}
-              />
-              <FormErrorMessage error={errors.family_code} />
-            </div>
-            <div className="flex flex-col">
               <label className="form-label" htmlFor="ef-display">{t('brandsModels.displayName')}</label>
               <Input
                 id="ef-display"
@@ -551,15 +500,7 @@ function EditFamilyModal({ family, open, onClose, brands }: {
                 {...register('display_name', { required: t('brandsModels.displayName') + ' is required' })}
               />
               <FormErrorMessage error={errors.display_name} />
-            </div>
-            <div className="flex flex-col">
-              <label className="form-label" htmlFor="ef-default">{t('brandsModels.defaultModelName')}</label>
-              <Input
-                id="ef-default"
-                placeholder={t('brandsModels.defaultModelNamePlaceholder')}
-                {...register('default_model_name')}
-              />
-              <span className="text-xs text-subtle mt-1">{t('brandsModels.defaultModelNameHint')}</span>
+              <span className="text-xs text-subtle mt-1">{t('brandsModels.familyCodeAutoHint')}</span>
             </div>
             <div className="flex items-center justify-between">
               <label className="form-label mb-0" htmlFor="ef-active">{t('brandsModels.active')}</label>
@@ -1740,7 +1681,7 @@ export function FamiliesPage() {
         )}
       </div>
 
-      <CreateFamilyModal open={createOpen} onClose={() => setCreateOpen(false)} holdingId={holdingId} brands={allBrands} />
+      <CreateFamilyModal open={createOpen} onClose={() => setCreateOpen(false)} brands={allBrands} />
       <EditFamilyModal family={editFamily} open={!!editFamily} onClose={() => setEditFamily(null)} brands={allBrands} />
       <ManageFamilyAttributesModal family={manageAttrsFamily} open={!!manageAttrsFamily} onClose={() => setManageAttrsFamily(null)} holdingId={holdingId} />
     </>
