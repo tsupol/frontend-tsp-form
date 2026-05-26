@@ -727,6 +727,44 @@ function useManufacturerColorSuggestions() {
   });
 }
 
+/** Damerau-Levenshtein similarity in [0, 1]. 1 = identical, 0 = totally
+ *  different. Cheap to compute for short strings like color names. */
+function similarity(a: string, b: string): number {
+  if (a === b) return 1;
+  const al = a.length, bl = b.length;
+  if (al === 0 || bl === 0) return 0;
+  const matrix: number[][] = Array.from({ length: al + 1 }, () => new Array(bl + 1).fill(0));
+  for (let i = 0; i <= al; i++) matrix[i][0] = i;
+  for (let j = 0; j <= bl; j++) matrix[0][j] = j;
+  for (let i = 1; i <= al; i++) {
+    for (let j = 1; j <= bl; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost,
+      );
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        matrix[i][j] = Math.min(matrix[i][j], matrix[i - 2][j - 2] + cost);
+      }
+    }
+  }
+  const distance = matrix[al][bl];
+  return 1 - distance / Math.max(al, bl);
+}
+
+/** Best fuzzy score for a query against a candidate, comparing to each word
+ *  in the candidate so "blck" can hit "Jet Black" via its "Black" word. */
+function fuzzyScore(query: string, candidate: string): number {
+  const cands = [candidate, ...candidate.split(/\s+/)].filter(Boolean);
+  let best = 0;
+  for (const c of cands) {
+    const s = similarity(query, c.toLowerCase());
+    if (s > best) best = s;
+  }
+  return best;
+}
+
 /** Match a typed color against the known list — used by parent modals to
  *  render an "existing / new" badge on the label row. */
 function useColorMatch(value: string) {
@@ -764,21 +802,40 @@ function ColorAutocomplete({ id, value, onChange, placeholder, autoFocus }: {
     if (q.length === 0) return [];
     const tokens = q.split(/\s+/).filter(Boolean);
 
-    // Score: 0 exact, 1 starts-with, 2 whole-word, 3 contains. Frequency
-    // (= position in allColors) is the tiebreak, so a typed "Black" prefers
-    // "Black" over "Jet Black" while still surfacing the latter.
-    const scored: { color: string; score: number; index: number }[] = [];
+    // Tiers 0-3: substring scoring — exact / starts-with / whole-word /
+    // contains. Frequency (= position in allColors) is the tiebreak so a
+    // typed "Black" surfaces "Black" before "Jet Black".
+    const scored: { color: string; tier: number; index: number; fuzzy: number }[] = [];
+    const matchedIndex = new Set<number>();
     allColors.forEach((color, index) => {
       const hay = color.toLowerCase();
       if (!tokens.every(tok => hay.includes(tok))) return;
-      let score = 3;
-      if (hay === q) score = 0;
-      else if (hay.startsWith(q)) score = 1;
-      else if (new RegExp(`\\b${q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(hay)) score = 2;
-      scored.push({ color, score, index });
+      let tier = 3;
+      if (hay === q) tier = 0;
+      else if (hay.startsWith(q)) tier = 1;
+      else if (new RegExp(`\\b${q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(hay)) tier = 2;
+      scored.push({ color, tier, index, fuzzy: 1 });
+      matchedIndex.add(index);
     });
 
-    scored.sort((a, b) => a.score - b.score || a.index - b.index);
+    // Tier 4: fuzzy fallback for typos ("blck" → "Black"). Threshold scales
+    // with query length so a 2-char typo doesn't drag in half the catalog.
+    if (q.length >= 2) {
+      const threshold = q.length >= 3 ? 0.6 : 0.8;
+      allColors.forEach((color, index) => {
+        if (matchedIndex.has(index)) return;
+        const score = fuzzyScore(q, color);
+        if (score >= threshold) {
+          scored.push({ color, tier: 4, index, fuzzy: 1 - score });
+        }
+      });
+    }
+
+    scored.sort((a, b) =>
+      a.tier - b.tier
+      || (a.tier === 4 ? a.fuzzy - b.fuzzy : 0)
+      || a.index - b.index
+    );
     const matches = scored.map(s => s.color);
 
     if (isKnown && matches.length === 1) return [];
