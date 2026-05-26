@@ -2,8 +2,8 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, DataTable, Badge, Input, Select, Button, Modal, Switch, MobileHeader, PopOver, useSnackbarContext, FormErrorMessage } from 'tsp-form';
-import { Plus, XCircle, CheckCircle, Info, SlidersHorizontal, ArrowRightFromLine, ArrowLeft } from 'lucide-react';
+import { PageNav, PageNavPanel, DataTable, Badge, Input, Select, Button, Modal, Switch, MobileHeader, PopOver, MenuItem, useSnackbarContext, FormErrorMessage } from 'tsp-form';
+import { Plus, XCircle, CheckCircle, Info, SlidersHorizontal, ArrowRightFromLine, ArrowLeft, MoreHorizontal, Pencil, Power } from 'lucide-react';
 import { useForm, Controller } from 'react-hook-form';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -510,74 +510,565 @@ function CreateModelModal({ open, onClose, holdingId, families, brands }: {
   );
 }
 
-// ── VariantSubRow ────────────────────────────────────────────────────────────
+// ── Model variants section (list + add/edit/toggle) ──────────────────────────
 
-function VariantSubRow({ variants }: { variants: ModelVariant[] }) {
+function ModelVariantsSection({ modelId, variants }: { modelId: number; variants: ModelVariant[] }) {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const { addSnackbar } = useSnackbarContext();
 
-  if (variants.length === 0) {
-    return (
-      <div className="px-4 pb-6 text-center text-subtle text-xs">
-        {t('models.noVariantsFound')}
+  const [addOpen, setAddOpen] = useState(false);
+  const [editVariant, setEditVariant] = useState<ModelVariant | null>(null);
+
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['models-search'] });
+    queryClient.invalidateQueries({ queryKey: ['model-detail-fallback', modelId] });
+  };
+
+  const showErr = (err: unknown) => {
+    const msg = err instanceof ApiError
+      ? (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') || err.message
+      : t('common.error');
+    addSnackbar({
+      message: (
+        <div className="alert alert-danger">
+          <XCircle size={18} />
+          <div><div className="alert-title">{msg}</div></div>
+        </div>
+      ),
+      type: 'error', duration: 5000,
+    });
+  };
+
+  const handleToggleActive = async (v: ModelVariant) => {
+    try {
+      await apiClient.rpc('variant_update', {
+        p_variant_id: v.variant_id,
+        p_is_active: !v.is_active,
+      });
+      addSnackbar({
+        message: (
+          <div className="alert alert-success">
+            <CheckCircle size={18} />
+            <div><div className="alert-title">
+              {v.is_active ? t('models.variantDisabled') : t('models.variantEnabled')}
+            </div></div>
+          </div>
+        ),
+        type: 'success', duration: 3000,
+      });
+      refresh();
+    } catch (err) { showErr(err); }
+  };
+
+  return (
+    <>
+      <div className="px-4 py-3 flex items-center justify-between gap-2">
+        <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider">
+          {t('models.variants')} ({variants.length})
+        </h3>
+        <Button
+          size="sm"
+          variant="outline"
+          startIcon={<Plus size={14} />}
+          onClick={() => setAddOpen(true)}
+        >
+          {t('models.addVariant')}
+        </Button>
       </div>
-    );
+
+      {variants.length === 0 ? (
+        <div className="px-4 pb-6 text-center text-subtle text-xs">
+          {t('models.noVariantsFound')}
+        </div>
+      ) : (
+        <div className="px-4 pb-4 flex flex-col gap-2">
+          {variants.map((v) => (
+            <VariantRow
+              key={v.variant_id}
+              variant={v}
+              onEdit={() => setEditVariant(v)}
+              onToggleActive={() => handleToggleActive(v)}
+            />
+          ))}
+        </div>
+      )}
+
+      <AddVariantModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        modelId={modelId}
+        onSuccess={refresh}
+      />
+      <EditVariantModal
+        open={!!editVariant}
+        variant={editVariant}
+        onClose={() => setEditVariant(null)}
+        onSuccess={refresh}
+      />
+    </>
+  );
+}
+
+function VariantRow({ variant, onEdit, onToggleActive }: {
+  variant: ModelVariant;
+  onEdit: () => void;
+  onToggleActive: () => void;
+}) {
+  const { t } = useTranslation();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const attrEntries: [string, string][] = [];
+  if (variant.attributes) {
+    for (const [key, val] of Object.entries(variant.attributes)) {
+      if (val === null || val === '' || val === undefined) continue;
+      if (key === 'option_set' && typeof val === 'object' && !Array.isArray(val)) {
+        for (const [axisCode, axisVal] of Object.entries(val as Record<string, unknown>)) {
+          if (axisVal === null || axisVal === '' || axisVal === undefined) continue;
+          if (typeof axisVal === 'object') continue;
+          attrEntries.push([axisCode, String(axisVal)]);
+        }
+        continue;
+      }
+      if (typeof val === 'object') continue;
+      attrEntries.push([key, String(val)]);
+    }
   }
 
   return (
-    <div className="px-4 pb-4 flex flex-col gap-2">
-      {variants.map((v) => {
-        const attrEntries: [string, string][] = [];
-        if (v.attributes) {
-          for (const [key, val] of Object.entries(v.attributes)) {
-            if (val === null || val === '' || val === undefined) continue;
-            // option_set is a nested object of axis_code → option_value — flatten its entries
-            if (key === 'option_set' && typeof val === 'object' && !Array.isArray(val)) {
-              for (const [axisCode, axisVal] of Object.entries(val as Record<string, unknown>)) {
-                if (axisVal === null || axisVal === '' || axisVal === undefined) continue;
-                if (typeof axisVal === 'object') continue;
-                attrEntries.push([axisCode, String(axisVal)]);
-              }
-              continue;
+    <div
+      className={`flex flex-col gap-2 rounded-lg border p-3 transition-colors ${
+        variant.is_active ? 'border-line bg-surface' : 'border-line bg-surface opacity-60'
+      }`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="font-medium text-sm truncate">{variant.name}</div>
+          <div className="text-[11px] font-mono text-subtle truncate mt-0.5">{variant.sku_code}</div>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <Badge size="sm" color={variant.is_active ? 'success' : 'danger'}>
+            {variant.is_active ? t('brandsModels.active') : t('brandsModels.inactive')}
+          </Badge>
+          <PopOver
+            isOpen={menuOpen}
+            onClose={() => setMenuOpen(false)}
+            placement="bottom"
+            align="end"
+            offset={4}
+            openDelay={0}
+            trigger={
+              <button
+                className="p-1 rounded hover:bg-surface-hover transition-colors cursor-pointer bg-transparent border-0"
+                onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen); }}
+              >
+                <MoreHorizontal size={16} className="opacity-50" />
+              </button>
             }
-            // Skip any other nested object/array values — would render as "[object Object]"
-            if (typeof val === 'object') continue;
-            attrEntries.push([key, String(val)]);
-          }
-        }
-        return (
-          <div
-            key={v.variant_id}
-            className={`flex flex-col gap-2 rounded-lg border p-3 transition-colors ${
-              v.is_active ? 'border-line bg-surface' : 'border-line bg-surface opacity-60'
-            }`}
           >
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <div className="font-medium text-sm truncate">{v.name}</div>
-                <div className="text-[11px] font-mono text-subtle truncate mt-0.5">{v.sku_code}</div>
-              </div>
-              <Badge size="sm" color={v.is_active ? 'success' : 'danger'}>
-                {v.is_active ? t('brandsModels.active') : t('brandsModels.inactive')}
-              </Badge>
+            <div className="py-1 min-w-[160px]">
+              <MenuItem
+                icon={<Pencil size={14} />}
+                label={t('common.edit')}
+                onClick={() => { setMenuOpen(false); onEdit(); }}
+              />
+              <MenuItem
+                icon={<Power size={14} />}
+                label={variant.is_active ? t('brandsModels.disable') : t('brandsModels.enable')}
+                onClick={() => { setMenuOpen(false); onToggleActive(); }}
+              />
             </div>
+          </PopOver>
+        </div>
+      </div>
 
-            {attrEntries.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 pt-1 border-t border-line/60">
-                {attrEntries.map(([key, val]) => (
-                  <span
-                    key={key}
-                    className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-fg/5 text-subtle"
-                  >
-                    <span className="opacity-70">{key}:</span>
-                    <span className="font-medium text-fg">{String(val)}</span>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })}
+      {attrEntries.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 pt-1 border-t border-line/60">
+          {attrEntries.map(([key, val]) => (
+            <span
+              key={key}
+              className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-fg/5 text-subtle"
+            >
+              <span className="opacity-70">{key}:</span>
+              <span className="font-medium text-fg">{String(val)}</span>
+            </span>
+          ))}
+        </div>
+      )}
     </div>
+  );
+}
+
+// ── Color autocomplete ──────────────────────────────────────────────────────
+
+/** Distinct manufacturer_color values across the holding, frequency-ranked.
+ *  Used as suggestions in the variant add/edit form so colour names stay
+ *  consistent ("Jet Black", not "jet-black" / "JetBlack"). */
+function useManufacturerColorSuggestions() {
+  return useQuery({
+    queryKey: ['manufacturer-color-distinct'],
+    queryFn: async () => {
+      // PostgREST has no DISTINCT operator; pull a generous slice and dedupe
+      // client-side. ~8k variants today → at most a few KB after dedupe.
+      const rows = await apiClient.get<{ manufacturer_color: string | null }[]>(
+        '/v_product_variant_list?select=manufacturer_color&manufacturer_color=not.is.null&limit=10000',
+      );
+      const counts = new Map<string, number>();
+      for (const r of rows) {
+        const c = r.manufacturer_color?.trim();
+        if (!c) continue;
+        counts.set(c, (counts.get(c) ?? 0) + 1);
+      }
+      return Array.from(counts.entries())
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .map(([color]) => color);
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+/** Match a typed color against the known list — used by parent modals to
+ *  render an "existing / new" badge on the label row. */
+function useColorMatch(value: string) {
+  const { data: allColors = [] } = useManufacturerColorSuggestions();
+  const trimmed = value.trim();
+  const isKnown = !!trimmed && allColors.some(c => c.toLowerCase() === trimmed.toLowerCase());
+  return { allColors, trimmed, isKnown, isNew: !!trimmed && !isKnown };
+}
+
+function ColorMatchBadge({ value }: { value: string }) {
+  const { t } = useTranslation();
+  const { trimmed, isKnown } = useColorMatch(value);
+  if (!trimmed) return null;
+  return (
+    <Badge size="xs" color={isKnown ? 'default' : 'info'}>
+      {isKnown ? t('models.existingColor') : t('models.newColor')}
+    </Badge>
+  );
+}
+
+function ColorAutocomplete({ id, value, onChange, placeholder, autoFocus }: {
+  id?: string;
+  value: string;
+  onChange: (next: string) => void;
+  placeholder?: string;
+  autoFocus?: boolean;
+}) {
+  const { allColors, trimmed, isKnown } = useColorMatch(value);
+  const [open, setOpen] = useState(false);
+  const [highlighted, setHighlighted] = useState(-1);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  const suggestions = useMemo(() => {
+    const q = trimmed.toLowerCase();
+    if (q.length === 0) return [];
+    const tokens = q.split(/\s+/).filter(Boolean);
+
+    // Score: 0 exact, 1 starts-with, 2 whole-word, 3 contains. Frequency
+    // (= position in allColors) is the tiebreak, so a typed "Black" prefers
+    // "Black" over "Jet Black" while still surfacing the latter.
+    const scored: { color: string; score: number; index: number }[] = [];
+    allColors.forEach((color, index) => {
+      const hay = color.toLowerCase();
+      if (!tokens.every(tok => hay.includes(tok))) return;
+      let score = 3;
+      if (hay === q) score = 0;
+      else if (hay.startsWith(q)) score = 1;
+      else if (new RegExp(`\\b${q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(hay)) score = 2;
+      scored.push({ color, score, index });
+    });
+
+    scored.sort((a, b) => a.score - b.score || a.index - b.index);
+    const matches = scored.map(s => s.color);
+
+    if (isKnown && matches.length === 1) return [];
+    return matches.slice(0, 8);
+  }, [allColors, trimmed, isKnown]);
+
+  const triggerWidth = wrapperRef.current?.offsetWidth;
+  const showPopover = open && suggestions.length > 0;
+
+  const commit = (val: string) => {
+    onChange(val);
+    setOpen(false);
+    setHighlighted(-1);
+  };
+
+  return (
+    <div ref={wrapperRef}>
+      <PopOver
+        isOpen={showPopover}
+        onClose={() => setOpen(false)}
+        triggerRef={wrapperRef}
+        placement="bottom"
+        align="start"
+        width={triggerWidth ? `${triggerWidth}px` : undefined}
+        offset={4}
+        // Modal stack uses 1000+; pinning above keeps the dropdown visible
+        // across modal close/reopen cycles where PopOver's auto-detection
+        // misfires (tsp-form 0.7.21).
+        zIndex={2000}
+        trigger={
+          <Input
+            id={id}
+            className="w-full"
+            value={value}
+            placeholder={placeholder}
+            autoComplete="off"
+            autoFocus={autoFocus}
+            onChange={(e) => {
+              onChange(e.target.value);
+              setOpen(true);
+              setHighlighted(-1);
+            }}
+            onFocus={() => setOpen(true)}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (suggestions.length === 0) return;
+                setOpen(true);
+                setHighlighted((i) => (i < suggestions.length - 1 ? i + 1 : 0));
+              } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (suggestions.length === 0) return;
+                setHighlighted((i) => (i > 0 ? i - 1 : suggestions.length - 1));
+              } else if (e.key === 'Enter') {
+                if (highlighted >= 0 && highlighted < suggestions.length) {
+                  e.preventDefault();
+                  commit(suggestions[highlighted]);
+                } else {
+                  setOpen(false);
+                }
+              } else if (e.key === 'Escape') {
+                setOpen(false);
+              }
+            }}
+          />
+        }
+      >
+        <div onMouseDown={(e) => e.preventDefault()} className="py-1">
+          {suggestions.map((s, i) => (
+            <div
+              key={s}
+              className={`select-popover-item ${i === highlighted ? 'highlighted' : ''}`}
+              onMouseEnter={() => setHighlighted(i)}
+              onClick={() => commit(s)}
+            >
+              {s}
+            </div>
+          ))}
+        </div>
+      </PopOver>
+    </div>
+  );
+}
+
+// ── Add / Edit Variant modals ───────────────────────────────────────────────
+
+function AddVariantModal({ open, onClose, modelId, onSuccess }: {
+  open: boolean;
+  onClose: () => void;
+  modelId: number;
+  onSuccess: () => void;
+}) {
+  const { t } = useTranslation();
+  const { addSnackbar } = useSnackbarContext();
+  const [color, setColor] = useState('');
+  const [isActive, setIsActive] = useState(true);
+  const [isPending, setIsPending] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  useEffect(() => {
+    if (open) {
+      setColor('');
+      setIsActive(true);
+      setErrorMessage('');
+    }
+  }, [open]);
+
+  const onSubmit = async () => {
+    if (!color.trim()) {
+      setErrorMessage(t('models.colorRequired'));
+      return;
+    }
+    setIsPending(true);
+    setErrorMessage('');
+    try {
+      await apiClient.rpc('variant_create', {
+        p_model_id: modelId,
+        p_manufacturer_color: color.trim(),
+        p_is_active: isActive,
+      });
+      addSnackbar({
+        message: (
+          <div className="alert alert-success">
+            <CheckCircle size={18} />
+            <div><div className="alert-title">{t('models.variantCreated')}</div></div>
+          </div>
+        ),
+        type: 'success', duration: 3000,
+      });
+      onSuccess();
+      onClose();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setErrorMessage(translated || err.message);
+      } else {
+        setErrorMessage(t('common.error'));
+      }
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="24rem" width="100%">
+      <div className="modal-header">
+        <h2 className="modal-title">{t('models.addVariant')}</h2>
+        <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">×</button>
+      </div>
+      <div className="modal-content">
+        {errorMessage && (
+          <div className="alert alert-danger mb-4 animate-pop-in">
+            <XCircle size={18} />
+            <div><div className="alert-description">{errorMessage}</div></div>
+          </div>
+        )}
+        <div className="form-grid">
+          <div className="flex flex-col">
+            <div className="flex items-center justify-between gap-2">
+              <label className="form-label" htmlFor="av-color">{t('models.manufacturerColor')}</label>
+              <ColorMatchBadge value={color} />
+            </div>
+            <ColorAutocomplete
+              id="av-color"
+              value={color}
+              onChange={setColor}
+              placeholder={t('models.manufacturerColorPlaceholder')}
+              autoFocus
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <label className="form-label mb-0" htmlFor="av-active">{t('brandsModels.active')}</label>
+            <Switch id="av-active" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
+          </div>
+        </div>
+      </div>
+      <div className="modal-footer">
+        <Button type="button" variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
+        <Button type="button" color="primary" disabled={isPending || !color.trim()} onClick={onSubmit}>
+          {isPending ? t('common.loading') : t('common.create')}
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
+function EditVariantModal({ open, onClose, variant, onSuccess }: {
+  open: boolean;
+  onClose: () => void;
+  variant: ModelVariant | null;
+  onSuccess: () => void;
+}) {
+  const { t } = useTranslation();
+  const { addSnackbar } = useSnackbarContext();
+  // Variant doesn't carry manufacturer_color in the list view; let admin type
+  // a new colour name and submit. To "keep as is", they leave it blank.
+  const [color, setColor] = useState('');
+  const [isActive, setIsActive] = useState(true);
+  const [isPending, setIsPending] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  useEffect(() => {
+    if (open && variant) {
+      setColor('');
+      setIsActive(variant.is_active);
+      setErrorMessage('');
+    }
+  }, [open, variant]);
+
+  if (!variant) return null;
+
+  const onSubmit = async () => {
+    setIsPending(true);
+    setErrorMessage('');
+    try {
+      const params: Record<string, unknown> = {
+        p_variant_id: variant.variant_id,
+        p_is_active: isActive,
+      };
+      if (color.trim()) params.p_manufacturer_color = color.trim();
+      await apiClient.rpc('variant_update', params);
+      addSnackbar({
+        message: (
+          <div className="alert alert-success">
+            <CheckCircle size={18} />
+            <div><div className="alert-title">{t('models.variantUpdated')}</div></div>
+          </div>
+        ),
+        type: 'success', duration: 3000,
+      });
+      onSuccess();
+      onClose();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setErrorMessage(translated || err.message);
+      } else {
+        setErrorMessage(t('common.error'));
+      }
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="24rem" width="100%">
+      <div className="modal-header">
+        <h2 className="modal-title">{t('models.editVariant')}</h2>
+        <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">×</button>
+      </div>
+      <div className="modal-content">
+        {errorMessage && (
+          <div className="alert alert-danger mb-4 animate-pop-in">
+            <XCircle size={18} />
+            <div><div className="alert-description">{errorMessage}</div></div>
+          </div>
+        )}
+        <div className="form-grid">
+          <div className="flex flex-col">
+            <label className="form-label">{t('models.currentVariant')}</label>
+            <div className="text-sm">{variant.name}</div>
+            <div className="text-[11px] font-mono text-subtle truncate mt-0.5">{variant.sku_code}</div>
+          </div>
+          <div className="flex flex-col">
+            <div className="flex items-center justify-between gap-2">
+              <label className="form-label" htmlFor="ev-color">{t('models.renameColor')}</label>
+              <ColorMatchBadge value={color} />
+            </div>
+            <ColorAutocomplete
+              id="ev-color"
+              value={color}
+              onChange={setColor}
+              placeholder={t('models.renameColorPlaceholder')}
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <label className="form-label mb-0" htmlFor="ev-active">{t('brandsModels.active')}</label>
+            <Switch id="ev-active" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
+          </div>
+        </div>
+      </div>
+      <div className="modal-footer">
+        <Button type="button" variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
+        <Button type="button" color="primary" disabled={isPending} onClick={onSubmit}>
+          {isPending ? t('common.loading') : t('common.save')}
+        </Button>
+      </div>
+    </Modal>
   );
 }
 
@@ -1003,12 +1494,10 @@ export function ModelsPage() {
 
                       {/* Variants section */}
                       <div className="flex-1 min-h-0">
-                        <div className="px-4 py-3">
-                          <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-2">
-                            {t('models.variants')} ({selectedModel.variant_count})
-                          </h3>
-                        </div>
-                        <VariantSubRow variants={selectedModel.variants} />
+                        <ModelVariantsSection
+                          modelId={selectedModel.model_id}
+                          variants={selectedModel.variants}
+                        />
                       </div>
                     </div>
                   ) : (
