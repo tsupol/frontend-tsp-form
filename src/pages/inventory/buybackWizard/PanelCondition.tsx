@@ -96,9 +96,9 @@ export function PanelCondition({
   const canSave = !save.isPending && !!grade;
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-auto better-scroll">
-        <div className="p-4 max-w-2xl">
+    <div className="flex flex-col h-full min-w-0 overflow-hidden">
+      <div className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden better-scroll">
+        <div className="p-4 max-w-2xl min-w-0">
           <h2 className="heading-3 mb-4">{t('buybackWizard.cardCondition', { defaultValue: 'Condition' })}</h2>
 
           {error && (

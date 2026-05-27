@@ -4,6 +4,28 @@ import type { BuybackDraft, CardStatus, BuybackLine } from './types';
 import { CONDITION_KEYS } from './types';
 
 const QUERY_KEY = (poId: number | null) => ['buyback-draft', poId];
+const ACTIONS_KEY = (poId: number | null) => ['buyback-actions', poId];
+
+export interface BuybackActionsResponse {
+  po_id: number;
+  po_type: string;
+  status: string;
+  branch_id: number | null;
+  auto_reject_after: string | null;
+  auto_rejected: boolean;
+  validate_ready: boolean | null;
+  validate_failing_checks: string[];
+  actions: Array<{
+    action_code: string;
+    rpc_name: string;
+    category: string;
+    is_available: boolean;
+    blocking_reason: string | null;
+    require_pin: boolean;
+    sort_order: number;
+    target_line_id: number | null;
+  }>;
+}
 
 export function useBuybackDraft(poId: number | null) {
   const queryClient = useQueryClient();
@@ -18,11 +40,24 @@ export function useBuybackDraft(poId: number | null) {
   });
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: QUERY_KEY(poId) });
+    // Photos count + actions queries also depend on this row's state.
+    queryClient.invalidateQueries({ queryKey: ['buyback-photos-count', poId] });
+    queryClient.invalidateQueries({ queryKey: ACTIONS_KEY(poId) });
     // The list page caches buyback rows under ['buyback-orders', ...] — bust
     // it so newly-created drafts (and status changes) show up immediately.
     queryClient.invalidateQueries({ queryKey: ['buyback-orders'] });
   };
   return { ...query, invalidate };
+}
+
+// Backend-driven action catalog + validate_ready flag (mig 114, 2026-05-27).
+export function useBuybackActions(poId: number | null) {
+  return useQuery({
+    queryKey: ACTIONS_KEY(poId),
+    queryFn: () => apiClient.rpc<BuybackActionsResponse>('fn_buyback_available_actions', { p_po_id: poId }),
+    enabled: poId !== null,
+    staleTime: 30 * 1000,
+  });
 }
 
 // Buyback is always single-line per spec.
@@ -68,9 +103,15 @@ export function getSubmitStatus(
   draft: BuybackDraft | null | undefined,
   setup: CardStatus,
   condition: CardStatus,
+  actions?: BuybackActionsResponse | null,
 ): CardStatus {
   if (!draft) return 'locked';
   if (draft.status !== 'DRAFT') return 'complete';
+  // Prefer the server-authoritative validate_ready when available. The doc
+  // notes that during DRAFT browsing the 3 identifier checks always fail
+  // because identifiers haven't been scanned yet, so we OR with the FE
+  // heuristic: if setup+condition cards are complete, treat as ready-to-scan.
+  if (actions && actions.validate_ready === true) return 'empty';
   if (setup !== 'complete' || condition !== 'complete') return 'locked';
   return 'empty';
 }

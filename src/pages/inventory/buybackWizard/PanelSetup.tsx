@@ -168,9 +168,9 @@ export function PanelSetup({
   const isEditingExisting = !!draft;
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-auto better-scroll">
-        <div className="p-4 max-w-2xl">
+    <div className="flex flex-col h-full min-w-0 overflow-hidden">
+      <div className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden better-scroll">
+        <div className="p-4 max-w-2xl min-w-0">
           <h2 className="heading-3 mb-4">{t('buybackWizard.cardSetup', { defaultValue: 'Setup' })}</h2>
 
           {error && (
@@ -182,17 +182,17 @@ export function PanelSetup({
 
           <div className="form-grid gap-4">
             {/* Product picker */}
-            <div className="flex flex-col">
+            <div className="flex flex-col min-w-0">
               <label className="form-label">{t('buybackWizard.product', { defaultValue: 'Product' })} *</label>
               {product ? (
-                <div className="flex items-center gap-2 px-3 py-2.5 rounded-md border border-line bg-surface">
+                <div className="flex items-center gap-2 px-3 py-2.5 rounded-md border border-line bg-surface min-w-0">
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-sm truncate">
                       {[product.brand_name, product.family_name, product.model_name].filter(Boolean).join(' ')}
                     </div>
                     <div className="text-xs text-subtle truncate">{product.variant_name} · {product.sku_code}</div>
                   </div>
-                  <Button size="sm" variant="outline" onClick={() => setPickerOpen(true)}>
+                  <Button size="sm" variant="outline" onClick={() => setPickerOpen(true)} className="shrink-0">
                     {t('common.change', { defaultValue: 'Change' })}
                   </Button>
                 </div>
@@ -204,7 +204,7 @@ export function PanelSetup({
             </div>
 
             {/* Seller */}
-            <div className="flex flex-col">
+            <div className="flex flex-col min-w-0">
               <label className="form-label">{t('buyback.seller')} *</label>
               <Input
                 value={seller}
@@ -221,7 +221,7 @@ export function PanelSetup({
             </div>
 
             {/* Price */}
-            <div className="flex flex-col">
+            <div className="flex flex-col min-w-0">
               <label className="form-label">{t('buybackWizard.price', { defaultValue: 'Buyback price' })} *</label>
               <MaskedInput
                 mask="number"
@@ -233,7 +233,7 @@ export function PanelSetup({
             </div>
 
             {/* Notes */}
-            <div className="flex flex-col">
+            <div className="flex flex-col min-w-0">
               <label className="form-label">{t('buybackWizard.poNotes', { defaultValue: 'Notes' })}</label>
               <TextArea
                 value={notes}
@@ -241,6 +241,7 @@ export function PanelSetup({
                 rows={2}
                 placeholder={t('buybackWizard.poNotesPlaceholder', { defaultValue: 'Optional notes for this buyback' })}
                 disabled={isEditingExisting}
+                className="w-full"
               />
             </div>
           </div>

@@ -1498,6 +1498,9 @@
     "approved": "Approved",
     "submit": "Submit for Approval",
     "continueDraft": "Continue draft",
+    "autoRejected": "Auto-rejected",
+    "submitNotReady": "Not ready: {{checks}}",
+    "submitBlocked": "Submit not available",
     "submitSuccess": "Buyback submitted for approval",
     "revertDraft": "Revert to Draft",
     "revertSuccess": "Buyback reverted to draft",
@@ -1519,7 +1522,29 @@
     "imeiPlaceholder": "15-digit IMEI (optional)",
     "serialPlaceholder": "Serial number (optional)",
     "rejectReason": "Reject reason",
-    "selectReason": "Select reason"
+    "selectReason": "Select reason",
+    "actionNotWired": "Not a user button — runs automatically",
+    "category": {
+      "EDIT": "Edit",
+      "LIFECYCLE": "Lifecycle",
+      "SYSTEM": "System"
+    },
+    "blocking": {
+      "wrong_state": "Not allowed in this state",
+      "permission_denied": "You don't have permission",
+      "wrong_branch": "Wrong branch",
+      "validate_failed": "Pre-submit checklist not green",
+      "auto_rejected": "Auto-rejected (timer expired)"
+    }
+  },
+  "buybackAction": {
+    "BUYBACK_UPDATE_LINE": "Update line",
+    "BUYBACK_VALIDATE": "Validate",
+    "BUYBACK_SUBMIT": "Submit for Approval",
+    "BUYBACK_APPROVE": "Approve",
+    "BUYBACK_REJECT": "Reject",
+    "BUYBACK_REVERT_DRAFT": "Revert to Draft",
+    "BUYBACK_CONFIRM_INTAKE": "Confirm Intake"
   },
   "buybackWizard": {
     "cardSetup": "Setup",
@@ -1549,7 +1574,14 @@
     "connectivity": "Connectivity",
     "conditionNotes": "Notes",
     "conditionNotesPlaceholder": "Anything else worth noting about the condition",
-    "photosComingSoon": "Photos editor coming soon.",
+    "noPhotos": "No photos.",
+    "addPhoto": "Add photo",
+    "photoFile": "Photo",
+    "photoCaption": "Description",
+    "photoCaptionPlaceholder": "Optional — e.g. front view, scratch on top corner",
+    "editCaption": "Edit description",
+    "noCaption": "No description",
+    "errorPickImage": "Pick an image first",
     "submitHint": "Scan IMEI / Serial and submit for approval.",
     "alreadySubmitted": "Submitted — status is ",
     "checklist": "Pre-submit checklist",

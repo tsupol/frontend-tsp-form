@@ -1498,6 +1498,9 @@
     "approved": "อนุมัติเมื่อ",
     "submit": "ส่งเพื่ออนุมัติ",
     "continueDraft": "แก้ไขร่างต่อ",
+    "autoRejected": "ถูกปฏิเสธอัตโนมัติ",
+    "submitNotReady": "ยังไม่พร้อม: {{checks}}",
+    "submitBlocked": "ส่งไม่ได้",
     "submitSuccess": "ส่งรายการรับซื้อคืนเพื่ออนุมัติแล้ว",
     "revertDraft": "ย้อนกลับเป็นร่าง",
     "revertSuccess": "ย้อนกลับเป็นร่างแล้ว",
@@ -1519,7 +1522,29 @@
     "imeiPlaceholder": "IMEI 15 หลัก (ไม่บังคับ)",
     "serialPlaceholder": "หมายเลขเครื่อง (ไม่บังคับ)",
     "rejectReason": "เหตุผลปฏิเสธ",
-    "selectReason": "เลือกเหตุผล"
+    "selectReason": "เลือกเหตุผล",
+    "actionNotWired": "ไม่ใช่ปุ่มที่ผู้ใช้กด — ระบบจะรันให้อัตโนมัติ",
+    "category": {
+      "EDIT": "แก้ไข",
+      "LIFECYCLE": "สถานะ",
+      "SYSTEM": "ระบบ"
+    },
+    "blocking": {
+      "wrong_state": "สถานะปัจจุบันทำไม่ได้",
+      "permission_denied": "ไม่มีสิทธิ์",
+      "wrong_branch": "ไม่ใช่สาขาเจ้าของ",
+      "validate_failed": "ยังไม่ผ่าน checklist",
+      "auto_rejected": "ถูกปฏิเสธอัตโนมัติ (หมดเวลา)"
+    }
+  },
+  "buybackAction": {
+    "BUYBACK_UPDATE_LINE": "แก้ไขรายการ",
+    "BUYBACK_VALIDATE": "ตรวจสอบ",
+    "BUYBACK_SUBMIT": "ส่งเพื่ออนุมัติ",
+    "BUYBACK_APPROVE": "อนุมัติ",
+    "BUYBACK_REJECT": "ปฏิเสธ",
+    "BUYBACK_REVERT_DRAFT": "ย้อนกลับเป็นร่าง",
+    "BUYBACK_CONFIRM_INTAKE": "ยืนยันรับเข้า"
   },
   "buybackWizard": {
     "cardSetup": "ตั้งค่า",
@@ -1549,7 +1574,14 @@
     "connectivity": "การเชื่อมต่อ",
     "conditionNotes": "หมายเหตุ",
     "conditionNotesPlaceholder": "หมายเหตุเพิ่มเติมเกี่ยวกับสภาพ",
-    "photosComingSoon": "ตัวจัดการรูปภาพยังไม่พร้อม",
+    "noPhotos": "ไม่มีรูป",
+    "addPhoto": "เพิ่มรูป",
+    "photoFile": "รูปภาพ",
+    "photoCaption": "คำอธิบาย",
+    "photoCaptionPlaceholder": "ไม่บังคับ — เช่น มุมหน้า รอยขีดที่มุมบน",
+    "editCaption": "แก้ไขคำอธิบาย",
+    "noCaption": "ไม่มีคำอธิบาย",
+    "errorPickImage": "กรุณาเลือกรูปก่อน",
     "submitHint": "สแกน IMEI / Serial แล้วส่งขออนุมัติ",
     "alreadySubmitted": "ส่งแล้ว — สถานะคือ ",
     "checklist": "ตรวจสอบก่อนส่ง",

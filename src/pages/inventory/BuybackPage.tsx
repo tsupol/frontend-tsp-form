@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, Modal, TextArea, DataTable, PopOver, useSnackbarContext } from 'tsp-form';
+import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, Modal, TextArea, DataTable, PopOver, Tooltip, useSnackbarContext } from 'tsp-form';
 import { ArrowLeft, ArrowRightFromLine, RotateCcw, CheckCircle, XCircle, AlertTriangle, ImageOff, ChevronDown, Pencil } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
@@ -32,6 +32,7 @@ interface BuybackListItem {
   c_total_lines: number;
   c_completed_intakes: number;
   auto_reject_after: string | null;
+  is_auto_rejected: boolean;
   submitted_at: string | null;
   approved_at: string | null;
   rejected_at: string | null;
@@ -83,6 +84,29 @@ interface Branch {
   name: string;
 }
 
+// fn_buyback_available_actions response (mig 114, 2026-05-27).
+interface BuybackAction {
+  action_code: string;
+  rpc_name: string;
+  category: string;
+  is_available: boolean;
+  blocking_reason: string | null;
+  require_pin: boolean;
+  sort_order: number;
+  target_line_id: number | null;
+}
+interface BuybackActionsResponse {
+  po_id: number;
+  po_type: string;
+  status: string;
+  branch_id: number | null;
+  auto_reject_after: string | null;
+  auto_rejected: boolean;
+  validate_ready: boolean | null;
+  validate_failing_checks: string[];
+  actions: BuybackAction[];
+}
+
 // ============================================================================
 // Status display
 // ============================================================================
@@ -132,6 +156,94 @@ const INTAKE_STATUS_COLOR: Record<string, 'success' | 'warning' | 'danger' | 'in
   COMPLETED: 'success',
   FAILED: 'danger',
 };
+
+// Per-action color when used as a quick primary. Reject is danger; everything
+// else is the default primary blue (or neutral if not a primary).
+const PRIMARY_COLOR: Record<string, 'primary' | 'danger'> = {
+  BUYBACK_SUBMIT: 'primary',
+  BUYBACK_APPROVE: 'primary',
+  BUYBACK_REJECT: 'danger',
+  BUYBACK_CONFIRM_INTAKE: 'primary',
+  BUYBACK_REVERT_DRAFT: 'primary',
+};
+
+// Section grouping in the More menu (option B: Edit / Lifecycle / System).
+// Override the backend's `category` for VALIDATE which arrives as LIFECYCLE
+// but reads better under its own "System" header since it's an FE-driven check.
+const CATEGORY_OVERRIDE: Record<string, string> = {
+  BUYBACK_VALIDATE: 'SYSTEM',
+};
+const CATEGORY_ORDER = ['EDIT', 'LIFECYCLE', 'SYSTEM'];
+
+interface ActionHandlers {
+  primary: boolean;
+  t: ReturnType<typeof useTranslation>['t'];
+  onSubmit: () => void;
+  onApprove: () => void;
+  onReject: () => void;
+  onRevert: () => void;
+  onIntake: () => void;
+  validateFailingChecks: string[];
+}
+
+function renderBuybackActionButton(a: BuybackAction, h: ActionHandlers): React.ReactNode {
+  const label = h.t(`buybackAction.${a.action_code}`, { defaultValue: a.action_code });
+  const onClick: Record<string, () => void> = {
+    BUYBACK_SUBMIT: h.onSubmit,
+    BUYBACK_APPROVE: h.onApprove,
+    BUYBACK_REJECT: h.onReject,
+    BUYBACK_REVERT_DRAFT: h.onRevert,
+    BUYBACK_CONFIRM_INTAKE: h.onIntake,
+  };
+  const handler = onClick[a.action_code];
+  // UPDATE_LINE / VALIDATE are catalog entries the FE doesn't open a modal for.
+  // Render them disabled with a wrench-style hint, like AssetsPage does for
+  // not-yet-wired actions.
+  const wired = !!handler;
+
+  const lines: React.ReactNode[] = [<div key="l" className="font-medium">{label}</div>];
+  if (!wired) {
+    lines.push(
+      <div key="nw" className="text-xs opacity-90">
+        {h.t('buyback.actionNotWired', { defaultValue: 'Not a user button — runs automatically' })}
+      </div>,
+    );
+  }
+  if (!a.is_available && a.blocking_reason) {
+    let reason: string;
+    if (a.blocking_reason === 'validate_failed' && h.validateFailingChecks.length > 0) {
+      reason = h.t('buyback.submitNotReady', {
+        defaultValue: 'Not ready: {{checks}}',
+        checks: h.validateFailingChecks.join(', '),
+      });
+    } else {
+      reason = h.t(`buyback.blocking.${a.blocking_reason}`, {
+        defaultValue: a.blocking_reason,
+      });
+    }
+    lines.push(<div key="r" className="text-xs opacity-90">{reason}</div>);
+  }
+
+  const color = h.primary && a.is_available && wired ? PRIMARY_COLOR[a.action_code] : undefined;
+
+  return (
+    <Tooltip
+      key={a.action_code}
+      content={lines.length === 1 ? lines[0] : <div className="flex flex-col gap-0.5">{lines}</div>}
+      placement="top"
+    >
+      <Button
+        size="sm"
+        variant={h.primary ? undefined : 'outline'}
+        color={color}
+        disabled={!a.is_available || !wired}
+        onClick={handler}
+      >
+        {label}
+      </Button>
+    </Tooltip>
+  );
+}
 
 // ============================================================================
 // Component
@@ -200,6 +312,7 @@ export function BuybackPage() {
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['buyback-orders'] });
     queryClient.invalidateQueries({ queryKey: ['buyback-detail'] });
+    queryClient.invalidateQueries({ queryKey: ['buyback-actions'] });
   };
 
   return (
@@ -292,6 +405,11 @@ export function BuybackPage() {
                           <Badge size="xs" color={BUYBACK_STATUS_COLOR[order.status] ?? 'default'}>
                             {t(`buyback.status_${order.status}`, order.status)}
                           </Badge>
+                          {order.is_auto_rejected && (
+                            <Badge size="xs" color="danger">
+                              {t('buyback.autoRejected', { defaultValue: 'Auto-rejected' })}
+                            </Badge>
+                          )}
                           {ps?.asset_match_result && (
                             <Badge size="xs" color={ASSET_MATCH_COLOR[ps.asset_match_result] ?? 'default'}>
                               {ASSET_MATCH_LABEL[ps.asset_match_result] ?? ps.asset_match_result}
@@ -322,7 +440,7 @@ export function BuybackPage() {
               />
             </PageNavPanel>
 
-            <PageNavPanel id="detail" className={isMobile ? '' : 'flex-1 flex flex-col'}>
+            <PageNavPanel id="detail" className={isMobile ? '' : 'flex-1 min-w-0 flex flex-col'}>
               {selectedListItem && detail ? (
                 <BuybackDetailPanel
                   detail={detail}
@@ -375,23 +493,58 @@ function BuybackDetailPanel({
   const [intakeOpen, setIntakeOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const moreTriggerRef = useRef<HTMLButtonElement>(null);
-  const { user } = useAuth();
   const navigate = useNavigate();
 
   const lines = detail.lines ?? [];
   const totalPrice = lines.reduce((sum, l) => sum + (l.buyback_price ?? l.unit_cost), 0);
 
-  // Hide C_A-only buttons from non-C_A users. Backend enforces regardless;
-  // this just avoids late PERMISSION_DENIED clicks.
-  const isCompanyAdmin = user?.role_code === 'COMPANY_ADMIN';
+  // Backend-driven action catalog (mig 114, 2026-05-27). Pattern mirrors
+  // AssetsPage: show every action returned, primaries as quick buttons,
+  // everything else in More. Disabled buttons get a tooltip with the reason.
+  const { data: actionsResp } = useQuery({
+    queryKey: ['buyback-actions', detail.po_id],
+    queryFn: () => apiClient.rpc<BuybackActionsResponse>('fn_buyback_available_actions', {
+      p_po_id: detail.po_id,
+    }),
+    staleTime: 30 * 1000,
+  });
 
-  const canSubmit = detail.status === 'DRAFT';
-  const canRevert = detail.status === 'PENDING_APPROVAL';
-  const canDecide = detail.status === 'PENDING_APPROVAL' && isCompanyAdmin;
-  const canIntake = detail.status === 'APPROVED';
+  // All actions in catalog order, then sort_order. We do NOT filter
+  // permission_denied — disabled-with-tooltip is the convention.
+  const allActions = (actionsResp?.actions ?? [])
+    .slice()
+    .sort((a, b) => a.sort_order - b.sort_order);
+
+  // Per-status primaries — the obvious quick buttons. Everything else goes in More.
+  const PRIMARY_BY_STATUS: Record<string, string[]> = {
+    DRAFT:            ['BUYBACK_SUBMIT'],
+    PENDING_APPROVAL: ['BUYBACK_APPROVE', 'BUYBACK_REJECT'],
+    APPROVED:         ['BUYBACK_CONFIRM_INTAKE'],
+    REJECTED:         ['BUYBACK_REVERT_DRAFT'],
+  };
+  const primaryCodes = PRIMARY_BY_STATUS[detail.status] ?? [];
+  const primarySet = new Set(primaryCodes);
+  const primaryActions = primaryCodes
+    .map(c => allActions.find(a => a.action_code === c))
+    .filter((a): a is BuybackAction => !!a);
+  const secondaryActions = allActions.filter(a => !primarySet.has(a.action_code));
+
+  const intakeAction = allActions.find(a => a.action_code === 'BUYBACK_CONFIRM_INTAKE');
+
+  // Group secondaries by category (with override) → Edit / Lifecycle / System.
+  const groupedSecondary = secondaryActions.reduce<Record<string, BuybackAction[]>>((acc, a) => {
+    const cat = CATEGORY_OVERRIDE[a.action_code] ?? a.category;
+    (acc[cat] ||= []).push(a);
+    return acc;
+  }, {});
+  const sortedCategories = Object.keys(groupedSecondary).sort((a, b) => {
+    const ai = CATEGORY_ORDER.indexOf(a);
+    const bi = CATEGORY_ORDER.indexOf(b);
+    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+  });
 
   return (
-    <div className="relative flex flex-col h-full">
+    <div className="relative flex flex-col h-full min-w-0 overflow-hidden">
       {loading && (
         <div className="absolute inset-0 bg-bg/50 z-10 flex items-center justify-center animate-fade-in">
           <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -405,6 +558,11 @@ function BuybackDetailPanel({
           <Badge size="xs" color={BUYBACK_STATUS_COLOR[detail.status] ?? 'default'}>
             {t(`buyback.status_${detail.status}`, detail.status)}
           </Badge>
+          {detail.is_auto_rejected && (
+            <Badge size="xs" color="danger">
+              {t('buyback.autoRejected', { defaultValue: 'Auto-rejected' })}
+            </Badge>
+          )}
         </div>
       )}
 
@@ -541,36 +699,36 @@ function BuybackDetailPanel({
         ))}
       </div>
 
-      {/* Action buttons: quick primaries + More menu for secondary actions */}
-      {(canSubmit || canRevert || canIntake) && (
-        <div className="flex-none px-4 py-3 border-t border-line flex gap-2">
-          {/* DRAFT — continue editing in wizard, or submit for approval */}
-          {canSubmit && (
-            <>
-              <Button
-                size="sm"
-                variant="outline"
-                startIcon={<Pencil size={14} />}
-                className="flex-1"
-                onClick={() => navigate(`/admin/inventory/buyback/new/${detail.po_id}`)}
-              >
-                {t('buyback.continueDraft', { defaultValue: 'Continue draft' })}
-              </Button>
-              <Button size="sm" color="primary" className="flex-1" onClick={() => setActionModal('submit')}>
-                {t('buyback.submit')}
-              </Button>
-            </>
+      {/* Action buttons — backend-driven (mig 114). Show every action in the
+          catalog: primaries as quick buttons, the rest in More. Disabled
+          buttons get a tooltip with the blocking reason. */}
+      {allActions.length > 0 && (
+        <div className="flex-none px-4 py-3 border-t border-line flex flex-wrap gap-2">
+          {/* DRAFT only — extra non-RPC affordance to resume editing in the wizard. */}
+          {detail.status === 'DRAFT' && (
+            <Button
+              size="sm"
+              variant="outline"
+              startIcon={<Pencil size={14} />}
+              onClick={() => navigate(`/admin/inventory/buyback/new/${detail.po_id}`)}
+            >
+              {t('buyback.continueDraft', { defaultValue: 'Continue draft' })}
+            </Button>
           )}
 
-          {/* PENDING_APPROVAL + C_A — quick Approve/Reject, More holds Revert */}
-          {canDecide && (
+          {primaryActions.map(a => renderBuybackActionButton(a, {
+            primary: true,
+            t,
+            onSubmit: () => setActionModal('submit'),
+            onApprove: () => setActionModal('approve'),
+            onReject: () => setActionModal('reject'),
+            onRevert: () => setActionModal('revert'),
+            onIntake: () => setIntakeOpen(true),
+            validateFailingChecks: actionsResp?.validate_failing_checks ?? [],
+          }))}
+
+          {secondaryActions.length > 0 && (
             <>
-              <Button size="sm" color="primary" className="flex-1" onClick={() => setActionModal('approve')}>
-                {t('buyback.approve')}
-              </Button>
-              <Button size="sm" color="danger" className="flex-1" onClick={() => setActionModal('reject')}>
-                {t('buyback.reject')}
-              </Button>
               <Button
                 ref={moreTriggerRef}
                 size="sm"
@@ -586,38 +744,39 @@ function BuybackDetailPanel({
                 triggerRef={moreTriggerRef}
                 placement="top"
                 align="end"
-                maxWidth="20rem"
+                maxWidth="28rem"
               >
-                <div className="flex flex-col gap-1 p-2">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => { setMoreOpen(false); setActionModal('revert'); }}
-                  >
-                    {t('buyback.revertDraft')}
-                  </Button>
+                <div className="flex flex-col gap-3 p-3">
+                  {sortedCategories.map(cat => {
+                    const items = groupedSecondary[cat];
+                    if (!items?.length) return null;
+                    return (
+                      <div key={cat} className="flex flex-col gap-1.5">
+                        <div className="text-[11px] font-semibold uppercase tracking-wider text-subtle">
+                          {t(`buyback.category.${cat}`, { defaultValue: cat })}
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {items.map(a => (
+                            <div key={a.action_code} onClick={() => setMoreOpen(false)}>
+                              {renderBuybackActionButton(a, {
+                                primary: false,
+                                t,
+                                onSubmit: () => setActionModal('submit'),
+                                onApprove: () => setActionModal('approve'),
+                                onReject: () => setActionModal('reject'),
+                                onRevert: () => setActionModal('revert'),
+                                onIntake: () => setIntakeOpen(true),
+                                validateFailingChecks: actionsResp?.validate_failing_checks ?? [],
+                              })}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </PopOver>
             </>
-          )}
-
-          {/* PENDING_APPROVAL + non-C_A — only Revert is theirs */}
-          {canRevert && !canDecide && (
-            <Button size="sm" className="flex-1" onClick={() => setActionModal('revert')}>
-              {t('buyback.revertDraft')}
-            </Button>
-          )}
-
-          {/* APPROVED — intake */}
-          {canIntake && (
-            <Button
-              size="sm"
-              color="primary"
-              className="flex-1"
-              onClick={() => setIntakeOpen(true)}
-            >
-              {t('buyback.confirmIntake')}
-            </Button>
           )}
         </div>
       )}
@@ -651,6 +810,7 @@ function BuybackDetailPanel({
         open={intakeOpen}
         onClose={() => { setIntakeOpen(false); onRefresh(); }}
         detail={detail}
+        targetLineId={intakeAction?.target_line_id ?? null}
       />
     </div>
   );
@@ -672,14 +832,20 @@ function BuybackIntakeModal({
   open,
   onClose,
   detail,
+  targetLineId,
 }: {
   open: boolean;
   onClose: () => void;
   detail: BuybackDetail;
+  targetLineId: number | null;
 }) {
   const { t } = useTranslation();
-  // BUYBACK is always single-line per the flow spec — take the first line
-  const line = detail.lines?.[0] ?? null;
+  // Prefer the backend-resolved target line; fall back to lines[0] (buybacks
+  // are SINGLE_ITEM so they coincide, but target_line_id is the authoritative
+  // pick from fn_buyback_available_actions).
+  const line = (targetLineId != null
+    ? detail.lines?.find(l => l.po_line_id === targetLineId)
+    : detail.lines?.[0]) ?? null;
   const [view, setView] = useState<'form' | 'done'>('form');
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');

@@ -5,13 +5,14 @@ import { PageNav, PageNavPanel, MobileHeader, Badge, Button, Modal, useSnackbarC
 import { ArrowLeft, ArrowRightFromLine, CheckCircle } from 'lucide-react';
 import { codeDisplay } from './inventoryUtils';
 import { useNavGuard } from '../../contexts/NavGuardContext';
-import { useBuybackDraft, getSetupStatus, getConditionStatus, getSubmitStatus } from './buybackWizard/useBuyback';
+import { useBuybackDraft, useBuybackActions, getSetupStatus, getConditionStatus, getSubmitStatus } from './buybackWizard/useBuyback';
 import { CardSetup } from './buybackWizard/CardSetup';
 import { CardCondition } from './buybackWizard/CardCondition';
 import { CardPhotos } from './buybackWizard/CardPhotos';
 import { CardSubmit } from './buybackWizard/CardSubmit';
 import { PanelSetup } from './buybackWizard/PanelSetup';
 import { PanelCondition } from './buybackWizard/PanelCondition';
+import { PanelPhotos } from './buybackWizard/PanelPhotos';
 import { PanelSubmit } from './buybackWizard/PanelSubmit';
 import type { WizardSection } from './buybackWizard/types';
 
@@ -23,6 +24,7 @@ export function BuybackWizardPage() {
   const poId = poIdParam ? Number(poIdParam) : null;
 
   const { data: draft, invalidate } = useBuybackDraft(poId);
+  const { data: actionsResp } = useBuybackActions(poId);
   const navGuard = useNavGuard();
 
   // Dirty ref — Panels mutate, NavGuard reads it for sidebar nav, the wizard
@@ -67,7 +69,7 @@ export function BuybackWizardPage() {
 
   const setupStatus = getSetupStatus(draft);
   const conditionStatus = getConditionStatus(draft);
-  const submitStatus = getSubmitStatus(draft, setupStatus, conditionStatus);
+  const submitStatus = getSubmitStatus(draft, setupStatus, conditionStatus, actionsResp);
 
   const sectionTitle: Record<WizardSection, string> = {
     setup: t('buybackWizard.cardSetup', { defaultValue: 'Setup' }),
@@ -163,12 +165,12 @@ export function BuybackWizardPage() {
             )}
 
             <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
-              <PageNavPanel id="summary" className={isMobile ? '' : 'w-5/12 xl:w-4/12 border-r border-line flex flex-col'}>
+              <PageNavPanel id="summary" className={isMobile ? '' : 'w-5/12 xl:w-4/12 min-w-0 border-r border-line flex flex-col'}>
                 <div className="flex-1 overflow-y-auto better-scroll">
                   <div className="p-4 flex flex-col gap-3">
                     <CardSetup draft={draft ?? null} active={isCardActive('setup')} onEdit={() => handleOpen('setup')} />
                     <CardCondition draft={draft ?? null} active={isCardActive('condition')} onEdit={() => handleOpen('condition')} />
-                    <CardPhotos draft={draft ?? null} />
+                    <CardPhotos draft={draft ?? null} active={isCardActive('photos')} onEdit={() => handleOpen('photos')} />
                     <CardSubmit
                       draft={draft ?? null}
                       status={submitStatus}
@@ -219,6 +221,12 @@ export function BuybackWizardPage() {
                         ),
                       });
                     }}
+                  />
+                )}
+                {openSection === 'photos' && draft && (
+                  <PanelPhotos
+                    draft={draft}
+                    onClose={handleClose}
                   />
                 )}
                 {openSection === 'submit' && draft && (
