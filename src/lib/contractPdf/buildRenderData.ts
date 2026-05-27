@@ -156,14 +156,13 @@ export interface ContractRenderOverrides {
   witness2MediaId?: number | null;
   witness2Name?: string;
 
-  // Device fields (no BE columns — render-only)
-  battery?: string;
-
-  // Handover ticks (UI may pre-set these from v_contract_handover; up to caller
-  // to also persist via fn_contract_set_handover before generating)
-  hasBox?: boolean;
-  hasChargerSet?: boolean;
-  hasChargerCable?: boolean;
+  // Battery / accessory overrides. null (or absent) means "inherit asset
+  // value" — i.e. use whatever inv.assets / v_contract_handover currently
+  // shows. Non-null wins on the printed PDF.
+  batteryPct?: number | null;
+  hasBox?: boolean | null;
+  hasChargerSet?: boolean | null;
+  hasChargerCable?: boolean | null;
 
   // Clause 6 repo threshold — UI override. Defaults to CLAUSE_6_REPO_THRESHOLD_DAYS
   // until BE adds `repo_threshold_days` to company_config.
@@ -179,7 +178,6 @@ export class ContractRenderPrerequisiteError extends Error {
 }
 
 interface BuildOptions {
-  blankBattery?: string;
   overrides?: ContractRenderOverrides;
 }
 
@@ -249,12 +247,14 @@ export async function buildContractRenderData(
   const witness1NameAuto = boundBySlot.WITNESS_1 ? `${boundBySlot.WITNESS_1.first_name} ${boundBySlot.WITNESS_1.last_name}` : '';
   const witness2NameAuto = boundBySlot.WITNESS_2 ? `${boundBySlot.WITNESS_2.first_name} ${boundBySlot.WITNESS_2.last_name}` : '';
 
-  const hasBox = ov.hasBox ?? handover?.has_box ?? true;
-  const hasChargerSet = ov.hasChargerSet ?? handover?.has_charger_set ?? true;
-  const hasChargerCable = ov.hasChargerCable ?? handover?.has_charger_cable ?? true;
-
-  const batteryAuto = asset?.battery_health != null ? `${asset.battery_health}%` : '';
-  const battery = ov.battery ?? batteryAuto ?? opts.blankBattery ?? '';
+  // Asset truth: handover row for accessories, asset row for battery.
+  // Default the accessory booleans to true when the handover row is missing
+  // (mirrors prior behaviour — pre-handover contracts assumed everything
+  // included).
+  const assetHasBox = handover?.has_box ?? true;
+  const assetHasChargerSet = handover?.has_charger_set ?? true;
+  const assetHasCable = handover?.has_charger_cable ?? true;
+  const assetBatteryPct = asset?.battery_health ?? null;
 
   const bank = bankAccounts[0] ?? null;
   if (!bank) throw new ContractRenderPrerequisiteError('no_bank_account');
@@ -332,10 +332,15 @@ export async function buildContractRenderData(
     deviceStorage: asset?.variant_name ?? contract.variant_name ?? '',
     deviceImei: asset?.imei ?? (asset ? '' : (contract.device_identifier ?? '')),
     deviceSerial: asset?.serial_no ?? '',
-    deviceBattery: battery,
-    deviceBoxNote: hasBox ? 'มีกล่อง' : '',
-    deviceChargerBlockNote: hasChargerSet ? 'ชุดชาร์จ' : '',
-    deviceChargerCableNote: hasChargerCable ? 'สายชาร์จ' : '',
+
+    assetBatteryPct,
+    assetHasBox,
+    assetHasChargerSet,
+    assetHasCable: assetHasCable,
+    overrideBatteryPct: ov.batteryPct ?? null,
+    overrideHasBox: ov.hasBox ?? null,
+    overrideHasChargerSet: ov.hasChargerSet ?? null,
+    overrideHasCable: ov.hasChargerCable ?? null,
 
     upfrontAmount: upfront,
     monthlyAmount: monthly,

@@ -18,7 +18,14 @@ import { LESSOR,
   CLAUSE_5_INTRO, CLAUSE_5_LATE_FEE_BAHT, buildClause6, CLAUSE_7, CLAUSE_8,
   FOOTER_PAYMENT_NOTE, FOOTER_RETURN_NOTE,
 } from './constants';
-import type { ContractPdfInput } from './types';
+import {
+  resolveBattery,
+  resolveHasBox,
+  resolveHasChargerSet,
+  resolveHasCable,
+  thaiYesNo,
+  type ContractPdfInput,
+} from './types';
 
 // ── Style tokens ─────────────────────────────────────────────────────────────
 const FS_HEADER = 8.5;
@@ -186,7 +193,7 @@ function buildPage1(input: ContractPdfInput): Content[] {
         blank(input.deviceStorage),
         ' ',
         blank(deviceIdentifier(input.deviceImei, input.deviceSerial)),
-        ...batteryFragment(input.deviceBattery),
+        ...batteryFragment(resolveBattery(input)),
         ' ของ "ผู้ให้เช่า" ให้กับ "ผู้เช่า" โดย "ผู้เช่า" ได้ชำระเงินค่าเปิดใช้เครื่อง ค่าดำเนินการระบบติดตามระยะไกล และค่าความเสื่อมสภาพขณะใช้งานทรัพย์สิน ให้แก่ "ผู้ให้เช่า" ในวันทำสัญญานี้เป็นเงิน ',
         blank(`${fmtCurrency(input.upfrontAmount)} บาท`, { bold: true }),
       ],
@@ -324,7 +331,7 @@ function buildPage2(input: ContractPdfInput): Content[] {
         ' รุ่น ', blank(input.deviceModel),
         ' สี ', blank(input.deviceColor),
         ' ความจุตัวเครื่อง ', blank(input.deviceStorage),
-        ...batteryFragment(input.deviceBattery),
+        ...batteryFragment(resolveBattery(input)),
       ],
       fontSize: FS_BODY,
       margin: [0, 0, 0, 2],
@@ -332,9 +339,9 @@ function buildPage2(input: ContractPdfInput): Content[] {
     {
       text: [
         blank(deviceIdentifier(input.deviceImei, input.deviceSerial)),
-        ' กล่องตัวเครื่อง ', blank(input.deviceBoxNote),
-        ' ชุดชาร์จ ', blank(input.deviceChargerBlockNote),
-        ' สายชาร์จ ', blank(input.deviceChargerCableNote),
+        ' กล่องตัวเครื่อง ', blank(thaiYesNo(resolveHasBox(input), 'กล่อง')),
+        ' ชุดชาร์จ ', blank(thaiYesNo(resolveHasChargerSet(input), 'ชุดชาร์จ')),
+        ' สายชาร์จ ', blank(thaiYesNo(resolveHasCable(input), 'สายชาร์จ')),
       ],
       fontSize: FS_BODY,
       margin: [0, 0, 0, 6],
@@ -420,7 +427,7 @@ function buildPage3(input: ContractPdfInput): Content[] {
     {
       text: [
         blank(deviceIdentifier(input.deviceImei, input.deviceSerial)),
-        ...batteryFragment(input.deviceBattery),
+        ...batteryFragment(resolveBattery(input)),
       ],
       fontSize: FS_BODY, margin: [0, 0, 0, 4],
     },

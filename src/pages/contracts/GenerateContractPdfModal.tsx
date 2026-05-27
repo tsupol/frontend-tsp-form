@@ -131,11 +131,12 @@ export function GenerateContractPdfModal({ open, onClose, contract }: Props) {
   }, [open, handover]);
 
   // Battery is editable so staff can tweak the printed value without touching
-  // the asset record.
+  // the asset record. Stored as a string for the input; coerced to int (or
+  // null) when building overrides.
   const [battery, setBattery] = useState('');
   useEffect(() => {
     if (!open) return;
-    setBattery(assetRow?.battery_health != null ? `${assetRow.battery_health}%` : '');
+    setBattery(assetRow?.battery_health != null ? String(assetRow.battery_health) : '');
   }, [open, assetRow]);
 
   // Clause 6 repo threshold — overridable per print until BE adds the field.
@@ -177,11 +178,26 @@ export function GenerateContractPdfModal({ open, onClose, contract }: Props) {
   const [persisting, setPersisting] = useState(false);
 
   // Build overrides from current modal state. Shared by Print and Preview.
+  // An override is only emitted when the modal value differs from the asset
+  // truth (handover row for accessories, asset row for battery) — that way
+  // the wire payload preserves the asset-vs-override distinction even after
+  // persistHandover() has rewritten the handover row.
   const buildOverrides = (): PdfOverrides => {
     const lessor = findSig(sigPick.LESSOR);
     const w1 = findSig(sigPick.WITNESS_1);
     const w2 = findSig(sigPick.WITNESS_2);
     const parsedRepo = parseInt(repoThreshold, 10);
+
+    const assetHasBox = handover?.has_box ?? true;
+    const assetHasChargerSet = handover?.has_charger_set ?? true;
+    const assetHasChargerCable = handover?.has_charger_cable ?? true;
+    const assetBatteryPct = assetRow?.battery_health ?? null;
+
+    const parsedBattery = parseInt(battery, 10);
+    const batteryPct = Number.isFinite(parsedBattery) && parsedBattery >= 0 && parsedBattery <= 100
+      ? parsedBattery
+      : null;
+
     return {
       lessorMediaId: lessor?.signature_media_id ?? null,
       lessorName: lessor ? `${lessor.first_name} ${lessor.last_name}` : '',
@@ -189,10 +205,10 @@ export function GenerateContractPdfModal({ open, onClose, contract }: Props) {
       witness1Name: w1 ? `${w1.first_name} ${w1.last_name}` : '',
       witness2MediaId: w2?.signature_media_id ?? null,
       witness2Name: w2 ? `${w2.first_name} ${w2.last_name}` : '',
-      battery,
-      hasBox,
-      hasChargerSet,
-      hasChargerCable,
+      batteryPct: batteryPct !== assetBatteryPct ? batteryPct : null,
+      hasBox: hasBox !== assetHasBox ? hasBox : null,
+      hasChargerSet: hasChargerSet !== assetHasChargerSet ? hasChargerSet : null,
+      hasChargerCable: hasChargerCable !== assetHasChargerCable ? hasChargerCable : null,
       repoThresholdDays: Number.isFinite(parsedRepo) && parsedRepo > 0 ? parsedRepo : CLAUSE_6_REPO_THRESHOLD_DAYS,
     };
   };
@@ -313,13 +329,14 @@ export function GenerateContractPdfModal({ open, onClose, contract }: Props) {
                 <span className="text-xs text-subtle mt-1">{t('workspace.handoverUnlockCodeHint')}</span>
               </div>
               <div className="flex flex-col">
-                <label className="form-label">{t('contract.batteryHealth', { defaultValue: 'Battery health' })}</label>
+                <label className="form-label">{t('contract.batteryHealth', { defaultValue: 'Battery health (%)' })}</label>
                 <Input
                   value={battery}
                   onChange={e => setBattery(e.target.value)}
                   className="w-full"
                   size="sm"
-                  placeholder="100%"
+                  placeholder="100"
+                  inputMode="numeric"
                 />
               </div>
             </div>

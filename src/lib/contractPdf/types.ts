@@ -37,10 +37,17 @@ export interface ContractPdfInput {
   deviceStorage: string;      // "256 GB"
   deviceImei: string;         // "358883220481763" — empty if none
   deviceSerial: string;       // "F2LZK1ABCD" — empty if none
-  deviceBattery: string;      // "100%"
-  deviceBoxNote: string;      // "มีกล่อง"
-  deviceChargerBlockNote: string; // "ชุดชาร์จ"
-  deviceChargerCableNote: string; // "สายชาร์จ"
+
+  // Asset-derived condition. asset* = inventory truth; override* wins when
+  // non-null. misc-go renders Thai labels (มีกล่อง / ไม่มีกล่อง, …).
+  assetBatteryPct: number | null;     // 0–100, null = unknown
+  assetHasBox: boolean;
+  assetHasChargerSet: boolean;
+  assetHasCable: boolean;
+  overrideBatteryPct: number | null;
+  overrideHasBox: boolean | null;
+  overrideHasChargerSet: boolean | null;
+  overrideHasCable: boolean | null;
 
   // Money
   upfrontAmount: number;      // 7,900 — ค่าเปิดใช้/ค่าดำเนินการ/ค่าเสื่อม
@@ -76,4 +83,24 @@ export interface ContractPdfInput {
 
   // ID-card image embedded on page 3 above the "สำเนาถูกต้อง" heading
   lesseeIdCardDataUrl: string | null;
+}
+
+// Resolve asset-vs-override into the values the renderer actually prints.
+// Mirrors misc-go's template helpers so the local pdfmake / preview render
+// matches the server PDF.
+export function resolveBattery(input: ContractPdfInput): string {
+  const pct = input.overrideBatteryPct ?? input.assetBatteryPct;
+  return pct == null ? '' : `${pct}%`;
+}
+export function resolveHasBox(input: ContractPdfInput): boolean {
+  return input.overrideHasBox ?? input.assetHasBox;
+}
+export function resolveHasChargerSet(input: ContractPdfInput): boolean {
+  return input.overrideHasChargerSet ?? input.assetHasChargerSet;
+}
+export function resolveHasCable(input: ContractPdfInput): boolean {
+  return input.overrideHasCable ?? input.assetHasCable;
+}
+export function thaiYesNo(b: boolean, noun: string): string {
+  return (b ? 'มี' : 'ไม่มี') + noun;
 }

@@ -27,7 +27,14 @@ import {
   FOOTER_PAYMENT_NOTE,
   FOOTER_RETURN_NOTE,
 } from '../../lib/contractPdf/constants';
-import type { ContractPdfInput } from '../../lib/contractPdf/types';
+import {
+  resolveBattery,
+  resolveHasBox,
+  resolveHasChargerSet,
+  resolveHasCable,
+  thaiYesNo,
+  type ContractPdfInput,
+} from '../../lib/contractPdf/types';
 import { fmtCurrency } from '../../lib/format';
 import './contractPreview.css';
 
@@ -201,7 +208,7 @@ function ClausesSection({ input }: { input: ContractPdfInput }) {
         ยี่ห้อ <Fill>{input.deviceBrand}</Fill> รุ่น <Fill>{input.deviceModel}</Fill>{' '}
         สี <Fill>{input.deviceColor}</Fill> ความจุตัวเครื่อง <Fill>{input.deviceStorage}</Fill>{' '}
         <Fill>{deviceIdentifier(input.deviceImei, input.deviceSerial)}</Fill>
-        {input.deviceBattery && <> สุขภาพแบตเตอรี่ <Fill>{input.deviceBattery}</Fill></>}
+        {resolveBattery(input) && <> สุขภาพแบตเตอรี่ <Fill>{resolveBattery(input)}</Fill></>}
         {' '}ของ "ผู้ให้เช่า" ให้กับ "ผู้เช่า" โดย "ผู้เช่า" ได้ชำระเงินค่าเปิดใช้เครื่อง ค่าดำเนินการระบบติดตามระยะไกล
         และค่าความเสื่อมสภาพขณะใช้งานทรัพย์สิน ให้แก่ "ผู้ให้เช่า" ในวันทำสัญญานี้เป็นเงิน{' '}
         <Fill bold>{fmtCurrency(input.upfrontAmount)} บาท</Fill>
@@ -245,13 +252,13 @@ function AssetSection({ input }: { input: ContractPdfInput }) {
         รุ่น <Fill>{input.deviceModel}</Fill>{' '}
         สี <Fill>{input.deviceColor}</Fill>{' '}
         ความจุตัวเครื่อง <Fill>{input.deviceStorage}</Fill>
-        {input.deviceBattery && <> สุขภาพแบตเตอรี่ <Fill>{input.deviceBattery}</Fill></>}
+        {resolveBattery(input) && <> สุขภาพแบตเตอรี่ <Fill>{resolveBattery(input)}</Fill></>}
       </p>
       <p className="cp-body">
         <Fill>{deviceIdentifier(input.deviceImei, input.deviceSerial)}</Fill>{' '}
-        กล่องตัวเครื่อง <Fill>{input.deviceBoxNote}</Fill>{' '}
-        ชุดชาร์จ <Fill>{input.deviceChargerBlockNote}</Fill>{' '}
-        สายชาร์จ <Fill>{input.deviceChargerCableNote}</Fill>
+        กล่องตัวเครื่อง <Fill>{thaiYesNo(resolveHasBox(input), 'กล่อง')}</Fill>{' '}
+        ชุดชาร์จ <Fill>{thaiYesNo(resolveHasChargerSet(input), 'ชุดชาร์จ')}</Fill>{' '}
+        สายชาร์จ <Fill>{thaiYesNo(resolveHasCable(input), 'สายชาร์จ')}</Fill>
       </p>
     </section>
   );
@@ -377,7 +384,7 @@ function TrueCopySection({ input }: { input: ContractPdfInput }) {
       </p>
       <p className="cp-body">
         <Fill>{deviceIdentifier(input.deviceImei, input.deviceSerial)}</Fill>
-        {input.deviceBattery && <> สุขภาพแบตเตอรี่ <Fill>{input.deviceBattery}</Fill></>}
+        {resolveBattery(input) && <> สุขภาพแบตเตอรี่ <Fill>{resolveBattery(input)}</Fill></>}
       </p>
       <p className="cp-body">
         โดย "ผู้เช่า" ได้ชำระเงินค่าเปิดใช้เครื่อง, ค่าดำเนินการระบบติดตามระยะไกล,
