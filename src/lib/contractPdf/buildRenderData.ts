@@ -147,28 +147,6 @@ async function resolveSignatureByMediaId(mediaId: number | null | undefined): Pr
   }
 }
 
-export interface ContractRenderOverrides {
-  // Signatory render-only overrides (do not write back to contract_signatory)
-  lessorMediaId?: number | null;
-  lessorName?: string;
-  witness1MediaId?: number | null;
-  witness1Name?: string;
-  witness2MediaId?: number | null;
-  witness2Name?: string;
-
-  // Battery / accessory overrides. null (or absent) means "inherit asset
-  // value" — i.e. use whatever inv.assets / v_contract_handover currently
-  // shows. Non-null wins on the printed PDF.
-  batteryPct?: number | null;
-  hasBox?: boolean | null;
-  hasChargerSet?: boolean | null;
-  hasChargerCable?: boolean | null;
-
-  // Clause 6 repo threshold — UI override. Defaults to CLAUSE_6_REPO_THRESHOLD_DAYS
-  // until BE adds `repo_threshold_days` to company_config.
-  repoThresholdDays?: number;
-}
-
 export class ContractRenderPrerequisiteError extends Error {
   readonly reason: 'no_bank_account' | 'no_lessor' | 'no_witnesses';
   constructor(reason: 'no_bank_account' | 'no_lessor' | 'no_witnesses') {
@@ -177,13 +155,8 @@ export class ContractRenderPrerequisiteError extends Error {
   }
 }
 
-interface BuildOptions {
-  overrides?: ContractRenderOverrides;
-}
-
 export async function buildContractRenderData(
   contract: ContractMin,
-  opts: BuildOptions = {},
 ): Promise<ContractPdfInput> {
   if (contract.customer_id == null) {
     throw new Error('contract has no customer');
@@ -220,7 +193,6 @@ export async function buildContractRenderData(
   const asset = assets[0] ?? null;
 
   const customerSigDoc = sigDocs.find(d => d.customer_id === contract.customer_id) ?? sigDocs[0] ?? null;
-  const ov = opts.overrides ?? {};
 
   const detail = detailRows[0];
   const handover = detail?.handover ?? null;
@@ -231,9 +203,9 @@ export async function buildContractRenderData(
     WITNESS_2: boundSigs.find(s => s.slot === 'WITNESS_2') ?? null,
   };
 
-  const lessorMediaId = ov.lessorMediaId ?? boundBySlot.LESSOR?.signature_media_id ?? null;
-  const w1MediaId = ov.witness1MediaId ?? boundBySlot.WITNESS_1?.signature_media_id ?? null;
-  const w2MediaId = ov.witness2MediaId ?? boundBySlot.WITNESS_2?.signature_media_id ?? null;
+  const lessorMediaId = boundBySlot.LESSOR?.signature_media_id ?? null;
+  const w1MediaId = boundBySlot.WITNESS_1?.signature_media_id ?? null;
+  const w2MediaId = boundBySlot.WITNESS_2?.signature_media_id ?? null;
 
   const [lesseeSignatureDataUrl, lesseeIdCardDataUrl, lessorSig, w1Sig, w2Sig] = await Promise.all([
     resolveMediaDataUrl(customerSigDoc?.file_url ?? null),
@@ -262,9 +234,9 @@ export async function buildContractRenderData(
   const lateFeeMaxDays = companyCfg[0]?.late_fee_max_days ?? null;
   const gracePeriodDays = companyCfg[0]?.grace_period_days ?? null;
 
-  const lessorName = ov.lessorName || lessorNameAuto;
-  const witness1Name = ov.witness1Name || witness1NameAuto;
-  const witness2Name = ov.witness2Name || witness2NameAuto;
+  const lessorName = lessorNameAuto;
+  const witness1Name = witness1NameAuto;
+  const witness2Name = witness2NameAuto;
   if (!lessorName.trim()) throw new ContractRenderPrerequisiteError('no_lessor');
   if (!witness1Name.trim() || !witness2Name.trim()) throw new ContractRenderPrerequisiteError('no_witnesses');
 
@@ -337,10 +309,10 @@ export async function buildContractRenderData(
     assetHasBox,
     assetHasChargerSet,
     assetHasCable: assetHasCable,
-    overrideBatteryPct: ov.batteryPct ?? null,
-    overrideHasBox: ov.hasBox ?? null,
-    overrideHasChargerSet: ov.hasChargerSet ?? null,
-    overrideHasCable: ov.hasChargerCable ?? null,
+    overrideBatteryPct: null,
+    overrideHasBox: null,
+    overrideHasChargerSet: null,
+    overrideHasCable: null,
 
     upfrontAmount: upfront,
     monthlyAmount: monthly,
@@ -363,6 +335,6 @@ export async function buildContractRenderData(
     lateFeePerDay: lateFeePerDay,
     lateFeeMaxDays: lateFeeMaxDays,
     gracePeriodDays: gracePeriodDays,
-    repoThresholdDays: ov.repoThresholdDays ?? CLAUSE_6_REPO_THRESHOLD_DAYS,
+    repoThresholdDays: CLAUSE_6_REPO_THRESHOLD_DAYS,
   };
 }

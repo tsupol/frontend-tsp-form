@@ -11,7 +11,6 @@ import {
   buildContractRenderData,
   ContractRenderPrerequisiteError,
   type ContractMin,
-  type ContractRenderOverrides,
 } from '../../lib/contractPdf/buildRenderData';
 import {
   LESSOR,
@@ -42,10 +41,9 @@ interface Props {
   open: boolean;
   onClose: () => void;
   contract: ContractMin | null;
-  overrides: ContractRenderOverrides;
 }
 
-export function ContractPreviewModal({ open, onClose, contract, overrides }: Props) {
+export function ContractPreviewModal({ open, onClose, contract }: Props) {
   const { t } = useTranslation();
   const [data, setData] = useState<ContractPdfInput | null>(null);
   const [loading, setLoading] = useState(false);
@@ -57,7 +55,7 @@ export function ContractPreviewModal({ open, onClose, contract, overrides }: Pro
     setLoading(true);
     setErrMsg(null);
     setData(null);
-    buildContractRenderData(contract, { overrides })
+    buildContractRenderData(contract)
       .then((d) => { if (!cancelled) setData(d); })
       .catch((err) => {
         if (cancelled) return;
@@ -69,7 +67,7 @@ export function ContractPreviewModal({ open, onClose, contract, overrides }: Pro
       })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [open, contract, overrides, t]);
+  }, [open, contract, t]);
 
   return (
     <Modal

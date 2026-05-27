@@ -37,7 +37,11 @@
     "continue": "Continue",
     "back": "Back",
     "change": "Change",
-    "optional": "optional"
+    "optional": "optional",
+    "yes": "Yes",
+    "no": "No",
+    "notSet": "Not set",
+    "days": "days"
   },
   "dashboard": {
     "actionRequired": "Action required",
@@ -1880,10 +1884,11 @@
     "printBlock_openSignatoryBook": "Open Signatory Book",
     "printBlock_noBankAccount": "Branch has no active bank account set.",
     "printBlock_openBankAccounts": "Open Bank Accounts",
+    "printBlock_noSignatoryBound": "No signatory bound and no branch default — set defaults on the Signatory Book first.",
     "printBankAccountTitle": "Payment bank account",
     "printRepoThresholdTitle": "Repossession threshold (clause 6)",
     "printRepoThresholdLabel": "Days unreachable before repossession",
-    "printRepoThresholdHint": "Defaults to 15 days. Override only when needed.",
+    "printDefaultBadge": "branch default",
     "previewContract": "Preview",
     "printContractPdfFe": "Print (FE)",
     "printContractPdfServer": "Print (Server)",

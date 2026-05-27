@@ -1,22 +1,17 @@
 // React hook: triggers contract PDF generation via the nnf-misc-go server
 // endpoint (POST /api/v1/contract/pdf). Reuses the shared buildContractRenderData
-// data assembly so the server gets the same input shape the pdfmake renderer
-// uses locally — letting us compare both outputs side-by-side during the
-// migration window.
+// data assembly so the server gets the same input shape the preview uses.
 
 import { useCallback, useState } from 'react';
 import { config } from '../../config/config';
 import {
   buildContractRenderData,
   type ContractMin,
-  type ContractRenderOverrides,
 } from '../../lib/contractPdf/buildRenderData';
-
-export type PdfServerOverrides = ContractRenderOverrides;
 
 export interface UseGenerateContractPdfServer {
   generating: boolean;
-  generate: (contract: ContractMin, overrides?: PdfServerOverrides) => Promise<void>;
+  generate: (contract: ContractMin) => Promise<void>;
   error: string | null;
 }
 
@@ -35,11 +30,11 @@ export function useGenerateContractPdfServer(): UseGenerateContractPdfServer {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const generate = useCallback(async (contract: ContractMin, overrides?: PdfServerOverrides) => {
+  const generate = useCallback(async (contract: ContractMin) => {
     setError(null);
     setGenerating(true);
     try {
-      const input = await buildContractRenderData(contract, { overrides });
+      const input = await buildContractRenderData(contract);
       const res = await fetch(`${config.uploadUrl}/contract/pdf`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -57,7 +52,7 @@ export function useGenerateContractPdfServer(): UseGenerateContractPdfServer {
       }
       const blob = await res.blob();
       const code = contract.code_display ?? contract.code;
-      triggerDownload(blob, `${code}-server.pdf`);
+      triggerDownload(blob, `${code}.pdf`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'server pdf failed');
       throw err;

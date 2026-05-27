@@ -37,7 +37,11 @@
     "continue": "ดำเนินการต่อ",
     "back": "ย้อนกลับ",
     "change": "เปลี่ยน",
-    "optional": "ไม่บังคับ"
+    "optional": "ไม่บังคับ",
+    "yes": "ใช่",
+    "no": "ไม่ใช่",
+    "notSet": "ยังไม่ตั้งค่า",
+    "days": "วัน"
   },
   "dashboard": {
     "actionRequired": "ต้องดำเนินการ",
@@ -1880,10 +1884,11 @@
     "printBlock_openSignatoryBook": "เปิดสมุดผู้ลงนาม",
     "printBlock_noBankAccount": "สาขายังไม่ได้ตั้งบัญชีธนาคารที่ใช้งานอยู่",
     "printBlock_openBankAccounts": "เปิดบัญชีธนาคาร",
+    "printBlock_noSignatoryBound": "ยังไม่มีผู้ลงนามผูกกับสัญญา และไม่มีค่าเริ่มต้นของสาขา — กรุณาตั้งค่าเริ่มต้นในสมุดผู้ลงนามก่อน",
     "printBankAccountTitle": "บัญชีธนาคารสำหรับรับชำระ",
     "printRepoThresholdTitle": "ระยะเวลายึดคืน (ข้อ 6)",
     "printRepoThresholdLabel": "จำนวนวันที่ติดต่อไม่ได้ก่อนยึดคืน",
-    "printRepoThresholdHint": "ค่าเริ่มต้น 15 วัน ปรับเฉพาะเมื่อจำเป็น",
+    "printDefaultBadge": "ค่าเริ่มต้นของสาขา",
     "previewContract": "แสดงตัวอย่าง",
     "printContractPdfFe": "พิมพ์ (FE)",
     "printContractPdfServer": "พิมพ์ (เซิร์ฟเวอร์)",

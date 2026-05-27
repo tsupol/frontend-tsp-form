@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Badge, Button, Input, Select, Modal, TextArea, Tooltip, useSnackbarContext } from 'tsp-form';
 import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Upload, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, AlertTriangle } from 'lucide-react';
-import { useGenerateContractPdf } from './useGenerateContractPdf';
+import { useGenerateContractPdfServer } from './useGenerateContractPdfServer';
 import { GenerateContractPdfModal } from './GenerateContractPdfModal';
 import { useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
@@ -554,7 +554,7 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [lightboxKey, setLightboxKey] = useState<string | null>(null);
   const [lightboxAlt, setLightboxAlt] = useState<string>('');
-  const { generating: printingPdf } = useGenerateContractPdf();
+  const { generating: printingPdf } = useGenerateContractPdfServer();
   const [pdfModalOpen, setPdfModalOpen] = useState(false);
   const [printBlockOpen, setPrintBlockOpen] = useState(false);
   const [printBlockReasons, setPrintBlockReasons] = useState<string[]>([]);
