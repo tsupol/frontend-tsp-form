@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useSearchParams, useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, Modal, TextArea, DataTable, PopOver, Tooltip, useSnackbarContext } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, Box, Search, SlidersHorizontal, XCircle, ChevronDown, ExternalLink, Wrench, Printer, Plus, CheckCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, Box, Search, SlidersHorizontal, XCircle, ChevronDown, ExternalLink, Wrench, Printer, Plus, CheckCircle, Pencil } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
@@ -823,6 +823,7 @@ function AssetDetailPanel({
   addSnackbar: (opts: { message: React.ReactNode }) => void;
 }) {
   const [activeAction, setActiveAction] = useState<BackendAssetAction | null>(null);
+  const [actionPreset, setActionPreset] = useState<Record<string, string> | undefined>(undefined);
   const [addIdentifierType, setAddIdentifierType] = useState<string | null>(null);
   const { handlePrint: printAssetSticker, portal: stickerPortal } = useAssetStickerPrint();
 
@@ -833,6 +834,19 @@ function AssetDetailPanel({
     ),
     placeholderData: keepPreviousData,
   });
+
+  // Shared with AssetActionBar (same queryKey → cache hit). Used here to decide
+  // whether to render the per-row Correct pencil (permission gate).
+  const { data: assetActions } = useQuery({
+    queryKey: ['asset-actions', asset.asset_id],
+    queryFn: () => apiClient.rpc<AssetActionsResponse>('fn_asset_available_actions', {
+      p_asset_id: asset.asset_id,
+    }),
+    staleTime: 30 * 1000,
+  });
+  const correctAction = assetActions?.actions.find(
+    a => a.action_code === 'ASSET_IDENTIFIER_CORRECT' && a.blocking_reason !== 'permission_denied',
+  );
 
   return (
     <div className="relative flex flex-col h-full">
@@ -875,8 +889,8 @@ function AssetDetailPanel({
 
       {/* Identifiers — list current + offer to add any missing IMEI/Serial.
           Uses fn_inv_asset_identifier_add (mig 113) to fill gaps without
-          voiding the asset. For correcting an existing value, use the
-          ASSET_IDENTIFIER_CORRECT action in the footer. */}
+          voiding the asset. Per-row pencil opens ASSET_IDENTIFIER_CORRECT
+          (fn_inv_identifier_correct) preset to that identifier. */}
       {(() => {
         const presentTypes = new Set(
           asset.identifiers.filter(i => i.is_active).map(i => i.type),
@@ -885,6 +899,13 @@ function AssetDetailPanel({
           tp => !presentTypes.has(tp),
         );
         if (asset.identifiers.length === 0 && missingTypes.length === 0) return null;
+        const openCorrect = (id: { type: string; value: string }) => {
+          if (!correctAction) return;
+          setActionPreset({
+            p_old_value: JSON.stringify({ type: id.type, value: id.value }),
+          });
+          setActiveAction(correctAction);
+        };
         return (
           <div className="flex-none px-4 py-2.5 border-b border-line">
             <div className="text-xs text-subtle mb-1">{t('asset.identifiers')}</div>
@@ -893,6 +914,16 @@ function AssetDetailPanel({
                 <Badge size="xs" color="default">{id.type}</Badge>
                 <span className="text-sm font-mono">{id.value}</span>
                 {!id.is_active && <span className="text-xs text-danger">(inactive)</span>}
+                {id.is_active && correctAction && (
+                  <Tooltip content={t('identifierCorrect.correct', { ns: 'assetActions', defaultValue: 'Correct value' })}>
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      startIcon={<Pencil size={12} />}
+                      onClick={() => openCorrect(id)}
+                    />
+                  </Tooltip>
+                )}
               </div>
             ))}
             {missingTypes.length > 0 && (
@@ -1065,17 +1096,25 @@ function AssetDetailPanel({
       <AssetActionBar
         asset={asset}
         t={t}
-        onPick={setActiveAction}
+        onPick={(action) => {
+          setActionPreset(undefined);
+          setActiveAction(action);
+        }}
       />
 
       <AssetActionModal
         open={!!activeAction}
         action={activeAction}
-        onClose={() => setActiveAction(null)}
+        presetExtra={actionPreset}
+        onClose={() => {
+          setActiveAction(null);
+          setActionPreset(undefined);
+        }}
         asset={asset}
         t={t}
         onSuccess={(msgKey, response) => {
           setActiveAction(null);
+          setActionPreset(undefined);
           onRefresh();
           addSnackbar({
             message: buildBillActionToast(response, t, {
@@ -1234,6 +1273,7 @@ function AssetActionBar({
 function AssetActionModal({
   open,
   action,
+  presetExtra,
   onClose,
   asset,
   t,
@@ -1241,6 +1281,7 @@ function AssetActionModal({
 }: {
   open: boolean;
   action: BackendAssetAction | null;
+  presetExtra?: Record<string, string>;
   onClose: () => void;
   asset: Asset;
   t: ReturnType<typeof useTranslation>['t'];
@@ -1288,9 +1329,10 @@ function AssetActionModal({
       config?.extraFields?.forEach(f => {
         if (f.kind === 'select' && f.default) initial[f.name] = f.default;
       });
+      if (presetExtra) Object.assign(initial, presetExtra);
       setExtra(initial);
     }
-  }, [open, config]);
+  }, [open, config, presetExtra]);
 
   const isFieldFilled = (name: string) => {
     const v = extra[name];

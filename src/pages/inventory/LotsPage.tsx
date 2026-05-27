@@ -1478,9 +1478,10 @@ function LotActionModal({
                               <label className="form-label">{t('convert.conditionGrade', { ns: 'lotActions', defaultValue: 'Condition' })}</label>
                               <Select
                                 options={CONDITION_OPTIONS}
-                                value={row.condition_grade}
-                                onChange={(val) => setDevices(devices.map((r, i) => i === idx ? { ...r, condition_grade: (val as string) || 'NEW' } : r))}
+                                value="NEW"
+                                onChange={() => {}}
                                 showChevron
+                                disabled
                               />
                             </div>
                             <div className="flex-1 min-w-0 flex flex-col">
