@@ -29,7 +29,7 @@ import {
   // Fanout child icons — Pricing
   TrendingUp, Percent, Handshake,
   // Fanout child icons — Inventory
-  BarChart3, Boxes, ClipboardList, PackagePlus, ArrowLeftRight, Wrench, RotateCcw, ShoppingCart, Barcode,
+  BarChart3, Boxes, ClipboardList, PackagePlus, ArrowLeftRight, Wrench, RotateCcw, HandCoins, ShoppingCart, Barcode,
   // Retail
   Store,
   // Fanout child icons — Company
@@ -233,19 +233,26 @@ export const AppSideNav = () => {
         { key: 'stock', icon: <BarChart3 size="1rem" />, label: t('nav.stock'), path: '/admin/inventory/stock' },
         { key: 'lots', icon: <Boxes size="1rem" />, label: t('nav.lots'), path: '/admin/inventory/lots' },
         { key: 'assets', icon: <Box size="1rem" />, label: t('nav.assets'), path: '/admin/inventory/assets' },
+        {
+          key: 'branch-stock',
+          icon: <ShoppingCart size="1rem" className="text-primary-fg" />,
+          label: <span className="text-primary-fg font-medium">{t('nav.branchStock')}</span>,
+          path: '/admin/inventory/branch-stock',
+        },
         { type: 'group', key: 'grp-procurement', label: t('nav.groupProcurement') },
         { key: 'po', icon: <ClipboardList size="1rem" />, label: t('nav.purchaseOrders'), path: '/admin/inventory/po' },
         { key: 'receiving', icon: <PackagePlus size="1rem" />, label: t('nav.receiving'), path: '/admin/inventory/receiving' },
         { type: 'group', key: 'grp-operations', label: t('nav.groupOperations') },
         { key: 'transfers', icon: <ArrowLeftRight size="1rem" />, label: t('nav.transfers'), path: '/admin/inventory/transfers' },
         { key: 'repairs', icon: <Wrench size="1rem" />, label: t('nav.repairs'), path: '/admin/inventory/repairs' },
-        { key: 'buyback', icon: <RotateCcw size="1rem" />, label: t('nav.buyback'), path: '/admin/inventory/buyback' },
         { key: 'barcodes', icon: <Barcode size="1rem" />, label: t('nav.barcodes'), path: '/admin/inventory/barcodes' },
+        { type: 'group', key: 'grp-buyback', label: t('nav.groupBuyback') },
+        { key: 'buyback', icon: <RotateCcw size="1rem" />, label: t('nav.buyback'), path: '/admin/inventory/buyback' },
         {
-          key: 'branch-stock',
-          icon: <ShoppingCart size="1rem" className="text-primary-fg" />,
-          label: <span className="text-primary-fg font-medium">{t('nav.branchStock')}</span>,
-          path: '/admin/inventory/branch-stock',
+          key: 'new-buyback',
+          icon: <HandCoins size="1rem" className="text-primary-fg" />,
+          label: <span className="text-primary-fg font-medium">{t('nav.newBuyback')}</span>,
+          path: '/admin/inventory/buyback/new',
         },
       ],
     },

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { BarChart3, Box, Boxes, ClipboardList, PackagePlus, ArrowLeftRight, Wrench, RotateCcw, ShoppingCart, Barcode } from 'lucide-react';
+import { BarChart3, Box, Boxes, ClipboardList, PackagePlus, ArrowLeftRight, Wrench, RotateCcw, HandCoins, ShoppingCart, Barcode } from 'lucide-react';
 
 type NavItem =
   | { type: 'link'; path: string; labelKey: string; icon: typeof BarChart3; iconClassName?: string }
@@ -13,20 +13,29 @@ const navItems: NavItem[] = [
   { type: 'link', path: '/admin/inventory/stock', labelKey: 'nav.stock', icon: BarChart3 },
   { type: 'link', path: '/admin/inventory/lots', labelKey: 'nav.lots', icon: Boxes },
   { type: 'link', path: '/admin/inventory/assets', labelKey: 'nav.assets', icon: Box },
+  { type: 'highlight', path: '/admin/inventory/branch-stock', labelKey: 'nav.branchStock', icon: ShoppingCart },
   { type: 'group', labelKey: 'nav.groupProcurement' },
   { type: 'link', path: '/admin/inventory/po', labelKey: 'nav.purchaseOrders', icon: ClipboardList },
   { type: 'link', path: '/admin/inventory/receiving', labelKey: 'nav.receiving', icon: PackagePlus },
   { type: 'group', labelKey: 'nav.groupOperations' },
   { type: 'link', path: '/admin/inventory/transfers', labelKey: 'nav.transfers', icon: ArrowLeftRight },
   { type: 'link', path: '/admin/inventory/repairs', labelKey: 'nav.repairs', icon: Wrench },
-  { type: 'link', path: '/admin/inventory/buyback', labelKey: 'nav.buyback', icon: RotateCcw },
   { type: 'link', path: '/admin/inventory/barcodes', labelKey: 'nav.barcodes', icon: Barcode },
-  { type: 'highlight', path: '/admin/inventory/branch-stock', labelKey: 'nav.branchStock', icon: ShoppingCart },
+  { type: 'group', labelKey: 'nav.groupBuyback' },
+  { type: 'link', path: '/admin/inventory/buyback', labelKey: 'nav.buyback', icon: RotateCcw },
+  { type: 'highlight', path: '/admin/inventory/buyback/new', labelKey: 'nav.newBuyback', icon: HandCoins },
 ];
 
 export function InventoryLayout({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const location = useLocation();
+
+  // Longest-prefix match so /admin/inventory/buyback/new activates the
+  // new-buyback item, not the buyback list item.
+  const activePath = navItems
+    .filter((it): it is Exclude<NavItem, { type: 'group' }> => it.type !== 'group')
+    .filter(it => location.pathname.startsWith(it.path))
+    .reduce<string | null>((best, it) => (best && best.length >= it.path.length ? best : it.path), null);
 
   return (
     <div className="flex h-dvh">
@@ -41,7 +50,7 @@ export function InventoryLayout({ children }: { children: ReactNode }) {
           }
           const path = item.path;
           const Icon = item.icon;
-          const isActive = location.pathname.startsWith(path);
+          const isActive = activePath === path;
           if (item.type === 'highlight') {
             return (
               <NavLink

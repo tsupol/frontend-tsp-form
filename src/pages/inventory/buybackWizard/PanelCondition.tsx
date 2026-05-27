@@ -1,0 +1,197 @@
+import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useMutation } from '@tanstack/react-query';
+import { Button, Select, TextArea, MaskedInput } from 'tsp-form';
+import { XCircle } from 'lucide-react';
+import { apiClient, ApiError } from '../../../lib/api';
+import { useFormSnapshot } from '../../../hooks/useFormSnapshot';
+import { getLine } from './useBuyback';
+import {
+  OVERALL_CONDITION_OPTIONS, SCREEN_CONDITION_OPTIONS, BODY_CONDITION_OPTIONS,
+  ITEM_CONDITION_OPTIONS,
+} from './types';
+import type { BuybackDraft } from './types';
+
+export function PanelCondition({
+  draft,
+  dirtyRef,
+  onSaved,
+  onClose,
+}: {
+  draft: BuybackDraft;
+  dirtyRef?: React.MutableRefObject<boolean>;
+  onSaved: () => void;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const line = getLine(draft);
+  const snap = (line?.condition_snapshot ?? {}) as Record<string, string>;
+
+  const [grade, setGrade] = useState<string>(line?.item_condition ?? 'USED_A');
+  const [overall, setOverall] = useState<string>(snap.OVERALL_CONDITION ?? '');
+  const [screen, setScreen] = useState<string>(snap.SCREEN_CONDITION ?? '');
+  const [body, setBody] = useState<string>(snap.BODY_CONDITION ?? '');
+  const [battery, setBattery] = useState<string>(snap.BATTERY_HEALTH ?? '');
+  const [notes, setNotes] = useState<string>(snap.CONDITION_NOTES ?? '');
+  const [error, setError] = useState('');
+
+  const formSnapshot = useFormSnapshot({ grade, overall, screen, body, battery, notes });
+
+  useEffect(() => {
+    if (dirtyRef) dirtyRef.current = formSnapshot.isDirty;
+  }, [formSnapshot.isDirty, dirtyRef]);
+
+  useEffect(() => {
+    const l = getLine(draft);
+    const s = (l?.condition_snapshot ?? {}) as Record<string, string>;
+    setGrade(l?.item_condition ?? 'USED_A');
+    setOverall(s.OVERALL_CONDITION ?? '');
+    setScreen(s.SCREEN_CONDITION ?? '');
+    setBody(s.BODY_CONDITION ?? '');
+    setBattery(s.BATTERY_HEALTH ?? '');
+    setNotes(s.CONDITION_NOTES ?? '');
+    formSnapshot.resetNext();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft]);
+
+  const save = useMutation({
+    mutationFn: async () => {
+      if (!line) throw new Error('No line');
+      const payload: Record<string, string> = {};
+      if (overall) payload.OVERALL_CONDITION = overall;
+      if (screen) payload.SCREEN_CONDITION = screen;
+      if (body) payload.BODY_CONDITION = body;
+      if (battery) payload.BATTERY_HEALTH = battery;
+      if (notes.trim()) payload.CONDITION_NOTES = notes.trim();
+
+      await apiClient.rpc('fn_inv_buyback_update_line', {
+        p_line_id: line.po_line_id,
+        p_model_id: null,
+        p_variant_id: null,
+        p_buyback_price: null,
+        p_item_condition: grade,
+        p_condition_snapshot: payload,
+        p_images: null,
+        p_note: null,
+        p_branch_id: null,
+      });
+    },
+    onSuccess: () => {
+      setError('');
+      formSnapshot.reset();
+      if (dirtyRef) dirtyRef.current = false;
+      onSaved();
+    },
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setError(translated || err.message);
+      } else {
+        setError(String(err));
+      }
+    },
+  });
+
+  const canSave = !save.isPending && !!grade;
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex-1 overflow-auto better-scroll">
+        <div className="p-4 max-w-2xl">
+          <h2 className="heading-3 mb-4">{t('buybackWizard.cardCondition', { defaultValue: 'Condition' })}</h2>
+
+          {error && (
+            <div className="alert alert-danger mb-4">
+              <XCircle size={16} />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <div className="form-grid gap-4">
+            <div className="flex flex-col">
+              <label className="form-label">{t('buybackWizard.grade', { defaultValue: 'Grade' })} *</label>
+              <Select
+                options={ITEM_CONDITION_OPTIONS}
+                value={grade}
+                onChange={(v) => setGrade((v as string) || 'USED_A')}
+                showChevron
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex flex-col">
+                <label className="form-label">{t('buybackWizard.overall', { defaultValue: 'Overall condition' })}</label>
+                <Select
+                  options={OVERALL_CONDITION_OPTIONS}
+                  value={overall || null}
+                  onChange={(v) => setOverall((v as string) || '')}
+                  placeholder="—"
+                  showChevron
+                  clearable
+                />
+              </div>
+              <div className="flex flex-col">
+                <label className="form-label">{t('buybackWizard.screen', { defaultValue: 'Screen' })}</label>
+                <Select
+                  options={SCREEN_CONDITION_OPTIONS}
+                  value={screen || null}
+                  onChange={(v) => setScreen((v as string) || '')}
+                  placeholder="—"
+                  showChevron
+                  clearable
+                />
+              </div>
+              <div className="flex flex-col">
+                <label className="form-label">{t('buybackWizard.body', { defaultValue: 'Body' })}</label>
+                <Select
+                  options={BODY_CONDITION_OPTIONS}
+                  value={body || null}
+                  onChange={(v) => setBody((v as string) || '')}
+                  placeholder="—"
+                  showChevron
+                  clearable
+                />
+              </div>
+              <div className="flex flex-col">
+                <label className="form-label">{t('buybackWizard.batteryHealth', { defaultValue: 'Battery health (%)' })}</label>
+                <MaskedInput
+                  mask="number"
+                  decimalScale={0}
+                  value={battery}
+                  onChange={(raw) => {
+                    // Clamp to 0–100. Empty stays empty.
+                    if (raw === '') { setBattery(''); return; }
+                    const n = parseInt(raw, 10);
+                    if (isNaN(n)) return;
+                    setBattery(String(Math.max(0, Math.min(100, n))));
+                  }}
+                  placeholder="1-100"
+                  className="w-full"
+                  suffix="%"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col">
+              <label className="form-label">{t('buybackWizard.conditionNotes', { defaultValue: 'Notes' })}</label>
+              <TextArea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={3}
+                placeholder={t('buybackWizard.conditionNotesPlaceholder', { defaultValue: 'Anything else worth noting about the condition' })}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-none border-t border-line px-4 py-3 flex justify-end gap-2">
+        <Button onClick={onClose}>{t('common.cancel')}</Button>
+        <Button color="primary" disabled={!canSave} onClick={() => save.mutate()}>
+          {save.isPending ? t('common.loading') : t('common.save', { defaultValue: 'Save' })}
+        </Button>
+      </div>
+    </div>
+  );
+}

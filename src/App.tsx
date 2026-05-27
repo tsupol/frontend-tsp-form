@@ -32,6 +32,7 @@ import { PurchaseOrdersPage } from './pages/inventory/PurchaseOrdersPage';
 import { TransfersPage } from './pages/inventory/TransfersPage';
 import { RepairsPage } from './pages/inventory/RepairsPage';
 import { BuybackPage } from './pages/inventory/BuybackPage';
+import { BuybackWizardPage } from './pages/inventory/BuybackWizardPage';
 import { BarcodesPage } from './pages/inventory/BarcodesPage';
 import { PriceCheckPage } from './pages/PriceCheckPage';
 import { LegalLayout } from './pages/legal/LegalLayout';
@@ -388,6 +389,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <InventoryLayout><RepairsPage /></InventoryLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/inventory/buyback/new/:poId?"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <InventoryLayout><BuybackWizardPage /></InventoryLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

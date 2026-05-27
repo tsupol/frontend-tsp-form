@@ -1,9 +1,9 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Modal, TextArea, DataTable, useSnackbarContext } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, RotateCcw, CheckCircle, XCircle } from 'lucide-react';
+import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, Modal, TextArea, DataTable, PopOver, useSnackbarContext } from 'tsp-form';
+import { ArrowLeft, ArrowRightFromLine, RotateCcw, CheckCircle, XCircle, AlertTriangle, ImageOff, ChevronDown, Pencil } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { CopyButton } from '../../components/CopyButton';
@@ -105,11 +105,27 @@ const BUYBACK_STATUS_OPTIONS = [
   { value: 'CANCELLED', label: 'Cancelled' },
 ];
 
+// Backend codes from v_ref_asset_match_results:
+//   NO_MATCH / MATCH_REACQUIRABLE / MATCH_CONFLICT
 const ASSET_MATCH_COLOR: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'default'> = {
-  MATCHED: 'success',
-  NO_MATCH: 'warning',
-  CONFLICT: 'danger',
+  NO_MATCH: 'default',
+  MATCH_REACQUIRABLE: 'info',
+  MATCH_CONFLICT: 'danger',
 };
+
+const ASSET_MATCH_LABEL: Record<string, string> = {
+  NO_MATCH: 'No match',
+  MATCH_REACQUIRABLE: 'Re-acquirable',
+  MATCH_CONFLICT: 'Conflict',
+};
+
+interface BuybackReason {
+  id: number;
+  code: string;
+  label: string;
+  reason_group: 'REJECT' | 'CANCEL';
+  is_active: boolean;
+}
 
 const INTAKE_STATUS_COLOR: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'default'> = {
   PENDING: 'warning',
@@ -222,10 +238,10 @@ export function BuybackPage() {
                 <div className="flex gap-2 w-full">
                   <div className="flex-[2] min-w-0">
                     <Select
-                      options={BUYBACK_STATUS_OPTIONS}
-                      value={filterStatus}
-                      onChange={(val) => setFilterStatus((val as string) || null)}
-                      placeholder={t('buyback.allStatuses')}
+                      options={branchOptions}
+                      value={filterBranchId !== null ? String(filterBranchId) : null}
+                      onChange={(val) => setFilterBranchId(val ? Number(val) : null)}
+                      placeholder={t('inventory.allBranches')}
                       size="sm"
                       showChevron
                       clearable
@@ -233,10 +249,10 @@ export function BuybackPage() {
                   </div>
                   <div className="flex-[2] min-w-0">
                     <Select
-                      options={branchOptions}
-                      value={filterBranchId !== null ? String(filterBranchId) : null}
-                      onChange={(val) => setFilterBranchId(val ? Number(val) : null)}
-                      placeholder={t('inventory.allBranches')}
+                      options={BUYBACK_STATUS_OPTIONS}
+                      value={filterStatus}
+                      onChange={(val) => setFilterStatus((val as string) || null)}
+                      placeholder={t('buyback.allStatuses')}
                       size="sm"
                       showChevron
                       clearable
@@ -278,7 +294,7 @@ export function BuybackPage() {
                           </Badge>
                           {ps?.asset_match_result && (
                             <Badge size="xs" color={ASSET_MATCH_COLOR[ps.asset_match_result] ?? 'default'}>
-                              {ps.asset_match_result}
+                              {ASSET_MATCH_LABEL[ps.asset_match_result] ?? ps.asset_match_result}
                             </Badge>
                           )}
                         </div>
@@ -357,13 +373,21 @@ function BuybackDetailPanel({
 }) {
   const [actionModal, setActionModal] = useState<'submit' | 'revert' | 'approve' | 'reject' | null>(null);
   const [intakeOpen, setIntakeOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreTriggerRef = useRef<HTMLButtonElement>(null);
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   const lines = detail.lines ?? [];
   const totalPrice = lines.reduce((sum, l) => sum + (l.buyback_price ?? l.unit_cost), 0);
 
+  // Hide C_A-only buttons from non-C_A users. Backend enforces regardless;
+  // this just avoids late PERMISSION_DENIED clicks.
+  const isCompanyAdmin = user?.role_code === 'COMPANY_ADMIN';
+
   const canSubmit = detail.status === 'DRAFT';
   const canRevert = detail.status === 'PENDING_APPROVAL';
-  const canDecide = detail.status === 'PENDING_APPROVAL';
+  const canDecide = detail.status === 'PENDING_APPROVAL' && isCompanyAdmin;
   const canIntake = detail.status === 'APPROVED';
 
   return (
@@ -407,6 +431,16 @@ function BuybackDetailPanel({
         {detail.rejected_at && <span>{t('buyback.rejected')}: <DateTime value={detail.rejected_at} /></span>}
       </div>
 
+      {/* Auto-reject countdown */}
+      {detail.status === 'PENDING_APPROVAL' && detail.auto_reject_after && (
+        <div className="flex-none px-4 py-2 border-b border-line flex items-center gap-2 text-xs">
+          <AlertTriangle size={14} className="text-warning shrink-0" />
+          <span className="text-warning">
+            {t('buyback.autoRejectAt', { defaultValue: 'Auto-rejects' })}: <DateTime value={detail.auto_reject_after} showTime />
+          </span>
+        </div>
+      )}
+
       {detail.notes && (
         <div className="flex-none px-4 py-2 border-b border-line text-xs text-subtle whitespace-pre-line">
           {detail.notes}
@@ -424,73 +458,160 @@ function BuybackDetailPanel({
           <div className="p-8 text-center text-subtler">{t('common.noData')}</div>
         )}
         {lines.map((line) => (
-          <div key={line.po_line_id} className="px-4 py-2.5 border-b border-line flex items-start gap-3">
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium truncate">
-                {[line.brand_name, line.model_name].filter(Boolean).join(' ')}
-              </div>
-              <div className="text-xs text-subtle truncate">
-                {line.variant_name} · {line.sku_code}
-              </div>
-              <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                {line.item_condition && (
-                  <Badge size="xs" color="default">{line.item_condition}</Badge>
-                )}
-                {line.asset_match_result && (
-                  <Badge size="xs" color={ASSET_MATCH_COLOR[line.asset_match_result] ?? 'default'}>
-                    {line.asset_match_result}
-                  </Badge>
-                )}
-                {line.asset_intake_status && (
-                  <Badge size="xs" color={INTAKE_STATUS_COLOR[line.asset_intake_status] ?? 'default'}>
-                    {line.asset_intake_status}
-                  </Badge>
-                )}
-              </div>
-              {line.attempted_identifiers_json && line.attempted_identifiers_json.length > 0 && (
-                <div className="text-xs text-fg/50 font-mono mt-1 truncate">
-                  {line.attempted_identifiers_json.map(id => id.value).join(', ')}
+          <div key={line.po_line_id} className="px-4 py-2.5 border-b border-line flex flex-col gap-2">
+            <div className="flex items-start gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium truncate">
+                  {[line.brand_name, line.model_name].filter(Boolean).join(' ')}
                 </div>
-              )}
-              {line.note && <div className="text-xs text-fg/50 mt-0.5 italic">{line.note}</div>}
+                <div className="text-xs text-subtle truncate">
+                  {line.variant_name} · {line.sku_code}
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                  {line.item_condition && (
+                    <Badge size="xs" color="default">{line.item_condition}</Badge>
+                  )}
+                  {line.asset_match_result && (
+                    <Badge size="xs" color={ASSET_MATCH_COLOR[line.asset_match_result] ?? 'default'}>
+                      {ASSET_MATCH_LABEL[line.asset_match_result] ?? line.asset_match_result}
+                    </Badge>
+                  )}
+                  {line.asset_intake_status && (
+                    <Badge size="xs" color={INTAKE_STATUS_COLOR[line.asset_intake_status] ?? 'default'}>
+                      {line.asset_intake_status}
+                    </Badge>
+                  )}
+                </div>
+                {line.attempted_identifiers_json && line.attempted_identifiers_json.length > 0 && (
+                  <div className="text-xs text-fg/50 font-mono mt-1 truncate">
+                    {line.attempted_identifiers_json.map(id => `${id.type}: ${id.value}`).join(' · ')}
+                  </div>
+                )}
+                {line.note && <div className="text-xs text-fg/50 mt-0.5 italic">{line.note}</div>}
+              </div>
+              <div className="text-right shrink-0">
+                {line.buyback_price !== null && (
+                  <div className="text-sm font-medium tabular-nums">{fmtCurrency(line.buyback_price)}</div>
+                )}
+                {line.buyback_price !== line.unit_cost && (
+                  <div className="text-xs text-subtle tabular-nums">cost: {fmtCurrency(line.unit_cost)}</div>
+                )}
+              </div>
             </div>
-            <div className="text-right shrink-0">
-              {line.buyback_price !== null && (
-                <div className="text-sm font-medium tabular-nums">{fmtCurrency(line.buyback_price)}</div>
-              )}
-              {line.buyback_price !== line.unit_cost && (
-                <div className="text-xs text-subtle tabular-nums">cost: {fmtCurrency(line.unit_cost)}</div>
-              )}
-            </div>
+
+            {/* Condition snapshot */}
+            {line.condition_snapshot && Object.keys(line.condition_snapshot).length > 0 && (
+              <div className="rounded-md bg-surface border border-line px-3 py-2">
+                <div className="text-xs text-subtle mb-1">{t('buyback.conditionSnapshot', { defaultValue: 'Condition' })}</div>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                  {Object.entries(line.condition_snapshot).map(([k, v]) => (
+                    <div key={k} className="flex gap-1 min-w-0">
+                      <span className="text-subtle truncate">{k}:</span>
+                      <span className="font-medium truncate">{String(v ?? '—')}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Photos */}
+            {Array.isArray(line.images) && line.images.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {(line.images as Array<{ url?: string; label?: string }>).map((img, i) => (
+                  img?.url ? (
+                    <a
+                      key={i}
+                      href={img.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block w-20 h-20 rounded-md border border-line overflow-hidden bg-surface hover:opacity-80"
+                      title={img.label ?? ''}
+                    >
+                      <img src={img.url} alt={img.label ?? `photo ${i + 1}`} className="w-full h-full object-cover" />
+                    </a>
+                  ) : (
+                    <div key={i} className="w-20 h-20 rounded-md border border-line flex items-center justify-center bg-surface text-subtle">
+                      <ImageOff size={20} />
+                    </div>
+                  )
+                ))}
+              </div>
+            )}
           </div>
         ))}
       </div>
 
-      {/* Action buttons */}
-      {(canSubmit || canRevert || canDecide || canIntake) && (
+      {/* Action buttons: quick primaries + More menu for secondary actions */}
+      {(canSubmit || canRevert || canIntake) && (
         <div className="flex-none px-4 py-3 border-t border-line flex gap-2">
+          {/* DRAFT — continue editing in wizard, or submit for approval */}
           {canSubmit && (
-            <Button color="primary" className="flex-1" onClick={() => setActionModal('submit')}>
-              {t('buyback.submit')}
-            </Button>
-          )}
-          {canRevert && (
-            <Button className="flex-1" onClick={() => setActionModal('revert')}>
-              {t('buyback.revertDraft')}
-            </Button>
-          )}
-          {canDecide && (
             <>
-              <Button color="primary" className="flex-1" onClick={() => setActionModal('approve')}>
-                {t('buyback.approve')}
+              <Button
+                size="sm"
+                variant="outline"
+                startIcon={<Pencil size={14} />}
+                className="flex-1"
+                onClick={() => navigate(`/admin/inventory/buyback/new/${detail.po_id}`)}
+              >
+                {t('buyback.continueDraft', { defaultValue: 'Continue draft' })}
               </Button>
-              <Button className="flex-1" onClick={() => setActionModal('reject')}>
-                {t('buyback.reject')}
+              <Button size="sm" color="primary" className="flex-1" onClick={() => setActionModal('submit')}>
+                {t('buyback.submit')}
               </Button>
             </>
           )}
+
+          {/* PENDING_APPROVAL + C_A — quick Approve/Reject, More holds Revert */}
+          {canDecide && (
+            <>
+              <Button size="sm" color="primary" className="flex-1" onClick={() => setActionModal('approve')}>
+                {t('buyback.approve')}
+              </Button>
+              <Button size="sm" color="danger" className="flex-1" onClick={() => setActionModal('reject')}>
+                {t('buyback.reject')}
+              </Button>
+              <Button
+                ref={moreTriggerRef}
+                size="sm"
+                variant="outline"
+                endIcon={<ChevronDown size={14} />}
+                onClick={() => setMoreOpen(v => !v)}
+              >
+                {t('contract.moreActions', { defaultValue: 'More' })}
+              </Button>
+              <PopOver
+                isOpen={moreOpen}
+                onClose={() => setMoreOpen(false)}
+                triggerRef={moreTriggerRef}
+                placement="top"
+                align="end"
+                maxWidth="20rem"
+              >
+                <div className="flex flex-col gap-1 p-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => { setMoreOpen(false); setActionModal('revert'); }}
+                  >
+                    {t('buyback.revertDraft')}
+                  </Button>
+                </div>
+              </PopOver>
+            </>
+          )}
+
+          {/* PENDING_APPROVAL + non-C_A — only Revert is theirs */}
+          {canRevert && !canDecide && (
+            <Button size="sm" className="flex-1" onClick={() => setActionModal('revert')}>
+              {t('buyback.revertDraft')}
+            </Button>
+          )}
+
+          {/* APPROVED — intake */}
           {canIntake && (
             <Button
+              size="sm"
               color="primary"
               className="flex-1"
               onClick={() => setIntakeOpen(true)}
@@ -701,19 +822,34 @@ function BuybackActionModal({
   t: ReturnType<typeof useTranslation>['t'];
   onSuccess: () => void;
 }) {
+  const line = detail.lines?.[0] ?? null;
   const [note, setNote] = useState('');
+  const [imei, setImei] = useState('');
+  const [serial, setSerial] = useState('');
+  const [reasonId, setReasonId] = useState<number | null>(null);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (open) { setNote(''); setError(''); }
-  }, [open]);
+  // Lazy-load reject reasons only when the reject modal opens
+  const { data: rejectReasons = [] } = useQuery({
+    queryKey: ['buyback-reject-reasons'],
+    queryFn: () => apiClient.get<BuybackReason[]>(
+      '/v_ref_buyback_reasons?reason_group=eq.REJECT&is_active=is.true',
+    ),
+    enabled: open && action === 'reject',
+    staleTime: 30 * 60 * 1000,
+  });
 
-  const rpcMap: Record<string, string> = {
-    submit: 'fn_inv_buyback_submit',
-    revert: 'fn_inv_buyback_revert_draft',
-    approve: 'fn_inv_buyback_approve',
-    reject: 'fn_inv_buyback_reject',
-  };
+  useEffect(() => {
+    if (open) {
+      setNote('');
+      setError('');
+      setReasonId(null);
+      // Pre-fill any previously attempted identifiers so re-submit isn't a re-type
+      const existing = line?.attempted_identifiers_json ?? [];
+      setImei(existing.find(i => i.type === 'IMEI')?.value ?? '');
+      setSerial(existing.find(i => i.type === 'SERIAL_NO')?.value ?? '');
+    }
+  }, [open, action, line]);
 
   const titleMap: Record<string, string> = {
     submit: t('buyback.submit'),
@@ -725,16 +861,42 @@ function BuybackActionModal({
   const mutation = useMutation({
     mutationFn: () => {
       if (!action) return Promise.reject(new Error('No action'));
-      const params: Record<string, unknown> = { p_po_id: detail.po_id };
-      if (action !== 'submit') {
-        params.p_note = note || null;
+      if (action === 'submit') {
+        if (!line) return Promise.reject(new Error('No line'));
+        const identifiers: { type: string; value: string }[] = [];
+        if (imei.trim()) identifiers.push({ type: 'IMEI', value: imei.trim() });
+        if (serial.trim()) identifiers.push({ type: 'SERIAL_NO', value: serial.trim() });
+        return apiClient.rpc('fn_inv_buyback_submit', {
+          p_po_id: detail.po_id,
+          p_identifiers: [{ line_id: line.po_line_id, identifiers }],
+          p_branch_id: null,
+        });
       }
-      return apiClient.rpc(rpcMap[action], params);
+      if (action === 'reject') {
+        return apiClient.rpc('fn_inv_buyback_reject', {
+          p_po_id: detail.po_id,
+          p_reason_id: reasonId,
+          p_note: note.trim() || null,
+        });
+      }
+      if (action === 'approve') {
+        return apiClient.rpc('fn_inv_buyback_approve', {
+          p_po_id: detail.po_id,
+          p_note: note.trim() || null,
+        });
+      }
+      // revert
+      return apiClient.rpc('fn_inv_buyback_revert_draft', {
+        p_po_id: detail.po_id,
+        p_note: note.trim() || null,
+        p_branch_id: null,
+      });
     },
     onSuccess,
     onError: (err) => {
       if (err instanceof ApiError) {
-        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
         setError(translated || err.message);
       } else {
         setError(String(err));
@@ -744,7 +906,12 @@ function BuybackActionModal({
 
   if (!action) return null;
 
-  const showNote = action !== 'submit';
+  const isSubmit = action === 'submit';
+  const isReject = action === 'reject';
+  // Submit requires at least one identifier (Serial is always allowed; IMEI when applicable).
+  const submitValid = !isSubmit || imei.trim().length > 0 || serial.trim().length > 0;
+  const rejectValid = !isReject || reasonId !== null;
+  const canSubmit = submitValid && rejectValid && !mutation.isPending;
 
   return (
     <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
@@ -765,8 +932,49 @@ function BuybackActionModal({
             <div className="text-xs text-subtle">{detail.supplier_name}</div>
             <div className="text-xs text-subtle">{detail.c_total_lines} {t('buyback.items')} · {fmtCurrency(totalPrice)}</div>
           </div>
-          {showNote && (
-            <div className="form-grid gap-4">
+
+          <div className="form-grid gap-4">
+            {isSubmit && (
+              <>
+                <div className="alert alert-info">
+                  <span>{t('buyback.submitIdentifierHint', { defaultValue: 'Scan IMEI / Serial. At least one is required. Backend will reject duplicates or invalid IMEI checksums.' })}</span>
+                </div>
+                <div className="flex flex-col">
+                  <label className="form-label">IMEI</label>
+                  <Input
+                    value={imei}
+                    onChange={(e) => setImei(e.target.value)}
+                    placeholder={t('buyback.imeiPlaceholder', { defaultValue: '15-digit IMEI (optional)' })}
+                    className="w-full"
+                    autoFocus
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <label className="form-label">Serial No.</label>
+                  <Input
+                    value={serial}
+                    onChange={(e) => setSerial(e.target.value)}
+                    placeholder={t('buyback.serialPlaceholder', { defaultValue: 'Serial number (optional)' })}
+                    className="w-full"
+                  />
+                </div>
+              </>
+            )}
+
+            {isReject && (
+              <div className="flex flex-col">
+                <label className="form-label">{t('buyback.rejectReason', { defaultValue: 'Reject reason' })} *</label>
+                <Select
+                  options={rejectReasons.map(r => ({ value: String(r.id), label: r.label }))}
+                  value={reasonId !== null ? String(reasonId) : null}
+                  onChange={(val) => setReasonId(val ? Number(val) : null)}
+                  placeholder={t('buyback.selectReason', { defaultValue: 'Select reason' })}
+                  showChevron
+                />
+              </div>
+            )}
+
+            {!isSubmit && (
               <div className="flex flex-col">
                 <label className="form-label">{t('buyback.note')}</label>
                 <TextArea
@@ -776,15 +984,15 @@ function BuybackActionModal({
                   rows={3}
                 />
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
         <div className="modal-footer">
-          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button onClick={onClose} disabled={mutation.isPending}>{t('common.cancel')}</Button>
           <Button
-            color={action === 'reject' ? undefined : 'primary'}
+            color={isReject ? 'danger' : 'primary'}
             onClick={() => mutation.mutate()}
-            disabled={mutation.isPending}
+            disabled={!canSubmit}
           >
             {mutation.isPending ? t('common.loading') : titleMap[action]}
           </Button>
