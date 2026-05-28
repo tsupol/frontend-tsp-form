@@ -238,7 +238,6 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
         open={previewOpen}
         onClose={() => setPreviewOpen(false)}
         contract={previewContract}
-        overrides={{}}
       />
     </div>
   );
