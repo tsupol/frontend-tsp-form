@@ -100,6 +100,20 @@ export function useNavCounts() {
   });
   const pendingPaymentCount = pendingPaymentCountData?.totalCount ?? 0;
 
+  // Chat unread — sum unread_count from v_branch_chat_list (RLS-scoped to branch).
+  // Only branch users have access; the view returns empty for company/holding roles.
+  const { data: unreadChatRows } = useQuery({
+    queryKey: ['nav', 'chat-unread', sk],
+    queryFn: () => apiClient.get<{ unread_count: number }[]>(
+      `/v_branch_chat_list?select=unread_count&unread_count=gt.0`,
+    ),
+    enabled: isBranchUser,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+    retry: false,
+  });
+  const unreadChatCount = (unreadChatRows ?? []).reduce((sum, r) => sum + (r.unread_count ?? 0), 0);
+
   return {
     pendingApprovals,
     pendingSlips,
@@ -108,5 +122,6 @@ export function useNavCounts() {
     savingContractsCount,
     draftContractsCount,
     pendingPaymentCount,
+    unreadChatCount,
   };
 }

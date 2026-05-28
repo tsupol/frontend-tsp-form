@@ -207,6 +207,7 @@
     "staffCommission": "แต้มพนักงาน",
     "approvals": "อนุมัติ",
     "paymentSubmissions": "ตรวจสลิป",
+    "chat": "แชท",
     "legal": "กฎหมาย",
     "dunningTargets": "ทวงถาม",
     "legalCases": "คดี",
@@ -3151,5 +3152,29 @@
     "JOURNAL": "บันทึกบัญชี {{code}}",
     "cnSuffix": "ออกใบลดหนี้ {{code}}",
     "done": "เรียบร้อย"
+  },
+  "chat": {
+    "title": "แชท",
+    "searchPlaceholder": "ค้นหาลูกค้า / เลขสัญญา",
+    "unreadOnly": "เฉพาะที่ยังไม่อ่าน",
+    "empty": "ไม่มีการสนทนา",
+    "emptyThread": "ยังไม่มีข้อความ",
+    "imageMessage": "รูปภาพ",
+    "you": "คุณ",
+    "customer": "ลูกค้า",
+    "composerPlaceholder": "พิมพ์ข้อความ",
+    "send": "ส่ง",
+    "backToInbox": "กลับไปกล่องข้อความ",
+    "contractLink": "ดูสัญญา",
+    "messageCount_one": "{{count}} ข้อความ",
+    "messageCount_other": "{{count}} ข้อความ",
+    "sendFailed": "ส่งไม่สำเร็จ",
+    "attach": "แนบ",
+    "attachImage": "รูปภาพ",
+    "attachFile": "ไฟล์",
+    "attachFileComingSoon": "การแนบไฟล์จะเปิดให้ใช้เร็วๆ นี้",
+    "uploading": "กำลังอัปโหลด…",
+    "imageInvalid": "กรุณาเลือกไฟล์รูปภาพ",
+    "imageTooLarge": "ไฟล์รูปภาพใหญ่เกินไป"
   }
 }

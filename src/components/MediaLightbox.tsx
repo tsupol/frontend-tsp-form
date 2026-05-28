@@ -12,8 +12,14 @@ export function MediaLightbox({ open, onClose, mediaKey, alt }: Props) {
   const { url, loading } = useMediaUrl(mediaKey ?? null);
 
   return (
-    <Modal open={open} onClose={onClose} maxWidth="48rem" width="100%">
-      <div className="modal-content !p-0 bg-black/95">
+    <Modal
+      open={open}
+      onClose={onClose}
+      width="100%"
+      maxWidth="48rem"
+      className="max-md:!max-w-none max-md:!w-screen max-md:!h-dvh max-md:!max-h-dvh max-md:!rounded-none"
+    >
+      <div className="modal-content !p-0 bg-black/95 max-md:h-full">
         <div className="absolute top-2 right-2 z-10">
           <button
             type="button"
@@ -24,7 +30,7 @@ export function MediaLightbox({ open, onClose, mediaKey, alt }: Props) {
             ×
           </button>
         </div>
-        <div className="aspect-[4/3] flex items-center justify-center">
+        <div className="aspect-[4/3] max-md:aspect-auto max-md:h-full flex items-center justify-center">
           {loading || !url ? (
             <div className="text-white/60 text-sm">Loading…</div>
           ) : (

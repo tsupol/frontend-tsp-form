@@ -207,6 +207,7 @@
     "staffCommission": "Staff Points",
     "approvals": "Approvals",
     "paymentSubmissions": "Slips to Review",
+    "chat": "Chat",
     "legal": "Legal",
     "dunningTargets": "Dunning Targets",
     "legalCases": "Cases",
@@ -3151,5 +3152,29 @@
     "JOURNAL": "Journal {{code}}",
     "cnSuffix": "Credit note {{code}} issued",
     "done": "Done"
+  },
+  "chat": {
+    "title": "Chat",
+    "searchPlaceholder": "Search customer or contract",
+    "unreadOnly": "Unread only",
+    "empty": "No conversations",
+    "emptyThread": "No messages yet",
+    "imageMessage": "Photo",
+    "you": "You",
+    "customer": "Customer",
+    "composerPlaceholder": "Type a message",
+    "send": "Send",
+    "backToInbox": "Back to inbox",
+    "contractLink": "See contract",
+    "messageCount_one": "{{count}} message",
+    "messageCount_other": "{{count}} messages",
+    "sendFailed": "Failed to send",
+    "attach": "Attach",
+    "attachImage": "Image",
+    "attachFile": "File",
+    "attachFileComingSoon": "File attachments coming soon",
+    "uploading": "Uploading…",
+    "imageInvalid": "Please choose an image file",
+    "imageTooLarge": "Image is too large"
   }
 }

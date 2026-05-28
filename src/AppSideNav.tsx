@@ -40,6 +40,8 @@ import {
   UserCheck, ClipboardCheck,
   // Fanout child icons — Accounting
   CalendarCheck, Wallet, List, ArrowUpRight, Receipt, ShieldAlert,
+  // Chat
+  MessageSquare,
   // Dev sandbox
   FlaskConical, PenLine,
 } from 'lucide-react';
@@ -153,6 +155,7 @@ export const AppSideNav = () => {
   const { user } = useAuth();
   const role = user?.role_code ?? '';
   const canApprove = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
+  const canChat = role === 'BRANCH_STAFF' || role === 'BRANCH_MANAGER';
 
   const {
     pendingApprovals,
@@ -162,6 +165,7 @@ export const AppSideNav = () => {
     savingContractsCount,
     draftContractsCount,
     pendingPaymentCount,
+    unreadChatCount,
   } = useNavCounts();
 
   // Render an icon with an optional count badge.
@@ -299,6 +303,14 @@ export const AppSideNav = () => {
         },
       ],
     },
+    ...(canChat
+      ? [{
+          key: 'chat',
+          ...iconWithCount(<MessageSquare size="1rem" />, unreadChatCount),
+          label: t('nav.chat'),
+          path: '/admin/chat',
+        }]
+      : []),
     ...(canApprove
       ? [{
           key: 'approvals',
