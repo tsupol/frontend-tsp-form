@@ -22,6 +22,7 @@ import { fmtCurrency } from '../lib/format';
 import { DateTime } from '../components/DateTime';
 import { useAuth } from '../contexts/AuthContext';
 import { DashboardScopePicker } from '../components/DashboardScopePicker';
+import { PushSubscribeBanner } from '../components/PushSubscribeBanner';
 import {
   defaultScopeFor,
   scopeQuery,
@@ -269,6 +270,8 @@ export function DashboardPage() {
       </MobileHeader>
 
       <div className="page-content">
+        <PushSubscribeBanner />
+
         {/* Desktop header with scope picker */}
         <div className="mb-4 flex-none max-md:hidden flex items-end justify-between gap-3">
           <div>

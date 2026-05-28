@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import { useEffect } from 'react';
 import { wsClient } from './lib/api/ws';
 import { setupStaffPush } from './lib/api/push';
+import { useChatRealtimeSnackbars } from './hooks/useChatRealtimeSnackbars';
 import { LoginPage } from './pages/LoginPage';
 import { HomePage } from './pages/HomePage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -124,6 +125,10 @@ function RealtimeBridge() {
     }, 1500);
     return () => clearTimeout(t);
   }, [isAuthenticated, navigate]);
+
+  // In-app chat notifier. Fires snackbar anywhere except inside the open
+  // thread.
+  useChatRealtimeSnackbars();
 
   return null;
 }

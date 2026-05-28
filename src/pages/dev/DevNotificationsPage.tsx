@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Button, Input, Select } from 'tsp-form';
+import { Button, Input, Select, useSnackbarContext } from 'tsp-form';
 import { Bell, MessageSquare } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { setupStaffPush } from '../../lib/api/push';
 import { useAuth } from '../../contexts/AuthContext';
+import { ChatSnackbar } from '../../components/ChatSnackbar';
 
 const EVENT_TYPES = [
   'chat_to_customer',
@@ -67,6 +68,33 @@ function ResultBlock({ label, value }: { label: string; value: unknown }) {
 
 export function DevNotificationsPage() {
   const { user } = useAuth();
+  const { addSnackbar } = useSnackbarContext();
+
+  // Local snackbar preview — no RPC, no WS round-trip. Mirrors what the
+  // global useChatRealtimeSnackbars hook produces. Use this to iterate on
+  // snackbar visuals/copy without polluting the chat_messages table.
+  const [previewContractId, setPreviewContractId] = useState<string>('92');
+  const [previewSender, setPreviewSender] = useState<string>('Test Customer');
+  const [previewBody, setPreviewBody] = useState<string>('[TEST] hello from test');
+  const [previewIsImage, setPreviewIsImage] = useState<string>('false');
+
+  const showPreview = () => {
+    const cid = Number(previewContractId.trim());
+    const target = Number.isInteger(cid) && cid > 0
+      ? `/admin/chat?contract=${cid}`
+      : '/admin/chat';
+    addSnackbar({
+      duration: 6000,
+      message: (
+        <ChatSnackbar
+          sender={previewSender.trim() || 'Customer'}
+          body={previewBody.trim() || 'New message'}
+          isImage={previewIsImage === 'true'}
+          onOpen={() => { window.location.assign(target); }}
+        />
+      ),
+    });
+  };
 
   // fn_send_test_notification
   const [eventType, setEventType] = useState<string>('chat_to_staff');
@@ -95,7 +123,15 @@ export function DevNotificationsPage() {
     setPushResult(null);
     try {
       const body: Record<string, unknown> = { p_event_type: eventType };
-      if (pushContractId.trim()) body.p_contract_id = Number(pushContractId.trim());
+      if (pushContractId.trim()) {
+        const parsed = Number(pushContractId.trim());
+        if (!Number.isInteger(parsed) || parsed <= 0) {
+          setPushError('Contract ID must be a positive integer');
+          setPushLoading(false);
+          return;
+        }
+        body.p_contract_id = parsed;
+      }
       const result = await apiClient.rpc<SendTestResult>('fn_send_test_notification', body);
       setPushResult(result);
     } catch (err) {
@@ -106,8 +142,9 @@ export function DevNotificationsPage() {
   };
 
   const simulateChat = async () => {
-    if (!chatContractId.trim()) {
-      setChatError('Contract ID required');
+    const parsed = Number(chatContractId.trim());
+    if (!chatContractId.trim() || !Number.isInteger(parsed) || parsed <= 0) {
+      setChatError('Contract ID must be a positive integer');
       return;
     }
     setChatLoading(true);
@@ -115,7 +152,7 @@ export function DevNotificationsPage() {
     setChatResult(null);
     try {
       const result = await apiClient.rpc<SimulateChatResult>('fn_dev_simulate_customer_chat', {
-        p_contract_id: Number(chatContractId.trim()),
+        p_contract_id: parsed,
         p_sender_type: senderType,
         p_message_text: messageText.trim() || null,
       });
@@ -147,6 +184,58 @@ export function DevNotificationsPage() {
           caller's own JWT — you can only send to yourself.
         </p>
       </div>
+
+      <section className="border border-line rounded-lg p-5 flex flex-col gap-4">
+        <div className="flex items-center gap-2">
+          <MessageSquare size={18} />
+          <h2 className="text-lg font-semibold">Preview chat snackbar</h2>
+        </div>
+        <p className="text-sm text-subtle">
+          Fires the same snackbar the global realtime hook produces, locally —
+          no RPC, no chat row. Iterate on layout and copy here.
+        </p>
+        <div className="form-grid gap-3">
+          <div className="flex flex-col">
+            <label className="form-label">Contract ID (for the tap target)</label>
+            <Input
+              className="w-full"
+              value={previewContractId}
+              onChange={e => setPreviewContractId(e.target.value)}
+              inputMode="numeric"
+            />
+          </div>
+          <div className="flex flex-col">
+            <label className="form-label">Sender label</label>
+            <Input
+              className="w-full"
+              value={previewSender}
+              onChange={e => setPreviewSender(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-col">
+            <label className="form-label">Body</label>
+            <Input
+              className="w-full"
+              value={previewBody}
+              onChange={e => setPreviewBody(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-col">
+            <label className="form-label">Variant</label>
+            <Select
+              value={previewIsImage}
+              onChange={v => setPreviewIsImage(v as string)}
+              options={[
+                { value: 'false', label: 'Text message' },
+                { value: 'true', label: 'Image message' },
+              ]}
+            />
+          </div>
+        </div>
+        <div>
+          <Button color="primary" onClick={showPreview}>Show snackbar</Button>
+        </div>
+      </section>
 
       <section className="border border-line rounded-lg p-5 flex flex-col gap-4">
         <div className="flex items-center gap-2">

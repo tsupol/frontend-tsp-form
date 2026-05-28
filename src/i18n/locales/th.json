@@ -44,6 +44,13 @@
     "days": "วัน"
   },
   "dashboard": {
+    "pushBannerTitle": "ยังไม่ได้เปิดการแจ้งเตือน",
+    "pushBannerBody": "เปิดการแจ้งเตือนของเบราว์เซอร์เพื่อรับแจ้งเตือนแชท สลิป และคำขออนุมัติ แม้แท็บนี้ไม่ได้เปิดอยู่",
+    "pushBannerEnable": "เปิดการแจ้งเตือน",
+    "pushBannerBlocked": "เบราว์เซอร์บล็อกการแจ้งเตือนอยู่ กดไอคอนกุญแจที่แถบที่อยู่ → Notifications → Allow แล้วกดปุ่ม \"เปิดการแจ้งเตือน\" อีกครั้ง",
+    "pushBannerUnsupported": "เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือน",
+    "pushBannerEnabling": "กำลังเปิด…",
+    "pushBannerEnabled": "เปิดการแจ้งเตือนเรียบร้อย",
     "actionRequired": "ต้องดำเนินการ",
     "pendingTasks": "งานรอทำ",
     "pendingDeviceBind": "รอผูกเครื่อง",
@@ -3177,6 +3184,9 @@
     "imageInvalid": "กรุณาเลือกไฟล์รูปภาพ",
     "imageTooLarge": "ไฟล์รูปภาพใหญ่เกินไป",
     "selectToView": "เลือกการสนทนา",
-    "detailsToggle": "แสดง/ซ่อนรายละเอียด"
+    "detailsToggle": "แสดง/ซ่อนรายละเอียด",
+    "newMessage": "ข้อความใหม่",
+    "newImage": "ส่งรูปภาพ",
+    "openThread": "เปิด"
   }
 }

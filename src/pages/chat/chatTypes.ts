@@ -26,6 +26,7 @@ export interface ChatMessage {
   message_text: string | null;
   media_id: number | null;
   media_url: string | null;
+  media_url_sm?: string | null;
   is_read: boolean;
   read_at: string | null;
   created_at: string;

@@ -44,6 +44,13 @@
     "days": "days"
   },
   "dashboard": {
+    "pushBannerTitle": "Push notifications are off",
+    "pushBannerBody": "Turn on browser notifications to get alerts for chat, slips, and approvals while this tab is in the background.",
+    "pushBannerEnable": "Enable notifications",
+    "pushBannerBlocked": "Notifications are blocked in this browser. Open the site settings (lock icon → Notifications) and set it to Allow, then click Enable again.",
+    "pushBannerUnsupported": "This browser doesn't support push notifications.",
+    "pushBannerEnabling": "Enabling…",
+    "pushBannerEnabled": "Push notifications enabled.",
     "actionRequired": "Action required",
     "pendingTasks": "Pending tasks",
     "pendingDeviceBind": "Awaiting device bind",
@@ -3177,6 +3184,9 @@
     "imageInvalid": "Please choose an image file",
     "imageTooLarge": "Image is too large",
     "selectToView": "Select a conversation",
-    "detailsToggle": "Toggle details"
+    "detailsToggle": "Toggle details",
+    "newMessage": "New message",
+    "newImage": "Sent a photo",
+    "openThread": "Open"
   }
 }
