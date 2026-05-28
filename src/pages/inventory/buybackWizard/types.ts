@@ -49,33 +49,22 @@ export interface ConditionSnapshot {
 }
 
 // Conventional values — backend stores jsonb as-is, so these are UI-chosen.
-export const OVERALL_CONDITION_OPTIONS = [
-  { value: 'EXCELLENT', label: 'Excellent' },
-  { value: 'GOOD', label: 'Good' },
-  { value: 'FAIR', label: 'Fair' },
-  { value: 'POOR', label: 'Poor' },
-];
+// Labels are i18n keys under `buyback.condition` / `buyback.grade`; callers
+// resolve with `t(opt.labelKey)`.
+export const OVERALL_CONDITION_VALUES = ['EXCELLENT', 'GOOD', 'FAIR', 'POOR'] as const;
+export const SCREEN_CONDITION_VALUES = ['NO_DAMAGE', 'MINOR', 'CRACKED', 'BROKEN'] as const;
+export const BODY_CONDITION_VALUES = ['NO_DAMAGE', 'MINOR', 'MODERATE', 'MAJOR'] as const;
+export const ITEM_CONDITION_VALUES = ['NEW', 'REFURBISHED', 'USED_A', 'USED_B'] as const;
 
-export const SCREEN_CONDITION_OPTIONS = [
-  { value: 'NO_DAMAGE', label: 'No damage' },
-  { value: 'MINOR', label: 'Minor scratches' },
-  { value: 'CRACKED', label: 'Cracked' },
-  { value: 'BROKEN', label: 'Broken' },
-];
+export const OVERALL_CONDITION_OPTIONS = OVERALL_CONDITION_VALUES.map((v) => ({ value: v, labelKey: `buyback.condition.${v}` }));
+export const SCREEN_CONDITION_OPTIONS = SCREEN_CONDITION_VALUES.map((v) => ({ value: v, labelKey: `buyback.condition.${v}` }));
+export const BODY_CONDITION_OPTIONS = BODY_CONDITION_VALUES.map((v) => ({ value: v, labelKey: `buyback.condition.${v}` }));
+export const ITEM_CONDITION_OPTIONS = ITEM_CONDITION_VALUES.map((v) => ({ value: v, labelKey: `buyback.grade.${v}` }));
 
-export const BODY_CONDITION_OPTIONS = [
-  { value: 'NO_DAMAGE', label: 'No damage' },
-  { value: 'MINOR', label: 'Minor scratches' },
-  { value: 'MODERATE', label: 'Moderate dents' },
-  { value: 'MAJOR', label: 'Major damage' },
-];
-
-export const ITEM_CONDITION_OPTIONS = [
-  { value: 'NEW', label: 'New' },
-  { value: 'REFURBISHED', label: 'Refurbished' },
-  { value: 'USED_A', label: 'Used A' },
-  { value: 'USED_B', label: 'Used B' },
-];
+type LabelKeyOpt = { value: string; labelKey: string };
+export function resolveOptions(opts: LabelKeyOpt[], t: (k: string) => string) {
+  return opts.map((o) => ({ value: o.value, label: t(o.labelKey) }));
+}
 
 // Branch-observed condition fields. CONNECTIVITY is a model attribute — not in
 // this list; it gets auto-stamped from model.connectivity at save time.

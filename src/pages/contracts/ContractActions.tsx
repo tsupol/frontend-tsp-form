@@ -1305,7 +1305,7 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
             {/* Contract info summary */}
             <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
               <div className="font-medium text-sm">{contract.code_display ?? contract.code}</div>
-              <div className="text-xs text-subtle">{contract.state} · {contract.commercial_model ?? ''}</div>
+              <div className="text-xs text-subtle">{t(`contract.state_${contract.state}`, { defaultValue: contract.state })} · {contract.commercial_model ?? ''}</div>
             </div>
 
             <div className="form-grid">
@@ -1701,7 +1701,7 @@ function SavingDepositModal({ open, contract, onClose, onSuccess }: {
 
           <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
             <div className="font-medium text-sm">{contract.code_display ?? contract.code}</div>
-            <div className="text-xs text-subtle">{contract.state} · {t('contract.savingBalance')}: {fmtCurrency(contract.saving_balance ?? 0)}</div>
+            <div className="text-xs text-subtle">{t(`contract.state_${contract.state}`, { defaultValue: contract.state })} · {t('contract.savingBalance')}: {fmtCurrency(contract.saving_balance ?? 0)}</div>
           </div>
 
           <div className="form-grid">
@@ -1871,7 +1871,7 @@ function CancelSavingModal({ open, contract, onClose, onSuccess }: {
           {/* Contract info summary */}
           <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
             <div className="font-medium text-sm">{contract.code_display ?? contract.code}</div>
-            <div className="text-xs text-subtle">{contract.state} · {contract.commercial_model ?? ''}</div>
+            <div className="text-xs text-subtle">{t(`contract.state_${contract.state}`, { defaultValue: contract.state })} · {contract.commercial_model ?? ''}</div>
           </div>
 
           {/* Saving balance display */}
@@ -2603,7 +2603,7 @@ function PayInstallmentModal({ open, contract, onClose }: {
               {/* Contract info summary */}
               <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
                 <div className="font-medium text-sm">{contract.code_display ?? contract.code}</div>
-                <div className="text-xs text-subtle">{contract.state} · {contract.commercial_model ?? ''}</div>
+                <div className="text-xs text-subtle">{t(`contract.state_${contract.state}`, { defaultValue: contract.state })} · {contract.commercial_model ?? ''}</div>
               </div>
 
               {/* Outstanding summary */}
@@ -3088,7 +3088,7 @@ function AttachSlipModal({ open, contract, onClose }: {
 
             <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
               <div className="font-medium text-sm">{contract.code_display ?? contract.code}</div>
-              <div className="text-xs text-subtle">{contract.state} · {contract.commercial_model ?? ''}</div>
+              <div className="text-xs text-subtle">{t(`contract.state_${contract.state}`, { defaultValue: contract.state })} · {contract.commercial_model ?? ''}</div>
             </div>
 
             <div className="form-grid">

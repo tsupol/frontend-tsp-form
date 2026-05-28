@@ -234,7 +234,7 @@ export function RetailBillsPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
                           <span className="font-mono text-sm font-medium">{b.code_display}</span>
-                          <Badge color={statusColor} size="sm">{b.status}</Badge>
+                          <Badge color={statusColor} size="sm">{t(`retail.status_${b.status}`, { defaultValue: b.status })}</Badge>
                         </div>
                         <div className="text-xs text-subtle truncate">
                           {b.customer_name || t('retail.walkIn')}
@@ -322,7 +322,7 @@ function RetailBillDetail({ billId, isMobile }: { billId: number; isMobile: bool
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
           <span className="font-semibold font-mono">{detail.bill_code_display}</span>
-          <Badge color={statusColor} size="sm">{detail.status}</Badge>
+          <Badge color={statusColor} size="sm">{t(`retail.status_${detail.status}`, { defaultValue: detail.status })}</Badge>
           <div className="flex-1" />
           {showPayBtn && (
             <Button

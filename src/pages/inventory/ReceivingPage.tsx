@@ -93,11 +93,7 @@ const RECEIPT_STATUS_COLOR: Record<string, 'success' | 'warning' | 'danger' | 'i
   CANCELLED: 'danger',
 };
 
-const RECEIPT_STATUS_OPTIONS = [
-  { value: 'DRAFT', label: 'Draft' },
-  { value: 'CONFIRMED', label: 'Confirmed' },
-  { value: 'CANCELLED', label: 'Cancelled' },
-];
+const RECEIPT_STATUS_VALUES = ['DRAFT', 'CONFIRMED', 'CANCELLED'] as const;
 
 // ============================================================================
 // Component
@@ -215,7 +211,7 @@ export function ReceivingPage() {
                 <div className="flex gap-2 w-full">
                   <div className="flex-[2] min-w-0">
                     <Select
-                      options={RECEIPT_STATUS_OPTIONS}
+                      options={RECEIPT_STATUS_VALUES.map((v) => ({ value: v, label: t(`receiving.status_${v}`) }))}
                       value={filterStatus}
                       onChange={(val) => setFilterStatus((val as string) || null)}
                       placeholder={t('receiving.allStatuses')}

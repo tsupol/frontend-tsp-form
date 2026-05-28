@@ -911,9 +911,9 @@ function AssetDetailPanel({
             <div className="text-xs text-subtle mb-1">{t('asset.identifiers')}</div>
             {asset.identifiers.map((id, i) => (
               <div key={i} className="flex items-center gap-2">
-                <Badge size="xs" color="default">{id.type}</Badge>
+                <Badge size="xs" color="default">{t(`asset.idType.${id.type}`, { defaultValue: id.type })}</Badge>
                 <span className="text-sm font-mono">{id.value}</span>
-                {!id.is_active && <span className="text-xs text-danger">(inactive)</span>}
+                {!id.is_active && <span className="text-xs text-danger">({t('asset.inactive', { defaultValue: 'inactive' })})</span>}
                 {id.is_active && correctAction && (
                   <Tooltip content={t('identifierCorrect.correct', { ns: 'assetActions', defaultValue: 'Correct value' })}>
                     <Button

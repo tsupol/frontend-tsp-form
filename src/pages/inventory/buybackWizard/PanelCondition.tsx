@@ -8,7 +8,7 @@ import { useFormSnapshot } from '../../../hooks/useFormSnapshot';
 import { getLine } from './useBuyback';
 import {
   OVERALL_CONDITION_OPTIONS, SCREEN_CONDITION_OPTIONS, BODY_CONDITION_OPTIONS,
-  ITEM_CONDITION_OPTIONS,
+  ITEM_CONDITION_OPTIONS, resolveOptions,
 } from './types';
 import type { BuybackDraft } from './types';
 
@@ -112,7 +112,7 @@ export function PanelCondition({
             <div className="flex flex-col">
               <label className="form-label">{t('buybackWizard.grade', { defaultValue: 'Grade' })} *</label>
               <Select
-                options={ITEM_CONDITION_OPTIONS}
+                options={resolveOptions(ITEM_CONDITION_OPTIONS, t)}
                 value={grade}
                 onChange={(v) => setGrade((v as string) || 'USED_A')}
                 showChevron
@@ -123,7 +123,7 @@ export function PanelCondition({
               <div className="flex flex-col">
                 <label className="form-label">{t('buybackWizard.overall', { defaultValue: 'Overall condition' })}</label>
                 <Select
-                  options={OVERALL_CONDITION_OPTIONS}
+                  options={resolveOptions(OVERALL_CONDITION_OPTIONS, t)}
                   value={overall || null}
                   onChange={(v) => setOverall((v as string) || '')}
                   placeholder="—"
@@ -134,7 +134,7 @@ export function PanelCondition({
               <div className="flex flex-col">
                 <label className="form-label">{t('buybackWizard.screen', { defaultValue: 'Screen' })}</label>
                 <Select
-                  options={SCREEN_CONDITION_OPTIONS}
+                  options={resolveOptions(SCREEN_CONDITION_OPTIONS, t)}
                   value={screen || null}
                   onChange={(v) => setScreen((v as string) || '')}
                   placeholder="—"
@@ -145,7 +145,7 @@ export function PanelCondition({
               <div className="flex flex-col">
                 <label className="form-label">{t('buybackWizard.body', { defaultValue: 'Body' })}</label>
                 <Select
-                  options={BODY_CONDITION_OPTIONS}
+                  options={resolveOptions(BODY_CONDITION_OPTIONS, t)}
                   value={body || null}
                   onChange={(v) => setBody((v as string) || '')}
                   placeholder="—"

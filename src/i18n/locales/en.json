@@ -1008,6 +1008,12 @@
   },
   "asset": {
     "allStatuses": "All statuses",
+    "inactive": "inactive",
+    "idType": {
+      "IMEI": "IMEI",
+      "SERIAL": "Serial",
+      "MAC": "MAC"
+    },
     "allBranches": "All branches",
     "allConditions": "All conditions",
     "allBrands": "All brands",
@@ -1299,6 +1305,10 @@
   },
   "retail": {
     "walkIn": "Walk-in",
+    "status_OPEN": "Open",
+    "status_PAID": "Paid",
+    "status_VOIDED": "Voided",
+    "status_PENDING_APPROVAL": "Pending approval",
     "create": {
       "title": "New Retail Bill",
       "emptyCart": "Add a product to start",
@@ -1535,6 +1545,42 @@
       "wrong_branch": "Wrong branch",
       "validate_failed": "Pre-submit checklist not green",
       "auto_rejected": "Auto-rejected (timer expired)"
+    },
+    "field": {
+      "OVERALL_CONDITION": "Overall",
+      "SCREEN_CONDITION": "Screen",
+      "BODY_CONDITION": "Body",
+      "BATTERY_HEALTH": "Battery health",
+      "CONDITION_NOTES": "Notes",
+      "CONNECTIVITY": "Connectivity"
+    },
+    "condition": {
+      "EXCELLENT": "Excellent",
+      "GOOD": "Good",
+      "FAIR": "Fair",
+      "POOR": "Poor",
+      "NO_DAMAGE": "No damage",
+      "MINOR": "Minor scratches",
+      "MODERATE": "Moderate dents",
+      "MAJOR": "Major damage",
+      "CRACKED": "Cracked",
+      "BROKEN": "Broken"
+    },
+    "grade": {
+      "NEW": "New",
+      "REFURBISHED": "Refurbished",
+      "USED_A": "Used A",
+      "USED_B": "Used B"
+    },
+    "assetMatch": {
+      "NO_MATCH": "Unregistered",
+      "MATCH_REACQUIRABLE": "Re-acquirable",
+      "MATCH_CONFLICT": "Conflict"
+    },
+    "intake": {
+      "PENDING": "Pending intake",
+      "COMPLETED": "Intake done",
+      "FAILED": "Intake failed"
     }
   },
   "buybackAction": {

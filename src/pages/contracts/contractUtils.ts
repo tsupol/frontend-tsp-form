@@ -42,19 +42,13 @@ export const SCOPE_TO_STATES: Record<ContractScope, string[] | null> = {
 
 // ── State filter options ────────────────────────────────────────────────────
 
-export const STATE_OPTIONS = [
-  { value: 'DRAFT', label: 'Draft' },
-  { value: 'SAVING', label: 'Saving' },
-  { value: 'PENDING_APPROVAL', label: 'Pending Approval' },
-  { value: 'APPROVED', label: 'Approved' },
-  { value: 'PENDING_PAYMENT', label: 'Pending Payment' },
-  { value: 'ACTIVE', label: 'Active' },
-  { value: 'WAIT_LEGAL_PROCESS', label: 'Wait Legal Process' },
-  { value: 'ON_LEGAL_PROCESS', label: 'On Legal Process' },
-  { value: 'ON_COURT_PROCESS', label: 'On Court Process' },
-  { value: 'COMPLETED', label: 'Completed' },
-  { value: 'TERMINATED', label: 'Terminated' },
-  { value: 'VOIDED', label: 'Voided' },
-  { value: 'CANCELLED', label: 'Cancelled' },
-  { value: 'EXPIRED', label: 'Expired' },
-];
+export const STATE_VALUES = [
+  'DRAFT', 'SAVING', 'PENDING_APPROVAL', 'APPROVED', 'PENDING_PAYMENT',
+  'ACTIVE', 'WAIT_LEGAL_PROCESS', 'ON_LEGAL_PROCESS', 'ON_COURT_PROCESS',
+  'COMPLETED', 'TERMINATED', 'VOIDED', 'CANCELLED', 'EXPIRED',
+] as const;
+
+/** Resolve STATE_VALUES → Select options. Pass `t` so labels are localized. */
+export function stateOptions(t: TFunction) {
+  return STATE_VALUES.map((v) => ({ value: v, label: getStateLabel(v, t) }));
+}

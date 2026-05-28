@@ -465,7 +465,7 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
                     {c.branch_name && <div className="text-xs text-subtle">{c.branch_name}</div>}
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <Badge size="xs" color={stateColor(c.state)}>{c.state}</Badge>
+                    <Badge size="xs" color={stateColor(c.state)}>{t(`contract.state_${c.state}`, { defaultValue: c.state })}</Badge>
                     <Button variant="ghost" className="btn-icon-xs" onClick={() => navigate(`/admin/contracts/search/${c.id}`)} startIcon={<ExternalLink size={12} />} />
                   </div>
                 </div>

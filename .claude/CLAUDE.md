@@ -21,6 +21,12 @@
 - **Playwright MCP** — before using Playwright, read `.claude/playwright-guide.md` for login shortcuts and performance rules (use `browser_run_code` to batch actions, `browser_snapshot` not screenshots)
 - **Action button end-icons** — backend-driven action footers (Contract, Asset) use `ExternalLink` for actions that live elsewhere and `Wrench` for not-yet-wired actions, with stacked tooltip lines. See `.claude/action-button-end-icons.md` before adding/wiring any action button.
 - **Dual nav menus** — each section's fan-out lives in both `src/AppSideNav.tsx` (global) and `src/pages/<section>/<Section>Layout.tsx` (page sub-nav). Update both when changing items/labels/icons/badges. Count badges share queries via `src/hooks/useNavCounts.ts`.
+- **No hardcoded English in user-facing strings.** Anything a user reads — Select `label`, Badge text, button labels, modal titles, table headers, placeholders, toast messages — must come from `t('...')`. Specifically forbidden patterns:
+  1. **Select options with literal labels:** `[{value: 'DRAFT', label: 'Draft'}]`. Instead: keep a `_VALUES` const of codes and resolve at the call site: `VALUES.map(v => ({value: v, label: t(\`section.status_${v}\`)}))`. The status_* translation keys for inventory (po, receiving, transfer, repair, buyback) and contracts already exist in `en.json` / `th.json` — reuse them.
+  2. **Badges rendering raw enum values:** `<Badge>{row.status}</Badge>` or `<Badge>{id.type}</Badge>`. Wrap in `t(\`section.status_${row.status}\`, { defaultValue: row.status })` so Thai users don't see `PENDING_APPROVAL`. The `defaultValue` is a safety net for new codes, not the primary path.
+  3. **String concatenation that includes a raw enum:** `{contract.state} · {something}`. Same fix — translate the enum portion first.
+  4. **Field labels mid-render:** `<span>{k}:</span>` where `k` is a JSON key (`OVERALL_CONDITION`, `BATTERY_HEALTH`). Map through `t(\`section.field.${k}\`, { defaultValue: k })`.
+  When you add a new enum/code, add Thai + English entries to `en.json` / `th.json` in the same commit. If you're unsure whether a translation key exists, grep `src/i18n/locales/en.json` for `status_<CODE>` before defaulting to a literal.
 
 ## tsp-form Component Usage
 
@@ -70,7 +76,8 @@ When using tsp-form components, follow this lookup order:
 - OpenAPI doc available at root endpoint
 - Backend is PostgREST (in development, may change)
 - Backend repo: `https://github.com/czynet/nnf` — cloned at `D:\dev\nnf` (pull before reading)
-- **Misc Go service** (`D:\dev\nnf-misc-go`): file upload microservice at `misc.ecap.cc`. Uses `nnf-system-bucket` in `ap-southeast-1`. Key routes: `POST /api/v1/upload/s3` (upload), `DELETE /api/v1/delete/s3` (batch delete, body: `{files: [key1, key2]}`), `GET /api/v1/list/s3?prefix=...`. See `D:\dev\nnf-misc-go\.claude\API.md` for full reference.
+- **Misc Go service** (`D:\dev\nnf-misc-go`): file upload microservice at `misc.ecap.cc`. Storage is **Cloudflare R2** with two buckets: `nnf-public` (served via `R2_PUBLIC_URL` = `https://pub-ec97c2bdb4564779b166762d78a98593.r2.dev`, plain `<img src>` works) and `nnf-private` (no public access, must call `/media/url` for a 4 h presigned URL). Key routes: `GET /api/v1/upload/spec?type={type}` (resize contract), `POST /api/v1/upload` (one file at one size, deterministic keys — re-upload overwrites), `GET /api/v1/media/url?key=...` (resolve key → URL), `DELETE /api/v1/media` (batch delete, body: `{keys: [key1, key2]}`). Privacy is inferred from key prefix: `uploads/` → public, `private/` → private. **Buyback condition photos are PUBLIC** (`uploads/buyback/{po_line_id}/condition-{idx}-{size}.webp`, max 5). See `D:\dev\nnf-misc-go\.claude\API.md` for full reference and upload-type registry.
+- **R2 access via AWS CLI**: use endpoint `https://b4317a366d1f46b8a5c6a864c7447fbc.r2.cloudflarestorage.com` with `--region auto`. Credentials are in `D:\dev\nnf-misc-go\.env` (`R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`). Token is bucket-scoped, so `aws s3 ls` (root, no bucket) returns AccessDenied — that's expected. List inside a bucket: `aws s3 ls s3://nnf-private/private/ --endpoint-url <r2-endpoint>`.
 - **Misc Infrastructure** (`D:\dev\nnf-misc-infrastructure`): Traefik reverse proxy with auto Let's Encrypt SSL. Server: `nnfsup@103.208.24.76`.
 - **Views:** Read endpoints use `v_[table_name]` views (e.g. `/v_users`), returns plain arrays (no v2 envelope)
 - **Writes:** Mutations use RPC functions (e.g. `/rpc/user_create`, `/rpc/user_update`)

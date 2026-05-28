@@ -794,7 +794,7 @@ function LotDetailPanel({
                       {transferNo ?? `#${tl.transfer_order_id}`}
                       <ExternalLink size={11} />
                     </Link>
-                    <Badge size="xs" color="warning" className="ml-auto">{tl.status}</Badge>
+                    <Badge size="xs" color="warning" className="ml-auto">{t(`transfer.lineStatus_${tl.status}`, { defaultValue: tl.status })}</Badge>
                   </div>
                   <div className="flex items-center gap-1.5 text-[11px] text-subtle">
                     <ArrowRight size={10} className="opacity-60" />

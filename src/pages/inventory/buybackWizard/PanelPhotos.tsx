@@ -7,7 +7,7 @@ import { Plus, X, XCircle, ImageOff, Pencil, Check } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useUploadSpec, useMediaUrl } from '../../../hooks/useMediaUrl';
-import { uploadFromImage } from '../../../lib/upload';
+import { uploadFromImage, deleteMedia } from '../../../lib/upload';
 import { toStoragePath, normalizeKey } from '../../../lib/mediaPath';
 import { MediaLightbox } from '../../../components/MediaLightbox';
 import { getLine } from './useBuyback';
@@ -21,6 +21,8 @@ interface EntityMedia {
   usage_type: string;
   sort_order: number;
   caption: string | null;
+  is_locked: boolean;
+  locked_at: string | null;
   storage_path: string;
   variants_json: Record<string, string> | null;
 }
@@ -36,6 +38,14 @@ function pickThumbKey(m: EntityMedia): string | null {
 function pickFullKey(m: EntityMedia): string | null {
   const v = m.variants_json ?? {};
   return v.original || v.lg || v.md || v.sm || m.storage_path || null;
+}
+function collectMediaKeys(m: EntityMedia): string[] {
+  const keys: string[] = [];
+  if (m.storage_path) keys.push(m.storage_path);
+  for (const v of Object.values(m.variants_json ?? {})) {
+    if (typeof v === 'string' && v) keys.push(v);
+  }
+  return keys;
 }
 
 export function PanelPhotos({
@@ -65,6 +75,9 @@ export function PanelPhotos({
       );
     },
     enabled: lineId != null,
+    // Cache for 30s — invalidate() calls after add/remove/caption-edit run
+    // refetch() explicitly so we don't need eager refetching on every render.
+    staleTime: 30 * 1000,
   });
 
   const maxFiles = upload.spec?.max_files ?? 5;
@@ -78,8 +91,18 @@ export function PanelPhotos({
   }, [refetch, queryClient, draft.po_id, lineId]);
 
   const remove = useMutation({
-    mutationFn: async (entityMediaId: number) => {
-      await apiClient.rpc('fn_media_detach', { p_entity_media_id: entityMediaId });
+    mutationFn: async (m: EntityMedia) => {
+      // Detach DB row first — source of truth. If R2 delete fails afterwards,
+      // we leave an orphan in R2 but the UI is consistent. Inverse order would
+      // leave a DB row pointing at a missing file on partial failure.
+      await apiClient.rpc('fn_media_detach', { p_entity_media_id: m.entity_media_id });
+      const keys = collectMediaKeys(m);
+      if (keys.length > 0) {
+        // Don't block the UI on R2 cleanup — log and move on.
+        deleteMedia(keys).catch((err) => {
+          console.warn('R2 cleanup failed for', keys, err);
+        });
+      }
     },
     onSuccess: () => { setError(''); refresh(); },
     onError: (err) => setError(formatApiError(err, t)),
@@ -101,17 +124,17 @@ export function PanelPhotos({
             </div>
           )}
 
-          <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-2 gap-3">
             {photos.map((m) => (
               <PhotoRow
                 key={m.entity_media_id}
                 media={m}
-                editable={editable && !remove.isPending}
+                editable={editable && !m.is_locked && !remove.isPending}
                 onPreview={() => {
                   const full = pickFullKey(m);
                   if (full) setLightboxKey(normalizeKey(full));
                 }}
-                onRemove={() => remove.mutate(m.entity_media_id)}
+                onRemove={() => remove.mutate(m)}
                 onEditCaption={() => setEditCaptionFor(m)}
               />
             ))}
@@ -122,14 +145,14 @@ export function PanelPhotos({
                 size="sm"
                 startIcon={<Plus size={16} />}
                 onClick={() => setAddOpen(true)}
-                className="w-full"
+                className="col-span-2"
               >
                 {t('buybackWizard.addPhoto', { defaultValue: 'Add photo' })}
               </Button>
             )}
 
             {!editable && photos.length === 0 && (
-              <div className="text-xs text-subtler italic text-center py-6 border border-dashed border-line rounded-md">
+              <div className="col-span-2 text-xs text-subtler italic text-center py-6 border border-dashed border-line rounded-md">
                 {t('buybackWizard.noPhotos', { defaultValue: 'No photos.' })}
               </div>
             )}
@@ -193,7 +216,7 @@ function PhotoRow({
         <button
           type="button"
           onClick={onPreview}
-          className="block w-full h-40 bg-surface cursor-zoom-in border-none p-0"
+          className="block w-full aspect-[4/3] bg-surface cursor-zoom-in border-none p-0"
           aria-label="Preview photo"
         >
           {url ? (
@@ -215,20 +238,20 @@ function PhotoRow({
           </button>
         )}
       </div>
-      <div className="flex items-center gap-2 px-3 py-2 border-t border-line/60 min-w-0">
-        <div className="flex-1 min-w-0 text-xs text-subtle truncate">
+      <div className="flex items-stretch border-t border-line/60 min-w-0">
+        <div className="flex-1 min-w-0 text-xs text-subtle self-center px-3 py-2 break-words">
           {media.caption || <span className="italic text-subtler">{t('buybackWizard.noCaption', { defaultValue: 'No description' })}</span>}
         </div>
         {editable && (
-          <Button
-            variant="ghost"
-            size="xs"
-            startIcon={<Pencil size={12} />}
+          <button
+            type="button"
             onClick={onEditCaption}
-            className="shrink-0"
+            className="shrink-0 w-9 flex items-center justify-center border-l border-line/60 hover:bg-surface-hover text-subtle hover:text-fg cursor-pointer bg-transparent"
+            aria-label={t('common.edit', { defaultValue: 'Edit' })}
+            title={t('buybackWizard.editCaption', { defaultValue: 'Edit description' })}
           >
-            {t('common.edit', { defaultValue: 'Edit' })}
-          </Button>
+            <Pencil size={14} />
+          </button>
         )}
       </div>
     </div>
@@ -289,28 +312,46 @@ function AddPhotoModal({
         variants[label] = toStoragePath(r.key);
       }
 
-      await apiClient.rpc('fn_media_attach', {
-        p_holding_id: user.holding_id,
-        p_storage_path: toStoragePath(primary.key),
-        p_variants_json: Object.keys(variants).length > 0 ? variants : null,
-        p_media_type: 'IMAGE',
-        p_access_level: 'PUBLIC',
-        p_mime_type: 'image/webp',
-        p_file_size_bytes: null,
-        p_original_filename: null,
-        p_entity_type: ENTITY_TYPE,
-        p_entity_id: lineId,
-        p_usage_type: USAGE_TYPE,
-        p_sort_order: sortOrder,
-        p_caption: caption.trim() || null,
-      });
+      try {
+        await apiClient.rpc('fn_media_attach', {
+          p_holding_id: user.holding_id,
+          p_storage_path: toStoragePath(primary.key),
+          p_variants_json: Object.keys(variants).length > 0 ? variants : null,
+          p_media_type: 'IMAGE',
+          p_access_level: 'PUBLIC',
+          p_mime_type: 'image/webp',
+          p_file_size_bytes: null,
+          p_original_filename: null,
+          p_entity_type: ENTITY_TYPE,
+          p_entity_id: lineId,
+          p_usage_type: USAGE_TYPE,
+          p_sort_order: sortOrder,
+          p_caption: caption.trim() || null,
+        });
+      } catch (err) {
+        // Attach failed → uploaded R2 objects are orphans. Sweep them.
+        const orphanKeys = Object.values(results).map((r) => r.key);
+        deleteMedia(orphanKeys).catch((cleanupErr) => {
+          console.warn('R2 orphan cleanup failed for', orphanKeys, cleanupErr);
+        });
+        throw err;
+      }
     },
     onSuccess: () => onAdded(),
     onError: (err) => setError(formatApiError(err, t)),
   });
 
-  // Local preview URL for the picked image (before upload)
-  const previewUrl = picked?.preview ?? null;
+  // Local preview URL for the picked image (before upload). When ImageUploader
+  // runs in multi-size mode (sizes prop), `file`/`preview` at the top level are
+  // undefined — files live under `variants[label]`. Fall back to the largest
+  // variant's preview, then the smallest, then the original.
+  const previewUrl = picked
+    ? (picked.preview
+        ?? picked.variants?.md?.preview
+        ?? picked.variants?.sm?.preview
+        ?? (picked.variants ? Object.values(picked.variants)[0]?.preview : undefined)
+        ?? null)
+    : null;
 
   return (
     <Modal open={open} onClose={onClose} maxWidth="32rem" width="100%">

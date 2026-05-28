@@ -60,11 +60,7 @@ const REPAIR_STATUS_COLOR: Record<string, 'success' | 'warning' | 'danger' | 'in
   CANCELLED: 'default',
 };
 
-const REPAIR_STATUS_OPTIONS = [
-  { value: 'OPEN', label: 'Open' },
-  { value: 'COMPLETED', label: 'Completed' },
-  { value: 'CANCELLED', label: 'Cancelled' },
-];
+const REPAIR_STATUS_VALUES = ['OPEN', 'COMPLETED', 'CANCELLED'] as const;
 
 const RESULT_OPTIONS = [
   { value: 'FIXED', label: 'Fixed' },
@@ -188,7 +184,7 @@ export function RepairsPage() {
                 <div className="flex gap-2 w-full">
                   <div className="flex-[2] min-w-0">
                     <Select
-                      options={REPAIR_STATUS_OPTIONS}
+                      options={REPAIR_STATUS_VALUES.map((v) => ({ value: v, label: t(`repair.status_${v}`) }))}
                       value={filterStatus}
                       onChange={(val) => setFilterStatus((val as string) || null)}
                       placeholder={t('repair.allStatuses')}

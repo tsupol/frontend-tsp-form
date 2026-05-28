@@ -1008,6 +1008,12 @@
   },
   "asset": {
     "allStatuses": "ทุกสถานะ",
+    "inactive": "ไม่ใช้งาน",
+    "idType": {
+      "IMEI": "IMEI",
+      "SERIAL": "ซีเรียล",
+      "MAC": "MAC"
+    },
     "allBranches": "ทุกสาขา",
     "allConditions": "ทุกสภาพ",
     "allBrands": "ทุกแบรนด์",
@@ -1299,6 +1305,10 @@
   },
   "retail": {
     "walkIn": "ลูกค้าทั่วไป",
+    "status_OPEN": "เปิด",
+    "status_PAID": "ชำระแล้ว",
+    "status_VOIDED": "ยกเลิก",
+    "status_PENDING_APPROVAL": "รอการอนุมัติ",
     "create": {
       "title": "สร้างบิลขายปลีก",
       "emptyCart": "เพิ่มสินค้าเพื่อเริ่ม",
@@ -1535,6 +1545,42 @@
       "wrong_branch": "ไม่ใช่สาขาเจ้าของ",
       "validate_failed": "ยังไม่ผ่าน checklist",
       "auto_rejected": "ถูกปฏิเสธอัตโนมัติ (หมดเวลา)"
+    },
+    "field": {
+      "OVERALL_CONDITION": "สภาพรวม",
+      "SCREEN_CONDITION": "หน้าจอ",
+      "BODY_CONDITION": "ตัวเครื่อง",
+      "BATTERY_HEALTH": "สุขภาพแบตเตอรี่",
+      "CONDITION_NOTES": "หมายเหตุ",
+      "CONNECTIVITY": "การเชื่อมต่อ"
+    },
+    "condition": {
+      "EXCELLENT": "ดีเยี่ยม",
+      "GOOD": "ดี",
+      "FAIR": "พอใช้",
+      "POOR": "ไม่ดี",
+      "NO_DAMAGE": "ไม่มีตำหนิ",
+      "MINOR": "รอยขีดข่วนเล็กน้อย",
+      "MODERATE": "รอยบุบปานกลาง",
+      "MAJOR": "เสียหายมาก",
+      "CRACKED": "ร้าว",
+      "BROKEN": "แตก"
+    },
+    "grade": {
+      "NEW": "ใหม่",
+      "REFURBISHED": "รีเฟอร์บิช",
+      "USED_A": "มือสอง A",
+      "USED_B": "มือสอง B"
+    },
+    "assetMatch": {
+      "NO_MATCH": "ยังไม่ได้ลงทะเบียน",
+      "MATCH_REACQUIRABLE": "ซื้อคืนได้",
+      "MATCH_CONFLICT": "ขัดแย้ง"
+    },
+    "intake": {
+      "PENDING": "รอรับเข้า",
+      "COMPLETED": "รับเข้าแล้ว",
+      "FAILED": "รับเข้าไม่สำเร็จ"
     }
   },
   "buybackAction": {

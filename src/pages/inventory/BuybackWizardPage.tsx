@@ -139,7 +139,7 @@ export function BuybackWizardPage() {
                       : t('nav.newBuyback')}
                 </div>
                 <div className="mobile-header-end min-w-nav">
-                  {draft?.code_display && (
+                  {draft?.status === 'DRAFT' && draft.code_display && (
                     <Badge size="sm" color="default" className="font-mono mr-2">{codeDisplay(draft.code_display, draft.po_no)}</Badge>
                   )}
                 </div>
@@ -153,7 +153,7 @@ export function BuybackWizardPage() {
                   <Badge size="sm" color="default" className="font-mono">{codeDisplay(draft.code_display, draft.po_no)}</Badge>
                 )}
                 {isReadOnly && (
-                  <Badge size="sm" color="info">{draft.status}</Badge>
+                  <Badge size="sm" color="info">{t(`buyback.status_${draft.status}`, { defaultValue: draft.status })}</Badge>
                 )}
                 <div className="flex-1" />
                 {draft && (

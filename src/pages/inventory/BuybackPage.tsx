@@ -120,14 +120,7 @@ const BUYBACK_STATUS_COLOR: Record<string, 'success' | 'warning' | 'danger' | 'i
   CANCELLED: 'danger',
 };
 
-const BUYBACK_STATUS_OPTIONS = [
-  { value: 'DRAFT', label: 'Draft' },
-  { value: 'PENDING_APPROVAL', label: 'Pending Approval' },
-  { value: 'APPROVED', label: 'Approved' },
-  { value: 'REJECTED', label: 'Rejected' },
-  { value: 'COMPLETED', label: 'Completed' },
-  { value: 'CANCELLED', label: 'Cancelled' },
-];
+const BUYBACK_STATUS_VALUES = ['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'COMPLETED', 'CANCELLED'] as const;
 
 // Backend codes from v_ref_asset_match_results:
 //   NO_MATCH / MATCH_REACQUIRABLE / MATCH_CONFLICT
@@ -137,11 +130,6 @@ const ASSET_MATCH_COLOR: Record<string, 'success' | 'warning' | 'danger' | 'info
   MATCH_CONFLICT: 'danger',
 };
 
-const ASSET_MATCH_LABEL: Record<string, string> = {
-  NO_MATCH: 'No match',
-  MATCH_REACQUIRABLE: 'Re-acquirable',
-  MATCH_CONFLICT: 'Conflict',
-};
 
 interface BuybackReason {
   id: number;
@@ -362,7 +350,7 @@ export function BuybackPage() {
                   </div>
                   <div className="flex-[2] min-w-0">
                     <Select
-                      options={BUYBACK_STATUS_OPTIONS}
+                      options={BUYBACK_STATUS_VALUES.map((v) => ({ value: v, label: t(`buyback.status_${v}`) }))}
                       value={filterStatus}
                       onChange={(val) => setFilterStatus((val as string) || null)}
                       placeholder={t('buyback.allStatuses')}
@@ -412,7 +400,7 @@ export function BuybackPage() {
                           )}
                           {ps?.asset_match_result && (
                             <Badge size="xs" color={ASSET_MATCH_COLOR[ps.asset_match_result] ?? 'default'}>
-                              {ASSET_MATCH_LABEL[ps.asset_match_result] ?? ps.asset_match_result}
+                              {t(`buyback.assetMatch.${ps.asset_match_result}`, { defaultValue: ps.asset_match_result })}
                             </Badge>
                           )}
                         </div>
@@ -627,16 +615,18 @@ function BuybackDetailPanel({
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5 mt-1">
                   {line.item_condition && (
-                    <Badge size="xs" color="default">{line.item_condition}</Badge>
+                    <Badge size="xs" color="default">
+                      {t(`buyback.grade.${line.item_condition}`, { defaultValue: line.item_condition })}
+                    </Badge>
                   )}
                   {line.asset_match_result && (
                     <Badge size="xs" color={ASSET_MATCH_COLOR[line.asset_match_result] ?? 'default'}>
-                      {ASSET_MATCH_LABEL[line.asset_match_result] ?? line.asset_match_result}
+                      {t(`buyback.assetMatch.${line.asset_match_result}`, { defaultValue: line.asset_match_result })}
                     </Badge>
                   )}
                   {line.asset_intake_status && (
                     <Badge size="xs" color={INTAKE_STATUS_COLOR[line.asset_intake_status] ?? 'default'}>
-                      {line.asset_intake_status}
+                      {t(`buyback.intake.${line.asset_intake_status}`, { defaultValue: line.asset_intake_status })}
                     </Badge>
                   )}
                 </div>
@@ -662,12 +652,26 @@ function BuybackDetailPanel({
               <div className="rounded-md bg-surface border border-line px-3 py-2">
                 <div className="text-xs text-subtle mb-1">{t('buyback.conditionSnapshot', { defaultValue: 'Condition' })}</div>
                 <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-                  {Object.entries(line.condition_snapshot).map(([k, v]) => (
-                    <div key={k} className="flex gap-1 min-w-0">
-                      <span className="text-subtle truncate">{k}:</span>
-                      <span className="font-medium truncate">{String(v ?? '—')}</span>
-                    </div>
-                  ))}
+                  {Object.entries(line.condition_snapshot).map(([k, v]) => {
+                    const label = t(`buyback.field.${k}`, { defaultValue: k });
+                    const rawValue = v == null ? '' : String(v);
+                    let display: string;
+                    if (rawValue === '') {
+                      display = '—';
+                    } else if (/^\d+$/.test(rawValue)) {
+                      // Numeric: battery health is a 1–100 percentage; suffix it.
+                      const n = parseInt(rawValue, 10);
+                      display = k === 'BATTERY_HEALTH' && n >= 1 && n <= 100 ? `${rawValue}%` : rawValue;
+                    } else {
+                      display = t(`buyback.condition.${rawValue}`, { defaultValue: rawValue });
+                    }
+                    return (
+                      <div key={k} className="flex gap-1 min-w-0">
+                        <span className="text-subtle truncate">{label}:</span>
+                        <span className="font-medium truncate">{display}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

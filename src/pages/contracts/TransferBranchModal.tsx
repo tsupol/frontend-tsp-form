@@ -144,7 +144,7 @@ export function TransferBranchModal({ open, contract, onClose }: Props) {
               {/* Contract info summary */}
               <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
                 <div className="font-medium text-sm">{contract.code_display ?? contract.code}</div>
-                <div className="text-xs text-subtle">{contract.state} · {fromBranchName}</div>
+                <div className="text-xs text-subtle">{t(`contract.state_${contract.state}`, { defaultValue: contract.state })} · {fromBranchName}</div>
               </div>
 
               <div className="form-grid">

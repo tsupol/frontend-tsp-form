@@ -94,14 +94,7 @@ const LINE_STATUS_COLOR: Record<string, 'success' | 'warning' | 'danger' | 'info
   NOT_RECEIVED: 'danger',
 };
 
-const TRANSFER_STATUS_OPTIONS = [
-  { value: 'DRAFT', label: 'Draft' },
-  { value: 'APPROVED', label: 'Approved' },
-  { value: 'IN_TRANSIT', label: 'In Transit' },
-  { value: 'COMPLETED', label: 'Completed' },
-  { value: 'DISPUTED', label: 'Disputed' },
-  { value: 'CANCELLED', label: 'Cancelled' },
-];
+const TRANSFER_STATUS_VALUES = ['DRAFT', 'APPROVED', 'IN_TRANSIT', 'COMPLETED', 'DISPUTED', 'CANCELLED'] as const;
 
 const RECEIVE_ACTION_OPTIONS = [
   { value: 'RECEIVED', label: 'Received' },
@@ -218,7 +211,7 @@ export function TransfersPage() {
                 <div className="flex gap-2 w-full">
                   <div className="flex-[2] min-w-0">
                     <Select
-                      options={TRANSFER_STATUS_OPTIONS}
+                      options={TRANSFER_STATUS_VALUES.map((v) => ({ value: v, label: t(`transfer.status_${v}`) }))}
                       value={filterStatus}
                       onChange={(val) => setFilterStatus((val as string) || null)}
                       placeholder={t('transfer.allStatuses')}

@@ -31,6 +31,7 @@ export function CardPhotos({
       `/v_entity_media?entity_type=eq.PO_LINE&entity_id=eq.${lineId}&usage_type=eq.BUYBACK_CONDITION&select=entity_media_id`,
     ),
     enabled: lineId != null,
+    staleTime: 30 * 1000,
   });
 
   const count = photos.length;

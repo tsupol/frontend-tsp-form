@@ -9,7 +9,7 @@ import { ArrowLeft, ArrowRightFromLine, Search, SlidersHorizontal, Plus } from '
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency } from '../../lib/format';
-import { getStateColor, getStateLabel, STATE_OPTIONS } from './contractUtils';
+import { getStateColor, getStateLabel, stateOptions } from './contractUtils';
 import { ContractDetailPanel } from './ContractDetailPanel';
 import { ContractDetailSlot } from './ContractDetailSlot';
 
@@ -217,10 +217,11 @@ export function ContractListPane({
 
   // Optionally narrow the state-filter dropdown to the pane's allowed states.
   const stateFilterOptions = useMemo(() => {
-    if (!states || states.length === 0) return STATE_OPTIONS;
+    const all = stateOptions(t);
+    if (!states || states.length === 0) return all;
     const allowed = new Set(states);
-    return STATE_OPTIONS.filter(o => allowed.has(o.value));
-  }, [states]);
+    return all.filter(o => allowed.has(o.value));
+  }, [states, t]);
 
   const extraFilterCount = [filterState, filterBranchId].filter(Boolean).length;
 
