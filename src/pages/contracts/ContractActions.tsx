@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, Modal, Input, Select, TextArea, MaskedInput, Badge, Tooltip, PopOver, ImageUploader, useSnackbarContext } from 'tsp-form';
 import type { UploadedImage } from 'tsp-form';
-import { CheckCircle, XCircle, X, Pencil, Plus, Trash2, Loader2, ChevronsRight, ChevronDown, ExternalLink, Wrench, ArrowRight, Info, Receipt, Paperclip } from 'lucide-react';
+import { CheckCircle, XCircle, X, Pencil, Plus, Trash2, Loader2, ChevronsRight, ChevronDown, ExternalLink, Wrench, ArrowRight, Info, Receipt, Paperclip, MessageSquare } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { fmtCurrency } from '../../lib/format';
 import { BranchPinInput } from '../../components/BranchPinInput';
@@ -925,6 +925,15 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
                 {t('contract.attachSlip_action', { defaultValue: 'Submit Slip' })}
               </Button>
             )}
+            <Button
+              variant="outline"
+              color="primary"
+              size="sm"
+              startIcon={<MessageSquare size={14} />}
+              onClick={() => navigate(`/admin/chat?contract=${contract.id}`)}
+            >
+              {t('nav.chat')}
+            </Button>
             {secondaryActions.length > 0 && (
               <Button
                 ref={moreTriggerRef}

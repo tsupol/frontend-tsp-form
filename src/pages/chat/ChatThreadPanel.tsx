@@ -1,12 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  MobileHeader, Button, PopOver, Skeleton,
+  Button, Skeleton,
 } from 'tsp-form';
 import {
-  ArrowLeft, ExternalLink, Send, Plus, Image as ImageIcon, Paperclip, XCircle,
+  ExternalLink, Send, Image as ImageIcon, XCircle,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -15,32 +15,35 @@ import { DateTime } from '../../components/DateTime';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
 import { normalizeKey, toStoragePath } from '../../lib/mediaPath';
 import { uploadImage } from '../../lib/upload';
-import { MediaLightbox } from '../../components/MediaLightbox';
 import type { ChatInboxRow, ChatMessage } from './chatTypes';
 
 const MAX_TEXTAREA_LINES = 6;
 const TEXTAREA_LINE_HEIGHT_PX = 20;
 
-export function ChatThreadPage() {
+interface Props {
+  contractId: number | null;
+  /** If null, image clicks are no-ops. Lift to parent to open MediaLightbox. */
+  onOpenImage: (key: string) => void;
+  /** Hide the desktop header (e.g. when the parent layout shows its own title). */
+  hideDesktopHeader?: boolean;
+  /** Whether the mobile-only details strip (contract code + link) is open. */
+  mobileDetailsOpen?: boolean;
+}
+
+export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mobileDetailsOpen }: Props) {
   const { t, i18n } = useTranslation();
-  const { contractId: contractIdParam } = useParams<{ contractId: string }>();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const contractId = contractIdParam ? parseInt(contractIdParam, 10) : NaN;
 
   const [composer, setComposer] = useState('');
   const [sendError, setSendError] = useState('');
   const [uploading, setUploading] = useState(false);
-  const [attachOpen, setAttachOpen] = useState(false);
-  const [composerHeight, setComposerHeight] = useState(0);
-  const [lightboxKey, setLightboxKey] = useState<string | null>(null);
 
-  const pageRef = useRef<HTMLDivElement | null>(null);
-  const composerRef = useRef<HTMLDivElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const plusButtonRef = useRef<HTMLButtonElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const enabled = contractId !== null && !Number.isNaN(contractId);
 
   const { data: inboxRow } = useQuery({
     queryKey: ['chat-thread-meta', contractId],
@@ -50,7 +53,7 @@ export function ChatThreadPage() {
       );
       return rows[0] ?? null;
     },
-    enabled: !Number.isNaN(contractId),
+    enabled,
   });
 
   const { data: messages = [], isLoading } = useQuery({
@@ -58,13 +61,19 @@ export function ChatThreadPage() {
     queryFn: () => apiClient.get<ChatMessage[]>(
       `/v_branch_chat_messages?contract_id=eq.${contractId}&order=created_at.asc`,
     ),
-    enabled: !Number.isNaN(contractId),
+    enabled,
     refetchInterval: 15_000,
   });
 
+  // Reset composer state when switching threads
+  useEffect(() => {
+    setComposer('');
+    setSendError('');
+  }, [contractId]);
+
   const markedRef = useRef<number | null>(null);
   useEffect(() => {
-    if (Number.isNaN(contractId)) return;
+    if (!enabled || contractId === null) return;
     if (markedRef.current === contractId) return;
     markedRef.current = contractId;
     apiClient.rpc('chat_mark_read', { p_contract_id: contractId })
@@ -73,35 +82,24 @@ export function ChatThreadPage() {
         queryClient.invalidateQueries({ queryKey: ['nav', 'chat-unread'] });
       })
       .catch(err => console.warn('[chat] mark_read failed', err));
-  }, [contractId, queryClient]);
+  }, [contractId, enabled, queryClient]);
 
-  // Auto-scroll on first load and on new messages — NOT on composer growth.
-  // The scroller is AdminLayout's `<div className="flex-grow ... better-scroll">`,
-  // which is the closest ancestor with overflow:auto. Walk up to find it.
+  // Auto-scroll: jump to bottom whenever the contract changes (so a freshly
+  // opened thread lands at the latest message) or when new messages arrive.
+  // Resetting the counter in the same layout effect avoids a race where the
+  // reset happens after the scroll check on a thread switch.
   const lastSeenCount = useRef(0);
+  const lastSeenContract = useRef<number | null>(null);
   useLayoutEffect(() => {
-    if (!pageRef.current) return;
-    if (messages.length <= lastSeenCount.current) return;
-    lastSeenCount.current = messages.length;
-    const scroller = findScrollableParent(pageRef.current);
-    if (scroller) scroller.scrollTop = scroller.scrollHeight;
-  }, [messages.length]);
-
-  // Track composer height so the message list can pad the bottom by the same
-  // amount. This keeps already-visible content in place when the textarea
-  // grows upward — instead of scrolling it out of view.
-  useLayoutEffect(() => {
-    const el = composerRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(entries => {
-      for (const entry of entries) {
-        setComposerHeight(entry.contentRect.height);
-      }
-    });
-    ro.observe(el);
-    setComposerHeight(el.getBoundingClientRect().height);
-    return () => ro.disconnect();
-  }, []);
+    if (!scrollRef.current) return;
+    const contractChanged = lastSeenContract.current !== contractId;
+    const newMessages = messages.length > lastSeenCount.current;
+    if (contractChanged || newMessages) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      lastSeenCount.current = messages.length;
+      lastSeenContract.current = contractId;
+    }
+  }, [contractId, messages.length]);
 
   // Auto-resize the textarea between 1 and MAX_TEXTAREA_LINES.
   useLayoutEffect(() => {
@@ -146,15 +144,10 @@ export function ChatThreadPage() {
     }
   };
 
-  const handleAttachImageClick = () => {
-    setAttachOpen(false);
-    fileInputRef.current?.click();
-  };
-
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
-    if (!file) return;
+    if (!file || !enabled || contractId === null) return;
     if (!file.type.startsWith('image/')) {
       setSendError(t('chat.imageInvalid'));
       return;
@@ -171,7 +164,7 @@ export function ChatThreadPage() {
       const result = await uploadImage({
         type: 'chat_image',
         file: resized,
-        size: 'md',
+        size: 'lg',
         idx,
         params: { contract_id: contractId },
       });
@@ -215,39 +208,24 @@ export function ChatThreadPage() {
     return out;
   }, [messages]);
 
-  const title = inboxRow?.customer_name ?? t('chat.title');
-
-  if (Number.isNaN(contractId)) {
-    navigate('/admin/chat', { replace: true });
-    return null;
+  if (contractId === null) {
+    return (
+      <div className="h-full flex items-center justify-center text-subtler p-8">
+        {t('chat.selectToView')}
+      </div>
+    );
   }
 
-  return (
-    <>
-      <MobileHeader className="mobile-header-bordered md:hidden">
-        <div className="mobile-header-start">
-          <button
-            className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
-            aria-label={t('chat.backToInbox')}
-            onClick={() => navigate('/admin/chat')}
-          >
-            <ArrowLeft size={18} />
-          </button>
-        </div>
-        <div className="mobile-header-title mobile-header-title-truncate">{title}</div>
-        <div className="mobile-header-end w-nav" />
-      </MobileHeader>
+  const title = inboxRow?.customer_name ?? t('chat.title');
 
-      <div
-        ref={pageRef}
-        className="page-content flex flex-col min-h-full !py-0"
-      >
-        {/* Desktop header — sticky to the parent scroller's top edge */}
-        <div className="sticky top-0 z-20 bg-bg flex items-center justify-between py-3 max-md:hidden">
+  return (
+    <div className="flex-1 min-h-0 flex flex-col h-full relative">
+      {!hideDesktopHeader && (
+        <div className="flex-none hidden md:flex items-center justify-between px-4 py-3 border-b border-line">
           <div className="min-w-0">
-            <h1 className="heading-2 truncate">{title}</h1>
+            <div className="text-sm font-medium truncate">{title}</div>
             {inboxRow && (
-              <div className="text-sm text-subtle">
+              <div className="text-xs text-subtle">
                 <span className="tabular-nums">{inboxRow.contract_code_display}</span>
                 {' · '}
                 {t('chat.messageCount', { count: inboxRow.total_messages })}
@@ -257,14 +235,36 @@ export function ChatThreadPage() {
           {inboxRow && (
             <Link
               to={`/admin/contracts/search/${contractId}`}
-              className="inline-flex items-center gap-1 text-sm text-primary-fg hover:underline shrink-0"
+              className="inline-flex items-center gap-1 text-xs text-primary-fg hover:underline shrink-0"
             >
-              {t('chat.contractLink')} <ExternalLink size={14} />
+              {t('chat.contractLink')} <ExternalLink size={12} />
             </Link>
           )}
         </div>
+      )}
 
-        {/* Message list — flows in normal page scroll */}
+      {/* Mobile-only collapsible details — overlays the top of the message
+          list so toggling doesn't push content down. Chevron in MobileHeader
+          drives the open state via prop. */}
+      {inboxRow && mobileDetailsOpen && (
+        <div className="md:hidden absolute top-0 left-0 right-0 z-10 bg-bg border-b border-line shadow-sm animate-fade-in">
+          <div className="px-4 py-3 flex items-center justify-between gap-3">
+            <div className="min-w-0 text-xs text-subtle">
+              <div className="tabular-nums truncate">{inboxRow.contract_code_display}</div>
+              <div>{t('chat.messageCount', { count: inboxRow.total_messages })}</div>
+            </div>
+            <Link
+              to={`/admin/contracts/search/${contractId}`}
+              className="inline-flex items-center gap-1 text-xs text-primary-fg hover:underline shrink-0"
+            >
+              {t('chat.contractLink')} <ExternalLink size={12} />
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Scrollable message list */}
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-auto better-scroll px-3 py-3 md:px-8">
         {isLoading ? (
           <div className="text-center text-subtle p-8">{t('common.loading')}</div>
         ) : messages.length === 0 ? (
@@ -284,9 +284,9 @@ export function ChatThreadPage() {
                     {senderLabel ? <span className="mr-2">{senderLabel}</span> : null}
                     <span>{formatSmart(g.startedAt, i18n.language)}</span>
                   </div>
-                  <div className={`flex flex-col gap-0.5 max-w-[80%] ${align}`}>
+                  <div className={`flex flex-col gap-0.5 max-w-[70%] ${align}`}>
                     {g.messages.map(m => (
-                      <Bubble key={m.id} message={m} isStaff={isStaff} onOpenImage={setLightboxKey} />
+                      <Bubble key={m.id} message={m} isStaff={isStaff} onOpenImage={onOpenImage} />
                     ))}
                   </div>
                 </div>
@@ -294,115 +294,65 @@ export function ChatThreadPage() {
             })}
           </div>
         )}
-
-        {/* Spacer — gives the last message room above the sticky composer.
-            flex-1 ensures it absorbs extra height when content is short
-            (pushing composer to the viewport bottom). Min-height matches
-            composer so even on long content the last bubble can scroll into
-            view above the composer. */}
-        <div className="flex-1" style={{ minHeight: composerHeight + 8 }} />
-
-        {/* Composer — sticky to the parent scroller's bottom edge. Stays in
-            page-content's horizontal box (no fixed-position / sidenav math),
-            and pins to the viewport bottom as the user scrolls.
-            bg-bg + bottom padding paints the gap below the composer so
-            messages don't peek through as they scroll past. */}
-        <div
-          ref={composerRef}
-          className="sticky bottom-0 z-30 bg-bg pb-1 md:pb-3 -mx-3 md:-mx-5"
-        >
-          {sendError && (
-            <div className="alert alert-danger mb-2 animate-pop-in">
-              <XCircle size={16} />
-              <div><div className="alert-description text-xs">{sendError}</div></div>
-            </div>
-          )}
-          <div className="rounded-2xl border border-line bg-bg shadow-sm flex flex-col">
-            <textarea
-              ref={textareaRef}
-              rows={1}
-              value={composer}
-              onChange={e => setComposer(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={t('chat.composerPlaceholder')}
-              disabled={sendMutation.isPending || uploading}
-              className="w-full resize-none bg-transparent border-0 outline-0 px-3 pt-3 pb-1 text-xs md:text-sm leading-5 placeholder:text-subtle"
-              style={{ minHeight: TEXTAREA_LINE_HEIGHT_PX }}
-            />
-            <div className="flex items-center justify-between px-2 pb-2 pt-1">
-              <Button
-                ref={plusButtonRef}
-                variant="ghost"
-                size="sm"
-                className="btn-icon-sm"
-                startIcon={<Plus size={18} />}
-                onClick={() => setAttachOpen(o => !o)}
-                disabled={sendMutation.isPending || uploading}
-                aria-label={t('chat.attach')}
-              />
-              <div className="flex items-center gap-2">
-                {uploading && (
-                  <span className="text-xs text-subtle">{t('chat.uploading')}</span>
-                )}
-                <Button
-                  color="primary"
-                  size="sm"
-                  className="btn-icon-sm"
-                  startIcon={<Send size={16} />}
-                  disabled={!composer.trim() || sendMutation.isPending || uploading}
-                  onClick={handleSend}
-                  aria-label={t('chat.send')}
-                />
-              </div>
-            </div>
-          </div>
-
-          <PopOver
-            isOpen={attachOpen}
-            onClose={() => setAttachOpen(false)}
-            triggerRef={plusButtonRef}
-            placement="top"
-            align="start"
-            offset={8}
-          >
-            <div className="flex flex-col py-1 min-w-[12rem]">
-              <button
-                type="button"
-                className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-surface-hover bg-transparent border-0 cursor-pointer text-left"
-                onClick={handleAttachImageClick}
-              >
-                <ImageIcon size={16} />
-                <span>{t('chat.attachImage')}</span>
-              </button>
-              <button
-                type="button"
-                disabled
-                title={t('chat.attachFileComingSoon')}
-                className="flex items-center gap-2 px-3 py-2 text-sm bg-transparent border-0 text-left text-subtle cursor-not-allowed"
-              >
-                <Paperclip size={16} />
-                <span>{t('chat.attachFile')}</span>
-              </button>
-            </div>
-          </PopOver>
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleFileChange}
-          />
-        </div>
       </div>
 
-      <MediaLightbox
-        open={lightboxKey !== null}
-        onClose={() => setLightboxKey(null)}
-        mediaKey={lightboxKey}
-        alt={t('chat.imageMessage')}
-      />
-    </>
+      {/* Composer pinned at panel bottom */}
+      <div className="flex-none bg-bg px-1 pb-1 md:px-3 md:pb-3">
+        {sendError && (
+          <div className="alert alert-danger mb-2 animate-pop-in">
+            <XCircle size={16} />
+            <div><div className="alert-description text-xs">{sendError}</div></div>
+          </div>
+        )}
+        <div className="rounded-lg md:rounded-2xl border border-line bg-bg shadow-sm flex flex-col">
+          <textarea
+            ref={textareaRef}
+            rows={1}
+            value={composer}
+            onChange={e => setComposer(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={t('chat.composerPlaceholder')}
+            disabled={sendMutation.isPending || uploading}
+            className="w-full resize-none bg-transparent border-0 outline-0 px-3 pt-3 pb-1 text-xs md:text-sm leading-5 placeholder:text-subtle"
+            style={{ minHeight: TEXTAREA_LINE_HEIGHT_PX }}
+          />
+          <div className="flex items-center justify-between px-2 pb-2 pt-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="btn-icon-sm"
+              startIcon={<ImageIcon size={18} />}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={sendMutation.isPending || uploading}
+              aria-label={t('chat.attachImage')}
+              title={t('chat.attachImage')}
+            />
+            <div className="flex items-center gap-2">
+              {uploading && (
+                <span className="text-xs text-subtle">{t('chat.uploading')}</span>
+              )}
+              <Button
+                color="primary"
+                size="sm"
+                className="btn-icon-sm"
+                startIcon={<Send size={16} />}
+                disabled={!composer.trim() || sendMutation.isPending || uploading}
+                onClick={handleSend}
+                aria-label={t('chat.send')}
+              />
+            </div>
+          </div>
+        </div>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleFileChange}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -448,19 +398,6 @@ function Bubble({ message, isStaff, onOpenImage }: {
       )}
     </div>
   );
-}
-
-function findScrollableParent(el: HTMLElement | null): HTMLElement | null {
-  let node: HTMLElement | null = el?.parentElement ?? null;
-  while (node) {
-    const style = getComputedStyle(node);
-    const overflowY = style.overflowY;
-    if ((overflowY === 'auto' || overflowY === 'scroll') && node.scrollHeight > node.clientHeight) {
-      return node;
-    }
-    node = node.parentElement;
-  }
-  return null;
 }
 
 function ImageWithSkeleton({ src, alt }: { src: string; alt: string }) {

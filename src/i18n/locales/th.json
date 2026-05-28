@@ -3175,6 +3175,8 @@
     "attachFileComingSoon": "การแนบไฟล์จะเปิดให้ใช้เร็วๆ นี้",
     "uploading": "กำลังอัปโหลด…",
     "imageInvalid": "กรุณาเลือกไฟล์รูปภาพ",
-    "imageTooLarge": "ไฟล์รูปภาพใหญ่เกินไป"
+    "imageTooLarge": "ไฟล์รูปภาพใหญ่เกินไป",
+    "selectToView": "เลือกการสนทนา",
+    "detailsToggle": "แสดง/ซ่อนรายละเอียด"
   }
 }

@@ -3175,6 +3175,8 @@
     "attachFileComingSoon": "File attachments coming soon",
     "uploading": "Uploading…",
     "imageInvalid": "Please choose an image file",
-    "imageTooLarge": "Image is too large"
+    "imageTooLarge": "Image is too large",
+    "selectToView": "Select a conversation",
+    "detailsToggle": "Toggle details"
   }
 }

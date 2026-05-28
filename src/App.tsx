@@ -40,8 +40,7 @@ import { DunningTargetsPage } from './pages/legal/DunningTargetsPage';
 import { LegalCasesPage } from './pages/legal/LegalCasesPage';
 import { StaffCommissionPage } from './pages/commission/StaffCommissionPage';
 import { ApprovalsPage } from './pages/approvals/ApprovalsPage';
-import { ChatInboxPage } from './pages/chat/ChatInboxPage';
-import { ChatThreadPage } from './pages/chat/ChatThreadPage';
+import { ChatPage } from './pages/chat/ChatPage';
 import { PaymentSubmissionsPage } from './pages/PaymentSubmissionsPage';
 import { ContractsLayout } from './pages/contracts/ContractsLayout';
 import { ContractSearchPage } from './pages/contracts/ContractSearchPage';
@@ -586,17 +585,7 @@ function App() {
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <ChatInboxPage />
-            </AdminLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin/chat/:contractId"
-        element={
-          <ProtectedRoute>
-            <AdminLayout>
-              <ChatThreadPage />
+              <ChatPage />
             </AdminLayout>
           </ProtectedRoute>
         }
