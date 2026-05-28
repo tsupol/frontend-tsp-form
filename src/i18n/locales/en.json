@@ -255,6 +255,8 @@
     "holdingId": "Holding ID",
     "companyId": "Company ID",
     "branchId": "Branch ID",
+    "branch": "Branch",
+    "company": "Company",
     "capabilities": "Capabilities"
   },
   "users": {
@@ -346,7 +348,10 @@
     "uploadImage": "Upload Image",
     "uploading": "Uploading...",
     "uploadSuccess": "Profile image updated",
-    "uploadFailed": "Failed to upload image"
+    "uploadFailed": "Failed to upload image",
+    "avatar": "Avatar",
+    "changeAvatar": "Change avatar",
+    "updatedAt": "Last updated"
   },
   "theme": {
     "title": "Theme",
@@ -1662,6 +1667,23 @@
     "step3": "Paste the URL and go",
     "iosOnly": "iOS Device Required",
     "iosOnlyDesc": "MDM enrollment is only available for iPhone and iPad devices."
+  },
+  "help": {
+    "title": "Help",
+    "printer": "Printer Setup",
+    "printerDesc": "Sticker printer paper size and exposure",
+    "userGuide": "User Guide",
+    "userGuideDesc": "How to use the app — common workflows and tips",
+    "userGuideComingSoon": "User guide content is in progress. Check back soon."
+  },
+  "notifPrefs": {
+    "title": "Notifications",
+    "pushLabel": "Push notifications on this browser",
+    "pushHelp": "Get chat, slip, and approval alerts when this tab is in the background or closed.",
+    "deniedTitle": "Notifications are blocked",
+    "deniedBody": "This browser is blocking notifications. Open the lock icon in the address bar → Notifications → Allow, then come back here to turn them on.",
+    "unsupported": "This browser doesn't support push notifications.",
+    "enableFailed": "Couldn't enable: {{reason}}"
   },
   "settings": {
     "title": "Settings",

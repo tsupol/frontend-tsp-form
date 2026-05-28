@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
-import { FlaskConical, PenLine, Image, Bell, AlertTriangle } from 'lucide-react';
+import { FlaskConical, PenLine, Image, Bell, AlertTriangle, KeyRound } from 'lucide-react';
 
 const navItems = [
   { path: '/dev/signature', label: 'Signature Pad', icon: PenLine },
   { path: '/dev/media', label: 'Media Viewer', icon: Image },
   { path: '/dev/notifications', label: 'Notifications', icon: Bell },
+  { path: '/dev/tokens', label: 'Token Debug', icon: KeyRound },
 ];
 
 function isLocalhost(): boolean {

@@ -67,7 +67,10 @@ import { BranchesPage } from './pages/BranchesPage';
 import { SettingsLayout } from './pages/settings/SettingsLayout';
 import { HoldingsPage } from './pages/settings/HoldingsPage';
 import { CompaniesPage } from './pages/settings/CompaniesPage';
-import { PrinterSetupPage } from './pages/settings/PrinterSetupPage';
+import { PrinterSetupPage } from './pages/help/PrinterSetupPage';
+import { NotificationPrefsPage } from './pages/settings/NotificationPrefsPage';
+import { HelpLayout } from './pages/help/HelpLayout';
+import { UserGuidePage } from './pages/help/UserGuidePage';
 import { CustomersPage } from './pages/customers/CustomersPage';
 import { AccountingLayout } from './pages/accounting/AccountingLayout';
 import { DayClosePage } from './pages/accounting/DayClosePage';
@@ -84,6 +87,7 @@ import { DevLayout } from './pages/dev/DevLayout';
 import { DevSignaturePage } from './pages/dev/DevSignaturePage';
 import { DevMediaPage } from './pages/dev/DevMediaPage';
 import { DevNotificationsPage } from './pages/dev/DevNotificationsPage';
+import { DevTokensPage } from './pages/dev/DevTokensPage';
 import { isLocalDev } from './lib/devEnv';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -198,12 +202,36 @@ function App() {
           </ProtectedRoute>
         }
       />
+      <Route path="/admin/settings/printer" element={<Navigate to="/admin/help/printer" replace />} />
       <Route
-        path="/admin/settings/printer"
+        path="/admin/settings/notifications"
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <SettingsLayout><PrinterSetupPage /></SettingsLayout>
+              <SettingsLayout><NotificationPrefsPage /></SettingsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Help */}
+      <Route path="/admin/help" element={<Navigate to="/admin/help/user-guide" replace />} />
+      <Route
+        path="/admin/help/user-guide"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <HelpLayout><UserGuidePage /></HelpLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/help/printer"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <HelpLayout><PrinterSetupPage /></HelpLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
@@ -568,6 +596,16 @@ function App() {
               <ProtectedRoute>
                 <AdminLayout>
                   <DevLayout><DevNotificationsPage /></DevLayout>
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dev/tokens"
+            element={
+              <ProtectedRoute>
+                <AdminLayout>
+                  <DevLayout><DevTokensPage /></DevLayout>
                 </AdminLayout>
               </ProtectedRoute>
             }

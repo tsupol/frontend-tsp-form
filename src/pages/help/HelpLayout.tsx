@@ -1,32 +1,24 @@
 import type { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { User, Building2, Store, Bell } from 'lucide-react';
+import { Printer, BookOpen } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
-import { useAuth } from '../../contexts/AuthContext';
 
-export function SettingsLayout({ children }: { children: ReactNode }) {
+export function HelpLayout({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
   const navGuard = useNavGuard();
-  const { user } = useAuth();
-  const role = user?.role_code ?? '';
-  const canManageOrg = ['HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
 
   const navItems = [
-    { path: '/admin/settings/profile', labelKey: 'nav.profile', icon: User },
-    { path: '/admin/settings/notifications', labelKey: 'notifPrefs.title', icon: Bell },
-    ...(canManageOrg ? [
-      { path: '/admin/settings/holdings', labelKey: 'settings.holdings', icon: Building2 },
-      { path: '/admin/settings/companies', labelKey: 'settings.companies', icon: Store },
-    ] : []),
+    { path: '/admin/help/user-guide', labelKey: 'help.userGuide', icon: BookOpen },
+    { path: '/admin/help/printer', labelKey: 'help.printer', icon: Printer },
   ];
 
   return (
     <div className="flex min-h-full">
       <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-48 border-r border-line p-4 pt-7.5 sticky top-0 h-dvh">
         <span className="text-xs font-semibold text-subtle uppercase tracking-wider mb-2 px-2">
-          {t('settings.title')}
+          {t('help.title')}
         </span>
         {navItems.map(({ path, labelKey, icon: Icon }) => {
           const isActive = pathname.startsWith(path);

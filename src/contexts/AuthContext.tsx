@@ -29,6 +29,7 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<LoginResult>;
   logout: () => Promise<void>;
   switchHolding: (holdingId: number) => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -234,6 +235,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setCapabilities(new Set());
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    try {
+      const res = await authService.meProfile();
+      const next = authService.profileToUserInfo(res);
+      setUser(prev => prev
+        ? {
+            ...prev,
+            firstname: next.firstname,
+            lastname: next.lastname,
+            nickname: next.nickname,
+            profile_image: next.profile_image,
+            role_code: next.role_code,
+          }
+        : next
+      );
+    } catch (err) {
+      console.warn('[Auth] refreshUser failed', err);
+    }
+  }, []);
+
   const switchHolding = useCallback(async (holdingId: number) => {
     const result = await authService.switchHolding(holdingId);
     // Use holding_id from server response as single source of truth
@@ -255,6 +276,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         logout,
         switchHolding,
+        refreshUser,
       }}
     >
       {children}

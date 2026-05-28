@@ -1,22 +1,18 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, KeyRound, CheckCircle, XCircle, Camera, Upload } from 'lucide-react';
-import { Button, Switch, Input, FormErrorMessage, Modal, ImageCropper, Slider, useSnackbarContext } from 'tsp-form';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowRightFromLine, Eye, EyeOff, KeyRound, CheckCircle, XCircle, Camera, Upload, User as UserIcon } from 'lucide-react';
+import { Button, Input, FormErrorMessage, Modal, ImageCropper, Slider, MobileHeader, useSnackbarContext } from 'tsp-form';
 import type { ImageCropperRef } from 'tsp-form';
 import { useAuth } from '../contexts/AuthContext';
 import { DateTime } from '../components/DateTime';
-import { authService } from '../lib/auth';
-import type { UserProfile, MeProfileResponse } from '../lib/auth';
+import type { MeProfileResponse } from '../lib/auth';
 import { apiClient, ApiError } from '../lib/api';
 import { uploadImage } from '../lib/upload';
 import { publicMediaUrl } from '../lib/mediaPath';
 import { useUploadSpec } from '../hooks/useMediaUrl';
-
-const EXPIRED_GRACE_PERIOD_MS = 5000;
-
-// ── helpers ──────────────────────────────────────────────────────────
+import { formatTel } from '../lib/format';
 
 function profileImageUrl(profileImage: Record<string, string> | null | undefined): string | null {
   if (!profileImage) return null;
@@ -29,12 +25,9 @@ function profileImageUrl(profileImage: Record<string, string> | null | undefined
 
 function ProfileCard() {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { addSnackbar } = useSnackbarContext();
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [currentImage, setCurrentImage] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const { spec } = useUploadSpec('user_profile');
 
   // Avatar crop modal
@@ -44,24 +37,16 @@ function ProfileCard() {
   const [cropFile, setCropFile] = useState<File | null>(null);
   const [cropSourceSize, setCropSourceSize] = useState<{ w: number; h: number } | null>(null);
   const [cropZoom, setCropZoom] = useState(1);
+  const [uploading, setUploading] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await apiClient.rpc<MeProfileResponse>('me_profile_get');
-        if (!cancelled) {
-          setProfile(res.profile);
-          setCurrentImage(profileImageUrl(res.profile?.profile_image));
-        }
-      } catch {
-        // fallback to auth context data
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+  const { data: meRes, isLoading } = useQuery({
+    queryKey: ['me', 'profile'],
+    queryFn: () => apiClient.rpc<MeProfileResponse>('me_profile_get'),
+    refetchOnWindowFocus: true,
+    staleTime: 30_000,
+  });
+  const profile = meRes?.profile ?? null;
+  const currentImage = profileImageUrl(profile?.profile_image);
 
   const closeAvatarModal = () => {
     setAvatarModalOpen(false);
@@ -74,7 +59,6 @@ function ProfileCard() {
     e.target.value = '';
     if (!f) return;
     setCropFile(f);
-    // Read intrinsic size so we can clamp output width (no upscaling).
     const img = new Image();
     const url = URL.createObjectURL(f);
     img.onload = () => {
@@ -100,7 +84,10 @@ function ProfileCard() {
           p_profile_image: { [spec.sizes[0].label]: `/${result.key}` },
         });
 
-        setCurrentImage(URL.createObjectURL(file));
+        // Refresh both the page query and the AuthContext so the sidenav
+        // avatar updates without a reload.
+        await queryClient.invalidateQueries({ queryKey: ['me', 'profile'] });
+        await refreshUser();
         closeAvatarModal();
 
         addSnackbar({
@@ -132,9 +119,9 @@ function ProfileCard() {
         setUploading(false);
       }
     });
-  }, [spec, user, addSnackbar, t]);
+  }, [spec, user, addSnackbar, t, queryClient, refreshUser]);
 
-  // Cap output width to source's smaller dimension so we never upscale.
+  // Cap output width so we never upscale past the source's smaller dimension.
   const specWidth = spec?.sizes[0]?.width ?? 320;
   const outputWidth = cropSourceSize
     ? Math.min(specWidth, Math.min(cropSourceSize.w, cropSourceSize.h))
@@ -142,23 +129,22 @@ function ProfileCard() {
 
   const displayName = profile
     ? [profile.firstname, profile.lastname].filter(Boolean).join(' ') || profile.nickname || profile.username
-    : user?.user_id;
+    : user?.username;
 
-  const infoFields = [
-    { label: t('user.username'), value: profile?.username },
-    { label: t('user.role'), value: profile?.role_code ?? user?.role_code },
-    { label: t('user.holdingId'), value: profile?.holding_id ?? user?.holding_id },
-    { label: t('user.companyId'), value: profile?.company_id ?? user?.company_id },
-    { label: t('user.branchId'), value: profile?.branch_id ?? user?.branch_id },
+  const personalFields: Array<{ label: string; value: string | null | undefined }> = [
+    { label: t('profile.firstname'), value: profile?.firstname },
+    { label: t('profile.lastname'), value: profile?.lastname },
+    { label: t('profile.nickname'), value: profile?.nickname },
+    { label: t('profile.tel'), value: profile?.tel ? formatTel(profile.tel) : null },
   ];
 
-  // Only show personal fields if they have data
-  const personalFields = profile ? [
-    { label: t('profile.firstname'), value: profile.firstname },
-    { label: t('profile.lastname'), value: profile.lastname },
-    { label: t('profile.nickname'), value: profile.nickname },
-    { label: t('profile.tel'), value: profile.tel },
-  ].filter(f => f.value) : [];
+  const orgFields: Array<{ label: string; value: string | number | null | undefined }> = [
+    { label: t('user.username'), value: profile?.username ?? user?.username },
+    { label: t('user.role'), value: profile?.role_code ?? user?.role_code },
+    { label: t('user.branch', { defaultValue: 'Branch' }), value: user?.branch_name ?? profile?.branch_id },
+    { label: t('user.company', { defaultValue: 'Company' }), value: user?.company_name ?? profile?.company_id },
+    { label: t('user.holdingId'), value: profile?.holding_id ?? user?.holding_id },
+  ];
 
   return (
     <div className="border border-line bg-surface p-6 rounded-lg">
@@ -169,20 +155,21 @@ function ProfileCard() {
           className="relative w-28 h-28 rounded-full overflow-hidden bg-surface-shallow border-2 border-line flex items-center justify-center shrink-0 cursor-pointer group p-0"
           onClick={() => { setCropFile(null); setAvatarModalOpen(true); }}
           disabled={!spec}
+          aria-label={t('profile.avatar')}
         >
-          {loading ? (
+          {isLoading ? (
             <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
           ) : currentImage ? (
-            <img src={currentImage} alt="Profile" className="w-full h-full object-cover" />
+            <img src={currentImage} alt="" className="w-full h-full object-cover" />
           ) : (
-            <Camera size={32} className="text-fg-muted" />
+            <UserIcon size={44} className="text-subtle" />
           )}
           <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
             <Camera size={20} className="text-white" />
           </div>
         </button>
-        <div className="text-center">
-          <div className="font-semibold text-lg">{loading ? '-' : displayName}</div>
+        <div className="text-center min-w-0 w-full">
+          <div className="font-semibold text-lg truncate">{isLoading ? '—' : displayName}</div>
           {profile?.role_code && (
             <div className="text-sm text-subtle">{profile.role_code}</div>
           )}
@@ -192,27 +179,33 @@ function ProfileCard() {
       <hr className="border-line mb-5" />
 
       {/* Personal info */}
-      {personalFields.length > 0 && (
-        <div className="space-y-3 mb-5">
-          {personalFields.map(({ label, value }) => (
-            <div key={label}>
-              <div className="text-sm text-subtle">{label}</div>
-              <div className="mt-0.5">{value}</div>
-            </div>
-          ))}
-          <hr className="border-line" />
-        </div>
-      )}
-
-      {/* System info */}
-      <div className="space-y-3">
-        {infoFields.map(({ label, value }) => (
-          <div key={label}>
-            <div className="text-sm text-subtle">{label}</div>
-            <div className="mt-0.5 text-base">{value ?? '-'}</div>
+      <div className="space-y-3 mb-5">
+        {personalFields.map(({ label, value }) => (
+          <div key={label} className="flex justify-between items-baseline gap-3">
+            <div className="text-sm text-subtle shrink-0">{label}</div>
+            <div className="text-sm text-right min-w-0 truncate">{value || '—'}</div>
           </div>
         ))}
+      </div>
 
+      <hr className="border-line mb-5" />
+
+      {/* Org / system info */}
+      <div className="space-y-3">
+        {orgFields.map(({ label, value }) => (
+          <div key={label} className="flex justify-between items-baseline gap-3">
+            <div className="text-sm text-subtle shrink-0">{label}</div>
+            <div className="text-sm text-right min-w-0 truncate">{value ?? '—'}</div>
+          </div>
+        ))}
+        {profile?.updated_at && (
+          <div className="flex justify-between items-baseline gap-3 pt-2 border-t border-line">
+            <div className="text-xs text-subtle shrink-0">{t('profile.updatedAt', { defaultValue: 'Last updated' })}</div>
+            <div className="text-xs text-subtle text-right min-w-0 truncate">
+              <DateTime value={profile.updated_at} showTime />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Hidden file input */}
@@ -237,7 +230,7 @@ function ProfileCard() {
                 <img src={currentImage} alt="" className="w-32 h-32 rounded-full object-cover" />
               ) : (
                 <div className="w-32 h-32 rounded-full bg-surface-shallow flex items-center justify-center">
-                  <Camera size={32} className="text-fg-muted" />
+                  <UserIcon size={48} className="text-subtle" />
                 </div>
               )}
               <Button variant="outline" startIcon={<Upload size={16} />} onClick={() => fileInputRef.current?.click()}>
@@ -338,7 +331,8 @@ function ChangePasswordForm() {
       setShowConfirm(false);
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
         setApiError(translated || err.message);
       } else {
         setApiError(t('common.error'));
@@ -417,211 +411,11 @@ function ChangePasswordForm() {
         </div>
 
         <div className="flex justify-end">
-          <Button type="submit" variant="solid" disabled={isSubmitting}>
+          <Button type="submit" color="primary" disabled={isSubmitting}>
             {isSubmitting ? t('profile.changingPassword') : t('profile.changePassword')}
           </Button>
         </div>
       </form>
-    </div>
-  );
-}
-
-// ── Token Debug ──────────────────────────────────────────────────────
-
-function TokenDebugPanel() {
-  const navigate = useNavigate();
-  const { logout } = useAuth();
-  const [autoRefresh, setAutoRefresh] = useState(true);
-  const [refreshError, setRefreshError] = useState<string | null>(null);
-  const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
-  const refreshingRef = useRef(false);
-  const expiredSinceRef = useRef<number | null>(null);
-
-  const [tokenInfo, setTokenInfo] = useState<{
-    accessToken: string | null;
-    refreshToken: string | null;
-    expiresAt: Date | null;
-    expiresAtRaw: string | null;
-    timeRemaining: string;
-    isExpired: boolean;
-  }>({
-    accessToken: null,
-    refreshToken: null,
-    expiresAt: null,
-    expiresAtRaw: null,
-    timeRemaining: '-',
-    isExpired: false,
-  });
-
-  const [refreshStatus, setRefreshStatus] = useState<string>('');
-
-  useEffect(() => {
-    const update = async () => {
-      const accessToken = authService.getAccessToken();
-      const refreshToken = authService.getRefreshToken();
-      const expiresAt = authService.getExpiresAt();
-      const expiresAtRaw = localStorage.getItem('expires_at');
-
-      let timeRemaining = '-';
-      let isExpired = false;
-
-      if (expiresAt && !isNaN(expiresAt.getTime())) {
-        const diff = expiresAt.getTime() - Date.now();
-        if (diff <= 0) {
-          timeRemaining = 'EXPIRED';
-          isExpired = true;
-        } else {
-          const seconds = Math.floor(diff / 1000);
-          const minutes = Math.floor(seconds / 60);
-          const secs = seconds % 60;
-          timeRemaining = `${minutes}m ${secs}s`;
-        }
-      }
-
-      setTokenInfo({ accessToken, refreshToken, expiresAt, expiresAtRaw, timeRemaining, isExpired });
-
-      if (isExpired && !refreshingRef.current) {
-        if (autoRefresh) {
-          refreshingRef.current = true;
-          setRefreshError(null);
-          try {
-            await authService.refresh();
-            setLastRefreshTime(new Date());
-            setRefreshError(null);
-            expiredSinceRef.current = null;
-          } catch (err) {
-            setRefreshError(err instanceof Error ? err.message : 'Refresh failed');
-            if (expiredSinceRef.current === null) expiredSinceRef.current = Date.now();
-            const expiredDuration = Date.now() - expiredSinceRef.current;
-            if (expiredDuration >= EXPIRED_GRACE_PERIOD_MS) {
-              await logout();
-              navigate('/login');
-            }
-          } finally {
-            refreshingRef.current = false;
-          }
-        } else {
-          if (expiredSinceRef.current === null) expiredSinceRef.current = Date.now();
-          const expiredDuration = Date.now() - expiredSinceRef.current;
-          if (expiredDuration >= EXPIRED_GRACE_PERIOD_MS) {
-            await logout();
-            navigate('/login');
-          }
-        }
-      } else if (!isExpired) {
-        expiredSinceRef.current = null;
-      }
-    };
-
-    update();
-    const interval = setInterval(update, 1000);
-    return () => clearInterval(interval);
-  }, [autoRefresh, logout, navigate]);
-
-  const handleManualRefresh = async () => {
-    setRefreshStatus('Refreshing...');
-    setRefreshError(null);
-    try {
-      await authService.refresh();
-      setRefreshStatus('Refreshed!');
-      setLastRefreshTime(new Date());
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
-      setRefreshStatus(`Failed: ${msg}`);
-      setRefreshError(msg);
-    }
-    setTimeout(() => setRefreshStatus(''), 3000);
-  };
-
-  const truncate = (str: string | null, len: number) => {
-    if (!str) return '-';
-    if (str.length <= len) return str;
-    return str.slice(0, len / 2) + '...' + str.slice(-len / 2);
-  };
-
-  const isNearExpiry = tokenInfo.expiresAt &&
-    (tokenInfo.expiresAt.getTime() - Date.now()) <= 60000 &&
-    !tokenInfo.isExpired;
-
-  return (
-    <div className="border border-line bg-surface p-6 rounded-lg">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-semibold">Token Debug</h2>
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-subtle">Auto Refresh</span>
-          <Switch checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)} />
-        </div>
-      </div>
-
-      {refreshError && (
-        <div className="mb-4 alert alert-danger">
-          <XCircle size={18} />
-          <div><div className="alert-description">Refresh Error: {refreshError}</div></div>
-        </div>
-      )}
-
-      <div className="space-y-4 font-mono text-sm">
-        <div>
-          <div className="text-subtle">Access Token</div>
-          <div className="mt-1 break-all bg-surface-shallow p-2 rounded">
-            {truncate(tokenInfo.accessToken, 60)}
-          </div>
-        </div>
-
-        <div>
-          <div className="text-subtle">Refresh Token</div>
-          <div className="mt-1 break-all bg-surface-shallow p-2 rounded">
-            {truncate(tokenInfo.refreshToken, 60)}
-          </div>
-        </div>
-
-        <div>
-          <div className="text-subtle">Expires At (raw)</div>
-          <div className="mt-1 text-xs bg-surface-shallow p-2 rounded">
-            {tokenInfo.expiresAtRaw ?? '-'}
-          </div>
-        </div>
-
-        <div>
-          <div className="text-subtle">Expires At (parsed)</div>
-          <div className="mt-1">
-            {tokenInfo.expiresAt && !isNaN(tokenInfo.expiresAt.getTime())
-              ? <DateTime value={tokenInfo.expiresAt.toISOString()} />
-              : 'Invalid'}
-          </div>
-        </div>
-
-        <div>
-          <div className="text-subtle">Time Remaining</div>
-          <div className={`mt-1 text-lg font-bold ${
-            tokenInfo.isExpired ? 'text-danger' :
-            isNearExpiry ? 'text-warning-fg' :
-            'text-success'
-          }`}>
-            {tokenInfo.timeRemaining}
-          </div>
-        </div>
-
-        {lastRefreshTime && (
-          <div>
-            <div className="text-subtle">Last Refresh</div>
-            <div className="mt-1 text-success">
-              {lastRefreshTime.toLocaleTimeString()}
-            </div>
-          </div>
-        )}
-
-        <div className="flex gap-2 items-center pt-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={handleManualRefresh}>
-            Manual Refresh
-          </Button>
-          {refreshStatus && (
-            <span className={refreshStatus.includes('Failed') ? 'text-danger' : 'text-success'}>
-              {refreshStatus}
-            </span>
-          )}
-        </div>
-      </div>
     </div>
   );
 }
@@ -632,23 +426,33 @@ export function UserPage() {
   const { t } = useTranslation();
 
   return (
-    <div className="page-content p-6">
-      <h1 className="heading-2 mb-6">{t('nav.userDetails')}</h1>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl">
-        {/* Left: profile card */}
-        <ProfileCard />
-
-        {/* Right: change password */}
-        <div className="self-start">
-          <ChangePasswordForm />
+    <>
+      <MobileHeader className="mobile-header-scrolled-shadow md:hidden">
+        <div className="mobile-header-start">
+          <button
+            className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
+            aria-label="Open menu"
+            onClick={() => window.dispatchEvent(new CustomEvent('sidemenu:open'))}
+          >
+            <ArrowRightFromLine size={18} />
+          </button>
         </div>
+        <div className="mobile-header-title mobile-header-title-truncate">
+          {t('nav.profile')}
+        </div>
+        <div className="mobile-header-end w-nav" />
+      </MobileHeader>
 
-        {/* Full width: token debug */}
-        <div className="md:col-span-2">
-          <TokenDebugPanel />
+      <div className="page-content">
+        <h1 className="heading-2 mb-6 max-md:hidden">{t('nav.profile')}</h1>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl">
+          <ProfileCard />
+          <div className="self-start">
+            <ChangePasswordForm />
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

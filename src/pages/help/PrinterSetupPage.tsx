@@ -1,4 +1,5 @@
-import { Printer } from 'lucide-react';
+import { ArrowRightFromLine, Printer } from 'lucide-react';
+import { MobileHeader } from 'tsp-form';
 
 // Static printer setup guide for the XP-420B (and equivalent thermal label
 // printers). The app injects @page { size: 76mm 26mm; margin: 0 } — that
@@ -36,11 +37,28 @@ function Step({ n, children }: { n: number; children: React.ReactNode }) {
 
 export function PrinterSetupPage() {
   return (
-    <div className="page-content max-w-4xl">
-      <div className="flex items-center gap-2 mb-4">
-        <Printer size={20} />
-        <h1 className="heading-2">Printer Setup</h1>
-      </div>
+    <>
+      <MobileHeader className="mobile-header-scrolled-shadow md:hidden">
+        <div className="mobile-header-start">
+          <button
+            className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
+            aria-label="Open menu"
+            onClick={() => window.dispatchEvent(new CustomEvent('sidemenu:open'))}
+          >
+            <ArrowRightFromLine size={18} />
+          </button>
+        </div>
+        <div className="mobile-header-title mobile-header-title-truncate">
+          Printer Setup
+        </div>
+        <div className="mobile-header-end w-nav" />
+      </MobileHeader>
+
+      <div className="page-content max-w-4xl">
+        <div className="flex items-center gap-2 mb-4 max-md:hidden">
+          <Printer size={20} />
+          <h1 className="heading-2">Printer Setup</h1>
+        </div>
 
       <p className="text-sm text-subtle mb-6">
         One-time configuration for thermal label printing (barcode stickers,
@@ -192,14 +210,15 @@ export function PrinterSetupPage() {
         </ol>
       </div>
 
-      <p className="text-xs text-subtler">
-        The app targets a printable area of
-        <span className="font-mono"> {PRINTABLE.width.mm} mm × {PRINTABLE.height.mm} mm</span>
-        ({PRINTABLE.width.in} in × {PRINTABLE.height.in} in) for both barcode
-        and asset stickers. If you change label media, update both the printer
-        profile above and ask a developer to update the
-        <span className="font-mono"> @page</span> rule in the app.
-      </p>
-    </div>
+        <p className="text-xs text-subtler">
+          The app targets a printable area of
+          <span className="font-mono"> {PRINTABLE.width.mm} mm × {PRINTABLE.height.mm} mm</span>
+          ({PRINTABLE.width.in} in × {PRINTABLE.height.in} in) for both barcode
+          and asset stickers. If you change label media, update both the printer
+          profile above and ask a developer to update the
+          <span className="font-mono"> @page</span> rule in the app.
+        </p>
+      </div>
+    </>
   );
 }

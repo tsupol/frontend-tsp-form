@@ -43,7 +43,7 @@ import {
   // Chat
   MessageSquare,
   // Dev sandbox
-  FlaskConical, PenLine,
+  FlaskConical, PenLine, Image as ImageIcon, Bell,
 } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
 import { useTheme } from './contexts/ThemeContext';
@@ -129,8 +129,8 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
         </SubMenu>
         <MenuItem
           icon={<HelpCircle size={14} />}
-          label="Help"
-          onClick={() => setOpen(false)}
+          label={t('help.title')}
+          onClick={() => { navigate('/admin/help'); setOpen(false); }}
         />
         <MenuSeparator />
         <MenuItem
@@ -368,6 +368,9 @@ export const AppSideNav = () => {
       path: '/dev/signature',
       children: [
         { key: 'dev-signature', icon: <PenLine size="1rem" />, label: 'Signature Pad', path: '/dev/signature' },
+        { key: 'dev-media', icon: <ImageIcon size="1rem" />, label: 'Media Viewer', path: '/dev/media' },
+        { key: 'dev-notifications', icon: <Bell size="1rem" />, label: 'Notifications', path: '/dev/notifications' },
+        { key: 'dev-tokens', icon: <KeyRound size="1rem" />, label: 'Token Debug', path: '/dev/tokens' },
       ],
     }] : []),
   ];
