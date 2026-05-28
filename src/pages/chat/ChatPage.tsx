@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, keepPreviousData, useQueryClient } from '@tanstack/react-query';
 import {
   PageNav, PageNavPanel, MobileHeader, DataTableFooter,
   Badge, Input, Switch,
 } from 'tsp-form';
 import { ArrowLeft, ArrowRightFromLine, ChevronDown, Image as ImageIcon } from 'lucide-react';
 import { apiClient } from '../../lib/api';
+import { wsClient } from '../../lib/api/ws';
+import { useAuth } from '../../contexts/AuthContext';
 import { formatSmart } from '../../lib/format';
 import { MediaLightbox } from '../../components/MediaLightbox';
 import { ChatThreadPanel } from './ChatThreadPanel';
@@ -15,9 +17,25 @@ import type { ChatInboxRow } from './chatTypes';
 
 export function ChatPage() {
   const { t, i18n } = useTranslation();
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const contractParam = searchParams.get('contract');
   const selectedContractId = contractParam ? parseInt(contractParam, 10) : null;
+
+  // Realtime: subscribe to branch channel so any new chat in the branch
+  // refreshes the inbox + unread badge without waiting for the 60s poll.
+  // ACL on the server filters this to the user's branch; CA/HA (no branch_id)
+  // get nothing and that matches the doc's fan-out rule.
+  useEffect(() => {
+    const branchId = user?.branch_id;
+    if (!branchId) return;
+    const unsub = wsClient.subscribe(`branch:${branchId}`, () => {
+      queryClient.invalidateQueries({ queryKey: ['chat-inbox'] });
+      queryClient.invalidateQueries({ queryKey: ['nav', 'chat-unread'] });
+    });
+    return unsub;
+  }, [user?.branch_id, queryClient]);
 
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');

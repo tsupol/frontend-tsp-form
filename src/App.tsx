@@ -1,8 +1,11 @@
-import { Route, Routes, Navigate } from 'react-router-dom';
+import { Route, Routes, Navigate, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AppSideNav } from './AppSideNav';
 import { useAuth } from './contexts/AuthContext';
 import type { ReactNode } from 'react';
+import { useEffect } from 'react';
+import { wsClient } from './lib/api/ws';
+import { setupStaffPush } from './lib/api/push';
 import { LoginPage } from './pages/LoginPage';
 import { HomePage } from './pages/HomePage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -79,6 +82,7 @@ import { RetailBillsPage } from './pages/retail/RetailBillsPage';
 import { DevLayout } from './pages/dev/DevLayout';
 import { DevSignaturePage } from './pages/dev/DevSignaturePage';
 import { DevMediaPage } from './pages/dev/DevMediaPage';
+import { DevNotificationsPage } from './pages/dev/DevNotificationsPage';
 import { isLocalDev } from './lib/devEnv';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -100,6 +104,30 @@ function AdminLayout({ children }: { children: ReactNode }) {
   );
 }
 
+function RealtimeBridge() {
+  const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+
+  // WebSocket: connect on auth, disconnect on logout.
+  useEffect(() => {
+    if (isAuthenticated) wsClient.connect();
+    else wsClient.disconnect();
+  }, [isAuthenticated]);
+
+  // Web Push: defer 1.5s after auth so the permission prompt does not race
+  // with login UX. Re-running is safe (backend upserts; permission API short-
+  // circuits once granted).
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const t = setTimeout(() => {
+      setupStaffPush({ onNavigate: (path) => navigate(path) }).catch(() => {});
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [isAuthenticated, navigate]);
+
+  return null;
+}
+
 function App() {
   const { t } = useTranslation();
   const { isLoading, needsHoldingSelect, isAuthenticated } = useAuth();
@@ -114,6 +142,7 @@ function App() {
 
   return (
     <>
+    <RealtimeBridge />
     <HoldingSelectModal open={isAuthenticated && needsHoldingSelect} />
     <Routes>
       {/* Public routes */}
@@ -524,6 +553,16 @@ function App() {
               <ProtectedRoute>
                 <AdminLayout>
                   <DevLayout><DevMediaPage /></DevLayout>
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dev/notifications"
+            element={
+              <ProtectedRoute>
+                <AdminLayout>
+                  <DevLayout><DevNotificationsPage /></DevLayout>
                 </AdminLayout>
               </ProtectedRoute>
             }

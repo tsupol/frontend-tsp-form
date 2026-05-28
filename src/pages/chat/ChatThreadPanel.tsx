@@ -9,6 +9,7 @@ import {
   ExternalLink, Send, Image as ImageIcon, XCircle,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import { wsClient } from '../../lib/api/ws';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatSmart } from '../../lib/format';
 import { DateTime } from '../../components/DateTime';
@@ -82,6 +83,18 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
         queryClient.invalidateQueries({ queryKey: ['nav', 'chat-unread'] });
       })
       .catch(err => console.warn('[chat] mark_read failed', err));
+  }, [contractId, enabled, queryClient]);
+
+  // Realtime: subscribe to chat:contract:<id> while the thread is open. New
+  // message → invalidate so React Query refetches. Polling stays as fallback.
+  useEffect(() => {
+    if (!enabled || contractId === null) return;
+    const unsub = wsClient.subscribe(`chat:contract:${contractId}`, () => {
+      queryClient.invalidateQueries({ queryKey: ['chat-messages', contractId] });
+      queryClient.invalidateQueries({ queryKey: ['chat-inbox'] });
+      queryClient.invalidateQueries({ queryKey: ['nav', 'chat-unread'] });
+    });
+    return unsub;
   }, [contractId, enabled, queryClient]);
 
   // Auto-scroll: jump to bottom whenever the contract changes (so a freshly
