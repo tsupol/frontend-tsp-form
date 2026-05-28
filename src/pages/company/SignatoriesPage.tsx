@@ -312,7 +312,7 @@ function SignatoryFormModal({ open, mode, branchId, existing, onClose, onDone }:
         image: imgs[0],
         params: { branch_id: branchId, signatory_slug: signatorySlug },
       });
-      const primary = results.sm?.key ?? Object.values(results)[0]?.key;
+      const primary = results.md?.key ?? results.sm?.key ?? Object.values(results)[0]?.key;
       if (!primary) throw new Error('Upload returned no key');
 
       // Private media (CONFIDENTIAL access) — backend table constraint

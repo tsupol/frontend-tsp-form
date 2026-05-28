@@ -124,7 +124,7 @@ interface PresignCacheEntry {
 }
 const presignCache = new Map<string, PresignCacheEntry>();
 const presignInFlight = new Map<string, Promise<string>>();
-const CACHE_TTL_MS = 3.5 * 60 * 60 * 1000; // 3.5h, slightly below backend's 4h
+const CACHE_TTL_MS = 45 * 60 * 1000; // 45min, slightly below backend's 1h presign TTL
 
 export async function privateMediaUrl(key: string): Promise<string> {
   const k = normalizeKey(key);

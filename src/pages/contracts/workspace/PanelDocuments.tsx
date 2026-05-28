@@ -148,7 +148,10 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
         image: images[0],
         params: { contract_id: contractId, customer_id: customerId },
       });
-      const key = results.sm?.key ?? Object.values(results)[0]?.key;
+      // Signature spec emits a single size. Use a fallback chain so the
+      // upload survives any future relabel from the backend (was `sm`,
+      // currently `md`).
+      const key = results.md?.key ?? results.sm?.key ?? Object.values(results)[0]?.key;
       if (!key) throw new Error('Upload returned no key');
       await apiClient.rpc('fn_contract_document_upload', {
         p_contract_id: contractId,

@@ -1074,8 +1074,6 @@ function BuybackActionModal({
     },
   });
 
-  if (!action) return null;
-
   const isSubmit = action === 'submit';
   const isReject = action === 'reject';
   // Submit requires at least one identifier (Serial is always allowed; IMEI when applicable).
@@ -1087,7 +1085,7 @@ function BuybackActionModal({
     <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
       <div className="flex flex-col overflow-hidden">
         <div className="modal-header">
-          <h2 className="modal-title">{titleMap[action]}</h2>
+          <h2 className="modal-title">{action ? titleMap[action] : ''}</h2>
           <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
         </div>
         <div className="modal-content">
@@ -1164,7 +1162,7 @@ function BuybackActionModal({
             onClick={() => mutation.mutate()}
             disabled={!canSubmit}
           >
-            {mutation.isPending ? t('common.loading') : titleMap[action]}
+            {mutation.isPending ? t('common.loading') : (action ? titleMap[action] : '')}
           </Button>
         </div>
       </div>

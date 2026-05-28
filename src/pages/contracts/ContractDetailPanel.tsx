@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Badge, Button, Input, Select, Modal, TextArea, Tooltip, useSnackbarContext } from 'tsp-form';
-import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Upload, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Copy, Check, Minus, Pencil, Truck, CheckCircle, XCircle, Loader2, Upload, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, AlertTriangle } from 'lucide-react';
 import { useGenerateContractPdfServer } from './useGenerateContractPdfServer';
 import { GenerateContractPdfModal } from './GenerateContractPdfModal';
 import { useNavigate } from 'react-router-dom';
@@ -552,8 +552,6 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
     contract.device_id == null &&
     !contract.is_used_asset;
   const [copiedField, setCopiedField] = useState<string | null>(null);
-  const [lightboxKey, setLightboxKey] = useState<string | null>(null);
-  const [lightboxAlt, setLightboxAlt] = useState<string>('');
   const { generating: printingPdf } = useGenerateContractPdfServer();
   const [pdfModalOpen, setPdfModalOpen] = useState(false);
   const [printBlockOpen, setPrintBlockOpen] = useState(false);
@@ -695,53 +693,18 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
           </Tooltip>
         </div>
         <div className="flex flex-wrap gap-4">
-          <div className="flex flex-col gap-1">
-            <div className="text-xs text-subtle">{t('contract.idCard', { defaultValue: 'ID card' })}</div>
-            {idCardKey ? (
-              <MediaThumbButton
-                mediaKey={idCardKey}
-                alt={t('contract.idCard', { defaultValue: 'ID card' })}
-                className="w-32 aspect-[4/3] rounded border border-line overflow-hidden cursor-zoom-in hover:opacity-80 transition-opacity bg-surface-shallow"
-                fit="contain"
-                onClick={() => {
-                  setLightboxKey(idCardKey);
-                  setLightboxAlt(t('contract.idCard', { defaultValue: 'ID card' }));
-                }}
-              />
-            ) : (
-              <div className="w-32 aspect-[4/3] rounded border border-dashed border-line flex items-center justify-center text-subtler">
-                <IdCard size={20} />
-              </div>
-            )}
-          </div>
-          <div className="flex flex-col gap-1">
-            <div className="text-xs text-subtle">{t('contract.signature', { defaultValue: 'Signature' })}</div>
-            {signatureKey ? (
-              <MediaThumbButton
-                mediaKey={signatureKey}
-                alt={t('contract.signature', { defaultValue: 'Signature' })}
-                className="w-32 aspect-[4/3] rounded border border-line overflow-hidden cursor-zoom-in hover:opacity-80 transition-opacity bg-surface-shallow"
-                fit="contain"
-                onClick={() => {
-                  setLightboxKey(signatureKey);
-                  setLightboxAlt(t('contract.signature', { defaultValue: 'Signature' }));
-                }}
-              />
-            ) : (
-              <div className="w-32 aspect-[4/3] rounded border border-dashed border-line flex items-center justify-center text-subtler">
-                <Pencil size={20} />
-              </div>
-            )}
-          </div>
+          <DocumentPresence
+            icon={<IdCard size={14} />}
+            label={t('contract.idCard', { defaultValue: 'ID card' })}
+            present={!!idCardKey}
+          />
+          <DocumentPresence
+            icon={<Pencil size={14} />}
+            label={t('contract.signature', { defaultValue: 'Signature' })}
+            present={!!signatureKey}
+          />
         </div>
       </div>
-
-      <MediaLightbox
-        open={lightboxKey != null}
-        onClose={() => setLightboxKey(null)}
-        mediaKey={lightboxKey}
-        alt={lightboxAlt}
-      />
 
       {/* Financial summary */}
       <div className="border border-line rounded-md px-4 py-3">
@@ -1988,6 +1951,26 @@ function InfoCell({ label, value, highlight }: { label: string; value: React.Rea
     <div>
       <div className="text-xs text-subtle">{label}</div>
       <div className={`text-sm font-medium tabular-nums ${highlight ? 'text-danger' : ''}`}>{value}</div>
+    </div>
+  );
+}
+
+function DocumentPresence({
+  icon,
+  label,
+  present,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  present: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 rounded border border-line bg-surface-shallow">
+      <span className="text-subtle shrink-0">{icon}</span>
+      <span className="text-sm">{label}</span>
+      {present
+        ? <Check size={14} className="text-success-fg shrink-0" />
+        : <Minus size={14} className="text-subtler shrink-0" />}
     </div>
   );
 }

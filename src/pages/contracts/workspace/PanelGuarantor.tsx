@@ -514,7 +514,7 @@ function GuarantorRow({ guarantor, contractId, expanded, onToggle, onRemove, rem
         image: images[0],
         params: { contract_id: contractId, customer_id: guarantor.customerId },
       });
-      const key = results.sm?.key ?? Object.values(results)[0]?.key;
+      const key = results.md?.key ?? results.sm?.key ?? Object.values(results)[0]?.key;
       if (!key) throw new Error('Upload returned no key');
       await apiClient.rpc('fn_contract_document_upload', {
         p_contract_id: contractId, p_doc_type: 'SIGNATURE_PAD', p_file_url: `/${key}`,
