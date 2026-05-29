@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button } from 'tsp-form';
 import type { UploadedImage } from 'tsp-form';
 import { XCircle, CreditCard, Eye, ScrollText, AlertTriangle, PenLine, CheckCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';

@@ -277,11 +277,6 @@ function ReadOnlyRow({ label, value, colSpan }: { label: string; value: React.Re
   );
 }
 
-function yesNo(v: boolean | undefined, t: (k: string, opts?: Record<string, unknown>) => string): string {
-  if (v == null) return '—';
-  return v ? t('common.yes', { defaultValue: 'Yes' }) : t('common.no', { defaultValue: 'No' });
-}
-
 // "Has / does not have" — matches how the contract PDF prints handover items
 // (มี / ไม่มี) so the modal labels read the same as the printed document.
 function hasOrNot(v: boolean | undefined, t: (k: string, opts?: Record<string, unknown>) => string): string {
