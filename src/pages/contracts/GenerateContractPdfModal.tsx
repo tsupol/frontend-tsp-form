@@ -196,9 +196,9 @@ export function GenerateContractPdfModal({ open, onClose, contract }: Props) {
           <section className="flex flex-col gap-2">
             <div className="text-xs font-semibold text-subtle uppercase tracking-wider">{t('workspace.cardHandover')}</div>
             <div className="grid grid-cols-2 gap-2 text-sm">
-              <ReadOnlyRow label={t('workspace.handoverHasBox')} value={yesNo(handover?.has_box, t)} />
-              <ReadOnlyRow label={t('workspace.handoverHasChargerSet')} value={yesNo(handover?.has_charger_set, t)} />
-              <ReadOnlyRow label={t('workspace.handoverHasChargerCable')} value={yesNo(handover?.has_charger_cable, t)} />
+              <ReadOnlyRow label={t('workspace.handoverHasBox')} value={hasOrNot(handover?.has_box, t)} />
+              <ReadOnlyRow label={t('workspace.handoverHasChargerSet')} value={hasOrNot(handover?.has_charger_set, t)} />
+              <ReadOnlyRow label={t('workspace.handoverHasChargerCable')} value={hasOrNot(handover?.has_charger_cable, t)} />
               <ReadOnlyRow label={t('contract.batteryHealth', { defaultValue: 'Battery health (%)' })} value={batteryDisplay} />
               <ReadOnlyRow label={t('workspace.handoverUnlockCode')} value={handover?.device_unlock_code || '—'} colSpan={2} />
             </div>
@@ -280,6 +280,13 @@ function ReadOnlyRow({ label, value, colSpan }: { label: string; value: React.Re
 function yesNo(v: boolean | undefined, t: (k: string, opts?: Record<string, unknown>) => string): string {
   if (v == null) return '—';
   return v ? t('common.yes', { defaultValue: 'Yes' }) : t('common.no', { defaultValue: 'No' });
+}
+
+// "Has / does not have" — matches how the contract PDF prints handover items
+// (มี / ไม่มี) so the modal labels read the same as the printed document.
+function hasOrNot(v: boolean | undefined, t: (k: string, opts?: Record<string, unknown>) => string): string {
+  if (v == null) return '—';
+  return v ? t('common.has', { defaultValue: 'Has' }) : t('common.doesNotHave', { defaultValue: 'Does not have' });
 }
 
 function surfaceError(err: unknown, t: (k: string, opts?: Record<string, unknown>) => string, addSnackbar: (s: { message: React.ReactNode; type?: 'success' | 'error' }) => void) {

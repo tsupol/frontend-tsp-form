@@ -97,8 +97,7 @@ export function SingleUpload({ icon, label, fileUrl, uploading, onUpload, disabl
 
       {fileUrl ? (
         <div
-          className="relative group cursor-pointer rounded-lg border-2 border-transparent hover:border-primary transition-colors overflow-hidden"
-          style={{ maxWidth: '20rem' }}
+          className="relative group cursor-pointer rounded-lg border border-line hover:border-primary transition-colors overflow-hidden w-full h-40 bg-surface-shallow flex items-center justify-center"
           onClick={handleClick}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
@@ -108,10 +107,10 @@ export function SingleUpload({ icon, label, fileUrl, uploading, onUpload, disabl
             <img
               src={displayUrl}
               alt=""
-              className="w-full h-auto rounded-lg"
+              className="max-w-full max-h-full object-contain"
             />
           ) : (
-            <div className="w-full h-40 bg-surface-shallow animate-pulse rounded-lg" />
+            <div className="w-full h-full animate-pulse" />
           )}
           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
             <span className="text-white text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5">
@@ -122,8 +121,7 @@ export function SingleUpload({ icon, label, fileUrl, uploading, onUpload, disabl
         </div>
       ) : (
         <div
-          className="flex items-center justify-center gap-2 py-4 px-6 border-2 border-dashed border-line rounded-lg cursor-pointer hover:border-primary hover:bg-surface-hover transition-colors text-subtle text-sm"
-          style={{ maxWidth: '20rem' }}
+          className="flex items-center justify-center gap-2 border-2 border-dashed border-line rounded-lg cursor-pointer hover:border-primary hover:bg-surface-hover transition-colors text-subtle text-sm w-full h-40"
           onClick={handleClick}
           onDrop={handleDrop}
           onDragOver={handleDragOver}

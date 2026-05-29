@@ -14,6 +14,10 @@ interface Props {
   disabled?: boolean;
   cacheBust?: number;
   onUpload: (imgs: UploadedImage[]) => void;
+  // When true, skip the "saved view + Replace button" intermediate state and
+  // render the capture UI directly. Used inside the sign modal where the user
+  // already clicked "sign" — showing a Replace button there is redundant.
+  startInEditing?: boolean;
 }
 
 function fileToUploadedImage(file: File, w: number, h: number, blob: Blob, originalFile?: File): UploadedImage {
@@ -58,7 +62,7 @@ async function resizePhotoToWebp(file: File): Promise<UploadedImage> {
   });
 }
 
-export function SignatureCapture({ fileUrl, uploading, disabled, cacheBust = 0, onUpload }: Props) {
+export function SignatureCapture({ fileUrl, uploading, disabled, cacheBust = 0, onUpload, startInEditing = false }: Props) {
   const { t } = useTranslation();
   const { url: displayUrl } = useMediaUrl(fileUrl, cacheBust);
   const [mode, setMode] = useState<SigMode>('draw');
@@ -108,8 +112,9 @@ export function SignatureCapture({ fileUrl, uploading, disabled, cacheBust = 0, 
     if (f) handlePhotoFile(f);
   };
 
-  // Saved view — show preview + Replace button
-  if (fileUrl && !editing) {
+  // Saved view — show preview + Replace button.
+  // Skipped when startInEditing is set (e.g. inside the sign modal).
+  if (fileUrl && !editing && !startInEditing) {
     return (
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2 mb-1">

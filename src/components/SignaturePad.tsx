@@ -33,7 +33,7 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
     const containerRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const padRef = useRef<SignaturePadLib | null>(null);
-    const [isEmpty, setIsEmpty] = useState(true);
+    const [, setIsEmpty] = useState(true);
 
     useEffect(() => {
       const canvas = canvasRef.current;
@@ -148,11 +148,6 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
         style={{ touchAction: 'none' }}
       >
         <canvas ref={canvasRef} className="block w-full h-full" />
-        {isEmpty && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-fg-muted select-none">
-            Sign here
-          </div>
-        )}
       </div>
     );
   },

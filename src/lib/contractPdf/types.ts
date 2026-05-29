@@ -83,6 +83,10 @@ export interface ContractPdfInput {
 
   // ID-card image embedded on page 3 above the "สำเนาถูกต้อง" heading
   lesseeIdCardDataUrl: string | null;
+
+  // Preview mode: server skips the lessee signature when true. Used for the
+  // staff "show the customer before signing" flow.
+  preview?: boolean;
 }
 
 // Resolve asset-vs-override into the values the renderer actually prints.
