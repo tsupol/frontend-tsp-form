@@ -143,7 +143,19 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
                   <div className="text-xs text-subtle">{t('contract.deviceModel')}</div>
                   <div className="text-sm">{contract.variant_name ?? contract.model_name ?? '—'}</div>
                 </div>
-                {contract.device_identifier && (
+                {primaryAsset?.imei && (
+                  <div>
+                    <div className="text-xs text-subtle">IMEI</div>
+                    <div className="text-sm font-mono">{primaryAsset.imei}</div>
+                  </div>
+                )}
+                {primaryAsset?.serial_no && (
+                  <div>
+                    <div className="text-xs text-subtle">SN</div>
+                    <div className="text-sm font-mono">{primaryAsset.serial_no}</div>
+                  </div>
+                )}
+                {!primaryAsset && contract.device_identifier && (
                   <div>
                     <div className="text-xs text-subtle">IMEI / SN</div>
                     <div className="text-sm font-mono">{contract.device_identifier}</div>
@@ -308,10 +320,16 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
                     <div className="text-sm">{loanerAsset.variant_name}</div>
                   </div>
                 )}
-                {(loanerAsset?.serial_no || loanerAsset?.imei) && (
+                {loanerAsset?.imei && (
                   <div>
-                    <div className="text-xs text-subtle">IMEI / SN</div>
-                    <div className="text-sm font-mono">{loanerAsset.imei || loanerAsset.serial_no}</div>
+                    <div className="text-xs text-subtle">IMEI</div>
+                    <div className="text-sm font-mono">{loanerAsset.imei}</div>
+                  </div>
+                )}
+                {loanerAsset?.serial_no && (
+                  <div>
+                    <div className="text-xs text-subtle">SN</div>
+                    <div className="text-sm font-mono">{loanerAsset.serial_no}</div>
                   </div>
                 )}
               </div>

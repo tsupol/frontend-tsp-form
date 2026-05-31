@@ -23,6 +23,8 @@ export interface ContractSearchResult {
   branch_id: number;
   branch_name: string;
   device_id: number | null;
+  device_primary_identifier: string | null;
+  device_serial: string | null;
   device_imei: string | null;
   asset_code: string | null;
   device_code_display: string | null;

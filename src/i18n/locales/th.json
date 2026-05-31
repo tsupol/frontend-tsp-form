@@ -1936,7 +1936,7 @@
     "state_VOIDED": "ยกเลิกในวัน",
     "state_CANCELLED": "ยกเลิกร่าง",
     "state_EXPIRED": "หมดอายุ",
-    "searchPlaceholder": "ค้นหาสัญญา, ลูกค้า, IMEI...",
+    "searchPlaceholder": "รหัสสัญญา / ชื่อลูกค้า / เบอร์ / รหัส asset / สแกน Serial หรือ IMEI",
     "allStates": "ทุกสถานะ",
     "allBranches": "ทุกสาขา",
     "selectToView": "เลือกสัญญาเพื่อดูรายละเอียด",

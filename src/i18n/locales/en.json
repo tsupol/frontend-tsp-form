@@ -1936,7 +1936,7 @@
     "state_VOIDED": "Voided",
     "state_CANCELLED": "Cancelled",
     "state_EXPIRED": "Expired",
-    "searchPlaceholder": "Search contract, customer, IMEI...",
+    "searchPlaceholder": "Contract / customer / phone / asset code / scan Serial or IMEI",
     "allStates": "All States",
     "allBranches": "All Branches",
     "selectToView": "Select a contract to view details",
