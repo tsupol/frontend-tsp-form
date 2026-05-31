@@ -17,6 +17,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { getBucketLabel, getBucketColor, fmtNum, codeDisplay } from './inventoryUtils';
 import { ActionDoneView } from '../contracts/ActionDoneView';
+import { ColorAutocomplete, ColorMatchBadge } from '../../components/ColorAutocomplete';
 
 // ============================================================================
 // Types — verified against live API 2026-05-08
@@ -1002,6 +1003,15 @@ interface DeviceRow {
   imei: string;
   condition_grade: string;
   physical_color: string;
+  external_ref: string;
+}
+
+/** If the string ends with a run of digits, return [prefix, number, width].
+ *  "PO-3000" → ["PO-", 3000, 4]. "abc" → null. Pads back to original width. */
+function splitTrailingNumber(s: string): { prefix: string; num: number; width: number } | null {
+  const m = /^(.*?)(\d+)$/.exec(s);
+  if (!m) return null;
+  return { prefix: m[1], num: parseInt(m[2], 10), width: m[2].length };
 }
 
 interface BatchRowError {
@@ -1104,9 +1114,9 @@ function LotActionModal({
     imei: '',
     condition_grade: 'NEW',
     physical_color: '',
+    external_ref: '',
   });
   const [devices, setDevicesState] = useState<DeviceRow[]>([newDeviceRow()]);
-  const [externalRef, setExternalRefState] = useState('');
   const [validation, setValidation] = useState<BatchValidateData | null>(null);
 
   // Any edit invalidates the prior batch_validate result — admin must re-validate
@@ -1114,10 +1124,6 @@ function LotActionModal({
   const setDevices: typeof setDevicesState = (next) => {
     setValidation(null);
     setDevicesState(next);
-  };
-  const setExternalRef: typeof setExternalRefState = (next) => {
-    setValidation(null);
-    setExternalRefState(next);
   };
 
   // Transfer-create state
@@ -1137,7 +1143,6 @@ function LotActionModal({
       setView('form');
       setResult(null);
       setDevices([newDeviceRow()]);
-      setExternalRef('');
       setValidation(null);
       setToBranchId(null);
       setTransferMode('FREE_TRANSFER');
@@ -1189,7 +1194,8 @@ function LotActionModal({
 
   /** Build p_devices payload from rows. Empty values become missing identifiers
    *  so the backend can flag IMEI_REQUIRED_FOR_MODEL per-row. Each device sends
-   *  only the identifier types that were actually filled in. */
+   *  only the identifier types that were actually filled in.
+   *  external_ref is per-device (1:1) — the backend stores it on each asset. */
   const buildDevicesPayload = () => devices.map(d => {
     const ids: { type: string; value: string }[] = [];
     if (d.serial.trim()) ids.push({ type: 'SERIAL_NO', value: d.serial.trim() });
@@ -1198,9 +1204,39 @@ function LotActionModal({
       identifiers: ids,
       condition_grade: d.condition_grade || 'NEW',
       physical_color: d.physical_color.trim() || null,
-      external_ref: externalRef.trim() || null,
+      external_ref: d.external_ref.trim() || null,
     };
   });
+
+  /** Edit row[idx].external_ref. If the new value ends in a number, auto-fill
+   *  any *empty* downstream rows with +1, +2, ... so admin can type once and
+   *  let the rest cascade. Rows that already have a value are left alone. */
+  const setRowExternalRef = (idx: number, next: string) => {
+    setDevices(devices.map((r, i) => {
+      if (i === idx) return { ...r, external_ref: next };
+      if (i < idx) return r;
+      // Downstream row — only auto-fill if it's currently empty.
+      if (r.external_ref.trim()) return r;
+      const seed = splitTrailingNumber(next);
+      if (!seed) return r;
+      const offset = i - idx;
+      const nextNum = String(seed.num + offset).padStart(seed.width, '0');
+      return { ...r, external_ref: `${seed.prefix}${nextNum}` };
+    }));
+  };
+
+  /** Add a new device row. If the last row has a numeric-tail external_ref,
+   *  seed the new row with +1. */
+  const addDeviceRow = () => {
+    const fresh = newDeviceRow();
+    const lastRef = devices[devices.length - 1]?.external_ref ?? '';
+    const seed = splitTrailingNumber(lastRef);
+    if (seed) {
+      const nextNum = String(seed.num + 1).padStart(seed.width, '0');
+      fresh.external_ref = `${seed.prefix}${nextNum}`;
+    }
+    setDevices([...devices, fresh]);
+  };
 
   /** Row is "ready for submit" only when at least one identifier is filled. */
   const rowsReady = devices.every(d => d.serial.trim() || d.imei.trim());
@@ -1501,14 +1537,31 @@ function LotActionModal({
                               />
                             </div>
                             <div className="flex-1 min-w-0 flex flex-col">
-                              <label className="form-label">{t('convert.physicalColor', { ns: 'lotActions', defaultValue: 'Physical color' })}</label>
-                              <Input
+                              <div className="flex items-center justify-between gap-2">
+                                <label className="form-label">{t('convert.physicalColor', { ns: 'lotActions', defaultValue: 'Physical color' })}</label>
+                                <ColorMatchBadge value={row.physical_color} />
+                              </div>
+                              <ColorAutocomplete
                                 value={row.physical_color}
-                                onChange={(e) => setDevices(devices.map((r, i) => i === idx ? { ...r, physical_color: e.target.value } : r))}
+                                onChange={(next) => setDevices(devices.map((r, i) => i === idx ? { ...r, physical_color: next } : r))}
                                 placeholder={t('convert.physicalColorPlaceholder', { ns: 'lotActions', defaultValue: 'Optional' })}
-                                className="w-full"
                               />
                             </div>
+                          </div>
+
+                          <div className="flex flex-col">
+                            <label className="form-label">{t('convert.externalRef', { ns: 'lotActions', defaultValue: 'External reference' })}</label>
+                            <Input
+                              value={row.external_ref}
+                              onChange={(e) => setRowExternalRef(idx, e.target.value)}
+                              placeholder={t('convert.externalRefPlaceholder', { ns: 'lotActions', defaultValue: 'Optional PO line / external ID' })}
+                              className="w-full"
+                            />
+                            {idx === 0 && (
+                              <div className="text-xs text-subtle mt-1">
+                                {t('convert.externalRefHint', { ns: 'lotActions', defaultValue: 'If it ends with a number, the next rows auto-increment' })}
+                              </div>
+                            )}
                           </div>
 
                           {rowInvalid && rowResult && (
@@ -1530,22 +1583,12 @@ function LotActionModal({
                     variant="outline"
                     size="sm"
                     startIcon={<Plus size={14} />}
-                    onClick={() => setDevices([...devices, newDeviceRow()])}
+                    onClick={addDeviceRow}
                     disabled={devices.length >= lot.qty_on_hand}
                     className="self-start"
                   >
                     {t('convert.addDevice', { ns: 'lotActions', defaultValue: 'Add device' })}
                   </Button>
-
-                  <div className="flex flex-col">
-                    <label className="form-label">{t('convert.externalRef', { ns: 'lotActions', defaultValue: 'External reference' })}</label>
-                    <Input
-                      value={externalRef}
-                      onChange={(e) => setExternalRef(e.target.value)}
-                      placeholder={t('convert.externalRefPlaceholder', { ns: 'lotActions', defaultValue: 'Optional PO line / external ID — shared across all devices' })}
-                      className="w-full"
-                    />
-                  </div>
                 </div>
               </>
             )}
