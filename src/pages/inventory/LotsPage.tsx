@@ -171,6 +171,7 @@ export function LotsPage() {
     ? Number(searchParams.get('branch_id'))
     : defaultBranchId;
   const initialBucket = searchParams.get('bucket');
+  const initialPoId = searchParams.get('po_id') ? Number(searchParams.get('po_id')) : null;
 
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -178,6 +179,7 @@ export function LotsPage() {
   const [filterBranchId, setFilterBranchId] = useState<number | null>(initialBranchId);
   const [filterPoType, setFilterPoType] = useState<string | null>(null);
   const [filterContractable, setFilterContractable] = useState<string | null>(null);
+  const [filterPoId, setFilterPoId] = useState<number | null>(initialPoId);
   const [filterPopoverOpen, setFilterPopoverOpen] = useState(false);
   const filterTriggerRef = useRef<HTMLButtonElement>(null);
   const [pageIndex, setPageIndex] = useState(0);
@@ -228,13 +230,14 @@ export function LotsPage() {
   );
 
   const { data: listData, isFetching } = useQuery({
-    queryKey: ['lots', debouncedSearch, filterBucket, filterBranchId, filterPoType, filterContractable, pageIndex, pageSize],
+    queryKey: ['lots', debouncedSearch, filterBucket, filterBranchId, filterPoType, filterContractable, filterPoId, pageIndex, pageSize],
     queryFn: () => {
       let url = '/v_stock_lots?order=created_at.desc';
       if (filterBucket) url += `&current_bucket=eq.${filterBucket}`;
       if (filterBranchId) url += `&branch_id=eq.${filterBranchId}`;
       if (filterPoType) url += `&po_type=eq.${filterPoType}`;
       if (filterContractable) url += `&is_contractable=is.${filterContractable}`;
+      if (filterPoId) url += `&po_id=eq.${filterPoId}`;
       if (debouncedSearch) {
         url += `&or=(lot_code.ilike.*${encodeURIComponent(debouncedSearch)}*,variant_sku_code.ilike.*${encodeURIComponent(debouncedSearch)}*,model_name.ilike.*${encodeURIComponent(debouncedSearch)}*,po_no.ilike.*${encodeURIComponent(debouncedSearch)}*)`;
       }
@@ -246,7 +249,7 @@ export function LotsPage() {
   const list = listData?.data ?? [];
   const totalCount = listData?.totalCount ?? 0;
 
-  useEffect(() => { setPageIndex(0); }, [debouncedSearch, filterBucket, filterBranchId, filterPoType, filterContractable]);
+  useEffect(() => { setPageIndex(0); }, [debouncedSearch, filterBucket, filterBranchId, filterPoType, filterContractable, filterPoId]);
 
   // Detail uses the same view (no v_lot_detail exists). Fetch by id even if
   // not in the current page, so direct deep-link `/lots/123` still works.
@@ -305,6 +308,19 @@ export function LotsPage() {
           {/* ── Filter bar — full-width, spans both panels (pricebook pattern) ── */}
           {(isRoot || !isMobile) && (
             <div className="flex-none p-2 border-b border-line">
+              {filterPoId != null && (
+                <div className="mb-2 flex items-center gap-2 text-xs">
+                  <span className="text-subtle">{t('common.filters')}:</span>
+                  <button
+                    type="button"
+                    onClick={() => setFilterPoId(null)}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-line bg-surface-subtle hover:bg-surface-hover"
+                  >
+                    <span>{t('po.po', { defaultValue: 'PO' })}: {list[0]?.po_no ?? `#${filterPoId}`}</span>
+                    <XCircle size={12} />
+                  </button>
+                </div>
+              )}
               <div className="flex items-center gap-2 w-full">
                 <div className="flex-1 min-w-0">
                   <Input

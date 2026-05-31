@@ -771,10 +771,13 @@ function PoLineRow({
     <div className="px-4 py-2.5 border-b border-line flex items-center gap-3">
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium truncate">
-          {[line.brand_name, line.family_name, line.model_name].filter(Boolean).join(' ')}
+          {[line.brand_name, line.family_name].filter(Boolean).join(' ')}
         </div>
-        <div className="text-xs text-subtle truncate">
-          {line.variant_name} · {line.sku_code}
+        <div className="text-xs text-subtle font-semibold truncate mt-1">
+          {line.variant_name}
+        </div>
+        <div className="text-[11px] text-subtler font-mono truncate">
+          {line.sku_code}
         </div>
       </div>
       <div className="text-right shrink-0">
@@ -1086,6 +1089,7 @@ function CreatePoModal({
             secondaryAction={{
               label: t('po.openPo', { defaultValue: 'Open PO' }),
               onClick: () => { onCreated(result.po_id); },
+              endIcon: <ExternalLink size={12} />,
             }}
             onClose={onClose}
           />
@@ -1689,6 +1693,7 @@ function CreateReceiptModal({
                 onClose();
                 navigate(`/admin/inventory/receiving/${result.receipt_id}`);
               },
+              endIcon: <ExternalLink size={12} />,
             }}
             onClose={onClose}
           />
