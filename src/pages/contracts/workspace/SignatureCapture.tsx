@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from 'tsp-form';
 import type { UploadedImage } from 'tsp-form';
-import { CheckCircle, PenLine, Upload, Camera, Eraser, Undo2, Save } from 'lucide-react';
+import { CheckCircle, PenLine, Upload, Camera, Eraser, Undo2, Save, Loader2 } from 'lucide-react';
 import { useMediaUrl } from '../../../hooks/useMediaUrl';
 import { SignaturePad, type SignaturePadHandle } from '../../../components/SignaturePad';
 
@@ -68,15 +68,23 @@ export function SignatureCapture({ fileUrl, uploading, disabled, cacheBust = 0, 
   const [mode, setMode] = useState<SigMode>('draw');
   const [editing, setEditing] = useState(false);
   const [sigEmpty, setSigEmpty] = useState(true);
+  const [justSaved, setJustSaved] = useState(false);
   const padRef = useRef<SignaturePadHandle>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const wasUploadingRef = useRef(false);
 
-  // When an upload completes successfully, exit editing mode so the new preview shows.
+  // When an upload completes successfully, flash a transient "saved" state on
+  // the action button, then exit editing mode so the new preview shows.
   useEffect(() => {
     if (wasUploadingRef.current && !uploading && fileUrl) {
-      setEditing(false);
+      setJustSaved(true);
+      const t = setTimeout(() => {
+        setJustSaved(false);
+        setEditing(false);
+      }, 1000);
+      wasUploadingRef.current = uploading;
+      return () => clearTimeout(t);
     }
     wasUploadingRef.current = uploading;
   }, [uploading, fileUrl]);
@@ -124,7 +132,9 @@ export function SignatureCapture({ fileUrl, uploading, disabled, cacheBust = 0, 
           {uploading && <span className="text-xs text-subtle">{t('common.loading')}</span>}
         </div>
         <div
-          className="border border-line rounded-lg overflow-hidden bg-white aspect-[3/1] w-full flex items-center justify-center"
+          className={`relative border rounded-lg overflow-hidden bg-white aspect-[3/1] w-full flex items-center justify-center transition-colors ${
+            justSaved ? 'border-success ring-2 ring-success/30' : 'border-line'
+          }`}
         >
           {displayUrl ? (
             <img
@@ -134,6 +144,11 @@ export function SignatureCapture({ fileUrl, uploading, disabled, cacheBust = 0, 
             />
           ) : (
             <div className="w-full h-full bg-surface-shallow animate-pulse" />
+          )}
+          {justSaved && (
+            <div className="absolute inset-0 bg-success/10 flex items-center justify-center pointer-events-none">
+              <CheckCircle size={32} className="text-success drop-shadow" />
+            </div>
           )}
         </div>
         <div>
@@ -186,8 +201,15 @@ export function SignatureCapture({ fileUrl, uploading, disabled, cacheBust = 0, 
 
       {mode === 'draw' && (
         <div className="flex flex-col gap-2">
-          <div className="border border-line rounded-lg overflow-hidden bg-white aspect-[3/1] w-full">
+          <div className={`relative border rounded-lg overflow-hidden bg-white aspect-[3/1] w-full transition-colors ${
+            justSaved ? 'border-success ring-2 ring-success/30' : 'border-line'
+          }`}>
             <SignaturePad ref={padRef} onChange={setSigEmpty} />
+            {justSaved && (
+              <div className="absolute inset-0 bg-success/10 flex items-center justify-center pointer-events-none">
+                <CheckCircle size={32} className="text-success drop-shadow" />
+              </div>
+            )}
           </div>
           <div className="flex flex-wrap gap-2">
             <Button
@@ -205,25 +227,42 @@ export function SignatureCapture({ fileUrl, uploading, disabled, cacheBust = 0, 
               {t('workspace.sigClear')}
             </Button>
             <Button
-              color="primary"
+              color={justSaved ? 'success' : 'primary'}
               onClick={handleDrawSave}
-              disabled={sigEmpty || uploading || disabled}
-              startIcon={<Save size={16} />}
+              disabled={sigEmpty || uploading || disabled || justSaved}
+              startIcon={
+                justSaved ? <CheckCircle size={16} />
+                : uploading ? <Loader2 size={16} className="animate-spin" />
+                : <Save size={16} />
+              }
             >
-              {uploading ? t('common.loading') : t('workspace.sigSave')}
+              {justSaved ? t('common.saved') : uploading ? t('common.saving') : t('workspace.sigSave')}
             </Button>
           </div>
         </div>
       )}
 
       {mode === 'upload' && (
-        <div className="flex flex-col items-start gap-2">
+        <div className="flex flex-col items-start gap-2 w-full">
           <div
-            className="flex items-center justify-center gap-2 py-4 px-6 border-2 border-dashed border-line rounded-lg cursor-pointer hover:border-primary hover:bg-surface-hover transition-colors text-subtle text-sm w-full"
-            onClick={() => !disabled && !uploading && uploadInputRef.current?.click()}
+            className={`flex items-center justify-center gap-2 py-4 px-6 border-2 border-dashed rounded-lg cursor-pointer transition-colors text-sm w-full ${
+              justSaved
+                ? 'border-success bg-success/10 text-success'
+                : 'border-line text-subtle hover:border-primary hover:bg-surface-hover'
+            }`}
+            onClick={() => !disabled && !uploading && !justSaved && uploadInputRef.current?.click()}
           >
-            <Upload size={16} className="opacity-50" />
-            <span>{t('workspace.clickOrDrag')}</span>
+            {justSaved ? (
+              <>
+                <CheckCircle size={16} />
+                <span>{t('common.saved')}</span>
+              </>
+            ) : (
+              <>
+                <Upload size={16} className="opacity-50" />
+                <span>{t('workspace.clickOrDrag')}</span>
+              </>
+            )}
           </div>
           <input
             ref={uploadInputRef}
@@ -240,12 +279,16 @@ export function SignatureCapture({ fileUrl, uploading, disabled, cacheBust = 0, 
         <div className="flex flex-col items-start gap-2">
           <div className="flex items-center justify-center gap-3 border-2 border-dashed border-line rounded-lg py-6 w-full">
             <Button
-              color="primary"
+              color={justSaved ? 'success' : 'primary'}
               onClick={() => cameraInputRef.current?.click()}
-              disabled={disabled || uploading}
-              startIcon={<Camera size={16} />}
+              disabled={disabled || uploading || justSaved}
+              startIcon={
+                justSaved ? <CheckCircle size={16} />
+                : uploading ? <Loader2 size={16} className="animate-spin" />
+                : <Camera size={16} />
+              }
             >
-              {uploading ? t('common.loading') : t('workspace.sigTakePhoto')}
+              {justSaved ? t('common.saved') : uploading ? t('common.saving') : t('workspace.sigTakePhoto')}
             </Button>
           </div>
           <input

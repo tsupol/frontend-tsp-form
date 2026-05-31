@@ -2478,6 +2478,8 @@
     "guarantorSkipped": "Guarantor skipped",
     "guarantorNotNeeded": "Not needed (customer is 18+)",
     "guarantorRequired": "Required (customer is under 18)",
+    "guarantorSigOptionalNote": "Signing now is optional. The guarantor can sign together with the customer from the Documents step, or by hand on the printed contract.",
+    "guarantorSignature": "Guarantor signature",
     "needCustomerFirst": "Register customer first",
     "checkCustomer": "Check Customer",
     "citizenIdLength": "Citizen ID must be 13 digits",

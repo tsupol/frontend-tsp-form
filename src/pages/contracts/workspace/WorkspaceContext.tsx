@@ -297,20 +297,19 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { data: guarantorsAllComplete = false } = useQuery({
     queryKey: ['guarantor-all-complete', data.contractId, guarantorIds.join(',')],
     queryFn: async () => {
+      // Signature intentionally NOT required here — guarantors can sign in
+      // the same modal as the lessee from the Documents panel, or by hand
+      // on the printed contract.
       const results = await Promise.all(guarantorIds.map(async (custId) => {
-        const [addrs, idCard, sig, custInfo] = await Promise.all([
+        const [addrs, idCard, custInfo] = await Promise.all([
           apiClient.get<Array<{ address_type: string }>>(`/v_customer_addresses?customer_id=eq.${custId}&select=address_type`).catch(() => []),
           apiClient.get<Array<{ id: number }>>(`/v_customer_documents?customer_id=eq.${custId}&doc_type=eq.ID_CARD_FRONT&is_active=eq.true&select=id`).catch(() => []),
-          data.contractId
-            ? apiClient.get<Array<{ id: number }>>(`/v_contract_documents?contract_id=eq.${data.contractId}&customer_id=eq.${custId}&doc_type=eq.SIGNATURE_PAD&select=id`).catch(() => [])
-            : [],
           apiClient.get<Array<{ date_of_birth: string | null }>>(`/v_customers?id=eq.${custId}&select=date_of_birth`).catch(() => []),
         ]);
         return !!custInfo[0]?.date_of_birth
           && addrs.some(a => a.address_type === 'HOME')
           && addrs.some(a => a.address_type === 'WORK')
-          && idCard.length > 0
-          && sig.length > 0;
+          && idCard.length > 0;
       }));
       return results.every(Boolean);
     },

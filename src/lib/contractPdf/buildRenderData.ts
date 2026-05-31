@@ -162,7 +162,7 @@ export async function buildContractRenderData(
     throw new Error('contract has no customer');
   }
 
-  const [customers, addresses, references, assets, installments, sigDocs, idCardDocs, detailRows, bankAccounts, companyCfg] = await Promise.all([
+  const [customers, addresses, references, assets, installments, sigDocs, idCardDocs, detailRows, bankAccounts, companyCfg, guarantorRows] = await Promise.all([
     apiClient.get<CustomerRow[]>(`/v_customers?id=eq.${contract.customer_id}&select=id,prefix,first_name,last_name,full_name,id_number,tel`),
     apiClient.get<AddressRow[]>(`/v_customer_addresses?customer_id=eq.${contract.customer_id}&order=is_default.desc,address_type`),
     apiClient.get<ReferenceRow[]>(`/v_customer_references?customer_id=eq.${contract.customer_id}&is_active=is.true&order=id&limit=2`),
@@ -185,6 +185,9 @@ export async function buildContractRenderData(
     apiClient.get<Array<{ late_fee_per_day: number | null; late_fee_max_days: number | null; grace_period_days: number | null }>>(
       `/v_company_config?select=late_fee_per_day,late_fee_max_days,grace_period_days&limit=1`,
     ).catch(() => [] as Array<{ late_fee_per_day: number | null; late_fee_max_days: number | null; grace_period_days: number | null }>),
+    apiClient.get<Array<{ customer_id: number; customer_name: string }>>(
+      `/v_contract_customers?contract_id=eq.${contract.id}&role=eq.GUARANTOR&order=created_at&select=customer_id,customer_name`,
+    ).catch(() => [] as Array<{ customer_id: number; customer_name: string }>),
   ]);
 
   const customer = customers[0];
@@ -207,12 +210,28 @@ export async function buildContractRenderData(
   const w1MediaId = boundBySlot.WITNESS_1?.signature_media_id ?? null;
   const w2MediaId = boundBySlot.WITNESS_2?.signature_media_id ?? null;
 
-  const [lesseeSignatureDataUrl, lesseeIdCardDataUrl, lessorSig, w1Sig, w2Sig] = await Promise.all([
+  // Pair each guarantor with their signature row (if any) and resolve the
+  // signature image to a data URL. The line stays blank when unsigned so
+  // the contract can still be printed and signed by hand.
+  const guarantorSigByCustomer = new Map<number, string>();
+  for (const doc of sigDocs) {
+    if (doc.customer_id !== contract.customer_id) {
+      guarantorSigByCustomer.set(doc.customer_id, doc.file_url);
+    }
+  }
+
+  const [lesseeSignatureDataUrl, lesseeIdCardDataUrl, lessorSig, w1Sig, w2Sig, guarantorSigs] = await Promise.all([
     resolveMediaDataUrl(customerSigDoc?.file_url ?? null),
     resolveMediaDataUrl(idCardDocs[0]?.file_url ?? null),
     resolveSignatureByMediaId(lessorMediaId),
     resolveSignatureByMediaId(w1MediaId),
     resolveSignatureByMediaId(w2MediaId),
+    Promise.all(
+      guarantorRows.map(async (g) => ({
+        name: g.customer_name,
+        signatureDataUrl: await resolveMediaDataUrl(guarantorSigByCustomer.get(g.customer_id) ?? null),
+      })),
+    ),
   ]);
 
   const lessorNameAuto = boundBySlot.LESSOR ? `${boundBySlot.LESSOR.first_name} ${boundBySlot.LESSOR.last_name}` : '';
@@ -328,6 +347,7 @@ export async function buildContractRenderData(
     lessorName,
     witness1Name,
     witness2Name,
+    guarantors: guarantorSigs,
 
     bankName: bank.bank_name,
     bankAccountNumber: bank.account_number,

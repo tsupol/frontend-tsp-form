@@ -5,12 +5,14 @@ import { Input, Select, Button, InputDatePicker, MaskedInput, useSnackbarContext
 import type { UploadedImage } from 'tsp-form';
 import { ShieldAlert, CheckCircle, XCircle, Keyboard, Search, Loader2, Trash2, AlertTriangle, CreditCard, PenLine, ChevronDown, ChevronRight, Plus } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
-import { uploadFromImage } from '../../../lib/upload';
+import { uploadFromImage, invalidateMediaUrl } from '../../../lib/upload';
 import { toLocalDateStr, parseLocalDate, makeDatePickerFormat } from '../../../lib/format';
+import { useMediaUrl } from '../../../hooks/useMediaUrl';
 import { useWorkspace } from './WorkspaceContext';
 import { PanelSection } from './PanelSection';
 import { AddressFormPostal } from './AddressFormPostal';
 import { SingleUpload } from './SingleUpload';
+import { ContractSignModal } from './ContractSignModal';
 import type { CustomerRegisterResult, CustomerAddress } from './WorkspaceTypes';
 
 interface CustomerDocument {
@@ -360,9 +362,14 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
 
 // ── Section toggle header ─────────────────────────────────────────────────
 
-function SectionHeader({ label, done, expanded, onToggle }: {
+function SectionHeader({ label, done, expanded, onToggle, optional }: {
   label: string; done: boolean; expanded: boolean; onToggle: () => void;
+  // optional sections show a neutral empty circle instead of a warning icon
+  // when not done — used for the guarantor signature which can be captured
+  // later from the Documents panel.
+  optional?: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <>
       <div className="border-t border-line -mx-3" />
@@ -372,8 +379,17 @@ function SectionHeader({ label, done, expanded, onToggle }: {
         onClick={onToggle}
       >
         {expanded ? <ChevronDown size={13} className="text-subtle" /> : <ChevronRight size={13} className="text-subtle" />}
-        {done ? <CheckCircle size={13} className="text-success" /> : <AlertTriangle size={13} className="text-warning-fg" />}
+        {done
+          ? <CheckCircle size={13} className="text-success" />
+          : optional
+            ? <span className="w-3 h-3 rounded-full border-2 border-fg/30 inline-block" />
+            : <AlertTriangle size={13} className="text-warning-fg" />}
         <span>{label}</span>
+        {optional && !done && (
+          <span className="ml-auto text-xs font-normal text-subtle pr-1">
+            ({t('common.optional', { defaultValue: 'optional' })})
+          </span>
+        )}
       </button>
     </>
   );
@@ -409,6 +425,7 @@ function GuarantorRow({ guarantor, contractId, expanded, onToggle, onRemove, rem
   const [cacheBust, setCacheBust] = useState(0);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [openSection, setOpenSection] = useState<string | null>('info');
+  const [signOpen, setSignOpen] = useState(false);
 
   // Fetch guarantor customer info
   const { data: custInfo, refetch: refetchCustInfo } = useQuery({
@@ -441,7 +458,9 @@ function GuarantorRow({ guarantor, contractId, expanded, onToggle, onRemove, rem
   const idCard = idCardDocs[0] ?? null;
   const signature = sigDocs[0] ?? null;
   const hasInfo = !!custInfo?.date_of_birth;
-  const isComplete = hasInfo && !!homeAddress && !!workAddress && !!idCard && !!signature;
+  // Signature is optional for guarantors — they can sign together with the
+  // lessee in the Documents panel, or by hand on the printed contract.
+  const isComplete = hasInfo && !!homeAddress && !!workAddress && !!idCard;
 
   const toggle = (section: string) => setOpenSection(openSection === section ? null : section);
 
@@ -520,6 +539,7 @@ function GuarantorRow({ guarantor, contractId, expanded, onToggle, onRemove, rem
         p_contract_id: contractId, p_doc_type: 'SIGNATURE_PAD', p_file_url: `/${key}`,
         p_customer_id: guarantor.customerId,
       });
+      invalidateMediaUrl(key);
       queryClient.invalidateQueries({ queryKey: ['guarantor-signature', contractId, guarantor.customerId] });
       queryClient.invalidateQueries({ queryKey: ['guarantor-status'] }); queryClient.invalidateQueries({ queryKey: ['guarantor-all-complete'] });
       setCacheBust(n => n + 1);
@@ -672,17 +692,95 @@ function GuarantorRow({ guarantor, contractId, expanded, onToggle, onRemove, rem
             )}
           </div>
 
-          {/* Signature */}
+          {/* Signature — optional. Can also be signed alongside the lessee
+              from the Documents panel, or by hand on the printed contract. */}
           <div className="px-3">
-            <SectionHeader label={t('workspace.docSignature')} done={!!signature} expanded={openSection === 'signature'} onToggle={() => toggle('signature')} />
+            <SectionHeader
+              label={t('workspace.docSignature')}
+              done={!!signature}
+              optional
+              expanded={openSection === 'signature'}
+              onToggle={() => toggle('signature')}
+            />
             {openSection === 'signature' && (
-              <div className="pt-2 pb-4">
-                <SingleUpload icon={<PenLine size={14} />} label={t('workspace.docSignature')} fileUrl={signature?.file_url ?? null} uploading={uploading === 'SIGNATURE'} onUpload={uploadSignature} disabled={!contractId} cacheBust={cacheBust} />
+              <div className="pt-2 pb-4 flex flex-col gap-2">
+                <p className="text-xs text-subtle leading-relaxed">
+                  {t('workspace.guarantorSigOptionalNote', {
+                    defaultValue:
+                      'Signing now is optional. The guarantor can sign together with the customer from the Documents step, or by hand on the printed contract.',
+                  })}
+                </p>
+                <GuarantorSignatureCard
+                  fileUrl={signature?.file_url ?? null}
+                  cacheBust={cacheBust}
+                  disabled={!contractId}
+                  onClick={() => setSignOpen(true)}
+                />
               </div>
             )}
           </div>
         </div>
       )}
+
+      <ContractSignModal
+        open={signOpen}
+        onClose={() => setSignOpen(false)}
+        fileUrl={signature?.file_url ?? null}
+        uploading={uploading === 'SIGNATURE'}
+        onUpload={uploadSignature}
+        disabled={!contractId}
+        cacheBust={cacheBust}
+        onSigned={() => setSignOpen(false)}
+      />
     </div>
+  );
+}
+
+function GuarantorSignatureCard({ fileUrl, cacheBust, disabled, onClick }: {
+  fileUrl: string | null;
+  cacheBust: number;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  const { t } = useTranslation();
+  const { url: displayUrl } = useMediaUrl(fileUrl, cacheBust);
+  const signed = !!fileUrl;
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="group flex flex-col h-40 w-full border border-line rounded-lg overflow-hidden bg-surface hover:border-primary disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-line transition-colors"
+    >
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-line text-xs">
+        <span className="inline-flex items-center gap-1.5 font-medium text-fg">
+          {signed
+            ? <CheckCircle size={12} className="text-success" />
+            : <span className="w-3 h-3 rounded-full border-2 border-fg/30" />}
+          {t('workspace.docSignature')}
+        </span>
+        <span className="inline-flex items-center gap-1 text-subtle">
+          <PenLine size={12} />
+          {signed ? t('workspace.sigRetake') : t('contract.acceptAndSign', { defaultValue: 'Accept & sign' })}
+        </span>
+      </div>
+      <div className="flex-1 min-h-0 bg-white flex items-center justify-center overflow-hidden">
+        {signed ? (
+          displayUrl ? (
+            <img
+              key={displayUrl}
+              src={displayUrl}
+              alt=""
+              className="max-w-full max-h-full object-contain p-2"
+            />
+          ) : (
+            <span className="text-xs text-subtle">{t('common.loading')}</span>
+          )
+        ) : (
+          <span className="text-xs text-subtle">{t('workspace.sigNotSignedYet', { defaultValue: 'Not signed yet' })}</span>
+        )}
+      </div>
+    </button>
   );
 }
