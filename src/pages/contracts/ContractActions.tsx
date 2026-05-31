@@ -13,6 +13,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useUploadSpec } from '../../hooks/useMediaUrl';
 import { uploadFromImage, deleteMedia } from '../../lib/upload';
 import { toStoragePath } from '../../lib/mediaPath';
+import { fuzzyScore } from '../../lib/fuzzy';
 import { CompleteContractModal } from './CompleteContractModal';
 import { BindLoanerModal, UnbindLoanerModal } from './LoanerModals';
 import { RepairRequestModal } from './RepairRequestModal';
@@ -1099,8 +1100,32 @@ interface Branch {
 interface Asset {
   asset_id: number;
   asset_code: string;
+  asset_code_display: string | null;
+  family_name: string | null;
   model_name: string;
   variant_name: string;
+  physical_color: string | null;
+  serial_no: string | null;
+  imei: string | null;
+}
+
+function AssetSummaryLines({ asset, dense }: { asset: Asset; dense?: boolean }) {
+  const code = asset.asset_code_display ?? asset.asset_code;
+  const headlineParts = [asset.family_name, asset.model_name, asset.physical_color].filter(Boolean);
+  return (
+    <div className={`flex flex-col min-w-0 ${dense ? 'gap-0.5' : 'gap-1'}`}>
+      <div className="text-sm font-medium truncate">
+        {headlineParts.length > 0 ? headlineParts.join(' ') : asset.variant_name}
+      </div>
+      <div className="text-xs text-subtle font-mono truncate">{code}</div>
+      {(asset.imei || asset.serial_no) && (
+        <div className="text-[11px] text-subtle font-mono truncate flex gap-2">
+          {asset.imei && <span><span className="opacity-60">IMEI</span> {asset.imei}</span>}
+          {asset.serial_no && <span><span className="opacity-60">SN</span> {asset.serial_no}</span>}
+        </div>
+      )}
+    </div>
+  );
 }
 
 interface StaffUser {
@@ -1122,6 +1147,7 @@ const DONE_VIEW_ACTIONS: ReadonlySet<ContractAction> = new Set([
   'transfer_accept',
   'transfer_cancel',
   'unbind_device',
+  'bind_device',
 ]);
 
 function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
@@ -1185,10 +1211,11 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
     queryKey: ['assets-available', contract.branch_id, contract.model_id],
     queryFn: () => {
       const params = new URLSearchParams({
+        select: 'asset_id,asset_code,asset_code_display,family_name,model_name,variant_name,physical_color,serial_no,imei',
         current_bucket: 'eq.ON_HAND_AVAILABLE',
         branch_id: `eq.${contract.branch_id}`,
         order: 'asset_code',
-        limit: '100',
+        limit: '500',
       });
       if (contract.model_id != null) params.set('model_id', `eq.${contract.model_id}`);
       return apiClient.get<Asset[]>(`/v_assets?${params.toString()}`);
@@ -1197,10 +1224,70 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
     enabled: !!config?.needsDevice && contract.model_id != null,
   });
 
+  const [assetSearch, setAssetSearch] = useState('');
+
+  const assetMap = useMemo(() => {
+    const m = new Map<string, Asset>();
+    (assets ?? []).forEach(a => m.set(String(a.asset_id), a));
+    return m;
+  }, [assets]);
+
   const assetOptions = useMemo(() => {
     if (!assets) return [];
-    return assets.map(a => ({ value: String(a.asset_id), label: `${a.asset_code} — ${a.model_name} ${a.variant_name}` }));
-  }, [assets]);
+    const codeOf = (a: Asset) => a.asset_code_display ?? a.asset_code;
+    const headlineOf = (a: Asset) =>
+      [a.family_name, a.model_name, a.physical_color].filter(Boolean).join(' ');
+    const labelOf = (a: Asset) => `${codeOf(a)} — ${headlineOf(a) || a.variant_name}`;
+    const q = assetSearch.trim().toLowerCase();
+    if (!q) return assets.map(a => ({ value: String(a.asset_id), label: labelOf(a) }));
+
+    const tokens = q.split(/\s+/).filter(Boolean);
+    const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    type Scored = { asset: Asset; tier: number; fuzzy: number; index: number };
+    const scored: Scored[] = [];
+    const matched = new Set<number>();
+
+    assets.forEach((a, index) => {
+      const code = codeOf(a).toLowerCase();
+      const hay = [
+        code,
+        a.family_name ?? '',
+        a.model_name,
+        a.variant_name,
+        a.physical_color ?? '',
+        a.serial_no ?? '',
+        a.imei ?? '',
+      ].join(' ').toLowerCase();
+      if (!tokens.every(tok => hay.includes(tok))) return;
+
+      let tier = 3;
+      if (code === q) tier = 0;
+      else if (code.startsWith(q)) tier = 1;
+      else if (new RegExp(`\\b${escape(q)}\\b`).test(hay)) tier = 2;
+      scored.push({ asset: a, tier, fuzzy: 1, index });
+      matched.add(index);
+    });
+
+    if (q.length >= 2) {
+      const threshold = q.length >= 3 ? 0.6 : 0.8;
+      assets.forEach((a, index) => {
+        if (matched.has(index)) return;
+        const hay = `${headlineOf(a)} ${a.variant_name}`;
+        const score = fuzzyScore(q, hay);
+        if (score >= threshold) {
+          scored.push({ asset: a, tier: 4, fuzzy: 1 - score, index });
+        }
+      });
+    }
+
+    scored.sort((x, y) =>
+      x.tier - y.tier
+      || (x.tier === 4 ? x.fuzzy - y.fuzzy : 0)
+      || x.index - y.index
+    );
+    return scored.slice(0, 50).map(s => ({ value: String(s.asset.asset_id), label: labelOf(s.asset) }));
+  }, [assets, assetSearch]);
 
   // Staff users for change_draft_owner
   const { data: staffUsers } = useQuery({
@@ -1298,6 +1385,7 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
               formCtx={{
                 toBranchName: branches?.find(b => b.id === Number(toBranchId))?.name,
                 fromBranchName: branches?.find(b => b.id === contract.branch_id)?.name,
+                selectedAsset: deviceId ? assetMap.get(deviceId) ?? null : null,
               }}
               onClose={onClose}
             />
@@ -1369,7 +1457,23 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
                     placeholder={t('contract.selectDevice')}
                     showChevron
                     searchable
+                    filterOptions={false}
+                    onSearchChange={setAssetSearch}
+                    renderOption={(option) => {
+                      const a = assetMap.get(option.value);
+                      if (!a) return <span className="text-sm">{option.label}</span>;
+                      return (
+                        <div className="py-0.5">
+                          <AssetSummaryLines asset={a} dense />
+                        </div>
+                      );
+                    }}
                   />
+                  {deviceId && assetMap.get(deviceId) && (
+                    <div className="mt-2 px-3 py-2 rounded-md bg-info/5 border border-info/20">
+                      <AssetSummaryLines asset={assetMap.get(deviceId)!} />
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1459,6 +1563,7 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
 interface ContractActionFormCtx {
   toBranchName?: string;
   fromBranchName?: string;
+  selectedAsset?: Asset | null;
 }
 
 interface AssetMovementForAction {
@@ -1628,6 +1733,55 @@ function ContractActionDoneView({
                 ))}
               </div>
             ) : null
+          }
+          onClose={onClose}
+        />
+      );
+    }
+
+    case 'bind_device': {
+      const movements = (result.asset_movements ?? null) as AssetMovementForAction[] | null;
+      const mode = String(result.mode ?? 'BIND');
+      const isRebind = mode === 'REBIND';
+      const asset = formCtx.selectedAsset ?? null;
+      return (
+        <ActionDoneView
+          headline={t(
+            isRebind ? 'contract.action_bind_device_done_headline_rebind' : 'contract.action_bind_device_done_headline',
+            { defaultValue: isRebind ? 'Device swapped' : 'Device bound' },
+          )}
+          contractCode={contractCode}
+          tone="success"
+          extras={
+            <div className="flex flex-col gap-3">
+              {asset && (
+                <div className="px-3 py-2.5 rounded-md bg-success/5 border border-success/20">
+                  <div className="text-xs text-subtle mb-1.5">
+                    {t('contract.action_bind_device_done_device', { defaultValue: 'Device bound' })}
+                  </div>
+                  <AssetSummaryLines asset={asset} />
+                </div>
+              )}
+              {movements && movements.length > 0 && (
+                <div className="px-3 py-2.5 rounded-md bg-info/5 border border-info/20">
+                  <div className="text-xs text-subtle mb-1.5">
+                    {t('contract.action_bind_device_done_movements', { defaultValue: 'Stock movement' })}
+                  </div>
+                  {movements.map((m, i) => (
+                    <div key={m.txn_id ?? i} className="flex items-center gap-2 text-sm">
+                      <span className="font-medium">{m.asset_code ?? `asset #${m.asset_id}`}</span>
+                      {m.from_bucket && m.to_bucket && (
+                        <>
+                          <span className="text-xs text-subtle">{m.from_bucket}</span>
+                          <ArrowRight size={12} className="text-subtle" />
+                          <span className="text-xs">{m.to_bucket}</span>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           }
           onClose={onClose}
         />
