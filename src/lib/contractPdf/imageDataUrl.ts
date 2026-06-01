@@ -1,26 +1,12 @@
-// Convert a stored R2 object (referenced by key) into a base64 PNG data URL.
-// pdfmake supports only JPEG and PNG — anything else (WebP in our case) has
-// to be re-encoded client-side via a canvas.
-//
-// Flow:
-//   1. Fetch bytes through the misc-go /proxy/s3 endpoint (R2 doesn't allow
-//      direct browser CORS).
-//   2. Load via blob URL into an Image (same-origin, untainted canvas).
-//   3. Draw onto a canvas and export PNG.
+// Convert a stored R2 object (referenced by key) into a base64 data URL for
+// embedding in the contract PDF HTML rendered by misc-go (chromedp). Chrome
+// handles webp/jpeg/png in <img> natively, so the bytes pass through unchanged
+// — no canvas re-encode (a lossless PNG re-encode of a photographic ID card
+// inflates ~10×, pushing the final data:text/html URL past Chrome's ~2 MB
+// Navigate limit and triggering ERR_ABORTED).
 
 import { config } from '../../config/config';
 import { normalizeKey } from '../mediaPath';
-
-const PDFMAKE_OK = /^image\/(png|jpeg)$/i;
-
-function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error('image decode failed'));
-    img.src = src;
-  });
-}
 
 function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -31,31 +17,10 @@ function blobToDataUrl(blob: Blob): Promise<string> {
   });
 }
 
-async function transcodeToPng(blob: Blob): Promise<string> {
-  const url = URL.createObjectURL(blob);
-  try {
-    const img = await loadImage(url);
-    const canvas = document.createElement('canvas');
-    canvas.width = img.naturalWidth;
-    canvas.height = img.naturalHeight;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('canvas 2d context unavailable');
-    ctx.drawImage(img, 0, 0);
-    return canvas.toDataURL('image/png');
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
-
 export async function fetchImageAsDataUrl(key: string): Promise<string> {
   const url = `${config.uploadUrl}/proxy/s3?key=${encodeURIComponent(normalizeKey(key))}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`image fetch failed: ${res.status}`);
   const blob = await res.blob();
-  // pdfmake accepts JPEG/PNG straight through; WebP and anything else must be
-  // re-encoded via a canvas.
-  if (PDFMAKE_OK.test(blob.type)) {
-    return await blobToDataUrl(blob);
-  }
-  return await transcodeToPng(blob);
+  return await blobToDataUrl(blob);
 }
