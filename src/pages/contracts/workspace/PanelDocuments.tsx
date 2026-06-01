@@ -8,6 +8,7 @@ import { uploadFromImage, invalidateMediaUrl } from '../../../lib/upload';
 import { useWorkspace } from './WorkspaceContext';
 import { SingleUpload } from './SingleUpload';
 import { ContractPreviewSignPair } from './ContractPreviewSignPair';
+import { useContractGuarantors } from './useContractGuarantors';
 import type { ContractMin } from '../../../lib/contractPdf/buildRenderData';
 
 interface CustomerDocument {
@@ -38,10 +39,6 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
   const contractId = workspace.contractId;
   const customerId = workspace.customerId;
 
-  // Preview + signature require the contract to be "ready enough" to render.
-  // We gate on the same cards the renderer + activate flow care about.
-  // ID card is gated separately below — it lives on this same panel so we
-  // surface it as its own prereq line, not via getCardStatus.
   const prereqCards: Array<{ id: string; labelKey: string }> = [
     { id: 'customer', labelKey: 'workspace.cardCustomer' },
     { id: 'productPlan', labelKey: 'workspace.cardProduct' },
@@ -51,13 +48,12 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
   ];
   const missingCardPrereqs = prereqCards.filter(c => getCardStatus(c.id) !== 'complete');
 
+  // uploading is a "<scope>:<customerId>" string so multiple rows can each
+  // track their own busy state without colliding.
   const [uploading, setUploading] = useState('');
   const [error, setError] = useState('');
   const [cacheBust, setCacheBust] = useState(0);
 
-  // Build ContractMin from the workspace server state for the preview modal.
-  // Preview reads bound signatories + handover straight from v_contract_detail,
-  // so no overrides needed — what the customer sees matches the current state.
   const previewContract: ContractMin | null = contract ? {
     id: contract.id,
     code: contract.code,
@@ -82,16 +78,27 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
     created_at: contract.created_at,
   } : null;
 
-  // Fetch customer documents (ID_CARD_FRONT)
-  const { data: customerDocs = [] } = useQuery({
-    queryKey: ['customer-documents', customerId],
-    queryFn: () => apiClient.get<CustomerDocument[]>(
-      `/v_customer_documents?customer_id=eq.${customerId}&doc_type=eq.ID_CARD_FRONT&is_active=eq.true`
-    ),
-    enabled: !!customerId,
-  });
+  const { data: guarantors = [] } = useContractGuarantors(contractId);
 
-  // Fetch contract documents (SIGNATURE_PAD)
+  // All ID cards for everyone on the contract (lessee + guarantors). One
+  // batched query keyed on the full customer-id set so we don't N+1.
+  const docCustomerIds = [
+    ...(customerId ? [customerId] : []),
+    ...guarantors.map(g => g.customer_id),
+  ];
+  const { data: customerDocs = [] } = useQuery({
+    queryKey: ['customer-documents-multi', docCustomerIds],
+    queryFn: () => apiClient.get<CustomerDocument[]>(
+      `/v_customer_documents?customer_id=in.(${docCustomerIds.join(',')})&doc_type=eq.ID_CARD_FRONT&is_active=eq.true&order=uploaded_at.desc`
+    ),
+    enabled: docCustomerIds.length > 0,
+  });
+  const idCardByCustomer = new Map<number, CustomerDocument>();
+  for (const d of customerDocs) {
+    if (!idCardByCustomer.has(d.customer_id)) idCardByCustomer.set(d.customer_id, d);
+  }
+
+  // All signature documents for this contract (lessee + guarantors).
   const { data: contractDocs = [] } = useQuery({
     queryKey: ['contract-documents', contractId],
     queryFn: () => apiClient.get<ContractDocument[]>(
@@ -99,89 +106,93 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
     ),
     enabled: !!contractId,
   });
+  const signatureByCustomer = new Map<number, ContractDocument>();
+  for (const d of contractDocs) {
+    if (d.customer_id != null) signatureByCustomer.set(d.customer_id, d);
+  }
 
-  const idCard = customerDocs[0] ?? null;
-  const signature = contractDocs.find(d => d.customer_id === customerId) ?? null;
+  const lesseeIdCard = customerId ? idCardByCustomer.get(customerId) ?? null : null;
 
-  // ID card must be uploaded before previewing / signing.
-  const missingPrereqs = [
-    ...missingCardPrereqs,
-    ...(!idCard ? [{ id: 'idCard', labelKey: 'workspace.docIdPhoto' }] : []),
-  ];
+  // Print-readiness — same cards as before, plus an ID-card per person on
+  // the contract (lessee + each guarantor). Signatures stay optional.
+  const missingIdCardPeople: Array<{ id: string; labelKey?: string; labelText?: string }> = [];
+  if (!lesseeIdCard) {
+    missingIdCardPeople.push({ id: 'idCard-lessee', labelKey: 'workspace.docIdPhoto' });
+  }
+  for (const g of guarantors) {
+    if (!idCardByCustomer.has(g.customer_id)) {
+      missingIdCardPeople.push({
+        id: `idCard-${g.customer_id}`,
+        labelText: `${t('workspace.docIdPhoto')} — ${g.customer_name}`,
+      });
+    }
+  }
+  const missingPrereqs = [...missingCardPrereqs, ...missingIdCardPeople];
   const prereqsMet = missingPrereqs.length === 0;
 
-  // ── ID Card upload ──────────────────────────────────────────────────
-  const uploadIdCard = async (images: UploadedImage[]) => {
-    if (!customerId || images.length === 0) return;
-    setUploading('ID_CARD');
+  // ── Generic upload helpers (parameterised by target customer) ───────
+  const handleErr = (err: unknown) => {
+    if (err instanceof ApiError) {
+      const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+        || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+      setError(tr || err.code || err.message);
+    } else {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const uploadIdCardFor = (targetCustomerId: number) => async (images: UploadedImage[]) => {
+    if (images.length === 0) return;
+    const tag = `ID_CARD:${targetCustomerId}`;
+    setUploading(tag);
     setError('');
     try {
       const results = await uploadFromImage({
         type: 'customer_id_card',
         image: images[0],
-        params: { customer_id: customerId },
+        params: { customer_id: targetCustomerId },
       });
       const key = results.lg?.key ?? Object.values(results)[0]?.key;
       if (!key) throw new Error('Upload returned no key');
       await apiClient.rpc('fn_customer_document_upload', {
-        p_customer_id: customerId,
+        p_customer_id: targetCustomerId,
         p_doc_type: 'ID_CARD_FRONT',
         p_file_url: `/${key}`,
       });
       invalidateMediaUrl(key);
-      queryClient.invalidateQueries({ queryKey: ['customer-documents', customerId] });
+      queryClient.invalidateQueries({ queryKey: ['customer-documents-multi'] });
       setCacheBust(n => n + 1);
-      invalidateCustomer();
+      if (targetCustomerId === customerId) invalidateCustomer();
     } catch (err) {
-      if (err instanceof ApiError) {
-        const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
-        setError(tr || err.code || err.message);
-      } else {
-        setError(err instanceof Error ? err.message : String(err));
-      }
+      handleErr(err);
     } finally { setUploading(''); }
   };
 
-  // ── Signature upload ────────────────────────────────────────────────
-  const uploadSignature = async (images: UploadedImage[]) => {
-    if (!contractId || !customerId || images.length === 0) return;
-    setUploading('SIGNATURE');
+  const uploadSignatureFor = (targetCustomerId: number) => async (images: UploadedImage[]) => {
+    if (!contractId || images.length === 0) return;
+    const tag = `SIGNATURE:${targetCustomerId}`;
+    setUploading(tag);
     setError('');
     try {
       const results = await uploadFromImage({
         type: 'contract_signature',
         image: images[0],
-        params: { contract_id: contractId, customer_id: customerId },
+        params: { contract_id: contractId, customer_id: targetCustomerId },
       });
-      // Signature spec emits a single size. Use a fallback chain so the
-      // upload survives any future relabel from the backend (was `sm`,
-      // currently `md`).
       const key = results.md?.key ?? results.sm?.key ?? Object.values(results)[0]?.key;
       if (!key) throw new Error('Upload returned no key');
       await apiClient.rpc('fn_contract_document_upload', {
         p_contract_id: contractId,
         p_doc_type: 'SIGNATURE_PAD',
         p_file_url: `/${key}`,
-        p_customer_id: customerId,
+        p_customer_id: targetCustomerId,
       });
-      // Re-upload overwrites at the same storage key, so the previously
-      // cached presigned URL still resolves but points at the OLD image
-      // (browser cache hit on the same URL). Drop the presign cache so
-      // useMediaUrl fetches a fresh signed URL — the new URL string forces
-      // the browser to refetch.
       invalidateMediaUrl(key);
       queryClient.invalidateQueries({ queryKey: ['contract-documents', contractId] });
       setCacheBust(n => n + 1);
       invalidateDocs();
     } catch (err) {
-      if (err instanceof ApiError) {
-        const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
-        setError(tr || err.code || err.message);
-      } else {
-        setError(err instanceof Error ? err.message : String(err));
-      }
+      handleErr(err);
     } finally { setUploading(''); }
   };
 
@@ -191,41 +202,75 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
     <div className="p-4 flex flex-col gap-8 max-w-2xl">
       {error && <div className="alert alert-danger"><XCircle size={18} /><div><div className="alert-description">{error}</div></div></div>}
 
-      {/* ID Card / Passport */}
+      {/* ── Lessee block — unchanged layout ─────────────────────────── */}
       <SingleUpload
         icon={<CreditCard size={14} />}
         label={t('workspace.docIdPhoto')}
         type="customer_id_card"
-        fileUrl={idCard?.file_url ?? null}
-        uploading={uploading === 'ID_CARD'}
-        onUpload={uploadIdCard}
+        fileUrl={lesseeIdCard?.file_url ?? null}
+        uploading={uploading === `ID_CARD:${customerId}`}
+        onUpload={customerId ? uploadIdCardFor(customerId) : () => {}}
         disabled={!customerId}
         cacheBust={cacheBust}
       />
 
-      {/* Prerequisite alert — preview and signature stay disabled until ready */}
       {!prereqsMet && (
         <div className="alert alert-warning">
           <AlertTriangle size={16} />
           <div className="flex flex-col gap-0.5">
             <div className="alert-title">{t('workspace.docPrereqTitle')}</div>
             <div className="alert-description">
-              {missingPrereqs.map(c => t(c.labelKey)).join(' · ')}
+              {missingPrereqs.map(c => c.labelText ?? t(c.labelKey!)).join(' · ')}
             </div>
           </div>
         </div>
       )}
 
-      {/* Preview + Signature — side-by-side cards */}
       <ContractPreviewSignPair
         contract={previewContract}
-        fileUrl={signature?.file_url ?? null}
-        uploading={uploading === 'SIGNATURE'}
-        onUpload={uploadSignature}
+        fileUrl={customerId ? signatureByCustomer.get(customerId)?.file_url ?? null : null}
+        uploading={uploading === `SIGNATURE:${customerId}`}
+        onUpload={customerId ? uploadSignatureFor(customerId) : () => {}}
         disabled={!customerId || !prereqsMet}
         cacheBust={cacheBust}
       />
+
+      {/* ── Guarantor blocks ────────────────────────────────────────── */}
+      {guarantors.map(g => {
+        const gIdCard = idCardByCustomer.get(g.customer_id) ?? null;
+        const gSig = signatureByCustomer.get(g.customer_id) ?? null;
+        return (
+          <div key={g.customer_id} className="flex flex-col gap-6 pt-6 border-t border-line">
+            <div className="text-sm font-semibold text-fg">
+              {t('workspace.docsGuarantorHeading', {
+                defaultValue: 'Guarantor: {{name}}',
+                name: g.customer_name,
+              })}
+            </div>
+            <SingleUpload
+              icon={<CreditCard size={14} />}
+              label={t('workspace.docIdPhoto')}
+              type="customer_id_card"
+              fileUrl={gIdCard?.file_url ?? null}
+              uploading={uploading === `ID_CARD:${g.customer_id}`}
+              onUpload={uploadIdCardFor(g.customer_id)}
+              cacheBust={cacheBust}
+            />
+            <ContractPreviewSignPair
+              contract={previewContract}
+              fileUrl={gSig?.file_url ?? null}
+              uploading={uploading === `SIGNATURE:${g.customer_id}`}
+              onUpload={uploadSignatureFor(g.customer_id)}
+              disabled={!prereqsMet}
+              cacheBust={cacheBust}
+              pairLabel={t('workspace.docContractAndSignatureFor', {
+                defaultValue: 'Contract & signature — {{name}}',
+                name: g.customer_name,
+              })}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }
-
