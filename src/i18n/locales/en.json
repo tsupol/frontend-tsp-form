@@ -1027,6 +1027,8 @@
     "idType": {
       "IMEI": "IMEI",
       "SERIAL": "Serial",
+      "SERIAL_NO": "Serial",
+      "CHASSIS_NO": "Chassis",
       "MAC": "MAC"
     },
     "allBranches": "All branches",

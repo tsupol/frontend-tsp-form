@@ -1027,6 +1027,8 @@
     "idType": {
       "IMEI": "IMEI",
       "SERIAL": "ซีเรียล",
+      "SERIAL_NO": "ซีเรียล",
+      "CHASSIS_NO": "เลขตัวถัง",
       "MAC": "MAC"
     },
     "allBranches": "ทุกสาขา",

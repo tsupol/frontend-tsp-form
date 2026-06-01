@@ -1019,6 +1019,23 @@ interface BatchRowError {
   params?: Record<string, unknown>;
 }
 
+/** Translate a per-row / blocking error with its backend-shipped params.
+ *  Backend `params` keys differ per code (e.g. `{type, value}` for IDENTIFIER_CONFLICT,
+ *  `{imei}` for BUYBACK_IMEI_CHECKSUM_FAIL, `{requested, available}` for
+ *  BATCH_DEVICES_EXCEED_LOT_QTY) — we forward them as i18next interpolation
+ *  values. The `type` field is itself an enum code (`IMEI/SERIAL_NO/CHASSIS_NO`)
+ *  so we translate it via `asset.idType.<CODE>` before injection. */
+function useTranslateBatchError() {
+  const { t } = useTranslation();
+  return (err: BatchRowError): string => {
+    const params: Record<string, unknown> = { ...(err.params ?? {}) };
+    if (typeof params.type === 'string') {
+      params.type = t(`asset.idType.${params.type}`, { defaultValue: params.type });
+    }
+    return t(err.code, { ns: 'apiErrors', defaultValue: err.code, ...params });
+  };
+}
+
 interface BatchRowResult {
   index: number;
   valid: boolean;
@@ -1098,6 +1115,7 @@ function LotActionModal({
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const translateBatchError = useTranslateBatchError();
   const config = action ? SIMPLE_ACTIONS[action.action_code] : null;
 
   const isConvert = action?.action_code === 'LOT_CONVERT_TO_ASSET';
@@ -1465,7 +1483,7 @@ function LotActionModal({
                     <XCircle size={16} />
                     <div className="flex-1 min-w-0">
                       {validation.blocking_errors.map((e, i) => (
-                        <div key={i}>{t(e.code, { ns: 'apiErrors', defaultValue: e.code })}</div>
+                        <div key={i}>{translateBatchError(e)}</div>
                       ))}
                     </div>
                   </div>
@@ -1569,7 +1587,7 @@ function LotActionModal({
                               {rowResult.errors.map((e, ei) => (
                                 <div key={ei} className="text-xs text-danger flex items-start gap-1">
                                   <XCircle size={12} className="mt-0.5 shrink-0" />
-                                  <span>{t(e.code, { ns: 'apiErrors', defaultValue: e.code })}</span>
+                                  <span>{translateBatchError(e)}</span>
                                 </div>
                               ))}
                             </div>
