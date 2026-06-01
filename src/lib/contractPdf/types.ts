@@ -74,11 +74,13 @@ export interface ContractPdfInput {
 
   // Optional guarantors. Each cell rendered next to the lessee in row 1
   // (up to 2 guarantors share row 1 with the lessee); 3+ get their own
-  // labelled block. signatureDataUrl is optional — empty string keeps the
-  // line so the PDF can be printed and signed later.
+  // labelled block. signatureDataUrl / idCardDataUrl are optional — missing
+  // slots show a placeholder so the PDF can be printed and signed/attached
+  // by hand later.
   guarantors: Array<{
     name: string;
     signatureDataUrl: string | null;
+    idCardDataUrl: string | null;
   }>;
 
   // Bank / company config — pulled from BE; builder falls back to constants if empty

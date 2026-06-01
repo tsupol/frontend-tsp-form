@@ -220,6 +220,22 @@ export async function buildContractRenderData(
     }
   }
 
+  // Resolve guarantor ID cards in one batched query against
+  // v_customer_documents (latest active ID_CARD_FRONT per customer), then
+  // pair each row with its guarantor.
+  const guarantorIds = guarantorRows.map(g => g.customer_id);
+  const guarantorIdCardKeyByCustomer = new Map<number, string>();
+  if (guarantorIds.length > 0) {
+    const idCardRows = await apiClient.get<Array<{ customer_id: number; file_url: string }>>(
+      `/v_customer_documents?customer_id=in.(${guarantorIds.join(',')})&doc_type=eq.ID_CARD_FRONT&is_active=eq.true&select=customer_id,file_url&order=uploaded_at.desc`,
+    ).catch(() => [] as Array<{ customer_id: number; file_url: string }>);
+    for (const row of idCardRows) {
+      if (!guarantorIdCardKeyByCustomer.has(row.customer_id)) {
+        guarantorIdCardKeyByCustomer.set(row.customer_id, row.file_url);
+      }
+    }
+  }
+
   const [lesseeSignatureDataUrl, lesseeIdCardDataUrl, lessorSig, w1Sig, w2Sig, guarantorSigs] = await Promise.all([
     resolveMediaDataUrl(customerSigDoc?.file_url ?? null),
     resolveMediaDataUrl(idCardDocs[0]?.file_url ?? null),
@@ -227,10 +243,13 @@ export async function buildContractRenderData(
     resolveSignatureByMediaId(w1MediaId),
     resolveSignatureByMediaId(w2MediaId),
     Promise.all(
-      guarantorRows.map(async (g) => ({
-        name: g.customer_name,
-        signatureDataUrl: await resolveMediaDataUrl(guarantorSigByCustomer.get(g.customer_id) ?? null),
-      })),
+      guarantorRows.map(async (g) => {
+        const [signatureDataUrl, idCardDataUrl] = await Promise.all([
+          resolveMediaDataUrl(guarantorSigByCustomer.get(g.customer_id) ?? null),
+          resolveMediaDataUrl(guarantorIdCardKeyByCustomer.get(g.customer_id) ?? null),
+        ]);
+        return { name: g.customer_name, signatureDataUrl, idCardDataUrl };
+      }),
     ),
   ]);
 
