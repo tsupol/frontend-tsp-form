@@ -128,6 +128,7 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
         p_doc_type: 'ID_CARD_FRONT',
         p_file_url: `/${key}`,
       });
+      invalidateMediaUrl(key);
       queryClient.invalidateQueries({ queryKey: ['customer-documents', customerId] });
       setCacheBust(n => n + 1);
       invalidateCustomer();
@@ -194,6 +195,7 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
       <SingleUpload
         icon={<CreditCard size={14} />}
         label={t('workspace.docIdPhoto')}
+        type="customer_id_card"
         fileUrl={idCard?.file_url ?? null}
         uploading={uploading === 'ID_CARD'}
         onUpload={uploadIdCard}

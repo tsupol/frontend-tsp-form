@@ -1,12 +1,14 @@
-import { useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ImageUploader } from 'tsp-form';
 import type { UploadedImage } from 'tsp-form';
 import { CheckCircle, Upload } from 'lucide-react';
 import { useMediaUrl } from '../../../hooks/useMediaUrl';
+import { useUploadSpec } from '../../../hooks/useMediaUrl';
 
-export function SingleUpload({ icon, label, fileUrl, uploading, onUpload, disabled, cacheBust = 0 }: {
+export function SingleUpload({ icon, label, type, fileUrl, uploading, onUpload, disabled, cacheBust = 0 }: {
   icon: React.ReactNode;
   label: string;
+  type: string;
   fileUrl: string | null;
   uploading: boolean;
   onUpload: (imgs: UploadedImage[]) => void;
@@ -15,67 +17,37 @@ export function SingleUpload({ icon, label, fileUrl, uploading, onUpload, disabl
 }) {
   const { url: displayUrl } = useMediaUrl(fileUrl, cacheBust);
   const { t } = useTranslation();
-  const inputRef = useRef<HTMLInputElement>(null);
+  const spec = useUploadSpec(type);
 
-  const handleClick = useCallback(() => {
-    if (disabled || uploading) return;
-    inputRef.current?.click();
-  }, [disabled, uploading]);
+  const emptyPlaceholder = (
+    <div className="flex items-center justify-center gap-2 text-subtle text-sm w-full h-40">
+      <Upload size={16} className="opacity-50" />
+      <span>{t('workspace.clickOrDrag')}</span>
+    </div>
+  );
 
-  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = '';
-
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      const maxW = 1280, maxH = 1280;
-      let w = img.width, h = img.height;
-      if (w > maxW || h > maxH) {
-        const ratio = Math.min(maxW / w, maxH / h);
-        w = Math.round(w * ratio);
-        h = Math.round(h * ratio);
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = w; canvas.height = h;
-      canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
-      canvas.toBlob((blob) => {
-        if (!blob) return;
-        const resized = new File([blob], file.name, { type: 'image/webp' });
-        onUpload([{
-          id: Math.random().toString(36).slice(2),
-          file: resized, originalFile: file,
-          preview: URL.createObjectURL(blob),
-          width: w, height: h,
-          originalWidth: img.width, originalHeight: img.height,
-          size: blob.size, originalSize: file.size,
-        }]);
-      }, 'image/webp', 0.85);
-    };
-    img.src = url;
-  }, [onUpload]);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (disabled || uploading) return;
-    const file = e.dataTransfer.files?.[0];
-    if (file && file.type.startsWith('image/')) {
-      const dt = new DataTransfer();
-      dt.items.add(file);
-      if (inputRef.current) {
-        inputRef.current.files = dt.files;
-        inputRef.current.dispatchEvent(new Event('change', { bubbles: true }));
-      }
-    }
-  }, [disabled, uploading]);
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  }, []);
+  const filledPlaceholder = (
+    <div
+      className="relative group rounded-lg overflow-hidden w-full h-40 bg-surface-shallow flex items-center justify-center"
+      title={t('workspace.clickToReplace')}
+    >
+      {displayUrl ? (
+        <img
+          src={displayUrl}
+          alt=""
+          className="max-w-full max-h-full object-contain"
+        />
+      ) : (
+        <div className="w-full h-full animate-pulse" />
+      )}
+      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+        <span className="text-white text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5">
+          <Upload size={14} />
+          {t('workspace.clickToReplace')}
+        </span>
+      </div>
+    </div>
+  );
 
   return (
     <div>
@@ -86,50 +58,18 @@ export function SingleUpload({ icon, label, fileUrl, uploading, onUpload, disabl
         {uploading && <span className="text-xs text-subtle">{t('common.loading')}</span>}
       </div>
 
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={handleFileChange}
-        disabled={disabled || uploading}
+      <ImageUploader
+        resizeOptions={spec.resize}
+        sizes={spec.sizes}
+        onUpload={onUpload}
+        disabled={disabled || uploading || !spec.spec}
+        className={
+          fileUrl
+            ? '!min-h-0 !p-0 !border !border-solid !border-line hover:!border-primary transition-colors'
+            : '!min-h-0 !p-0 !border-2 !border-dashed !border-line hover:!border-primary hover:!bg-surface-hover transition-colors'
+        }
+        placeholder={fileUrl ? filledPlaceholder : emptyPlaceholder}
       />
-
-      {fileUrl ? (
-        <div
-          className="relative group cursor-pointer rounded-lg border border-line hover:border-primary transition-colors overflow-hidden w-full h-40 bg-surface-shallow flex items-center justify-center"
-          onClick={handleClick}
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-          title={t('workspace.clickToReplace')}
-        >
-          {displayUrl ? (
-            <img
-              src={displayUrl}
-              alt=""
-              className="max-w-full max-h-full object-contain"
-            />
-          ) : (
-            <div className="w-full h-full animate-pulse" />
-          )}
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
-            <span className="text-white text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5">
-              <Upload size={14} />
-              {t('workspace.clickToReplace')}
-            </span>
-          </div>
-        </div>
-      ) : (
-        <div
-          className="flex items-center justify-center gap-2 border-2 border-dashed border-line rounded-lg cursor-pointer hover:border-primary hover:bg-surface-hover transition-colors text-subtle text-sm w-full h-40"
-          onClick={handleClick}
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-        >
-          <Upload size={16} className="opacity-50" />
-          <span>{t('workspace.clickOrDrag')}</span>
-        </div>
-      )}
     </div>
   );
 }

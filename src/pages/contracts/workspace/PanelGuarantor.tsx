@@ -518,6 +518,7 @@ function GuarantorRow({ guarantor, contractId, expanded, onToggle, onRemove, rem
       await apiClient.rpc('fn_customer_document_upload', {
         p_customer_id: guarantor.customerId, p_doc_type: 'ID_CARD_FRONT', p_file_url: `/${key}`,
       });
+      invalidateMediaUrl(key);
       queryClient.invalidateQueries({ queryKey: ['guarantor-idcard', guarantor.customerId] });
       queryClient.invalidateQueries({ queryKey: ['guarantor-status'] }); queryClient.invalidateQueries({ queryKey: ['guarantor-all-complete'] });
       setCacheBust(n => n + 1);
@@ -687,7 +688,7 @@ function GuarantorRow({ guarantor, contractId, expanded, onToggle, onRemove, rem
             <SectionHeader label={t('workspace.docIdPhoto')} done={!!idCard} expanded={openSection === 'idcard'} onToggle={() => toggle('idcard')} />
             {openSection === 'idcard' && (
               <div className="pt-2 pb-4">
-                <SingleUpload icon={<CreditCard size={14} />} label={t('workspace.docIdPhoto')} fileUrl={idCard?.file_url ?? null} uploading={uploading === 'ID_CARD'} onUpload={uploadIdCard} cacheBust={cacheBust} />
+                <SingleUpload icon={<CreditCard size={14} />} label={t('workspace.docIdPhoto')} type="customer_id_card" fileUrl={idCard?.file_url ?? null} uploading={uploading === 'ID_CARD'} onUpload={uploadIdCard} cacheBust={cacheBust} />
               </div>
             )}
           </div>
