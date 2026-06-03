@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
@@ -176,6 +176,14 @@ export function PurchaseOrdersPage() {
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
   const [filterOwnership, setFilterOwnership] = useState<string | null>(null);
   const [filterPoType, setFilterPoType] = useState<string | null>(null);
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const handleSearch = (value: string) => {
+    setSearchInput(value);
+    clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => setSearch(value.trim()), 300);
+  };
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
   const navigate = useNavigate();
@@ -254,12 +262,16 @@ export function PurchaseOrdersPage() {
 
   // ── PO list (all 3 types: PURCHASE / BUYBACK / DEAL_PARTNER) ─────────
   const { data: listData, isFetching } = useQuery({
-    queryKey: ['purchase-orders', filterStatus, filterOwnership, filterPoType, pageIndex, pageSize],
+    queryKey: ['purchase-orders', filterStatus, filterOwnership, filterPoType, search, pageIndex, pageSize],
     queryFn: () => {
       let url = '/v_purchase_orders?order=created_at.desc';
       if (filterStatus) url += `&status=eq.${filterStatus}`;
       if (filterOwnership) url += `&ownership=eq.${filterOwnership}`;
       if (filterPoType) url += `&po_type=eq.${filterPoType}`;
+      if (search) {
+        const term = encodeURIComponent(`*${search}*`);
+        url += `&or=(po_no.ilike.${term},code_display.ilike.${term},supplier_name.ilike.${term})`;
+      }
       return apiClient.getPaginated<PoListRow>(url, { page: pageIndex + 1, pageSize });
     },
     placeholderData: keepPreviousData,
@@ -277,7 +289,7 @@ export function PurchaseOrdersPage() {
     placeholderData: keepPreviousData,
   });
 
-  useEffect(() => { setPageIndex(0); }, [filterStatus, filterOwnership, filterPoType]);
+  useEffect(() => { setPageIndex(0); }, [filterStatus, filterOwnership, filterPoType, search]);
 
   // Don't auto-clear the selection based on list membership: the user can deep-link
   // to /po/:id, and the list may be filtered / paginated so the row isn't visible.
@@ -336,57 +348,70 @@ export function PurchaseOrdersPage() {
             </div>
           )}
 
+          {/* Filter bar — spans both panels on desktop, list view only on mobile */}
+          {(isRoot || !isMobile) && (
+            <div className="flex-none p-2 border-b border-line">
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <Input
+                    placeholder={t('common.search')}
+                    value={searchInput}
+                    onChange={(e) => handleSearch(e.target.value)}
+                    startIcon={<Search size={14} />}
+                    size="sm"
+                    className="w-full"
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <Select
+                    options={poTypeOptions}
+                    value={filterPoType}
+                    onChange={(v) => setFilterPoType((v as string) || null)}
+                    placeholder={t('po.allTypes')}
+                    size="sm"
+                    showChevron
+                    clearable
+                  />
+                </div>
+                <div className="flex-1 min-w-0 hidden sm:block">
+                  <Select
+                    options={statusOptions}
+                    value={filterStatus}
+                    onChange={(v) => setFilterStatus((v as string) || null)}
+                    placeholder={t('po.allStatuses')}
+                    size="sm"
+                    showChevron
+                    clearable
+                  />
+                </div>
+                <div className="flex-1 min-w-0 hidden md:block">
+                  <Select
+                    options={ownershipOptions}
+                    value={filterOwnership}
+                    onChange={(v) => setFilterOwnership((v as string) || null)}
+                    placeholder={t('po.allOwnership')}
+                    size="sm"
+                    showChevron
+                    clearable
+                  />
+                </div>
+                {canCreate && isMobile && (
+                  <Button
+                    color="primary"
+                    size="sm"
+                    startIcon={<Plus size={16} />}
+                    onClick={() => setCreateOpen(true)}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+
           <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
             <PageNavPanel
               id="list"
               className={isMobile ? '' : 'w-1/2 xl:w-5/12 border-r border-line flex flex-col'}
             >
-              <div className="flex-none flex flex-col gap-2 p-2 border-b border-line">
-                <div className="flex flex-wrap gap-2 w-full">
-                  <div className="flex-[2] min-w-0">
-                    <Select
-                      options={poTypeOptions}
-                      value={filterPoType}
-                      onChange={(v) => setFilterPoType((v as string) || null)}
-                      placeholder={t('po.allTypes')}
-                      size="sm"
-                      showChevron
-                      clearable
-                    />
-                  </div>
-                  <div className="flex-[2] min-w-0">
-                    <Select
-                      options={statusOptions}
-                      value={filterStatus}
-                      onChange={(v) => setFilterStatus((v as string) || null)}
-                      placeholder={t('po.allStatuses')}
-                      size="sm"
-                      showChevron
-                      clearable
-                    />
-                  </div>
-                  <div className="flex-[2] min-w-0">
-                    <Select
-                      options={ownershipOptions}
-                      value={filterOwnership}
-                      onChange={(v) => setFilterOwnership((v as string) || null)}
-                      placeholder={t('po.allOwnership')}
-                      size="sm"
-                      showChevron
-                      clearable
-                    />
-                  </div>
-                  {canCreate && isMobile && (
-                    <Button
-                      color="primary"
-                      size="sm"
-                      startIcon={<Plus size={16} />}
-                      onClick={() => setCreateOpen(true)}
-                    />
-                  )}
-                </div>
-              </div>
-
               <DataTable<PoListRow>
                 data={poList}
                 renderRow={(row) => {
