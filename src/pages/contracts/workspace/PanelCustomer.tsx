@@ -3,13 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Input, Select, Button, InputDatePicker, Modal, MaskedInput } from 'tsp-form';
 import type { UploadedImage } from 'tsp-form';
-import { ShieldAlert, AlertTriangle, CheckCircle, XCircle, Keyboard, Search, Loader2, Info } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, CheckCircle, XCircle, Keyboard, Search, Loader2 } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { uploadFromImage, invalidateMediaUrl } from '../../../lib/upload';
 import { toLocalDateStr, parseLocalDate, makeDatePickerFormat } from '../../../lib/format';
+import { useMediaUrl } from '../../../hooks/useMediaUrl';
 import { useWorkspace } from './WorkspaceContext';
-import { PanelSection } from './PanelSection';
-import { AddressFormPostal } from './AddressFormPostal';
+import { AddressCard, AddressEditModal } from '../../../components/AddressCard';
 import { IdCardScanner, type DetectedIdCardFields } from '../../../components/IdCardScanner';
 import { passesThaiCidChecksum } from '../../../lib/ocr/extractIdCard';
 import type { CustomerRegisterResult, CustomerAddress } from './WorkspaceTypes';
@@ -152,6 +152,7 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
   const [searchResults, setSearchResults] = useState<CustomerSearchResult[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [confirmData, setConfirmData] = useState<FieldComparison[] | null>(null);
+  const [editAddressType, setEditAddressType] = useState<'HOME' | 'WORK' | 'SHIPPING' | null>(null);
 
   // Pending scanned ID card image — uploaded to backend once we have a customer_id.
   const pendingScanRef = useRef<UploadedImage | null>(null);
@@ -167,6 +168,16 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
   const homeAddress = addresses.find(a => a.address_type === 'HOME');
   const workAddress = addresses.find(a => a.address_type === 'WORK');
   const shippingAddress = addresses.find(a => a.address_type === 'SHIPPING');
+
+  // Currently-saved ID card so the scanner can show it on revisit.
+  const { data: idCardDocs = [] } = useQuery({
+    queryKey: ['customer-idcard', customerId],
+    queryFn: () => apiClient.get<{ file_url: string }[]>(
+      `/v_customer_documents?customer_id=eq.${customerId}&doc_type=eq.ID_CARD_FRONT&is_active=eq.true&select=file_url&order=uploaded_at.desc&limit=1`
+    ),
+    enabled: !!customerId,
+  });
+  const { url: existingIdCardUrl } = useMediaUrl(idCardDocs[0]?.file_url ?? null);
 
 
   // Dirty tracking — compare against loaded snapshot, not just non-empty
@@ -300,6 +311,7 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
         p_file_url: `/${key}`,
       });
       invalidateMediaUrl(key);
+      queryClient.invalidateQueries({ queryKey: ['customer-idcard', custId] });
       queryClient.invalidateQueries({ queryKey: ['customer-summary', custId] });
       queryClient.invalidateQueries({ queryKey: ['contract-readiness'] });
     } catch { /* ignore — user can re-upload in Documents */ }
@@ -381,21 +393,34 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
 
   const canSearch = !!(idNumber.trim() || firstName.trim() || lastName.trim());
   const isExisting = !!selectedCustomer;
-  const buttonLabel = isExisting ? t('workspace.useThisCustomer') : t('wizard.registerCustomer');
+
+  // Has the customer panel already been attached to the current contract?
+  // If yes, "use this customer" is a no-op — only "save changes" makes sense.
+  const alreadyAttached = !!(workspace.contractId && selectedCustomer && contract?.customer_id === selectedCustomer.id);
+  const hasInfoChanges = !!(originalRef.current && compareFields(originalRef.current, getCurrentSnapshot()).hasChanges);
+
+  // The action button stays visible at all times; it's just disabled when the
+  // customer is attached and nothing's been edited (nothing to save / no-op
+  // "use" action).
+  const buttonNoop = isExisting && !hasInfoChanges && alreadyAttached;
+  const buttonLabel = hasInfoChanges
+    ? t('common.save')
+    : (isExisting ? t('workspace.useThisCustomer') : t('wizard.registerCustomer'));
 
   return (
     <div className="p-4 flex flex-col gap-3 max-w-2xl">
       {apiError && <div className="alert alert-danger"><XCircle size={18} /><div><div className="alert-description">{apiError}</div></div></div>}
       {result && <ResultBanner result={result} t={t} />}
 
-      {/* ID card scanner — autofills the form, also persists as ID_CARD_FRONT */}
-      {!selectedCustomer && (
-        <IdCardScanner
-          onDetected={handleOcrDetected}
-          onPersist={handleOcrPersist}
-          disabled={submitting}
-        />
-      )}
+      {/* ID card scanner — autofills the form for new customers (gated inside
+          handleOcrDetected when an existing customer is selected), and always
+          re-persists the uploaded image as ID_CARD_FRONT. */}
+      <IdCardScanner
+        onDetected={handleOcrDetected}
+        onPersist={handleOcrPersist}
+        disabled={submitting}
+        existingImageUrl={existingIdCardUrl}
+      />
 
       {/* Form */}
       <div className="form-grid">
@@ -487,10 +512,10 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
           {t('workspace.checkCustomer')}
         </Button>
         <Button
-          color={isExisting ? 'primary' : undefined}
-          variant={isExisting ? undefined : 'outline'}
+          color={hasInfoChanges || isExisting ? 'primary' : undefined}
+          variant={hasInfoChanges || isExisting ? undefined : 'outline'}
           onClick={handleUseOrRegister}
-          disabled={submitting || !idNumber.trim() || !firstName.trim() || !lastName.trim() || !tel.trim() || !dateOfBirth}
+          disabled={submitting || buttonNoop || !idNumber.trim() || !firstName.trim() || !lastName.trim() || !tel.trim() || !dateOfBirth}
           startIcon={submitting ? <Loader2 size={14} className="animate-spin" /> : undefined}
         >
           {submitting ? t('common.saving') : buttonLabel}
@@ -524,39 +549,48 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
         </div>
       )}
 
-      {/* Address — disabled until customer attached */}
-      <div className={`mt-6 ${!customerId ? 'opacity-50 pointer-events-none' : ''}`}>
-        <PanelSection title={t('workspace.addressHome')}>
-          <AddressFormPostal
-            customerId={customerId ?? 0}
-            addressType="HOME"
-            existing={homeAddress}
-            onSuccess={() => handleAddressSuccess('HOME')}
-          />
-        </PanelSection>
-
-        <PanelSection title={t('workspace.addressWork')}>
-          <AddressFormPostal
-            customerId={customerId ?? 0}
-            addressType="WORK"
-            existing={workAddress}
-            onSuccess={() => handleAddressSuccess('WORK')}
-          />
-        </PanelSection>
-
-        <PanelSection title={t('workspace.addressShipping')}>
-          <div className="alert alert-info mb-3">
-            <Info size={16} />
-            <div><div className="alert-description">{t('workspace.shippingAddressHint')}</div></div>
-          </div>
-          <AddressFormPostal
-            customerId={customerId ?? 0}
-            addressType="SHIPPING"
-            existing={shippingAddress}
-            onSuccess={() => handleAddressSuccess('SHIPPING')}
-          />
-        </PanelSection>
+      {/* Addresses — disabled until customer attached */}
+      <div className="mt-6">
+        <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-2">
+          {t('customer.addresses')}
+        </h3>
+        <AddressCard
+          label={t('customer.addressHome')}
+          address={homeAddress}
+          onEdit={() => setEditAddressType('HOME')}
+          disabled={!customerId}
+        />
+        <AddressCard
+          label={t('customer.addressWork')}
+          address={workAddress}
+          onEdit={() => setEditAddressType('WORK')}
+          disabled={!customerId}
+        />
+        <AddressCard
+          label={t('customer.addressShipping')}
+          address={shippingAddress}
+          onEdit={() => setEditAddressType('SHIPPING')}
+          disabled={!customerId}
+          optional
+          emptyHint={t('workspace.shippingAddressHint')}
+        />
       </div>
+
+      {customerId && (
+        <AddressEditModal
+          open={!!editAddressType}
+          onClose={() => setEditAddressType(null)}
+          customerId={customerId}
+          addressType={editAddressType ?? 'HOME'}
+          existing={
+            editAddressType === 'HOME' ? homeAddress
+              : editAddressType === 'WORK' ? workAddress
+              : editAddressType === 'SHIPPING' ? shippingAddress
+              : undefined
+          }
+          onSuccess={() => handleAddressSuccess(editAddressType ?? 'HOME')}
+        />
+      )}
 
       {/* Confirm changes modal — shows all fields, changed ones in green */}
       <Modal open={!!confirmData} onClose={() => setConfirmData(null)} maxWidth="32rem" width="100%">

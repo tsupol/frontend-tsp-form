@@ -558,6 +558,15 @@ function GuarantorRow({ guarantor, contractId, expanded, onToggle, onRemove, rem
     setInfoLoaded(true);
   }
 
+  // Dirty check vs. the loaded snapshot — drives the save button's disabled state.
+  const hasInfoChanges = !!custInfo && (
+    editPrefix !== (custInfo.prefix ?? '')
+    || editFirstName !== custInfo.first_name
+    || editLastName !== custInfo.last_name
+    || editDob !== (custInfo.date_of_birth ?? '')
+    || editTel !== (custInfo.tel ?? '')
+  );
+
   const handleInfoSave = async () => {
     if (!custInfo) return;
     setInfoSaving(true);
@@ -726,7 +735,7 @@ function GuarantorRow({ guarantor, contractId, expanded, onToggle, onRemove, rem
                   <Button
                     color={infoSaved ? 'success' : 'primary'}
                     onClick={handleInfoSave}
-                    disabled={infoSaving || !editFirstName.trim() || !editLastName.trim() || !editDob}
+                    disabled={infoSaving || (!hasInfoChanges && !infoSaved) || !editFirstName.trim() || !editLastName.trim() || !editDob}
                     startIcon={infoSaved ? <CheckCircle size={16} /> : undefined}
                   >
                     {infoSaving ? t('common.saving') : infoSaved ? t('common.saved') : t('common.save')}

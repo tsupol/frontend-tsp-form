@@ -28,6 +28,8 @@ interface Props {
   onClear?: () => void;
   /** Disabled while parent is busy. */
   disabled?: boolean;
+  /** URL of an already-saved ID card image to show when the user hasn't scanned in this session. Upload a new image to replace it (the old one stays on the server until the new upload completes). */
+  existingImageUrl?: string | null;
 }
 
 function resultToFields(r: ScanResult): DetectedIdCardFields {
@@ -55,7 +57,7 @@ function progressLabel(p: ProgressEvent | null, t: (k: string, o?: Record<string
   }
 }
 
-export function IdCardScanner({ onDetected, onPersist, onClear, disabled }: Props) {
+export function IdCardScanner({ onDetected, onPersist, onClear, disabled, existingImageUrl }: Props) {
   const { t } = useTranslation();
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
@@ -84,6 +86,7 @@ export function IdCardScanner({ onDetected, onPersist, onClear, disabled }: Prop
     setProgress(null);
     setError(null);
     setResult(null);
+    setExistingCleared(true);
     onClear?.();
   };
 
@@ -136,7 +139,12 @@ export function IdCardScanner({ onDetected, onPersist, onClear, disabled }: Prop
     }
   };
 
-  const showEmpty = !previewUrl && !scanning && !result && !error;
+  // Local override of `existingImageUrl` so the user can clear a previously-
+  // saved card image visually without us needing a delete RPC.
+  const [existingCleared, setExistingCleared] = useState(false);
+  const visibleExisting = !existingCleared && !previewUrl ? existingImageUrl : null;
+  const displayUrl = previewUrl ?? visibleExisting ?? null;
+  const showEmpty = !displayUrl && !scanning && !result && !error;
 
   return (
     <div className="flex flex-col gap-2">
@@ -154,7 +162,7 @@ export function IdCardScanner({ onDetected, onPersist, onClear, disabled }: Prop
         onUpload={handleUpload}
         disabled={disabled || scanning}
         className={
-          previewUrl
+          displayUrl
             ? '!min-h-0 !p-0 !border !border-solid !border-line hover:!border-primary transition-colors'
             : '!min-h-0 !p-0 !border-2 !border-dashed !border-line hover:!border-primary hover:!bg-surface-hover transition-colors'
         }
@@ -167,8 +175,8 @@ export function IdCardScanner({ onDetected, onPersist, onClear, disabled }: Prop
             </div>
           ) : (
             <div key="filled" className="relative w-full bg-surface-shallow flex items-center justify-center p-2">
-              {previewUrl && (
-                <img key="preview" src={previewUrl} alt="" className="max-w-full max-h-40 object-contain" />
+              {displayUrl && (
+                <img key="preview" src={displayUrl} alt="" className="max-w-full max-h-40 object-contain" />
               )}
               {scanning && (
                 <div key="overlay" className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center gap-1.5 text-white text-xs">
@@ -185,6 +193,14 @@ export function IdCardScanner({ onDetected, onPersist, onClear, disabled }: Prop
         <div className="alert alert-danger">
           <XCircle size={14} />
           <span>{error}</span>
+        </div>
+      )}
+
+      {visibleExisting && !result && !scanning && !error && (
+        <div className="flex justify-end">
+          <Button variant="ghost" size="sm" onClick={reset} startIcon={<Trash2 size={14} />}>
+            {t('ocr.rescan')}
+          </Button>
         </div>
       )}
 

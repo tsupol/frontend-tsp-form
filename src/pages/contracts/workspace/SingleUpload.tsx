@@ -20,7 +20,7 @@ export function SingleUpload({ icon, label, type, fileUrl, uploading, onUpload, 
   const spec = useUploadSpec(type);
 
   const emptyPlaceholder = (
-    <div className="flex items-center justify-center gap-2 text-subtle text-sm w-full h-40">
+    <div key="empty" className="flex items-center justify-center gap-2 text-subtle text-sm w-full h-40">
       <Upload size={16} className="opacity-50" />
       <span>{t('workspace.clickOrDrag')}</span>
     </div>
@@ -28,6 +28,7 @@ export function SingleUpload({ icon, label, type, fileUrl, uploading, onUpload, 
 
   const filledPlaceholder = (
     <div
+      key="filled"
       className="relative group rounded-lg overflow-hidden w-full h-40 bg-surface-shallow flex items-center justify-center"
       title={t('workspace.clickToReplace')}
     >

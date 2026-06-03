@@ -335,6 +335,7 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
 
   const homeAddress = addresses.find(a => a.address_type === 'HOME');
   const workAddress = addresses.find(a => a.address_type === 'WORK');
+  const shippingAddress = addresses.find(a => a.address_type === 'SHIPPING');
 
   // Modal states
   const [editInfoOpen, setEditInfoOpen] = useState(false);
@@ -409,6 +410,11 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
           label={t('customer.addressWork')}
           address={workAddress}
           onEdit={() => setEditAddressType('WORK')}
+        />
+        <AddressCard
+          label={t('customer.addressShipping')}
+          address={shippingAddress}
+          onEdit={() => setEditAddressType('SHIPPING')}
         />
 
         {/* ── Contacts ── */}
@@ -488,7 +494,12 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
         onClose={() => setEditAddressType(null)}
         customerId={customerId}
         addressType={editAddressType ?? 'HOME'}
-        existing={editAddressType === 'HOME' ? homeAddress : workAddress}
+        existing={
+          editAddressType === 'HOME' ? homeAddress
+            : editAddressType === 'WORK' ? workAddress
+            : editAddressType === 'SHIPPING' ? shippingAddress
+            : undefined
+        }
         onSuccess={() => { setEditAddressType(null); refreshAll(); showSuccess(t('customer.addressSaved')); }}
       />
 
