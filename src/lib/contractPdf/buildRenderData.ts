@@ -21,6 +21,15 @@ export interface ContractMin {
   device_identifier: string | null;
   model_name: string | null;
   variant_name: string | null;
+  // Catalog denormalized on v_contract_detail (mig 119). Optional so older
+  // callers building ContractMin from views that don't expose these still
+  // typecheck — the PDF renderer just falls back to empty.
+  brand_name?: string | null;
+  family_name?: string | null;
+  base_model_name?: string | null;
+  manufacturer_color?: string | null;
+  variant_sku_code?: string | null;
+  category_name?: string | null;
   down_payment: number | null;
   insurance_deposit: number | null;
   installment_amount: number | null;
@@ -123,6 +132,21 @@ function singleLineAddress(a: AddressRow): string {
 function pickPrimaryAddress(rows: AddressRow[]): AddressRow | null {
   if (rows.length === 0) return null;
   return rows.find(r => r.is_default) ?? rows.find(r => r.address_type === 'HOME') ?? rows[0];
+}
+
+// Catalog has no first-class "storage" attribute (see filing 2026-06-02). The
+// capacity is baked into model_name (e.g. "Base 256GB"). When base_model_name
+// is available we strip it to get just the storage tier ("256GB"). When it
+// isn't, we fall back to a regex for the first "###[ ]?(GB|TB|MB)" token.
+// Empty string means "no clean source" — the PDF slot stays blank.
+function extractStorage(modelName: string | null, baseModelName: string | null): string {
+  if (!modelName) return '';
+  if (baseModelName && modelName.startsWith(baseModelName)) {
+    const tail = modelName.slice(baseModelName.length).trim();
+    if (tail) return tail;
+  }
+  const m = modelName.match(/\d+\s?(?:GB|TB|MB)\b/i);
+  return m ? m[0].replace(/\s+/g, '') : '';
 }
 
 async function resolveMediaDataUrl(key: string | null): Promise<string | null> {
@@ -335,11 +359,11 @@ export async function buildContractRenderData(
     ref2Tel: ref2?.tel ?? '',
     ref2Relation: ref2?.relation ?? '',
 
-    deviceCategory: asset?.family_name ?? 'มือถือ',
-    deviceBrand: asset?.brand_name ?? '',
-    deviceModel: asset?.model_name ?? contract.model_name ?? '',
-    deviceColor: asset?.physical_color ?? asset?.manufacturer_color ?? '',
-    deviceStorage: asset?.variant_name ?? contract.variant_name ?? '',
+    deviceCategory: asset?.family_name ?? contract.family_name ?? contract.category_name ?? 'มือถือ',
+    deviceBrand: asset?.brand_name ?? contract.brand_name ?? '',
+    deviceModel: contract.base_model_name ?? asset?.model_name ?? contract.model_name ?? '',
+    deviceColor: asset?.physical_color ?? asset?.manufacturer_color ?? contract.manufacturer_color ?? '',
+    deviceStorage: extractStorage(contract.model_name ?? asset?.model_name ?? null, contract.base_model_name ?? null),
     deviceImei: asset?.imei ?? (asset ? '' : (contract.device_identifier ?? '')),
     deviceSerial: asset?.serial_no ?? '',
 

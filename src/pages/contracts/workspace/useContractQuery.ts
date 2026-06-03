@@ -26,6 +26,13 @@ export interface ContractServerState {
   model_name: string | null;
   variant_id: number | null;
   variant_name: string | null;
+  // Catalog denormalized (mig 119) — naming matches v_assets
+  brand_name: string | null;
+  family_name: string | null;
+  base_model_name: string | null;
+  manufacturer_color: string | null;
+  variant_sku_code: string | null;
+  category_name: string | null;
 
   // Pricing — current values
   rate_card_id: number | null;

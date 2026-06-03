@@ -29,6 +29,12 @@ interface ContractMin {
   device_identifier: string | null;
   model_name: string | null;
   variant_name: string | null;
+  brand_name?: string | null;
+  family_name?: string | null;
+  base_model_name?: string | null;
+  manufacturer_color?: string | null;
+  variant_sku_code?: string | null;
+  category_name?: string | null;
   down_payment: number | null;
   insurance_deposit: number | null;
   installment_amount: number | null;
