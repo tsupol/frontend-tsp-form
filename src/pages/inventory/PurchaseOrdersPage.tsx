@@ -145,6 +145,20 @@ const STATUS_COLOR: Record<string, 'success' | 'warning' | 'danger' | 'info' | '
   CANCELLED: 'default',
 };
 
+// PO type buckets: PURCHASE = invoice (สั่งซื้อ/รับของ), BUYBACK = ซื้อคืน, DEAL_PARTNER = partner
+const PO_TYPE_COLOR: Record<string, 'primary' | 'warning' | 'info' | 'default'> = {
+  PURCHASE: 'primary',
+  BUYBACK: 'warning',
+  DEAL_PARTNER: 'info',
+};
+
+// Thai display overrides — backend's name_th is verbose, owner prefers these shorter labels.
+const PO_TYPE_TH_OVERRIDE: Record<string, string> = {
+  PURCHASE: 'สั่งซื้อ',
+  BUYBACK: 'ซื้อมือสอง',
+  DEAL_PARTNER: 'ซื้อเครื่องจากตู้',
+};
+
 // ============================================================================
 // Component
 // ============================================================================
@@ -161,6 +175,7 @@ export function PurchaseOrdersPage() {
   // ── Filters ─────────────────────────────────────────────────────────
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
   const [filterOwnership, setFilterOwnership] = useState<string | null>(null);
+  const [filterPoType, setFilterPoType] = useState<string | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
   const navigate = useNavigate();
@@ -185,6 +200,12 @@ export function PurchaseOrdersPage() {
     staleTime: 60 * 60 * 1000,
   });
 
+  const { data: poTypeRefs } = useQuery({
+    queryKey: ['ref', 'po_types'],
+    queryFn: () => apiClient.get<RefRow[]>('/v_ref_po_types?order=sort_order&is_active=eq.true'),
+    staleTime: 60 * 60 * 1000,
+  });
+
   const statusOptions = useMemo(
     () => (statusRefs ?? []).map(r => ({ value: r.code, label: isThai ? r.name_th : r.name_en })),
     [statusRefs, isThai],
@@ -195,6 +216,14 @@ export function PurchaseOrdersPage() {
     [ownershipRefs, isThai],
   );
 
+  const poTypeOptions = useMemo(
+    () => (poTypeRefs ?? []).map(r => ({
+      value: r.code,
+      label: isThai ? (PO_TYPE_TH_OVERRIDE[r.code] ?? r.name_th) : r.name_en,
+    })),
+    [poTypeRefs, isThai],
+  );
+
   const ownershipLabel = (code: string): string => {
     const r = ownershipRefs?.find(x => x.code === code);
     return r ? (isThai ? r.name_th : r.name_en) : code;
@@ -203,6 +232,12 @@ export function PurchaseOrdersPage() {
   const statusLabel = (code: string): string => {
     const r = statusRefs?.find(x => x.code === code);
     return r ? (isThai ? r.name_th : r.name_en) : code;
+  };
+
+  const poTypeLabel = (code: string): string => {
+    const r = poTypeRefs?.find(x => x.code === code);
+    if (!r) return code;
+    return isThai ? (PO_TYPE_TH_OVERRIDE[code] ?? r.name_th) : r.name_en;
   };
 
   const { data: allBranches } = useQuery({
@@ -217,13 +252,14 @@ export function PurchaseOrdersPage() {
     return m;
   }, [allBranches]);
 
-  // ── PO list (PURCHASE only) ─────────────────────────────────────────
+  // ── PO list (all 3 types: PURCHASE / BUYBACK / DEAL_PARTNER) ─────────
   const { data: listData, isFetching } = useQuery({
-    queryKey: ['purchase-orders', filterStatus, filterOwnership, pageIndex, pageSize],
+    queryKey: ['purchase-orders', filterStatus, filterOwnership, filterPoType, pageIndex, pageSize],
     queryFn: () => {
-      let url = '/v_purchase_orders?po_type=eq.PURCHASE&order=created_at.desc';
+      let url = '/v_purchase_orders?order=created_at.desc';
       if (filterStatus) url += `&status=eq.${filterStatus}`;
       if (filterOwnership) url += `&ownership=eq.${filterOwnership}`;
+      if (filterPoType) url += `&po_type=eq.${filterPoType}`;
       return apiClient.getPaginated<PoListRow>(url, { page: pageIndex + 1, pageSize });
     },
     placeholderData: keepPreviousData,
@@ -241,7 +277,7 @@ export function PurchaseOrdersPage() {
     placeholderData: keepPreviousData,
   });
 
-  useEffect(() => { setPageIndex(0); }, [filterStatus, filterOwnership]);
+  useEffect(() => { setPageIndex(0); }, [filterStatus, filterOwnership, filterPoType]);
 
   // Don't auto-clear the selection based on list membership: the user can deep-link
   // to /po/:id, and the list may be filtered / paginated so the row isn't visible.
@@ -306,7 +342,18 @@ export function PurchaseOrdersPage() {
               className={isMobile ? '' : 'w-1/2 xl:w-5/12 border-r border-line flex flex-col'}
             >
               <div className="flex-none flex flex-col gap-2 p-2 border-b border-line">
-                <div className="flex gap-2 w-full">
+                <div className="flex flex-wrap gap-2 w-full">
+                  <div className="flex-[2] min-w-0">
+                    <Select
+                      options={poTypeOptions}
+                      value={filterPoType}
+                      onChange={(v) => setFilterPoType((v as string) || null)}
+                      placeholder={t('po.allTypes')}
+                      size="sm"
+                      showChevron
+                      clearable
+                    />
+                  </div>
                   <div className="flex-[2] min-w-0">
                     <Select
                       options={statusOptions}
@@ -361,6 +408,9 @@ export function PurchaseOrdersPage() {
                           <span className="font-medium text-sm truncate">{codeDisplay(po.code_display, po.po_no)}</span>
                         </div>
                         <div className="flex items-center gap-2 min-w-0 mt-0.5">
+                          <Badge size="xs" color={PO_TYPE_COLOR[po.po_type] ?? 'default'}>
+                            {poTypeLabel(po.po_type)}
+                          </Badge>
                           <Badge size="xs" color={STATUS_COLOR[po.status] ?? 'default'}>
                             {statusLabel(po.status)}
                           </Badge>

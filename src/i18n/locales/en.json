@@ -1115,6 +1115,7 @@
   "po": {
     "allStatuses": "All statuses",
     "allOwnership": "All ownership",
+    "allTypes": "All types",
     "selectToView": "Select a PO to view details",
     "notAccessible": "This PO is not accessible from your account.",
     "lines": "lines",
