@@ -8,6 +8,7 @@ import { uploadFromImage, invalidateMediaUrl } from '../../../lib/upload';
 import { useWorkspace } from './WorkspaceContext';
 import { SingleUpload } from './SingleUpload';
 import { ContractPreviewSignPair } from './ContractPreviewSignPair';
+import { SignatoryEditor } from './SignatoryEditor';
 import { useContractGuarantors } from './useContractGuarantors';
 import type { ContractMin } from '../../../lib/contractPdf/buildRenderData';
 
@@ -39,12 +40,13 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
   const contractId = workspace.contractId;
   const customerId = workspace.customerId;
 
+  // Signatory used to be a prereq card — it now lives inline at the top of
+  // this panel via <SignatoryEditor />, so it's no longer in the prereq list.
   const prereqCards: Array<{ id: string; labelKey: string }> = [
     { id: 'customer', labelKey: 'workspace.cardCustomer' },
     { id: 'productPlan', labelKey: 'workspace.cardProduct' },
     { id: 'contactRef', labelKey: 'workspace.cardContactRef' },
     { id: 'guarantor', labelKey: 'workspace.cardGuarantor' },
-    { id: 'signatory', labelKey: 'workspace.cardSignatory' },
   ];
   const missingCardPrereqs = prereqCards.filter(c => getCardStatus(c.id) !== 'complete');
 
@@ -127,7 +129,14 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
       });
     }
   }
+  // Signatory completeness — sign-pair rendering needs lessor + 2 witnesses
+  // bound. Surfaced inline via the embedded SignatoryEditor; here it just
+  // gates the sign-pair "Generate contract" button.
+  const signatoryReady = getCardStatus('signatory') === 'complete';
   const missingPrereqs = [...missingCardPrereqs, ...missingIdCardPeople];
+  if (!signatoryReady) {
+    missingPrereqs.push({ id: 'signatory', labelKey: 'workspace.cardSignatory' });
+  }
   const prereqsMet = missingPrereqs.length === 0;
 
   // ── Generic upload helpers (parameterised by target customer) ───────
@@ -201,6 +210,14 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
   return (
     <div className="p-4 flex flex-col gap-8 max-w-2xl">
       {error && <div className="alert alert-danger"><XCircle size={18} /><div><div className="alert-description">{error}</div></div></div>}
+
+      {/* ── Signatory selection (lessor + witnesses) ────────────────── */}
+      <div className="flex flex-col gap-2">
+        <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider">
+          {t('workspace.cardSignatory')}
+        </h3>
+        <SignatoryEditor />
+      </div>
 
       {/* ── Lessee block — unchanged layout ─────────────────────────── */}
       <SingleUpload

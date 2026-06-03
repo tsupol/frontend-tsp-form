@@ -15,7 +15,6 @@ import { CardInsurance } from './workspace/CardInsurance';
 import { CardCustomer } from './workspace/CardCustomer';
 import { CardGuarantor } from './workspace/CardGuarantor';
 import { CardDocuments } from './workspace/CardDocuments';
-import { CardSignatory } from './workspace/CardSignatory';
 import { CardHandover } from './workspace/CardHandover';
 import { PanelSignatory } from './workspace/PanelSignatory';
 import { PanelHandover } from './workspace/PanelHandover';
@@ -404,7 +403,6 @@ function WorkspaceContent() {
                     <CardInsurance onEdit={() => handleEditOpen('insurance')} active={isCardActive('insurance')} shake={shakingCards.has('insurance')} />
                     <CardContactRef onEdit={() => handleEditOpen('contactRef')} active={isCardActive('contactRef')} shake={shakingCards.has('contactRef')} />
                     <CardGuarantor onEdit={() => handleEditOpen('guarantor')} active={isCardActive('guarantor')} shake={shakingCards.has('guarantor')} />
-                    <CardSignatory onEdit={() => handleEditOpen('signatory')} active={isCardActive('signatory')} shake={shakingCards.has('signatory')} />
                     <CardHandover onEdit={() => handleEditOpen('handover')} active={isCardActive('handover')} shake={shakingCards.has('handover')} />
                     <CardDocuments onEdit={() => handleEditOpen('documents')} active={isCardActive('documents')} shake={shakingCards.has('documents')} />
 
