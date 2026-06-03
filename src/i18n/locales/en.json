@@ -2459,6 +2459,27 @@
     "insurance_cashout_ok": "Cashout available — installments complete",
     "insurance_cashout_blocked": "Cashout blocked — {{remaining}} installments unpaid"
   },
+  "ocr": {
+    "title": "Scan ID card",
+    "dropHint": "Drop or click to scan a Thai ID card",
+    "dropSubhint": "We will auto-fill ID, name and date of birth",
+    "rescan": "Remove image",
+    "fieldCid": "ID number",
+    "fieldPrefix": "Prefix",
+    "fieldFirstName": "First name",
+    "fieldLastName": "Last name",
+    "fieldDob": "Date of birth",
+    "cidChecksumBad": "checksum",
+    "dobUnparsed": "unparsed",
+    "phaseLoad": "Loading image…",
+    "phaseUpscale": "Upscaling…",
+    "phasePass1": "Reading card text…",
+    "phaseDetect": "Finding labels…",
+    "phasePass2": "Reading fields ({{step}}/{{total}})",
+    "phaseDone": "Done",
+    "errorScanFailed": "Could not read the card. Try a sharper or better-lit photo.",
+    "errorFitFailed": "Couldn't locate enough labels on the card. Make sure the whole card is in frame."
+  },
   "workspace": {
     "cardProduct": "Product & Finance Plan",
     "cardCustomer": "Customer",

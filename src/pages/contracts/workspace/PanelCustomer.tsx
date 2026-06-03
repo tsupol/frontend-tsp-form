@@ -1,13 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Input, Select, Button, InputDatePicker, Modal, MaskedInput } from 'tsp-form';
+import type { UploadedImage } from 'tsp-form';
 import { ShieldAlert, AlertTriangle, CheckCircle, XCircle, Keyboard, Search, Loader2, Info } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
+import { uploadFromImage, invalidateMediaUrl } from '../../../lib/upload';
 import { toLocalDateStr, parseLocalDate, makeDatePickerFormat } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
 import { PanelSection } from './PanelSection';
 import { AddressFormPostal } from './AddressFormPostal';
+import { IdCardScanner, type DetectedIdCardFields } from '../../../components/IdCardScanner';
+import { passesThaiCidChecksum } from '../../../lib/ocr/extractIdCard';
 import type { CustomerRegisterResult, CustomerAddress } from './WorkspaceTypes';
 
 const thaiPhoneMask = (digits: string) => {
@@ -94,9 +98,12 @@ function compareFields(original: CustomerSnapshot, current: CustomerSnapshot): {
 
 interface Props { onClose: () => void }
 
+const KNOWN_TH_PREFIXES = new Set(PREFIX_OPTIONS.map(o => o.value).filter(Boolean));
+
 export function PanelCustomer({ onClose: _onClose }: Props) {
   const { t, i18n } = useTranslation();
   const { data: workspace, contract, updateData, invalidateContract, invalidateCustomer, setPanelDirty } = useWorkspace();
+  const queryClient = useQueryClient();
 
   // Form fields
   const [idType, setIdType] = useState<'CITIZEN_ID' | 'PASSPORT'>('CITIZEN_ID');
@@ -145,6 +152,9 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
   const [searchResults, setSearchResults] = useState<CustomerSearchResult[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [confirmData, setConfirmData] = useState<FieldComparison[] | null>(null);
+
+  // Pending scanned ID card image — uploaded to backend once we have a customer_id.
+  const pendingScanRef = useRef<UploadedImage | null>(null);
 
   // Address
   const customerId = workspace.customerId;
@@ -272,6 +282,52 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
     await doRegister(); // fn_customer_register_or_update handles both create and update by id_number
   };
 
+  // Persist the OCR-scanned ID card image as the customer's ID_CARD_FRONT
+  // document. Best-effort — failures are silent because the user can still
+  // re-upload from the Documents panel.
+  const persistScannedIdCard = async (custId: number, image: UploadedImage) => {
+    try {
+      const results = await uploadFromImage({
+        type: 'customer_id_card',
+        image,
+        params: { customer_id: custId },
+      });
+      const key = results.lg?.key ?? Object.values(results)[0]?.key;
+      if (!key) return;
+      await apiClient.rpc('fn_customer_document_upload', {
+        p_customer_id: custId,
+        p_doc_type: 'ID_CARD_FRONT',
+        p_file_url: `/${key}`,
+      });
+      invalidateMediaUrl(key);
+      queryClient.invalidateQueries({ queryKey: ['customer-summary', custId] });
+      queryClient.invalidateQueries({ queryKey: ['contract-readiness'] });
+    } catch { /* ignore — user can re-upload in Documents */ }
+  };
+
+  // OCR scanner callback — overwrite form fields with detected values. Skipped
+  // entirely for an existing (already-saved) customer to avoid corrupting their
+  // record, but for a new registration each scan wins.
+  const handleOcrDetected = (f: DetectedIdCardFields) => {
+    if (selectedCustomer) return;
+    if (f.cid) {
+      setIdType('CITIZEN_ID');
+      setIdNumber(f.cid);
+    }
+    if (f.prefix && KNOWN_TH_PREFIXES.has(f.prefix)) setPrefix(f.prefix);
+    if (f.firstName) setFirstName(f.firstName);
+    if (f.lastName) setLastName(f.lastName);
+    if (f.dob) setDateOfBirth(f.dob);
+  };
+
+  const handleOcrPersist = async (img: UploadedImage) => {
+    if (customerId) {
+      await persistScannedIdCard(customerId, img);
+    } else {
+      pendingScanRef.current = img;
+    }
+  };
+
   // Attach the picked customer to the contract. When no contractId exists yet,
   // WorkspaceContext will create a draft from the customerId we set on data;
   // when one does, we call the attach RPC directly so failures surface here
@@ -301,6 +357,12 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
       setSelectedCustomer(null);
       originalRef.current = null;
       setPanelDirty(false);
+      // If we held a scanned ID card until the customer existed, persist it now.
+      if (pendingScanRef.current) {
+        const img = pendingScanRef.current;
+        pendingScanRef.current = null;
+        void persistScannedIdCard(custId, img);
+      }
     } catch (err) {
       if (err instanceof ApiError) {
         const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
@@ -326,6 +388,15 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
       {apiError && <div className="alert alert-danger"><XCircle size={18} /><div><div className="alert-description">{apiError}</div></div></div>}
       {result && <ResultBanner result={result} t={t} />}
 
+      {/* ID card scanner — autofills the form, also persists as ID_CARD_FRONT */}
+      {!selectedCustomer && (
+        <IdCardScanner
+          onDetected={handleOcrDetected}
+          onPersist={handleOcrPersist}
+          disabled={submitting}
+        />
+      )}
+
       {/* Form */}
       <div className="form-grid">
         <div className="flex gap-3">
@@ -336,7 +407,16 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
           <div className="flex flex-col flex-1 min-w-0">
             <label className="form-label">{t('wizard.idNumber')}</label>
             {idType === 'CITIZEN_ID' ? (
-              <MaskedInput mask="#-####-#####-##-#" placeholder="" value={idNumber} onChange={(raw) => setIdNumber(raw)} size="sm" className="w-full" disabled={!!selectedCustomer} />
+              <MaskedInput
+                mask="#-####-#####-##-#"
+                placeholder=""
+                value={idNumber}
+                onChange={(raw) => setIdNumber(raw)}
+                size="sm"
+                className="w-full"
+                disabled={!!selectedCustomer}
+                endIcon={<CidChecksumIcon digits={idNumber} />}
+              />
             ) : (
               <Input value={idNumber} onChange={(e) => setIdNumber(e.target.value)} size="sm" className="w-full" disabled={!!selectedCustomer} />
             )}
@@ -509,6 +589,14 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
       </Modal>
     </div>
   );
+}
+
+function CidChecksumIcon({ digits }: { digits: string }) {
+  const raw = digits.replace(/\D/g, '');
+  if (raw.length !== 13) return null;
+  return passesThaiCidChecksum(raw)
+    ? <CheckCircle size={14} className="text-success" />
+    : <XCircle size={14} className="text-warning-fg" />;
 }
 
 function ResultBanner({ result, t }: { result: CustomerRegisterResult; t: (key: string, opts?: Record<string, unknown>) => string }) {

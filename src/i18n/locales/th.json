@@ -2459,6 +2459,27 @@
     "insurance_cashout_ok": "คืนประกันได้ — ผ่อนครบแล้ว",
     "insurance_cashout_blocked": "คืนประกันยังไม่ได้ — ค้างชำระอีก {{remaining}} งวด"
   },
+  "ocr": {
+    "title": "สแกนบัตรประชาชน",
+    "dropHint": "วาง หรือคลิกเพื่อสแกนบัตรประชาชนไทย",
+    "dropSubhint": "ระบบจะกรอกเลขบัตร ชื่อ–สกุล และวันเกิดให้อัตโนมัติ",
+    "rescan": "ลบรูป",
+    "fieldCid": "เลขบัตร",
+    "fieldPrefix": "คำนำหน้า",
+    "fieldFirstName": "ชื่อ",
+    "fieldLastName": "นามสกุล",
+    "fieldDob": "วันเกิด",
+    "cidChecksumBad": "checksum ไม่ผ่าน",
+    "dobUnparsed": "อ่านวันที่ไม่ออก",
+    "phaseLoad": "กำลังโหลดภาพ…",
+    "phaseUpscale": "กำลังขยายภาพ…",
+    "phasePass1": "กำลังอ่านตัวอักษรบนบัตร…",
+    "phaseDetect": "กำลังหาตำแหน่ง…",
+    "phasePass2": "อ่านฟิลด์ ({{step}}/{{total}})",
+    "phaseDone": "เสร็จ",
+    "errorScanFailed": "อ่านบัตรไม่ได้ ลองถ่ายภาพให้คมชัด/แสงดีกว่านี้",
+    "errorFitFailed": "หาตำแหน่งบนบัตรไม่พอ ลองให้ภาพเห็นบัตรเต็มใบ"
+  },
   "workspace": {
     "cardProduct": "สินค้า + แผนผ่อน",
     "cardCustomer": "ลูกค้า",

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Input, Select, Button, InputDatePicker, MaskedInput, useSnackbarContext } from 'tsp-form';
@@ -13,7 +13,11 @@ import { PanelSection } from './PanelSection';
 import { AddressFormPostal } from './AddressFormPostal';
 import { SingleUpload } from './SingleUpload';
 import { ContractSignModal } from './ContractSignModal';
+import { IdCardScanner, type DetectedIdCardFields } from '../../../components/IdCardScanner';
+import { passesThaiCidChecksum } from '../../../lib/ocr/extractIdCard';
 import type { CustomerRegisterResult, CustomerAddress } from './WorkspaceTypes';
+
+const KNOWN_TH_PREFIXES = new Set(['นาย', 'นาง', 'นางสาว']);
 
 interface CustomerDocument {
   id: number;
@@ -46,6 +50,7 @@ interface Props { onClose: () => void }
 export function PanelGuarantor({ onClose: _onClose }: Props) {
   const { t, i18n } = useTranslation();
   const { data: workspace, guarantorList, invalidateGuarantors, setPanelDirty } = useWorkspace();
+  const queryClient = useQueryClient();
 
   // Map server guarantorList to the shape used by the panel
   const guarantors = guarantorList.map(g => ({ customerId: g.customer_id, fullName: g.customer_name, idNumber: g.id_number ?? '' }));
@@ -98,6 +103,9 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
 
+  // Pending scanned ID card image — uploaded to backend once we have a customer_id.
+  const pendingScanRef = useRef<UploadedImage | null>(null);
+
   // Track dirty state for nav guard
   useEffect(() => {
     setPanelDirty(!!(idNumber || firstName || lastName || tel || dateOfBirth || prefix));
@@ -109,6 +117,47 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
     setLastName(''); setDateOfBirth(''); setTel('');
     setSelectedCustomer(null); setResult(null); setApiError('');
     setSearchResults([]); setHasSearched(false);
+    pendingScanRef.current = null;
+  };
+
+  // Persist the OCR-scanned ID card as the guarantor's ID_CARD_FRONT document.
+  const persistScannedIdCard = async (custId: number, image: UploadedImage) => {
+    try {
+      const results = await uploadFromImage({
+        type: 'customer_id_card',
+        image,
+        params: { customer_id: custId },
+      });
+      const key = results.lg?.key ?? Object.values(results)[0]?.key;
+      if (!key) return;
+      await apiClient.rpc('fn_customer_document_upload', {
+        p_customer_id: custId,
+        p_doc_type: 'ID_CARD_FRONT',
+        p_file_url: `/${key}`,
+      });
+      invalidateMediaUrl(key);
+      queryClient.invalidateQueries({ queryKey: ['guarantor-idcard', custId] });
+      queryClient.invalidateQueries({ queryKey: ['guarantor-status'] });
+      queryClient.invalidateQueries({ queryKey: ['guarantor-all-complete'] });
+    } catch { /* ignore — user can re-upload */ }
+  };
+
+  // Apply OCR-detected fields. Each scan overwrites the previous values so
+  // re-scanning works; skipped for an existing customer to protect their data.
+  const handleOcrDetected = (f: DetectedIdCardFields) => {
+    if (selectedCustomer) return;
+    if (f.cid) {
+      setIdType('CITIZEN_ID');
+      setIdNumber(f.cid);
+    }
+    if (f.prefix && KNOWN_TH_PREFIXES.has(f.prefix)) setPrefix(f.prefix);
+    if (f.firstName) setFirstName(f.firstName);
+    if (f.lastName) setLastName(f.lastName);
+    if (f.dob) setDateOfBirth(f.dob);
+  };
+
+  const handleOcrPersist = (img: UploadedImage) => {
+    pendingScanRef.current = img;
   };
 
   const handleSearch = async () => {
@@ -154,6 +203,12 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
         p_customer_id: custId,
         p_relation: null,
       });
+      // Persist any scanned ID card image before we reset form state.
+      if (pendingScanRef.current) {
+        const img = pendingScanRef.current;
+        pendingScanRef.current = null;
+        void persistScannedIdCard(custId, img);
+      }
       invalidateGuarantors();
       resetForm();
       setShowAddForm(false);
@@ -260,6 +315,16 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
               <div className="alert alert-danger mb-3"><ShieldAlert size={18} /><div><div className="alert-title">{t('wizard.blacklisted')}</div></div></div>
             )}
 
+            {!selectedCustomer && (
+              <div className="mb-3">
+                <IdCardScanner
+                  onDetected={handleOcrDetected}
+                  onPersist={handleOcrPersist}
+                  disabled={submitting}
+                />
+              </div>
+            )}
+
             <div className="form-grid">
               <div className="flex gap-3">
                 <div className="flex flex-col" style={{ width: '10rem' }}>
@@ -269,7 +334,7 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
                 <div className="flex flex-col flex-1 min-w-0">
                   <label className="form-label">{t('wizard.idNumber')}</label>
                   {idType === 'CITIZEN_ID' ? (
-                    <MaskedInput mask="#-####-#####-##-#" placeholder="" value={idNumber} onChange={(raw) => setIdNumber(raw)} size="sm" className="w-full" disabled={!!selectedCustomer} />
+                    <MaskedInput mask="#-####-#####-##-#" placeholder="" value={idNumber} onChange={(raw) => setIdNumber(raw)} size="sm" className="w-full" disabled={!!selectedCustomer} endIcon={<CidChecksumIcon digits={idNumber} />} />
                   ) : (
                     <Input value={idNumber} onChange={(e) => setIdNumber(e.target.value)} size="sm" className="w-full" disabled={!!selectedCustomer} />
                   )}
@@ -361,6 +426,14 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
 }
 
 // ── Section toggle header ─────────────────────────────────────────────────
+
+function CidChecksumIcon({ digits }: { digits: string }) {
+  const raw = digits.replace(/\D/g, '');
+  if (raw.length !== 13) return null;
+  return passesThaiCidChecksum(raw)
+    ? <CheckCircle size={14} className="text-success" />
+    : <XCircle size={14} className="text-warning-fg" />;
+}
 
 function SectionHeader({ label, done, expanded, onToggle, optional }: {
   label: string; done: boolean; expanded: boolean; onToggle: () => void;
@@ -594,7 +667,7 @@ function GuarantorRow({ guarantor, contractId, expanded, onToggle, onRemove, rem
                     <div className="flex flex-col flex-1 min-w-0">
                       <label className="form-label">{t('wizard.idNumber')}</label>
                       {custInfo?.id_type === 'CITIZEN_ID' ? (
-                        <MaskedInput mask="#-####-#####-##-#" placeholder="" value={custInfo?.id_number ?? ''} onChange={() => {}} size="sm" className="w-full" disabled />
+                        <MaskedInput mask="#-####-#####-##-#" placeholder="" value={custInfo?.id_number ?? ''} onChange={() => {}} size="sm" className="w-full" disabled endIcon={<CidChecksumIcon digits={custInfo?.id_number ?? ''} />} />
                       ) : (
                         <Input size="sm" value={custInfo?.id_number ?? ''} disabled className="w-full" />
                       )}
