@@ -42,7 +42,7 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
 
   // Signatory used to be a prereq card — it now lives inline at the top of
   // this panel via <SignatoryEditor />, so it's no longer in the prereq list.
-  const prereqCards: Array<{ id: string; labelKey: string }> = [
+  const prereqCards: Array<{ id: string; labelKey?: string; labelText?: string }> = [
     { id: 'customer', labelKey: 'workspace.cardCustomer' },
     { id: 'productPlan', labelKey: 'workspace.cardProduct' },
     { id: 'contactRef', labelKey: 'workspace.cardContactRef' },
