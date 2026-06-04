@@ -152,11 +152,16 @@ const PO_TYPE_COLOR: Record<string, 'primary' | 'warning' | 'info' | 'default'> 
   DEAL_PARTNER: 'info',
 };
 
-// Thai display overrides — backend's name_th is verbose, owner prefers these shorter labels.
+// Display overrides — backend's name_th / name_en are verbose, owner prefers these shorter labels.
 const PO_TYPE_TH_OVERRIDE: Record<string, string> = {
   PURCHASE: 'สั่งซื้อ',
   BUYBACK: 'ซื้อมือสอง',
   DEAL_PARTNER: 'ซื้อเครื่องจากตู้',
+};
+const PO_TYPE_EN_OVERRIDE: Record<string, string> = {
+  PURCHASE: 'Supplier',
+  BUYBACK: 'Buyback',
+  DEAL_PARTNER: 'Partner',
 };
 
 // ============================================================================
@@ -227,7 +232,9 @@ export function PurchaseOrdersPage() {
   const poTypeOptions = useMemo(
     () => (poTypeRefs ?? []).map(r => ({
       value: r.code,
-      label: isThai ? (PO_TYPE_TH_OVERRIDE[r.code] ?? r.name_th) : r.name_en,
+      label: isThai
+        ? (PO_TYPE_TH_OVERRIDE[r.code] ?? r.name_th)
+        : (PO_TYPE_EN_OVERRIDE[r.code] ?? r.name_en),
     })),
     [poTypeRefs, isThai],
   );
@@ -245,7 +252,9 @@ export function PurchaseOrdersPage() {
   const poTypeLabel = (code: string): string => {
     const r = poTypeRefs?.find(x => x.code === code);
     if (!r) return code;
-    return isThai ? (PO_TYPE_TH_OVERRIDE[code] ?? r.name_th) : r.name_en;
+    return isThai
+      ? (PO_TYPE_TH_OVERRIDE[code] ?? r.name_th)
+      : (PO_TYPE_EN_OVERRIDE[code] ?? r.name_en);
   };
 
   const { data: allBranches } = useQuery({
