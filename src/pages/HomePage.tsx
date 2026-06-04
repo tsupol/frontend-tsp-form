@@ -38,7 +38,7 @@ export function HomePage() {
   }, []);
 
   return (
-    <div className="relative min-h-screen flex flex-col bg-bg">
+    <div className="relative h-dvh flex flex-col bg-bg overflow-hidden">
       <header className="relative border-b border-line p-4">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-3">

@@ -74,7 +74,7 @@ export function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-bg sm:bg-surface">
+    <div className="h-dvh flex flex-col bg-bg sm:bg-surface overflow-hidden">
       <header className="px-4 sm:px-8 pt-6 sm:pt-8 pb-2 flex justify-center sm:justify-start">
         <div className="flex items-center gap-3">
           <img src="/nnf-favicon.svg" alt="" className="w-8 h-8 rounded-md" />
