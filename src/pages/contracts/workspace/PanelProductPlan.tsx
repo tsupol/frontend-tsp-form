@@ -2,12 +2,14 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Input, Select, Badge, Button, MaskedInput, useSnackbarContext } from 'tsp-form';
-import { Search, XCircle, X, Calculator, Info, CheckCircle, Package, BookOpen, AlertTriangle, Wand2 } from 'lucide-react';
+import { Search, ScanBarcode, XCircle, X, Calculator, Info, CheckCircle, Package, BookOpen, AlertTriangle, Wand2 } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { fmtCurrency } from '../../../lib/format';
 import { getConditionLabel, getConditionTextColor } from '../../inventory/inventoryUtils';
 import { useWorkspace } from './WorkspaceContext';
 import type { Quote } from './WorkspaceTypes';
+import { useBarcodeScanner } from '../../../components/BarcodeScanner';
+import { lookupBarcode } from '../../../lib/barcodeLookup';
 
 // ── Types ───────────────────────────────────────────────────────────────
 
@@ -398,6 +400,54 @@ export function PanelProductPlan(_props: Props) {
     setLocalQuote(null);
   };
 
+  const handleBarcodeScan = async (raw: string) => {
+    const hit = await lookupBarcode(raw).catch(() => null);
+    if (hit) {
+      // Synthesize a SearchModel containing the one matched variant so the
+      // downstream quote pickers behave exactly as if the model+variant had been
+      // chosen from the catalog list.
+      const synthModel: SearchModel = {
+        score: 1,
+        model_id: hit.model_id,
+        model_name: hit.model_name,
+        base_model_name: hit.model_name,
+        model_name_suffix: null,
+        brand_name: hit.brand_name,
+        family_name: hit.family_name,
+        variants: [{
+          variant_id: hit.variant_id,
+          name: hit.sku_name,
+          sku_code: hit.sku_code,
+          attributes: { option_set: hit.manufacturer_color ? { COLOR: hit.manufacturer_color } : undefined },
+        }],
+      };
+      setSelectedModel(synthModel);
+      setLocalModelId(hit.model_id);
+      setLocalModelName(hit.model_name);
+      setLocalFamilyName(hit.family_name);
+      setLocalBrandName(hit.brand_name);
+      setLocalVariantId(hit.variant_id);
+      setLocalVariantName(hit.sku_name);
+      setLocalQuote(null);
+      setSearch('');
+      setDebouncedSearch('');
+      return;
+    }
+    setSearch(raw);
+    setDebouncedSearch(raw);
+    addSnackbar({
+      message: (
+        <div className="alert alert-warning">
+          <XCircle size={16} />
+          <span>{t('wizard.barcodeNotFound', { defaultValue: 'Barcode {{barcode}} not registered', barcode: raw })}</span>
+        </div>
+      ),
+      type: 'warning',
+      duration: 3500,
+    });
+  };
+  const { open: openScanner, scannerEl } = useBarcodeScanner({ onScan: handleBarcodeScan });
+
   const handleSelectVariant = (v: SearchVariant) => {
     setLocalVariantId(v.variant_id);
     setLocalVariantName(colorLabel(v));
@@ -660,6 +710,7 @@ export function PanelProductPlan(_props: Props) {
 
   return (
     <div className="flex flex-col h-full max-w-2xl">
+    {scannerEl}
     <div className="flex-1 overflow-y-auto better-scroll p-4 flex flex-col gap-3">
 
       {/* ── Selected display (either mode) ───────────────────────────── */}
@@ -781,7 +832,7 @@ export function PanelProductPlan(_props: Props) {
           {/* Catalog search */}
           {sourceTab === 'catalog' && (
             <>
-              <Input ref={searchRef} value={search} onChange={(e) => handleSearchInput(e.target.value)} placeholder={t('wizard.searchProductPlaceholder')} startIcon={<Search size={16} />} className="w-full" size="sm" />
+              <Input ref={searchRef} value={search} onChange={(e) => handleSearchInput(e.target.value)} placeholder={t('wizard.searchProductPlaceholder')} startIcon={<ScanBarcode size={16} />} onStartIconClick={openScanner} className="w-full" size="sm" />
               <div className="border border-line rounded-lg overflow-hidden h-48 data-table-content better-scroll">
                 {!shouldSearch ? (
                   <div className="flex items-center justify-center h-full text-subtle text-sm">{t('wizard.typeToSearch')}</div>

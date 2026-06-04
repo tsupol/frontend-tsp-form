@@ -3,12 +3,13 @@ import { useSearchParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { MobileHeader, Badge, Select, Input } from 'tsp-form';
-import { Boxes, Search, ArrowRightFromLine, ShoppingCart, Smartphone } from 'lucide-react';
+import { Boxes, ScanBarcode, ArrowRightFromLine, ShoppingCart, Smartphone } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { fmtNum } from './inventoryUtils';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { useBarcodeScanner } from '../../components/BarcodeScanner';
 
 // ============================================================================
 // Branch Stock — two views of "what's on the shelf at branch X":
@@ -80,6 +81,9 @@ export function BranchStockPage() {
   const [filterBranchId, setFilterBranchId] = useState<number | null>(initialBranchId);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const { open: openScanner, scannerEl } = useBarcodeScanner({
+    onScan: (val) => { setSearch(val); setDebouncedSearch(val); },
+  });
 
   useEffect(() => {
     const tm = setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -119,7 +123,11 @@ export function BranchStockPage() {
       let url = '/v_branch_sellable_stock?order=full_name';
       if (filterBranchId) url += `&branch_id=eq.${filterBranchId}`;
       if (debouncedSearch) {
-        url += `&or=(full_name.ilike.*${encodeURIComponent(debouncedSearch)}*,model_name.ilike.*${encodeURIComponent(debouncedSearch)}*,variant_name.ilike.*${encodeURIComponent(debouncedSearch)}*)`;
+        const enc = encodeURIComponent(debouncedSearch);
+        const isBarcode = /^\d{8,}$/.test(debouncedSearch);
+        const orParts = [`full_name.ilike.*${enc}*`, `model_name.ilike.*${enc}*`, `variant_name.ilike.*${enc}*`];
+        if (isBarcode) orParts.push(`barcodes.cs.{${debouncedSearch}}`);
+        url += `&or=(${orParts.join(',')})`;
       }
       return apiClient.get<SellableRow[]>(url);
     },
@@ -156,6 +164,7 @@ export function BranchStockPage() {
 
   return (
     <div className="flex flex-col h-dvh">
+      {scannerEl}
       {isMobile ? (
         <MobileHeader className="mobile-header-bordered">
           <div className="mobile-header-start">
@@ -222,7 +231,8 @@ export function BranchStockPage() {
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t('branchStock.search', { defaultValue: 'Search by name, model, variant' })}
             size="sm"
-            startIcon={<Search size={16} />}
+            startIcon={<ScanBarcode size={16} />}
+            onStartIconClick={openScanner}
           />
         </div>
         <div className="flex-1 min-w-0 max-w-64">

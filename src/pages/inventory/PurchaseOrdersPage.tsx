@@ -7,7 +7,7 @@ import {
   DataTable, useSnackbarContext,
 } from 'tsp-form';
 import {
-  ArrowLeft, ArrowRightFromLine, ClipboardList, CheckCircle, XCircle, Plus, Trash2, Search, PackagePlus, ExternalLink, ChevronsRight,
+  ArrowLeft, ArrowRightFromLine, ClipboardList, CheckCircle, XCircle, Plus, Trash2, Search, ScanBarcode, PackagePlus, ExternalLink, ChevronsRight,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
@@ -18,6 +18,8 @@ import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { fmtNum, codeDisplay } from './inventoryUtils';
 import { ActionDoneView } from '../contracts/ActionDoneView';
+import { useBarcodeScanner } from '../../components/BarcodeScanner';
+import { lookupBarcode } from '../../lib/barcodeLookup';
 
 // ============================================================================
 // Types — verified against live API 2026-05-02
@@ -1469,10 +1471,41 @@ function ProductPickerModal({
   onPick: (row: VariantSearchRow) => void;
 }) {
   const { t } = useTranslation();
+  const { addSnackbar } = useSnackbarContext();
   const [keyword, setKeyword] = useState('');
   const [debounced, setDebounced] = useState('');
   const [selectedModelId, setSelectedModelId] = useState<number | null>(null);
   const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null);
+
+  const handleBarcodeScan = async (raw: string) => {
+    const hit = await lookupBarcode(raw).catch(() => null);
+    if (hit) {
+      onPick({
+        variant_id: hit.variant_id,
+        model_id: hit.model_id,
+        brand_name: hit.brand_name,
+        family_name: hit.family_name,
+        model_name: hit.model_name,
+        model_code: hit.model_code,
+        sku_code: hit.sku_code,
+        item_name: hit.sku_name,
+        manufacturer_color: hit.manufacturer_color,
+      });
+      return;
+    }
+    setKeyword(raw);
+    addSnackbar({
+      message: (
+        <div className="alert alert-warning">
+          <XCircle size={16} />
+          <span>{t('po.barcodeNotFound', { defaultValue: 'Barcode {{barcode}} not registered', barcode: raw })}</span>
+        </div>
+      ),
+      type: 'warning',
+      duration: 3500,
+    });
+  };
+  const { open: openScanner, scannerEl } = useBarcodeScanner({ onScan: handleBarcodeScan });
 
   useEffect(() => {
     if (open) {
@@ -1540,6 +1573,8 @@ function ProductPickerModal({
   };
 
   return (
+    <>
+    {scannerEl}
     <Modal open={open} onClose={onClose} maxWidth="36rem" width="100%">
       <div className="flex flex-col overflow-hidden">
         <div className="modal-header">
@@ -1551,7 +1586,8 @@ function ProductPickerModal({
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
             placeholder={t('po.searchPlaceholder')}
-            startIcon={<Search size={16} />}
+            startIcon={<ScanBarcode size={16} />}
+            onStartIconClick={openScanner}
             className="w-full"
             autoFocus
           />
@@ -1650,6 +1686,7 @@ function ProductPickerModal({
         </div>
       </div>
     </Modal>
+    </>
   );
 }
 

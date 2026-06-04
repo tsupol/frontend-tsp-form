@@ -1,13 +1,15 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Modal, Input, Select, Badge, Button } from 'tsp-form';
-import { Search, Check } from 'lucide-react';
+import { Modal, Input, Select, Badge, Button, useSnackbarContext } from 'tsp-form';
+import { ScanBarcode, Check, XCircle } from 'lucide-react';
 import { apiClient } from '../../../lib/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import { fmtCurrency } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
 import type { ProductModel, Variant, Quote, QuoteResponse, BrandLookup, FamilyLookup } from './WorkspaceTypes';
+import { useBarcodeScanner } from '../../../components/BarcodeScanner';
+import { lookupBarcode } from '../../../lib/barcodeLookup';
 
 interface Props {
   open: boolean;
@@ -17,6 +19,7 @@ interface Props {
 export function ModalProductPlan({ open, onClose }: Props) {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const { addSnackbar } = useSnackbarContext();
   const { data: wizardData, updateData } = useWorkspace();
   const holdingId = user?.holding_id;
 
@@ -156,6 +159,33 @@ export function ModalProductPlan({ open, onClose }: Props) {
     setLocalQuote(null);
   };
 
+  const handleBarcodeScan = async (raw: string) => {
+    const hit = await lookupBarcode(raw).catch(() => null);
+    if (hit) {
+      setLocalModelId(hit.model_id);
+      setLocalModelName(hit.model_name);
+      setLocalFamilyName(hit.family_name);
+      setLocalBrandName(hit.brand_name);
+      setLocalVariantId(hit.variant_id);
+      setLocalVariantName(hit.sku_name);
+      setLocalQuote(null);
+      setSearch('');
+      return;
+    }
+    setSearch(raw);
+    addSnackbar({
+      message: (
+        <div className="alert alert-warning">
+          <XCircle size={16} />
+          <span>{t('wizard.barcodeNotFound', { defaultValue: 'Barcode {{barcode}} not registered', barcode: raw })}</span>
+        </div>
+      ),
+      type: 'warning',
+      duration: 3500,
+    });
+  };
+  const { open: openScanner, scannerEl } = useBarcodeScanner({ onScan: handleBarcodeScan });
+
   const isSelected = (q: Quote) =>
     localQuote?.finance_model === q.finance_model &&
     localQuote?.term_months === q.term_months &&
@@ -179,6 +209,8 @@ export function ModalProductPlan({ open, onClose }: Props) {
   const fmt = (n: number) => n.toLocaleString('en-US');
 
   return (
+    <>
+    {scannerEl}
     <Modal open={open} onClose={onClose} maxWidth="48rem" width="100%">
       <div className="modal-header">
         <h2 className="modal-title">{t('workspace.cardProduct')}</h2>
@@ -224,7 +256,8 @@ export function ModalProductPlan({ open, onClose }: Props) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t('wizard.searchProductPlaceholder')}
-            startIcon={<Search size={16} />}
+            startIcon={<ScanBarcode size={16} />}
+            onStartIconClick={openScanner}
             className="w-full"
             size="sm"
           />
@@ -377,6 +410,7 @@ export function ModalProductPlan({ open, onClose }: Props) {
         </Button>
       </div>
     </Modal>
+    </>
   );
 }
 

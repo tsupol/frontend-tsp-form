@@ -1,9 +1,11 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, Input, Badge, MaskedInput } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, Search, Calculator, Clock, Trash2, X, ArrowUp, Info } from 'lucide-react';
+import { PageNav, PageNavPanel, MobileHeader, Input, Badge, MaskedInput, useSnackbarContext } from 'tsp-form';
+import { ArrowLeft, ArrowRightFromLine, ScanBarcode, Calculator, Clock, Trash2, X, ArrowUp, Info, XCircle } from 'lucide-react';
 import { apiClient } from '../lib/api';
+import { useBarcodeScanner } from '../components/BarcodeScanner';
+import { lookupBarcode } from '../lib/barcodeLookup';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -92,12 +94,48 @@ const fmt = (n: number) => n.toLocaleString('en-US');
 
 export function PriceCheckPage() {
   const { t } = useTranslation();
+  const { addSnackbar } = useSnackbarContext();
 
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedModelId, setSelectedModelId] = useState<number | null>(null);
   const [selectedModelInfo, setSelectedModelInfo] = useState<RecentModel | null>(null);
   const [recentModels, setRecentModels] = useState<RecentModel[]>(getRecentModels);
+
+  const handleBarcodeScan = useCallback(async (raw: string) => {
+    try {
+      const hit = await lookupBarcode(raw);
+      if (hit) {
+        const model: RecentModel = {
+          model_id: hit.model_id,
+          model_name: hit.model_name,
+          family_name: hit.family_name,
+          brand_name: hit.brand_name,
+        };
+        setSelectedModelId(hit.model_id);
+        setSelectedModelInfo(model);
+        addRecentModel(model);
+        setSearch('');
+        setDebouncedSearch('');
+        return;
+      }
+      // Miss — show the raw value in search; user sees empty results
+      setSearch(raw);
+      addSnackbar({
+        message: (
+          <div className="alert alert-warning">
+            <XCircle size={16} />
+            <span>{t('priceCheck.barcodeNotFound', { defaultValue: 'Barcode {{barcode}} not registered', barcode: raw })}</span>
+          </div>
+        ),
+        type: 'warning',
+        duration: 3500,
+      });
+    } catch {
+      setSearch(raw);
+    }
+  }, [addSnackbar, t]);
+  const { open: openScanner, scannerEl } = useBarcodeScanner({ onScan: handleBarcodeScan });
 
   // Debounce search
   useEffect(() => {
@@ -158,6 +196,7 @@ export function PriceCheckPage() {
     <PageNav panels={['list', 'detail']} className="h-dvh">
       {({ isMobile, isRoot, goTo, goBack }) => (
         <>
+          {scannerEl}
           {isMobile && (
             <MobileHeader className="mobile-header-bordered">
               <div className="mobile-header-start">
@@ -194,7 +233,8 @@ export function PriceCheckPage() {
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder={t('priceCheck.searchPlaceholder')}
                   size="sm"
-                  startIcon={<Search size={16} />}
+                  startIcon={<ScanBarcode size={16} />}
+                  onStartIconClick={openScanner}
                   className="w-full"
                 />
               </div>

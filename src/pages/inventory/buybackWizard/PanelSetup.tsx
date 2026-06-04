@@ -1,12 +1,14 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, keepPreviousData } from '@tanstack/react-query';
-import { Input, Button, Modal, Badge, TextArea, MaskedInput } from 'tsp-form';
-import { Search, XCircle } from 'lucide-react';
+import { Input, Button, Modal, Badge, TextArea, MaskedInput, useSnackbarContext } from 'tsp-form';
+import { Search, ScanBarcode, XCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { useFormSnapshot } from '../../../hooks/useFormSnapshot';
 import { getLine } from './useBuyback';
 import type { BuybackDraft } from './types';
+import { useBarcodeScanner } from '../../../components/BarcodeScanner';
+import { lookupBarcode } from '../../../lib/barcodeLookup';
 
 interface ProductSearchVariant { variant_id: number; sku_code: string; name: string; is_active: boolean }
 interface ProductSearchModel {
@@ -274,10 +276,42 @@ function ProductPickerModal({
   onPick: (p: PickedProduct) => void;
 }) {
   const { t } = useTranslation();
+  const { addSnackbar } = useSnackbarContext();
   const [keyword, setKeyword] = useState('');
   const [debounced, setDebounced] = useState('');
   const [selectedModelId, setSelectedModelId] = useState<number | null>(null);
   const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null);
+
+  const handleBarcodeScan = async (raw: string) => {
+    const hit = await lookupBarcode(raw).catch(() => null);
+    if (hit) {
+      // Buyback intake is contractable-only; surface the model so the user can
+      // verify, but show a warning if the scanned variant is non-contractable.
+      setKeyword(hit.model_name);
+      onPick({
+        model_id: hit.model_id,
+        variant_id: hit.variant_id,
+        brand_name: hit.brand_name,
+        family_name: hit.family_name,
+        model_name: hit.model_name,
+        variant_name: hit.sku_name,
+        sku_code: hit.sku_code,
+      });
+      return;
+    }
+    setKeyword(raw);
+    addSnackbar({
+      message: (
+        <div className="alert alert-warning">
+          <XCircle size={16} />
+          <span>{t('buybackWizard.barcodeNotFound', { defaultValue: 'Barcode {{barcode}} not registered', barcode: raw })}</span>
+        </div>
+      ),
+      type: 'warning',
+      duration: 3500,
+    });
+  };
+  const { open: openScanner, scannerEl } = useBarcodeScanner({ onScan: handleBarcodeScan });
 
   useEffect(() => {
     if (open) {
@@ -333,6 +367,8 @@ function ProductPickerModal({
   };
 
   return (
+    <>
+    {scannerEl}
     <Modal open={open} onClose={onClose} maxWidth="36rem" width="100%">
       <div className="flex flex-col overflow-hidden">
         <div className="modal-header">
@@ -344,7 +380,8 @@ function ProductPickerModal({
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
             placeholder={t('buybackWizard.searchPlaceholder', { defaultValue: 'Search model (e.g. iPhone 16)' })}
-            startIcon={<Search size={16} />}
+            startIcon={<ScanBarcode size={16} />}
+            onStartIconClick={openScanner}
             className="w-full"
             autoFocus
           />
@@ -427,5 +464,6 @@ function ProductPickerModal({
         </div>
       </div>
     </Modal>
+    </>
   );
 }
