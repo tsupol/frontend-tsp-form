@@ -3259,6 +3259,11 @@
     "detailsToggle": "แสดง/ซ่อนรายละเอียด",
     "newMessage": "ข้อความใหม่",
     "newImage": "ส่งรูปภาพ",
-    "openThread": "เปิด"
+    "openThread": "เปิด",
+    "today": "วันนี้",
+    "yesterday": "เมื่อวาน",
+    "slipSubmitted": "ส่งสลิป",
+    "slipStaffSubmitted": "ส่งโดยพนักงาน",
+    "slipRejectReason": "เหตุผล"
   }
 }

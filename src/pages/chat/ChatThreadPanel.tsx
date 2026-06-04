@@ -3,19 +3,25 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Button, Skeleton,
+  Badge, Button, Skeleton, useSnackbarContext,
 } from 'tsp-form';
 import {
-  ExternalLink, Send, Image as ImageIcon, XCircle,
+  ChevronRight, CheckCircle, ExternalLink, FileText, Image as ImageIcon, Send, XCircle,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { wsClient } from '../../lib/api/ws';
 import { useAuth } from '../../contexts/AuthContext';
-import { formatSmart } from '../../lib/format';
+import { fmtCurrency, formatSmart } from '../../lib/format';
 import { DateTime } from '../../components/DateTime';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
 import { normalizeKey, toStoragePath } from '../../lib/mediaPath';
 import { uploadImage } from '../../lib/upload';
+import {
+  SubmissionReviewDrawer,
+  submissionStatusColor,
+  type SubmissionRow,
+} from '../../components/SubmissionReviewDrawer';
+import { buildChatTimeline, type ChatTimelineItem } from './chatTimeline';
 import type { ChatInboxRow, ChatMessage } from './chatTypes';
 
 const MAX_TEXTAREA_LINES = 6;
@@ -35,10 +41,12 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { addSnackbar } = useSnackbarContext();
 
   const [composer, setComposer] = useState('');
   const [sendError, setSendError] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [selectedSlip, setSelectedSlip] = useState<SubmissionRow | null>(null);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -66,6 +74,17 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
     refetchInterval: 15_000,
   });
 
+  // Slips for the same contract — merged into the timeline alongside messages.
+  // See UI_FEEDBACK/2026-06-02_RECOMMEND_chat_slip_interleaved_timeline_pattern.md
+  const { data: submissions = [] } = useQuery({
+    queryKey: ['chat-thread-submissions', contractId],
+    queryFn: () => apiClient.get<SubmissionRow[]>(
+      `/v_payment_submissions?contract_id=eq.${contractId}&order=submitted_at.asc&limit=100`,
+    ),
+    enabled,
+    refetchInterval: 30_000,
+  });
+
   // Reset composer state when switching threads
   useEffect(() => {
     setComposer('');
@@ -85,34 +104,37 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
       .catch(err => console.warn('[chat] mark_read failed', err));
   }, [contractId, enabled, queryClient]);
 
-  // Realtime: subscribe to chat:contract:<id> while the thread is open. New
-  // message → invalidate so React Query refetches. Polling stays as fallback.
+  // Realtime: subscribe to chat:contract:<id> + slip:contract:<id> while the
+  // thread is open. Either event reloads both queries — the timeline merge
+  // re-runs and re-renders. Polling stays as fallback.
   useEffect(() => {
     if (!enabled || contractId === null) return;
-    const unsub = wsClient.subscribe(`chat:contract:${contractId}`, () => {
+    const reload = () => {
       queryClient.invalidateQueries({ queryKey: ['chat-messages', contractId] });
+      queryClient.invalidateQueries({ queryKey: ['chat-thread-submissions', contractId] });
       queryClient.invalidateQueries({ queryKey: ['chat-inbox'] });
       queryClient.invalidateQueries({ queryKey: ['nav', 'chat-unread'] });
-    });
-    return unsub;
+    };
+    const unsubChat = wsClient.subscribe(`chat:contract:${contractId}`, reload);
+    const unsubSlip = wsClient.subscribe(`slip:contract:${contractId}`, reload);
+    return () => { unsubChat(); unsubSlip(); };
   }, [contractId, enabled, queryClient]);
 
   // Auto-scroll: jump to bottom whenever the contract changes (so a freshly
-  // opened thread lands at the latest message) or when new messages arrive.
-  // Resetting the counter in the same layout effect avoids a race where the
-  // reset happens after the scroll check on a thread switch.
+  // opened thread lands at the latest item) or when new messages/slips arrive.
   const lastSeenCount = useRef(0);
   const lastSeenContract = useRef<number | null>(null);
+  const itemCount = messages.length + submissions.length;
   useLayoutEffect(() => {
     if (!scrollRef.current) return;
     const contractChanged = lastSeenContract.current !== contractId;
-    const newMessages = messages.length > lastSeenCount.current;
-    if (contractChanged || newMessages) {
+    const newItems = itemCount > lastSeenCount.current;
+    if (contractChanged || newItems) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-      lastSeenCount.current = messages.length;
+      lastSeenCount.current = itemCount;
       lastSeenContract.current = contractId;
     }
-  }, [contractId, messages.length]);
+  }, [contractId, itemCount]);
 
   // Auto-resize the textarea between 1 and MAX_TEXTAREA_LINES.
   useLayoutEffect(() => {
@@ -204,22 +226,10 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
     }
   };
 
-  type Group = { sender: ChatMessage['sender_type']; messages: ChatMessage[]; startedAt: string };
-  const groups: Group[] = useMemo(() => {
-    const out: Group[] = [];
-    for (const m of messages) {
-      const last = out[out.length - 1];
-      const sameSender = last && last.sender === m.sender_type;
-      const closeInTime = last
-        && (new Date(m.created_at).getTime() - new Date(last.messages[last.messages.length - 1].created_at).getTime()) < 5 * 60_000;
-      if (sameSender && closeInTime) {
-        last.messages.push(m);
-      } else {
-        out.push({ sender: m.sender_type, messages: [m], startedAt: m.created_at });
-      }
-    }
-    return out;
-  }, [messages]);
+  const timeline = useMemo(
+    () => buildChatTimeline(messages, submissions),
+    [messages, submissions],
+  );
 
   if (contractId === null) {
     return (
@@ -276,33 +286,38 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
         </div>
       )}
 
-      {/* Scrollable message list */}
+      {/* Scrollable timeline (chat + slips merged) */}
       <div ref={scrollRef} className="flex-1 min-h-0 overflow-auto better-scroll px-3 py-3 md:px-8">
         {isLoading ? (
           <div className="text-center text-subtle p-8">{t('common.loading')}</div>
-        ) : messages.length === 0 ? (
+        ) : timeline.length === 0 ? (
           <div className="text-center text-subtle p-8">{t('chat.emptyThread')}</div>
         ) : (
-          <div className="flex flex-col gap-4">
-            {groups.map((g, gi) => {
-              const isStaff = g.sender === 'STAFF';
-              const isOwn = isStaff && user?.user_id === g.messages[0].sender_id;
-              const align = isStaff ? 'items-end' : 'items-start';
-              const senderLabel = isStaff
-                ? (g.messages[0].sender_name ?? (isOwn ? t('chat.you') : ''))
-                : (g.messages[0].sender_name ?? t('chat.customer'));
+          <div className="flex flex-col gap-3">
+            {timeline.map((item, i) => {
+              // Suppress the sender label when this message continues a run
+              // from the same sender within 5 minutes — LINE/iMessage style.
+              let showSender = true;
+              if (item.kind === 'message') {
+                const prev = timeline[i - 1];
+                if (
+                  prev?.kind === 'message'
+                  && prev.data.sender_type === item.data.sender_type
+                  && (item.timestamp.getTime() - prev.timestamp.getTime()) < 5 * 60_000
+                ) {
+                  showSender = false;
+                }
+              }
               return (
-                <div key={gi} className={`flex flex-col ${align} gap-1`}>
-                  <div className="text-[11px] text-subtle px-1">
-                    {senderLabel ? <span className="mr-2">{senderLabel}</span> : null}
-                    <span>{formatSmart(g.startedAt, i18n.language)}</span>
-                  </div>
-                  <div className={`flex flex-col gap-0.5 max-w-[70%] ${align}`}>
-                    {g.messages.map(m => (
-                      <Bubble key={m.id} message={m} isStaff={isStaff} onOpenImage={onOpenImage} />
-                    ))}
-                  </div>
-                </div>
+                <TimelineRow
+                  key={item.id}
+                  item={item}
+                  showSender={showSender}
+                  currentUserId={user?.user_id ?? null}
+                  lang={i18n.language}
+                  onOpenImage={onOpenImage}
+                  onOpenSlip={setSelectedSlip}
+                />
               );
             })}
           </div>
@@ -365,6 +380,150 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
           onChange={handleFileChange}
         />
       </div>
+
+      <SubmissionReviewDrawer
+        row={selectedSlip}
+        open={!!selectedSlip}
+        onClose={() => setSelectedSlip(null)}
+        onSuccess={(action) => {
+          setSelectedSlip(null);
+          queryClient.invalidateQueries({ queryKey: ['chat-thread-submissions', contractId] });
+          queryClient.invalidateQueries({ queryKey: ['payment-submissions'] });
+          queryClient.invalidateQueries({ queryKey: ['payment-submissions-pending-count'] });
+          queryClient.invalidateQueries({ queryKey: ['nav', 'pending-submissions-summary'] });
+          const key =
+            action === 'approve' ? 'paymentSubmissions.approveSuccess'
+              : action === 'reject' ? 'paymentSubmissions.rejectSuccess'
+                : 'paymentSubmissions.reopenSuccess';
+          addSnackbar({
+            type: 'success',
+            message: <div className="alert alert-success"><CheckCircle size={16} /><span>{t(key)}</span></div>,
+          });
+        }}
+      />
+    </div>
+  );
+}
+
+function TimelineRow({ item, showSender, currentUserId, lang, onOpenImage, onOpenSlip }: {
+  item: ChatTimelineItem;
+  showSender: boolean;
+  currentUserId: number | null;
+  lang: string;
+  onOpenImage: (key: string) => void;
+  onOpenSlip: (row: SubmissionRow) => void;
+}) {
+  const { t } = useTranslation();
+
+  if (item.kind === 'daySeparator') {
+    return <DaySeparator dayKey={item.key} lang={lang} />;
+  }
+
+  if (item.kind === 'slip') {
+    return (
+      <SlipEventCard submission={item.data} lang={lang} onOpen={() => onOpenSlip(item.data)} />
+    );
+  }
+
+  const m = item.data;
+  const isStaff = m.sender_type === 'STAFF';
+  const isOwn = isStaff && currentUserId === m.sender_id;
+  const align = isStaff ? 'items-end' : 'items-start';
+  const senderLabel = isStaff
+    ? (m.sender_name ?? (isOwn ? t('chat.you') : ''))
+    : (m.sender_name ?? t('chat.customer'));
+
+  // LINE-style layout: sender name on top of a new run, bubble on its own
+  // row with the wall-clock time on the *outside* edge (left of staff
+  // bubbles, right of customer bubbles), bottom-aligned.
+  const clock = new Date(m.created_at).toLocaleTimeString(
+    lang === 'th' ? 'th-TH-u-ca-gregory' : 'en-GB',
+    { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok', hour12: false },
+  );
+  const timeNode = (
+    <span className="text-[10px] text-subtle/60 tabular-nums shrink-0 self-end pb-1">{clock}</span>
+  );
+  return (
+    <div className={`flex flex-col ${align} ${showSender ? 'gap-1 mt-1' : 'gap-0.5 -mt-2'}`}>
+      {showSender && senderLabel && (
+        <div className="text-[11px] text-subtle px-1">{senderLabel}</div>
+      )}
+      <div className={`flex items-end gap-1.5 max-w-[80%] ${isStaff ? 'flex-row' : 'flex-row-reverse'}`}>
+        {timeNode}
+        <Bubble message={m} isStaff={isStaff} onOpenImage={onOpenImage} />
+      </div>
+    </div>
+  );
+}
+
+function DaySeparator({ dayKey, lang }: { dayKey: string; lang: string }) {
+  const { t } = useTranslation();
+  // dayKey is YYYY-MM-DD in Bangkok local time.
+  const [y, m, d] = dayKey.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+
+  // Compare against today/yesterday in Bangkok time. The simplest portable way
+  // is to shift now() by the same offset chatTimeline uses and compare keys.
+  const now = new Date();
+  const bkk = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+  const today = bkk.toISOString().slice(0, 10);
+  const yest = new Date(bkk.getTime() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+  let label: string;
+  if (dayKey === today) label = t('chat.today');
+  else if (dayKey === yest) label = t('chat.yesterday');
+  else label = date.toLocaleDateString(lang, { day: 'numeric', month: 'short', year: 'numeric' });
+
+  return (
+    <div className="flex items-center gap-2 my-2">
+      <div className="flex-1 border-t border-line" />
+      <span className="text-[11px] text-subtle px-2">{label}</span>
+      <div className="flex-1 border-t border-line" />
+    </div>
+  );
+}
+
+function SlipEventCard({ submission, lang, onOpen }: {
+  submission: SubmissionRow;
+  lang: string;
+  onOpen: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex justify-center">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="w-full max-w-md text-left bg-bg border border-line rounded-xl px-3 py-2.5 hover:bg-surface-hover transition-colors cursor-pointer flex items-center gap-3"
+      >
+        <div className="shrink-0 w-9 h-9 rounded-full bg-primary-soft text-primary-fg flex items-center justify-center">
+          <FileText size={18} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-medium tabular-nums">
+              {fmtCurrency(submission.amount)}
+            </span>
+            <Badge size="xs" color={submissionStatusColor(submission.status)}>
+              {t(`paymentSubmissions.status_${submission.status}`)}
+            </Badge>
+            {submission.is_staff_submitted && (
+              <Badge size="xs" color="info">{t('chat.slipStaffSubmitted')}</Badge>
+            )}
+          </div>
+          <div className="text-[11px] text-subtle mt-0.5 flex items-center gap-2">
+            <span>{t('chat.slipSubmitted')}</span>
+            <span>·</span>
+            <span>{formatSmart(submission.submitted_at, lang)}</span>
+          </div>
+          {submission.status === 'REJECTED' && submission.reject_reason && (
+            <div className="text-xs text-danger mt-1 break-words">
+              {t('chat.slipRejectReason')}: {submission.reject_reason}
+            </div>
+          )}
+        </div>
+        <ChevronRight size={16} className="text-subtle shrink-0" />
+      </button>
     </div>
   );
 }
@@ -377,7 +536,7 @@ function Bubble({ message, isStaff, onOpenImage }: {
   const { t } = useTranslation();
   const bubbleClass = isStaff
     ? 'bg-primary text-primary-contrast'
-    : 'bg-bg border border-line';
+    : 'bg-surface';
 
   const storageKey = message.media_url ? normalizeKey(message.media_url) : null;
   const { url: displayUrl } = useMediaUrl(storageKey);

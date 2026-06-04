@@ -3259,6 +3259,11 @@
     "detailsToggle": "Toggle details",
     "newMessage": "New message",
     "newImage": "Sent a photo",
-    "openThread": "Open"
+    "openThread": "Open",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "slipSubmitted": "Slip submitted",
+    "slipStaffSubmitted": "By staff",
+    "slipRejectReason": "Reason"
   }
 }
