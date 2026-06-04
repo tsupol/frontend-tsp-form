@@ -463,6 +463,7 @@ function RegisterBarcodeModal({ open, onClose, initialBarcode, onSuccess }: Regi
   const [barcode, setBarcode] = useState(initialBarcode ?? '');
   const [errorMessage, setErrorMessage] = useState('');
   const [isPending, setIsPending] = useState(false);
+  const { open: openScanner, scannerEl } = useBarcodeScanner({ onScan: setBarcode });
 
   const [modelQuery, setModelQuery] = useState('');
   const [debouncedModelQuery, setDebouncedModelQuery] = useState('');
@@ -572,6 +573,8 @@ function RegisterBarcodeModal({ open, onClose, initialBarcode, onSuccess }: Regi
   };
 
   return (
+    <>
+    {scannerEl}
     <Modal open={open} onClose={onClose} maxWidth="36rem" width="100%">
       <div className="modal-header">
         <h2 className="modal-title">{t('barcodes.registerTitle')}</h2>
@@ -607,6 +610,8 @@ function RegisterBarcodeModal({ open, onClose, initialBarcode, onSuccess }: Regi
               className="w-full font-mono"
               autoFocus
               inputMode="numeric"
+              startIcon={<ScanBarcode size={16} />}
+              onStartIconClick={openScanner}
             />
             <div className="mt-1.5 text-xs flex items-center gap-2 min-h-[1.25rem]">
               {detectedType ? (
@@ -731,6 +736,7 @@ function RegisterBarcodeModal({ open, onClose, initialBarcode, onSuccess }: Regi
         </Button>
       </div>
     </Modal>
+    </>
   );
 }
 
