@@ -159,30 +159,6 @@ interface ContractNote {
   created_at: string;
 }
 
-interface Payment {
-  payment_id: number;
-  code: string;
-  code_display: string | null;
-  bill_id: number;
-  bill_code: string | null;
-  contract_id: number;
-  charge_types: string[] | null;
-  method: string | null;
-  amount: number;
-  bank_account_id: number | null;
-  bank_name: string | null;
-  account_number: string | null;
-  payer_type: string | null;
-  payer_id: number | null;
-  payer_name: string | null;
-  days_early: number | null;
-  is_reversal: boolean;
-  ref_voided_id: number | null;
-  void_note: string | null;
-  created_at: string;
-  created_by: number | null;
-}
-
 interface EntityMedia {
   entity_media_id: number;
   media_id: number;
@@ -205,9 +181,9 @@ type DetailTab = 'overview' | 'money' | 'device' | 'customers' | 'notes';
 
 const TABS: DetailTab[] = ['overview', 'money', 'device', 'customers', 'notes'];
 
-type MoneySection = 'installments' | 'txns' | 'payments' | 'wallets' | 'bills';
+type MoneySection = 'installments' | 'txns' | 'wallets' | 'bills';
 
-const MONEY_SECTIONS: MoneySection[] = ['installments', 'wallets', 'bills', 'txns', 'payments'];
+const MONEY_SECTIONS: MoneySection[] = ['installments', 'wallets', 'bills', 'txns'];
 
 // ── Scrollable Tabs ─────────────────────────────────────────────────────────
 
@@ -433,7 +409,8 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
           queryClient.invalidateQueries({ queryKey: ['saving-contracts'] });
           queryClient.invalidateQueries({ queryKey: ['contract-installments', contractId] });
           queryClient.invalidateQueries({ queryKey: ['contract-txns', contractId] });
-          queryClient.invalidateQueries({ queryKey: ['contract-payments', contractId] });
+          queryClient.invalidateQueries({ queryKey: ['contract-bills', contractId] });
+          queryClient.invalidateQueries({ queryKey: ['contract-bill-payments', contractId] });
         }}
       />
 
@@ -905,18 +882,6 @@ function MoneyTab({ contractId, contract, t }: {
     staleTime: 30 * 1000,
   });
 
-  const { data: paymentCount } = useQuery({
-    queryKey: ['contract-payments-count', contractId],
-    queryFn: async () => {
-      const res = await apiClient.getPaginated<Payment>(
-        `/v_payments?contract_id=eq.${contractId}`,
-        { page: 1, pageSize: 1 },
-      );
-      return res.totalCount;
-    },
-    staleTime: 30 * 1000,
-  });
-
   // Bills count — INVOICE only (CREDIT_NOTE/JOURNAL aren't customer-facing).
   const { data: billCount } = useQuery({
     queryKey: ['contract-bills-count', contractId],
@@ -939,7 +904,6 @@ function MoneyTab({ contractId, contract, t }: {
   const counts: Record<MoneySection, number | null> = {
     installments: installmentDueCount ?? null,
     txns: txnCount ?? null,
-    payments: paymentCount ?? null,
     wallets: walletNonEmptyCount,
     bills: billCount ?? null,
   };
@@ -968,7 +932,6 @@ function MoneyTab({ contractId, contract, t }: {
       <div className="flex-1 overflow-auto better-scroll">
         {section === 'installments' && <InstallmentsTab contractId={contractId} t={t} />}
         {section === 'txns' && <TxnsTab contractId={contractId} t={t} />}
-        {section === 'payments' && <PaymentsTab contractId={contractId} t={t} />}
         {section === 'wallets' && <WalletsTab contract={contract} />}
         {section === 'bills' && <BillsTab contractId={contractId} t={t} />}
       </div>
@@ -1556,14 +1519,59 @@ function getBillStatusColor(status: string, isCancelled: boolean): 'success' | '
   }
 }
 
+interface BillPaymentEmbedded {
+  id: number;
+  code_display: string | null;
+  method: string | null;
+  amount: number;
+  bank_name: string | null;
+  account_number: string | null;
+  reference: string | null;
+  is_reversal: boolean;
+  ref_voided_id: number | null;
+  void_note: string | null;
+  bank_account_id: number | null;
+  created_at: string;
+  created_by: number | null;
+  created_by_name: string | null;
+}
+
 function BillsTab({ contractId, t }: { contractId: number; t: ReturnType<typeof useTranslation>['t'] }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
+  // Bill list (INVOICE only — CREDIT_NOTE/JOURNAL aren't shown here).
   const { data: bills, isLoading } = useQuery({
     queryKey: ['contract-bills', contractId],
     queryFn: () => apiClient.get<BillRow[]>(
       `/v_bills?contract_id=eq.${contractId}&bill_type=eq.INVOICE&order=created_at.desc`,
+    ),
+  });
+
+  // Payments embedded per bill via v_bill_detail. One query per bill keeps each
+  // row cacheable for the print path (which fetches the same key).
+  const billIds = bills?.map(b => b.id) ?? [];
+  const billIdsKey = billIds.join(',');
+  const { data: paymentsByBill } = useQuery<Record<number, BillPaymentEmbedded[]>>({
+    queryKey: ['contract-bill-payments', contractId, billIdsKey],
+    enabled: billIds.length > 0,
+    queryFn: async () => {
+      // PostgREST in.(...) — single round trip for all bills on this contract.
+      const rows = await apiClient.get<Array<{ bill_id: number; payments: BillPaymentEmbedded[] | null }>>(
+        `/v_bill_detail?bill_id=in.(${billIdsKey})`,
+      );
+      const out: Record<number, BillPaymentEmbedded[]> = {};
+      for (const r of rows) out[r.bill_id] = r.payments ?? [];
+      return out;
+    },
+  });
+
+  // Payment slips — currently linked to CONTRACT (not bill_payment yet).
+  // Show as a chronological strip on top until backend adds the FK.
+  const { data: paymentSlips = [] } = useQuery({
+    queryKey: ['entity-media', 'CONTRACT', contractId, 'PAYMENT_SLIP'],
+    queryFn: () => apiClient.get<EntityMedia[]>(
+      `/v_entity_media?entity_type=eq.CONTRACT&entity_id=eq.${contractId}&usage_type=eq.PAYMENT_SLIP&order=sort_order`,
     ),
   });
 
@@ -1601,138 +1609,101 @@ function BillsTab({ contractId, t }: { contractId: number; t: ReturnType<typeof 
   if (!bills || bills.length === 0) return <div className="p-8 text-center text-subtler">{t('common.noData')}</div>;
 
   return (
-    <div className="p-4 flex flex-col gap-2">
-      {bills.map(bill => (
-        <div
-          key={bill.id}
-          className={`border border-line rounded-md px-4 py-3 ${bill.is_cancelled ? 'opacity-60' : ''}`}
-        >
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="font-mono text-xs text-subtle">{bill.code_display}</span>
-              <Badge size="xs" color={getBillStatusColor(bill.status, bill.is_cancelled)}>
-                {bill.is_cancelled
-                  ? t('contract.billStatus_CANCELLED', { defaultValue: 'Cancelled' })
-                  : t(`contract.billStatus_${bill.status}`, { defaultValue: bill.status })}
-              </Badge>
-            </div>
-            <div className="flex items-center gap-1 shrink-0">
-              <Tooltip content={t('wizard.receipt_print')}>
-                <Button
-                  variant="outline"
-                  color="default"
-                  size="sm"
-                  className="btn-icon-xs"
-                  onClick={() => handlePrint(bill.id)}
-                  aria-label={t('wizard.receipt_print')}
-                >
-                  <Printer size={14} />
-                </Button>
-              </Tooltip>
-              <Tooltip content={t('contract.openInBills', { defaultValue: 'Open in Bills' })}>
-                <Button
-                  variant="outline"
-                  color="default"
-                  size="sm"
-                  className="btn-icon-xs"
-                  onClick={() => navigate(`/admin/accounting/bills/${bill.id}`)}
-                  aria-label={t('contract.openInBills', { defaultValue: 'Open in Bills' })}
-                >
-                  <ExternalLink size={14} />
-                </Button>
-              </Tooltip>
-            </div>
-          </div>
-          <div className="flex items-center justify-between gap-3 mt-2">
-            <div className="min-w-0">
-              <div className="text-sm">{bill.bill_purpose_label ?? bill.bill_purpose}</div>
-              {bill.bill_type_label_short && (
-                <div className="text-xs text-subtle">{bill.bill_type_label_short}</div>
+    <div className="p-4 flex flex-col gap-4">
+      {paymentSlips.length > 0 && (
+        <div className="border border-line rounded-md px-4 py-3">
+          <MediaRow label={t('contract.paymentSlips')} media={paymentSlips} />
+        </div>
+      )}
+
+      <div className="flex flex-col gap-2">
+        {bills.map(bill => {
+          const payments = paymentsByBill?.[bill.id] ?? [];
+          return (
+            <div
+              key={bill.id}
+              className={`border border-line rounded-md px-4 py-3 ${bill.is_cancelled ? 'opacity-60' : ''}`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="font-mono text-xs text-subtle">{bill.code_display}</span>
+                  <Badge size="xs" color={getBillStatusColor(bill.status, bill.is_cancelled)}>
+                    {bill.is_cancelled
+                      ? t('contract.billStatus_CANCELLED', { defaultValue: 'Cancelled' })
+                      : t(`contract.billStatus_${bill.status}`, { defaultValue: bill.status })}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Tooltip content={t('wizard.receipt_print')}>
+                    <Button
+                      variant="outline"
+                      color="default"
+                      size="sm"
+                      className="btn-icon-xs"
+                      onClick={() => handlePrint(bill.id)}
+                      aria-label={t('wizard.receipt_print')}
+                    >
+                      <Printer size={14} />
+                    </Button>
+                  </Tooltip>
+                  <Tooltip content={t('contract.openInBills', { defaultValue: 'Open in Bills' })}>
+                    <Button
+                      variant="outline"
+                      color="default"
+                      size="sm"
+                      className="btn-icon-xs"
+                      onClick={() => navigate(`/admin/accounting/bills/${bill.id}`)}
+                      aria-label={t('contract.openInBills', { defaultValue: 'Open in Bills' })}
+                    >
+                      <ExternalLink size={14} />
+                    </Button>
+                  </Tooltip>
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-3 mt-2">
+                <div className="min-w-0">
+                  <div className="text-sm">{bill.bill_purpose_label ?? bill.bill_purpose}</div>
+                  {bill.bill_type_label_short && (
+                    <div className="text-xs text-subtle">{bill.bill_type_label_short}</div>
+                  )}
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="text-sm font-medium tabular-nums">{fmtCurrency(bill.total_amount)}</div>
+                  <div className="text-xs text-subtle"><DateTime value={bill.bill_date} showTime={false} /></div>
+                </div>
+              </div>
+
+              {payments.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-line flex flex-col gap-1.5">
+                  {payments.map(p => (
+                    <div
+                      key={p.id}
+                      className={`flex items-center justify-between gap-3 text-xs ${p.is_reversal ? 'opacity-50 line-through' : ''}`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-subtle">└</span>
+                        <span>{p.method ? t(`wizard.method_${p.method}`, { defaultValue: p.method }) : '—'}</span>
+                        {p.bank_name && <span className="text-subtle">{p.bank_name}</span>}
+                        {p.reference && <span className="text-subtle font-mono">{p.reference}</span>}
+                        {p.is_reversal && (
+                          <Badge size="xs" color="danger">VOID</Badge>
+                        )}
+                      </div>
+                      <span className="tabular-nums shrink-0">{fmtCurrency(p.amount)}</span>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
-            <div className="text-right shrink-0">
-              <div className="text-sm font-medium tabular-nums">{fmtCurrency(bill.total_amount)}</div>
-              <div className="text-xs text-subtle"><DateTime value={bill.bill_date} showTime={false} /></div>
-            </div>
-          </div>
-        </div>
-      ))}
+          );
+        })}
+      </div>
 
       {printReady && printBillId != null && createPortal(
         <div className="print-only-receipt" aria-hidden>
           <BillReceipt billId={printBillId} hidePrintButton />
         </div>,
         document.body,
-      )}
-    </div>
-  );
-}
-
-// ── Payments Tab ─────────────────────────────────────────────────────────────
-
-function PaymentsTab({ contractId, t }: { contractId: number; t: ReturnType<typeof useTranslation>['t'] }) {
-  const { data: payments, isLoading } = useQuery({
-    queryKey: ['contract-payments', contractId],
-    queryFn: () => apiClient.get<Payment[]>(`/v_payments?contract_id=eq.${contractId}&order=created_at.desc`),
-  });
-
-  // Payment slips for this contract.
-  // Note: v_entity_media is filtered to active rows by default in the view, but
-  // we still ask explicitly for clarity if/when that changes.
-  const { data: paymentSlips = [] } = useQuery({
-    queryKey: ['entity-media', 'CONTRACT', contractId, 'PAYMENT_SLIP'],
-    queryFn: () => apiClient.get<EntityMedia[]>(
-      `/v_entity_media?entity_type=eq.CONTRACT&entity_id=eq.${contractId}&usage_type=eq.PAYMENT_SLIP&order=sort_order`
-    ),
-  });
-
-  if (isLoading) return <div className="p-8 text-center text-subtler">{t('common.loading')}</div>;
-
-  const hasPayments = payments && payments.length > 0;
-  const hasSlips = paymentSlips.length > 0;
-
-  if (!hasPayments && !hasSlips) return <div className="p-8 text-center text-subtler">{t('common.noData')}</div>;
-
-  return (
-    <div className="p-4 flex flex-col gap-4">
-      {/* Payment records */}
-      {hasPayments && (
-        <div className="flex flex-col gap-2">
-          {payments!.map(p => (
-            <div key={p.payment_id} className={`border border-line rounded-md px-4 py-3 ${p.is_reversal ? 'opacity-50' : ''}`}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-sm">{p.code_display ?? p.code}</span>
-                  {p.charge_types?.map(ct => (
-                    <Badge key={ct} size="xs" color="default">{ct}</Badge>
-                  ))}
-                  {p.is_reversal && (
-                    <Badge size="xs" color="danger">VOID</Badge>
-                  )}
-                </div>
-                <span className="font-medium text-sm tabular-nums">{fmtCurrency(p.amount)}</span>
-              </div>
-              <div className="flex items-center gap-3 mt-1 text-xs text-subtle">
-                {p.method && <span>{p.method}</span>}
-                {p.bank_name && <span>{p.bank_name}</span>}
-                {p.payer_name && <span>{t('contract.payer')}: {p.payer_name}</span>}
-              </div>
-              <div className="flex items-center gap-3 mt-1 text-xs text-subtle">
-                <DateTime value={p.created_at} />
-                {p.days_early != null && p.days_early > 0 && (
-                  <span className="text-success">{t('contract.daysEarly', { days: p.days_early })}</span>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Payment slips */}
-      {hasSlips && (
-        <div className="border border-line rounded-md px-4 py-3">
-          <MediaRow label={t('contract.paymentSlips')} media={paymentSlips} />
-        </div>
       )}
     </div>
   );
