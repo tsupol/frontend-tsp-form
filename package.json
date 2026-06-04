@@ -13,6 +13,8 @@
     "@fontsource/sarabun": "^5.2.8",
     "@tailwindcss/vite": "^4.1.14",
     "@tanstack/react-query": "^5.62.0",
+    "@zxing/browser": "^0.2.0",
+    "@zxing/library": "^0.22.0",
     "clsx": "^2.1.1",
     "fastest-levenshtein": "^1.0.16",
     "i18next": "^24.2.2",

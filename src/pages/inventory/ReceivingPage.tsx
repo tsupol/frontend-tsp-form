@@ -3,7 +3,8 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Modal, Input, NumberSpinner, DataTable, useSnackbarContext } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, PackagePlus, CheckCircle, XCircle, Plus, Trash2, Search, ExternalLink } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, PackagePlus, CheckCircle, XCircle, Plus, Trash2, ScanBarcode, ExternalLink } from 'lucide-react';
+import { useBarcodeScanner } from '../../components/BarcodeScanner';
 import { CurrencyInput } from '../../components/CurrencyInput';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { apiClient, ApiError } from '../../lib/api';
@@ -1397,6 +1398,7 @@ function VariantPickerInline({
 }) {
   const [keyword, setKeyword] = useState('');
   const [debounced, setDebounced] = useState('');
+  const { open: openScanner, scannerEl } = useBarcodeScanner({ onScan: setKeyword });
 
   useEffect(() => {
     const tm = setTimeout(() => setDebounced(keyword.trim()), 300);
@@ -1408,19 +1410,24 @@ function VariantPickerInline({
     queryFn: () => {
       const base = '/v_product_variant_search?variant_is_active=eq.true&order=brand_name,family_name,model_name&limit=20';
       if (!debounced) return apiClient.get<VariantSearchRow[]>(base);
-      const filter = `&or=(item_name.ilike.*${encodeURIComponent(debounced)}*,sku_code.ilike.*${encodeURIComponent(debounced)}*,model_name.ilike.*${encodeURIComponent(debounced)}*)`;
-      return apiClient.get<VariantSearchRow[]>(base + filter);
+      const enc = encodeURIComponent(debounced);
+      const isBarcode = /^\d{8,}$/.test(debounced);
+      const orParts = [`item_name.ilike.*${enc}*`, `sku_code.ilike.*${enc}*`, `model_name.ilike.*${enc}*`];
+      if (isBarcode) orParts.push(`barcodes.cs.{${debounced}}`);
+      return apiClient.get<VariantSearchRow[]>(`${base}&or=(${orParts.join(',')})`);
     },
     placeholderData: keepPreviousData,
   });
 
   return (
     <div>
+      {scannerEl}
       <Input
         value={keyword}
         onChange={(e) => setKeyword(e.target.value)}
         placeholder={t('receiving.searchProduct')}
-        startIcon={<Search size={16} />}
+        startIcon={<ScanBarcode size={16} />}
+        onStartIconClick={openScanner}
         className="w-full"
         autoFocus
       />

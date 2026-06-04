@@ -8,13 +8,14 @@ import {
   PopOver, MenuItem, useSnackbarContext,
 } from 'tsp-form';
 import {
-  Barcode, Plus, Search, ArrowRightFromLine, CheckCircle, XCircle,
+  Barcode, Plus, Search, ScanBarcode, ArrowRightFromLine, CheckCircle, XCircle,
   MoreHorizontal, ShieldOff, ShieldCheck, AlertCircle, Eye, ExternalLink, Printer, X,
 } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import { apiClient, ApiError } from '../../lib/api';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { DateTime } from '../../components/DateTime';
+import { useBarcodeScanner } from '../../components/BarcodeScanner';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 // v_barcode_list columns (verified against the view DDL):
@@ -124,6 +125,14 @@ export function BarcodesPage() {
     setPageIndex(0);
   }, [searchInput]);
 
+  const { open: openScanner, scannerEl } = useBarcodeScanner({
+    onScan: (val) => {
+      setSearchInput(val);
+      setActiveSearch(val);
+      setPageIndex(0);
+    },
+  });
+
   const clearSearch = () => {
     setSearchInput('');
     setActiveSearch('');
@@ -208,6 +217,7 @@ export function BarcodesPage() {
 
   return (
     <>
+      {scannerEl}
       {/* Mobile header */}
       <MobileHeader className="mobile-header-bordered md:hidden">
         <div className="mobile-header-start">
@@ -259,7 +269,8 @@ export function BarcodesPage() {
                 onKeyDown={onSearchKey}
                 placeholder={t('barcodes.search')}
                 size="sm"
-                startIcon={<Search size={16} />}
+                startIcon={<ScanBarcode size={16} />}
+                onStartIconClick={openScanner}
                 endIcon={searchInput ? <X size={14} /> : undefined}
                 onEndIconClick={searchInput ? clearSearch : undefined}
                 className="w-full"

@@ -3,13 +3,14 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, DataTable, Badge, Input, Select, Button, Modal, Switch, MobileHeader, PopOver, MenuItem, useSnackbarContext, FormErrorMessage } from 'tsp-form';
-import { Plus, X, XCircle, CheckCircle, SlidersHorizontal, ArrowRightFromLine, ArrowLeft, MoreHorizontal, Pencil, Power, Trash2, AlertCircle, Star, ShieldOff, ShieldCheck, Barcode as BarcodeIcon } from 'lucide-react';
+import { Plus, X, XCircle, CheckCircle, SlidersHorizontal, ArrowRightFromLine, ArrowLeft, MoreHorizontal, Pencil, Power, Trash2, AlertCircle, Star, ShieldOff, ShieldCheck, Barcode as BarcodeIcon, ScanBarcode } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import { useForm, Controller } from 'react-hook-form';
-import { apiClient, ApiError } from '../../lib/api';
+import { apiClient } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { useAuth } from '../../contexts/AuthContext';
 import { ColorAutocomplete, ColorMatchBadge } from '../../components/ColorAutocomplete';
+import { useBarcodeScanner } from '../../components/BarcodeScanner';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -946,9 +947,11 @@ function BarcodeInput({ value, onChange, badge, trailing, onEnter }: {
   const digitsOnly = trimmed.replace(/\D/g, '');
   const showLengthWarn = trimmed.length > 0 && type === null;
   const checksumOk = type !== null && isValidGs1Checksum(trimmed);
+  const { open: openScanner, scannerEl } = useBarcodeScanner({ onScan: onChange });
 
   return (
     <div className="flex flex-col gap-1.5 p-2 border border-line rounded-md">
+      {scannerEl}
       <div className="flex items-center gap-2">
         <Input
           value={value}
@@ -957,6 +960,8 @@ function BarcodeInput({ value, onChange, badge, trailing, onEnter }: {
           size="sm"
           className="w-full font-mono"
           inputMode="numeric"
+          startIcon={<ScanBarcode size={16} />}
+          onStartIconClick={openScanner}
           onKeyDown={onEnter ? (e) => { if (e.key === 'Enter') { e.preventDefault(); onEnter(); } } : undefined}
         />
         {badge}

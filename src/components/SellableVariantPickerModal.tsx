@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Modal, Button, Input, NumberSpinner, Tooltip } from 'tsp-form';
-import { Search, Barcode } from 'lucide-react';
+import { ScanBarcode, Barcode } from 'lucide-react';
 import { apiClient } from '../lib/api';
 import { fmtCurrency } from '../lib/format';
+import { useBarcodeScanner } from './BarcodeScanner';
 
 export interface SellableVariant {
   variant_id: number;
@@ -45,6 +46,7 @@ export function SellableVariantPickerModal({
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
   const [pickedQtys, setPickedQtys] = useState<Record<number, number>>({});
+  const { open: openScanner, scannerEl } = useBarcodeScanner({ onScan: setSearch });
 
   useEffect(() => {
     if (!open) {
@@ -78,6 +80,8 @@ export function SellableVariantPickerModal({
   });
 
   return (
+    <>
+    {scannerEl}
     <Modal open={open} onClose={onClose} maxWidth="40rem" width="100%" ariaLabel={t(titleKey ?? 'retail.create.productPickerTitle')}>
       <div className="flex flex-col overflow-hidden" style={{ height: '70dvh' }}>
         <div className="modal-header">
@@ -89,7 +93,8 @@ export function SellableVariantPickerModal({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t('retail.create.searchProducts')}
-            startIcon={<Search size={16} />}
+            startIcon={<ScanBarcode size={16} />}
+            onStartIconClick={openScanner}
             size="sm"
             className="w-full mb-3"
             autoFocus
@@ -152,5 +157,6 @@ export function SellableVariantPickerModal({
         </div>
       </div>
     </Modal>
+    </>
   );
 }

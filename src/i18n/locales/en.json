@@ -1,4 +1,17 @@
 {
+  "barcodeScanner": {
+    "title": "Scan barcode",
+    "scanning": "Scanning",
+    "found": "Found",
+    "alignHint": "Align barcode in the band",
+    "detected": "Detected",
+    "scanAgain": "Scan again",
+    "use": "Use",
+    "errorNoCamera": "Camera not available. Use HTTPS or localhost.",
+    "errorDenied": "Camera permission denied.",
+    "errorGeneric": "Camera error: {{msg}}",
+    "errorDecoder": "Decoder failed: {{msg}}"
+  },
   "common": {
     "loading": "Loading...",
     "error": "An error occurred",

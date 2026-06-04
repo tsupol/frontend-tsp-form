@@ -6,11 +6,12 @@ import {
 } from 'tsp-form';
 import {
   Plus, Trash2, ShoppingCart, Truck, Percent, ChevronsRight,
-  AlertCircle, CheckCircle, XCircle, Search, Barcode,
+  AlertCircle, CheckCircle, XCircle, Barcode, ScanBarcode,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { fmtCurrency } from '../../lib/format';
+import { useBarcodeScanner } from '../../components/BarcodeScanner';
 
 /* ───────────────────────────────────────────────────────────────────────────
  * Types — match fn_bill_retail_preview / fn_bill_retail_submit (doc 38 §0)
@@ -685,6 +686,7 @@ function ProductPickerModal({ open, branchId, onClose, onPick }: {
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
   const [pickedQtys, setPickedQtys] = useState<Record<number, number>>({});
+  const { open: openScanner, scannerEl } = useBarcodeScanner({ onScan: setSearch });
 
   useEffect(() => {
     if (!open) {
@@ -718,6 +720,8 @@ function ProductPickerModal({ open, branchId, onClose, onPick }: {
   });
 
   return (
+    <>
+    {scannerEl}
     <Modal open={open} onClose={onClose} maxWidth="40rem" width="100%" ariaLabel="Add Product">
       <div className="flex flex-col overflow-hidden" style={{ height: '70dvh' }}>
         <div className="modal-header">
@@ -729,7 +733,8 @@ function ProductPickerModal({ open, branchId, onClose, onPick }: {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t('retail.create.searchProducts')}
-            startIcon={<Search size={16} />}
+            startIcon={<ScanBarcode size={16} />}
+            onStartIconClick={openScanner}
             size="sm"
             className="w-full mb-3"
             autoFocus
@@ -792,6 +797,7 @@ function ProductPickerModal({ open, branchId, onClose, onPick }: {
         </div>
       </div>
     </Modal>
+    </>
   );
 }
 

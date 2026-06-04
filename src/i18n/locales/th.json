@@ -1,4 +1,17 @@
 {
+  "barcodeScanner": {
+    "title": "สแกนบาร์โค้ด",
+    "scanning": "กำลังสแกน",
+    "found": "พบแล้ว",
+    "alignHint": "วางบาร์โค้ดให้อยู่ในแถบ",
+    "detected": "ตรวจพบ",
+    "scanAgain": "สแกนใหม่",
+    "use": "ใช้",
+    "errorNoCamera": "ไม่พบกล้อง ต้องใช้ HTTPS หรือ localhost",
+    "errorDenied": "กล้องถูกปฏิเสธสิทธิ์",
+    "errorGeneric": "กล้องผิดพลาด: {{msg}}",
+    "errorDecoder": "ตัวถอดรหัสล้มเหลว: {{msg}}"
+  },
   "common": {
     "loading": "กำลังโหลด...",
     "error": "เกิดข้อผิดพลาด",
