@@ -3,9 +3,11 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, DataTable, Badge, Input, Select, Button, Modal, Switch, MobileHeader, PopOver, MenuItem, useSnackbarContext, FormErrorMessage } from 'tsp-form';
-import { Plus, X, XCircle, CheckCircle, SlidersHorizontal, ArrowRightFromLine, ArrowLeft, MoreHorizontal, Pencil, Power } from 'lucide-react';
+import { Plus, X, XCircle, CheckCircle, SlidersHorizontal, ArrowRightFromLine, ArrowLeft, MoreHorizontal, Pencil, Power, Trash2, AlertCircle, Star, ShieldOff, ShieldCheck, Barcode as BarcodeIcon } from 'lucide-react';
+import JsBarcode from 'jsbarcode';
 import { useForm, Controller } from 'react-hook-form';
 import { apiClient, ApiError } from '../../lib/api';
+import { translateApiError } from '../../lib/apiErrors';
 import { useAuth } from '../../contexts/AuthContext';
 import { ColorAutocomplete, ColorMatchBadge } from '../../components/ColorAutocomplete';
 
@@ -264,12 +266,7 @@ function CreateModelModal({ open, onClose, holdingId, families, brands }: {
       queryClient.invalidateQueries({ queryKey: ['models'] });
       forceClose();
     } catch (err) {
-      if (err instanceof ApiError) {
-        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
-        setErrorMessage(translated || err.message);
-      } else {
-        setErrorMessage(t('common.error'));
-      }
+      setErrorMessage(translateApiError(err, t));
       setErrorKey(k => k + 1);
     } finally {
       const elapsed = Date.now() - start;
@@ -476,6 +473,7 @@ function ModelVariantsSection({ modelId, variants }: { modelId: number; variants
 
   const [addOpen, setAddOpen] = useState(false);
   const [editVariant, setEditVariant] = useState<ModelVariant | null>(null);
+  const [manageVariant, setManageVariant] = useState<ModelVariant | null>(null);
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['models-search'] });
@@ -483,9 +481,7 @@ function ModelVariantsSection({ modelId, variants }: { modelId: number; variants
   };
 
   const showErr = (err: unknown) => {
-    const msg = err instanceof ApiError
-      ? (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') || err.message
-      : t('common.error');
+    const msg = translateApiError(err, t);
     addSnackbar({
       message: (
         <div className="alert alert-danger">
@@ -545,6 +541,7 @@ function ModelVariantsSection({ modelId, variants }: { modelId: number; variants
               key={v.variant_id}
               variant={v}
               onEdit={() => setEditVariant(v)}
+              onManageBarcodes={() => setManageVariant(v)}
               onToggleActive={() => handleToggleActive(v)}
             />
           ))}
@@ -563,13 +560,24 @@ function ModelVariantsSection({ modelId, variants }: { modelId: number; variants
         onClose={() => setEditVariant(null)}
         onSuccess={refresh}
       />
+      <ManageBarcodesModal
+        open={!!manageVariant}
+        onClose={() => setManageVariant(null)}
+        variant={manageVariant}
+        onChanged={() => {
+          if (!manageVariant) return;
+          queryClient.invalidateQueries({ queryKey: ['variant-barcodes', manageVariant.variant_id] });
+          queryClient.invalidateQueries({ queryKey: ['barcodes-list'] });
+        }}
+      />
     </>
   );
 }
 
-function VariantRow({ variant, onEdit, onToggleActive }: {
+function VariantRow({ variant, onEdit, onManageBarcodes, onToggleActive }: {
   variant: ModelVariant;
   onEdit: () => void;
+  onManageBarcodes: () => void;
   onToggleActive: () => void;
 }) {
   const { t } = useTranslation();
@@ -630,6 +638,11 @@ function VariantRow({ variant, onEdit, onToggleActive }: {
                 onClick={() => { setMenuOpen(false); onEdit(); }}
               />
               <MenuItem
+                icon={<BarcodeIcon size={14} />}
+                label={t('barcodes.manage', { defaultValue: 'Manage barcodes' })}
+                onClick={() => { setMenuOpen(false); onManageBarcodes(); }}
+              />
+              <MenuItem
                 icon={<Power size={14} />}
                 label={variant.is_active ? t('brandsModels.disable') : t('brandsModels.enable')}
                 onClick={() => { setMenuOpen(false); onToggleActive(); }}
@@ -640,7 +653,7 @@ function VariantRow({ variant, onEdit, onToggleActive }: {
       </div>
 
       {attrEntries.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 pt-1 border-t border-line/60">
+        <div className="flex flex-wrap gap-1.5 pt-1">
           {attrEntries.map(([key, val]) => (
             <span
               key={key}
@@ -668,30 +681,101 @@ function AddVariantModal({ open, onClose, modelId, onSuccess }: {
   const { addSnackbar } = useSnackbarContext();
   const [color, setColor] = useState('');
   const [isActive, setIsActive] = useState(true);
+  const [barcodes, setBarcodes] = useState<string[]>(['']);
   const [isPending, setIsPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [barcodeWarnings, setBarcodeWarnings] = useState<string[]>([]);
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
 
   useEffect(() => {
     if (open) {
       setColor('');
       setIsActive(true);
+      setBarcodes(['']);
       setErrorMessage('');
+      setBarcodeWarnings([]);
+      setConfirmCloseOpen(false);
     }
   }, [open]);
+
+  const filledBarcodes = barcodes.map(b => b.trim()).filter(Boolean);
+  const allBarcodesValid = filledBarcodes.every(b => detectBarcodeType(b) !== null && isValidGs1Checksum(b));
+
+  // Dirty = any field diverges from initial blank state. Color empty + active=true
+  // + only one empty barcode row = pristine.
+  const isDirty =
+    color.trim() !== '' ||
+    !isActive ||
+    barcodes.length > 1 ||
+    barcodes.some(b => b.trim() !== '');
+
+  const handleClose = () => {
+    if (isPending) return;
+    if (isDirty) { setConfirmCloseOpen(true); return; }
+    onClose();
+  };
+
+  const forceClose = () => {
+    setConfirmCloseOpen(false);
+    onClose();
+  };
 
   const onSubmit = async () => {
     if (!color.trim()) {
       setErrorMessage(t('models.colorRequired'));
       return;
     }
+    if (filledBarcodes.length > 0 && !allBarcodesValid) {
+      setErrorMessage(t('barcodes.invalidLengthError', { defaultValue: 'Each barcode must be 8, 12, or 13 digits.' }));
+      return;
+    }
     setIsPending(true);
     setErrorMessage('');
+    setBarcodeWarnings([]);
     try {
-      await apiClient.rpc('variant_create', {
+      const res = await apiClient.rpc<{ id: number }>('variant_create', {
         p_model_id: modelId,
         p_manufacturer_color: color.trim(),
         p_is_active: isActive,
       });
+      const newVariantId = res?.id;
+
+      // Chain barcode_create calls. First filled barcode = primary. Collect
+      // per-barcode failures so the user can see which ones got dropped
+      // without rolling back the freshly-created variant.
+      const warnings: string[] = [];
+      if (newVariantId && filledBarcodes.length > 0) {
+        for (let i = 0; i < filledBarcodes.length; i++) {
+          const b = filledBarcodes[i];
+          try {
+            await apiClient.rpc('barcode_create', {
+              p_variant_id: newVariantId,
+              p_barcode: b,
+              p_source: 'MANUAL_SCAN',
+              p_branch_id: null,
+              p_pin: null,
+            });
+          } catch (err) {
+            warnings.push(`${b} — ${translateApiError(err, t)}`);
+          }
+        }
+      }
+
+      if (warnings.length > 0) {
+        setBarcodeWarnings(warnings);
+        addSnackbar({
+          message: (
+            <div className="alert alert-warning">
+              <AlertCircle size={18} />
+              <div><div className="alert-title">{t('models.variantCreatedBarcodeWarn', { defaultValue: 'Variant created, some barcodes failed' })}</div></div>
+            </div>
+          ),
+          type: 'warning', duration: 4000,
+        });
+        onSuccess(); // refresh list so user sees the new variant
+        return; // keep modal open so they can read the warning
+      }
+
       addSnackbar({
         message: (
           <div className="alert alert-success">
@@ -704,29 +788,38 @@ function AddVariantModal({ open, onClose, modelId, onSuccess }: {
       onSuccess();
       onClose();
     } catch (err) {
-      if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
-        setErrorMessage(translated || err.message);
-      } else {
-        setErrorMessage(t('common.error'));
-      }
+      setErrorMessage(translateApiError(err, t));
     } finally {
       setIsPending(false);
     }
   };
 
   return (
-    <Modal open={open} onClose={onClose} maxWidth="24rem" width="100%">
+    <>
+    <Modal open={open} onClose={handleClose} maxWidth="32rem" width="100%">
       <div className="modal-header">
         <h2 className="modal-title">{t('models.addVariant')}</h2>
-        <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">×</button>
+        <button type="button" className="modal-close-btn" onClick={handleClose} aria-label="Close">×</button>
       </div>
       <div className="modal-content">
         {errorMessage && (
           <div className="alert alert-danger mb-4 animate-pop-in">
             <XCircle size={18} />
             <div><div className="alert-description">{errorMessage}</div></div>
+          </div>
+        )}
+        {barcodeWarnings.length > 0 && (
+          <div className="alert alert-warning mb-4">
+            <AlertCircle size={18} />
+            <div>
+              <div className="alert-title">{t('models.variantCreatedBarcodeWarn', { defaultValue: 'Variant created, some barcodes failed' })}</div>
+              <div className="alert-description">
+                <ul className="list-disc pl-5 mt-1 text-xs">
+                  {barcodeWarnings.map((w, i) => <li key={i}>{w}</li>)}
+                </ul>
+                <div className="mt-1 text-xs">{t('models.addBarcodesLater', { defaultValue: 'You can add them later from the Barcodes page.' })}</div>
+              </div>
+            </div>
           </div>
         )}
         <div className="form-grid">
@@ -747,15 +840,207 @@ function AddVariantModal({ open, onClose, modelId, onSuccess }: {
             <label className="form-label mb-0" htmlFor="av-active">{t('brandsModels.active')}</label>
             <Switch id="av-active" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
           </div>
+
+          <BarcodeRowsEditor barcodes={barcodes} onChange={setBarcodes} />
         </div>
       </div>
       <div className="modal-footer">
-        <Button type="button" variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
-        <Button type="button" color="primary" disabled={isPending || !color.trim()} onClick={onSubmit}>
+        <Button type="button" variant="ghost" onClick={handleClose}>{t('common.cancel')}</Button>
+        <Button
+          type="button"
+          color="primary"
+          disabled={isPending || !color.trim() || (filledBarcodes.length > 0 && !allBarcodesValid)}
+          onClick={onSubmit}
+        >
           {isPending ? t('common.loading') : t('common.create')}
         </Button>
       </div>
     </Modal>
+
+    <Modal open={confirmCloseOpen} onClose={() => setConfirmCloseOpen(false)} maxWidth="24rem" width="100%">
+      <div className="modal-header">
+        <h2 className="modal-title">{t('common.unsavedChanges')}</h2>
+      </div>
+      <div className="modal-content">
+        <p>{t('common.unsavedChangesMessage')}</p>
+      </div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={() => setConfirmCloseOpen(false)}>{t('common.cancel')}</Button>
+        <Button color="danger" onClick={forceClose}>{t('common.discard')}</Button>
+      </div>
+    </Modal>
+    </>
+  );
+}
+
+// ── Barcode helpers (mirror BarcodesPage) ────────────────────────────────────
+
+function detectBarcodeType(raw: string): 'EAN8' | 'UPCA' | 'EAN13' | null {
+  const d = raw.replace(/\D/g, '');
+  if (d.length !== raw.length) return null;
+  if (d.length === 8) return 'EAN8';
+  if (d.length === 12) return 'UPCA';
+  if (d.length === 13) return 'EAN13';
+  return null;
+}
+
+// GS1 mod-10 check. Walking from the right: index 0 = check digit (×1),
+// index 1 = ×3, index 2 = ×1, ... The full weighted sum is divisible by 10
+// when the check digit is correct. Same algorithm for EAN-8 / UPC-A / EAN-13.
+function isValidGs1Checksum(digits: string): boolean {
+  if (!/^\d+$/.test(digits)) return false;
+  let sum = 0;
+  for (let i = 0; i < digits.length; i++) {
+    const d = digits.charCodeAt(digits.length - 1 - i) - 48;
+    sum += i % 2 === 1 ? d * 3 : d;
+  }
+  return sum % 10 === 0;
+}
+
+function jsbarcodeFormat(type: 'EAN8' | 'UPCA' | 'EAN13'): string {
+  if (type === 'UPCA') return 'UPC';
+  if (type === 'EAN8') return 'EAN8';
+  return 'EAN13';
+}
+
+function BarcodePreviewSvg({ value, type }: { value: string; type: 'EAN8' | 'UPCA' | 'EAN13' }) {
+  const ref = useRef<SVGSVGElement>(null);
+  useEffect(() => {
+    if (!ref.current) return;
+    try {
+      JsBarcode(ref.current, value, {
+        format: jsbarcodeFormat(type),
+        width: 1.6,
+        height: 40,
+        displayValue: true,
+        fontSize: 11,
+        margin: 0,
+        background: '#ffffff',
+        lineColor: '#000000',
+      });
+      // Width-based scaling stretches EAN8 vertically (fewer bars same width).
+      // Lock the rendered height; let width auto-scale by aspect ratio.
+      ref.current.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+      ref.current.style.height = '56px';
+      ref.current.style.width = 'auto';
+    } catch {
+      if (ref.current) ref.current.innerHTML = '';
+    }
+  }, [value, type]);
+  return <svg ref={ref} />;
+}
+
+// Shared barcode input: text input + type chip / checksum warn / preview SVG.
+// Used by BarcodeRowsEditor (Create Variant, looped) and ManageBarcodesModal's
+// add row (single). Validation rules and preview shape must match.
+function BarcodeInput({ value, onChange, badge, trailing, onEnter }: {
+  value: string;
+  onChange: (next: string) => void;
+  badge?: React.ReactNode;
+  trailing?: React.ReactNode;
+  onEnter?: () => void;
+}) {
+  const { t } = useTranslation();
+  const trimmed = value.trim();
+  const type = trimmed ? detectBarcodeType(trimmed) : null;
+  const digitsOnly = trimmed.replace(/\D/g, '');
+  const showLengthWarn = trimmed.length > 0 && type === null;
+  const checksumOk = type !== null && isValidGs1Checksum(trimmed);
+
+  return (
+    <div className="flex flex-col gap-1.5 p-2 border border-line rounded-md">
+      <div className="flex items-center gap-2">
+        <Input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={t('barcodes.barcodePlaceholder')}
+          size="sm"
+          className="w-full font-mono"
+          inputMode="numeric"
+          onKeyDown={onEnter ? (e) => { if (e.key === 'Enter') { e.preventDefault(); onEnter(); } } : undefined}
+        />
+        {badge}
+        {trailing}
+      </div>
+      {trimmed && (
+        <div className="flex items-center gap-2 min-h-[1.25rem]">
+          {type && checksumOk ? (
+            <Badge size="xs" color="success">{type}</Badge>
+          ) : type && !checksumOk ? (
+            <span className="text-[11px] text-warning">{t('barcodes.checksumInvalid')}</span>
+          ) : showLengthWarn ? (
+            <span className="text-[11px] text-warning">
+              {t('barcodes.lengthHint', { count: digitsOnly.length })}
+            </span>
+          ) : null}
+        </div>
+      )}
+      {type && checksumOk && (
+        <div className="flex justify-center items-center bg-white rounded border border-line h-16">
+          <BarcodePreviewSvg value={trimmed} type={type} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BarcodeRowsEditor({ barcodes, onChange }: {
+  barcodes: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const { t } = useTranslation();
+
+  const update = (i: number, v: string) => {
+    const next = barcodes.slice();
+    next[i] = v;
+    onChange(next);
+  };
+  const addRow = () => onChange([...barcodes, '']);
+  const removeRow = (i: number) => {
+    if (barcodes.length === 1) {
+      onChange(['']);
+    } else {
+      onChange(barcodes.filter((_, idx) => idx !== i));
+    }
+  };
+
+  return (
+    <div className="flex flex-col">
+      <label className="form-label">
+        {t('barcodes.title', { defaultValue: 'Barcodes' })}
+        <span className="text-subtler font-normal ml-1">({t('common.optional', { defaultValue: 'optional' })})</span>
+      </label>
+      <div className="flex flex-col gap-2">
+        {barcodes.map((raw, i) => (
+          <BarcodeInput
+            key={i}
+            value={raw}
+            onChange={(v) => update(i, v)}
+            badge={i === 0 && raw.trim() ? <Badge size="xs" color="primary">{t('barcodes.primary')}</Badge> : null}
+            trailing={
+              <Button
+                size="sm"
+                variant="ghost"
+                className="btn-icon-sm"
+                startIcon={<Trash2 size={14} />}
+                onClick={() => removeRow(i)}
+                aria-label={t('common.remove', { defaultValue: 'Remove' })}
+                disabled={barcodes.length === 1 && !raw}
+              />
+            }
+          />
+        ))}
+      </div>
+      <Button
+        size="sm"
+        variant="outline"
+        startIcon={<Plus size={14} />}
+        onClick={addRow}
+        className="self-start mt-2"
+      >
+        {t('barcodes.addBarcode')}
+      </Button>
+    </div>
   );
 }
 
@@ -767,11 +1052,13 @@ function EditVariantModal({ open, onClose, variant, onSuccess }: {
 }) {
   const { t } = useTranslation();
   const { addSnackbar } = useSnackbarContext();
+  const queryClient = useQueryClient();
   const [color, setColor] = useState('');
   const [editingColor, setEditingColor] = useState(false);
   const [isActive, setIsActive] = useState(true);
   const [isPending, setIsPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [manageBarcodesOpen, setManageBarcodesOpen] = useState(false);
 
   // Fetch the current manufacturer_color so we can show it (and pre-fill the
   // editor). It isn't on the search RPC response.
@@ -785,6 +1072,15 @@ function EditVariantModal({ open, onClose, variant, onSuccess }: {
     },
     enabled: open && !!variant?.variant_id,
     staleTime: 30 * 1000,
+  });
+
+  const { data: barcodeRows = [] } = useQuery({
+    queryKey: ['variant-barcodes', variant?.variant_id],
+    queryFn: () => apiClient.get<VariantBarcodeRow[]>(
+      `/v_barcode_list?variant_id=eq.${variant!.variant_id}&select=barcode_id,barcode,barcode_type,is_primary,is_active&order=is_primary.desc,barcode_id.asc`,
+    ),
+    enabled: open && !!variant?.variant_id,
+    staleTime: 10 * 1000,
   });
 
   const currentColor = detail?.manufacturer_color?.trim() ?? '';
@@ -833,20 +1129,17 @@ function EditVariantModal({ open, onClose, variant, onSuccess }: {
       onSuccess();
       onClose();
     } catch (err) {
-      if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
-        setErrorMessage(translated || err.message);
-      } else {
-        setErrorMessage(t('common.error'));
-      }
+      setErrorMessage(translateApiError(err, t));
     } finally {
       setIsPending(false);
     }
   };
 
+  const activeBarcodes = barcodeRows.filter(b => b.is_active);
+
   return (
-    <Modal open={open} onClose={onClose} maxWidth="24rem" width="100%">
+    <>
+    <Modal open={open} onClose={onClose} maxWidth="32rem" width="100%">
       <div className="modal-header">
         <h2 className="modal-title">{t('models.editVariant')}</h2>
         <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">×</button>
@@ -901,6 +1194,39 @@ function EditVariantModal({ open, onClose, variant, onSuccess }: {
             <label className="form-label mb-0" htmlFor="ev-active">{t('brandsModels.active')}</label>
             <Switch id="ev-active" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
           </div>
+
+          <div className="flex flex-col">
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <label className="form-label mb-0">{t('barcodes.title')}</label>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                startIcon={<Pencil size={12} />}
+                onClick={() => setManageBarcodesOpen(true)}
+              >
+                {t('barcodes.manage', { defaultValue: 'Manage' })}
+              </Button>
+            </div>
+            <div className="card py-2">
+              {activeBarcodes.length === 0 ? (
+                <span className="text-xs text-subtler">{t('barcodes.noneForVariant', { defaultValue: 'No barcodes bound to this variant yet.' })}</span>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {activeBarcodes.map(b => (
+                    <span
+                      key={b.barcode_id}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-line text-[11px] font-mono"
+                    >
+                      {b.is_primary && <Badge size="xs" color="primary">{t('barcodes.primary')}</Badge>}
+                      <span>{b.barcode}</span>
+                      {b.barcode_type && <span className="text-subtler">· {b.barcode_type}</span>}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
       <div className="modal-footer">
@@ -908,6 +1234,259 @@ function EditVariantModal({ open, onClose, variant, onSuccess }: {
         <Button type="button" color="primary" disabled={isPending} onClick={onSubmit}>
           {isPending ? t('common.loading') : t('common.save')}
         </Button>
+      </div>
+    </Modal>
+
+    <ManageBarcodesModal
+      open={manageBarcodesOpen}
+      onClose={() => setManageBarcodesOpen(false)}
+      variant={variant}
+      onChanged={() => {
+        if (!variant) return;
+        queryClient.invalidateQueries({ queryKey: ['variant-barcodes', variant.variant_id] });
+        queryClient.invalidateQueries({ queryKey: ['barcodes-list'] });
+      }}
+    />
+    </>
+  );
+}
+
+// ── Manage Barcodes modal (per-variant) ──────────────────────────────────────
+
+interface VariantBarcodeRow {
+  barcode_id: number;
+  barcode: string;
+  barcode_type: string | null;
+  is_primary: boolean;
+  is_active: boolean;
+}
+
+function BarcodeRowActions({ row, busy, onSetPrimary, onToggleActive }: {
+  row: VariantBarcodeRow;
+  busy: boolean;
+  onSetPrimary: () => void;
+  onToggleActive: () => void;
+}) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const canSetPrimary = row.is_active && !row.is_primary;
+  return (
+    <PopOver
+      isOpen={open}
+      onClose={() => setOpen(false)}
+      placement="bottom"
+      align="end"
+      offset={4}
+      openDelay={0}
+      trigger={
+        <button
+          type="button"
+          className="p-1 rounded hover:bg-surface-hover transition-colors cursor-pointer bg-transparent border-0 disabled:opacity-50"
+          onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+          disabled={busy}
+          aria-label={t('common.actions', { defaultValue: 'Actions' })}
+        >
+          <MoreHorizontal size={16} className="opacity-50" />
+        </button>
+      }
+    >
+      <div className="py-1 min-w-[160px]">
+        {canSetPrimary && (
+          <MenuItem
+            icon={<Star size={14} />}
+            label={t('barcodes.setPrimary')}
+            onClick={() => { setOpen(false); onSetPrimary(); }}
+          />
+        )}
+        <MenuItem
+          icon={row.is_active ? <ShieldOff size={14} /> : <ShieldCheck size={14} />}
+          label={row.is_active ? t('barcodes.disable') : t('barcodes.enable')}
+          onClick={() => { setOpen(false); onToggleActive(); }}
+        />
+      </div>
+    </PopOver>
+  );
+}
+
+function ManageBarcodesModal({ open, onClose, variant, onChanged }: {
+  open: boolean;
+  onClose: () => void;
+  variant: ModelVariant | null;
+  onChanged: () => void;
+}) {
+  const { t } = useTranslation();
+  const { addSnackbar } = useSnackbarContext();
+  const queryClient = useQueryClient();
+  const [newBarcode, setNewBarcode] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [adding, setAdding] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setNewBarcode('');
+      setErrorMessage('');
+      setBusyId(null);
+      setAdding(false);
+    }
+  }, [open]);
+
+  const { data: rows = [], isFetching } = useQuery({
+    queryKey: ['variant-barcodes', variant?.variant_id],
+    queryFn: () => apiClient.get<VariantBarcodeRow[]>(
+      `/v_barcode_list?variant_id=eq.${variant!.variant_id}&select=barcode_id,barcode,barcode_type,is_primary,is_active&order=is_active.desc,is_primary.desc,barcode_id.asc`,
+    ),
+    enabled: open && !!variant?.variant_id,
+    staleTime: 5 * 1000,
+  });
+
+  const invalidate = () => {
+    if (variant) queryClient.invalidateQueries({ queryKey: ['variant-barcodes', variant.variant_id] });
+    onChanged();
+  };
+
+  const showErr = (err: unknown) => {
+    setErrorMessage(translateApiError(err, t));
+  };
+
+  const handleAdd = async () => {
+    if (!variant) return;
+    const b = newBarcode.trim();
+    setErrorMessage('');
+    const type = detectBarcodeType(b);
+    if (!type) {
+      setErrorMessage(t('barcodes.digitsOnly'));
+      return;
+    }
+    if (!isValidGs1Checksum(b)) {
+      setErrorMessage(t('barcodes.checksumInvalid'));
+      return;
+    }
+    setAdding(true);
+    try {
+      await apiClient.rpc('barcode_create', {
+        p_variant_id: variant.variant_id,
+        p_barcode: b,
+        p_source: 'MANUAL_SCAN',
+        p_branch_id: null,
+        p_pin: null,
+      });
+      setNewBarcode('');
+      invalidate();
+      addSnackbar({
+        message: (
+          <div className="alert alert-success">
+            <CheckCircle size={18} />
+            <div><div className="alert-title">{t('barcodes.createSuccess')}</div></div>
+          </div>
+        ),
+        type: 'success', duration: 2500,
+      });
+    } catch (err) { showErr(err); }
+    finally { setAdding(false); }
+  };
+
+  const handleSetPrimary = async (row: VariantBarcodeRow) => {
+    setBusyId(row.barcode_id);
+    setErrorMessage('');
+    try {
+      await apiClient.rpc('barcode_update', {
+        p_barcode_id: row.barcode_id,
+        p_is_primary: true,
+      });
+      invalidate();
+    } catch (err) { showErr(err); }
+    finally { setBusyId(null); }
+  };
+
+  const handleToggleActive = async (row: VariantBarcodeRow) => {
+    setBusyId(row.barcode_id);
+    setErrorMessage('');
+    try {
+      await apiClient.rpc(row.is_active ? 'barcode_disable' : 'barcode_enable', {
+        p_barcode_id: row.barcode_id,
+      });
+      invalidate();
+    } catch (err) { showErr(err); }
+    finally { setBusyId(null); }
+  };
+
+  const newType = newBarcode.trim() ? detectBarcodeType(newBarcode.trim()) : null;
+  const newChecksumOk = newType !== null && isValidGs1Checksum(newBarcode.trim());
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="32rem" width="100%">
+      <div className="modal-header">
+        <h2 className="modal-title">{t('barcodes.manageTitle', { defaultValue: 'Manage barcodes' })}</h2>
+        <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">×</button>
+      </div>
+      <div className="modal-content">
+        <div className="flex flex-col mb-4">
+          <label className="form-label">{t('models.currentVariant')}</label>
+          <div className="card py-2">
+            <div className="text-sm">{variant?.name ?? ''}</div>
+            <div className="text-[11px] font-mono text-subtle truncate mt-0.5">{variant?.sku_code ?? ''}</div>
+          </div>
+        </div>
+
+        {errorMessage && (
+          <div className="alert alert-danger mb-3 animate-pop-in">
+            <XCircle size={18} />
+            <div><div className="alert-description">{errorMessage}</div></div>
+          </div>
+        )}
+
+        <div className="flex flex-col gap-2 mb-4">
+          {isFetching && rows.length === 0 ? (
+            <div className="p-4 text-center text-subtler text-xs">{t('common.loading')}</div>
+          ) : rows.length === 0 ? (
+            <div className="p-4 text-center text-subtler text-xs">{t('barcodes.noneForVariant', { defaultValue: 'No barcodes bound to this variant yet.' })}</div>
+          ) : (
+            rows.map(row => (
+              <div
+                key={row.barcode_id}
+                className={`flex items-center gap-2 px-3 py-2 border border-line rounded-md ${row.is_active ? '' : 'opacity-50'}`}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="font-mono text-sm truncate">{row.barcode}</span>
+                    {row.barcode_type && <Badge size="xs" color="default">{row.barcode_type}</Badge>}
+                    {row.is_primary && <Badge size="xs" color="primary">{t('barcodes.primary')}</Badge>}
+                    {!row.is_active && <Badge size="xs" color="default">{t('barcodes.inactive')}</Badge>}
+                  </div>
+                </div>
+                <BarcodeRowActions
+                  row={row}
+                  busy={busyId === row.barcode_id}
+                  onSetPrimary={() => handleSetPrimary(row)}
+                  onToggleActive={() => handleToggleActive(row)}
+                />
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label className="form-label">{t('barcodes.addBarcode')}</label>
+          <BarcodeInput
+            value={newBarcode}
+            onChange={setNewBarcode}
+            onEnter={handleAdd}
+            trailing={
+              <Button
+                size="sm"
+                color="primary"
+                disabled={adding || !newType || !newChecksumOk}
+                onClick={handleAdd}
+              >
+                {adding ? t('common.loading') : t('common.add', { defaultValue: 'Add' })}
+              </Button>
+            }
+          />
+        </div>
+      </div>
+      <div className="modal-footer">
+        <Button onClick={onClose}>{t('common.close')}</Button>
       </div>
     </Modal>
   );

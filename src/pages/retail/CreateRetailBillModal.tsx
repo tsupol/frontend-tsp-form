@@ -2,11 +2,11 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import {
-  Modal, Button, Select, Badge, Input, MaskedInput, NumberSpinner, TextArea, useSnackbarContext,
+  Modal, Button, Select, Badge, Input, MaskedInput, NumberSpinner, TextArea, Tooltip, useSnackbarContext,
 } from 'tsp-form';
 import {
   Plus, Trash2, ShoppingCart, Truck, Percent, ChevronsRight,
-  AlertCircle, CheckCircle, XCircle, Search,
+  AlertCircle, CheckCircle, XCircle, Search, Barcode,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -26,6 +26,7 @@ interface SellableVariant {
   variant_name: string;
   retail_price: number;
   qty: number;
+  barcodes: string[];
 }
 
 interface BankAccount {
@@ -704,7 +705,11 @@ function ProductPickerModal({ open, branchId, onClose, onPick }: {
       let url = `/v_branch_sellable_stock_priced?branch_id=eq.${branchId}&qty=gt.0&order=brand_name,model_name&limit=50`;
       if (debounced) {
         const term = debounced.replace(/\s+/g, '*');
-        url += `&full_name=ilike.*${encodeURIComponent(term)}*`;
+        const enc = encodeURIComponent(term);
+        const isBarcode = /^\d{8,}$/.test(debounced);
+        const orParts = [`full_name.ilike.*${enc}*`];
+        if (isBarcode) orParts.push(`barcodes.cs.{${debounced}}`);
+        url += `&or=(${orParts.join(',')})`;
       }
       return apiClient.get<SellableVariant[]>(url);
     },
@@ -740,7 +745,17 @@ function ProductPickerModal({ open, branchId, onClose, onPick }: {
                 return (
                   <div key={v.variant_id} className="flex items-center gap-3 py-2.5">
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">{v.full_name}</div>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-sm font-medium truncate">{v.full_name}</span>
+                        {v.barcodes.length > 0 && (
+                          <Tooltip content={v.barcodes.join('\n')} placement="top">
+                            <span className="inline-flex items-center gap-0.5 text-[10px] text-subtle shrink-0">
+                              <Barcode size={12} />
+                              {v.barcodes.length > 1 && <span className="tabular-nums">{v.barcodes.length}</span>}
+                            </span>
+                          </Tooltip>
+                        )}
+                      </div>
                       <div className="text-xs text-subtle flex items-center gap-2">
                         <span>{t('retail.create.stock')}: {v.qty}</span>
                         <span className="font-medium tabular-nums">{fmtCurrency(v.retail_price)}</span>

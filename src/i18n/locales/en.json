@@ -924,6 +924,7 @@
     "lengthHintEmpty": "Enter 8 / 12 / 13 digits — type is auto-detected.",
     "lengthHint": "{{count}} digits — expected 8 / 12 / 13.",
     "digitsOnly": "Digits only — 8, 12 or 13 digits.",
+    "checksumInvalid": "Check digit doesn’t match — verify the printed code.",
     "createSuccess": "Barcode registered",
     "updateSuccess": "Barcode updated",
     "disableSuccess": "Barcode disabled",

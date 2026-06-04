@@ -32,6 +32,25 @@
 
 **This project uses tsp-form everywhere.** Every page, every form, every table is built from tsp-form components. Before writing any component code in this project, read `C:\Users\tonsu\.claude\tsp-form-guide.md` **in full**. Not skim, not grep, not defer. The file is small. Component APIs have gotchas that only the guide documents, and pattern-matching from sibling pages will miss them. Past sessions have shipped broken code by skipping this step.
 
+> ### ⛔ STOP — before writing `<Modal>`
+>
+> **Modal must ALWAYS stay mounted.** Visibility is controlled by the `open` prop ONLY. Never wrap a `<Modal>` in `{x && <Modal ... />}` or `{x ? <Modal /> : null}` — the conditional mount silently breaks the transition and the modal will not appear.
+>
+> ```tsx
+> // ❌ WRONG — modal silently never opens
+> {selectedItem && <Modal open={true} ...>...</Modal>}
+> {selectedItem ? <Modal ... /> : null}
+>
+> // ✅ CORRECT — always mounted, open prop controls visibility
+> <Modal open={!!selectedItem} onClose={() => setSelectedItem(null)} ...>
+>   {/* guard reads of selectedItem inside: selectedItem?.field */}
+> </Modal>
+> ```
+>
+> If the modal needs data from a nullable selection (`selectedItem | null`), accept `null` in the modal's props and guard reads inside (`?.`), or render placeholder text. Do NOT gate the `<Modal>` itself.
+>
+> This rule applies even when "it would be cleaner" to early-return. It is not negotiable. Repeated mistake — re-read this every time before writing a new `<Modal>`.
+
 When using tsp-form components, follow this lookup order:
 
 1. **This project first:** Check existing usage in `src/` — reuse the same patterns for consistency
