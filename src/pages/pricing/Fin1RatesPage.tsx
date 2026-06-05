@@ -160,7 +160,6 @@ function Fin1Modal({ open, onClose, categories, onSuccess }: {
                       value={field.value || null}
                       onChange={(val) => field.onChange((val as string) ?? '')}
                       placeholder={t('fin1.selectCategory')}
-                      size="sm"
                       showChevron
                       renderOption={(opt) => (
                         <div>
@@ -188,7 +187,6 @@ function Fin1Modal({ open, onClose, categories, onSuccess }: {
                       decimalScale={0}
                       value={field.value}
                       onChange={(raw) => field.onChange(raw)}
-                      size="sm"
                       placeholder="12"
                     />
                   )}
@@ -207,7 +205,6 @@ function Fin1Modal({ open, onClose, categories, onSuccess }: {
                       decimalScale={1}
                       value={field.value}
                       onChange={(raw) => field.onChange(raw)}
-                      size="sm"
                       suffix="%"
                     />
                   )}
@@ -229,7 +226,6 @@ function Fin1Modal({ open, onClose, categories, onSuccess }: {
                       decimalScale={2}
                       value={field.value}
                       onChange={(raw) => field.onChange(raw)}
-                      size="sm"
                       suffix="%"
                     />
                   )}
@@ -248,7 +244,6 @@ function Fin1Modal({ open, onClose, categories, onSuccess }: {
                       decimalScale={0}
                       value={field.value}
                       onChange={(raw) => field.onChange(raw)}
-                      size="sm"
                       placeholder="10"
                     />
                   )}
@@ -269,7 +264,6 @@ function Fin1Modal({ open, onClose, categories, onSuccess }: {
                     decimalScale={1}
                     value={field.value}
                     onChange={(raw) => field.onChange(raw)}
-                    size="sm"
                     suffix="%"
                     placeholder="5"
                   />

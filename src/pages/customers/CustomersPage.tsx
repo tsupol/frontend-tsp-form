@@ -13,6 +13,7 @@ import { toLocalDateStr, parseLocalDate, formatTel, formatCid } from '../../lib/
 import { DateTime } from '../../components/DateTime';
 import { DatePicker } from '../../components/DatePicker';
 import { PhoneInput } from '../../components/PhoneInput';
+import { CustomerLoginCard, useInvalidateLoginInfo } from '../../components/CustomerLoginCard';
 import { ContractDetailPanel } from '../contracts/ContractDetailPanel';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -38,6 +39,12 @@ interface Customer {
   source: string | null;
   created_at: string;
   holding_id: number;
+  username: string | null;
+  has_login: boolean;
+  last_login_at: string | null;
+  failed_login_count: number;
+  locked_until: string | null;
+  is_currently_locked: boolean;
 }
 
 interface CustomerAddress {
@@ -352,8 +359,11 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
     setAddReferenceOpen(false);
   }, [customerId]);
 
+  const invalidateLogin = useInvalidateLoginInfo();
+
   const refreshAll = () => {
     queryClient.invalidateQueries({ queryKey: ['customers'] });
+    queryClient.invalidateQueries({ queryKey: ['customer', customerId] });
     queryClient.invalidateQueries({ queryKey: ['customer-addresses', customerId] });
     queryClient.invalidateQueries({ queryKey: ['customer-contacts', customerId] });
     queryClient.invalidateQueries({ queryKey: ['customer-references', customerId] });
@@ -396,6 +406,25 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
           <DetailRow label="Created">
             <DateTime value={customer.created_at} showTime={false} />
           </DetailRow>
+        </div>
+
+        {/* ── App Login ── */}
+        <div className="mb-4">
+          <CustomerLoginCard
+            customer={{
+              id: customer.id,
+              full_name: customer.full_name,
+              id_number: customer.id_number,
+              tel: customer.tel,
+              username: customer.username,
+              has_login: customer.has_login,
+              last_login_at: customer.last_login_at,
+              failed_login_count: customer.failed_login_count,
+              locked_until: customer.locked_until,
+              is_currently_locked: customer.is_currently_locked,
+            }}
+            onChanged={() => { invalidateLogin(customer.id); refreshAll(); }}
+          />
         </div>
 
         {/* ── Addresses ── */}
@@ -467,13 +496,17 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
               {contracts.map(c => (
                 <div key={c.id} className="px-3 py-2.5 flex items-center justify-between">
                   <div>
-                    <span className="text-sm font-medium">{c.code_display}</span>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/admin/contracts/search/${c.id}`)}
+                      className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
+                    >
+                      {c.code_display}
+                      <ExternalLink size={12} />
+                    </button>
                     {c.branch_name && <div className="text-xs text-subtle">{c.branch_name}</div>}
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <Badge size="xs" color={stateColor(c.state)}>{t(`contract.state_${c.state}`, { defaultValue: c.state })}</Badge>
-                    <Button variant="ghost" className="btn-icon-xs" onClick={() => navigate(`/admin/contracts/search/${c.id}`)} startIcon={<ExternalLink size={12} />} />
-                  </div>
+                  <Badge size="xs" color={stateColor(c.state)}>{t(`contract.state_${c.state}`, { defaultValue: c.state })}</Badge>
                 </div>
               ))}
             </div>
@@ -669,7 +702,7 @@ function EditInfoModal({ open, onClose, customer, onSuccess }: {
   return (
     <Modal open={open} onClose={onClose} maxWidth="32rem" width="100%">
       <div className="modal-header">
-        <h2 className="modal-title">{t('customer.basicInfo')}</h2>
+        <h2 className="modal-title">{t('customer.editCustomerInfo')}</h2>
         <button type="button" className="modal-close-btn" onClick={onClose}>&times;</button>
       </div>
       <div className="modal-content">
@@ -677,32 +710,31 @@ function EditInfoModal({ open, onClose, customer, onSuccess }: {
         <div className="form-grid">
           <div className="flex flex-col">
             <label className="form-label">{t('customer.prefix')}</label>
-            <Select size="sm" options={PREFIX_OPTIONS} value={form.prefix} onChange={v => set('prefix', (v as string) ?? '')} showChevron clearable />
+            <Select options={PREFIX_OPTIONS} value={form.prefix} onChange={v => set('prefix', (v as string) ?? '')} showChevron clearable />
           </div>
           <div className="flex gap-3">
             <div className="flex flex-col flex-1">
               <label className="form-label">{t('customer.firstName')} *</label>
-              <Input size="sm" value={form.first_name} onChange={e => set('first_name', e.target.value)} className="w-full" />
+              <Input value={form.first_name} onChange={e => set('first_name', e.target.value)} className="w-full" />
             </div>
             <div className="flex flex-col flex-1">
               <label className="form-label">{t('customer.lastName')} *</label>
-              <Input size="sm" value={form.last_name} onChange={e => set('last_name', e.target.value)} className="w-full" />
+              <Input value={form.last_name} onChange={e => set('last_name', e.target.value)} className="w-full" />
             </div>
           </div>
           <div className="flex gap-3">
             <div className="flex flex-col flex-1">
               <label className="form-label">{t('customer.phone')}</label>
-              <PhoneInput value={form.tel} onChange={(raw) => set('tel', raw)} size="sm" className="w-full" />
+              <PhoneInput value={form.tel} onChange={(raw) => set('tel', raw)} className="w-full" />
             </div>
             <div className="flex flex-col flex-1">
               <label className="form-label">{t('customer.phone')} 2</label>
-              <PhoneInput value={form.tel2} onChange={(raw) => set('tel2', raw)} size="sm" className="w-full" />
+              <PhoneInput value={form.tel2} onChange={(raw) => set('tel2', raw)} className="w-full" />
             </div>
           </div>
           <div className="flex flex-col">
             <label className="form-label">{t('customer.dateOfBirth')}</label>
             <DatePicker
-              size="sm"
               value={parseLocalDate(form.date_of_birth)}
               onChange={v => set('date_of_birth', toLocalDateStr(v))}
             />
@@ -710,11 +742,11 @@ function EditInfoModal({ open, onClose, customer, onSuccess }: {
           <div className="flex gap-3">
             <div className="flex flex-col flex-1">
               <label className="form-label">{t('customer.facebook')}</label>
-              <Input size="sm" value={form.facebook} onChange={e => set('facebook', e.target.value)} className="w-full" />
+              <Input value={form.facebook} onChange={e => set('facebook', e.target.value)} className="w-full" />
             </div>
             <div className="flex flex-col flex-1">
               <label className="form-label">{t('customer.lineId')}</label>
-              <Input size="sm" value={form.line_id} onChange={e => set('line_id', e.target.value)} className="w-full" />
+              <Input value={form.line_id} onChange={e => set('line_id', e.target.value)} className="w-full" />
             </div>
           </div>
         </div>
@@ -835,34 +867,33 @@ function EditAddressModal({ open, onClose, customerId, addressType, existing, on
           <div className="form-grid">
             <div className="flex flex-col">
               <label className="form-label">{t('customer.addressLine1')} *</label>
-              <Input size="sm" className="w-full" {...register('address_line1', { required: t('common.required') })} />
+              <Input className="w-full" {...register('address_line1', { required: t('common.required') })} />
               <FormErrorMessage error={errors.address_line1} />
             </div>
             <div className="flex flex-col">
               <label className="form-label">{t('customer.addressLine2')}</label>
-              <Input size="sm" className="w-full" {...register('address_line2')} />
+              <Input className="w-full" {...register('address_line2')} />
             </div>
             <div className="flex gap-3">
               <div className="flex flex-col flex-1">
                 <label className="form-label">{t('customer.soi')}</label>
-                <Input size="sm" className="w-full" {...register('soi')} />
+                <Input className="w-full" {...register('soi')} />
               </div>
               <div className="flex flex-col flex-1">
                 <label className="form-label">{t('customer.road')}</label>
-                <Input size="sm" className="w-full" {...register('road')} />
+                <Input className="w-full" {...register('road')} />
               </div>
             </div>
             <div className="flex gap-3">
               <div className="flex flex-col flex-1">
                 <label className="form-label">{t('customer.postalCode')} *</label>
-                <Input size="sm" className="w-full" maxLength={5} placeholder={t('customer.postalCodeHint')} {...register('postal_code', { required: t('common.required') })} />
+                <Input className="w-full" maxLength={5} placeholder={t('customer.postalCodeHint')} {...register('postal_code', { required: t('common.required') })} />
                 <FormErrorMessage error={errors.postal_code} />
               </div>
               <div className="flex flex-col flex-1">
                 <label className="form-label">{t('customer.subDistrict')} *</label>
                 {postalResults.length > 0 ? (
                   <Select
-                    size="sm"
                     options={subDistrictOptions}
                     value={watch('sub_district')}
                     onChange={handleSubDistrictSelect}
@@ -870,7 +901,7 @@ function EditAddressModal({ open, onClose, customerId, addressType, existing, on
                     showChevron
                   />
                 ) : (
-                  <Input size="sm" className="w-full" value={watch('sub_district')} onChange={e => setValue('sub_district', e.target.value, { shouldValidate: true })} />
+                  <Input className="w-full" value={watch('sub_district')} onChange={e => setValue('sub_district', e.target.value, { shouldValidate: true })} />
                 )}
                 <FormErrorMessage error={errors.sub_district} />
               </div>
@@ -878,12 +909,12 @@ function EditAddressModal({ open, onClose, customerId, addressType, existing, on
             <div className="flex gap-3">
               <div className="flex flex-col flex-1">
                 <label className="form-label">{t('customer.district')} *</label>
-                <Input size="sm" className="w-full" disabled={postalResults.length > 0} value={watch('district')} onChange={e => setValue('district', e.target.value, { shouldValidate: true })} />
+                <Input className="w-full" disabled={postalResults.length > 0} value={watch('district')} onChange={e => setValue('district', e.target.value, { shouldValidate: true })} />
                 <FormErrorMessage error={errors.district} />
               </div>
               <div className="flex flex-col flex-1">
                 <label className="form-label">{t('customer.province')} *</label>
-                <Input size="sm" className="w-full" disabled={postalResults.length > 0} value={watch('province')} onChange={e => setValue('province', e.target.value, { shouldValidate: true })} />
+                <Input className="w-full" disabled={postalResults.length > 0} value={watch('province')} onChange={e => setValue('province', e.target.value, { shouldValidate: true })} />
                 <FormErrorMessage error={errors.province} />
               </div>
             </div>
@@ -954,20 +985,20 @@ function AddContactModal({ open, onClose, customerId, onSuccess }: {
           <div className="flex gap-3">
             <div className="flex flex-col" style={{ width: '8rem' }}>
               <label className="form-label">{t('customer.contactType')}</label>
-              <Select size="sm" options={typeOptions} value={contactType} onChange={v => setContactType(v as string)} showChevron searchable={false} />
+              <Select options={typeOptions} value={contactType} onChange={v => setContactType(v as string)} showChevron searchable={false} />
             </div>
             <div className="flex flex-col flex-1 min-w-0">
               <label className="form-label">{t('customer.contactValue')} *</label>
               {['MOBILE', 'HOME', 'WORK'].includes(contactType) ? (
-                <PhoneInput value={value} onChange={(raw) => setValue(raw)} size="sm" className="w-full" />
+                <PhoneInput value={value} onChange={(raw) => setValue(raw)} className="w-full" />
               ) : (
-                <Input size="sm" value={value} onChange={e => setValue(e.target.value)} className="w-full" />
+                <Input value={value} onChange={e => setValue(e.target.value)} className="w-full" />
               )}
             </div>
           </div>
           <div className="flex flex-col">
             <label className="form-label">{t('customer.contactLabel')}</label>
-            <Input size="sm" value={label} onChange={e => setLabel(e.target.value)} className="w-full" />
+            <Input value={label} onChange={e => setLabel(e.target.value)} className="w-full" />
           </div>
           <LabeledCheckbox label={t('customer.contactPrimary')} checked={isPrimary} onChange={e => setIsPrimary(e.target.checked)} />
         </div>
@@ -1035,21 +1066,21 @@ function AddReferenceModal({ open, onClose, customerId, onSuccess }: {
           <div className="flex gap-3">
             <div className="flex flex-col flex-1">
               <label className="form-label">{t('customer.refName')} *</label>
-              <Input size="sm" value={name} onChange={e => setName(e.target.value)} className="w-full" />
+              <Input value={name} onChange={e => setName(e.target.value)} className="w-full" />
             </div>
             <div className="flex flex-col flex-1">
               <label className="form-label">{t('customer.refLastName')}</label>
-              <Input size="sm" value={lastName} onChange={e => setLastName(e.target.value)} className="w-full" />
+              <Input value={lastName} onChange={e => setLastName(e.target.value)} className="w-full" />
             </div>
           </div>
           <div className="flex gap-3">
             <div className="flex flex-col flex-1">
               <label className="form-label">{t('customer.refTel')}</label>
-              <PhoneInput value={tel} onChange={(raw) => setTel(raw)} size="sm" className="w-full" />
+              <PhoneInput value={tel} onChange={(raw) => setTel(raw)} className="w-full" />
             </div>
             <div className="flex flex-col flex-1">
               <label className="form-label">{t('customer.refRelation')}</label>
-              <Input size="sm" value={relation} onChange={e => setRelation(e.target.value)} className="w-full" />
+              <Input value={relation} onChange={e => setRelation(e.target.value)} className="w-full" />
             </div>
           </div>
         </div>

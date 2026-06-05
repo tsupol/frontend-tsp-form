@@ -64,3 +64,21 @@ Don't substitute `Wand2`, `Sparkles`, `RefreshCw`, etc. — keep the convention.
 
 - **No edit icon button** on desktop list rows — single click opens the editor/detail panel
 - Mobile: single tap navigates to detail panel
+
+## Inline links
+
+Inline navigation links (clickable codes, IDs, references that route to another page) use **`text-primary-fg hover:underline`**. Never use `text-primary` — that's the brand fill color, not the link color.
+
+```tsx
+<button
+  type="button"
+  onClick={() => navigate(`/admin/contracts/search/${c.id}`)}
+  className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
+>
+  {c.code_display}
+  <ExternalLink size={12} />
+</button>
+```
+
+- Pair with a trailing `<ExternalLink size={12} />` when the target opens a different section/page so the affordance is obvious.
+- Don't substitute a separate icon `<Button>` next to a non-link label — make the label itself the link. Saves a column of action buttons in dense tables/lists.

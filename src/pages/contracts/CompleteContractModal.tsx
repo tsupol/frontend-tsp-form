@@ -1139,9 +1139,12 @@ function PayoffView({
                 />
               </div>
               {payments.length > 1 && (
-                <Button size="sm" className="btn-icon-sm shrink-0" onClick={() => removePaymentLine(idx)}>
-                  <Trash2 size={14} />
-                </Button>
+                <Button
+                  size="sm"
+                  className="shrink-0"
+                  startIcon={<Trash2 size={14} />}
+                  onClick={() => removePaymentLine(idx)}
+                />
               )}
             </div>
             {payment.method === 'TRANSFER' && (

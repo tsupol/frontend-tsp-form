@@ -931,14 +931,19 @@ export function ICloudPoolPage() {
                       maxWidth="300px"
                       maxHeight="400px"
                       trigger={
-                        <Button variant="outline" size="sm" className="relative btn-icon-sm" onClick={() => setFilterOpen(!filterOpen)}>
-                          <SlidersHorizontal size={16} />
+                        <div className="relative inline-flex">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            startIcon={<SlidersHorizontal size={16} />}
+                            onClick={() => setFilterOpen(!filterOpen)}
+                          />
                           {activeFilterCount > 0 && (
-                            <span className="absolute -top-1.5 -right-1.5 bg-primary text-white text-xs rounded-full w-4 h-4 flex items-center justify-center leading-none">
+                            <span className="absolute -top-1 -right-1 bg-primary text-white text-[10px] rounded-full w-3.5 h-3.5 flex items-center justify-center leading-none pointer-events-none">
                               {activeFilterCount}
                             </span>
                           )}
-                        </Button>
+                        </div>
                       }
                     >
                       <div className="flex flex-col gap-3 p-3">

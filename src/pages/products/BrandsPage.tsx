@@ -163,6 +163,7 @@ function CreateBrandModal({ open, onClose, holdingId }: { open: boolean; onClose
               <label className="form-label" htmlFor="cb-code">{t('brandsModels.brandCode')}</label>
               <Input
                 id="cb-code"
+                placeholder={t('brandsModels.brandCodePlaceholder')}
                 error={!!errors.code}
                 {...register('code', { required: t('brandsModels.brandCode') + ' is required' })}
               />
@@ -172,6 +173,7 @@ function CreateBrandModal({ open, onClose, holdingId }: { open: boolean; onClose
               <label className="form-label" htmlFor="cb-name">{t('brandsModels.brandName')}</label>
               <Input
                 id="cb-name"
+                placeholder={t('brandsModels.brandNamePlaceholder')}
                 error={!!errors.name}
                 {...register('name', { required: t('brandsModels.brandName') + ' is required' })}
               />
@@ -298,6 +300,7 @@ function EditBrandModal({ brand, open, onClose }: { brand: Brand | null; open: b
               <label className="form-label" htmlFor="eb-code">{t('brandsModels.brandCode')}</label>
               <Input
                 id="eb-code"
+                placeholder={t('brandsModels.brandCodePlaceholder')}
                 error={!!errors.code}
                 {...register('code', { required: t('brandsModels.brandCode') + ' is required' })}
               />
@@ -307,6 +310,7 @@ function EditBrandModal({ brand, open, onClose }: { brand: Brand | null; open: b
               <label className="form-label" htmlFor="eb-name">{t('brandsModels.brandName')}</label>
               <Input
                 id="eb-name"
+                placeholder={t('brandsModels.brandNamePlaceholder')}
                 error={!!errors.name}
                 {...register('name', { required: t('brandsModels.brandName') + ' is required' })}
               />
@@ -532,14 +536,19 @@ export function BrandsPage() {
                 align="end"
                 maxWidth="300px"
                 trigger={
-                  <Button variant="outline" size="sm" className="relative btn-icon-sm" onClick={() => setFilterOpen(!filterOpen)}>
-                    <SlidersHorizontal size={16} />
+                  <div className="relative inline-flex">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      startIcon={<SlidersHorizontal size={16} />}
+                      onClick={() => setFilterOpen(!filterOpen)}
+                    />
                     {activeFilterCount > 0 && (
-                      <span className="absolute -top-1.5 -right-1.5 bg-primary text-white text-xs rounded-full w-4 h-4 flex items-center justify-center leading-none">
+                      <span className="absolute -top-1 -right-1 bg-primary text-white text-[10px] rounded-full w-3.5 h-3.5 flex items-center justify-center leading-none pointer-events-none">
                         {activeFilterCount}
                       </span>
                     )}
-                  </Button>
+                  </div>
                 }
               >
                 <div className="flex flex-col gap-3 p-3">

@@ -344,14 +344,13 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
                   {payments.length > 1 && (
                     <Button
                       size="sm"
-                      className="btn-icon-sm shrink-0"
+                      className="shrink-0"
+                      startIcon={<Trash2 size={14} />}
                       onClick={() => {
                         userEditedPayments.current = true;
                         setPayments(prev => prev.filter((_, i) => i !== idx));
                       }}
-                    >
-                      <Trash2 size={14} />
-                    </Button>
+                    />
                   )}
                 </div>
                 {payment.method === 'TRANSFER' && (

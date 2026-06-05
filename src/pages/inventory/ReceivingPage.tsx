@@ -2,8 +2,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Modal, Input, NumberSpinner, DataTable, useSnackbarContext } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, PackagePlus, CheckCircle, XCircle, Plus, Trash2, ScanBarcode, ExternalLink } from 'lucide-react';
+import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Modal, Input, NumberSpinner, DataTable, PopOver, useSnackbarContext } from 'tsp-form';
+import { ArrowLeft, ArrowRightFromLine, PackagePlus, CheckCircle, XCircle, Plus, Trash2, ScanBarcode, ExternalLink, Search, SlidersHorizontal } from 'lucide-react';
 import { useBarcodeScanner } from '../../components/BarcodeScanner';
 import { CurrencyInput } from '../../components/CurrencyInput';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
@@ -123,6 +123,16 @@ export function ReceivingPage() {
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
   const [createOpen, setCreateOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [filterOpen, setFilterOpen] = useState(false);
+
+  const extraFilterCount = (filterStatus ? 1 : 0) + (filterBranchId !== null ? 1 : 0);
+
+  useEffect(() => {
+    const tm = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(tm);
+  }, [search]);
 
   const { data: branches } = useQuery({
     queryKey: ['branches'],
@@ -135,11 +145,15 @@ export function ReceivingPage() {
   }, [branches]);
 
   const { data: listData, isFetching } = useQuery({
-    queryKey: ['receipts', filterStatus, filterBranchId, pageIndex, pageSize],
+    queryKey: ['receipts', filterStatus, filterBranchId, debouncedSearch, pageIndex, pageSize],
     queryFn: () => {
       let url = '/v_receipts?order=created_at.desc';
       if (filterStatus) url += `&status=eq.${filterStatus}`;
       if (filterBranchId) url += `&branch_id=eq.${filterBranchId}`;
+      if (debouncedSearch) {
+        const term = encodeURIComponent(debouncedSearch);
+        url += `&or=(receipt_no.ilike.*${term}*,po_no.ilike.*${term}*,supplier_name.ilike.*${term}*)`;
+      }
       return apiClient.getPaginated<Receipt>(url, { page: pageIndex + 1, pageSize });
     },
     placeholderData: keepPreviousData,
@@ -155,7 +169,7 @@ export function ReceivingPage() {
     placeholderData: keepPreviousData,
   });
 
-  useEffect(() => { setPageIndex(0); }, [filterStatus, filterBranchId]);
+  useEffect(() => { setPageIndex(0); }, [filterStatus, filterBranchId, debouncedSearch]);
 
   const selectedReceipt = list.find(r => r.id === selectedId) ?? null;
 
@@ -208,29 +222,63 @@ export function ReceivingPage() {
 
           <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
             <PageNavPanel id="list" className={isMobile ? '' : 'w-1/2 xl:w-5/12 border-r border-line flex flex-col'}>
-              <div className="flex-none flex flex-col gap-2 p-2 border-b border-line">
-                <div className="flex gap-2 w-full">
-                  <div className="flex-[2] min-w-0">
-                    <Select
-                      options={RECEIPT_STATUS_VALUES.map((v) => ({ value: v, label: t(`receiving.status_${v}`) }))}
-                      value={filterStatus}
-                      onChange={(val) => setFilterStatus((val as string) || null)}
-                      placeholder={t('receiving.allStatuses')}
+              <div className="flex-none p-2 border-b border-line">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <Input
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder={t('common.search')}
                       size="sm"
-                      showChevron
-                      clearable
+                      startIcon={<Search size={16} />}
+                      className="w-full"
                     />
                   </div>
-                  <div className="flex-[2] min-w-0">
-                    <Select
-                      options={branchOptions}
-                      value={filterBranchId !== null ? String(filterBranchId) : null}
-                      onChange={(val) => setFilterBranchId(val ? Number(val) : null)}
-                      placeholder={t('inventory.allBranches')}
-                      size="sm"
-                      showChevron
-                      clearable
-                    />
+                  <div className="shrink-0">
+                    <PopOver
+                      isOpen={filterOpen}
+                      onClose={() => setFilterOpen(false)}
+                      placement="bottom"
+                      align="end"
+                      maxWidth="300px"
+                      trigger={
+                        <div className="relative inline-flex">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            startIcon={<SlidersHorizontal size={16} />}
+                            onClick={() => setFilterOpen(!filterOpen)}
+                          />
+                          {extraFilterCount > 0 && (
+                            <span className="absolute -top-1 -right-1 bg-primary text-white text-[10px] rounded-full w-3.5 h-3.5 flex items-center justify-center leading-none pointer-events-none">
+                              {extraFilterCount}
+                            </span>
+                          )}
+                        </div>
+                      }
+                    >
+                      <div className="flex flex-col gap-3 p-3">
+                        <div className="text-xs font-medium text-subtle uppercase tracking-wide">{t('common.filters')}</div>
+                        <Select
+                          options={RECEIPT_STATUS_VALUES.map((v) => ({ value: v, label: t(`receiving.status_${v}`) }))}
+                          value={filterStatus}
+                          onChange={(val) => setFilterStatus((val as string) || null)}
+                          placeholder={t('receiving.allStatuses')}
+                          size="sm"
+                          showChevron
+                          clearable
+                        />
+                        <Select
+                          options={branchOptions}
+                          value={filterBranchId !== null ? String(filterBranchId) : null}
+                          onChange={(val) => setFilterBranchId(val ? Number(val) : null)}
+                          placeholder={t('inventory.allBranches')}
+                          size="sm"
+                          showChevron
+                          clearable
+                        />
+                      </div>
+                    </PopOver>
                   </div>
                   {canCreate && isMobile && (
                     <Button
@@ -1145,7 +1193,7 @@ interface PoLineOption {
   model_name: string;
   variant_id: number;
   variant_name: string;
-  variant_sku_code: string;
+  sku_code: string;
   brand_name: string;
   family_name: string;
   qty: number;
@@ -1159,7 +1207,7 @@ interface VariantSearchRow {
   family_name: string;
   model_name: string;
   sku_code: string;
-  item_name: string;
+  variant_name: string;
 }
 
 function AddReceiptLineModal({
@@ -1197,19 +1245,11 @@ function AddReceiptLineModal({
     queryFn: () =>
       apiClient.get<PoLineOption[]>(
         `/v_po_lines?po_id=eq.${detail.po_id}&order=po_line_id`
-        + '&select=po_line_id,model_id,model_name,variant_id,variant_name,variant_sku_code,brand_name,family_name,qty,unit_cost',
+        + '&select=po_line_id,model_id,model_name,variant_id,variant_name,sku_code,brand_name,family_name,qty,unit_cost',
       ),
     enabled: open,
     staleTime: 30 * 1000,
   });
-
-  const poLineOptions = useMemo(
-    () => (poLines ?? []).map(l => ({
-      value: String(l.po_line_id),
-      label: `${l.brand_name} ${l.model_name} · ${l.variant_name} (${fmtNum(l.qty)} pcs)`,
-    })),
-    [poLines],
-  );
 
   const selectedPoLine = useMemo(
     () => poLines?.find(l => l.po_line_id === poLineId) ?? null,
@@ -1265,7 +1305,7 @@ function AddReceiptLineModal({
     <Modal open={open} onClose={onClose} maxWidth="32rem" width="100%">
       <div className="flex flex-col overflow-hidden">
         <div className="modal-header">
-          <h2 className="modal-title">{t('receiving.addLine')}</h2>
+          <h2 className="modal-title">{t('receiving.addLineTitle')}</h2>
           <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
         </div>
         <div className="modal-content">
@@ -1277,9 +1317,8 @@ function AddReceiptLineModal({
           )}
 
           {/* Mode toggle */}
-          <div className="flex gap-2 mb-4">
+          <div className="btn-group mb-4 w-full">
             <Button
-              size="sm"
               variant={mode === 'matched' ? 'solid' : 'outline'}
               color={mode === 'matched' ? 'primary' : 'default'}
               onClick={() => { setMode('matched'); setVariant(null); }}
@@ -1288,7 +1327,6 @@ function AddReceiptLineModal({
               {t('receiving.matchedMode')}
             </Button>
             <Button
-              size="sm"
               variant={mode === 'unmatched' ? 'solid' : 'outline'}
               color={mode === 'unmatched' ? 'primary' : 'default'}
               onClick={() => { setMode('unmatched'); setPoLineId(null); }}
@@ -1302,17 +1340,37 @@ function AddReceiptLineModal({
             {mode === 'matched' ? (
               <div className="flex flex-col">
                 <label className="form-label">{t('receiving.poLine')}</label>
-                <Select
-                  options={poLineOptions}
-                  value={poLineId !== null ? String(poLineId) : null}
-                  onChange={(v) => {
-                    const id = v ? Number(v) : null;
-                    setPoLineId(id);
-                    setUnitCost(''); // reset so the picked line's cost auto-fills
-                  }}
-                  placeholder={t('receiving.selectPoLine')}
-                  searchable
-                />
+                <div className="border border-line rounded-md divide-y divide-line overflow-hidden">
+                  {(poLines ?? []).length === 0 && (
+                    <div className="p-3 text-xs text-subtler text-center">{t('common.noData')}</div>
+                  )}
+                  {(poLines ?? []).map((line) => {
+                    const isActive = line.po_line_id === poLineId;
+                    return (
+                      <button
+                        key={line.po_line_id}
+                        type="button"
+                        className={`block w-full text-left px-3 py-2 cursor-pointer flex items-center gap-3 ${isActive ? 'bg-item-active-bg text-item-active-fg' : 'hover:bg-surface-hover'}`}
+                        onClick={() => {
+                          setPoLineId(line.po_line_id);
+                          setUnitCost('');
+                        }}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">
+                            {[line.brand_name, line.family_name, line.model_name].filter(Boolean).join(' ')}
+                          </div>
+                          <div className="text-xs text-subtle truncate">
+                            {line.variant_name} · {line.sku_code}
+                          </div>
+                        </div>
+                        <div className="shrink-0 w-10 text-right text-xs tabular-nums">
+                          {fmtNum(line.qty)}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             ) : (
               <div className="flex flex-col">
@@ -1324,7 +1382,7 @@ function AddReceiptLineModal({
                         {[variant.brand_name, variant.family_name, variant.model_name].filter(Boolean).join(' ')}
                       </div>
                       <div className="text-xs text-subtle truncate">
-                        {variant.item_name} · {variant.sku_code}
+                        {variant.variant_name} · {variant.sku_code}
                       </div>
                     </div>
                     <Button size="sm" variant="ghost" onClick={() => setVariant(null)}>
@@ -1338,7 +1396,7 @@ function AddReceiptLineModal({
             )}
 
             <div className="flex gap-3">
-              <div className="shrink-0 flex flex-col">
+              <div className="shrink-0 w-36 flex flex-col">
                 <label className="form-label">{t('receiving.qty')}</label>
                 <NumberSpinner
                   value={qty}
@@ -1407,16 +1465,13 @@ function VariantPickerInline({
 
   const { data: results, isFetching } = useQuery({
     queryKey: ['variant-search-receipt', debounced],
-    queryFn: () => {
-      const base = '/v_product_variant_search?variant_is_active=eq.true&order=brand_name,family_name,model_name&limit=20';
-      if (!debounced) return apiClient.get<VariantSearchRow[]>(base);
-      const enc = encodeURIComponent(debounced);
-      const isBarcode = /^\d{8,}$/.test(debounced);
-      const orParts = [`item_name.ilike.*${enc}*`, `sku_code.ilike.*${enc}*`, `model_name.ilike.*${enc}*`];
-      if (isBarcode) orParts.push(`barcodes.cs.{${debounced}}`);
-      return apiClient.get<VariantSearchRow[]>(`${base}&or=(${orParts.join(',')})`);
-    },
+    queryFn: () =>
+      apiClient.rpc<{ rows: VariantSearchRow[]; total: number; has_more: boolean }>(
+        'fn_product_variant_search',
+        { p_q: debounced, p_limit: 20 },
+      ),
     placeholderData: keepPreviousData,
+    staleTime: 30 * 1000,
   });
 
   return (
@@ -1432,13 +1487,13 @@ function VariantPickerInline({
         autoFocus
       />
       <div className="mt-2 max-h-56 overflow-auto better-scroll border border-line rounded-md">
-        {isFetching && (results ?? []).length === 0 && (
+        {isFetching && (results?.rows ?? []).length === 0 && (
           <div className="p-3 text-xs text-subtle text-center">{t('common.loading')}</div>
         )}
-        {!isFetching && (results ?? []).length === 0 && (
+        {!isFetching && (results?.rows ?? []).length === 0 && (
           <div className="p-3 text-xs text-subtler text-center">{t('common.noData')}</div>
         )}
-        {(results ?? []).map((row) => (
+        {(results?.rows ?? []).map((row) => (
           <button
             key={row.variant_id}
             type="button"
@@ -1449,7 +1504,7 @@ function VariantPickerInline({
               {[row.brand_name, row.family_name, row.model_name].filter(Boolean).join(' ')}
             </div>
             <div className="min-w-0 text-xs text-subtle truncate">
-              {row.item_name}
+              {row.variant_name}
             </div>
           </button>
         ))}

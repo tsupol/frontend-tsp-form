@@ -24,7 +24,7 @@ import { ColorAutocomplete, ColorMatchBadge } from '../../components/ColorAutoco
 // v_stock_lots: lot_id, holding_id, company_id, branch_id, lot_code,
 //   current_bucket, qty_received, qty_on_hand, qty_consumed, unit_cost,
 //   on_hand_value, is_closed, closed_at, variant_id, model_id,
-//   variant_sku_code, variant_name, model_name, family_name, brand_name,
+//   sku_code, variant_name, model_name, family_name, brand_name,
 //   po_id, po_no, po_type, source_lot_id, created_by, created_at, updated_at.
 //   NOT in view: owner_type, branch_name, is_contractable.
 // fn_lot_available_actions response wraps actions[] with per-lot context:
@@ -48,7 +48,7 @@ interface Lot {
   closed_at: string | null;
   variant_id: number;
   model_id: number;
-  variant_sku_code: string;
+  sku_code: string;
   variant_name: string;
   model_name: string;
   family_name: string;
@@ -240,7 +240,7 @@ export function LotsPage() {
       if (filterContractable) url += `&is_contractable=is.${filterContractable}`;
       if (filterPoId) url += `&po_id=eq.${filterPoId}`;
       if (debouncedSearch) {
-        url += `&or=(lot_code.ilike.*${encodeURIComponent(debouncedSearch)}*,variant_sku_code.ilike.*${encodeURIComponent(debouncedSearch)}*,model_name.ilike.*${encodeURIComponent(debouncedSearch)}*,po_no.ilike.*${encodeURIComponent(debouncedSearch)}*)`;
+        url += `&or=(lot_code.ilike.*${encodeURIComponent(debouncedSearch)}*,sku_code.ilike.*${encodeURIComponent(debouncedSearch)}*,model_name.ilike.*${encodeURIComponent(debouncedSearch)}*,po_no.ilike.*${encodeURIComponent(debouncedSearch)}*)`;
       }
       return apiClient.getPaginated<Lot>(url, { page: pageIndex + 1, pageSize });
     },
@@ -432,20 +432,21 @@ export function LotsPage() {
                     </div>
                   </div>
                 </PopOver>
-                <Button
-                  ref={filterTriggerRef}
-                  size="sm"
-                  variant="outline"
-                  className={`relative btn-icon-sm shrink-0 xl:hidden ${hiddenActiveFilters > 0 ? 'text-primary-fg' : ''}`}
-                  onClick={() => setFilterPopoverOpen((v) => !v)}
-                >
-                  <SlidersHorizontal size={14} />
+                <div className="relative inline-flex shrink-0 xl:hidden">
+                  <Button
+                    ref={filterTriggerRef}
+                    size="sm"
+                    variant="outline"
+                    className={hiddenActiveFilters > 0 ? 'text-primary-fg' : ''}
+                    startIcon={<SlidersHorizontal size={14} />}
+                    onClick={() => setFilterPopoverOpen((v) => !v)}
+                  />
                   {hiddenActiveFilters > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 bg-primary text-white text-xs rounded-full w-4 h-4 flex items-center justify-center leading-none">
+                    <span className="absolute -top-1 -right-1 bg-primary text-white text-[10px] rounded-full w-3.5 h-3.5 flex items-center justify-center leading-none pointer-events-none">
                       {hiddenActiveFilters}
                     </span>
                   )}
-                </Button>
+                </div>
               </div>
             </div>
           )}
@@ -476,7 +477,7 @@ export function LotsPage() {
                           {[lot.brand_name, lot.family_name, lot.model_name].filter(Boolean).join(' ')}
                         </div>
                         <div className="text-xs text-subtle truncate">
-                          {lot.variant_name} · {lot.variant_sku_code}
+                          {lot.variant_name} · {lot.sku_code}
                         </div>
                       </div>
                       <div className="text-right shrink-0">
@@ -710,7 +711,7 @@ function LotDetailPanel({
           {lot.variant_name}
         </div>
         <div className="text-[11px] text-subtler font-mono truncate mt-0.5">
-          {lot.variant_sku_code}
+          {lot.sku_code}
         </div>
       </div>
 

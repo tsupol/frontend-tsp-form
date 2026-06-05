@@ -5,8 +5,11 @@ export function fmtCurrency(value: number | null | undefined): string {
   return new Intl.NumberFormat('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(value);
 }
 
+import { getDateCalendar } from './datePref';
+
 function getLocale(lang: string): string {
-  return lang === 'th' ? 'th-TH-u-ca-gregory' : 'en-GB';
+  if (lang !== 'th') return 'en-GB';
+  return getDateCalendar() === 'buddhist' ? 'th-TH-u-ca-buddhist' : 'th-TH-u-ca-gregory';
 }
 
 export function formatDateTime(dateStr: string | null, lang: string, showTime = true): string {

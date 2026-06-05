@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, Badge, Input, Select, Button, DataTableFooter } from 'tsp-form';
+import { PageNav, PageNavPanel, MobileHeader, Badge, Input, Select, Button, DataTableFooter, PopOver } from 'tsp-form';
 import { useAuth } from '../../contexts/AuthContext';
 import { ArrowLeft, ArrowRightFromLine, Search, SlidersHorizontal, Plus } from 'lucide-react';
 import { apiClient } from '../../lib/api';
@@ -113,7 +113,7 @@ export function ContractListPane({
   const [debouncedKeyword, setDebouncedKeyword] = useState('');
   const [filterState, setFilterState] = useState<string | null>(null);
   const [filterBranchId, setFilterBranchId] = useState<number | null>(defaultBranchId);
-  const [filtersExpanded, setFiltersExpanded] = useState(isBranchUser);
+  const [filterOpen, setFilterOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
   const { contractId: contractIdParam } = useParams<{ contractId?: string }>();
@@ -293,10 +293,10 @@ export function ContractListPane({
             <PageNavPanel id="list" className={isMobile ? '' : 'w-5/12 xl:w-4/12 border-r border-line flex flex-col'}>
               {headerSlot}
 
-              {/* Filters */}
-              <div className="flex-none flex flex-col gap-2 p-2 border-b border-line">
-                <div className="flex gap-2 w-full">
-                  <div className="flex-[3] min-w-0">
+              {/* Filters — search + sliders dropdown for state/branch */}
+              <div className="flex-none p-2 border-b border-line">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
                     <Input
                       value={keyword}
                       onChange={(e) => setKeyword(e.target.value)}
@@ -306,42 +306,55 @@ export function ContractListPane({
                       className="w-full"
                     />
                   </div>
-                  <Button
-                    size="sm"
-                    className={`btn-icon-sm shrink-0 ${filtersExpanded || extraFilterCount > 0 ? 'text-primary-fg' : ''}`}
-                    onClick={() => setFiltersExpanded(!filtersExpanded)}
-                  >
-                    <SlidersHorizontal size={14} />
-                  </Button>
-                </div>
-                {filtersExpanded && (
-                  <div className="flex gap-2 w-full">
-                    {showStateFilter && (
-                      <div className="flex-1 min-w-0">
+                  <div className="shrink-0">
+                    <PopOver
+                      isOpen={filterOpen}
+                      onClose={() => setFilterOpen(false)}
+                      placement="bottom"
+                      align="end"
+                      maxWidth="300px"
+                      trigger={
+                        <div className="relative inline-flex">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            startIcon={<SlidersHorizontal size={16} />}
+                            onClick={() => setFilterOpen(!filterOpen)}
+                          />
+                          {extraFilterCount > 0 && (
+                            <span className="absolute -top-1 -right-1 bg-primary text-white text-[10px] rounded-full w-3.5 h-3.5 flex items-center justify-center leading-none pointer-events-none">
+                              {extraFilterCount}
+                            </span>
+                          )}
+                        </div>
+                      }
+                    >
+                      <div className="flex flex-col gap-3 p-3">
+                        <div className="text-xs font-medium text-subtle uppercase tracking-wide">{t('common.filters')}</div>
+                        {showStateFilter && (
+                          <Select
+                            options={stateFilterOptions}
+                            value={filterState}
+                            onChange={(val) => setFilterState((val as string) || null)}
+                            placeholder={t('contract.allStates')}
+                            size="sm"
+                            showChevron
+                            clearable
+                          />
+                        )}
                         <Select
-                          options={stateFilterOptions}
-                          value={filterState}
-                          onChange={(val) => setFilterState((val as string) || null)}
-                          placeholder={t('contract.allStates')}
+                          options={branchOptions}
+                          value={filterBranchId !== null ? String(filterBranchId) : null}
+                          onChange={(val) => setFilterBranchId(val ? Number(val) : null)}
+                          placeholder={t('contract.allBranches')}
                           size="sm"
                           showChevron
                           clearable
                         />
                       </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <Select
-                        options={branchOptions}
-                        value={filterBranchId !== null ? String(filterBranchId) : null}
-                        onChange={(val) => setFilterBranchId(val ? Number(val) : null)}
-                        placeholder={t('contract.allBranches')}
-                        size="sm"
-                        showChevron
-                        clearable
-                      />
-                    </div>
+                    </PopOver>
                   </div>
-                )}
+                </div>
               </div>
 
               {/* Contract list */}

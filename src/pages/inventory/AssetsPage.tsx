@@ -712,20 +712,21 @@ export function AssetsPage() {
                     </div>
                   </div>
                 </PopOver>
-                <Button
-                  ref={filterTriggerRef}
-                  size="sm"
-                  variant="outline"
-                  className={`relative btn-icon-sm shrink-0 ${extraFilterCount > 0 ? 'text-primary-fg' : ''}`}
-                  onClick={() => setFilterPopoverOpen((v) => !v)}
-                >
-                  <SlidersHorizontal size={14} />
+                <div className="relative inline-flex shrink-0">
+                  <Button
+                    ref={filterTriggerRef}
+                    size="sm"
+                    variant="outline"
+                    className={extraFilterCount > 0 ? 'text-primary-fg' : ''}
+                    startIcon={<SlidersHorizontal size={14} />}
+                    onClick={() => setFilterPopoverOpen((v) => !v)}
+                  />
                   {extraFilterCount > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 bg-primary text-white text-xs rounded-full w-4 h-4 flex items-center justify-center leading-none">
+                    <span className="absolute -top-1 -right-1 bg-primary text-white text-[10px] rounded-full w-3.5 h-3.5 flex items-center justify-center leading-none pointer-events-none">
                       {extraFilterCount}
                     </span>
                   )}
-                </Button>
+                </div>
               </div>
             </div>
           )}

@@ -69,6 +69,7 @@ import { HoldingsPage } from './pages/settings/HoldingsPage';
 import { CompaniesPage } from './pages/settings/CompaniesPage';
 import { PrinterSetupPage } from './pages/help/PrinterSetupPage';
 import { NotificationPrefsPage } from './pages/settings/NotificationPrefsPage';
+import { AppearancePage } from './pages/settings/AppearancePage';
 import { HelpLayout } from './pages/help/HelpLayout';
 import { UserGuidePage } from './pages/help/UserGuidePage';
 import { CustomersPage } from './pages/customers/CustomersPage';
@@ -209,6 +210,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <SettingsLayout><NotificationPrefsPage /></SettingsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/settings/appearance"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <SettingsLayout><AppearancePage /></SettingsLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

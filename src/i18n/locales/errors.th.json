@@ -507,5 +507,14 @@
   "variant_model_mismatch": "Variant ไม่ได้สังกัดรุ่นสินค้าที่ระบุ",
   "INV.VALIDATION.WRONG_HELPER": "Helper ตัวนี้ใช้กับ entity ประเภทนี้ไม่ได้",
   "inv.validation.wrong_helper": "Helper ตัวนี้ใช้กับ entity ประเภทนี้ไม่ได้",
-  "INV.PO.OWNERSHIP_REQUIRED": "ต้องระบุ ownership เมื่อสร้าง PO"
+  "INV.PO.OWNERSHIP_REQUIRED": "ต้องระบุ ownership เมื่อสร้าง PO",
+  "AUTH.CUSTOMER.ACCOUNT_NOT_FOUND": "ไม่พบบัญชีลูกค้า",
+  "AUTH.CUSTOMER.MISSING_CONTACT_INFO": "ลูกค้าไม่มีเลขบัตรหรือเบอร์โทร — กรุณาเพิ่มข้อมูลก่อนรีเซ็ต",
+  "AUTH.AUTH.MISSING_PERMISSION": "คุณไม่มีสิทธิ์ทำรายการนี้",
+  "SALE.AUTH.PERMISSION_DENIED": "คุณไม่มีสิทธิ์ในสาขานี้",
+  "AUTH.CUSTOMER.USER_NOT_FOUND": "ไม่พบ username",
+  "AUTH.CUSTOMER.WRONG_PASSWORD": "รหัสผ่านไม่ถูกต้อง",
+  "AUTH.CUSTOMER.ACCOUNT_LOCKED": "บัญชีถูกล็อก — กรอกรหัสผิดเกินจำนวนครั้งที่กำหนด",
+  "AUTH.CUSTOMER.INACTIVE": "บัญชียังไม่เปิดใช้งาน",
+  "AUTH.CUSTOMER.NO_ACTIVE_CONTRACT": "ลูกค้ายังไม่มีสัญญาที่ใช้งานอยู่"
 }

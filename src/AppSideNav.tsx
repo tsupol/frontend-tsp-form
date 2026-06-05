@@ -46,6 +46,7 @@ import {
   FlaskConical, PenLine, Image as ImageIcon, Bell,
 } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
+import { getRoleLabel } from './lib/roleLabel';
 import { useTheme } from './contexts/ThemeContext';
 import { useNavGuard } from './contexts/NavGuardContext';
 import { isLocalDev } from './lib/devEnv';
@@ -71,7 +72,7 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
 
   const displayName = user?.nickname || user?.firstname || user?.username || 'User';
   const initials = displayName.slice(0, 2).toUpperCase();
-  const roleName = (user?.role_code ?? '').replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+  const roleName = user?.role_code ? getRoleLabel(t, user.role_code) : '';
   const subtitle = user?.branch_name ? `${roleName} · ${user.branch_name}` : roleName;
 
   return (

@@ -507,5 +507,14 @@
   "variant_model_mismatch": "Variant does not belong to the specified model.",
   "INV.VALIDATION.WRONG_HELPER": "This helper is not for this entity type.",
   "inv.validation.wrong_helper": "This helper is not for this entity type.",
-  "INV.PO.OWNERSHIP_REQUIRED": "Ownership is required when creating a PO."
+  "INV.PO.OWNERSHIP_REQUIRED": "Ownership is required when creating a PO.",
+  "AUTH.CUSTOMER.ACCOUNT_NOT_FOUND": "Customer account not found",
+  "AUTH.CUSTOMER.MISSING_CONTACT_INFO": "Customer is missing an ID number or phone — please add them before resetting.",
+  "AUTH.AUTH.MISSING_PERMISSION": "You do not have permission to perform this action",
+  "SALE.AUTH.PERMISSION_DENIED": "You do not have permission for this branch",
+  "AUTH.CUSTOMER.USER_NOT_FOUND": "Username not found",
+  "AUTH.CUSTOMER.WRONG_PASSWORD": "Wrong password",
+  "AUTH.CUSTOMER.ACCOUNT_LOCKED": "Account locked — too many failed attempts",
+  "AUTH.CUSTOMER.INACTIVE": "Account is inactive",
+  "AUTH.CUSTOMER.NO_ACTIVE_CONTRACT": "No active contract for this customer"
 }

@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, Input, Select, DataTableFooter } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, Search, FilePlus } from 'lucide-react';
+import { PageNav, PageNavPanel, MobileHeader, Input, Select, Button, DataTableFooter, PopOver } from 'tsp-form';
+import { ArrowLeft, ArrowRightFromLine, Search, FilePlus, SlidersHorizontal } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { DraftDetailPanel } from './DraftDetailPanel';
@@ -52,6 +52,9 @@ export function DraftContractsPage() {
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [filterOpen, setFilterOpen] = useState(false);
+
+  const extraFilterCount = filterBranchId !== null ? 1 : 0;
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -126,27 +129,55 @@ export function DraftContractsPage() {
 
           <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
             <PageNavPanel id="list" className={isMobile ? '' : 'w-5/12 xl:w-4/12 border-r border-line flex flex-col'}>
-              <div className="flex-none flex gap-2 p-2 border-b border-line">
-                <div className="flex-1 min-w-0">
-                  <Input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder={t('contract.searchPlaceholder')}
-                    size="sm"
-                    startIcon={<Search size={16} />}
-                    className="w-full"
-                  />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <Select
-                    options={branchOptions}
-                    value={filterBranchId !== null ? String(filterBranchId) : null}
-                    onChange={(val) => setFilterBranchId(val ? Number(val) : null)}
-                    placeholder={t('contract.allBranches')}
-                    size="sm"
-                    showChevron
-                    clearable
-                  />
+              <div className="flex-none p-2 border-b border-line">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <Input
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder={t('contract.searchPlaceholder')}
+                      size="sm"
+                      startIcon={<Search size={16} />}
+                      className="w-full"
+                    />
+                  </div>
+                  <div className="shrink-0">
+                    <PopOver
+                      isOpen={filterOpen}
+                      onClose={() => setFilterOpen(false)}
+                      placement="bottom"
+                      align="end"
+                      maxWidth="300px"
+                      trigger={
+                        <div className="relative inline-flex">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            startIcon={<SlidersHorizontal size={16} />}
+                            onClick={() => setFilterOpen(!filterOpen)}
+                          />
+                          {extraFilterCount > 0 && (
+                            <span className="absolute -top-1 -right-1 bg-primary text-white text-[10px] rounded-full w-3.5 h-3.5 flex items-center justify-center leading-none pointer-events-none">
+                              {extraFilterCount}
+                            </span>
+                          )}
+                        </div>
+                      }
+                    >
+                      <div className="flex flex-col gap-3 p-3">
+                        <div className="text-xs font-medium text-subtle uppercase tracking-wide">{t('common.filters')}</div>
+                        <Select
+                          options={branchOptions}
+                          value={filterBranchId !== null ? String(filterBranchId) : null}
+                          onChange={(val) => setFilterBranchId(val ? Number(val) : null)}
+                          placeholder={t('contract.allBranches')}
+                          size="sm"
+                          showChevron
+                          clearable
+                        />
+                      </div>
+                    </PopOver>
+                  </div>
                 </div>
               </div>
 

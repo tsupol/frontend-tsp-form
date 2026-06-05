@@ -6,6 +6,7 @@ import { DataTable, DataTableColumnHeader, DataTableFooter, Button, Input, Selec
 import { Plus, MoreHorizontal, Pencil, ShieldCheck, ShieldOff, KeyRound, Trash2, Ban, XCircle, CheckCircle, Eye, EyeOff, Copy, SlidersHorizontal, ArrowRightFromLine } from 'lucide-react';
 import { apiClient, ApiError } from '../lib/api';
 import { FormErrorMessage } from 'tsp-form';
+import { getRoleLabel } from '../lib/roleLabel';
 
 interface VUser {
   id: number;
@@ -414,7 +415,7 @@ function CreateUserModal({ open, onClose }: { open: boolean; onClose: () => void
   const companyId = watch('company_id');
 
   const { data: roles = [], isLoading: rolesLoading } = useRoles();
-  const roleOptions = roles.map((r) => ({ value: r.code, label: r.name, scope: r.scope }));
+  const roleOptions = roles.map((r) => ({ value: r.code, label: getRoleLabel(t, r.code), scope: r.scope }));
   const selectedRole = roles.find((r) => r.code === roleCode);
   const needsCompany = selectedRole ? ['COMPANY', 'BRANCH'].includes(selectedRole.scope) : false;
   const needsBranch = selectedRole?.scope === 'BRANCH';
@@ -652,7 +653,7 @@ function EditUserModal({ user, open, onClose }: { user: VUser | null; open: bool
   const companyId = watch('company_id');
 
   const { data: roles = [], isLoading: rolesLoading } = useRoles();
-  const roleOptions = roles.map((r) => ({ value: r.code, label: r.name, scope: r.scope }));
+  const roleOptions = roles.map((r) => ({ value: r.code, label: getRoleLabel(t, r.code), scope: r.scope }));
   const selectedRole = roles.find((r) => r.code === roleCode);
   const needsCompany = selectedRole ? ['COMPANY', 'BRANCH'].includes(selectedRole.scope) : false;
   const needsBranch = selectedRole?.scope === 'BRANCH';
@@ -1133,7 +1134,7 @@ function ChangeRoleModal({ user, open, onClose }: { user: VUser | null; open: bo
   const roleCode = watch('role_code');
 
   const { data: roles = [], isLoading: rolesLoading } = useRoles();
-  const roleOptions = roles.map((r) => ({ value: r.code, label: r.name }));
+  const roleOptions = roles.map((r) => ({ value: r.code, label: getRoleLabel(t, r.code) }));
 
   const onSubmit = async (data: ChangeRoleFormData) => {
     if (!user) return;
@@ -1272,8 +1273,8 @@ export function UsersPage() {
   const { data: filterBranches = [], isLoading: filterBranchesLoading } = useBranches(filterCompany || null);
 
   const holdingOptions = holdings.map((h) => ({ value: String(h.id), label: h.name }));
-  const roleFilterOptions = roles.map((r) => ({ value: r.code, label: r.name }));
-  const roleMap = useMemo(() => new Map(roles.map(r => [r.code, r.name])), [roles]);
+  const roleFilterOptions = roles.map((r) => ({ value: r.code, label: getRoleLabel(t, r.code) }));
+  const roleMap = useMemo(() => new Map(roles.map(r => [r.code, getRoleLabel(t, r.code)])), [roles, t]);
   const companyFilterOptions = filterCompanies.map((c) => ({ value: String(c.id), label: c.name }));
   const branchFilterOptions = filterBranches.map((b) => ({ value: String(b.id), label: b.name }));
 
@@ -1506,14 +1507,19 @@ export function UsersPage() {
                 maxWidth="300px"
                 maxHeight="400px"
                 trigger={
-                  <Button variant="outline" size="sm" className="relative btn-icon-sm" onClick={() => setFilterOpen(!filterOpen)}>
-                    <SlidersHorizontal size={16} />
+                  <div className="relative inline-flex">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      startIcon={<SlidersHorizontal size={16} />}
+                      onClick={() => setFilterOpen(!filterOpen)}
+                    />
                     {activeFilterCount > 0 && (
-                      <span className="absolute -top-1.5 -right-1.5 bg-primary text-white text-xs rounded-full w-4 h-4 flex items-center justify-center leading-none">
+                      <span className="absolute -top-1 -right-1 bg-primary text-white text-[10px] rounded-full w-3.5 h-3.5 flex items-center justify-center leading-none pointer-events-none">
                         {activeFilterCount}
                       </span>
                     )}
-                  </Button>
+                  </div>
                 }
               >
                 <div className="flex flex-col gap-3 p-3">

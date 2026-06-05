@@ -6,6 +6,7 @@ import { Button, Modal, Input, Select, TextArea, MaskedInput, Badge, Tooltip, Po
 import type { UploadedImage } from 'tsp-form';
 import { CheckCircle, XCircle, X, Pencil, Plus, Trash2, Loader2, ChevronsRight, ChevronDown, ExternalLink, Wrench, ArrowRight, Info, Receipt, Paperclip, MessageSquare } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import { getRoleLabel } from '../../lib/roleLabel';
 import { fmtCurrency } from '../../lib/format';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { DateTime } from '../../components/DateTime';
@@ -1304,7 +1305,7 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
     enabled: !!config?.needsNewOwner,
   });
 
-  const roleMap = useMemo(() => new Map((roles ?? []).map(r => [r.code, r.name])), [roles]);
+  const roleMap = useMemo(() => new Map((roles ?? []).map(r => [r.code, getRoleLabel(t, r.code)])), [roles, t]);
 
   const staffMap = useMemo(() => {
     if (!staffUsers) return new Map<string, StaffUser>();
@@ -2396,9 +2397,12 @@ function PendingPaymentModal({ open, contract, onClose, onSuccess }: {
                       />
                     </div>
                     {payments.length > 1 && (
-                      <Button size="sm" className="btn-icon-sm shrink-0" onClick={() => setPayments(prev => prev.filter((_, i) => i !== idx))}>
-                        <Trash2 size={14} />
-                      </Button>
+                      <Button
+                        size="sm"
+                        className="shrink-0"
+                        startIcon={<Trash2 size={14} />}
+                        onClick={() => setPayments(prev => prev.filter((_, i) => i !== idx))}
+                      />
                     )}
                   </div>
                   {payment.method === 'TRANSFER' && (

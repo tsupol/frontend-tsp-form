@@ -416,7 +416,7 @@ function TimelineRow({ item, showSender, currentUserId, lang, onOpenImage, onOpe
   const { t } = useTranslation();
 
   if (item.kind === 'daySeparator') {
-    return <DaySeparator dayKey={item.key} lang={lang} />;
+    return <DaySeparator dayKey={item.key} />;
   }
 
   if (item.kind === 'slip') {
@@ -456,11 +456,8 @@ function TimelineRow({ item, showSender, currentUserId, lang, onOpenImage, onOpe
   );
 }
 
-function DaySeparator({ dayKey, lang }: { dayKey: string; lang: string }) {
+function DaySeparator({ dayKey }: { dayKey: string }) {
   const { t } = useTranslation();
-  // dayKey is YYYY-MM-DD in Bangkok local time.
-  const [y, m, d] = dayKey.split('-').map(Number);
-  const date = new Date(y, m - 1, d);
 
   // Compare against today/yesterday in Bangkok time. The simplest portable way
   // is to shift now() by the same offset chatTimeline uses and compare keys.
@@ -469,15 +466,16 @@ function DaySeparator({ dayKey, lang }: { dayKey: string; lang: string }) {
   const today = bkk.toISOString().slice(0, 10);
   const yest = new Date(bkk.getTime() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-  let label: string;
-  if (dayKey === today) label = t('chat.today');
-  else if (dayKey === yest) label = t('chat.yesterday');
-  else label = date.toLocaleDateString(lang, { day: 'numeric', month: 'short', year: 'numeric' });
-
   return (
     <div className="flex items-center gap-2 my-2">
       <div className="flex-1 border-t border-line" />
-      <span className="text-[11px] text-subtle px-2">{label}</span>
+      <span className="text-[11px] text-subtle px-2">
+        {dayKey === today
+          ? t('chat.today')
+          : dayKey === yest
+            ? t('chat.yesterday')
+            : <DateTime value={`${dayKey}T00:00:00+07:00`} showTime={false} />}
+      </span>
       <div className="flex-1 border-t border-line" />
     </div>
   );

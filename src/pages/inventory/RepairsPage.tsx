@@ -2,8 +2,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Modal, TextArea, DataTable, useSnackbarContext } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, Wrench, CheckCircle, XCircle, ExternalLink } from 'lucide-react';
+import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Modal, Input, TextArea, DataTable, PopOver, useSnackbarContext } from 'tsp-form';
+import { ArrowLeft, ArrowRightFromLine, Wrench, CheckCircle, XCircle, ExternalLink, Search, SlidersHorizontal } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { CopyButton } from '../../components/CopyButton';
@@ -108,6 +108,16 @@ export function RepairsPage() {
   const [filterBranchId, setFilterBranchId] = useState<number | null>(defaultBranchId);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [filterOpen, setFilterOpen] = useState(false);
+
+  const extraFilterCount = (filterStatus ? 1 : 0) + (filterBranchId !== null ? 1 : 0);
+
+  useEffect(() => {
+    const tm = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(tm);
+  }, [search]);
 
   const { data: branches } = useQuery({
     queryKey: ['branches'],
@@ -120,11 +130,15 @@ export function RepairsPage() {
   }, [branches]);
 
   const { data: listData, isFetching } = useQuery({
-    queryKey: ['repair-orders', filterStatus, filterBranchId, pageIndex, pageSize],
+    queryKey: ['repair-orders', filterStatus, filterBranchId, debouncedSearch, pageIndex, pageSize],
     queryFn: () => {
       let url = '/v_repair_orders?order=created_at.desc';
       if (filterStatus) url += `&status=eq.${filterStatus}`;
       if (filterBranchId) url += `&branch_id=eq.${filterBranchId}`;
+      if (debouncedSearch) {
+        const term = encodeURIComponent(debouncedSearch);
+        url += `&or=(repair_no.ilike.*${term}*,asset_code.ilike.*${term}*)`;
+      }
       return apiClient.getPaginated<RepairOrder>(url, { page: pageIndex + 1, pageSize });
     },
     placeholderData: keepPreviousData,
@@ -133,7 +147,7 @@ export function RepairsPage() {
   const list = listData?.data ?? [];
   const totalCount = listData?.totalCount ?? 0;
 
-  useEffect(() => { setPageIndex(0); }, [filterStatus, filterBranchId]);
+  useEffect(() => { setPageIndex(0); }, [filterStatus, filterBranchId, debouncedSearch]);
 
   // Fallback fetch so direct deep-links (id not on current page) still resolve.
   const { data: detailFallback } = useQuery({
@@ -180,29 +194,63 @@ export function RepairsPage() {
 
           <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
             <PageNavPanel id="list" className={isMobile ? '' : 'w-1/2 xl:w-5/12 border-r border-line flex flex-col'}>
-              <div className="flex-none flex flex-col gap-2 p-2 border-b border-line">
-                <div className="flex gap-2 w-full">
-                  <div className="flex-[2] min-w-0">
-                    <Select
-                      options={REPAIR_STATUS_VALUES.map((v) => ({ value: v, label: t(`repair.status_${v}`) }))}
-                      value={filterStatus}
-                      onChange={(val) => setFilterStatus((val as string) || null)}
-                      placeholder={t('repair.allStatuses')}
+              <div className="flex-none p-2 border-b border-line">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <Input
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder={t('common.search')}
                       size="sm"
-                      showChevron
-                      clearable
+                      startIcon={<Search size={16} />}
+                      className="w-full"
                     />
                   </div>
-                  <div className="flex-[2] min-w-0">
-                    <Select
-                      options={branchOptions}
-                      value={filterBranchId !== null ? String(filterBranchId) : null}
-                      onChange={(val) => setFilterBranchId(val ? Number(val) : null)}
-                      placeholder={t('inventory.allBranches')}
-                      size="sm"
-                      showChevron
-                      clearable
-                    />
+                  <div className="shrink-0">
+                    <PopOver
+                      isOpen={filterOpen}
+                      onClose={() => setFilterOpen(false)}
+                      placement="bottom"
+                      align="end"
+                      maxWidth="300px"
+                      trigger={
+                        <div className="relative inline-flex">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            startIcon={<SlidersHorizontal size={16} />}
+                            onClick={() => setFilterOpen(!filterOpen)}
+                          />
+                          {extraFilterCount > 0 && (
+                            <span className="absolute -top-1 -right-1 bg-primary text-white text-[10px] rounded-full w-3.5 h-3.5 flex items-center justify-center leading-none pointer-events-none">
+                              {extraFilterCount}
+                            </span>
+                          )}
+                        </div>
+                      }
+                    >
+                      <div className="flex flex-col gap-3 p-3">
+                        <div className="text-xs font-medium text-subtle uppercase tracking-wide">{t('common.filters')}</div>
+                        <Select
+                          options={REPAIR_STATUS_VALUES.map((v) => ({ value: v, label: t(`repair.status_${v}`) }))}
+                          value={filterStatus}
+                          onChange={(val) => setFilterStatus((val as string) || null)}
+                          placeholder={t('repair.allStatuses')}
+                          size="sm"
+                          showChevron
+                          clearable
+                        />
+                        <Select
+                          options={branchOptions}
+                          value={filterBranchId !== null ? String(filterBranchId) : null}
+                          onChange={(val) => setFilterBranchId(val ? Number(val) : null)}
+                          placeholder={t('inventory.allBranches')}
+                          size="sm"
+                          showChevron
+                          clearable
+                        />
+                      </div>
+                    </PopOver>
                   </div>
                 </div>
               </div>

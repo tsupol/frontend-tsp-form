@@ -13,6 +13,7 @@ import { uploadImage } from '../lib/upload';
 import { publicMediaUrl } from '../lib/mediaPath';
 import { useUploadSpec } from '../hooks/useMediaUrl';
 import { formatTel } from '../lib/format';
+import { getRoleLabel } from '../lib/roleLabel';
 
 function profileImageUrl(profileImage: Record<string, string> | null | undefined): string | null {
   if (!profileImage) return null;
@@ -140,7 +141,7 @@ function ProfileCard() {
 
   const orgFields: Array<{ label: string; value: string | number | null | undefined }> = [
     { label: t('user.username'), value: profile?.username ?? user?.username },
-    { label: t('user.role'), value: profile?.role_code ?? user?.role_code },
+    { label: t('user.role'), value: getRoleLabel(t, profile?.role_code ?? user?.role_code) },
     { label: t('user.branch', { defaultValue: 'Branch' }), value: user?.branch_name ?? profile?.branch_id },
     { label: t('user.company', { defaultValue: 'Company' }), value: user?.company_name ?? profile?.company_id },
     { label: t('user.holdingId'), value: profile?.holding_id ?? user?.holding_id },
@@ -171,7 +172,7 @@ function ProfileCard() {
         <div className="text-center min-w-0 w-full">
           <div className="font-semibold text-lg truncate">{isLoading ? '—' : displayName}</div>
           {profile?.role_code && (
-            <div className="text-sm text-subtle">{profile.role_code}</div>
+            <div className="text-sm text-subtle">{getRoleLabel(t, profile.role_code)}</div>
           )}
         </div>
       </div>

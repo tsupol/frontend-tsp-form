@@ -208,7 +208,7 @@ export function PanelProductPlan(_props: Props) {
       if (branchId) url += `&branch_id=eq.${branchId}`;
       if (debouncedAssetSearch) {
         const q = debouncedAssetSearch;
-        url += `&or=(asset_code.ilike.*${q}*,serial_no.ilike.*${q}*,imei.ilike.*${q}*,model_name.ilike.*${q}*,base_model_name.ilike.*${q}*,variant_name.ilike.*${q}*,variant_sku_code.ilike.*${q}*,family_name.ilike.*${q}*,brand_name.ilike.*${q}*,physical_color.ilike.*${q}*,manufacturer_color.ilike.*${q}*)`;
+        url += `&or=(asset_code.ilike.*${q}*,serial_no.ilike.*${q}*,imei.ilike.*${q}*,model_name.ilike.*${q}*,base_model_name.ilike.*${q}*,variant_name.ilike.*${q}*,sku_code.ilike.*${q}*,family_name.ilike.*${q}*,brand_name.ilike.*${q}*,physical_color.ilike.*${q}*,manufacturer_color.ilike.*${q}*)`;
       }
       return apiClient.get<StockAsset[]>(url);
     },

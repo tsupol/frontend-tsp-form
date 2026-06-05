@@ -6,7 +6,7 @@ import { Badge, Button, Input, Select, Modal, TextArea, Tooltip, useSnackbarCont
 import { ChevronLeft, ChevronRight, Copy, Check, Minus, Pencil, Truck, CheckCircle, XCircle, Loader2, Upload, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, AlertTriangle } from 'lucide-react';
 import { useGenerateContractPdfServer } from './useGenerateContractPdfServer';
 import { GenerateContractPdfModal } from './GenerateContractPdfModal';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { ApiError } from '../../lib/api';
 import { uploadFromImage, getUploadSpec, specToResize } from '../../lib/upload';
@@ -25,6 +25,7 @@ import { useNavGuard } from '../../contexts/NavGuardContext';
 import { CustomerPickerModal } from './CustomerPickerModal';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { MediaLightbox, MediaThumbButton } from '../../components/MediaLightbox';
+import { CustomerLoginCard, useCustomerLoginInfo, useInvalidateLoginInfo, type CustomerLoginInfo } from '../../components/CustomerLoginCard';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -1113,6 +1114,10 @@ function CustomersTab({ contractId, customerId, customerName, t, onRequestDetach
     enabled: !!customerId,
   });
 
+  // App-login state (username / locked / last_login_at) for the primary customer
+  const { data: primaryLogin } = useCustomerLoginInfo(customerId);
+  const invalidateLogin = useInvalidateLoginInfo();
+
   // Pull customer detail for primary + every guarantor — gives us phone + ID number.
   const allCustomerIds = [
     ...(customerId ? [customerId] : []),
@@ -1127,6 +1132,18 @@ function CustomersTab({ contractId, customerId, customerName, t, onRequestDetach
   });
   const detailById = new Map(customerDetails.map(d => [d.id, d]));
 
+  // Login state for primary + every guarantor — one batched query so each row
+  // can render its own CustomerLoginCard without N parallel hooks.
+  const guarantorIds = (guarantors ?? []).map(c => c.customer_id);
+  const { data: customerLogins = [] } = useQuery({
+    queryKey: ['customer-logins', allCustomerIds.join(',')],
+    queryFn: () => apiClient.get<CustomerLoginInfo[]>(
+      `/v_customers?id=in.(${allCustomerIds.join(',')})&select=id,full_name,id_number,tel,username,has_login,last_login_at,failed_login_count,locked_until,is_currently_locked`,
+    ),
+    enabled: guarantorIds.length > 0,
+  });
+  const loginById = new Map(customerLogins.map(l => [l.id, l]));
+
   if (isLoading) return <div className="p-8 text-center text-subtler">{t('common.loading')}</div>;
 
   const guarantorList = guarantors ?? [];
@@ -1134,13 +1151,18 @@ function CustomersTab({ contractId, customerId, customerName, t, onRequestDetach
 
   const renderGuarantorRow = (c: ContractCustomer) => {
     const d = detailById.get(c.customer_id);
+    const login = loginById.get(c.customer_id) ?? null;
     return (
       <div key={c.id} className="border border-line rounded-md px-4 py-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <div className="font-medium text-sm">
-              {d?.prefix ? `${d.prefix} ` : ''}{c.customer_name}
-            </div>
+            <Link
+              to={`/admin/customers/${c.customer_id}`}
+              className="font-medium text-sm inline-flex items-center gap-1 hover:underline"
+            >
+              <span>{d?.prefix ? `${d.prefix} ` : ''}{c.customer_name}</span>
+              <ExternalLink size={12} className="text-subtle" />
+            </Link>
             <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-xs text-subtle">
               {d?.tel && (
                 <span className="inline-flex items-center gap-1"><Phone size={11} />{d.tel}</span>
@@ -1167,6 +1189,15 @@ function CustomersTab({ contractId, customerId, customerName, t, onRequestDetach
             />
           </Tooltip>
         </div>
+        {login && (
+          <div className="mt-3 pt-3 border-t border-line">
+            <CustomerLoginCard
+              customer={login}
+              onChanged={() => invalidateLogin(login.id)}
+              noCard
+            />
+          </div>
+        )}
       </div>
     );
   };
@@ -1177,9 +1208,13 @@ function CustomersTab({ contractId, customerId, customerName, t, onRequestDetach
       <div className="border border-line rounded-md px-4 py-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <div className="font-medium text-sm">
-              {primaryDetail?.prefix ? `${primaryDetail.prefix} ` : ''}{customerName ?? primaryDetail?.full_name ?? '—'}
-            </div>
+            <Link
+              to={`/admin/customers/${customerId}`}
+              className="font-medium text-sm inline-flex items-center gap-1 hover:underline"
+            >
+              <span>{primaryDetail?.prefix ? `${primaryDetail.prefix} ` : ''}{customerName ?? primaryDetail?.full_name ?? '—'}</span>
+              <ExternalLink size={12} className="text-subtle" />
+            </Link>
             <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-xs text-subtle">
               {primaryDetail?.tel && (
                 <span className="inline-flex items-center gap-1"><Phone size={11} />{primaryDetail.tel}</span>
@@ -1203,6 +1238,15 @@ function CustomersTab({ contractId, customerId, customerName, t, onRequestDetach
         {idCardMedia.length > 0 && (
           <div className="mt-2 pt-2 border-t border-line">
             <MediaRow label={t('contract.idCard')} media={idCardMedia} />
+          </div>
+        )}
+        {primaryLogin && (
+          <div className="mt-3 pt-3 border-t border-line">
+            <CustomerLoginCard
+              customer={primaryLogin}
+              onChanged={() => invalidateLogin(primaryLogin.id)}
+              noCard
+            />
           </div>
         )}
       </div>
@@ -1444,7 +1488,7 @@ function NotesTab({ contractId, t, dirtyRef }: {
 
   return (
     <div className="p-4 flex flex-col gap-3">
-      <div className="border border-line rounded-md p-3 flex flex-col gap-2">
+      <div className="flex flex-col gap-2 pb-4 border-b border-line">
         {error && (
           <div className="alert alert-danger">
             <XCircle size={16} />
@@ -1537,7 +1581,6 @@ interface BillPaymentEmbedded {
 }
 
 function BillsTab({ contractId, t }: { contractId: number; t: ReturnType<typeof useTranslation>['t'] }) {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   // Bill list (INVOICE only — CREDIT_NOTE/JOURNAL aren't shown here).
@@ -1626,7 +1669,13 @@ function BillsTab({ contractId, t }: { contractId: number; t: ReturnType<typeof 
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="font-mono text-xs text-subtle">{bill.code_display}</span>
+                  <Link
+                    to={`/admin/accounting/bills/${bill.id}`}
+                    className="font-mono text-xs text-primary-fg inline-flex items-center gap-1 no-underline hover:underline"
+                  >
+                    {bill.code_display}
+                    <ExternalLink size={12} />
+                  </Link>
                   <Badge size="xs" color={getBillStatusColor(bill.status, bill.is_cancelled)}>
                     {bill.is_cancelled
                       ? t('contract.billStatus_CANCELLED', { defaultValue: 'Cancelled' })
@@ -1644,18 +1693,6 @@ function BillsTab({ contractId, t }: { contractId: number; t: ReturnType<typeof 
                       aria-label={t('wizard.receipt_print')}
                     >
                       <Printer size={14} />
-                    </Button>
-                  </Tooltip>
-                  <Tooltip content={t('contract.openInBills', { defaultValue: 'Open in Bills' })}>
-                    <Button
-                      variant="outline"
-                      color="default"
-                      size="sm"
-                      className="btn-icon-xs"
-                      onClick={() => navigate(`/admin/accounting/bills/${bill.id}`)}
-                      aria-label={t('contract.openInBills', { defaultValue: 'Open in Bills' })}
-                    >
-                      <ExternalLink size={14} />
                     </Button>
                   </Tooltip>
                 </div>
