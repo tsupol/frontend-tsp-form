@@ -30,6 +30,7 @@ interface AssetSummary {
   condition_grade: string | null;
   serial_no: string | null;
   imei: string | null;
+  external_ref: string | null;
   model_name: string;
   variant_name: string;
   brand_name: string;
@@ -78,7 +79,7 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
   const { data: loanerAsset } = useQuery({
     queryKey: ['asset-summary', contract.loaner_device_id],
     queryFn: () => apiClient.get<AssetSummary[]>(
-      `/v_assets?asset_id=eq.${contract.loaner_device_id}&select=asset_id,asset_code,asset_code_display,current_bucket,condition_grade,serial_no,imei,model_name,variant_name,brand_name,branch_id,branch_name,icloud_account_id,icloud_apple_id&limit=1`,
+      `/v_assets?asset_id=eq.${contract.loaner_device_id}&select=asset_id,asset_code,asset_code_display,current_bucket,condition_grade,serial_no,imei,external_ref,model_name,variant_name,brand_name,branch_id,branch_name,icloud_account_id,icloud_apple_id&limit=1`,
     ).then(rows => rows[0] ?? null),
     enabled: contract.loaner_device_id != null,
     staleTime: 30 * 1000,
@@ -88,7 +89,7 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
   const { data: primaryAsset } = useQuery({
     queryKey: ['asset-summary', contract.device_id],
     queryFn: () => apiClient.get<AssetSummary[]>(
-      `/v_assets?asset_id=eq.${contract.device_id}&select=asset_id,asset_code,asset_code_display,current_bucket,condition_grade,serial_no,imei,model_name,variant_name,brand_name,branch_id,branch_name,icloud_account_id,icloud_apple_id&limit=1`,
+      `/v_assets?asset_id=eq.${contract.device_id}&select=asset_id,asset_code,asset_code_display,current_bucket,condition_grade,serial_no,imei,external_ref,model_name,variant_name,brand_name,branch_id,branch_name,icloud_account_id,icloud_apple_id&limit=1`,
     ).then(rows => rows[0] ?? null),
     enabled: contract.device_id != null,
     staleTime: 30 * 1000,
@@ -131,13 +132,20 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <div className="text-xs text-subtle">{t('contract.assetCode')}</div>
-                  <Link
-                    to={`/admin/inventory/assets/${contract.device_id}`}
-                    className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1"
-                  >
-                    {primaryAsset ? codeDisplay(primaryAsset.asset_code_display, primaryAsset.asset_code) : `#${contract.device_id}`}
-                    <ExternalLink size={11} />
-                  </Link>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <Link
+                      to={`/admin/inventory/assets/${contract.device_id}`}
+                      className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1"
+                    >
+                      {primaryAsset ? codeDisplay(primaryAsset.asset_code_display, primaryAsset.asset_code) : `#${contract.device_id}`}
+                      <ExternalLink size={11} />
+                    </Link>
+                    {primaryAsset?.external_ref && (
+                      <span className="text-[10px] font-mono text-subtle bg-surface px-1 py-0.5 rounded border border-line">
+                        EXT {primaryAsset.external_ref}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <div className="text-xs text-subtle">{t('contract.deviceModel')}</div>
@@ -306,13 +314,20 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <div className="text-xs text-subtle">{t('contract.assetCode')}</div>
-                  <Link
-                    to={`/admin/inventory/assets/${contract.loaner_device_id}`}
-                    className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1"
-                  >
-                    {loanerAsset ? codeDisplay(loanerAsset.asset_code_display, loanerAsset.asset_code) : `#${contract.loaner_device_id}`}
-                    <ExternalLink size={11} />
-                  </Link>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <Link
+                      to={`/admin/inventory/assets/${contract.loaner_device_id}`}
+                      className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1"
+                    >
+                      {loanerAsset ? codeDisplay(loanerAsset.asset_code_display, loanerAsset.asset_code) : `#${contract.loaner_device_id}`}
+                      <ExternalLink size={11} />
+                    </Link>
+                    {loanerAsset?.external_ref && (
+                      <span className="text-[10px] font-mono text-subtle bg-surface px-1 py-0.5 rounded border border-line">
+                        EXT {loanerAsset.external_ref}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 {loanerAsset?.variant_name && (
                   <div>

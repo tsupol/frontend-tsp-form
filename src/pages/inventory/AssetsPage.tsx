@@ -50,6 +50,7 @@ interface Asset {
   identifiers: { type: string; value: string; is_active: boolean }[];
   serial_no: string | null;
   imei: string | null;
+  external_ref: string | null;
   battery_health: number | null;
   has_open_conflict: boolean;
   custodian_user_id: number | null;
@@ -749,6 +750,11 @@ export function AssetsPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-baseline gap-1.5 min-w-0">
                           <span className="font-medium text-sm truncate">{codeDisplay(asset.asset_code_display, asset.asset_code)}</span>
+                          {asset.external_ref && (
+                            <span className="text-[10px] font-mono text-subtle bg-surface px-1 py-0.5 rounded border border-line shrink-0">
+                              EXT {asset.external_ref}
+                            </span>
+                          )}
                         </div>
                         <div className="text-xs text-subtle truncate">
                           {asset.brand_name} {asset.family_name} · {asset.variant_name}
@@ -982,6 +988,9 @@ function AssetDetailPanel({
         </div>
       </div>
 
+      {/* External reference (TPA legacy ticket ID) */}
+      <ExternalRefRow asset={asset} onChanged={onRefresh} t={t} addSnackbar={addSnackbar} />
+
       {/* Financial info */}
       <div className="flex-none grid grid-cols-2 gap-3 px-4 py-3 border-b border-line">
         <div>
@@ -1124,6 +1133,131 @@ function AssetDetailPanel({
           });
         }}
       />
+    </div>
+  );
+}
+
+// ============================================================================
+// External reference row — TPA legacy ticket ID with inline edit
+// Edit RPC permission-gated by backend; we just attempt and surface errors.
+// ============================================================================
+
+function ExternalRefRow({
+  asset,
+  onChanged,
+  t,
+  addSnackbar,
+}: {
+  asset: Asset;
+  onChanged: () => void;
+  t: ReturnType<typeof useTranslation>['t'];
+  addSnackbar: (opts: { message: React.ReactNode }) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(asset.external_ref ?? '');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!editing) setValue(asset.external_ref ?? '');
+  }, [asset.external_ref, editing]);
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      apiClient.rpc<{ asset_id: number; external_ref: string | null; changed: boolean }>(
+        'fn_inv_asset_update_external_ref',
+        {
+          p_asset_id: asset.asset_id,
+          p_external_ref: value.trim() || null,
+          p_note: null,
+        },
+      ),
+    onSuccess: () => {
+      setEditing(false);
+      setError('');
+      onChanged();
+      addSnackbar({
+        message: (
+          <div className="alert alert-success">
+            <CheckCircle size={16} />
+            <span>{t('asset.externalRef_saved', { defaultValue: 'TPA reference updated' })}</span>
+          </div>
+        ),
+      });
+    },
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        const translated =
+          (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') ||
+          (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setError(translated || err.message);
+      } else {
+        setError(String(err));
+      }
+    },
+  });
+
+  const startEdit = () => {
+    setValue(asset.external_ref ?? '');
+    setError('');
+    setEditing(true);
+  };
+  const cancelEdit = () => {
+    setEditing(false);
+    setError('');
+    setValue(asset.external_ref ?? '');
+  };
+
+  return (
+    <div className="flex-none px-4 py-3 border-b border-line">
+      <div className="flex items-center gap-2">
+        <div className="text-xs text-subtle shrink-0">{t('asset.externalRef', { defaultValue: 'TPA Reference' })}</div>
+        {!editing && (
+          <>
+            <span className="text-sm font-mono">
+              {asset.external_ref || <span className="text-subtler italic font-sans">{t('common.none', { defaultValue: '—' })}</span>}
+            </span>
+            <Button
+              variant="ghost"
+              size="xs"
+              startIcon={<Pencil size={12} />}
+              onClick={startEdit}
+            />
+          </>
+        )}
+        {editing && (
+          <div className="flex-1 flex items-center gap-2">
+            <Input
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              size="sm"
+              placeholder={t('asset.externalRef_placeholder', { defaultValue: 'TPA ticket ID' })}
+              className="w-full"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') mutation.mutate();
+                if (e.key === 'Escape') cancelEdit();
+              }}
+            />
+            <Button
+              size="sm"
+              color="primary"
+              onClick={() => mutation.mutate()}
+              disabled={mutation.isPending}
+            >
+              {mutation.isPending ? t('common.saving') : t('common.save')}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={cancelEdit} disabled={mutation.isPending}>
+              {t('common.cancel')}
+            </Button>
+          </div>
+        )}
+      </div>
+      {error && (
+        <div className="alert alert-danger mt-2">
+          <XCircle size={16} />
+          <span>{error}</span>
+        </div>
+      )}
     </div>
   );
 }
