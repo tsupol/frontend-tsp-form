@@ -48,7 +48,6 @@ export function BranchSignersPage() {
   const invalidate = useInvalidateSignatories();
 
   const [branchId, setBranchId] = useState<number | null>(user?.branch_id ?? null);
-  const [showInactive, setShowInactive] = useState(false);
   const [modalMode, setModalMode] = useState<ModalMode | null>(null);
   const [editWitness, setEditWitness] = useState<BranchWitness | null>(null);
   const [deleteWitness, setDeleteWitness] = useState<BranchWitness | null>(null);
@@ -67,7 +66,7 @@ export function BranchSignersPage() {
   const currentBranch = useMemo(() => branches.find(b => b.id === branchId) ?? null, [branches, branchId]);
   const companyId = currentBranch?.company_id ?? user?.company_id ?? null;
 
-  const { data: witnesses = [], isLoading: witnessesLoading } = useBranchWitnesses(branchId, { includeInactive: showInactive });
+  const { data: witnesses = [], isLoading: witnessesLoading } = useBranchWitnesses(branchId, { includeInactive: true });
   const { data: defaults = [] } = useBranchSignatoryDefaults(branchId);
   const { data: lessors = [] } = useCompanyLessors(companyId);
 
@@ -145,15 +144,9 @@ export function BranchSignersPage() {
                 <h2 className="text-base font-medium">{t('branchSigners.witnessesTitle')}</h2>
                 <p className="text-xs text-subtle">{t('branchSigners.witnessesHint')}</p>
               </div>
-              <div className="flex items-center gap-3">
-                <label className="inline-flex items-center gap-2 text-sm">
-                  <Switch checked={showInactive} onChange={e => setShowInactive(e.target.checked)} />
-                  <span>{t('branchSigners.showInactive')}</span>
-                </label>
-                <Button color="primary" startIcon={<Plus size={14} />} onClick={openCreate}>
-                  {t('branchSigners.addWitness')}
-                </Button>
-              </div>
+              <Button color="primary" startIcon={<Plus size={14} />} onClick={openCreate}>
+                {t('branchSigners.addWitness')}
+              </Button>
             </div>
 
             <div className="border border-line rounded-lg overflow-hidden">

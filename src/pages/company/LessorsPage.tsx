@@ -40,12 +40,11 @@ export function LessorsPage() {
   const { addSnackbar } = useSnackbarContext();
   const invalidate = useInvalidateSignatories();
 
-  const [showInactive, setShowInactive] = useState(false);
   const [modalMode, setModalMode] = useState<ModalMode | null>(null);
   const [editLessor, setEditLessor] = useState<CompanyLessor | null>(null);
   const [deleteLessor, setDeleteLessor] = useState<CompanyLessor | null>(null);
 
-  const { data: lessors = [], isLoading } = useCompanyLessors(companyId, { includeInactive: showInactive });
+  const { data: lessors = [], isLoading } = useCompanyLessors(companyId, { includeInactive: true });
 
   const openCreate = () => { setEditLessor(null); setModalMode('create'); };
   const openEdit = (l: CompanyLessor) => { setEditLessor(l); setModalMode('edit'); };
@@ -78,12 +77,8 @@ export function LessorsPage() {
       </div>
 
       <section className="flex flex-col gap-3">
-        <div className="flex items-end justify-between gap-3">
-          <label className="inline-flex items-center gap-2 text-sm">
-            <Switch checked={showInactive} onChange={e => setShowInactive(e.target.checked)} size="sm" />
-            <span>{t('lessors.showInactive')}</span>
-          </label>
-          <Button color="primary" startIcon={<Plus size={14} />} size="sm" onClick={openCreate}>
+        <div className="flex justify-end">
+          <Button color="primary" startIcon={<Plus size={14} />} onClick={openCreate}>
             {t('lessors.add')}
           </Button>
         </div>
