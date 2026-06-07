@@ -2725,7 +2725,7 @@
     "showInactive": "Show inactive",
     "defaultW1": "Default W1",
     "defaultW2": "Default W2",
-    "defaultUsage": "Currently a default ({{count}})",
+    "defaultUsage": "Default",
     "colSignature": "Signature",
     "colName": "Name",
     "colId": "ID number",

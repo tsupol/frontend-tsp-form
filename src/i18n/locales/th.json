@@ -2725,7 +2725,7 @@
     "showInactive": "แสดงที่ปิดใช้งาน",
     "defaultW1": "พยาน 1 เริ่มต้น",
     "defaultW2": "พยาน 2 เริ่มต้น",
-    "defaultUsage": "เป็นค่าเริ่มต้นอยู่ ({{count}})",
+    "defaultUsage": "ค่าเริ่มต้น",
     "colSignature": "ลายเซ็น",
     "colName": "ชื่อ",
     "colId": "เลขประจำตัว",
