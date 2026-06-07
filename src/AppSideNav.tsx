@@ -44,6 +44,8 @@ import {
   MessageSquare,
   // Dev sandbox
   FlaskConical, PenLine, Image as ImageIcon, Bell,
+  // Signatories (v2)
+  Stamp,
 } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
 import { getRoleLabel } from './lib/roleLabel';
@@ -274,7 +276,10 @@ export const AppSideNav = () => {
           { key: 'branches', icon: <MapPin size="1rem" />, label: t('nav.branches'), path: '/admin/company/branches' },
         ] : []),
         { key: 'pin', icon: <KeyRound size="1rem" />, label: t('nav.branchPin'), path: '/admin/company/pin' },
-        { key: 'signatories', icon: <PenLine size="1rem" />, label: t('nav.signatories'), path: '/admin/company/signatories' },
+        ...(['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
+          { key: 'lessors', icon: <Stamp size="1rem" />, label: t('nav.lessors'), path: '/admin/company/lessors' },
+        ] : []),
+        { key: 'signers', icon: <PenLine size="1rem" />, label: t('nav.branchSigners'), path: '/admin/company/signers' },
         { type: 'group', key: 'grp-finance', label: t('nav.groupFinance') },
         { key: 'bank-accounts', icon: <Landmark size="1rem" />, label: t('nav.bankAccounts'), path: '/admin/company/bank-accounts' },
         { key: 'company-config', icon: <Building2 size="1rem" />, label: t('nav.companyConfig'), path: '/admin/company/config' },

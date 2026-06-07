@@ -62,7 +62,8 @@ import { DunningConfigPage } from './pages/company/DunningConfigPage';
 import { BlacklistPage } from './pages/company/BlacklistPage';
 import { ICloudPoolPage } from './pages/company/ICloudPoolPage';
 import { BranchPinPage } from './pages/company/BranchPinPage';
-import { SignatoriesPage } from './pages/company/SignatoriesPage';
+import { LessorsPage } from './pages/company/LessorsPage';
+import { BranchSignersPage } from './pages/company/BranchSignersPage';
 import { BranchesPage } from './pages/BranchesPage';
 import { SettingsLayout } from './pages/settings/SettingsLayout';
 import { HoldingsPage } from './pages/settings/HoldingsPage';
@@ -790,15 +791,27 @@ function App() {
         }
       />
       <Route
-        path="/admin/company/signatories"
+        path="/admin/company/lessors"
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <CompanyLayout><SignatoriesPage /></CompanyLayout>
+              <CompanyLayout><LessorsPage /></CompanyLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/admin/company/signers"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <CompanyLayout><BranchSignersPage /></CompanyLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      {/* Back-compat: old route → redirect to branch signers */}
+      <Route path="/admin/company/signatories" element={<Navigate to="/admin/company/signers" replace />} />
 
 
 

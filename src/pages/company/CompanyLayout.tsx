@@ -1,7 +1,7 @@
 import { useMemo, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { MapPin, Building2, Landmark, CalendarDays, AlertTriangle, ShieldBan, Cloud, KeyRound, UserCheck, PenLine } from 'lucide-react';
+import { MapPin, Building2, Landmark, CalendarDays, AlertTriangle, ShieldBan, Cloud, KeyRound, UserCheck, PenLine, Stamp } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -23,7 +23,8 @@ export function CompanyLayout({ children }: { children: ReactNode }) {
     { type: 'group', labelKey: 'nav.groupOrganization' },
     ...(isAdmin ? [{ type: 'link' as const, path: '/admin/company/branches', labelKey: 'nav.branches', icon: MapPin }] : []),
     { type: 'link', path: '/admin/company/pin', labelKey: 'nav.branchPin', icon: KeyRound },
-    { type: 'link', path: '/admin/company/signatories', labelKey: 'nav.signatories', icon: PenLine },
+    ...(isAdmin ? [{ type: 'link' as const, path: '/admin/company/lessors', labelKey: 'nav.lessors', icon: Stamp }] : []),
+    { type: 'link', path: '/admin/company/signers', labelKey: 'nav.branchSigners', icon: PenLine },
     { type: 'group', labelKey: 'nav.groupFinance' },
     { type: 'link', path: '/admin/company/bank-accounts', labelKey: 'nav.bankAccounts', icon: Landmark },
     { type: 'link', path: '/admin/company/config', labelKey: 'nav.companyConfig', icon: Building2 },

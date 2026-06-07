@@ -1,29 +1,12 @@
-// Hardcoded lessor identity for the contract PDF.
-// TODO(BE): pending sale.branch_lessor_profile (filed 2026-05-20_lessor_legal_identity_missing.md).
-// Lessor name comes from the bound signatory; id_number + address still
-// fall back to this constant until BE adds them.
-
-export interface LessorProfile {
-  prefix: string;          // "นาย" / "น.ส." / "นาง"
-  firstName: string;
-  lastName: string;
-  idNumber: string;        // 13-digit citizen ID
-  address: string;         // full address line as printed
-}
+// Lessor identity now comes from v_contract_detail.signatories[*] (slot=LESSOR)
+// — prefix / first_name / last_name / id_number / address. Pool managed via
+// fn_company_lessor_* RPCs and the /admin/company/lessors page.
 
 export interface BankAccount {
   bankName: string;
   accountNumber: string;
   accountName: string;
 }
-
-export const LESSOR: LessorProfile = {
-  prefix: 'นาย',
-  firstName: 'อนุสรณ์',
-  lastName: 'บูรณัติ',
-  idNumber: '3730600572721',
-  address: '107 ม.7 ต.คลองใหม่ อ.สามพราน จ.นครปฐม',
-};
 
 // Body copy of clauses 2.1 and 7 (long paragraphs). Pulled verbatim from the
 // sample so any tweak lives in one place.

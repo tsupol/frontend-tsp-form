@@ -9,9 +9,11 @@ import { useGenerateContractPdfServer } from './useGenerateContractPdfServer';
 import { ContractPreviewModal } from './ContractPreviewModal';
 import { CLAUSE_6_REPO_THRESHOLD_DAYS } from '../../lib/contractPdf/constants';
 import {
-  useBranchSignatories,
+  useCompanyLessors,
+  useBranchWitnesses,
   useBranchSignatoryDefaults,
   useContractSignatories,
+  composeName,
   type SignatorySlot,
 } from './workspace/useContractSignatories';
 import { useContractHandover } from './workspace/useContractHandover';
@@ -65,7 +67,18 @@ export function GenerateContractPdfModal({ open, onClose, contract }: Props) {
   const contractId = contract?.id ?? null;
   const deviceId = contract?.device_id ?? null;
 
-  const { data: book = [] } = useBranchSignatories(branchId);
+  const { data: branchRow } = useQuery({
+    queryKey: ['pdf-modal-branch', branchId],
+    queryFn: () => apiClient.get<Array<{ id: number; company_id: number }>>(
+      `/v_branches?id=eq.${branchId}&select=id,company_id&limit=1`,
+    ).then(rows => rows[0] ?? null),
+    enabled: !!branchId && open,
+    staleTime: 60_000,
+  });
+  const companyId = branchRow?.company_id ?? null;
+
+  const { data: lessorPool = [] } = useCompanyLessors(companyId);
+  const { data: witnessPool = [] } = useBranchWitnesses(branchId);
   const { data: defaults = [] } = useBranchSignatoryDefaults(branchId);
   const { data: bound = [] } = useContractSignatories(contractId);
   const { data: handover } = useContractHandover(contractId);
@@ -99,19 +112,30 @@ export function GenerateContractPdfModal({ open, onClose, contract }: Props) {
     for (const s of SLOTS) {
       const b = bound.find(x => x.slot === s.slot);
       if (b) {
-        out[s.slot] = { name: `${b.first_name} ${b.last_name}`, signature_media_id: b.signature_media_id, source: 'bound' };
+        // v_contract_signatories has prefix-less name parts; compose without prefix
+        // to match the existing display.
+        out[s.slot] = {
+          name: composeName(null, b.first_name, b.last_name),
+          signature_media_id: b.signature_media_id,
+          source: 'bound',
+        };
         continue;
       }
       const d = defaults.find(x => x.slot === s.slot);
-      if (d) {
-        out[s.slot] = { name: `${d.first_name} ${d.last_name}`, signature_media_id: d.signature_media_id, source: 'default' };
+      const defName = d ? composeName(d.person_prefix, d.person_first_name, d.person_last_name) : '';
+      if (d && defName) {
+        out[s.slot] = {
+          name: defName,
+          signature_media_id: d.signature_media_id,
+          source: 'default',
+        };
       }
     }
     return out;
   }, [bound, defaults]);
 
-  const lessorPoolEmpty = book.filter(b => b.role === 'LESSOR' && b.is_active).length === 0;
-  const witnessPoolShort = book.filter(b => b.role === 'WITNESS' && b.is_active).length < 2;
+  const lessorPoolEmpty = lessorPool.filter(l => l.is_active).length === 0;
+  const witnessPoolShort = witnessPool.filter(w => w.is_active).length < 2;
   const missingPick = !resolved.LESSOR.signature_media_id || !resolved.WITNESS_1.signature_media_id || !resolved.WITNESS_2.signature_media_id;
   const witnessDup = !!resolved.WITNESS_1.signature_media_id
     && resolved.WITNESS_1.signature_media_id === resolved.WITNESS_2.signature_media_id;
