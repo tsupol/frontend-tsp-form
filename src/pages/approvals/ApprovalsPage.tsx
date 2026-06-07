@@ -141,12 +141,7 @@ export function ApprovalsPage() {
     {
       accessorKey: 'branch_name',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('approvals.branch')} />,
-      cell: ({ row }) => (
-        <div>
-          <div className="text-sm truncate">{row.original.branch_name ?? '—'}</div>
-          <div className="text-xs text-subtle truncate">{row.original.requested_by_name ?? ''}</div>
-        </div>
-      ),
+      cell: ({ row }) => <div className="text-sm truncate">{row.original.branch_name ?? '—'}</div>,
       className: 'max-lg:hidden',
     },
     {
