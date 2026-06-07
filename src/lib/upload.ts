@@ -192,7 +192,9 @@ export function specToSizes(spec: UploadSpec | null | undefined): Record<string,
 
 /**
  * Upload all sizes in the spec from a single UploadedImage's variants.
- * Falls back to the resized `file` when only one size is defined.
+ * Falls back to resizing `file` to the spec when no variants are present —
+ * used by single-size flows (OCR ID-card capture, signature pad) so the raw
+ * camera/upload frame doesn't get pushed to R2 unresized.
  */
 export async function uploadFromImage(opts: {
   type: string;
@@ -206,10 +208,12 @@ export async function uploadFromImage(opts: {
     const v = opts.image.variants?.[sz.label]?.file;
     if (v) files[sz.label] = v;
   }
-  // Fallback: only one size in spec and no variants — use the resized `file`.
+  // Fallback: only one size in spec and no variants — resize the source file
+  // to the spec's width + webp before uploading.
   if (Object.keys(files).length === 0 && spec.sizes.length === 1) {
-    const f = opts.image.file ?? opts.image.originalFile;
-    files[spec.sizes[0].label] = f;
+    const src = opts.image.file ?? opts.image.originalFile;
+    const sz = spec.sizes[0];
+    files[sz.label] = await resizeFileToWebp(src, sz.width, spec.quality);
   }
   return uploadImageMulti({
     type: opts.type,
@@ -217,4 +221,37 @@ export async function uploadFromImage(opts: {
     idx: opts.idx,
     params: opts.params,
   });
+}
+
+/**
+ * Downscale `src` to fit within `maxWidth × maxWidth` (contain) and encode
+ * as webp. Shrinks files dramatically vs raw camera PNG/JPEG — keeps the
+ * misc-go uploaded copies small enough for downstream PDF embedding.
+ */
+async function resizeFileToWebp(src: File, maxWidth: number, quality: number): Promise<File> {
+  const url = URL.createObjectURL(src);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const im = new Image();
+      im.onload = () => resolve(im);
+      im.onerror = () => reject(new Error('image load failed'));
+      im.src = url;
+    });
+    let w = img.naturalWidth, h = img.naturalHeight;
+    if (w > maxWidth || h > maxWidth) {
+      const ratio = Math.min(maxWidth / w, maxWidth / h);
+      w = Math.round(w * ratio);
+      h = Math.round(h * ratio);
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(b => b ? resolve(b) : reject(new Error('encode failed')), 'image/webp', quality);
+    });
+    const name = src.name.replace(/\.[^.]+$/, '') + '.webp';
+    return new File([blob], name, { type: 'image/webp' });
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }

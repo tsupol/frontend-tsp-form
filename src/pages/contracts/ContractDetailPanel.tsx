@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Badge, Button, Input, Select, Modal, TextArea, Tooltip, useSnackbarContext } from 'tsp-form';
-import { ChevronLeft, ChevronRight, Copy, Check, Minus, Pencil, Truck, CheckCircle, XCircle, Loader2, Upload, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Upload, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, AlertTriangle } from 'lucide-react';
 import { useGenerateContractPdfServer } from './useGenerateContractPdfServer';
 import { GenerateContractPdfModal } from './GenerateContractPdfModal';
 import { Link } from 'react-router-dom';
@@ -1977,8 +1977,8 @@ function DocumentPresence({
       <span className="text-subtle shrink-0">{icon}</span>
       <span className="text-sm">{label}</span>
       {present
-        ? <Check size={14} className="text-success-fg shrink-0" />
-        : <Minus size={14} className="text-subtler shrink-0" />}
+        ? <CheckCircle size={14} className="text-success-fg shrink-0" />
+        : <XCircle size={14} className="text-subtler shrink-0" />}
     </div>
   );
 }

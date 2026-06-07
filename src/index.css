@@ -244,7 +244,7 @@
     --color-bg: #f3f3f6;
     --color-bg-contrast: #1c2024;
 
-    --color-line: rgba(0, 0, 0, 0.12);
+    --color-line: rgba(0, 0, 0, 0.15);
     --color-link: #1d4ed8;
 
     --color-surface: #f9f9fb;
@@ -264,6 +264,7 @@
     --color-danger-hover: #e11d48;
     --color-danger-fade: #be123c;
 
+    /*--color-success: #16a34a;*/
     --color-success-hover: #059669;
     --color-success-fade: #047857;
 
@@ -317,10 +318,10 @@
        look washed out. Stronger tinted backgrounds with darker text. */
     --color-badge-default-bg: #d9d9e0;
     --color-badge-default-fg: #1c2024;
-    --color-badge-warning-bg: #fde68a;
-    --color-badge-warning-fg: #78350f;
-    --color-badge-success-bg: #bbf7d0;
-    --color-badge-success-fg: #14532d;
-    --color-badge-info-bg: #bae6fd;
-    --color-badge-info-fg: #0c4a6e;
+    --color-badge-warning-bg: #f6d4a3;
+    --color-badge-warning-fg: #8d610d;
+    --color-badge-success-bg: #a3e7be;
+    --color-badge-success-fg: #055e2c;
+    --color-badge-info-bg: #afe3f1;
+    --color-badge-info-fg: #166c83;
 }

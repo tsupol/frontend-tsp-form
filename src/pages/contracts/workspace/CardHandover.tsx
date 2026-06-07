@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Check, X, Smartphone } from 'lucide-react';
+import { CheckCircle, XCircle, Smartphone } from 'lucide-react';
 import { useWorkspace } from './WorkspaceContext';
 import { SummaryCard } from './SummaryCard';
 import { useContractHandover } from './useContractHandover';
@@ -45,7 +45,7 @@ export function CardHandover({ onEdit, active, shake }: { onEdit?: () => void; a
 function Item({ ok, label }: { ok: boolean | null | undefined; label: string }) {
   return (
     <span className={`inline-flex items-center gap-1 ${ok ? '' : 'text-subtle'}`}>
-      {ok ? <Check size={12} className="text-success" /> : <X size={12} className="text-fg/30" />}
+      {ok ? <CheckCircle size={12} className="text-success" /> : <XCircle size={12} className="text-fg/30" />}
       {label}
     </span>
   );
