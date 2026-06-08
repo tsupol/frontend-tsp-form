@@ -1299,6 +1299,7 @@
     "empty": "ไม่พบสลิปตามตัวกรอง",
     "allStatuses": "ทุกสถานะ",
     "allBranches": "ทุกสาขา",
+    "searchPlaceholder": "ค้นหาเลขสัญญา ชื่อ เบอร์โทร",
     "submittedAt": "ส่งเมื่อ",
     "contract": "สัญญา",
     "customer": "ลูกค้า",
@@ -2675,7 +2676,15 @@
     "handoverUnlockCode": "รหัสปลดล็อกเครื่อง",
     "handoverUnlockCodeHint": "เก็บไว้สำหรับเข้าเครื่องตอนยึด/ซ่อม — เว้นว่างได้ถ้าใช้ biometric",
     "handoverSaved": "บันทึกแล้ว",
-    "handoverNothingRecorded": "ยังไม่ได้บันทึก"
+    "handoverNothingRecorded": "ยังไม่ได้บันทึก",
+    "commissionOwner": "เจ้าของค่าคอม",
+    "commissionOwnerHint": "พนักงานที่ได้ค่าคอมของสัญญานี้ — ล็อกเมื่อ activate",
+    "commissionOwnerUnset": "ยังไม่ได้กำหนด",
+    "commissionOwnerChange": "เปลี่ยน",
+    "commissionOwnerCancel": "ยกเลิก",
+    "commissionOwnerSave": "บันทึกเจ้าของ",
+    "commissionOwnerPicker": "เจ้าของใหม่",
+    "commissionOwnerSaved": "เปลี่ยนเจ้าของแล้ว"
   },
   "lessors": {
     "title": "ผู้ให้เช่า",

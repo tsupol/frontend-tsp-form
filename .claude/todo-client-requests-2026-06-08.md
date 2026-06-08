@@ -22,6 +22,13 @@ Items checked off below are already shipped; the rest are open.
 
 ## Done
 
+### ✅ 4. Contract wizard: pick commission owner (staff)
+- Shipped 2026-06-09 in `src/pages/contracts/workspace/PanelReviewPay.tsx`. New "Commission owner" section at the top of the Review & Pay panel: read-only row with current owner (from `v_contract_detail.commission_owner_name`), Change button expands to a branch-scoped staff `Select` + 6-digit PIN + Save/Cancel.
+- Calls `fn_contract_change_draft_owner(p_contract_id, p_new_owner_id, p_pin)`. Backend enforces same-branch + `CONTRACT.CHANGE_OWNER` permission + PIN — UI surfaces translated errors via `apiErrors`.
+- Staff list query filters `branch_id=eq.<contract.branch_id>` against `v_users`. Added `commission_owner_id` / `commission_owner_name` to `ContractServerState` in `useContractQuery.ts`.
+- i18n: `workspace.commissionOwner*` keys in both locales.
+- Placement: Review & Pay was the client's call. Owner locks at activation (the next click), so this is the last editable point. Earlier placements (Customer/Product card) were considered but the client preferred keeping it next to payment/confirm so the BS sets it right before paying.
+
 ### ✅ 2. "สรุปรายวัน" → renamed to "วันที่ปิดแล้ว"
 - Shipped 2026-06-09. The label is driven by a single i18n key `nav.dailyAccounting`, used in the side nav (`AppSideNav.tsx`), the accounting layout sub-nav (`AccountingLayout.tsx`), and the page H1 (`DailyAccountingPage.tsx`).
 - TH: `สรุปรายวัน` → `วันที่ปิดแล้ว`. EN: `Daily Accounting` → `Closed Days` (matches the new intent — the page shows historical day-close records, not a daily summary).

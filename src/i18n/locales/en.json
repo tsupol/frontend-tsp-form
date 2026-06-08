@@ -1299,6 +1299,7 @@
     "empty": "No slips match the filters",
     "allStatuses": "All statuses",
     "allBranches": "All branches",
+    "searchPlaceholder": "Search contract, name, phone",
     "submittedAt": "Submitted",
     "contract": "Contract",
     "customer": "Customer",
@@ -2675,7 +2676,15 @@
     "handoverUnlockCode": "Device unlock code",
     "handoverUnlockCodeHint": "Used internally to access the device if repossessed or repaired. Optional — leave blank if biometric only.",
     "handoverSaved": "Saved",
-    "handoverNothingRecorded": "Not recorded"
+    "handoverNothingRecorded": "Not recorded",
+    "commissionOwner": "Commission owner",
+    "commissionOwnerHint": "Staff member who earns commission on this contract. Locks at activation.",
+    "commissionOwnerUnset": "Not set",
+    "commissionOwnerChange": "Change",
+    "commissionOwnerCancel": "Cancel",
+    "commissionOwnerSave": "Save owner",
+    "commissionOwnerPicker": "New owner",
+    "commissionOwnerSaved": "Owner changed"
   },
   "lessors": {
     "title": "Lessors",

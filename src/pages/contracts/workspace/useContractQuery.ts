@@ -71,6 +71,10 @@ export interface ContractServerState {
   staff_confidence_score: number | null;
   draft_note: string | null;
 
+  // Commission owner (locked at activation)
+  commission_owner_id: number | null;
+  commission_owner_name: string | null;
+
   // Saving
   saving_target_amount: number | null;
   saving_balance: number;
