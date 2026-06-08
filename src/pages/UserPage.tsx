@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRightFromLine, Eye, EyeOff, KeyRound, CheckCircle, XCircle, Camera, Upload, User as UserIcon } from 'lucide-react';
+import { ArrowRightFromLine, Eye, EyeOff, KeyRound, CheckCircle, XCircle, Camera, Upload, User as UserIcon, RotateCcw, RotateCw } from 'lucide-react';
 import { Button, Input, FormErrorMessage, Modal, ImageCropper, Slider, MobileHeader, useSnackbarContext } from 'tsp-form';
 import type { ImageCropperRef } from 'tsp-form';
 import { useAuth } from '../contexts/AuthContext';
@@ -38,6 +38,7 @@ function ProfileCard() {
   const [cropFile, setCropFile] = useState<File | null>(null);
   const [cropSourceSize, setCropSourceSize] = useState<{ w: number; h: number } | null>(null);
   const [cropZoom, setCropZoom] = useState(1);
+  const [cropRotation, setCropRotation] = useState(0);
   const [uploading, setUploading] = useState(false);
 
   const { data: meRes, isLoading } = useQuery({
@@ -53,6 +54,14 @@ function ProfileCard() {
     setAvatarModalOpen(false);
     setCropFile(null);
     setCropSourceSize(null);
+    setCropRotation(0);
+  };
+
+  const snapAvatarRotate = (delta: 90 | -90) => {
+    const target = delta > 0
+      ? Math.floor(cropRotation / 90) * 90 + 90
+      : Math.ceil(cropRotation / 90) * 90 - 90;
+    cropperRef.current?.setRotation(Math.max(-180, Math.min(180, target)));
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -60,6 +69,7 @@ function ProfileCard() {
     e.target.value = '';
     if (!f) return;
     setCropFile(f);
+    setCropRotation(0);
     const img = new Image();
     const url = URL.createObjectURL(f);
     img.onload = () => {
@@ -249,7 +259,9 @@ function ProfileCard() {
                 outputType={spec?.content_type ?? 'image/webp'}
                 outputQuality={spec?.quality ?? 0.85}
                 outputWidth={outputWidth}
-                onZoomChange={setCropZoom}
+                rotation
+                onZoomChange={(z) => setCropZoom(z)}
+                onRotationChange={setCropRotation}
                 className="[&_.image-cropper-viewport]:rounded-full"
               />
               <div className="w-full max-w-[280px]">
@@ -259,6 +271,31 @@ function ProfileCard() {
                   step={1}
                   value={Math.round(cropZoom * 1000)}
                   onChange={(v) => cropperRef.current?.setZoom(Number(v) / 1000)}
+                />
+              </div>
+              <div className="flex items-center gap-2 w-full max-w-[280px]">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="btn-icon-xs shrink-0"
+                  startIcon={<RotateCcw size={12} />}
+                  onClick={() => snapAvatarRotate(-90)}
+                  aria-label="Rotate -90°"
+                />
+                <Slider
+                  min={-180}
+                  max={180}
+                  step={1}
+                  value={Math.round(cropRotation)}
+                  onChange={(v) => cropperRef.current?.setRotation(Number(v))}
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="btn-icon-xs shrink-0"
+                  startIcon={<RotateCw size={12} />}
+                  onClick={() => snapAvatarRotate(90)}
+                  aria-label="Rotate +90°"
                 />
               </div>
             </div>

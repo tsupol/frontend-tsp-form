@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
 import { Button, Select, Slider, ImageCropper, type ImageCropperRef } from 'tsp-form';
-import { Upload, Scissors, X, Download } from 'lucide-react';
+import { Upload, Scissors, X, Download, RotateCcw, RotateCw } from 'lucide-react';
 
 /* ── Aspect presets ──────────────────────────────────────────────────────
    ISO/IEC 7810 ID-1 covers Thai national ID, driver's license, ATM/credit
@@ -27,6 +27,7 @@ export function DevCropPage() {
   const [src, setSrc] = useState<File | null>(null);
   const [preset, setPreset] = useState<PresetKey>('id_card');
   const [zoom, setZoom] = useState(1);
+  const [rotation, setRotation] = useState(0);
   const [croppedUrl, setCroppedUrl] = useState<string | null>(null);
   const [croppedSize, setCroppedSize] = useState<number | null>(null);
   const [outputDims, setOutputDims] = useState<{ w: number; h: number } | null>(null);
@@ -40,12 +41,20 @@ export function DevCropPage() {
   const onFile = (f: File | undefined) => {
     if (!f) return;
     setSrc(f);
+    setRotation(0);
     if (croppedUrl) {
       URL.revokeObjectURL(croppedUrl);
       setCroppedUrl(null);
     }
     setCroppedSize(null);
     setOutputDims(null);
+  };
+
+  const snapRotate = (delta: 90 | -90) => {
+    const target = delta > 0
+      ? Math.floor(rotation / 90) * 90 + 90
+      : Math.ceil(rotation / 90) * 90 - 90;
+    cropperRef.current?.setRotation(Math.max(-180, Math.min(180, target)));
   };
 
   const handleCrop = () => {
@@ -62,6 +71,7 @@ export function DevCropPage() {
 
   const handleClear = () => {
     setSrc(null);
+    setRotation(0);
     if (croppedUrl) {
       URL.revokeObjectURL(croppedUrl);
       setCroppedUrl(null);
@@ -128,7 +138,9 @@ export function DevCropPage() {
               outputType="image/jpeg"
               outputQuality={0.9}
               viewportWidth={360}
-              onZoomChange={setZoom}
+              rotation
+              onZoomChange={(z) => setZoom(z)}
+              onRotationChange={setRotation}
             />
           </div>
 
@@ -144,6 +156,37 @@ export function DevCropPage() {
             />
             <span className="text-xs text-subtle tabular-nums w-12 text-right">
               {Math.round(zoom * 100)}%
+            </span>
+          </div>
+
+          {/* Rotate */}
+          <div className="flex items-center gap-3 w-full max-w-md">
+            <span className="text-xs text-subtle whitespace-nowrap w-12">Rotate</span>
+            <Button
+              size="sm"
+              variant="outline"
+              className="btn-icon-xs shrink-0"
+              startIcon={<RotateCcw size={12} />}
+              onClick={() => snapRotate(-90)}
+              aria-label="Rotate -90°"
+            />
+            <Slider
+              min={-180}
+              max={180}
+              step={1}
+              value={Math.round(rotation)}
+              onChange={(v) => cropperRef.current?.setRotation(v)}
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              className="btn-icon-xs shrink-0"
+              startIcon={<RotateCw size={12} />}
+              onClick={() => snapRotate(90)}
+              aria-label="Rotate +90°"
+            />
+            <span className="text-xs text-subtle tabular-nums w-12 text-right">
+              {Math.round(rotation)}°
             </span>
           </div>
 

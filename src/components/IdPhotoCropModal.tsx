@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, Slider, ImageCropper, type ImageCropperRef } from 'tsp-form';
 import type { ResizedVariant } from 'tsp-form';
-import { Scissors, X } from 'lucide-react';
+import { RotateCcw, RotateCw, Scissors, X } from 'lucide-react';
 
 /* ── Aspect presets ──────────────────────────────────────────────────────
    ID-1 covers Thai national ID + driver's license (85.6×53.98mm → 1.586).
@@ -54,6 +54,7 @@ export function IdPhotoCropModal({ source, defaultPreset = 'id_card', onConfirm,
   const cropperRef = useRef<ImageCropperRef>(null);
   const [preset, setPreset] = useState<IdPhotoPresetKey>(defaultPreset);
   const [zoom, setZoom] = useState(1);
+  const [rotation, setRotation] = useState(0);
   const [processing, setProcessing] = useState(false);
 
   // Reset on each open
@@ -61,6 +62,7 @@ export function IdPhotoCropModal({ source, defaultPreset = 'id_card', onConfirm,
     if (source) {
       setPreset(defaultPreset);
       setZoom(1);
+      setRotation(0);
     }
   }, [source, defaultPreset]);
 
@@ -126,7 +128,9 @@ export function IdPhotoCropModal({ source, defaultPreset = 'id_card', onConfirm,
                 outputType="image/png"
                 outputWidth={2400}
                 viewportWidth={360}
-                onZoomChange={setZoom}
+                rotation
+                onZoomChange={(z) => setZoom(z)}
+                onRotationChange={setRotation}
               />
             </div>
 
@@ -140,6 +144,36 @@ export function IdPhotoCropModal({ source, defaultPreset = 'id_card', onConfirm,
                 onChange={(v) => cropperRef.current?.setZoom(v / 100)}
               />
               <span className="text-xs text-subtle tabular-nums w-12 text-right">{Math.round(zoom * 100)}%</span>
+            </div>
+
+            <div className="flex items-center gap-3 w-full max-w-md">
+              <span className="text-xs text-subtle w-12">{t('idPhoto.rotate', { defaultValue: 'Rotate' })}</span>
+              <Button
+                size="sm"
+                variant="outline"
+                className="btn-icon-xs shrink-0"
+                startIcon={<RotateCcw size={12} />}
+                onClick={() => cropperRef.current?.setRotation(snapRotate(rotation, -90))}
+                disabled={processing}
+                aria-label="Rotate -90°"
+              />
+              <Slider
+                min={-180}
+                max={180}
+                step={1}
+                value={Math.round(rotation)}
+                onChange={(v) => cropperRef.current?.setRotation(v)}
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                className="btn-icon-xs shrink-0"
+                startIcon={<RotateCw size={12} />}
+                onClick={() => cropperRef.current?.setRotation(snapRotate(rotation, 90))}
+                disabled={processing}
+                aria-label="Rotate +90°"
+              />
+              <span className="text-xs text-subtle tabular-nums w-12 text-right">{Math.round(rotation)}°</span>
             </div>
           </div>
         )}
@@ -157,6 +191,15 @@ export function IdPhotoCropModal({ source, defaultPreset = 'id_card', onConfirm,
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Snap rotation to the nearest 90° multiple in the requested direction.
+    Clamped to [-180, 180] to match the cropper's default bounds. */
+function snapRotate(current: number, delta: 90 | -90): number {
+  const target = delta > 0
+    ? Math.floor(current / 90) * 90 + 90
+    : Math.ceil(current / 90) * 90 - 90;
+  return Math.max(-180, Math.min(180, target));
+}
 
 export function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {

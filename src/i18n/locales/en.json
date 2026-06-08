@@ -4,6 +4,7 @@
     "preset_idCard": "ID card",
     "preset_passport": "Passport",
     "zoom": "Zoom",
+    "rotate": "Rotate",
     "cropAndUpload": "Crop & upload"
   },
   "barcodeScanner": {

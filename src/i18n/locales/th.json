@@ -4,6 +4,7 @@
     "preset_idCard": "บัตรประชาชน",
     "preset_passport": "พาสปอร์ต",
     "zoom": "ซูม",
+    "rotate": "หมุน",
     "cropAndUpload": "ครอปและอัปโหลด"
   },
   "barcodeScanner": {

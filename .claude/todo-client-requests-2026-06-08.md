@@ -10,11 +10,6 @@ Items checked off below are already shipped; the rest are open.
 - Likely places: side nav, page header, breadcrumb, any i18n keys with `dailySummary` / `daySummary` / `day_close_summary`.
 - Update both `src/i18n/locales/en.json` and `th.json` — pick an English label that matches the new intent (e.g. "Closed days") rather than translating "วันที่ปิดแล้ว" literally.
 
-### 3. Products → Models page: search by barcode
-- Page: `/admin/products` (or wherever the "รุ่นสินค้า" / Models list lives).
-- Add barcode to the search input alongside the existing name/code search.
-- Backend: check whether `fn_product_variant_search` (mig 52 — variant-level typeahead) or the existing models view already supports barcode lookup, or if we need a new RPC / view column.
-
 ### 4. Contract wizard: pick commission owner (staff)
 - Wizard is missing the field for selecting which staff member earns commission on the contract.
 - Field exists on `v_contract_detail` as `commission_owner_name` (already rendered in overview/draft tabs). The wizard step needs to set it.
@@ -31,6 +26,12 @@ Items checked off below are already shipped; the rest are open.
 - Once page is clear, expose a format selector and wire the SVG encoder accordingly. Check `src/pages/inventory/BarcodesPage.tsx` and `printer-setup` guide.
 
 ## Done
+
+### ✅ 3. Products → Models page: search by barcode
+- Shipped 2026-06-09. No frontend change to the search input itself was needed — `fn_product_search` (used by `ModelsPage`) had no barcode probe, so a valid barcode returned 0 hits.
+- Filed a backend request; BE shipped mig 56 (`barcode_exact` CTE in `fn_product_search`, score 100, matching variant sorted first inside `variants[]`, USB-scanner CR-strip mirrored from mig 52/53). Mig 57 then added `barcodes: string[]` to each variant in the `variants[]` jsonb.
+- Frontend: added optional `barcodes?: string[]` to `ModelVariant`, and a small barcode-icon chip + green count next to the attribute chips on each variant row (tooltip lists the codes). Commit `548b7b1`.
+- Variant-pick screens (PO/Receiving/Buyback/Promo) keep using `fn_product_variant_search` — same barcode behavior, different return shape (variants, not models).
 
 ### ✅ 1. Zoom photos in the delivery-photo album (Shipping)
 - Shipped 2026-06-08 in `src/pages/contracts/ContractDetailPanel.tsx` — `DeliveryModal` photo thumbs now open in `MediaLightbox` (tsp-form `ImageZoomPan` with `rubberBand` — pinch / wheel-zoom / pan, snaps back to 1×). Also added trash-overlay remove via `fn_media_detach`.
