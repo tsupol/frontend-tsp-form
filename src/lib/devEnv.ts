@@ -7,7 +7,6 @@ const DEV_EXPOSED_HOSTS = new Set<string>([
   'localhost',
   '127.0.0.1',
   '::1',
-  'frontend-tsp-form.ecap.space',
 ]);
 
 export function isLocalDev(): boolean {

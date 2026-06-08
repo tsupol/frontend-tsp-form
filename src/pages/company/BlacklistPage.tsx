@@ -11,6 +11,7 @@ import {
 import {
   Plus, MoreHorizontal, ShieldOff, XCircle, CheckCircle, ArrowRightFromLine,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -358,10 +359,14 @@ export function BlacklistPage() {
       id: 'customer',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('settings.blacklist.customerName')} />,
       cell: ({ row }) => (
-        <div>
-          <div className="text-xs font-medium">{row.original.customer_name}</div>
-          <div className="text-[11px] text-subtle tabular-nums">{row.original.national_id}</div>
-        </div>
+        <Link
+          to={`/admin/customers/${row.original.customer_id}`}
+          className="block text-primary-fg hover:underline"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="text-sm font-medium text-primary-fg">{row.original.customer_name}</div>
+          <div className="text-xs text-primary-fg tabular-nums">{row.original.national_id}</div>
+        </Link>
       ),
     },
     {
@@ -496,12 +501,22 @@ export function BlacklistPage() {
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="font-medium text-sm truncate">{entry.customer_name}</span>
+                        <Link
+                          to={`/admin/customers/${entry.customer_id}`}
+                          className="font-medium text-sm truncate text-primary-fg hover:underline"
+                        >
+                          {entry.customer_name}
+                        </Link>
                         <Badge color={entry.is_active ? 'danger' : 'default'} size="sm">
                           {entry.is_active ? t('settings.blacklist.statusActive') : t('settings.blacklist.statusLifted')}
                         </Badge>
                       </div>
-                      <div className="text-xs text-subtle tabular-nums mt-0.5">{entry.national_id}</div>
+                      <Link
+                        to={`/admin/customers/${entry.customer_id}`}
+                        className="text-xs text-primary-fg hover:underline tabular-nums mt-0.5 block"
+                      >
+                        {entry.national_id}
+                      </Link>
                       <div className="text-xs text-fg/40 mt-0.5">{entry.reason}</div>
                     </div>
                     <RowActions

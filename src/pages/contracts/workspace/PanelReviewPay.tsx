@@ -1,11 +1,12 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Select, MaskedInput } from 'tsp-form';
 import {
   Star, Plus, Trash2, XCircle, Loader2, CheckCircle,
-  ChevronsRight, Link2, FileText,
+  ChevronsRight, Link2, FileText, Printer,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { fmtCurrency } from '../../../lib/format';
@@ -257,36 +258,20 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
     }
   };
 
-  // ── Post-confirm: section IS the printable receipt + footer actions ──
+  // ── Post-confirm: confirmation summary + direct print via portal ──
+  // No on-screen receipt preview. Print goes through the same
+  // createPortal(.print-only-receipt, body) pattern as BillsPage /
+  // ContractDetailPanel so the 80mm @page resolves cleanly.
   if (data.billConfirmed && data.billId) {
     const needsBindDevice = contract != null && contract.device_id == null;
     return (
-      <div className="flex flex-col h-full">
-        <div className="flex-1 overflow-y-auto better-scroll p-4">
-          <BillReceipt billId={data.billId} />
-        </div>
-        <div className="shrink-0 border-t border-line bg-bg px-4 py-3 flex justify-end gap-2 print:hidden">
-          {needsBindDevice && data.contractId && (
-            <Button
-              color="primary"
-              startIcon={<Link2 size={16} />}
-              onClick={() => navigate(`/admin/contracts/pending-pairing/${data.contractId}`)}
-            >
-              {t('wizard.action_bindDevice')}
-            </Button>
-          )}
-          {data.contractId && (
-            <Button
-              variant={needsBindDevice ? 'outline' : 'solid'}
-              color={needsBindDevice ? undefined : 'primary'}
-              startIcon={<FileText size={16} />}
-              onClick={() => navigate(`/admin/contracts/search/${data.contractId}`)}
-            >
-              {t('wizard.action_viewInContract')}
-            </Button>
-          )}
-        </div>
-      </div>
+      <PostConfirmView
+        billId={data.billId}
+        contractId={data.contractId ?? null}
+        needsBindDevice={needsBindDevice}
+        onNavigate={navigate}
+        t={t}
+      />
     );
   }
 
@@ -478,6 +463,87 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
           </Button>
         </div>
       </div>
+    </div>
+  );
+}
+
+interface PostConfirmViewProps {
+  billId: number;
+  contractId: number | null;
+  needsBindDevice: boolean;
+  onNavigate: (to: string) => void;
+  t: ReturnType<typeof useTranslation>['t'];
+}
+
+function PostConfirmView({ billId, contractId, needsBindDevice, onNavigate, t }: PostConfirmViewProps) {
+  const queryClient = useQueryClient();
+  const [printReady, setPrintReady] = useState(false);
+
+  const handlePrint = useCallback(async () => {
+    try {
+      const billRows = await queryClient.fetchQuery({
+        queryKey: ['bill-detail', billId],
+        queryFn: () => apiClient.get<unknown[]>(`/v_bill_detail?bill_id=eq.${billId}`).then(rows => rows[0] ?? null),
+      });
+      const branchId = (billRows as { branch_id?: number } | null)?.branch_id;
+      if (branchId != null) {
+        await queryClient.fetchQuery({
+          queryKey: ['branch-info', branchId],
+          queryFn: () => apiClient.get(`/v_branches?id=eq.${branchId}&select=id,name,address`).then((rows: unknown) => (rows as unknown[])[0] ?? null),
+        });
+      }
+    } catch {
+      // Fall through — receipt will show its loading state and still print empty if data fails.
+    }
+    setPrintReady(true);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      window.print();
+      setPrintReady(false);
+    }));
+  }, [billId, queryClient]);
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex-1 overflow-y-auto better-scroll p-6 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3 text-center max-w-sm">
+          <CheckCircle size={56} className="text-success" />
+          <div className="text-lg font-semibold">{t('wizard.bill_confirmed_title', { defaultValue: 'Payment confirmed' })}</div>
+          <div className="text-sm text-subtle">
+            {t('wizard.bill_confirmed_body', { defaultValue: 'The bill has been recorded. Print the receipt or continue.' })}
+          </div>
+        </div>
+      </div>
+      <div className="shrink-0 border-t border-line bg-bg px-4 py-3 flex justify-end gap-2 print:hidden">
+        <Button variant="outline" startIcon={<Printer size={16} />} onClick={handlePrint}>
+          {t('wizard.receipt_print')}
+        </Button>
+        {needsBindDevice && contractId != null && (
+          <Button
+            color="primary"
+            startIcon={<Link2 size={16} />}
+            onClick={() => onNavigate(`/admin/contracts/pending-pairing/${contractId}`)}
+          >
+            {t('wizard.action_bindDevice')}
+          </Button>
+        )}
+        {contractId != null && (
+          <Button
+            variant={needsBindDevice ? 'outline' : 'solid'}
+            color={needsBindDevice ? undefined : 'primary'}
+            startIcon={<FileText size={16} />}
+            onClick={() => onNavigate(`/admin/contracts/search/${contractId}`)}
+          >
+            {t('wizard.action_viewInContract')}
+          </Button>
+        )}
+      </div>
+
+      {printReady && createPortal(
+        <div className="print-only-receipt" aria-hidden>
+          <BillReceipt billId={billId} hidePrintButton />
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }

@@ -2435,6 +2435,8 @@
     "receipt_change": "Change",
     "receipt_thankYou": "Thank you for your business.",
     "receipt_print": "Print",
+    "bill_confirmed_title": "Payment confirmed",
+    "bill_confirmed_body": "The bill has been recorded. Print the receipt or continue.",
     "receipt_voidedNotice": "This bill has been voided.",
     "receipt_creditNote": "Credit Note",
     "receipt_continueToPair": "Continue — Pair Device",

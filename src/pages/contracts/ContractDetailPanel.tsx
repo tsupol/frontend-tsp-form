@@ -9,7 +9,7 @@ import { GenerateContractPdfModal } from './GenerateContractPdfModal';
 import { Link } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { ApiError } from '../../lib/api';
-import { uploadFromImage, getUploadSpec, specToResize } from '../../lib/upload';
+import { uploadFromImage, getUploadSpec, specToResize, deleteMedia } from '../../lib/upload';
 import { toStoragePath, normalizeKey } from '../../lib/mediaPath';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
 import { useAuth } from '../../contexts/AuthContext';
@@ -434,19 +434,34 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
 
 // ── Media thumbnail helper ───────────────────────────────────────────────────
 
-function DeliveryPhotoThumb({ media }: { media: EntityMedia }) {
+function DeliveryPhotoThumb({ media, onPreview, onRemove, disabled }: {
+  media: EntityMedia;
+  onPreview: () => void;
+  onRemove: () => void;
+  disabled?: boolean;
+}) {
   const v = media.variants_json ?? {};
-  const src = v.sm || v.thumb || v.md || v.medium || v.lg || v.original || media.storage_path;
-  const { url } = useMediaUrl(src ?? null);
-  if (!src) return null;
-  return url ? (
-    <img
-      src={url}
-      alt={media.caption ?? ''}
-      className="w-20 h-20 object-cover rounded border border-line"
-    />
-  ) : (
-    <div className="w-20 h-20 bg-surface-shallow animate-pulse rounded border border-line" />
+  const thumbKey = v.sm || v.thumb || v.md || v.medium || v.lg || v.original || media.storage_path;
+  if (!thumbKey) return null;
+  return (
+    <div className="relative group">
+      <MediaThumbButton
+        mediaKey={normalizeKey(thumbKey)}
+        alt={media.caption ?? ''}
+        className="w-20 h-20 rounded border border-line overflow-hidden cursor-zoom-in hover:opacity-80 transition-opacity bg-surface-shallow p-0"
+        fit="cover"
+        onClick={onPreview}
+      />
+      <button
+        type="button"
+        onClick={onRemove}
+        disabled={disabled}
+        aria-label="Remove"
+        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-danger text-white flex items-center justify-center shadow-sm hover:bg-danger/90 disabled:opacity-50 disabled:cursor-not-allowed border-none p-0 cursor-pointer"
+      >
+        <Trash2 size={11} />
+      </button>
+    </div>
   );
 }
 
@@ -1768,6 +1783,9 @@ function DeliveryModal({ open, contract, onClose, onSuccess }: {
   const [trackingNumber, setTrackingNumber] = useState(contract.tracking_number ?? '');
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [lightboxKey, setLightboxKey] = useState<string | null>(null);
+  const [lightboxAlt, setLightboxAlt] = useState<string>('');
+  const [removingId, setRemovingId] = useState<number | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -1785,6 +1803,34 @@ function DeliveryModal({ open, contract, onClose, onSuccess }: {
     ),
     enabled: open,
   });
+
+  const handleRemovePhoto = async (m: EntityMedia) => {
+    setRemovingId(m.entity_media_id);
+    setError('');
+    try {
+      // Detach DB row first — source of truth. R2 cleanup after, best-effort.
+      await apiClient.rpc('fn_media_detach', { p_entity_media_id: m.entity_media_id });
+      const keys: string[] = [];
+      if (m.storage_path) keys.push(m.storage_path);
+      for (const v of Object.values(m.variants_json ?? {})) {
+        if (typeof v === 'string' && v) keys.push(v);
+      }
+      if (keys.length > 0) {
+        deleteMedia(keys).catch(() => {});
+      }
+      refetchPhotos();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setError(translated || err.message);
+      } else {
+        setError(String(err));
+      }
+    } finally {
+      setRemovingId(null);
+    }
+  };
 
   const mutation = useMutation({
     mutationFn: () => apiClient.rpc('fn_contract_update_delivery', {
@@ -1918,9 +1964,24 @@ function DeliveryModal({ open, contract, onClose, onSuccess }: {
               {t('contract.deliveryPhotos')}
             </label>
             <div className="flex flex-wrap gap-2 mt-2">
-              {photos.map(m => (
-                <DeliveryPhotoThumb key={m.entity_media_id} media={m} />
-              ))}
+              {photos.map(m => {
+                const v = m.variants_json ?? {};
+                const fullKey = v.original || v.lg || v.md || v.medium || m.storage_path;
+                return (
+                  <DeliveryPhotoThumb
+                    key={m.entity_media_id}
+                    media={m}
+                    disabled={removingId === m.entity_media_id}
+                    onPreview={() => {
+                      if (fullKey) {
+                        setLightboxKey(normalizeKey(fullKey));
+                        setLightboxAlt(m.caption ?? '');
+                      }
+                    }}
+                    onRemove={() => handleRemovePhoto(m)}
+                  />
+                );
+              })}
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleUploadPhoto} />
               <button
                 type="button"
@@ -1948,6 +2009,12 @@ function DeliveryModal({ open, contract, onClose, onSuccess }: {
           </Button>
         </div>
       </div>
+      <MediaLightbox
+        open={lightboxKey != null}
+        onClose={() => setLightboxKey(null)}
+        mediaKey={lightboxKey}
+        alt={lightboxAlt}
+      />
     </Modal>
   );
 }
