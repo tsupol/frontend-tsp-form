@@ -134,10 +134,11 @@ interface CreateModelForm {
 
 // ── CreateModelModal ─────────────────────────────────────────────────────────
 
-function CreateModelModal({ open, onClose, holdingId, families, brands }: {
+function CreateModelModal({ open, onClose, holdingId, companyId, families, brands }: {
   open: boolean;
   onClose: () => void;
   holdingId: number | null;
+  companyId: number | null;
   families: FamilyLookup[];
   brands: BrandLookup[];
 }) {
@@ -237,7 +238,7 @@ function CreateModelModal({ open, onClose, holdingId, families, brands }: {
     }
     return {
       p_holding_id: holdingId,
-      p_company_id: null,
+      p_company_id: companyId,
       p_family_id: Number(data.family_id),
       p_requested_model_name: data.model_name,
       p_model_option_set: optionSet,
@@ -1943,6 +1944,7 @@ export function ModelsPage() {
               open={createOpen}
               onClose={() => setCreateOpen(false)}
               holdingId={holdingId}
+              companyId={user?.company_id ?? null}
               families={families}
               brands={brands}
             />
