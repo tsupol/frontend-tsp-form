@@ -2680,6 +2680,7 @@
     "commissionOwner": "Commission owner",
     "commissionOwnerHint": "Staff member who earns commission on this contract. Locks at activation.",
     "commissionOwnerUnset": "Not set",
+    "commissionOwnerUnknown": "user #{{id}}",
     "commissionOwnerChange": "Change",
     "commissionOwnerCancel": "Cancel",
     "commissionOwnerSave": "Save owner",

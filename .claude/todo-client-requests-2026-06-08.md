@@ -5,12 +5,6 @@ Items checked off below are already shipped; the rest are open.
 
 ## Open
 
-### 4. Contract wizard: pick commission owner (staff)
-- Wizard is missing the field for selecting which staff member earns commission on the contract.
-- Field exists on `v_contract_detail` as `commission_owner_name` (already rendered in overview/draft tabs). The wizard step needs to set it.
-- Probably belongs in the Review & Pay step or a dedicated section earlier (Customer / Product).
-- Check `26_COMMISSION_FLOW.md` and `17_COMMISSION_GUIDE.md` in `D:/dev/nnf/UI_SUMMARY/` for the canonical flow before designing UI.
-
 ### 6. Multiple barcode / QR formats
 - Need clarification: which page? Inventory barcode sticker print? Asset sticker? Or product/catalog?
 - Current barcode sticker (XP-420B 76×26mm) is single-format. Client likely wants to choose between Code128, Code39, EAN-13, QR, etc., per use case.

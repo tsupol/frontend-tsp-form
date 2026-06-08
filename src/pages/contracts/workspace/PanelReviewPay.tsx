@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Select, MaskedInput } from 'tsp-form';
+import { Button, Select, MaskedInput, useSnackbarContext } from 'tsp-form';
 import {
   Star, Plus, Trash2, XCircle, Loader2, CheckCircle,
   ChevronsRight, Link2, FileText, Printer, User,
@@ -64,6 +64,7 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
   const navigate = useNavigate();
   const { data, updateData, contract, invalidateContract, setOpenModal } = useWorkspace();
   const queryClient = useQueryClient();
+  const { addSnackbar } = useSnackbarContext();
 
   const savingBalance = contract?.saving_balance ?? 0;
 
@@ -244,6 +245,9 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
       });
       invalidateContract();
       cancelOwnerEdit();
+      addSnackbar({
+        message: <div className="alert alert-success"><CheckCircle size={16} /><span>{t('workspace.commissionOwnerSaved')}</span></div>,
+      });
     } catch (err) {
       if (err instanceof ApiError) {
         const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
@@ -361,7 +365,11 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
               <User size={16} className="text-subtle shrink-0" />
               <div className="flex flex-col min-w-0 flex-1">
                 <div className="text-sm font-medium truncate">
-                  {ownerName || <span className="text-subtle">{t('workspace.commissionOwnerUnset')}</span>}
+                  {ownerName
+                    ? ownerName
+                    : ownerId != null
+                      ? <span className="text-subtle font-normal">{t('workspace.commissionOwnerUnknown', { id: ownerId, defaultValue: 'user #{{id}}' })}</span>
+                      : <span className="text-subtle">{t('workspace.commissionOwnerUnset')}</span>}
                 </div>
                 <div className="text-xs text-subtle">{t('workspace.commissionOwnerHint')}</div>
               </div>

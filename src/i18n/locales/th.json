@@ -2680,6 +2680,7 @@
     "commissionOwner": "เจ้าของค่าคอม",
     "commissionOwnerHint": "พนักงานที่ได้ค่าคอมของสัญญานี้ — ล็อกเมื่อ activate",
     "commissionOwnerUnset": "ยังไม่ได้กำหนด",
+    "commissionOwnerUnknown": "ผู้ใช้ #{{id}}",
     "commissionOwnerChange": "เปลี่ยน",
     "commissionOwnerCancel": "ยกเลิก",
     "commissionOwnerSave": "บันทึกเจ้าของ",
