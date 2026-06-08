@@ -562,5 +562,9 @@
   "AUTH.CUSTOMER.WRONG_PASSWORD": "Wrong password",
   "AUTH.CUSTOMER.ACCOUNT_LOCKED": "Account locked — too many failed attempts",
   "AUTH.CUSTOMER.INACTIVE": "Account is inactive",
-  "AUTH.CUSTOMER.NO_ACTIVE_CONTRACT": "No active contract for this customer"
+  "AUTH.CUSTOMER.NO_ACTIVE_CONTRACT": "No active contract for this customer",
+  "OPS.CONFLICT.TICKET_PAUSED_BY_APPOINTMENT": "This ticket is paused because the customer has an active payment promise",
+  "OPS.CONFLICT.ALREADY_IN_PROGRESS": "This ticket has already been taken by someone else",
+  "OPS.CONFLICT.COOLING_DOWN": "This ticket is in cooldown — try again later",
+  "OPS.CONFLICT.CLOSED": "This ticket is already closed"
 }

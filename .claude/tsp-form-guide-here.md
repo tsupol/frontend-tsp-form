@@ -60,6 +60,36 @@ When an input can be auto-filled from a related value (e.g. catalog price, defau
 
 Don't substitute `Wand2`, `Sparkles`, `RefreshCw`, etc. — keep the convention.
 
+## Clearable filter Select — empty-string convention
+
+This project uses **Shape B** (empty-string sentinel) for filter Selects, not `T | null`. Match it everywhere so filter wiring is consistent across pages.
+
+```tsx
+const [filterBrand, setFilterBrand] = useState<string>('');
+
+<Select
+  options={brandOptions}
+  value={filterBrand || null}
+  onChange={(val) => { setFilterBrand((val as string) ?? ''); setPageIndex(0); }}
+  placeholder={t('pricing.brand')}
+  size="sm"
+  showChevron
+  clearable
+/>
+```
+
+- State is `useState<string>('')` — empty string = no filter applied.
+- `value={filterBrand || null}` — coerce `''` → `null` so the Select renders the placeholder, not a phantom blank option.
+- `onChange={(val) => setX((val as string) ?? '')}` — clearing yields `''`, never `'ALL'` / `'ANY'` / any sentinel value.
+- Always set `placeholder` to the cleared-state label ("All brands", "All statuses").
+- In the query builder, only push the param when truthy: `if (filterBrand) params.push(\`brand_id=eq.${filterBrand}\`)`.
+
+**Do not** invent a sentinel like `'ALL'`. It produces a Select that looks broken when cleared (× button visible with no apparent value) and forces ugly `value={x === 'ALL' ? null : x}` mappings. The empty string is the cleared state — let the placeholder name it.
+
+Reference implementations: `src/pages/pricing/PricebookPage.tsx` (brand / family / base-model filters), `src/pages/call-center/TicketQueuePage.tsx` (mode filter).
+
+**Sort Selects are not clearable.** A sort selector always needs a value — omit `clearable` and don't add a "no sort" option.
+
 ## List row interaction
 
 - **No edit icon button** on desktop list rows — single click opens the editor/detail panel

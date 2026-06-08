@@ -562,5 +562,9 @@
   "AUTH.CUSTOMER.WRONG_PASSWORD": "รหัสผ่านไม่ถูกต้อง",
   "AUTH.CUSTOMER.ACCOUNT_LOCKED": "บัญชีถูกล็อก — กรอกรหัสผิดเกินจำนวนครั้งที่กำหนด",
   "AUTH.CUSTOMER.INACTIVE": "บัญชียังไม่เปิดใช้งาน",
-  "AUTH.CUSTOMER.NO_ACTIVE_CONTRACT": "ลูกค้ายังไม่มีสัญญาที่ใช้งานอยู่"
+  "AUTH.CUSTOMER.NO_ACTIVE_CONTRACT": "ลูกค้ายังไม่มีสัญญาที่ใช้งานอยู่",
+  "OPS.CONFLICT.TICKET_PAUSED_BY_APPOINTMENT": "Ticket นี้ถูก pause เพราะลูกค้ามีนัดชำระอยู่",
+  "OPS.CONFLICT.ALREADY_IN_PROGRESS": "Ticket นี้มีคนหยิบไปแล้ว",
+  "OPS.CONFLICT.COOLING_DOWN": "Ticket นี้กำลังรอช่วงพัก — ลองใหม่ภายหลัง",
+  "OPS.CONFLICT.CLOSED": "Ticket นี้ปิดไปแล้ว"
 }
