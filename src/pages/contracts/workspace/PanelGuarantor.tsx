@@ -11,7 +11,7 @@ import { useMediaUrl } from '../../../hooks/useMediaUrl';
 import { useWorkspace } from './WorkspaceContext';
 import { PanelSection } from './PanelSection';
 import { AddressFormPostal } from './AddressFormPostal';
-import { SingleUpload } from './SingleUpload';
+import { IdPhotoUpload } from './IdPhotoUpload';
 import { ContractSignModal } from './ContractSignModal';
 import { IdCardScanner, type DetectedIdCardFields } from '../../../components/IdCardScanner';
 import { passesThaiCidChecksum } from '../../../lib/ocr/extractIdCard';
@@ -315,15 +315,32 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
               <div className="alert alert-danger mb-3"><ShieldAlert size={18} /><div><div className="alert-title">{t('wizard.blacklisted')}</div></div></div>
             )}
 
-            {!selectedCustomer && (
-              <div className="mb-3">
-                <IdCardScanner
-                  onDetected={handleOcrDetected}
-                  onPersist={handleOcrPersist}
-                  disabled={submitting}
-                />
-              </div>
-            )}
+            <div className="mb-3">
+              <IdCardScanner
+                onDetected={handleOcrDetected}
+                onPersist={handleOcrPersist}
+                disabled={submitting}
+                currentFields={{
+                  cid: idNumber,
+                  prefix,
+                  firstName,
+                  lastName,
+                  dob: dateOfBirth,
+                }}
+                onCopyField={(field, value) => {
+                  // CID is immutable once committed — scanner never fires this for cid.
+                  if (field === 'prefix') {
+                    if (KNOWN_TH_PREFIXES.has(value)) setPrefix(value);
+                  } else if (field === 'firstName') {
+                    setFirstName(value);
+                  } else if (field === 'lastName') {
+                    setLastName(value);
+                  } else if (field === 'dob') {
+                    setDateOfBirth(value);
+                  }
+                }}
+              />
+            </div>
 
             <div className="form-grid">
               <div className="flex gap-3">
@@ -770,7 +787,7 @@ function GuarantorRow({ guarantor, contractId, expanded, onToggle, onRemove, rem
             <SectionHeader label={t('workspace.docIdPhoto')} done={!!idCard} expanded={openSection === 'idcard'} onToggle={() => toggle('idcard')} />
             {openSection === 'idcard' && (
               <div className="pt-2 pb-4">
-                <SingleUpload icon={<CreditCard size={14} />} label={t('workspace.docIdPhoto')} type="customer_id_card" fileUrl={idCard?.file_url ?? null} uploading={uploading === 'ID_CARD'} onUpload={uploadIdCard} cacheBust={cacheBust} />
+                <IdPhotoUpload icon={<CreditCard size={14} />} label={t('workspace.docIdPhoto')} type="customer_id_card" fileUrl={idCard?.file_url ?? null} uploading={uploading === 'ID_CARD'} onUpload={uploadIdCard} cacheBust={cacheBust} />
               </div>
             )}
           </div>

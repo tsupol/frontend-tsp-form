@@ -1,4 +1,11 @@
 {
+  "idPhoto": {
+    "cropTitle": "ครอปรูปบัตร",
+    "preset_idCard": "บัตรประชาชน",
+    "preset_passport": "พาสปอร์ต",
+    "zoom": "ซูม",
+    "cropAndUpload": "ครอปและอัปโหลด"
+  },
   "barcodeScanner": {
     "title": "สแกนบาร์โค้ด",
     "scanning": "กำลังสแกน",
@@ -2507,6 +2514,7 @@
     "dropHint": "วาง หรือคลิกเพื่อสแกนบัตรประชาชนไทย",
     "dropSubhint": "ระบบจะกรอกเลขบัตร ชื่อ–สกุล และวันเกิดให้อัตโนมัติ",
     "rescan": "ลบรูป",
+    "applyAll": "นำไปใช้ทั้งหมด",
     "fieldCid": "เลขบัตร",
     "fieldPrefix": "คำนำหน้า",
     "fieldFirstName": "ชื่อ",

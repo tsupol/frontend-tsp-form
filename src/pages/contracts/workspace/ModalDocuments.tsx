@@ -8,6 +8,7 @@ import { apiClient } from '../../../lib/api';
 import { uploadFromImage } from '../../../lib/upload';
 import { useUploadSpec } from '../../../hooks/useMediaUrl';
 import { useWorkspace } from './WorkspaceContext';
+import { IdPhotoUpload } from './IdPhotoUpload';
 
 interface Props {
   open: boolean;
@@ -26,7 +27,6 @@ export function ModalDocuments({ open, onClose }: Props) {
   const [uploading, setUploading] = useState('');
   const [error, setError] = useState('');
 
-  const idCard = useUploadSpec('customer_id_card');
   const signature = useUploadSpec('contract_signature');
   const evidence = useUploadSpec('contract_evidence');
 
@@ -141,25 +141,16 @@ export function ModalDocuments({ open, onClose }: Props) {
           )}
 
           {/* ID Card Photo */}
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              {idPhotoUploaded ? <CheckCircle size={14} className="text-success" /> : <span className="w-3.5 h-3.5 rounded-full border-2 border-fg/30" />}
-              <label className="form-label mb-0">{t('workspace.docIdPhoto')}</label>
-              {uploading === 'idPhoto' && <span className="text-xs text-subtle">{t('common.loading')}</span>}
-            </div>
-            <ImageUploader
-              resizeOptions={idCard.resize}
-              sizes={idCard.sizes}
-              onUpload={handleIdPhotoUpload}
-              disabled={uploading === 'idPhoto' || !idCard.spec || !customerId}
-              placeholder={
-                <div className="flex flex-col items-center gap-2 py-6 text-subtle">
-                  <CreditCard size={24} className="opacity-40" />
-                  <span className="text-xs">{t('wizard.uploadIdCard')}</span>
-                </div>
-              }
-            />
-          </div>
+          <IdPhotoUpload
+            icon={<CreditCard size={14} />}
+            label={t('workspace.docIdPhoto')}
+            type="customer_id_card"
+            fileUrl={null}
+            presentWithoutKey={idPhotoUploaded}
+            uploading={uploading === 'idPhoto'}
+            onUpload={handleIdPhotoUpload}
+            disabled={!customerId}
+          />
 
           <div className="border-t border-line" />
 

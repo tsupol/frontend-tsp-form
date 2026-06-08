@@ -6,7 +6,7 @@ import { XCircle, CreditCard, AlertTriangle } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { uploadFromImage, invalidateMediaUrl } from '../../../lib/upload';
 import { useWorkspace } from './WorkspaceContext';
-import { SingleUpload } from './SingleUpload';
+import { IdPhotoUpload } from './IdPhotoUpload';
 import { ContractPreviewSignPair } from './ContractPreviewSignPair';
 import { SignatoryEditor } from './SignatoryEditor';
 import { useContractGuarantors } from './useContractGuarantors';
@@ -226,7 +226,7 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
       </div>
 
       {/* ── Lessee block — unchanged layout ─────────────────────────── */}
-      <SingleUpload
+      <IdPhotoUpload
         icon={<CreditCard size={14} />}
         label={t('workspace.docIdPhoto')}
         type="customer_id_card"
@@ -270,7 +270,7 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
                 name: g.customer_name,
               })}
             </div>
-            <SingleUpload
+            <IdPhotoUpload
               icon={<CreditCard size={14} />}
               label={t('workspace.docIdPhoto')}
               type="customer_id_card"

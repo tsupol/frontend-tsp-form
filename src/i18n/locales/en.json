@@ -1,4 +1,11 @@
 {
+  "idPhoto": {
+    "cropTitle": "Crop ID photo",
+    "preset_idCard": "ID card",
+    "preset_passport": "Passport",
+    "zoom": "Zoom",
+    "cropAndUpload": "Crop & upload"
+  },
   "barcodeScanner": {
     "title": "Scan barcode",
     "scanning": "Scanning",
@@ -2507,6 +2514,7 @@
     "dropHint": "Drop or click to scan a Thai ID card",
     "dropSubhint": "We will auto-fill ID, name and date of birth",
     "rescan": "Remove image",
+    "applyAll": "Apply all",
     "fieldCid": "ID number",
     "fieldPrefix": "Prefix",
     "fieldFirstName": "First name",

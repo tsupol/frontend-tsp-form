@@ -420,6 +420,25 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
         onPersist={handleOcrPersist}
         disabled={submitting}
         existingImageUrl={existingIdCardUrl}
+        currentFields={{
+          cid: idNumber,
+          prefix,
+          firstName,
+          lastName,
+          dob: dateOfBirth,
+        }}
+        onCopyField={(field, value) => {
+          // CID is immutable once committed — scanner never fires this for cid.
+          if (field === 'prefix') {
+            if (KNOWN_TH_PREFIXES.has(value)) setPrefix(value);
+          } else if (field === 'firstName') {
+            setFirstName(value);
+          } else if (field === 'lastName') {
+            setLastName(value);
+          } else if (field === 'dob') {
+            setDateOfBirth(value);
+          }
+        }}
       />
 
       {/* Form */}
