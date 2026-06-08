@@ -23,6 +23,9 @@ import {
 } from '../../components/SubmissionReviewDrawer';
 import { buildChatTimeline, type ChatTimelineItem } from './chatTimeline';
 import type { ChatInboxRow, ChatMessage } from './chatTypes';
+import {
+  ChatStatusBadge, ChatStatusSetterLine, ChatThreadActionsMenu, ChatPinnedNoteRow,
+} from './ChatStatusHeader';
 
 const MAX_TEXTAREA_LINES = 6;
 const TEXTAREA_LINE_HEIGHT_PX = 20;
@@ -107,12 +110,19 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
   // Realtime: subscribe to chat:contract:<id> + slip:contract:<id> while the
   // thread is open. Either event reloads both queries — the timeline merge
   // re-runs and re-renders. Polling stays as fallback.
+  //
+  // chat:branch:<id> is subscribed by ChatPage globally; status / pinned-note
+  // events flow through there and invalidate ['chat-inbox'], which the meta
+  // query rides on. We still refetch the meta + audit log here so a status
+  // flip from another tab updates the open thread's header instantly.
   useEffect(() => {
     if (!enabled || contractId === null) return;
     const reload = () => {
       queryClient.invalidateQueries({ queryKey: ['chat-messages', contractId] });
       queryClient.invalidateQueries({ queryKey: ['chat-thread-submissions', contractId] });
       queryClient.invalidateQueries({ queryKey: ['chat-inbox'] });
+      queryClient.invalidateQueries({ queryKey: ['chat-thread-meta', contractId] });
+      queryClient.invalidateQueries({ queryKey: ['chat-thread-status-log', contractId] });
       queryClient.invalidateQueries({ queryKey: ['nav', 'chat-unread'] });
     };
     const unsubChat = wsClient.subscribe(`chat:contract:${contractId}`, reload);
@@ -244,24 +254,29 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
   return (
     <div className="flex-1 min-h-0 flex flex-col h-full relative">
       {!hideDesktopHeader && (
-        <div className="flex-none hidden md:flex items-center justify-between px-4 py-3 border-b border-line">
-          <div className="min-w-0">
-            <div className="text-sm font-medium truncate">{title}</div>
+        <div className="flex-none hidden md:flex items-start justify-between gap-3 px-4 py-3 border-b border-line">
+          <div className="min-w-0 flex-1 flex flex-col gap-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-sm font-medium truncate">{title}</span>
+              {inboxRow && <ChatStatusBadge row={inboxRow} />}
+            </div>
+            {inboxRow && <ChatStatusSetterLine row={inboxRow} lang={i18n.language} />}
             {inboxRow && (
-              <div className="text-xs text-subtle">
-                <span className="tabular-nums">{inboxRow.contract_code_display}</span>
-                {' · '}
-                {t('chat.messageCount', { count: inboxRow.total_messages })}
+              <div className="text-xs text-subtle flex items-center gap-2">
+                <Link
+                  to={`/admin/contracts/search/${contractId}`}
+                  className="inline-flex items-center gap-1 text-primary-fg hover:underline tabular-nums"
+                >
+                  {inboxRow.contract_code_display}
+                  <ExternalLink size={12} />
+                </Link>
+                <span>·</span>
+                <span>{t('chat.messageCount', { count: inboxRow.total_messages })}</span>
               </div>
             )}
           </div>
           {inboxRow && (
-            <Link
-              to={`/admin/contracts/search/${contractId}`}
-              className="inline-flex items-center gap-1 text-xs text-primary-fg hover:underline shrink-0"
-            >
-              {t('chat.contractLink')} <ExternalLink size={12} />
-            </Link>
+            <ChatThreadActionsMenu contractId={contractId} inboxRow={inboxRow} />
           )}
         </div>
       )}
@@ -271,19 +286,34 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
           drives the open state via prop. */}
       {inboxRow && mobileDetailsOpen && (
         <div className="md:hidden absolute top-0 left-0 right-0 z-10 bg-bg border-b border-line shadow-sm animate-fade-in">
-          <div className="px-4 py-3 flex items-center justify-between gap-3">
-            <div className="min-w-0 text-xs text-subtle">
-              <div className="tabular-nums truncate">{inboxRow.contract_code_display}</div>
-              <div>{t('chat.messageCount', { count: inboxRow.total_messages })}</div>
+          <div className="px-4 py-3 flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1 flex flex-col gap-1">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-sm font-medium truncate">{inboxRow.customer_name ?? t('chat.title')}</span>
+                <ChatStatusBadge row={inboxRow} />
+              </div>
+              <ChatStatusSetterLine row={inboxRow} lang={i18n.language} />
+              <div className="text-xs text-subtle flex items-center gap-2">
+                <Link
+                  to={`/admin/contracts/search/${contractId}`}
+                  className="inline-flex items-center gap-1 text-primary-fg hover:underline tabular-nums"
+                >
+                  {inboxRow.contract_code_display}
+                  <ExternalLink size={12} />
+                </Link>
+                <span>·</span>
+                <span>{t('chat.messageCount', { count: inboxRow.total_messages })}</span>
+              </div>
             </div>
-            <Link
-              to={`/admin/contracts/search/${contractId}`}
-              className="inline-flex items-center gap-1 text-xs text-primary-fg hover:underline shrink-0"
-            >
-              {t('chat.contractLink')} <ExternalLink size={12} />
-            </Link>
+            <ChatThreadActionsMenu contractId={contractId} inboxRow={inboxRow} />
           </div>
         </div>
+      )}
+
+      {/* Pinned-note row — only renders when a note exists. Has its own
+          ... menu for edit / clear. */}
+      {inboxRow && (
+        <ChatPinnedNoteRow contractId={contractId} inboxRow={inboxRow} lang={i18n.language} />
       )}
 
       {/* Scrollable timeline (chat + slips merged) */}

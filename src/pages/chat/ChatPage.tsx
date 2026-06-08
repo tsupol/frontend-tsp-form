@@ -4,16 +4,19 @@ import { useSearchParams } from 'react-router-dom';
 import { useQuery, keepPreviousData, useQueryClient } from '@tanstack/react-query';
 import {
   PageNav, PageNavPanel, MobileHeader, DataTableFooter,
-  Badge, Input, Switch,
+  Badge, Input, Switch, Select, Tooltip,
 } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, ChevronDown, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, ChevronDown, Image as ImageIcon, Pin } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { wsClient } from '../../lib/api/ws';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatSmart } from '../../lib/format';
 import { MediaLightbox } from '../../components/MediaLightbox';
 import { ChatThreadPanel } from './ChatThreadPanel';
-import type { ChatInboxRow } from './chatTypes';
+import { CHAT_STATUS_VALUES, type ChatInboxRow, type ChatStatus } from './chatTypes';
+import { chatStatusBadgeColor, sortChatRowsByStatusThenRecency } from './chatStatus';
+
+type StatusFilter = ChatStatus | 'NONE' | null;
 
 export function ChatPage() {
   const { t, i18n } = useTranslation();
@@ -27,26 +30,33 @@ export function ChatPage() {
   // refreshes the inbox + unread badge without waiting for the 60s poll.
   // ACL on the server filters this to the user's branch; CA/HA (no branch_id)
   // get nothing and that matches the doc's fan-out rule.
+  //
+  // The `chat:branch:<id>` channel also carries `chat_status_changed` and
+  // `chat_note_changed` events from the 2026-06-09 backend ship — re-invalidate
+  // the inbox on every event so chips/pins stay live across staff.
   useEffect(() => {
     const branchId = user?.branch_id;
     if (!branchId) return;
-    const unsub = wsClient.subscribe(`branch:${branchId}`, () => {
+    const refresh = () => {
       queryClient.invalidateQueries({ queryKey: ['chat-inbox'] });
       queryClient.invalidateQueries({ queryKey: ['nav', 'chat-unread'] });
-    });
-    return unsub;
+    };
+    const unsubBranch = wsClient.subscribe(`branch:${branchId}`, refresh);
+    const unsubChat = wsClient.subscribe(`chat:branch:${branchId}`, refresh);
+    return () => { unsubBranch(); unsubChat(); };
   }, [user?.branch_id, queryClient]);
 
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [unreadOnly, setUnreadOnly] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(null);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [lightboxKey, setLightboxKey] = useState<string | null>(null);
   const [mobileDetailsOpen, setMobileDetailsOpen] = useState(false);
 
-  useEffect(() => { setPageIndex(0); }, [search, unreadOnly]);
+  useEffect(() => { setPageIndex(0); }, [search, unreadOnly, statusFilter]);
   useEffect(() => { setMobileDetailsOpen(false); }, [selectedContractId]);
   useEffect(() => () => { if (searchTimer.current) clearTimeout(searchTimer.current); }, []);
 
@@ -59,15 +69,20 @@ export function ChatPage() {
   const queryUrl = useMemo(() => {
     const params: string[] = ['order=last_message_at.desc.nullslast'];
     if (unreadOnly) params.push('unread_count=gt.0');
+    if (statusFilter === 'NONE') {
+      params.push('chat_status=is.null');
+    } else if (statusFilter) {
+      params.push(`chat_status=eq.${statusFilter}`);
+    }
     if (search.trim()) {
       const q = encodeURIComponent(search.trim());
       params.push(`or=(customer_name.ilike.*${q}*,contract_code.ilike.*${q}*)`);
     }
     return `/v_branch_chat_list?${params.join('&')}`;
-  }, [search, unreadOnly]);
+  }, [search, unreadOnly, statusFilter]);
 
   const { data, isFetching } = useQuery({
-    queryKey: ['chat-inbox', search, unreadOnly, pageIndex, pageSize],
+    queryKey: ['chat-inbox', search, unreadOnly, statusFilter, pageIndex, pageSize],
     queryFn: () => apiClient.getPaginated<ChatInboxRow>(
       queryUrl,
       { page: pageIndex + 1, pageSize },
@@ -76,8 +91,18 @@ export function ChatPage() {
     placeholderData: keepPreviousData,
   });
 
-  const rows = data?.data ?? [];
+  // Re-sort fetched rows so attention-needing flags float to the top regardless
+  // of last_message_at ordering on the server.
+  const rows = useMemo(
+    () => sortChatRowsByStatusThenRecency(data?.data ?? []),
+    [data?.data],
+  );
   const totalCount = data?.totalCount ?? 0;
+
+  const statusFilterOptions = useMemo(() => [
+    ...CHAT_STATUS_VALUES.map(v => ({ value: v, label: t(`chat.status.${v}`) })),
+    { value: 'NONE', label: t('chat.statusFilter.none') },
+  ], [t]);
 
   const selectThread = (contractId: number, goTo?: (id: string) => void) => {
     setSearchParams(prev => {
@@ -154,20 +179,34 @@ export function ChatPage() {
               id="list"
               className={isMobile ? '' : 'w-1/3 xl:w-1/4 border-r border-line flex flex-col'}
             >
-              <div className="flex-none flex items-center gap-2 p-2 border-b border-line">
-                <div className="flex-1 min-w-0">
-                  <Input
-                    size="sm"
-                    className="w-full"
-                    placeholder={t('chat.searchPlaceholder')}
-                    value={searchInput}
-                    onChange={e => handleSearch(e.target.value)}
-                  />
+              <div className="flex-none flex flex-col gap-2 p-2 border-b border-line">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <Input
+                      size="sm"
+                      className="w-full"
+                      placeholder={t('chat.searchPlaceholder')}
+                      value={searchInput}
+                      onChange={e => handleSearch(e.target.value)}
+                    />
+                  </div>
+                  <label className="inline-flex items-center gap-2 text-xs shrink-0 cursor-pointer">
+                    <Switch size="sm" checked={unreadOnly} onChange={e => setUnreadOnly(e.target.checked)} />
+                    <span>{t('chat.unreadOnly')}</span>
+                  </label>
                 </div>
-                <label className="inline-flex items-center gap-2 text-xs shrink-0 cursor-pointer">
-                  <Switch size="sm" checked={unreadOnly} onChange={e => setUnreadOnly(e.target.checked)} />
-                  <span>{t('chat.unreadOnly')}</span>
-                </label>
+                <div className="flex items-center gap-2">
+                  <div style={{ width: '12rem' }}>
+                    <Select
+                      size="sm"
+                      options={statusFilterOptions}
+                      value={statusFilter}
+                      onChange={(v) => setStatusFilter((v as StatusFilter) || null)}
+                      placeholder={t('chat.statusFilter.all')}
+                      clearable
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className={`flex-1 min-h-0 overflow-auto better-scroll ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
@@ -200,8 +239,15 @@ export function ChatPage() {
                               )}
                             </div>
                           </div>
-                          <div className="text-[11px] text-subtle truncate font-mono">
-                            {row.contract_code_display}
+                          <div className="flex items-center justify-between gap-2 mt-0.5">
+                            <div className="text-[11px] text-subtle truncate font-mono min-w-0">
+                              {row.contract_code_display}
+                            </div>
+                            {row.chat_status && (
+                              <Badge size="xs" color={chatStatusBadgeColor(row.chat_status)}>
+                                {t(`chat.status.${row.chat_status}`)}
+                              </Badge>
+                            )}
                           </div>
                           <div className="text-xs text-subtle truncate mt-0.5">
                             {isImage ? (
@@ -212,6 +258,14 @@ export function ChatPage() {
                               row.last_message_text ?? ''
                             )}
                           </div>
+                          {row.pinned_note && (
+                            <Tooltip content={row.pinned_note} placement="bottom">
+                              <div className="flex items-center gap-1 text-[11px] text-subtle mt-1 min-w-0">
+                                <Pin size={11} className="shrink-0 text-warning" />
+                                <span className="truncate">{row.pinned_note}</span>
+                              </div>
+                            </Tooltip>
+                          )}
                         </button>
                       );
                     })}

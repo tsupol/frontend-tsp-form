@@ -5,11 +5,6 @@ Items checked off below are already shipped; the rest are open.
 
 ## Open
 
-### 2. "สรุปรายวัน" → rename to "วันที่ปิดแล้ว"
-- Re-label the menu/page currently titled **สรุปรายวัน** ("Daily Summary") to **วันที่ปิดแล้ว** ("Closed days").
-- Likely places: side nav, page header, breadcrumb, any i18n keys with `dailySummary` / `daySummary` / `day_close_summary`.
-- Update both `src/i18n/locales/en.json` and `th.json` — pick an English label that matches the new intent (e.g. "Closed days") rather than translating "วันที่ปิดแล้ว" literally.
-
 ### 4. Contract wizard: pick commission owner (staff)
 - Wizard is missing the field for selecting which staff member earns commission on the contract.
 - Field exists on `v_contract_detail` as `commission_owner_name` (already rendered in overview/draft tabs). The wizard step needs to set it.
@@ -26,6 +21,11 @@ Items checked off below are already shipped; the rest are open.
 - Once page is clear, expose a format selector and wire the SVG encoder accordingly. Check `src/pages/inventory/BarcodesPage.tsx` and `printer-setup` guide.
 
 ## Done
+
+### ✅ 2. "สรุปรายวัน" → renamed to "วันที่ปิดแล้ว"
+- Shipped 2026-06-09. The label is driven by a single i18n key `nav.dailyAccounting`, used in the side nav (`AppSideNav.tsx`), the accounting layout sub-nav (`AccountingLayout.tsx`), and the page H1 (`DailyAccountingPage.tsx`).
+- TH: `สรุปรายวัน` → `วันที่ปิดแล้ว`. EN: `Daily Accounting` → `Closed Days` (matches the new intent — the page shows historical day-close records, not a daily summary).
+- Path / route key (`/admin/accounting/daily`) and the page filename (`DailyAccountingPage.tsx`) are unchanged — internal identifiers, not user-visible. Rename later if the team wants.
 
 ### ✅ 3. Products → Models page: search by barcode
 - Shipped 2026-06-09. No frontend change to the search input itself was needed — `fn_product_search` (used by `ModelsPage`) had no barcode probe, so a valid barcode returned 0 hits.

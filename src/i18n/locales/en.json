@@ -264,7 +264,7 @@
     "accounting": "Accounting",
     "dayClose": "Day Close",
     "dayCloseHistory": "Day Close History",
-    "dailyAccounting": "Daily Accounting",
+    "dailyAccounting": "Closed Days",
     "cashFlow": "Cash Flow",
     "branchBalance": "Branch Balance",
     "holdingRemittance": "Holding Remittance",
@@ -3402,6 +3402,64 @@
     "yesterday": "Yesterday",
     "slipSubmitted": "Slip submitted",
     "slipStaffSubmitted": "By staff",
-    "slipRejectReason": "Reason"
+    "slipRejectReason": "Reason",
+
+    "status": {
+      "WAITING_REPLY": "Waiting reply",
+      "RESOLVED": "Resolved",
+      "WAITING_FINANCE": "Waiting finance",
+      "WAITING_TECH": "Waiting tech"
+    },
+    "statusFilter": {
+      "label": "Status",
+      "all": "All",
+      "none": "No flag"
+    },
+    "setStatus": {
+      "title": "Set status",
+      "waiting_reply": "Waiting reply",
+      "waiting_finance": "Finance",
+      "waiting_tech": "Tech",
+      "resolved": "Resolved",
+      "clear": "Clear",
+      "notePrompt": "Add a note (optional)",
+      "save": "Save",
+      "cancel": "Cancel",
+      "noPermission": "Only branch staff can set status",
+      "setByLine": "{{user}} · {{when}}",
+      "setBySystem": "System",
+      "setSuccess": "Status updated",
+      "setFailed": "Could not update status"
+    },
+    "pinnedNote": {
+      "title": "Pinned note",
+      "subtitle": "Visible to all branch staff",
+      "placeholder": "Pin context for the team (e.g. customer prefers simple Thai)",
+      "empty": "No pinned note",
+      "setBy": "Pinned by {{user}} · {{when}}",
+      "add": "Pin a note",
+      "edit": "Edit note",
+      "clear": "Unpin note",
+      "save": "Save",
+      "cancel": "Cancel",
+      "saveSuccess": "Pinned note updated",
+      "saveFailed": "Could not save note"
+    },
+    "actions": {
+      "menu": "Actions"
+    },
+    "auditLog": {
+      "open": "History",
+      "title": "Status history",
+      "empty": "No history yet",
+      "systemUser": "System",
+      "actionSet": "set {{status}}",
+      "actionCleared": "cleared the flag",
+      "noteAdded": "pinned a note",
+      "noteEdited": "edited the note",
+      "noteCleared": "cleared the note",
+      "systemElevate": "Set Waiting reply (customer sent a message)",
+      "systemClear": "Cleared (Resolved over 5 minutes)"
+    }
   }
 }

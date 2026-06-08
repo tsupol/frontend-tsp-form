@@ -11,7 +11,6 @@ import { useMutation } from '@tanstack/react-query';
 import { ApiError } from '../../lib/api';
 import { uploadFromImage, getUploadSpec, specToResize, deleteMedia } from '../../lib/upload';
 import { toStoragePath, normalizeKey } from '../../lib/mediaPath';
-import { useMediaUrl } from '../../hooks/useMediaUrl';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';

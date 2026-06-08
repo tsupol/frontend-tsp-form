@@ -264,7 +264,7 @@
     "accounting": "บัญชี",
     "dayClose": "ปิดวัน",
     "dayCloseHistory": "ประวัติปิดวัน",
-    "dailyAccounting": "สรุปรายวัน",
+    "dailyAccounting": "วันที่ปิดแล้ว",
     "cashFlow": "กระแสเงินสด",
     "branchBalance": "ยอดคงค้างสาขา",
     "holdingRemittance": "ส่ง Holding",
@@ -3402,6 +3402,64 @@
     "yesterday": "เมื่อวาน",
     "slipSubmitted": "ส่งสลิป",
     "slipStaffSubmitted": "ส่งโดยพนักงาน",
-    "slipRejectReason": "เหตุผล"
+    "slipRejectReason": "เหตุผล",
+
+    "status": {
+      "WAITING_REPLY": "รอตอบ",
+      "RESOLVED": "เรียบร้อยแล้ว",
+      "WAITING_FINANCE": "รอฝ่ายการเงิน",
+      "WAITING_TECH": "รอฝ่ายเทคนิค"
+    },
+    "statusFilter": {
+      "label": "สถานะ",
+      "all": "ทั้งหมด",
+      "none": "ไม่มี flag"
+    },
+    "setStatus": {
+      "title": "ตั้งสถานะ",
+      "waiting_reply": "รอตอบ",
+      "waiting_finance": "ฝ่ายการเงิน",
+      "waiting_tech": "ฝ่ายเทคนิค",
+      "resolved": "เรียบร้อย",
+      "clear": "ล้าง",
+      "notePrompt": "เพิ่ม note (ไม่จำเป็น)",
+      "save": "บันทึก",
+      "cancel": "ยกเลิก",
+      "noPermission": "เฉพาะพนักงานสาขาเท่านั้นที่ตั้งสถานะได้",
+      "setByLine": "{{user}} · {{when}}",
+      "setBySystem": "ระบบ",
+      "setSuccess": "อัปเดตสถานะแล้ว",
+      "setFailed": "อัปเดตสถานะไม่สำเร็จ"
+    },
+    "pinnedNote": {
+      "title": "Note ปักหมุด",
+      "subtitle": "ทุกคนในสาขาเห็นได้",
+      "placeholder": "ปักหมุด context สำหรับทีม (เช่น ลูกค้าพูดไทยไม่คล่อง)",
+      "empty": "ไม่มี note ปักหมุด",
+      "setBy": "ปักโดย {{user}} · {{when}}",
+      "add": "ปักหมุด note",
+      "edit": "แก้ note",
+      "clear": "ล้าง note",
+      "save": "บันทึก",
+      "cancel": "ยกเลิก",
+      "saveSuccess": "บันทึก note แล้ว",
+      "saveFailed": "บันทึก note ไม่สำเร็จ"
+    },
+    "actions": {
+      "menu": "เมนูการดำเนินการ"
+    },
+    "auditLog": {
+      "open": "ดูประวัติ",
+      "title": "ประวัติการเปลี่ยน flag",
+      "empty": "ยังไม่มีประวัติ",
+      "systemUser": "ระบบ",
+      "actionSet": "ตั้ง {{status}}",
+      "actionCleared": "ล้าง flag",
+      "noteAdded": "ปักหมุด note",
+      "noteEdited": "แก้ note",
+      "noteCleared": "ล้าง note",
+      "systemElevate": "ตั้ง รอตอบ (ลูกค้าส่งข้อความ)",
+      "systemClear": "ล้าง flag (เรียบร้อยเกิน 5 นาที)"
+    }
   }
 }
