@@ -3,20 +3,26 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
   DataTable, DataTableColumnHeader, DataTableFooter, MobileHeader,
-  Badge, Select,
+  Badge, Select, Input, Button, PopOver,
   useSnackbarContext,
   type ColumnDef, type RowExpansionState, type SortingState,
 } from 'tsp-form';
-import { ArrowRightFromLine, CheckCircle } from 'lucide-react';
+import { ArrowRightFromLine, CheckCircle, Search, SlidersHorizontal } from 'lucide-react';
 import { apiClient } from '../lib/api';
 import { fmtCurrency, formatSmart } from '../lib/format';
 import { useAuth } from '../contexts/AuthContext';
+import { wsClient } from '../lib/api/ws';
 import {
   SubmissionReviewDrawer,
   submissionStatusColor as statusColor,
   type SubmissionRow,
   type SubmissionStatus,
 } from '../components/SubmissionReviewDrawer';
+
+const COMPANY_TIER_ROLES = new Set([
+  'COMPANY_ADMIN', 'COMPANY_ACCOUNTANT', 'COMPANY_COLLECTOR',
+  'COMPANY_INVENTORY', 'COMPANY_REPO',
+]);
 
 // ── Page ───────────────────────────────────────────────────────────────────
 
@@ -38,12 +44,20 @@ export function PaymentSubmissionsPage() {
 
   const [statusFilter, setStatusFilter] = useState<SubmissionStatus | null>('PENDING_REVIEW');
   const [branchFilter, setBranchFilter] = useState<number | null>(null);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
   const [selected, setSelected] = useState<SubmissionRow | null>(null);
+  const [filterOpen, setFilterOpen] = useState(false);
 
-  useEffect(() => { setPageIndex(0); }, [statusFilter, branchFilter]);
+  useEffect(() => { setPageIndex(0); }, [statusFilter, branchFilter, debouncedSearch]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   // Branch list for the picker — only fetched when the picker is visible.
   // Scope by the user's natural workspace; RLS enforces holding boundary.
@@ -69,12 +83,25 @@ export function PaymentSubmissionsPage() {
     } else if (lockedCompanyId != null) {
       params.push(`company_id=eq.${lockedCompanyId}`);
     }
+    const term = debouncedSearch;
+    if (term.length >= 2) {
+      // Phone digits stripped of separators so "081-234-5678" matches stored "0812345678".
+      const digits = term.replace(/\D/g, '');
+      const enc = encodeURIComponent(term);
+      const ors = [
+        `contract_code.ilike.*${enc}*`,
+        `contract_code_display.ilike.*${enc}*`,
+        `customer_name.ilike.*${enc}*`,
+      ];
+      if (digits.length >= 3) ors.push(`customer_tel.ilike.*${digits}*`);
+      params.push(`or=(${ors.join(',')})`);
+    }
     params.push('order=submitted_at.desc');
     return `/v_payment_submissions?${params.join('&')}`;
-  }, [statusFilter, branchFilter, lockedBranchId, lockedCompanyId]);
+  }, [statusFilter, branchFilter, lockedBranchId, lockedCompanyId, debouncedSearch]);
 
   const { data, isFetching } = useQuery({
-    queryKey: ['payment-submissions', statusFilter, branchFilter, lockedBranchId, pageIndex, pageSize],
+    queryKey: ['payment-submissions', statusFilter, branchFilter, lockedBranchId, debouncedSearch, pageIndex, pageSize],
     queryFn: () => apiClient.getPaginated<SubmissionRow>(
       queryUrl,
       { page: pageIndex + 1, pageSize },
@@ -112,6 +139,27 @@ export function PaymentSubmissionsPage() {
     queryClient.invalidateQueries({ queryKey: ['nav', 'pending-submissions-summary'] });
     queryClient.invalidateQueries({ queryKey: ['dashboard'] });
   };
+
+  // Realtime: backend (mig 133) emits `slip:branch:<id>` for branch reviewers and
+  // `slip:company:<id>` for company-tier reviewers on slip_submitted / slip_reopened.
+  // One subscription replaces the old "fan out across N branches" pattern.
+  // HOLDING_ADMIN / SYSTEM_DEV have no channel by design — no realtime, no APN.
+  useEffect(() => {
+    if (!user) return;
+    let channel: string | null = null;
+    if (isBranchUser && user.branch_id != null) {
+      channel = `slip:branch:${user.branch_id}`;
+    } else if (user.role_code && COMPANY_TIER_ROLES.has(user.role_code) && user.company_id != null) {
+      channel = `slip:company:${user.company_id}`;
+    }
+    if (!channel) return;
+    const unsub = wsClient.subscribe(channel, () => {
+      queryClient.invalidateQueries({ queryKey: ['payment-submissions'] });
+      queryClient.invalidateQueries({ queryKey: ['payment-submissions-pending-count'] });
+      queryClient.invalidateQueries({ queryKey: ['nav', 'pending-submissions-summary'] });
+    });
+    return unsub;
+  }, [user, isBranchUser, queryClient]);
 
   const columns: ColumnDef<SubmissionRow>[] = useMemo(() => [
     {
@@ -234,45 +282,108 @@ export function PaymentSubmissionsPage() {
           <h1 className="heading-2">{t('paymentSubmissions.title')}</h1>
         </div>
 
-        <div className="flex items-center gap-2 pb-4 flex-none flex-wrap">
-          <div className="flex items-center gap-1.5">
-            {statusPills.map(pill => {
-              const active = statusFilter === pill.value;
-              return (
-                <button
-                  key={pill.value}
-                  type="button"
-                  onClick={() => setStatusFilter(pill.value)}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-colors cursor-pointer ${
-                    active
-                      ? 'bg-primary-soft text-primary-fg border-primary'
-                      : 'border-line hover:bg-surface-hover bg-transparent'
-                  }`}
-                >
-                  <span>{pill.label}</span>
-                  {pill.showCount && pendingCount > 0 && (
-                    <Badge size="xs" color={active ? 'primary' : 'warning'}>
-                      {pendingCount}
-                    </Badge>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-          {!isBranchUser && (
-            <div className="flex-1 min-w-0 max-w-[16rem]">
-              <Select
-                options={branchOptions.map(b => ({ value: String(b.id), label: b.name }))}
-                value={branchFilter != null ? String(branchFilter) : null}
-                onChange={val => setBranchFilter(val ? Number(val) : null)}
-                placeholder={t('paymentSubmissions.allBranches')}
-                size="sm"
-                showChevron
-                clearable
-              />
+        {(() => {
+          const renderPills = (variant: 'row' | 'stack') => (
+            <div className={variant === 'stack' ? 'flex flex-col gap-1.5' : 'flex items-center gap-1.5 flex-wrap'}>
+              {statusPills.map(pill => {
+                const active = statusFilter === pill.value;
+                return (
+                  <button
+                    key={pill.value}
+                    type="button"
+                    onClick={() => { setStatusFilter(pill.value); if (variant === 'stack') setFilterOpen(false); }}
+                    className={`inline-flex items-center ${variant === 'stack' ? 'justify-between' : 'gap-1.5'} px-2.5 py-1 rounded-md text-xs font-medium border transition-colors cursor-pointer ${
+                      active
+                        ? 'bg-primary-soft text-primary-fg border-primary'
+                        : 'border-line hover:bg-surface-hover bg-transparent'
+                    }`}
+                  >
+                    <span>{pill.label}</span>
+                    {pill.showCount && pendingCount > 0 && (
+                      <Badge size="xs" color={active ? 'primary' : 'warning'}>
+                        {pendingCount}
+                      </Badge>
+                    )}
+                  </button>
+                );
+              })}
             </div>
-          )}
-        </div>
+          );
+          const renderBranchSelect = () => (
+            <Select
+              options={branchOptions.map(b => ({ value: String(b.id), label: b.name }))}
+              value={branchFilter != null ? String(branchFilter) : null}
+              onChange={val => setBranchFilter(val ? Number(val) : null)}
+              placeholder={t('paymentSubmissions.allBranches')}
+              size="sm"
+              showChevron
+              clearable
+            />
+          );
+          // Collapsed-filter count badge: branch (if picked) + status (if not default Pending).
+          const collapsedActive =
+            (!isBranchUser && branchFilter != null ? 1 : 0) +
+            (statusFilter !== 'PENDING_REVIEW' ? 1 : 0);
+          return (
+            <div className="flex items-center gap-2 pb-4 flex-none flex-wrap">
+              <div className="w-64 max-w-full">
+                <Input
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder={t('paymentSubmissions.searchPlaceholder')}
+                  size="sm"
+                  startIcon={<Search size={16} />}
+                  className="w-full"
+                />
+              </div>
+              {/* Status pills — inline ≥md */}
+              <div className="hidden md:block">
+                {renderPills('row')}
+              </div>
+              {!isBranchUser && (
+                <div className="hidden lg:block w-56 ml-auto">
+                  {renderBranchSelect()}
+                </div>
+              )}
+              {/* Filter popover — visible <lg (branch collapse) or <md (status also collapses).
+                  For branch users on ≥md (status inline, no branch picker), no popover needed. */}
+              <div className={`shrink-0 ml-auto ${isBranchUser ? 'md:hidden' : 'lg:hidden'}`}>
+                <PopOver
+                  isOpen={filterOpen}
+                  onClose={() => setFilterOpen(false)}
+                  placement="bottom"
+                  align="end"
+                  maxWidth="280px"
+                  trigger={
+                    <div className="relative inline-flex">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        startIcon={<SlidersHorizontal size={16} />}
+                        onClick={() => setFilterOpen(!filterOpen)}
+                      />
+                      {collapsedActive > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-primary text-white text-[10px] rounded-full w-3.5 h-3.5 flex items-center justify-center leading-none pointer-events-none">
+                          {collapsedActive}
+                        </span>
+                      )}
+                    </div>
+                  }
+                >
+                  <div className="flex flex-col gap-3 p-3">
+                    <div className="text-xs font-medium text-subtle uppercase tracking-wide">{t('common.filters')}</div>
+                    {/* Status — only shown in popover <md */}
+                    <div className="md:hidden">
+                      {renderPills('stack')}
+                    </div>
+                    {/* Branch — only shown in popover when not a branch user */}
+                    {!isBranchUser && renderBranchSelect()}
+                  </div>
+                </PopOver>
+              </div>
+            </div>
+          );
+        })()}
 
         <DataTable<SubmissionRow>
           data={rows}
