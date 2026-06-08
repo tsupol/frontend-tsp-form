@@ -30,13 +30,15 @@ Items checked off below are already shipped; the rest are open.
 - Current barcode sticker (XP-420B 76×26mm) is single-format. Client likely wants to choose between Code128, Code39, EAN-13, QR, etc., per use case.
 - Once page is clear, expose a format selector and wire the SVG encoder accordingly. Check `src/pages/inventory/BarcodesPage.tsx` and `printer-setup` guide.
 
-### 7. Image / card crop helper
-- Help users crop ID card / passport / other ID photos before upload.
-- tsp-form ships `ImageCropper` (cover-mode, fixed `aspectRatio`). Standard ID card ratio is ~1.586:1 (ISO/IEC 7810 ID-1 / credit card).
-- Places to add: customer KYC upload, guarantor ID upload, anywhere `ImageUploader` is used for ID photos.
-- Ask the client which document types they want presets for (Thai ID card, passport bio page, driver's license, work permit, etc.) so we can ship templates instead of "free crop".
-
 ## Done
 
 ### ✅ 1. Zoom photos in the delivery-photo album (Shipping)
 - Shipped 2026-06-08 in `src/pages/contracts/ContractDetailPanel.tsx` — `DeliveryModal` photo thumbs now open in `MediaLightbox` (tsp-form `ImageZoomPan` with `rubberBand` — pinch / wheel-zoom / pan, snaps back to 1×). Also added trash-overlay remove via `fn_media_detach`.
+
+### ✅ 7. Image / card crop helper (Thai ID + Passport)
+- Shipped 2026-06-08 across the contract wizard's customer + guarantor steps, the Documents step/modal, and a `/dev/crop` sandbox.
+- Shared `src/components/IdPhotoCropModal.tsx` with two presets: Thai ID card (1.586:1, ISO/IEC 7810 ID-1) and Passport bio page (3:2 per ICAO Doc 9303). Outputs a 2400px PNG so OCR reads lossless pixels; persistence still encodes to WebP through the BE spec (R2 stores WebP only).
+- `IdCardScanner` now ALWAYS opens the crop modal before OCR — cropped pixels feed both `scanIdCard()` (lossless PNG in-memory) and `buildWebpVariantsFromImage()` (BE-spec WebP variants for upload).
+- New merge UI on the scanner: per-field Copy buttons write detected values into the form one field at a time. CID is immutable (no Copy ever) — it just shows current vs detected side-by-side so you can confirm the scanned card belongs to the same person. No "Apply all" — user copies what they need.
+- Non-OCR upload sites (`PanelDocuments` lessee + guarantor slots, `PanelGuarantor` secondary tile, `ModalDocuments`) all flow through the same crop modal via `IdPhotoUpload` (formerly `SingleUpload`, renamed for clarity since it was always ID-card-specific).
+- Notes for next time: a) crop on the `IdCardScanner`'s drop input still uses tsp-form `ImageUploader` for the drop affordance — its WebP output is discarded; we read `originalFile`. Could simplify to a plain button if desired. b) Other ID types (driver's license, work permit) not yet added — add presets to `ID_PHOTO_PRESETS` in `IdPhotoCropModal.tsx` if needed.
