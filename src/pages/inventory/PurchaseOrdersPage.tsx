@@ -1502,7 +1502,7 @@ function ProductPickerModal({
     queryFn: () =>
       apiClient.rpc<{ rows: VariantSearchRow[]; total: number; has_more: boolean }>(
         'fn_product_variant_search',
-        { p_q: debounced, p_only_contractable: true, p_limit: 20 },
+        { p_q: debounced, p_limit: 20 },
       ),
     enabled: open,
     placeholderData: keepPreviousData,
