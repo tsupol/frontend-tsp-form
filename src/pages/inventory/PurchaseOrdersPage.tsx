@@ -817,6 +817,7 @@ function PoDetailPanel({
         open={addLineOpen}
         onClose={() => setAddLineOpen(false)}
         poId={detail.po_id}
+        poCode={codeDisplay(detail.code_display, detail.po_no)}
         companyId={detail.company_id}
         onAdded={() => {
           setAddLineOpen(false);
@@ -1261,12 +1262,14 @@ function AddLineModal({
   open,
   onClose,
   poId,
+  poCode,
   companyId,
   onAdded,
 }: {
   open: boolean;
   onClose: () => void;
   poId: number;
+  poCode: string;
   companyId: number;
   onAdded: () => void;
 }) {
@@ -1333,7 +1336,7 @@ function AddLineModal({
     <Modal open={open} onClose={onClose} maxWidth="36rem" width="100%">
       <div className="flex flex-col overflow-hidden">
         <div className="modal-header">
-          <h2 className="modal-title">{t('po.addLine')}</h2>
+          <h2 className="modal-title">{poCode} · {t('po.addLine')}</h2>
           <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
         </div>
         <div className="modal-content">
