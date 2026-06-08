@@ -1305,7 +1305,7 @@ function AddReceiptLineModal({
     <Modal open={open} onClose={onClose} maxWidth="32rem" width="100%">
       <div className="flex flex-col overflow-hidden">
         <div className="modal-header">
-          <h2 className="modal-title">{t('receiving.addLineTitle')}</h2>
+          <h2 className="modal-title">{codeDisplay(detail.code_display, detail.receipt_no)} · {t('receiving.addLine')}</h2>
           <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
         </div>
         <div className="modal-content">
