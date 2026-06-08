@@ -11,10 +11,6 @@ Items checked off below are already shipped; the rest are open.
 - Probably belongs in the Review & Pay step or a dedicated section earlier (Customer / Product).
 - Check `26_COMMISSION_FLOW.md` and `17_COMMISSION_GUIDE.md` in `D:/dev/nnf/UI_SUMMARY/` for the canonical flow before designing UI.
 
-### 5. Slip-review page (`/admin/payment-submissions` or similar)
-- (a) **Auto-refresh / live counter** — currently no indication when new submissions arrive. Options: visible counter badge that polls, periodic background refetch with a "n new submissions" pill, or true realtime via WebSocket (chat already uses WS per `UI_SUMMARY/66`).
-- (b) **Search** — let reviewers find a submission by contract code, first/last name, or phone number. Need to check what `v_payment_submissions` exposes and whether PostgREST `or=(...)` with `ilike` on those columns is feasible, or if a search RPC is warranted.
-
 ### 6. Multiple barcode / QR formats
 - Need clarification: which page? Inventory barcode sticker print? Asset sticker? Or product/catalog?
 - Current barcode sticker (XP-420B 76×26mm) is single-format. Client likely wants to choose between Code128, Code39, EAN-13, QR, etc., per use case.
@@ -39,6 +35,13 @@ Items checked off below are already shipped; the rest are open.
 - Filed a backend request; BE shipped mig 56 (`barcode_exact` CTE in `fn_product_search`, score 100, matching variant sorted first inside `variants[]`, USB-scanner CR-strip mirrored from mig 52/53). Mig 57 then added `barcodes: string[]` to each variant in the `variants[]` jsonb.
 - Frontend: added optional `barcodes?: string[]` to `ModelVariant`, and a small barcode-icon chip + green count next to the attribute chips on each variant row (tooltip lists the codes). Commit `548b7b1`.
 - Variant-pick screens (PO/Receiving/Buyback/Promo) keep using `fn_product_variant_search` — same barcode behavior, different return shape (variants, not models).
+
+### ✅ 5. Slip-review page (`/admin/payment-submissions`)
+- Shipped 2026-06-09 in `src/pages/PaymentSubmissionsPage.tsx` (commit `c2c1507`).
+- (a) **Realtime WS, no polling.** Subscribes to `slip:branch:<id>` for branch reviewers and `slip:company:<id>` for company-tier reviewers (the new channel from backend mig 133 `feat(slip): extend review + APN to company tier`). One channel covers the user's whole scope — no fan-out across branches. On any event, invalidates the list query + pending-count query, so the pending pill badge bumps live.
+- (b) **Search** by contract code / customer name / phone. PostgREST `or=(contract_code.ilike,contract_code_display.ilike,customer_name.ilike,customer_tel.ilike)` on `v_payment_submissions`. Debounced 300ms, ≥2 chars. Phone separators are stripped from the user's input before sending so `081-234-5678` matches stored `0812345678`.
+- Filter row is progressively collapsible: branch select stays inline ≥lg, status pills stay inline ≥md, both fall into a `SlidersHorizontal` popover below those breakpoints with an active-filter count badge on the trigger.
+- Notes: backend `nnf-ws` ACL update for `slip:company:<id>` needs to ship for company-tier realtime to actually flow. Until then company users get `acl_denied` (console warn), no UI failure. Branch tier works regardless.
 
 ### ✅ 1. Zoom photos in the delivery-photo album (Shipping)
 - Shipped 2026-06-08 in `src/pages/contracts/ContractDetailPanel.tsx` — `DeliveryModal` photo thumbs now open in `MediaLightbox` (tsp-form `ImageZoomPan` with `rubberBand` — pinch / wheel-zoom / pan, snaps back to 1×). Also added trash-overlay remove via `fn_media_detach`.
