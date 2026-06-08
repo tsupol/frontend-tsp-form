@@ -20,6 +20,7 @@ interface ModelVariant {
   name: string;
   attributes: Record<string, unknown> | null;
   is_active: boolean;
+  barcodes?: string[];
 }
 
 interface Model {
@@ -654,7 +655,7 @@ function VariantRow({ variant, onEdit, onManageBarcodes, onToggleActive }: {
         </div>
       </div>
 
-      {attrEntries.length > 0 && (
+      {(attrEntries.length > 0 || (variant.barcodes && variant.barcodes.length > 0)) && (
         <div className="flex flex-wrap gap-1.5 pt-1">
           {attrEntries.map(([key, val]) => (
             <span
@@ -665,6 +666,15 @@ function VariantRow({ variant, onEdit, onManageBarcodes, onToggleActive }: {
               <span className="font-medium text-fg">{String(val)}</span>
             </span>
           ))}
+          {variant.barcodes && variant.barcodes.length > 0 && (
+            <span
+              className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-fg/5 text-subtle"
+              title={variant.barcodes.join('\n')}
+            >
+              <BarcodeIcon size={11} className="opacity-70" />
+              <span className="font-mono font-medium text-success">{variant.barcodes.length}</span>
+            </span>
+          )}
         </div>
       )}
     </div>
