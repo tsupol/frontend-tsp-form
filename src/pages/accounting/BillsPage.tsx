@@ -5,18 +5,18 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
   PageNav, PageNavPanel, MobileHeader, DataTable, PopOver, Tooltip,
-  Select, Badge, Button, Input, MaskedInput, Modal, useSnackbarContext,
+  Select, Badge, Button, Input, MaskedInput, Modal, LabeledCheckbox, useSnackbarContext,
 } from 'tsp-form';
 import {
   ArrowRightFromLine, ArrowLeft, Plus, Trash2, XCircle, CheckCircle, Ban, Printer,
-  Wrench, ChevronDown, Copy,
+  Wrench, ChevronDown, Copy, Filter,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { fmtCurrency } from '../../lib/format';
 import { buildBillActionToast, hasBill, type StandardBillResponse } from '../../lib/billActionToast';
-import { type Branch, type BillRow, type BillDetail } from './accountingTypes';
+import { type Branch, type BillRow, type BillDetail, todayISO } from './accountingTypes';
 import { useBillActions, type BillAction, type BillActionCode } from '../../hooks/useBillActions';
 import { BillReceipt } from '../contracts/workspace/BillReceipt';
 
@@ -71,14 +71,19 @@ export function BillsPage() {
   const { billId: billIdParam } = useParams<{ billId?: string }>();
   const selectedBillId = billIdParam ? Number(billIdParam) : null;
 
-  // URL-driven filters: ?branch_id=&status=&type= so deep links work
-  // (e.g. day-close's "ดูบิลค้างชำระ" link).
+  // URL-driven filters: ?branch_id=&status=&type=&date=&unclosed= so deep links
+  // work (e.g. day-close's "ดูบิลค้างชำระ" link).
   const [searchParams, setSearchParams] = useSearchParams();
   const branchId = searchParams.get('branch_id') ?? '';
   const statusFilter = searchParams.get('status') ?? '';
   const typeFilter = searchParams.get('type') ?? '';
+  const dateFilter = searchParams.get('date') ?? '';
+  const unclosedFilter = searchParams.get('unclosed') === '1';
 
-  const updateFilters = useCallback((patch: Partial<{ branch_id: string; status: string; type: string }>) => {
+  type FilterPatch = Partial<{
+    branch_id: string; status: string; type: string; date: string; unclosed: string;
+  }>;
+  const updateFilters = useCallback((patch: FilterPatch) => {
     setSearchParams(prev => {
       const next = new URLSearchParams(prev);
       for (const [k, v] of Object.entries(patch)) {
@@ -121,9 +126,11 @@ export function BillsPage() {
     params.set('status', `eq.${statusFilter}`);
   }
   if (typeFilter) params.set('bill_type', `eq.${typeFilter}`);
+  if (dateFilter === 'today') params.set('bill_date', `eq.${todayISO()}`);
+  if (unclosedFilter) params.set('is_in_closed_day', 'eq.false');
 
   const { data: billsData, isFetching } = useQuery({
-    queryKey: ['accounting', 'bills', branchId, statusFilter, typeFilter, pageIndex, pageSize],
+    queryKey: ['accounting', 'bills', branchId, statusFilter, typeFilter, dateFilter, unclosedFilter, pageIndex, pageSize],
     queryFn: () => apiClient.getPaginated<BillRow>(
       `/v_bills?${params.toString()}`,
       { page: pageIndex + 1, pageSize }
@@ -143,6 +150,12 @@ export function BillsPage() {
   const pendingCount = pendingData?.length ?? 0;
 
   const STATUS_TABS = ['', 'OPEN', 'PAID', 'VOIDED'] as const;
+
+  const activeFilterCount =
+    (branchId ? 1 : 0) + (typeFilter ? 1 : 0) + (dateFilter ? 1 : 0) + (unclosedFilter ? 1 : 0);
+
+  const [filterOpen, setFilterOpen] = useState(false);
+  const filterTriggerRef = useRef<HTMLButtonElement>(null);
 
   const selectBill = (id: number, goTo?: (panel: string) => void) => {
     setSelectedBillId(id);
@@ -191,57 +204,100 @@ export function BillsPage() {
               {pendingCount > 0 && (
                 <Badge color="danger" size="sm">{pendingCount} {t('accounting.bills.pendingLabel')}</Badge>
               )}
-              <p className="text-sm text-subtle truncate">{t('accounting.bills.description')}</p>
             </div>
           )}
 
           <div key="panels" className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
             {/* Left panel — bill list */}
             <PageNavPanel id="list" className={isMobile ? '' : 'w-1/2 xl:w-5/12 border-r border-line flex flex-col'}>
-              {/* Status tabs */}
-              <div className="flex-none flex border-b border-line">
-                {STATUS_TABS.map(s => (
-                  <button
-                    key={s || '__all'}
-                    className={`flex-1 py-2 text-sm font-medium transition-colors cursor-pointer border-b-2 ${
-                      statusFilter === s
-                        ? 'border-primary-fg text-primary-fg'
-                        : 'border-transparent text-fg'
-                    }`}
-                    onClick={() => updateFilters({ status: s })}
-                  >
-                    {t(`accounting.bills.tab_${s || 'ALL'}`)}
-                    {s === 'OPEN' && pendingCount > 0 && (
-                      <Badge color="danger" size="sm" className="ml-1.5">{pendingCount}</Badge>
+              {/* Status tabs + filter button on the same row */}
+              <div className="flex-none flex items-center border-b border-line">
+                <div className="flex-1 flex">
+                  {STATUS_TABS.map(s => (
+                    <button
+                      key={s || '__all'}
+                      className={`flex-1 py-2 text-sm font-medium transition-colors cursor-pointer border-b-2 ${
+                        statusFilter === s
+                          ? 'border-primary-fg text-primary-fg'
+                          : 'border-transparent text-fg'
+                      }`}
+                      onClick={() => updateFilters({ status: s })}
+                    >
+                      {t(`accounting.bills.tab_${s || 'ALL'}`)}
+                      {s === 'OPEN' && pendingCount > 0 && (
+                        <Badge color="danger" size="sm" className="ml-1.5">{pendingCount}</Badge>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  ref={filterTriggerRef}
+                  type="button"
+                  aria-label={t('accounting.bills.filterButton', { defaultValue: 'Filters' })}
+                  onClick={() => setFilterOpen(v => !v)}
+                  className="relative self-stretch aspect-square flex items-center justify-center border-l border-line cursor-pointer bg-transparent hover:bg-surface-hover transition-colors text-fg"
+                >
+                  <Filter size={16} />
+                  {activeFilterCount > 0 && (
+                    <span className="absolute top-1 right-1 min-w-[1rem] h-4 px-1 rounded-full bg-primary-fg text-white text-[10px] leading-4 text-center font-semibold pointer-events-none">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </button>
+                <PopOver
+                  isOpen={filterOpen}
+                  onClose={() => setFilterOpen(false)}
+                  triggerRef={filterTriggerRef}
+                  placement="bottom"
+                  align="end"
+                  maxWidth="20rem"
+                >
+                  <div className="flex flex-col gap-3 p-3">
+                    <div className="flex flex-col">
+                      <label className="form-label">{t('accounting.branch')}</label>
+                      <Select
+                        value={branchId || null}
+                        onChange={(v) => updateFilters({ branch_id: (v as string) ?? '' })}
+                        placeholder={t('accounting.branch')}
+                        options={branches.map(b => ({ label: b.name, value: String(b.id) }))}
+                        size="sm"
+                        showChevron
+                        clearable
+                      />
+                    </div>
+                    <div className="flex flex-col">
+                      <label className="form-label">{t('accounting.bills.type')}</label>
+                      <Select
+                        value={typeFilter || null}
+                        onChange={(v) => updateFilters({ type: (v as string) ?? '' })}
+                        options={TYPE_OPTIONS}
+                        size="sm"
+                        showChevron
+                        placeholder={t('accounting.bills.type')}
+                        clearable
+                      />
+                    </div>
+                    <LabeledCheckbox
+                      label={t('accounting.bills.filterToday', { defaultValue: 'Today only' })}
+                      checked={dateFilter === 'today'}
+                      onChange={(e) => updateFilters({ date: e.target.checked ? 'today' : '' })}
+                    />
+                    <LabeledCheckbox
+                      label={t('accounting.bills.filterUnclosed', { defaultValue: 'Day unclosed only' })}
+                      checked={unclosedFilter}
+                      onChange={(e) => updateFilters({ unclosed: e.target.checked ? '1' : '' })}
+                    />
+                    {activeFilterCount > 0 && (
+                      <Button
+                        size="sm"
+                        color="default"
+                        onClick={() => updateFilters({ branch_id: '', type: '', date: '', unclosed: '' })}
+                      >
+                        {t('accounting.bills.filterClear', { defaultValue: 'Clear filters' })}
+                      </Button>
                     )}
-                  </button>
-                ))}
-              </div>
-
-              {/* Branch + type filter — 50/50 */}
-              <div className="flex-none flex items-center p-2 border-b border-line gap-2">
-                <div className="flex-1 min-w-0">
-                  <Select
-                    value={branchId || null}
-                    onChange={(v) => updateFilters({ branch_id: (v as string) ?? '' })}
-                    placeholder={t('accounting.branch')}
-                    options={branches.map(b => ({ label: b.name, value: String(b.id) }))}
-                    size="sm"
-                    showChevron
-                    clearable
-                  />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <Select
-                    value={typeFilter || null}
-                    onChange={(v) => updateFilters({ type: (v as string) ?? '' })}
-                    options={TYPE_OPTIONS}
-                    size="sm"
-                    showChevron
-                    placeholder={t('accounting.bills.type')}
-                    clearable
-                  />
-                </div>
+                  </div>
+                </PopOver>
               </div>
 
               {/* Bill list */}
@@ -268,6 +324,11 @@ export function BillsPage() {
                         <span className="font-mono text-sm font-medium truncate">{b.code_display}</span>
                         <Badge color={typeColor} size="sm">{b.bill_type}</Badge>
                         <Badge color={statusColor} size="sm">{cancelled ? 'VOIDED' : b.status}</Badge>
+                        {b.is_in_closed_day ? (
+                          <Badge color="default" size="sm">{t('accounting.bills.dayClosedBadge')}</Badge>
+                        ) : (
+                          <Badge color="warning" size="sm">{t('accounting.bills.dayUnclosedBadge')}</Badge>
+                        )}
                         <span className="ml-auto text-sm font-medium tabular-nums shrink-0">{fmtCurrency(b.total_amount)}</span>
                       </div>
                       {/* Line 2: purpose · customer · contract ........... date */}
@@ -518,7 +579,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      {/* Desktop header strip — code + status badge + secondary meta */}
+      {/* Desktop header strip — code + status badge */}
       <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
         <span className="font-semibold font-mono">{detail.bill_code_display}</span>
         <button
@@ -531,11 +592,6 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
           <Copy size={14} />
         </button>
         <Badge color={statusColor} size="sm">{displayStatus}</Badge>
-        <span className="text-xs text-subtle">
-          {t(`accounting.bills.typeLabel.${detail.bill_type}`, { defaultValue: detail.bill_type })}
-          {' · '}
-          {t(`accounting.bills.purposeLabel.${detail.bill_purpose}`, { defaultValue: detail.bill_purpose.replace(/_/g, ' ') })}
-        </span>
       </div>
 
       {/* Cancellation banner — visible when bill is voided */}
@@ -561,17 +617,31 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
         </div>
       )}
 
-      {/* Customer / contract info block */}
-      {(detail.customer_name || detail.contract_code) && (
-        <div className="flex-none px-4 py-3 border-b border-line bg-surface">
+      {/* Customer / contract info block + bill type/purpose + print */}
+      <div className="flex-none flex items-start gap-2 px-4 py-3 border-b border-line bg-surface">
+        <div className="flex-1 min-w-0">
           {detail.customer_name && (
             <div className="font-semibold text-sm">{detail.customer_name}</div>
           )}
           {detail.contract_code && (
             <div className="text-xs font-mono text-subtle mt-0.5">{detail.contract_code}</div>
           )}
+          <div className="text-xs text-subtle mt-1">
+            {t(`accounting.bills.typeLabel.${detail.bill_type}`, { defaultValue: detail.bill_type })}
+            {' · '}
+            {t(`accounting.bills.purposeLabel.${detail.bill_purpose}`, { defaultValue: detail.bill_purpose.replace(/_/g, ' ') })}
+          </div>
         </div>
-      )}
+        <Tooltip content={t('accounting.bills.actionLabel.PRINT', { defaultValue: 'Print' })} placement="bottom">
+          <Button
+            size="sm"
+            variant="outline"
+            startIcon={<Printer size={14} />}
+            aria-label={t('accounting.bills.actionLabel.PRINT', { defaultValue: 'Print' })}
+            onClick={handlePrint}
+          />
+        </Tooltip>
+      </div>
 
       {/* Financial summary — 3-col key/value grid */}
       <div className="flex-none grid grid-cols-3 gap-3 px-4 py-3 border-b border-line">
@@ -751,7 +821,6 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
       <BillActionBar
         actions={allActions}
         suppressLifecycle={suppressLifecycle}
-        onPrint={handlePrint}
         onVoidOrCancel={() => { setVoidOpen(true); setVoidError(''); setVoidReason(''); setVoidPin(''); }}
       />
 
@@ -832,11 +901,10 @@ const WIRED_ACTIONS: ReadonlySet<BillActionCode> = new Set<BillActionCode>([
 interface BillActionBarProps {
   actions: BillAction[];
   suppressLifecycle: boolean;
-  onPrint: () => void;
   onVoidOrCancel: () => void;
 }
 
-function BillActionBar({ actions, suppressLifecycle, onPrint, onVoidOrCancel }: BillActionBarProps) {
+function BillActionBar({ actions, suppressLifecycle, onVoidOrCancel }: BillActionBarProps) {
   const { t } = useTranslation();
   const [moreOpen, setMoreOpen] = useState(false);
   const moreTriggerRef = useRef<HTMLButtonElement>(null);
@@ -849,21 +917,8 @@ function BillActionBar({ actions, suppressLifecycle, onPrint, onVoidOrCancel }: 
     .slice()
     .sort((a, b) => a.sort_order - b.sort_order);
 
-  // Synthetic PRINT entry — not from BE, always available.
-  const printAction: BillAction & { __synthetic: true } = {
-    action_code: 'PRINT' as BillActionCode,
-    category: 'PRINT' as never, // synthetic category
-    rpc_name: '',
-    is_available: true,
-    blocking_reason: null,
-    require_pin: false,
-    creates_credit_note: false,
-    target_status: null,
-    sort_order: 999,
-    __synthetic: true,
-  };
-
-  const allEntries: BillAction[] = [...visibleBeActions, printAction];
+  // Print lives in the panel header now — no synthetic action footer entry.
+  const allEntries: BillAction[] = visibleBeActions;
 
   // Determine current status from actions (if any action's required_statuses
   // didn't match → we're not in that state). Easier: use the first available
@@ -876,7 +931,7 @@ function BillActionBar({ actions, suppressLifecycle, onPrint, onVoidOrCancel }: 
     : actions.find(a => a.action_code === 'CANCEL_BILL' && a.is_available) ? 'OPEN'
     : 'VOIDED';
 
-  const primaryCodes = new Set<string>(['PRINT', ...(PRIMARY_BY_STATUS[inferredStatus] ?? [])]);
+  const primaryCodes = new Set<string>(PRIMARY_BY_STATUS[inferredStatus] ?? []);
   const primaryActions = allEntries.filter(a => primaryCodes.has(a.action_code));
   const secondaryActions = allEntries.filter(a => !primaryCodes.has(a.action_code));
 
@@ -894,10 +949,6 @@ function BillActionBar({ actions, suppressLifecycle, onPrint, onVoidOrCancel }: 
 
   const handleClick = (a: BillAction) => {
     setMoreOpen(false);
-    if (a.action_code === ('PRINT' as BillActionCode)) {
-      onPrint();
-      return;
-    }
     if (a.action_code === 'VOID_BILL' || a.action_code === 'CANCEL_BILL') {
       onVoidOrCancel();
       return;
@@ -906,8 +957,7 @@ function BillActionBar({ actions, suppressLifecycle, onPrint, onVoidOrCancel }: 
   };
 
   const renderActionButton = (a: BillAction, primary = false) => {
-    const isSynthetic = a.action_code === ('PRINT' as BillActionCode);
-    const wired = isSynthetic || WIRED_ACTIONS.has(a.action_code);
+    const wired = WIRED_ACTIONS.has(a.action_code);
     const label = t(`accounting.bills.actionLabel.${a.action_code}`, {
       defaultValue: a.action_code,
     });
@@ -932,10 +982,8 @@ function BillActionBar({ actions, suppressLifecycle, onPrint, onVoidOrCancel }: 
         </div>
       );
 
-    // Color: lifecycle danger actions render danger; print is plain.
     const isDanger = a.action_code === 'VOID_BILL' || a.action_code === 'CANCEL_BILL' || a.action_code === 'REVERSE_BILL';
-    const isPrint = isSynthetic;
-    const startIcon = isPrint ? <Printer size={14} /> : isDanger ? <Ban size={14} /> : undefined;
+    const startIcon = isDanger ? <Ban size={14} /> : undefined;
 
     return (
       <Tooltip key={a.action_code} content={tooltipContent} placement="top">

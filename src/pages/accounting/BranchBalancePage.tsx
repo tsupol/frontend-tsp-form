@@ -1,13 +1,17 @@
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { MobileHeader } from 'tsp-form';
-import { ArrowRightFromLine } from 'lucide-react';
+import { ArrowRightFromLine, Building2, Store } from 'lucide-react';
 import { apiClient } from '../../lib/api';
+import { useAuth } from '../../contexts/AuthContext';
 import { fmtCurrency } from '../../lib/format';
-import { type BranchBalanceRow, type Branch } from './accountingTypes';
+import type { BranchBalanceRow, CompanyBalanceRow, Branch } from './accountingTypes';
 
 export function BranchBalancePage() {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const isBranchUser = ['BRANCH_STAFF', 'BRANCH_MANAGER'].includes(user?.role_code ?? '');
+  const showCompanyRollup = !isBranchUser;
 
   const { data: branches = [] } = useQuery({
     queryKey: ['branches-active'],
@@ -15,9 +19,15 @@ export function BranchBalancePage() {
   });
   const branchById = new Map(branches.map(b => [b.id, b]));
 
-  const { data: rows = [], isLoading } = useQuery({
+  const { data: branchRows = [], isLoading: branchLoading } = useQuery({
     queryKey: ['accounting', 'balance'],
     queryFn: () => apiClient.get<BranchBalanceRow[]>('/v_branch_balance_summary?order=branch_id'),
+  });
+
+  const { data: companyRows = [] } = useQuery({
+    queryKey: ['accounting', 'balance-company'],
+    queryFn: () => apiClient.get<CompanyBalanceRow[]>('/v_company_balance_summary?order=company_id'),
+    enabled: showCompanyRollup,
   });
 
   return (
@@ -46,42 +56,130 @@ export function BranchBalancePage() {
           </div>
         </div>
 
-        {isLoading && (
-          <div className="text-subtle p-8 text-center">{t('common.loading')}</div>
+        {/* Company rollup section */}
+        {showCompanyRollup && companyRows.length > 0 && (
+          <section className="mb-6">
+            <h2 className="text-sm font-semibold text-subtle uppercase tracking-wider mb-2 flex items-center gap-2">
+              <Building2 size={14} />
+              {t('accounting.balance.companyRollupTitle')}
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {companyRows.map(r => (
+                <BalanceCard
+                  key={`co-${r.company_id}`}
+                  title={t('users.company') + ` #${r.company_id}`}
+                  active={r.active_contracts}
+                  paused={r.paused_contracts}
+                  outstanding={r.total_outstanding}
+                  overdue={r.total_overdue}
+                  insuranceHeld={r.total_insurance_held}
+                  savingHeld={r.total_saving_held}
+                  creditHeld={r.total_credit_held}
+                  lateFeePending={r.total_late_fee_pending}
+                  contractableCount={r.contractable_asset_count}
+                  contractableValue={r.contractable_asset_value}
+                  nonContractableQty={r.non_contractable_item_qty}
+                  nonContractableValue={r.non_contractable_value}
+                  withCustomerCount={r.device_with_customer_count}
+                />
+              ))}
+            </div>
+          </section>
         )}
 
-        {!isLoading && rows.length === 0 && (
-          <div className="text-subtle p-8 text-center">{t('accounting.empty')}</div>
-        )}
+        {/* Per-branch section */}
+        <section>
+          {showCompanyRollup && (
+            <h2 className="text-sm font-semibold text-subtle uppercase tracking-wider mb-2 flex items-center gap-2">
+              <Store size={14} />
+              {t('accounting.balance.branchSectionTitle')}
+            </h2>
+          )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {rows.map((r) => {
-            const branchName = branchById.get(r.branch_id)?.name ?? `Branch #${r.branch_id}`;
-            return (
-              <div key={r.branch_id} className="border border-line rounded-lg p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-base font-semibold">{branchName}</h3>
-                  <div className="text-xs text-subtle">
-                    {r.active_contracts} {t('accounting.balance.active')}
-                    {r.paused_contracts > 0 ? ` · ${r.paused_contracts} ${t('accounting.balance.paused')}` : ''}
-                  </div>
-                </div>
-                <dl className="grid grid-cols-2 gap-3 text-sm">
-                  <Item label={t('accounting.balance.outstanding')} value={fmtCurrency(r.total_outstanding)} />
-                  <Item label={t('accounting.balance.overdue')} value={fmtCurrency(r.total_overdue)} tone={r.total_overdue > 0 ? 'danger' : undefined} />
-                  <Item label={t('accounting.balance.insuranceHeld')} value={fmtCurrency(r.total_insurance_held)} />
-                  <Item label={t('accounting.balance.savingHeld')} value={fmtCurrency(r.total_saving_held)} />
-                  <Item label={t('accounting.balance.creditHeld')} value={fmtCurrency(r.total_credit_held)} />
-                  <Item label={t('accounting.balance.lateFeePending')} value={fmtCurrency(r.total_late_fee_pending)} />
-                  <Item label={t('accounting.balance.stockCount')} value={r.stock_asset_count != null ? String(r.stock_asset_count) : '—'} />
-                  <Item label={t('accounting.balance.stockValue')} value={fmtCurrency(r.stock_asset_value ?? 0)} />
-                </dl>
-              </div>
-            );
-          })}
-        </div>
+          {branchLoading && (
+            <div className="text-subtle p-8 text-center">{t('common.loading')}</div>
+          )}
+
+          {!branchLoading && branchRows.length === 0 && (
+            <div className="text-subtle p-8 text-center">{t('accounting.empty')}</div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {branchRows.map(r => {
+              const branchName = branchById.get(r.branch_id)?.name ?? `Branch #${r.branch_id}`;
+              return (
+                <BalanceCard
+                  key={`br-${r.branch_id}`}
+                  title={branchName}
+                  active={r.active_contracts}
+                  paused={r.paused_contracts}
+                  outstanding={r.total_outstanding}
+                  overdue={r.total_overdue}
+                  insuranceHeld={r.total_insurance_held}
+                  savingHeld={r.total_saving_held}
+                  creditHeld={r.total_credit_held}
+                  lateFeePending={r.total_late_fee_pending}
+                  contractableCount={r.contractable_asset_count}
+                  contractableValue={r.contractable_asset_value}
+                  nonContractableQty={r.non_contractable_item_qty}
+                  nonContractableValue={r.non_contractable_value}
+                  withCustomerCount={r.device_with_customer_count ?? 0}
+                />
+              );
+            })}
+          </div>
+        </section>
       </div>
     </>
+  );
+}
+
+interface CardProps {
+  title: string;
+  active: number;
+  paused: number;
+  outstanding: number;
+  overdue: number;
+  insuranceHeld: number;
+  savingHeld: number;
+  creditHeld: number;
+  lateFeePending: number;
+  contractableCount: number;
+  contractableValue: number;
+  nonContractableQty: number;
+  nonContractableValue: number;
+  withCustomerCount: number;
+}
+
+function BalanceCard(p: CardProps) {
+  const { t } = useTranslation();
+  return (
+    <div className="border border-line rounded-lg p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-base font-semibold">{p.title}</h3>
+        <div className="text-xs text-subtle">
+          {p.active} {t('accounting.balance.active')}
+          {p.paused > 0 ? ` · ${p.paused} ${t('accounting.balance.paused')}` : ''}
+        </div>
+      </div>
+      <dl className="grid grid-cols-2 gap-3 text-sm">
+        <Item label={t('accounting.balance.outstanding')} value={fmtCurrency(p.outstanding)} />
+        <Item
+          label={t('accounting.balance.overdue')}
+          value={fmtCurrency(p.overdue)}
+          tone={p.overdue > 0 ? 'danger' : undefined}
+        />
+        <Item label={t('accounting.balance.insuranceHeld')} value={fmtCurrency(p.insuranceHeld)} />
+        <Item label={t('accounting.balance.savingHeld')} value={fmtCurrency(p.savingHeld)} />
+        <Item label={t('accounting.balance.creditHeld')} value={fmtCurrency(p.creditHeld)} />
+        <Item label={t('accounting.balance.lateFeePending')} value={fmtCurrency(p.lateFeePending)} />
+        <Item label={t('accounting.balance.contractableCount')} value={String(p.contractableCount)} />
+        <Item label={t('accounting.balance.contractableValue')} value={fmtCurrency(p.contractableValue)} />
+        <Item label={t('accounting.balance.nonContractableQty')} value={String(p.nonContractableQty)} />
+        <Item label={t('accounting.balance.nonContractableValue')} value={fmtCurrency(p.nonContractableValue)} />
+        <Item label={t('accounting.balance.deviceWithCustomerCount')} value={String(p.withCustomerCount)} />
+      </dl>
+    </div>
   );
 }
 

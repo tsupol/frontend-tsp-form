@@ -40,6 +40,11 @@ export interface DayCloseHistoryRow {
   closed_by_name: string | null;
   closed_at: string;
   note: string | null;
+  // mig 136 — persisted breakdown for "ปิดวัน" snapshot view
+  holding_item_count: number;
+  company_item_count: number;
+  invoice_amount: number;
+  credit_note_amount: number;
 }
 
 export interface DayCloseAuditRow {
@@ -101,30 +106,6 @@ export interface BranchTodaySummaryRow {
   pending_amount: number;
 }
 
-export interface DailyAccountingRow {
-  holding_id: number;
-  company_id: number;
-  branch_id: number;
-  txn_date: string;
-  txn_type: string;
-  direction: string;
-  category_th: string;
-  total_amount: number;
-  txn_count: number;
-}
-
-export interface DailyCashflowRow {
-  holding_id: number;
-  company_id: number;
-  branch_id: number;
-  txn_date: string;
-  method: string;
-  bank_name: string | null;
-  account_number: string | null;
-  total_in: number;
-  payment_count: number;
-}
-
 export interface BranchBalanceRow {
   holding_id: number;
   company_id: number;
@@ -140,6 +121,29 @@ export interface BranchBalanceRow {
   stock_asset_count: number | null;
   stock_asset_value: number | null;
   device_with_customer_count: number | null;
+  // mig 140 — split stock by contractability
+  contractable_asset_count: number;
+  contractable_asset_value: number;
+  non_contractable_item_qty: number;
+  non_contractable_value: number;
+}
+
+export interface CompanyBalanceRow {
+  holding_id: number;
+  company_id: number;
+  active_contracts: number;
+  paused_contracts: number;
+  total_outstanding: number;
+  total_overdue: number;
+  total_insurance_held: number;
+  total_saving_held: number;
+  total_credit_held: number;
+  total_late_fee_pending: number;
+  contractable_asset_count: number;
+  contractable_asset_value: number;
+  non_contractable_item_qty: number;
+  non_contractable_value: number;
+  device_with_customer_count: number;
 }
 
 export interface RemittanceRevenueRow {
@@ -161,6 +165,43 @@ export interface RemittanceRevenueRow {
   amount: number;
   bill_status: string;
   day_closed: boolean;
+  bill_code_display: string;
+  contract_code_display: string | null;
+  // mig 138 — bill type tag for filtering
+  bill_type: string;
+}
+
+// v_payments row — used by Payments page (mig 139 adds bill_date / bill_type / bill_status)
+export interface PaymentRow {
+  payment_id: number;
+  code: string;
+  code_display: string;
+  holding_id: number;
+  company_id: number;
+  branch_id: number;
+  method: string;
+  amount: number;
+  bank_account_id: number | null;
+  bank_name: string | null;
+  account_number: string | null;
+  payer_type: string | null;
+  payer_id: number | null;
+  payer_name: string | null;
+  bill_id: number;
+  bill_code: string;
+  bill_code_display: string;
+  contract_id: number | null;
+  charge_types: string[] | null;
+  days_early: number | null;
+  is_reversal: boolean;
+  ref_voided_id: number | null;
+  void_note: string | null;
+  created_by: number;
+  created_at: string;
+  // mig 139
+  bill_date: string;
+  bill_type: string;
+  bill_status: string;
 }
 
 export interface UnclosedDayRow {
@@ -206,6 +247,10 @@ export interface BillRow {
   created_by: number;
   created_at: string;
   is_cancelled: boolean;
+  // mig 137 — day-closed flag (null until matched day_close row created)
+  day_close_id: number | null;
+  is_in_closed_day: boolean;
+  day_closed_at: string | null;
 }
 
 // v_bill_detail row — line items + payments for one bill

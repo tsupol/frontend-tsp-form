@@ -15,7 +15,6 @@ import {
   Building2,
   FileText,
   Calculator,
-  Coins,
   UserSearch,
   Scale,
   BookOpen,
@@ -39,7 +38,7 @@ import {
   // Fanout child icons — Commission
   UserCheck, ClipboardCheck,
   // Fanout child icons — Accounting
-  CalendarCheck, Wallet, List, ArrowUpRight, Receipt, ShieldAlert,
+  CalendarCheck, ArrowUpRight, Receipt, ShieldAlert, Banknote,
   // Chat
   MessageSquare,
   // Dev sandbox
@@ -337,25 +336,23 @@ export const AppSideNav = () => {
       label: t('nav.accounting'),
       path: '/admin/accounting/day-close',
       children: [
-        { type: 'group', key: 'grp-acc-close', label: t('accounting.groupDayClose') },
+        { type: 'group', key: 'grp-acct-daily', label: t('nav.groupDaily') },
         {
           key: 'day-close',
           ...iconWithCount(<CalendarCheck size="1rem" />, unclosedCount),
           label: t('nav.dayClose'),
           path: '/admin/accounting/day-close',
         },
+        { key: 'bills', icon: <Receipt size="1rem" />, label: t('nav.bills'), path: '/admin/accounting/bills' },
+        { type: 'group', key: 'grp-acct-cashflow', label: t('nav.groupCashflow') },
+        { key: 'remittance', icon: <ArrowUpRight size="1rem" />, label: t('nav.remittance'), path: '/admin/accounting/remittance' },
+        { key: 'payments', icon: <Banknote size="1rem" />, label: t('nav.payments'), path: '/admin/accounting/payments' },
+        { type: 'group', key: 'grp-acct-reports', label: t('nav.groupReports') },
+        { key: 'branch-balance', icon: <Scale size="1rem" />, label: t('nav.branchBalance'), path: '/admin/accounting/balance' },
         ...(['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
+          { type: 'group' as const, key: 'grp-acct-audit', label: t('nav.groupAudit') },
           { key: 'audit-flags', icon: <ShieldAlert size="1rem" />, label: t('nav.auditFlags'), path: '/admin/accounting/audit-flags' },
         ] : []),
-        { type: 'group', key: 'grp-acc-reports', label: t('accounting.groupReports') },
-        { key: 'bills', icon: <Receipt size="1rem" />, label: t('nav.bills'), path: '/admin/accounting/bills' },
-        { key: 'daily-accounting', icon: <BookOpen size="1rem" />, label: t('nav.dailyAccounting'), path: '/admin/accounting/daily' },
-        { key: 'cashflow', icon: <Wallet size="1rem" />, label: t('nav.cashFlow'), path: '/admin/accounting/cashflow' },
-        { key: 'branch-ledger', icon: <List size="1rem" />, label: t('nav.branchLedger'), path: '/admin/accounting/ledger' },
-        { key: 'branch-balance', icon: <Scale size="1rem" />, label: t('nav.branchBalance'), path: '/admin/accounting/balance' },
-        { type: 'group', key: 'grp-acc-remit', label: t('accounting.groupRemittance') },
-        { key: 'holding-remittance', icon: <ArrowUpRight size="1rem" />, label: t('nav.holdingRemittance'), path: '/admin/accounting/remittance' },
-        { key: 'company-revenue', icon: <Coins size="1rem" />, label: t('nav.companyRevenue'), path: '/admin/accounting/revenue' },
       ],
     },
     ...(['COMPANY_REPO', 'COMPANY_COLLECTOR', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [{

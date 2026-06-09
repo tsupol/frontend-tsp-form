@@ -7,6 +7,7 @@ import {
 } from 'tsp-form';
 import {
   ArrowRightFromLine, ArrowLeft, CalendarCheck, AlertTriangle, CheckCircle2, Lock, Sparkles, Keyboard, XCircle, Clock, ChevronsRight,
+  ArrowUpRight, Banknote,
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { apiClient, ApiError } from '../../lib/api';
@@ -256,7 +257,6 @@ export function DayClosePage() {
           {!isMobile && (
             <div key="header" className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
               <h1 className="heading-2 shrink-0">{t('nav.dayClose')}</h1>
-              <p className="text-sm text-subtle truncate">{t('accounting.dayClose.description')}</p>
             </div>
           )}
 
@@ -668,6 +668,9 @@ function ReconcileBody({
 
 function ClosedSnapshot({ close, branchId }: { close: DayCloseHistoryRow; branchId: string }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const remittanceLink = `/admin/accounting/remittance?branch_id=${branchId}&from=${close.close_date}&to=${close.close_date}`;
+  const paymentsLink = `/admin/accounting/payments?branch_id=${branchId}&from=${close.close_date}&to=${close.close_date}`;
   return (
     <div className="flex flex-col h-full min-h-0">
       <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
@@ -676,6 +679,14 @@ function ClosedSnapshot({ close, branchId }: { close: DayCloseHistoryRow; branch
           <DateTime value={close.close_date} showTime={false} />
         </span>
         <Badge color="success" size="sm">{t('accounting.dayClose.closedBadge')}</Badge>
+        <div className="ml-auto flex items-center gap-2">
+          <Button size="sm" variant="outline" startIcon={<ArrowUpRight size={14} />} onClick={() => navigate(remittanceLink)}>
+            {t('accounting.dayClose.drillRemittance')}
+          </Button>
+          <Button size="sm" variant="outline" startIcon={<Banknote size={14} />} onClick={() => navigate(paymentsLink)}>
+            {t('accounting.dayClose.drillPayments')}
+          </Button>
+        </div>
       </div>
 
       <div className="flex-none px-4 py-3 border-b border-line">
@@ -702,6 +713,29 @@ function ClosedSnapshot({ close, branchId }: { close: DayCloseHistoryRow; branch
             <span className="font-medium">{t('accounting.dayClose.note')}:</span> {close.note}
           </div>
         )}
+      </div>
+
+      {/* Remittance breakdown */}
+      <div className="flex-none px-4 py-2.5 flex items-center gap-2 border-b border-line">
+        <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider">
+          {t('accounting.dayClose.remitTitle')}
+        </h3>
+      </div>
+      <div className="flex-none px-4 py-3 border-b border-line">
+        <dl className="grid grid-cols-2 md:grid-cols-3 gap-x-3 gap-y-2">
+          <Stat
+            label={t('accounting.dayClose.holdingItems')}
+            value={`${close.holding_item_count} · ${fmtCurrency(close.holding_amount)}`}
+          />
+          <Stat
+            label={t('accounting.dayClose.companyItems')}
+            value={`${close.company_item_count} · ${fmtCurrency(close.company_amount)}`}
+          />
+          <div /> {/* spacer */}
+          <Stat label={t('accounting.dayClose.invoiceAmount')} value={fmtCurrency(close.invoice_amount)} />
+          <Stat label={t('accounting.dayClose.creditNoteAmount')} value={fmtCurrency(close.credit_note_amount)} />
+          <Stat label={t('accounting.dayClose.journalAmount')} value={fmtCurrency(close.journal_amount)} />
+        </dl>
       </div>
 
       {/* Reconcile section — read-only view of bills on this closed day */}

@@ -261,15 +261,16 @@
     "groupFinance": "Finance",
     "groupPolicy": "Policy",
     "groupStaff": "Staff",
+    "groupDaily": "Daily",
+    "groupCashflow": "Cash Flow",
+    "groupReports": "Reports",
+    "groupAudit": "Audit",
     "accounting": "Accounting",
     "dayClose": "Day Close",
     "dayCloseHistory": "Day Close History",
-    "dailyAccounting": "Closed Days",
-    "cashFlow": "Cash Flow",
-    "branchBalance": "Branch Balance",
-    "holdingRemittance": "Holding Remittance",
-    "companyRevenue": "Company Revenue",
-    "branchLedger": "Branch Ledger",
+    "branchBalance": "Outstanding Balance",
+    "remittance": "Remittance",
+    "payments": "Payments Received",
     "bills": "Bills",
     "auditFlags": "Audit Flags"
   },
@@ -3094,9 +3095,6 @@
     "empty": "No data for selected period",
     "exportCsv": "Export CSV",
     "exportStub": "Export not implemented yet",
-    "groupDayClose": "Day Close",
-    "groupReports": "Reports",
-    "groupRemittance": "Remittance",
     "dayClose": {
       "description": "Review and close the day. Closing is immutable.",
       "preview": "Preview",
@@ -3170,7 +3168,18 @@
       "openCloseModal": "Close this day",
       "notAllowedTitle": "Cannot close this day",
       "alreadyClosedSummary": "This day is already closed.",
-      "viewBillDetail": "View bill →"
+      "viewBillDetail": "View bill →",
+      "holdingItems": "To Holding (items)",
+      "companyItems": "To Company (items)",
+      "holdingAmount": "Holding Amount",
+      "companyAmount": "Company Amount",
+      "invoiceAmount": "Invoice Total",
+      "creditNoteAmount": "Credit Note Total",
+      "journalAmount": "Journal Total",
+      "drillRemittance": "View remittance lines →",
+      "drillPayments": "View payments →",
+      "breakdownTitle": "Breakdown",
+      "remitTitle": "Remittance"
     },
     "dayCloseHistory": {
       "description": "Historical day close snapshots with audit flags."
@@ -3216,6 +3225,13 @@
       "tab_OPEN": "Open",
       "tab_PAID": "Paid",
       "tab_VOIDED": "Voided",
+      "filterButton": "Filters",
+      "filterToday": "Today only",
+      "filterUnclosed": "Day unclosed only",
+      "filterClear": "Clear filters",
+      "dayClosedBadge": "Day Closed",
+      "dayUnclosedBadge": "Day Unclosed",
+      "dayClosedAt": "Closed at {{when}}",
       "selectToView": "Select a bill to view details",
       "remaining": "Remaining",
       "lineItems": "Charges",
@@ -3308,8 +3324,8 @@
       "empty": "No cash flow for selected date"
     },
     "balance": {
-      "description": "Outstanding balances, deposits, and stock value per branch.",
-      "active": "active",
+      "description": "Outstanding balances, deposits, and stock value.",
+      "active": "active contracts",
       "paused": "paused",
       "outstanding": "Outstanding",
       "overdue": "Overdue",
@@ -3317,8 +3333,13 @@
       "savingHeld": "Saving Held",
       "creditHeld": "Credit Held",
       "lateFeePending": "Late Fee Pending",
-      "stockCount": "Stock Count",
-      "stockValue": "Stock Value"
+      "contractableCount": "Ready to Lease (items)",
+      "contractableValue": "Ready to Lease (value)",
+      "nonContractableQty": "Ready to Sell (items)",
+      "nonContractableValue": "Ready to Sell (value)",
+      "deviceWithCustomerCount": "With Customer (items)",
+      "companyRollupTitle": "Company Rollup",
+      "branchSectionTitle": "By Branch"
     },
     "ledger": {
       "description": "Every payment in/out for a branch. Filter by date range, direction, and channel.",
@@ -3369,10 +3390,39 @@
       "ct_SETTLEMENT_REFUND": "Settlement"
     },
     "remittance": {
-      "description": "Items owed to holding — installments, down payments, late fees, partner commission."
+      "title": "Remittance",
+      "description": "Bill lines collected from customers — split holding/company by line.",
+      "tab_holding": "To Holding",
+      "tab_company": "To Company",
+      "billType": "Bill Type",
+      "allTypes": "All types",
+      "summaryTitle": "Summary",
+      "lineCount": "Lines",
+      "totalAmount": "Total Amount",
+      "subtotal": "Subtotal"
     },
-    "revenue": {
-      "description": "Items kept by company — savings, insurance, retail sales, gifts, service charges."
+    "payments": {
+      "title": "Payments Received",
+      "description": "Every payment received — by channel, by bill, by bill date.",
+      "method": "Method",
+      "allMethods": "All methods",
+      "billType": "Bill Type",
+      "allTypes": "All types",
+      "channelTitle": "By Channel",
+      "summaryTitle": "Summary",
+      "paymentCount": "Payments",
+      "totalAmount": "Total Amount",
+      "m_CASH": "Cash",
+      "m_TRANSFER": "Transfer",
+      "m_SAVING_WALLET": "Saving Wallet",
+      "m_CREDIT_WALLET": "Credit Wallet",
+      "m_INSURANCE_WALLET": "Insurance Wallet",
+      "m_WAIVE": "Waive",
+      "m_HOLDING_BUDGET": "Holding Budget",
+      "payer": "Payer",
+      "bill": "Bill",
+      "billDate": "Bill Date",
+      "subtotal": "Subtotal"
     },
     "rr": {
       "date": "Date",
@@ -3384,7 +3434,8 @@
       "closed": "Closed",
       "open": "Open",
       "totalRows": "Rows",
-      "totalAmount": "Total Amount"
+      "totalAmount": "Total Amount",
+      "billType": "Bill Type"
     }
   },
   "billToast": {

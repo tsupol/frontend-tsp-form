@@ -116,7 +116,6 @@ export function AuditFlagsPage() {
           {!isMobile && (
             <div key="header" className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
               <h1 className="heading-2 shrink-0">{t('nav.auditFlags')}</h1>
-              <p className="text-sm text-subtle truncate">{t('accounting.auditFlags.description')}</p>
             </div>
           )}
 

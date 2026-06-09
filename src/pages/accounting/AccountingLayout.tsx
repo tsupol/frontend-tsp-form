@@ -3,14 +3,14 @@ import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Badge } from 'tsp-form';
 import {
-  CalendarCheck, BookOpen, Wallet, Scale, ArrowUpRight, Coins, List, Receipt, ShieldAlert,
+  CalendarCheck, Scale, ArrowUpRight, Receipt, ShieldAlert, Banknote,
 } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavCounts } from '../../hooks/useNavCounts';
 
 type NavItem =
-  | { type: 'link'; path: string; labelKey: string; icon: typeof BookOpen; badge?: number }
+  | { type: 'link'; path: string; labelKey: string; icon: typeof CalendarCheck; badge?: number }
   | { type: 'group'; labelKey: string };
 
 export function AccountingLayout({ children }: { children: ReactNode }) {
@@ -22,18 +22,18 @@ export function AccountingLayout({ children }: { children: ReactNode }) {
   const { unclosedCount } = useNavCounts();
 
   const navItems: NavItem[] = useMemo(() => [
-    { type: 'group', labelKey: 'accounting.groupDayClose' },
+    { type: 'group', labelKey: 'nav.groupDaily' },
     { type: 'link', path: '/admin/accounting/day-close', labelKey: 'nav.dayClose', icon: CalendarCheck, badge: unclosedCount },
-    ...(canSeeAudit ? [{ type: 'link' as const, path: '/admin/accounting/audit-flags', labelKey: 'nav.auditFlags', icon: ShieldAlert }] : []),
     { type: 'link', path: '/admin/accounting/bills', labelKey: 'nav.bills', icon: Receipt },
-    { type: 'group', labelKey: 'accounting.groupReports' },
-    { type: 'link', path: '/admin/accounting/daily', labelKey: 'nav.dailyAccounting', icon: BookOpen },
-    { type: 'link', path: '/admin/accounting/cashflow', labelKey: 'nav.cashFlow', icon: Wallet },
-    { type: 'link', path: '/admin/accounting/ledger', labelKey: 'nav.branchLedger', icon: List },
+    { type: 'group', labelKey: 'nav.groupCashflow' },
+    { type: 'link', path: '/admin/accounting/remittance', labelKey: 'nav.remittance', icon: ArrowUpRight },
+    { type: 'link', path: '/admin/accounting/payments', labelKey: 'nav.payments', icon: Banknote },
+    { type: 'group', labelKey: 'nav.groupReports' },
     { type: 'link', path: '/admin/accounting/balance', labelKey: 'nav.branchBalance', icon: Scale },
-    { type: 'group', labelKey: 'accounting.groupRemittance' },
-    { type: 'link', path: '/admin/accounting/remittance', labelKey: 'nav.holdingRemittance', icon: ArrowUpRight },
-    { type: 'link', path: '/admin/accounting/revenue', labelKey: 'nav.companyRevenue', icon: Coins },
+    ...(canSeeAudit ? [
+      { type: 'group' as const, labelKey: 'nav.groupAudit' },
+      { type: 'link' as const, path: '/admin/accounting/audit-flags', labelKey: 'nav.auditFlags', icon: ShieldAlert },
+    ] : []),
   ], [canSeeAudit, unclosedCount]);
 
   return (

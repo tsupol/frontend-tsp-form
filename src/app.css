@@ -30,7 +30,8 @@
         margin-bottom: 1.25rem;
     }
 
-    .panel-datatable .data-table-footer {
+    .panel-datatable .data-table-footer,
+    .padded-datatable .data-table-footer {
         padding-inline: 0.5rem;
         padding-block: 0.5rem;
         border-top: 1px solid var(--color-line);

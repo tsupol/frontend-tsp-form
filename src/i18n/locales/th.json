@@ -261,15 +261,16 @@
     "groupFinance": "การเงิน",
     "groupPolicy": "นโยบาย",
     "groupStaff": "พนักงาน",
+    "groupDaily": "ประจำวัน",
+    "groupCashflow": "กระแสเงินสด",
+    "groupReports": "รายงาน",
+    "groupAudit": "ตรวจสอบ",
     "accounting": "บัญชี",
     "dayClose": "ปิดวัน",
     "dayCloseHistory": "ประวัติปิดวัน",
-    "dailyAccounting": "วันที่ปิดแล้ว",
-    "cashFlow": "กระแสเงินสด",
-    "branchBalance": "ยอดคงค้างสาขา",
-    "holdingRemittance": "ส่ง Holding",
-    "companyRevenue": "รายได้บริษัท",
-    "branchLedger": "รายการเคลื่อนไหว",
+    "branchBalance": "ยอดคงค้าง",
+    "remittance": "เรียกเก็บ (นำส่ง)",
+    "payments": "ชำระ (เก็บเงิน)",
     "bills": "บิล",
     "auditFlags": "ธงตรวจสอบ"
   },
@@ -3094,9 +3095,6 @@
     "empty": "ไม่มีข้อมูลในช่วงที่เลือก",
     "exportCsv": "ส่งออก CSV",
     "exportStub": "ยังไม่รองรับการส่งออก",
-    "groupDayClose": "ปิดวัน",
-    "groupReports": "รายงาน",
-    "groupRemittance": "ส่งเงิน",
     "dayClose": {
       "description": "ตรวจสอบและปิดวัน การปิดเป็นการล็อกถาวร",
       "preview": "ตัวอย่าง",
@@ -3170,7 +3168,18 @@
       "openCloseModal": "ปิดวันนี้",
       "notAllowedTitle": "ไม่สามารถปิดวันนี้ได้",
       "alreadyClosedSummary": "วันนี้ปิดแล้ว",
-      "viewBillDetail": "ดูบิล →"
+      "viewBillDetail": "ดูบิล →",
+      "holdingItems": "นำส่ง Holding (รายการ)",
+      "companyItems": "นำส่ง Company (รายการ)",
+      "holdingAmount": "ยอดนำส่ง Holding",
+      "companyAmount": "ยอดนำส่ง Company",
+      "invoiceAmount": "ยอดรวม Invoice",
+      "creditNoteAmount": "ยอดรวม Credit Note",
+      "journalAmount": "ยอดรวม Journal",
+      "drillRemittance": "ดูรายการเรียกเก็บ →",
+      "drillPayments": "ดูรายการชำระ →",
+      "breakdownTitle": "สรุปวัน",
+      "remitTitle": "นำส่ง"
     },
     "dayCloseHistory": {
       "description": "บันทึกประวัติการปิดวันพร้อมธงเตือน"
@@ -3216,6 +3225,13 @@
       "tab_OPEN": "รอชำระ",
       "tab_PAID": "ชำระแล้ว",
       "tab_VOIDED": "ยกเลิก",
+      "filterButton": "ตัวกรอง",
+      "filterToday": "เฉพาะวันนี้",
+      "filterUnclosed": "ยังไม่ปิดวัน",
+      "filterClear": "ล้างตัวกรอง",
+      "dayClosedBadge": "ปิดวันแล้ว",
+      "dayUnclosedBadge": "ยังไม่ปิดวัน",
+      "dayClosedAt": "ปิดเมื่อ {{when}}",
       "selectToView": "เลือกบิลเพื่อดูรายละเอียด",
       "remaining": "คงเหลือ",
       "lineItems": "รายการเรียกเก็บ",
@@ -3308,8 +3324,8 @@
       "empty": "ไม่มีกระแสเงินสดในวันที่เลือก"
     },
     "balance": {
-      "description": "ยอดคงค้าง เงินประกัน และมูลค่าสต็อกแต่ละสาขา",
-      "active": "ใช้งาน",
+      "description": "ยอดคงค้าง เงินถือไว้ และมูลค่าสต็อก",
+      "active": "กำลังผ่อน",
       "paused": "พัก",
       "outstanding": "คงค้าง",
       "overdue": "เกินกำหนด",
@@ -3317,8 +3333,13 @@
       "savingHeld": "เงินออมถือไว้",
       "creditHeld": "เครดิตถือไว้",
       "lateFeePending": "ค่าปรับค้าง",
-      "stockCount": "จำนวนสต็อก",
-      "stockValue": "มูลค่าสต็อก"
+      "contractableCount": "จำนวน asset พร้อมปล่อยเช่า",
+      "contractableValue": "มูลค่าสต๊อกพร้อมปล่อยเช่า",
+      "nonContractableQty": "จำนวนสินค้าพร้อมขาย",
+      "nonContractableValue": "มูลค่าสต๊อกพร้อมขาย",
+      "deviceWithCustomerCount": "อยู่กับลูกค้า",
+      "companyRollupTitle": "ภาพรวมบริษัท",
+      "branchSectionTitle": "แยกตามสาขา"
     },
     "ledger": {
       "description": "รายการรับ-จ่ายทั้งหมดของสาขา กรองตามช่วงวัน ทิศทาง และช่องทาง",
@@ -3369,10 +3390,39 @@
       "ct_SETTLEMENT_REFUND": "เงินคืนเจรจา"
     },
     "remittance": {
-      "description": "รายการที่ต้องส่ง Holding — งวดผ่อน เงินดาวน์ ค่าปรับ คอมมิชชั่นพาร์ทเนอร์"
+      "title": "รายการเรียกเก็บ (นำส่ง)",
+      "description": "บิลที่เรียกเก็บจากลูกค้า แยกฝั่งนำส่ง Holding / Company ระดับ line item",
+      "tab_holding": "นำส่ง Holding",
+      "tab_company": "นำส่ง Company",
+      "billType": "ประเภทบิล",
+      "allTypes": "ทุกประเภท",
+      "summaryTitle": "สรุป",
+      "lineCount": "รายการ",
+      "totalAmount": "ยอดรวม",
+      "subtotal": "ยอดย่อย"
     },
-    "revenue": {
-      "description": "รายการที่บริษัทเก็บไว้ — เงินออม ประกัน ขายปลีก ของแถม ค่าบริการ"
+    "payments": {
+      "title": "รายการชำระ (เก็บเงิน)",
+      "description": "การชำระเงินที่รับมา — แยกตามช่องทาง บิล และวันที่บิล",
+      "method": "ช่องทาง",
+      "allMethods": "ทุกช่องทาง",
+      "billType": "ประเภทบิล",
+      "allTypes": "ทุกประเภท",
+      "channelTitle": "สรุปตามช่องทาง",
+      "summaryTitle": "สรุป",
+      "paymentCount": "รายการ",
+      "totalAmount": "ยอดรวม",
+      "m_CASH": "เงินสด",
+      "m_TRANSFER": "โอน",
+      "m_SAVING_WALLET": "กระเป๋าออม",
+      "m_CREDIT_WALLET": "กระเป๋าเครดิต",
+      "m_INSURANCE_WALLET": "กระเป๋าประกัน",
+      "m_WAIVE": "ยกเว้น",
+      "m_HOLDING_BUDGET": "งบ Holding",
+      "payer": "ผู้ชำระ",
+      "bill": "บิล",
+      "billDate": "วันที่บิล",
+      "subtotal": "ยอดย่อย"
     },
     "rr": {
       "date": "วันที่",
@@ -3384,7 +3434,8 @@
       "closed": "ปิดแล้ว",
       "open": "เปิดอยู่",
       "totalRows": "รายการ",
-      "totalAmount": "ยอดรวม"
+      "totalAmount": "ยอดรวม",
+      "billType": "ประเภทบิล"
     }
   },
   "billToast": {

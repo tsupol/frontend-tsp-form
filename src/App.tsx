@@ -76,13 +76,10 @@ import { UserGuidePage } from './pages/help/UserGuidePage';
 import { CustomersPage } from './pages/customers/CustomersPage';
 import { AccountingLayout } from './pages/accounting/AccountingLayout';
 import { DayClosePage } from './pages/accounting/DayClosePage';
-import { DailyAccountingPage } from './pages/accounting/DailyAccountingPage';
-import { CashFlowPage } from './pages/accounting/CashFlowPage';
 import { BranchBalancePage } from './pages/accounting/BranchBalancePage';
-import { HoldingRemittancePage } from './pages/accounting/HoldingRemittancePage';
-import { CompanyRevenuePage } from './pages/accounting/CompanyRevenuePage';
-import { BranchLedgerPage } from './pages/accounting/BranchLedgerPage';
 import { BillsPage } from './pages/accounting/BillsPage';
+import { RemittancePage } from './pages/accounting/RemittancePage';
+import { PaymentsPage } from './pages/accounting/PaymentsPage';
 import { AuditFlagsPage } from './pages/accounting/AuditFlagsPage';
 import { RetailBillsPage } from './pages/retail/RetailBillsPage';
 import { DevLayout } from './pages/dev/DevLayout';
@@ -871,36 +868,6 @@ function App() {
         }
       />
       <Route
-        path="/admin/accounting/daily"
-        element={
-          <ProtectedRoute>
-            <AdminLayout>
-              <AccountingLayout><DailyAccountingPage /></AccountingLayout>
-            </AdminLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin/accounting/cashflow"
-        element={
-          <ProtectedRoute>
-            <AdminLayout>
-              <AccountingLayout><CashFlowPage /></AccountingLayout>
-            </AdminLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin/accounting/ledger"
-        element={
-          <ProtectedRoute>
-            <AdminLayout>
-              <AccountingLayout><BranchLedgerPage /></AccountingLayout>
-            </AdminLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
         path="/admin/accounting/balance"
         element={
           <ProtectedRoute>
@@ -915,17 +882,17 @@ function App() {
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <AccountingLayout><HoldingRemittancePage /></AccountingLayout>
+              <AccountingLayout><RemittancePage /></AccountingLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
       />
       <Route
-        path="/admin/accounting/revenue"
+        path="/admin/accounting/payments"
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <AccountingLayout><CompanyRevenuePage /></AccountingLayout>
+              <AccountingLayout><PaymentsPage /></AccountingLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
