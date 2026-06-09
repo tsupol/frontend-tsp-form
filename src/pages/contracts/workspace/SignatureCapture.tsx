@@ -5,6 +5,7 @@ import type { UploadedImage } from 'tsp-form';
 import { CheckCircle, PenLine, Upload, Camera, Eraser, Undo2, Save, Loader2 } from 'lucide-react';
 import { useMediaUrl } from '../../../hooks/useMediaUrl';
 import { SignaturePad, type SignaturePadHandle } from '../../../components/SignaturePad';
+import { encodeCanvas, renameForExt } from '../../../lib/upload';
 
 type SigMode = 'draw' | 'upload' | 'camera';
 
@@ -35,31 +36,34 @@ function fileToUploadedImage(file: File, w: number, h: number, blob: Blob, origi
   };
 }
 
-async function resizePhotoToWebp(file: File): Promise<UploadedImage> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      const maxW = 1280, maxH = 1280;
-      let w = img.width, h = img.height;
-      if (w > maxW || h > maxH) {
-        const ratio = Math.min(maxW / w, maxH / h);
-        w = Math.round(w * ratio);
-        h = Math.round(h * ratio);
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = w; canvas.height = h;
-      canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
-      canvas.toBlob((blob) => {
-        if (!blob) { reject(new Error('encode failed')); return; }
-        const resized = new File([blob], file.name.replace(/\.[^.]+$/, '') + '.webp', { type: 'image/webp' });
-        resolve(fileToUploadedImage(resized, w, h, blob, file));
-      }, 'image/webp', 0.85);
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('image load failed')); };
-    img.src = url;
-  });
+// Photo-of-paper-signature: resize and encode webp, JPEG fallback for browsers
+// without webp encode (Safari < 17.4). Never silently produces PNG — see
+// encodeCanvas in lib/upload.ts.
+async function resizePhotoForUpload(file: File): Promise<UploadedImage> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const im = new Image();
+      im.onload = () => resolve(im);
+      im.onerror = () => reject(new Error('image load failed'));
+      im.src = url;
+    });
+    const maxW = 1280, maxH = 1280;
+    let w = img.width, h = img.height;
+    if (w > maxW || h > maxH) {
+      const ratio = Math.min(maxW / w, maxH / h);
+      w = Math.round(w * ratio);
+      h = Math.round(h * ratio);
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
+    const { blob, mime, ext } = await encodeCanvas(canvas, 0.85);
+    const resized = new File([blob], renameForExt(file.name, ext), { type: mime });
+    return fileToUploadedImage(resized, w, h, blob, file);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 
 export function SignatureCapture({ fileUrl, uploading, disabled, cacheBust = 0, onUpload, startInEditing = false }: Props) {
@@ -103,7 +107,7 @@ export function SignatureCapture({ fileUrl, uploading, disabled, cacheBust = 0, 
 
   const handlePhotoFile = async (file: File) => {
     try {
-      const img = await resizePhotoToWebp(file);
+      const img = await resizePhotoForUpload(file);
       onUpload([img]);
     } catch {
       // ignore — caller surfaces upload errors via its own state
