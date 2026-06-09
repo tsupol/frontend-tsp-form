@@ -12,7 +12,7 @@ import { BranchPinInput } from '../../components/BranchPinInput';
 import { DateTime } from '../../components/DateTime';
 import { useAuth } from '../../contexts/AuthContext';
 import { useUploadSpec } from '../../hooks/useMediaUrl';
-import { uploadFromImage, deleteMedia } from '../../lib/upload';
+import { uploadFromImage, deleteMedia, mimeFromKey } from '../../lib/upload';
 import { toStoragePath } from '../../lib/mediaPath';
 import { fuzzyScore } from '../../lib/fuzzy';
 import { CompleteContractModal } from './CompleteContractModal';
@@ -2716,7 +2716,7 @@ function PayInstallmentModal({ open, contract, onClose }: {
             p_variants_json: null,
             p_media_type: 'IMAGE',
             p_access_level: 'CONFIDENTIAL',
-            p_mime_type: 'image/webp',
+            p_mime_type: mimeFromKey(slipKey),
             p_file_size_bytes: slipFile?.size ?? null,
             p_original_filename: slipFile?.name ?? null,
             p_entity_type: 'CONTRACT',
@@ -3176,7 +3176,7 @@ function AttachSlipModal({ open, contract, onClose }: {
           p_variants_json: null,
           p_media_type: 'IMAGE',
           p_access_level: 'CONFIDENTIAL',
-          p_mime_type: 'image/webp',
+          p_mime_type: mimeFromKey(slipKey),
           p_file_size_bytes: slipFile?.size ?? null,
           p_original_filename: slipFile?.name ?? null,
           p_entity_type: 'CONTRACT',

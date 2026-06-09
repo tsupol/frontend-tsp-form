@@ -13,7 +13,7 @@ import {
 import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { useAuth } from '../../contexts/AuthContext';
-import { uploadFromImage } from '../../lib/upload';
+import { uploadFromImage, mimeFromKey } from '../../lib/upload';
 import { toStoragePath } from '../../lib/mediaPath';
 import { passesThaiCidChecksum } from '../../lib/ocr/extractIdCard';
 import { SignatureCapture } from '../contracts/workspace/SignatureCapture';
@@ -430,7 +430,7 @@ function WitnessFormModal({ open, mode, witness, branchId, onClose, onDone }: {
         p_variants_json: null,
         p_media_type: 'IMAGE',
         p_access_level: 'CONFIDENTIAL',
-        p_mime_type: 'image/webp',
+        p_mime_type: mimeFromKey(primary),
         p_file_size_bytes: imgs[0].file?.size ?? imgs[0].originalSize ?? 0,
         p_original_filename: imgs[0].originalFile?.name ?? imgs[0].file?.name ?? 'signature.webp',
         p_entity_type: 'BRANCH',

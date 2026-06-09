@@ -28,6 +28,43 @@ export interface UploadResult {
   url?: string;
 }
 
+const EXT_TO_MIME: Record<string, string> = {
+  webp: 'image/webp',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  gif: 'image/gif',
+  heic: 'image/heic',
+  pdf: 'application/pdf',
+};
+
+/** Read the canonical MIME from a storage key's extension (lowercase). */
+export function mimeFromKey(key: string): string {
+  const m = key.toLowerCase().match(/\.([a-z0-9]+)$/);
+  return (m && EXT_TO_MIME[m[1]]) || 'application/octet-stream';
+}
+
+/**
+ * Encode a canvas as webp, falling back to JPEG when the browser does not
+ * support webp encoding (Safari < 17.4 silently returns a PNG blob). Returns
+ * the actual blob, MIME, and extension — never lies about the type.
+ */
+export async function encodeCanvas(
+  canvas: HTMLCanvasElement,
+  quality: number,
+): Promise<{ blob: Blob; mime: string; ext: 'webp' | 'jpg' }> {
+  const webp = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/webp', quality));
+  if (webp && webp.type === 'image/webp') return { blob: webp, mime: 'image/webp', ext: 'webp' };
+  const jpeg = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/jpeg', quality));
+  if (!jpeg) throw new Error('canvas encode failed');
+  return { blob: jpeg, mime: 'image/jpeg', ext: 'jpg' };
+}
+
+/** Swap a file's extension to match the encoded format. */
+export function renameForExt(name: string, ext: string): string {
+  return name.replace(/\.[^.]+$/, '') + '.' + ext;
+}
+
 type ServerResponse<T> =
   | { success: true; data: T }
   | { success: false; error: { code: string; message: string } };
@@ -225,8 +262,9 @@ export async function uploadFromImage(opts: {
 
 /**
  * Downscale `src` to fit within `maxWidth × maxWidth` (contain) and encode
- * as webp. Shrinks files dramatically vs raw camera PNG/JPEG — keeps the
- * misc-go uploaded copies small enough for downstream PDF embedding.
+ * as webp (with JPEG fallback on browsers that don't support webp encode —
+ * Safari < 17.4). Shrinks files dramatically vs raw camera PNG/JPEG and keeps
+ * the misc-go uploaded copies small enough for downstream PDF embedding.
  */
 async function resizeFileToWebp(src: File, maxWidth: number, quality: number): Promise<File> {
   const url = URL.createObjectURL(src);
@@ -246,11 +284,8 @@ async function resizeFileToWebp(src: File, maxWidth: number, quality: number): P
     const canvas = document.createElement('canvas');
     canvas.width = w; canvas.height = h;
     canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
-    const blob = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob(b => b ? resolve(b) : reject(new Error('encode failed')), 'image/webp', quality);
-    });
-    const name = src.name.replace(/\.[^.]+$/, '') + '.webp';
-    return new File([blob], name, { type: 'image/webp' });
+    const { blob, mime, ext } = await encodeCanvas(canvas, quality);
+    return new File([blob], renameForExt(src.name, ext), { type: mime });
   } finally {
     URL.revokeObjectURL(url);
   }

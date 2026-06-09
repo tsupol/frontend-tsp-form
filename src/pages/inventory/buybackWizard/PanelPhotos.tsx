@@ -7,7 +7,7 @@ import { Plus, X, XCircle, ImageOff, Pencil, Check } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useUploadSpec, useMediaUrl } from '../../../hooks/useMediaUrl';
-import { uploadFromImage, deleteMedia } from '../../../lib/upload';
+import { uploadFromImage, deleteMedia, mimeFromKey } from '../../../lib/upload';
 import { toStoragePath, normalizeKey } from '../../../lib/mediaPath';
 import { MediaLightbox } from '../../../components/MediaLightbox';
 import { getLine } from './useBuyback';
@@ -319,7 +319,7 @@ function AddPhotoModal({
           p_variants_json: Object.keys(variants).length > 0 ? variants : null,
           p_media_type: 'IMAGE',
           p_access_level: 'PUBLIC',
-          p_mime_type: 'image/webp',
+          p_mime_type: mimeFromKey(primary.key),
           p_file_size_bytes: null,
           p_original_filename: null,
           p_entity_type: ENTITY_TYPE,

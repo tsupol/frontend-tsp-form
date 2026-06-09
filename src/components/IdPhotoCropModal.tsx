@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, Modal, Slider, ImageCropper, type ImageCropperRef } from 'tsp-form';
 import type { ResizedVariant } from 'tsp-form';
 import { RotateCcw, RotateCw, Scissors, X } from 'lucide-react';
+import { encodeCanvas } from '../lib/upload';
 
 /* ── Aspect presets ──────────────────────────────────────────────────────
    ID-1 covers Thai national ID + driver's license (85.6×53.98mm → 1.586).
@@ -238,9 +239,8 @@ export async function buildWebpVariantsFromImage(
     const ctx = canvas.getContext('2d');
     if (!ctx) continue;
     ctx.drawImage(img, 0, 0, w, h);
-    const blob: Blob | null = await new Promise(res => canvas.toBlob(res, 'image/webp', quality));
-    if (!blob) continue;
-    const f = new File([blob], `${baseName}-${t.label}.webp`, { type: 'image/webp' });
+    const { blob, mime, ext } = await encodeCanvas(canvas, quality);
+    const f = new File([blob], `${baseName}-${t.label}.${ext}`, { type: mime });
     out[t.label] = { file: f, preview: '', width: w, height: h, size: f.size };
   }
   return out;

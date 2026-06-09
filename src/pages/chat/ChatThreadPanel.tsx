@@ -15,7 +15,7 @@ import { fmtCurrency, formatSmart } from '../../lib/format';
 import { DateTime } from '../../components/DateTime';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
 import { normalizeKey, toStoragePath } from '../../lib/mediaPath';
-import { uploadImage } from '../../lib/upload';
+import { uploadImage, encodeCanvas, renameForExt, mimeFromKey } from '../../lib/upload';
 import {
   SubmissionReviewDrawer,
   submissionStatusColor,
@@ -219,7 +219,7 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
         p_variants_json: null,
         p_media_type: 'IMAGE',
         p_access_level: 'CONFIDENTIAL',
-        p_mime_type: 'image/webp',
+        p_mime_type: mimeFromKey(result.key),
         p_file_size_bytes: resized.size,
         p_original_filename: file.name,
         p_entity_type: 'CHAT_MESSAGE',
@@ -625,7 +625,7 @@ async function resizeImageToWebp(file: File, maxDim: number, quality: number): P
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
-    img.onload = () => {
+    img.onload = async () => {
       URL.revokeObjectURL(url);
       let { width: w, height: h } = img;
       if (w > maxDim || h > maxDim) {
@@ -642,17 +642,12 @@ async function resizeImageToWebp(file: File, maxDim: number, quality: number): P
         return;
       }
       ctx.drawImage(img, 0, 0, w, h);
-      canvas.toBlob(
-        blob => {
-          if (!blob) {
-            reject(new Error('Resize failed'));
-            return;
-          }
-          resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.webp'), { type: 'image/webp' }));
-        },
-        'image/webp',
-        quality,
-      );
+      try {
+        const { blob, mime, ext } = await encodeCanvas(canvas, quality);
+        resolve(new File([blob], renameForExt(file.name, ext), { type: mime }));
+      } catch (err) {
+        reject(err instanceof Error ? err : new Error('Resize failed'));
+      }
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);

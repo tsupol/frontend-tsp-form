@@ -9,7 +9,7 @@ import { GenerateContractPdfModal } from './GenerateContractPdfModal';
 import { Link } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { ApiError } from '../../lib/api';
-import { uploadFromImage, getUploadSpec, specToResize, deleteMedia } from '../../lib/upload';
+import { uploadFromImage, getUploadSpec, specToResize, deleteMedia, encodeCanvas, renameForExt, mimeFromKey } from '../../lib/upload';
 import { toStoragePath, normalizeKey } from '../../lib/mediaPath';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiClient } from '../../lib/api';
@@ -1878,8 +1878,8 @@ function DeliveryModal({ open, contract, onClose, onSuccess }: {
             const canvas = document.createElement('canvas');
             canvas.width = w; canvas.height = h;
             canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
-            const blob: Blob | null = await new Promise((res) => canvas.toBlob(res, 'image/webp', spec.quality));
-            if (blob) out[sz.label] = new File([blob], file.name, { type: 'image/webp' });
+            const { blob, mime, ext } = await encodeCanvas(canvas, spec.quality);
+            out[sz.label] = new File([blob], renameForExt(file.name, ext), { type: mime });
           }
           resolve(out);
         };
@@ -1912,7 +1912,7 @@ function DeliveryModal({ open, contract, onClose, onSuccess }: {
         p_variants_json: null,
         p_media_type: 'IMAGE',
         p_access_level: 'CONFIDENTIAL',
-        p_mime_type: 'image/webp',
+        p_mime_type: mimeFromKey(primary),
         p_file_size_bytes: (variants.sm ?? Object.values(variants)[0]).size,
         p_original_filename: file.name,
         p_entity_type: 'CONTRACT',
