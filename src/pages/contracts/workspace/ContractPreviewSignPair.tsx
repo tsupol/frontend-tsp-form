@@ -149,7 +149,7 @@ function SignatureCard({ fileUrl, cacheBust, disabled, label, onClick }: {
           {signed ? t('workspace.sigRetake') : t('contract.acceptAndSign', { defaultValue: 'Accept & sign' })}
         </span>
       </div>
-      <div className="flex-1 min-h-0 bg-white flex items-center justify-center overflow-hidden">
+      <div className="flex-1 min-h-0 w-full bg-white grid place-items-center overflow-hidden">
         {signed ? (
           displayUrl ? (
             <img
