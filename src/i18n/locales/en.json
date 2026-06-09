@@ -11,14 +11,17 @@
     "title": "Scan barcode",
     "scanning": "Scanning",
     "found": "Found",
-    "alignHint": "Align barcode in the band",
+    "alignHint": "Align barcode in the band (any spot for QR)",
     "detected": "Detected",
     "scanAgain": "Scan again",
     "use": "Use",
+    "uploadImage": "Upload image",
+    "decodingImage": "Decoding image…",
     "errorNoCamera": "Camera not available. Use HTTPS or localhost.",
     "errorDenied": "Camera permission denied.",
     "errorGeneric": "Camera error: {{msg}}",
-    "errorDecoder": "Decoder failed: {{msg}}"
+    "errorDecoder": "Decoder failed: {{msg}}",
+    "errorNoBarcodeFound": "No barcode found in image."
   },
   "common": {
     "loading": "Loading...",
@@ -2546,7 +2549,8 @@
     "phasePass2": "Reading fields ({{step}}/{{total}})",
     "phaseDone": "Done",
     "errorScanFailed": "Could not read the card. Try a sharper or better-lit photo.",
-    "errorFitFailed": "Couldn't locate enough labels on the card. Make sure the whole card is in frame."
+    "errorFitFailed": "Couldn't locate enough labels on the card. Make sure the whole card is in frame.",
+    "noFieldsDetected": "No fields detected — photo saved, fill in details manually."
   },
   "workspace": {
     "cardProduct": "Product & Finance Plan",

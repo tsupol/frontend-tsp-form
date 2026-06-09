@@ -11,14 +11,17 @@
     "title": "สแกนบาร์โค้ด",
     "scanning": "กำลังสแกน",
     "found": "พบแล้ว",
-    "alignHint": "วางบาร์โค้ดให้อยู่ในแถบ",
+    "alignHint": "วางบาร์โค้ดในแถบ (QR วางตรงไหนก็ได้)",
     "detected": "ตรวจพบ",
     "scanAgain": "สแกนใหม่",
     "use": "ใช้",
+    "uploadImage": "อัปโหลดรูป",
+    "decodingImage": "กำลังถอดรหัสรูป…",
     "errorNoCamera": "ไม่พบกล้อง ต้องใช้ HTTPS หรือ localhost",
     "errorDenied": "กล้องถูกปฏิเสธสิทธิ์",
     "errorGeneric": "กล้องผิดพลาด: {{msg}}",
-    "errorDecoder": "ตัวถอดรหัสล้มเหลว: {{msg}}"
+    "errorDecoder": "ตัวถอดรหัสล้มเหลว: {{msg}}",
+    "errorNoBarcodeFound": "ไม่พบบาร์โค้ดในรูป"
   },
   "common": {
     "loading": "กำลังโหลด...",
@@ -2546,7 +2549,8 @@
     "phasePass2": "อ่านฟิลด์ ({{step}}/{{total}})",
     "phaseDone": "เสร็จ",
     "errorScanFailed": "อ่านบัตรไม่ได้ ลองถ่ายภาพให้คมชัด/แสงดีกว่านี้",
-    "errorFitFailed": "หาตำแหน่งบนบัตรไม่พอ ลองให้ภาพเห็นบัตรเต็มใบ"
+    "errorFitFailed": "หาตำแหน่งบนบัตรไม่พอ ลองให้ภาพเห็นบัตรเต็มใบ",
+    "noFieldsDetected": "อ่านข้อมูลไม่ได้ — บันทึกรูปไว้แล้ว กรอกข้อมูลเองได้เลย"
   },
   "workspace": {
     "cardProduct": "สินค้า + แผนผ่อน",

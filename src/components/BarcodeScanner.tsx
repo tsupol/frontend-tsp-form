@@ -1,10 +1,29 @@
 import { useState, useRef, useCallback, useEffect, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Button } from 'tsp-form';
-import { X, RotateCcw, Check } from 'lucide-react';
+import { X, RotateCcw, Check, ImagePlus, Loader2 } from 'lucide-react';
 
-type BarcodeFormat = 'ean_13' | 'ean_8' | 'upc_a' | 'upc_e';
-const TARGET_FORMATS: BarcodeFormat[] = ['ean_13', 'ean_8', 'upc_a', 'upc_e'];
+// Formats we want to support. Native BarcodeDetector and zxing both use these
+// same string identifiers (zxing's enum names lowercase to the same strings).
+// We pass the intersection of this list with the browser's supported set to
+// native; if native can't do *any* of these we fall through to zxing, which
+// supports all of them via its multi-format reader.
+type BarcodeFormat =
+  | 'ean_13' | 'ean_8' | 'upc_a' | 'upc_e'
+  | 'code_128' | 'code_39' | 'code_93' | 'codabar' | 'itf'
+  | 'qr_code' | 'data_matrix' | 'aztec' | 'pdf417';
+const TARGET_FORMATS: BarcodeFormat[] = [
+  'ean_13', 'ean_8', 'upc_a', 'upc_e',
+  'code_128', 'code_39', 'code_93', 'codabar', 'itf',
+  'qr_code', 'data_matrix', 'aztec', 'pdf417',
+];
+
+// 2D symbologies — the horizontal guide band only makes sense for 1D barcodes.
+// Accept these anywhere in the frame.
+const TWO_D_FORMATS = new Set(['qr_code', 'data_matrix', 'aztec', 'pdf417']);
+function isTwoD(format: string): boolean {
+  return TWO_D_FORMATS.has(format.toLowerCase());
+}
 
 // Vertical band on the video frame where a detection counts.
 // Portrait: tight stripe. Landscape (iPad): taller band — barcodes fill more vertical real estate.
@@ -68,6 +87,8 @@ export function useBarcodeScanner({ onScan, autoConfirm = false }: UseBarcodeSca
   const [error, setError] = useState<string | null>(null);
   const [engine, setEngine] = useState<Engine>(null);
   const [pending, setPending] = useState<DecodedBarcode | null>(null);
+  const [decodingImage, setDecodingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Track landscape vs portrait for the guide-band layout.
   const [isLandscape, setIsLandscape] = useState(() =>
@@ -146,9 +167,14 @@ export function useBarcodeScanner({ onScan, autoConfirm = false }: UseBarcodeSca
         const results = await detector.detect(video);
         const vh = video.videoHeight;
         for (const r of results) {
-          const bb = r.boundingBox as BBox | undefined;
-          if (!bb) continue;
-          if (!isInsideBand(bb.y + bb.height / 2, vh)) continue;
+          // 2D codes (QR, DataMatrix, Aztec, PDF417) don't fit a horizontal
+          // band — accept anywhere in the frame. 1D codes still need to sit
+          // inside the band so users get a stable "aim here" target.
+          if (!isTwoD(r.format)) {
+            const bb = r.boundingBox as BBox | undefined;
+            if (!bb) continue;
+            if (!isInsideBand(bb.y + bb.height / 2, vh)) continue;
+          }
           handleDecoded({ rawValue: r.rawValue, format: r.format });
           break;
         }
@@ -166,10 +192,10 @@ export function useBarcodeScanner({ onScan, autoConfirm = false }: UseBarcodeSca
     const { BrowserMultiFormatReader } = await import('@zxing/browser');
     const { DecodeHintType, BarcodeFormat: ZxFormat } = await import('@zxing/library');
 
+    // No POSSIBLE_FORMATS hint — let the multi-format reader try every
+    // symbology it knows. TRY_HARDER trades a bit of CPU for much better
+    // pickup on rotated / partially-blurred frames.
     const hints = new Map();
-    hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-      ZxFormat.EAN_13, ZxFormat.EAN_8, ZxFormat.UPC_A, ZxFormat.UPC_E,
-    ]);
     hints.set(DecodeHintType.TRY_HARDER, true);
 
     const reader = new BrowserMultiFormatReader(hints);
@@ -178,16 +204,16 @@ export function useBarcodeScanner({ onScan, autoConfirm = false }: UseBarcodeSca
 
     const controls = await reader.decodeFromVideoElement(video, (result) => {
       if (stopRequestedRef.current || pausedRef.current || !result) return;
-      const points = result.getResultPoints();
-      if (points.length === 0) return;
-      const ys = points.map(p => p.getY());
-      const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
-      if (!isInsideBand(centerY, video.videoHeight)) return;
       const fmt = result.getBarcodeFormat();
-      handleDecoded({
-        rawValue: result.getText(),
-        format: (ZxFormat[fmt] ?? String(fmt)).toLowerCase(),
-      });
+      const formatStr = (ZxFormat[fmt] ?? String(fmt)).toLowerCase();
+      if (!isTwoD(formatStr)) {
+        const points = result.getResultPoints();
+        if (points.length === 0) return;
+        const ys = points.map(p => p.getY());
+        const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
+        if (!isInsideBand(centerY, video.videoHeight)) return;
+      }
+      handleDecoded({ rawValue: result.getText(), format: formatStr });
     });
     zxingControlsRef.current = { stop: () => controls.stop() };
   }, [handleDecoded, isInsideBand]);
@@ -229,13 +255,18 @@ export function useBarcodeScanner({ onScan, autoConfirm = false }: UseBarcodeSca
     let useNative = false;
     if (Native) {
       try {
+        // Use the intersection of TARGET_FORMATS with what the browser
+        // supports. We only fall through to zxing when native can't handle
+        // *any* of our targets — otherwise native runs with whatever it can,
+        // which keeps things fast on Chrome/Safari even when one or two
+        // formats (e.g. PDF417) aren't there.
+        let formats: string[] = TARGET_FORMATS;
         if (Native.getSupportedFormats) {
           const supported = await Native.getSupportedFormats();
-          useNative = TARGET_FORMATS.every(f => supported.includes(f));
-        } else {
-          useNative = true;
+          formats = TARGET_FORMATS.filter(f => supported.includes(f));
         }
-        if (useNative) detectorRef.current = new Native({ formats: TARGET_FORMATS });
+        useNative = formats.length > 0;
+        if (useNative) detectorRef.current = new Native({ formats });
       } catch {
         useNative = false;
       }
@@ -286,6 +317,92 @@ export function useBarcodeScanner({ onScan, autoConfirm = false }: UseBarcodeSca
   }, [pending, close]);
 
   useEffect(() => () => { teardownRef.current(); }, []);
+
+  // Decode a still image (file upload). Tries native BarcodeDetector first
+  // since it's already loaded; otherwise lazy-loads zxing for the same job.
+  // Skips the guide-band check — uploads are deliberate, the band only makes
+  // sense for live camera framing.
+  const decodeImageFile = useCallback(async (file: File) => {
+    setError(null);
+    setDecodingImage(true);
+    pausedRef.current = true; // suspend camera loop while we work the image
+    try {
+      const url = URL.createObjectURL(file);
+      try {
+        const img = new Image();
+        img.src = url;
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => resolve();
+          img.onerror = () => reject(new Error('image load failed'));
+        });
+        if (img.decode) await img.decode().catch(() => {});
+
+        let decoded: DecodedBarcode | null = null;
+
+        const Native = getNativeDetector();
+        if (Native) {
+          try {
+            let formats: string[] = TARGET_FORMATS;
+            if (Native.getSupportedFormats) {
+              const supported = await Native.getSupportedFormats();
+              formats = TARGET_FORMATS.filter(f => supported.includes(f));
+            }
+            if (formats.length > 0) {
+              const det = new Native({ formats });
+              const results = await det.detect(img);
+              if (results.length > 0) {
+                decoded = { rawValue: results[0].rawValue, format: results[0].format };
+              }
+            }
+          } catch {
+            // fall through to zxing
+          }
+        }
+
+        if (!decoded) {
+          try {
+            const { BrowserMultiFormatReader } = await import('@zxing/browser');
+            const { DecodeHintType, BarcodeFormat: ZxFormat } = await import('@zxing/library');
+            const hints = new Map();
+            hints.set(DecodeHintType.TRY_HARDER, true);
+            const reader = new BrowserMultiFormatReader(hints);
+            const result = await reader.decodeFromImageElement(img);
+            const fmt = result.getBarcodeFormat();
+            decoded = {
+              rawValue: result.getText(),
+              format: (ZxFormat[fmt] ?? String(fmt)).toLowerCase(),
+            };
+          } catch {
+            // no decode
+          }
+        }
+
+        if (!decoded) {
+          setError(t('barcodeScanner.errorNoBarcodeFound', { defaultValue: 'No barcode found in image.' }));
+          pausedRef.current = false;
+          return;
+        }
+
+        if (autoConfirmRef.current) {
+          onScanRef.current(decoded.rawValue);
+          close();
+          return;
+        }
+        setPending(decoded);
+        videoRef.current?.pause();
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    } finally {
+      setDecodingImage(false);
+    }
+  }, [close, t]);
+
+  const onFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow picking the same file again
+    if (file) void decodeImageFile(file);
+  }, [decodeImageFile]);
 
   const scannerEl = (
     <Modal
@@ -341,15 +458,43 @@ export function useBarcodeScanner({ onScan, autoConfirm = false }: UseBarcodeSca
               <span className="text-xs px-2 py-0.5 rounded bg-white/20">{engine}</span>
             )}
           </div>
-          <button
-            type="button"
-            onClick={close}
-            aria-label={t('common.close')}
-            className="w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center"
-          >
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              aria-label={t('barcodeScanner.uploadImage', { defaultValue: 'Upload image' })}
+              disabled={decodingImage}
+              className="w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center disabled:opacity-50"
+            >
+              <ImagePlus size={20} />
+            </button>
+            <button
+              type="button"
+              onClick={close}
+              aria-label={t('common.close')}
+              className="w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center"
+            >
+              <X size={20} />
+            </button>
+          </div>
         </div>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={onFileChange}
+          className="hidden"
+        />
+
+        {decodingImage && (
+          <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-2 z-20 pointer-events-none">
+            <Loader2 size={28} className="animate-spin" />
+            <span className="text-sm">
+              {t('barcodeScanner.decodingImage', { defaultValue: 'Decoding image…' })}
+            </span>
+          </div>
+        )}
 
         {error && (
           <div className="absolute inset-x-0 top-14 mx-3 z-10">
