@@ -48,25 +48,21 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
       });
       padRef.current = pad;
 
+      let lastW = 0;
+      let lastH = 0;
       const resize = () => {
+        const data = pad.toData();
         const ratio = Math.max(window.devicePixelRatio || 1, 1);
         // Measure the canvas itself (sized by CSS w-full h-full), not the container.
         // The container may be measured before layout settles (e.g. inside an
         // animating modal); the canvas's own rect always reflects current CSS size.
         const rect = canvas.getBoundingClientRect();
         if (rect.width === 0 || rect.height === 0) return;
-        // Compare CSS rect to the canvas's internal pixel buffer. iPad-Safari
-        // can race the initial measurement: we set canvas.width during modal
-        // transform, then the layout settles at a different width. RO fires,
-        // but if the rect *happens* to match our last-known value the pad's
-        // pixel grid drifts and strokes render in the wrong horizontal slice.
-        // Compare against canvas.width directly — that's authoritative.
-        const targetW = Math.round(rect.width * ratio);
-        const targetH = Math.round(rect.height * ratio);
-        if (canvas.width === targetW && canvas.height === targetH) return;
-        const data = pad.toData();
-        canvas.width = targetW;
-        canvas.height = targetH;
+        if (rect.width === lastW && rect.height === lastH) return;
+        lastW = rect.width;
+        lastH = rect.height;
+        canvas.width = rect.width * ratio;
+        canvas.height = rect.height * ratio;
         const ctx = canvas.getContext('2d');
         ctx?.setTransform(ratio, 0, 0, ratio, 0, 0);
         pad.clear();
@@ -82,11 +78,11 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
 
       // Modal transitions use `transform: scale()` which does NOT trigger
       // ResizeObserver — the canvas's layout box never changes width, only
-      // its rendered size. Poll past the longest realistic modal transition
-      // (iPad-Safari is the slow one) to re-sync the internal pixel grid.
+      // its rendered size. Poll for ~600ms after mount to catch the
+      // post-transition rect and re-sync the internal pixel grid.
       const pollStart = performance.now();
       let pollRaf = 0;
-      const POLL_MS = 1500;
+      const POLL_MS = 600;
       const poll = () => {
         resize();
         if (performance.now() - pollStart < POLL_MS) {
@@ -94,11 +90,6 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
         }
       };
       pollRaf = requestAnimationFrame(poll);
-
-      // Orientation changes don't always fire a RO entry quickly enough on
-      // iPad-Safari — listen explicitly.
-      const onOrient = () => resize();
-      window.addEventListener('orientationchange', onOrient);
 
       const handleStateChange = () => {
         const empty = pad.isEmpty();
@@ -110,7 +101,6 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
       return () => {
         cancelAnimationFrame(pollRaf);
         ro.disconnect();
-        window.removeEventListener('orientationchange', onOrient);
         pad.removeEventListener('endStroke', handleStateChange);
         pad.off();
         padRef.current = null;
