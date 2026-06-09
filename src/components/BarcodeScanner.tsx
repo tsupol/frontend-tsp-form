@@ -51,6 +51,31 @@ function getNativeDetector(): NativeBarcodeDetectorConstructor | null {
   return w.BarcodeDetector ?? null;
 }
 
+// Some vendors stuff multiple fields into one QR as a URL query string, e.g.
+//   n=G0ASI1C-API15-BK&d=Apple iPhone 15/16&q=PRT2612-33641
+// We can't predict which field the user actually wants, so we surface every
+// key=value pair as a picker. Strict so plain text with a stray "=" doesn't
+// trigger: needs &, every segment must look like an identifier=value.
+type QueryPart = { key: string; value: string };
+const KV_SEGMENT = /^[a-zA-Z][a-zA-Z0-9_]*=.+$/;
+function parseQueryParts(raw: string): QueryPart[] | null {
+  if (!raw.includes('&') || !raw.includes('=')) return null;
+  // Reject URLs — they have `://` or start with `http`/`https`.
+  if (/^https?:\/\//i.test(raw) || raw.includes('://')) return null;
+  const segments = raw.split('&');
+  if (segments.length < 2) return null;
+  const parts: QueryPart[] = [];
+  for (const seg of segments) {
+    if (!KV_SEGMENT.test(seg)) return null;
+    const eq = seg.indexOf('=');
+    parts.push({
+      key: seg.slice(0, eq),
+      value: decodeURIComponent(seg.slice(eq + 1).replace(/\+/g, ' ')),
+    });
+  }
+  return parts;
+}
+
 export interface UseBarcodeScannerOptions {
   onScan: (value: string) => void;
   /** Auto-confirm and close on first decode (skips the confirm sheet). */
@@ -87,6 +112,7 @@ export function useBarcodeScanner({ onScan, autoConfirm = false }: UseBarcodeSca
   const [error, setError] = useState<string | null>(null);
   const [engine, setEngine] = useState<Engine>(null);
   const [pending, setPending] = useState<DecodedBarcode | null>(null);
+  const [pendingParts, setPendingParts] = useState<QueryPart[] | null>(null);
   const [decodingImage, setDecodingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -130,6 +156,15 @@ export function useBarcodeScanner({ onScan, autoConfirm = false }: UseBarcodeSca
   const handleDecoded = useCallback((d: DecodedBarcode) => {
     if (pausedRef.current) return;
     pausedRef.current = true;
+    // Multi-part payloads (e.g. vendor QR `n=...&d=...&q=...`) always show
+    // the picker — autoConfirm can't know which field the caller wants.
+    const parts = parseQueryParts(d.rawValue);
+    if (parts) {
+      setPending(d);
+      setPendingParts(parts);
+      videoRef.current?.pause();
+      return;
+    }
     if (autoConfirmRef.current) {
       onScanRef.current(d.rawValue);
       // teardown + close inline (avoid pulling `close` into deps and rebuilding chain).
@@ -137,6 +172,7 @@ export function useBarcodeScanner({ onScan, autoConfirm = false }: UseBarcodeSca
       setScanOpen(false);
       setEngine(null);
       setPending(null);
+      setPendingParts(null);
       return;
     }
     setPending(d);
@@ -148,6 +184,7 @@ export function useBarcodeScanner({ onScan, autoConfirm = false }: UseBarcodeSca
     setScanOpen(false);
     setEngine(null);
     setPending(null);
+    setPendingParts(null);
   }, [teardown]);
 
   const runNativeLoop = useCallback(() => {
@@ -306,6 +343,7 @@ export function useBarcodeScanner({ onScan, autoConfirm = false }: UseBarcodeSca
 
   const scanAgain = useCallback(() => {
     setPending(null);
+    setPendingParts(null);
     pausedRef.current = false;
     videoRef.current?.play().catch(() => {});
   }, []);
@@ -315,6 +353,11 @@ export function useBarcodeScanner({ onScan, autoConfirm = false }: UseBarcodeSca
     onScanRef.current(pending.rawValue);
     close();
   }, [pending, close]);
+
+  const usePart = useCallback((value: string) => {
+    onScanRef.current(value);
+    close();
+  }, [close]);
 
   useEffect(() => () => { teardownRef.current(); }, []);
 
@@ -383,6 +426,13 @@ export function useBarcodeScanner({ onScan, autoConfirm = false }: UseBarcodeSca
           return;
         }
 
+        const parts = parseQueryParts(decoded.rawValue);
+        if (parts) {
+          setPending(decoded);
+          setPendingParts(parts);
+          videoRef.current?.pause();
+          return;
+        }
         if (autoConfirmRef.current) {
           onScanRef.current(decoded.rawValue);
           close();
@@ -515,7 +565,39 @@ export function useBarcodeScanner({ onScan, autoConfirm = false }: UseBarcodeSca
           </div>
         )}
 
-        {pending && (
+        {pending && pendingParts && (
+          <div
+            className="absolute inset-x-0 bottom-0 px-4 pb-4 pt-6 bg-gradient-to-t from-black/90 via-black/70 to-transparent z-10 max-h-[70%] overflow-y-auto"
+            style={{ animation: 'barcode-sheet-in 220ms ease-out both' }}
+          >
+            <div className="text-xs text-white/60 mb-2">
+              {t('barcodeScanner.pickField', { defaultValue: 'Pick which value to use' })}
+            </div>
+            <div className="flex flex-col gap-2 mb-3">
+              {pendingParts.map((p, i) => (
+                <button
+                  key={`${p.key}-${i}`}
+                  type="button"
+                  onClick={() => usePart(p.value)}
+                  className="text-left px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 border border-white/20 active:bg-white/25"
+                >
+                  <div className="text-[10px] uppercase tracking-wider text-white/60">{p.key}</div>
+                  <div className="font-mono text-base font-medium break-all">{p.value}</div>
+                </button>
+              ))}
+            </div>
+            <Button
+              onClick={scanAgain}
+              variant="outline"
+              className="w-full !bg-white/10 !text-white !border-white/30 hover:!bg-white/20"
+              startIcon={<RotateCcw size={16} />}
+            >
+              {t('barcodeScanner.scanAgain', { defaultValue: 'Scan again' })}
+            </Button>
+          </div>
+        )}
+
+        {pending && !pendingParts && (
           <div
             className="absolute inset-x-0 bottom-0 px-4 pb-4 pt-6 bg-gradient-to-t from-black/90 via-black/70 to-transparent z-10"
             style={{ animation: 'barcode-sheet-in 220ms ease-out both' }}

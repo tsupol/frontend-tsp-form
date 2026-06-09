@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { MobileHeader, Badge, Select, Input } from 'tsp-form';
+import { MobileHeader, Badge, Select, Input, Button } from 'tsp-form';
 import { Boxes, ScanBarcode, ArrowRightFromLine, ShoppingCart, Smartphone } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { fmtCurrency } from '../../lib/format';
@@ -225,15 +225,24 @@ export function BranchStockPage() {
 
       {/* Filter bar */}
       <div className="flex-none p-2 border-b border-line flex items-center gap-2">
-        <div className="flex-1 min-w-0 max-w-64">
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t('branchStock.search', { defaultValue: 'Search by name, model, variant' })}
-            size="sm"
-            startIcon={<ScanBarcode size={16} />}
-            onStartIconClick={openScanner}
-          />
+        <div className="flex-1 min-w-0 max-w-72">
+          <div className="input-group">
+            <Button
+              size="sm"
+              variant="outline"
+              startIcon={<ScanBarcode size={16} />}
+              onClick={openScanner}
+              aria-label={t('barcodeScanner.title', { defaultValue: 'Scan barcode' })}
+            />
+            <div className="input-group-divider" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t('branchStock.search', { defaultValue: 'Search by name, model, variant' })}
+              size="sm"
+              className="w-full"
+            />
+          </div>
         </div>
         <div className="flex-1 min-w-0 max-w-64">
           <Select

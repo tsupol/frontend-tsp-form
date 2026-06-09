@@ -17,6 +17,7 @@
     "use": "Use",
     "uploadImage": "Upload image",
     "decodingImage": "Decoding image…",
+    "pickField": "Pick which value to use",
     "errorNoCamera": "Camera not available. Use HTTPS or localhost.",
     "errorDenied": "Camera permission denied.",
     "errorGeneric": "Camera error: {{msg}}",

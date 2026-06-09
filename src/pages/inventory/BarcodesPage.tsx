@@ -263,14 +263,20 @@ export function BarcodesPage() {
         <div className="flex-none pb-3 flex flex-wrap items-center gap-2">
           <div className="flex-1 min-w-0 max-w-md">
             <div className="input-group">
+              <Button
+                size="sm"
+                variant="outline"
+                startIcon={<ScanBarcode size={16} />}
+                onClick={openScanner}
+                aria-label={t('barcodeScanner.title', { defaultValue: 'Scan barcode' })}
+              />
+              <div className="input-group-divider" />
               <Input
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 onKeyDown={onSearchKey}
                 placeholder={t('barcodes.search')}
                 size="sm"
-                startIcon={<ScanBarcode size={16} />}
-                onStartIconClick={openScanner}
                 endIcon={searchInput ? <X size={14} /> : undefined}
                 onEndIconClick={searchInput ? clearSearch : undefined}
                 className="w-full"
@@ -602,17 +608,25 @@ function RegisterBarcodeModal({ open, onClose, initialBarcode, onSuccess }: Regi
         <div className="form-grid">
           <div className="flex flex-col">
             <label className="form-label">{t('barcodes.barcode')} *</label>
-            <Input
-              value={barcode}
-              onChange={(e) => setBarcode(e.target.value)}
-              placeholder={t('barcodes.barcodePlaceholder')}
-              size="md"
-              className="w-full font-mono"
-              autoFocus
-              inputMode="numeric"
-              startIcon={<ScanBarcode size={16} />}
-              onStartIconClick={openScanner}
-            />
+            <div className="input-group">
+              <Button
+                size="md"
+                variant="outline"
+                startIcon={<ScanBarcode size={16} />}
+                onClick={openScanner}
+                aria-label={t('barcodeScanner.title', { defaultValue: 'Scan barcode' })}
+              />
+              <div className="input-group-divider" />
+              <Input
+                value={barcode}
+                onChange={(e) => setBarcode(e.target.value)}
+                placeholder={t('barcodes.barcodePlaceholder')}
+                size="md"
+                className="w-full font-mono"
+                autoFocus
+                inputMode="numeric"
+              />
+            </div>
             <div className="mt-1.5 text-xs flex items-center gap-2 min-h-[1.25rem]">
               {detectedType ? (
                 <>

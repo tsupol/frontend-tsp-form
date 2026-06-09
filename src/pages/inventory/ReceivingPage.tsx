@@ -1477,15 +1477,22 @@ function VariantPickerInline({
   return (
     <div>
       {scannerEl}
-      <Input
-        value={keyword}
-        onChange={(e) => setKeyword(e.target.value)}
-        placeholder={t('receiving.searchProduct')}
-        startIcon={<ScanBarcode size={16} />}
-        onStartIconClick={openScanner}
-        className="w-full"
-        autoFocus
-      />
+      <div className="input-group">
+        <Button
+          variant="outline"
+          startIcon={<ScanBarcode size={16} />}
+          onClick={openScanner}
+          aria-label={t('barcodeScanner.title', { defaultValue: 'Scan barcode' })}
+        />
+        <div className="input-group-divider" />
+        <Input
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
+          placeholder={t('receiving.searchProduct')}
+          className="w-full"
+          autoFocus
+        />
+      </div>
       <div className="mt-2 max-h-56 overflow-auto better-scroll border border-line rounded-md">
         {isFetching && (results?.rows ?? []).length === 0 && (
           <div className="p-3 text-xs text-subtle text-center">{t('common.loading')}</div>

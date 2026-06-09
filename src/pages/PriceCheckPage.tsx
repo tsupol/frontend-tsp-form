@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, Input, Badge, MaskedInput, useSnackbarContext } from 'tsp-form';
+import { PageNav, PageNavPanel, MobileHeader, Input, Badge, MaskedInput, Button, useSnackbarContext } from 'tsp-form';
 import { ArrowLeft, ArrowRightFromLine, ScanBarcode, Calculator, Clock, Trash2, X, ArrowUp, Info, XCircle } from 'lucide-react';
 import { apiClient } from '../lib/api';
 import { useBarcodeScanner } from '../components/BarcodeScanner';
@@ -228,15 +228,23 @@ export function PriceCheckPage() {
             <PageNavPanel id="list" className={isMobile ? '' : 'w-4/12 xl:w-3/12 min-w-56 border-r border-line flex flex-col'}>
               {/* Search */}
               <div className="flex-none px-4 py-2 border-b border-line">
-                <Input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder={t('priceCheck.searchPlaceholder')}
-                  size="sm"
-                  startIcon={<ScanBarcode size={16} />}
-                  onStartIconClick={openScanner}
-                  className="w-full"
-                />
+                <div className="input-group">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    startIcon={<ScanBarcode size={16} />}
+                    onClick={openScanner}
+                    aria-label={t('barcodeScanner.title', { defaultValue: 'Scan barcode' })}
+                  />
+                  <div className="input-group-divider" />
+                  <Input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder={t('priceCheck.searchPlaceholder')}
+                    size="sm"
+                    className="w-full"
+                  />
+                </div>
               </div>
 
               {/* List */}

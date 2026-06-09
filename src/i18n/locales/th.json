@@ -17,6 +17,7 @@
     "use": "ใช้",
     "uploadImage": "อัปโหลดรูป",
     "decodingImage": "กำลังถอดรหัสรูป…",
+    "pickField": "เลือกค่าที่ต้องการใช้",
     "errorNoCamera": "ไม่พบกล้อง ต้องใช้ HTTPS หรือ localhost",
     "errorDenied": "กล้องถูกปฏิเสธสิทธิ์",
     "errorGeneric": "กล้องผิดพลาด: {{msg}}",

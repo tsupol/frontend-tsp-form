@@ -89,16 +89,24 @@ export function SellableVariantPickerModal({
           <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">×</button>
         </div>
         <div className="modal-content">
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t('retail.create.searchProducts')}
-            startIcon={<ScanBarcode size={16} />}
-            onStartIconClick={openScanner}
-            size="sm"
-            className="w-full mb-3"
-            autoFocus
-          />
+          <div className="input-group mb-3">
+            <Button
+              size="sm"
+              variant="outline"
+              startIcon={<ScanBarcode size={16} />}
+              onClick={openScanner}
+              aria-label={t('barcodeScanner.title', { defaultValue: 'Scan barcode' })}
+            />
+            <div className="input-group-divider" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t('retail.create.searchProducts')}
+              size="sm"
+              className="w-full"
+              autoFocus
+            />
+          </div>
           {isFetching && variants.length === 0 ? (
             <div className="p-8 text-center text-subtler text-sm">{t('common.loading')}</div>
           ) : variants.length === 0 ? (

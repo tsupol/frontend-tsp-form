@@ -252,15 +252,23 @@ export function ModalProductPlan({ open, onClose }: Props) {
           </div>
 
           {/* Search */}
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t('wizard.searchProductPlaceholder')}
-            startIcon={<ScanBarcode size={16} />}
-            onStartIconClick={openScanner}
-            className="w-full"
-            size="sm"
-          />
+          <div className="input-group">
+            <Button
+              size="sm"
+              variant="outline"
+              startIcon={<ScanBarcode size={16} />}
+              onClick={openScanner}
+              aria-label={t('barcodeScanner.title', { defaultValue: 'Scan barcode' })}
+            />
+            <div className="input-group-divider" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t('wizard.searchProductPlaceholder')}
+              className="w-full"
+              size="sm"
+            />
+          </div>
 
           {/* Model results */}
           {shouldSearch && (

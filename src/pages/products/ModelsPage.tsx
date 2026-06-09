@@ -964,17 +964,25 @@ function BarcodeInput({ value, onChange, badge, trailing, onEnter }: {
     <div className="flex flex-col gap-1.5 p-2 border border-line rounded-md">
       {scannerEl}
       <div className="flex items-center gap-2">
-        <Input
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={t('barcodes.barcodePlaceholder')}
-          size="sm"
-          className="w-full font-mono"
-          inputMode="numeric"
-          startIcon={<ScanBarcode size={16} />}
-          onStartIconClick={openScanner}
-          onKeyDown={onEnter ? (e) => { if (e.key === 'Enter') { e.preventDefault(); onEnter(); } } : undefined}
-        />
+        <div className="input-group flex-1 min-w-0">
+          <Button
+            size="sm"
+            variant="outline"
+            startIcon={<ScanBarcode size={16} />}
+            onClick={openScanner}
+            aria-label={t('barcodeScanner.title', { defaultValue: 'Scan barcode' })}
+          />
+          <div className="input-group-divider" />
+          <Input
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={t('barcodes.barcodePlaceholder')}
+            size="sm"
+            className="w-full font-mono"
+            inputMode="numeric"
+            onKeyDown={onEnter ? (e) => { if (e.key === 'Enter') { e.preventDefault(); onEnter(); } } : undefined}
+          />
+        </div>
         {badge}
         {trailing}
       </div>
@@ -1551,6 +1559,16 @@ export function ModelsPage() {
     }, 300);
   };
 
+  // Barcode scan → commit immediately, skip the debounce.
+  const { open: openSearchScanner, scannerEl: searchScannerEl } = useBarcodeScanner({
+    onScan: (val) => {
+      clearTimeout(searchTimer.current);
+      setSearchInput(val);
+      setSearch(val);
+      setPageIndex(0);
+    },
+  });
+
   // Brand lookup (still needed for filter dropdown — all brands, not just current page)
   const { data: brands = [] } = useQuery({
     queryKey: ['brand-lookup', holdingId],
@@ -1738,17 +1756,28 @@ export function ModelsPage() {
             )}
 
             {/* ── Filter bar — above panels, list view only on mobile ── */}
+            {searchScannerEl}
             {(isRoot || !isMobile) && (
               <div className="flex-none p-2 border-b border-line">
                 <div className="flex items-center gap-2">
                   <div className="flex-1 min-w-0">
-                    <Input
-                      placeholder={t('common.search')}
-                      value={searchInput}
-                      onChange={(e) => handleSearch(e.target.value)}
-                      size="sm"
-                      className="w-full"
-                    />
+                    <div className="input-group">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        startIcon={<ScanBarcode size={16} />}
+                        onClick={openSearchScanner}
+                        aria-label={t('barcodeScanner.title', { defaultValue: 'Scan barcode' })}
+                      />
+                      <div className="input-group-divider" />
+                      <Input
+                        placeholder={t('common.search')}
+                        value={searchInput}
+                        onChange={(e) => handleSearch(e.target.value)}
+                        size="sm"
+                        className="w-full"
+                      />
+                    </div>
                   </div>
                   <div className="flex-1 min-w-0 hidden sm:block">
                     <Select

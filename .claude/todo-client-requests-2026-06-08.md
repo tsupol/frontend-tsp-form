@@ -3,12 +3,17 @@
 Raw list from client (TH), with my notes on which page/area each belongs to.
 Items checked off below are already shipped; the rest are open.
 
-## Open
+## Done
 
-### 6. Multiple barcode / QR formats
-- Need clarification: which page? Inventory barcode sticker print? Asset sticker? Or product/catalog?
-- Current barcode sticker (XP-420B 76×26mm) is single-format. Client likely wants to choose between Code128, Code39, EAN-13, QR, etc., per use case.
-- Once page is clear, expose a format selector and wire the SVG encoder accordingly. Check `src/pages/inventory/BarcodesPage.tsx` and `printer-setup` guide.
+### ✅ 6. Multiple barcode / QR formats — scanner side
+- Clarified with client: they meant the **scanner**, not the printed sticker. Live camera was EAN/UPC-only and there was no way to scan from a photo. Shipped 2026-06-09 in `src/components/BarcodeScanner.tsx`.
+- Formats expanded from 4 → 13: EAN_13/8, UPC_A/E, Code 128/39/93, Codabar, ITF, QR, Data Matrix, Aztec, PDF417. Both engines updated — native `BarcodeDetector` now uses the intersection with `getSupportedFormats()` (fell through to zxing too eagerly before), zxing dropped the EAN-only `POSSIBLE_FORMATS` hint and runs multi-format with `TRY_HARDER`.
+- Horizontal guide-band check skipped for 2D codes (QR/DM/Aztec/PDF417) — those are accepted anywhere in the frame. Hint text updated.
+- New "Upload image" button in the scanner modal: file picker → decode still image via native (preferred) or zxing fallback. Skips the band, respects `autoConfirm`.
+- Vendor query-string QR payloads (e.g. `n=G0ASI1C-API15-BK&d=Apple iPhone 15/16&q=PRT2612-33641`) are detected and surfaced as a picker — each key/value rendered as a tappable row, user picks the one they want, that value alone fires `onScan`. Strict detection (identifier=value segments, no URLs, ≥2 pairs) so plain codes still go through the normal confirm sheet.
+- **Accessibility pass** across all 11 scan callsites: replaced `startIcon`/`onStartIconClick` on `Input` with a leading icon-only `Button` inside an `input-group` for a much bigger tap target. Pages touched: BarcodesPage (filter + register modal), ModelsPage (filter bar + `BarcodeFieldInput`), PurchaseOrdersPage, ReceivingPage, PanelProductPlan, ModalProductPlan, PanelSetup (buyback), PriceCheckPage, BranchStockPage, CreateRetailBillModal, SellableVariantPickerModal. ModelsPage filter scanner bypasses the 300ms debounce so a scan searches immediately.
+- i18n: added `barcodeScanner.uploadImage` / `decodingImage` / `pickField` / `errorNoBarcodeFound` (EN + TH); updated `alignHint` to mention "any spot for QR".
+- Not done: printer side / sticker format selector — separate ask if client wants it. Today only Code128 is used for sticker print.
 
 ## Done
 

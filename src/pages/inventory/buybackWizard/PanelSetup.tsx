@@ -376,15 +376,22 @@ function ProductPickerModal({
           <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
         </div>
         <div className="modal-content">
-          <Input
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            placeholder={t('buybackWizard.searchPlaceholder', { defaultValue: 'Search model (e.g. iPhone 16)' })}
-            startIcon={<ScanBarcode size={16} />}
-            onStartIconClick={openScanner}
-            className="w-full"
-            autoFocus
-          />
+          <div className="input-group">
+            <Button
+              variant="outline"
+              startIcon={<ScanBarcode size={16} />}
+              onClick={openScanner}
+              aria-label={t('barcodeScanner.title', { defaultValue: 'Scan barcode' })}
+            />
+            <div className="input-group-divider" />
+            <Input
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              placeholder={t('buybackWizard.searchPlaceholder', { defaultValue: 'Search model (e.g. iPhone 16)' })}
+              className="w-full"
+              autoFocus
+            />
+          </div>
           <div className="mt-3 h-80 overflow-auto better-scroll border border-line rounded-md">
             {isFetching && models.length === 0 && (
               <div className="p-3 text-xs text-subtle text-center">{t('common.loading')}</div>

@@ -832,7 +832,17 @@ export function PanelProductPlan(_props: Props) {
           {/* Catalog search */}
           {sourceTab === 'catalog' && (
             <>
-              <Input ref={searchRef} value={search} onChange={(e) => handleSearchInput(e.target.value)} placeholder={t('wizard.searchProductPlaceholder')} startIcon={<ScanBarcode size={16} />} onStartIconClick={openScanner} className="w-full" size="sm" />
+              <div className="input-group">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  startIcon={<ScanBarcode size={16} />}
+                  onClick={openScanner}
+                  aria-label={t('barcodeScanner.title', { defaultValue: 'Scan barcode' })}
+                />
+                <div className="input-group-divider" />
+                <Input ref={searchRef} value={search} onChange={(e) => handleSearchInput(e.target.value)} placeholder={t('wizard.searchProductPlaceholder')} className="w-full" size="sm" />
+              </div>
               <div className="border border-line rounded-lg overflow-hidden h-48 data-table-content better-scroll">
                 {!shouldSearch ? (
                   <div className="flex items-center justify-center h-full text-subtle text-sm">{t('wizard.typeToSearch')}</div>
