@@ -35,7 +35,15 @@ let workerPromise: Promise<Tesseract.Worker> | null = null;
 
 function getWorker(): Promise<Tesseract.Worker> {
   if (!workerPromise) {
+    // Pin to the locally-hosted simd-lstm core. tesseract.js's autodetect
+    // picks `tesseract-core-relaxedsimd-lstm.wasm` on Chrome 114+, but that
+    // jsdelivr build is missing `DotProductSSE` and crashes mid-recognize in
+    // production (works locally only because dev caches an older worker).
+    // Every relaxed-SIMD browser also supports plain SIMD, so pinning to
+    // simd-lstm is safe and avoids the moving CDN target.
     workerPromise = Tesseract.createWorker('tha+eng', OEM.LSTM_ONLY, {
+      corePath: '/tesseract/tesseract-core-simd-lstm.wasm.js',
+      workerPath: '/tesseract/worker.min.js',
       langPath: 'https://tessdata.projectnaptha.com/4.0.0_best',
     }).catch((err) => {
       workerPromise = null;

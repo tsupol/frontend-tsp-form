@@ -53,6 +53,16 @@ interface Props {
   onCopyField?: (field: IdCardField, value: string) => void;
 }
 
+const EMPTY_FIELDS: DetectedIdCardFields = {
+  cid: null, cidValid: false,
+  prefix: null, firstName: null, lastName: null,
+  dob: null, dobRaw: null, fullNameTh: null,
+};
+
+function isEmptyResult(f: DetectedIdCardFields): boolean {
+  return !f.cid && !f.prefix && !f.firstName && !f.lastName && !f.dob && !f.dobRaw && !f.fullNameTh;
+}
+
 function resultToFields(r: ScanResult): DetectedIdCardFields {
   return {
     cid: r.cid?.thirteen ? r.cid.text : (r.cid?.text ?? null),
@@ -148,6 +158,32 @@ export function IdCardScanner({ onDetected, onPersist, onClear, disabled, existi
     const abort = new AbortController();
     abortRef.current = abort;
 
+    const persistCroppedImage = async () => {
+      if (!onPersist || !persistSpec.spec) return;
+      try {
+        const baseName = source.name.replace(/\.[^.]+$/, '');
+        const targets: ResizedTarget[] = persistSpec.spec.sizes.map(s => ({ label: s.label, width: s.width }));
+        const variants = await buildWebpVariantsFromImage(crop.croppedImage, baseName, targets, persistSpec.spec.quality);
+        const primaryLabel = pickPrimaryLabel(targets);
+        const primary = variants[primaryLabel]?.file ?? Object.values(variants)[0]?.file;
+        if (!primary) return;
+        const image: UploadedImage = {
+          id: Math.random().toString(36).slice(2),
+          originalFile: source,
+          originalWidth: crop.croppedImage.naturalWidth,
+          originalHeight: crop.croppedImage.naturalHeight,
+          originalSize: source.size,
+          file: primary,
+          preview: '',
+          width: crop.croppedImage.naturalWidth,
+          height: crop.croppedImage.naturalHeight,
+          size: primary.size,
+          variants,
+        };
+        await onPersist(image);
+      } catch { /* user can re-upload from Documents */ }
+    };
+
     try {
       // OCR reads the lossless PNG of the cropped region.
       const scan = await scanIdCard(crop.pngBlob, {
@@ -156,49 +192,24 @@ export function IdCardScanner({ onDetected, onPersist, onClear, disabled, existi
       });
       if (abort.signal.aborted) return;
 
-      if (!scan.ok) {
-        setError(scan.reason === 'fit_failed' ? t('ocr.errorFitFailed') : t('ocr.errorScanFailed'));
-        setScanning(false);
-        return;
-      }
-
-      const fields = resultToFields(scan);
+      // OCR may fail when the upload isn't a Thai ID (passport, work permit,
+      // other doc). Don't block — surface an empty result so the user can
+      // type fields manually, and still persist the cropped photo.
+      const fields = scan.ok ? resultToFields(scan) : EMPTY_FIELDS;
       setResult(fields);
       // In merge mode (currentFields given), the user copies fields manually
       // — don't write detected values into the form automatically.
-      if (!currentFields) {
+      if (!currentFields && scan.ok) {
         onDetected(fields);
       }
 
-      // Persist the CROPPED pixels as WebP at BE-spec sizes.
-      if (onPersist && persistSpec.spec) {
-        try {
-          const baseName = source.name.replace(/\.[^.]+$/, '');
-          const targets: ResizedTarget[] = persistSpec.spec.sizes.map(s => ({ label: s.label, width: s.width }));
-          const variants = await buildWebpVariantsFromImage(crop.croppedImage, baseName, targets, persistSpec.spec.quality);
-          const primaryLabel = pickPrimaryLabel(targets);
-          const primary = variants[primaryLabel]?.file ?? Object.values(variants)[0]?.file;
-          if (primary) {
-            const image: UploadedImage = {
-              id: Math.random().toString(36).slice(2),
-              originalFile: source,
-              originalWidth: crop.croppedImage.naturalWidth,
-              originalHeight: crop.croppedImage.naturalHeight,
-              originalSize: source.size,
-              file: primary,
-              preview: '',
-              width: crop.croppedImage.naturalWidth,
-              height: crop.croppedImage.naturalHeight,
-              size: primary.size,
-              variants,
-            };
-            await onPersist(image);
-          }
-        } catch { /* user can re-upload from Documents */ }
-      }
+      await persistCroppedImage();
     } catch (err) {
       if ((err as DOMException)?.name === 'AbortError') return;
-      setError(t('ocr.errorScanFailed'));
+      // Worker crash or unexpected error — still keep the photo and let the
+      // user fill in fields manually instead of forcing a re-upload.
+      setResult(EMPTY_FIELDS);
+      await persistCroppedImage();
     } finally {
       setScanning(false);
     }
@@ -273,7 +284,16 @@ export function IdCardScanner({ onDetected, onPersist, onClear, disabled, existi
         </div>
       )}
 
-      {result && !scanning && (
+      {result && !scanning && isEmptyResult(result) && (
+        <div className="flex items-center justify-between gap-2 text-xs border border-line rounded-md p-2 bg-surface-shallow">
+          <span className="text-subtle">{t('ocr.noFieldsDetected')}</span>
+          <Button variant="ghost" size="sm" onClick={reset} startIcon={<Trash2 size={14} />}>
+            {t('ocr.rescan')}
+          </Button>
+        </div>
+      )}
+
+      {result && !scanning && !isEmptyResult(result) && (
         <div className="flex flex-col gap-1.5 text-xs border border-line rounded-md p-2 bg-surface-shallow">
           {currentFields ? (
             <>
