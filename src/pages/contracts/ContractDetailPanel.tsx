@@ -19,6 +19,7 @@ import { getStateColor, getStateLabel } from './contractUtils';
 import { ContractActionButtons } from './ContractActions';
 import { WalletsTab } from './wallet/WalletsTab';
 import { DeviceTab } from './DeviceTab';
+import { SigningTab } from './SigningTab';
 import { BillReceipt } from './workspace/BillReceipt';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { CustomerPickerModal } from './CustomerPickerModal';
@@ -177,9 +178,9 @@ interface EntityMedia {
 
 // ── Tabs ─────────────────────────────────────────────────────────────────────
 
-type DetailTab = 'overview' | 'money' | 'device' | 'customers' | 'notes';
+type DetailTab = 'overview' | 'money' | 'device' | 'customers' | 'signing' | 'notes';
 
-const TABS: DetailTab[] = ['overview', 'money', 'device', 'customers', 'notes'];
+const TABS: DetailTab[] = ['overview', 'money', 'device', 'customers', 'signing', 'notes'];
 
 type MoneySection = 'installments' | 'txns' | 'wallets' | 'bills';
 
@@ -395,6 +396,7 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
         {activeTab === 'device' && (
           <DeviceTab contract={contract} onRequestAction={setRequestedAction} />
         )}
+        {activeTab === 'signing' && <SigningTab contractId={contractId} />}
       </div>
 
       {/* Contract actions */}
