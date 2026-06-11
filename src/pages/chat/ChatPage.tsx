@@ -46,6 +46,23 @@ export function ChatPage() {
     return () => { unsubBranch(); unsubChat(); };
   }, [user?.branch_id, queryClient]);
 
+  // Refetch the inbox when the tab regains focus or the page becomes visible.
+  // The 60s poll + WS keep the list fresh while the tab is active; this covers
+  // the gap where the user was away and WS may have dropped events.
+  useEffect(() => {
+    const refresh = () => {
+      queryClient.invalidateQueries({ queryKey: ['chat-inbox'] });
+      queryClient.invalidateQueries({ queryKey: ['nav', 'chat-unread'] });
+    };
+    const onVisibility = () => { if (document.visibilityState === 'visible') refresh(); };
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [queryClient]);
+
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -98,6 +115,30 @@ export function ChatPage() {
     [data?.data],
   );
   const totalCount = data?.totalCount ?? 0;
+
+  // New chat messages fire on `chat:contract:<id>` only — `chat:branch:<id>`
+  // carries status / pinned-note events, not message events (see doc 66 §2).
+  // So the list must subscribe to every visible thread to catch incoming
+  // messages, otherwise unread badges + order lag behind the open thread until
+  // the 60s poll catches up.
+  //
+  // Key on a stable string of contract IDs so the subscription set doesn't
+  // churn on every refetch (which would issue WS subscribe/unsubscribe frames
+  // for unchanged channels).
+  const visibleContractIdsKey = useMemo(
+    () => rows.map(r => r.contract_id).sort((a, b) => a - b).join(','),
+    [rows],
+  );
+  useEffect(() => {
+    if (!visibleContractIdsKey) return;
+    const ids = visibleContractIdsKey.split(',').map(Number);
+    const refresh = () => {
+      queryClient.invalidateQueries({ queryKey: ['chat-inbox'] });
+      queryClient.invalidateQueries({ queryKey: ['nav', 'chat-unread'] });
+    };
+    const unsubs = ids.map(id => wsClient.subscribe(`chat:contract:${id}`, refresh));
+    return () => { unsubs.forEach(u => u()); };
+  }, [visibleContractIdsKey, queryClient]);
 
   const statusFilterOptions = useMemo(() => [
     ...CHAT_STATUS_VALUES.map(v => ({ value: v, label: t(`chat.status.${v}`) })),
