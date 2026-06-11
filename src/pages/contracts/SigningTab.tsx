@@ -10,8 +10,11 @@
 // 2026-06-11_ALERT_signing_history_view_403.md), the tab falls back to
 // rendering party-only groups so the surface still loads.
 //
-// Sign / void / create actions are NOT wired in this iteration — they'll come
-// once the backend gap is resolved and the modal flows are designed.
+// Sign / void / create actions are NOT exposed in this iteration. The Sign
+// and Void modals exist (SigningVoidModal, SigningSignModal) and were
+// verified end-to-end manually; entry points are hidden until the action
+// surface (BE-driven action list, permission gating, manual create) is
+// settled.
 
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -307,19 +310,21 @@ function SigningCard({ signing, parties }: {
               <span className="text-xs text-subtle">v{signing.version}</span>
             )}
           </div>
-          <div className="text-xs text-subtle mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
-            {signing.category && (
-              <span>{t(`signing.category_${signing.category}`, { defaultValue: signing.category })}</span>
-            )}
-            <span>{t('signing.createdAt')} <DateTime value={signing.created_at} /></span>
+          <div className="text-xs text-subtle mt-1 flex flex-col gap-0.5">
+            <div className="flex flex-wrap gap-x-3">
+              {signing.category && (
+                <span>{t(`signing.category_${signing.category}`, { defaultValue: signing.category })}</span>
+              )}
+              <span>{t('signing.createdAt')} <DateTime value={signing.created_at} /></span>
+              {ttl && signing.status === 'COLLECTING' && (
+                <span className="text-warning-fg">{t('signing.ttlLabel')}: <span className="tabular-nums">{ttl}</span></span>
+              )}
+            </div>
             {signing.sealed_at && (
-              <span>· {t('signing.sealedAt')} <DateTime value={signing.sealed_at} /></span>
+              <div>{t('signing.sealedAt')} <DateTime value={signing.sealed_at} /></div>
             )}
             {signing.voided_at && (
-              <span>· {t('signing.voidedAt')} <DateTime value={signing.voided_at} /></span>
-            )}
-            {ttl && signing.status === 'COLLECTING' && (
-              <span className="text-warning-fg">· {t('signing.ttlLabel')}: <span className="tabular-nums">{ttl}</span></span>
+              <div>{t('signing.voidedAt')} <DateTime value={signing.voided_at} /></div>
             )}
           </div>
           {signing.void_reason && (
@@ -368,9 +373,7 @@ function SigningCard({ signing, parties }: {
               <div className="shrink-0 text-right text-[11px] text-subtle tabular-nums">
                 {p.signed_at ? (
                   <Tooltip content={<DateTime value={p.signed_at} />}>
-                    <span>
-                      <DateTime value={p.signed_at} showTime={false} />
-                    </span>
+                    <span><DateTime value={p.signed_at} showTime={false} /></span>
                   </Tooltip>
                 ) : (
                   <span className="text-warning-fg">{t('signing.partyPending')}</span>
