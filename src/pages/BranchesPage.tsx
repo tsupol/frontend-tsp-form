@@ -2,11 +2,11 @@ import { useState, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  DataTable, DataTableColumnHeader, DataTableFooter, MobileHeader,
+  DataTable, MobileHeader,
   Input, Badge, Modal, Button, Select, PopOver,
-  type ColumnDef, type SortingState,
+  type SortingState,
 } from 'tsp-form';
-import { AlertTriangle, ArrowRightFromLine, Plus, Pencil, Power, Search, SlidersHorizontal } from 'lucide-react';
+import { ArrowRightFromLine, ExternalLink, Plus, Pencil, Power, Search, SlidersHorizontal } from 'lucide-react';
 import { apiClient, ApiError } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { PhoneInput } from '../components/PhoneInput';
@@ -25,11 +25,8 @@ interface Branch {
   branch_lat: number | null;
   branch_lng: number | null;
   line_id: string | null;
-  // Returned by v_branches IF the backend extends it (see
-  // UI_FEEDBACK/2026-06-11_ALERT_v_branches_missing_contact_urls.md).
-  // Until then both are undefined on read; writes still work via the RPC.
-  google_map_url?: string | null;
-  facebook_url?: string | null;
+  google_map_url: string | null;
+  facebook_url: string | null;
 }
 
 interface BranchEditModel {
@@ -53,6 +50,13 @@ const EMPTY_EDIT: BranchEditModel = {
   branch_lat: '', branch_lng: '', line_id: '',
   google_map_url: '', facebook_url: '',
 };
+
+// Cheap sanity check for the preview affordance — show the open-in-new-tab
+// icon only when the field looks like an actual http(s) URL. Avoids dangling
+// the icon on partial typing or blank values.
+function isPreviewableUrl(v: string): boolean {
+  return /^https?:\/\/\S+/i.test(v.trim());
+}
 
 // Compute the COALESCE patch per fn_branch_update semantics:
 //   - field unchanged → omit (don't send) → null at the RPC layer → no-touch
@@ -262,63 +266,13 @@ export function BranchesPage() {
     } finally { setModalSaving(false); }
   };
 
-  // ── Columns ──
-
-  const columns: ColumnDef<Branch>[] = [
-    {
-      accessorKey: 'code',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('org.code')} />,
-      cell: ({ row }) => <span className="font-mono text-sm">{row.original.code}</span>,
-      className: 'w-[15%] min-w-24',
-    },
-    {
-      accessorKey: 'name',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('org.name')} />,
-      cell: ({ row }) => <span className="text-sm">{row.original.name}</span>,
-      className: 'w-[30%] min-w-40',
-    },
-    {
-      accessorKey: 'branch_type',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('org.branchTypeLabel')} />,
-      cell: ({ row }) => (
-        <Badge size="sm" color={BRANCH_TYPE_COLORS[row.original.branch_type] ?? 'default'}>
-          {t(`org.branchType.${row.original.branch_type}`)}
-        </Badge>
-      ),
-      className: 'w-[15%] min-w-28',
-    },
-    {
-      accessorKey: 'address',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('org.address')} />,
-      cell: ({ row }) => <span className="text-xs text-subtle truncate">{row.original.address ?? '—'}</span>,
-      className: 'w-[25%] min-w-32',
-    },
-    {
-      id: 'status',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('common.status')} />,
-      cell: ({ row }) => row.original.is_active
-        ? <Badge size="sm" color="success">{t('common.active')}</Badge>
-        : <Badge size="sm" color="default">{t('common.inactive')}</Badge>,
-      className: 'w-[10%] min-w-20',
-    },
-    {
-      id: 'actions',
-      header: () => null,
-      cell: ({ row }) => (
-        <button
-          className="p-1 rounded hover:bg-surface-hover transition-colors cursor-pointer"
-          onClick={(e: React.MouseEvent) => { e.stopPropagation(); openEdit(row.original); }}
-          aria-label={t('common.edit')}
-        >
-          <Pencil size={14} className="opacity-50" />
-        </button>
-      ),
-      enableSorting: false,
-      className: 'w-10',
-    },
-  ];
-
   const activeFilterCount = (filterType ? 1 : 0) + (filterCompany ? 1 : 0);
+
+  // Resolve company name once per row so we don't keep doing array.find inside render.
+  const companyById = useMemo(
+    () => new Map(companies.map(c => [c.id, c.name])),
+    [companies],
+  );
 
   return (
     <>
@@ -477,7 +431,6 @@ export function BranchesPage() {
         {/* Desktop DataTable */}
         <DataTable<Branch>
           data={paginated}
-          columns={columns}
           sorting={sorting}
           onSortingChange={setSorting}
           enablePagination
@@ -486,45 +439,51 @@ export function BranchesPage() {
           pageSizeOptions={[25, 50]}
           rowCount={totalCount}
           onPageChange={({ pageIndex: pi, pageSize: ps }) => { setPageIndex(pi); setPageSize(ps); }}
-          className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
+          className={`flex-1 min-h-0 ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
           noResults={<div className="p-8 text-center text-subtle">{isLoading ? t('common.loading') : t('common.noData')}</div>}
-        />
-
-        {/* Mobile cards */}
-        <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60' : ''}`}>
-          <div className="flex-1 overflow-auto better-scroll pb-8">
-            {filtered.length === 0 ? (
-              <div className="p-8 text-center text-subtle">{isLoading ? t('common.loading') : t('common.noData')}</div>
-            ) : (
-              <div className="flex flex-col divide-y divide-line">
-                {paginated.map(b => (
-                  <div key={b.id} className="px-4 py-3 cursor-pointer active:bg-surface-hover" onClick={() => openEdit(b)}>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm">{b.name}</span>
-                      <span className="text-xs text-subtle font-mono">{b.code}</span>
-                      <Badge size="sm" color={BRANCH_TYPE_COLORS[b.branch_type] ?? 'default'}>
-                        {t(`org.branchType.${b.branch_type}`)}
-                      </Badge>
-                      {!b.is_active && <Badge size="sm" color="default">{t('common.inactive')}</Badge>}
-                    </div>
-                    {b.address && <div className="text-xs text-subtle mt-0.5 truncate">{b.address}</div>}
+          renderRow={(row) => {
+            const b = row.original;
+            const companyName = companyById.get(b.company_id);
+            return (
+              <div
+                className="flex items-start gap-3 px-3 py-2.5 border-b border-line hover:bg-surface-hover transition-colors cursor-pointer"
+                onClick={() => openEdit(b)}
+              >
+                <div className="flex-1 min-w-0 space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <span className="text-sm font-medium truncate">{b.name}</span>
+                    <span className="text-[11px] text-subtle font-mono">{b.code}</span>
+                    <Badge size="sm" color={BRANCH_TYPE_COLORS[b.branch_type] ?? 'default'}>
+                      {t(`org.branchType.${b.branch_type}`)}
+                    </Badge>
+                    {!b.is_active && (
+                      <Badge size="sm" color="default">{t('common.inactive')}</Badge>
+                    )}
                   </div>
-                ))}
+                  <div className="flex items-center gap-x-3 gap-y-0.5 text-[11px] text-subtle flex-wrap min-w-0">
+                    {isHoldingLevel && companyName && (
+                      <span className="truncate">{companyName}</span>
+                    )}
+                    {b.address && (
+                      <span className="truncate">{b.address}</span>
+                    )}
+                    {b.phone && (
+                      <span className="tabular-nums shrink-0">{b.phone}</span>
+                    )}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="shrink-0 p-1 rounded hover:bg-surface-hover transition-colors cursor-pointer bg-transparent border-none"
+                  onClick={(e) => { e.stopPropagation(); openEdit(b); }}
+                  aria-label={t('common.edit')}
+                >
+                  <Pencil size={14} className="opacity-50" />
+                </button>
               </div>
-            )}
-          </div>
-          {totalCount > 0 && (
-            <DataTableFooter
-              currentPage={pageIndex + 1}
-              totalPages={Math.ceil(totalCount / pageSize)}
-              onPageChange={(p) => setPageIndex(p - 1)}
-              pageSize={pageSize}
-              pageSizeOptions={[25, 50]}
-              onPageSizeChange={(ps) => { setPageSize(ps); setPageIndex(0); }}
-              totalRows={totalCount}
-            />
-          )}
-        </div>
+            );
+          }}
+        />
       </div>
 
       {/* Create/Edit Modal */}
@@ -594,23 +553,32 @@ export function BranchesPage() {
                 </div>
                 <div className="flex flex-col">
                   <label className="form-label">{t('branches.googleMapUrl')}</label>
-                  <Input value={modalData.google_map_url} onChange={(e) => updateField('google_map_url', e.target.value)} size="md" className="w-full" placeholder="https://maps.app.goo.gl/..." />
+                  <Input
+                    value={modalData.google_map_url}
+                    onChange={(e) => updateField('google_map_url', e.target.value)}
+                    size="md"
+                    className="w-full"
+                    placeholder="https://maps.app.goo.gl/..."
+                    endIcon={isPreviewableUrl(modalData.google_map_url) ? <ExternalLink size={14} /> : undefined}
+                    onEndIconClick={isPreviewableUrl(modalData.google_map_url)
+                      ? () => window.open(modalData.google_map_url, '_blank', 'noopener,noreferrer')
+                      : undefined}
+                  />
                 </div>
                 <div className="flex flex-col">
                   <label className="form-label">{t('branches.facebookUrl')}</label>
-                  <Input value={modalData.facebook_url} onChange={(e) => updateField('facebook_url', e.target.value)} size="md" className="w-full" placeholder="https://facebook.com/..." />
+                  <Input
+                    value={modalData.facebook_url}
+                    onChange={(e) => updateField('facebook_url', e.target.value)}
+                    size="md"
+                    className="w-full"
+                    placeholder="https://facebook.com/..."
+                    endIcon={isPreviewableUrl(modalData.facebook_url) ? <ExternalLink size={14} /> : undefined}
+                    onEndIconClick={isPreviewableUrl(modalData.facebook_url)
+                      ? () => window.open(modalData.facebook_url, '_blank', 'noopener,noreferrer')
+                      : undefined}
+                  />
                 </div>
-                {/* Backend gap warning — v_branches doesn't expose these two
-                    columns yet (see UI_FEEDBACK ALERT). Writes work; existing
-                    values can't be shown until the view is extended. */}
-                {modalOrig && modalOrig.google_map_url === undefined && (
-                  <div className="alert alert-warning">
-                    <AlertTriangle size={14} />
-                    <div className="alert-description text-xs">
-                      {t('branches.viewMissingUrlsWarning')}
-                    </div>
-                  </div>
-                )}
               </>
             )}
 

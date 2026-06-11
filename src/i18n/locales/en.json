@@ -2876,8 +2876,7 @@
     "lat": "Latitude",
     "lng": "Longitude",
     "googleMapUrl": "Google Maps URL",
-    "facebookUrl": "Facebook URL",
-    "viewMissingUrlsWarning": "Saved Google Maps and Facebook URLs aren't shown here yet — backend gap (UI_FEEDBACK 2026-06-11_ALERT_v_branches_missing_contact_urls). Leaving these blank may overwrite existing values."
+    "facebookUrl": "Facebook URL"
   },
   "commission": {
     "staffTitle": "Staff Commission",
@@ -3482,7 +3481,7 @@
   },
   "signing": {
     "empty": "No signings yet",
-    "historyViewUnavailable": "Signing history view is unavailable on this account — showing party rows only. See UI_FEEDBACK 2026-06-11_ALERT_signing_history_view_403.",
+    "historyViewUnavailable": "Signing history view is unavailable on this account — showing party rows only.",
     "pendingCallout": "Waiting for {{count}} party to sign",
     "pendingCallout_plural": "Waiting for {{count}} parties to sign",
     "ttlLabel": "TTL",
