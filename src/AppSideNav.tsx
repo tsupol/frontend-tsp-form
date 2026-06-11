@@ -54,6 +54,7 @@ import { useTheme } from './contexts/ThemeContext';
 import { useNavGuard } from './contexts/NavGuardContext';
 import { isLocalDev } from './lib/devEnv';
 import { useNavCounts } from './hooks/useNavCounts';
+import { NotificationMenuItem } from './components/NotificationMenu';
 
 const lgQuery = window.matchMedia('(min-width: 1024px)');
 const subscribeLg = (cb: () => void) => { lgQuery.addEventListener('change', cb); return () => lgQuery.removeEventListener('change', cb); };
@@ -172,6 +173,7 @@ export const AppSideNav = () => {
     unreadChatCount,
     callCenterMineCount,
     legalCasesQueuedCount,
+    unreadNotifCount,
   } = useNavCounts();
 
   // Render an icon with an optional count badge.
@@ -377,6 +379,14 @@ export const AppSideNav = () => {
           { key: 'collections-config', icon: <Settings size="1rem" />, label: t('nav.dunningConfig'), path: '/admin/collections/config' },
         ] : []),
       ],
+    },
+    { type: 'separator', key: 'sep-notifications' },
+    {
+      type: 'custom',
+      key: 'notifications',
+      render: ({ collapsed, isMobile: m }) => (
+        <NotificationMenuItem collapsed={collapsed} isMobile={m} unreadCount={unreadNotifCount} />
+      ),
     },
     ...(isLocalDev() ? [{
       key: 'dev', icon: <FlaskConical size="1rem" />, label: 'Dev',

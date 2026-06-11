@@ -145,6 +145,19 @@ export function useNavCounts() {
   });
   const unreadChatCount = (unreadChatRows ?? []).reduce((sum, r) => sum + (r.unread_count ?? 0), 0);
 
+  // Notification center — sum unread_count across categories from
+  // v_staff_notification_summary (JWT-scoped, security_invoker).
+  const { data: notifSummaryRows } = useQuery({
+    queryKey: ['nav', 'notif-unread-summary', sk],
+    queryFn: () => apiClient.get<{ unread_count: number }[]>(
+      `/v_staff_notification_summary?select=unread_count`,
+    ),
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+    retry: false,
+  });
+  const unreadNotifCount = (notifSummaryRows ?? []).reduce((sum, r) => sum + (r.unread_count ?? 0), 0);
+
   return {
     pendingApprovals,
     pendingSlips,
@@ -156,5 +169,6 @@ export function useNavCounts() {
     unreadChatCount,
     callCenterMineCount,
     legalCasesQueuedCount,
+    unreadNotifCount,
   };
 }

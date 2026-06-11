@@ -284,7 +284,30 @@
     "remittance": "Remittance",
     "payments": "Payments Received",
     "bills": "Bills",
-    "auditFlags": "Audit Flags"
+    "auditFlags": "Audit Flags",
+    "notifications": "Notifications"
+  },
+  "notifCenter": {
+    "title": "Notifications",
+    "markAllRead": "Mark all as read",
+    "empty": "No notifications — you're all caught up.",
+    "loading": "Loading...",
+    "error": "Couldn't load notifications.",
+    "viewAll": "View all",
+    "tab": {
+      "all": "All",
+      "contract": "Contracts",
+      "chat": "Chat",
+      "payment": "Payments",
+      "system": "System"
+    },
+    "time": {
+      "justNow": "just now",
+      "minAgo": "{{n}} min ago",
+      "hrAgo": "{{n}} hr ago",
+      "dayAgo": "{{n}} d ago",
+      "weekAgo": "{{n}} wk ago"
+    }
   },
   "user": {
     "id": "User ID",
