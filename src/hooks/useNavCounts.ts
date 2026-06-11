@@ -100,6 +100,37 @@ export function useNavCounts() {
   });
   const pendingPaymentCount = pendingPaymentCountData?.totalCount ?? 0;
 
+  // Call-center: open tickets assigned to the current user. is_mine + is_takeable
+  // are projected columns on v_ops_call_ticket_list. Goes to zero when the user
+  // clears their pickups — exactly the daily-actionable signal we want.
+  const { data: callsMineData } = useQuery({
+    queryKey: ['nav', 'call-center-mine', sk],
+    queryFn: () => apiClient.getPaginated<{ ticket_code: string }>(
+      `/v_ops_call_ticket_list?is_mine=is.true&is_takeable=is.true&select=ticket_code`,
+      { page: 1, pageSize: 1 },
+    ),
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+    retry: false,
+  });
+  const callCenterMineCount = callsMineData?.totalCount ?? 0;
+
+  // Legal cases: queued (awaiting pickup). Team-managed, not per-user; small
+  // number, drops to zero when triage is done.
+  const isLegalRole = ['COMPANY_REPO', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
+  const { data: legalQueuedData } = useQuery({
+    queryKey: ['nav', 'legal-cases-queued', sk],
+    queryFn: () => apiClient.getPaginated<{ case_code: string }>(
+      `/v_legal_case_list?status=eq.QUEUED&select=case_code`,
+      { page: 1, pageSize: 1 },
+    ),
+    enabled: isLegalRole,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+    retry: false,
+  });
+  const legalCasesQueuedCount = legalQueuedData?.totalCount ?? 0;
+
   // Chat unread — sum unread_count from v_branch_chat_list (RLS-scoped to branch).
   // Only branch users have access; the view returns empty for company/holding roles.
   const { data: unreadChatRows } = useQuery({
@@ -123,5 +154,7 @@ export function useNavCounts() {
     draftContractsCount,
     pendingPaymentCount,
     unreadChatCount,
+    callCenterMineCount,
+    legalCasesQueuedCount,
   };
 }

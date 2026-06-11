@@ -232,6 +232,14 @@
     "bankAccounts": "บัญชีธนาคาร",
     "holidays": "วันหยุด",
     "dunning": "ทวงถาม",
+    "dunningSystem": "ระบบติดตามทวงยอด",
+    "collections": "ติดตามทวงยอด",
+    "groupCollectionsDaily": "งานประจำวัน",
+    "groupCollectionsReports": "รายงาน",
+    "groupCollectionsConfig": "ตั้งค่า",
+    "overdueWorklist": "ทวงรายวัน",
+    "timelineOverview": "ภาพรวมไทม์ไลน์",
+    "dunningConfig": "ตั้งค่าระบบทวง",
     "blacklist": "บัญชีดำ",
     "icloud": "iCloud Pool",
     "dealPartnerRates": "อัตราพาร์ทเนอร์",
@@ -3478,6 +3486,16 @@
     "JOURNAL": "บันทึกบัญชี {{code}}",
     "cnSuffix": "ออกใบลดหนี้ {{code}}",
     "done": "เรียบร้อย"
+  },
+  "dunningSystem": {
+    "description": "แยกขั้นการทวงเป็น 4 โมดูล — แจ้งเตือนแอป, บัญชีดำ, ศูนย์โทร, ฝ่ายกฎหมาย — แทนแลดเดอร์เดียวของระบบเดิม",
+    "tab_notif": "แจ้งเตือนแอป",
+    "tab_blacklist": "บัญชีดำ",
+    "tab_ops": "ศูนย์โทร",
+    "tab_legal": "ฝ่ายกฎหมาย",
+    "stubBody": "แท็บนี้กำลังจะใช้งานได้ในอีกไม่นาน ระหว่างนี้ใช้หน้าทวงถามเดิมไปก่อน",
+    "timelineDescription": "ตารางทวงยอดรวมทุกโมดูล วันต่อวัน ทั้งเลนแจ้งเตือนแอป บัญชีดำ ศูนย์โทร และฝ่ายกฎหมาย",
+    "timelineStubBody": "ไทม์ไลน์รวมทุกโมดูลจะแสดงที่นี่หลังจากเปิดใช้งานครบทั้ง 4 โมดูล"
   },
   "signing": {
     "empty": "ยังไม่มีรายการเซ็น",

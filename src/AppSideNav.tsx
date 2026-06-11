@@ -39,6 +39,8 @@ import {
   UserCheck, ClipboardCheck,
   // Fanout child icons — Accounting
   CalendarCheck, ArrowUpRight, Receipt, ShieldAlert, Banknote,
+  // Fanout child icons — Collections
+  Calendar,
   // Chat
   MessageSquare,
   // Dev sandbox
@@ -168,6 +170,8 @@ export const AppSideNav = () => {
     draftContractsCount,
     pendingPaymentCount,
     unreadChatCount,
+    callCenterMineCount,
+    legalCasesQueuedCount,
   } = useNavCounts();
 
   // Render an icon with an optional count badge.
@@ -284,7 +288,6 @@ export const AppSideNav = () => {
         { key: 'company-config', icon: <Building2 size="1rem" />, label: t('nav.companyConfig'), path: '/admin/company/config' },
         { type: 'group', key: 'grp-policy', label: t('nav.groupPolicy') },
         { key: 'holidays', icon: <CalendarDays size="1rem" />, label: t('nav.holidays'), path: '/admin/company/holidays' },
-        { key: 'dunning', icon: <AlertTriangle size="1rem" />, label: t('nav.dunning'), path: '/admin/company/dunning' },
         { key: 'blacklist', icon: <ShieldBan size="1rem" />, label: t('nav.blacklist'), path: '/admin/company/blacklist' },
         { key: 'icloud', icon: <Cloud size="1rem" />, label: t('nav.icloud'), path: '/admin/company/icloud' },
         { type: 'group', key: 'grp-staff', label: t('nav.groupStaff') },
@@ -355,17 +358,26 @@ export const AppSideNav = () => {
         ] : []),
       ],
     },
-    ...(['COMPANY_REPO', 'COMPANY_COLLECTOR', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [{
-      key: 'legal', icon: <Scale size="1rem" />, label: t('nav.legal'),
-      path: '/admin/legal/dunning',
+    {
+      key: 'collections',
+      icon: <AlertTriangle size="1rem" />,
+      label: t('nav.collections'),
+      path: '/admin/collections/worklist',
       children: [
-        { key: 'dunning-targets', icon: <AlertTriangle size="1rem" />, label: t('nav.dunningTargets'), path: '/admin/legal/dunning' },
+        { type: 'group', key: 'grp-collections-daily', label: t('nav.groupCollectionsDaily') },
+        { key: 'overdue-worklist', icon: <CalendarDays size="1rem" />, label: t('nav.overdueWorklist'), path: '/admin/collections/worklist' },
+        { key: 'collections-calls', ...iconWithCount(<Headset size="1rem" />, callCenterMineCount), label: t('nav.callCenter'), path: '/admin/collections/calls' },
         ...(['COMPANY_REPO', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
-          { key: 'legal-cases', icon: <Scale size="1rem" />, label: t('nav.legalCases'), path: '/admin/legal/cases' },
+          { key: 'collections-cases', ...iconWithCount(<Scale size="1rem" />, legalCasesQueuedCount), label: t('nav.legalCases'), path: '/admin/collections/cases' },
+        ] : []),
+        { type: 'group' as const, key: 'grp-collections-reports', label: t('nav.groupCollectionsReports') },
+        { key: 'collections-timeline', icon: <Calendar size="1rem" />, label: t('nav.timelineOverview'), path: '/admin/collections/timeline' },
+        ...(['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
+          { type: 'group' as const, key: 'grp-collections-config', label: t('nav.groupCollectionsConfig') },
+          { key: 'collections-config', icon: <Settings size="1rem" />, label: t('nav.dunningConfig'), path: '/admin/collections/config' },
         ] : []),
       ],
-    }] : []),
-    { key: 'call-center', icon: <Headset size="1rem" />, label: t('nav.callCenter'), path: '/admin/call-center' },
+    },
     ...(isLocalDev() ? [{
       key: 'dev', icon: <FlaskConical size="1rem" />, label: 'Dev',
       path: '/dev/signature',

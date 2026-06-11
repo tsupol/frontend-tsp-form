@@ -232,6 +232,14 @@
     "bankAccounts": "Bank Accounts",
     "holidays": "Holidays",
     "dunning": "Dunning",
+    "dunningSystem": "Dunning System",
+    "collections": "Collections",
+    "groupCollectionsDaily": "Daily work",
+    "groupCollectionsReports": "Reports",
+    "groupCollectionsConfig": "Configuration",
+    "overdueWorklist": "Overdue Worklist",
+    "timelineOverview": "Timeline Overview",
+    "dunningConfig": "Dunning Config",
     "blacklist": "Blacklist",
     "icloud": "iCloud Pool",
     "dealPartnerRates": "Partner Rates",
@@ -3478,6 +3486,16 @@
     "JOURNAL": "Journal {{code}}",
     "cnSuffix": "Credit note {{code}} issued",
     "done": "Done"
+  },
+  "dunningSystem": {
+    "description": "Per-module dunning ladders — notification, blacklist, call-center and legal — replacing the legacy single ladder.",
+    "tab_notif": "App notifications",
+    "tab_blacklist": "Blacklist",
+    "tab_ops": "Call Center",
+    "tab_legal": "Legal",
+    "stubBody": "This tab is coming online shortly. The legacy dunning ladder remains available in the meantime.",
+    "timelineDescription": "Cross-module dunning schedule, day-by-day across notification, blacklist, call-center and legal lanes.",
+    "timelineStubBody": "Cross-module fan-out timeline will render here once all four modules are live."
   },
   "signing": {
     "empty": "No signings yet",

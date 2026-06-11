@@ -218,8 +218,8 @@ export function LegalCasesPage() {
   const selectedCaseId = caseIdParam ? Number(caseIdParam) : null;
 
   const setSelectedCaseId = useCallback((id: number | null) => {
-    if (id) navigate(`/admin/legal/cases/${id}`, { replace: true });
-    else navigate('/admin/legal/cases', { replace: true });
+    if (id) navigate(`/admin/collections/cases/${id}`, { replace: true });
+    else navigate('/admin/collections/cases', { replace: true });
   }, [navigate]);
 
   // Filters

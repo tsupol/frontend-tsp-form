@@ -235,7 +235,7 @@ export function DunningConfigPage() {
         <div className="mobile-header-end">
           <button
             className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-subtle hover:text-fg"
-            onClick={() => navigate('/admin/legal/dunning')}
+            onClick={() => navigate('/admin/collections/worklist')}
           >
             <ExternalLink size={18} />
           </button>
@@ -249,7 +249,7 @@ export function DunningConfigPage() {
             <h1 className="heading-2">{t('settings.dunning.title')}</h1>
             <p className="text-sm text-subtle mt-1">{t('settings.dunning.description')}</p>
           </div>
-          <Button variant="ghost" size="sm" startIcon={<ExternalLink size={14} />} onClick={() => navigate('/admin/legal/dunning')}>
+          <Button variant="ghost" size="sm" startIcon={<ExternalLink size={14} />} onClick={() => navigate('/admin/collections/worklist')}>
             {t('settings.dunning.viewTargets')}
           </Button>
         </div>

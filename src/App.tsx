@@ -39,7 +39,6 @@ import { BuybackPage } from './pages/inventory/BuybackPage';
 import { BuybackWizardPage } from './pages/inventory/BuybackWizardPage';
 import { BarcodesPage } from './pages/inventory/BarcodesPage';
 import { PriceCheckPage } from './pages/PriceCheckPage';
-import { LegalLayout } from './pages/legal/LegalLayout';
 import { DunningTargetsPage } from './pages/legal/DunningTargetsPage';
 import { LegalCasesPage } from './pages/legal/LegalCasesPage';
 import { StaffCommissionPage } from './pages/commission/StaffCommissionPage';
@@ -59,6 +58,9 @@ import { CompanyConfigDetailPage } from './pages/company/CompanyConfigDetailPage
 import { BankAccountsPage } from './pages/company/BankAccountsPage';
 import { HolidaysPage } from './pages/company/HolidaysPage';
 import { DunningConfigPage } from './pages/company/DunningConfigPage';
+import { DunningSystemPage } from './pages/dunning/DunningSystemPage';
+import { CollectionsLayout } from './pages/collections/CollectionsLayout';
+import { TimelineOverviewPage } from './pages/collections/TimelineOverviewPage';
 import { BlacklistPage } from './pages/company/BlacklistPage';
 import { ICloudPoolPage } from './pages/company/ICloudPoolPage';
 import { BranchPinPage } from './pages/company/BranchPinPage';
@@ -313,17 +315,8 @@ function App() {
         }
       />
 
-      {/* Call Center */}
-      <Route
-        path="/admin/call-center"
-        element={
-          <ProtectedRoute>
-            <AdminLayout>
-              <TicketQueuePage />
-            </AdminLayout>
-          </ProtectedRoute>
-        }
-      />
+      {/* Call Center (legacy path — redirect to Collections section) */}
+      <Route path="/admin/call-center" element={<Navigate to="/admin/collections/calls" replace />} />
 
       {/* Pricing */}
       <Route
@@ -693,23 +686,57 @@ function App() {
         }
       />
 
-      {/* Legal */}
+      {/* Legal (legacy paths — redirect to Collections section) */}
+      <Route path="/admin/legal/dunning" element={<Navigate to="/admin/collections/worklist" replace />} />
+      <Route path="/admin/legal/cases/:caseId?" element={<Navigate to="/admin/collections/cases" replace />} />
+
+      {/* Collections — unified section (worklist / calls / cases / timeline / config) */}
       <Route
-        path="/admin/legal/dunning"
+        path="/admin/collections/worklist"
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <LegalLayout><DunningTargetsPage /></LegalLayout>
+              <CollectionsLayout><DunningTargetsPage /></CollectionsLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
       />
       <Route
-        path="/admin/legal/cases/:caseId?"
+        path="/admin/collections/calls"
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <LegalLayout><LegalCasesPage /></LegalLayout>
+              <CollectionsLayout><TicketQueuePage /></CollectionsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/collections/cases/:caseId?"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <CollectionsLayout><LegalCasesPage /></CollectionsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/collections/timeline"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <CollectionsLayout><TimelineOverviewPage /></CollectionsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/collections/config"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <CollectionsLayout><DunningSystemPage /></CollectionsLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
@@ -768,6 +795,8 @@ function App() {
           </ProtectedRoute>
         }
       />
+      {/* /admin/dunning legacy path — redirect to Collections config */}
+      <Route path="/admin/dunning" element={<Navigate to="/admin/collections/config" replace />} />
       <Route
         path="/admin/company/blacklist"
         element={
