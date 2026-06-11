@@ -3508,7 +3508,16 @@
     "reason_DEVICE_HANDOVER": "Device handover",
     "reason_COMPLIANCE_AUDIT": "Compliance audit",
     "reason_CUSTOMER_REQUEST": "Customer request",
-    "reason_OTHER": "Other"
+    "reason_OTHER": "Other",
+    "voidTitle": "Void this signing",
+    "voidConfirm": "Void",
+    "voidReasonPlaceholder": "Why are you voiding this signing?",
+    "voidHint": "The signing will move to VOIDED state. Any captured signatures stay on the audit trail.",
+    "signTitle": "Capture signature",
+    "signConfirm": "Sign",
+    "signStaffPartyUnsupported": "Staff witness signatures are not yet supported in this UI.",
+    "partyAlreadySigned": "This party has already signed.",
+    "partyOnlyOnCollecting": "Signing is only possible while the signing is in COLLECTING state."
   },
   "chat": {
     "title": "Chat",
@@ -3553,7 +3562,7 @@
     },
     "statusFilter": {
       "label": "Status",
-      "all": "All",
+      "all": "All statuses",
       "none": "No flag"
     },
     "setStatus": {

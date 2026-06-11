@@ -3508,7 +3508,16 @@
     "reason_DEVICE_HANDOVER": "รับเครื่อง",
     "reason_COMPLIANCE_AUDIT": "Compliance",
     "reason_CUSTOMER_REQUEST": "ลูกค้าร้องขอ",
-    "reason_OTHER": "อื่นๆ"
+    "reason_OTHER": "อื่นๆ",
+    "voidTitle": "ยกเลิกการเซ็นนี้",
+    "voidConfirm": "ยกเลิก",
+    "voidReasonPlaceholder": "ระบุเหตุผลที่ยกเลิก",
+    "voidHint": "การเซ็นจะถูกเปลี่ยนสถานะเป็น VOIDED ลายเซ็นที่เก็บไว้แล้วยังคงอยู่ใน audit",
+    "signTitle": "เซ็นชื่อ",
+    "signConfirm": "เซ็น",
+    "signStaffPartyUnsupported": "ระบบยังไม่รองรับลายเซ็นพยานพนักงานในตอนนี้",
+    "partyAlreadySigned": "คู่สัญญารายนี้เซ็นไปแล้ว",
+    "partyOnlyOnCollecting": "เซ็นได้เฉพาะตอนสถานะเป็น COLLECTING"
   },
   "chat": {
     "title": "แชท",
@@ -3553,7 +3562,7 @@
     },
     "statusFilter": {
       "label": "สถานะ",
-      "all": "ทั้งหมด",
+      "all": "ทุกสถานะ",
       "none": "ไม่มี flag"
     },
     "setStatus": {

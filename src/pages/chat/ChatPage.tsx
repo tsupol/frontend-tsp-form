@@ -221,7 +221,7 @@ export function ChatPage() {
               that it collapses into a SlidersHorizontal PopOver. */}
           {(isRoot || !isMobile) && (
             <div className="flex-none p-2 border-b border-line flex items-center gap-2">
-              <div className="flex-1 min-w-0 max-w-md">
+              <div className="flex-1 min-w-0 max-w-xs">
                 <Input
                   size="sm"
                   className="w-full"
@@ -232,7 +232,8 @@ export function ChatPage() {
               </div>
               <Button
                 size="sm"
-                variant={unreadOnly ? 'primary' : 'outline'}
+                variant={unreadOnly ? 'solid' : 'outline'}
+                color={unreadOnly ? 'success' : undefined}
                 startIcon={unreadOnly
                   ? <CheckCircle2 size={14} />
                   : <Circle size={14} className="text-subtle" />}
