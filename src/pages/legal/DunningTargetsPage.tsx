@@ -406,7 +406,7 @@ export function DunningTargetsPage() {
                                 {item.customer_name ?? '—'} · {item.branch_name}
                               </span>
                             </div>
-                            <span className="tabular-nums text-danger font-medium shrink-0 ml-2">
+                            <span className={`tabular-nums font-medium shrink-0 ml-2 ${item.overdue_amount > 0 ? 'text-danger' : 'text-subtle'}`}>
                               {fmt(item.overdue_amount)}
                             </span>
                           </div>
@@ -458,11 +458,11 @@ export function DunningTargetsPage() {
                         </Button>
                       </div>
 
-                      {/* Overdue summary */}
-                      <div className="mb-4 px-3 py-2.5 rounded-md bg-danger/5 border border-danger/20">
+                      {/* Overdue summary — neutral surface when nothing is overdue */}
+                      <div className={`mb-4 px-3 py-2.5 rounded-md border ${selected.overdue_amount > 0 ? 'bg-danger/5 border-danger/20' : 'bg-surface border-line'}`}>
                         <div className="flex justify-between text-sm">
                           <span className="text-subtle">{t('legal.overdueAmount')}</span>
-                          <span className="tabular-nums font-semibold text-danger">{fmt(selected.overdue_amount)}</span>
+                          <span className={`tabular-nums font-semibold ${selected.overdue_amount > 0 ? 'text-danger' : 'text-fg'}`}>{fmt(selected.overdue_amount)}</span>
                         </div>
                         <div className="flex justify-between text-xs mt-1">
                           <span className="text-subtle">{t('legal.overdueCount')}</span>
