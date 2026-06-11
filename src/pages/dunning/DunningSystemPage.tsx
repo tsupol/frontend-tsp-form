@@ -1,14 +1,14 @@
-// Dunning Config admin page — replaces the legacy single-ladder
-// `DunningConfigPage` per UI_SUMMARY/110_DUNNING_SYSTEM_MIGRATION_GUIDE.md and
-// the menu structure recommendation in UI_SUMMARY/112_DUNNING_SYSTEM_MENU_STRUCTURE_RECOMMENDATION.md.
-//
-// 4 modules (notif / blacklist / ops / legal), each surfaced as a tab. The
-// Timeline overview is its own page at /admin/collections/timeline so
-// non-admin viewers can read it without entering this config screen.
+// Dunning Config admin page — 4 modules (notif / blacklist / ops / legal),
+// each surfaced as a tab. The Timeline overview is its own page at
+// /admin/collections/timeline so non-admin viewers can read the schedule
+// without entering this config screen.
 //
 // Each tab body is the same DunningStagesTable component parameterised by
 // module — the per-module differences (extra editable column: reason_code /
 // intent_type / action_code) are encoded in MODULE_CONFIG in dunningTypes.ts.
+//
+// Replaces the legacy single-ladder /admin/company/dunning page per
+// UI_SUMMARY/110_DUNNING_SYSTEM_MIGRATION_GUIDE.md. Old paths redirect.
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';

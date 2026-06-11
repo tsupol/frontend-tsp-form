@@ -57,7 +57,6 @@ import { CompanyConfigRoot } from './pages/company/CompanyConfigRoot';
 import { CompanyConfigDetailPage } from './pages/company/CompanyConfigDetailPage';
 import { BankAccountsPage } from './pages/company/BankAccountsPage';
 import { HolidaysPage } from './pages/company/HolidaysPage';
-import { DunningConfigPage } from './pages/company/DunningConfigPage';
 import { DunningSystemPage } from './pages/dunning/DunningSystemPage';
 import { CollectionsLayout } from './pages/collections/CollectionsLayout';
 import { TimelineOverviewPage } from './pages/collections/TimelineOverviewPage';
@@ -785,17 +784,8 @@ function App() {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/admin/company/dunning"
-        element={
-          <ProtectedRoute>
-            <AdminLayout>
-              <CompanyLayout><DunningConfigPage /></CompanyLayout>
-            </AdminLayout>
-          </ProtectedRoute>
-        }
-      />
-      {/* /admin/dunning legacy path — redirect to Collections config */}
+      {/* Legacy dunning paths — redirect to unified Collections config */}
+      <Route path="/admin/company/dunning" element={<Navigate to="/admin/collections/config" replace />} />
       <Route path="/admin/dunning" element={<Navigate to="/admin/collections/config" replace />} />
       <Route
         path="/admin/company/blacklist"
