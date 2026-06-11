@@ -21,6 +21,7 @@ import { WalletsTab } from './wallet/WalletsTab';
 import { DeviceTab } from './DeviceTab';
 import { SigningTab } from './SigningTab';
 import { AppointmentsSection } from './AppointmentsSection';
+import { CommissionOwnerModal } from './CommissionOwnerModal';
 import { BillReceipt } from './workspace/BillReceipt';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { CustomerPickerModal } from './CustomerPickerModal';
@@ -551,6 +552,12 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
   const [pdfModalOpen, setPdfModalOpen] = useState(false);
   const [printBlockOpen, setPrintBlockOpen] = useState(false);
   const [printBlockReasons, setPrintBlockReasons] = useState<string[]>([]);
+  const [commissionModalOpen, setCommissionModalOpen] = useState(false);
+
+  // Commission owner editable only while the contract is in DRAFT or SAVING
+  // (sale._is_editable). Server enforces the rest as a race-condition net.
+  const commissionEditable =
+    contract.state === 'DRAFT' || contract.state === 'SAVING';
 
   // ID card (primary customer)
   const { data: idCardDocs = [] } = useQuery({
@@ -661,6 +668,26 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
             )}
           </div>
         )}
+        <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-line">
+          <div className="col-span-2 flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <div className="text-xs text-subtle">{t('contract.commissionOwner')}</div>
+              <div className="text-sm truncate">
+                {contract.commission_owner_name ?? '—'}
+              </div>
+            </div>
+            {commissionEditable && (
+              <Button
+                size="sm"
+                variant="outline"
+                startIcon={<Pencil size={13} />}
+                onClick={() => setCommissionModalOpen(true)}
+              >
+                {t('contract.commissionOwner_change')}
+              </Button>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Documents — ID card, signature */}
@@ -824,7 +851,6 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
         {contract.activated_at && <span>{t('contract.activatedAt')}: <DateTime value={contract.activated_at} /></span>}
         {contract.closed_at && <span>{t('contract.closedAt')}: <DateTime value={contract.closed_at} /></span>}
         {contract.close_reason && <span>{t('contract.closeReason')}: {contract.close_reason}</span>}
-        {contract.commission_owner_name && <span>{t('contract.commissionOwner')}: {contract.commission_owner_name}</span>}
         {contract.last_note && <span>{t('contract.lastNote')}: {contract.last_note}</span>}
       </div>
 
@@ -843,6 +869,14 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
         open={pdfModalOpen}
         onClose={() => setPdfModalOpen(false)}
         contract={contract}
+      />
+
+      <CommissionOwnerModal
+        open={commissionModalOpen}
+        onClose={() => setCommissionModalOpen(false)}
+        contractId={contract.id}
+        currentOwnerId={contract.commission_owner_id}
+        currentOwnerName={contract.commission_owner_name}
       />
 
       <Modal open={printBlockOpen} onClose={() => setPrintBlockOpen(false)} maxWidth="28rem" width="100%">
