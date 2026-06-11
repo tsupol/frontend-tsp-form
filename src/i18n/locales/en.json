@@ -3513,6 +3513,7 @@
   "chat": {
     "title": "Chat",
     "searchPlaceholder": "Search customer or contract",
+    "unread": "Unread",
     "unreadOnly": "Unread only",
     "empty": "No conversations",
     "emptyThread": "No messages yet",

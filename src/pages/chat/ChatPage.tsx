@@ -4,9 +4,9 @@ import { useSearchParams } from 'react-router-dom';
 import { useQuery, keepPreviousData, useQueryClient } from '@tanstack/react-query';
 import {
   PageNav, PageNavPanel, MobileHeader, DataTableFooter,
-  Badge, Input, Switch, Select, Tooltip,
+  Badge, Button, Input, PopOver, Switch, Select, Tooltip,
 } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, ChevronDown, Image as ImageIcon, Pin } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, ChevronDown, Image as ImageIcon, Pin, SlidersHorizontal } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { wsClient } from '../../lib/api/ws';
 import { useAuth } from '../../contexts/AuthContext';
@@ -72,6 +72,8 @@ export function ChatPage() {
   const [pageSize, setPageSize] = useState(25);
   const [lightboxKey, setLightboxKey] = useState<string | null>(null);
   const [mobileDetailsOpen, setMobileDetailsOpen] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const activeFilterCount = statusFilter ? 1 : 0;
 
   useEffect(() => { setPageIndex(0); }, [search, unreadOnly, statusFilter]);
   useEffect(() => { setMobileDetailsOpen(false); }, [selectedContractId]);
@@ -214,30 +216,62 @@ export function ChatPage() {
             </div>
           )}
 
-          <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
-            {/* Left panel — inbox list */}
-            <PageNavPanel
-              id="list"
-              className={isMobile ? '' : 'w-1/3 xl:w-1/4 border-r border-line flex flex-col'}
-            >
-              <div className="flex-none flex flex-col gap-2 p-2 border-b border-line">
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 min-w-0">
-                    <Input
-                      size="sm"
-                      className="w-full"
-                      placeholder={t('chat.searchPlaceholder')}
-                      value={searchInput}
-                      onChange={e => handleSearch(e.target.value)}
-                    />
-                  </div>
-                  <label className="inline-flex items-center gap-2 text-xs shrink-0 cursor-pointer">
-                    <Switch size="sm" checked={unreadOnly} onChange={e => setUnreadOnly(e.target.checked)} />
-                    <span>{t('chat.unreadOnly')}</span>
-                  </label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div style={{ width: '12rem' }}>
+          {/* Filter bar — spans both panels on desktop, mirrors the
+              products/models layout. The Select sits inline on >= sm; below
+              that it collapses into a SlidersHorizontal PopOver. */}
+          {(isRoot || !isMobile) && (
+            <div className="flex-none p-2 border-b border-line flex items-center gap-2">
+              <div className="flex-1 min-w-0">
+                <Input
+                  size="sm"
+                  className="w-full"
+                  placeholder={t('chat.searchPlaceholder')}
+                  value={searchInput}
+                  onChange={e => handleSearch(e.target.value)}
+                />
+              </div>
+              <label className="inline-flex items-center gap-2 text-xs shrink-0 cursor-pointer">
+                <Switch size="sm" checked={unreadOnly} onChange={e => setUnreadOnly(e.target.checked)} />
+                <span>{t('chat.unread')}</span>
+              </label>
+              <div className="hidden sm:block w-48 shrink-0">
+                <Select
+                  size="sm"
+                  options={statusFilterOptions}
+                  value={statusFilter}
+                  onChange={(v) => setStatusFilter((v as StatusFilter) || null)}
+                  placeholder={t('chat.statusFilter.all')}
+                  clearable
+                />
+              </div>
+              <div className="sm:hidden shrink-0">
+                <PopOver
+                  isOpen={filterOpen}
+                  onClose={() => setFilterOpen(false)}
+                  placement="bottom"
+                  align="end"
+                  maxWidth="280px"
+                  trigger={
+                    <div className="relative inline-flex">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        startIcon={<SlidersHorizontal size={16} />}
+                        onClick={() => setFilterOpen(o => !o)}
+                        aria-label={t('common.filters')}
+                      />
+                      {activeFilterCount > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-primary text-white text-[10px] rounded-full w-3.5 h-3.5 flex items-center justify-center leading-none pointer-events-none">
+                          {activeFilterCount}
+                        </span>
+                      )}
+                    </div>
+                  }
+                >
+                  <div className="flex flex-col gap-3 p-3">
+                    <div className="text-xs font-medium text-subtle uppercase tracking-wide">
+                      {t('common.filters')}
+                    </div>
                     <Select
                       size="sm"
                       options={statusFilterOptions}
@@ -247,9 +281,17 @@ export function ChatPage() {
                       clearable
                     />
                   </div>
-                </div>
+                </PopOver>
               </div>
+            </div>
+          )}
 
+          <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
+            {/* Left panel — inbox list */}
+            <PageNavPanel
+              id="list"
+              className={isMobile ? '' : 'w-1/3 xl:w-1/4 border-r border-line flex flex-col'}
+            >
               <div className={`flex-1 min-h-0 overflow-auto better-scroll ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
                 {rows.length === 0 ? (
                   <div className="p-8 text-center text-subtle text-sm">{t('chat.empty')}</div>
