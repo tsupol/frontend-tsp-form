@@ -63,8 +63,10 @@ export function PaymentsPage() {
   const initial = defaultRange();
   const [searchParams, setSearchParams] = useSearchParams();
   const branchId = searchParams.get('branch_id') ?? userBranchId;
-  const fromDate = searchParams.get('from') ?? initial.from;
-  const toDate = searchParams.get('to') ?? initial.to;
+  const fromParam = searchParams.get('from');
+  const toParam = searchParams.get('to');
+  const fromDate = fromParam === null ? initial.from : fromParam;
+  const toDate = toParam === null ? initial.to : toParam;
   const methodFilter = searchParams.get('method') ?? '';
   const typeFilter = searchParams.get('type') ?? '';
 
@@ -72,14 +74,26 @@ export function PaymentsPage() {
   const [pageSize, setPageSize] = useState(25);
   const [isTypingRange, setIsTypingRange] = useState(false);
 
+  const pendingPatchRef = useRef<Record<string, string> | null>(null);
   const updateFilters = useCallback((patch: Partial<{ branch_id: string; from: string; to: string; method: string; type: string }>) => {
-    setSearchParams(prev => {
-      const next = new URLSearchParams(prev);
-      for (const [k, v] of Object.entries(patch)) {
-        if (v) next.set(k, v); else next.delete(k);
-      }
-      return next;
-    }, { replace: true });
+    if (pendingPatchRef.current) {
+      Object.assign(pendingPatchRef.current, patch);
+      return;
+    }
+    pendingPatchRef.current = { ...patch } as Record<string, string>;
+    queueMicrotask(() => {
+      const merged = pendingPatchRef.current ?? {};
+      pendingPatchRef.current = null;
+      setSearchParams(prev => {
+        const next = new URLSearchParams(prev);
+        for (const [k, v] of Object.entries(merged)) {
+          if (v) next.set(k, v);
+          else if (k === 'from' || k === 'to') next.set(k, '');
+          else next.delete(k);
+        }
+        return next;
+      }, { replace: true });
+    });
     setPageIndex(0);
   }, [setSearchParams]);
 
@@ -97,8 +111,8 @@ export function PaymentsPage() {
 
   const params = new URLSearchParams();
   if (branchId) params.set('branch_id', `eq.${branchId}`);
-  params.set('bill_date', `gte.${fromDate}`);
-  params.append('bill_date', `lt.${toExclusive}`);
+  if (fromDate) params.set('bill_date', `gte.${fromDate}`);
+  if (toDate) params.append('bill_date', `lt.${toExclusive}`);
   if (methodFilter) params.set('method', `eq.${methodFilter}`);
   if (typeFilter) params.set('bill_type', `eq.${typeFilter}`);
   params.set('order', 'bill_date.desc,payment_id.desc');
@@ -116,8 +130,8 @@ export function PaymentsPage() {
 
   const summaryParams = new URLSearchParams();
   if (branchId) summaryParams.set('branch_id', `eq.${branchId}`);
-  summaryParams.set('bill_date', `gte.${fromDate}`);
-  summaryParams.append('bill_date', `lt.${toExclusive}`);
+  if (fromDate) summaryParams.set('bill_date', `gte.${fromDate}`);
+  if (toDate) summaryParams.append('bill_date', `lt.${toExclusive}`);
   summaryParams.set('select', 'method,bill_type,amount');
   const { data: summaryRows = [] } = useQuery({
     queryKey: ['accounting', 'payments-summary', branchId, fromDate, toDate],
