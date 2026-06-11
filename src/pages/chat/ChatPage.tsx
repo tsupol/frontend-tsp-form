@@ -221,7 +221,7 @@ export function ChatPage() {
               that it collapses into a SlidersHorizontal PopOver. */}
           {(isRoot || !isMobile) && (
             <div className="flex-none p-2 border-b border-line flex items-center gap-2">
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-0 max-w-md">
                 <Input
                   size="sm"
                   className="w-full"
