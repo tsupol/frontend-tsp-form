@@ -6,9 +6,10 @@ import {
   Input, Badge, Modal, Button, Select, PopOver,
   type ColumnDef, type SortingState,
 } from 'tsp-form';
-import { ArrowRightFromLine, Plus, Pencil, Power, Search, SlidersHorizontal } from 'lucide-react';
+import { AlertTriangle, ArrowRightFromLine, Plus, Pencil, Power, Search, SlidersHorizontal } from 'lucide-react';
 import { apiClient, ApiError } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { PhoneInput } from '../components/PhoneInput';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -20,6 +21,78 @@ interface Branch {
   branch_type: 'INTERNAL' | 'EXTERNAL' | 'DEAL_PARTNER';
   is_active: boolean;
   address: string | null;
+  phone: string | null;
+  branch_lat: number | null;
+  branch_lng: number | null;
+  line_id: string | null;
+  // Returned by v_branches IF the backend extends it (see
+  // UI_FEEDBACK/2026-06-11_ALERT_v_branches_missing_contact_urls.md).
+  // Until then both are undefined on read; writes still work via the RPC.
+  google_map_url?: string | null;
+  facebook_url?: string | null;
+}
+
+interface BranchEditModel {
+  id?: number;
+  company_id?: number;
+  code?: string;
+  name: string;
+  branch_type: 'INTERNAL' | 'EXTERNAL' | 'DEAL_PARTNER';
+  address: string;
+  phone: string;
+  branch_lat: string;
+  branch_lng: string;
+  line_id: string;
+  google_map_url: string;
+  facebook_url: string;
+  is_active?: boolean;
+}
+
+const EMPTY_EDIT: BranchEditModel = {
+  name: '', branch_type: 'INTERNAL', address: '', phone: '',
+  branch_lat: '', branch_lng: '', line_id: '',
+  google_map_url: '', facebook_url: '',
+};
+
+// Compute the COALESCE patch per fn_branch_update semantics:
+//   - field unchanged → omit (don't send) → null at the RPC layer → no-touch
+//   - field cleared by user (originally non-empty, now '') → send '' → clear
+//   - field has a new value → send the string → set
+// Numeric lat/lng get parsed to float; non-numeric blank stays as omitted.
+function buildUpdatePatch(
+  orig: Branch,
+  next: BranchEditModel,
+): Record<string, unknown> {
+  const patch: Record<string, unknown> = { p_branch_id: orig.id };
+  const strField = (
+    key: 'name' | 'address' | 'phone' | 'line_id' | 'google_map_url' | 'facebook_url',
+    rpcKey: string,
+  ) => {
+    const before = (orig[key] as string | null | undefined) ?? '';
+    const after = next[key] ?? '';
+    if (before === after) return;
+    patch[rpcKey] = after;
+  };
+  strField('name', 'p_name');
+  strField('address', 'p_address');
+  strField('phone', 'p_phone');
+  strField('line_id', 'p_line_id');
+  strField('google_map_url', 'p_google_map_url');
+  strField('facebook_url', 'p_facebook_url');
+
+  const parseNum = (v: string): number | null => {
+    if (v.trim() === '') return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+  const beforeLat = orig.branch_lat ?? null;
+  const afterLat = parseNum(next.branch_lat);
+  if (beforeLat !== afterLat) patch.p_lat = afterLat;
+  const beforeLng = orig.branch_lng ?? null;
+  const afterLng = parseNum(next.branch_lng);
+  if (beforeLng !== afterLng) patch.p_lng = afterLng;
+
+  return patch;
 }
 
 interface Company {
@@ -51,9 +124,14 @@ export function BranchesPage() {
   // Modal
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
-  const [modalData, setModalData] = useState<Record<string, unknown>>({});
+  const [modalData, setModalData] = useState<BranchEditModel>(EMPTY_EDIT);
+  const [modalOrig, setModalOrig] = useState<Branch | null>(null);
   const [modalError, setModalError] = useState('');
   const [modalSaving, setModalSaving] = useState(false);
+
+  const updateField = <K extends keyof BranchEditModel>(key: K, val: BranchEditModel[K]) => {
+    setModalData(d => ({ ...d, [key]: val }));
+  };
 
   const { data: branches = [], isFetching, isLoading } = useQuery({
     queryKey: ['branches-list'],
@@ -97,14 +175,34 @@ export function BranchesPage() {
 
   const openCreate = () => {
     setModalMode('create');
-    setModalData({ company_id: companies[0]?.id ?? '', code: '', name: '', branch_type: 'INTERNAL', address: '' });
+    setModalOrig(null);
+    setModalData({
+      ...EMPTY_EDIT,
+      company_id: companies[0]?.id,
+      code: '',
+    });
     setModalError('');
     setModalOpen(true);
   };
 
   const openEdit = (b: Branch) => {
     setModalMode('edit');
-    setModalData({ id: b.id, company_id: b.company_id, code: b.code, name: b.name, branch_type: b.branch_type, address: b.address ?? '', is_active: b.is_active });
+    setModalOrig(b);
+    setModalData({
+      id: b.id,
+      company_id: b.company_id,
+      code: b.code,
+      name: b.name,
+      branch_type: b.branch_type,
+      address: b.address ?? '',
+      phone: b.phone ?? '',
+      branch_lat: b.branch_lat != null ? String(b.branch_lat) : '',
+      branch_lng: b.branch_lng != null ? String(b.branch_lng) : '',
+      line_id: b.line_id ?? '',
+      google_map_url: b.google_map_url ?? '',
+      facebook_url: b.facebook_url ?? '',
+      is_active: b.is_active,
+    });
     setModalError('');
     setModalOpen(true);
   };
@@ -121,19 +219,17 @@ export function BranchesPage() {
           p_code: modalData.code,
           p_name: modalData.name,
           p_branch_type: modalData.branch_type,
-          p_address: (modalData.address as string) || null,
+          p_address: modalData.address || null,
         });
-      } else {
-        await apiClient.rpc('fn_branch_update', {
-          p_branch_id: modalData.id,
-          p_name: modalData.name,
-          p_address: (modalData.address as string) || null,
-        });
-        // Change type if different
-        const orig = branches.find(b => b.id === modalData.id);
-        if (orig && orig.branch_type !== modalData.branch_type) {
+      } else if (modalOrig) {
+        const patch = buildUpdatePatch(modalOrig, modalData);
+        // Only call the update RPC if something actually changed.
+        if (Object.keys(patch).length > 1) {
+          await apiClient.rpc('fn_branch_update', patch);
+        }
+        if (modalOrig.branch_type !== modalData.branch_type) {
           await apiClient.rpc('fn_branch_change_type', {
-            p_branch_id: modalData.id,
+            p_branch_id: modalOrig.id,
             p_branch_type: modalData.branch_type,
           });
         }
@@ -150,6 +246,7 @@ export function BranchesPage() {
   };
 
   const handleDeactivate = async () => {
+    if (!modalData.id) return;
     setModalError('');
     setModalSaving(true);
     try {
@@ -443,7 +540,7 @@ export function BranchesPage() {
                 <label className="form-label">{t('settings.company')}</label>
                 <Select
                   value={String(modalData.company_id ?? '')}
-                  onChange={(val) => setModalData(d => ({ ...d, company_id: Number(val) }))}
+                  onChange={(val) => updateField('company_id', Number(val))}
                   options={companies.map(c => ({ value: String(c.id), label: c.name }))}
                   size="md"
                 />
@@ -452,26 +549,71 @@ export function BranchesPage() {
             {modalMode === 'create' && (
               <div className="flex flex-col">
                 <label className="form-label">{t('org.code')}</label>
-                <Input value={(modalData.code as string) ?? ''} onChange={(e) => setModalData(d => ({ ...d, code: e.target.value }))} placeholder={t('org.codePlaceholder')} size="md" className="w-full" />
+                <Input value={modalData.code ?? ''} onChange={(e) => updateField('code', e.target.value)} placeholder={t('org.codePlaceholder')} size="md" className="w-full" />
               </div>
             )}
             <div className="flex flex-col">
               <label className="form-label">{t('org.name')}</label>
-              <Input value={(modalData.name as string) ?? ''} onChange={(e) => setModalData(d => ({ ...d, name: e.target.value }))} size="md" className="w-full" />
+              <Input value={modalData.name} onChange={(e) => updateField('name', e.target.value)} size="md" className="w-full" />
             </div>
             <div className="flex flex-col">
               <label className="form-label">{t('org.branchTypeLabel')}</label>
               <Select
-                value={modalData.branch_type as string}
-                onChange={(val) => setModalData(d => ({ ...d, branch_type: val as string }))}
+                value={modalData.branch_type}
+                onChange={(val) => updateField('branch_type', val as BranchEditModel['branch_type'])}
                 options={BRANCH_TYPE_OPTIONS.map(bt => ({ value: bt, label: t(`org.branchType.${bt}`) }))}
                 size="md"
               />
             </div>
             <div className="flex flex-col">
               <label className="form-label">{t('org.address')}</label>
-              <Input value={(modalData.address as string) ?? ''} onChange={(e) => setModalData(d => ({ ...d, address: e.target.value }))} size="md" className="w-full" />
+              <Input value={modalData.address} onChange={(e) => updateField('address', e.target.value)} size="md" className="w-full" />
             </div>
+
+            {/* Edit-only fields — fn_branch_update accepts them; fn_branch_create
+                does not. Hidden on create. */}
+            {modalMode === 'edit' && (
+              <>
+                <div className="flex flex-col">
+                  <label className="form-label">{t('branches.phone')}</label>
+                  <PhoneInput value={modalData.phone} onChange={(raw) => updateField('phone', raw)} size="md" className="w-full" />
+                </div>
+                <div className="flex flex-col">
+                  <label className="form-label">{t('branches.lineId')}</label>
+                  <Input value={modalData.line_id} onChange={(e) => updateField('line_id', e.target.value)} size="md" className="w-full" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col">
+                    <label className="form-label">{t('branches.lat')}</label>
+                    <Input value={modalData.branch_lat} onChange={(e) => updateField('branch_lat', e.target.value)} size="md" className="w-full" placeholder="13.7563" inputMode="decimal" />
+                  </div>
+                  <div className="flex flex-col">
+                    <label className="form-label">{t('branches.lng')}</label>
+                    <Input value={modalData.branch_lng} onChange={(e) => updateField('branch_lng', e.target.value)} size="md" className="w-full" placeholder="100.5018" inputMode="decimal" />
+                  </div>
+                </div>
+                <div className="flex flex-col">
+                  <label className="form-label">{t('branches.googleMapUrl')}</label>
+                  <Input value={modalData.google_map_url} onChange={(e) => updateField('google_map_url', e.target.value)} size="md" className="w-full" placeholder="https://maps.app.goo.gl/..." />
+                </div>
+                <div className="flex flex-col">
+                  <label className="form-label">{t('branches.facebookUrl')}</label>
+                  <Input value={modalData.facebook_url} onChange={(e) => updateField('facebook_url', e.target.value)} size="md" className="w-full" placeholder="https://facebook.com/..." />
+                </div>
+                {/* Backend gap warning — v_branches doesn't expose these two
+                    columns yet (see UI_FEEDBACK ALERT). Writes work; existing
+                    values can't be shown until the view is extended. */}
+                {modalOrig && modalOrig.google_map_url === undefined && (
+                  <div className="alert alert-warning">
+                    <AlertTriangle size={14} />
+                    <div className="alert-description text-xs">
+                      {t('branches.viewMissingUrlsWarning')}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
             {modalError && <div className="alert alert-danger"><div className="alert-description">{modalError}</div></div>}
           </div>
         </div>

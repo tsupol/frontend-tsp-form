@@ -2870,7 +2870,14 @@
     "title": "Branches",
     "description": "Manage branches and their types",
     "allTypes": "All types",
-    "allCompanies": "All companies"
+    "allCompanies": "All companies",
+    "phone": "Phone",
+    "lineId": "LINE ID",
+    "lat": "Latitude",
+    "lng": "Longitude",
+    "googleMapUrl": "Google Maps URL",
+    "facebookUrl": "Facebook URL",
+    "viewMissingUrlsWarning": "Saved Google Maps and Facebook URLs aren't shown here yet — backend gap (UI_FEEDBACK 2026-06-11_ALERT_v_branches_missing_contact_urls). Leaving these blank may overwrite existing values."
   },
   "commission": {
     "staffTitle": "Staff Commission",

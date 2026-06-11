@@ -2870,7 +2870,14 @@
     "title": "สาขา",
     "description": "จัดการสาขาและประเภทสาขา",
     "allTypes": "ทุกประเภท",
-    "allCompanies": "ทุกบริษัท"
+    "allCompanies": "ทุกบริษัท",
+    "phone": "เบอร์โทรศัพท์",
+    "lineId": "LINE ID",
+    "lat": "ละติจูด",
+    "lng": "ลองจิจูด",
+    "googleMapUrl": "ลิงก์ Google Maps",
+    "facebookUrl": "ลิงก์ Facebook",
+    "viewMissingUrlsWarning": "ลิงก์ Google Maps และ Facebook ที่เคยบันทึกไว้ยังไม่แสดงในตอนนี้ — backend gap (UI_FEEDBACK 2026-06-11_ALERT_v_branches_missing_contact_urls) การเว้นว่างไว้อาจทับค่าเดิม"
   },
   "commission": {
     "staffTitle": "ค่าคอมฯ พนักงาน",
