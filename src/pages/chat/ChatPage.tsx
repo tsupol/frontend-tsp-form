@@ -4,9 +4,9 @@ import { useSearchParams } from 'react-router-dom';
 import { useQuery, keepPreviousData, useQueryClient } from '@tanstack/react-query';
 import {
   PageNav, PageNavPanel, MobileHeader, DataTableFooter,
-  Badge, Button, Input, PopOver, Switch, Select, Tooltip,
+  Badge, Button, Input, PopOver, Select, Tooltip,
 } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, ChevronDown, Image as ImageIcon, Pin, SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, ChevronDown, CheckCircle2, Circle, Image as ImageIcon, Pin, SlidersHorizontal } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { wsClient } from '../../lib/api/ws';
 import { useAuth } from '../../contexts/AuthContext';
@@ -230,10 +230,17 @@ export function ChatPage() {
                   onChange={e => handleSearch(e.target.value)}
                 />
               </div>
-              <label className="inline-flex items-center gap-2 text-xs shrink-0 cursor-pointer">
-                <Switch size="sm" checked={unreadOnly} onChange={e => setUnreadOnly(e.target.checked)} />
-                <span>{t('chat.unread')}</span>
-              </label>
+              <Button
+                size="sm"
+                variant={unreadOnly ? 'primary' : 'outline'}
+                startIcon={unreadOnly
+                  ? <CheckCircle2 size={14} />
+                  : <Circle size={14} className="text-subtle" />}
+                onClick={() => setUnreadOnly(v => !v)}
+                aria-pressed={unreadOnly}
+              >
+                {t('chat.unread')}
+              </Button>
               <div className="hidden sm:block w-48 shrink-0">
                 <Select
                   size="sm"
