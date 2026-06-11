@@ -3545,7 +3545,9 @@
     "field_action_code": "รหัสการดำเนินการ",
     "resetTitle": "รีเซ็ตเป็นค่าตั้งต้น",
     "resetBody": "รีเซ็ตขั้น {{stage}} เป็นค่าตั้งต้นของระบบ? Override ของ holding นี้จะถูกลบ",
-    "resetConfirm": "รีเซ็ต"
+    "resetConfirm": "รีเซ็ต",
+    "timelineLegendStage": "จุดทริกเกอร์ของขั้น",
+    "timelineLegendOpenEnded": "ไม่กำหนดสิ้นสุด"
   },
   "signing": {
     "empty": "ยังไม่มีรายการเซ็น",

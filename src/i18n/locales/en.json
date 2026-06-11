@@ -3545,7 +3545,9 @@
     "field_action_code": "Action code",
     "resetTitle": "Reset to default",
     "resetBody": "Reset stage {{stage}} to the system default? Your holding override will be removed.",
-    "resetConfirm": "Reset"
+    "resetConfirm": "Reset",
+    "timelineLegendStage": "Stage trigger",
+    "timelineLegendOpenEnded": "Open-ended"
   },
   "signing": {
     "empty": "No signings yet",

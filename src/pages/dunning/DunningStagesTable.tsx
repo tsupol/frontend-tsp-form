@@ -54,17 +54,15 @@ export function DunningStagesTable({ module }: Props) {
           <div className="w-20" />
         </div>
 
-        <ul className="divide-y divide-line">
-          {rows.map(row => (
-            <StageRow
-              key={row.stage}
-              row={row}
-              extraField={config.extraField}
-              onEdit={() => setEditStage(row)}
-              onReset={() => setResetStage(row)}
-            />
-          ))}
-        </ul>
+        {rows.map(row => (
+          <StageRow
+            key={row.stage}
+            row={row}
+            extraField={config.extraField}
+            onEdit={() => setEditStage(row)}
+            onReset={() => setResetStage(row)}
+          />
+        ))}
       </div>
 
       <DunningStageEditModal
@@ -97,7 +95,7 @@ function StageRow({ row, extraField, onEdit, onReset }: {
   const extraValue = extraField ? eff[extraField] : row.event_type;
 
   return (
-    <li className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto_auto_auto] gap-3 px-3 py-3 items-center">
+    <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto_auto_auto] gap-3 px-3 py-3 items-center border-b border-line">
       {/* Stage label + description */}
       <div className="min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
@@ -145,7 +143,7 @@ function StageRow({ row, extraField, onEdit, onReset }: {
           {t('dunningSystem.lastUpdated')} <DateTime value={eff.updated_at} />
         </div>
       )}
-    </li>
+    </div>
   );
 }
 
