@@ -6,22 +6,18 @@
 // Timeline overview is its own page at /admin/collections/timeline so
 // non-admin viewers can read it without entering this config screen.
 //
-// This iteration ships the SHELL only — container, tab bar, role gating,
-// stubbed tab bodies. Per-module tables (the 5 RPCs each) land in follow-on
-// commits, Notif first per doc 112 §9. The legacy `DunningConfigPage` stays
-// alive in parallel through Phase 1 of the migration (doc 110 §6).
-//
-// Open design questions resolved with conservative defaults (redirect if
-// these turn out wrong):
-//   - Single-stage modules: table view (consistent across all 4 tabs)
-//   - Audit log: inline panel under each tab (matches existing audit UX)
+// Each tab body is the same DunningStagesTable component parameterised by
+// module — the per-module differences (extra editable column: reason_code /
+// intent_type / action_code) are encoded in MODULE_CONFIG in dunningTypes.ts.
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MobileHeader } from 'tsp-form';
 import { ArrowRightFromLine, Bell, ShieldBan, Phone, Scale } from 'lucide-react';
+import { DunningStagesTable } from './DunningStagesTable';
+import type { DunningModule } from './dunningTypes';
 
-type DunningTab = 'notif' | 'blacklist' | 'ops' | 'legal';
+type DunningTab = DunningModule;
 
 const TABS: { key: DunningTab; icon: React.ReactNode }[] = [
   { key: 'notif',     icon: <Bell size={14} /> },
@@ -77,23 +73,8 @@ export function DunningSystemPage() {
           </div>
         </div>
 
-        {activeTab === 'notif'     && <ModuleStub module="notif" />}
-        {activeTab === 'blacklist' && <ModuleStub module="blacklist" />}
-        {activeTab === 'ops'       && <ModuleStub module="ops" />}
-        {activeTab === 'legal'     && <ModuleStub module="legal" />}
+        <DunningStagesTable module={activeTab} />
       </div>
     </>
-  );
-}
-
-function ModuleStub({ module }: {
-  module: 'notif' | 'blacklist' | 'ops' | 'legal';
-}) {
-  const { t } = useTranslation();
-  return (
-    <div className="border border-dashed border-line rounded-md p-8 text-center text-sm text-subtle">
-      <div className="font-medium text-fg mb-1">{t(`dunningSystem.tab_${module}`)}</div>
-      <div>{t('dunningSystem.stubBody')}</div>
-    </div>
   );
 }
