@@ -11,6 +11,11 @@
 //
 // Customer-party only for now. Staff witnesses (party_role=WITNESS without
 // customer_id) need a different upload type and are deferred.
+//
+// Follows the tsp-form modal pattern: success step (view='done') inside the
+// modal; the user closes themselves. Dirty-form close guard skipped because
+// the form has no editable text input — the only "dirty" state is mid-upload
+// or mid-mutation, which we already block via `submitting`.
 
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -23,6 +28,7 @@ import { uploadFromImage } from '../../lib/upload';
 import { toStoragePath } from '../../lib/mediaPath';
 import { useAuth } from '../../contexts/AuthContext';
 import { SignatureCapture } from './workspace/SignatureCapture';
+import { ActionDoneView } from './ActionDoneView';
 
 interface PendingParty {
   signing_id: number;
@@ -31,6 +37,13 @@ interface PendingParty {
   customer_id: number | null;
   staff_id: number | null;
   frozen_full_name: string | null;
+}
+
+interface SignResult {
+  signing_id: number;
+  party_id?: number;
+  state: string;            // 'COLLECTING' or 'SEALED' if last signature
+  remaining_parties?: number;
 }
 
 interface Props {
@@ -57,27 +70,35 @@ export function SigningSignModal({ open, onClose, contractId, party }: Props) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const [view, setView] = useState<'form' | 'done'>('form');
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [result, setResult] = useState<SignResult | null>(null);
 
   useEffect(() => {
-    if (open) { setError(''); setUploading(false); }
+    if (open) {
+      setView('form');
+      setError('');
+      setUploading(false);
+      setResult(null);
+    }
   }, [open]);
 
   const mutation = useMutation({
     mutationFn: async (mediaId: number) => {
       if (!party) throw new Error('No party');
-      return apiClient.rpc('fn_contract_signing_sign', {
+      return apiClient.rpc<SignResult>('fn_contract_signing_sign', {
         p_signing_id: party.signing_id,
         p_party_role: party.party_role,
         p_party_index: party.party_index,
         p_signature_media_id: mediaId,
       });
     },
-    onSuccess: () => {
+    onSuccess: (res) => {
+      setResult(res);
+      setView('done');
       queryClient.invalidateQueries({ queryKey: ['contract-signings', contractId] });
       queryClient.invalidateQueries({ queryKey: ['contract-signing-parties', contractId] });
-      onClose();
     },
     onError: (err) => setError(describeApiError(err, t)),
   });
@@ -127,39 +148,81 @@ export function SigningSignModal({ open, onClose, contractId, party }: Props) {
   };
 
   const submitting = uploading || mutation.isPending;
+  // While the upload or RPC is in flight, the close-X / footer button stay
+  // visible but disabled. No dirty-form prompt needed — the SignatureCapture
+  // surface is canvas-based and not a text editor.
+  const handleClose = () => {
+    if (submitting) return;
+    onClose();
+  };
 
   return (
-    <Modal open={open} onClose={onClose} maxWidth="42rem" width="100%">
+    <Modal open={open} onClose={handleClose} maxWidth="42rem" width="100%">
       <div className="modal-header">
-        <h2 className="modal-title">{t('signing.signTitle')}</h2>
-        <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+        <h2 className="modal-title">
+          {view === 'done' ? t('signing.signDoneTitle') : t('signing.signTitle')}
+        </h2>
+        <button type="button" className="modal-close-btn" onClick={handleClose} aria-label="Close" disabled={submitting}>&times;</button>
       </div>
-      <div className="modal-content">
-        {party && (
-          <div className="mb-3 px-3 py-2 rounded-md bg-surface border border-line flex items-center gap-2 flex-wrap">
-            <Badge size="xs" color="info">
-              {t(`signing.role_${party.party_role}`, { defaultValue: party.party_role })}
-            </Badge>
-            <span className="text-sm font-medium">{party.frozen_full_name ?? '—'}</span>
+
+      {view === 'form' && (
+        <>
+          <div className="modal-content">
+            {party && (
+              <div className="mb-3 px-3 py-2 rounded-md bg-surface border border-line flex items-center gap-2 flex-wrap">
+                <Badge size="xs" color="info">
+                  {t(`signing.role_${party.party_role}`, { defaultValue: party.party_role })}
+                </Badge>
+                <span className="text-sm font-medium">{party.frozen_full_name ?? '—'}</span>
+              </div>
+            )}
+            {error && (
+              <div className="alert alert-danger mb-3 animate-pop-in">
+                <XCircle size={16} />
+                <span>{error}</span>
+              </div>
+            )}
+            <SignatureCapture
+              fileUrl={null}
+              uploading={submitting}
+              disabled={submitting}
+              onUpload={handleUpload}
+              startInEditing
+            />
           </div>
-        )}
-        {error && (
-          <div className="alert alert-danger mb-3 animate-pop-in">
-            <XCircle size={16} />
-            <span>{error}</span>
+          <div className="modal-footer">
+            <Button onClick={handleClose} disabled={submitting}>{t('common.close')}</Button>
           </div>
-        )}
-        <SignatureCapture
-          fileUrl={null}
-          uploading={submitting}
-          disabled={submitting}
-          onUpload={handleUpload}
-          startInEditing
+        </>
+      )}
+
+      {view === 'done' && result && (
+        <ActionDoneView
+          headline={
+            result.state === 'SEALED'
+              ? t('signing.signDoneSealed')
+              : t('signing.signDoneCollecting')
+          }
+          contractCode={`SGN-${result.signing_id}`}
+          tone="success"
+          stateTransition={
+            result.state === 'SEALED'
+              ? { from: 'COLLECTING', to: 'SEALED' }
+              : undefined
+          }
+          detailRows={[
+            ...(party ? [{
+              label: t(`signing.role_${party.party_role}`, { defaultValue: party.party_role }),
+              value: party.frozen_full_name ?? '—',
+            }] : []),
+            ...(result.remaining_parties != null && result.state !== 'SEALED' ? [{
+              label: t('signing.remainingParties'),
+              value: String(result.remaining_parties),
+            }] : []),
+          ]}
+          onClose={onClose}
         />
-      </div>
-      <div className="modal-footer">
-        <Button onClick={onClose} disabled={submitting}>{t('common.close')}</Button>
-      </div>
+      )}
     </Modal>
   );
 }

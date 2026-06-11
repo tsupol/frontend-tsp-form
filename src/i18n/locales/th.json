@@ -3517,7 +3517,13 @@
     "signConfirm": "เซ็น",
     "signStaffPartyUnsupported": "ระบบยังไม่รองรับลายเซ็นพยานพนักงานในตอนนี้",
     "partyAlreadySigned": "คู่สัญญารายนี้เซ็นไปแล้ว",
-    "partyOnlyOnCollecting": "เซ็นได้เฉพาะตอนสถานะเป็น COLLECTING"
+    "partyOnlyOnCollecting": "เซ็นได้เฉพาะตอนสถานะเป็น COLLECTING",
+    "voidDoneTitle": "ยกเลิกการเซ็นแล้ว",
+    "voidDoneHeadline": "ยกเลิกการเซ็นแล้ว",
+    "signDoneTitle": "บันทึกลายเซ็นแล้ว",
+    "signDoneCollecting": "บันทึกลายเซ็นแล้ว",
+    "signDoneSealed": "เซ็นครบทุกฝ่าย",
+    "remainingParties": "เหลือรอเซ็นอีก"
   },
   "chat": {
     "title": "แชท",
