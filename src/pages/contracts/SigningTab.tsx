@@ -9,21 +9,22 @@
 // When `v_contract_signing_history` returns 403, the tab falls back to
 // rendering party-only groups so the surface still loads.
 //
-// Sign / void / create actions are NOT exposed in this iteration. The Sign
-// and Void modals exist (SigningVoidModal, SigningSignModal) and were
-// verified end-to-end manually; entry points are hidden until the action
-// surface (BE-driven action list, permission gating, manual create) is
-// settled.
+// Sign + Void actions are only shown when actionable:
+//   - Void   → status === 'COLLECTING'
+//   - Sign   → status === 'COLLECTING' && party hasn't signed && customer-party
+// Manual create (PRIMARY_SWAP / ADD_GUARANTOR / etc.) is still TODO.
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Badge, Tooltip } from 'tsp-form';
+import { Badge, Button, Tooltip } from 'tsp-form';
 import {
-  AlertTriangle, CheckCircle2, Circle, Clock, FileSignature, XCircle,
+  AlertTriangle, CheckCircle2, Circle, Clock, FileSignature, PenLine, Trash2, XCircle,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
+import { SigningVoidModal } from './SigningVoidModal';
+import { SigningSignModal } from './SigningSignModal';
 
 type SigningStatus = 'COLLECTING' | 'SEALED' | 'SUPERSEDED' | 'VOIDED';
 type SigningCategory = 'CONTRACT' | 'AMENDMENT' | 'RECEIPT' | null;
@@ -109,8 +110,19 @@ function formatTtl(raw: string | null): string | null {
   return `${minutes}m`;
 }
 
+type SignTarget = {
+  signing_id: number;
+  party_role: PartyRole;
+  party_index: number;
+  customer_id: number | null;
+  staff_id: number | null;
+  frozen_full_name: string | null;
+};
+
 export function SigningTab({ contractId }: { contractId: number }) {
   const { t } = useTranslation();
+  const [voidSigningId, setVoidSigningId] = useState<number | null>(null);
+  const [signTarget, setSignTarget] = useState<SignTarget | null>(null);
 
   // Read history first. Treat 403 as "view unavailable" so the tab still
   // renders party groups for read-only inspection.
@@ -236,8 +248,30 @@ export function SigningTab({ contractId }: { contractId: number }) {
           key={s.signing_id}
           signing={s}
           parties={partiesBySigning.get(s.signing_id) ?? []}
+          onRequestVoid={() => setVoidSigningId(s.signing_id)}
+          onRequestSign={(party) => setSignTarget({
+            signing_id: s.signing_id,
+            party_role: party.party_role,
+            party_index: party.party_index,
+            customer_id: party.customer_id,
+            staff_id: party.staff_id,
+            frozen_full_name: party.frozen_full_name,
+          })}
         />
       ))}
+
+      <SigningVoidModal
+        open={voidSigningId !== null}
+        onClose={() => setVoidSigningId(null)}
+        contractId={contractId}
+        signingId={voidSigningId ?? 0}
+      />
+      <SigningSignModal
+        open={signTarget !== null}
+        onClose={() => setSignTarget(null)}
+        contractId={contractId}
+        party={signTarget}
+      />
     </div>
   );
 }
@@ -278,12 +312,15 @@ function PendingCallout({ signing }: { signing: SigningHistoryRow }) {
   );
 }
 
-function SigningCard({ signing, parties }: {
+function SigningCard({ signing, parties, onRequestVoid, onRequestSign }: {
   signing: SigningHistoryRow;
   parties: SigningPartyRow[];
+  onRequestVoid: () => void;
+  onRequestSign: (party: SigningPartyRow) => void;
 }) {
   const { t } = useTranslation();
   const ttl = formatTtl(signing.ttl_remaining);
+  const isCollecting = signing.status === 'COLLECTING';
 
   return (
     <div className="border border-line rounded-md overflow-hidden">
@@ -335,11 +372,24 @@ function SigningCard({ signing, parties }: {
             <div className="text-xs text-subtle mt-1 italic">"{signing.change_note}"</div>
           )}
         </div>
-        <div className="shrink-0 text-right">
-          <div className="text-sm font-semibold tabular-nums">
-            {signing.signed_count} / {signing.total_parties}
+        <div className="shrink-0 flex flex-col items-end gap-1.5">
+          <div className="text-right">
+            <div className="text-sm font-semibold tabular-nums">
+              {signing.signed_count} / {signing.total_parties}
+            </div>
+            <div className="text-[11px] text-subtle">{t('signing.signedCount')}</div>
           </div>
-          <div className="text-[11px] text-subtle">{t('signing.signedCount')}</div>
+          {isCollecting && (
+            <Button
+              size="sm"
+              variant="outline"
+              color="danger"
+              startIcon={<Trash2 size={13} />}
+              onClick={onRequestVoid}
+            >
+              {t('signing.voidConfirm')}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -369,13 +419,28 @@ function SigningCard({ signing, parties }: {
                   {p.frozen_phone && <span>{p.frozen_phone}</span>}
                 </div>
               </div>
-              <div className="shrink-0 text-right text-[11px] text-subtle tabular-nums">
+              <div className="shrink-0 flex items-center gap-2">
                 {p.signed_at ? (
                   <Tooltip content={<DateTime value={p.signed_at} />}>
-                    <span><DateTime value={p.signed_at} showTime={false} /></span>
+                    <span className="text-[11px] text-subtle tabular-nums">
+                      <DateTime value={p.signed_at} showTime={false} />
+                    </span>
+                  </Tooltip>
+                ) : isCollecting && p.customer_id != null ? (
+                  <Button
+                    size="sm"
+                    color="primary"
+                    startIcon={<PenLine size={13} />}
+                    onClick={() => onRequestSign(p)}
+                  >
+                    {t('signing.signConfirm')}
+                  </Button>
+                ) : isCollecting && p.customer_id == null ? (
+                  <Tooltip content={t('signing.signStaffPartyUnsupported')}>
+                    <span className="text-[11px] text-warning-fg">{t('signing.partyPending')}</span>
                   </Tooltip>
                 ) : (
-                  <span className="text-warning-fg">{t('signing.partyPending')}</span>
+                  <span className="text-[11px] text-warning-fg">{t('signing.partyPending')}</span>
                 )}
               </div>
             </li>
