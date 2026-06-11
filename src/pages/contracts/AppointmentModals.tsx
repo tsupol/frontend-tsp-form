@@ -1,17 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { Button, Modal, TextArea, Select, InputDatePicker } from 'tsp-form';
+import { Button, Modal, TextArea, InputDatePicker } from 'tsp-form';
 import { XCircle, Keyboard } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { makeDatePickerFormat } from '../../lib/format';
 import { DateTime } from '../../components/DateTime';
+import { BranchPinInput } from '../../components/BranchPinInput';
 import { ActionDoneView } from './ActionDoneView';
 import { useContractInvalidate } from './useContractInvalidate';
 
-// Backend RPCs:
-//   fn_contract_appointment_create(p_contract_id, p_promise_date, p_installment_id?, p_note?)
-//   fn_contract_appointment_cancel(p_appointment_id, p_note?)
+// Backend RPCs (mig 173 — PIN required on both):
+//   fn_contract_appointment_create(p_contract_id, p_promise_date, p_installment_id?, p_note?, p_pin)
+//   fn_contract_appointment_cancel(p_appointment_id, p_note?, p_pin)
 
 interface ContractAppointment {
   id: number;
@@ -21,13 +22,6 @@ interface ContractAppointment {
   status: string;
   note: string | null;
   created_at: string;
-}
-
-interface InstallmentOption {
-  id: number;
-  pay_no: number;
-  due_date: string;
-  status: string;
 }
 
 function toLocalDateStr(d: Date | null): string {
@@ -55,43 +49,30 @@ export function AppointmentCreateModal({
 }) {
   const { t, i18n } = useTranslation();
   const [promiseDate, setPromiseDate] = useState<Date | null>(null);
-  const [installmentId, setInstallmentId] = useState<string | null>(null);
   const [note, setNote] = useState('');
+  const [pin, setPin] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (open) {
       setPromiseDate(null);
-      setInstallmentId(null);
       setNote('');
+      setPin('');
       setIsTyping(false);
       setError('');
     }
   }, [open]);
 
-  // Outstanding installments — show pending/due ones first so staff can attach
-  const { data: installments = [] } = useQuery({
-    queryKey: ['contract-installments-open', contractId],
-    queryFn: () => apiClient.get<InstallmentOption[]>(
-      `/v_installments?contract_id=eq.${contractId}&status=in.(PENDING,DUE,OVERDUE)&order=pay_no&limit=24`,
-    ),
-    enabled: open,
-    staleTime: 30 * 1000,
-  });
-
-  const installmentOptions = installments.map(i => ({
-    value: String(i.id),
-    label: `#${i.pay_no} · ${i.due_date} · ${i.status}`,
-  }));
-
+  // Appointment is contract-level — installment FK was dropped in the
+  // 2026-06-11 spec (mig 173). Keep params lean.
   const mutation = useMutation({
     mutationFn: () => {
       const params: Record<string, unknown> = {
         p_contract_id: contractId,
         p_promise_date: toLocalDateStr(promiseDate),
+        p_pin: pin,
       };
-      if (installmentId) params.p_installment_id = Number(installmentId);
       if (note.trim()) params.p_note = note.trim();
       return apiClient.rpc('fn_contract_appointment_create', params);
     },
@@ -99,7 +80,7 @@ export function AppointmentCreateModal({
     onError: (err) => setApiError(err, t, setError),
   });
 
-  const canSubmit = !!promiseDate && !mutation.isPending;
+  const canSubmit = !!promiseDate && pin.length === 6 && !mutation.isPending;
 
   return (
     <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
@@ -146,20 +127,6 @@ export function AppointmentCreateModal({
               />
             </div>
 
-            {installmentOptions.length > 0 && (
-              <div className="flex flex-col">
-                <label className="form-label">{t('contract.appointment_installment')}</label>
-                <Select
-                  options={installmentOptions}
-                  value={installmentId}
-                  onChange={(val) => setInstallmentId((val as string) || null)}
-                  placeholder={t('contract.appointment_installmentPlaceholder')}
-                  clearable
-                  showChevron
-                />
-              </div>
-            )}
-
             <div className="flex flex-col">
               <label className="form-label">{t('contract.note')}</label>
               <TextArea
@@ -169,6 +136,8 @@ export function AppointmentCreateModal({
                 rows={3}
               />
             </div>
+
+            <BranchPinInput value={pin} onChange={setPin} required />
           </div>
 
           <div className="text-xs text-subtle mt-3">
@@ -208,6 +177,7 @@ export function AppointmentCancelModal({
   const invalidate = useContractInvalidate(contractId);
   const [view, setView] = useState<'form' | 'done'>('form');
   const [note, setNote] = useState('');
+  const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [result, setResult] = useState<AppointmentCancelResult | null>(null);
   // Snapshot the appointment that was cancelled (RPC only returns id + status)
@@ -230,6 +200,7 @@ export function AppointmentCancelModal({
     if (open) {
       setView('form');
       setNote('');
+      setPin('');
       setError('');
       setResult(null);
       setCancelledSnapshot(null);
@@ -239,7 +210,10 @@ export function AppointmentCancelModal({
   const mutation = useMutation({
     mutationFn: () => {
       if (!activeAppt) return Promise.reject(new Error('No active appointment'));
-      const params: Record<string, unknown> = { p_appointment_id: activeAppt.id };
+      const params: Record<string, unknown> = {
+        p_appointment_id: activeAppt.id,
+        p_pin: pin,
+      };
       if (note.trim()) params.p_note = note.trim();
       return apiClient.rpc<AppointmentCancelResult>('fn_contract_appointment_cancel', params);
     },
@@ -252,7 +226,7 @@ export function AppointmentCancelModal({
     onError: (err) => setApiError(err, t, setError),
   });
 
-  const canSubmit = !!activeAppt && !mutation.isPending;
+  const canSubmit = !!activeAppt && pin.length === 6 && !mutation.isPending;
 
   return (
     <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
@@ -302,6 +276,7 @@ export function AppointmentCancelModal({
                       rows={3}
                     />
                   </div>
+                  <BranchPinInput value={pin} onChange={setPin} required />
                 </div>
               )}
             </div>

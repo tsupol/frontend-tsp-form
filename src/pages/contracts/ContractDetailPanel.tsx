@@ -20,6 +20,7 @@ import { ContractActionButtons } from './ContractActions';
 import { WalletsTab } from './wallet/WalletsTab';
 import { DeviceTab } from './DeviceTab';
 import { SigningTab } from './SigningTab';
+import { AppointmentsSection } from './AppointmentsSection';
 import { BillReceipt } from './workspace/BillReceipt';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { CustomerPickerModal } from './CustomerPickerModal';
@@ -765,6 +766,9 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
           )}
         </div>
       )}
+
+      {/* Appointments / promise */}
+      {isActive && <AppointmentsSection contractId={contract.id} />}
 
       {/* Saving progress (for SAVING contracts) */}
       {contract.state === 'SAVING' && contract.saving_target_amount != null && (
