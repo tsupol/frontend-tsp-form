@@ -17,7 +17,7 @@
   "REJECT_DP": "ปฏิเสธ DP",
   "DP_ADJUST_RETAIL": "ปรับราคาขาย",
   "OPEN_CONTRACT_BILL": "ออกบิลสัญญา",
-  "VOID_CONTRACT": "Void สัญญา",
+  "VOID_CONTRACT": "ยกเลิกสัญญาทั้งฉบับ",
   "COMPLETE_CONTRACT": "ปิดสัญญา (ผ่อนครบ)",
   "CANCEL_CONTRACT": "ยกเลิกสัญญา",
   "TERMINATE_CONTRACT": "เลิกสัญญา",

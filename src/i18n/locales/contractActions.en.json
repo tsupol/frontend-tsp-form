@@ -17,7 +17,7 @@
   "REJECT_DP": "Reject DP",
   "DP_ADJUST_RETAIL": "Adjust retail price",
   "OPEN_CONTRACT_BILL": "Open contract bill",
-  "VOID_CONTRACT": "Void contract",
+  "VOID_CONTRACT": "Void contract (whole)",
   "COMPLETE_CONTRACT": "Complete contract",
   "CANCEL_CONTRACT": "Cancel contract",
   "TERMINATE_CONTRACT": "Terminate contract",
