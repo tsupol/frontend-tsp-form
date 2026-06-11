@@ -6,8 +6,7 @@
 //   - api.v_contract_signing_party    → one row per party (LESSOR / LESSEE /
 //     GUARANTOR / WITNESS), with frozen identity + signed_at
 //
-// When `v_contract_signing_history` returns 403 (see UI_FEEDBACK/
-// 2026-06-11_ALERT_signing_history_view_403.md), the tab falls back to
+// When `v_contract_signing_history` returns 403, the tab falls back to
 // rendering party-only groups so the surface still loads.
 //
 // Sign / void / create actions are NOT exposed in this iteration. The Sign
