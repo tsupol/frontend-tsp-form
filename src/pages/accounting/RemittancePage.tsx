@@ -3,14 +3,15 @@ import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import {
-  MobileHeader, DataTable, Select, Badge, InputDateRangePicker, Button, PopOver,
+  MobileHeader, DataTable, Select, Badge, InputDateRangePicker,
 } from 'tsp-form';
 import {
-  ArrowRightFromLine, Keyboard, SlidersHorizontal,
+  ArrowRightFromLine, Keyboard,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { DateTime } from '../../components/DateTime';
+import { FilterBar, type FilterBarItem } from '../../components/FilterBar';
 import {
   fmtCurrency, toLocalDateStr, parseLocalDate, makeDateRangePickerFormat,
 } from '../../lib/format';
@@ -149,74 +150,71 @@ export function RemittancePage() {
     return { byType: m, totalCount: totalCountAll, totalAmount };
   }, [summaryRows]);
 
-  const [filterOpen, setFilterOpen] = useState(false);
-  const filterTriggerRef = useRef<HTMLButtonElement>(null);
   const activeFilterCount = (typeFilter ? 1 : 0) + (!isBranchUser && branchId ? 1 : 0);
 
-  const renderDateFilter = (wrapperClass: string): ReactNode => (
-    <div className={wrapperClass}>
-      <InputDateRangePicker
-        fromDate={parseLocalDate(fromDate)}
-        toDate={parseLocalDate(toDate)}
-        onFromDateChange={(d) => updateFilters({ from: toLocalDateStr(d) })}
-        onToDateChange={(d) => updateFilters({ to: toLocalDateStr(d) })}
-        dateFormat={makeDateRangePickerFormat(i18n.language)}
-        size="sm"
-        locale={i18n.language}
-        calendar="gregorian"
-        endIcon={<Keyboard size={14} />}
-        onEndIconClick={() => setIsTypingRange(v => !v)}
-        typingMode={isTypingRange}
-        onTypingModeChange={setIsTypingRange}
-        typingMask="##/##/#### - ##/##/####"
-        typingPlaceholder="DD/MM/YYYY - DD/MM/YYYY"
-        parseTypedDates={(raw) => {
-          const parse = (digits: string) => {
-            if (digits.length !== 8) return null;
-            const day = parseInt(digits.slice(0, 2), 10);
-            const month = parseInt(digits.slice(2, 4), 10);
-            let year = parseInt(digits.slice(4, 8), 10);
-            if (year > 2400) year -= 543;
-            if (month < 1 || month > 12 || day < 1 || day > 31) return null;
-            const d = new Date(year, month - 1, day);
-            if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
-            return d;
-          };
-          return {
-            from: parse(raw.slice(0, 8)),
-            to: raw.length >= 16 ? parse(raw.slice(8, 16)) : null,
-          };
-        }}
-      />
-    </div>
+  const dateFilter: ReactNode = (
+    <InputDateRangePicker
+      fromDate={parseLocalDate(fromDate)}
+      toDate={parseLocalDate(toDate)}
+      onFromDateChange={(d) => updateFilters({ from: toLocalDateStr(d) })}
+      onToDateChange={(d) => updateFilters({ to: toLocalDateStr(d) })}
+      dateFormat={makeDateRangePickerFormat(i18n.language)}
+      size="sm"
+      locale={i18n.language}
+      calendar="gregorian"
+      endIcon={<Keyboard size={14} />}
+      onEndIconClick={() => setIsTypingRange(v => !v)}
+      typingMode={isTypingRange}
+      onTypingModeChange={setIsTypingRange}
+      typingMask="##/##/#### - ##/##/####"
+      typingPlaceholder="DD/MM/YYYY - DD/MM/YYYY"
+      parseTypedDates={(raw) => {
+        const parse = (digits: string) => {
+          if (digits.length !== 8) return null;
+          const day = parseInt(digits.slice(0, 2), 10);
+          const month = parseInt(digits.slice(2, 4), 10);
+          let year = parseInt(digits.slice(4, 8), 10);
+          if (year > 2400) year -= 543;
+          if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+          const d = new Date(year, month - 1, day);
+          if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+          return d;
+        };
+        return {
+          from: parse(raw.slice(0, 8)),
+          to: raw.length >= 16 ? parse(raw.slice(8, 16)) : null,
+        };
+      }}
+    />
   );
-  const renderTypeFilter = (wrapperClass: string): ReactNode => (
-    <div className={wrapperClass}>
-      <Select
-        value={typeFilter || null}
-        onChange={(v) => updateFilters({ type: (v as string) ?? '' })}
-        options={TYPE_VALUES.map(v => ({ value: v, label: t(`accounting.bills.typeLabel.${v}`) }))}
-        size="sm"
-        showChevron
-        placeholder={t('accounting.remittance.allTypes')}
-        clearable
-      />
-    </div>
+  const typeNode: ReactNode = (
+    <Select
+      value={typeFilter || null}
+      onChange={(v) => updateFilters({ type: (v as string) ?? '' })}
+      options={TYPE_VALUES.map(v => ({ value: v, label: t(`accounting.bills.typeLabel.${v}`) }))}
+      size="sm"
+      showChevron
+      placeholder={t('accounting.remittance.allTypes')}
+      clearable
+    />
   );
-  const renderBranchFilter = (wrapperClass: string): ReactNode => (
-    <div className={wrapperClass}>
-      <Select
-        value={branchId || null}
-        onChange={(v) => updateFilters({ branch_id: (v as string) ?? '' })}
-        placeholder={t('accounting.branch')}
-        options={branches.map(b => ({ label: b.name, value: String(b.id) }))}
-        size="sm"
-        showChevron
-        clearable={!isBranchUser}
-        disabled={isBranchUser}
-      />
-    </div>
+  const branchNode: ReactNode = (
+    <Select
+      value={branchId || null}
+      onChange={(v) => updateFilters({ branch_id: (v as string) ?? '' })}
+      placeholder={t('accounting.branch')}
+      options={branches.map(b => ({ label: b.name, value: String(b.id) }))}
+      size="sm"
+      showChevron
+      clearable={!isBranchUser}
+      disabled={isBranchUser}
+    />
   );
+
+  const filterItems: FilterBarItem[] = [
+    { key: 'type', width: 176, node: typeNode, priority: 50 },
+    { key: 'branch', width: 176, node: branchNode, priority: 10 },
+  ];
 
   return (
     <>
@@ -257,49 +255,15 @@ export function RemittancePage() {
           ))}
         </div>
 
-        {/* Filters — date always inline; type at sm+; branch at md+ */}
-        <div className="flex-none flex items-center p-2 border-b border-line gap-2">
-          <div className="flex-1 sm:flex-none sm:w-56">
-            {renderDateFilter('w-full')}
-          </div>
-          <div className="hidden sm:block sm:w-44">
-            {renderTypeFilter('w-full')}
-          </div>
-          <div className="hidden md:block md:w-44">
-            {renderBranchFilter('w-full')}
-          </div>
-
-          <div className="md:hidden relative shrink-0 ml-auto">
-            <Button
-              ref={filterTriggerRef}
-              variant="outline"
-              size="sm"
-              startIcon={<SlidersHorizontal size={16} />}
-              aria-label={t('common.filters', { defaultValue: 'Filters' })}
-              onClick={() => setFilterOpen(v => !v)}
-            />
-            {activeFilterCount > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[1rem] h-4 px-1 rounded-full bg-primary-fg text-white text-[10px] leading-4 text-center font-semibold pointer-events-none">
-                {activeFilterCount}
-              </span>
-            )}
-          </div>
-          <PopOver
-            isOpen={filterOpen}
-            onClose={() => setFilterOpen(false)}
-            triggerRef={filterTriggerRef}
-            placement="bottom"
-            align="end"
-            maxWidth="20rem"
-          >
-            <div className="flex flex-col gap-3 p-3 min-w-[16rem]">
-              <div className="sm:hidden">
-                {renderTypeFilter('w-full')}
-              </div>
-              {renderBranchFilter('w-full')}
-            </div>
-          </PopOver>
-        </div>
+        {/* Filters — overflow-aware, measures the bar (not the viewport) */}
+        <FilterBar
+          className="flex-none p-2 border-b border-line"
+          leading={dateFilter}
+          leadingMinWidth={224}
+          leadingMaxWidth={240}
+          items={filterItems}
+          activeCount={activeFilterCount}
+        />
 
         {/* Summary card */}
         <div className="flex-none px-4 py-3 border-b border-line">

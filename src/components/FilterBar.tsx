@@ -21,6 +21,8 @@ interface FilterBarProps {
   leading?: ReactNode;
   /** Minimum px the leading slot needs before items start filling */
   leadingMinWidth?: number;
+  /** Optional cap on the leading slot's width — keeps a wide date picker from eating the whole bar */
+  leadingMaxWidth?: number;
   items: FilterBarItem[];
   /** Gap between siblings, px. Should match the className gap. */
   gap?: number;
@@ -34,6 +36,7 @@ const OVERFLOW_BUTTON_WIDTH = 36; // sm outline icon button
 export function FilterBar({
   leading,
   leadingMinWidth = 200,
+  leadingMaxWidth,
   items,
   gap = 8,
   activeCount = 0,
@@ -111,7 +114,10 @@ export function FilterBar({
       className={`flex items-center gap-2 ${className}`}
     >
       {leading && (
-        <div className="flex-1 min-w-0">
+        <div
+          className="flex-1 min-w-0"
+          style={leadingMaxWidth ? { maxWidth: leadingMaxWidth } : undefined}
+        >
           {leading}
         </div>
       )}
