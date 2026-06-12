@@ -88,6 +88,8 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
       offset={4}
       openDelay={0}
       triggerClassName="w-full"
+      minWidth="calc(var(--spacing-side-menu) - 1rem)"
+      maxWidth="calc(var(--spacing-side-menu) - 1rem)"
       trigger={
         <button
           className={clsx('flex items-center gap-3 py-2.5 transition-all text-item-fg hover:bg-item-hover-bg w-full cursor-pointer', collapsed ? 'px-1.5' : 'px-3')}
@@ -104,7 +106,7 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
         </button>
       }
     >
-      <div className="py-1 w-[calc(var(--spacing-side-menu)-1rem)]">
+      <div className="py-1">
         <MenuItem
           icon={<Settings size={14} />}
           label={t('settings.title')}
@@ -380,7 +382,7 @@ export const AppSideNav = () => {
         ] : []),
       ],
     },
-    { type: 'separator', key: 'sep-notifications' },
+    { type: 'group', key: 'grp-inbox', label: t('nav.groupInbox') },
     {
       type: 'custom',
       key: 'notifications',
