@@ -3447,6 +3447,7 @@
       "allMethods": "ทุกช่องทาง",
       "billType": "ประเภทบิล",
       "allTypes": "ทุกประเภท",
+      "allBankAccounts": "ทุกบัญชีธนาคาร",
       "channelTitle": "สรุปตามช่องทาง",
       "summaryTitle": "สรุป",
       "paymentCount": "รายการ",

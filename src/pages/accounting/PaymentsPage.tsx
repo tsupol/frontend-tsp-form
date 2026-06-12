@@ -3,18 +3,28 @@ import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import {
-  MobileHeader, DataTable, Select, Badge, InputDateRangePicker, Button, PopOver,
+  MobileHeader, DataTable, Select, Badge, InputDateRangePicker,
 } from 'tsp-form';
 import {
-  ArrowRightFromLine, Keyboard, SlidersHorizontal,
+  ArrowRightFromLine, Keyboard,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { DateTime } from '../../components/DateTime';
+import { FilterBar, type FilterBarItem } from '../../components/FilterBar';
 import {
   fmtCurrency, toLocalDateStr, parseLocalDate, makeDateRangePickerFormat,
 } from '../../lib/format';
 import type { Branch, PaymentRow } from './accountingTypes';
+
+interface BankAccountOption {
+  id: number;
+  branch_id: number;
+  bank_name: string;
+  account_number: string;
+  account_name: string;
+  is_active: boolean;
+}
 
 const METHODS = ['CASH', 'TRANSFER', 'SAVING_WALLET', 'CREDIT_WALLET', 'INSURANCE_WALLET', 'WAIVE', 'HOLDING_BUDGET'] as const;
 
@@ -69,13 +79,14 @@ export function PaymentsPage() {
   const toDate = toParam === null ? initial.to : toParam;
   const methodFilter = searchParams.get('method') ?? '';
   const typeFilter = searchParams.get('type') ?? '';
+  const bankAccountFilter = searchParams.get('bank_account_id') ?? '';
 
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [isTypingRange, setIsTypingRange] = useState(false);
 
   const pendingPatchRef = useRef<Record<string, string> | null>(null);
-  const updateFilters = useCallback((patch: Partial<{ branch_id: string; from: string; to: string; method: string; type: string }>) => {
+  const updateFilters = useCallback((patch: Partial<{ branch_id: string; from: string; to: string; method: string; type: string; bank_account_id: string }>) => {
     if (pendingPatchRef.current) {
       Object.assign(pendingPatchRef.current, patch);
       return;
@@ -102,6 +113,16 @@ export function PaymentsPage() {
     queryFn: () => apiClient.get<Branch[]>('/v_branches?is_active=is.true&order=name'),
   });
 
+  const { data: bankAccounts = [] } = useQuery({
+    queryKey: ['bank-accounts-active', branchId],
+    queryFn: () => apiClient.get<BankAccountOption[]>(
+      branchId
+        ? `/v_bank_accounts?is_active=is.true&branch_id=eq.${branchId}&order=is_default.desc,bank_name`
+        : '/v_bank_accounts?is_active=is.true&order=bank_name',
+    ),
+    staleTime: 5 * 60 * 1000,
+  });
+
   const toExclusive = useMemo(() => {
     const d = parseLocalDate(toDate);
     if (!d) return toDate;
@@ -115,10 +136,11 @@ export function PaymentsPage() {
   if (toDate) params.append('bill_date', `lt.${toExclusive}`);
   if (methodFilter) params.set('method', `eq.${methodFilter}`);
   if (typeFilter) params.set('bill_type', `eq.${typeFilter}`);
+  if (bankAccountFilter) params.set('bank_account_id', `eq.${bankAccountFilter}`);
   params.set('order', 'bill_date.desc,payment_id.desc');
 
   const { data: pageData, isFetching } = useQuery({
-    queryKey: ['accounting', 'payments', branchId, fromDate, toDate, methodFilter, typeFilter, pageIndex, pageSize],
+    queryKey: ['accounting', 'payments', branchId, fromDate, toDate, methodFilter, typeFilter, bankAccountFilter, pageIndex, pageSize],
     queryFn: () => apiClient.getPaginated<PaymentRow>(
       `/v_payments?${params.toString()}`,
       { page: pageIndex + 1, pageSize }
@@ -132,9 +154,10 @@ export function PaymentsPage() {
   if (branchId) summaryParams.set('branch_id', `eq.${branchId}`);
   if (fromDate) summaryParams.set('bill_date', `gte.${fromDate}`);
   if (toDate) summaryParams.append('bill_date', `lt.${toExclusive}`);
+  if (bankAccountFilter) summaryParams.set('bank_account_id', `eq.${bankAccountFilter}`);
   summaryParams.set('select', 'method,bill_type,amount');
   const { data: summaryRows = [] } = useQuery({
-    queryKey: ['accounting', 'payments-summary', branchId, fromDate, toDate],
+    queryKey: ['accounting', 'payments-summary', branchId, fromDate, toDate, bankAccountFilter],
     queryFn: () => apiClient.get<{ method: string; bill_type: string; amount: number }[]>(
       `/v_payments?${summaryParams.toString()}`,
     ),
@@ -155,90 +178,142 @@ export function PaymentsPage() {
 
   const visibleMethods = METHODS.filter(m => (summary.byMethod.get(m)?.count ?? 0) > 0);
 
-  const [filterOpen, setFilterOpen] = useState(false);
-  const filterTriggerRef = useRef<HTMLButtonElement>(null);
-  // Branch filter is the only one not always on screen — methodFilter/typeFilter/date
-  // are reflected by default ranges, so the "active extras" count is just optional ones.
   const activeFilterCount =
-    (methodFilter ? 1 : 0) + (typeFilter ? 1 : 0) + (!isBranchUser && branchId ? 1 : 0);
+    (methodFilter ? 1 : 0) + (typeFilter ? 1 : 0) + (!isBranchUser && branchId ? 1 : 0) + (bankAccountFilter ? 1 : 0);
 
-  const renderDateFilter = (wrapperClass: string): ReactNode => (
-    <div className={wrapperClass}>
-      <InputDateRangePicker
-        fromDate={parseLocalDate(fromDate)}
-        toDate={parseLocalDate(toDate)}
-        onFromDateChange={(d) => updateFilters({ from: toLocalDateStr(d) })}
-        onToDateChange={(d) => updateFilters({ to: toLocalDateStr(d) })}
-        dateFormat={makeDateRangePickerFormat(i18n.language)}
-        size="sm"
-        locale={i18n.language}
-        calendar="gregorian"
-        endIcon={<Keyboard size={14} />}
-        onEndIconClick={() => setIsTypingRange(v => !v)}
-        typingMode={isTypingRange}
-        onTypingModeChange={setIsTypingRange}
-        typingMask="##/##/#### - ##/##/####"
-        typingPlaceholder="DD/MM/YYYY - DD/MM/YYYY"
-        parseTypedDates={(raw) => {
-          const parse = (digits: string) => {
-            if (digits.length !== 8) return null;
-            const day = parseInt(digits.slice(0, 2), 10);
-            const month = parseInt(digits.slice(2, 4), 10);
-            let year = parseInt(digits.slice(4, 8), 10);
-            if (year > 2400) year -= 543;
-            if (month < 1 || month > 12 || day < 1 || day > 31) return null;
-            const d = new Date(year, month - 1, day);
-            if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
-            return d;
-          };
-          return {
-            from: parse(raw.slice(0, 8)),
-            to: raw.length >= 16 ? parse(raw.slice(8, 16)) : null,
-          };
-        }}
-      />
-    </div>
+  const dateFilter: ReactNode = (
+    <InputDateRangePicker
+      fromDate={parseLocalDate(fromDate)}
+      toDate={parseLocalDate(toDate)}
+      onFromDateChange={(d) => updateFilters({ from: toLocalDateStr(d) })}
+      onToDateChange={(d) => updateFilters({ to: toLocalDateStr(d) })}
+      dateFormat={makeDateRangePickerFormat(i18n.language)}
+      size="sm"
+      locale={i18n.language}
+      calendar="gregorian"
+      endIcon={<Keyboard size={14} />}
+      onEndIconClick={() => setIsTypingRange(v => !v)}
+      typingMode={isTypingRange}
+      onTypingModeChange={setIsTypingRange}
+      typingMask="##/##/#### - ##/##/####"
+      typingPlaceholder="DD/MM/YYYY - DD/MM/YYYY"
+      parseTypedDates={(raw) => {
+        const parse = (digits: string) => {
+          if (digits.length !== 8) return null;
+          const day = parseInt(digits.slice(0, 2), 10);
+          const month = parseInt(digits.slice(2, 4), 10);
+          let year = parseInt(digits.slice(4, 8), 10);
+          if (year > 2400) year -= 543;
+          if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+          const d = new Date(year, month - 1, day);
+          if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+          return d;
+        };
+        return {
+          from: parse(raw.slice(0, 8)),
+          to: raw.length >= 16 ? parse(raw.slice(8, 16)) : null,
+        };
+      }}
+    />
   );
-  const renderMethodFilter = (wrapperClass: string): ReactNode => (
-    <div className={wrapperClass}>
-      <Select
-        value={methodFilter || null}
-        onChange={(v) => updateFilters({ method: (v as string) ?? '' })}
-        options={METHODS.map(m => ({ value: m, label: t(`accounting.payments.m_${m}`) }))}
-        size="sm"
-        showChevron
-        placeholder={t('accounting.payments.allMethods')}
-        clearable
-      />
-    </div>
+  // Channel select — merges method + bank account into one control.
+  // Bank accounts only matter for method=TRANSFER, so they live under the Transfer group.
+  // Value encoding (Select side only; URL stays split as method / bank_account_id):
+  //   ''                       → no filter
+  //   'CASH' / 'WAIVE' / …     → method only
+  //   'TRANSFER'               → method=TRANSFER, no bank filter
+  //   'TRANSFER:<id>'          → method=TRANSFER, bank_account_id=<id>
+  const channelValue =
+    methodFilter === 'TRANSFER' && bankAccountFilter
+      ? `TRANSFER:${bankAccountFilter}`
+      : methodFilter || null;
+
+  const channelOptions = [
+    ...METHODS
+      .filter(m => m !== 'TRANSFER')
+      .map(m => ({ value: m, label: t(`accounting.payments.m_${m}`) })),
+    { value: 'TRANSFER', label: t('accounting.payments.m_TRANSFER') },
+    ...bankAccounts.map(b => ({
+      value: `TRANSFER:${b.id}`,
+      label: `${b.bank_name} · ${b.account_number}`,
+    })),
+  ];
+
+  const bankById = new Map(bankAccounts.map(b => [b.id, b]));
+  const renderChannelOption = (opt: { value: string; label: string }) => {
+    if (opt.value.startsWith('TRANSFER:')) {
+      const id = Number(opt.value.slice('TRANSFER:'.length));
+      const b = bankById.get(id);
+      if (b) {
+        return (
+          <div className="flex flex-col leading-tight py-0.5 min-w-0">
+            <div className="text-sm truncate">
+              {t('accounting.payments.m_TRANSFER')}
+              <span className="text-subtle"> · {b.bank_name}</span>
+            </div>
+            <div className="text-xs text-subtle truncate">{b.account_number}</div>
+          </div>
+        );
+      }
+    }
+    return <span className="text-sm">{opt.label}</span>;
+  };
+
+  const onChannelChange = (raw: string | string[] | null | undefined) => {
+    const v = (raw as string) ?? '';
+    if (!v) {
+      updateFilters({ method: '', bank_account_id: '' });
+      return;
+    }
+    if (v.startsWith('TRANSFER:')) {
+      updateFilters({ method: 'TRANSFER', bank_account_id: v.slice('TRANSFER:'.length) });
+      return;
+    }
+    updateFilters({ method: v, bank_account_id: '' });
+  };
+
+  const methodNode: ReactNode = (
+    <Select
+      value={channelValue}
+      onChange={onChannelChange}
+      options={channelOptions}
+      renderOption={renderChannelOption}
+      size="sm"
+      showChevron
+      placeholder={t('accounting.payments.allMethods')}
+      clearable
+      searchable
+    />
   );
-  const renderTypeFilter = (wrapperClass: string): ReactNode => (
-    <div className={wrapperClass}>
-      <Select
-        value={typeFilter || null}
-        onChange={(v) => updateFilters({ type: (v as string) ?? '' })}
-        options={TYPE_VALUES.map(v => ({ value: v, label: t(`accounting.bills.typeLabel.${v}`) }))}
-        size="sm"
-        showChevron
-        placeholder={t('accounting.payments.allTypes')}
-        clearable
-      />
-    </div>
+  const typeNode: ReactNode = (
+    <Select
+      value={typeFilter || null}
+      onChange={(v) => updateFilters({ type: (v as string) ?? '' })}
+      options={TYPE_VALUES.map(v => ({ value: v, label: t(`accounting.bills.typeLabel.${v}`) }))}
+      size="sm"
+      showChevron
+      placeholder={t('accounting.payments.allTypes')}
+      clearable
+    />
   );
-  const renderBranchFilter = (wrapperClass: string): ReactNode => (
-    <div className={wrapperClass}>
-      <Select
-        value={branchId || null}
-        onChange={(v) => updateFilters({ branch_id: (v as string) ?? '' })}
-        placeholder={t('accounting.branch')}
-        options={branches.map(b => ({ label: b.name, value: String(b.id) }))}
-        size="sm"
-        showChevron
-        clearable={!isBranchUser}
-        disabled={isBranchUser}
-      />
-    </div>
+  const branchNode: ReactNode = (
+    <Select
+      value={branchId || null}
+      onChange={(v) => updateFilters({ branch_id: (v as string) ?? '', bank_account_id: '' })}
+      placeholder={t('accounting.branch')}
+      options={branches.map(b => ({ label: b.name, value: String(b.id) }))}
+      size="sm"
+      showChevron
+      clearable={!isBranchUser}
+      disabled={isBranchUser}
+    />
   );
+  // Priority: higher = inlined first / dropped last.
+  const filterItems: FilterBarItem[] = [
+    { key: 'method', width: 224, node: methodNode, priority: 50 },
+    { key: 'type', width: 176, node: typeNode, priority: 30 },
+    { key: 'branch', width: 176, node: branchNode, priority: 10 },
+  ];
 
   return (
     <>
@@ -263,60 +338,14 @@ export function PaymentsPage() {
           <h1 className="heading-2 shrink-0">{t('accounting.payments.title')}</h1>
         </div>
 
-        {/* Filters — visibility depends on breakpoint; overflow goes into a popover */}
-        <div className="flex-none flex items-center p-2 border-b border-line gap-2">
-          {/* Date: always inline */}
-          <div className="flex-1 sm:flex-none sm:w-56">
-            {renderDateFilter('w-full')}
-          </div>
-          {/* Method: inline at sm+ */}
-          <div className="hidden sm:block sm:w-44">
-            {renderMethodFilter('w-full')}
-          </div>
-          {/* Type: inline at md+ */}
-          <div className="hidden md:block md:w-44">
-            {renderTypeFilter('w-full')}
-          </div>
-          {/* Branch: inline at lg+ */}
-          <div className="hidden lg:block lg:w-44">
-            {renderBranchFilter('w-full')}
-          </div>
-
-          {/* Overflow button: visible below lg */}
-          <div className="lg:hidden relative shrink-0 ml-auto">
-            <Button
-              ref={filterTriggerRef}
-              variant="outline"
-              size="sm"
-              startIcon={<SlidersHorizontal size={16} />}
-              aria-label={t('common.filters', { defaultValue: 'Filters' })}
-              onClick={() => setFilterOpen(v => !v)}
-            />
-            {activeFilterCount > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[1rem] h-4 px-1 rounded-full bg-primary-fg text-white text-[10px] leading-4 text-center font-semibold pointer-events-none">
-                {activeFilterCount}
-              </span>
-            )}
-          </div>
-          <PopOver
-            isOpen={filterOpen}
-            onClose={() => setFilterOpen(false)}
-            triggerRef={filterTriggerRef}
-            placement="bottom"
-            align="end"
-            maxWidth="20rem"
-          >
-            <div className="flex flex-col gap-3 p-3 min-w-[16rem]">
-              <div className="sm:hidden">
-                {renderMethodFilter('w-full')}
-              </div>
-              <div className="md:hidden">
-                {renderTypeFilter('w-full')}
-              </div>
-              {renderBranchFilter('w-full')}
-            </div>
-          </PopOver>
-        </div>
+        {/* Filters — overflow-aware, measures the bar (not the viewport) */}
+        <FilterBar
+          className="flex-none p-2 border-b border-line"
+          leading={dateFilter}
+          leadingMinWidth={224}
+          items={filterItems}
+          activeCount={activeFilterCount}
+        />
 
         {/* Channel breakdown */}
         <div className="flex-none px-4 py-3 border-b border-line">
