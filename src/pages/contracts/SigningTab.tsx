@@ -1,27 +1,32 @@
 // Read-only signing tab for the contract detail panel.
 //
-// Data sources (per UI_SUMMARY/42_CONTRACT_SIGNING.md §8):
-//   - api.v_contract_signing_history  → one row per signing, with state /
-//     change_reason / sealed_at / ttl / counts
+// Data sources (per UI_SUMMARY/42b §3, UI_TEAM_NOTICE_SNAPSHOT_EVENT_DRIVEN_2026_06_12.md):
+//   - api.v_contract_signing_visible  → UI default. Same columns as
+//     v_contract_signing_history, with system auto-voids (voided_by=0 — emitted
+//     by fn_bill_cancel / fn_contract_unbind_device / etc.) hidden.
+//   - api.v_contract_signing_history  → full audit, including system auto-voids.
+//     Surfaced via the "Show system events" toggle for audit/debug.
 //   - api.v_contract_signing_party    → one row per party (LESSOR / LESSEE /
-//     GUARANTOR / WITNESS), with frozen identity + signed_at
+//     GUARANTOR / WITNESS), with frozen identity + signed_at.
 //
-// When `v_contract_signing_history` returns 403, the tab falls back to
-// rendering party-only groups so the surface still loads.
-//
-// Sign + Void actions are only shown when actionable:
-//   - Void   → status === 'COLLECTING'
-//   - Sign   → status === 'COLLECTING' && party hasn't signed && customer-party
-// Manual create (PRIMARY_SWAP / ADD_GUARANTOR / etc.) is still TODO.
+// Rendering model:
+//   - One collapsible card per snapshot. Default expanded: newest COLLECTING.
+//   - Collapsed view = single header line (status dot, version, reason, counts).
+//   - Per-status action surface:
+//       COLLECTING        → Void + per-party Sign
+//       SEALED/SUPERSEDED → Print contract PDF
+//       VOIDED            → no actions, void reason inline
+//   - System-voided rows (voided_by=0) show a Bot icon for disambiguation.
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Badge, Button, Tooltip } from 'tsp-form';
+import { Badge, Button, Switch, Tooltip } from 'tsp-form';
 import {
-  AlertTriangle, CheckCircle2, Circle, Clock, FileSignature, PenLine, Trash2, XCircle,
+  Bot, CheckCircle2, ChevronDown, ChevronRight, Circle, FileSignature, PenLine,
+  Printer, Trash2, XCircle,
 } from 'lucide-react';
-import { apiClient, ApiError } from '../../lib/api';
+import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { SigningVoidModal } from './SigningVoidModal';
 import { SigningSignModal } from './SigningSignModal';
@@ -48,6 +53,7 @@ interface SigningHistoryRow {
   created_at: string;
   sealed_at: string | null;
   voided_at: string | null;
+  voided_by: number | null;
   void_reason: string | null;
   expires_at: string | null;
   ttl_remaining: string | null;
@@ -72,13 +78,33 @@ interface SigningPartyRow {
   has_signed: boolean;
 }
 
-function statusColor(s: SigningStatus): 'success' | 'warning' | 'default' | 'danger' {
+function statusBadgeColor(s: SigningStatus): 'success' | 'warning' | 'default' | 'danger' {
   switch (s) {
     case 'COLLECTING': return 'warning';
     case 'SEALED':     return 'success';
     case 'SUPERSEDED': return 'default';
     case 'VOIDED':     return 'danger';
     default:           return 'default';
+  }
+}
+
+function statusDotClass(s: SigningStatus): string {
+  switch (s) {
+    case 'COLLECTING': return 'bg-warning';
+    case 'SEALED':     return 'bg-success';
+    case 'SUPERSEDED': return 'bg-fg/30';
+    case 'VOIDED':     return 'bg-danger/70';
+    default:           return 'bg-fg/30';
+  }
+}
+
+function cardBorderClass(s: SigningStatus): string {
+  switch (s) {
+    case 'COLLECTING': return 'border-warning-border';
+    case 'SEALED':     return 'border-success-border';
+    case 'SUPERSEDED':
+    case 'VOIDED':     return 'border-line-subtle';
+    default:           return 'border-line';
   }
 }
 
@@ -96,7 +122,6 @@ function roleColor(r: PartyRole): 'primary' | 'info' | 'default' {
 // a compact "Xh Ym" hint. Returns null when the input is null or unparseable.
 function formatTtl(raw: string | null): string | null {
   if (!raw) return null;
-  // Strip leading "N day(s) " if present
   const dayMatch = raw.match(/^(\d+)\s+days?\s+(.*)$/);
   const days = dayMatch ? parseInt(dayMatch[1], 10) : 0;
   const time = dayMatch ? dayMatch[2] : raw;
@@ -110,6 +135,10 @@ function formatTtl(raw: string | null): string | null {
   return `${minutes}m`;
 }
 
+function isSystemVoided(row: SigningHistoryRow): boolean {
+  return row.status === 'VOIDED' && row.voided_by === 0;
+}
+
 type SignTarget = {
   signing_id: number;
   party_role: PartyRole;
@@ -119,25 +148,26 @@ type SignTarget = {
   frozen_full_name: string | null;
 };
 
-export function SigningTab({ contractId }: { contractId: number }) {
+export function SigningTab({
+  contractId,
+  onPrintPdf,
+}: {
+  contractId: number;
+  onPrintPdf?: () => void;
+}) {
   const { t } = useTranslation();
   const [voidSigningId, setVoidSigningId] = useState<number | null>(null);
   const [signTarget, setSignTarget] = useState<SignTarget | null>(null);
+  const [showAudit, setShowAudit] = useState(false);
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const [defaultedFor, setDefaultedFor] = useState<number | null>(null);
 
-  // Read history first. Treat 403 as "view unavailable" so the tab still
-  // renders party groups for read-only inspection.
+  const sourceView = showAudit ? 'v_contract_signing_history' : 'v_contract_signing_visible';
   const historyQuery = useQuery({
-    queryKey: ['contract-signings', contractId],
-    queryFn: async () => {
-      try {
-        return await apiClient.get<SigningHistoryRow[]>(
-          `/v_contract_signing_history?contract_id=eq.${contractId}&order=created_at.desc`,
-        );
-      } catch (err) {
-        if (err instanceof ApiError && err.httpStatus === 403) return null;
-        throw err;
-      }
-    },
+    queryKey: ['contract-signings', contractId, sourceView],
+    queryFn: () => apiClient.get<SigningHistoryRow[]>(
+      `/${sourceView}?contract_id=eq.${contractId}&order=version.desc,created_at.desc`,
+    ),
     staleTime: 30_000,
   });
 
@@ -149,7 +179,6 @@ export function SigningTab({ contractId }: { contractId: number }) {
     staleTime: 30_000,
   });
 
-  // Group party rows by signing_id for fast lookup.
   const partiesBySigning = useMemo(() => {
     const map = new Map<number, SigningPartyRow[]>();
     for (const p of partyQuery.data ?? []) {
@@ -160,50 +189,34 @@ export function SigningTab({ contractId }: { contractId: number }) {
     return map;
   }, [partyQuery.data]);
 
-  // When the history view 403s, synthesize stub rows from parties so each
-  // signing still shows up.
-  const signings: SigningHistoryRow[] = useMemo(() => {
-    if (historyQuery.data && historyQuery.data.length > 0) return historyQuery.data;
-    if (historyQuery.data === null) {
-      // Fallback: derive minimal rows from parties.
-      const ids = Array.from(partiesBySigning.keys()).sort((a, b) => b - a);
-      return ids.map<SigningHistoryRow>(id => {
-        const parties = partiesBySigning.get(id) ?? [];
-        const signed = parties.filter(p => p.has_signed).length;
-        return {
-          signing_id: id,
-          contract_id: contractId,
-          version: null,
-          type: '',
-          category: null,
-          required_witnesses: null,
-          status: signed === parties.length && parties.length > 0 ? 'SEALED' : 'COLLECTING',
-          is_current_full_contract: false,
-          change_reason: null,
-          change_reason_fk: null,
-          change_note: null,
-          is_forced: false,
-          supersedes_id: null,
-          superseded_by: null,
-          created_at: parties[0]?.signed_at ?? new Date().toISOString(),
-          sealed_at: null,
-          voided_at: null,
-          void_reason: null,
-          expires_at: null,
-          ttl_remaining: null,
-          signed_count: signed,
-          total_parties: parties.length,
-          pdf_available: false,
-        };
-      });
-    }
-    return [];
-  }, [historyQuery.data, partiesBySigning, contractId]);
-
-  const collecting = signings.find(s => s.status === 'COLLECTING');
-  const historyUnavailable = historyQuery.data === null;
+  const signings: SigningHistoryRow[] = historyQuery.data ?? [];
   const isLoading = historyQuery.isLoading || partyQuery.isLoading;
   const error = historyQuery.error ?? partyQuery.error;
+
+  // Auto-expand the newest COLLECTING row once per contract load. Falling back
+  // to the first row if no COLLECTING is present. User's manual expand/collapse
+  // overrides this — we only seed `defaultedFor` once per contractId.
+  useEffect(() => {
+    if (defaultedFor === contractId || signings.length === 0) return;
+    const seed = signings.find(s => s.status === 'COLLECTING') ?? signings[0];
+    if (seed) {
+      setExpanded(prev => {
+        const next = new Set(prev);
+        next.add(seed.signing_id);
+        return next;
+      });
+    }
+    setDefaultedFor(contractId);
+  }, [contractId, defaultedFor, signings]);
+
+  const toggleExpanded = (signingId: number) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(signingId)) next.delete(signingId);
+      else next.add(signingId);
+      return next;
+    });
+  };
 
   if (isLoading && signings.length === 0) {
     return <div className="p-8 text-center text-subtler">{t('common.loading')}</div>;
@@ -218,47 +231,42 @@ export function SigningTab({ contractId }: { contractId: number }) {
       </div>
     );
   }
-  if (signings.length === 0) {
-    return (
-      <div className="p-8 text-center text-subtler flex flex-col items-center gap-2">
-        <FileSignature size={28} className="text-subtle" />
-        <div>{t('signing.empty')}</div>
-      </div>
-    );
-  }
 
   return (
-    <div className="p-4 flex flex-col gap-4">
-      {historyUnavailable && (
-        <div className="alert alert-warning">
-          <AlertTriangle size={16} />
-          <div className="alert-description text-xs">
-            {t('signing.historyViewUnavailable')}
-          </div>
+    <div className="p-4 flex flex-col gap-3">
+      <Tooltip content={t('signing.auditToggleHint')}>
+        <label className="self-end flex items-center gap-2 text-xs text-subtle cursor-pointer">
+          <span>{t('signing.auditToggle')}</span>
+          <Switch size="sm" checked={showAudit} onChange={e => setShowAudit(e.target.checked)} />
+        </label>
+      </Tooltip>
+
+      {signings.length === 0 ? (
+        <div className="p-8 text-center text-subtler flex flex-col items-center gap-2">
+          <FileSignature size={28} className="text-subtle" />
+          <div>{t('signing.empty')}</div>
         </div>
+      ) : (
+        signings.map(s => (
+          <SigningCard
+            key={s.signing_id}
+            signing={s}
+            parties={partiesBySigning.get(s.signing_id) ?? []}
+            expanded={expanded.has(s.signing_id)}
+            onToggleExpand={() => toggleExpanded(s.signing_id)}
+            onRequestVoid={() => setVoidSigningId(s.signing_id)}
+            onRequestPrint={onPrintPdf}
+            onRequestSign={(party) => setSignTarget({
+              signing_id: s.signing_id,
+              party_role: party.party_role,
+              party_index: party.party_index,
+              customer_id: party.customer_id,
+              staff_id: party.staff_id,
+              frozen_full_name: party.frozen_full_name,
+            })}
+          />
+        ))
       )}
-
-      {/* Pending-action callout — top of tab */}
-      {collecting && !historyUnavailable && (
-        <PendingCallout signing={collecting} />
-      )}
-
-      {signings.map(s => (
-        <SigningCard
-          key={s.signing_id}
-          signing={s}
-          parties={partiesBySigning.get(s.signing_id) ?? []}
-          onRequestVoid={() => setVoidSigningId(s.signing_id)}
-          onRequestSign={(party) => setSignTarget({
-            signing_id: s.signing_id,
-            party_role: party.party_role,
-            party_index: party.party_index,
-            customer_id: party.customer_id,
-            staff_id: party.staff_id,
-            frozen_full_name: party.frozen_full_name,
-          })}
-        />
-      ))}
 
       <SigningVoidModal
         open={voidSigningId !== null}
@@ -276,176 +284,190 @@ export function SigningTab({ contractId }: { contractId: number }) {
   );
 }
 
-function PendingCallout({ signing }: { signing: SigningHistoryRow }) {
-  const { t } = useTranslation();
-  const ttl = formatTtl(signing.ttl_remaining);
-  const remaining = signing.total_parties - signing.signed_count;
-  return (
-    <div className="border border-warning/40 bg-warning/5 rounded-md px-4 py-3 flex items-start gap-3">
-      <Clock size={18} className="text-warning-fg shrink-0 mt-0.5" />
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-semibold text-warning-fg">
-          {t('signing.pendingCallout', { count: remaining })}
-        </div>
-        <div className="text-xs text-subtle mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
-          {signing.change_reason && (
-            <span>
-              {t(`signing.reason_${signing.change_reason}`, { defaultValue: signing.change_reason })}
-            </span>
-          )}
-          {ttl && (
-            <span>
-              · {t('signing.ttlLabel')}: <span className="tabular-nums">{ttl}</span>
-            </span>
-          )}
-          {signing.expires_at && (
-            <span>
-              · {t('signing.expiresAt')}: <DateTime value={signing.expires_at} />
-            </span>
-          )}
-        </div>
-        <div className="text-[11px] text-subtler mt-1">
-          {t('signing.createdAt')} <DateTime value={signing.created_at} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SigningCard({ signing, parties, onRequestVoid, onRequestSign }: {
+function SigningCard({
+  signing, parties, expanded, onToggleExpand,
+  onRequestVoid, onRequestSign, onRequestPrint,
+}: {
   signing: SigningHistoryRow;
   parties: SigningPartyRow[];
+  expanded: boolean;
+  onToggleExpand: () => void;
   onRequestVoid: () => void;
   onRequestSign: (party: SigningPartyRow) => void;
+  onRequestPrint?: () => void;
 }) {
   const { t } = useTranslation();
   const ttl = formatTtl(signing.ttl_remaining);
   const isCollecting = signing.status === 'COLLECTING';
+  const isSealed = signing.status === 'SEALED' || signing.status === 'SUPERSEDED';
+  const systemVoided = isSystemVoided(signing);
+  const muted = signing.status === 'VOIDED' || signing.status === 'SUPERSEDED';
+
+  // Tail line — the right-aligned context that depends on status.
+  let tail: React.ReactNode = null;
+  if (isCollecting) {
+    tail = (
+      <span className="tabular-nums">
+        {signing.signed_count}/{signing.total_parties}
+        {ttl && <span className="text-warning-fg ml-2">{ttl}</span>}
+      </span>
+    );
+  } else if (signing.status === 'SEALED' && signing.sealed_at) {
+    tail = <DateTime value={signing.sealed_at} showTime={false} />;
+  } else if (signing.status === 'VOIDED' && signing.voided_at) {
+    tail = <DateTime value={signing.voided_at} showTime={false} />;
+  } else if (signing.status === 'SUPERSEDED' && signing.sealed_at) {
+    tail = <DateTime value={signing.sealed_at} showTime={false} />;
+  }
 
   return (
-    <div className="border border-line rounded-md overflow-hidden">
-      {/* Header row */}
-      <div className="px-4 py-3 border-b border-line bg-surface/40 flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge size="sm" color={statusColor(signing.status)}>
-              {t(`signing.status_${signing.status}`, { defaultValue: signing.status })}
-            </Badge>
-            {signing.change_reason && (
-              <span className="text-sm font-medium">
-                {t(`signing.reason_${signing.change_reason}`, { defaultValue: signing.change_reason })}
-              </span>
+    <div className={`border ${cardBorderClass(signing.status)} rounded-md overflow-hidden ${muted ? 'opacity-80' : ''}`}>
+      {/* Collapsed header — clickable to toggle */}
+      <button
+        type="button"
+        onClick={onToggleExpand}
+        className="w-full px-3 py-2.5 flex items-center gap-2 text-left hover:bg-surface/40 transition-colors"
+        aria-expanded={expanded}
+      >
+        <span className="shrink-0">
+          {expanded ? <ChevronDown size={14} className="text-subtle" /> : <ChevronRight size={14} className="text-subtle" />}
+        </span>
+        <span className={`shrink-0 w-2 h-2 rounded-full ${statusDotClass(signing.status)}`} />
+        {signing.version != null && (
+          <span className="shrink-0 text-xs text-subtle tabular-nums">v{signing.version}</span>
+        )}
+        <span className="text-sm font-medium truncate">
+          {signing.change_reason
+            ? t(`signing.reason_${signing.change_reason}`, { defaultValue: signing.change_reason })
+            : t(`signing.status_${signing.status}`)}
+        </span>
+        {signing.is_current_full_contract && (
+          <Badge size="xs" color="success">{t('signing.currentContract')}</Badge>
+        )}
+        {signing.is_forced && (
+          <Badge size="xs" color="warning">{t('signing.forced')}</Badge>
+        )}
+        {systemVoided && (
+          <Tooltip content={t('signing.systemEventHint')}>
+            <Bot size={13} className="text-subtle shrink-0" />
+          </Tooltip>
+        )}
+        <span className="ml-auto shrink-0 text-xs text-subtle">{tail}</span>
+      </button>
+
+      {expanded && (
+        <div className="border-t border-line/60">
+          {/* Meta strip */}
+          <div className="px-3 py-2 text-[11px] text-subtle flex flex-wrap gap-x-3 gap-y-0.5">
+            <span>
+              <Badge size="xs" color={statusBadgeColor(signing.status)}>
+                {t(`signing.status_${signing.status}`, { defaultValue: signing.status })}
+              </Badge>
+            </span>
+            {signing.type && (
+              <span>{signing.type === 'FULL_CONTRACT' ? t('signing.category_CONTRACT') : t('signing.category_AMENDMENT')}</span>
             )}
-            {signing.is_current_full_contract && (
-              <Badge size="xs" color="success">{t('signing.currentContract')}</Badge>
-            )}
-            {signing.is_forced && (
-              <Badge size="xs" color="warning">{t('signing.forced')}</Badge>
-            )}
-            {signing.version != null && (
-              <span className="text-xs text-subtle">v{signing.version}</span>
-            )}
-          </div>
-          <div className="text-xs text-subtle mt-1 flex flex-col gap-0.5">
-            <div className="flex flex-wrap gap-x-3">
-              {signing.category && (
-                <span>{t(`signing.category_${signing.category}`, { defaultValue: signing.category })}</span>
-              )}
-              <span>{t('signing.createdAt')} <DateTime value={signing.created_at} /></span>
-              {ttl && signing.status === 'COLLECTING' && (
-                <span className="text-warning-fg">{t('signing.ttlLabel')}: <span className="tabular-nums">{ttl}</span></span>
-              )}
-            </div>
+            <span>{t('signing.createdAt')} <DateTime value={signing.created_at} /></span>
             {signing.sealed_at && (
-              <div>{t('signing.sealedAt')} <DateTime value={signing.sealed_at} /></div>
+              <span>{t('signing.sealedAt')} <DateTime value={signing.sealed_at} /></span>
             )}
             {signing.voided_at && (
-              <div>{t('signing.voidedAt')} <DateTime value={signing.voided_at} /></div>
+              <span>{t('signing.voidedAt')} <DateTime value={signing.voided_at} /></span>
+            )}
+            {signing.expires_at && isCollecting && (
+              <span>{t('signing.expiresAt')} <DateTime value={signing.expires_at} /></span>
             )}
           </div>
+
           {signing.void_reason && (
-            <div className="text-xs text-danger mt-1">
+            <div className="px-3 pb-2 text-xs text-danger">
               {t('signing.voidReason')}: {signing.void_reason}
             </div>
           )}
           {signing.change_note && (
-            <div className="text-xs text-subtle mt-1 italic">"{signing.change_note}"</div>
+            <div className="px-3 pb-2 text-xs text-subtle italic">"{signing.change_note}"</div>
           )}
-        </div>
-        <div className="shrink-0 flex flex-col items-end gap-1.5">
-          <div className="text-right">
-            <div className="text-sm font-semibold tabular-nums">
-              {signing.signed_count} / {signing.total_parties}
-            </div>
-            <div className="text-[11px] text-subtle">{t('signing.signedCount')}</div>
-          </div>
-          {isCollecting && (
-            <Button
-              size="sm"
-              variant="outline"
-              color="danger"
-              startIcon={<Trash2 size={13} />}
-              onClick={onRequestVoid}
-            >
-              {t('signing.voidConfirm')}
-            </Button>
-          )}
-        </div>
-      </div>
 
-      {/* Party list */}
-      {parties.length === 0 ? (
-        <div className="px-4 py-3 text-xs text-subtler">{t('signing.noParties')}</div>
-      ) : (
-        <ul className="divide-y divide-line">
-          {parties.map(p => (
-            <li key={p.id} className="px-4 py-2.5 flex items-center gap-3">
-              <span className="shrink-0">
-                {p.has_signed
-                  ? <CheckCircle2 size={16} className="text-success" />
-                  : <Circle size={16} className="text-subtle" />}
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Badge size="xs" color={roleColor(p.party_role)}>
-                    {t(`signing.role_${p.party_role}`, { defaultValue: p.party_role })}
-                  </Badge>
-                  <span className="text-sm font-medium truncate">
-                    {p.frozen_full_name ?? '—'}
+          {/* Party list */}
+          {parties.length === 0 ? (
+            <div className="px-3 py-3 text-xs text-subtler border-t border-line/60">{t('signing.noParties')}</div>
+          ) : (
+            <ul className="divide-y divide-line/60 border-t border-line/60">
+              {parties.map(p => (
+                <li key={p.id} className="px-3 py-2 flex items-center gap-3">
+                  <span className="shrink-0">
+                    {p.has_signed
+                      ? <CheckCircle2 size={16} className="text-success" />
+                      : <Circle size={16} className="text-subtle" />}
                   </span>
-                </div>
-                <div className="text-[11px] text-subtle mt-0.5 flex flex-wrap gap-x-3">
-                  {p.frozen_id_number && <span>{p.frozen_id_number}</span>}
-                  {p.frozen_phone && <span>{p.frozen_phone}</span>}
-                </div>
-              </div>
-              <div className="shrink-0 flex items-center gap-2">
-                {p.signed_at ? (
-                  <Tooltip content={<DateTime value={p.signed_at} />}>
-                    <span className="text-[11px] text-subtle tabular-nums">
-                      <DateTime value={p.signed_at} showTime={false} />
-                    </span>
-                  </Tooltip>
-                ) : isCollecting && p.customer_id != null ? (
-                  <Button
-                    size="sm"
-                    color="primary"
-                    startIcon={<PenLine size={13} />}
-                    onClick={() => onRequestSign(p)}
-                  >
-                    {t('signing.signConfirm')}
-                  </Button>
-                ) : isCollecting && p.customer_id == null ? (
-                  <Tooltip content={t('signing.signStaffPartyUnsupported')}>
-                    <span className="text-[11px] text-warning-fg">{t('signing.partyPending')}</span>
-                  </Tooltip>
-                ) : (
-                  <span className="text-[11px] text-warning-fg">{t('signing.partyPending')}</span>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge size="xs" color={roleColor(p.party_role)}>
+                        {t(`signing.role_${p.party_role}`, { defaultValue: p.party_role })}
+                      </Badge>
+                      <span className="text-sm font-medium truncate">
+                        {p.frozen_full_name ?? '—'}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-subtle mt-0.5 flex flex-wrap gap-x-3">
+                      {p.frozen_id_number && <span>{p.frozen_id_number}</span>}
+                      {p.frozen_phone && <span>{p.frozen_phone}</span>}
+                    </div>
+                  </div>
+                  <div className="shrink-0 flex items-center gap-2">
+                    {p.signed_at ? (
+                      <Tooltip content={<DateTime value={p.signed_at} />}>
+                        <span className="text-[11px] text-subtle tabular-nums">
+                          <DateTime value={p.signed_at} showTime={false} />
+                        </span>
+                      </Tooltip>
+                    ) : isCollecting && p.customer_id != null ? (
+                      <Button
+                        size="sm"
+                        color="primary"
+                        startIcon={<PenLine size={13} />}
+                        onClick={() => onRequestSign(p)}
+                      >
+                        {t('signing.signConfirm')}
+                      </Button>
+                    ) : (
+                      <Tooltip content={t('signing.signStaffPartyUnsupported')}>
+                        <span className="text-[11px] text-subtler">—</span>
+                      </Tooltip>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {/* Footer actions — only render buttons that make sense for the status */}
+          {(isCollecting || (isSealed && onRequestPrint)) && (
+            <div className="px-3 py-2.5 border-t border-line/60 flex flex-wrap gap-1.5 justify-end bg-surface/30">
+              {isSealed && onRequestPrint && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  startIcon={<Printer size={13} />}
+                  onClick={onRequestPrint}
+                >
+                  {t('contract.printContractPdf', { defaultValue: 'Print contract PDF' })}
+                </Button>
+              )}
+              {isCollecting && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  color="danger"
+                  startIcon={<Trash2 size={13} />}
+                  onClick={onRequestVoid}
+                >
+                  {t('signing.voidConfirm')}
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

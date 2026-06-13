@@ -16,7 +16,7 @@ export function CardPostPayment({ onEdit, active }: CardPostPaymentProps) {
     <div
       className={`border rounded-lg transition-colors ${
         active ? 'border-success bg-success/10' :
-        'border-success/40 bg-success/5 hover:border-success/60 cursor-pointer'
+        'border-success-border bg-success/5 hover:border-success cursor-pointer'
       }`}
       onClick={clickable ? onEdit : undefined}
       role={clickable ? 'button' : undefined}

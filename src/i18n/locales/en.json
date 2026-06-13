@@ -3526,7 +3526,9 @@
   },
   "signing": {
     "empty": "No signings yet",
-    "historyViewUnavailable": "Signing history view is unavailable on this account — showing party rows only.",
+    "auditToggle": "Show system events",
+    "auditToggleHint": "Includes signings auto-voided by bill cancel / unbind / detach. Off by default.",
+    "systemEventHint": "Auto-voided by system (no staff action)",
     "pendingCallout": "Waiting for {{count}} party to sign",
     "pendingCallout_plural": "Waiting for {{count}} parties to sign",
     "ttlLabel": "TTL",

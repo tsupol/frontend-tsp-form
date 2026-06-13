@@ -23,7 +23,7 @@ export function CardSaving({ onEdit, active, shake }: { onEdit?: () => void; act
       active={active}
       shake={shake}
       disabled={isReadOnly || !hasCustomer}
-      className={!active && hasBalance ? 'border-info/30 bg-info/5' : undefined}
+      className={!active && hasBalance ? 'border-info-border bg-info/5' : undefined}
     >
       {!hasCustomer ? (
         <div className="text-subtle text-xs">{t('workspace.needCustomerFirst')}</div>

@@ -26,7 +26,7 @@ export function CardInsurance({ onEdit, active, shake }: { onEdit?: () => void; 
       active={active}
       shake={shake}
       disabled={isReadOnly || !isFin2 || !hasCustomer}
-      className={!active && isFin2 && hasAmount ? 'border-info/30 bg-info/5' : undefined}
+      className={!active && isFin2 && hasAmount ? 'border-info-border bg-info/5' : undefined}
     >
       {!isFin2 ? (
         <div className="text-subtle flex items-center gap-2 text-xs">

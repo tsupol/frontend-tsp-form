@@ -30,8 +30,8 @@ export function SummaryCard({ title, status, icon, onEdit, disabled, active, sha
     <div
       className={`border rounded-lg transition-colors ${
         active ? 'border-primary bg-primary-soft' :
-        status === 'complete' ? 'border-success/50 bg-success/10' :
-        status === 'locked' ? 'border-line/50 bg-surface/50 opacity-60' :
+        status === 'complete' ? 'border-success-border bg-success/10' :
+        status === 'locked' ? 'border-line-subtle bg-surface/50 opacity-60' :
         'border-line bg-bg'
       } ${clickable ? 'cursor-pointer hover:border-fg/20' : ''} ${shake ? 'animate-shake' : ''} ${className ?? ''}`}
       onClick={clickable ? onEdit : undefined}

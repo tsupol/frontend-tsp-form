@@ -279,6 +279,7 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
     | null
   >(null);
   const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
+  const [pdfModalOpen, setPdfModalOpen] = useState(false);
   const notesDirtyRef = useRef(false);
   const [pendingTab, setPendingTab] = useState<DetailTab | null>(null);
   const navGuard = useNavGuard();
@@ -382,6 +383,8 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
             onRequestBindDevice={() => setRequestedAction('bind_device')}
             deliveryModalOpen={deliveryModalOpen}
             setDeliveryModalOpen={setDeliveryModalOpen}
+            pdfModalOpen={pdfModalOpen}
+            setPdfModalOpen={setPdfModalOpen}
           />
         )}
         {activeTab === 'money' && <MoneyTab contractId={contractId} contract={contract} t={t} />}
@@ -398,7 +401,9 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
         {activeTab === 'device' && (
           <DeviceTab contract={contract} onRequestAction={setRequestedAction} />
         )}
-        {activeTab === 'signing' && <SigningTab contractId={contractId} />}
+        {activeTab === 'signing' && (
+          <SigningTab contractId={contractId} onPrintPdf={() => setPdfModalOpen(true)} />
+        )}
       </div>
 
       {/* Contract actions */}
@@ -431,6 +436,12 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
           <Button color="danger" onClick={confirmDiscardTab}>{t('common.discard')}</Button>
         </div>
       </Modal>
+
+      <GenerateContractPdfModal
+        open={pdfModalOpen}
+        onClose={() => setPdfModalOpen(false)}
+        contract={contract}
+      />
     </div>
   );
 }
@@ -533,13 +544,15 @@ function MediaRow({ label, media }: { label: string; media: EntityMedia[] }) {
 
 // ── Overview Tab ─────────────────────────────────────────────────────────────
 
-function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryModalOpen, setDeliveryModalOpen }: {
+function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryModalOpen, setDeliveryModalOpen, pdfModalOpen, setPdfModalOpen }: {
   contract: ContractDetail;
   t: ReturnType<typeof useTranslation>['t'];
   queryClient: ReturnType<typeof useQueryClient>;
   onRequestBindDevice: () => void;
   deliveryModalOpen: boolean;
   setDeliveryModalOpen: (open: boolean) => void;
+  pdfModalOpen: boolean;
+  setPdfModalOpen: (open: boolean) => void;
 }) {
   const isFin2 = contract.commercial_model === 'FIN2';
   const isActive = contract.state === 'ACTIVE' || contract.state === 'COMPLETED' || contract.state === 'TERMINATED';
@@ -549,7 +562,6 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
     !contract.is_used_asset;
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const { generating: printingPdf } = useGenerateContractPdfServer();
-  const [pdfModalOpen, setPdfModalOpen] = useState(false);
   const [printBlockOpen, setPrintBlockOpen] = useState(false);
   const [printBlockReasons, setPrintBlockReasons] = useState<string[]>([]);
   const [commissionModalOpen, setCommissionModalOpen] = useState(false);
@@ -609,7 +621,7 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
     <div className="p-4 flex flex-col gap-4">
       {/* Bind device reminder — NEW asset post-activate */}
       {needsDeviceBind && (
-        <div className="border rounded-md px-4 py-3 border-warning/30 bg-warning/5">
+        <div className="border rounded-md px-4 py-3 border-warning-border bg-warning/5">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 min-w-0">
               <Smartphone size={14} className="text-warning-fg shrink-0" />
@@ -817,7 +829,7 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
 
       {/* Delivery */}
       {isActive && (
-        <div className={`border rounded-md px-4 py-3 ${contract.shipped_at ? 'border-line' : 'border-warning/30 bg-warning/5'}`}>
+        <div className={`border rounded-md px-4 py-3 ${contract.shipped_at ? 'border-line' : 'border-warning-border bg-warning/5'}`}>
           <div className="flex items-center justify-between mb-2">
             <h3 className={`text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 ${contract.shipped_at ? 'text-subtle' : 'text-warning-fg'}`}>
               <Truck size={13} />
@@ -863,12 +875,6 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
           setDeliveryModalOpen(false);
           queryClient.invalidateQueries({ queryKey: ['contract-detail', contract.id] });
         }}
-      />
-
-      <GenerateContractPdfModal
-        open={pdfModalOpen}
-        onClose={() => setPdfModalOpen(false)}
-        contract={contract}
       />
 
       <CommissionOwnerModal

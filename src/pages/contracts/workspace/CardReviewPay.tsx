@@ -16,9 +16,9 @@ export function CardReviewPay({ onEdit, active, disabled }: { onEdit?: () => voi
   return (
     <div
       className={`border rounded-lg transition-colors ${
-        disabled ? 'border-line/50 bg-surface/50 opacity-50' :
+        disabled ? 'border-line-subtle bg-surface/50 opacity-50' :
         active ? 'border-warning bg-warning/10' :
-        'border-warning/40 bg-warning/5 hover:border-warning/60 cursor-pointer'
+        'border-warning-border bg-warning/5 hover:border-warning cursor-pointer'
       }`}
       onClick={clickable ? onEdit : undefined}
       role={clickable ? 'button' : undefined}

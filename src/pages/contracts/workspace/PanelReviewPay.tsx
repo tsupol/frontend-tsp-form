@@ -504,7 +504,7 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
           </div>
 
           <div className={`flex justify-between items-center p-3 rounded-lg border mt-3 ${
-            isBalanced ? 'border-success/30 bg-success/5' : 'border-warning/30 bg-warning/5'
+            isBalanced ? 'border-success-border bg-success/5' : 'border-warning-border bg-warning/5'
           }`}>
             <span className="text-sm">{t('wizard.totalPayment')}</span>
             <span className={`font-semibold tabular-nums ${isBalanced ? 'text-success' : 'text-warning-fg'}`}>

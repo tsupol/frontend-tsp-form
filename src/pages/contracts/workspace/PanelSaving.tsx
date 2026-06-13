@@ -123,7 +123,7 @@ export function PanelSaving({ onClose: _onClose }: Props) {
   return (
     <div className="p-4 flex flex-col">
       {/* ── Saving Setup ─────────────────────────────────────────────── */}
-        <div className={`rounded-lg px-4 py-3 border mb-4 ${balance > 0 ? 'border-info/30 bg-info/5' : 'border-line bg-surface'}`}>
+        <div className={`rounded-lg px-4 py-3 border mb-4 ${balance > 0 ? 'border-info-border bg-info/5' : 'border-line bg-surface'}`}>
           <div className="text-xs text-subtle mb-1">{t('workspace.savingCurrentBalance')}</div>
           <div className="flex items-center gap-2">
             <PiggyBank size={18} className={balance > 0 ? 'text-info' : 'text-fg/30'} />
@@ -162,7 +162,7 @@ export function PanelSaving({ onClose: _onClose }: Props) {
         {txns && txns.length > 0 && (
           <div className="flex flex-col gap-2 mb-4">
             {txns.map(txn => (
-              <div key={txn.id} className="px-3 py-2 border border-success/30 rounded-lg flex items-center gap-3 text-sm">
+              <div key={txn.id} className="px-3 py-2 border border-success-border rounded-lg flex items-center gap-3 text-sm">
                 <span className={`font-semibold tabular-nums ${txn.amount > 0 ? 'text-success' : 'text-danger'}`}>
                   {txn.amount > 0 ? '+' : ''}{fmtCurrency(txn.amount)}
                 </span>

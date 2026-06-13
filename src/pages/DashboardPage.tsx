@@ -538,9 +538,9 @@ function CountCard({ icon, title, count, isLoading, isError, error, subtitle, to
 
   const toneClass =
     tone === 'danger'
-      ? 'border-danger/40 bg-danger/5'
+      ? 'border-danger-border bg-danger/5'
       : tone === 'warning'
-        ? 'border-warning/40 bg-warning/5'
+        ? 'border-warning-border bg-warning/5'
         : 'border-line bg-surface';
   const iconColor = tone === 'danger' ? 'text-danger' : tone === 'warning' ? 'text-warning-fg' : 'text-success';
 
@@ -620,8 +620,8 @@ function PendingDeviceBindCard({
   const tone = maxDays >= 7 ? 'danger' : 'warning';
   const toneClass =
     tone === 'danger'
-      ? 'border-danger/40 bg-danger/5'
-      : 'border-warning/40 bg-warning/5';
+      ? 'border-danger-border bg-danger/5'
+      : 'border-warning-border bg-warning/5';
   const iconColor = tone === 'danger' ? 'text-danger' : 'text-warning-fg';
 
   return (

@@ -1,53 +1,31 @@
-/* App-specific Tailwind theme tokens — NOT part of tsp-form theme copy.
-   This file imports index.css first then declares overrides AFTER, so
-   anything redefined here wins (later @theme tokens win, later unlayered
-   rules win on cascade). main.tsx must import THIS file, not index.css. */
-
 @import "./index.css";
 
 @theme static {
-    /* Layout */
     --spacing-side-menu: 200px;
     --spacing-panel-header-h: 2.792rem;
     --spacing-info-content-h: 1.708rem;
 
-    /* App-specific text tokens (not in library) */
-    --color-figure: #aabde8;       /* money / currency values */
-    --color-qty: #c2c7d7;          /* quantity / count values */
+    --color-figure: #aabde8;
+    --color-qty: #c2c7d7;
 
-    /* ── Primary (overrides library) ────────────────────────────────── */
     --color-primary: #2333d6;
     --color-primary-hover: #3e4ee0;
     --color-primary-active: #1a28ad;
     --color-primary-fade: #6e7be8;
     --color-primary-contrast: #ffffff;
-    --color-badge-outline-default-border: #404040;
     --color-primary-light: rgba(35, 51, 214, 0.1);
-
-    /* Readable on-page text variant (library defaults *-fg to the solid
-       hue; override here so .text-primary-fg renders the lighter shade). */
     --color-primary-fg: #5a78ee;
-    /* --color-warning-fg falls through to library default (= --color-warning) */
-
-    /* Soft tinted surface for selected/active cards — same formula as the
-       Badge bg, so primary-tinted regions read consistently. Theme-aware via
-       --color-surface (adapts to light/dark automatically). */
-    --color-primary-soft: color-mix(in srgb, var(--color-primary) 15%, var(--color-bg));
-    --color-danger-soft: color-mix(in srgb, var(--color-danger) 15%, var(--color-bg));
 }
 
 [data-theme="light"] {
     --color-figure: #4a4d55;
     --color-qty: #555960;
-    --color-bg: #f3f3f6;
     --color-primary-hover: #1a28ad;
     --color-primary-active: #131e85;
     --color-primary-fade: #131e85;
 
     --color-primary-fg: #2333d6;
     --color-warning-fg: #d7800c;
-
-    --color-badge-outline-default-border: #ccc;
 }
 
 @layer components {

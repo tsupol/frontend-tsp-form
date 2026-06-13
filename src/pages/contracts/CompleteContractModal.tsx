@@ -470,7 +470,7 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
           {view === 'wallets' && (
             <>
               {payoffBill && (
-                <div className="mb-3 px-3 py-2 rounded-md bg-success/5 border border-success/30 flex items-center gap-2">
+                <div className="mb-3 px-3 py-2 rounded-md bg-success/5 border border-success-border flex items-center gap-2">
                   <CheckCircle size={16} className="text-success shrink-0" />
                   <div className="text-xs flex-1">
                     {t('contract.earlyPayoff_billConfirmed', { defaultValue: 'Payment confirmed' })}
@@ -647,7 +647,7 @@ function DeviceMovementsBlock({
   const { t } = useTranslation();
   if (movements && movements.length > 0) {
     return (
-      <div className="px-3 py-2.5 rounded-md bg-info/5 border border-info/20">
+      <div className="px-3 py-2.5 rounded-md bg-info/5 border border-info-border">
         <div className="text-xs text-subtle mb-1.5">
           {t('contract.complete_done_deviceMovement', { defaultValue: 'Device' })}
         </div>
@@ -671,7 +671,7 @@ function DeviceMovementsBlock({
   }
   if (deviceOwnershipTransferred) {
     return (
-      <div className="px-3 py-2 rounded-md bg-info/5 border border-info/20 text-sm">
+      <div className="px-3 py-2 rounded-md bg-info/5 border border-info-border text-sm">
         {t('contract.complete_done_deviceOwnershipTransferred', { defaultValue: 'Device ownership transferred to customer.' })}
       </div>
     );
@@ -799,7 +799,7 @@ function WalletGateRow({
   return (
     <div
       className={`flex items-center gap-3 px-3 py-2.5 rounded-md border ${
-        cleared ? 'border-line bg-surface' : 'border-warning/30 bg-warning/5'
+        cleared ? 'border-line bg-surface' : 'border-warning-border bg-warning/5'
       }`}
     >
       <Icon size={18} className={cleared ? 'text-fg/40' : 'text-warning-fg'} />
@@ -877,7 +877,7 @@ function ConfirmView({
   return (
     <div className="form-grid">
       {/* Action context badge */}
-      <div className="px-3 py-2.5 rounded-md bg-info/5 border border-info/20 text-sm">
+      <div className="px-3 py-2.5 rounded-md bg-info/5 border border-info-border text-sm">
         {action.kind === 'complete' ? (
           <>
             <span className="text-subtle">{t('contract.selectCloseReason')}: </span>
@@ -1085,7 +1085,7 @@ function PayoffView({
 
   return (
     <>
-      <div className="mb-4 px-3 py-2.5 rounded-md bg-warning/10 border border-warning/20">
+      <div className="mb-4 px-3 py-2.5 rounded-md bg-warning/10 border border-warning-border">
         <div className="text-xs text-subtle">{t('contract.earlyPayoff_payoffAmount', { defaultValue: 'Payoff Amount' })}</div>
         <div className="text-lg font-semibold tabular-nums">{fmtCurrency(preview.installments.gross_remaining)}</div>
         <div className="text-xs text-subtle mt-1">
@@ -1166,7 +1166,7 @@ function PayoffView({
       </div>
 
       <div className={`flex justify-between items-center p-3 rounded-lg border mb-4 ${
-        isBalanced ? 'border-success/30 bg-success/5' : 'border-warning/30 bg-warning/5'
+        isBalanced ? 'border-success-border bg-success/5' : 'border-warning-border bg-warning/5'
       }`}>
         <span className="text-sm">{t('wizard.totalPayment', { defaultValue: 'Total Payment' })}</span>
         <span className={`font-semibold tabular-nums ${isBalanced ? 'text-success' : 'text-warning-fg'}`}>
