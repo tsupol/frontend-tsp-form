@@ -386,7 +386,7 @@ export function PaymentsPage() {
             return (
               <div
                 key={p.payment_id}
-                className="w-full px-4 py-3 border-b border-line flex flex-col gap-1"
+                className="w-full px-4 py-3 flex flex-col gap-1"
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="font-mono text-sm font-medium truncate">{p.code_display}</span>

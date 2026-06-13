@@ -216,16 +216,16 @@ export function RetailBillsPage() {
 
               <DataTable<RetailBillRow>
                 data={bills}
+                getRowProps={(row) => ({
+                  'data-state': selectedBillId === row.original.id ? 'selected' : undefined,
+                })}
                 renderRow={(row) => {
                   const b = row.original;
-                  const isSelected = selectedBillId === b.id;
                   const statusColor = b.status === 'PAID' ? 'success' : b.status === 'VOIDED' ? 'default' : 'warning';
                   return (
                     <button
                       key={b.id}
-                      className={`w-full text-left px-4 py-3 border-b border-line flex items-center gap-3 transition-colors cursor-pointer ${
-                        isSelected ? 'bg-primary-soft' : 'hover:bg-surface-hover'
-                      }`}
+                      className="w-full text-left px-4 py-3 flex items-center gap-3 transition-colors cursor-pointer"
                       onClick={() => {
                         setSelectedBillId(b.id);
                         if (isMobile) goTo('detail');

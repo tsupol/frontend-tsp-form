@@ -412,9 +412,11 @@ export function BuybackPage() {
 
               <DataTable<BuybackListItem>
                 data={list}
+                getRowProps={(row) => ({
+                  'data-state': row.original.id === selectedId ? 'selected' : undefined,
+                })}
                 renderRow={(row) => {
                   const order = row.original;
-                  const isSelected = order.id === selectedId;
                   const ps = order.product_summary;
                   const productLine = ps
                     ? [ps.brand_name, ps.model_name].filter(Boolean).join(' ')
@@ -422,9 +424,7 @@ export function BuybackPage() {
                   return (
                     <button
                       key={order.id}
-                      className={`w-full text-left px-4 py-2.5 border-b border-line flex items-center gap-3 transition-colors cursor-pointer ${
-                        isSelected ? 'bg-primary-soft' : 'hover:bg-surface-hover'
-                      }`}
+                      className="w-full text-left px-4 py-2.5 flex items-center gap-3 transition-colors cursor-pointer"
                       onClick={() => { setSelectedId(order.id); if (isMobile) goTo('detail'); }}
                     >
                       <div className="flex-1 min-w-0">

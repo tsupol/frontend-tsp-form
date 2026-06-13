@@ -455,15 +455,15 @@ export function LotsPage() {
             <PageNavPanel id="list" className={isMobile ? '' : 'w-1/2 xl:w-5/12 border-r border-line flex flex-col'}>
               <DataTable<Lot>
                 data={list}
+                getRowProps={(row) => ({
+                  'data-state': row.original.lot_id === selectedId ? 'selected' : undefined,
+                })}
                 renderRow={(row) => {
                   const lot = row.original;
-                  const isSelected = lot.lot_id === selectedId;
                   return (
                     <button
                       key={lot.lot_id}
-                      className={`w-full text-left px-4 py-2.5 border-b border-line flex items-center gap-3 transition-colors cursor-pointer ${
-                        isSelected ? 'bg-item-active-bg text-item-active-fg' : 'hover:bg-surface-hover'
-                      }`}
+                      className="w-full text-left px-4 py-2.5 flex items-center gap-3 transition-colors cursor-pointer"
                       onClick={() => { setSelectedId(lot.lot_id); if (isMobile) goTo('detail'); }}
                     >
                       <div className="flex-1 min-w-0">

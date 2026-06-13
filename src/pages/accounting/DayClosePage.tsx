@@ -372,6 +372,9 @@ export function DayClosePage() {
 
               <DataTable<DayCloseHistoryRow>
                 data={history}
+                getRowProps={(row) => ({
+                  'data-state': !selectedIsToday && row.original.close_date === selectedDate ? 'selected' : undefined,
+                })}
                 renderRow={(row) => {
                   const h = row.original;
                   const audit = auditById.get(h.id);
@@ -381,13 +384,10 @@ export function DayClosePage() {
                     audit.flag_refund_high && t('accounting.dayClose.flagRefundHigh'),
                     audit.flag_gift_cost_high && t('accounting.dayClose.flagGiftCostHigh'),
                   ].filter(Boolean) as string[] : [];
-                  const isSelected = !selectedIsToday && h.close_date === selectedDate;
                   return (
                     <button
                       key={h.id}
-                      className={`w-full text-left px-4 py-3 border-b border-line flex items-center gap-3 transition-colors cursor-pointer ${
-                        isSelected ? 'bg-primary-soft' : 'hover:bg-surface-hover'
-                      }`}
+                      className="w-full text-left px-4 py-3 flex items-center gap-3 transition-colors cursor-pointer"
                       onClick={() => selectDate(h.close_date, isMobile ? goTo : undefined)}
                     >
                       <Lock size={14} className="text-success shrink-0" />

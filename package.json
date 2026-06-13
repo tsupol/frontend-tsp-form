@@ -31,7 +31,7 @@
     "signature_pad": "^5.1.3",
     "tailwindcss": "^4.1.14",
     "tesseract.js": "^7.0.0",
-    "tsp-form": "^0.7.22"
+    "tsp-form": "^0.7.23"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",

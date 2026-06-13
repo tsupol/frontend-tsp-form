@@ -425,15 +425,15 @@ export function PurchaseOrdersPage() {
             >
               <DataTable<PoListRow>
                 data={poList}
+                getRowProps={(row) => ({
+                  'data-state': row.original.po_id === selectedPoId ? 'selected' : undefined,
+                })}
                 renderRow={(row) => {
                   const po = row.original;
-                  const isSelected = po.po_id === selectedPoId;
                   return (
                     <button
                       key={po.po_id}
-                      className={`w-full text-left px-4 py-2.5 border-b border-line flex items-start gap-3 cursor-pointer transition-colors ${
-                        isSelected ? 'bg-item-active-bg text-item-active-fg' : 'hover:bg-surface-hover'
-                      }`}
+                      className="w-full text-left px-4 py-2.5 flex items-start gap-3 cursor-pointer transition-colors"
                       onClick={() => {
                         setSelectedPoId(po.po_id);
                         if (isMobile) goTo('detail');

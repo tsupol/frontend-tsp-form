@@ -1123,6 +1123,11 @@ export function PricebookPage() {
                 <PageNavPanel id="list" className="flex-1 min-w-0 border-r border-line" mobileClassName="flex flex-col overflow-hidden">
                   <DataTable<ModelRow>
                     data={displayModels}
+                    rowClassName="cursor-pointer select-none"
+                    getRowProps={(row) => ({
+                      'data-active': row.original.id === selectedModelId ? 'true' : undefined,
+                      onClick: () => handleRowSelect(row.original.id),
+                    })}
                     renderRow={(row) => {
                       const model = row.original;
                       const pricing = pricingMap.get(model.id);
@@ -1130,13 +1135,9 @@ export function PricebookPage() {
                       const cp = pricing?.cost_price ?? null;
                       const needsSetup = pricing?.needs_price_setup ?? true;
                       const fin2Terms = pricing?.fin2_terms ?? [];
-                      const isSelected = model.id === selectedModelId;
 
                       return (
-                        <div
-                          className={`flex items-center gap-3 px-3 py-2.5 border-b border-line hover:bg-surface-hover transition-colors select-none cursor-pointer ${isSelected ? 'bg-primary-soft' : ''}`}
-                          onClick={() => handleRowSelect(model.id)}
-                        >
+                        <div className="flex items-center gap-3 px-3 py-2.5">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-baseline gap-1.5 min-w-0">
                               <ModelName brand={model.brand_name} family={model.family_name} model={model.name} />

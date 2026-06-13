@@ -248,6 +248,12 @@
     --spacing-pagination-gap: 0.125rem;
 
     --color-badge-outline-default-border: #404040;
+
+    --color-table-row-tint: var(--color-primary);
+    --color-table-row-bg: transparent;
+    --color-table-row-selected: color-mix(in srgb, var(--color-table-row-tint) 8%, transparent);
+    --color-table-row-active: var(--color-primary-soft);
+    --color-table-row-disabled: transparent;
     --color-badge-outline-primary-border: var(--color-primary);
     --color-badge-outline-secondary-border: var(--color-secondary);
     --color-badge-outline-success-border: var(--color-success);

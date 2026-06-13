@@ -736,15 +736,15 @@ export function AssetsPage() {
             <PageNavPanel id="list" className={isMobile ? '' : 'w-1/2 xl:w-5/12 border-r border-line flex flex-col'}>
               <DataTable<Asset>
                 data={list}
+                getRowProps={(row) => ({
+                  'data-state': row.original.asset_id === selectedId ? 'selected' : undefined,
+                })}
                 renderRow={(row) => {
                   const asset = row.original;
-                  const isSelected = asset.asset_id === selectedId;
                   return (
                     <button
                       key={asset.asset_id}
-                      className={`w-full text-left px-4 py-2.5 border-b border-line flex items-center gap-3 transition-colors cursor-pointer ${
-                        isSelected ? 'bg-primary-soft' : 'hover:bg-surface-hover'
-                      }`}
+                      className="w-full text-left px-4 py-2.5 flex items-center gap-3 transition-colors cursor-pointer"
                       onClick={() => { setSelectedId(asset.asset_id); if (isMobile) goTo('detail'); }}
                     >
                       <div className="flex-1 min-w-0">

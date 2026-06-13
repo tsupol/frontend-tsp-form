@@ -284,15 +284,15 @@ export function TransfersPage() {
 
               <DataTable<TransferOrder>
                 data={list}
+                getRowProps={(row) => ({
+                  'data-state': row.original.transfer_order_id === selectedId ? 'selected' : undefined,
+                })}
                 renderRow={(row) => {
                   const order = row.original;
-                  const isSelected = order.transfer_order_id === selectedId;
                   return (
                     <button
                       key={order.transfer_order_id}
-                      className={`w-full text-left px-4 py-2.5 border-b border-line flex items-start gap-3 transition-colors cursor-pointer ${
-                        isSelected ? 'bg-item-active-bg text-item-active-fg' : 'hover:bg-surface-hover'
-                      }`}
+                      className="w-full text-left px-4 py-2.5 flex items-start gap-3 transition-colors cursor-pointer"
                       onClick={() => { setSelectedId(order.transfer_order_id); if (isMobile) goTo('detail'); }}
                     >
                       <div className="flex-1 min-w-0">

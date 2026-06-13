@@ -982,16 +982,16 @@ export function TicketQueuePage() {
               {!isError && (
                 <DataTable<Ticket>
                   data={tickets}
+                  getRowProps={(row) => ({
+                    'data-state': selectedTicketId === row.original.id ? 'selected' : undefined,
+                  })}
                   renderRow={(row) => {
                     const ticket = row.original;
-                    const isSelected = selectedTicketId === ticket.id;
                     const isPaused = ticket.is_paused_by_appointment;
                     const apptCountdown = isPaused ? daysUntil(ticket.next_appointment_at) : null;
                     return (
                       <div
-                        className={`px-4 py-2 border-b border-line transition-colors cursor-pointer ${
-                          isSelected ? 'bg-primary-soft' : isPaused ? 'bg-surface-muted hover:bg-surface-hover' : 'hover:bg-surface-hover'
-                        }`}
+                        className={`px-4 py-2 transition-colors cursor-pointer ${isPaused ? 'bg-surface-muted' : ''}`}
                         onClick={() => {
                           setSelectedTicketId(ticket.id);
                           if (isMobile) goTo('detail');

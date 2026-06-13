@@ -446,7 +446,7 @@ export function BranchesPage() {
             const companyName = companyById.get(b.company_id);
             return (
               <div
-                className="flex items-start gap-3 px-3 py-2.5 border-b border-line hover:bg-surface-hover transition-colors cursor-pointer"
+                className="flex items-start gap-3 px-3 py-2.5 transition-colors cursor-pointer"
                 onClick={() => openEdit(b)}
               >
                 <div className="flex-1 min-w-0 space-y-1">

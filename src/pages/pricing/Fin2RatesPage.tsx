@@ -1053,17 +1053,19 @@ export function Fin2RatesPage() {
                 <PageNavPanel id="list" className="flex-1 min-w-0 border-r border-line" mobileClassName="flex flex-col overflow-hidden">
                   <DataTable<ModelRow>
                     data={models}
+                    getRowProps={(row) => ({
+                      'data-state': row.original.id === selectedModelId ? 'selected' : undefined,
+                    })}
                     renderRow={(row) => {
                       const model = row.original;
                       const rateSummary = rateSummaryMap.get(model.id);
                       const terms = rateSummary?.terms ?? [];
-                      const isSelected = model.id === selectedModelId;
 
                       return (
                         <div>
                           {/* Collapsed row */}
                           <div
-                            className={`flex items-center gap-3 px-3 py-2.5 border-b border-line hover:bg-surface-hover transition-colors select-none cursor-pointer ${isSelected ? 'bg-primary-soft' : ''}`}
+                            className="flex items-center gap-3 px-3 py-2.5 transition-colors select-none cursor-pointer"
                             onClick={() => handleRowSelect(model.id)}
                           >
                             <div className="flex-1 min-w-0">

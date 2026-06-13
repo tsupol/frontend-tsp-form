@@ -171,18 +171,18 @@ export function AuditFlagsPage() {
 
               <DataTable<DayCloseAuditRow>
                 data={rows}
+                getRowProps={(row) => ({
+                  'data-state': selectedId === row.original.day_close_id ? 'selected' : undefined,
+                })}
                 renderRow={(row) => {
                   const r = row.original;
                   const flagCount = countFlags(r);
                   const drift = computeDrift(r);
                   const hasDrift = drift.cash !== 0 || drift.transfer !== 0;
-                  const isSelected = selectedId === r.day_close_id;
                   return (
                     <button
                       key={r.day_close_id}
-                      className={`w-full text-left px-4 py-3 border-b border-line flex items-center gap-3 transition-colors cursor-pointer ${
-                        isSelected ? 'bg-primary-soft' : 'hover:bg-surface-hover'
-                      }`}
+                      className="w-full text-left px-4 py-3 flex items-center gap-3 transition-colors cursor-pointer"
                       onClick={() => selectRow(r, isMobile ? goTo : undefined)}
                     >
                       <Lock size={14} className="text-success shrink-0" />

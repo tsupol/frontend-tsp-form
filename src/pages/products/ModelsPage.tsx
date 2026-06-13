@@ -1889,14 +1889,14 @@ export function ModelsPage() {
                 <PageNavPanel id="list" className="w-1/2 xl:w-5/12 border-r border-line flex flex-col" mobileClassName="flex flex-col overflow-hidden">
                   <DataTable<Model>
                     data={models}
+                    getRowProps={(row) => ({
+                      'data-state': row.original.model_id === selectedModelId ? 'selected' : undefined,
+                    })}
                     renderRow={(row) => {
                       const model = row.original;
-                      const isSelected = model.model_id === selectedModelId;
                       return (
                         <div
-                          className={`flex items-center gap-3 px-3 py-2 border-b border-line hover:bg-surface-hover transition-colors cursor-pointer ${
-                            isSelected ? 'bg-primary-soft' : ''
-                          }`}
+                          className="flex items-center gap-3 px-3 py-2 transition-colors cursor-pointer"
                           onClick={() => handleRowSelect(model.model_id)}
                         >
                           <div className="flex-1 min-w-0 space-y-1">

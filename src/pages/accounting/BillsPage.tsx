@@ -303,9 +303,11 @@ export function BillsPage() {
               {/* Bill list */}
               <DataTable<BillRow>
                 data={bills}
+                getRowProps={(row) => ({
+                  'data-state': selectedBillId === row.original.id ? 'selected' : undefined,
+                })}
                 renderRow={(row) => {
                   const b = row.original;
-                  const isSelected = selectedBillId === b.id;
                   const cancelled = b.is_cancelled || b.status === 'VOIDED';
                   const statusColor = cancelled
                     ? 'default'
@@ -314,9 +316,7 @@ export function BillsPage() {
                   return (
                     <button
                       key={b.id}
-                      className={`w-full text-left px-4 py-3 border-b border-line flex flex-col gap-1 transition-colors cursor-pointer ${
-                        isSelected ? 'bg-primary-soft' : 'hover:bg-surface-hover'
-                      }`}
+                      className="w-full text-left px-4 py-3 flex flex-col gap-1 transition-colors cursor-pointer"
                       onClick={() => selectBill(b.id, isMobile ? goTo : undefined)}
                     >
                       {/* Line 1: code + badges ............... amount */}
