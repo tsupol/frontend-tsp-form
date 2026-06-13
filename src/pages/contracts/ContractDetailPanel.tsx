@@ -544,7 +544,7 @@ function MediaRow({ label, media }: { label: string; media: EntityMedia[] }) {
 
 // ── Overview Tab ─────────────────────────────────────────────────────────────
 
-function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryModalOpen, setDeliveryModalOpen, pdfModalOpen, setPdfModalOpen }: {
+function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryModalOpen, setDeliveryModalOpen, setPdfModalOpen }: {
   contract: ContractDetail;
   t: ReturnType<typeof useTranslation>['t'];
   queryClient: ReturnType<typeof useQueryClient>;
