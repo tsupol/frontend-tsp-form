@@ -6,7 +6,8 @@ import type { SubmissionRow } from '../../components/SubmissionReviewDrawer';
 export type ChatTimelineItem =
   | { kind: 'message'; id: string; timestamp: Date; data: ChatMessage }
   | { kind: 'slip';    id: string; timestamp: Date; data: SubmissionRow }
-  | { kind: 'daySeparator'; id: string; key: string };
+  | { kind: 'daySeparator'; id: string; key: string }
+  | { kind: 'unreadDivider'; id: string };
 
 // Bangkok-day bucket (UTC+7) so the day separator label matches what the
 // user sees in their local time — the rest of the app uses Asia/Bangkok.
@@ -18,6 +19,10 @@ function bangkokDayKey(d: Date): string {
 export function buildChatTimeline(
   messages: ChatMessage[],
   submissions: SubmissionRow[],
+  // ID of the first unread CUSTOMER message at panel mount time. Pass null to
+  // skip rendering the divider. Snapshot once on mount in the caller so the
+  // divider stays fixed even as messages mark themselves read.
+  unreadAnchorMessageId: number | null = null,
 ): ChatTimelineItem[] {
   const combined: ChatTimelineItem[] = [
     ...messages.map<ChatTimelineItem>(m => ({
@@ -37,12 +42,22 @@ export function buildChatTimeline(
 
   const out: ChatTimelineItem[] = [];
   let lastKey: string | null = null;
+  let dividerInserted = false;
   for (const item of combined) {
     if (item.kind === 'daySeparator') continue;
     const key = bangkokDayKey(item.timestamp);
     if (key !== lastKey) {
       out.push({ kind: 'daySeparator', id: `day-${key}`, key });
       lastKey = key;
+    }
+    if (
+      !dividerInserted
+      && unreadAnchorMessageId !== null
+      && item.kind === 'message'
+      && item.data.id === unreadAnchorMessageId
+    ) {
+      out.push({ kind: 'unreadDivider', id: 'unread-divider' });
+      dividerInserted = true;
     }
     out.push(item);
   }

@@ -3618,6 +3618,8 @@
     "empty": "ไม่มีการสนทนา",
     "emptyThread": "ยังไม่มีข้อความ",
     "unreadBelow": "ข้อความที่ยังไม่ได้อ่าน",
+    "unknownStaff": "พนักงาน",
+    "youSuffix": "(คุณ)",
     "imageMessage": "รูปภาพ",
     "you": "คุณ",
     "customer": "ลูกค้า",

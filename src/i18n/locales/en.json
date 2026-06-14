@@ -3618,6 +3618,8 @@
     "empty": "No conversations",
     "emptyThread": "No messages yet",
     "unreadBelow": "Unread messages below",
+    "unknownStaff": "Staff",
+    "youSuffix": "(You)",
     "imageMessage": "Photo",
     "you": "You",
     "customer": "Customer",

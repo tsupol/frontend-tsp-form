@@ -315,6 +315,7 @@ export const AppSideNav = () => {
         },
       ],
     },
+    { type: 'group', key: 'grp-inbox', label: t('nav.groupInbox') },
     ...(canChat
       ? [{
           key: 'chat',
@@ -336,6 +337,13 @@ export const AppSideNav = () => {
       ...iconWithCount(<Receipt size="1rem" />, pendingSlips),
       label: t('nav.paymentSubmissions'),
       path: '/admin/payment-submissions',
+    },
+    {
+      type: 'custom',
+      key: 'notifications',
+      render: ({ collapsed, isMobile: m }) => (
+        <NotificationMenuItem collapsed={collapsed} isMobile={m} unreadCount={unreadNotifCount} />
+      ),
     },
     {
       key: 'accounting',
@@ -381,14 +389,6 @@ export const AppSideNav = () => {
           { key: 'collections-config', icon: <Settings size="1rem" />, label: t('nav.dunningConfig'), path: '/admin/collections/config' },
         ] : []),
       ],
-    },
-    { type: 'group', key: 'grp-inbox', label: t('nav.groupInbox') },
-    {
-      type: 'custom',
-      key: 'notifications',
-      render: ({ collapsed, isMobile: m }) => (
-        <NotificationMenuItem collapsed={collapsed} isMobile={m} unreadCount={unreadNotifCount} />
-      ),
     },
     ...(isLocalDev() ? [{
       key: 'dev', icon: <FlaskConical size="1rem" />, label: 'Dev',

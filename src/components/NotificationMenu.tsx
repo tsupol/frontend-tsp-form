@@ -1,21 +1,39 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Badge, PopOver } from 'tsp-form';
-import { Bell, MessageSquare, FileText, CreditCard, AlertTriangle, CheckCheck } from 'lucide-react';
+import { Badge, PopOver, Tooltip } from 'tsp-form';
+import {
+  Bell, MessageSquare, FileText, CreditCard, AlertTriangle, CheckCheck,
+  ExternalLink,
+} from 'lucide-react';
 import clsx from 'clsx';
 import { apiClient } from '../lib/api';
+
+// ── Types ───────────────────────────────────────────────────────────────────
 
 type NotifCategory = 'contract' | 'chat' | 'payment' | 'system';
 
 type NotificationRow = {
   notification_id: number;
   event_type: string;
+  // Top-level variant discriminator (mig 27). NULL until Phase A2 wires
+  // producers — fall back to plain event_type when missing.
+  event_variant: string | null;
   category: NotifCategory | string;
+  // title/body/deeplink kept until Phase B; we ignore them on in-app rendering.
   title: string | null;
   body: string | null;
-  payload: { deeplink?: string; contract_id?: number; contract_display?: string; customer_display?: string } | null;
+  payload: {
+    contract_id?: number;
+    contract_code?: string;        // canonical, always formatted (mig 27)
+    customer_full_name?: string;   // canonical (mig 27)
+    signing_id?: number;
+    new_lessee_name?: string;
+    bill_code?: string;
+    amount?: number;
+    staff_name?: string;
+  } | null;
   contract_ids: number[] | null;
   created_at: string;
   is_read: boolean;
@@ -27,6 +45,8 @@ type ListResponse = {
   limit: number;
   offset: number;
 };
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
 
 function relativeTime(t: ReturnType<typeof useTranslation>['t'], iso: string): string {
   const then = new Date(iso).getTime();
@@ -42,6 +62,15 @@ function relativeTime(t: ReturnType<typeof useTranslation>['t'], iso: string): s
   return t('notifCenter.time.weekAgo', { n: diffWk });
 }
 
+// Map event_type to category for tab filtering + icon. The BE `category` field
+// is unreliable (chat_status_attention currently ships as `system`).
+function resolveCategory(evt: string, fallback: string): NotifCategory | string {
+  if (evt.startsWith('chat_')) return 'chat';
+  if (evt.startsWith('signing_') || evt.startsWith('bind_') || evt.startsWith('contract_')) return 'contract';
+  if (evt.startsWith('bill_') || evt === 'slip_uploaded') return 'payment';
+  return fallback;
+}
+
 function iconForCategory(category: string) {
   switch (category) {
     case 'contract': return <FileText size={14} />;
@@ -50,6 +79,97 @@ function iconForCategory(category: string) {
     default:         return <AlertTriangle size={14} />;
   }
 }
+
+// BE canonical fields (mig 27): contract_code is always formatted via
+// sale.format_business_code; customer_full_name is the canonical name.
+function contractCodeOf(row: NotificationRow): string | null {
+  return row.payload?.contract_code ?? null;
+}
+
+function customerNameOf(row: NotificationRow): string | null {
+  return row.payload?.customer_full_name ?? null;
+}
+
+// FE owns deeplinks. event_type + contract_id → route.
+function deeplinkFor(row: NotificationRow): string | null {
+  const cid = row.payload?.contract_id ?? row.contract_ids?.[0];
+  if (!cid) return null;
+  const evt = row.event_type;
+  if (evt.startsWith('chat_')) return `/admin/chat?contract=${cid}`;
+  if (evt.startsWith('signing_')) return `/admin/contracts/search/${cid}?tab=signing`;
+  if (evt.startsWith('bill_') || evt === 'slip_uploaded') return `/admin/contracts/search/${cid}?tab=money`;
+  return `/admin/contracts/search/${cid}`;
+}
+
+// Title resolution. Prefers top-level row.event_variant (mig 27); falls back
+// to event_type alone. Until Phase A2 wires producers, event_variant is NULL
+// for every row and the title falls back to the per-event default.
+function titleFor(row: NotificationRow, t: ReturnType<typeof useTranslation>['t']): string {
+  const evt = row.event_type;
+  if (row.event_variant) {
+    const k = `notifCenter.event.${evt}.${row.event_variant}`;
+    const hit = t(k, { defaultValue: '' });
+    if (hit) return hit;
+  }
+  return t(`notifCenter.event.${evt}`, { defaultValue: evt });
+}
+
+// Visible placeholder for a missing payload field. Renders "[field_name]" with
+// a tooltip explaining what's missing. Style is muted-warning so the gap is
+// obvious but not alarming.
+function MissingField({ field }: { field: string }) {
+  const { t } = useTranslation();
+  return (
+    <Tooltip content={t('notifCenter.missingFieldTooltip', { field })}>
+      <span className="text-[11px] text-warning bg-warning/10 rounded px-1 py-0 inline-flex items-center align-middle border border-warning/30">
+        [{field}]
+      </span>
+    </Tooltip>
+  );
+}
+
+// ── Collapse rule ───────────────────────────────────────────────────────────
+
+type DisplayItem =
+  | { kind: 'row'; row: NotificationRow }
+  | { kind: 'group'; contractId: number; contractDisplay: string | null; customerDisplay: string | null; rows: NotificationRow[] };
+
+// Collapse ≥3 consecutive chat-category rows for the same contract_id.
+function collapseRows(items: NotificationRow[]): DisplayItem[] {
+  const out: DisplayItem[] = [];
+  let i = 0;
+  while (i < items.length) {
+    const head = items[i];
+    const cid = head.payload?.contract_id ?? head.contract_ids?.[0];
+    if (resolveCategory(head.event_type, head.category) === 'chat' && cid) {
+      let j = i + 1;
+      while (
+        j < items.length
+        && resolveCategory(items[j].event_type, items[j].category) === 'chat'
+        && (items[j].payload?.contract_id ?? items[j].contract_ids?.[0]) === cid
+      ) j++;
+      const span = items.slice(i, j);
+      if (span.length >= 3) {
+        const contractDisplay = span.map(contractCodeOf).find(Boolean) ?? null;
+        const customerDisplay = span.map(customerNameOf).find(Boolean) ?? null;
+        out.push({
+          kind: 'group',
+          contractId: cid,
+          contractDisplay,
+          customerDisplay,
+          rows: span,
+        });
+        i = j;
+        continue;
+      }
+    }
+    out.push({ kind: 'row', row: head });
+    i++;
+  }
+  return out;
+}
+
+// ── Component ───────────────────────────────────────────────────────────────
 
 type Props = {
   collapsed: boolean;
@@ -93,12 +213,21 @@ export function NotificationMenuItem({ collapsed, isMobile, unreadCount }: Props
     },
   });
 
-  const handleRowClick = (row: NotificationRow) => {
+  const navigateRow = (row: NotificationRow) => {
     if (!row.is_read) markRead.mutate(row.notification_id);
-    const link = row.payload?.deeplink;
+    const link = deeplinkFor(row);
     setOpen(false);
     if (link) navigate(link);
   };
+
+  const handleRowClick = (row: NotificationRow) => navigateRow(row);
+
+  const handleContractClick = (e: React.MouseEvent, row: NotificationRow) => {
+    e.stopPropagation();
+    navigateRow(row);
+  };
+
+  const items = useMemo(() => collapseRows(data?.items ?? []), [data?.items]);
 
   const label = unreadCount > 99 ? '99+' : String(unreadCount);
   const showCollapsedDot = collapsed && !isMobile && unreadCount > 0;
@@ -161,12 +290,76 @@ export function NotificationMenuItem({ collapsed, isMobile, unreadCount }: Props
             {isError && (
               <div className="px-3 py-6 text-sm text-danger text-center">{t('notifCenter.error')}</div>
             )}
-            {!isLoading && !isError && (data?.items ?? []).length === 0 && (
+            {!isLoading && !isError && items.length === 0 && (
               <div className="px-3 py-8 text-sm text-subtle text-center">{t('notifCenter.empty')}</div>
             )}
-            {(data?.items ?? []).map((row) => {
+
+            {items.map((item) => {
+              if (item.kind === 'group') {
+                const anyUnread = item.rows.some(r => !r.is_read);
+                const latest = item.rows[0];
+                const navigateGroup = () => {
+                  item.rows.forEach(r => { if (!r.is_read) markRead.mutate(r.notification_id); });
+                  setOpen(false);
+                  navigate(`/admin/chat?contract=${item.contractId}`);
+                };
+                return (
+                  <button
+                    key={`group-${item.contractId}-${latest.notification_id}`}
+                    type="button"
+                    className="w-full text-left px-3 py-2.5 hover:bg-item-hover-bg transition-colors border-b border-line/60 last:border-b-0 cursor-pointer bg-transparent"
+                    onClick={navigateGroup}
+                  >
+                    <div className="flex items-start gap-2">
+                      <span className={clsx('mt-1.5 w-1.5 h-1.5 rounded-full shrink-0', anyUnread ? 'bg-primary' : 'bg-line')} />
+                      <span className="mt-0.5 text-subtle shrink-0"><MessageSquare size={14} /></span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={clsx('text-sm leading-snug truncate min-w-0', anyUnread ? 'text-fg font-medium' : 'text-subtle')}>
+                            {t('notifCenter.chatGroupTitle', { n: item.rows.length })}
+                          </span>
+                          <span className="text-[11px] text-subtle shrink-0 ml-auto tabular-nums">{relativeTime(t, latest.created_at)}</span>
+                        </div>
+                        <div className="text-xs leading-snug truncate mt-0.5 inline-flex items-center gap-1.5 min-w-0 flex-wrap">
+                          {item.customerDisplay ? <span className="text-subtle truncate">{item.customerDisplay}</span> : <MissingField field="customer_full_name" />}
+                          <span className="text-subtle">·</span>
+                          {item.contractDisplay ? (
+                            <span className="text-primary-fg hover:underline inline-flex items-center gap-1 shrink-0">
+                              {item.contractDisplay}
+                              <ExternalLink size={11} />
+                            </span>
+                          ) : (
+                            <MissingField field="contract_code" />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                );
+              }
+
+              const row = item.row;
               const dotClass = row.is_read ? 'bg-line' : 'bg-primary';
               const titleClass = row.is_read ? 'text-subtle' : 'text-fg font-medium';
+              const code = contractCodeOf(row);
+              const customer = customerNameOf(row);
+              const cat = resolveCategory(row.event_type, row.category);
+              const title = titleFor(row, t);
+
+              // Event-specific extras (composed FE-side from payload fields).
+              const extras: React.ReactNode[] = [];
+              // Signing variant label — comes from top-level event_variant
+              // (mig 27, populated in Phase A2). Until producers wire it,
+              // event_variant is NULL and no label renders.
+              if (row.event_type.startsWith('signing_') && row.event_variant) {
+                const label = t(`notifCenter.signingType.${row.event_variant}`, { defaultValue: '' });
+                if (label) extras.push(<span key="sig-type" className="text-subtle">({label})</span>);
+              }
+              if (row.event_type === 'signing_sealed_primary_swap_staff' && row.payload?.new_lessee_name && row.payload.new_lessee_name !== '-') {
+                extras.push(<span key="new-lessee" className="text-subtle truncate">→ {row.payload.new_lessee_name}</span>);
+              }
+              const actor = row.payload?.staff_name;
+
               return (
                 <button
                   key={row.notification_id}
@@ -176,15 +369,40 @@ export function NotificationMenuItem({ collapsed, isMobile, unreadCount }: Props
                 >
                   <div className="flex items-start gap-2">
                     <span className={clsx('mt-1.5 w-1.5 h-1.5 rounded-full shrink-0', dotClass)} />
-                    <span className="mt-0.5 text-subtle shrink-0">{iconForCategory(row.category)}</span>
+                    <span className="mt-0.5 text-subtle shrink-0">{iconForCategory(cat)}</span>
                     <div className="flex-1 min-w-0">
-                      <div className={clsx('text-sm leading-snug truncate', titleClass)}>
-                        {row.title || row.event_type}
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={clsx('text-sm leading-snug truncate min-w-0', titleClass)}>
+                          {title}
+                        </span>
+                        <span className="text-[11px] text-subtle shrink-0 ml-auto tabular-nums">
+                          {relativeTime(t, row.created_at)}
+                        </span>
                       </div>
-                      {row.body && (
-                        <div className="text-xs text-subtle leading-snug truncate mt-0.5">{row.body}</div>
+                      <div className="text-xs leading-snug truncate mt-0.5 inline-flex items-center gap-1.5 min-w-0 flex-wrap">
+                        {customer ? <span className="text-subtle truncate">{customer}</span> : <MissingField field="customer_full_name" />}
+                        <span className="text-subtle">·</span>
+                        {code ? (
+                          <span
+                            role="link"
+                            tabIndex={0}
+                            onClick={(e) => handleContractClick(e, row)}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleContractClick(e as unknown as React.MouseEvent, row); }}
+                            className="text-primary-fg hover:underline inline-flex items-center gap-1 cursor-pointer shrink-0"
+                          >
+                            {code}
+                            <ExternalLink size={11} />
+                          </span>
+                        ) : (
+                          <MissingField field="contract_code" />
+                        )}
+                        {extras}
+                      </div>
+                      {actor && (
+                        <div className="text-[11px] text-subtle/80 mt-0.5 truncate">
+                          {t('notifCenter.actorBy', { name: actor })}
+                        </div>
                       )}
-                      <div className="text-[11px] text-subtle mt-1">{relativeTime(t, row.created_at)}</div>
                     </div>
                   </div>
                 </button>

@@ -130,6 +130,23 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
     return () => { unsubChat(); unsubSlip(); };
   }, [contractId, enabled, queryClient]);
 
+  // Snapshot the first unread CUSTOMER message ID on initial load — this
+  // pins the "unread below" divider so it stays put as the user reads, just
+  // like Slack / iMessage. Resets when the user switches contracts.
+  const [unreadAnchorId, setUnreadAnchorId] = useState<number | null>(null);
+  const anchorSnapshotForContract = useRef<number | null>(null);
+  useEffect(() => {
+    anchorSnapshotForContract.current = null;
+    setUnreadAnchorId(null);
+  }, [contractId]);
+  useEffect(() => {
+    if (anchorSnapshotForContract.current === contractId) return;
+    if (!messages.length) return;
+    const firstUnread = messages.find(m => m.sender_type === 'CUSTOMER' && !m.is_read);
+    setUnreadAnchorId(firstUnread ? firstUnread.id : null);
+    anchorSnapshotForContract.current = contractId;
+  }, [messages, contractId]);
+
   // Auto-scroll: jump to bottom whenever the contract changes (so a freshly
   // opened thread lands at the latest item) or when new messages/slips arrive.
   const lastSeenCount = useRef(0);
@@ -140,11 +157,25 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
     const contractChanged = lastSeenContract.current !== contractId;
     const newItems = itemCount > lastSeenCount.current;
     if (contractChanged || newItems) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      // On contract change, prefer the unread divider as the landing position
+      // (Slack / Line behavior) so the user sees context above + new below.
+      // Falls through to bottom-scroll when no divider is present or new items
+      // arrived without a contract switch.
+      let scrolled = false;
+      if (contractChanged) {
+        const divider = scrollRef.current.querySelector<HTMLElement>('[data-chat-unread-divider]');
+        if (divider) {
+          divider.scrollIntoView({ block: 'center' });
+          scrolled = true;
+        }
+      }
+      if (!scrolled) {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      }
       lastSeenCount.current = itemCount;
       lastSeenContract.current = contractId;
     }
-  }, [contractId, itemCount]);
+  }, [contractId, itemCount, unreadAnchorId]);
 
   // Auto-resize the textarea between 1 and MAX_TEXTAREA_LINES.
   useLayoutEffect(() => {
@@ -237,8 +268,8 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
   };
 
   const timeline = useMemo(
-    () => buildChatTimeline(messages, submissions),
-    [messages, submissions],
+    () => buildChatTimeline(messages, submissions, unreadAnchorId),
+    [messages, submissions, unreadAnchorId],
   );
 
   if (contractId === null) {
@@ -449,6 +480,10 @@ function TimelineRow({ item, showSender, currentUserId, lang, onOpenImage, onOpe
     return <DaySeparator dayKey={item.key} />;
   }
 
+  if (item.kind === 'unreadDivider') {
+    return <UnreadDivider />;
+  }
+
   if (item.kind === 'slip') {
     return (
       <SlipEventCard submission={item.data} lang={lang} onOpen={() => onOpenSlip(item.data)} />
@@ -459,9 +494,11 @@ function TimelineRow({ item, showSender, currentUserId, lang, onOpenImage, onOpe
   const isStaff = m.sender_type === 'STAFF';
   const isOwn = isStaff && currentUserId === m.sender_id;
   const align = isStaff ? 'items-end' : 'items-start';
-  const senderLabel = isStaff
-    ? (m.sender_name ?? (isOwn ? t('chat.you') : ''))
-    : (m.sender_name ?? t('chat.customer'));
+  // Shared-branch threads — always show the actual staff name so other staff
+  // know who replied. Add "(You)" suffix on own messages so you can self-spot.
+  const baseName = m.sender_name
+    ?? (isStaff ? t('chat.unknownStaff', { defaultValue: 'Staff' }) : t('chat.customer'));
+  const senderLabel = isOwn ? `${baseName} ${t('chat.youSuffix', { defaultValue: '(You)' })}` : baseName;
 
   // LINE-style layout: sender name on top of a new run, bubble on its own
   // row with the wall-clock time on the *outside* edge (left of staff
@@ -507,6 +544,23 @@ function DaySeparator({ dayKey }: { dayKey: string }) {
             : <DateTime value={`${dayKey}T00:00:00+07:00`} showTime={false} />}
       </span>
       <div className="flex-1 border-t border-line" />
+    </div>
+  );
+}
+
+function UnreadDivider() {
+  const { t } = useTranslation();
+  return (
+    <div
+      data-chat-unread-divider
+      className="flex items-center gap-2 my-1"
+      aria-label={t('chat.unreadBelow', { defaultValue: 'Unread messages below' })}
+    >
+      <div className="flex-1 border-t border-danger/40" />
+      <span className="text-[11px] text-danger font-medium px-2 uppercase tracking-wide">
+        {t('chat.unreadBelow', { defaultValue: 'Unread messages below' })}
+      </span>
+      <div className="flex-1 border-t border-danger/40" />
     </div>
   );
 }
