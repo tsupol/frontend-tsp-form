@@ -20,7 +20,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Badge, Button, Modal } from 'tsp-form';
+import { Badge, Button, LabeledCheckbox, Modal } from 'tsp-form';
 import type { UploadedImage } from 'tsp-form';
 import { XCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
@@ -70,17 +70,21 @@ export function SigningSignModal({ open, onClose, contractId, party }: Props) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const [view, setView] = useState<'form' | 'done'>('form');
+  const [view, setView] = useState<'consent' | 'form' | 'done'>('consent');
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState<SignResult | null>(null);
+  // Consent state — reset on every open so each party confirms their own
+  // ceremony. Continue button only enables once the checkbox is ticked.
+  const [consentChecked, setConsentChecked] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setView('form');
+      setView('consent');
       setError('');
       setUploading(false);
       setResult(null);
+      setConsentChecked(false);
     }
   }, [open]);
 
@@ -160,10 +164,45 @@ export function SigningSignModal({ open, onClose, contractId, party }: Props) {
     <Modal open={open} onClose={handleClose} maxWidth="42rem" width="100%">
       <div className="modal-header">
         <h2 className="modal-title">
-          {view === 'done' ? t('signing.signDoneTitle') : t('signing.signTitle')}
+          {view === 'done'
+            ? t('signing.signDoneTitle')
+            : view === 'consent'
+              ? t('signing.consentTitle')
+              : t('signing.signTitle')}
         </h2>
         <button type="button" className="modal-close-btn" onClick={handleClose} aria-label="Close" disabled={submitting}>&times;</button>
       </div>
+
+      {view === 'consent' && (
+        <>
+          <div className="modal-content">
+            {party && (
+              <div className="mb-3 px-3 py-2 rounded-md bg-surface border border-line flex items-center gap-2 flex-wrap">
+                <Badge size="xs" color="info">
+                  {t(`signing.role_${party.party_role}`, { defaultValue: party.party_role })}
+                </Badge>
+                <span className="text-sm font-medium">{party.frozen_full_name ?? '—'}</span>
+              </div>
+            )}
+            <p className="text-sm text-fg mb-3">{t('signing.consentBody')}</p>
+            <LabeledCheckbox
+              label={t('signing.consentCheckbox')}
+              checked={consentChecked}
+              onChange={(e) => setConsentChecked(e.target.checked)}
+            />
+          </div>
+          <div className="modal-footer">
+            <Button onClick={handleClose}>{t('common.cancel')}</Button>
+            <Button
+              color="primary"
+              onClick={() => setView('form')}
+              disabled={!consentChecked}
+            >
+              {t('signing.consentContinue')}
+            </Button>
+          </div>
+        </>
+      )}
 
       {view === 'form' && (
         <>

@@ -6,7 +6,7 @@ import { Badge, Button, Input, Select, Modal, TextArea, Tooltip, useSnackbarCont
 import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Upload, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, AlertTriangle } from 'lucide-react';
 import { useGenerateContractPdfServer } from './useGenerateContractPdfServer';
 import { GenerateContractPdfModal } from './GenerateContractPdfModal';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { ApiError } from '../../lib/api';
 import { uploadFromImage, getUploadSpec, specToResize, deleteMedia, encodeCanvas, renameForExt, mimeFromKey } from '../../lib/upload';
@@ -265,7 +265,19 @@ function ScrollableTabs<T extends string>({ tabs, activeTab, onTabChange, render
 export function ContractDetailPanel({ contractId, isMobile }: { contractId: number; isMobile: boolean }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<DetailTab>('overview');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const initialTab: DetailTab = (TABS as readonly string[]).includes(tabParam ?? '')
+    ? (tabParam as DetailTab)
+    : 'overview';
+  const [activeTab, setActiveTab] = useState<DetailTab>(initialTab);
+
+  useEffect(() => {
+    if (!tabParam) return;
+    if ((TABS as readonly string[]).includes(tabParam) && tabParam !== activeTab) {
+      setActiveTab(tabParam as DetailTab);
+    }
+  }, [tabParam]);
   const [copied, setCopied] = useState(false);
   const [requestedAction, setRequestedAction] = useState<
     | 'bind_device'
@@ -299,18 +311,27 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
     return () => window.removeEventListener('beforeunload', handler);
   }, []);
 
+  const syncTabToUrl = useCallback((next: DetailTab) => {
+    const params = new URLSearchParams(searchParams);
+    if (next === 'overview') params.delete('tab');
+    else params.set('tab', next);
+    setSearchParams(params, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   const handleTabChange = useCallback((next: DetailTab) => {
     if (notesDirtyRef.current && activeTab !== next) {
       setPendingTab(next);
       return;
     }
     setActiveTab(next);
-  }, [activeTab]);
+    syncTabToUrl(next);
+  }, [activeTab, syncTabToUrl]);
 
   const confirmDiscardTab = () => {
     if (!pendingTab) return;
     notesDirtyRef.current = false;
     setActiveTab(pendingTab);
+    syncTabToUrl(pendingTab);
     setPendingTab(null);
   };
 
@@ -420,6 +441,11 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
           queryClient.invalidateQueries({ queryKey: ['contract-txns', contractId] });
           queryClient.invalidateQueries({ queryKey: ['contract-bills', contractId] });
           queryClient.invalidateQueries({ queryKey: ['contract-bill-payments', contractId] });
+          // Event-driven snapshots (2026-06-12): bind / unbind / void / bill_cancel
+          // and friends auto-create or auto-void signing rows. Refresh the
+          // signing tab data too so the user doesn't have to reload.
+          queryClient.invalidateQueries({ queryKey: ['contract-signings', contractId] });
+          queryClient.invalidateQueries({ queryKey: ['contract-signing-parties', contractId] });
         }}
       />
 
@@ -1162,6 +1188,9 @@ function CustomersTab({ contractId, customerId, customerName, t, onRequestDetach
       p_relation: null,
     });
     queryClient.invalidateQueries({ queryKey: ['contract-customers', contractId] });
+    // Post-INITIAL auto-creates an ADD_GUARANTOR ADDENDUM (2026-06-12).
+    queryClient.invalidateQueries({ queryKey: ['contract-signings', contractId] });
+    queryClient.invalidateQueries({ queryKey: ['contract-signing-parties', contractId] });
     successSnack(t('contract.added_guarantor', { defaultValue: `Added ${fullName} as guarantor`, customer: fullName }));
   };
 
@@ -1395,6 +1424,11 @@ function CustomersTab({ contractId, customerId, customerName, t, onRequestDetach
         onSuccess={(name) => {
           setRemoveTarget(null);
           queryClient.invalidateQueries({ queryKey: ['contract-customers', contractId] });
+          // remove_guarantor auto-voids the matching COLLECTING ADDENDUM
+          // (or blocks if it's already SEALED). Either way the signing tab
+          // needs a refresh.
+          queryClient.invalidateQueries({ queryKey: ['contract-signings', contractId] });
+          queryClient.invalidateQueries({ queryKey: ['contract-signing-parties', contractId] });
           successSnack(t('contract.removed_guarantor', { defaultValue: `Removed ${name}`, customer: name }));
         }}
         t={t}

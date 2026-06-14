@@ -78,18 +78,20 @@ export function ModalGuarantor({ open, onClose }: Props) {
       setResult(res);
 
       if (res.action !== 'BLOCK') {
-        updateData({
-          guarantors: [...workspace.guarantors, { customerId: res.customer_id, fullName: res.full_name, idNumber: res.id_number }],
-          guarantorSkipped: false,
-        });
-
-        // Attach guarantor to contract if draft exists
+        // Attach to contract first so an attach failure surfaces before the
+        // workspace shows the guarantor as added. Post-INITIAL contracts also
+        // auto-create an ADD_GUARANTOR addendum here; any validation error
+        // from that path propagates as an ApiError.
         if (workspace.contractId) {
           await apiClient.rpc('fn_contract_add_guarantor', {
             p_contract_id: workspace.contractId,
             p_customer_id: res.customer_id,
-          }).catch(() => {});
+          });
         }
+        updateData({
+          guarantors: [...workspace.guarantors, { customerId: res.customer_id, fullName: res.full_name, idNumber: res.id_number }],
+          guarantorSkipped: false,
+        });
       }
     } catch (err) {
       if (err instanceof ApiError) {
