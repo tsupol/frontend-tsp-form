@@ -54,6 +54,16 @@ export function AppointmentCreateModal({
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState('');
 
+  // Client-side gate per 50_CONTRACT_APPOINTMENT_FLOW §8.4: promise_date
+  // must be strictly future. The backend enforces this too, but giving the
+  // calendar a `minDate=tomorrow` prevents the trip + better-error UX.
+  const tomorrow = (() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + 1);
+    return d;
+  })();
+
   useEffect(() => {
     if (open) {
       setPromiseDate(null);
@@ -80,7 +90,7 @@ export function AppointmentCreateModal({
     onError: (err) => setApiError(err, t, setError),
   });
 
-  const canSubmit = !!promiseDate && pin.length === 6 && !mutation.isPending;
+  const canSubmit = !!promiseDate && promiseDate >= tomorrow && pin.length === 6 && !mutation.isPending;
 
   return (
     <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
@@ -109,6 +119,7 @@ export function AppointmentCreateModal({
                 locale={i18n.language}
                 calendar="gregorian"
                 dateFormat={makeDatePickerFormat(i18n.language)}
+                datePickerProps={{ minDate: tomorrow }}
                 typingMode={isTyping}
                 onTypingModeChange={setIsTyping}
                 typingMask="##/##/####"
@@ -122,6 +133,8 @@ export function AppointmentCreateModal({
                   if (month < 1 || month > 12 || day < 1 || day > 31) return null;
                   const d = new Date(year, month - 1, day);
                   if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+                  // Mirror minDate — typed past/today dates are rejected too.
+                  if (d < tomorrow) return null;
                   return d;
                 }}
               />

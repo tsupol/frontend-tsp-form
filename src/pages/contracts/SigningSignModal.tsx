@@ -29,6 +29,7 @@ import { toStoragePath } from '../../lib/mediaPath';
 import { useAuth } from '../../contexts/AuthContext';
 import { SignatureCapture } from './workspace/SignatureCapture';
 import { ActionDoneView } from './ActionDoneView';
+import { SigningConsentBody } from './SigningConsentBody';
 
 interface PendingParty {
   signing_id: number;
@@ -37,6 +38,8 @@ interface PendingParty {
   customer_id: number | null;
   staff_id: number | null;
   frozen_full_name: string | null;
+  signing_type: string;
+  change_reason: string | null;
 }
 
 interface SignResult {
@@ -77,6 +80,9 @@ export function SigningSignModal({ open, onClose, contractId, party }: Props) {
   // Consent state — reset on every open so each party confirms their own
   // ceremony. Continue button only enables once the checkbox is ticked.
   const [consentChecked, setConsentChecked] = useState(false);
+  // Checkbox copy depends on change_reason; the body component decides which
+  // string to use and bubbles it up here.
+  const [consentLabel, setConsentLabel] = useState(t('signing.consentCheckbox'));
 
   useEffect(() => {
     if (open) {
@@ -184,9 +190,21 @@ export function SigningSignModal({ open, onClose, contractId, party }: Props) {
                 <span className="text-sm font-medium">{party.frozen_full_name ?? '—'}</span>
               </div>
             )}
-            <p className="text-sm text-fg mb-3">{t('signing.consentBody')}</p>
+            {party && (
+              <div className="mb-3">
+                <SigningConsentBody
+                  signingId={party.signing_id}
+                  contractId={contractId}
+                  changeReason={party.change_reason}
+                  signingType={party.signing_type}
+                  onCheckboxLabelChange={(label) =>
+                    setConsentLabel((prev) => (prev === label ? prev : label))
+                  }
+                />
+              </div>
+            )}
             <LabeledCheckbox
-              label={t('signing.consentCheckbox')}
+              label={consentLabel}
               checked={consentChecked}
               onChange={(e) => setConsentChecked(e.target.checked)}
             />

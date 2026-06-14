@@ -146,6 +146,10 @@ type SignTarget = {
   customer_id: number | null;
   staff_id: number | null;
   frozen_full_name: string | null;
+  // Snapshot-level context so the modal can pick the right consent body
+  // without re-querying the history view.
+  signing_type: string;
+  change_reason: string | null;
 };
 
 export function SigningTab({
@@ -263,6 +267,8 @@ export function SigningTab({
               customer_id: party.customer_id,
               staff_id: party.staff_id,
               frozen_full_name: party.frozen_full_name,
+              signing_type: s.type,
+              change_reason: s.change_reason,
             })}
           />
         ))

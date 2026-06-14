@@ -45,6 +45,7 @@ export function buildChatTimeline(
   let dividerInserted = false;
   for (const item of combined) {
     if (item.kind === 'daySeparator') continue;
+    if (item.kind === 'unreadDivider') continue;
     const key = bangkokDayKey(item.timestamp);
     if (key !== lastKey) {
       out.push({ kind: 'daySeparator', id: `day-${key}`, key });
