@@ -23,13 +23,14 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Badge, Button, Switch, Tooltip } from 'tsp-form';
 import {
-  Bot, CheckCircle2, ChevronDown, ChevronRight, Circle, FileSignature, PenLine,
+  Bot, CheckCircle2, ChevronDown, ChevronRight, Circle, FileSignature, Info, PenLine,
   Printer, Trash2, XCircle,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { SigningVoidModal } from './SigningVoidModal';
 import { SigningSignModal } from './SigningSignModal';
+import { SigningDetailModal } from './SigningDetailModal';
 
 type SigningStatus = 'COLLECTING' | 'SEALED' | 'SUPERSEDED' | 'VOIDED';
 type SigningCategory = 'CONTRACT' | 'AMENDMENT' | 'RECEIPT' | null;
@@ -162,6 +163,11 @@ export function SigningTab({
   const { t } = useTranslation();
   const [voidSigningId, setVoidSigningId] = useState<number | null>(null);
   const [signTarget, setSignTarget] = useState<SignTarget | null>(null);
+  const [detailTarget, setDetailTarget] = useState<{
+    signing_id: number;
+    signing_type: string;
+    change_reason: string | null;
+  } | null>(null);
   const [showAudit, setShowAudit] = useState(false);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [defaultedFor, setDefaultedFor] = useState<number | null>(null);
@@ -270,6 +276,11 @@ export function SigningTab({
               signing_type: s.type,
               change_reason: s.change_reason,
             })}
+            onRequestDetail={() => setDetailTarget({
+              signing_id: s.signing_id,
+              signing_type: s.type,
+              change_reason: s.change_reason,
+            })}
           />
         ))
       )}
@@ -286,13 +297,21 @@ export function SigningTab({
         contractId={contractId}
         party={signTarget}
       />
+      <SigningDetailModal
+        open={detailTarget !== null}
+        onClose={() => setDetailTarget(null)}
+        signingId={detailTarget?.signing_id ?? null}
+        contractId={contractId}
+        signingType={detailTarget?.signing_type ?? ''}
+        changeReason={detailTarget?.change_reason ?? null}
+      />
     </div>
   );
 }
 
 function SigningCard({
   signing, parties, expanded, onToggleExpand,
-  onRequestVoid, onRequestSign, onRequestPrint,
+  onRequestVoid, onRequestSign, onRequestPrint, onRequestDetail,
 }: {
   signing: SigningHistoryRow;
   parties: SigningPartyRow[];
@@ -301,6 +320,7 @@ function SigningCard({
   onRequestVoid: () => void;
   onRequestSign: (party: SigningPartyRow) => void;
   onRequestPrint?: () => void;
+  onRequestDetail: () => void;
 }) {
   const { t } = useTranslation();
   const ttl = formatTtl(signing.ttl_remaining);
@@ -447,32 +467,38 @@ function SigningCard({
             </ul>
           )}
 
-          {/* Footer actions — only render buttons that make sense for the status */}
-          {(isCollecting || (isSealed && onRequestPrint)) && (
-            <div className="px-3 py-2.5 border-t border-line/60 flex flex-wrap gap-1.5 justify-end bg-surface/30">
-              {isSealed && onRequestPrint && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  startIcon={<Printer size={13} />}
-                  onClick={onRequestPrint}
-                >
-                  {t('contract.printContractPdf', { defaultValue: 'Print contract PDF' })}
-                </Button>
-              )}
-              {isCollecting && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  color="danger"
-                  startIcon={<Trash2 size={13} />}
-                  onClick={onRequestVoid}
-                >
-                  {t('signing.voidConfirm')}
-                </Button>
-              )}
-            </div>
-          )}
+          {/* Footer actions — View detail always; Print on SEALED/SUPERSEDED; Void on COLLECTING */}
+          <div className="px-3 py-2.5 border-t border-line/60 flex flex-wrap gap-1.5 justify-end bg-surface/30">
+            <Button
+              size="sm"
+              variant="outline"
+              startIcon={<Info size={13} />}
+              onClick={onRequestDetail}
+            >
+              {t('signing.viewDetail', { defaultValue: 'View detail' })}
+            </Button>
+            {isSealed && onRequestPrint && (
+              <Button
+                size="sm"
+                variant="outline"
+                startIcon={<Printer size={13} />}
+                onClick={onRequestPrint}
+              >
+                {t('contract.printContractPdf', { defaultValue: 'Print contract PDF' })}
+              </Button>
+            )}
+            {isCollecting && (
+              <Button
+                size="sm"
+                variant="outline"
+                color="danger"
+                startIcon={<Trash2 size={13} />}
+                onClick={onRequestVoid}
+              >
+                {t('signing.voidConfirm')}
+              </Button>
+            )}
+          </div>
         </div>
       )}
     </div>
