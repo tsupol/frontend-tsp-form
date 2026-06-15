@@ -494,11 +494,12 @@ function TimelineRow({ item, showSender, currentUserId, lang, onOpenImage, onOpe
   const isStaff = m.sender_type === 'STAFF';
   const isOwn = isStaff && currentUserId === m.sender_id;
   const align = isStaff ? 'items-end' : 'items-start';
-  // Shared-branch threads — always show the actual staff name so other staff
-  // know who replied. Add "(You)" suffix on own messages so you can self-spot.
-  const baseName = m.sender_name
-    ?? (isStaff ? t('chat.unknownStaff', { defaultValue: 'Staff' }) : t('chat.customer'));
-  const senderLabel = isOwn ? `${baseName} ${t('chat.youSuffix', { defaultValue: '(You)' })}` : baseName;
+  // Staff side only — customer side has one participant, naming them is noise.
+  // Own messages keep the "(You)" suffix so you can self-spot in a shared thread.
+  const baseName = m.sender_name ?? t('chat.unknownStaff', { defaultValue: 'Staff' });
+  const senderLabel = isStaff
+    ? (isOwn ? `${baseName} ${t('chat.youSuffix', { defaultValue: '(You)' })}` : baseName)
+    : null;
 
   // LINE-style layout: sender name on top of a new run, bubble on its own
   // row with the wall-clock time on the *outside* edge (left of staff
@@ -511,7 +512,7 @@ function TimelineRow({ item, showSender, currentUserId, lang, onOpenImage, onOpe
     <span className="text-[10px] text-subtle/60 tabular-nums shrink-0 self-end pb-1">{clock}</span>
   );
   return (
-    <div className={`flex flex-col ${align} ${showSender ? 'gap-1 mt-1' : 'gap-0.5 -mt-2'}`}>
+    <div className={`flex flex-col ${align} ${showSender && senderLabel ? 'gap-1 mt-1' : 'gap-0.5 -mt-2'}`}>
       {showSender && senderLabel && (
         <div className="text-[11px] text-subtle px-1">{senderLabel}</div>
       )}
