@@ -203,6 +203,19 @@ export function SigningTab({
   const isLoading = historyQuery.isLoading || partyQuery.isLoading;
   const error = historyQuery.error ?? partyQuery.error;
 
+  // Newest non-VOIDED signing wins. Any COLLECTING older than that one is
+  // considered superseded by activity (a newer ceremony was opened or sealed)
+  // and shouldn't be signable — even though BE didn't auto-void it. Order is
+  // by version desc / created_at desc, so the first non-VOIDED in `signings`
+  // is the newest. Equal IDs to the newest are signable; everything older
+  // gets locked.
+  const newestActiveSigningId: number | null = useMemo(() => {
+    for (const s of signings) {
+      if (s.status !== 'VOIDED') return s.signing_id;
+    }
+    return null;
+  }, [signings]);
+
   // Auto-expand the newest COLLECTING row once per contract load. Falling back
   // to the first row if no COLLECTING is present. User's manual expand/collapse
   // overrides this — we only seed `defaultedFor` once per contractId.
@@ -261,6 +274,7 @@ export function SigningTab({
           <SigningCard
             key={s.signing_id}
             signing={s}
+            isStale={s.status === 'COLLECTING' && newestActiveSigningId !== null && s.signing_id !== newestActiveSigningId}
             parties={partiesBySigning.get(s.signing_id) ?? []}
             expanded={expanded.has(s.signing_id)}
             onToggleExpand={() => toggleExpanded(s.signing_id)}
@@ -310,10 +324,11 @@ export function SigningTab({
 }
 
 function SigningCard({
-  signing, parties, expanded, onToggleExpand,
+  signing, isStale, parties, expanded, onToggleExpand,
   onRequestVoid, onRequestSign, onRequestPrint, onRequestDetail,
 }: {
   signing: SigningHistoryRow;
+  isStale: boolean;
   parties: SigningPartyRow[];
   expanded: boolean;
   onToggleExpand: () => void;
@@ -325,9 +340,10 @@ function SigningCard({
   const { t } = useTranslation();
   const ttl = formatTtl(signing.ttl_remaining);
   const isCollecting = signing.status === 'COLLECTING';
+  const isActionable = isCollecting && !isStale;
   const isSealed = signing.status === 'SEALED' || signing.status === 'SUPERSEDED';
   const systemVoided = isSystemVoided(signing);
-  const muted = signing.status === 'VOIDED' || signing.status === 'SUPERSEDED';
+  const muted = signing.status === 'VOIDED' || signing.status === 'SUPERSEDED' || isStale;
 
   // Tail line — the right-aligned context that depends on status.
   let tail: React.ReactNode = null;
@@ -373,6 +389,11 @@ function SigningCard({
         {signing.is_forced && (
           <Badge size="xs" color="warning">{t('signing.forced')}</Badge>
         )}
+        {isStale && (
+          <Tooltip content={t('signing.staleHint')}>
+            <Badge size="xs" color="default">{t('signing.staleBadge')}</Badge>
+          </Tooltip>
+        )}
         {systemVoided && (
           <Tooltip content={t('signing.systemEventHint')}>
             <Bot size={13} className="text-subtle shrink-0" />
@@ -405,6 +426,14 @@ function SigningCard({
             )}
           </div>
 
+          {isStale && (
+            <div className="px-3 pb-2">
+              <div className="alert alert-info">
+                <Info size={14} />
+                <div className="alert-description text-xs">{t('signing.staleHint')}</div>
+              </div>
+            </div>
+          )}
           {signing.void_reason && (
             <div className="px-3 pb-2 text-xs text-danger">
               {t('signing.voidReason')}: {signing.void_reason}
@@ -447,7 +476,7 @@ function SigningCard({
                           <DateTime value={p.signed_at} showTime={false} />
                         </span>
                       </Tooltip>
-                    ) : isCollecting && p.customer_id != null ? (
+                    ) : isActionable && p.customer_id != null ? (
                       <Button
                         size="sm"
                         color="primary"
@@ -456,6 +485,10 @@ function SigningCard({
                       >
                         {t('signing.signConfirm')}
                       </Button>
+                    ) : isCollecting && isStale ? (
+                      <Tooltip content={t('signing.staleHint')}>
+                        <span className="text-[11px] text-subtler">—</span>
+                      </Tooltip>
                     ) : (
                       <Tooltip content={t('signing.signStaffPartyUnsupported')}>
                         <span className="text-[11px] text-subtler">—</span>
@@ -487,7 +520,7 @@ function SigningCard({
                 {t('contract.printContractPdf', { defaultValue: 'Print contract PDF' })}
               </Button>
             )}
-            {isCollecting && (
+            {isActionable && (
               <Button
                 size="sm"
                 variant="outline"

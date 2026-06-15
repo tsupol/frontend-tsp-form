@@ -17,11 +17,11 @@ import { useTranslation } from 'react-i18next';
 import { Badge, Button, Modal, Tooltip } from 'tsp-form';
 import { Bot, CheckCircle2, Circle, Loader2, XCircle } from 'lucide-react';
 import { apiClient } from '../../lib/api';
-import { fmtCurrency } from '../../lib/format';
 import { DateTime } from '../../components/DateTime';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
+import { SnapshotOverviewDiff } from './SnapshotOverviewDiff';
 
-// ─── Types (mirror SigningConsentBody) ─────────────────────────────────
+// ─── Types ─────────────────────────────────────────────────────────────
 
 interface PdfInput {
   signing_id: number;
@@ -84,36 +84,10 @@ interface PdfPartyRow {
   signed_at: string | null;
 }
 
-interface AssetRow {
-  asset_id: number;
-  asset_code: string | null;
-  variant_name: string | null;
-  model_name: string | null;
-  brand_name: string | null;
-  manufacturer_color: string | null;
-  physical_color: string | null;
-  imei: string | null;
-  serial_no: string | null;
-  battery_health: number | null;
-  condition_grade: string | null;
-}
-
-interface HandoverEmbed {
-  has_box: boolean | null;
-  has_charger_set: boolean | null;
-  has_charger_cable: boolean | null;
-}
-
-interface InstallmentRow {
-  pay_no: number;
-  due_date: string;
-}
-
-interface ContractRow {
-  id: number;
-  code_display: string | null;
-  code: string;
-  activated_at: string | null;
+interface SiblingRow {
+  signing_id: number;
+  version: number;
+  status: string;
 }
 
 // ─── Props ─────────────────────────────────────────────────────────────
@@ -131,6 +105,7 @@ interface Props {
 
 export function SigningDetailModal({ open, onClose, signingId, contractId, signingType, changeReason }: Props) {
   const { t } = useTranslation();
+  void signingType; // currently unused — kept on the prop for caller stability
 
   const pdfInputQuery = useQuery({
     queryKey: ['signing-pdf-input', signingId],
@@ -143,51 +118,46 @@ export function SigningDetailModal({ open, onClose, signingId, contractId, signi
 
   const data = pdfInputQuery.data ?? null;
   const payload = data?.snapshot_payload ?? null;
-  const deviceId = payload?.asset?.device_id ?? null;
 
-  const assetQuery = useQuery({
-    queryKey: ['signing-consent-asset', deviceId],
-    queryFn: () => apiClient.get<AssetRow[]>(
-      `/v_assets?asset_id=eq.${deviceId}&select=asset_id,asset_code,variant_name,model_name,brand_name,manufacturer_color,physical_color,imei,serial_no,battery_health,condition_grade&limit=1`,
-    ),
-    enabled: open && changeReason === 'BIND' && deviceId != null,
-    staleTime: 60_000,
-  });
-
-  const handoverQuery = useQuery({
-    queryKey: ['signing-consent-handover', contractId],
-    queryFn: () => apiClient.get<Array<{ handover: HandoverEmbed | null }>>(
-      `/v_contract_detail?id=eq.${contractId}&select=handover&limit=1`,
-    ),
-    enabled: open && changeReason === 'BIND',
-    staleTime: 60_000,
-  });
-
-  const contractQuery = useQuery({
-    queryKey: ['signing-consent-contract', contractId],
-    queryFn: () => apiClient.get<ContractRow[]>(
-      `/v_contracts?id=eq.${contractId}&select=id,code_display,code,activated_at&limit=1`,
-    ),
-    enabled: open && (changeReason === 'ADD_GUARANTOR' || changeReason === 'REMOVE_GUARANTOR'),
-    staleTime: 60_000,
-  });
-
-  const installmentsQuery = useQuery({
-    queryKey: ['signing-consent-installments', contractId],
-    queryFn: () => apiClient.get<InstallmentRow[]>(
-      `/v_installments?contract_id=eq.${contractId}&select=pay_no,due_date&order=pay_no`,
-    ),
-    enabled: open && changeReason === 'ADD_GUARANTOR',
-    staleTime: 60_000,
-  });
-
-  const isLoading = pdfInputQuery.isLoading
-    || (changeReason === 'BIND' && (assetQuery.isLoading || handoverQuery.isLoading))
-    || (changeReason === 'ADD_GUARANTOR' && (contractQuery.isLoading || installmentsQuery.isLoading))
-    || (changeReason === 'REMOVE_GUARANTOR' && contractQuery.isLoading);
+  const isLoading = pdfInputQuery.isLoading;
   const error = pdfInputQuery.error;
 
   const isSystemVoided = data?.status === 'VOIDED' && (data as unknown as { voided_by?: number }).voided_by === 0;
+
+  // ─── Set-diff fallback ────────────────────────────────────────────────
+  // Legacy FULL payloads carry cumulative state, not a delta. To identify
+  // "which guarantor was added" on a FULL row, we set-diff against the
+  // previous non-VOIDED snapshot. For DELTA payloads (mig 227+) the change
+  // is read directly off the payload and this query is unused.
+  // VOIDED rows are skipped entirely upstream — they never committed.
+  const siblingsQuery = useQuery({
+    queryKey: ['contract-signing-siblings', contractId],
+    queryFn: () => apiClient.get<SiblingRow[]>(
+      `/v_contract_signing_history?contract_id=eq.${contractId}&order=version.desc&select=signing_id,version,status`,
+    ),
+    enabled: open && data?.status !== 'VOIDED' && data != null,
+    staleTime: 30_000,
+  });
+
+  const prevSiblingId: number | null = (() => {
+    if (!data || !siblingsQuery.data) return null;
+    const siblings = siblingsQuery.data;
+    const self = siblings.find(s => s.signing_id === data.signing_id);
+    if (!self) return null;
+    const prev = siblings
+      .filter(s => s.version < self.version && s.status !== 'VOIDED')
+      .sort((a, b) => b.version - a.version)[0];
+    return prev?.signing_id ?? null;
+  })();
+
+  const prevSnapshotQuery = useQuery({
+    queryKey: ['signing-pdf-input', prevSiblingId],
+    queryFn: () => apiClient.rpc<PdfInput>('fn_staff_get_signing_pdf_input', {
+      p_signing_id: prevSiblingId,
+    }),
+    enabled: open && prevSiblingId != null,
+    staleTime: 60_000,
+  });
 
   return (
     <Modal open={open} onClose={onClose} maxWidth="42rem" width="100%">
@@ -240,17 +210,27 @@ export function SigningDetailModal({ open, onClose, signingId, contractId, signi
               )}
             </section>
 
-            {/* Per-change_reason summary */}
-            <SnapshotSummary
-              changeReason={changeReason}
-              signingType={signingType}
-              payload={payload}
-              asset={assetQuery.data?.[0] ?? null}
-              handover={handoverQuery.data?.[0]?.handover ?? null}
-              contract={contractQuery.data?.[0] ?? null}
-              installments={installmentsQuery.data ?? []}
-              t={t}
-            />
+            {/* Differences from the previous non-VOIDED snapshot. This
+                tells the truth about state movement — a row here may not
+                trace 1:1 to this signing's change_reason (contract fields
+                can drift between SEALs), but that's correct. The reason
+                label at the top frames what THIS signing was about.
+                Skipped for VOIDED (never committed) and when no prior
+                non-VOIDED snapshot exists (CONTRACT_OPEN baseline). */}
+            {data.status !== 'VOIDED' && prevSnapshotQuery.data?.snapshot_payload && payload && (
+              <SnapshotOverviewDiff
+                changeReason={changeReason}
+                stateBefore={prevSnapshotQuery.data.snapshot_payload}
+                stateAfter={payload}
+              />
+            )}
+            {data.status !== 'VOIDED' && !prevSiblingId && payload && (
+              <SnapshotOverviewDiff
+                changeReason={changeReason}
+                stateBefore={null}
+                stateAfter={payload}
+              />
+            )}
 
             {/* Parties + signatures */}
             <section>
@@ -302,230 +282,6 @@ export function SigningDetailModal({ open, onClose, signingId, contractId, signi
         <Button onClick={onClose}>{t('common.close')}</Button>
       </div>
     </Modal>
-  );
-}
-
-// ─── Snapshot summary dispatcher ───────────────────────────────────────
-
-function SnapshotSummary({
-  changeReason, signingType, payload, asset, handover, contract, installments, t,
-}: {
-  changeReason: string | null;
-  signingType: string;
-  payload: SnapshotPayload | null;
-  asset: AssetRow | null;
-  handover: HandoverEmbed | null;
-  contract: ContractRow | null;
-  installments: InstallmentRow[];
-  t: ReturnType<typeof useTranslation>['t'];
-}) {
-  if (changeReason === 'BIND') {
-    return <BindSummary asset={asset} handover={handover} t={t} />;
-  }
-  if (changeReason === 'ADD_GUARANTOR') {
-    return <AddGuarantorSummary payload={payload} contract={contract} installments={installments} t={t} />;
-  }
-  if (changeReason === 'REMOVE_GUARANTOR') {
-    return <RemoveGuarantorSummary payload={payload} contract={contract} t={t} />;
-  }
-  // INITIAL / PRIMARY_SWAP / ATTACH_PRIMARY_CUSTOMER / force-only.
-  return <FullContractSummary payload={payload} signingType={signingType} t={t} />;
-}
-
-// ─── BIND ──────────────────────────────────────────────────────────────
-
-function BindSummary({ asset, handover, t }: {
-  asset: AssetRow | null;
-  handover: HandoverEmbed | null;
-  t: ReturnType<typeof useTranslation>['t'];
-}) {
-  return (
-    <section>
-      <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-2">
-        {t('signing.detail_bindTitle', { defaultValue: 'Device handover' })}
-      </h3>
-      {asset ? (
-        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm border border-line rounded-md px-3 py-2.5">
-          <Row label={t('contract.device')} value={[asset.brand_name, asset.model_name, asset.variant_name].filter(Boolean).join(' ')} />
-          {asset.asset_code && <Row label={t('contract.assetCode', { defaultValue: 'Asset code' })} value={asset.asset_code} />}
-          {asset.imei && <Row label="IMEI" value={<span className="font-mono">{asset.imei}</span>} />}
-          {asset.serial_no && <Row label={t('contract.serial', { defaultValue: 'Serial' })} value={<span className="font-mono">{asset.serial_no}</span>} />}
-          {(asset.physical_color ?? asset.manufacturer_color) && (
-            <Row label={t('contract.color', { defaultValue: 'Color' })} value={asset.physical_color ?? asset.manufacturer_color ?? '—'} />
-          )}
-          {asset.condition_grade && (
-            <Row
-              label={t('contract.condition', { defaultValue: 'Condition' })}
-              value={t(`asset.condition_${asset.condition_grade}`, { defaultValue: asset.condition_grade })}
-            />
-          )}
-          {asset.battery_health != null && (
-            <Row label={t('contract.batteryHealth', { defaultValue: 'Battery health' })} value={`${asset.battery_health}%`} />
-          )}
-        </dl>
-      ) : (
-        <p className="text-xs text-subtle">{t('signing.consent_bind_noAsset')}</p>
-      )}
-
-      <p className="mt-3 mb-2 text-xs text-subtle">{t('signing.consent_bind_includedTitle')}</p>
-      {handover ? (
-        <ul className="border border-line rounded-md px-3 py-2.5 text-sm flex flex-col gap-1">
-          <IncludedItem ok={handover.has_box} label={t('workspace.handoverHasBox')} t={t} />
-          <IncludedItem ok={handover.has_charger_set} label={t('workspace.handoverHasChargerSet')} t={t} />
-          <IncludedItem ok={handover.has_charger_cable} label={t('workspace.handoverHasChargerCable')} t={t} />
-        </ul>
-      ) : (
-        <p className="text-xs text-subtle italic">{t('signing.consent_bind_handoverNotRecorded')}</p>
-      )}
-    </section>
-  );
-}
-
-function IncludedItem({ ok, label, t }: {
-  ok: boolean | null;
-  label: string;
-  t: ReturnType<typeof useTranslation>['t'];
-}) {
-  return (
-    <li className="flex items-center gap-2">
-      <span
-        className={
-          ok === true ? 'inline-flex w-4 h-4 rounded-full bg-success/20 text-success items-center justify-center text-[10px] font-bold'
-          : ok === false ? 'inline-flex w-4 h-4 rounded-full bg-danger/15 text-danger items-center justify-center text-[10px] font-bold'
-          : 'inline-flex w-4 h-4 rounded-full bg-fg/10 text-subtle items-center justify-center text-[10px] font-bold'
-        }
-        aria-hidden="true"
-      >
-        {ok === true ? '✓' : ok === false ? '×' : '—'}
-      </span>
-      <span className={ok === false ? 'text-subtle line-through' : ok === null ? 'text-subtle' : ''}>{label}</span>
-      {ok === null && (
-        <span className="text-[11px] text-subtler">{t('signing.consent_bind_includedUnknown')}</span>
-      )}
-    </li>
-  );
-}
-
-// ─── ADD_GUARANTOR ─────────────────────────────────────────────────────
-
-function AddGuarantorSummary({ payload, contract, installments, t }: {
-  payload: SnapshotPayload | null;
-  contract: ContractRow | null;
-  installments: InstallmentRow[];
-  t: ReturnType<typeof useTranslation>['t'];
-}) {
-  const lessee = payload?.parties.find(p => p.role === 'LESSEE') ?? null;
-  const lesseeName = lessee
-    ? [lessee.prefix, lessee.first_name, lessee.last_name].filter(Boolean).join(' ')
-    : '—';
-  const agreed = payload?.agreed ?? null;
-  const term = agreed?.value_month ?? installments.length ?? null;
-  const installment = agreed?.installment_amount ?? null;
-  const totalPayable = installment != null && term != null
-    ? (installment * term) + (agreed?.down_payment ?? 0) + (agreed?.insurance_deposit ?? 0)
-    : null;
-  const firstDue = installments[0]?.due_date ?? null;
-  const lastDue = installments[installments.length - 1]?.due_date ?? null;
-  const dueDay = firstDue ? new Date(`${firstDue}T00:00:00+07:00`).getDate() : null;
-
-  return (
-    <section>
-      <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-2">
-        {t('signing.detail_guarantorTitle', { defaultValue: 'Contract being guaranteed' })}
-      </h3>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm border border-line rounded-md px-3 py-2.5">
-        <Row label={t('contract.code', { defaultValue: 'Contract code' })} value={<span className="font-mono">{contract?.code_display ?? contract?.code ?? '—'}</span>} />
-        <Row label={t('signing.role_LESSEE')} value={lesseeName} />
-        {lessee?.id_number && <Row label={t('contract.idNumber', { defaultValue: 'ID number' })} value={<span className="font-mono">{lessee.id_number}</span>} />}
-        {installment != null && term != null && (
-          <Row
-            label={t('contract.installments', { defaultValue: 'Installments' })}
-            value={`${fmtCurrency(installment)} × ${term} ${t('contract.months', { defaultValue: 'months' })}`}
-          />
-        )}
-        {dueDay != null && (
-          <Row
-            label={t('signing.consent_add_guarantor_dueDay')}
-            value={t('signing.consent_add_guarantor_dueDayValue', { day: dueDay })}
-          />
-        )}
-        {firstDue && lastDue && (
-          <Row
-            label={t('signing.consent_add_guarantor_period')}
-            value={(<><DateTime value={firstDue} showTime={false} /> — <DateTime value={lastDue} showTime={false} /></>)}
-          />
-        )}
-        {totalPayable != null && (
-          <Row label={t('contract.totalPayable', { defaultValue: 'Total payable' })} value={fmtCurrency(totalPayable)} />
-        )}
-        {contract?.activated_at && (
-          <Row label={t('contract.activatedAt', { defaultValue: 'Active since' })} value={<DateTime value={contract.activated_at} showTime={false} />} />
-        )}
-      </dl>
-    </section>
-  );
-}
-
-// ─── REMOVE_GUARANTOR ──────────────────────────────────────────────────
-
-function RemoveGuarantorSummary({ payload, contract, t }: {
-  payload: SnapshotPayload | null;
-  contract: ContractRow | null;
-  t: ReturnType<typeof useTranslation>['t'];
-}) {
-  const lessee = payload?.parties.find(p => p.role === 'LESSEE') ?? null;
-  const lesseeName = lessee
-    ? [lessee.prefix, lessee.first_name, lessee.last_name].filter(Boolean).join(' ')
-    : '—';
-  return (
-    <section>
-      <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-2">
-        {t('signing.detail_removeGuarantorTitle', { defaultValue: 'Contract being released from' })}
-      </h3>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm border border-line rounded-md px-3 py-2.5">
-        <Row label={t('contract.code', { defaultValue: 'Contract code' })} value={<span className="font-mono">{contract?.code_display ?? contract?.code ?? '—'}</span>} />
-        <Row label={t('signing.role_LESSEE')} value={lesseeName} />
-      </dl>
-    </section>
-  );
-}
-
-// ─── FULL_CONTRACT (INITIAL, PRIMARY_SWAP, ATTACH_PRIMARY_CUSTOMER, force) ─
-
-function FullContractSummary({ payload, t }: {
-  payload: SnapshotPayload | null;
-  signingType: string;
-  t: ReturnType<typeof useTranslation>['t'];
-}) {
-  if (!payload) return null;
-  const agreed = payload.agreed;
-  return (
-    <section>
-      <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-2">
-        {t('signing.detail_contractTitle', { defaultValue: 'Contract terms' })}
-      </h3>
-      {agreed ? (
-        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm border border-line rounded-md px-3 py-2.5">
-          {agreed.agreed_price != null && (
-            <Row label={t('contract.agreedPrice', { defaultValue: 'Agreed price' })} value={fmtCurrency(agreed.agreed_price)} />
-          )}
-          {agreed.down_payment != null && (
-            <Row label={t('contract.downPayment', { defaultValue: 'Down payment' })} value={fmtCurrency(agreed.down_payment)} />
-          )}
-          {agreed.insurance_deposit != null && agreed.insurance_deposit > 0 && (
-            <Row label={t('contract.insuranceDeposit', { defaultValue: 'Insurance deposit' })} value={fmtCurrency(agreed.insurance_deposit)} />
-          )}
-          {agreed.installment_amount != null && agreed.value_month != null && (
-            <Row
-              label={t('contract.installments', { defaultValue: 'Installments' })}
-              value={`${fmtCurrency(agreed.installment_amount)} × ${agreed.value_month} ${t('contract.months', { defaultValue: 'months' })}`}
-            />
-          )}
-        </dl>
-      ) : (
-        <p className="text-xs text-subtler">{t('signing.detail_noPayloadAgreed', { defaultValue: 'No terms recorded on this snapshot.' })}</p>
-      )}
-    </section>
   );
 }
 

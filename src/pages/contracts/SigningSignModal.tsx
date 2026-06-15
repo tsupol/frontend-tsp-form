@@ -19,17 +19,17 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, LabeledCheckbox, Modal } from 'tsp-form';
 import type { UploadedImage } from 'tsp-form';
-import { XCircle } from 'lucide-react';
+import { Loader2, XCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { uploadFromImage } from '../../lib/upload';
 import { toStoragePath } from '../../lib/mediaPath';
 import { useAuth } from '../../contexts/AuthContext';
 import { SignatureCapture } from './workspace/SignatureCapture';
 import { ActionDoneView } from './ActionDoneView';
-import { SigningConsentBody } from './SigningConsentBody';
+import { SnapshotOverviewDiff } from './SnapshotOverviewDiff';
 
 interface PendingParty {
   signing_id: number;
@@ -47,6 +47,20 @@ interface SignResult {
   party_id?: number;
   state: string;            // 'COLLECTING' or 'SEALED' if last signature
   remaining_parties?: number;
+}
+
+// Subset of api.v_contract_signing_preview we care about for the diff UI.
+// `state_before` / `state_after_if_signed` are JSONB blobs of the snapshot
+// payload shape (parties[], asset, agreed, _anchor, ...).
+export interface PreviewRow {
+  signing_id: number;
+  change_reason: string | null;
+  change_reason_th: string | null;
+  signing_type: string;
+  state_before: unknown;
+  delta_payload: unknown;
+  state_after_if_signed: unknown;
+  state_before_hash: string | null;
 }
 
 interface Props {
@@ -73,20 +87,30 @@ export function SigningSignModal({ open, onClose, contractId, party }: Props) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const [view, setView] = useState<'consent' | 'form' | 'done'>('consent');
+  const [view, setView] = useState<'review' | 'form' | 'done'>('review');
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState<SignResult | null>(null);
-  // Consent state — reset on every open so each party confirms their own
-  // ceremony. Continue button only enables once the checkbox is ticked.
+  // Consent checkbox state — reset on every open so each party confirms
+  // their own ceremony. Continue button only enables once ticked.
   const [consentChecked, setConsentChecked] = useState(false);
-  // Checkbox copy depends on change_reason; the body component decides which
-  // string to use and bubbles it up here.
-  const [consentLabel, setConsentLabel] = useState(t('signing.consentCheckbox'));
+
+  // BE-driven before/after preview (mig 226). Per docs we MUST refetch right
+  // before the signature is captured because the cache shifts on intervening
+  // SEAL events. `refetch()` is called on the preview→consent transition.
+  const previewQuery = useQuery({
+    queryKey: ['contract-signing-preview', party?.signing_id],
+    queryFn: () => apiClient.get<PreviewRow[]>(
+      `/v_contract_signing_preview?signing_id=eq.${party!.signing_id}&limit=1`,
+    ),
+    enabled: open && party != null,
+    staleTime: 0,
+  });
+  const previewRow = previewQuery.data?.[0] ?? null;
 
   useEffect(() => {
     if (open) {
-      setView('consent');
+      setView('review');
       setError('');
       setUploading(false);
       setResult(null);
@@ -172,14 +196,14 @@ export function SigningSignModal({ open, onClose, contractId, party }: Props) {
         <h2 className="modal-title">
           {view === 'done'
             ? t('signing.signDoneTitle')
-            : view === 'consent'
-              ? t('signing.consentTitle')
+            : view === 'review'
+              ? t('signing.reviewTitle', { defaultValue: 'Review and sign' })
               : t('signing.signTitle')}
         </h2>
         <button type="button" className="modal-close-btn" onClick={handleClose} aria-label="Close" disabled={submitting}>&times;</button>
       </div>
 
-      {view === 'consent' && (
+      {view === 'review' && (
         <>
           <div className="modal-content">
             {party && (
@@ -190,31 +214,46 @@ export function SigningSignModal({ open, onClose, contractId, party }: Props) {
                 <span className="text-sm font-medium">{party.frozen_full_name ?? '—'}</span>
               </div>
             )}
-            {party && (
-              <div className="mb-3">
-                <SigningConsentBody
-                  signingId={party.signing_id}
-                  contractId={contractId}
-                  changeReason={party.change_reason}
-                  signingType={party.signing_type}
-                  onCheckboxLabelChange={(label) =>
-                    setConsentLabel((prev) => (prev === label ? prev : label))
-                  }
+            {previewQuery.isLoading && (
+              <div className="flex items-center gap-2 text-xs text-subtle py-4">
+                <Loader2 size={14} className="animate-spin" />
+                {t('common.loading')}
+              </div>
+            )}
+            {previewQuery.error && (
+              <div className="alert alert-danger mb-3">
+                <XCircle size={16} />
+                <span>{describeApiError(previewQuery.error, t)}</span>
+              </div>
+            )}
+            {previewRow && (
+              <SnapshotOverviewDiff
+                changeReason={previewRow.change_reason}
+                stateBefore={previewRow.state_before}
+                stateAfter={previewRow.state_after_if_signed}
+              />
+            )}
+            {previewRow && (
+              <div className="mt-4">
+                <LabeledCheckbox
+                  label={t('signing.consentCheckbox')}
+                  checked={consentChecked}
+                  onChange={(e) => setConsentChecked(e.target.checked)}
                 />
               </div>
             )}
-            <LabeledCheckbox
-              label={consentLabel}
-              checked={consentChecked}
-              onChange={(e) => setConsentChecked(e.target.checked)}
-            />
           </div>
           <div className="modal-footer">
             <Button onClick={handleClose}>{t('common.cancel')}</Button>
             <Button
               color="primary"
-              onClick={() => setView('form')}
-              disabled={!consentChecked}
+              onClick={() => {
+                // Re-fetch right before the user commits — BE-mandated.
+                // The cache can shift on intervening SEAL events.
+                previewQuery.refetch();
+                setView('form');
+              }}
+              disabled={previewQuery.isLoading || !previewRow || !consentChecked}
             >
               {t('signing.consentContinue')}
             </Button>
