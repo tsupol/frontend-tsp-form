@@ -1485,7 +1485,7 @@ export function FamiliesPage() {
         {/* Desktop header */}
         <div className="flex items-center justify-between mb-4 flex-none max-md:hidden">
           <h1 className="heading-2">{t('brandsModels.models')}</h1>
-          <Button color="primary" startIcon={<Plus size={16} />} onClick={() => setCreateOpen(true)}>
+          <Button color="primary" size="sm" startIcon={<Plus size={16} />} onClick={() => setCreateOpen(true)}>
             {t('brandsModels.addFamily')}
           </Button>
         </div>

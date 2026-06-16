@@ -1237,7 +1237,7 @@ export function AttributesPage() {
       <div className="page-content responsive-dvh-mobile-header">
         <div className="flex items-center justify-between mb-4 flex-none max-md:hidden">
           <h1 className="heading-2">{t('attributes.title')}</h1>
-          <Button color="primary" startIcon={<Plus />} onClick={() => setCreateAttrOpen(true)}>
+          <Button color="primary" size="sm" startIcon={<Plus size={16} />} onClick={() => setCreateAttrOpen(true)}>
             {t('attributes.addAttribute')}
           </Button>
         </div>
