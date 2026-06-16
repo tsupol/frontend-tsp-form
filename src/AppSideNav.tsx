@@ -39,6 +39,8 @@ import {
   UserCheck, ClipboardCheck,
   // Fanout child icons — Accounting
   CalendarCheck, ArrowUpRight, Receipt, ShieldAlert, Banknote,
+  // Fanout child icons — Branch expense
+  Tag as TagIcon, BarChart3 as BarChartIcon, BookOpen as BookIcon,
   // Fanout child icons — Collections
   Calendar,
   // Chat
@@ -275,6 +277,47 @@ export const AppSideNav = () => {
       path: '/admin/retail/bills',
     },
     {
+      key: 'accounting',
+      ...iconWithCount(<BookOpen size="1rem" />, unclosedCount),
+      label: t('nav.accounting'),
+      path: '/admin/accounting/day-close',
+      children: [
+        { type: 'group', key: 'grp-acct-daily', label: t('nav.groupDaily') },
+        {
+          key: 'day-close',
+          ...iconWithCount(<CalendarCheck size="1rem" />, unclosedCount),
+          label: t('nav.dayClose'),
+          path: '/admin/accounting/day-close',
+        },
+        { key: 'bills', icon: <Receipt size="1rem" />, label: t('nav.bills'), path: '/admin/accounting/bills' },
+        { type: 'group', key: 'grp-acct-cashflow', label: t('nav.groupCashflow') },
+        { key: 'remittance', icon: <ArrowUpRight size="1rem" />, label: t('nav.remittance'), path: '/admin/accounting/remittance' },
+        { key: 'payments', icon: <Banknote size="1rem" />, label: t('nav.payments'), path: '/admin/accounting/payments' },
+        { type: 'group', key: 'grp-acct-reports', label: t('nav.groupReports') },
+        { key: 'branch-balance', icon: <Scale size="1rem" />, label: t('nav.branchBalance'), path: '/admin/accounting/balance' },
+        ...(['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
+          { type: 'group' as const, key: 'grp-acct-audit', label: t('nav.groupAudit') },
+          { key: 'audit-flags', icon: <ShieldAlert size="1rem" />, label: t('nav.auditFlags'), path: '/admin/accounting/audit-flags' },
+        ] : []),
+      ],
+    },
+    {
+      key: 'branch-expense',
+      icon: <BookIcon size="1rem" />,
+      label: t('nav.branchExpense'),
+      path: '/admin/branch-expense/entries',
+      children: [
+        { type: 'group', key: 'grp-bxp-record', label: t('branchExpense.groupRecord') },
+        { key: 'bxp-entries', icon: <BookIcon size="1rem" />, label: t('branchExpense.entries'), path: '/admin/branch-expense/entries' },
+        ...(['COMPANY_ADMIN', 'COMPANY_ACCOUNTANT', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
+          { type: 'group' as const, key: 'grp-bxp-reports', label: t('branchExpense.groupReports') },
+          { key: 'bxp-summary', icon: <BarChartIcon size="1rem" />, label: t('branchExpense.summary'), path: '/admin/branch-expense/summary' },
+          { type: 'group' as const, key: 'grp-bxp-config', label: t('branchExpense.groupConfig') },
+          { key: 'bxp-categories', icon: <TagIcon size="1rem" />, label: t('branchExpense.categories'), path: '/admin/branch-expense/categories' },
+        ] : []),
+      ],
+    },
+    {
       key: 'company', icon: <Building2 size="1rem" />, label: t('nav.company'),
       path: ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? '/admin/company/branches' : '/admin/company/config',
       children: [
@@ -344,31 +387,6 @@ export const AppSideNav = () => {
       render: ({ collapsed, isMobile: m }) => (
         <NotificationMenuItem collapsed={collapsed} isMobile={m} unreadCount={unreadNotifCount} />
       ),
-    },
-    {
-      key: 'accounting',
-      ...iconWithCount(<BookOpen size="1rem" />, unclosedCount),
-      label: t('nav.accounting'),
-      path: '/admin/accounting/day-close',
-      children: [
-        { type: 'group', key: 'grp-acct-daily', label: t('nav.groupDaily') },
-        {
-          key: 'day-close',
-          ...iconWithCount(<CalendarCheck size="1rem" />, unclosedCount),
-          label: t('nav.dayClose'),
-          path: '/admin/accounting/day-close',
-        },
-        { key: 'bills', icon: <Receipt size="1rem" />, label: t('nav.bills'), path: '/admin/accounting/bills' },
-        { type: 'group', key: 'grp-acct-cashflow', label: t('nav.groupCashflow') },
-        { key: 'remittance', icon: <ArrowUpRight size="1rem" />, label: t('nav.remittance'), path: '/admin/accounting/remittance' },
-        { key: 'payments', icon: <Banknote size="1rem" />, label: t('nav.payments'), path: '/admin/accounting/payments' },
-        { type: 'group', key: 'grp-acct-reports', label: t('nav.groupReports') },
-        { key: 'branch-balance', icon: <Scale size="1rem" />, label: t('nav.branchBalance'), path: '/admin/accounting/balance' },
-        ...(['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
-          { type: 'group' as const, key: 'grp-acct-audit', label: t('nav.groupAudit') },
-          { key: 'audit-flags', icon: <ShieldAlert size="1rem" />, label: t('nav.auditFlags'), path: '/admin/accounting/audit-flags' },
-        ] : []),
-      ],
     },
     {
       key: 'collections',

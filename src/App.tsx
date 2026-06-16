@@ -82,6 +82,10 @@ import { BillsPage } from './pages/accounting/BillsPage';
 import { RemittancePage } from './pages/accounting/RemittancePage';
 import { PaymentsPage } from './pages/accounting/PaymentsPage';
 import { AuditFlagsPage } from './pages/accounting/AuditFlagsPage';
+import { BranchExpenseLayout } from './pages/branch-expense/BranchExpenseLayout';
+import { ExpenseEntriesPage } from './pages/branch-expense/ExpenseEntriesPage';
+import { CategoriesPage as BranchExpenseCategoriesPage } from './pages/branch-expense/CategoriesPage';
+import { ExpenseSummaryPage } from './pages/branch-expense/ExpenseSummaryPage';
 import { RetailBillsPage } from './pages/retail/RetailBillsPage';
 import { DevLayout } from './pages/dev/DevLayout';
 import { DevSignaturePage } from './pages/dev/DevSignaturePage';
@@ -922,6 +926,42 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <AccountingLayout><AuditFlagsPage /></AccountingLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Branch expense (BM records, accountant rolls up) */}
+      <Route
+        path="/admin/branch-expense"
+        element={<Navigate to="/admin/branch-expense/entries" replace />}
+      />
+      <Route
+        path="/admin/branch-expense/entries"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <BranchExpenseLayout><ExpenseEntriesPage /></BranchExpenseLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/branch-expense/categories"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <BranchExpenseLayout><BranchExpenseCategoriesPage /></BranchExpenseLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/branch-expense/summary"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <BranchExpenseLayout><ExpenseSummaryPage /></BranchExpenseLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
