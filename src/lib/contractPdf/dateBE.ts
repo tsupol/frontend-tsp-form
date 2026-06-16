@@ -32,3 +32,22 @@ export function toLongDateBE(date: string | null | undefined): string {
   if (isNaN(d.getTime())) return '';
   return `${d.getDate()} ${THAI_MONTHS[d.getMonth()]} พ.ศ. ${d.getFullYear() + 543}`;
 }
+
+/** ISO timestamp → "DD/MM/YYYY HH:MM" in Asia/Bangkok with Buddhist Era year.
+ *  Matches the misc-go `formatBangkokBE` output so freshness stamps render
+ *  identically whether the value comes from the client or the server. */
+export function toDateTimeBE(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const fmt = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  });
+  const parts = Object.fromEntries(
+    fmt.formatToParts(d).filter(p => p.type !== 'literal').map(p => [p.type, p.value]),
+  );
+  const yearBE = Number(parts.year) + 543;
+  return `${parts.day}/${parts.month}/${yearBE} ${parts.hour}:${parts.minute}`;
+}

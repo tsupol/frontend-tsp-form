@@ -13,6 +13,7 @@ import {
   ContractRenderPrerequisiteError,
   type ContractMin,
 } from '../../lib/contractPdf/buildRenderData';
+import { PdfCanvasViewer } from '../../components/PdfCanvasViewer';
 
 interface Props {
   open: boolean;
@@ -117,11 +118,12 @@ export function ContractPreviewModal({ open, onClose, contract, onAcceptAndSign 
           </div>
         )}
         {blobUrl && !loading && (
-          <iframe
-            title={t('contract.previewModalTitle', { defaultValue: 'Contract preview' })}
-            src={blobUrl}
-            style={{ flex: 1, width: '100%', border: 'none', background: '#525659' }}
-          />
+          <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+            <PdfCanvasViewer
+              src={blobUrl}
+              loadingText={t('common.loading')}
+            />
+          </div>
         )}
       </div>
 

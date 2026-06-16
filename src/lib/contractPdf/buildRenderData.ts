@@ -4,7 +4,7 @@
 
 import { apiClient } from '../api';
 import { fetchImageAsDataUrl } from './imageDataUrl';
-import { toDateBE, toLongDateBE } from './dateBE';
+import { toDateBE, toLongDateBE, toDateTimeBE } from './dateBE';
 import { CLAUSE_6_REPO_THRESHOLD_DAYS } from './constants';
 import type { ContractPdfInput } from './types';
 
@@ -114,6 +114,8 @@ interface InstallmentRow {
   pay_no: number;
   due_date: string;
   due_amount: number;
+  paid_amount: number | null;
+  paid_at: string | null;
 }
 
 function singleLineAddress(a: AddressRow): string {
@@ -193,7 +195,7 @@ export async function buildContractRenderData(
     contract.device_id != null
       ? apiClient.get<AssetRow[]>(`/v_assets?asset_id=eq.${contract.device_id}&select=asset_id,asset_code,variant_name,model_name,brand_name,family_name,manufacturer_color,physical_color,imei,serial_no,battery_health&limit=1`)
       : Promise.resolve([] as AssetRow[]),
-    apiClient.get<InstallmentRow[]>(`/v_installments?contract_id=eq.${contract.id}&order=pay_no&select=pay_no,due_date,due_amount`),
+    apiClient.get<InstallmentRow[]>(`/v_installments?contract_id=eq.${contract.id}&order=pay_no&select=pay_no,due_date,due_amount,paid_amount,paid_at`),
     apiClient.get<Array<{ id: number; file_url: string; customer_id: number }>>(
       `/v_contract_documents?contract_id=eq.${contract.id}&doc_type=eq.SIGNATURE_PAD&select=id,file_url,customer_id`,
     ),
@@ -310,7 +312,10 @@ export async function buildContractRenderData(
     ?? contract.snapshot_term_months
     ?? contract.total_installments
     ?? installments.length;
-  const upfront = (contract.down_payment ?? 0) + (contract.insurance_deposit ?? 0);
+  // Upfront = setup/service/depreciation only. The insurance deposit is now
+  // printed as its own line in the contract paragraph.
+  const upfront = contract.down_payment ?? 0;
+  const insuranceDeposit = contract.insurance_deposit ?? 0;
 
   const contractDateIso = contract.activated_at ?? contract.created_at;
   const dueDay = installments[0]?.due_date
@@ -324,6 +329,7 @@ export async function buildContractRenderData(
     ? installments.map(r => ({
         payNo: r.pay_no,
         amount: r.due_amount,
+        paidAmount: r.paid_amount ?? 0,
         dueDateBE: toDateBE(r.due_date),
       }))
     : Array.from({ length: term }, (_, i) => {
@@ -331,8 +337,18 @@ export async function buildContractRenderData(
         const due = new Date(base);
         due.setMonth(due.getMonth() + i + 1);
         const iso = `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, '0')}-${String(due.getDate()).padStart(2, '0')}`;
-        return { payNo: i + 1, amount: monthly, dueDateBE: toDateBE(iso) };
+        return { payNo: i + 1, amount: monthly, paidAmount: 0, dueDateBE: toDateBE(iso) };
       });
+
+  // Latest paid_at across the schedule. Used as the "ตารางนี้อัพเดทล่าสุดเมื่อ"
+  // stamp under the table. Empty string when no row has been paid — server
+  // skips the line entirely.
+  const latestPaidIso = installments
+    .map(r => r.paid_at)
+    .filter((v): v is string => !!v)
+    .sort()
+    .pop() ?? null;
+  const scheduleUpdatedAtBE = latestPaidIso ? toDateTimeBE(latestPaidIso) : '';
 
   return {
     assetCode: asset?.asset_code ?? '—',
@@ -377,10 +393,12 @@ export async function buildContractRenderData(
     overrideHasCable: null,
 
     upfrontAmount: upfront,
+    insuranceDeposit,
     monthlyAmount: monthly,
     termMonths: term,
 
     installments: installmentRows,
+    scheduleUpdatedAtBE,
 
     lesseeSignatureDataUrl,
     lesseeIdCardDataUrl,

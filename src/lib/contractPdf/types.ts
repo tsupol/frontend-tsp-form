@@ -50,7 +50,8 @@ export interface ContractPdfInput {
   overrideHasCable: boolean | null;
 
   // Money
-  upfrontAmount: number;      // 7,900 — ค่าเปิดใช้/ค่าดำเนินการ/ค่าเสื่อม
+  upfrontAmount: number;      // ค่าเปิดใช้/ค่าดำเนินการ/ค่าเสื่อม (excludes deposit)
+  insuranceDeposit: number;   // เงินค้ำประกัน — printed as its own line
   monthlyAmount: number;      // 2,800
   termMonths: number;         // 12
 
@@ -58,8 +59,14 @@ export interface ContractPdfInput {
   installments: Array<{
     payNo: number;
     amount: number;
+    paidAmount: number;       // 0 for the synthetic (pre-activation) schedule
     dueDateBE: string;        // "18/06/2569"
   }>;
+
+  // Freshness stamp printed under the installment table. Formatted "DD/MM/YYYY HH:MM"
+  // in BE — when the paid-amount column was last meaningful.
+  // Empty string when no payments have been made (server omits the line).
+  scheduleUpdatedAtBE: string;
 
   // Signatures — base64 data URLs (or null for blank-line placeholder)
   lesseeSignatureDataUrl: string | null;
