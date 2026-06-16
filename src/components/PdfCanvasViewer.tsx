@@ -51,8 +51,11 @@ export function PdfCanvasViewer({ src, className, loadingText, errorText }: Prop
 
     return () => {
       cancelled = true;
-      task.destroy().catch(() => { /* already torn down */ });
-      if (loaded) loaded.cleanup().catch(() => { /* ignore */ });
+      // Only abort the loading task if it never produced a document.
+      // Destroying after success can wedge the worker on some Safari versions.
+      if (!loaded) {
+        task.destroy().catch(() => { /* already torn down */ });
+      }
     };
   }, [src]);
 
@@ -66,8 +69,8 @@ export function PdfCanvasViewer({ src, className, loadingText, errorText }: Prop
     return () => ro.disconnect();
   }, []);
 
-  // Ctrl/Cmd + wheel zoom on desktop. Pinch on touch trackpads fires this too
-  // (browsers translate pinch to Ctrl+wheel events).
+  // Ctrl/Cmd + wheel zoom on desktop. Trackpad pinch fires this too (browsers
+  // translate pinch gestures into Ctrl+wheel events).
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -81,8 +84,7 @@ export function PdfCanvasViewer({ src, className, loadingText, errorText }: Prop
     return () => el.removeEventListener('wheel', onWheel);
   }, []);
 
-  // Keyboard shortcuts: + / - / 0 to zoom (when the viewer has focus or
-  // contains the active element).
+  // Keyboard shortcuts: Ctrl/Cmd + +/-/0 (when the viewer has focus).
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -134,9 +136,7 @@ export function PdfCanvasViewer({ src, className, loadingText, errorText }: Prop
         }}
       >
         {loadError && (
-          <div style={{ color: '#fff', padding: '1rem' }}>
-            {errorText || loadError}
-          </div>
+          <div style={{ color: '#fff', padding: '1rem' }}>{errorText || loadError}</div>
         )}
         {!doc && !loadError && (
           <div style={{ color: '#ddd', padding: '1rem' }}>{loadingText || 'Loading…'}</div>
@@ -251,26 +251,40 @@ function PdfPage({
   useEffect(() => {
     if (targetWidth <= 0) return;
     let cancelled = false;
-    let renderTask: { cancel: () => void; promise: Promise<void> } | null = null;
 
     (async () => {
       const page = await doc.getPage(pageNum);
       if (cancelled) return;
+      // iOS Safari has tighter canvas-memory caps and rendering quirks at high
+      // DPR. 1.5× on iOS keeps it sharp without blowing the per-canvas budget;
+      // 2× elsewhere. A hard 2048px ceiling on the longest backing-buffer side
+      // is a belt-and-braces guard.
+      const ua = navigator.userAgent;
+      const isIOS = /iPad|iPhone|iPod/.test(ua) ||
+        (ua.includes('Mac') && navigator.maxTouchPoints > 1);
+      const rawDpr = window.devicePixelRatio || 1;
+      const dpr = Math.min(rawDpr, isIOS ? 1.5 : 2);
       const baseViewport = page.getViewport({ scale: 1 });
-      const scale = targetWidth / baseViewport.width;
-      const viewport = page.getViewport({ scale });
+      const cssScale = targetWidth / baseViewport.width;
+      const cssViewport = page.getViewport({ scale: cssScale });
+      const MAX_CANVAS_PX = 2048;
+      const wantedW = cssViewport.width * dpr;
+      const wantedH = cssViewport.height * dpr;
+      const bufferCap = Math.min(1, MAX_CANVAS_PX / Math.max(wantedW, wantedH));
+      const effectiveDpr = dpr * bufferCap;
+      const renderViewport = page.getViewport({ scale: cssScale * effectiveDpr });
       const canvas = canvasRef.current;
       if (!canvas) return;
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = Math.floor(viewport.width * dpr);
-      canvas.height = Math.floor(viewport.height * dpr);
-      canvas.style.width = `${viewport.width}px`;
-      canvas.style.height = `${viewport.height}px`;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const task = page.render({ canvas, canvasContext: ctx, viewport });
-      renderTask = task as unknown as { cancel: () => void; promise: Promise<void> };
+      canvas.width = Math.floor(renderViewport.width);
+      canvas.height = Math.floor(renderViewport.height);
+      canvas.style.width = `${cssViewport.width}px`;
+      canvas.style.height = `${cssViewport.height}px`;
+      // Force layout flush — iOS Safari can produce a transparent backing
+      // buffer when the canvas was just resized in the same task.
+      void canvas.offsetHeight;
+      // pdf.js v6: pass `canvas` (not canvasContext). Mixing both, or applying
+      // setTransform manually, breaks rendering.
+      const task = page.render({ canvas, viewport: renderViewport });
       try {
         await task.promise;
       } catch {
@@ -280,7 +294,8 @@ function PdfPage({
 
     return () => {
       cancelled = true;
-      if (renderTask) renderTask.cancel();
+      // Do not cancel an in-flight render — on some Safari builds this wedges
+      // the pdf.js worker. The `cancelled` flag prevents post-render writes.
     };
   }, [doc, pageNum, targetWidth]);
 

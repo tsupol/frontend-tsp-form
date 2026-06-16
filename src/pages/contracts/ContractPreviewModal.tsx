@@ -85,9 +85,9 @@ export function ContractPreviewModal({ open, onClose, contract, onAcceptAndSign 
       open={open}
       onClose={onClose}
       width="100vw"
-      height="100vh"
+      height="100dvh"
       maxWidth="100vw"
-      maxHeight="100vh"
+      maxHeight="100dvh"
       ariaLabel={t('contract.previewModalTitle', { defaultValue: 'Contract preview' })}
     >
       <div className="modal-header">
