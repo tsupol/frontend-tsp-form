@@ -105,6 +105,11 @@ export interface ContractPdfInput {
   // Preview mode: server skips the lessee signature when true. Used for the
   // staff "show the customer before signing" flow.
   preview?: boolean;
+
+  // Anchor hash of the signed contract (sha256 of the commitment fields).
+  // The server prints its first 16 chars in the footer next to the print
+  // stamp. Empty/undefined for drafts (no snapshot signed yet).
+  hash?: string;
 }
 
 // Resolve asset-vs-override into the values the renderer actually prints.

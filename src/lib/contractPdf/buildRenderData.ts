@@ -196,6 +196,7 @@ interface ContractRenderResponse {
   contract_id: number;
   state: string;
   is_signed: boolean;
+  hash: string | null;
   legal_core: RenderLegalCore | null;
   contract: RenderContract | null;
   branch: RenderBranch | null;
@@ -475,5 +476,9 @@ export async function buildContractRenderData(
     lateFeeMaxDays: res.company_config?.late_fee_max_days ?? null,
     gracePeriodDays: res.company_config?.grace_period_days ?? null,
     repoThresholdDays: CLAUSE_6_REPO_THRESHOLD_DAYS,
+
+    // Verification anchor — printed in the PDF footer (first 16 chars). Null
+    // for drafts; the server omits the hash from the footer when empty.
+    hash: res.hash ?? undefined,
   };
 }
