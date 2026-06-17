@@ -21,7 +21,7 @@
 import { useTranslation } from 'react-i18next';
 import { Badge } from 'tsp-form';
 import { Minus, Plus } from 'lucide-react';
-import { fmtCurrency } from '../../lib/format';
+import { fmtCurrency, formatAssetCode } from '../../lib/format';
 
 interface PartyEntry {
   role: string;
@@ -118,8 +118,8 @@ export function SnapshotOverviewDiff({ changeReason, stateBefore, stateAfter }: 
   // ─── Device ─────────────────────────────────────────────────────────
   const beforeAsset = before.asset ?? null;
   const afterAsset  = after.asset  ?? null;
-  const beforeAssetId = beforeAsset?.asset_code ?? (beforeAsset?.device_id != null ? `#${beforeAsset.device_id}` : null);
-  const afterAssetId  = afterAsset?.asset_code  ?? (afterAsset?.device_id  != null ? `#${afterAsset.device_id}`  : null);
+  const beforeAssetId = beforeAsset?.asset_code ? formatAssetCode(beforeAsset.asset_code) : (beforeAsset?.device_id != null ? `#${beforeAsset.device_id}` : null);
+  const afterAssetId  = afterAsset?.asset_code  ? formatAssetCode(afterAsset.asset_code)  : (afterAsset?.device_id  != null ? `#${afterAsset.device_id}`  : null);
   const deviceKind: ChangeKind =
     !beforeAssetId && afterAssetId ? 'added' :
     beforeAssetId && !afterAssetId ? 'removed' :

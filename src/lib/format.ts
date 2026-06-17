@@ -192,3 +192,20 @@ export function formatCid(cid: string | null | undefined): string {
   if (d.length === 13) return `${d[0]}-${d.slice(1, 5)}-${d.slice(5, 10)}-${d.slice(10, 12)}-${d[12]}`;
   return cid;
 }
+
+/**
+ * Format an asset code for display: XX-XXXX-XXXXXX-X
+ * e.g. AT26050000152 → AT-2605-000015-2. Prefix is the leading non-digits;
+ * the digit body splits 4-6-1. The backend's `asset_code_display` field
+ * already carries this format — prefer it when present and only fall back to
+ * this for raw `asset_code`.
+ */
+export function formatAssetCode(code: string | null | undefined): string {
+  if (!code) return '—';
+  const m = code.match(/^([A-Za-z]*)(\d+)$/);
+  if (!m) return code;
+  const [, prefix, digits] = m;
+  if (digits.length !== 11) return code;
+  const head = prefix ? `${prefix}-` : '';
+  return `${head}${digits.slice(0, 4)}-${digits.slice(4, 10)}-${digits.slice(10)}`;
+}

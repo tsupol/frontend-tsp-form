@@ -170,6 +170,82 @@ input[type="number"
         visibility: hidden;
         pointer-events: none;
     }
+    /* Same off-screen hide for the signing-detail print while it's briefly
+       mounted during the print flow. Wrapper is display:contents (no box, like
+       .print-only-receipt), so hide via the print node itself. */
+    .print-only-signing-detail {
+        display: contents;
+    }
+    .print-only-signing-detail .signing-detail-print {
+        position: absolute;
+        left: -10000px;
+        top: 0;
+        visibility: hidden;
+        pointer-events: none;
+    }
+}
+
+/* Signing detail document — prints on the SAME 80mm thermal paper as the bill
+   receipt (72mm printable). Single column, text + dashed rules, no boxes. Uses
+   the bill's default @page (80mm auto) — no dynamic injection needed. */
+.signing-detail-print {
+    width: 72mm;
+    background: #fff;
+    color: #000;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Sarabun", sans-serif;
+    font-size: 13px;
+    line-height: 1.4;
+}
+.signing-detail-print .sdp-title {
+    text-align: center;
+    font-weight: 700;
+    font-size: 15px;
+}
+.signing-detail-print .sdp-sub {
+    text-align: center;
+    font-size: 12px;
+}
+.signing-detail-print .sdp-note {
+    text-align: center;
+    font-style: italic;
+    font-size: 12px;
+    margin-top: 2px;
+}
+.signing-detail-print .sdp-rule {
+    border: 0;
+    border-top: 1px dashed #000;
+    margin: 6px 0;
+}
+.signing-detail-print .sdp-heading {
+    font-weight: 700;
+    font-size: 13px;
+    margin-bottom: 2px;
+}
+.signing-detail-print .sdp-line {
+    display: flex;
+    justify-content: space-between;
+    gap: 6px;
+}
+.signing-detail-print .sdp-line-value {
+    font-weight: 600;
+    text-align: right;
+}
+.signing-detail-print .sdp-mono {
+    font-family: ui-monospace, monospace;
+}
+.signing-detail-print .sdp-party {
+    margin-top: 6px;
+}
+.signing-detail-print .sdp-party-role {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+.signing-detail-print .sdp-party-name {
+    font-weight: 600;
+}
+.signing-detail-print .sdp-party-detail {
+    font-size: 12px;
 }
 
 /* Print: isolate the bill receipt — hide everything outside it,
@@ -254,6 +330,29 @@ input[type="number"
         text-rendering: geometricPrecision;
         -webkit-font-smoothing: none;
         font-smooth: never;
+    }
+
+    /* Signing detail document print — 80mm thermal, same as the bill receipt.
+       Isolation + @page (80mm auto, the default) match the bill pattern. */
+    body:has(.signing-detail-print) * {
+        visibility: hidden;
+    }
+    body:has(.signing-detail-print) .signing-detail-print,
+    body:has(.signing-detail-print) .signing-detail-print * {
+        visibility: visible;
+    }
+    body:has(.signing-detail-print) > *:not(:has(.signing-detail-print)) {
+        display: none !important;
+    }
+    .signing-detail-print {
+        width: 72mm;
+        margin: 0 !important;
+        padding: 3mm 4mm;
+        position: static !important;
+        left: auto !important;
+        top: auto !important;
+        background: #fff !important;
+        color: #000 !important;
     }
 }
 

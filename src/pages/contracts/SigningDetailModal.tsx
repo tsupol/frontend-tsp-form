@@ -12,14 +12,18 @@
 // Read-only — no mutations. Closes via header X or backdrop. Modal always
 // mounted; visibility controlled by `open` prop only.
 
+import { useCallback, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Badge, Button, Modal, Tooltip } from 'tsp-form';
-import { Bot, CheckCircle2, Circle, Loader2, XCircle } from 'lucide-react';
+import { Bot, CheckCircle2, Circle, Loader2, Printer, XCircle } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
+import { formatCid, formatTel } from '../../lib/format';
 import { SnapshotOverviewDiff } from './SnapshotOverviewDiff';
+import { SigningDetailPrint, type SigningDetailPrintData, type PrintParty } from './SigningDetailPrint';
 
 // ─── Types ─────────────────────────────────────────────────────────────
 
@@ -159,6 +163,45 @@ export function SigningDetailModal({ open, onClose, signingId, contractId, signi
     staleTime: 60_000,
   });
 
+  // ─── Print (browser-print pattern; see .claude/print-pattern.md) ─────────
+  // Customer-facing copy: identity + the change only. No signatures, no
+  // signed-at dates — the customer is reading what they agreed to, not auditing
+  // the ceremony.
+  const [printReady, setPrintReady] = useState(false);
+  const [printData, setPrintData] = useState<SigningDetailPrintData | null>(null);
+
+  const handlePrint = useCallback(() => {
+    if (!data) return;
+
+    setPrintData({
+      contract_code: null,
+      signing_id: data.signing_id,
+      version_no: data.version_no,
+      status: data.status,
+      signing_type: data.signing_type,
+      change_reason: data.change_reason,
+      change_note: data.change_note,
+      sealed_at: (data as unknown as { sealed_at?: string | null }).sealed_at ?? null,
+      anchor_hash: data.anchor_hash,
+      agreed: payload?.agreed ?? null,
+      asset_code: payload?.asset?.asset_code ?? null,
+      parties: data.parties.map((p): PrintParty => ({
+        role: p.role,
+        full_name: p.full_name,
+        id_number: p.id_number,
+        phone: p.phone,
+      })),
+    });
+    setPrintReady(true);
+
+    // Two RAFs: React commits, browser paints, then open the dialog. Prints on
+    // 80mm thermal — reuses the bill receipt's default @page, no injection.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      window.print();
+      setPrintReady(false);
+    }));
+  }, [data, payload]);
+
   return (
     <Modal open={open} onClose={onClose} maxWidth="42rem" width="100%">
       <div className="modal-header">
@@ -279,8 +322,27 @@ export function SigningDetailModal({ open, onClose, signingId, contractId, signi
       </div>
 
       <div className="modal-footer">
+        {data && (
+          <Button
+            variant="outline"
+            startIcon={<Printer size={16} />}
+            onClick={handlePrint}
+          >
+            {t('signing.printDetail', { defaultValue: 'Print' })}
+          </Button>
+        )}
         <Button onClick={onClose}>{t('common.close')}</Button>
       </div>
+
+      {/* Off-screen print mount — body portal + .signing-detail-print isolation
+          (see .claude/print-pattern.md). NOT inside this Modal: the Modal's
+          fixed/overflow-hidden container clips the @page box. */}
+      {printReady && printData && createPortal(
+        <div className="print-only-signing-detail" aria-hidden>
+          <SigningDetailPrint data={printData} />
+        </div>,
+        document.body,
+      )}
     </Modal>
   );
 }
@@ -306,8 +368,8 @@ function PartyRow({ party, t }: {
           <span className="text-sm font-medium">{party.full_name ?? '—'}</span>
         </div>
         <div className="text-[11px] text-subtle mt-0.5 flex flex-wrap gap-x-3">
-          {party.id_number && <span>{party.id_number}</span>}
-          {party.phone && <span>{party.phone}</span>}
+          {party.id_number && <span>{formatCid(party.id_number)}</span>}
+          {party.phone && <span>{formatTel(party.phone)}</span>}
         </div>
         {party.address && <div className="text-[11px] text-subtle mt-0.5 break-words">{party.address}</div>}
         {party.signed_at && (

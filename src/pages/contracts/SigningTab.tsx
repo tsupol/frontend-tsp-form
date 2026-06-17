@@ -27,6 +27,7 @@ import {
   Printer, Trash2, XCircle,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
+import { formatCid, formatTel } from '../../lib/format';
 import { DateTime } from '../../components/DateTime';
 import { SigningVoidModal } from './SigningVoidModal';
 import { SigningSignModal } from './SigningSignModal';
@@ -465,8 +466,8 @@ function SigningCard({
                       </span>
                     </div>
                     <div className="text-[11px] text-subtle mt-0.5 flex flex-wrap gap-x-3">
-                      {p.frozen_id_number && <span>{p.frozen_id_number}</span>}
-                      {p.frozen_phone && <span>{p.frozen_phone}</span>}
+                      {p.frozen_id_number && <span>{formatCid(p.frozen_id_number)}</span>}
+                      {p.frozen_phone && <span>{formatTel(p.frozen_phone)}</span>}
                     </div>
                   </div>
                   <div className="shrink-0 flex items-center gap-2">
