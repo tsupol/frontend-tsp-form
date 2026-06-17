@@ -2176,7 +2176,6 @@
     "printBlock_signatoryBookEmpty": "Branch signatory book is missing a lessor and at least 2 active witnesses.",
     "printBlock_noLessorInBook": "Branch signatory book has no active lessor.",
     "printBlock_notEnoughWitnesses": "Branch signatory book needs at least 2 active witnesses.",
-    "printBlock_draftNotReady": "Complete the required contract details before previewing.",
     "printBlock_openSignatoryBook": "Open Signatory Book",
     "printBlock_noBankAccount": "Branch has no active bank account set.",
     "printBlock_openBankAccounts": "Open Bank Accounts",

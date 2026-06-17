@@ -152,8 +152,6 @@ function prerequisiteMsg(reason: string, t: (k: string, opts?: Record<string, un
       return t('contract.printBlock_noLessorInBook', { defaultValue: 'Branch signatory book has no active lessor.' });
     case 'no_witnesses':
       return t('contract.printBlock_notEnoughWitnesses', { defaultValue: 'Branch signatory book needs at least 2 active witnesses.' });
-    case 'not_ready':
-      return t('contract.printBlock_draftNotReady', { defaultValue: 'Complete the required contract details before previewing.' });
     default:
       return reason;
   }

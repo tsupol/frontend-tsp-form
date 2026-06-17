@@ -259,12 +259,10 @@ async function resolveSignatureByMediaId(mediaId: number | null | undefined): Pr
 }
 
 // Reasons preserved from the old assembly so the modals' prerequisite UI
-// keeps working. fn_contract_render returns NULL legal_core when the draft
-// isn't ready (same gate as the "open bill" button); we surface that the same
-// way the old code did via the bank/lessor/witness checks below.
+// keeps working — surfaced via the bank/lessor/witness checks below.
 export class ContractRenderPrerequisiteError extends Error {
-  readonly reason: 'no_bank_account' | 'no_lessor' | 'no_witnesses' | 'not_ready';
-  constructor(reason: 'no_bank_account' | 'no_lessor' | 'no_witnesses' | 'not_ready') {
+  readonly reason: 'no_bank_account' | 'no_lessor' | 'no_witnesses';
+  constructor(reason: 'no_bank_account' | 'no_lessor' | 'no_witnesses') {
     super(`render prerequisite missing: ${reason}`);
     this.reason = reason;
   }
@@ -283,10 +281,12 @@ export async function buildContractRenderData(
   });
 
   const legal = res.legal_core;
-  // No legal core = incomplete draft (build couldn't run). Same meaning as the
-  // old "contract has no customer" / not-ready guards.
+  // legal_core is populated even for incomplete drafts (the render is
+  // readiness-gated separately, surfaced in the document step). A null here is
+  // a genuine exceptional case — the server's payload builder threw — not a
+  // user-facing prerequisite, so fail loudly rather than mislead.
   if (!legal) {
-    throw new ContractRenderPrerequisiteError('not_ready');
+    throw new Error('fn_contract_render returned no legal_core');
   }
 
   const agreed = legal.agreed ?? {};
