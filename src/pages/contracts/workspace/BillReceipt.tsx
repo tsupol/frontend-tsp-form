@@ -47,7 +47,7 @@ interface BillCancelInfo {
   credit_note_amount: number;
 }
 
-interface BillDetail {
+export interface BillDetail {
   bill_id: number;
   bill_code: string;
   bill_code_display: string;
@@ -82,7 +82,16 @@ interface BranchInfo {
 }
 
 interface BillReceiptProps {
-  billId: number;
+  /** Fetch the receipt from v_bill_detail. Omit when passing `bill` directly. */
+  billId?: number;
+  /**
+   * Render from a pre-built BillDetail instead of fetching. Used for the
+   * unofficial draft invoice (no bill row exists yet) — same printable markup
+   * and print isolation, data sourced from the staged cart. When set, the
+   * bill + branch queries are skipped and `branch_name` on the object is used
+   * for the header.
+   */
+  bill?: BillDetail;
   /** Hide the inline Print button (e.g. when the host page provides its own). */
   hidePrintButton?: boolean;
 }
@@ -103,27 +112,31 @@ const BILL_TYPE_TITLE_KEY: Record<string, string> = {
  * magnitudes shown), JOURNAL → ใบบันทึกบัญชี (no payment block). Voided
  * bills get a VOIDED watermark and cancel info.
  */
-export function BillReceipt({ billId, hidePrintButton }: BillReceiptProps) {
+export function BillReceipt({ billId, bill: billProp, hidePrintButton }: BillReceiptProps) {
   const { t, i18n } = useTranslation();
 
-  const { data: bill, isLoading } = useQuery({
+  const { data: fetchedBill, isLoading } = useQuery({
     queryKey: ['bill-detail', billId],
     queryFn: () => apiClient.get<BillDetail[]>(
       `/v_bill_detail?bill_id=eq.${billId}`,
     ).then(rows => rows[0] ?? null),
+    enabled: billProp == null && billId != null,
     staleTime: 30 * 1000,
   });
+
+  const bill = billProp ?? fetchedBill;
 
   const { data: branch } = useQuery({
     queryKey: ['branch-info', bill?.branch_id],
     queryFn: () => apiClient.get<BranchInfo[]>(
       `/v_branches?id=eq.${bill!.branch_id}&select=id,name,address`,
     ).then(rows => rows[0] ?? null),
-    enabled: bill?.branch_id != null,
+    // Pre-built (draft) receipts carry their own branch_name; don't refetch.
+    enabled: billProp == null && bill?.branch_id != null,
     staleTime: 5 * 60 * 1000,
   });
 
-  if (isLoading || !bill) {
+  if ((billProp == null && isLoading) || !bill) {
     return (
       <div className="flex items-center justify-center p-8 text-subtle">
         <Loader2 size={20} className="animate-spin mr-2" />

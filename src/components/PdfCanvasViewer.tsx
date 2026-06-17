@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-import type { PDFDocumentProxy } from 'pdfjs-dist';
+import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
 import { ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
@@ -247,6 +247,11 @@ function PdfPage({
   targetWidth: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const renderTaskRef = useRef<RenderTask | null>(null);
+  // Width this canvas was last SUCCESSFULLY rendered at. Lets a re-run (zoom /
+  // StrictMode double-invoke / layout settle) skip work only when the existing
+  // pixels are already correct, instead of clearing a good render.
+  const renderedWidthRef = useRef<number>(0);
 
   useEffect(() => {
     if (targetWidth <= 0) return;
@@ -275,18 +280,28 @@ function PdfPage({
       const renderViewport = page.getViewport({ scale: cssScale * effectiveDpr });
       const canvas = canvasRef.current;
       if (!canvas) return;
-      canvas.width = Math.floor(renderViewport.width);
-      canvas.height = Math.floor(renderViewport.height);
+      const nextW = Math.floor(renderViewport.width);
+      const nextH = Math.floor(renderViewport.height);
+      // Setting canvas.width/height ALWAYS clears the backing store (→ black
+      // over the dark backdrop). The effect re-runs on StrictMode double-invoke
+      // and on every targetWidth settle; unconditionally reassigning size wiped
+      // an already-good render — the "white flash then black" symptom. Skip
+      // only when we already SUCCESSFULLY rendered this exact size.
+      if (renderedWidthRef.current === nextW && canvas.width === nextW && canvas.height === nextH) {
+        return;
+      }
+      canvas.width = nextW;
+      canvas.height = nextH;
       canvas.style.width = `${cssViewport.width}px`;
       canvas.style.height = `${cssViewport.height}px`;
-      // Force layout flush — iOS Safari can produce a transparent backing
-      // buffer when the canvas was just resized in the same task.
-      void canvas.offsetHeight;
-      // pdf.js v6: pass `canvas` (not canvasContext). Mixing both, or applying
-      // setTransform manually, breaks rendering.
+      // pdf.js v6: pass `canvas` and let pdf.js own it (its default background
+      // is opaque white). Don't grab the 2D context ourselves — that desyncs
+      // pdf.js's internal state and corrupts the page transform.
       const task = page.render({ canvas, viewport: renderViewport });
+      renderTaskRef.current = task;
       try {
         await task.promise;
+        if (!cancelled) renderedWidthRef.current = nextW;
       } catch {
         /* render cancelled — ignore */
       }
@@ -294,8 +309,9 @@ function PdfPage({
 
     return () => {
       cancelled = true;
-      // Do not cancel an in-flight render — on some Safari builds this wedges
-      // the pdf.js worker. The `cancelled` flag prevents post-render writes.
+      // Cancel an in-flight render so a superseded pass can't paint (or leave a
+      // cleared canvas) after a newer one started.
+      renderTaskRef.current?.cancel();
     };
   }, [doc, pageNum, targetWidth]);
 

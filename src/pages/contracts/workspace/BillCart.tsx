@@ -61,6 +61,8 @@ interface Props {
   systemLines: Array<{ key: string; description: string; amount: number }>;
   lines: DraftCartLine[];
   onChange: (next: DraftCartLine[]) => void;
+  /** Right-aligned action on the "+ add line" row (e.g. print invoice). */
+  rowAction?: ReactNode;
 }
 
 const SELLABLE_CHARGE_TYPES = new Set(['ACCESSORY_SALE', 'GIFT']);
@@ -74,7 +76,7 @@ const CHARGE_ICONS: Record<string, ReactNode> = {
 let cartIdCounter = 0;
 const nextCartId = () => `cart-${Date.now()}-${++cartIdCounter}`;
 
-export function BillCart({ branchId, systemLines, lines, onChange }: Props) {
+export function BillCart({ branchId, systemLines, lines, onChange, rowAction }: Props) {
   const { t, i18n } = useTranslation();
 
   const [addOpen, setAddOpen] = useState(false);
@@ -241,6 +243,7 @@ export function BillCart({ branchId, systemLines, lines, onChange }: Props) {
             ))}
           </div>
         </PopOver>
+        {rowAction && <div className="ml-auto">{rowAction}</div>}
       </div>
 
       <SellableVariantPickerModal

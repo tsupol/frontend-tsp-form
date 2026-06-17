@@ -13,7 +13,7 @@ import { fmtCurrency } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
 import type { PaymentMethod, PaymentLine, BankAccount, BillOpenResult } from './WorkspaceTypes';
 import { ERROR_TO_MODAL } from './WorkspaceTypes';
-import { BillReceipt } from './BillReceipt';
+import { BillReceipt, type BillDetail } from './BillReceipt';
 import { BillCart, type DraftCartLine } from './BillCart';
 import { BranchPinInput } from '../../../components/BranchPinInput';
 
@@ -264,6 +264,86 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
   const ownerPickValid = ownerPick != null && ownerPick !== ownerId;
   const canSaveOwner = ownerPickValid && ownerPin.length === 6 && !ownerSaving;
 
+  // ── Unofficial invoice print ─────────────────────────────────────────
+  // No bill exists in DRAFT, so we print the staged cart through the SAME
+  // BillReceipt + print isolation used everywhere else (BillsPage pattern:
+  // mount the receipt off-screen via a body portal, then window.print()).
+  // The receipt is fed a pre-built BillDetail — header shows the contract
+  // code, not a bill number. There is no on-screen receipt and exactly one
+  // .bill-receipt node at print time, so print isolation is unchanged.
+  const draftBill = useMemo<BillDetail | null>(() => {
+    if (!contract) return null;
+    const lineItems = [
+      ...systemLines.map((l, i) => ({
+        line_id: -1 - i,
+        description: l.description,
+        charge_type: l.key,
+        amount: l.amount,
+        quantity: 1,
+      })),
+      ...cartLines.map((l, i) => ({
+        line_id: 1000 + i,
+        description: l.description,
+        charge_type: l.charge_type,
+        amount: l.as_gift ? 0 : l.amount,
+        quantity: l.quantity,
+      })),
+    ];
+    const bankById = new Map((bankAccounts ?? []).map(b => [b.id, b]));
+    const billPayments = payments
+      .filter(p => p.amount > 0)
+      .map((p, i) => {
+        const bank = p.bank_account_id != null ? bankById.get(p.bank_account_id) : null;
+        return {
+          id: i,
+          code_display: '',
+          method: p.method,
+          amount: p.amount,
+          bank_name: bank?.bank_name ?? null,
+          account_number: bank?.account_number ?? null,
+          reference: null,
+        };
+      });
+    const paid = billPayments.reduce((s, p) => s + p.amount, 0);
+    return {
+      bill_id: -1,
+      bill_code: '',
+      bill_code_display: '—',
+      bill_type: 'INVOICE',
+      bill_purpose: 'CONTRACT_OPEN',
+      ref_bill_id: null,
+      ref_bill_code: null,
+      branch_id: contract.branch_id,
+      branch_name: contract.branch_name,
+      customer_id: contract.customer_id,
+      customer_name: contract.customer_name,
+      customer_tel: null,
+      contract_id: contract.id,
+      contract_code: contract.code_display ?? contract.code,
+      total_amount: totalAmount,
+      paid_amount: paid,
+      change_amount: 0,
+      status: 'OPEN',
+      is_voided: false,
+      bill_date: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+      created_by_name: null,
+      line_items: lineItems,
+      payments: billPayments,
+      cancel_info: null,
+    };
+  }, [contract, systemLines, cartLines, payments, bankAccounts, totalAmount]);
+
+  const [printReady, setPrintReady] = useState(false);
+  const handlePrintInvoice = useCallback(() => {
+    if (!draftBill) return;
+    setPrintReady(true);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      window.print();
+      setPrintReady(false);
+    }));
+  }, [draftBill]);
+
   // ── Confirm & Activate (the ONLY user action that mutates state) ─────
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -423,6 +503,16 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
             systemLines={systemLines}
             lines={cartLines}
             onChange={setCartLines}
+            rowAction={
+              <Button
+                size="sm"
+                variant="outline"
+                startIcon={<Printer size={14} />}
+                onClick={handlePrintInvoice}
+              >
+                {t('workspace.previewInvoice', { defaultValue: 'Print invoice' })}
+              </Button>
+            }
           />
         </div>
 
@@ -599,6 +689,15 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
           </Button>
         </div>
       </div>
+
+      {/* Unofficial invoice print — same off-screen body portal + isolation
+          as BillsPage. Exactly one .bill-receipt node, only at print time. */}
+      {printReady && draftBill && createPortal(
+        <div className="print-only-receipt" aria-hidden>
+          <BillReceipt bill={draftBill} hidePrintButton />
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }
