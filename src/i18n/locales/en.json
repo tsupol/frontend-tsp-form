@@ -2738,6 +2738,7 @@
     "needsDraft": "Create draft first to upload documents",
     "docIdPhoto": "ID Card / Passport Photo",
     "docContractAndSignature": "Contract & signature",
+    "docNotReadyTitle": "Complete these before previewing or signing the contract",
     "docSignature": "Signature",
     "docEvidence": "Contract Photos",
     "docEvidenceHint": "Optional. Upload photos showing the device handed over to the customer — proof of delivery.",

@@ -8,12 +8,17 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CheckCircle, ScrollText, Eye, PenLine } from 'lucide-react';
+import { CheckCircle, ScrollText, Eye, PenLine, AlertTriangle } from 'lucide-react';
 import { useMediaUrl } from '../../../hooks/useMediaUrl';
 import { ContractPreviewModal } from '../ContractPreviewModal';
 import { ContractSignModal } from './ContractSignModal';
 import type { ContractMin } from '../../../lib/contractPdf/buildRenderData';
 import type { UploadedImage } from 'tsp-form';
+
+export interface ReadinessError {
+  code: string;
+  detail?: Record<string, unknown>;
+}
 
 interface Props {
   contract: ContractMin | null;
@@ -31,6 +36,11 @@ interface Props {
   // "Contract & signature". Pass a guarantor name for the guarantor flow.
   pairLabel?: string;
   signCardLabel?: string;
+  // When the contract isn't ready to render (BE readiness from
+  // fn_contract_render / fn_contract_validate_ready), show WHY here instead of
+  // the preview + signature cards — the document can't be previewed or signed
+  // until these are filled.
+  notReadyErrors?: ReadinessError[];
 }
 
 export function ContractPreviewSignPair({
@@ -42,6 +52,7 @@ export function ContractPreviewSignPair({
   cacheBust = 0,
   pairLabel,
   signCardLabel,
+  notReadyErrors,
 }: Props) {
   const { t } = useTranslation();
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -50,6 +61,8 @@ export function ContractPreviewSignPair({
   const resolvedPairLabel = pairLabel
     ?? t('workspace.docContractAndSignature', { defaultValue: 'Contract & signature' });
   const resolvedSignCardLabel = signCardLabel ?? t('workspace.docSignature');
+
+  const notReady = (notReadyErrors?.length ?? 0) > 0;
 
   return (
     <div className="flex flex-col gap-2">
@@ -60,6 +73,21 @@ export function ContractPreviewSignPair({
         <ScrollText size={14} />
         <label className="form-label mb-0">{resolvedPairLabel}</label>
       </div>
+      {notReady ? (
+        // Not ready to render the document — show WHY (BE readiness codes)
+        // instead of the preview + signature cards.
+        <div className="alert alert-warning">
+          <AlertTriangle size={16} />
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <div className="alert-title">{t('workspace.docNotReadyTitle', { defaultValue: 'Complete these before previewing or signing' })}</div>
+            <ul className="alert-description list-disc pl-5 flex flex-col gap-0.5">
+              {notReadyErrors!.map((err, i) => (
+                <li key={`${err.code}-${i}`}>{readinessLabel(err, t)}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      ) : (
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <PreviewCard
           disabled={!contract || disabled}
@@ -73,6 +101,7 @@ export function ContractPreviewSignPair({
           onClick={() => setSignOpen(true)}
         />
       </div>
+      )}
 
       <ContractPreviewModal
         open={previewOpen}
@@ -96,6 +125,19 @@ export function ContractPreviewSignPair({
       />
     </div>
   );
+}
+
+// Turn a BE readiness error into a human line. Code → i18n (apiErrors ns);
+// SIGNATORY_INCOMPLETE carries detail.missing (LESSOR / WITNESS_1 / …) so we
+// append the specific slot.
+function readinessLabel(err: ReadinessError, t: ReturnType<typeof useTranslation>['t']): string {
+  const base = t(err.code, { ns: 'apiErrors', defaultValue: err.code });
+  const missing = err.detail?.missing;
+  if (typeof missing === 'string' && missing) {
+    const slot = t(`workspace.signatory${missing === 'LESSOR' ? 'Lessor' : missing === 'WITNESS_1' ? 'Witness1' : missing === 'WITNESS_2' ? 'Witness2' : ''}`, { defaultValue: missing });
+    return `${base} — ${slot}`;
+  }
+  return base;
 }
 
 function PreviewCard({ disabled, onClick }: { disabled: boolean; onClick: () => void }) {

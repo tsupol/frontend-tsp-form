@@ -7,7 +7,7 @@ import { apiClient, ApiError } from '../../../lib/api';
 import { uploadFromImage, invalidateMediaUrl } from '../../../lib/upload';
 import { useWorkspace } from './WorkspaceContext';
 import { IdPhotoUpload } from './IdPhotoUpload';
-import { ContractPreviewSignPair } from './ContractPreviewSignPair';
+import { ContractPreviewSignPair, type ReadinessError } from './ContractPreviewSignPair';
 import { SignatoryEditor } from './SignatoryEditor';
 import { useContractGuarantors } from './useContractGuarantors';
 import type { ContractMin } from '../../../lib/contractPdf/buildRenderData';
@@ -87,6 +87,21 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
   } : null;
 
   const { data: guarantors = [] } = useContractGuarantors(contractId);
+
+  // BE readiness — same validator the "open bill" button uses. When not ready
+  // the document can't be previewed/signed; the Contract & signature section
+  // shows WHY (these typed codes) instead of the preview + signature cards.
+  // Shares the ['contract-readiness', id] cache with PanelReviewPay.
+  const { data: readiness } = useQuery({
+    queryKey: ['contract-readiness', contractId],
+    queryFn: () => apiClient.rpc<{ ready: boolean; errors: ReadinessError[] }>(
+      'fn_contract_validate_ready',
+      { p_contract_id: contractId },
+    ),
+    enabled: !!contractId,
+    staleTime: 0,
+  });
+  const notReadyErrors = readiness && !readiness.ready ? readiness.errors : undefined;
 
   // All ID cards for everyone on the contract (lessee + guarantors). One
   // batched query keyed on the full customer-id set so we don't N+1.
@@ -256,6 +271,7 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
         onUpload={customerId ? uploadSignatureFor(customerId) : () => {}}
         disabled={!customerId || !prereqsMet}
         cacheBust={cacheBust}
+        notReadyErrors={notReadyErrors}
       />
 
       {/* ── Guarantor blocks ────────────────────────────────────────── */}
@@ -286,6 +302,7 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
               onUpload={uploadSignatureFor(g.customer_id)}
               disabled={!prereqsMet}
               cacheBust={cacheBust}
+              notReadyErrors={notReadyErrors}
               pairLabel={t('workspace.docContractAndSignatureFor', {
                 defaultValue: 'Contract & signature — {{name}}',
                 name: g.customer_name,

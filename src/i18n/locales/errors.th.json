@@ -189,6 +189,7 @@
   "CONTRACT.STATE.INVALID_STATE": "สถานะสัญญาไม่ถูกต้อง",
   "CONTRACT.VALIDATION.BRANCH_INACTIVE": "สาขาไม่ได้เปิดใช้งาน",
   "CONTRACT.VALIDATION.CUSTOMER_REQUIRED": "ต้องระบุลูกค้า",
+  "CONTRACT.VALIDATION.AGREED_PRICE_REQUIRED": "ต้องระบุราคาที่ตกลง",
   "CONTRACT.VALIDATION.GUARANTOR_REQUIRED_FOR_MINOR": "ต้องมีผู้ค้ำประกัน (ลูกค้าอายุต่ำกว่า 18 ปี)",
   "CONTRACT.VALIDATION.REFERENCE_REQUIRED": "ต้องมีบุคคลอ้างอิงอย่างน้อย 1 คน",
   "CONTRACT.VALIDATION.MODEL_REQUIRED": "ต้องเลือกรุ่นสินค้า",

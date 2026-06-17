@@ -189,6 +189,7 @@
   "CONTRACT.STATE.INVALID_STATE": "Contract is in an invalid state",
   "CONTRACT.VALIDATION.BRANCH_INACTIVE": "Branch is inactive",
   "CONTRACT.VALIDATION.CUSTOMER_REQUIRED": "Customer is required",
+  "CONTRACT.VALIDATION.AGREED_PRICE_REQUIRED": "Agreed price is required",
   "CONTRACT.VALIDATION.GUARANTOR_REQUIRED_FOR_MINOR": "Guarantor is required (customer is under 18)",
   "CONTRACT.VALIDATION.REFERENCE_REQUIRED": "At least 1 reference is required",
   "CONTRACT.VALIDATION.MODEL_REQUIRED": "Product model is required",
