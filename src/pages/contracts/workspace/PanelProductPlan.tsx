@@ -232,22 +232,36 @@ export function PanelProductPlan(_props: Props) {
     setLocalVariantId(contract.variant_id);
     setLocalVariantName(contract.variant_name ?? '');
 
-    apiClient.rpc<SearchResponse>('fn_product_search', {
-      p_q: contract.model_name,
-      p_is_contractable: true,
-      p_limit: 10,
-    }).then(res => {
-      const match = res.rows.find(m => m.model_id === contract.model_id);
-      if (match) {
-        setSelectedModel(match);
-        setLocalFamilyName(match.family_name);
-        setLocalBrandName(match.brand_name);
-        if (contract.variant_id) {
-          const v = match.variants.find(v => v.variant_id === contract.variant_id);
-          if (v) setLocalVariantName(colorLabel(v));
+    // Resolve the saved model by id. The query is the model name, which is NOT
+    // unique — e.g. "Base 128GB" matches ~88 models (one per iPhone family). A
+    // single capped page can omit the target model, leaving selectedModel unset
+    // → no quotes → the panel can't rehydrate and shows "select a plan" forever
+    // after a reload. Page through until we find the exact model_id (or run out).
+    const targetModelId = contract.model_id;
+    const targetVariantId = contract.variant_id;
+    const PAGE = 50;
+    (async () => {
+      for (let offset = 0; ; offset += PAGE) {
+        const res = await apiClient.rpc<SearchResponse>('fn_product_search', {
+          p_q: contract.model_name,
+          p_is_contractable: true,
+          p_limit: PAGE,
+          p_offset: offset,
+        });
+        const match = res.rows.find(m => m.model_id === targetModelId);
+        if (match) {
+          setSelectedModel(match);
+          setLocalFamilyName(match.family_name);
+          setLocalBrandName(match.brand_name);
+          if (targetVariantId) {
+            const v = match.variants.find(v => v.variant_id === targetVariantId);
+            if (v) setLocalVariantName(colorLabel(v));
+          }
+          return;
         }
+        if (offset + res.rows.length >= res.total || res.rows.length === 0) return;
       }
-    }).catch(() => {});
+    })().catch(() => {});
   }, [contract?.model_id, contract?.model_name]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── USED: Restore from server state ─────────────────────────────────
@@ -386,6 +400,49 @@ export function PanelProductPlan(_props: Props) {
   const retailPrice = mode === 'used'
     ? (usedQuoteData?.suggested_retail ?? dedupedQuotes[0]?.retail_price)
     : dedupedQuotes[0]?.retail_price;
+
+  // ── Restore localQuote from a rate committed outside this panel ──────
+  // The model/variant restore effects above rehydrate the selection, but the
+  // footer summary (and the confirm button) key off `localQuote`, which is only
+  // set when the user clicks a quote row. A draft whose rate was set elsewhere
+  // (re-opened later, edited via another path) would show "Please select a
+  // plan" despite having a committed rate. Match the saved rate against the
+  // loaded quote rows once and seed localQuote so the panel reflects server
+  // truth. Guarded so it never overrides a user's in-session selection.
+  const restoredQuoteRef = useRef(false);
+  useEffect(() => {
+    if (restoredQuoteRef.current || localQuote) return;
+    if (!contract?.commercial_model || contract.value_month == null || contract.installment_amount == null) return;
+    if (dedupedQuotes.length === 0 || !localVariantId) return;
+
+    const model = contract.commercial_model;
+    const term = contract.value_month;
+    const savedDown = contract.snapshot_down_percent;
+    const match =
+      dedupedQuotes.find(r =>
+        r.finance_model === model &&
+        r.term_months === term &&
+        (savedDown == null || r.down_percent === savedDown),
+      ) ?? dedupedQuotes.find(r => r.finance_model === model && r.term_months === term);
+    if (!match) return;
+
+    restoredQuoteRef.current = true;
+    setLocalQuote({
+      variant_id: localVariantId,
+      item_name: localVariantName,
+      finance_model: match.finance_model,
+      term_months: match.term_months,
+      down_percent: match.down_percent,
+      down_amount: match.down_amount,
+      retail_price: match.retail_price,
+      installment_amount: match.installment_amount,
+      total_amount: match.total_amount,
+      financed_amount: match.financed_amount,
+      cost_price: match.cost_price,
+      interest_percent_total: match.interest_percent_total,
+      fin2_profit_amount: match.fin2_profit_amount,
+    });
+  }, [dedupedQuotes, localVariantId, localVariantName, localQuote, contract?.commercial_model, contract?.value_month, contract?.installment_amount, contract?.snapshot_down_percent]);
 
   // ── Handlers: NEW ───────────────────────────────────────────────────
 
