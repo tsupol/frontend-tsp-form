@@ -91,6 +91,7 @@ import { DevLayout } from './pages/dev/DevLayout';
 import { DevSignaturePage } from './pages/dev/DevSignaturePage';
 import { DevMediaPage } from './pages/dev/DevMediaPage';
 import { DevCropPage } from './pages/dev/DevCropPage';
+import { DevWatermarkPage } from './pages/dev/DevWatermarkPage';
 import { DevNotificationsPage } from './pages/dev/DevNotificationsPage';
 import { DevTokensPage } from './pages/dev/DevTokensPage';
 import { isLocalDev } from './lib/devEnv';
@@ -602,6 +603,16 @@ function App() {
               <ProtectedRoute>
                 <AdminLayout>
                   <DevLayout><DevCropPage /></DevLayout>
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dev/watermark"
+            element={
+              <ProtectedRoute>
+                <AdminLayout>
+                  <DevLayout><DevWatermarkPage /></DevLayout>
                 </AdminLayout>
               </ProtectedRoute>
             }

@@ -21,7 +21,7 @@
 import { useTranslation } from 'react-i18next';
 import { Badge } from 'tsp-form';
 import { Minus, Plus } from 'lucide-react';
-import { fmtCurrency, formatAssetCode } from '../../lib/format';
+import { fmtCurrency, formatAssetCode, formatCid, formatTel } from '../../lib/format';
 
 interface PartyEntry {
   role: string;
@@ -267,8 +267,8 @@ function PartyLine({ party, mark }: { party: PartyEntry; mark: 'added' | 'remove
         </div>
         {(party.id_number || party.tel) && (
           <div className="text-[11px] text-subtle mt-0.5 flex flex-wrap gap-x-3">
-            {party.id_number && <span className="font-mono">{party.id_number}</span>}
-            {party.tel && <span>{party.tel}</span>}
+            {party.id_number && <span className="font-mono">{formatCid(party.id_number)}</span>}
+            {party.tel && <span>{formatTel(party.tel)}</span>}
           </div>
         )}
       </div>

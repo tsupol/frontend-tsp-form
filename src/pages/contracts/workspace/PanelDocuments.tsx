@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UploadedImage } from 'tsp-form';
-import { XCircle, CreditCard, AlertTriangle } from 'lucide-react';
+import { XCircle, CreditCard } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { uploadFromImage, invalidateMediaUrl } from '../../../lib/upload';
 import { useWorkspace } from './WorkspaceContext';
 import { IdPhotoUpload } from './IdPhotoUpload';
 import { ContractPreviewSignPair, type ReadinessError } from './ContractPreviewSignPair';
 import { SignatoryEditor } from './SignatoryEditor';
+import { ConfidenceScoreEditor } from './ConfidenceScoreEditor';
 import { useContractGuarantors } from './useContractGuarantors';
 import type { ContractMin } from '../../../lib/contractPdf/buildRenderData';
 
@@ -232,6 +233,9 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
     <div className="p-4 flex flex-col gap-8 max-w-2xl">
       {error && <div className="alert alert-danger"><XCircle size={18} /><div><div className="alert-description">{error}</div></div></div>}
 
+      {/* ── Customer confidence rating (readiness prerequisite) ─────── */}
+      <ConfidenceScoreEditor />
+
       {/* ── Signatory selection (lessor + witnesses) ────────────────── */}
       <div className="flex flex-col gap-2">
         <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider">
@@ -252,17 +256,9 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
         cacheBust={cacheBust}
       />
 
-      {!prereqsMet && (
-        <div className="alert alert-warning">
-          <AlertTriangle size={16} />
-          <div className="flex flex-col gap-0.5">
-            <div className="alert-title">{t('workspace.docPrereqTitle')}</div>
-            <div className="alert-description">
-              {missingPrereqs.map(c => c.labelText ?? t(c.labelKey!)).join(' · ')}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* The single source of "what's missing" is the BE readiness list,
+          rendered inside ContractPreviewSignPair below. The old client-side
+          prereq warning was redundant with it. */}
 
       <ContractPreviewSignPair
         contract={previewContract}
@@ -295,6 +291,8 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
               onUpload={uploadIdCardFor(g.customer_id)}
               cacheBust={cacheBust}
             />
+            {/* notReadyErrors intentionally omitted — the why-not-ready list
+                is shown once on the lessee block above, not repeated here. */}
             <ContractPreviewSignPair
               contract={previewContract}
               fileUrl={gSig?.file_url ?? null}
@@ -302,7 +300,7 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
               onUpload={uploadSignatureFor(g.customer_id)}
               disabled={!prereqsMet}
               cacheBust={cacheBust}
-              notReadyErrors={notReadyErrors}
+              signatureOptional
               pairLabel={t('workspace.docContractAndSignatureFor', {
                 defaultValue: 'Contract & signature — {{name}}',
                 name: g.customer_name,

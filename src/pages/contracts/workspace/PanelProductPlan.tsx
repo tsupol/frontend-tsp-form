@@ -715,7 +715,7 @@ export function PanelProductPlan(_props: Props) {
 
       {/* ── Selected display (either mode) ───────────────────────────── */}
       {hasSelection && mode === 'new' && localModelId && (
-        <div className="border border-line rounded-lg">
+        <div className="border border-success-border bg-success-soft rounded-lg transition-colors">
           <div className="flex items-center px-4 py-3">
             <div className="flex-1 min-w-0">
               <div className="font-medium">{localFamilyName} {localModelName}</div>
@@ -730,7 +730,7 @@ export function PanelProductPlan(_props: Props) {
       )}
 
       {hasSelection && mode === 'used' && localTargetAssetId && (
-        <div className="border border-line rounded-lg">
+        <div className="border border-success-border bg-success-soft rounded-lg transition-colors">
           <div className="flex items-center px-4 py-3 gap-3">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">

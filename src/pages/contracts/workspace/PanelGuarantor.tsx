@@ -3,16 +3,14 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Input, Select, Button, InputDatePicker, MaskedInput, useSnackbarContext } from 'tsp-form';
 import type { UploadedImage } from 'tsp-form';
-import { ShieldAlert, CheckCircle, XCircle, Keyboard, Search, Loader2, Trash2, AlertTriangle, CreditCard, PenLine, ChevronDown, ChevronRight, Plus } from 'lucide-react';
+import { ShieldAlert, CheckCircle, XCircle, Keyboard, Search, Loader2, Trash2, AlertTriangle, CreditCard, ChevronDown, ChevronRight, Plus } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { uploadFromImage, invalidateMediaUrl } from '../../../lib/upload';
 import { toLocalDateStr, parseLocalDate, makeDatePickerFormat } from '../../../lib/format';
-import { useMediaUrl } from '../../../hooks/useMediaUrl';
 import { useWorkspace } from './WorkspaceContext';
 import { PanelSection } from './PanelSection';
 import { AddressFormPostal } from './AddressFormPostal';
 import { IdPhotoUpload } from './IdPhotoUpload';
-import { ContractSignModal } from './ContractSignModal';
 import { IdCardScanner, type DetectedIdCardFields } from '../../../components/IdCardScanner';
 import { passesThaiCidChecksum } from '../../../lib/ocr/extractIdCard';
 import type { CustomerRegisterResult, CustomerAddress } from './WorkspaceTypes';
@@ -20,11 +18,6 @@ import type { CustomerRegisterResult, CustomerAddress } from './WorkspaceTypes';
 const KNOWN_TH_PREFIXES = new Set(['นาย', 'นาง', 'นางสาว']);
 
 interface CustomerDocument {
-  id: number;
-  file_url: string;
-}
-
-interface ContractDocument {
   id: number;
   file_url: string;
 }
@@ -464,7 +457,9 @@ function SectionHeader({ label, done, expanded, onToggle, optional }: {
     <>
       <div className="border-t border-line -mx-3" />
       <button
-        className="w-full flex items-center gap-2 py-2 px-3 -mx-3 text-sm font-medium cursor-pointer bg-transparent border-none text-current hover:bg-surface-hover transition-colors"
+        className={`w-full flex items-center gap-2 py-2 px-3 -mx-3 text-sm font-medium cursor-pointer border-none text-current transition-colors ${
+          done ? 'bg-success-soft hover:bg-success-soft' : 'bg-transparent hover:bg-surface-hover'
+        }`}
         style={{ width: 'calc(100% + 1.5rem)' }}
         onClick={onToggle}
       >
@@ -500,7 +495,7 @@ interface GuarantorCustomer {
   date_of_birth: string | null; tel: string | null;
 }
 
-function GuarantorRow({ guarantor, contractId, expanded, onToggle, onRemove, removing }: {
+function GuarantorRow({ guarantor, expanded, onToggle, onRemove, removing }: {
   guarantor: { customerId: number; fullName: string; idNumber: string };
   contractId: number | null;
   expanded: boolean;
@@ -515,7 +510,6 @@ function GuarantorRow({ guarantor, contractId, expanded, onToggle, onRemove, rem
   const [cacheBust, setCacheBust] = useState(0);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [openSection, setOpenSection] = useState<string | null>('info');
-  const [signOpen, setSignOpen] = useState(false);
 
   // Fetch guarantor customer info
   const { data: custInfo, refetch: refetchCustInfo } = useQuery({
@@ -537,19 +531,9 @@ function GuarantorRow({ guarantor, contractId, expanded, onToggle, onRemove, rem
     ),
   });
 
-  const { data: sigDocs = [] } = useQuery({
-    queryKey: ['guarantor-signature', contractId, guarantor.customerId],
-    queryFn: () => apiClient.get<ContractDocument[]>(
-      `/v_contract_documents?contract_id=eq.${contractId}&customer_id=eq.${guarantor.customerId}&doc_type=eq.SIGNATURE_PAD&select=id,file_url`
-    ),
-    enabled: !!contractId,
-  });
-
   const idCard = idCardDocs[0] ?? null;
-  const signature = sigDocs[0] ?? null;
   const hasInfo = !!custInfo?.date_of_birth;
-  // Signature is optional for guarantors — they can sign together with the
-  // lessee in the Documents panel, or by hand on the printed contract.
+  // Guarantor signature is captured in the Documents step, not here.
   const isComplete = hasInfo && !!homeAddress && !!workAddress && !!idCard;
 
   const toggle = (section: string) => setOpenSection(openSection === section ? null : section);
@@ -624,32 +608,10 @@ function GuarantorRow({ guarantor, contractId, expanded, onToggle, onRemove, rem
     } catch {} finally { setUploading(''); }
   };
 
-  const uploadSignature = async (images: UploadedImage[]) => {
-    if (!contractId || images.length === 0 || !guarantor.customerId) return;
-    setUploading('SIGNATURE');
-    try {
-      const results = await uploadFromImage({
-        type: 'contract_signature',
-        image: images[0],
-        params: { contract_id: contractId, customer_id: guarantor.customerId },
-      });
-      const key = results.md?.key ?? results.sm?.key ?? Object.values(results)[0]?.key;
-      if (!key) throw new Error('Upload returned no key');
-      await apiClient.rpc('fn_contract_document_upload', {
-        p_contract_id: contractId, p_doc_type: 'SIGNATURE_PAD', p_file_url: `/${key}`,
-        p_customer_id: guarantor.customerId,
-      });
-      invalidateMediaUrl(key);
-      queryClient.invalidateQueries({ queryKey: ['guarantor-signature', contractId, guarantor.customerId] });
-      queryClient.invalidateQueries({ queryKey: ['guarantor-status'] }); queryClient.invalidateQueries({ queryKey: ['guarantor-all-complete'] });
-      setCacheBust(n => n + 1);
-    } catch {} finally { setUploading(''); }
-  };
-
   return (
-    <div className={`border rounded-lg overflow-hidden ${isComplete ? 'border-success-border' : 'border-warning-border'}`}>
-      {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2.5 cursor-pointer bg-surface-hover/50 hover:bg-surface-hover transition-colors" onClick={onToggle}>
+    <div className="border border-success-border bg-success-soft rounded-lg overflow-hidden transition-colors">
+      {/* Header — accent marks an added guarantor */}
+      <div className="flex items-center gap-2 px-3 py-2.5 cursor-pointer hover:bg-surface-hover transition-colors" onClick={onToggle}>
         {expanded ? <ChevronDown size={14} className="text-subtle shrink-0" /> : <ChevronRight size={14} className="text-subtle shrink-0" />}
         {isComplete
           ? <CheckCircle size={14} className="text-success shrink-0" />
@@ -792,95 +754,11 @@ function GuarantorRow({ guarantor, contractId, expanded, onToggle, onRemove, rem
             )}
           </div>
 
-          {/* Signature — optional. Can also be signed alongside the lessee
-              from the Documents panel, or by hand on the printed contract. */}
-          <div className="px-3">
-            <SectionHeader
-              label={t('workspace.docSignature')}
-              done={!!signature}
-              optional
-              expanded={openSection === 'signature'}
-              onToggle={() => toggle('signature')}
-            />
-            {openSection === 'signature' && (
-              <div className="pt-2 pb-4 flex flex-col gap-2">
-                <p className="text-xs text-subtle leading-relaxed">
-                  {t('workspace.guarantorSigOptionalNote', {
-                    defaultValue:
-                      'Signing now is optional. The guarantor can sign together with the customer from the Documents step, or by hand on the printed contract.',
-                  })}
-                </p>
-                <GuarantorSignatureCard
-                  fileUrl={signature?.file_url ?? null}
-                  cacheBust={cacheBust}
-                  disabled={!contractId}
-                  onClick={() => setSignOpen(true)}
-                />
-              </div>
-            )}
-          </div>
+          {/* Signature is captured in the Documents step (alongside the
+              lessee), not here — see PanelDocuments. */}
         </div>
       )}
-
-      <ContractSignModal
-        open={signOpen}
-        onClose={() => setSignOpen(false)}
-        fileUrl={signature?.file_url ?? null}
-        uploading={uploading === 'SIGNATURE'}
-        onUpload={uploadSignature}
-        disabled={!contractId}
-        cacheBust={cacheBust}
-        onSigned={() => setSignOpen(false)}
-      />
     </div>
   );
 }
 
-function GuarantorSignatureCard({ fileUrl, cacheBust, disabled, onClick }: {
-  fileUrl: string | null;
-  cacheBust: number;
-  disabled: boolean;
-  onClick: () => void;
-}) {
-  const { t } = useTranslation();
-  const { url: displayUrl } = useMediaUrl(fileUrl, cacheBust);
-  const signed = !!fileUrl;
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="group flex flex-col h-40 w-full border border-line rounded-lg overflow-hidden bg-surface hover:border-primary disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-line transition-colors"
-    >
-      <div className="flex items-center justify-between px-3 py-1.5 border-b border-line text-xs">
-        <span className="inline-flex items-center gap-1.5 font-medium text-fg">
-          {signed
-            ? <CheckCircle size={12} className="text-success" />
-            : <span className="w-3 h-3 rounded-full border-2 border-fg/30" />}
-          {t('workspace.docSignature')}
-        </span>
-        <span className="inline-flex items-center gap-1 text-subtle">
-          <PenLine size={12} />
-          {signed ? t('workspace.sigRetake') : t('contract.acceptAndSign', { defaultValue: 'Accept & sign' })}
-        </span>
-      </div>
-      <div className="flex-1 min-h-0 w-full bg-white grid place-items-center overflow-hidden">
-        {signed ? (
-          displayUrl ? (
-            <img
-              key={displayUrl}
-              src={displayUrl}
-              alt=""
-              className="max-w-full max-h-full object-contain p-2"
-            />
-          ) : (
-            <span className="text-xs text-subtle">{t('common.loading')}</span>
-          )
-        ) : (
-          <span className="text-xs text-subtle">{t('workspace.sigNotSignedYet', { defaultValue: 'Not signed yet' })}</span>
-        )}
-      </div>
-    </button>
-  );
-}

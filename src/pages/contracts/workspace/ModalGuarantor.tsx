@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Modal, Input, Select, Button, InputDatePicker } from 'tsp-form';
+import { Modal, Input, Select, Button, InputDatePicker, MaskedInput } from 'tsp-form';
 import { ShieldAlert, CheckCircle, XCircle, Calendar } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
+import { passesThaiCidChecksum } from '../../../lib/ocr/extractIdCard';
 import { toLocalDateStr, parseLocalDate } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
 import { AddressFormPostal } from './AddressFormPostal';
@@ -59,8 +60,17 @@ export function ModalGuarantor({ open, onClose }: Props) {
   const currentAddress = addresses.find(a => a.address_type === 'HOME');
   const workAddress = addresses.find(a => a.address_type === 'WORK');
 
+  // CITIZEN_ID must pass the Thai 13-digit checksum before we hit the backend,
+  // which rejects it as CORE.VALIDATION.INVALID_CITIZEN_ID otherwise.
+  const cidDigits = idNumber.replace(/\D/g, '');
+  const cidValid = idType !== 'CITIZEN_ID' || passesThaiCidChecksum(cidDigits);
+
   const handleRegister = async () => {
     if (!idNumber.trim() || !firstName.trim() || !lastName.trim() || !tel.trim()) return;
+    if (idType === 'CITIZEN_ID' && !passesThaiCidChecksum(cidDigits)) {
+      setApiError(t(cidDigits.length !== 13 ? 'workspace.citizenIdLength' : 'workspace.citizenIdInvalid'));
+      return;
+    }
     setSubmitting(true);
     setApiError('');
 
@@ -142,7 +152,22 @@ export function ModalGuarantor({ open, onClose }: Props) {
               </div>
               <div className="flex flex-col flex-1 min-w-0">
                 <label className="form-label">{t('wizard.idNumber')}</label>
-                <Input value={idNumber} onChange={(e) => setIdNumber(e.target.value)} size="sm" className="w-full" />
+                {idType === 'CITIZEN_ID' ? (
+                  <MaskedInput
+                    mask="#-####-#####-##-#"
+                    value={idNumber}
+                    onChange={(raw) => setIdNumber(raw)}
+                    size="sm"
+                    className="w-full"
+                    endIcon={
+                      cidDigits.length !== 13 ? undefined
+                        : cidValid ? <CheckCircle size={14} className="text-success" />
+                        : <XCircle size={14} className="text-warning-fg" />
+                    }
+                  />
+                ) : (
+                  <Input value={idNumber} onChange={(e) => setIdNumber(e.target.value)} size="sm" className="w-full" />
+                )}
               </div>
             </div>
 
@@ -180,7 +205,7 @@ export function ModalGuarantor({ open, onClose }: Props) {
           </div>
 
           <div className="flex justify-end">
-            <Button color="primary" onClick={handleRegister} disabled={submitting || !idNumber.trim() || !firstName.trim() || !lastName.trim() || !tel.trim()}>
+            <Button color="primary" onClick={handleRegister} disabled={submitting || !idNumber.trim() || !firstName.trim() || !lastName.trim() || !tel.trim() || !cidValid}>
               {submitting ? t('common.saving') : t('wizard.registerCustomer')}
             </Button>
           </div>

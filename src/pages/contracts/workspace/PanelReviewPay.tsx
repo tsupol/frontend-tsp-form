@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Select, MaskedInput, useSnackbarContext } from 'tsp-form';
 import {
-  Star, Plus, Trash2, XCircle, Loader2, CheckCircle,
+  Plus, Trash2, XCircle, Loader2, CheckCircle,
   ChevronsRight, Link2, FileText, Printer, User,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
@@ -16,6 +16,7 @@ import { ERROR_TO_MODAL } from './WorkspaceTypes';
 import { BillReceipt, type BillDetail } from './BillReceipt';
 import { BillCart, type DraftCartLine } from './BillCart';
 import { BranchPinInput } from '../../../components/BranchPinInput';
+import { signContractOpenParties } from './signContractOpenParties';
 
 interface BranchStaffUser {
   id: number;
@@ -46,14 +47,6 @@ const BASE_PAYMENT_METHODS = [
   { value: 'TRANSFER', label: 'Bank Transfer' },
 ];
 
-const SCORE_TOOLTIPS: Record<number, string> = {
-  1: 'workspace.score1',
-  2: 'workspace.score2',
-  3: 'workspace.score3',
-  4: 'workspace.score4',
-  5: 'workspace.score5',
-};
-
 interface ReadinessResult {
   ready: boolean;
   errors: Array<{ code: string; detail?: Record<string, unknown> }>;
@@ -63,50 +56,9 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { data, updateData, contract, invalidateContract, setOpenModal } = useWorkspace();
-  const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
 
   const savingBalance = contract?.saving_balance ?? 0;
-
-  // ── Confidence score (UI gate for Confirm only) ──────────────────────
-  const [pendingScore, setPendingScore] = useState<number | null>(null);
-  const serverScore = contract?.staff_confidence_score ?? null;
-  const score = pendingScore ?? serverScore;
-  useEffect(() => {
-    if (serverScore != null && serverScore === pendingScore) setPendingScore(null);
-  }, [serverScore, pendingScore]);
-
-  const [scoreSaving, setScoreSaving] = useState(false);
-  const [scoreError, setScoreError] = useState('');
-  const [hoverStar, setHoverStar] = useState(0);
-
-  const handleSetScore = async (n: number) => {
-    if (!data.contractId) return;
-    setScoreSaving(true);
-    setScoreError('');
-    setPendingScore(n);
-    try {
-      await apiClient.rpc('fn_contract_set_staff_confidence_score', {
-        p_contract_id: data.contractId,
-        p_score: n,
-      });
-      invalidateContract();
-      // Readiness check depends on the score — refetch it now so the
-      // blocker alert + Confirm gate update immediately.
-      queryClient.invalidateQueries({ queryKey: ['contract-readiness', data.contractId] });
-    } catch (err) {
-      setPendingScore(null);
-      if (err instanceof ApiError) {
-        const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
-        setScoreError(tr || err.message);
-      } else {
-        setScoreError(String(err));
-      }
-    } finally {
-      setScoreSaving(false);
-    }
-  };
 
   // ── Readiness check (read-only — DOES NOT open the bill) ─────────────
   // fn_contract_validate_ready is pure: it returns blockers and never
@@ -385,7 +337,29 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
         }
       }
 
-      // 3. Record payments.
+      // 3. Bind signatures to the auto-created CONTRACT_OPEN snapshot. Opening
+      //    the bill creates a COLLECTING FULL_CONTRACT snapshot whose parties
+      //    (LESSEE + guarantors + lessor + 2 witnesses) all start unsigned.
+      //    The contract only activates once PAID *and* SEALED, so we sign every
+      //    required party here from the already-captured signatures (customer
+      //    SIGNATURE_PAD docs + branch signatory media). Without this the bill
+      //    pays but the contract stays "paid, awaiting signature".
+      if (contract?.holding_id != null) {
+        const signRes = await signContractOpenParties(data.contractId, contract.holding_id);
+        if (signRes.unsigned.length > 0) {
+          const who = signRes.unsigned
+            .map(u => u.name || t(`signing.role_${u.role}`, { defaultValue: u.role }))
+            .join(', ');
+          throw new Error(
+            t('wizard.signMissingSignatures', {
+              defaultValue: 'Cannot activate — missing signature for: {{who}}',
+              who,
+            }),
+          );
+        }
+      }
+
+      // 4. Record payments.
       for (const payment of payments) {
         await apiClient.rpc('fn_bill_payment_add', {
           p_bill_id: bill.bill_id,
@@ -395,7 +369,7 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
         });
       }
 
-      // 4. Confirm — server cascades to ACTIVE.
+      // 5. Confirm — server cascades to ACTIVE (paid + sealed).
       await apiClient.rpc('fn_bill_payment_confirm', {
         p_bill_id: bill.bill_id,
         p_contract_id: data.contractId,
@@ -603,41 +577,8 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
           </div>
         </div>
 
-        {/* ── Section 3: Confidence score (Confirm gate) ───────── */}
-        <div>
-          <div className="text-sm font-medium mb-3">{t('workspace.confidenceLabel')}</div>
-          <div className="flex items-center gap-1" onMouseLeave={() => setHoverStar(0)}>
-            {[1, 2, 3, 4, 5].map(n => {
-              const filled = n <= (hoverStar || score || 0);
-              return (
-                <button
-                  key={n}
-                  className="p-1 cursor-pointer bg-transparent border-none transition-transform hover:scale-110"
-                  onClick={() => handleSetScore(n)}
-                  onMouseEnter={() => setHoverStar(n)}
-                  disabled={scoreSaving}
-                  title={t(SCORE_TOOLTIPS[n])}
-                >
-                  <Star size={28} className={filled ? 'text-warning-fg fill-warning' : 'text-fg/20'} />
-                </button>
-              );
-            })}
-            {scoreSaving && <Loader2 size={16} className="animate-spin text-subtle ml-2" />}
-          </div>
-
-          {(hoverStar > 0 || score) && (
-            <div className="text-xs text-subtle mt-1.5">
-              {t(SCORE_TOOLTIPS[hoverStar || score || 3])}
-            </div>
-          )}
-
-          {scoreError && (
-            <div className="alert alert-danger mt-2">
-              <XCircle size={14} />
-              <span>{scoreError}</span>
-            </div>
-          )}
-        </div>
+        {/* Confidence score moved to the Documents step (it's a readiness
+            prerequisite, surfaced there with the other missing-field items). */}
 
         {/* ── Confirm error ────────────────────────────────────── */}
         {error && (

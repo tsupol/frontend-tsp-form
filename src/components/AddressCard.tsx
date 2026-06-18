@@ -27,7 +27,7 @@ interface AddressCardProps {
 export function AddressCard({ label, address, onEdit, disabled, emptyHint, optional }: AddressCardProps) {
   const { t } = useTranslation();
   return (
-    <div className={`mb-3 px-3 py-2.5 rounded-md bg-surface border border-line ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
+    <div className={`mb-3 px-3 py-2.5 rounded-md border transition-colors ${address ? 'border-success-border bg-success-soft' : 'bg-surface border-line'} ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
       <div className="flex items-center justify-between mb-1">
         <span className="text-sm font-medium flex items-center gap-1.5">
           <MapPin size={13} className="text-subtle" />

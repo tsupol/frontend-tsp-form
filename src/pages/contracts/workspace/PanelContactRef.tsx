@@ -95,7 +95,7 @@ function ContactRow({ contact, onDeleted }: { contact: CustomerContact; onDelete
   const [deleting, setDeleting] = useState(false);
   const handleDelete = async () => { setDeleting(true); try { await apiClient.rpc('fn_customer_contact_delete', { p_id: contact.id }); onDeleted(); } catch {} finally { setDeleting(false); } };
   return (
-    <div className="flex items-center gap-2 px-3 py-2 border border-success-border rounded-lg text-sm">
+    <div className="flex items-center gap-2 px-3 py-2 border border-success-border bg-success-soft rounded-lg text-sm">
       <Badge size="xs" color="info">{contact.contact_type}</Badge>
       <span className="tabular-nums flex-1">{contact.value}</span>
       {contact.is_primary && <Star size={12} className="text-warning-fg fill-warning shrink-0" />}
@@ -117,7 +117,7 @@ function ReferenceRow({ reference, onDeleted }: { reference: CustomerReference; 
     } catch {} finally { setDeleting(false); }
   };
   return (
-    <div className="border border-success-border rounded-lg overflow-hidden">
+    <div className="border border-success-border bg-success-soft rounded-lg overflow-hidden transition-colors">
       <div className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-surface-hover transition-colors" onClick={() => setExpanded(!expanded)}>
         {expanded ? <ChevronDown size={14} className="text-subtle shrink-0" /> : <ChevronRight size={14} className="text-subtle shrink-0" />}
         <span className="font-medium text-sm flex-1 truncate">{reference.name} {reference.last_name}</span>

@@ -123,10 +123,10 @@ export function PanelSaving({ onClose: _onClose }: Props) {
   return (
     <div className="p-4 flex flex-col">
       {/* ── Saving Setup ─────────────────────────────────────────────── */}
-        <div className={`rounded-lg px-4 py-3 border mb-4 ${balance > 0 ? 'border-info-border bg-info/5' : 'border-line bg-surface'}`}>
+        <div className={`rounded-lg px-4 py-3 border mb-4 transition-colors ${balance > 0 ? 'border-success-border bg-success-soft' : 'border-line bg-surface'}`}>
           <div className="text-xs text-subtle mb-1">{t('workspace.savingCurrentBalance')}</div>
           <div className="flex items-center gap-2">
-            <PiggyBank size={18} className={balance > 0 ? 'text-info' : 'text-fg/30'} />
+            <PiggyBank size={18} className={balance > 0 ? 'text-success' : 'text-fg/30'} />
             <span className="text-xl font-semibold tabular-nums">{fmtCurrency(balance)}</span>
           </div>
           {savingTarget > 0 && balance > 0 && (

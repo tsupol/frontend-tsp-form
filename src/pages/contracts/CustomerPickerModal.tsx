@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Modal, Button, Input, Select, MaskedInput, InputDatePicker } from 'tsp-form';
 import { Search, Loader2, CheckCircle, XCircle, Keyboard } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import { passesThaiCidChecksum } from '../../lib/ocr/extractIdCard';
 import { toLocalDateStr, parseLocalDate, makeDatePickerFormat } from '../../lib/format';
 
 const ID_TYPE_OPTIONS = [
@@ -81,7 +82,11 @@ export function CustomerPickerModal({ open, title, excludeCustomerIds = [], onCl
 
   const canSearch = !!(idNumber.trim() || firstName.trim() || lastName.trim());
   const isExisting = !!selected;
-  const canRegisterAndPick = !!idNumber.trim() && !!firstName.trim() && !!lastName.trim() && !!tel.trim() && !!dateOfBirth;
+  // CITIZEN_ID must pass the Thai 13-digit checksum before we register — the
+  // backend rejects it as CORE.VALIDATION.INVALID_CITIZEN_ID otherwise.
+  const cidDigits = idNumber.replace(/\D/g, '');
+  const cidValid = !!selected || idType !== 'CITIZEN_ID' || passesThaiCidChecksum(cidDigits);
+  const canRegisterAndPick = !!idNumber.trim() && !!firstName.trim() && !!lastName.trim() && !!tel.trim() && !!dateOfBirth && cidValid;
 
   const handleSearch = async () => {
     setSearching(true); setHasSearched(true); setError('');
@@ -138,8 +143,10 @@ export function CustomerPickerModal({ open, title, excludeCustomerIds = [], onCl
       await submitWithCustomer(selected.id, selected.full_name);
       return;
     }
-    if (idType === 'CITIZEN_ID' && idNumber.replace(/\D/g, '').length !== 13) {
-      setError(t('workspace.citizenIdLength', { defaultValue: 'Citizen ID must be 13 digits' }));
+    if (idType === 'CITIZEN_ID' && !passesThaiCidChecksum(cidDigits)) {
+      setError(cidDigits.length !== 13
+        ? t('workspace.citizenIdLength', { defaultValue: 'Citizen ID must be 13 digits' })
+        : t('workspace.citizenIdInvalid', { defaultValue: 'Invalid citizen ID — checksum does not match' }));
       return;
     }
     if (!canRegisterAndPick) return;
@@ -203,7 +210,20 @@ export function CustomerPickerModal({ open, title, excludeCustomerIds = [], onCl
               <div className="flex flex-col flex-1 min-w-0">
                 <label className="form-label">{t('wizard.idNumber')}</label>
                 {idType === 'CITIZEN_ID' ? (
-                  <MaskedInput mask="#-####-#####-##-#" placeholder="" value={idNumber} onChange={(raw) => setIdNumber(raw)} size="sm" className="w-full" disabled={!!selected} />
+                  <MaskedInput
+                    mask="#-####-#####-##-#"
+                    placeholder=""
+                    value={idNumber}
+                    onChange={(raw) => setIdNumber(raw)}
+                    size="sm"
+                    className="w-full"
+                    disabled={!!selected}
+                    endIcon={
+                      selected || cidDigits.length !== 13 ? undefined
+                        : passesThaiCidChecksum(cidDigits) ? <CheckCircle size={14} className="text-success" />
+                        : <XCircle size={14} className="text-warning-fg" />
+                    }
+                  />
                 ) : (
                   <Input value={idNumber} onChange={(e) => setIdNumber(e.target.value)} size="sm" className="w-full" disabled={!!selected} />
                 )}

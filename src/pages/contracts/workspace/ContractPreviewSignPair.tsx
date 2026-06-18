@@ -41,6 +41,10 @@ interface Props {
   // the preview + signature cards — the document can't be previewed or signed
   // until these are filled.
   notReadyErrors?: ReadinessError[];
+  // Signature is optional for this party (e.g. guarantor — can sign by hand on
+  // the printed contract). Drops the "pending" empty-circle indicator so the
+  // unsigned state doesn't read as a blocking requirement.
+  signatureOptional?: boolean;
 }
 
 export function ContractPreviewSignPair({
@@ -53,6 +57,7 @@ export function ContractPreviewSignPair({
   pairLabel,
   signCardLabel,
   notReadyErrors,
+  signatureOptional = false,
 }: Props) {
   const { t } = useTranslation();
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -69,9 +74,16 @@ export function ContractPreviewSignPair({
       <div className="flex items-center gap-2 mb-1">
         {fileUrl
           ? <CheckCircle size={14} className="text-success" />
-          : <span className="w-3.5 h-3.5 rounded-full border-2 border-fg/30" />}
-        <ScrollText size={14} />
+          : signatureOptional
+            ? <ScrollText size={14} className="text-subtle" />
+            : <span className="w-3.5 h-3.5 rounded-full border-2 border-fg/30" />}
+        {!signatureOptional && <ScrollText size={14} />}
         <label className="form-label mb-0">{resolvedPairLabel}</label>
+        {signatureOptional && !fileUrl && (
+          <span className="ml-auto text-xs font-normal text-subtle">
+            ({t('common.optional', { defaultValue: 'optional' })})
+          </span>
+        )}
       </div>
       {notReady ? (
         // Not ready to render the document — show WHY (BE readiness codes)
