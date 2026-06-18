@@ -67,6 +67,17 @@ export function useNavCounts() {
   });
   const pendingPairingCount = pairingCountData?.totalCount ?? 0;
 
+  const { data: pendingSignData } = useQuery({
+    queryKey: ['nav', 'pending-sign-count', sk],
+    queryFn: () => apiClient.getPaginated<{ contract_id: number }>(
+      `/v_branch_action_required?action_type=eq.PENDING_SIGN&select=contract_id${sq}`,
+      { page: 1, pageSize: 1 },
+    ),
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+  });
+  const pendingSignCount = pendingSignData?.totalCount ?? 0;
+
   const { data: savingCountData } = useQuery({
     queryKey: ['nav', 'saving-contracts-count', sk],
     queryFn: () => apiClient.getPaginated<{ id: number }>(
@@ -163,6 +174,7 @@ export function useNavCounts() {
     pendingSlips,
     unclosedCount,
     pendingPairingCount,
+    pendingSignCount,
     savingContractsCount,
     draftContractsCount,
     pendingPaymentCount,

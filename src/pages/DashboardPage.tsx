@@ -16,6 +16,7 @@ import {
   CalendarX,
   XCircle,
   Smartphone,
+  PenLine,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../lib/api';
 import { fmtCurrency } from '../lib/format';
@@ -68,6 +69,17 @@ interface PendingDeviceBindRow {
   model_name: string | null;
   branch_name: string | null;
   days_pending: number;
+}
+
+// v_branch_action_required, filtered to action_type=PENDING_SIGN — contracts
+// with a contract_signing batch still in COLLECTING. deadline = MIN(expires_at)
+// of the COLLECTING batches. One row per contract. No expiry sweep on the BE
+// yet, so a past deadline still shows here as COLLECTING — flag it client-side.
+interface PendingSignRow {
+  contract_id: number;
+  contract_code_display: string;
+  customer_name: string | null;
+  deadline: string | null;
 }
 
 // Today rollup — superset of fields across branch/company/holding views.
@@ -203,6 +215,21 @@ export function DashboardPage() {
   const deviceBindRows = deviceBindQuery.data?.data ?? [];
   const deviceBindMaxDays = deviceBindRows[0]?.days_pending ?? 0;
 
+  // ── Pending tasks: contracts awaiting signature (PENDING_SIGN) ────────
+  // Same one-round-trip pattern: totalCount for the headline + first few rows
+  // ordered by soonest deadline for an inline preview.
+  const pendingSignQuery = useQuery({
+    queryKey: ['dashboard', 'pending-sign', sk],
+    queryFn: () =>
+      apiClient.getPaginated<PendingSignRow>(
+        `/v_branch_action_required?action_type=eq.PENDING_SIGN&select=contract_id,contract_code_display,customer_name,deadline&order=deadline.asc.nullslast${sq}`,
+        { page: 1, pageSize: 5 },
+      ),
+    refetchInterval: 60_000,
+  });
+  const pendingSignCount = pendingSignQuery.data?.totalCount ?? 0;
+  const pendingSignRows = pendingSignQuery.data?.data ?? [];
+
   // ── Same-day-last-week comparison for the Income card delta ──────────
   // Sum expected_amount across whatever close rows fall under our scope on that day.
   const lastWeekDate = useMemo(() => {
@@ -332,7 +359,7 @@ export function DashboardPage() {
                 error={approvalsQuery.error}
                 subtitle={
                   (approvalsRow?.pending_count ?? 0) > 0
-                    ? fmtCurrency(approvalsRow!.pending_amount)
+                    ? t('dashboard.amountTotal', { amount: fmtCurrency(approvalsRow!.pending_amount) })
                     : undefined
                 }
                 to="/admin/approvals"
@@ -349,7 +376,7 @@ export function DashboardPage() {
               error={submissionsQuery.error}
               subtitle={
                 (submissionsRow?.pending_count ?? 0) > 0
-                  ? fmtCurrency(submissionsRow!.pending_amount)
+                  ? t('dashboard.amountTotal', { amount: fmtCurrency(submissionsRow!.pending_amount) })
                   : undefined
               }
               to="/admin/payment-submissions"
@@ -365,7 +392,7 @@ export function DashboardPage() {
               error={reconQuery.error}
               subtitle={
                 (reconRow?.mismatch_count ?? 0) > 0
-                  ? fmtCurrency(reconRow!.mismatch_amount)
+                  ? t('dashboard.amountTotal', { amount: fmtCurrency(reconRow!.mismatch_amount) })
                   : undefined
               }
               to="/admin/accounting/bills"
@@ -376,18 +403,33 @@ export function DashboardPage() {
         </section>
 
         {/* ── Pending tasks ─────────────────────────────────────────────── */}
-        {!deviceBindQuery.isError && (deviceBindQuery.isLoading || deviceBindCount > 0) && (
+        {/* Always render both cards (zero shows a green-check empty state, like
+            the action band) — hiding a card on zero looked broken next to the
+            always-on action cards. Skip only on a hard query error. */}
+        {(!pendingSignQuery.isError || !deviceBindQuery.isError) && (
           <section className="mb-6">
             <h2 className="text-sm font-semibold text-subtle mb-3 uppercase tracking-wide">
               {t('dashboard.pendingTasks')}
             </h2>
-            <PendingDeviceBindCard
-              count={deviceBindCount}
-              maxDays={deviceBindMaxDays}
-              rows={deviceBindRows}
-              isLoading={deviceBindQuery.isLoading}
-              t={t}
-            />
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+              {!pendingSignQuery.isError && (
+                <PendingSignCard
+                  count={pendingSignCount}
+                  rows={pendingSignRows}
+                  isLoading={pendingSignQuery.isLoading}
+                  t={t}
+                />
+              )}
+              {!deviceBindQuery.isError && (
+                <PendingDeviceBindCard
+                  count={deviceBindCount}
+                  maxDays={deviceBindMaxDays}
+                  rows={deviceBindRows}
+                  isLoading={deviceBindQuery.isLoading}
+                  t={t}
+                />
+              )}
+            </div>
           </section>
         )}
 
@@ -566,21 +608,18 @@ function CountCard({ icon, title, count, isLoading, isError, error, subtitle, to
       </div>
     );
   } else {
-    body = (
-      <>
-        <div className="flex items-baseline gap-2 mb-1">
-          <span className="text-2xl font-semibold tabular-nums">{count}</span>
-          {subtitle && count > 0 && (
-            <span className="text-xs text-subtle tabular-nums truncate">{subtitle}</span>
-          )}
-        </div>
-        {count === 0 && (
-          <div className="text-xs text-subtle flex items-center gap-1">
-            <CheckCircle2 size={14} className="text-success" />
-            {emptyText}
-          </div>
+    body = count === 0 ? (
+      <div className="text-sm text-subtle flex items-center gap-1.5 min-h-9">
+        <CheckCircle2 size={16} className="text-success" />
+        {emptyText}
+      </div>
+    ) : (
+      <div className="flex items-baseline gap-2 mb-1">
+        <span className="text-2xl font-semibold tabular-nums">{count}</span>
+        {subtitle && (
+          <span className="text-xs text-subtle tabular-nums truncate">{subtitle}</span>
         )}
-      </>
+      </div>
     );
   }
 
@@ -617,16 +656,20 @@ function PendingDeviceBindCard({
   isLoading: boolean;
   t: (k: string, opts?: Record<string, unknown>) => string;
 }) {
-  const tone = maxDays >= 7 ? 'danger' : 'warning';
+  const isEmpty = !isLoading && count === 0;
+  const tone = isEmpty ? 'ok' : maxDays >= 7 ? 'danger' : 'warning';
   const toneClass =
     tone === 'danger'
       ? 'border-danger-border bg-danger/5'
-      : 'border-warning-border bg-warning/5';
-  const iconColor = tone === 'danger' ? 'text-danger' : 'text-warning-fg';
+      : tone === 'warning'
+        ? 'border-warning-border bg-warning/5'
+        : 'border-line bg-surface';
+  const iconColor =
+    tone === 'danger' ? 'text-danger' : tone === 'warning' ? 'text-warning-fg' : 'text-success';
 
   return (
     <Link
-      to="/admin/contracts/search"
+      to="/admin/contracts/pending-pairing"
       className={`block border ${toneClass} rounded-lg p-4 hover:shadow-sm transition-shadow no-underline text-current`}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
@@ -636,14 +679,21 @@ function PendingDeviceBindCard({
         </div>
         <ChevronRight size={16} className="text-subtle" />
       </div>
-      <div className="flex items-baseline gap-2 mb-3">
-        <span className="text-2xl font-semibold tabular-nums">{isLoading ? '—' : count}</span>
-        {!isLoading && maxDays > 0 && (
-          <span className="text-xs text-subtle tabular-nums">
-            {t('dashboard.overdueDays', { count: maxDays })}
-          </span>
-        )}
-      </div>
+      {isEmpty ? (
+        <div className="text-sm text-subtle flex items-center gap-1.5 min-h-9">
+          <CheckCircle2 size={16} className="text-success" />
+          {t('dashboard.noPendingDeviceBind')}
+        </div>
+      ) : (
+        <div className="flex items-baseline gap-2 mb-3">
+          <span className="text-2xl font-semibold tabular-nums">{isLoading ? '—' : count}</span>
+          {!isLoading && maxDays > 0 && (
+            <span className="text-xs text-subtle tabular-nums">
+              {t('dashboard.overdueDays', { count: maxDays })}
+            </span>
+          )}
+        </div>
+      )}
       {rows.length > 0 && (
         <ul className="divide-y divide-line border-t border-line">
           {rows.map((r) => (
@@ -665,6 +715,102 @@ function PendingDeviceBindCard({
         </ul>
       )}
     </Link>
+  );
+}
+
+// Card for "contracts awaiting signature" (PENDING_SIGN). There's no single
+// list page for this action_type, so the card itself isn't a link — each
+// preview row deep-links to that contract's signing tab instead. Tone turns
+// danger when any previewed deadline is already past — there's no BE expiry
+// sweep, so an overdue COLLECTING batch lingers here and should read as urgent.
+function PendingSignCard({
+  count,
+  rows,
+  isLoading,
+  t,
+}: {
+  count: number;
+  rows: PendingSignRow[];
+  isLoading: boolean;
+  t: (k: string, opts?: Record<string, unknown>) => string;
+}) {
+  const now = Date.now();
+  const daysUntil = (iso: string | null): number | null => {
+    if (!iso) return null;
+    return Math.ceil((new Date(iso).getTime() - now) / 86_400_000);
+  };
+  const isEmpty = !isLoading && count === 0;
+  // Soonest deadline drives the headline + tone (rows are deadline.asc).
+  const soonest = rows[0]?.deadline ?? null;
+  const soonestDays = daysUntil(soonest);
+  const anyExpired = rows.some((r) => {
+    const d = daysUntil(r.deadline);
+    return d !== null && d < 0;
+  });
+  const tone = isEmpty ? 'ok' : anyExpired ? 'danger' : 'warning';
+  const toneClass =
+    tone === 'danger'
+      ? 'border-danger-border bg-danger/5'
+      : tone === 'warning'
+        ? 'border-warning-border bg-warning/5'
+        : 'border-line bg-surface';
+  const iconColor =
+    tone === 'danger' ? 'text-danger' : tone === 'warning' ? 'text-warning-fg' : 'text-success';
+
+  const deadlineLabel = (iso: string | null): string | null => {
+    const d = daysUntil(iso);
+    if (d === null) return null;
+    return d < 0 ? t('dashboard.signExpired') : t('dashboard.expiresInDays', { n: d });
+  };
+
+  return (
+    <div className={`border ${toneClass} rounded-lg p-4`}>
+      <div className="flex items-center gap-2 mb-2">
+        <PenLine size={20} className={iconColor} />
+        <h3 className="text-sm font-semibold">{t('dashboard.pendingSign')}</h3>
+      </div>
+      {isEmpty ? (
+        <div className="text-sm text-subtle flex items-center gap-1.5 min-h-9">
+          <CheckCircle2 size={16} className="text-success" />
+          {t('dashboard.noPendingSign')}
+        </div>
+      ) : (
+        <div className="flex items-baseline gap-2 mb-3">
+          <span className="text-2xl font-semibold tabular-nums">{isLoading ? '—' : count}</span>
+          {!isLoading && soonestDays !== null && (
+            <span className={`text-xs tabular-nums ${anyExpired ? 'text-danger' : 'text-subtle'}`}>
+              {deadlineLabel(soonest)}
+            </span>
+          )}
+        </div>
+      )}
+      {rows.length > 0 && (
+        <ul className="divide-y divide-line border-t border-line">
+          {rows.map((r) => {
+            const label = deadlineLabel(r.deadline);
+            const rowExpired = (daysUntil(r.deadline) ?? 0) < 0;
+            return (
+              <li key={r.contract_id}>
+                <Link
+                  to={`/admin/contracts/search/${r.contract_id}?tab=signing`}
+                  className="py-1.5 flex items-center justify-between gap-3 text-sm no-underline text-current hover:text-primary-fg"
+                >
+                  <span className="truncate min-w-0">
+                    <span className="font-medium">{r.contract_code_display}</span>
+                    {r.customer_name && <span className="text-subtle"> · {r.customer_name}</span>}
+                  </span>
+                  {label && (
+                    <span className={`text-xs tabular-nums whitespace-nowrap ${rowExpired ? 'text-danger' : 'text-subtle'}`}>
+                      {label}
+                    </span>
+                  )}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
   );
 }
 
