@@ -1,7 +1,8 @@
 // Fullscreen modal that shows the contract PDF (server-rendered by misc-go)
 // in an iframe for staff to show the customer before signing/printing.
-// Same endpoint as the print flow, with `preview: true` so the server omits
-// the lessee signature — that's the only difference between preview and print.
+// Sends `preview` = whether the lessee is still unsigned: while unsigned the
+// server omits the lessee signature (the "show the customer before they sign"
+// flow); once the lessee has signed, the signed document is shown in full.
 
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -45,10 +46,14 @@ export function ContractPreviewModal({ open, onClose, contract, onAcceptAndSign 
         const input = await buildContractRenderData(contract);
         if (cancelled) return;
         setContractCode(input.contractCode);
+        // preview=true tells the server to omit the lessee signature (the
+        // "show the customer before they sign" flow). Once the lessee has
+        // actually signed, show it — i.e. preview only while unsigned.
+        const previewMode = !input.lesseeSignatureDataUrl;
         const res = await fetch(`${config.uploadUrl}/contract/pdf`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...input, preview: true }),
+          body: JSON.stringify({ ...input, preview: previewMode }),
         });
         if (!res.ok) {
           let detail = '';

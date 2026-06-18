@@ -19,17 +19,15 @@ export function CardGuarantor({ onEdit, active, shake }: { onEdit?: () => void; 
 
   const contractId = contract?.id ?? null;
 
-  // Check guarantor completeness — addresses, ID card, signature
+  // Check guarantor completeness — addresses, ID card. Signature is captured
+  // in the Documents step (not here), so it's NOT part of this card's status.
   const { data: guarantorStatus } = useQuery({
     queryKey: ['guarantor-status', contractId, guarantors.map(g => g.customerId).join(',')],
     queryFn: async () => {
       const results = await Promise.all(guarantors.map(async (g) => {
-        const [addrs, idCard, sig, custInfo] = await Promise.all([
+        const [addrs, idCard, custInfo] = await Promise.all([
           apiClient.get<Array<{ address_type: string }>>(`/v_customer_addresses?customer_id=eq.${g.customerId}&select=address_type`).catch(() => []),
           apiClient.get<Array<{ id: number }>>(`/v_customer_documents?customer_id=eq.${g.customerId}&doc_type=eq.ID_CARD_FRONT&is_active=eq.true&select=id`).catch(() => []),
-          contractId
-            ? apiClient.get<Array<{ id: number }>>(`/v_contract_documents?contract_id=eq.${contractId}&customer_id=eq.${g.customerId}&doc_type=eq.SIGNATURE_PAD&select=id`).catch(() => [])
-            : [],
           apiClient.get<Array<{ date_of_birth: string | null }>>(`/v_customers?id=eq.${g.customerId}&select=date_of_birth`).catch(() => []),
         ]);
         return {
@@ -38,7 +36,6 @@ export function CardGuarantor({ onEdit, active, shake }: { onEdit?: () => void; 
           hasHome: addrs.some(a => a.address_type === 'HOME'),
           hasWork: addrs.some(a => a.address_type === 'WORK'),
           hasIdCard: idCard.length > 0,
-          hasSignature: sig.length > 0,
         };
       }));
       return results;
@@ -47,7 +44,7 @@ export function CardGuarantor({ onEdit, active, shake }: { onEdit?: () => void; 
     staleTime: 0,
   });
 
-  const allGuarantorsComplete = guarantorStatus?.every(g => g.hasInfo && g.hasHome && g.hasWork && g.hasIdCard && g.hasSignature) ?? false;
+  const allGuarantorsComplete = guarantorStatus?.every(g => g.hasInfo && g.hasHome && g.hasWork && g.hasIdCard) ?? false;
 
   const status = !hasCustomer ? 'locked' as const
     : needsGuarantor && !hasGuarantors ? 'warning' as const
@@ -75,13 +72,12 @@ export function CardGuarantor({ onEdit, active, shake }: { onEdit?: () => void; 
         <div className="flex flex-col gap-1.5">
           {guarantors.map(g => {
             const gs = guarantorStatus?.find(s => s.customerId === g.customerId);
-            const complete = gs ? (gs.hasInfo && gs.hasHome && gs.hasWork && gs.hasIdCard && gs.hasSignature) : false;
+            const complete = gs ? (gs.hasInfo && gs.hasHome && gs.hasWork && gs.hasIdCard) : false;
             const missing: string[] = [];
             if (gs && !gs.hasInfo) missing.push(t('customer.basicInfo'));
             if (gs && !gs.hasHome) missing.push(t('workspace.addressHome'));
             if (gs && !gs.hasWork) missing.push(t('workspace.addressWork'));
             if (gs && !gs.hasIdCard) missing.push(t('workspace.docIdPhoto'));
-            if (gs && !gs.hasSignature) missing.push(t('workspace.docSignature'));
             return (
               <div key={g.customerId}>
                 <div className="flex items-center gap-2 text-sm">

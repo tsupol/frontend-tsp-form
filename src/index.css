@@ -16,7 +16,7 @@
     --color-success-fade: #6ee7b7;
     --color-success-contrast: #ffffff;
     --color-success-border: rgba(16, 185, 129, 0.35);
-    --color-success-soft: color-mix(in srgb, var(--color-success) 15%, var(--color-bg));
+    --color-success-soft: color-mix(in srgb, var(--color-success) 8%, var(--color-bg));
 
     --color-warning: #f59e0b;
     --color-warning-hover: #fbbf24;
@@ -273,6 +273,10 @@
     --color-line: rgba(0, 0, 0, 0.15);
     --color-line-subtle: rgba(0, 0, 0, 0.12);
     --color-link: #1d4ed8;
+
+    /* Soft fills read lighter on the bright bg — keep the fuller mix here.
+       The @theme (dark) default is toned down to 8% so it isn't too opaque. */
+    --color-success-soft: color-mix(in srgb, var(--color-success) 15%, var(--color-bg));
 
     --color-surface: #f9f9fb;
     --color-surface-hover: #e8e8ec;

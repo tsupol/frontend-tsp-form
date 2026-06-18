@@ -1,56 +1,36 @@
 import { useTranslation } from 'react-i18next';
-import { Star, CreditCard } from 'lucide-react';
+import { CreditCard } from 'lucide-react';
 import { fmtCurrency } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
+import { SummaryCard } from './SummaryCard';
 
 export function CardReviewPay({ onEdit, active, disabled }: { onEdit?: () => void; active?: boolean; disabled?: boolean }) {
   const { t } = useTranslation();
   const { contract } = useWorkspace();
 
-  const score = contract?.staff_confidence_score;
   const downPayment = contract?.down_payment ?? 0;
   const insuranceDeposit = contract?.insurance_deposit ?? 0;
   const total = downPayment + insuranceDeposit;
-  const clickable = !!onEdit && !disabled && !active;
 
   return (
-    <div
-      className={`border rounded-lg transition-colors ${
-        disabled ? 'border-line-subtle bg-surface/50 opacity-50' :
-        active ? 'border-warning bg-warning/10' :
-        'border-warning-border bg-warning/5 hover:border-warning cursor-pointer'
-      }`}
-      onClick={clickable ? onEdit : undefined}
-      role={clickable ? 'button' : undefined}
-      tabIndex={clickable ? 0 : undefined}
-      onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') onEdit?.(); } : undefined}
+    <SummaryCard
+      title={t('workspace.cardReviewPay')}
+      status={disabled ? 'locked' : 'warning'}
+      icon={<CreditCard size={16} className="text-warning-fg shrink-0" />}
+      onEdit={disabled ? undefined : onEdit}
+      active={active}
+      disabled={disabled}
     >
-      <div className="flex items-center gap-2 px-4 py-3">
-        <CreditCard size={16} className="text-warning-fg shrink-0" />
-        <span className="font-medium text-sm flex-1">{t('workspace.cardReviewPay')}</span>
-      </div>
-      <div className="px-4 pb-3 text-sm flex flex-col gap-1.5">
-        {/* Confidence score */}
+      {disabled ? (
+        <div className="text-subtle text-xs">{t('workspace.needsDraft')}</div>
+      ) : total > 0 ? (
         <div className="flex items-center gap-2">
-          <span className="text-xs text-subtle">{t('workspace.confidence')}</span>
-          {score ? (
-            <div className="flex items-center gap-0.5">
-              {[1, 2, 3, 4, 5].map(n => (
-                <Star key={n} size={12} className={n <= score ? 'text-warning-fg fill-warning' : 'text-fg/15'} />
-              ))}
-            </div>
-          ) : (
-            <span className="text-xs text-warning-fg">{t('workspace.notRated')}</span>
-          )}
+          <span className="text-xs text-subtle">{t('workspace.total')}</span>
+          <span className="text-xs font-medium tabular-nums">{fmtCurrency(total)}</span>
         </div>
-        {/* Bill preview */}
-        {total > 0 && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-subtle">{t('workspace.total')}</span>
-            <span className="text-xs font-medium tabular-nums">{fmtCurrency(total)}</span>
-          </div>
-        )}
-      </div>
-    </div>
+      ) : (
+        <div className="text-subtle text-xs">{t('workspace.reviewPayHint', { defaultValue: 'Review and confirm to activate' })}</div>
+      )}
+    </SummaryCard>
   );
 }

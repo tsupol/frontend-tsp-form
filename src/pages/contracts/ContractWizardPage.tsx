@@ -381,22 +381,26 @@ function WorkspaceContent() {
               {/* Left panel — Summary cards */}
               <PageNavPanel id="summary" className={isMobile ? '' : 'w-5/12 xl:w-4/12 border-r border-line flex flex-col'}>
                 <div className="flex-1 overflow-y-auto better-scroll">
-                  <div className="p-4 flex flex-col gap-3">
-                    {/* Draft error */}
-                    {data.draftError && (
-                      <div className="alert alert-danger">
-                        <XCircle size={18} />
-                        <div><div className="alert-description">{data.draftError}</div></div>
-                      </div>
-                    )}
+                  {/* Status messages — padded */}
+                  {(data.draftError || data.draftCreating) && (
+                    <div className="p-4 pb-0 flex flex-col gap-3">
+                      {data.draftError && (
+                        <div className="alert alert-danger">
+                          <XCircle size={18} />
+                          <div><div className="alert-description">{data.draftError}</div></div>
+                        </div>
+                      )}
+                      {data.draftCreating && (
+                        <div className="flex items-center gap-2 text-sm text-subtle px-1">
+                          <Loader2 size={14} className="animate-spin" />
+                          <span>{t('workspace.creatingDraft')}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
-                    {data.draftCreating && (
-                      <div className="flex items-center gap-2 text-sm text-subtle px-1">
-                        <Loader2 size={14} className="animate-spin" />
-                        <span>{t('workspace.creatingDraft')}</span>
-                      </div>
-                    )}
-
+                  {/* Summary rows — full-width, separated by lines (no card chrome) */}
+                  <div className="flex flex-col border-t border-line">
                     <CardCustomer onEdit={() => handleEditOpen('customer')} active={isCardActive('customer')} shake={shakingCards.has('customer')} />
                     <CardProductPlan onEdit={() => handleEditOpen('productPlan')} active={isCardActive('productPlan')} shake={shakingCards.has('productPlan')} />
                     <CardSaving onEdit={() => handleEditOpen('saving')} active={isCardActive('saving')} shake={shakingCards.has('saving')} />

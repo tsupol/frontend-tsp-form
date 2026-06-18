@@ -609,9 +609,9 @@ function GuarantorRow({ guarantor, expanded, onToggle, onRemove, removing }: {
   };
 
   return (
-    <div className="border border-success-border bg-success-soft rounded-lg overflow-hidden transition-colors">
+    <div className="border border-success-border rounded-lg overflow-hidden transition-colors">
       {/* Header — accent marks an added guarantor */}
-      <div className="flex items-center gap-2 px-3 py-2.5 cursor-pointer hover:bg-surface-hover transition-colors" onClick={onToggle}>
+      <div className="flex items-center gap-2 px-3 py-2.5 cursor-pointer bg-success-soft hover:bg-surface-hover transition-colors" onClick={onToggle}>
         {expanded ? <ChevronDown size={14} className="text-subtle shrink-0" /> : <ChevronRight size={14} className="text-subtle shrink-0" />}
         {isComplete
           ? <CheckCircle size={14} className="text-success shrink-0" />

@@ -2795,6 +2795,7 @@
     "selectToEdit": "Select a section to edit",
     "savingWallet": "Saving Wallet",
     "cardReviewPay": "Review & Pay",
+    "reviewPayHint": "Review and confirm to activate",
     "confidence": "Confidence",
     "confidenceLabel": "Customer Confidence Rating",
     "confidenceHint": "Rate your confidence in this customer before proceeding",
