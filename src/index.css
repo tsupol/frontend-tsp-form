@@ -231,7 +231,7 @@
 
     /* Subtle text — used by library components (slider, image-uploader, etc.) */
     --color-subtle: #999999;
-    --color-subtler: #70737c;
+    --color-subtler: #5a5d66;
 
     /* Section spacing */
     --spacing-section: 2rem;

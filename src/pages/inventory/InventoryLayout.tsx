@@ -43,7 +43,7 @@ export function InventoryLayout({ children }: { children: ReactNode }) {
         {navItems.map((item, i) => {
           if (item.type === 'group') {
             return (
-              <span key={item.labelKey} className={`text-[11px] text-subtle uppercase tracking-wider px-2 ${i > 0 ? 'mt-3 mb-1' : 'mb-1'}`}>
+              <span key={item.labelKey} className={`subnav-group-label ${i > 0 ? 'mt-3 mb-1' : 'mb-1'}`}>
                 {t(item.labelKey)}
               </span>
             );

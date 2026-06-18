@@ -21,7 +21,7 @@ export function DevLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-dvh overflow-hidden">
       <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-48 border-r border-line p-4 pt-8">
-        <span className="text-xs font-semibold text-subtle uppercase tracking-wider mb-2 px-2 flex items-center gap-1">
+        <span className="subnav-group-label mb-1 flex items-center gap-1">
           <FlaskConical size={13} /> Dev
         </span>
         {navItems.map(({ path, label, icon: Icon }) => (

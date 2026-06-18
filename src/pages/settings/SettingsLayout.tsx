@@ -26,7 +26,7 @@ export function SettingsLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-full">
       <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-48 border-r border-line p-4 pt-7.5 sticky top-0 h-dvh">
-        <span className="text-xs font-semibold text-subtle uppercase tracking-wider mb-2 px-2">
+        <span className="subnav-group-label mb-1">
           {t('settings.title')}
         </span>
         {navItems.map(({ path, labelKey, icon: Icon }) => {

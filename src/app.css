@@ -30,6 +30,19 @@
         margin-bottom: 1.25rem;
     }
 
+    /* Section/group label inside a page sub-nav rail (the in-page fanout).
+       Visual identity only — each layout keeps its own margin utility
+       (mb-1, or mt-3 mb-1 for groups after the first) inline, since spacing
+       depends on the label's position in the list. */
+    .subnav-group-label {
+        font-size: 11px;
+        line-height: 1.2;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--color-subtle);
+        padding-inline: 0.25rem;
+    }
+
     .panel-datatable .data-table-footer,
     .padded-datatable .data-table-footer {
         padding-inline: 0.5rem;
