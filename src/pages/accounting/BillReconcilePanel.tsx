@@ -92,7 +92,7 @@ export function BillReconcilePanel({ branchId, billDate }: Props) {
             }`}
             onClick={() => setTypeFilter(type)}
           >
-            {type || t('accounting.dayClose.billTypeAll')}
+            {type ? t(`accounting.bills.typeLabel.${type}`, { defaultValue: type }) : t('accounting.dayClose.billTypeAll')}
             <span className="ml-1 text-fg/40">({typeCount(type)})</span>
           </button>
         ))}

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
   PageNav, PageNavPanel, MobileHeader, Button, Select, Badge, TextArea,
-  DataTable, InputDatePicker, MaskedInput, Modal,
+  DataTable, InputDatePicker, MaskedInput, Modal, Tooltip,
 } from 'tsp-form';
 import {
   ArrowRightFromLine, ArrowLeft, CalendarCheck, AlertTriangle, CheckCircle2, Lock, Sparkles, Keyboard, XCircle, Clock, ChevronsRight,
@@ -561,6 +561,8 @@ function ReconcileBody({
   // Suppress the warning in that case to avoid two alerts saying the same thing.
   const blockIsOpenBills = blockMessage?.reason === 'HAS_OPEN_BILLS';
   const showPendingWarning = hasPending && !blockIsOpenBills;
+  // Default to the reconcile list — it's the primary work area before closing.
+  const [tab, setTab] = useState<'reconcile' | 'breakdown'>('reconcile');
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -631,27 +633,27 @@ function ReconcileBody({
         </div>
       )}
 
-      {/* Breakdown (revenue / wallet / refund / settle + integrity) */}
-      {branchId && (
-        <div className="flex-none">
-          <DayCloseBreakdown branchId={branchId} closeDate={billDate} />
-        </div>
-      )}
-
-      {/* Reconcile section header */}
-      <div className="flex-none px-4 py-2.5 mt-1 flex items-center gap-2 border-b border-line">
-        <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider">
-          {t('accounting.dayClose.reconcileTitle')}
-        </h3>
-        <span className="text-xs text-subtler">{t('accounting.dayClose.reconcileDesc')}</span>
-      </div>
-
-      {/* Reconcile bill list */}
+      {/* Tabs: Reconcile (bill list) | Remittance (breakdown). Only one fills
+          the panel at a time so each gets full scroll height. */}
+      <DetailTabs
+        tab={tab}
+        onChange={setTab}
+        tabs={[
+          { key: 'reconcile', label: t('accounting.dayClose.reconcileTitle') },
+          { key: 'breakdown', label: t('accounting.dayClose.remitTitle') },
+        ]}
+      />
       <div className="flex-1 min-h-0">
-        {branchId ? (
-          <BillReconcilePanel branchId={branchId} billDate={billDate} />
+        {tab === 'reconcile' ? (
+          branchId ? (
+            <BillReconcilePanel branchId={branchId} billDate={billDate} />
+          ) : (
+            <div className="p-8 text-center text-subtler text-sm">{t('common.loading')}</div>
+          )
         ) : (
-          <div className="p-8 text-center text-subtler text-sm">{t('common.loading')}</div>
+          <div className="h-full overflow-y-auto better-scroll">
+            {branchId && <DayCloseBreakdown branchId={branchId} closeDate={billDate} />}
+          </div>
         )}
       </div>
 
@@ -676,6 +678,8 @@ function ReconcileBody({
 function ClosedSnapshot({ close, branchId }: { close: DayCloseHistoryRow; branchId: string }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  // Default to the breakdown — on a closed day that's the figure being looked up.
+  const [tab, setTab] = useState<'breakdown' | 'reconcile'>('breakdown');
   const remittanceLink = `/admin/accounting/remittance?branch_id=${branchId}&from=${close.close_date}&to=${close.close_date}`;
   const paymentsLink = `/admin/accounting/payments?branch_id=${branchId}&from=${close.close_date}&to=${close.close_date}`;
   return (
@@ -686,13 +690,27 @@ function ClosedSnapshot({ close, branchId }: { close: DayCloseHistoryRow; branch
           <DateTime value={close.close_date} showTime={false} />
         </span>
         <Badge color="success" size="sm">{t('accounting.dayClose.closedBadge')}</Badge>
-        <div className="ml-auto flex items-center gap-2">
-          <Button size="sm" variant="outline" startIcon={<ArrowUpRight size={14} />} onClick={() => navigate(remittanceLink)}>
-            {t('accounting.dayClose.drillRemittance')}
-          </Button>
-          <Button size="sm" variant="outline" startIcon={<Banknote size={14} />} onClick={() => navigate(paymentsLink)}>
-            {t('accounting.dayClose.drillPayments')}
-          </Button>
+        <div className="ml-auto flex items-center gap-1.5 shrink-0">
+          <Tooltip content={t('accounting.dayClose.drillRemittance')} placement="bottom">
+            <Button
+              size="sm"
+              variant="outline"
+              className="btn-icon-sm"
+              startIcon={<ArrowUpRight size={16} />}
+              onClick={() => navigate(remittanceLink)}
+              aria-label={t('accounting.dayClose.drillRemittance')}
+            />
+          </Tooltip>
+          <Tooltip content={t('accounting.dayClose.drillPayments')} placement="bottom">
+            <Button
+              size="sm"
+              variant="outline"
+              className="btn-icon-sm"
+              startIcon={<Banknote size={16} />}
+              onClick={() => navigate(paymentsLink)}
+              aria-label={t('accounting.dayClose.drillPayments')}
+            />
+          </Tooltip>
         </div>
       </div>
 
@@ -713,7 +731,7 @@ function ClosedSnapshot({ close, branchId }: { close: DayCloseHistoryRow; branch
           <Stat label={t('accounting.dayClose.totalCash')} value={fmtCurrency(close.total_cash)} />
           <Stat label={t('accounting.dayClose.totalTransfer')} value={fmtCurrency(close.total_transfer)} />
           <Stat label={t('accounting.dayClose.billCount')} value={String(close.bill_count)} />
-          <Stat label={t('accounting.dayClose.closedAt')} value={<DateTime value={close.closed_at} />} />
+          <Stat label={t('accounting.dayClose.closedAt')} value={<DateTime value={close.closed_at} />} small />
         </dl>
         {close.note && (
           <div className="text-sm text-subtle mt-3">
@@ -722,27 +740,23 @@ function ClosedSnapshot({ close, branchId }: { close: DayCloseHistoryRow; branch
         )}
       </div>
 
-      {/* Remittance breakdown (revenue / wallet / refund / settle + integrity) */}
-      <div className="flex-none px-4 py-2.5 flex items-center gap-2 border-b border-line">
-        <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider">
-          {t('accounting.dayClose.remitTitle')}
-        </h3>
-      </div>
-      {branchId && (
-        <div className="flex-none">
-          <DayCloseBreakdown branchId={branchId} closeDate={close.close_date} />
-        </div>
-      )}
-
-      {/* Reconcile section — read-only view of bills on this closed day */}
-      <div className="flex-none px-4 py-2.5 flex items-center gap-2 border-b border-line">
-        <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider">
-          {t('accounting.dayClose.reconcileTitle')}
-        </h3>
-        <span className="text-xs text-subtler">{t('accounting.dayClose.reconcileDesc')}</span>
-      </div>
+      {/* Tabs: Remittance (breakdown) | Reconcile (read-only bill list) */}
+      <DetailTabs
+        tab={tab}
+        onChange={setTab}
+        tabs={[
+          { key: 'breakdown', label: t('accounting.dayClose.remitTitle') },
+          { key: 'reconcile', label: t('accounting.dayClose.reconcileTitle') },
+        ]}
+      />
       <div className="flex-1 min-h-0">
-        {branchId && <BillReconcilePanel branchId={branchId} billDate={close.close_date} />}
+        {tab === 'breakdown' ? (
+          <div className="h-full overflow-y-auto better-scroll">
+            {branchId && <DayCloseBreakdown branchId={branchId} closeDate={close.close_date} />}
+          </div>
+        ) : (
+          branchId && <BillReconcilePanel branchId={branchId} billDate={close.close_date} />
+        )}
       </div>
     </div>
   );
@@ -940,12 +954,38 @@ function CloseDayModal({
   );
 }
 
-function Stat({ label, value, tone }: { label: string; value: React.ReactNode; tone?: 'danger' | 'warning' }) {
+/* Two-up tab strip for the detail panel. Mutually-exclusive sections so the
+   active one fills the panel and gets full scroll height. */
+function DetailTabs<K extends string>({
+  tab, onChange, tabs,
+}: {
+  tab: K;
+  onChange: (k: K) => void;
+  tabs: { key: K; label: string }[];
+}) {
+  return (
+    <div className="flex-none flex items-center border-b border-line">
+      {tabs.map(tb => (
+        <button
+          key={tb.key}
+          className={`flex-1 py-2 text-sm font-medium transition-colors cursor-pointer border-b-2 ${
+            tab === tb.key ? 'border-primary-fg text-primary-fg' : 'border-transparent text-fg'
+          }`}
+          onClick={() => onChange(tb.key)}
+        >
+          {tb.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function Stat({ label, value, tone, small }: { label: string; value: React.ReactNode; tone?: 'danger' | 'warning'; small?: boolean }) {
   const toneClass = tone === 'danger' ? 'text-danger' : tone === 'warning' ? 'text-warning-fg' : '';
   return (
     <div>
       <dt className="text-xs text-subtle">{label}</dt>
-      <dd className={`text-base font-semibold tabular-nums ${toneClass}`}>{value}</dd>
+      <dd className={`${small ? 'text-xs font-medium' : 'text-base font-semibold'} tabular-nums ${toneClass}`}>{value}</dd>
     </div>
   );
 }
@@ -988,9 +1028,9 @@ function DayCloseBreakdown({ branchId, closeDate }: { branchId: string; closeDat
   const integrityDiff = lhs - rhs;
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col divide-y divide-line">
       {/* Integrity badge */}
-      <div className="px-4 py-2.5 border-b border-line">
+      <div className="px-4 py-2.5">
         {integrityOk ? (
           <div className="inline-flex items-center gap-1.5 text-sm text-success">
             <CheckCircle2 size={15} />
@@ -1005,7 +1045,7 @@ function DayCloseBreakdown({ branchId, closeDate }: { branchId: string; closeDat
       </div>
 
       {/* Drawer (cash flow) */}
-      <div className="px-4 py-3 border-b border-line">
+      <div className="px-4 py-3">
         <ClusterTitle>{t('accounting.dayClose.clusterDrawer')}</ClusterTitle>
         <dl className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-2">
           <Stat label={t('accounting.dayClose.cashIn')} value={fmtCurrency(row.cash_amount)} />
@@ -1016,7 +1056,7 @@ function DayCloseBreakdown({ branchId, closeDate }: { branchId: string; closeDat
       </div>
 
       {/* Revenue */}
-      <div className="px-4 py-3 border-b border-line">
+      <div className="px-4 py-3">
         <ClusterTitle>{t('accounting.dayClose.clusterRevenue')}</ClusterTitle>
         <dl className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-2">
           <Stat label={t('accounting.dayClose.revenueHolding')} value={fmtCurrency(row.revenue_holding)} />
@@ -1028,7 +1068,7 @@ function DayCloseBreakdown({ branchId, closeDate }: { branchId: string; closeDat
 
       {/* Wallet (only when used) */}
       {hasWallet && (
-        <div className="px-4 py-3 border-b border-line">
+        <div className="px-4 py-3">
           <ClusterTitle>{t('accounting.dayClose.clusterWallet')}</ClusterTitle>
           <dl className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-2">
             <Stat label={t('accounting.dayClose.walletUsedNet')} value={fmtCurrency(row.wallet_amount)} />
@@ -1040,7 +1080,7 @@ function DayCloseBreakdown({ branchId, closeDate }: { branchId: string; closeDat
       )}
 
       {/* Settle — the remit / owe direction */}
-      <div className="px-4 py-3 border-b border-line">
+      <div className="px-4 py-3">
         <ClusterTitle>{t('accounting.dayClose.clusterSettle')}</ClusterTitle>
         <dl className="grid grid-cols-2 gap-x-3 gap-y-2">
           <SettleRow
