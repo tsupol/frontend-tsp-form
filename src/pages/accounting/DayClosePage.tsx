@@ -17,7 +17,7 @@ import { DateTime } from '../../components/DateTime';
 import { toLocalDateStr, parseLocalDate, makeDatePickerFormat, fmtCurrency } from '../../lib/format';
 import {
   type Branch, type BranchTodaySummaryRow, type DayCloseHistoryRow, type DayCloseAuditRow,
-  type UnclosedDayRow,
+  type UnclosedDayRow, type DayCloseBreakdownRow,
   todayISO, netCash, netTransfer, netTotal,
 } from './accountingTypes';
 import { BillReconcilePanel } from './BillReconcilePanel';
@@ -631,6 +631,13 @@ function ReconcileBody({
         </div>
       )}
 
+      {/* Breakdown (revenue / wallet / refund / settle + integrity) */}
+      {branchId && (
+        <div className="flex-none">
+          <DayCloseBreakdown branchId={branchId} closeDate={billDate} />
+        </div>
+      )}
+
       {/* Reconcile section header */}
       <div className="flex-none px-4 py-2.5 mt-1 flex items-center gap-2 border-b border-line">
         <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider">
@@ -715,28 +722,17 @@ function ClosedSnapshot({ close, branchId }: { close: DayCloseHistoryRow; branch
         )}
       </div>
 
-      {/* Remittance breakdown */}
+      {/* Remittance breakdown (revenue / wallet / refund / settle + integrity) */}
       <div className="flex-none px-4 py-2.5 flex items-center gap-2 border-b border-line">
         <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider">
           {t('accounting.dayClose.remitTitle')}
         </h3>
       </div>
-      <div className="flex-none px-4 py-3 border-b border-line">
-        <dl className="grid grid-cols-2 md:grid-cols-3 gap-x-3 gap-y-2">
-          <Stat
-            label={t('accounting.dayClose.holdingItems')}
-            value={`${close.holding_item_count} · ${fmtCurrency(close.holding_amount)}`}
-          />
-          <Stat
-            label={t('accounting.dayClose.companyItems')}
-            value={`${close.company_item_count} · ${fmtCurrency(close.company_amount)}`}
-          />
-          <div /> {/* spacer */}
-          <Stat label={t('accounting.dayClose.invoiceAmount')} value={fmtCurrency(close.invoice_amount)} />
-          <Stat label={t('accounting.dayClose.creditNoteAmount')} value={fmtCurrency(close.credit_note_amount)} />
-          <Stat label={t('accounting.dayClose.journalAmount')} value={fmtCurrency(close.journal_amount)} />
-        </dl>
-      </div>
+      {branchId && (
+        <div className="flex-none">
+          <DayCloseBreakdown branchId={branchId} closeDate={close.close_date} />
+        </div>
+      )}
 
       {/* Reconcile section — read-only view of bills on this closed day */}
       <div className="flex-none px-4 py-2.5 flex items-center gap-2 border-b border-line">
@@ -950,6 +946,141 @@ function Stat({ label, value, tone }: { label: string; value: React.ReactNode; t
     <div>
       <dt className="text-xs text-subtle">{label}</dt>
       <dd className={`text-base font-semibold tabular-nums ${toneClass}`}>{value}</dd>
+    </div>
+  );
+}
+
+/* ── Day-close breakdown (v_day_close_breakdown) ───────────────────────────
+   One unified view for both live (pre-close) and snapshot (closed) days.
+   Renders revenue / wallet / refund / settle clusters + an integrity check.
+   Wallet & refund clusters are hidden on clean days to keep the panel lean. */
+
+function ClusterTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <h4 className="text-[11px] font-semibold text-subtle uppercase tracking-wider mb-2">{children}</h4>
+  );
+}
+
+function DayCloseBreakdown({ branchId, closeDate }: { branchId: string; closeDate: string }) {
+  const { t } = useTranslation();
+  const { data, isFetching } = useQuery({
+    queryKey: ['accounting', 'day-close-breakdown', branchId, closeDate],
+    queryFn: () => apiClient.get<DayCloseBreakdownRow[]>(
+      `/v_day_close_breakdown?branch_id=eq.${branchId}&close_date=eq.${closeDate}&limit=1`
+    ),
+    enabled: !!branchId && !!closeDate,
+  });
+  const row = data?.[0];
+
+  if (!row) {
+    return isFetching
+      ? <div className="px-4 py-6 text-sm text-subtler">{t('common.loading')}</div>
+      : null;
+  }
+
+  const hasWallet = row.wallet_amount !== 0 || row.jrn_wallet_consumed !== 0;
+  const hasRefund = row.cn_holding_refund !== 0 || row.cn_company_refund !== 0 || row.refund_cash_out !== 0;
+
+  // Integrity: cash + transfer (signed) should equal the net settle obligation.
+  const lhs = row.cash_amount + row.transfer_amount;
+  const rhs = (row.holding_to_remit - row.holding_owes_bm) + (row.company_to_remit - row.company_owes_bm);
+  const integrityOk = Math.abs(lhs - rhs) < 0.01;
+  const integrityDiff = lhs - rhs;
+
+  return (
+    <div className="flex flex-col">
+      {/* Integrity badge */}
+      <div className="px-4 py-2.5 border-b border-line">
+        {integrityOk ? (
+          <div className="inline-flex items-center gap-1.5 text-sm text-success">
+            <CheckCircle2 size={15} />
+            <span>{t('accounting.dayClose.integrityOk')}</span>
+          </div>
+        ) : (
+          <div className="inline-flex items-center gap-1.5 text-sm text-warning-fg">
+            <AlertTriangle size={15} />
+            <span>{t('accounting.dayClose.integrityMismatch', { diff: fmtCurrency(integrityDiff) })}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Drawer (cash flow) */}
+      <div className="px-4 py-3 border-b border-line">
+        <ClusterTitle>{t('accounting.dayClose.clusterDrawer')}</ClusterTitle>
+        <dl className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-2">
+          <Stat label={t('accounting.dayClose.cashIn')} value={fmtCurrency(row.cash_amount)} />
+          <Stat label={t('accounting.dayClose.transferIn')} value={fmtCurrency(row.transfer_amount)} />
+          <Stat label={t('accounting.dayClose.refundCashOut')} value={fmtCurrency(row.refund_cash_out)} tone={row.refund_cash_out > 0 ? 'warning' : undefined} />
+          <Stat label={t('accounting.dayClose.drawerNet')} value={fmtCurrency(row.cash_amount + row.transfer_amount)} />
+        </dl>
+      </div>
+
+      {/* Revenue */}
+      <div className="px-4 py-3 border-b border-line">
+        <ClusterTitle>{t('accounting.dayClose.clusterRevenue')}</ClusterTitle>
+        <dl className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-2">
+          <Stat label={t('accounting.dayClose.revenueHolding')} value={fmtCurrency(row.revenue_holding)} />
+          <Stat label={t('accounting.dayClose.revenueCompany')} value={fmtCurrency(row.revenue_company)} />
+          {hasRefund && <Stat label={t('accounting.dayClose.cnHoldingRefund')} value={fmtCurrency(row.cn_holding_refund)} tone={row.cn_holding_refund > 0 ? 'warning' : undefined} />}
+          {hasRefund && <Stat label={t('accounting.dayClose.cnCompanyRefund')} value={fmtCurrency(row.cn_company_refund)} tone={row.cn_company_refund > 0 ? 'warning' : undefined} />}
+        </dl>
+      </div>
+
+      {/* Wallet (only when used) */}
+      {hasWallet && (
+        <div className="px-4 py-3 border-b border-line">
+          <ClusterTitle>{t('accounting.dayClose.clusterWallet')}</ClusterTitle>
+          <dl className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-2">
+            <Stat label={t('accounting.dayClose.walletUsedNet')} value={fmtCurrency(row.wallet_amount)} />
+            <Stat label={t('accounting.dayClose.walletSaving')} value={fmtCurrency(row.wallet_saving)} />
+            <Stat label={t('accounting.dayClose.walletCredit')} value={fmtCurrency(row.wallet_credit)} />
+            <Stat label={t('accounting.dayClose.walletInsurance')} value={fmtCurrency(row.wallet_insurance)} />
+          </dl>
+        </div>
+      )}
+
+      {/* Settle — the remit / owe direction */}
+      <div className="px-4 py-3 border-b border-line">
+        <ClusterTitle>{t('accounting.dayClose.clusterSettle')}</ClusterTitle>
+        <dl className="grid grid-cols-2 gap-x-3 gap-y-2">
+          <SettleRow
+            label={t('accounting.dayClose.holding')}
+            toRemit={row.holding_to_remit}
+            owesBm={row.holding_owes_bm}
+            t={t}
+          />
+          <SettleRow
+            label={t('accounting.dayClose.company')}
+            toRemit={row.company_to_remit}
+            owesBm={row.company_owes_bm}
+            t={t}
+          />
+        </dl>
+      </div>
+    </div>
+  );
+}
+
+/* One side of the settle (holding | company). Shows whichever of to-remit /
+   owes-bm is non-zero — they're mutually exclusive in the view. */
+function SettleRow({
+  label, toRemit, owesBm, t,
+}: {
+  label: string;
+  toRemit: number;
+  owesBm: number;
+  t: ReturnType<typeof useTranslation>['t'];
+}) {
+  const owes = owesBm > 0;
+  return (
+    <div className={`rounded-md border px-3 py-2 ${owes ? 'border-warning/40 bg-warning/5' : 'border-line'}`}>
+      <div className="text-xs text-subtle">{label}</div>
+      <div className={`text-base font-semibold tabular-nums ${owes ? 'text-warning-fg' : ''}`}>
+        {owes ? `−${fmtCurrency(owesBm)}` : fmtCurrency(toRemit)}
+      </div>
+      <div className="text-[11px] text-subtler">
+        {owes ? t('accounting.dayClose.owesBm') : t('accounting.dayClose.toRemit')}
+      </div>
     </div>
   );
 }

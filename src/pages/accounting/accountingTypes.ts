@@ -204,6 +204,69 @@ export interface PaymentRow {
   bill_status: string;
 }
 
+// v_day_close_breakdown — unified day-close view (1 row per branch+date).
+// data_source = 'LIVE' (not yet closed, computed from bills) | 'SNAPSHOT' (closed).
+// Same column shape either way; UI branches on is_closed / data_source.
+export interface DayCloseBreakdownRow {
+  close_date: string;
+  branch_id: number;
+  holding_id: number;
+  company_id: number;
+  // Cluster A — revenue / drawer
+  cash_amount: number;
+  transfer_amount: number;
+  wallet_amount: number;
+  wallet_saving: number;
+  wallet_credit: number;
+  wallet_insurance: number;
+  revenue_holding: number;
+  revenue_company: number;
+  // Cluster B — refund
+  cn_holding_refund: number;
+  cn_company_refund: number;
+  refund_cash_out: number;
+  // Cluster C — wallet shift
+  jrn_wallet_consumed: number;
+  // Cluster D — settle (always ≥ 0, mutually exclusive within each side)
+  holding_to_remit: number;
+  holding_owes_bm: number;
+  company_to_remit: number;
+  company_owes_bm: number;
+  // Aggregates
+  holding_amount: number;
+  company_amount: number;
+  invoice_amount: number;
+  credit_note_amount: number;
+  journal_amount: number;
+  // Cash reconciliation
+  expected_amount: number;
+  actual_amount: number;
+  shortage: number;
+  overage: number;
+  // Counts
+  bill_count: number;
+  bill_voided_count: number;
+  journal_count: number;
+  holding_item_count: number;
+  company_item_count: number;
+  // Misc
+  retail_amount: number;
+  contract_amount: number;
+  total_refund: number;
+  gift_cost: number;
+  // Contract activity
+  contracts_opened: number;
+  contracts_completed: number;
+  contracts_terminated: number;
+  contracts_voided: number;
+  // Metadata
+  closed_by: number | null;
+  closed_at: string | null;
+  note: string | null;
+  is_closed: boolean;
+  data_source: 'LIVE' | 'SNAPSHOT';
+}
+
 export interface UnclosedDayRow {
   holding_id: number;
   company_id: number;
