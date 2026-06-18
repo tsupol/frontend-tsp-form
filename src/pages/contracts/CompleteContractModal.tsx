@@ -5,6 +5,7 @@ import { Badge, Button, Modal, MaskedInput, Select, TextArea, Tooltip, useSnackb
 import { CheckCircle, XCircle, PiggyBank, CreditCard, ShieldCheck, ArrowRight, ChevronsRight, Loader2, Plus, Trash2 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { BranchPinInput } from '../../components/BranchPinInput';
+import { BranchPaymentAccountField } from '../../components/BranchPaymentAccountField';
 import { fmtCurrency } from '../../lib/format';
 import { useWalletAvailable } from './wallet/useWallet';
 import { WalletActionForm } from './wallet/WalletActionModal';
@@ -79,12 +80,6 @@ interface ConflictBill {
   created_by: number;
 }
 
-interface BankAccount {
-  id: number;
-  bank_name: string;
-  account_number: string;
-  account_name: string;
-}
 
 // Payoff bill summary captured after the collect+pay+confirm chain
 interface PayoffBillInfo {
@@ -251,13 +246,6 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
       setApiError(previewError);
     }
   }, [previewError]);
-
-  const { data: bankAccounts } = useQuery({
-    queryKey: ['bank-accounts-active'],
-    queryFn: () => apiClient.get<BankAccount[]>('/v_bank_accounts?is_active=is.true&order=bank_name'),
-    enabled: open && isEarlyPayoff,
-    staleTime: 5 * 60 * 1000,
-  });
 
   // Multi-step pay flow: collect → add×N → confirm. After success → wallets gate.
   const collectAddConfirm = async () => {
@@ -430,7 +418,6 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
               onPaymentsChange={setPayments}
               note={note}
               onNoteChange={setNote}
-              bankAccounts={bankAccounts ?? []}
               isPending={payMutation.isPending}
               step={step}
               onCancel={onClose}
@@ -976,7 +963,6 @@ function PayoffView({
   onPaymentsChange,
   note,
   onNoteChange,
-  bankAccounts,
   isPending,
   step,
   onCancel,
@@ -988,7 +974,6 @@ function PayoffView({
   onPaymentsChange: (payments: EarlyPayoffPayment[]) => void;
   note: string;
   onNoteChange: (v: string) => void;
-  bankAccounts: BankAccount[];
   isPending: boolean;
   step: string;
   onCancel: () => void;
@@ -1044,11 +1029,6 @@ function PayoffView({
       disabled: !allowed.has(m) || balance === 0,
     };
   });
-
-  const bankOptions = bankAccounts.map(b => ({
-    value: String(b.id),
-    label: `${b.bank_name} - ${b.account_number} (${b.account_name})`,
-  }));
 
   // Wallet badges (informational — only show wallets with balance > 0)
   const walletEntries = preview ? [
@@ -1148,14 +1128,9 @@ function PayoffView({
               )}
             </div>
             {payment.method === 'TRANSFER' && (
-              <Select
-                options={bankOptions}
-                value={payment.bank_account_id ? String(payment.bank_account_id) : null}
-                onChange={(val) => updatePayment(idx, { bank_account_id: val ? Number(val) : null })}
-                placeholder={t('wizard.selectBankAccount', { defaultValue: 'Select bank account' })}
-                size="sm"
-                showChevron
-                searchable
+              <BranchPaymentAccountField
+                active={payment.method === 'TRANSFER'}
+                onResolve={(id) => updatePayment(idx, { bank_account_id: id })}
               />
             )}
           </div>

@@ -1,12 +1,12 @@
 import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
 import { Button, Select, MaskedInput } from 'tsp-form';
 import { Plus, Trash2, XCircle, Loader2, CreditCard, ChevronsRight } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { fmtCurrency } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
-import type { PaymentMethod, PaymentLine, BankAccount, BillOpenResult } from './WorkspaceTypes';
+import { BranchPaymentAccountField } from '../../../components/BranchPaymentAccountField';
+import type { PaymentMethod, PaymentLine, BillOpenResult } from './WorkspaceTypes';
 
 const BASE_PAYMENT_METHODS = [
   { value: 'CASH', label: 'Cash' },
@@ -42,17 +42,6 @@ export function CardPayment() {
   ]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  const { data: bankAccounts } = useQuery({
-    queryKey: ['bank-accounts-active'],
-    queryFn: () => apiClient.get<BankAccount[]>('/v_bank_accounts?is_active=is.true&order=bank_name'),
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const bankOptions = (bankAccounts ?? []).map(b => ({
-    value: String(b.id),
-    label: `${b.bank_name} - ${b.account_number} (${b.account_name})`,
-  }));
 
   const totalPayment = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
   const isBalanced = totalAmount > 0 && Math.abs(totalPayment - totalAmount) < 0.01;
@@ -215,14 +204,9 @@ export function CardPayment() {
               {payment.method === 'TRANSFER' && (
                 <div className="flex flex-col">
                   <label className="form-label text-xs">{t('wizard.bankAccount')}</label>
-                  <Select
-                    options={bankOptions}
-                    value={payment.bank_account_id ? String(payment.bank_account_id) : null}
-                    onChange={(val) => updatePayment(idx, { bank_account_id: val ? Number(val) : null })}
-                    placeholder={t('wizard.selectBankAccount')}
-                    size="sm"
-                    showChevron
-                    searchable
+                  <BranchPaymentAccountField
+                    active={payment.method === 'TRANSFER'}
+                    onResolve={(id) => updatePayment(idx, { bank_account_id: id })}
                   />
                 </div>
               )}

@@ -103,6 +103,10 @@
     "amountMin": "Min",
     "amountMax": "Max"
   },
+  "bankAccount": {
+    "temporary": "Temporary account",
+    "noReceivingAccount": "No receiving account is set for this branch. Set a default bank account before taking transfers."
+  },
   "common": {
     "loading": "Loading...",
     "done": "Done",
@@ -158,6 +162,9 @@
     "pushBannerUnsupported": "This browser doesn't support push notifications.",
     "pushBannerEnabling": "Enabling…",
     "pushBannerEnabled": "Push notifications enabled.",
+    "receivingAccount": "Today's receiving account:",
+    "receivingAccountOverride": "Temporary",
+    "noReceivingAccount": "No receiving account is set for your branch. Set a default bank account before taking transfers.",
     "actionRequired": "Action required",
     "pendingTasks": "Pending tasks",
     "pendingDeviceBind": "Awaiting device bind",

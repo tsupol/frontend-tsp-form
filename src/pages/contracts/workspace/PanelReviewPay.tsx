@@ -11,8 +11,9 @@ import {
 import { apiClient, ApiError } from '../../../lib/api';
 import { fmtCurrency } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
-import type { PaymentMethod, PaymentLine, BankAccount, BillOpenResult } from './WorkspaceTypes';
+import type { PaymentMethod, PaymentLine, BillOpenResult } from './WorkspaceTypes';
 import { ERROR_TO_MODAL } from './WorkspaceTypes';
+import { BranchPaymentAccountField, useBranchPaymentAccount } from '../../../components/BranchPaymentAccountField';
 import { BillReceipt, type BillDetail } from './BillReceipt';
 import { BillCart, type DraftCartLine } from './BillCart';
 import { BranchPinInput } from '../../../components/BranchPinInput';
@@ -118,15 +119,9 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [totalAmount]);
 
-  const { data: bankAccounts } = useQuery({
-    queryKey: ['bank-accounts-active'],
-    queryFn: () => apiClient.get<BankAccount[]>('/v_bank_accounts?is_active=is.true&order=bank_name'),
-    staleTime: 5 * 60 * 1000,
-  });
-  const bankOptions = (bankAccounts ?? []).map(b => ({
-    value: String(b.id),
-    label: `${b.bank_name} - ${b.account_number} (${b.account_name})`,
-  }));
+  // Single override-aware receiving account for this (own) branch. Used to
+  // label the printed receipt's TRANSFER lines; the picker auto-selects it.
+  const { data: paymentAccount = null } = useBranchPaymentAccount();
 
   const totalPayment = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
   const isBalanced = totalAmount > 0 && Math.abs(totalPayment - totalAmount) < 0.01;
@@ -241,18 +236,19 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
         quantity: l.quantity,
       })),
     ];
-    const bankById = new Map((bankAccounts ?? []).map(b => [b.id, b]));
     const billPayments = payments
       .filter(p => p.amount > 0)
       .map((p, i) => {
-        const bank = p.bank_account_id != null ? bankById.get(p.bank_account_id) : null;
+        const bank = p.bank_account_id != null && p.bank_account_id === paymentAccount?.account_id
+          ? paymentAccount
+          : null;
         return {
           id: i,
           code_display: '',
           method: p.method,
           amount: p.amount,
           bank_name: bank?.bank_name ?? null,
-          account_number: bank?.account_number ?? null,
+          account_number: bank?.account_number_display ?? bank?.account_number ?? null,
           reference: null,
         };
       });
@@ -284,7 +280,7 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
       payments: billPayments,
       cancel_info: null,
     };
-  }, [contract, systemLines, cartLines, payments, bankAccounts, totalAmount]);
+  }, [contract, systemLines, cartLines, payments, paymentAccount, totalAmount]);
 
   const [printReady, setPrintReady] = useState(false);
   const handlePrintInvoice = useCallback(() => {
@@ -541,14 +537,9 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
                 {payment.method === 'TRANSFER' && (
                   <div className="flex flex-col">
                     <label className="form-label text-xs">{t('wizard.bankAccount')}</label>
-                    <Select
-                      options={bankOptions}
-                      value={payment.bank_account_id ? String(payment.bank_account_id) : null}
-                      onChange={(val) => updatePayment(idx, { bank_account_id: val ? Number(val) : null })}
-                      placeholder={t('wizard.selectBankAccount')}
-                      size="sm"
-                      showChevron
-                      searchable
+                    <BranchPaymentAccountField
+                      active={payment.method === 'TRANSFER'}
+                      onResolve={(id) => updatePayment(idx, { bank_account_id: id })}
                     />
                   </div>
                 )}

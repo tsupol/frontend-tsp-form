@@ -12,6 +12,7 @@ import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { fmtCurrency } from '../../lib/format';
 import { useBarcodeScanner } from '../../components/BarcodeScanner';
+import { BranchPaymentAccountField } from '../../components/BranchPaymentAccountField';
 
 /* ───────────────────────────────────────────────────────────────────────────
  * Types — match fn_bill_retail_preview / fn_bill_retail_submit (doc 38 §0)
@@ -28,13 +29,6 @@ interface SellableVariant {
   retail_price: number;
   qty: number;
   barcodes: string[];
-}
-
-interface BankAccount {
-  id: number;
-  bank_name: string;
-  account_number: string;
-  account_name: string;
 }
 
 type PaymentMethod = 'CASH' | 'TRANSFER';
@@ -150,12 +144,6 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
   const { data: branches = [] } = useQuery({
     queryKey: ['branches-active'],
     queryFn: () => apiClient.get<Branch[]>('/v_branches?is_active=is.true&order=name'),
-  });
-
-  const { data: bankAccounts = [] } = useQuery({
-    queryKey: ['bank-accounts-active'],
-    queryFn: () => apiClient.get<BankAccount[]>('/v_bank_accounts?is_active=is.true&order=bank_name'),
-    staleTime: 5 * 60 * 1000,
   });
 
   useEffect(() => {
@@ -600,19 +588,10 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
                   onEndIconClick={total > 0 ? () => setPaymentAmount(total) : undefined}
                 />
               </div>
-              {paymentMethod === 'TRANSFER' && (
-                <Select
-                  value={bankAccountId ? String(bankAccountId) : null}
-                  onChange={(v) => setBankAccountId(v ? Number(v) : null)}
-                  options={bankAccounts.map(b => ({
-                    label: `${b.bank_name} - ${b.account_number}`,
-                    value: String(b.id),
-                  }))}
-                  placeholder={t('retail.create.selectBank')}
-                  size="sm"
-                  showChevron
-                />
-              )}
+              <BranchPaymentAccountField
+                active={paymentMethod === 'TRANSFER'}
+                onResolve={setBankAccountId}
+              />
             </>
           )}
           {needsApproval && (

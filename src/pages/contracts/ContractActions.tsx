@@ -9,6 +9,7 @@ import { apiClient, ApiError } from '../../lib/api';
 import { getRoleLabel } from '../../lib/roleLabel';
 import { fmtCurrency } from '../../lib/format';
 import { BranchPinInput } from '../../components/BranchPinInput';
+import { BranchPaymentAccountField } from '../../components/BranchPaymentAccountField';
 import { DateTime } from '../../components/DateTime';
 import { useAuth } from '../../contexts/AuthContext';
 import { useUploadSpec } from '../../hooks/useMediaUrl';
@@ -2270,13 +2271,6 @@ interface PaymentLine {
   bank_account_id: number | null;
 }
 
-interface BankAccount {
-  id: number;
-  bank_name: string;
-  account_number: string;
-  account_name: string;
-}
-
 const BASE_METHODS = [
   { value: 'CASH', label: 'Cash' },
   { value: 'TRANSFER', label: 'Bank Transfer' },
@@ -2323,18 +2317,6 @@ function PendingPaymentModal({ open, contract, onClose, onSuccess }: {
       setError('');
     }
   }, [open, totalAmount, savingBalance]);
-
-  const { data: bankAccounts } = useQuery({
-    queryKey: ['bank-accounts-active'],
-    queryFn: () => apiClient.get<BankAccount[]>('/v_bank_accounts?is_active=is.true&order=bank_name'),
-    staleTime: 5 * 60 * 1000,
-    enabled: open,
-  });
-
-  const bankOptions = (bankAccounts ?? []).map(b => ({
-    value: String(b.id),
-    label: `${b.bank_name} - ${b.account_number} (${b.account_name})`,
-  }));
 
   const totalPayment = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
   const isBalanced = totalAmount > 0 && Math.abs(totalPayment - totalAmount) < 0.01;
@@ -2453,14 +2435,9 @@ function PendingPaymentModal({ open, contract, onClose, onSuccess }: {
                   {payment.method === 'TRANSFER' && (
                     <div className="flex flex-col">
                       <label className="form-label text-xs">{t('wizard.bankAccount')}</label>
-                      <Select
-                        options={bankOptions}
-                        value={payment.bank_account_id ? String(payment.bank_account_id) : null}
-                        onChange={(val) => updatePayment(idx, { bank_account_id: val ? Number(val) : null })}
-                        placeholder={t('wizard.selectBankAccount')}
-                        size="sm"
-                        showChevron
-                        searchable
+                      <BranchPaymentAccountField
+                        active={payment.method === 'TRANSFER'}
+                        onResolve={(id) => updatePayment(idx, { bank_account_id: id })}
                       />
                     </div>
                   )}
@@ -2677,21 +2654,6 @@ function PayInstallmentModal({ open, contract, onClose }: {
     enabled: view === 'done' && result != null,
     staleTime: 0,
   });
-
-  const { data: bankAccounts } = useQuery({
-    queryKey: ['bank-accounts-active'],
-    queryFn: () => apiClient.get<BankAccount[]>('/v_bank_accounts?is_active=is.true&order=bank_name'),
-    staleTime: 5 * 60 * 1000,
-    enabled: open && channel === 'TRANSFER',
-  });
-
-  const bankOptions = useMemo(
-    () => (bankAccounts ?? []).map(b => ({
-      value: String(b.id),
-      label: `${b.bank_name} - ${b.account_number} (${b.account_name})`,
-    })),
-    [bankAccounts],
-  );
 
   const channelOptions = useMemo(() => {
     const opts: { value: InstallmentChannel; label: string; disabled?: boolean }[] = [
@@ -2922,13 +2884,9 @@ function PayInstallmentModal({ open, contract, onClose }: {
                 {channel === 'TRANSFER' && (
                   <div className="flex flex-col">
                     <label className="form-label">{t('wizard.bankAccount')} *</label>
-                    <Select
-                      options={bankOptions}
-                      value={bankAccountId}
-                      onChange={(val) => setBankAccountId((val as string) || null)}
-                      placeholder={t('wizard.selectBankAccount')}
-                      showChevron
-                      searchable
+                    <BranchPaymentAccountField
+                      active={channel === 'TRANSFER'}
+                      onResolve={(id) => setBankAccountId(id != null ? String(id) : null)}
                     />
                   </div>
                 )}

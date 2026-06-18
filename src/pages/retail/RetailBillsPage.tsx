@@ -16,6 +16,7 @@ import { fmtCurrency } from '../../lib/format';
 import { buildBillActionToast, hasBill, type StandardBillResponse } from '../../lib/billActionToast';
 import { CreateRetailBillModal } from './CreateRetailBillModal';
 import { useBillActions, type BillAction, type BillBlockingReason } from '../../hooks/useBillActions';
+import { BranchPaymentAccountField } from '../../components/BranchPaymentAccountField';
 
 interface Branch {
   id: number;
@@ -74,12 +75,6 @@ interface BillDetail {
   payments: BillPayment[] | null;
 }
 
-interface BankAccount {
-  id: number;
-  bank_name: string;
-  account_number: string;
-  account_name: string;
-}
 
 type PaymentMethod = 'CASH' | 'TRANSFER';
 
@@ -510,12 +505,6 @@ function TakePaymentModal({
     }
   }, [open, remaining]);
 
-  const { data: bankAccounts = [] } = useQuery({
-    queryKey: ['bank-accounts-active'],
-    queryFn: () => apiClient.get<BankAccount[]>('/v_bank_accounts?is_active=is.true&order=bank_name'),
-    staleTime: 5 * 60 * 1000,
-  });
-
   const amount = parseFloat(amountStr) || 0;
   const change = amount > remaining ? amount - remaining : 0;
   const valid =
@@ -602,16 +591,9 @@ function TakePaymentModal({
           {method === 'TRANSFER' && (
             <div className="flex flex-col">
               <label className="form-label">{t('retail.create.selectBank')}</label>
-              <Select
-                value={bankAccountId ? String(bankAccountId) : null}
-                onChange={(v) => setBankAccountId(v ? Number(v) : null)}
-                options={bankAccounts.map(b => ({
-                  label: `${b.bank_name} - ${b.account_number}`,
-                  value: String(b.id),
-                }))}
-                placeholder={t('retail.create.selectBank')}
-                size="sm"
-                showChevron
+              <BranchPaymentAccountField
+                active={method === 'TRANSFER'}
+                onResolve={setBankAccountId}
               />
             </div>
           )}

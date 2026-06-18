@@ -102,6 +102,10 @@
     "amountMin": "ขั้นต่ำ",
     "amountMax": "ขั้นสูง"
   },
+  "bankAccount": {
+    "temporary": "บัญชีชั่วคราว",
+    "noReceivingAccount": "สาขานี้ยังไม่ได้ตั้งบัญชีรับโอน กรุณาตั้งบัญชีหลักก่อนรับชำระแบบโอน"
+  },
   "common": {
     "loading": "กำลังโหลด...",
     "done": "เสร็จสิ้น",
@@ -157,6 +161,9 @@
     "pushBannerUnsupported": "เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือน",
     "pushBannerEnabling": "กำลังเปิด…",
     "pushBannerEnabled": "เปิดการแจ้งเตือนเรียบร้อย",
+    "receivingAccount": "บัญชีรับเงินวันนี้:",
+    "receivingAccountOverride": "ชั่วคราว",
+    "noReceivingAccount": "สาขาของคุณยังไม่ได้ตั้งบัญชีรับโอน กรุณาตั้งบัญชีหลักก่อนรับชำระแบบโอน",
     "actionRequired": "ต้องดำเนินการ",
     "pendingTasks": "งานรอทำ",
     "pendingDeviceBind": "รอผูกเครื่อง",

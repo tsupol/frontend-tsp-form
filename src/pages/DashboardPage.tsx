@@ -17,6 +17,7 @@ import {
   XCircle,
   Smartphone,
   PenLine,
+  Landmark,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../lib/api';
 import { fmtCurrency } from '../lib/format';
@@ -24,6 +25,7 @@ import { DateTime } from '../components/DateTime';
 import { useAuth } from '../contexts/AuthContext';
 import { DashboardScopePicker } from '../components/DashboardScopePicker';
 import { PushSubscribeBanner } from '../components/PushSubscribeBanner';
+import { useBranchPaymentAccount, type BranchPaymentAccount } from '../components/BranchPaymentAccountField';
 import {
   defaultScopeFor,
   scopeQuery,
@@ -115,7 +117,12 @@ export function DashboardPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const canApprove = !!user?.role_code && APPROVER_ROLES.has(user.role_code);
+  const isBranchUser = !!user?.branch_id;
   const today = todayISO();
+
+  // Today's receiving account — branch-level users only (JWT-scoped view).
+  const paymentAccountQuery = useBranchPaymentAccount(isBranchUser);
+  const paymentAccount = paymentAccountQuery.data ?? null;
 
   const [scope, setScope] = useState<Scope>(() => defaultScopeFor(user));
   const sk = scopeKey(scope);
@@ -300,26 +307,38 @@ export function DashboardPage() {
         <PushSubscribeBanner />
 
         {/* Desktop header with scope picker */}
-        <div className="mb-4 flex-none max-md:hidden flex items-end justify-between gap-3">
+        <div className="mb-4 flex-none max-md:hidden flex items-start justify-between gap-4">
           <div>
             <h1 className="heading-2">{t('nav.dashboard')}</h1>
             <div className="text-subtle text-sm">
               <DateTime value={new Date().toISOString()} showTime={false} />
             </div>
-          </div>
-          <div className="flex items-center gap-3">
             {actionCount > 0 && (
-              <Badge color="warning">
+              <Badge color="warning" className="mt-2">
                 {t('dashboard.actionCount', { count: actionCount })}
               </Badge>
             )}
+          </div>
+          <div className="flex flex-col items-end gap-2 min-w-0">
             <DashboardScopePicker scope={scope} onChange={setScope} />
+            <ReceivingAccount
+              show={isBranchUser}
+              account={paymentAccount}
+              noAccount={isBranchUser && paymentAccountQuery.isSuccess && !paymentAccount}
+              t={t}
+            />
           </div>
         </div>
 
-        {/* Mobile scope picker */}
-        <div className="mb-3 md:hidden">
+        {/* Mobile scope picker + receiving account */}
+        <div className="mb-3 md:hidden flex flex-col gap-2">
           <DashboardScopePicker scope={scope} onChange={setScope} />
+          <ReceivingAccount
+            show={isBranchUser}
+            account={paymentAccount}
+            noAccount={isBranchUser && paymentAccountQuery.isSuccess && !paymentAccount}
+            t={t}
+          />
         </div>
 
         {/* ── Action band ──────────────────────────────────────────────── */}
@@ -557,6 +576,59 @@ export function DashboardPage() {
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────
+
+// Today's receiving account — branch-level users only. Compact, right-aligned
+// in the desktop header so it doesn't push the title down. Account number
+// styled to match BranchPaymentAccountField (white, bold, wide tracking).
+function ReceivingAccount({
+  show,
+  account,
+  noAccount,
+  t,
+}: {
+  show: boolean;
+  account: BranchPaymentAccount | null;
+  noAccount: boolean;
+  t: (k: string, opts?: Record<string, unknown>) => string;
+}) {
+  if (!show) return null;
+
+  if (account) {
+    return (
+      <div className="flex items-start gap-3 rounded-lg border border-line bg-surface px-4 py-3 max-w-full">
+        <span className="shrink-0 mt-0.5 flex h-8 w-8 items-center justify-center rounded-md bg-info/10 text-info">
+          <Landmark size={18} />
+        </span>
+        <div className="min-w-0">
+          <div className="text-xs text-subtle mb-1 flex items-center gap-2">
+            <span className="truncate">{t('dashboard.receivingAccount')}</span>
+            {account.source === 'OVERRIDE' && (
+              <Badge color="warning" size="sm">{t('dashboard.receivingAccountOverride')}</Badge>
+            )}
+          </div>
+          <div className="text-fg tabular-nums tracking-widest font-semibold truncate">
+            {account.account_number_display ?? account.account_number}
+          </div>
+          <div className="text-subtle text-xs truncate mt-0.5">
+            {account.bank_name} · {account.account_name}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (noAccount) {
+    return (
+      <div className="flex items-center gap-2 rounded-md border border-warning-border bg-warning/5 px-3 py-1.5 text-xs text-warning-fg max-w-full">
+        <AlertCircle size={14} className="shrink-0" />
+        <span className="truncate">{t('dashboard.noReceivingAccount')}</span>
+      </div>
+    );
+  }
+
+  return null;
+}
+
 
 interface CountCardProps {
   icon: React.ReactNode;

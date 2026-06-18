@@ -5,6 +5,7 @@ import { Button, Modal, Input, MaskedInput, Select, TextArea } from 'tsp-form';
 import { XCircle, AlertTriangle, Wallet } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { BranchPinInput } from '../../../components/BranchPinInput';
+import { BranchPaymentAccountField } from '../../../components/BranchPaymentAccountField';
 import { fmtCurrency } from '../../../lib/format';
 import {
   useWalletActions,
@@ -96,7 +97,9 @@ export function WalletActionForm({
       apiClient.get<BankAccount[]>(
         `/v_bank_accounts?holding_id=eq.${holdingId}&is_active=eq.true&order=is_default.desc,bank_name.asc`,
       ),
-    enabled: active && channel === 'TRANSFER',
+    // DEPOSIT receives into the resolved branch account (handled by the
+    // BranchPaymentAccountField); only CASHOUT needs the full pay-out list.
+    enabled: active && channel === 'TRANSFER' && action === 'CASHOUT',
     staleTime: 5 * 60 * 1000,
   });
 
@@ -114,12 +117,14 @@ export function WalletActionForm({
     }
   }, [active, walletType, action]);
 
+  // CASHOUT only — pre-select the default pay-out account. DEPOSIT's account is
+  // set by BranchPaymentAccountField via onResolve.
   useEffect(() => {
-    if (channel === 'TRANSFER' && bankAccounts && bankAccounts.length > 0 && !bankAccountId) {
+    if (action === 'CASHOUT' && channel === 'TRANSFER' && bankAccounts && bankAccounts.length > 0 && !bankAccountId) {
       const def = bankAccounts.find(b => b.is_default) ?? bankAccounts[0];
       setBankAccountId(String(def.id));
     }
-  }, [channel, bankAccounts, bankAccountId]);
+  }, [action, channel, bankAccounts, bankAccountId]);
 
   const mutation = useWalletMutation(contractId);
 
@@ -276,16 +281,25 @@ export function WalletActionForm({
         {requiresChannel && channel === 'TRANSFER' && (
           <div className="flex flex-col">
             <label className="form-label">{t('wallet.bankAccount')} *</label>
-            <Select
-              options={
-                bankAccounts?.map(b => ({
-                  value: String(b.id),
-                  label: `${b.bank_name} · ${b.account_number} · ${b.account_name}`,
-                })) ?? []
-              }
-              value={bankAccountId}
-              onChange={val => setBankAccountId(val as string)}
-            />
+            {action === 'DEPOSIT' ? (
+              // Money IN — receive into the branch's resolved account.
+              <BranchPaymentAccountField
+                active={channel === 'TRANSFER'}
+                onResolve={(id) => setBankAccountId(id != null ? String(id) : '')}
+              />
+            ) : (
+              // Money OUT (CASHOUT) — staff may pay from any branch account.
+              <Select
+                options={
+                  bankAccounts?.map(b => ({
+                    value: String(b.id),
+                    label: `${b.bank_name} · ${b.account_number} · ${b.account_name}`,
+                  })) ?? []
+                }
+                value={bankAccountId}
+                onChange={val => setBankAccountId(val as string)}
+              />
+            )}
           </div>
         )}
 
