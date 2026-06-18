@@ -279,6 +279,8 @@ export interface BillPayment {
   created_by: number;
   created_by_name: string | null;
   is_reversal: boolean;
+  ref_voided_id: number | null;
+  void_note: string | null;
   reference: string | null;
 }
 
