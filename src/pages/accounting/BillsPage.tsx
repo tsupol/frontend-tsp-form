@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -9,14 +9,15 @@ import {
 } from 'tsp-form';
 import {
   ArrowRightFromLine, ArrowLeft, Plus, Trash2, XCircle, CheckCircle, Ban, Printer,
-  Wrench, ChevronDown, Copy, Filter,
+  Wrench, ChevronDown, Copy, Search, X,
 } from 'lucide-react';
+import { FilterBar } from '../../components/FilterBar';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { fmtCurrency } from '../../lib/format';
 import { buildBillActionToast, hasBill, type StandardBillResponse } from '../../lib/billActionToast';
-import { type Branch, type BillRow, type BillDetail, todayISO } from './accountingTypes';
+import { type Branch, type BillRow, type BillDetail, type BillPayment, todayISO } from './accountingTypes';
 import { useBillActions, type BillAction, type BillActionCode } from '../../hooks/useBillActions';
 import { BillReceipt } from '../contracts/workspace/BillReceipt';
 
@@ -79,9 +80,10 @@ export function BillsPage() {
   const typeFilter = searchParams.get('type') ?? '';
   const dateFilter = searchParams.get('date') ?? '';
   const unclosedFilter = searchParams.get('unclosed') === '1';
+  const searchQuery = searchParams.get('q') ?? '';
 
   type FilterPatch = Partial<{
-    branch_id: string; status: string; type: string; date: string; unclosed: string;
+    branch_id: string; status: string; type: string; date: string; unclosed: string; q: string;
   }>;
   const updateFilters = useCallback((patch: FilterPatch) => {
     setSearchParams(prev => {
@@ -107,6 +109,15 @@ export function BillsPage() {
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(25);
 
+  // Debounced search box — local input mirrors ?q=, committed to the URL after a pause.
+  const [searchInput, setSearchInput] = useState(searchQuery);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const onSearchChange = useCallback((value: string) => {
+    setSearchInput(value);
+    clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => updateFilters({ q: value.trim() }), 300);
+  }, [updateFilters]);
+
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
 
@@ -128,9 +139,18 @@ export function BillsPage() {
   if (typeFilter) params.set('bill_type', `eq.${typeFilter}`);
   if (dateFilter === 'today') params.set('bill_date', `eq.${todayISO()}`);
   if (unclosedFilter) params.set('is_in_closed_day', 'eq.false');
+  if (searchQuery) {
+    // Substring (ilike) search across bill code (raw + dash-formatted), customer name,
+    // and contract code. Strip commas/parens so the term can't break the or() grammar.
+    const term = searchQuery.replace(/[(),]/g, ' ').trim();
+    if (term) {
+      const like = `*${term}*`;
+      params.set('or', `(code.ilike.${like},code_display.ilike.${like},customer_name.ilike.${like},contract_code.ilike.${like})`);
+    }
+  }
 
   const { data: billsData, isFetching } = useQuery({
-    queryKey: ['accounting', 'bills', branchId, statusFilter, typeFilter, dateFilter, unclosedFilter, pageIndex, pageSize],
+    queryKey: ['accounting', 'bills', branchId, statusFilter, typeFilter, dateFilter, unclosedFilter, searchQuery, pageIndex, pageSize],
     queryFn: () => apiClient.getPaginated<BillRow>(
       `/v_bills?${params.toString()}`,
       { page: pageIndex + 1, pageSize }
@@ -153,9 +173,6 @@ export function BillsPage() {
 
   const activeFilterCount =
     (branchId ? 1 : 0) + (typeFilter ? 1 : 0) + (dateFilter ? 1 : 0) + (unclosedFilter ? 1 : 0);
-
-  const [filterOpen, setFilterOpen] = useState(false);
-  const filterTriggerRef = useRef<HTMLButtonElement>(null);
 
   const selectBill = (id: number, goTo?: (panel: string) => void) => {
     setSelectedBillId(id);
@@ -210,94 +227,103 @@ export function BillsPage() {
           <div key="panels" className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
             {/* Left panel — bill list */}
             <PageNavPanel id="list" className={isMobile ? '' : 'w-1/2 xl:w-5/12 border-r border-line flex flex-col'}>
-              {/* Status tabs + filter button on the same row */}
+              {/* Filter bar — search (leading) + branch / type / scope filters that
+                  overflow into a popover when the panel narrows */}
+              <div className="flex-none p-2 border-b border-line">
+                <FilterBar
+                  leading={
+                    <Input
+                      value={searchInput}
+                      onChange={(e) => onSearchChange(e.target.value)}
+                      placeholder={t('accounting.bills.searchPlaceholder')}
+                      size="sm"
+                      className="w-full"
+                      startIcon={<Search size={14} />}
+                      endIcon={searchInput ? <X size={14} /> : undefined}
+                      onEndIconClick={searchInput ? () => onSearchChange('') : undefined}
+                    />
+                  }
+                  leadingMinWidth={180}
+                  activeCount={activeFilterCount}
+                  items={[
+                    ...(branches.length > 1 ? [{
+                      key: 'branch',
+                      width: 176,
+                      priority: 40,
+                      node: (
+                        <Select
+                          value={branchId || null}
+                          onChange={(v) => updateFilters({ branch_id: (v as string) ?? '' })}
+                          placeholder={t('accounting.branch')}
+                          options={branches.map(b => ({ label: b.name, value: String(b.id) }))}
+                          size="sm"
+                          showChevron
+                          clearable
+                        />
+                      ),
+                    }] : []),
+                    {
+                      key: 'type',
+                      width: 160,
+                      priority: 30,
+                      node: (
+                        <Select
+                          value={typeFilter || null}
+                          onChange={(v) => updateFilters({ type: (v as string) ?? '' })}
+                          options={TYPE_OPTIONS}
+                          size="sm"
+                          showChevron
+                          placeholder={t('accounting.bills.type')}
+                          clearable
+                        />
+                      ),
+                    },
+                    {
+                      key: 'today',
+                      width: 150,
+                      priority: 20,
+                      node: (
+                        <LabeledCheckbox
+                          label={t('accounting.bills.filterToday', { defaultValue: 'Today only' })}
+                          checked={dateFilter === 'today'}
+                          onChange={(e) => updateFilters({ date: e.target.checked ? 'today' : '' })}
+                        />
+                      ),
+                    },
+                    {
+                      key: 'unclosed',
+                      width: 170,
+                      priority: 10,
+                      node: (
+                        <LabeledCheckbox
+                          label={t('accounting.bills.filterUnclosed', { defaultValue: 'Day unclosed only' })}
+                          checked={unclosedFilter}
+                          onChange={(e) => updateFilters({ unclosed: e.target.checked ? '1' : '' })}
+                        />
+                      ),
+                    },
+                  ]}
+                />
+              </div>
+
+              {/* Status tabs */}
               <div className="flex-none flex items-center border-b border-line">
-                <div className="flex-1 flex">
-                  {STATUS_TABS.map(s => (
-                    <button
-                      key={s || '__all'}
-                      className={`flex-1 py-2 text-sm font-medium transition-colors cursor-pointer border-b-2 ${
-                        statusFilter === s
-                          ? 'border-primary-fg text-primary-fg'
-                          : 'border-transparent text-fg'
-                      }`}
-                      onClick={() => updateFilters({ status: s })}
-                    >
-                      {t(`accounting.bills.tab_${s || 'ALL'}`)}
-                      {s === 'OPEN' && pendingCount > 0 && (
-                        <Badge color="danger" size="sm" className="ml-1.5">{pendingCount}</Badge>
-                      )}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  ref={filterTriggerRef}
-                  type="button"
-                  aria-label={t('accounting.bills.filterButton', { defaultValue: 'Filters' })}
-                  onClick={() => setFilterOpen(v => !v)}
-                  className="relative self-stretch aspect-square flex items-center justify-center border-l border-line cursor-pointer bg-transparent hover:bg-surface-hover transition-colors text-fg"
-                >
-                  <Filter size={16} />
-                  {activeFilterCount > 0 && (
-                    <span className="absolute top-1 right-1 min-w-[1rem] h-4 px-1 rounded-full bg-primary-fg text-white text-[10px] leading-4 text-center font-semibold pointer-events-none">
-                      {activeFilterCount}
-                    </span>
-                  )}
-                </button>
-                <PopOver
-                  isOpen={filterOpen}
-                  onClose={() => setFilterOpen(false)}
-                  triggerRef={filterTriggerRef}
-                  placement="bottom"
-                  align="end"
-                  maxWidth="20rem"
-                >
-                  <div className="flex flex-col gap-3 p-3">
-                    <div className="flex flex-col">
-                      <label className="form-label">{t('accounting.branch')}</label>
-                      <Select
-                        value={branchId || null}
-                        onChange={(v) => updateFilters({ branch_id: (v as string) ?? '' })}
-                        placeholder={t('accounting.branch')}
-                        options={branches.map(b => ({ label: b.name, value: String(b.id) }))}
-                        size="sm"
-                        showChevron
-                        clearable
-                      />
-                    </div>
-                    <div className="flex flex-col">
-                      <label className="form-label">{t('accounting.bills.type')}</label>
-                      <Select
-                        value={typeFilter || null}
-                        onChange={(v) => updateFilters({ type: (v as string) ?? '' })}
-                        options={TYPE_OPTIONS}
-                        size="sm"
-                        showChevron
-                        placeholder={t('accounting.bills.type')}
-                        clearable
-                      />
-                    </div>
-                    <LabeledCheckbox
-                      label={t('accounting.bills.filterToday', { defaultValue: 'Today only' })}
-                      checked={dateFilter === 'today'}
-                      onChange={(e) => updateFilters({ date: e.target.checked ? 'today' : '' })}
-                    />
-                    <LabeledCheckbox
-                      label={t('accounting.bills.filterUnclosed', { defaultValue: 'Day unclosed only' })}
-                      checked={unclosedFilter}
-                      onChange={(e) => updateFilters({ unclosed: e.target.checked ? '1' : '' })}
-                    />
-                    {activeFilterCount > 0 && (
-                      <Button
-                        size="sm"
-                        color="default"
-                        onClick={() => updateFilters({ branch_id: '', type: '', date: '', unclosed: '' })}
-                      >
-                        {t('accounting.bills.filterClear', { defaultValue: 'Clear filters' })}
-                      </Button>
+                {STATUS_TABS.map(s => (
+                  <button
+                    key={s || '__all'}
+                    className={`flex-1 py-2 text-sm font-medium transition-colors cursor-pointer border-b-2 ${
+                      statusFilter === s
+                        ? 'border-primary-fg text-primary-fg'
+                        : 'border-transparent text-fg'
+                    }`}
+                    onClick={() => updateFilters({ status: s })}
+                  >
+                    {t(`accounting.bills.tab_${s || 'ALL'}`)}
+                    {s === 'OPEN' && pendingCount > 0 && (
+                      <Badge color="danger" size="sm" className="ml-1.5">{pendingCount}</Badge>
                     )}
-                  </div>
-                </PopOver>
+                  </button>
+                ))}
               </div>
 
               {/* Bill list */}
@@ -421,12 +447,15 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState('');
 
-  // Void state
+  // Void (cancel whole bill) state
   const [voidOpen, setVoidOpen] = useState(false);
   const [voidReason, setVoidReason] = useState('');
   const [voidPin, setVoidPin] = useState('');
   const [voiding, setVoiding] = useState(false);
   const [voidError, setVoidError] = useState('');
+
+  // Void-single-payment state — the payment row the BM chose to void
+  const [voidPayment, setVoidPayment] = useState<BillPayment | null>(null);
 
   // Print: render receipt off-screen in this page and call window.print().
   // No modal — tsp-form Modal portals into a fixed/overflow-hidden container
@@ -483,6 +512,12 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
   const existingPayments = detail.payments ?? [];
   const lineTotal = lines.reduce((s, l) => s + l.amount, 0);
   const existingPayTotal = existingPayments.reduce((s, p) => s + p.amount, 0);
+  // Reversal rows (is_reversal) are bookkeeping mirrors — don't list them as their
+  // own line. Instead, an original is "voided" when some reversal targets its id.
+  const voidedPaymentIds = new Set(
+    existingPayments.filter(p => p.is_reversal && p.ref_voided_id != null).map(p => p.ref_voided_id as number)
+  );
+  const originalPayments = existingPayments.filter(p => !p.is_reversal);
   const balanced = Math.abs(lineTotal - existingPayTotal) < 0.01;
   const isCancelled = detail.is_voided || detail.status === 'VOIDED';
   const displayStatus = isCancelled ? 'VOIDED' : detail.status;
@@ -702,27 +737,48 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
           <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-2">
             {t('accounting.bills.payments')} ({existingPayments.length})
           </h3>
-          {existingPayments.length === 0 ? (
+          {originalPayments.length === 0 ? (
             <div className="text-sm text-subtler italic">{t('accounting.bills.noPayments')}</div>
           ) : (
             <div className="flex flex-col">
-              {existingPayments.map((pay) => (
-                <div key={pay.id} className="flex items-center gap-2 text-sm py-1.5 border-b border-line last:border-b-0">
-                  <Badge color={METHOD_COLOR[pay.method] ?? 'default'} size="sm">
-                    {pay.method}
-                  </Badge>
-                  <span className="flex-1 min-w-0 truncate text-subtle">
-                    {pay.bank_name ? `${pay.bank_name} ${pay.account_number ?? ''}` : pay.code_display}
-                    {pay.reference && <span className="opacity-70"> · {pay.reference}</span>}
-                  </span>
-                  <span className="tabular-nums font-medium shrink-0">
-                    {fmtCurrency(pay.amount)}
-                  </span>
-                </div>
-              ))}
+              {originalPayments.map((pay) => {
+                const isVoided = voidedPaymentIds.has(pay.id);
+                // BM can void a real (non-reversal, non-voided) payment while the bill
+                // isn't itself cancelled. Server enforces permission + day-closed block.
+                const canVoid = !isVoided && !isCancelled;
+                return (
+                  <div key={pay.id} className="flex items-center gap-2 text-sm py-1.5 border-b border-line last:border-b-0">
+                    <Badge color={isVoided ? 'default' : (METHOD_COLOR[pay.method] ?? 'default')} size="sm">
+                      {pay.method}
+                    </Badge>
+                    <span className={`flex-1 min-w-0 break-words ${isVoided ? 'text-subtler line-through' : 'text-subtle'}`}>
+                      {pay.bank_name ? `${pay.bank_name} ${pay.account_number ?? ''}` : pay.code_display}
+                      {pay.reference && <span className="opacity-70 block">· {pay.reference}</span>}
+                    </span>
+                    {isVoided && (
+                      <Badge color="default" size="sm">{t('accounting.bills.paymentVoided', { defaultValue: 'Voided' })}</Badge>
+                    )}
+                    <span className={`tabular-nums font-medium shrink-0 ${isVoided ? 'text-subtler line-through' : ''}`}>
+                      {fmtCurrency(pay.amount)}
+                    </span>
+                    {canVoid && (
+                      <Tooltip content={t('accounting.bills.voidPayment', { defaultValue: 'Void payment' })} placement="left">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="btn-icon-sm shrink-0"
+                          startIcon={<Ban size={14} className="text-danger" />}
+                          onClick={() => setVoidPayment(pay)}
+                          aria-label={t('accounting.bills.voidPayment', { defaultValue: 'Void payment' })}
+                        />
+                      </Tooltip>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
-          {existingPayments.length > 0 && (
+          {originalPayments.length > 0 && (
             <div className="mt-2 pt-2 border-t border-line text-sm font-semibold flex justify-between">
               <span>{t('accounting.bills.totalPaid')}</span>
               <span className="tabular-nums">{fmtCurrency(existingPayTotal)}</span>
@@ -869,7 +925,170 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
           </Button>
         </div>
       </Modal>
+
+      {/* ── Void single payment modal ── */}
+      <VoidPaymentModal
+        payment={voidPayment}
+        onClose={() => setVoidPayment(null)}
+        onVoided={() => {
+          queryClient.invalidateQueries({ queryKey: ['accounting', 'bill-detail', billId] });
+          queryClient.invalidateQueries({ queryKey: ['bill-actions', billId] });
+          onBillChanged();
+        }}
+      />
     </div>
+  );
+}
+
+/* ── Void single payment modal ─────────────────────────────────────────────
+   Standalone per-payment void. On success the bill recalcs server-side
+   (PAID → PARTIAL/OPEN) and the host's "add payment" form reappears for
+   re-entry. Follows the form→done + dirty-guard write-modal pattern. */
+
+function VoidPaymentModal({
+  payment, onClose, onVoided,
+}: {
+  payment: BillPayment | null;
+  onClose: () => void;
+  onVoided: () => void;
+}) {
+  const { t } = useTranslation();
+  const [view, setView] = useState<'form' | 'done'>('form');
+  const [reason, setReason] = useState('');
+  const [pin, setPin] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [confirmClose, setConfirmClose] = useState(false);
+
+  const open = payment !== null;
+  const dirty = view === 'form' && (reason.trim() !== '' || pin !== '');
+
+  // Reset to a clean form on open.
+  useEffect(() => {
+    if (open) {
+      setView('form');
+      setReason('');
+      setPin('');
+      setError('');
+      setConfirmClose(false);
+    }
+  }, [open]);
+
+  const forceClose = () => { setConfirmClose(false); onClose(); };
+  const handleClose = () => {
+    if (busy) return;
+    if (view === 'done') { forceClose(); return; }
+    if (dirty) { setConfirmClose(true); return; }
+    forceClose();
+  };
+
+  const handleVoid = async () => {
+    if (!payment || !reason.trim() || !pin) return;
+    setBusy(true);
+    setError('');
+    try {
+      await apiClient.rpc('fn_bill_payment_void', {
+        p_payment_id: payment.id,
+        p_reason: reason.trim(),
+        p_pin: pin,
+      });
+      onVoided();
+      setView('done');
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setError(translated || err.message);
+      } else {
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <Modal open={open} onClose={handleClose} maxWidth="24rem" width="100%">
+        <div className="modal-header">
+          <h2 className="modal-title">
+            {view === 'done'
+              ? t('accounting.bills.paymentVoidedTitle', { defaultValue: 'Payment voided' })
+              : t('accounting.bills.voidPayment', { defaultValue: 'Void payment' })}
+          </h2>
+        </div>
+
+        {view === 'form' && (
+          <>
+            <div className="modal-content">
+              <div className="form-grid">
+                {error && (
+                  <div className="alert alert-danger">
+                    <XCircle size={18} />
+                    <div><div className="alert-description">{error}</div></div>
+                  </div>
+                )}
+                {payment && (
+                  <div className="flex items-center gap-2 text-sm rounded-md bg-surface px-3 py-2 border border-line">
+                    <Badge color={METHOD_COLOR[payment.method] ?? 'default'} size="sm">{payment.method}</Badge>
+                    <span className="flex-1 min-w-0 truncate text-subtle">
+                      {payment.bank_name ? `${payment.bank_name} ${payment.account_number ?? ''}` : payment.code_display}
+                    </span>
+                    <span className="tabular-nums font-medium shrink-0">{fmtCurrency(payment.amount)}</span>
+                  </div>
+                )}
+                <p className="text-sm text-subtle">{t('accounting.bills.voidPaymentMessage', { defaultValue: 'A reversal entry will be recorded and the bill will reopen for re-entry.' })}</p>
+                <div className="flex flex-col">
+                  <label className="form-label">{t('accounting.bills.voidReason')} *</label>
+                  <Input
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder={t('accounting.bills.voidReasonPlaceholder')}
+                    className="w-full"
+                  />
+                </div>
+                <BranchPinInput value={pin} onChange={setPin} label={t('accounting.bills.pin')} required />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <Button onClick={handleClose} disabled={busy}>{t('common.cancel')}</Button>
+              <Button color="danger" onClick={handleVoid} disabled={!reason.trim() || !pin || busy}>
+                {busy ? t('common.loading') : t('accounting.bills.confirmVoidPayment', { defaultValue: 'Void payment' })}
+              </Button>
+            </div>
+          </>
+        )}
+
+        {view === 'done' && payment && (
+          <>
+            <div className="modal-content">
+              <div className="flex flex-col items-center text-center gap-2 py-2">
+                <CheckCircle size={40} className="text-success" />
+                <div className="text-sm text-subtle">
+                  {t('accounting.bills.paymentVoidedDesc', { defaultValue: 'The payment was voided. Add the corrected payment on the bill.' })}
+                </div>
+                <div className="flex items-center gap-2 text-sm mt-1">
+                  <Badge color="default" size="sm">{payment.method}</Badge>
+                  <span className="tabular-nums font-medium line-through text-subtler">{fmtCurrency(payment.amount)}</span>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <Button color="primary" onClick={forceClose}>{t('common.done')}</Button>
+            </div>
+          </>
+        )}
+      </Modal>
+
+      <Modal open={confirmClose} onClose={() => setConfirmClose(false)} maxWidth="24rem" width="100%">
+        <div className="modal-header"><h2 className="modal-title">{t('common.unsavedChanges')}</h2></div>
+        <div className="modal-content"><p>{t('common.unsavedChangesMessage')}</p></div>
+        <div className="modal-footer">
+          <Button variant="ghost" onClick={() => setConfirmClose(false)}>{t('common.cancel')}</Button>
+          <Button color="danger" onClick={forceClose}>{t('common.discard')}</Button>
+        </div>
+      </Modal>
+    </>
   );
 }
 
