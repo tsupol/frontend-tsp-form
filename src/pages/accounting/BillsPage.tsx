@@ -743,9 +743,12 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
             <div className="flex flex-col">
               {originalPayments.map((pay) => {
                 const isVoided = voidedPaymentIds.has(pay.id);
-                // BM can void a real (non-reversal, non-voided) payment while the bill
-                // isn't itself cancelled. Server enforces permission + day-closed block.
-                const canVoid = !isVoided && !isCancelled;
+                // Single reversal door (mig 264): payment void only on OPEN/PARTIAL
+                // bills. Once PAID the DB blocks fn_bill_payment_void
+                // (PAYMENT_VOID_NOT_ALLOWED_FOR_BILL_PURPOSE) — cancel the whole
+                // bill instead. VOID_PAYMENT.is_available from the action evaluator
+                // already encodes that rule + permission + day-closed block.
+                const canVoid = !isVoided && !isCancelled && isActionAvailable('VOID_PAYMENT');
                 return (
                   <div key={pay.id} className="flex items-center gap-2 text-sm py-1.5 border-b border-line last:border-b-0">
                     <Badge color={isVoided ? 'default' : (METHOD_COLOR[pay.method] ?? 'default')} size="sm">
