@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { Modal, Button, useSnackbarContext } from 'tsp-form';
 import { Loader2, Printer, XCircle, AlertTriangle, ExternalLink, Eye } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import { BeMediaError } from '../../lib/beMedia';
 import { useGenerateContractPdfServer } from './useGenerateContractPdfServer';
 import { ContractPreviewModal } from './ContractPreviewModal';
 import { CLAUSE_6_REPO_THRESHOLD_DAYS } from '../../lib/contractPdf/constants';
@@ -316,7 +317,9 @@ function hasOrNot(v: boolean | undefined, t: (k: string, opts?: Record<string, u
 
 function surfaceError(err: unknown, t: (k: string, opts?: Record<string, unknown>) => string, addSnackbar: (s: { message: React.ReactNode; type?: 'success' | 'error' }) => void) {
   let msg = '';
-  if (err instanceof ApiError) {
+  if (err instanceof BeMediaError) {
+    msg = t(err.code, { ns: 'apiErrors', defaultValue: err.message });
+  } else if (err instanceof ApiError) {
     msg = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
       || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '')
       || err.message;

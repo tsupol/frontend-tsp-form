@@ -1,13 +1,10 @@
-// React hook: triggers contract PDF generation via the nnf-misc-go server
-// endpoint (POST /api/v1/contract/pdf). Reuses the shared buildContractRenderData
-// data assembly so the server gets the same input shape the preview uses.
+// React hook: triggers contract PDF generation via be-media
+// (POST /api/v1/contract/pdf). be-media assembles the document server-side
+// from the contract id — no client-side data assembly needed.
 
 import { useCallback, useState } from 'react';
-import { config } from '../../config/config';
-import {
-  buildContractRenderData,
-  type ContractMin,
-} from '../../lib/contractPdf/buildRenderData';
+import { beMediaContractPdf } from '../../lib/beMedia';
+import type { ContractMin } from '../../lib/contractPdf/buildRenderData';
 
 export interface UseGenerateContractPdfServer {
   generating: boolean;
@@ -34,23 +31,7 @@ export function useGenerateContractPdfServer(): UseGenerateContractPdfServer {
     setError(null);
     setGenerating(true);
     try {
-      const input = await buildContractRenderData(contract);
-      const res = await fetch(`${config.uploadUrl}/contract/pdf`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(input),
-      });
-      if (!res.ok) {
-        let detail = '';
-        try {
-          const j = await res.json();
-          detail = j?.error?.message || j?.error?.code || '';
-        } catch {
-          /* non-json body */
-        }
-        throw new Error(`server pdf ${res.status}${detail ? `: ${detail}` : ''}`);
-      }
-      const blob = await res.blob();
+      const blob = await beMediaContractPdf({ contractId: contract.id });
       const code = contract.code_display ?? contract.code;
       triggerDownload(blob, `${code}.pdf`);
     } catch (err) {

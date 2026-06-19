@@ -1,19 +1,15 @@
-// Fullscreen modal that shows the contract PDF (server-rendered by misc-go)
-// in an iframe for staff to show the customer before signing/printing.
-// Sends `preview` = whether the lessee is still unsigned: while unsigned the
-// server omits the lessee signature (the "show the customer before they sign"
-// flow); once the lessee has signed, the signed document is shown in full.
+// Fullscreen modal that shows the contract PDF (server-rendered by be-media)
+// in a canvas viewer for staff to show the customer before signing/printing.
+// be-media assembles + renders from the contract id; draft vs signed is
+// decided server-side by contract state (signatures simply absent until
+// signed), so no client-side preview flag is needed.
 
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Button } from 'tsp-form';
 import { Loader2, X, AlertTriangle, PenLine } from 'lucide-react';
-import { config } from '../../config/config';
-import {
-  buildContractRenderData,
-  ContractRenderPrerequisiteError,
-  type ContractMin,
-} from '../../lib/contractPdf/buildRenderData';
+import { beMediaContractPdf, BeMediaError } from '../../lib/beMedia';
+import type { ContractMin } from '../../lib/contractPdf/buildRenderData';
 import { PdfCanvasViewer } from '../../components/PdfCanvasViewer';
 
 interface Props {
@@ -41,36 +37,18 @@ export function ContractPreviewModal({ open, onClose, contract, onAcceptAndSign 
     setErrMsg(null);
     setBlobUrl(null);
 
+    setContractCode(contract.code_display ?? contract.code);
+
     (async () => {
       try {
-        const input = await buildContractRenderData(contract);
-        if (cancelled) return;
-        setContractCode(input.contractCode);
-        // preview=true tells the server to omit the lessee signature (the
-        // "show the customer before they sign" flow). Once the lessee has
-        // actually signed, show it — i.e. preview only while unsigned.
-        const previewMode = !input.lesseeSignatureDataUrl;
-        const res = await fetch(`${config.uploadUrl}/contract/pdf`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...input, preview: previewMode }),
-        });
-        if (!res.ok) {
-          let detail = '';
-          try {
-            const j = await res.json();
-            detail = j?.error?.message || j?.error?.code || '';
-          } catch { /* non-json body */ }
-          throw new Error(`server pdf ${res.status}${detail ? `: ${detail}` : ''}`);
-        }
-        const blob = await res.blob();
+        const blob = await beMediaContractPdf({ contractId: contract.id });
         if (cancelled) return;
         createdUrl = URL.createObjectURL(blob);
         setBlobUrl(createdUrl);
       } catch (err) {
         if (cancelled) return;
-        if (err instanceof ContractRenderPrerequisiteError) {
-          setErrMsg(prerequisiteMsg(err.reason, t));
+        if (err instanceof BeMediaError) {
+          setErrMsg(t(err.code, { ns: 'apiErrors', defaultValue: err.message }));
         } else {
           setErrMsg(err instanceof Error ? err.message : String(err));
         }
@@ -147,17 +125,4 @@ export function ContractPreviewModal({ open, onClose, contract, onAcceptAndSign 
       </div>
     </Modal>
   );
-}
-
-function prerequisiteMsg(reason: string, t: (k: string, opts?: Record<string, unknown>) => string): string {
-  switch (reason) {
-    case 'no_bank_account':
-      return t('contract.printBlock_noBankAccount', { defaultValue: 'Branch has no active bank account set.' });
-    case 'no_lessor':
-      return t('contract.printBlock_noLessorInBook', { defaultValue: 'Branch signatory book has no active lessor.' });
-    case 'no_witnesses':
-      return t('contract.printBlock_notEnoughWitnesses', { defaultValue: 'Branch signatory book needs at least 2 active witnesses.' });
-    default:
-      return reason;
-  }
 }

@@ -29,6 +29,20 @@ export interface BeMediaUploadResult {
 interface OkEnvelope<T> { ok: true; data: T }
 interface ErrEnvelope { ok: false; error: { code: string; message: string; http?: number } }
 
+// Thrown on a be-media error envelope. Carries the DB i18n `code` so callers
+// can translate via the `apiErrors` namespace; `message` is the English
+// fallback.
+export class BeMediaError extends Error {
+  code: string;
+  http?: number;
+  constructor(code: string, message: string, http?: number) {
+    super(message || code);
+    this.name = 'BeMediaError';
+    this.code = code;
+    this.http = http;
+  }
+}
+
 function token(): string | null {
   return localStorage.getItem('access_token');
 }
@@ -94,6 +108,47 @@ export async function beMediaUploadFromImage(
     });
   }
   return out;
+}
+
+// ── Contract PDF ──────────────────────────────────────────────────────
+// One authenticated call → the full server-rendered contract PDF (raw bytes).
+// be-media assembles everything server-side from api.fn_contract_render
+// (staff) / fn_customer_contract_render (customer), auto-routed by the JWT
+// role claim. We send only the contract id (+ optional signing_id to print a
+// specific signed version). State watermark is applied server-side.
+//
+// NOTE: success is raw application/pdf, NOT the {ok,data} envelope — so this
+// does not go through `call()`. Errors come back as {ok:false,error:{code}}.
+export interface BeMediaContractPdfOpts {
+  contractId: number;
+  signingId?: number;
+}
+
+export async function beMediaContractPdf(opts: BeMediaContractPdfOpts): Promise<Blob> {
+  const t = token();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (t) headers['Authorization'] = `Bearer ${t}`;
+  const body: Record<string, number> = { contract_id: opts.contractId };
+  if (opts.signingId != null) body.signing_id = opts.signingId;
+
+  const res = await fetch(`${BE_MEDIA_URL}/contract/pdf`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let code = '';
+    let message = '';
+    try {
+      const j = (await res.json()) as ErrEnvelope;
+      code = j?.error?.code || '';
+      message = j?.error?.message || '';
+    } catch {
+      /* non-json body */
+    }
+    throw new BeMediaError(code, message || `contract pdf ${res.status}`, res.status);
+  }
+  return res.blob();
 }
 
 // Batch delete. Failures (per-key) come back in `failed`; harmless — the
