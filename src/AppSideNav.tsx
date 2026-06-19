@@ -214,31 +214,96 @@ export const AppSideNav = () => {
 
   const menuItems: SideMenuItemData[] = [
     { key: 'dashboard', icon: <LayoutDashboard size="1rem" />, label: t('nav.dashboard'), path: '/admin' },
-    { key: 'users', icon: <Users size="1rem" />, label: t('nav.users'), path: '/admin/users' },
+    {
+      key: 'contracts', icon: <FileText size="1rem" />, label: t('nav.contracts'),
+      path: '/admin/contracts',
+      children: [
+        { key: 'contract-search', icon: <Search size="1rem" />, label: t('nav.contractSearch'), path: '/admin/contracts/search' },
+        { key: 'saving-contracts', ...iconWithCount(<PiggyBank size="1rem" />, savingContractsCount), label: t('nav.savingContracts'), path: '/admin/contracts/saving' },
+        { key: 'draft-contracts', ...iconWithCount(<FileEdit size="1rem" />, draftContractsCount), label: t('nav.draftContracts'), path: '/admin/contracts/draft' },
+        { key: 'pending-payment', ...iconWithCount(<CreditCard size="1rem" />, pendingPaymentCount), label: t('nav.pendingPayment'), path: '/admin/contracts/pending-payment' },
+        { key: 'pending-pairing', ...iconWithCount(<Link2 size="1rem" />, pendingPairingCount), label: t('nav.pendingPairing'), path: '/admin/contracts/pending-pairing' },
+        {
+          key: 'new-contract',
+          icon: <FilePlus size="1rem" className="text-primary-fg" />,
+          label: <span className="text-primary-fg font-medium">{t('nav.newContract')}</span>,
+          path: '/admin/contracts/new',
+        },
+      ],
+    },
     {
       key: 'customers', icon: <UserSearch size="1rem" />, label: t('nav.customers'),
       path: '/admin/customers',
     },
-    { key: 'price-check', icon: <Calculator size="1rem" />, label: t('nav.priceCheck'), path: '/admin/price-check' },
     {
-      key: 'products', icon: <Package size="1rem" />, label: t('nav.products'),
-      path: '/admin/products/models',
+      key: 'payment-submissions',
+      ...iconWithCount(<Receipt size="1rem" />, pendingSlips),
+      label: t('nav.paymentSubmissions'),
+      path: '/admin/payment-submissions',
+    },
+    ...(canChat
+      ? [{
+          key: 'chat',
+          ...iconWithCount(<MessageSquare size="1rem" />, unreadChatCount),
+          label: t('nav.chat'),
+          path: '/admin/chat',
+        }]
+      : []),
+    ...(canApprove
+      ? [{
+          key: 'approvals',
+          ...iconWithCount(<ClipboardCheck size="1rem" />, pendingApprovals),
+          label: t('nav.approvals'),
+          path: '/admin/approvals',
+        }]
+      : []),
+    {
+      key: 'retail', icon: <Store size="1rem" />, label: t('nav.retail'),
+      path: '/admin/retail/bills',
+    },
+    {
+      key: 'collections',
+      icon: <AlertTriangle size="1rem" />,
+      label: t('nav.collections'),
+      path: '/admin/collections/worklist',
       children: [
-        { key: 'brands', icon: <Tag size="1rem" />, label: t('nav.brands'), path: '/admin/products/brands' },
-        { key: 'families', icon: <Layers size="1rem" />, label: t('nav.families'), path: '/admin/products/families' },
-        { key: 'attributes', icon: <SlidersHorizontal size="1rem" />, label: t('nav.attributes'), path: '/admin/products/attributes' },
-        { key: 'models', icon: <Box size="1rem" />, label: t('nav.models'), path: '/admin/products/models' },
+        { type: 'group', key: 'grp-collections-daily', label: t('nav.groupCollectionsDaily') },
+        { key: 'overdue-worklist', icon: <CalendarDays size="1rem" />, label: t('nav.overdueWorklist'), path: '/admin/collections/worklist' },
+        { key: 'collections-calls', ...iconWithCount(<Headset size="1rem" />, callCenterMineCount), label: t('nav.callCenter'), path: '/admin/collections/calls' },
+        ...(['COMPANY_REPO', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
+          { key: 'collections-cases', ...iconWithCount(<Scale size="1rem" />, legalCasesQueuedCount), label: t('nav.legalCases'), path: '/admin/collections/cases' },
+        ] : []),
+        { type: 'group' as const, key: 'grp-collections-reports', label: t('nav.groupCollectionsReports') },
+        { key: 'collections-timeline', icon: <Calendar size="1rem" />, label: t('nav.timelineOverview'), path: '/admin/collections/timeline' },
+        ...(['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
+          { type: 'group' as const, key: 'grp-collections-config', label: t('nav.groupCollectionsConfig') },
+          { key: 'collections-config', icon: <Settings size="1rem" />, label: t('nav.dunningConfig'), path: '/admin/collections/config' },
+        ] : []),
       ],
     },
     {
-      key: 'pricing', icon: <DollarSign size="1rem" />, label: t('nav.pricing'),
-      path: '/admin/pricing/pricebook',
+      key: 'accounting',
+      ...iconWithCount(<BookOpen size="1rem" />, unclosedCount),
+      label: t('nav.accounting'),
+      path: '/admin/accounting/day-close',
       children: [
-        { key: 'pricebook', icon: <DollarSign size="1rem" />, label: t('nav.pricebook'), path: '/admin/pricing/pricebook' },
-        { key: 'fin1-rates', icon: <Calculator size="1rem" />, label: t('nav.fin1Rates'), path: '/admin/pricing/fin1-rates' },
-        { key: 'fin2-rates', icon: <TrendingUp size="1rem" />, label: t('nav.fin2Rates'), path: '/admin/pricing/fin2-rates' },
-        { key: 'discount-policies', icon: <Percent size="1rem" />, label: t('nav.discountPolicies'), path: '/admin/pricing/discount-policies' },
-        { key: 'deal-partner-rates', icon: <Handshake size="1rem" />, label: t('nav.dealPartnerRates'), path: '/admin/pricing/deal-partner-rates' },
+        { type: 'group', key: 'grp-acct-daily', label: t('nav.groupDaily') },
+        {
+          key: 'day-close',
+          ...iconWithCount(<CalendarCheck size="1rem" />, unclosedCount),
+          label: t('nav.dayClose'),
+          path: '/admin/accounting/day-close',
+        },
+        { key: 'bills', icon: <Receipt size="1rem" />, label: t('nav.bills'), path: '/admin/accounting/bills' },
+        { type: 'group', key: 'grp-acct-cashflow', label: t('nav.groupCashflow') },
+        { key: 'remittance', icon: <ArrowUpRight size="1rem" />, label: t('nav.remittance'), path: '/admin/accounting/remittance' },
+        { key: 'payments', icon: <Banknote size="1rem" />, label: t('nav.payments'), path: '/admin/accounting/payments' },
+        { type: 'group', key: 'grp-acct-reports', label: t('nav.groupReports') },
+        { key: 'branch-balance', icon: <Scale size="1rem" />, label: t('nav.branchBalance'), path: '/admin/accounting/balance' },
+        ...(['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
+          { type: 'group' as const, key: 'grp-acct-audit', label: t('nav.groupAudit') },
+          { key: 'audit-flags', icon: <ShieldAlert size="1rem" />, label: t('nav.auditFlags'), path: '/admin/accounting/audit-flags' },
+        ] : []),
       ],
     },
     {
@@ -273,35 +338,6 @@ export const AppSideNav = () => {
       ],
     },
     {
-      key: 'retail', icon: <Store size="1rem" />, label: t('nav.retail'),
-      path: '/admin/retail/bills',
-    },
-    {
-      key: 'accounting',
-      ...iconWithCount(<BookOpen size="1rem" />, unclosedCount),
-      label: t('nav.accounting'),
-      path: '/admin/accounting/day-close',
-      children: [
-        { type: 'group', key: 'grp-acct-daily', label: t('nav.groupDaily') },
-        {
-          key: 'day-close',
-          ...iconWithCount(<CalendarCheck size="1rem" />, unclosedCount),
-          label: t('nav.dayClose'),
-          path: '/admin/accounting/day-close',
-        },
-        { key: 'bills', icon: <Receipt size="1rem" />, label: t('nav.bills'), path: '/admin/accounting/bills' },
-        { type: 'group', key: 'grp-acct-cashflow', label: t('nav.groupCashflow') },
-        { key: 'remittance', icon: <ArrowUpRight size="1rem" />, label: t('nav.remittance'), path: '/admin/accounting/remittance' },
-        { key: 'payments', icon: <Banknote size="1rem" />, label: t('nav.payments'), path: '/admin/accounting/payments' },
-        { type: 'group', key: 'grp-acct-reports', label: t('nav.groupReports') },
-        { key: 'branch-balance', icon: <Scale size="1rem" />, label: t('nav.branchBalance'), path: '/admin/accounting/balance' },
-        ...(['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
-          { type: 'group' as const, key: 'grp-acct-audit', label: t('nav.groupAudit') },
-          { key: 'audit-flags', icon: <ShieldAlert size="1rem" />, label: t('nav.auditFlags'), path: '/admin/accounting/audit-flags' },
-        ] : []),
-      ],
-    },
-    {
       key: 'branch-expense',
       icon: <BookIcon size="1rem" />,
       label: t('nav.branchExpense'),
@@ -315,6 +351,28 @@ export const AppSideNav = () => {
           { type: 'group' as const, key: 'grp-bxp-config', label: t('branchExpense.groupConfig') },
           { key: 'bxp-categories', icon: <TagIcon size="1rem" />, label: t('branchExpense.categories'), path: '/admin/branch-expense/categories' },
         ] : []),
+      ],
+    },
+    { key: 'price-check', icon: <Calculator size="1rem" />, label: t('nav.priceCheck'), path: '/admin/price-check' },
+    {
+      key: 'products', icon: <Package size="1rem" />, label: t('nav.products'),
+      path: '/admin/products/models',
+      children: [
+        { key: 'brands', icon: <Tag size="1rem" />, label: t('nav.brands'), path: '/admin/products/brands' },
+        { key: 'families', icon: <Layers size="1rem" />, label: t('nav.families'), path: '/admin/products/families' },
+        { key: 'attributes', icon: <SlidersHorizontal size="1rem" />, label: t('nav.attributes'), path: '/admin/products/attributes' },
+        { key: 'models', icon: <Box size="1rem" />, label: t('nav.models'), path: '/admin/products/models' },
+      ],
+    },
+    {
+      key: 'pricing', icon: <DollarSign size="1rem" />, label: t('nav.pricing'),
+      path: '/admin/pricing/pricebook',
+      children: [
+        { key: 'pricebook', icon: <DollarSign size="1rem" />, label: t('nav.pricebook'), path: '/admin/pricing/pricebook' },
+        { key: 'fin1-rates', icon: <Calculator size="1rem" />, label: t('nav.fin1Rates'), path: '/admin/pricing/fin1-rates' },
+        { key: 'fin2-rates', icon: <TrendingUp size="1rem" />, label: t('nav.fin2Rates'), path: '/admin/pricing/fin2-rates' },
+        { key: 'discount-policies', icon: <Percent size="1rem" />, label: t('nav.discountPolicies'), path: '/admin/pricing/discount-policies' },
+        { key: 'deal-partner-rates', icon: <Handshake size="1rem" />, label: t('nav.dealPartnerRates'), path: '/admin/pricing/deal-partner-rates' },
       ],
     },
     {
@@ -341,72 +399,13 @@ export const AppSideNav = () => {
         { key: 'staff-commission', icon: <UserCheck size="1rem" />, label: t('nav.staffCommission'), path: '/admin/company/staff-commission' },
       ],
     },
-    {
-      key: 'contracts', icon: <FileText size="1rem" />, label: t('nav.contracts'),
-      path: '/admin/contracts',
-      children: [
-        { key: 'contract-search', icon: <Search size="1rem" />, label: t('nav.contractSearch'), path: '/admin/contracts/search' },
-        { key: 'saving-contracts', ...iconWithCount(<PiggyBank size="1rem" />, savingContractsCount), label: t('nav.savingContracts'), path: '/admin/contracts/saving' },
-        { key: 'draft-contracts', ...iconWithCount(<FileEdit size="1rem" />, draftContractsCount), label: t('nav.draftContracts'), path: '/admin/contracts/draft' },
-        { key: 'pending-payment', ...iconWithCount(<CreditCard size="1rem" />, pendingPaymentCount), label: t('nav.pendingPayment'), path: '/admin/contracts/pending-payment' },
-        { key: 'pending-pairing', ...iconWithCount(<Link2 size="1rem" />, pendingPairingCount), label: t('nav.pendingPairing'), path: '/admin/contracts/pending-pairing' },
-        {
-          key: 'new-contract',
-          icon: <FilePlus size="1rem" className="text-primary-fg" />,
-          label: <span className="text-primary-fg font-medium">{t('nav.newContract')}</span>,
-          path: '/admin/contracts/new',
-        },
-      ],
-    },
-    { type: 'group', key: 'grp-inbox', label: t('nav.groupInbox') },
-    ...(canChat
-      ? [{
-          key: 'chat',
-          ...iconWithCount(<MessageSquare size="1rem" />, unreadChatCount),
-          label: t('nav.chat'),
-          path: '/admin/chat',
-        }]
-      : []),
-    ...(canApprove
-      ? [{
-          key: 'approvals',
-          ...iconWithCount(<ClipboardCheck size="1rem" />, pendingApprovals),
-          label: t('nav.approvals'),
-          path: '/admin/approvals',
-        }]
-      : []),
-    {
-      key: 'payment-submissions',
-      ...iconWithCount(<Receipt size="1rem" />, pendingSlips),
-      label: t('nav.paymentSubmissions'),
-      path: '/admin/payment-submissions',
-    },
+    { key: 'users', icon: <Users size="1rem" />, label: t('nav.users'), path: '/admin/users' },
     {
       type: 'custom',
       key: 'notifications',
       render: ({ collapsed, isMobile: m }) => (
         <NotificationMenuItem collapsed={collapsed} isMobile={m} unreadCount={unreadNotifCount} />
       ),
-    },
-    {
-      key: 'collections',
-      icon: <AlertTriangle size="1rem" />,
-      label: t('nav.collections'),
-      path: '/admin/collections/worklist',
-      children: [
-        { type: 'group', key: 'grp-collections-daily', label: t('nav.groupCollectionsDaily') },
-        { key: 'overdue-worklist', icon: <CalendarDays size="1rem" />, label: t('nav.overdueWorklist'), path: '/admin/collections/worklist' },
-        { key: 'collections-calls', ...iconWithCount(<Headset size="1rem" />, callCenterMineCount), label: t('nav.callCenter'), path: '/admin/collections/calls' },
-        ...(['COMPANY_REPO', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
-          { key: 'collections-cases', ...iconWithCount(<Scale size="1rem" />, legalCasesQueuedCount), label: t('nav.legalCases'), path: '/admin/collections/cases' },
-        ] : []),
-        { type: 'group' as const, key: 'grp-collections-reports', label: t('nav.groupCollectionsReports') },
-        { key: 'collections-timeline', icon: <Calendar size="1rem" />, label: t('nav.timelineOverview'), path: '/admin/collections/timeline' },
-        ...(['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
-          { type: 'group' as const, key: 'grp-collections-config', label: t('nav.groupCollectionsConfig') },
-          { key: 'collections-config', icon: <Settings size="1rem" />, label: t('nav.dunningConfig'), path: '/admin/collections/config' },
-        ] : []),
-      ],
     },
     ...(isLocalDev() ? [{
       key: 'dev', icon: <FlaskConical size="1rem" />, label: 'Dev',
