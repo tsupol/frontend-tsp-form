@@ -92,6 +92,7 @@ import { DevSignaturePage } from './pages/dev/DevSignaturePage';
 import { DevMediaPage } from './pages/dev/DevMediaPage';
 import { DevCropPage } from './pages/dev/DevCropPage';
 import { DevWatermarkPage } from './pages/dev/DevWatermarkPage';
+import { DevBillPrintPage } from './pages/dev/DevBillPrintPage';
 import { DevNotificationsPage } from './pages/dev/DevNotificationsPage';
 import { DevTokensPage } from './pages/dev/DevTokensPage';
 import { isLocalDev } from './lib/devEnv';
@@ -613,6 +614,16 @@ function App() {
               <ProtectedRoute>
                 <AdminLayout>
                   <DevLayout><DevWatermarkPage /></DevLayout>
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dev/bill-print"
+            element={
+              <ProtectedRoute>
+                <AdminLayout>
+                  <DevLayout><DevBillPrintPage /></DevLayout>
                 </AdminLayout>
               </ProtectedRoute>
             }

@@ -121,13 +121,43 @@ input[type="number"
    so nothing clips at the rightmost column.
    On screen it sits in a card; on print it takes over the page via
    @page size: 80mm auto (continuous feed). */
-.bill-receipt {
+.bill-receipt,
+.bill-receipt-preview {
     width: 72mm;
     background: var(--color-bg);
     color: var(--color-fg);
     font-size: 11px;
     line-height: 1.35;
     font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Sarabun", sans-serif;
+}
+
+/* Preview clone of the receipt's child styling — same look on screen, but the
+   `.bill-receipt-preview` marker is intentionally absent from every @media print
+   rule, so an on-screen preview never participates in print isolation. */
+.bill-receipt-preview .receipt-mono { font-variant-numeric: tabular-nums; }
+.bill-receipt-preview .receipt-divider {
+    border: 0;
+    border-top: 1px dashed currentColor;
+    opacity: 0.5;
+    margin: 4px 0;
+}
+.bill-receipt-preview .receipt-rule {
+    border: 0;
+    border-top: 1px solid currentColor;
+    margin: 4px 0;
+}
+.bill-receipt-preview .receipt-watermark {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    color: rgba(220, 38, 38, 0.18);
+    transform: rotate(-18deg);
 }
 
 .bill-receipt-screen {

@@ -8,7 +8,7 @@
 // off-screen via a body portal under `.print-only-signing-detail`; isolation +
 // @page come from the `.signing-detail-print` rules in app.css.
 //
-// See `.claude/print-pattern.md` for the shared browser-print pattern.
+// See `.claude/in-app-print-pattern.md` for the shared browser-print pattern.
 
 import { useTranslation } from 'react-i18next';
 import { formatAssetCode, formatCid, formatDateTime, formatTel } from '../../lib/format';

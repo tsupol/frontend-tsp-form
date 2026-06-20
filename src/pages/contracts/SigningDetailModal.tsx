@@ -163,7 +163,7 @@ export function SigningDetailModal({ open, onClose, signingId, contractId, signi
     staleTime: 60_000,
   });
 
-  // ─── Print (browser-print pattern; see .claude/print-pattern.md) ─────────
+  // ─── Print (browser-print pattern; see .claude/in-app-print-pattern.md) ──
   // Customer-facing copy: identity + the change only. No signatures, no
   // signed-at dates — the customer is reading what they agreed to, not auditing
   // the ceremony.
@@ -335,7 +335,7 @@ export function SigningDetailModal({ open, onClose, signingId, contractId, signi
       </div>
 
       {/* Off-screen print mount — body portal + .signing-detail-print isolation
-          (see .claude/print-pattern.md). NOT inside this Modal: the Modal's
+          (see .claude/in-app-print-pattern.md). NOT inside this Modal: the Modal's
           fixed/overflow-hidden container clips the @page box. */}
       {printReady && printData && createPortal(
         <div className="print-only-signing-detail" aria-hidden>
