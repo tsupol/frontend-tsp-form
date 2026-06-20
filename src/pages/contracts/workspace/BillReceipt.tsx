@@ -1,26 +1,9 @@
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Button } from 'tsp-form';
-import { Printer, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { apiClient } from '../../../lib/api';
-import { DateTime } from '../../../components/DateTime';
-import { fmtCurrency } from '../../../lib/format';
-
-function fmtReceiptDate(value: string | null, lang: string, withTime: boolean): string {
-  if (!value) return '—';
-  const locale = lang === 'th' ? 'th-TH-u-ca-gregory' : 'en-GB';
-  const opts: Intl.DateTimeFormatOptions = {
-    timeZone: 'Asia/Bangkok',
-    day: 'numeric',
-    month: 'short',
-    year: '2-digit',
-  };
-  if (withTime) {
-    opts.hour = '2-digit';
-    opts.minute = '2-digit';
-  }
-  return new Date(value).toLocaleString(locale, opts);
-}
+import { BillDocRenderer } from '../../../components/BillDocRenderer';
+import { buildBillDocFromDetail } from '../../../lib/billDetailToDoc';
 
 interface BillLine {
   line_id: number;
@@ -96,12 +79,6 @@ interface BillReceiptProps {
   hidePrintButton?: boolean;
 }
 
-const BILL_TYPE_TITLE_KEY: Record<string, string> = {
-  INVOICE: 'wizard.receipt_title',           // ใบเสร็จรับเงิน
-  CREDIT_NOTE: 'wizard.receipt_title_credit', // ใบลดหนี้
-  JOURNAL: 'wizard.receipt_title_journal',    // ใบบันทึกบัญชี
-};
-
 /**
  * Reusable printable bill receipt — 80mm thermal layout (Thai POS standard).
  * Renders `v_bill_detail` for `billId`. Print uses the global `@media print`
@@ -145,180 +122,9 @@ export function BillReceipt({ billId, bill: billProp, hidePrintButton }: BillRec
     );
   }
 
-  const isCreditNote = bill.bill_type === 'CREDIT_NOTE';
-  const isJournal = bill.bill_type === 'JOURNAL';
-  const isVoided = bill.is_voided;
-  const titleKey = BILL_TYPE_TITLE_KEY[bill.bill_type] ?? 'wizard.receipt_title';
+  // Build the unified block document from the v_bill_detail row + branch, then
+  // render it through BillDocRenderer (same .bill-receipt paper + print path).
+  const doc = buildBillDocFromDetail(bill, branch ?? null, t, i18n.language);
 
-  // For CREDIT_NOTE the underlying amounts are negative; show absolute values
-  // with a clear "ใบลดหนี้" framing. line.amount sign is preserved (a discount
-  // line on a credit note is still a positive line in display terms).
-  const displaySign = isCreditNote ? -1 : 1;
-  const totalDisplay = bill.total_amount * displaySign;
-  const paidDisplay = bill.paid_amount * displaySign;
-
-  return (
-    <div className="flex flex-col items-center gap-3">
-      {/* Print action — outside the paper area on screen, removed on print. */}
-      {!hidePrintButton && (
-        <div className="print:hidden">
-          <Button
-            size="sm"
-            variant="outline"
-            startIcon={<Printer size={14} />}
-            onClick={() => window.print()}
-          >
-            {t('wizard.receipt_print')}
-          </Button>
-        </div>
-      )}
-
-      <div className="bill-receipt bill-receipt-screen relative">
-      {isVoided && (
-        <div className="receipt-watermark">VOID</div>
-      )}
-
-      {/* Header — branch name + optional address, centered */}
-      <div className="text-center">
-        <div className="font-semibold text-[13px]">{branch?.name ?? bill.branch_name}</div>
-        {branch?.address && (
-          <div className="text-[10px] opacity-75 mt-0.5 whitespace-pre-line">{branch.address}</div>
-        )}
-        <hr className="receipt-rule" />
-        <div className="font-semibold text-[12px]">{t(titleKey)}</div>
-        {isCreditNote && bill.ref_bill_code && (
-          <div className="text-[10px] opacity-75 mt-0.5">
-            {t('wizard.receipt_refBill', { defaultValue: 'อ้างอิง' })}: <span className="receipt-mono">{bill.ref_bill_code}</span>
-          </div>
-        )}
-      </div>
-
-      <hr className="receipt-divider" />
-
-      {/* Meta — single column, label/value */}
-      <div className="flex flex-col gap-0.5">
-        <MetaRow label={t('wizard.receipt_billNo')} value={<span className="receipt-mono">{bill.bill_code_display}</span>} />
-        <div className="flex gap-2 text-[11px]">
-          <span className="opacity-70 shrink-0">{t('wizard.receipt_date')}:</span>
-          <span className="flex-1 min-w-0">{fmtReceiptDate(bill.bill_date, i18n.language, false)}</span>
-          <span className="opacity-70 shrink-0">{t('wizard.receipt_createdAt', { defaultValue: 'Created' })}:</span>
-          <span className="shrink-0">{fmtReceiptDate(bill.created_at, i18n.language, true)}</span>
-        </div>
-        {bill.contract_code && (
-          <MetaRow
-            label={t('wizard.receipt_contract')}
-            value={<span className="receipt-mono">{bill.contract_code}</span>}
-          />
-        )}
-        {bill.customer_name && (
-          <MetaRow label={t('wizard.receipt_customer')} value={bill.customer_name} />
-        )}
-        {bill.customer_tel && (
-          <MetaRow label={t('wizard.receipt_tel', { defaultValue: 'โทร' })} value={bill.customer_tel} />
-        )}
-        <MetaRow label={t('wizard.receipt_cashier')} value={bill.created_by_name ?? '—'} />
-      </div>
-
-      <hr className="receipt-rule" />
-
-      {/* Lines */}
-      <div className="flex flex-col">
-        {(bill.line_items ?? []).map(line => {
-          const lineAmt = line.amount * displaySign;
-          return (
-            <div key={line.line_id} className="py-0.5">
-              <div className="flex items-start gap-2">
-                <span className="flex-1 min-w-0 break-words">{line.description}</span>
-                <span className="receipt-mono shrink-0">{fmtCurrency(lineAmt)}</span>
-              </div>
-              {line.quantity !== 1 && (
-                <div className="text-[10px] opacity-70 pl-2">
-                  {t('wizard.receipt_qty')} {line.quantity}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      <hr className="receipt-rule" />
-
-      {/* Total */}
-      <div className="flex justify-between font-semibold text-[12px]">
-        <span>{t('wizard.receipt_total')}</span>
-        <span className="receipt-mono">{fmtCurrency(totalDisplay)}</span>
-      </div>
-
-      {/* Payments — skip for JOURNAL (no money movement) */}
-      {!isJournal && (bill.payments?.length ?? 0) > 0 && (
-        <>
-          <hr className="receipt-divider" />
-          <div className="flex flex-col gap-0.5">
-            {(bill.payments ?? []).map(p => (
-              <div key={p.id} className="flex justify-between gap-2">
-                <span className="flex-1 min-w-0">
-                  {t(`wizard.method_${p.method}`, { defaultValue: p.method })}
-                  {p.bank_name && (
-                    <span className="opacity-70"> · {p.bank_name}{p.account_number ? ` ${p.account_number}` : ''}</span>
-                  )}
-                  {p.reference && <span className="opacity-70"> · {p.reference}</span>}
-                </span>
-                <span className="receipt-mono shrink-0">{fmtCurrency(p.amount * displaySign)}</span>
-              </div>
-            ))}
-            <hr className="receipt-divider" />
-            <div className="flex justify-between font-semibold">
-              <span>{t('wizard.receipt_paid')}</span>
-              <span className="receipt-mono">{fmtCurrency(paidDisplay)}</span>
-            </div>
-            {bill.change_amount > 0 && (
-              <div className="flex justify-between">
-                <span>{t('wizard.receipt_change')}</span>
-                <span className="receipt-mono">{fmtCurrency(bill.change_amount)}</span>
-              </div>
-            )}
-          </div>
-        </>
-      )}
-
-      {/* Voided notice — explain why this isn't a valid receipt */}
-      {isVoided && (
-        <>
-          <hr className="receipt-rule" />
-          <div className="text-center text-[10px] opacity-90">
-            <div className="font-semibold">
-              {t('wizard.receipt_voidedNotice', { defaultValue: 'บิลนี้ถูกยกเลิก' })}
-            </div>
-            {bill.cancel_info && (
-              <>
-                <div className="mt-0.5">
-                  <DateTime value={bill.cancel_info.cancelled_at} showTime />
-                </div>
-                <div className="mt-0.5">
-                  {t('wizard.receipt_creditNote', { defaultValue: 'ใบลดหนี้' })}:{' '}
-                  <span className="receipt-mono">{bill.cancel_info.credit_note_code}</span>
-                </div>
-              </>
-            )}
-          </div>
-        </>
-      )}
-
-      {/* Footer */}
-      <hr className="receipt-rule" />
-      <div className="text-center text-[10px] opacity-75 mt-1">
-        {t('wizard.receipt_thankYou')}
-      </div>
-      </div>
-    </div>
-  );
-}
-
-function MetaRow({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex gap-2 text-[11px]">
-      <span className="opacity-70 shrink-0">{label}:</span>
-      <span className="flex-1 min-w-0 break-words">{value}</span>
-    </div>
-  );
+  return <BillDocRenderer doc={doc} hidePrintButton={hidePrintButton} />;
 }
