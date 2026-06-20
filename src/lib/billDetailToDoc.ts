@@ -1,18 +1,23 @@
 // ============================================================================
 // Adapter: v_bill_detail row (BillDetail)  →  BillDoc (block tree).
 //
-// This is the production path: the existing bill-receipt call sites already
-// fetch `v_bill_detail`; this turns that data into a BillDoc so they can render
-// through the unified BillDocRenderer instead of the old hand-rolled JSX. It
-// reproduces every behaviour of the legacy receipt exactly — bill-type title,
-// credit-note sign flip, journal payment skip, void watermark + cancel info,
-// per-payment bank/reference detail, change line.
+// FREEFORM-ONLY build. To validate that the block format can carry a complete,
+// legally-meaningful receipt using NOTHING but the generic primitives
+// (text / rows / cols / divider / group), this adapter deliberately avoids the
+// predefined blocks (seller_header / lines / totals / payments / void_notice).
+// Every line is hand-assembled from columns, exactly as a freeform-emitting BE
+// would have to. The on-paper output is identical to the legacy receipt.
+//
+// (The hybrid recommendation still stands: production should normally use the
+// predefined blocks for the regulated core. This all-freeform build exists so
+// the format can be eyeballed end-to-end before BE commits to emitting it.)
 //
 // Pure data-in → BillDoc-out; no fetch, no React. The host passes `t` + the
 // active language so labels resolve and dates format identically to before.
 // ============================================================================
 
 import type { TFunction } from 'i18next';
+import { fmtCurrency } from './format';
 import { BILL_DOC_FORMAT, type BillDoc, type DocBlock, type DocLine } from './billDoc';
 
 // Shape mirrors BillDetail in BillReceipt.tsx (kept local to avoid a circular
@@ -84,13 +89,15 @@ export function buildBillDocFromDetail(
   const blocks: DocBlock[] = [];
 
   // ── Header: branch name + optional address, then the document title ──
-  blocks.push({
-    type: 'seller_header',
-    data: {
-      branch_name: branch?.name ?? bill.branch_name,
-      address: branch?.address ?? null,
-    },
-  });
+  //    (freeform: a group of plain text lines, no seller_header block)
+  const headerLines: DocBlock[] = [
+    { type: 'text', text: branch?.name ?? bill.branch_name, align: 'center', emphasis: 'strong' },
+  ];
+  const address = branch?.address ?? null;
+  if (address) {
+    headerLines.push({ type: 'text', text: address, align: 'center', emphasis: 'muted', wrap: true });
+  }
+  blocks.push({ type: 'group', blocks: headerLines });
   blocks.push({ type: 'text', text: t(titleKey), align: 'center', emphasis: 'strong' });
   if (isCreditNote && bill.ref_bill_code) {
     blocks.push({
@@ -130,54 +137,73 @@ export function buildBillDocFromDetail(
 
   blocks.push({ type: 'divider', rule: true });
 
-  // ── Lines ──
-  blocks.push({
-    type: 'lines',
-    data: { items: bill.line_items.map(li => ({ description: li.description, qty: li.quantity, amount: li.amount * sign })) },
-  });
+  // ── Lines (freeform: a row per item; qty≠1 gets its own sub-line) ──
+  const lineRows: DocLine[] = [];
+  for (const li of bill.line_items) {
+    lineRows.push({
+      template: 'cols',
+      cols: [
+        { text: li.description, flex: 1, wrap: true },
+        { text: fmtCurrency(li.amount * sign), align: 'right', mono: true },
+      ],
+    });
+    if (li.quantity !== 1) {
+      lineRows.push({
+        template: 'text',
+        emphasis: 'muted',
+        text: `${t('wizard.receipt_qty')} ${li.quantity}`,
+      });
+    }
+  }
+  blocks.push({ type: 'rows', lines: lineRows });
 
   blocks.push({ type: 'divider', rule: true });
 
-  // ── Total ──
-  blocks.push({ type: 'totals', data: { grand_total: bill.total_amount * sign } });
+  // ── Total (freeform: a single emphasized kv) ──
+  blocks.push({
+    type: 'rows',
+    lines: [{ template: 'kv', label: t('wizard.receipt_total'), value: fmtCurrency(bill.total_amount * sign), valueMono: true, emphasis: 'strong' }],
+  });
 
   // ── Payments (skip for JOURNAL — no money movement) ──
   if (!isJournal && bill.payments.length > 0) {
     blocks.push({ type: 'divider' });
-    blocks.push({
-      type: 'payments',
-      data: {
-        items: bill.payments.map(p => {
-          const bankDetail = p.bank_name ? `${p.bank_name}${p.account_number ? ` ${p.account_number}` : ''}` : '';
-          const parts = [bankDetail, p.reference ?? ''].filter(Boolean);
-          return {
-            method: t(`wizard.method_${p.method}`, { defaultValue: p.method }),
-            amount: p.amount * sign,
-            detail: parts.length ? parts.join(' · ') : null,
-          };
-        }),
-        paid: bill.paid_amount * sign,
-        change: bill.change_amount > 0 ? bill.change_amount : undefined,
-      },
+    const payLines: DocLine[] = bill.payments.map(p => {
+      const bankDetail = p.bank_name ? `${p.bank_name}${p.account_number ? ` ${p.account_number}` : ''}` : '';
+      const parts = [bankDetail, p.reference ?? ''].filter(Boolean);
+      const methodLabel = t(`wizard.method_${p.method}`, { defaultValue: p.method });
+      const label = parts.length ? `${methodLabel} · ${parts.join(' · ')}` : methodLabel;
+      return {
+        template: 'cols' as const,
+        cols: [
+          { text: label, flex: 1, wrap: true },
+          { text: fmtCurrency(p.amount * sign), align: 'right' as const, mono: true },
+        ],
+      };
     });
+    payLines.push({ template: 'kv', label: t('wizard.receipt_paid'), value: fmtCurrency(bill.paid_amount * sign), valueMono: true, emphasis: 'strong' });
+    if (bill.change_amount > 0) {
+      payLines.push({ template: 'kv', label: t('wizard.receipt_change'), value: fmtCurrency(bill.change_amount), valueMono: true });
+    }
+    blocks.push({ type: 'rows', lines: payLines });
   }
 
-  // ── Voided notice + cancel info ──
+  // ── Voided notice + cancel info (freeform: centered text group) ──
   if (bill.is_voided) {
     blocks.push({ type: 'divider', rule: true });
-    const voidLines: DocLine[] = [];
+    const voidBlocks: DocBlock[] = [
+      { type: 'text', text: t('wizard.receipt_voidedNotice', { defaultValue: 'บิลนี้ถูกยกเลิก' }), align: 'center', emphasis: 'strong' },
+    ];
     if (bill.cancel_info) {
-      voidLines.push({ template: 'text', align: 'center', text: fmtReceiptDate(bill.cancel_info.cancelled_at, lang, true) });
-      voidLines.push({
-        template: 'text',
+      voidBlocks.push({ type: 'text', text: fmtReceiptDate(bill.cancel_info.cancelled_at, lang, true), align: 'center', emphasis: 'muted' });
+      voidBlocks.push({
+        type: 'text',
         align: 'center',
+        emphasis: 'muted',
         text: `${t('wizard.receipt_creditNote', { defaultValue: 'ใบลดหนี้' })}: ${bill.cancel_info.credit_note_code}`,
       });
     }
-    blocks.push({
-      type: 'void_notice',
-      data: { text: t('wizard.receipt_voidedNotice', { defaultValue: 'บิลนี้ถูกยกเลิก' }), lines: voidLines },
-    });
+    blocks.push({ type: 'group', blocks: voidBlocks });
   }
 
   // ── Footer ──
