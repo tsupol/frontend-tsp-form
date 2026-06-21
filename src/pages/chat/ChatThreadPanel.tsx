@@ -15,7 +15,8 @@ import { fmtCurrency, formatSmart } from '../../lib/format';
 import { DateTime } from '../../components/DateTime';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
 import { normalizeKey, toStoragePath } from '../../lib/mediaPath';
-import { uploadImage, encodeCanvas, renameForExt, mimeFromKey } from '../../lib/upload';
+import { encodeCanvas, renameForExt, mimeFromKey } from '../../lib/upload';
+import { beMediaUpload } from '../../lib/beMedia';
 import {
   SubmissionReviewDrawer,
   submissionStatusColor,
@@ -237,12 +238,11 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
     try {
       const resized = await resizeImageToWebp(file, 1280, 0.82);
       const idx = countChatImages(messages);
-      const result = await uploadImage({
+      const result = await beMediaUpload({
         type: 'chat_image',
         file: resized,
         size: 'lg',
-        idx,
-        params: { contract_id: contractId },
+        params: { contract_id: contractId, idx },
       });
       const attached = await apiClient.rpc<{ media_id: number }>('fn_media_attach', {
         p_holding_id: user.holding_id,

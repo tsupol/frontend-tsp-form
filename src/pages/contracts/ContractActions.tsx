@@ -12,9 +12,23 @@ import { BranchPinInput } from '../../components/BranchPinInput';
 import { BranchPaymentAccountField } from '../../components/BranchPaymentAccountField';
 import { DateTime } from '../../components/DateTime';
 import { useAuth } from '../../contexts/AuthContext';
-import { useUploadSpec } from '../../hooks/useMediaUrl';
-import { uploadFromImage, deleteMedia, mimeFromKey } from '../../lib/upload';
+import { mimeFromKey } from '../../lib/upload';
+import {
+  beMediaUploadFromImage,
+  beMediaDelete,
+  CONTRACT_PAYMENT_SLIP_TYPE,
+  CONTRACT_PAYMENT_SLIP_SIZES,
+  CONTRACT_PAYMENT_SLIP_RESIZE,
+} from '../../lib/beMedia';
 import { toStoragePath } from '../../lib/mediaPath';
+
+// be-media slip upload spec (replaces the misc-go useUploadSpec hook). Shape
+// matches what useUploadSpec returned so the ImageUploader props are unchanged.
+const SLIP_SPEC = {
+  spec: { sizes: CONTRACT_PAYMENT_SLIP_SIZES } as const,
+  resize: CONTRACT_PAYMENT_SLIP_RESIZE.lg,
+  sizes: CONTRACT_PAYMENT_SLIP_RESIZE,
+} as const;
 import { fuzzyScore } from '../../lib/fuzzy';
 import { CompleteContractModal } from './CompleteContractModal';
 import { BindLoanerModal, UnbindLoanerModal } from './LoanerModals';
@@ -2516,7 +2530,7 @@ function PayInstallmentModal({ open, contract, onClose }: {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const invalidate = useContractInvalidate(contract.id);
-  const slipSpec = useUploadSpec('contract_payment_slip');
+  const slipSpec = SLIP_SPEC;
 
   const outstanding = contract.outstanding_amount ?? 0;
   const nextDue = contract.next_due_amount ?? contract.installment_amount ?? 0;
@@ -2594,7 +2608,7 @@ function PayInstallmentModal({ open, contract, onClose }: {
     if (images.length === 0) return;
     // Replace any previous orphan upload in this session before re-uploading.
     if (slipKey) {
-      deleteMedia([slipKey]).catch(() => {});
+      beMediaDelete([slipKey]).catch(() => {});
     }
     if (slipPreviewUrl) {
       URL.revokeObjectURL(slipPreviewUrl);
@@ -2603,11 +2617,11 @@ function PayInstallmentModal({ open, contract, onClose }: {
     setError('');
     try {
       const img = images[0];
-      const results = await uploadFromImage({
-        type: 'contract_payment_slip',
+      const results = await beMediaUploadFromImage({
+        type: CONTRACT_PAYMENT_SLIP_TYPE,
         image: img,
-        idx: slipCount,
-        params: { contract_id: contract.id },
+        sizes: CONTRACT_PAYMENT_SLIP_SIZES,
+        params: { contract_id: contract.id, idx: slipCount },
       });
       const key = results.lg?.key ?? Object.values(results)[0]?.key;
       if (!key) throw new Error('Upload returned no key');
@@ -2627,7 +2641,7 @@ function PayInstallmentModal({ open, contract, onClose }: {
 
   const handleSlipClear = () => {
     if (slipKey) {
-      deleteMedia([slipKey]).catch(() => {});
+      beMediaDelete([slipKey]).catch(() => {});
     }
     if (slipPreviewUrl) {
       URL.revokeObjectURL(slipPreviewUrl);
@@ -2640,7 +2654,7 @@ function PayInstallmentModal({ open, contract, onClose }: {
   const handleCloseWithCleanup = () => {
     // If the user uploaded a slip but never submitted, the R2 object is an orphan.
     if (view === 'form' && slipKey) {
-      deleteMedia([slipKey]).catch(() => {});
+      beMediaDelete([slipKey]).catch(() => {});
     }
     onClose();
   };
@@ -3033,7 +3047,7 @@ function AttachSlipModal({ open, contract, onClose }: {
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const slipSpec = useUploadSpec('contract_payment_slip');
+  const slipSpec = SLIP_SPEC;
 
   const [view, setView] = useState<'form' | 'done'>('form');
   const [slipKey, setSlipKey] = useState<string | null>(null);
@@ -3092,7 +3106,7 @@ function AttachSlipModal({ open, contract, onClose }: {
   const handleSlipUpload = async (images: UploadedImage[]) => {
     if (images.length === 0) return;
     if (slipKey) {
-      deleteMedia([slipKey]).catch(() => {});
+      beMediaDelete([slipKey]).catch(() => {});
     }
     if (slipPreviewUrl) {
       URL.revokeObjectURL(slipPreviewUrl);
@@ -3101,11 +3115,11 @@ function AttachSlipModal({ open, contract, onClose }: {
     setError('');
     try {
       const img = images[0];
-      const results = await uploadFromImage({
-        type: 'contract_payment_slip',
+      const results = await beMediaUploadFromImage({
+        type: CONTRACT_PAYMENT_SLIP_TYPE,
         image: img,
-        idx: slipCount,
-        params: { contract_id: contract.id },
+        sizes: CONTRACT_PAYMENT_SLIP_SIZES,
+        params: { contract_id: contract.id, idx: slipCount },
       });
       const key = results.lg?.key ?? Object.values(results)[0]?.key;
       if (!key) throw new Error('Upload returned no key');
@@ -3125,7 +3139,7 @@ function AttachSlipModal({ open, contract, onClose }: {
 
   const handleSlipClear = () => {
     if (slipKey) {
-      deleteMedia([slipKey]).catch(() => {});
+      beMediaDelete([slipKey]).catch(() => {});
     }
     if (slipPreviewUrl) {
       URL.revokeObjectURL(slipPreviewUrl);
@@ -3139,7 +3153,7 @@ function AttachSlipModal({ open, contract, onClose }: {
     // Form view: if the user uploaded a slip but never submitted, the R2 object is an orphan.
     // Done view: the file is now owned by the media row — don't delete from R2.
     if (view === 'form' && slipKey) {
-      deleteMedia([slipKey]).catch(() => {});
+      beMediaDelete([slipKey]).catch(() => {});
     }
     if (slipPreviewUrl) {
       URL.revokeObjectURL(slipPreviewUrl);

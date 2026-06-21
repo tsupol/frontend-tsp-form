@@ -178,6 +178,32 @@ export const BRANCH_EXPENSE_SLIP_RESIZE: Record<BranchExpenseSlipSize, ResizeOpt
   lg: { maxWidth: 1200, maxHeight: 1200, mode: 'contain', format: 'webp', quality: 0.82 },
 };
 
+// ── contract_payment_slip — hardcoded spec (single lg=1800 variant) ───
+// Mirrors misc-go pkg/uploadspec/spec.go `contract_payment_slip`. Fed to the
+// tsp-form ImageUploader's resizeOptions/sizes instead of the misc-go
+// /upload/spec RPC, so the slip upload no longer depends on misc-go.
+export const CONTRACT_PAYMENT_SLIP_TYPE = 'contract_payment_slip';
+export const CONTRACT_PAYMENT_SLIP_SIZES = ['lg'] as const;
+export type ContractPaymentSlipSize = (typeof CONTRACT_PAYMENT_SLIP_SIZES)[number];
+export const CONTRACT_PAYMENT_SLIP_MAX = 5;
+
+export const CONTRACT_PAYMENT_SLIP_RESIZE: Record<ContractPaymentSlipSize, ResizeOptions> = {
+  lg: { maxWidth: 1800, maxHeight: 1800, mode: 'contain', format: 'webp', quality: 0.82 },
+};
+
+// ── buyback_condition — hardcoded spec (sm=320 / md=1280, public) ─────
+// Mirrors misc-go pkg/uploadspec/spec.go `buyback_condition`. Public bucket,
+// so reads resolve via publicMediaUrl (no presign).
+export const BUYBACK_CONDITION_TYPE = 'buyback_condition';
+export const BUYBACK_CONDITION_SIZES = ['sm', 'md'] as const;
+export type BuybackConditionSize = (typeof BUYBACK_CONDITION_SIZES)[number];
+export const BUYBACK_CONDITION_MAX = 5;
+
+export const BUYBACK_CONDITION_RESIZE: Record<BuybackConditionSize, ResizeOptions> = {
+  sm: { maxWidth: 320, maxHeight: 320, mode: 'contain', format: 'webp', quality: 0.82 },
+  md: { maxWidth: 1280, maxHeight: 1280, mode: 'contain', format: 'webp', quality: 0.82 },
+};
+
 export interface BranchExpenseImage {
   thumb?: string;
   lg?: string;

@@ -6,8 +6,31 @@ import type { UploadedImage } from 'tsp-form';
 import { Plus, X, XCircle, ImageOff, Pencil, Check } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { useAuth } from '../../../contexts/AuthContext';
-import { useUploadSpec, useMediaUrl } from '../../../hooks/useMediaUrl';
-import { uploadFromImage, deleteMedia, mimeFromKey } from '../../../lib/upload';
+import { useMediaUrl } from '../../../hooks/useMediaUrl';
+import { mimeFromKey } from '../../../lib/upload';
+import {
+  beMediaUploadFromImage,
+  beMediaDelete,
+  BUYBACK_CONDITION_TYPE,
+  BUYBACK_CONDITION_SIZES,
+  BUYBACK_CONDITION_RESIZE,
+  BUYBACK_CONDITION_MAX,
+} from '../../../lib/beMedia';
+
+// be-media buyback spec (replaces the misc-go useUploadSpec hook). Shape
+// matches what useUploadSpec returned so the ImageUploader props + the
+// largest-variant pick below are unchanged.
+const BUYBACK_SPEC = {
+  spec: {
+    max_files: BUYBACK_CONDITION_MAX,
+    sizes: [
+      { label: 'sm', width: 320 },
+      { label: 'md', width: 1280 },
+    ],
+  },
+  resize: BUYBACK_CONDITION_RESIZE.md,
+  sizes: BUYBACK_CONDITION_RESIZE,
+} as const;
 import { toStoragePath, normalizeKey } from '../../../lib/mediaPath';
 import { MediaLightbox } from '../../../components/MediaLightbox';
 import { getLine } from './useBuyback';
@@ -29,7 +52,6 @@ interface EntityMedia {
 
 const USAGE_TYPE = 'BUYBACK_CONDITION';
 const ENTITY_TYPE = 'PO_LINE';
-const UPLOAD_TYPE = 'buyback_condition';
 
 function pickThumbKey(m: EntityMedia): string | null {
   const v = m.variants_json ?? {};
@@ -59,7 +81,7 @@ export function PanelPhotos({
   const queryClient = useQueryClient();
   const line = getLine(draft);
   const lineId = line?.po_line_id ?? null;
-  const upload = useUploadSpec(UPLOAD_TYPE);
+  const upload = BUYBACK_SPEC;
 
   const [error, setError] = useState('');
   const [lightboxKey, setLightboxKey] = useState<string | null>(null);
@@ -99,7 +121,7 @@ export function PanelPhotos({
       const keys = collectMediaKeys(m);
       if (keys.length > 0) {
         // Don't block the UI on R2 cleanup — log and move on.
-        deleteMedia(keys).catch((err) => {
+        beMediaDelete(keys).catch((err) => {
           console.warn('R2 cleanup failed for', keys, err);
         });
       }
@@ -272,7 +294,7 @@ function AddPhotoModal({
   onClose: () => void;
   lineId: number;
   sortOrder: number;
-  uploadSpec: ReturnType<typeof useUploadSpec>;
+  uploadSpec: typeof BUYBACK_SPEC;
   onAdded: () => void;
 }) {
   const { t } = useTranslation();
@@ -294,11 +316,11 @@ function AddPhotoModal({
       if (!picked) throw new Error(t('buybackWizard.errorPickImage', { defaultValue: 'Pick an image first' }));
       if (!user?.holding_id) throw new Error('Missing holding context');
 
-      const results = await uploadFromImage({
-        type: UPLOAD_TYPE,
+      const results = await beMediaUploadFromImage({
+        type: BUYBACK_CONDITION_TYPE,
         image: picked,
-        idx: sortOrder,
-        params: { po_line_id: lineId },
+        sizes: BUYBACK_CONDITION_SIZES,
+        params: { po_line_id: lineId, idx: sortOrder },
       });
 
       const sizes = uploadSpec.spec?.sizes ?? [];
@@ -331,7 +353,7 @@ function AddPhotoModal({
       } catch (err) {
         // Attach failed → uploaded R2 objects are orphans. Sweep them.
         const orphanKeys = Object.values(results).map((r) => r.key);
-        deleteMedia(orphanKeys).catch((cleanupErr) => {
+        beMediaDelete(orphanKeys).catch((cleanupErr) => {
           console.warn('R2 orphan cleanup failed for', orphanKeys, cleanupErr);
         });
         throw err;
