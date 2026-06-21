@@ -236,22 +236,29 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
     setSendError('');
     setUploading(true);
     try {
-      const resized = await resizeImageToWebp(file, 1280, 0.82);
-      const idx = countChatImages(messages);
-      const result = await beMediaUpload({
-        type: 'chat_image',
-        file: resized,
-        size: 'lg',
-        params: { contract_id: contractId, idx },
-      });
+      // idx makes the R2 key unique per image (the leaf is chat-{idx}-{size}.{ext}).
+      // Must be unique per upload, NOT a count of existing images — sending two
+      // images before the message list refetches gives the same count and the
+      // deterministic key collides (both overwrite one object). Timestamp is
+      // unique per send and shared between this message's sm + lg variants.
+      const idx = Date.now();
+      // Upload both variants: lg = full-screen source, sm = bubble thumbnail.
+      const [smFile, lgFile] = await Promise.all([
+        resizeImageToWebp(file, 320, 0.82),
+        resizeImageToWebp(file, 1280, 0.82),
+      ]);
+      const [smResult, lgResult] = await Promise.all([
+        beMediaUpload({ type: 'chat_image', file: smFile, size: 'sm', params: { contract_id: contractId, idx } }),
+        beMediaUpload({ type: 'chat_image', file: lgFile, size: 'lg', params: { contract_id: contractId, idx } }),
+      ]);
       const attached = await apiClient.rpc<{ media_id: number }>('fn_media_attach', {
         p_holding_id: user.holding_id,
-        p_storage_path: toStoragePath(result.key),
-        p_variants_json: null,
+        p_storage_path: toStoragePath(lgResult.key),
+        p_variants_json: { sm: toStoragePath(smResult.key), lg: toStoragePath(lgResult.key) },
         p_media_type: 'IMAGE',
         p_access_level: 'CONFIDENTIAL',
-        p_mime_type: mimeFromKey(result.key),
-        p_file_size_bytes: resized.size,
+        p_mime_type: mimeFromKey(lgResult.key),
+        p_file_size_bytes: lgFile.size,
         p_original_filename: file.name,
         p_entity_type: 'CHAT_MESSAGE',
         p_entity_id: contractId,
@@ -622,20 +629,26 @@ function Bubble({ message, isStaff, onOpenImage }: {
     : 'bg-surface';
 
   const storageKey = message.media_url ? normalizeKey(message.media_url) : null;
-  const { url: displayUrl } = useMediaUrl(storageKey);
+  // Bubble preview uses the sm thumbnail; lightbox opens the full lg image.
+  const thumbKey = message.media_url_sm ? normalizeKey(message.media_url_sm) : null;
+  const { url: displayUrl } = useMediaUrl(thumbKey);
 
   if (message.message_type === 'IMAGE' && storageKey) {
     return (
       <button
         type="button"
         onClick={() => onOpenImage(storageKey)}
-        className={`rounded-2xl overflow-hidden max-w-xs ${isStaff ? 'self-end' : 'self-start'} border border-line block bg-transparent p-0 cursor-zoom-in`}
+        className={`rounded-2xl overflow-hidden ${isStaff ? 'self-end' : 'self-start'} border border-line block bg-transparent p-0 cursor-zoom-in`}
         aria-label={t('chat.imageMessage')}
       >
-        {displayUrl ? (
+        {thumbKey && displayUrl ? (
           <ImageWithSkeleton src={displayUrl} alt={t('chat.imageMessage')} />
+        ) : thumbKey ? (
+          <Skeleton variant="rectangular" width={120} height={120} />
         ) : (
-          <Skeleton variant="rectangular" width={192} height={144} />
+          <div className="flex items-center justify-center w-[120px] h-[120px] bg-surface text-subtle">
+            <ImageIcon size={32} />
+          </div>
         )}
       </button>
     );
@@ -666,14 +679,10 @@ function ImageWithSkeleton({ src, alt }: { src: string; alt: string }) {
         src={src}
         alt={alt}
         onLoad={() => setLoaded(true)}
-        className={`block w-full h-auto ${loaded ? '' : 'absolute inset-0 opacity-0'}`}
+        className={`block max-w-[200px] max-h-[200px] w-auto h-auto object-contain ${loaded ? '' : 'absolute inset-0 opacity-0'}`}
       />
     </div>
   );
-}
-
-function countChatImages(messages: ChatMessage[]): number {
-  return messages.filter(m => m.message_type === 'IMAGE').length;
 }
 
 async function resizeImageToWebp(file: File, maxDim: number, quality: number): Promise<File> {
