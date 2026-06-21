@@ -25,3 +25,8 @@ dist-ssr
 /tmp/
 .playwright-mcp/
 /screenshots/
+
+# deploy artifacts
+nnf-ui.tar.gz
+*.tar.gz
+*.stackdump
