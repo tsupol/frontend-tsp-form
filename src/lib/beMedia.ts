@@ -163,6 +163,25 @@ export async function beMediaDelete(keys: string[]): Promise<{ failed: string[] 
   });
 }
 
+// ── Private-media presign ─────────────────────────────────────────────
+// be-media's /media/url presigns a private object after PostgREST authz.
+// IMPORTANT: it only accepts contract chat/slip key shapes
+// (^private/contracts/<id>/(chat|slip)-...). Other private keys (id-card,
+// signatures, evidence) are rejected — those must still presign via misc-go
+// until be-media's fn_media_url_check regex is widened for them. See
+// privateMediaUrl in lib/upload.ts for the routing.
+export async function beMediaUrl(key: string): Promise<string> {
+  const data = await call<{ url: string }>(`/media/url?key=${encodeURIComponent(key)}`, {
+    method: 'GET',
+  });
+  return data.url;
+}
+
+// True for the private key shapes be-media's presign endpoint accepts today.
+export function beMediaCanPresign(key: string): boolean {
+  return /^\/?private\/contracts\/\d+\/(chat|slip)-/.test(key);
+}
+
 // ── branch_expense_slip — hardcoded spec ──────────────────────────────
 // be-media is service-only soon; the spec discovery RPC (GET /upload/spec)
 // is misc-go-only and not reachable from FE through be-media. Hardcode the

@@ -1,6 +1,7 @@
 import type { ResizeOptions, UploadedImage } from 'tsp-form';
 import { config } from '../config/config';
 import { normalizeKey, type MediaPrivacy } from './mediaPath';
+import { beMediaUrl, beMediaCanPresign } from './beMedia';
 
 export type ResizeMode = 'contain' | 'cover';
 
@@ -179,6 +180,16 @@ export async function privateMediaUrl(key: string): Promise<string> {
   if (inFlight) return inFlight;
 
   inFlight = (async () => {
+    // Route by key shape: chat/slip contract keys presign via be-media (the
+    // only private shapes its /media/url accepts today). Everything else
+    // (id-card, signatures, evidence) still goes to misc-go until be-media's
+    // presign regex is widened for those types.
+    if (beMediaCanPresign(k)) {
+      const url = await beMediaUrl(k);
+      // be-media returns no expires_in; cache for the local TTL window.
+      presignCache.set(k, { url, expiresAt: Date.now() + CACHE_TTL_MS });
+      return url;
+    }
     const data = await call<{ url: string; expires_in: number }>(
       `/media/url?key=${encodeURIComponent(k)}`,
     );
