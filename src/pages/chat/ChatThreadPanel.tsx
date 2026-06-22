@@ -3,10 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Badge, Button, Skeleton, useSnackbarContext,
+  Badge, Button, PopOver, Skeleton, useSnackbarContext,
 } from 'tsp-form';
 import {
-  ChevronRight, CheckCircle, ExternalLink, FileText, Image as ImageIcon, Send, XCircle,
+  ChevronRight, CheckCircle, ExternalLink, FileText, Image as ImageIcon, Send, Smile, XCircle,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { wsClient } from '../../lib/api/ws';
@@ -27,6 +27,8 @@ import type { ChatInboxRow, ChatMessage } from './chatTypes';
 import {
   ChatStatusBadge, ChatStatusSetterLine, ChatThreadActionsMenu, ChatPinnedNoteRow,
 } from './ChatStatusHeader';
+import { EmojiPicker } from './EmojiPicker';
+import { pushRecentEmoji } from './emojiData';
 
 const MAX_TEXTAREA_LINES = 6;
 const TEXTAREA_LINE_HEIGHT_PX = 20;
@@ -51,6 +53,7 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
   const [sendError, setSendError] = useState('');
   const [uploading, setUploading] = useState(false);
   const [selectedSlip, setSelectedSlip] = useState<SubmissionRow | null>(null);
+  const [emojiOpen, setEmojiOpen] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -93,6 +96,7 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
   useEffect(() => {
     setComposer('');
     setSendError('');
+    setEmojiOpen(false);
   }, [contractId]);
 
   const markedRef = useRef<number | null>(null);
@@ -219,6 +223,26 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
       e.preventDefault();
       handleSend();
     }
+  };
+
+  // Insert an emoji at the textarea caret (or append when unfocused), keep the
+  // picker open for multi-emoji bursts, and bump it to the front of recents.
+  const handleEmojiPick = (char: string) => {
+    pushRecentEmoji(char);
+    const el = textareaRef.current;
+    setComposer(prev => {
+      if (!el) return prev + char;
+      const start = el.selectionStart ?? prev.length;
+      const end = el.selectionEnd ?? prev.length;
+      const next = prev.slice(0, start) + char + prev.slice(end);
+      // Restore caret after the inserted glyph once React re-renders.
+      requestAnimationFrame(() => {
+        const pos = start + char.length;
+        el.focus();
+        el.setSelectionRange(pos, pos);
+      });
+      return next;
+    });
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -413,16 +437,39 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
             style={{ minHeight: TEXTAREA_LINE_HEIGHT_PX }}
           />
           <div className="flex items-center justify-between px-2 pb-2 pt-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="btn-icon-sm"
-              startIcon={<ImageIcon size={18} />}
-              onClick={() => fileInputRef.current?.click()}
-              disabled={sendMutation.isPending || uploading}
-              aria-label={t('chat.attachImage')}
-              title={t('chat.attachImage')}
-            />
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="btn-icon-sm"
+                startIcon={<ImageIcon size={18} />}
+                onClick={() => fileInputRef.current?.click()}
+                disabled={sendMutation.isPending || uploading}
+                aria-label={t('chat.attachImage')}
+                title={t('chat.attachImage')}
+              />
+              <PopOver
+                isOpen={emojiOpen}
+                onClose={() => setEmojiOpen(false)}
+                placement="top"
+                align="start"
+                offset={8}
+                trigger={
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="btn-icon-sm"
+                    startIcon={<Smile size={18} />}
+                    onClick={() => setEmojiOpen(o => !o)}
+                    disabled={sendMutation.isPending || uploading}
+                    aria-label={t('chat.emoji.button')}
+                    title={t('chat.emoji.button')}
+                  />
+                }
+              >
+                <EmojiPicker onPick={handleEmojiPick} />
+              </PopOver>
+            </div>
             <div className="flex items-center gap-2">
               {uploading && (
                 <span className="text-xs text-subtle">{t('chat.uploading')}</span>
