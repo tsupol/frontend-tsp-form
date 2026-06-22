@@ -26,8 +26,14 @@ direct-deploy: docker-build
             --label traefik.http.routers.nnfui.entrypoints=websecure \
             --label traefik.http.routers.nnfui.tls.certresolver=letsencrypt \
             --label traefik.http.services.nnfui.loadbalancer.server.port={{container_port}} \
-            {{image_name}} \
+            {{image_name}} && \
+        rm -f {{remote_dir}}/{{image_name}}.tar.gz && \
+        docker image prune -f && \
+        docker builder prune -f --filter until=168h \
     "
+    rm -f {{image_name}}.tar.gz
+    docker image prune -f
+    docker builder prune -f --filter until=168h
 
 restart:
     ssh {{droplet_user}}@{{droplet_ip}} " \
