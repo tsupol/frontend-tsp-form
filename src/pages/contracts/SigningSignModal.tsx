@@ -236,6 +236,7 @@ export function SigningSignModal({ open, onClose, contractId, party }: Props) {
             {previewRow && (
               <div className="mt-4">
                 <LabeledCheckbox
+                  wrapperClassName="items-start"
                   label={t('signing.consentCheckbox')}
                   checked={consentChecked}
                   onChange={(e) => setConsentChecked(e.target.checked)}

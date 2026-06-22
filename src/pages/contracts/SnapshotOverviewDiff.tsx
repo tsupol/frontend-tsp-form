@@ -128,7 +128,6 @@ export function SnapshotOverviewDiff({ changeReason, stateBefore, stateAfter }: 
 
   // ─── Agreed terms ───────────────────────────────────────────────────
   const agreedFields: Array<{ key: keyof AgreedEntry; labelKey: string; fmt: (v: number | null) => string }> = [
-    { key: 'agreed_price',       labelKey: 'contract.agreedPrice',       fmt: fmtMoney },
     { key: 'down_payment',       labelKey: 'contract.downPayment',       fmt: fmtMoney },
     { key: 'insurance_deposit',  labelKey: 'contract.insuranceDeposit',  fmt: fmtMoney },
     { key: 'installment_amount', labelKey: 'contract.installmentAmount', fmt: fmtMoney },

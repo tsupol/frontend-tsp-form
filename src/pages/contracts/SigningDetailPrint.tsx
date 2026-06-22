@@ -86,7 +86,6 @@ export function SigningDetailPrint({ data }: { data: SigningDetailPrintData }) {
       {data.agreed && (
         <>
           <hr className="sdp-rule" />
-          <Line label={t('contract.agreedPrice')} value={fmtMoney(data.agreed.agreed_price, lang)} />
           <Line label={t('contract.downPayment')} value={fmtMoney(data.agreed.down_payment, lang)} />
           <Line label={t('contract.insuranceDeposit')} value={fmtMoney(data.agreed.insurance_deposit, lang)} />
           <Line label={t('contract.installmentAmount')} value={fmtMoney(data.agreed.installment_amount, lang)} />

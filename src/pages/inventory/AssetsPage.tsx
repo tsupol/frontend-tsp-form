@@ -175,7 +175,7 @@ const FOOTER_ACTION_ALLOWLIST: ReadonlySet<string> = new Set([
 type ExtraField =
   | { kind: 'select'; name: string; labelKey: string; options: { value: string; label: string }[]; required?: boolean; default?: string }
   | { kind: 'text'; name: string; labelKey: string; required?: boolean }
-  | { kind: 'number'; name: string; labelKey: string; required?: boolean; min?: number; step?: number }
+  | { kind: 'number'; name: string; labelKey: string; required?: boolean; min?: number; step?: number; defaultFromAsset?: keyof Asset }
   | { kind: 'branch'; name: string; labelKey: string; required?: boolean }
   | { kind: 'user'; name: string; labelKey: string; required?: boolean }
   | { kind: 'identifier'; typeName: string; oldName: string; labelKey: string; required?: boolean };
@@ -296,7 +296,7 @@ const SIMPLE_ACTIONS: Record<string, SimpleActionConfig> = {
   ASSET_REVALUE: {
     rpc: 'fn_inv_asset_revalue',
     extraFields: [
-      { kind: 'number', name: 'p_new_cost_basis', labelKey: 'revalue.newCostBasis', required: true, min: 0 },
+      { kind: 'number', name: 'p_new_cost_basis', labelKey: 'revalue.newCostBasis', required: true, min: 0, defaultFromAsset: 'current_cost_basis' },
       { kind: 'text', name: 'p_reason', labelKey: 'revalue.reason', required: true },
       { kind: 'select', name: 'p_condition_grade', labelKey: 'revalue.conditionGrade', options: REVALUE_CONDITION_OPTIONS },
     ],
@@ -1463,11 +1463,15 @@ function AssetActionModal({
       const initial: Record<string, string> = {};
       config?.extraFields?.forEach(f => {
         if (f.kind === 'select' && f.default) initial[f.name] = f.default;
+        if (f.kind === 'number' && f.defaultFromAsset != null) {
+          const v = asset[f.defaultFromAsset];
+          if (v != null) initial[f.name] = String(v);
+        }
       });
       if (presetExtra) Object.assign(initial, presetExtra);
       setExtra(initial);
     }
-  }, [open, config, presetExtra]);
+  }, [open, config, presetExtra, asset]);
 
   const isFieldFilled = (name: string) => {
     const v = extra[name];

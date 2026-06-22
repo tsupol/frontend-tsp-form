@@ -997,13 +997,17 @@ function CreateReceiptModal({
 
   const selectedPo = useMemo(() => pos?.find(p => p.po_id === poId) ?? null, [pos, poId]);
 
+  const isBranchUser = ['BRANCH_STAFF', 'BRANCH_MANAGER'].includes(user?.role_code ?? '');
+
   const eligibleBranches = useMemo(() => {
     if (!branches || !selectedPo) return [];
     return branches.filter(b =>
       b.company_id === selectedPo.company_id
-      && !['EXTERNAL', 'DEAL_PARTNER'].includes(b.branch_type),
+      && !['EXTERNAL', 'DEAL_PARTNER'].includes(b.branch_type)
+      // Branch-level users can only receive at their own branch.
+      && (!isBranchUser || b.id === user?.branch_id),
     );
-  }, [branches, selectedPo]);
+  }, [branches, selectedPo, isBranchUser, user?.branch_id]);
 
   // Pre-pick user's branch when eligible
   useEffect(() => {
