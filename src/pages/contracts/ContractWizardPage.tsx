@@ -13,7 +13,7 @@ import { CardProductPlan } from './workspace/CardProductPlan';
 import { CardSaving } from './workspace/CardSaving';
 import { CardInsurance } from './workspace/CardInsurance';
 import { CardCustomer } from './workspace/CardCustomer';
-import { CardGuarantor } from './workspace/CardGuarantor';
+import { CardCoLessee } from './workspace/CardCoLessee';
 import { CardDocuments } from './workspace/CardDocuments';
 import { CardHandover } from './workspace/CardHandover';
 import { PanelSignatory } from './workspace/PanelSignatory';
@@ -24,7 +24,7 @@ import { PanelReviewPay } from './workspace/PanelReviewPay';
 import { CardPostPayment } from './workspace/CardPostPayment';
 import { PanelProductPlan } from './workspace/PanelProductPlan';
 import { PanelCustomer } from './workspace/PanelCustomer';
-import { PanelGuarantor } from './workspace/PanelGuarantor';
+import { PanelCoLessee } from './workspace/PanelCoLessee';
 import { PanelDocuments } from './workspace/PanelDocuments';
 import { PanelSaving } from './workspace/PanelSaving';
 import { PanelInsurance } from './workspace/PanelInsurance';
@@ -93,12 +93,12 @@ function WorkspaceContent() {
         const stepSaving = (c.step_data?.SAVING_TARGET as { saving_target_amount?: number } | undefined);
         const stepWorkspace = (c.step_data?.WORKSPACE as { modelId?: number; variantId?: number; selectedQuote?: unknown } | undefined);
 
-        // Fetch customer + guarantor details
+        // Fetch customer + co-lessee details
         let customerAddresses = { home: false, work: false, shipping: false };
         let customerContactCount = 0;
         let customerReferenceCount = 0;
         let customerDateOfBirth: string | null = null;
-        let guarantors: Array<{ customerId: number; fullName: string; idNumber: string }> = [];
+        let coLessees: Array<{ customerId: number; fullName: string; idNumber: string }> = [];
         let hasIdPhoto = false;
         let hasSignature = false;
         let evidenceCount = 0;
@@ -138,11 +138,11 @@ function WorkspaceContent() {
           })
         );
 
-        // Fetch guarantors
+        // Fetch co-lessees
         fetches.push(
-          apiClient.get<Array<{ customer_id: number; customer_name: string; id_number?: string }>>(`/v_contract_customers?contract_id=eq.${c.id}&role=eq.GUARANTOR&order=created_at`)
+          apiClient.get<Array<{ customer_id: number; customer_name: string; id_number?: string }>>(`/v_contract_customers?contract_id=eq.${c.id}&role=eq.CO_LESSEE&order=created_at`)
             .then(gs => {
-              guarantors = gs.map(g => ({
+              coLessees = gs.map(g => ({
                 customerId: g.customer_id,
                 fullName: g.customer_name,
                 idNumber: g.id_number ?? '',
@@ -209,7 +209,7 @@ function WorkspaceContent() {
           customerAddresses,
           customerContactCount,
           customerReferenceCount,
-          guarantors,
+          coLessees,
           modelId: resolvedModelId,
           modelName: resolvedModelName,
           familyName: resolvedFamilyName,
@@ -300,7 +300,7 @@ function WorkspaceContent() {
     saving: t('workspace.cardSaving'),
     insurance: t('workspace.cardInsurance'),
     contactRef: t('workspace.cardContactRef'),
-    guarantor: t('workspace.cardGuarantor'),
+    co_lessee: t('workspace.cardCoLessee'),
     documents: t('workspace.cardDocuments'),
     signatory: t('workspace.cardSignatory'),
     handover: t('workspace.cardHandover'),
@@ -325,7 +325,7 @@ function WorkspaceContent() {
         const isCardActive = (id: ModalId) => openModal === id && !(isMobile && isRoot);
 
         // Review & Pay card: always visible once draft exists, but disabled until all cards complete
-        const requiredCards = ['productPlan', 'customer', 'contactRef', 'guarantor', 'signatory', 'documents'] as const;
+        const requiredCards = ['productPlan', 'customer', 'contactRef', 'co_lessee', 'signatory', 'documents'] as const;
         const allCardsComplete = data.contractId != null && requiredCards.every(id => getCardStatus(id) === 'complete');
         const reviewPayReady = allCardsComplete || !!data.billId;
 
@@ -406,7 +406,7 @@ function WorkspaceContent() {
                     <CardSaving onEdit={() => handleEditOpen('saving')} active={isCardActive('saving')} shake={shakingCards.has('saving')} />
                     <CardInsurance onEdit={() => handleEditOpen('insurance')} active={isCardActive('insurance')} shake={shakingCards.has('insurance')} />
                     <CardContactRef onEdit={() => handleEditOpen('contactRef')} active={isCardActive('contactRef')} shake={shakingCards.has('contactRef')} />
-                    <CardGuarantor onEdit={() => handleEditOpen('guarantor')} active={isCardActive('guarantor')} shake={shakingCards.has('guarantor')} />
+                    <CardCoLessee onEdit={() => handleEditOpen('co_lessee')} active={isCardActive('co_lessee')} shake={shakingCards.has('co_lessee')} />
                     <CardHandover onEdit={() => handleEditOpen('handover')} active={isCardActive('handover')} shake={shakingCards.has('handover')} />
                     <CardDocuments onEdit={() => handleEditOpen('documents')} active={isCardActive('documents')} shake={shakingCards.has('documents')} />
 
@@ -437,7 +437,7 @@ function WorkspaceContent() {
                   {openModal === 'insurance' && <PanelInsurance onClose={handleEditClose} />}
                   {openModal === 'customer' && <PanelCustomer onClose={handleEditClose} />}
                   {openModal === 'contactRef' && <PanelContactRef onClose={handleEditClose} />}
-                  {openModal === 'guarantor' && <PanelGuarantor onClose={handleEditClose} />}
+                  {openModal === 'co_lessee' && <PanelCoLessee onClose={handleEditClose} />}
                   {openModal === 'documents' && <PanelDocuments onClose={handleEditClose} />}
                   {openModal === 'signatory' && <PanelSignatory onClose={handleEditClose} />}
                   {openModal === 'handover' && <PanelHandover onClose={handleEditClose} />}

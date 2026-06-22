@@ -1,6 +1,6 @@
 // Side-by-side "Preview contract" + "Signature" card pair, wired to the
 // shared ContractPreviewModal + ContractSignModal. Used for the lessee (in
-// PanelDocuments) and for guarantors (in PanelGuarantor).
+// PanelDocuments) and for co-lessees (in PanelCoLessee).
 //
 // The signature card hides itself in lessee-only modes by setting
 // hideSignatureCard if a caller ever wants the preview alone — currently
@@ -24,7 +24,7 @@ interface Props {
   contract: ContractMin | null;
   // Signature target. file_url + uploading + onUpload are passed straight
   // into ContractSignModal; the caller decides which customer (lessee or
-  // guarantor) the signature attaches to.
+  // co-lessee) the signature attaches to.
   fileUrl: string | null;
   uploading: boolean;
   onUpload: (imgs: UploadedImage[]) => void;
@@ -33,7 +33,7 @@ interface Props {
   disabled?: boolean;
   cacheBust?: number;
   // Optional: pair label shown above the cards. Defaults to
-  // "Contract & signature". Pass a guarantor name for the guarantor flow.
+  // "Contract & signature". Pass a co-lessee name for the co-lessee flow.
   pairLabel?: string;
   signCardLabel?: string;
   // When the contract isn't ready to render (BE readiness from
@@ -41,7 +41,7 @@ interface Props {
   // the preview + signature cards — the document can't be previewed or signed
   // until these are filled.
   notReadyErrors?: ReadinessError[];
-  // Signature is optional for this party (e.g. guarantor — can sign by hand on
+  // Signature is optional for this party (e.g. co-lessee — can sign by hand on
   // the printed contract). Drops the "pending" empty-circle indicator so the
   // unsigned state doesn't read as a blocking requirement.
   signatureOptional?: boolean;

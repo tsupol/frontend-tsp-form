@@ -584,7 +584,7 @@ const FOOTER_ACTION_ALLOWLIST: ReadonlySet<string> = new Set([
   'CUSTOMER_DEPOSIT_DEVICE', 'RETURN_DEPOSIT',
   'REPOSSESS', 'BIND_LOANER', 'UNBIND_LOANER', 'DEVICE_REPAIR_REQUEST',
   // CUSTOMER (contract-scoped only)
-  'ADD_GUARANTOR', 'REMOVE_GUARANTOR',
+  'ADD_CO_LESSEE', 'REMOVE_CO_LESSEE',
   'ATTACH_CUSTOMER', 'DETACH_CUSTOMER',
 ]);
 
@@ -620,8 +620,8 @@ const ELSEWHERE_TAB: Record<string, 'overview' | 'device' | 'notes' | 'customers
   ADD_NOTE: 'notes',
   ATTACH_CUSTOMER: 'customers',
   DETACH_CUSTOMER: 'customers',
-  ADD_GUARANTOR: 'customers',
-  REMOVE_GUARANTOR: 'customers',
+  ADD_CO_LESSEE: 'customers',
+  REMOVE_CO_LESSEE: 'customers',
   BIND_DEVICE: 'device',
   UNBIND_DEVICE: 'device',
   CUSTOMER_DEPOSIT_DEVICE: 'device',
@@ -646,8 +646,8 @@ const ACTION_PLACEMENT: Record<string, ActionPlacement> = {
   // Contract-customer ops live in the Customers tab
   ATTACH_CUSTOMER:   { kind: 'elsewhere', where: 'Customers tab' },
   DETACH_CUSTOMER:   { kind: 'elsewhere', where: 'Customers tab' },
-  ADD_GUARANTOR:     { kind: 'elsewhere', where: 'Customers tab' },
-  REMOVE_GUARANTOR:  { kind: 'elsewhere', where: 'Customers tab' },
+  ADD_CO_LESSEE:     { kind: 'elsewhere', where: 'Customers tab' },
+  REMOVE_CO_LESSEE:  { kind: 'elsewhere', where: 'Customers tab' },
   // Delivery edit lives in the Overview tab → Shipping section
   UPDATE_DELIVERY:       { kind: 'elsewhere', where: 'Overview tab → Shipping' },
   // Device ops live in the Device tab

@@ -10,8 +10,8 @@
 // Rendering:
 //   - Lessee block: highlights success/danger when the lessee identity
 //     changed (PRIMARY_SWAP / ATTACH_PRIMARY_CUSTOMER); plain otherwise.
-//   - Guarantors block: list, with added (success border + Plus) and
-//     removed (danger border + Minus) called out. Unchanged guarantors
+//   - Co-lessees block: list, with added (success border + Plus) and
+//     removed (danger border + Minus) called out. Unchanged co-lessees
 //     render plain.
 //   - Device block: success border if a device was newly bound, danger
 //     if released, warning if changed device. Plain if unchanged.
@@ -102,14 +102,14 @@ export function SnapshotOverviewDiff({ changeReason, stateBefore, stateAfter }: 
     lesseeBefore && lesseeAfter && partyKey(lesseeBefore) !== partyKey(lesseeAfter) ? 'changed' :
     'unchanged';
 
-  // ─── Guarantors ─────────────────────────────────────────────────────
-  const beforeGs = (before.parties ?? []).filter(p => p.role === 'GUARANTOR');
-  const afterGs  = (after.parties  ?? []).filter(p => p.role === 'GUARANTOR');
+  // ─── Co-lessees ─────────────────────────────────────────────────────
+  const beforeGs = (before.parties ?? []).filter(p => p.role === 'CO_LESSEE');
+  const afterGs  = (after.parties  ?? []).filter(p => p.role === 'CO_LESSEE');
   const beforeGKeys = new Set(beforeGs.map(partyKey));
   const afterGKeys  = new Set(afterGs.map(partyKey));
   const addedGs   = afterGs.filter(p => !beforeGKeys.has(partyKey(p)));
   const removedGs = beforeGs.filter(p => !afterGKeys.has(partyKey(p)));
-  const guarantorKind: ChangeKind =
+  const coLesseeKind: ChangeKind =
     addedGs.length && !removedGs.length ? 'added' :
     removedGs.length && !addedGs.length ? 'removed' :
     addedGs.length || removedGs.length ? 'changed' :
@@ -169,9 +169,9 @@ export function SnapshotOverviewDiff({ changeReason, stateBefore, stateAfter }: 
         </OverviewBlock>
       )}
 
-      {/* Guarantors */}
+      {/* Co-lessees */}
       {(afterGs.length > 0 || removedGs.length > 0) && (
-        <OverviewBlock title={t('signing.role_GUARANTOR')} kind={guarantorKind}>
+        <OverviewBlock title={t('signing.role_CO_LESSEE')} kind={coLesseeKind}>
           <ul className="flex flex-col gap-1.5">
             {afterGs.map(p => (
               <PartyLine

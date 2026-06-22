@@ -33,7 +33,7 @@ import { SnapshotOverviewDiff } from './SnapshotOverviewDiff';
 
 interface PendingParty {
   signing_id: number;
-  party_role: 'LESSOR' | 'LESSEE' | 'GUARANTOR' | 'WITNESS';
+  party_role: 'LESSOR' | 'LESSEE' | 'CO_LESSEE' | 'WITNESS';
   party_index: number;
   customer_id: number | null;
   staff_id: number | null;

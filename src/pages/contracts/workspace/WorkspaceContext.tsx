@@ -10,8 +10,8 @@ import { useCustomerSummary, useInvalidateCustomer } from './useCustomerSummary'
 import type { CustomerSummary } from './useCustomerSummary';
 import { useContractDocuments, useInvalidateDocs } from './useContractDocuments';
 import type { ContractDocSummary } from './useContractDocuments';
-import { useContractGuarantors, useInvalidateGuarantors } from './useContractGuarantors';
-import type { GuarantorRow } from './useContractGuarantors';
+import { useContractCoLessees, useInvalidateCoLessees } from './useContractCoLessees';
+import type { CoLesseeRow } from './useContractCoLessees';
 import { useContractSignatories, useInvalidateSignatories } from './useContractSignatories';
 import type { ContractSignatory } from './useContractSignatories';
 import { getCardStatus as deriveCardStatus } from './cardStatus';
@@ -37,9 +37,9 @@ const defaultData: WorkspaceData = {
   customerAddresses: { home: false, work: false, shipping: false },
   customerContactCount: 0,
   customerReferenceCount: 0,
-  guarantors: [],
-  guarantorSkipped: false,
-  guarantorsComplete: false,
+  coLessees: [],
+  coLesseeSkipped: false,
+  coLesseesComplete: false,
   hasIdPhoto: false,
   hasSignature: false,
   evidenceCount: 0,
@@ -69,14 +69,14 @@ interface WorkspaceContextValue {
   contractLoading: boolean;
   customer: CustomerSummary | null;
   docs: ContractDocSummary | null;
-  guarantorList: GuarantorRow[];
+  coLesseeList: CoLesseeRow[];
   signatories: ContractSignatory[];
 
   // Invalidation helpers — call after RPCs instead of updateData
   invalidateContract: () => void;
   invalidateCustomer: () => void;
   invalidateDocs: () => void;
-  invalidateGuarantors: () => void;
+  invalidateCoLessees: () => void;
   invalidateSignatories: () => void;
   invalidateAll: () => void;
 
@@ -164,8 +164,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const docsQuery = useContractDocuments(data.contractId);
   const docs = docsQuery.data ?? null;
 
-  const guarantorsQuery = useContractGuarantors(data.contractId);
-  const guarantorList = guarantorsQuery.data ?? [];
+  const coLesseesQuery = useContractCoLessees(data.contractId);
+  const coLesseeList = coLesseesQuery.data ?? [];
 
   const signatoriesQuery = useContractSignatories(data.contractId);
   const signatories = signatoriesQuery.data ?? [];
@@ -174,7 +174,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const _invalidateContract = useInvalidateContract();
   const _invalidateCustomer = useInvalidateCustomer();
   const _invalidateDocs = useInvalidateDocs();
-  const _invalidateGuarantors = useInvalidateGuarantors();
+  const _invalidateCoLessees = useInvalidateCoLessees();
   const _invalidateSignatories = useInvalidateSignatories();
 
   const invalidateContract = useCallback(() => {
@@ -189,9 +189,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     _invalidateDocs(data.contractId);
   }, [_invalidateDocs, data.contractId]);
 
-  const invalidateGuarantors = useCallback(() => {
-    _invalidateGuarantors(data.contractId);
-  }, [_invalidateGuarantors, data.contractId]);
+  const invalidateCoLessees = useCallback(() => {
+    _invalidateCoLessees(data.contractId);
+  }, [_invalidateCoLessees, data.contractId]);
 
   const invalidateSignatories = useCallback(() => {
     _invalidateSignatories({ contractId: data.contractId });
@@ -201,9 +201,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     invalidateContract();
     invalidateCustomer();
     invalidateDocs();
-    invalidateGuarantors();
+    invalidateCoLessees();
     invalidateSignatories();
-  }, [invalidateContract, invalidateCustomer, invalidateDocs, invalidateGuarantors, invalidateSignatories]);
+  }, [invalidateContract, invalidateCustomer, invalidateDocs, invalidateCoLessees, invalidateSignatories]);
 
   const isFinancialLocked = contract?.is_financial_locked ?? false;
 
@@ -290,17 +290,17 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     createDraft();
   }, [data.customerId, data.contractId, data.draftError, data.branchId, data.modelId, data.variantId, data.selectedQuote, user]);
 
-  // ── Guarantor completeness (server-derived) ──────────────────────────
-  const guarantorCount = guarantorList.length;
-  const guarantorIds = useMemo(() => guarantorList.map(g => g.customer_id), [guarantorList]);
+  // ── Co-lessee completeness (server-derived) ──────────────────────────
+  const coLesseeCount = coLesseeList.length;
+  const coLesseeIds = useMemo(() => coLesseeList.map(g => g.customer_id), [coLesseeList]);
 
-  const { data: guarantorsAllComplete = false } = useQuery({
-    queryKey: ['guarantor-all-complete', data.contractId, guarantorIds.join(',')],
+  const { data: coLesseesAllComplete = false } = useQuery({
+    queryKey: ['co-lessee-all-complete', data.contractId, coLesseeIds.join(',')],
     queryFn: async () => {
-      // Signature intentionally NOT required here — guarantors can sign in
+      // Signature intentionally NOT required here — co-lessees can sign in
       // the same modal as the lessee from the Documents panel, or by hand
       // on the printed contract.
-      const results = await Promise.all(guarantorIds.map(async (custId) => {
+      const results = await Promise.all(coLesseeIds.map(async (custId) => {
         const [addrs, idCard, custInfo] = await Promise.all([
           apiClient.get<Array<{ address_type: string }>>(`/v_customer_addresses?customer_id=eq.${custId}&select=address_type`).catch(() => []),
           apiClient.get<Array<{ id: number }>>(`/v_customer_documents?customer_id=eq.${custId}&doc_type=eq.ID_CARD_FRONT&is_active=eq.true&select=id`).catch(() => []),
@@ -313,17 +313,17 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       }));
       return results.every(Boolean);
     },
-    enabled: guarantorCount > 0,
+    enabled: coLesseeCount > 0,
     staleTime: 0,
   });
 
   // ── Card statuses (derived from server state) ────────────────────────
   const getCardStatus = useCallback((card: string): CardStatus => {
     return deriveCardStatus(card, contract, customer, docs, {
-      count: guarantorCount,
-      allComplete: guarantorsAllComplete,
+      count: coLesseeCount,
+      allComplete: coLesseesAllComplete,
     }, signatories);
-  }, [contract, customer, docs, guarantorCount, guarantorsAllComplete, signatories]);
+  }, [contract, customer, docs, coLesseeCount, coLesseesAllComplete, signatories]);
 
   // Phase flags
   const isPreDraft = !data.contractId;
@@ -341,12 +341,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     contractLoading,
     customer,
     docs,
-    guarantorList,
+    coLesseeList,
     signatories,
     invalidateContract,
     invalidateCustomer,
     invalidateDocs,
-    invalidateGuarantors,
+    invalidateCoLessees,
     invalidateSignatories,
     invalidateAll,
     isFinancialLocked,
@@ -366,7 +366,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     pendingModal,
     confirmPanelSwitch,
     cancelPanelSwitch,
-  }), [data, updateData, resetData, contract, contractLoading, customer, docs, guarantorList, signatories, invalidateContract, invalidateCustomer, invalidateDocs, invalidateGuarantors, invalidateSignatories, invalidateAll, isFinancialLocked, openModal, setOpenModal, getCardStatus, isPreDraft, isPreBill, isPostBill, isPostPayment, isReadOnly, readinessKey, triggerReadinessRefetch, setPanelDirty, pendingModal, confirmPanelSwitch, cancelPanelSwitch]);
+  }), [data, updateData, resetData, contract, contractLoading, customer, docs, coLesseeList, signatories, invalidateContract, invalidateCustomer, invalidateDocs, invalidateCoLessees, invalidateSignatories, invalidateAll, isFinancialLocked, openModal, setOpenModal, getCardStatus, isPreDraft, isPreBill, isPostBill, isPostPayment, isReadOnly, readinessKey, triggerReadinessRefetch, setPanelDirty, pendingModal, confirmPanelSwitch, cancelPanelSwitch]);
 
   return (
     <WorkspaceContext.Provider value={value}>

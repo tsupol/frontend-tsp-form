@@ -2,6 +2,7 @@
 
 ## General
 
+- **`guarantor` is now `co_lessee`** (renamed 2026-06-22, ผู้ค้ำประกัน → ผู้เช่าร่วม). Pure rename, behavior unchanged. The full mapping (incl. the abbreviated `signing_sealed_add_colessee_staff` event_type and which i18n keys are backend-locked vs FE-internal) is in `.claude/_RENAME_SPEC.md` — a temporary historical artifact, not standing guidance. If you see `guarantor` anywhere in `src/`, it's a leftover; apply that spec. Don't introduce new `guarantor` naming.
 - **Never start the dev server** (`npm run dev` / `npx vite`) — the user already has it running. Only use `npm run build` or `npx tsc --noEmit` to check for errors.
 - **Dev server URL**: `https://localhost:5173` (HTTPS, not HTTP)
 - Use Bangkok time (UTC+7) when displaying times to the user

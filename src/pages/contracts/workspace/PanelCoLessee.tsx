@@ -41,33 +41,33 @@ interface SearchResult {
 
 interface Props { onClose: () => void }
 
-export function PanelGuarantor({ onClose: _onClose }: Props) {
+export function PanelCoLessee({ onClose: _onClose }: Props) {
   const { t, i18n } = useTranslation();
-  const { data: workspace, guarantorList, invalidateGuarantors, setPanelDirty } = useWorkspace();
+  const { data: workspace, coLesseeList, invalidateCoLessees, setPanelDirty } = useWorkspace();
   const queryClient = useQueryClient();
 
-  // Map server guarantorList to the shape used by the panel
-  const guarantors = guarantorList.map(g => ({ customerId: g.customer_id, fullName: g.customer_name, idNumber: g.id_number ?? '' }));
+  // Map server coLesseeList to the shape used by the panel
+  const coLessees = coLesseeList.map(g => ({ customerId: g.customer_id, fullName: g.customer_name, idNumber: g.id_number ?? '' }));
 
-  // ── Existing guarantors list ────────────────────────────────────────────
+  // ── Existing co-lessees list ────────────────────────────────────────────
   const [removing, setRemoving] = useState<number | null>(null);
   const [removeError, setRemoveError] = useState('');
-  const [expandedGuarantor, setExpandedGuarantor] = useState<number | null>(
-    guarantors.length === 1 ? guarantors[0].customerId : null
+  const [expandedCoLessee, setExpandedCoLessee] = useState<number | null>(
+    coLessees.length === 1 ? coLessees[0].customerId : null
   );
-  const [showAddForm, setShowAddForm] = useState(guarantors.length === 0);
+  const [showAddForm, setShowAddForm] = useState(coLessees.length === 0);
 
   const handleRemove = async (customerId: number) => {
     if (!workspace.contractId) return;
     setRemoving(customerId);
     setRemoveError('');
     try {
-      await apiClient.rpc('fn_contract_remove_guarantor', {
+      await apiClient.rpc('fn_contract_remove_co_lessee', {
         p_contract_id: workspace.contractId,
         p_customer_id: customerId,
       });
-      invalidateGuarantors();
-      if (expandedGuarantor === customerId) setExpandedGuarantor(null);
+      invalidateCoLessees();
+      if (expandedCoLessee === customerId) setExpandedCoLessee(null);
     } catch (err) {
       if (err instanceof ApiError) {
         const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
@@ -79,7 +79,7 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
     }
   };
 
-  // ── Add new guarantor form ──────────────────────────────────────────────
+  // ── Add new co-lessee form ──────────────────────────────────────────────
   const [idType, setIdType] = useState<'CITIZEN_ID' | 'PASSPORT'>('CITIZEN_ID');
   const [idNumber, setIdNumber] = useState('');
   const [prefix, setPrefix] = useState('');
@@ -114,7 +114,7 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
     pendingScanRef.current = null;
   };
 
-  // Persist the OCR-scanned ID card as the guarantor's ID_CARD_FRONT document.
+  // Persist the OCR-scanned ID card as the co-lessee's ID_CARD_FRONT document.
   const persistScannedIdCard = async (custId: number, image: UploadedImage) => {
     try {
       const results = await beMediaUploadFromImage({
@@ -130,9 +130,9 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
         p_file_url: `/${key}`,
       });
       invalidateMediaUrl(key);
-      queryClient.invalidateQueries({ queryKey: ['guarantor-idcard', custId] });
-      queryClient.invalidateQueries({ queryKey: ['guarantor-status'] });
-      queryClient.invalidateQueries({ queryKey: ['guarantor-all-complete'] });
+      queryClient.invalidateQueries({ queryKey: ['co-lessee-idcard', custId] });
+      queryClient.invalidateQueries({ queryKey: ['co-lessee-status'] });
+      queryClient.invalidateQueries({ queryKey: ['co-lessee-all-complete'] });
     } catch { /* ignore — user can re-upload */ }
   };
 
@@ -181,18 +181,18 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
     setApiError(''); setResult(null);
   };
 
-  const attachGuarantor = async (custId: number, _fullName: string, _idNum: string) => {
+  const attachCoLessee = async (custId: number, _fullName: string, _idNum: string) => {
     if (!workspace.contractId) return;
     if (custId === workspace.customerId) {
-      setApiError(t('workspace.guarantorCannotBeSelf'));
+      setApiError(t('workspace.coLesseeCannotBeSelf'));
       return;
     }
-    if (guarantors.some(g => g.customerId === custId)) {
-      setApiError(t('workspace.guarantorAlreadyAttached'));
+    if (coLessees.some(g => g.customerId === custId)) {
+      setApiError(t('workspace.coLesseeAlreadyAttached'));
       return;
     }
     try {
-      await apiClient.rpc('fn_contract_add_guarantor', {
+      await apiClient.rpc('fn_contract_add_co_lessee', {
         p_contract_id: workspace.contractId,
         p_customer_id: custId,
         p_relation: null,
@@ -203,10 +203,10 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
         pendingScanRef.current = null;
         void persistScannedIdCard(custId, img);
       }
-      invalidateGuarantors();
+      invalidateCoLessees();
       resetForm();
       setShowAddForm(false);
-      setExpandedGuarantor(custId);
+      setExpandedCoLessee(custId);
     } catch (err) {
       if (err instanceof ApiError) {
         const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
@@ -219,7 +219,7 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
   const handleUseOrRegister = async () => {
     setApiError('');
     if (selectedCustomer) {
-      await attachGuarantor(selectedCustomer.id, selectedCustomer.full_name, selectedCustomer.id_number);
+      await attachCoLessee(selectedCustomer.id, selectedCustomer.full_name, selectedCustomer.id_number);
       return;
     }
     if (idType === 'CITIZEN_ID' && idNumber.replace(/\D/g, '').length !== 13) {
@@ -238,7 +238,7 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
         return;
       }
       setResult(res);
-      await attachGuarantor(res.customer_id, res.full_name, res.id_number);
+      await attachCoLessee(res.customer_id, res.full_name, res.id_number);
     } catch (err) {
       if (err instanceof ApiError) {
         const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
@@ -251,34 +251,34 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
   const canSearch = !!(idNumber.trim() || firstName.trim() || lastName.trim());
   const isExisting = !!selectedCustomer;
   const buttonLabel = isExisting ? t('workspace.useThisCustomer') : t('wizard.registerCustomer');
-  const hasGuarantors = guarantors.length > 0;
+  const hasCoLessees = coLessees.length > 0;
 
   return (
     <div className="p-4 flex flex-col max-w-2xl">
-      <PanelSection title={t('workspace.cardGuarantor')} count={guarantors.length}
+      <PanelSection title={t('workspace.cardCoLessee')} count={coLessees.length}
         alert={
           removeError ? <div className="alert alert-danger"><XCircle size={14} /><span>{removeError}</span></div>
-          : (workspace.customerId && guarantors.length === 0 && workspace.customerDateOfBirth && (() => {
+          : (workspace.customerId && coLessees.length === 0 && workspace.customerDateOfBirth && (() => {
               const birth = new Date(workspace.customerDateOfBirth!);
               const now = new Date();
               let age = now.getFullYear() - birth.getFullYear();
               const m = now.getMonth() - birth.getMonth();
               if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--;
               return age < 18;
-            })()) ? <div className="alert alert-warning"><AlertTriangle size={14} /><span>{t('workspace.guarantorRequired')}</span></div>
+            })()) ? <div className="alert alert-warning"><AlertTriangle size={14} /><span>{t('workspace.coLesseeRequired')}</span></div>
           : undefined
         }
       >
-        {/* Existing guarantors — accordion */}
-        {hasGuarantors && (
+        {/* Existing co-lessees — accordion */}
+        {hasCoLessees && (
           <div className="flex flex-col gap-2 mb-4">
-            {guarantors.map(g => (
-              <GuarantorRow
+            {coLessees.map(g => (
+              <CoLesseeRow
                 key={g.customerId}
-                guarantor={g}
+                coLessee={g}
                 contractId={workspace.contractId}
-                expanded={expandedGuarantor === g.customerId}
-                onToggle={() => setExpandedGuarantor(expandedGuarantor === g.customerId ? null : g.customerId)}
+                expanded={expandedCoLessee === g.customerId}
+                onToggle={() => setExpandedCoLessee(expandedCoLessee === g.customerId ? null : g.customerId)}
                 onRemove={() => handleRemove(g.customerId)}
                 removing={removing === g.customerId}
               />
@@ -286,18 +286,18 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
           </div>
         )}
 
-        {/* Add form — inline when no guarantors, expandable toggle when 1+ */}
-        {hasGuarantors && !showAddForm && (
+        {/* Add form — inline when no co-lessees, expandable toggle when 1+ */}
+        {hasCoLessees && !showAddForm && (
           <Button onClick={() => setShowAddForm(true)} startIcon={<Plus size={14} />} className="w-full">
-            {t('workspace.addGuarantor')}
+            {t('workspace.addCoLessee')}
           </Button>
         )}
 
-        {(showAddForm || !hasGuarantors) && (
-          <div className={hasGuarantors ? 'border border-line rounded-lg p-3' : 'p-3 rounded-md border border-dashed border-line'}>
-            {hasGuarantors && (
+        {(showAddForm || !hasCoLessees) && (
+          <div className={hasCoLessees ? 'border border-line rounded-lg p-3' : 'p-3 rounded-md border border-dashed border-line'}>
+            {hasCoLessees && (
               <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-medium">{t('workspace.addGuarantor')}</span>
+                <span className="text-sm font-medium">{t('workspace.addCoLessee')}</span>
                 <button className="text-subtle hover:text-fg cursor-pointer bg-transparent border-none p-1" onClick={() => { setShowAddForm(false); resetForm(); }}>
                   <XCircle size={16} />
                 </button>
@@ -449,7 +449,7 @@ function CidChecksumIcon({ digits }: { digits: string }) {
 function SectionHeader({ label, done, expanded, onToggle, optional }: {
   label: string; done: boolean; expanded: boolean; onToggle: () => void;
   // optional sections show a neutral empty circle instead of a warning icon
-  // when not done — used for the guarantor signature which can be captured
+  // when not done — used for the co-lessee signature which can be captured
   // later from the Documents panel.
   optional?: boolean;
 }) {
@@ -481,7 +481,7 @@ function SectionHeader({ label, done, expanded, onToggle, optional }: {
   );
 }
 
-// ── Guarantor row — accordion with collapsible sections ───────────────────
+// ── Co-lessee row — accordion with collapsible sections ───────────────────
 
 const thaiPhoneMask = (digits: string) => {
   if (digits.startsWith('02')) return '##-###-####';
@@ -490,14 +490,14 @@ const thaiPhoneMask = (digits: string) => {
   return '###-###-####';
 };
 
-interface GuarantorCustomer {
+interface CoLesseeCustomer {
   id: number; id_type: string; id_number: string;
   prefix: string | null; first_name: string; last_name: string;
   date_of_birth: string | null; tel: string | null;
 }
 
-function GuarantorRow({ guarantor, expanded, onToggle, onRemove, removing }: {
-  guarantor: { customerId: number; fullName: string; idNumber: string };
+function CoLesseeRow({ coLessee, expanded, onToggle, onRemove, removing }: {
+  coLessee: { customerId: number; fullName: string; idNumber: string };
   contractId: number | null;
   expanded: boolean;
   onToggle: () => void;
@@ -512,29 +512,29 @@ function GuarantorRow({ guarantor, expanded, onToggle, onRemove, removing }: {
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [openSection, setOpenSection] = useState<string | null>('info');
 
-  // Fetch guarantor customer info
+  // Fetch co-lessee customer info
   const { data: custInfo, refetch: refetchCustInfo } = useQuery({
-    queryKey: ['guarantor-info', guarantor.customerId],
-    queryFn: () => apiClient.get<GuarantorCustomer[]>(`/v_customers?id=eq.${guarantor.customerId}&select=id,id_type,id_number,prefix,first_name,last_name,date_of_birth,tel`).then(r => r[0] ?? null),
+    queryKey: ['co-lessee-info', coLessee.customerId],
+    queryFn: () => apiClient.get<CoLesseeCustomer[]>(`/v_customers?id=eq.${coLessee.customerId}&select=id,id_type,id_number,prefix,first_name,last_name,date_of_birth,tel`).then(r => r[0] ?? null),
   });
 
   const { data: addresses = [], refetch: refetchAddresses } = useQuery({
-    queryKey: ['guarantor-addresses', guarantor.customerId],
-    queryFn: () => apiClient.get<CustomerAddress[]>(`/v_customer_addresses?customer_id=eq.${guarantor.customerId}&order=address_type`),
+    queryKey: ['co-lessee-addresses', coLessee.customerId],
+    queryFn: () => apiClient.get<CustomerAddress[]>(`/v_customer_addresses?customer_id=eq.${coLessee.customerId}&order=address_type`),
   });
   const homeAddress = addresses.find(a => a.address_type === 'HOME');
   const workAddress = addresses.find(a => a.address_type === 'WORK');
 
   const { data: idCardDocs = [] } = useQuery({
-    queryKey: ['guarantor-idcard', guarantor.customerId],
+    queryKey: ['co-lessee-idcard', coLessee.customerId],
     queryFn: () => apiClient.get<CustomerDocument[]>(
-      `/v_customer_documents?customer_id=eq.${guarantor.customerId}&doc_type=eq.ID_CARD_FRONT&is_active=eq.true&select=id,file_url`
+      `/v_customer_documents?customer_id=eq.${coLessee.customerId}&doc_type=eq.ID_CARD_FRONT&is_active=eq.true&select=id,file_url`
     ),
   });
 
   const idCard = idCardDocs[0] ?? null;
   const hasInfo = !!custInfo?.date_of_birth;
-  // Guarantor signature is captured in the Documents step, not here.
+  // Co-lessee signature is captured in the Documents step, not here.
   const isComplete = hasInfo && !!homeAddress && !!workAddress && !!idCard;
 
   const toggle = (section: string) => setOpenSection(openSection === section ? null : section);
@@ -580,7 +580,7 @@ function GuarantorRow({ guarantor, expanded, onToggle, onRemove, removing }: {
         p_date_of_birth: editDob || null, p_tel: editTel.trim(),
       });
       refetchCustInfo();
-      queryClient.invalidateQueries({ queryKey: ['guarantor-status'] }); queryClient.invalidateQueries({ queryKey: ['guarantor-all-complete'] });
+      queryClient.invalidateQueries({ queryKey: ['co-lessee-status'] }); queryClient.invalidateQueries({ queryKey: ['co-lessee-all-complete'] });
       setInfoSaved(true);
       setTimeout(() => setInfoSaved(false), 2000);
       addSnackbar({ message: <div className="alert alert-success"><CheckCircle size={18} /><div><div className="alert-title">{t('common.saved')}</div></div></div> });
@@ -589,29 +589,29 @@ function GuarantorRow({ guarantor, expanded, onToggle, onRemove, removing }: {
 
   // ── Uploads ─────────────────────────────────────────────────────────
   const uploadIdCard = async (images: UploadedImage[]) => {
-    if (images.length === 0 || !guarantor.customerId) return;
+    if (images.length === 0 || !coLessee.customerId) return;
     setUploading('ID_CARD');
     try {
       const results = await beMediaUploadFromImage({
         type: 'customer_id_card',
         image: images[0],
-        params: { customer_id: guarantor.customerId },
+        params: { customer_id: coLessee.customerId },
       });
       const key = results.lg?.key ?? Object.values(results)[0]?.key;
       if (!key) throw new Error('Upload returned no key');
       await apiClient.rpc('fn_customer_document_upload', {
-        p_customer_id: guarantor.customerId, p_doc_type: 'ID_CARD_FRONT', p_file_url: `/${key}`,
+        p_customer_id: coLessee.customerId, p_doc_type: 'ID_CARD_FRONT', p_file_url: `/${key}`,
       });
       invalidateMediaUrl(key);
-      queryClient.invalidateQueries({ queryKey: ['guarantor-idcard', guarantor.customerId] });
-      queryClient.invalidateQueries({ queryKey: ['guarantor-status'] }); queryClient.invalidateQueries({ queryKey: ['guarantor-all-complete'] });
+      queryClient.invalidateQueries({ queryKey: ['co-lessee-idcard', coLessee.customerId] });
+      queryClient.invalidateQueries({ queryKey: ['co-lessee-status'] }); queryClient.invalidateQueries({ queryKey: ['co-lessee-all-complete'] });
       setCacheBust(n => n + 1);
     } catch {} finally { setUploading(''); }
   };
 
   return (
     <div className="border border-success-border rounded-lg overflow-hidden transition-colors">
-      {/* Header — accent marks an added guarantor */}
+      {/* Header — accent marks an added co-lessee */}
       <div className="flex items-center gap-2 px-3 py-2.5 cursor-pointer bg-success-soft hover:bg-surface-hover transition-colors" onClick={onToggle}>
         {expanded ? <ChevronDown size={14} className="text-subtle shrink-0" /> : <ChevronRight size={14} className="text-subtle shrink-0" />}
         {isComplete
@@ -619,8 +619,8 @@ function GuarantorRow({ guarantor, expanded, onToggle, onRemove, removing }: {
           : <AlertTriangle size={14} className="text-warning-fg shrink-0" />
         }
         <div className="flex-1 min-w-0">
-          <div className="font-medium text-sm truncate">{guarantor.fullName}</div>
-          {guarantor.idNumber && <div className="text-xs text-subtle">{guarantor.idNumber}</div>}
+          <div className="font-medium text-sm truncate">{coLessee.fullName}</div>
+          {coLessee.idNumber && <div className="text-xs text-subtle">{coLessee.idNumber}</div>}
         </div>
         {confirmRemove ? (
           <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
@@ -730,7 +730,7 @@ function GuarantorRow({ guarantor, expanded, onToggle, onRemove, removing }: {
             <SectionHeader label={t('workspace.addressHome')} done={!!homeAddress} expanded={openSection === 'home'} onToggle={() => toggle('home')} />
             {openSection === 'home' && (
               <div className="pt-2 pb-4">
-                <AddressFormPostal customerId={guarantor.customerId} addressType="HOME" existing={homeAddress} onSuccess={() => { refetchAddresses(); queryClient.invalidateQueries({ queryKey: ['guarantor-status'] }); queryClient.invalidateQueries({ queryKey: ['guarantor-all-complete'] }); }} />
+                <AddressFormPostal customerId={coLessee.customerId} addressType="HOME" existing={homeAddress} onSuccess={() => { refetchAddresses(); queryClient.invalidateQueries({ queryKey: ['co-lessee-status'] }); queryClient.invalidateQueries({ queryKey: ['co-lessee-all-complete'] }); }} />
               </div>
             )}
           </div>
@@ -740,7 +740,7 @@ function GuarantorRow({ guarantor, expanded, onToggle, onRemove, removing }: {
             <SectionHeader label={t('workspace.addressWork')} done={!!workAddress} expanded={openSection === 'work'} onToggle={() => toggle('work')} />
             {openSection === 'work' && (
               <div className="pt-2 pb-4">
-                <AddressFormPostal customerId={guarantor.customerId} addressType="WORK" existing={workAddress} onSuccess={() => { refetchAddresses(); queryClient.invalidateQueries({ queryKey: ['guarantor-status'] }); queryClient.invalidateQueries({ queryKey: ['guarantor-all-complete'] }); }} />
+                <AddressFormPostal customerId={coLessee.customerId} addressType="WORK" existing={workAddress} onSuccess={() => { refetchAddresses(); queryClient.invalidateQueries({ queryKey: ['co-lessee-status'] }); queryClient.invalidateQueries({ queryKey: ['co-lessee-all-complete'] }); }} />
               </div>
             )}
           </div>

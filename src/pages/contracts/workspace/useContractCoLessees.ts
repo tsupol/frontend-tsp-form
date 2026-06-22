@@ -4,7 +4,7 @@ import { apiClient } from '../../../lib/api';
 
 // ── Types ───────────────────────────────────────────────────────────────
 
-export interface GuarantorRow {
+export interface CoLesseeRow {
   customer_id: number;
   customer_name: string;
   id_number?: string;
@@ -12,17 +12,17 @@ export interface GuarantorRow {
 
 // ── Query key ───────────────────────────────────────────────────────────
 
-export const guarantorsQueryKey = (contractId: number | null) =>
-  ['workspace-guarantors', contractId] as const;
+export const coLesseesQueryKey = (contractId: number | null) =>
+  ['workspace-co-lessees', contractId] as const;
 
 // ── Hook ────────────────────────────────────────────────────────────────
 
-export function useContractGuarantors(contractId: number | null) {
+export function useContractCoLessees(contractId: number | null) {
   return useQuery({
-    queryKey: guarantorsQueryKey(contractId),
+    queryKey: coLesseesQueryKey(contractId),
     queryFn: () =>
-      apiClient.get<GuarantorRow[]>(
-        `/v_contract_customers?contract_id=eq.${contractId}&role=eq.GUARANTOR&order=created_at`
+      apiClient.get<CoLesseeRow[]>(
+        `/v_contract_customers?contract_id=eq.${contractId}&role=eq.CO_LESSEE&order=created_at`
       ),
     enabled: !!contractId,
     staleTime: 0,
@@ -31,12 +31,12 @@ export function useContractGuarantors(contractId: number | null) {
 
 // ── Invalidation helper ─────────────────────────────────────────────────
 
-export function useInvalidateGuarantors() {
+export function useInvalidateCoLessees() {
   const qc = useQueryClient();
   return useCallback(
     (contractId: number | null) => {
       if (contractId) {
-        qc.invalidateQueries({ queryKey: guarantorsQueryKey(contractId) });
+        qc.invalidateQueries({ queryKey: coLesseesQueryKey(contractId) });
       }
     },
     [qc]

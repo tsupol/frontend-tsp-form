@@ -6,7 +6,7 @@
 //   - api.fn_staff_get_signing_pdf_input  → snapshot row + frozen payload + parties
 //   - api.v_assets                        → live device fields for BIND
 //   - api.v_contract_detail               → handover row for BIND accessories
-//   - api.v_contracts                     → contract code for ADD/REMOVE_GUARANTOR
+//   - api.v_contracts                     → contract code for ADD/REMOVE_CO_LESSEE
 //   - api.v_installments                  → first/last due date + due day
 //
 // Read-only — no mutations. Closes via header X or backdrop. Modal always
@@ -130,7 +130,7 @@ export function SigningDetailModal({ open, onClose, signingId, contractId, signi
 
   // ─── Set-diff fallback ────────────────────────────────────────────────
   // Legacy FULL payloads carry cumulative state, not a delta. To identify
-  // "which guarantor was added" on a FULL row, we set-diff against the
+  // "which co-lessee was added" on a FULL row, we set-diff against the
   // previous non-VOIDED snapshot. For DELTA payloads (mig 227+) the change
   // is read directly off the payload and this query is unused.
   // VOIDED rows are skipped entirely upstream — they never committed.
@@ -426,7 +426,7 @@ function partyRoleColor(r: string): 'primary' | 'info' | 'default' {
   switch (r) {
     case 'LESSOR':
     case 'LESSEE':    return 'primary';
-    case 'GUARANTOR': return 'info';
+    case 'CO_LESSEE': return 'info';
     default:          return 'default';
   }
 }

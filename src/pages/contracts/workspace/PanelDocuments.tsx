@@ -11,7 +11,7 @@ import { IdPhotoUpload } from './IdPhotoUpload';
 import { ContractPreviewSignPair, type ReadinessError } from './ContractPreviewSignPair';
 import { SignatoryEditor } from './SignatoryEditor';
 import { ConfidenceScoreEditor } from './ConfidenceScoreEditor';
-import { useContractGuarantors } from './useContractGuarantors';
+import { useContractCoLessees } from './useContractCoLessees';
 import type { ContractMin } from '../../../lib/contractPdf/contractMin';
 
 interface CustomerDocument {
@@ -48,7 +48,7 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
     { id: 'customer', labelKey: 'workspace.cardCustomer' },
     { id: 'productPlan', labelKey: 'workspace.cardProduct' },
     { id: 'contactRef', labelKey: 'workspace.cardContactRef' },
-    { id: 'guarantor', labelKey: 'workspace.cardGuarantor' },
+    { id: 'co_lessee', labelKey: 'workspace.cardCoLessee' },
   ];
   const missingCardPrereqs = prereqCards.filter(c => getCardStatus(c.id) !== 'complete');
 
@@ -88,7 +88,7 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
     created_at: contract.created_at,
   } : null;
 
-  const { data: guarantors = [] } = useContractGuarantors(contractId);
+  const { data: coLessees = [] } = useContractCoLessees(contractId);
 
   // BE readiness — same validator the "open bill" button uses. When not ready
   // the document can't be previewed/signed; the Contract & signature section
@@ -105,11 +105,11 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
   });
   const notReadyErrors = readiness && !readiness.ready ? readiness.errors : undefined;
 
-  // All ID cards for everyone on the contract (lessee + guarantors). One
+  // All ID cards for everyone on the contract (lessee + co-lessees). One
   // batched query keyed on the full customer-id set so we don't N+1.
   const docCustomerIds = [
     ...(customerId ? [customerId] : []),
-    ...guarantors.map(g => g.customer_id),
+    ...coLessees.map(g => g.customer_id),
   ];
   const { data: customerDocs = [] } = useQuery({
     queryKey: ['customer-documents-multi', docCustomerIds],
@@ -123,7 +123,7 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
     if (!idCardByCustomer.has(d.customer_id)) idCardByCustomer.set(d.customer_id, d);
   }
 
-  // All signature documents for this contract (lessee + guarantors).
+  // All signature documents for this contract (lessee + co-lessees).
   const { data: contractDocs = [] } = useQuery({
     queryKey: ['contract-documents', contractId],
     queryFn: () => apiClient.get<ContractDocument[]>(
@@ -139,12 +139,12 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
   const lesseeIdCard = customerId ? idCardByCustomer.get(customerId) ?? null : null;
 
   // Print-readiness — same cards as before, plus an ID-card per person on
-  // the contract (lessee + each guarantor). Signatures stay optional.
+  // the contract (lessee + each co-lessee). Signatures stay optional.
   const missingIdCardPeople: Array<{ id: string; labelKey?: string; labelText?: string }> = [];
   if (!lesseeIdCard) {
     missingIdCardPeople.push({ id: 'idCard-lessee', labelKey: 'workspace.docIdPhoto' });
   }
-  for (const g of guarantors) {
+  for (const g of coLessees) {
     if (!idCardByCustomer.has(g.customer_id)) {
       missingIdCardPeople.push({
         id: `idCard-${g.customer_id}`,
@@ -271,15 +271,15 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
         notReadyErrors={notReadyErrors}
       />
 
-      {/* ── Guarantor blocks ────────────────────────────────────────── */}
-      {guarantors.map(g => {
+      {/* ── Co-lessee blocks ────────────────────────────────────────── */}
+      {coLessees.map(g => {
         const gIdCard = idCardByCustomer.get(g.customer_id) ?? null;
         const gSig = signatureByCustomer.get(g.customer_id) ?? null;
         return (
           <div key={g.customer_id} className="flex flex-col gap-6 pt-6 border-t border-line">
             <div className="text-sm font-semibold text-fg">
-              {t('workspace.docsGuarantorHeading', {
-                defaultValue: 'Guarantor: {{name}}',
+              {t('workspace.docsCoLesseeHeading', {
+                defaultValue: 'Co-lessee: {{name}}',
                 name: g.customer_name,
               })}
             </div>

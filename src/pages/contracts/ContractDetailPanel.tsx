@@ -1148,13 +1148,13 @@ function CustomersTab({ contractId, customerId, customerName, t, onRequestDetach
 }) {
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
-  const [pickerMode, setPickerMode] = useState<'attach' | 'guarantor' | null>(null);
+  const [pickerMode, setPickerMode] = useState<'attach' | 'co_lessee' | null>(null);
   const [removeTarget, setRemoveTarget] = useState<ContractCustomer | null>(null);
 
-  // v_contract_customers stores ONLY guarantors today (despite older docs that
+  // v_contract_customers stores ONLY co-lessees today (despite older docs that
   // suggested it'd also include the primary). The primary customer lives on
   // contract.customer_id directly — we get it via props.
-  const { data: guarantors, isLoading } = useQuery({
+  const { data: coLessees, isLoading } = useQuery({
     queryKey: ['contract-customers', contractId],
     queryFn: () => apiClient.get<ContractCustomer[]>(`/v_contract_customers?contract_id=eq.${contractId}&order=created_at`),
   });
@@ -1179,23 +1179,23 @@ function CustomersTab({ contractId, customerId, customerName, t, onRequestDetach
     successSnack(t('contract.attached_customer', { defaultValue: `Attached ${fullName}`, customer: fullName }));
   };
 
-  const handleAddGuarantor = async (newCustomerId: number, fullName: string) => {
+  const handleAddCoLessee = async (newCustomerId: number, fullName: string) => {
     if (newCustomerId === customerId) {
-      throw new Error(t('workspace.guarantorCannotBeSelf', { defaultValue: 'Guarantor cannot be the primary customer' }));
+      throw new Error(t('workspace.coLesseeCannotBeSelf', { defaultValue: 'Co-lessee cannot be the primary customer' }));
     }
-    if ((guarantors ?? []).some(g => g.customer_id === newCustomerId)) {
-      throw new Error(t('workspace.guarantorAlreadyAttached', { defaultValue: 'Already a guarantor on this contract' }));
+    if ((coLessees ?? []).some(g => g.customer_id === newCustomerId)) {
+      throw new Error(t('workspace.coLesseeAlreadyAttached', { defaultValue: 'Already a co-lessee on this contract' }));
     }
-    await apiClient.rpc('fn_contract_add_guarantor', {
+    await apiClient.rpc('fn_contract_add_co_lessee', {
       p_contract_id: contractId,
       p_customer_id: newCustomerId,
       p_relation: null,
     });
     queryClient.invalidateQueries({ queryKey: ['contract-customers', contractId] });
-    // Post-INITIAL auto-creates an ADD_GUARANTOR ADDENDUM (2026-06-12).
+    // Post-INITIAL auto-creates an ADD_CO_LESSEE ADDENDUM (2026-06-12).
     queryClient.invalidateQueries({ queryKey: ['contract-signings', contractId] });
     queryClient.invalidateQueries({ queryKey: ['contract-signing-parties', contractId] });
-    successSnack(t('contract.added_guarantor', { defaultValue: `Added ${fullName} as guarantor`, customer: fullName }));
+    successSnack(t('contract.added_co_lessee', { defaultValue: `Added ${fullName} as co-lessee`, customer: fullName }));
   };
 
   // Customer ID card media (primary customer only)
@@ -1211,10 +1211,10 @@ function CustomersTab({ contractId, customerId, customerName, t, onRequestDetach
   const { data: primaryLogin } = useCustomerLoginInfo(customerId);
   const invalidateLogin = useInvalidateLoginInfo();
 
-  // Pull customer detail for primary + every guarantor — gives us phone + ID number.
+  // Pull customer detail for primary + every co-lessee — gives us phone + ID number.
   const allCustomerIds = [
     ...(customerId ? [customerId] : []),
-    ...((guarantors ?? []).map(c => c.customer_id)),
+    ...((coLessees ?? []).map(c => c.customer_id)),
   ];
   const { data: customerDetails = [] } = useQuery({
     queryKey: ['customer-details', allCustomerIds.join(',')],
@@ -1225,24 +1225,24 @@ function CustomersTab({ contractId, customerId, customerName, t, onRequestDetach
   });
   const detailById = new Map(customerDetails.map(d => [d.id, d]));
 
-  // Login state for primary + every guarantor — one batched query so each row
+  // Login state for primary + every co-lessee — one batched query so each row
   // can render its own CustomerLoginCard without N parallel hooks.
-  const guarantorIds = (guarantors ?? []).map(c => c.customer_id);
+  const coLesseeIds = (coLessees ?? []).map(c => c.customer_id);
   const { data: customerLogins = [] } = useQuery({
     queryKey: ['customer-logins', allCustomerIds.join(',')],
     queryFn: () => apiClient.get<CustomerLoginInfo[]>(
       `/v_customers?id=in.(${allCustomerIds.join(',')})&select=id,full_name,id_number,tel,username,has_login,last_login_at,failed_login_count,locked_until,is_currently_locked`,
     ),
-    enabled: guarantorIds.length > 0,
+    enabled: coLesseeIds.length > 0,
   });
   const loginById = new Map(customerLogins.map(l => [l.id, l]));
 
   if (isLoading) return <div className="p-8 text-center text-subtler">{t('common.loading')}</div>;
 
-  const guarantorList = guarantors ?? [];
+  const coLesseeList = coLessees ?? [];
   const primaryDetail = customerId != null ? detailById.get(customerId) : null;
 
-  const renderGuarantorRow = (c: ContractCustomer) => {
+  const renderCoLesseeRow = (c: ContractCustomer) => {
     const d = detailById.get(c.customer_id);
     const login = loginById.get(c.customer_id) ?? null;
     return (
@@ -1271,7 +1271,7 @@ function CustomersTab({ contractId, customerId, customerName, t, onRequestDetach
               <DateTime value={c.created_at} />
             </div>
           </div>
-          <Tooltip content={t('contract.removeGuarantor', { defaultValue: 'Remove guarantor' })} placement="top">
+          <Tooltip content={t('contract.removeCoLessee', { defaultValue: 'Remove co-lessee' })} placement="top">
             <Button
               size="sm"
               variant="outline"
@@ -1374,28 +1374,28 @@ function CustomersTab({ contractId, customerId, customerName, t, onRequestDetach
         )}
       </div>
 
-      {/* Guarantors section */}
+      {/* Co-lessees section */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <div className="text-xs font-semibold uppercase tracking-wider text-subtle">
-            {t('contract.guarantors', { defaultValue: 'Guarantors' })}
-            {guarantorList.length > 0 && <span className="ml-1.5 text-fg/40">({guarantorList.length})</span>}
+            {t('contract.coLessees', { defaultValue: 'Co-lessees' })}
+            {coLesseeList.length > 0 && <span className="ml-1.5 text-fg/40">({coLesseeList.length})</span>}
           </div>
           <Button
             size="sm"
             variant="outline"
             startIcon={<UserPlus size={14} />}
-            onClick={() => setPickerMode('guarantor')}
+            onClick={() => setPickerMode('co_lessee')}
           >
-            {t('contract.addGuarantor', { defaultValue: 'Add guarantor' })}
+            {t('contract.addCoLessee', { defaultValue: 'Add co-lessee' })}
           </Button>
         </div>
-        {guarantorList.length === 0 ? (
+        {coLesseeList.length === 0 ? (
           <div className="text-xs text-subtler border border-dashed border-line rounded-md px-4 py-3">
-            {t('contract.noGuarantors', { defaultValue: 'No guarantors yet' })}
+            {t('contract.noCoLessees', { defaultValue: 'No co-lessees yet' })}
           </div>
         ) : (
-          guarantorList.map(c => renderGuarantorRow(c))
+          coLesseeList.map(c => renderCoLesseeRow(c))
         )}
       </div>
 
@@ -1404,36 +1404,36 @@ function CustomersTab({ contractId, customerId, customerName, t, onRequestDetach
         title={
           pickerMode === 'attach'
             ? t('contract.attachCustomer', { defaultValue: 'Attach customer' })
-            : t('contract.addGuarantor', { defaultValue: 'Add guarantor' })
+            : t('contract.addCoLessee', { defaultValue: 'Add co-lessee' })
         }
         excludeCustomerIds={
           pickerMode === 'attach'
             ? (customerId != null ? [customerId] : [])
             : [
                 ...(customerId != null ? [customerId] : []),
-                ...guarantorList.map(g => g.customer_id),
+                ...coLesseeList.map(g => g.customer_id),
               ]
         }
         onClose={() => setPickerMode(null)}
         onPick={async (cid, name) => {
           if (pickerMode === 'attach') await handleAttach(cid, name);
-          else if (pickerMode === 'guarantor') await handleAddGuarantor(cid, name);
+          else if (pickerMode === 'co_lessee') await handleAddCoLessee(cid, name);
         }}
       />
 
-      <RemoveGuarantorModal
+      <RemoveCoLesseeModal
         target={removeTarget}
         contractId={contractId}
         onClose={() => setRemoveTarget(null)}
         onSuccess={(name) => {
           setRemoveTarget(null);
           queryClient.invalidateQueries({ queryKey: ['contract-customers', contractId] });
-          // remove_guarantor auto-voids the matching COLLECTING ADDENDUM
+          // remove_co_lessee auto-voids the matching COLLECTING ADDENDUM
           // (or blocks if it's already SEALED). Either way the signing tab
           // needs a refresh.
           queryClient.invalidateQueries({ queryKey: ['contract-signings', contractId] });
           queryClient.invalidateQueries({ queryKey: ['contract-signing-parties', contractId] });
-          successSnack(t('contract.removed_guarantor', { defaultValue: `Removed ${name}`, customer: name }));
+          successSnack(t('contract.removed_co_lessee', { defaultValue: `Removed ${name}`, customer: name }));
         }}
         t={t}
       />
@@ -1441,9 +1441,9 @@ function CustomersTab({ contractId, customerId, customerName, t, onRequestDetach
   );
 }
 
-// ── Remove guarantor confirm + PIN modal ─────────────────────────────────────
+// ── Remove co-lessee confirm + PIN modal ─────────────────────────────────────
 
-function RemoveGuarantorModal({ target, contractId, onClose, onSuccess, t }: {
+function RemoveCoLesseeModal({ target, contractId, onClose, onSuccess, t }: {
   target: ContractCustomer | null;
   contractId: number;
   onClose: () => void;
@@ -1463,7 +1463,7 @@ function RemoveGuarantorModal({ target, contractId, onClose, onSuccess, t }: {
     if (!target) return;
     setSubmitting(true); setError('');
     try {
-      await apiClient.rpc('fn_contract_remove_guarantor', {
+      await apiClient.rpc('fn_contract_remove_co_lessee', {
         p_contract_id: contractId,
         p_customer_id: target.customer_id,
         p_reason: reason.trim() || null,
@@ -1486,7 +1486,7 @@ function RemoveGuarantorModal({ target, contractId, onClose, onSuccess, t }: {
     <Modal open={!!target} onClose={onClose} maxWidth="28rem" width="100%">
       <div className="flex flex-col overflow-hidden">
         <div className="modal-header">
-          <h2 className="modal-title">{t('contract.removeGuarantor', { defaultValue: 'Remove guarantor' })}</h2>
+          <h2 className="modal-title">{t('contract.removeCoLessee', { defaultValue: 'Remove co-lessee' })}</h2>
           <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
         </div>
         <div className="modal-content">
@@ -1497,8 +1497,8 @@ function RemoveGuarantorModal({ target, contractId, onClose, onSuccess, t }: {
             </div>
           )}
           <p className="text-sm mb-4">
-            {t('contract.removeGuarantorConfirm', {
-              defaultValue: 'Remove {{name}} as guarantor?',
+            {t('contract.removeCoLesseeConfirm', {
+              defaultValue: 'Remove {{name}} as co-lessee?',
               name: target?.customer_name ?? '',
             })}
           </p>

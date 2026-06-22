@@ -6,7 +6,7 @@ export type ModalId =
   | 'insurance'
   | 'customer'
   | 'contactRef'
-  | 'guarantor'
+  | 'co_lessee'
   | 'documents'
   | 'signatory'
   | 'handover'
@@ -193,14 +193,14 @@ export const ERROR_TO_MODAL: Record<string, ModalId> = {
   'CONTRACT.VALIDATION.CUSTOMER_REQUIRED': 'customer',
   'CONTRACT.VALIDATION.MODEL_REQUIRED': 'productPlan',
   'CONTRACT.VALIDATION.PRICING_REQUIRED': 'productPlan',
-  'CONTRACT.VALIDATION.GUARANTOR_REQUIRED_FOR_MINOR': 'guarantor',
+  'CONTRACT.VALIDATION.CO_LESSEE_REQUIRED_FOR_MINOR': 'co_lessee',
   'CONTRACT.VALIDATION.REFERENCE_REQUIRED': 'customer',
   'CONTRACT.VALIDATION.CUSTOMER_ADDRESS_REQUIRED': 'customer',
-  'CONTRACT.VALIDATION.GUARANTOR_ADDRESS_REQUIRED': 'guarantor',
+  'CONTRACT.VALIDATION.CO_LESSEE_ADDRESS_REQUIRED': 'co_lessee',
   'CONTRACT.VALIDATION.CUSTOMER_ID_CARD_REQUIRED': 'documents',
-  'CONTRACT.VALIDATION.GUARANTOR_ID_CARD_REQUIRED': 'guarantor',
+  'CONTRACT.VALIDATION.CO_LESSEE_ID_CARD_REQUIRED': 'co_lessee',
   'CONTRACT.VALIDATION.CUSTOMER_SIGNATURE_REQUIRED': 'documents',
-  'CONTRACT.VALIDATION.GUARANTOR_SIGNATURE_REQUIRED': 'guarantor',
+  'CONTRACT.VALIDATION.CO_LESSEE_SIGNATURE_REQUIRED': 'co_lessee',
   'CONTRACT.VALIDATION.RATE_CARD_REQUIRED': 'productPlan',
   'CONTRACT.VALIDATION.SNAPSHOT_REQUIRED': 'productPlan',
   'CONTRACT.STATE.DISCOUNT_APPROVAL_REQUIRED': null,
@@ -250,10 +250,10 @@ export interface WorkspaceData {
   customerContactCount: number;
   customerReferenceCount: number;
 
-  // Guarantors (multiple)
-  guarantors: Array<{ customerId: number; fullName: string; idNumber: string }>;
-  guarantorSkipped: boolean;
-  guarantorsComplete: boolean;
+  // Co-lessees (multiple)
+  coLessees: Array<{ customerId: number; fullName: string; idNumber: string }>;
+  coLesseeSkipped: boolean;
+  coLesseesComplete: boolean;
 
   // Documents
   hasIdPhoto: boolean;

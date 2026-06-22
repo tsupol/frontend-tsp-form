@@ -12,7 +12,7 @@ export function getCardStatus(
   contract: ContractServerState | null | undefined,
   customer: CustomerSummary | null | undefined,
   docs: ContractDocSummary | null | undefined,
-  guarantors: { count: number; allComplete: boolean },
+  coLessees: { count: number; allComplete: boolean },
   signatories?: ContractSignatory[] | null,
 ): CardStatus {
   switch (card) {
@@ -35,12 +35,12 @@ export function getCardStatus(
       if (customer.contactCount > 0 || customer.referenceCount > 0) return 'partial';
       return 'empty';
 
-    case 'guarantor': {
+    case 'co_lessee': {
       if (!contract?.customer_id) return 'locked';
       const isMinor = customer?.dateOfBirth ? getAge(customer.dateOfBirth) < 18 : false;
-      if (isMinor && guarantors.count === 0) return 'warning';
-      if (guarantors.count === 0) return 'complete';
-      if (guarantors.allComplete) return 'complete';
+      if (isMinor && coLessees.count === 0) return 'warning';
+      if (coLessees.count === 0) return 'complete';
+      if (coLessees.allComplete) return 'complete';
       return 'partial';
     }
 

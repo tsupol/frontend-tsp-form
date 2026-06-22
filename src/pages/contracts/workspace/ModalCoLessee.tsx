@@ -30,7 +30,7 @@ interface Props {
   onClose: () => void;
 }
 
-export function ModalGuarantor({ open, onClose }: Props) {
+export function ModalCoLessee({ open, onClose }: Props) {
   const { t } = useTranslation();
   const { data: workspace, updateData } = useWorkspace();
 
@@ -46,15 +46,15 @@ export function ModalGuarantor({ open, onClose }: Props) {
   const [apiError, setApiError] = useState('');
   const [result, setResult] = useState<CustomerRegisterResult | null>(null);
 
-  const guarantorId = workspace.guarantors.length > 0 ? workspace.guarantors[0].customerId : null;
+  const coLesseeId = workspace.coLessees.length > 0 ? workspace.coLessees[0].customerId : null;
 
   const [showAddressCurrent, setShowAddressCurrent] = useState(false);
   const [showAddressWork, setShowAddressWork] = useState(false);
 
   const { data: addresses = [], refetch: refetchAddresses } = useQuery({
-    queryKey: ['guarantor-addresses', guarantorId],
-    queryFn: () => apiClient.get<CustomerAddress[]>(`/v_customer_addresses?customer_id=eq.${guarantorId}&order=address_type`),
-    enabled: !!guarantorId,
+    queryKey: ['co-lessee-addresses', coLesseeId],
+    queryFn: () => apiClient.get<CustomerAddress[]>(`/v_customer_addresses?customer_id=eq.${coLesseeId}&order=address_type`),
+    enabled: !!coLesseeId,
   });
 
   const currentAddress = addresses.find(a => a.address_type === 'HOME');
@@ -89,18 +89,18 @@ export function ModalGuarantor({ open, onClose }: Props) {
 
       if (res.action !== 'BLOCK') {
         // Attach to contract first so an attach failure surfaces before the
-        // workspace shows the guarantor as added. Post-INITIAL contracts also
-        // auto-create an ADD_GUARANTOR addendum here; any validation error
+        // workspace shows the co-lessee as added. Post-INITIAL contracts also
+        // auto-create an ADD_CO_LESSEE addendum here; any validation error
         // from that path propagates as an ApiError.
         if (workspace.contractId) {
-          await apiClient.rpc('fn_contract_add_guarantor', {
+          await apiClient.rpc('fn_contract_add_co_lessee', {
             p_contract_id: workspace.contractId,
             p_customer_id: res.customer_id,
           });
         }
         updateData({
-          guarantors: [...workspace.guarantors, { customerId: res.customer_id, fullName: res.full_name, idNumber: res.id_number }],
-          guarantorSkipped: false,
+          coLessees: [...workspace.coLessees, { customerId: res.customer_id, fullName: res.full_name, idNumber: res.id_number }],
+          coLesseeSkipped: false,
         });
       }
     } catch (err) {
@@ -119,7 +119,7 @@ export function ModalGuarantor({ open, onClose }: Props) {
   return (
     <Modal open={open} onClose={onClose} maxWidth="40rem" width="100%">
       <div className="modal-header">
-        <h2 className="modal-title">{t('workspace.cardGuarantor')}</h2>
+        <h2 className="modal-title">{t('workspace.cardCoLessee')}</h2>
       </div>
       <div className="modal-content" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
         <div className="flex flex-col gap-5">
@@ -210,11 +210,11 @@ export function ModalGuarantor({ open, onClose }: Props) {
             </Button>
           </div>
 
-          {/* Address sections for guarantor */}
-          {guarantorId && (
+          {/* Address sections for co-lessee */}
+          {coLesseeId && (
             <>
               <div className="border-t border-line" />
-              <div className="text-xs text-subtle">{t('workspace.guarantorAddresses')}</div>
+              <div className="text-xs text-subtle">{t('workspace.coLesseeAddresses')}</div>
 
               <button
                 className="w-full text-left border border-line rounded-lg px-4 py-2.5 text-sm flex items-center gap-2 hover:bg-surface-hover cursor-pointer"
@@ -224,7 +224,7 @@ export function ModalGuarantor({ open, onClose }: Props) {
                 <span className="flex-1">{t('workspace.addressHome')}</span>
               </button>
               {showAddressCurrent && (
-                <AddressFormPostal customerId={guarantorId} addressType="HOME" existing={currentAddress} onSuccess={() => { refetchAddresses(); setShowAddressCurrent(false); }} />
+                <AddressFormPostal customerId={coLesseeId} addressType="HOME" existing={currentAddress} onSuccess={() => { refetchAddresses(); setShowAddressCurrent(false); }} />
               )}
 
               <button
@@ -235,7 +235,7 @@ export function ModalGuarantor({ open, onClose }: Props) {
                 <span className="flex-1">{t('workspace.addressWork')}</span>
               </button>
               {showAddressWork && (
-                <AddressFormPostal customerId={guarantorId} addressType="WORK" existing={workAddress} onSuccess={() => { refetchAddresses(); setShowAddressWork(false); }} />
+                <AddressFormPostal customerId={coLesseeId} addressType="WORK" existing={workAddress} onSuccess={() => { refetchAddresses(); setShowAddressWork(false); }} />
               )}
             </>
           )}

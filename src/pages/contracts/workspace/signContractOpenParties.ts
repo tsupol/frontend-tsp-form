@@ -2,14 +2,14 @@
 //
 // Why this exists: fn_bill_contract_open auto-creates a COLLECTING
 // FULL_CONTRACT snapshot with one party row per required signer — and (mig 251)
-// that's LESSEE + every GUARANTOR + LESSOR + both WITNESSes. None are
+// that's LESSEE + every CO_LESSEE + LESSOR + both WITNESSes. None are
 // pre-signed (signature_media_id starts NULL). The contract only goes ACTIVE
 // once the bill is PAID *and* the snapshot is SEALED (all parties signed). The
 // old confirm flow paid but never signed, so contracts got stuck at
 // "paid, awaiting signature".
 //
 // The signatures already exist from earlier steps — we do NOT re-capture:
-//   • LESSEE / GUARANTOR → a SIGNATURE_PAD contract document (file_url) saved in
+//   • LESSEE / CO_LESSEE → a SIGNATURE_PAD contract document (file_url) saved in
 //     the Documents step. We re-attach its storage_path as a CONTRACT/SIGNATURE
 //     media to mint the media_id fn_contract_signing_sign needs (option 2 — no
 //     new media row at capture time; mint it here on confirm).
@@ -24,7 +24,7 @@ import { toStoragePath } from '../../../lib/mediaPath';
 
 interface SigningParty {
   signing_id: number;
-  party_role: 'LESSEE' | 'GUARANTOR' | 'LESSOR' | 'WITNESS';
+  party_role: 'LESSEE' | 'CO_LESSEE' | 'LESSOR' | 'WITNESS';
   party_index: number;
   customer_id: number | null;
   staff_id: number | null;
@@ -139,7 +139,7 @@ export async function signContractOpenParties(
   for (const party of pending) {
     let mediaId: number | null = null;
 
-    if (party.party_role === 'LESSEE' || party.party_role === 'GUARANTOR') {
+    if (party.party_role === 'LESSEE' || party.party_role === 'CO_LESSEE') {
       const fileUrl = party.customer_id != null ? sigByCustomer.get(party.customer_id) : undefined;
       if (fileUrl) {
         mediaId = await attachSignatureMedia(holdingId, contractId, fileUrl);

@@ -14,7 +14,7 @@ export interface CompanyConfig {
   pause_enabled: boolean;
   pause_max_deferred: number;
   repo_fee_per_case: number;
-  max_guarantors: number;
+  max_co_lessees: number;
   deposit_max_days: number;
   updated_by: number | null;
   updated_at: string;

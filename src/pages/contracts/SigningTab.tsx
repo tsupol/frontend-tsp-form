@@ -7,7 +7,7 @@
 //   - api.v_contract_signing_history  → full audit, including system auto-voids.
 //     Surfaced via the "Show system events" toggle for audit/debug.
 //   - api.v_contract_signing_party    → one row per party (LESSOR / LESSEE /
-//     GUARANTOR / WITNESS), with frozen identity + signed_at.
+//     CO_LESSEE / WITNESS), with frozen identity + signed_at.
 //
 // Rendering model:
 //   - One collapsible card per snapshot. Default expanded: newest COLLECTING.
@@ -35,7 +35,7 @@ import { SigningDetailModal } from './SigningDetailModal';
 
 type SigningStatus = 'COLLECTING' | 'SEALED' | 'SUPERSEDED' | 'VOIDED';
 type SigningCategory = 'CONTRACT' | 'AMENDMENT' | 'RECEIPT' | null;
-type PartyRole = 'LESSOR' | 'LESSEE' | 'GUARANTOR' | 'WITNESS';
+type PartyRole = 'LESSOR' | 'LESSEE' | 'CO_LESSEE' | 'WITNESS';
 
 interface SigningHistoryRow {
   signing_id: number;
@@ -114,7 +114,7 @@ function roleColor(r: PartyRole): 'primary' | 'info' | 'default' {
   switch (r) {
     case 'LESSOR':    return 'primary';
     case 'LESSEE':    return 'primary';
-    case 'GUARANTOR': return 'info';
+    case 'CO_LESSEE': return 'info';
     case 'WITNESS':   return 'default';
     default:          return 'default';
   }

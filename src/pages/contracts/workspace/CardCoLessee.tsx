@@ -6,25 +6,25 @@ import { getAge } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
 import { SummaryCard } from './SummaryCard';
 
-export function CardGuarantor({ onEdit, active, shake }: { onEdit?: () => void; active?: boolean; shake?: boolean }) {
+export function CardCoLessee({ onEdit, active, shake }: { onEdit?: () => void; active?: boolean; shake?: boolean }) {
   const { t } = useTranslation();
-  const { contract, customer, guarantorList, isReadOnly } = useWorkspace();
+  const { contract, customer, coLesseeList, isReadOnly } = useWorkspace();
 
   const hasCustomer = !!contract?.customer_id;
   const dob = customer?.dateOfBirth;
   const isMinor = dob ? getAge(dob) < 18 : false;
-  const needsGuarantor = hasCustomer && isMinor;
-  const guarantors = guarantorList.map(g => ({ customerId: g.customer_id, fullName: g.customer_name, idNumber: g.id_number ?? '' }));
-  const hasGuarantors = guarantors.length > 0;
+  const needsCoLessee = hasCustomer && isMinor;
+  const coLessees = coLesseeList.map(g => ({ customerId: g.customer_id, fullName: g.customer_name, idNumber: g.id_number ?? '' }));
+  const hasCoLessees = coLessees.length > 0;
 
   const contractId = contract?.id ?? null;
 
-  // Check guarantor completeness — addresses, ID card. Signature is captured
+  // Check co-lessee completeness — addresses, ID card. Signature is captured
   // in the Documents step (not here), so it's NOT part of this card's status.
-  const { data: guarantorStatus } = useQuery({
-    queryKey: ['guarantor-status', contractId, guarantors.map(g => g.customerId).join(',')],
+  const { data: coLesseeStatus } = useQuery({
+    queryKey: ['co-lessee-status', contractId, coLessees.map(g => g.customerId).join(',')],
     queryFn: async () => {
-      const results = await Promise.all(guarantors.map(async (g) => {
+      const results = await Promise.all(coLessees.map(async (g) => {
         const [addrs, idCard, custInfo] = await Promise.all([
           apiClient.get<Array<{ address_type: string }>>(`/v_customer_addresses?customer_id=eq.${g.customerId}&select=address_type`).catch(() => []),
           apiClient.get<Array<{ id: number }>>(`/v_customer_documents?customer_id=eq.${g.customerId}&doc_type=eq.ID_CARD_FRONT&is_active=eq.true&select=id`).catch(() => []),
@@ -40,21 +40,21 @@ export function CardGuarantor({ onEdit, active, shake }: { onEdit?: () => void; 
       }));
       return results;
     },
-    enabled: hasGuarantors,
+    enabled: hasCoLessees,
     staleTime: 0,
   });
 
-  const allGuarantorsComplete = guarantorStatus?.every(g => g.hasInfo && g.hasHome && g.hasWork && g.hasIdCard) ?? false;
+  const allCoLesseesComplete = coLesseeStatus?.every(g => g.hasInfo && g.hasHome && g.hasWork && g.hasIdCard) ?? false;
 
   const status = !hasCustomer ? 'locked' as const
-    : needsGuarantor && !hasGuarantors ? 'warning' as const
-    : hasGuarantors && !allGuarantorsComplete ? 'partial' as const
-    : hasGuarantors && allGuarantorsComplete ? 'complete' as const
-    : 'complete' as const; // adult with no guarantor = ok
+    : needsCoLessee && !hasCoLessees ? 'warning' as const
+    : hasCoLessees && !allCoLesseesComplete ? 'partial' as const
+    : hasCoLessees && allCoLesseesComplete ? 'complete' as const
+    : 'complete' as const; // adult with no co-lessee = ok
 
   return (
     <SummaryCard
-      title={`${t('workspace.cardGuarantor')} (${guarantors.length})`}
+      title={`${t('workspace.cardCoLessee')} (${coLessees.length})`}
       status={status}
       onEdit={onEdit}
       active={active}
@@ -63,15 +63,15 @@ export function CardGuarantor({ onEdit, active, shake }: { onEdit?: () => void; 
     >
       {!hasCustomer ? (
         <div className="text-subtle text-xs">{t('workspace.needCustomerFirst')}</div>
-      ) : !needsGuarantor && !hasGuarantors ? (
+      ) : !needsCoLessee && !hasCoLessees ? (
         <div className="text-subtle flex items-center gap-2 text-xs">
           <CheckCircle size={14} className="text-success" />
-          <span>{t('workspace.guarantorNotNeeded')}</span>
+          <span>{t('workspace.coLesseeNotNeeded')}</span>
         </div>
-      ) : hasGuarantors ? (
+      ) : hasCoLessees ? (
         <div className="flex flex-col gap-1.5">
-          {guarantors.map(g => {
-            const gs = guarantorStatus?.find(s => s.customerId === g.customerId);
+          {coLessees.map(g => {
+            const gs = coLesseeStatus?.find(s => s.customerId === g.customerId);
             const complete = gs ? (gs.hasInfo && gs.hasHome && gs.hasWork && gs.hasIdCard) : false;
             const missing: string[] = [];
             if (gs && !gs.hasInfo) missing.push(t('customer.basicInfo'));
@@ -97,7 +97,7 @@ export function CardGuarantor({ onEdit, active, shake }: { onEdit?: () => void; 
       ) : (
         <div className="text-warning-fg flex items-center gap-2 text-xs">
           <AlertTriangle size={14} />
-          <span>{t('workspace.guarantorRequired')}</span>
+          <span>{t('workspace.coLesseeRequired')}</span>
         </div>
       )}
     </SummaryCard>

@@ -335,7 +335,7 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
 
       // 3. Bind signatures to the auto-created CONTRACT_OPEN snapshot. Opening
       //    the bill creates a COLLECTING FULL_CONTRACT snapshot whose parties
-      //    (LESSEE + guarantors + lessor + 2 witnesses) all start unsigned.
+      //    (LESSEE + co-lessees + lessor + 2 witnesses) all start unsigned.
       //    The contract only activates once PAID *and* SEALED, so we sign every
       //    required party here from the already-captured signatures (customer
       //    SIGNATURE_PAD docs + branch signatory media). Without this the bill
