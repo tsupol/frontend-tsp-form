@@ -626,7 +626,7 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
           as BillsPage. Exactly one .bill-receipt node, only at print time. */}
       {printReady && draftBill && createPortal(
         <div className="print-only-receipt" aria-hidden>
-          <BillReceipt bill={draftBill} hidePrintButton />
+          <BillReceipt bill={draftBill} hidePrintButton unofficial />
         </div>,
         document.body,
       )}

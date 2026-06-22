@@ -78,10 +78,16 @@ export function buildBillDocFromDetail(
   branch: BillDetailBranch | null,
   t: TFunction,
   lang: string,
+  // Unofficial draft invoice (wizard "Print invoice" before a bill exists):
+  // titled "Invoice" and no payment block, since nothing is paid yet.
+  opts?: { unofficial?: boolean },
 ): BillDoc {
   const isCreditNote = bill.bill_type === 'CREDIT_NOTE';
   const isJournal = bill.bill_type === 'JOURNAL';
-  const titleKey = BILL_TYPE_TITLE_KEY[bill.bill_type] ?? 'wizard.receipt_title';
+  const unofficial = opts?.unofficial ?? false;
+  const titleKey = unofficial
+    ? 'wizard.invoice_title'
+    : BILL_TYPE_TITLE_KEY[bill.bill_type] ?? 'wizard.receipt_title';
 
   // CREDIT_NOTE amounts are stored negative — show absolute magnitudes.
   const sign = isCreditNote ? -1 : 1;
@@ -165,8 +171,9 @@ export function buildBillDocFromDetail(
     lines: [{ template: 'kv', label: t('wizard.receipt_total'), value: fmtCurrency(bill.total_amount * sign), valueMono: true, emphasis: 'strong' }],
   });
 
-  // ── Payments (skip for JOURNAL — no money movement) ──
-  if (!isJournal && bill.payments.length > 0) {
+  // ── Payments (skip for JOURNAL — no money movement; skip for the
+  //    unofficial invoice — nothing is paid yet, so no Paid/Change lines) ──
+  if (!isJournal && !unofficial && bill.payments.length > 0) {
     blocks.push({ type: 'divider' });
     const payLines: DocLine[] = bill.payments.map(p => {
       const bankDetail = p.bank_name ? `${p.bank_name}${p.account_number ? ` ${p.account_number}` : ''}` : '';

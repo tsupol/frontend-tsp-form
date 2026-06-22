@@ -77,6 +77,12 @@ interface BillReceiptProps {
   bill?: BillDetail;
   /** Hide the inline Print button (e.g. when the host page provides its own). */
   hidePrintButton?: boolean;
+  /**
+   * Render as an unofficial draft invoice: titled "Invoice" with no payment
+   * block (nothing is paid yet). Used for the wizard "Print invoice" before a
+   * bill row exists. Default (false) renders the official receipt.
+   */
+  unofficial?: boolean;
 }
 
 /**
@@ -89,7 +95,7 @@ interface BillReceiptProps {
  * magnitudes shown), JOURNAL → ใบบันทึกบัญชี (no payment block). Voided
  * bills get a VOIDED watermark and cancel info.
  */
-export function BillReceipt({ billId, bill: billProp, hidePrintButton }: BillReceiptProps) {
+export function BillReceipt({ billId, bill: billProp, hidePrintButton, unofficial }: BillReceiptProps) {
   const { t, i18n } = useTranslation();
 
   const { data: fetchedBill, isLoading } = useQuery({
@@ -124,7 +130,7 @@ export function BillReceipt({ billId, bill: billProp, hidePrintButton }: BillRec
 
   // Build the unified block document from the v_bill_detail row + branch, then
   // render it through BillDocRenderer (same .bill-receipt paper + print path).
-  const doc = buildBillDocFromDetail(bill, branch ?? null, t, i18n.language);
+  const doc = buildBillDocFromDetail(bill, branch ?? null, t, i18n.language, { unofficial });
 
   return <BillDocRenderer doc={doc} hidePrintButton={hidePrintButton} />;
 }

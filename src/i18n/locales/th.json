@@ -2596,6 +2596,7 @@
     "receipt_title": "ใบเสร็จรับเงิน",
     "receipt_title_credit": "ใบลดหนี้",
     "receipt_title_journal": "ใบบันทึกบัญชี",
+    "invoice_title": "ใบแจ้งหนี้",
     "receipt_billNo": "เลขที่บิล",
     "receipt_date": "วันที่",
     "receipt_createdAt": "สร้าง",

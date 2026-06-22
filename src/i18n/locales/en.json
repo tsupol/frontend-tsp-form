@@ -2597,6 +2597,7 @@
     "receipt_title": "Receipt",
     "receipt_title_credit": "Credit Note",
     "receipt_title_journal": "Accounting Journal",
+    "invoice_title": "Invoice",
     "receipt_billNo": "Bill No.",
     "receipt_date": "Date",
     "receipt_createdAt": "Created",
