@@ -1,7 +1,7 @@
 import type { ResizeOptions, UploadedImage } from 'tsp-form';
 import { config } from '../config/config';
 import { normalizeKey, type MediaPrivacy } from './mediaPath';
-import { beMediaUrl, beMediaCanPresign } from './beMedia';
+import { beMediaUrl, beMediaCanPresign, UPLOAD_SPECS } from './beMedia';
 
 export type ResizeMode = 'contain' | 'cover';
 
@@ -92,10 +92,12 @@ const specCache = new Map<string, Promise<UploadSpec>>();
 export function getUploadSpec(type: string): Promise<UploadSpec> {
   let p = specCache.get(type);
   if (!p) {
-    p = call<UploadSpec>(`/upload/spec?type=${encodeURIComponent(type)}`).catch((err) => {
-      specCache.delete(type);
-      throw err;
-    });
+    // Specs are served from the hardcoded registry (UPLOAD_SPECS), not
+    // misc-go's /upload/spec — that endpoint is going away with misc-go.
+    const reg = UPLOAD_SPECS[type];
+    p = reg
+      ? Promise.resolve({ ...reg, content_type: 'image/webp' } as UploadSpec)
+      : Promise.reject(new Error(`unknown upload type: ${type}`));
     specCache.set(type, p);
   }
   return p;

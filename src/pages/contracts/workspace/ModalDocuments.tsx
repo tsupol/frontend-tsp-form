@@ -5,7 +5,7 @@ import { ImageUploader } from 'tsp-form';
 import type { UploadedImage } from 'tsp-form';
 import { CheckCircle, XCircle, CreditCard } from 'lucide-react';
 import { apiClient } from '../../../lib/api';
-import { uploadFromImage } from '../../../lib/upload';
+import { beMediaUploadFromImage } from '../../../lib/beMedia';
 import { useUploadSpec } from '../../../hooks/useMediaUrl';
 import { useWorkspace } from './WorkspaceContext';
 import { IdPhotoUpload } from './IdPhotoUpload';
@@ -41,7 +41,7 @@ export function ModalDocuments({ open, onClose }: Props) {
     setUploading('idPhoto');
     setError('');
     try {
-      const results = await uploadFromImage({
+      const results = await beMediaUploadFromImage({
         type: 'customer_id_card',
         image: images[0],
         params: { customer_id: customerId },
@@ -74,7 +74,7 @@ export function ModalDocuments({ open, onClose }: Props) {
     setUploading('signature');
     setError('');
     try {
-      const results = await uploadFromImage({
+      const results = await beMediaUploadFromImage({
         type: 'contract_signature',
         image: images[0],
         params: { contract_id: contractId, customer_id: customerId },
@@ -102,11 +102,10 @@ export function ModalDocuments({ open, onClose }: Props) {
     setError('');
     try {
       for (let i = 0; i < images.length; i++) {
-        const results = await uploadFromImage({
+        const results = await beMediaUploadFromImage({
           type: 'contract_evidence',
           image: images[i],
-          idx: evidenceCount + i,
-          params: { contract_id: contractId },
+          params: { contract_id: contractId, idx: evidenceCount + i },
         });
 
         await apiClient.rpc('fn_media_upload', {

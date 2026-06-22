@@ -4,7 +4,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UploadedImage } from 'tsp-form';
 import { XCircle, CreditCard } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
-import { uploadFromImage, invalidateMediaUrl } from '../../../lib/upload';
+import { invalidateMediaUrl } from '../../../lib/upload';
+import { beMediaUploadFromImage } from '../../../lib/beMedia';
 import { useWorkspace } from './WorkspaceContext';
 import { IdPhotoUpload } from './IdPhotoUpload';
 import { ContractPreviewSignPair, type ReadinessError } from './ContractPreviewSignPair';
@@ -178,7 +179,7 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
     setUploading(tag);
     setError('');
     try {
-      const results = await uploadFromImage({
+      const results = await beMediaUploadFromImage({
         type: 'customer_id_card',
         image: images[0],
         params: { customer_id: targetCustomerId },
@@ -205,7 +206,7 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
     setUploading(tag);
     setError('');
     try {
-      const results = await uploadFromImage({
+      const results = await beMediaUploadFromImage({
         type: 'contract_signature',
         image: images[0],
         params: { contract_id: contractId, customer_id: targetCustomerId },

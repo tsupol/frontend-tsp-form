@@ -24,7 +24,7 @@ import { Badge, Button, LabeledCheckbox, Modal } from 'tsp-form';
 import type { UploadedImage } from 'tsp-form';
 import { Loader2, XCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
-import { uploadFromImage } from '../../lib/upload';
+import { beMediaUploadFromImage } from '../../lib/beMedia';
 import { toStoragePath } from '../../lib/mediaPath';
 import { useAuth } from '../../contexts/AuthContext';
 import { SignatureCapture } from './workspace/SignatureCapture';
@@ -150,7 +150,7 @@ export function SigningSignModal({ open, onClose, contractId, party }: Props) {
     setError('');
     setUploading(true);
     try {
-      const results = await uploadFromImage({
+      const results = await beMediaUploadFromImage({
         type: 'contract_signature',
         image: images[0],
         params: { contract_id: contractId, customer_id: party.customer_id },

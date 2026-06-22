@@ -13,7 +13,8 @@ import {
 import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { useAuth } from '../../contexts/AuthContext';
-import { uploadFromImage, mimeFromKey } from '../../lib/upload';
+import { mimeFromKey } from '../../lib/upload';
+import { beMediaUploadFromImage } from '../../lib/beMedia';
 import { toStoragePath } from '../../lib/mediaPath';
 import { passesThaiCidChecksum } from '../../lib/ocr/extractIdCard';
 import { SignatureCapture } from '../contracts/workspace/SignatureCapture';
@@ -251,7 +252,7 @@ function LessorFormModal({ open, mode, lessor, companyId, onClose, onDone }: For
     try {
       const slug = `lessor-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const branchHint = user.branch_id ?? 0;
-      const results = await uploadFromImage({
+      const results = await beMediaUploadFromImage({
         type: 'branch_signatory_signature',
         image: imgs[0],
         params: { branch_id: branchHint, signatory_slug: slug },

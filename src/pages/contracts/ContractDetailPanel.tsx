@@ -9,7 +9,8 @@ import { GenerateContractPdfModal } from './GenerateContractPdfModal';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { ApiError } from '../../lib/api';
-import { uploadFromImage, getUploadSpec, specToResize, deleteMedia, encodeCanvas, renameForExt, mimeFromKey } from '../../lib/upload';
+import { getUploadSpec, specToResize, encodeCanvas, renameForExt, mimeFromKey } from '../../lib/upload';
+import { beMediaUploadFromImage, beMediaDelete } from '../../lib/beMedia';
 import { toStoragePath, normalizeKey } from '../../lib/mediaPath';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiClient } from '../../lib/api';
@@ -1895,7 +1896,7 @@ function DeliveryModal({ open, contract, onClose, onSuccess }: {
         if (typeof v === 'string' && v) keys.push(v);
       }
       if (keys.length > 0) {
-        deleteMedia(keys).catch(() => {});
+        beMediaDelete(keys).catch(() => {});
       }
       refetchPhotos();
     } catch (err) {
@@ -1976,11 +1977,10 @@ function DeliveryModal({ open, contract, onClose, onSuccess }: {
           Object.entries(variants).map(([k, f]) => [k, { file: f, preview: '', width: 0, height: 0, size: f.size }]),
         ),
       };
-      const results = await uploadFromImage({
+      const results = await beMediaUploadFromImage({
         type: 'contract_evidence',
         image: fakeImage as any, // eslint-disable-line @typescript-eslint/no-explicit-any
-        idx: photos.length,
-        params: { contract_id: contract.id },
+        params: { contract_id: contract.id, idx: photos.length },
       });
       const primary = results.sm?.key ?? Object.values(results)[0]?.key;
       if (!primary) throw new Error('Upload returned no key');

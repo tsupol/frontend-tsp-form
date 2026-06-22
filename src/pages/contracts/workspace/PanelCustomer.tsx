@@ -5,7 +5,8 @@ import { Input, Select, Button, InputDatePicker, Modal, MaskedInput } from 'tsp-
 import type { UploadedImage } from 'tsp-form';
 import { ShieldAlert, AlertTriangle, CheckCircle, XCircle, Keyboard, Search, Loader2 } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
-import { uploadFromImage, invalidateMediaUrl } from '../../../lib/upload';
+import { invalidateMediaUrl } from '../../../lib/upload';
+import { beMediaUploadFromImage } from '../../../lib/beMedia';
 import { toLocalDateStr, parseLocalDate, makeDatePickerFormat } from '../../../lib/format';
 import { useMediaUrl } from '../../../hooks/useMediaUrl';
 import { useWorkspace } from './WorkspaceContext';
@@ -298,7 +299,7 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
   // re-upload from the Documents panel.
   const persistScannedIdCard = async (custId: number, image: UploadedImage) => {
     try {
-      const results = await uploadFromImage({
+      const results = await beMediaUploadFromImage({
         type: 'customer_id_card',
         image,
         params: { customer_id: custId },

@@ -9,7 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { DateTime } from '../components/DateTime';
 import type { MeProfileResponse } from '../lib/auth';
 import { apiClient, ApiError } from '../lib/api';
-import { uploadImage } from '../lib/upload';
+import { beMediaUpload } from '../lib/beMedia';
 import { publicMediaUrl } from '../lib/mediaPath';
 import { useUploadSpec } from '../hooks/useMediaUrl';
 import { formatTel } from '../lib/format';
@@ -84,7 +84,7 @@ function ProfileCard() {
     cropperRef.current?.crop(async (_blob, file) => {
       setUploading(true);
       try {
-        const result = await uploadImage({
+        const result = await beMediaUpload({
           type: 'user_profile',
           file,
           params: { user_id: user.user_id },

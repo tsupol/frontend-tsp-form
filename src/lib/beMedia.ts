@@ -90,14 +90,16 @@ export interface BeMediaUploadFromImageOpts {
   type: string;
   image: UploadedImage;
   params: Record<string, string | number>;
-  sizes: readonly string[];
+  // Defaults to the type's sizes in UPLOAD_SPECS when omitted.
+  sizes?: readonly string[];
 }
 
 export async function beMediaUploadFromImage(
   opts: BeMediaUploadFromImageOpts,
 ): Promise<Record<string, BeMediaUploadResult>> {
+  const sizes = opts.sizes ?? UPLOAD_SPECS[opts.type]?.sizes.map((s) => s.label) ?? [];
   const out: Record<string, BeMediaUploadResult> = {};
-  for (const sz of opts.sizes) {
+  for (const sz of sizes) {
     const v = opts.image.variants?.[sz]?.file;
     if (!v) continue;
     out[sz] = await beMediaUpload({
@@ -165,11 +167,9 @@ export async function beMediaDelete(keys: string[]): Promise<{ failed: string[] 
 
 // ── Private-media presign ─────────────────────────────────────────────
 // be-media's /media/url presigns a private object after PostgREST authz.
-// IMPORTANT: it only accepts contract chat/slip key shapes
-// (^private/contracts/<id>/(chat|slip)-...). Other private keys (id-card,
-// signatures, evidence) are rejected — those must still presign via misc-go
-// until be-media's fn_media_url_check regex is widened for them. See
-// privateMediaUrl in lib/upload.ts for the routing.
+// Accepts the key shapes in fn_media_url_check (per the 5-types REPLY):
+// contract chat/slip/signature/evidence, customer id-card, branch signatory.
+// See privateMediaUrl in lib/upload.ts for the routing.
 export async function beMediaUrl(key: string): Promise<string> {
   const data = await call<{ url: string }>(`/media/url?key=${encodeURIComponent(key)}`, {
     method: 'GET',
@@ -177,9 +177,15 @@ export async function beMediaUrl(key: string): Promise<string> {
   return data.url;
 }
 
-// True for the private key shapes be-media's presign endpoint accepts today.
+// True for the private key shapes be-media's presign endpoint accepts.
+// Mirrors fn_media_url_check's regex (2026-06-22 5-types REPLY).
 export function beMediaCanPresign(key: string): boolean {
-  return /^\/?private\/contracts\/\d+\/(chat|slip)-/.test(key);
+  const k = key.replace(/^\//, '');
+  return (
+    /^private\/contracts\/\d+\/(chat|slip|signature|evidence)-/.test(k) ||
+    /^private\/customers\/\d+\/id-card-/.test(k) ||
+    /^private\/branches\/\d+\/signatory-/.test(k)
+  );
 }
 
 // ── branch_expense_slip — hardcoded spec ──────────────────────────────
@@ -221,6 +227,66 @@ export const BUYBACK_CONDITION_MAX = 5;
 export const BUYBACK_CONDITION_RESIZE: Record<BuybackConditionSize, ResizeOptions> = {
   sm: { maxWidth: 320, maxHeight: 320, mode: 'contain', format: 'webp', quality: 0.82 },
   md: { maxWidth: 1280, maxHeight: 1280, mode: 'contain', format: 'webp', quality: 0.82 },
+};
+
+// ── Hardcoded upload-spec registry ────────────────────────────────────
+// be-media has no /upload/spec endpoint; these mirror misc-go's
+// pkg/uploadspec/spec.go so getUploadSpec() can serve them client-side
+// (the spec is only resize/path-shape metadata — no network needed). When
+// be-media serves /upload/spec, this registry is what it replaces. Shape
+// matches lib/upload.ts UploadSpec.
+export interface BeMediaSpec {
+  type: string;
+  privacy: BeMediaPrivacy;
+  resize_mode: 'contain' | 'cover';
+  aspect_ratio?: string;
+  quality: number;
+  sizes: { label: string; width: number }[];
+  max_files?: number;
+  path_params: string[];
+}
+
+export const UPLOAD_SPECS: Record<string, BeMediaSpec> = {
+  chat_image: {
+    type: 'chat_image', privacy: 'private', resize_mode: 'contain', quality: 0.82,
+    sizes: [{ label: 'sm', width: 320 }, { label: 'lg', width: 1800 }],
+    path_params: ['contract_id'],
+  },
+  contract_payment_slip: {
+    type: 'contract_payment_slip', privacy: 'private', resize_mode: 'contain', quality: 0.82,
+    sizes: [{ label: 'lg', width: 1800 }], max_files: 5, path_params: ['contract_id'],
+  },
+  buyback_condition: {
+    type: 'buyback_condition', privacy: 'public', resize_mode: 'contain', quality: 0.82,
+    sizes: [{ label: 'sm', width: 320 }, { label: 'md', width: 1280 }], max_files: 5,
+    path_params: ['po_line_id'],
+  },
+  branch_expense_slip: {
+    type: 'branch_expense_slip', privacy: 'private', resize_mode: 'contain', quality: 0.82,
+    sizes: [{ label: 'thumb', width: 240 }, { label: 'lg', width: 1200 }], max_files: 5,
+    path_params: ['expense_id'],
+  },
+  customer_id_card: {
+    type: 'customer_id_card', privacy: 'private', resize_mode: 'contain', quality: 0.82,
+    sizes: [{ label: 'lg', width: 1800 }], path_params: ['customer_id'],
+  },
+  contract_signature: {
+    type: 'contract_signature', privacy: 'private', resize_mode: 'contain', quality: 0.82,
+    sizes: [{ label: 'sm', width: 320 }], path_params: ['contract_id', 'customer_id'],
+  },
+  branch_signatory_signature: {
+    type: 'branch_signatory_signature', privacy: 'private', resize_mode: 'contain', quality: 0.82,
+    sizes: [{ label: 'sm', width: 320 }], path_params: ['branch_id', 'signatory_slug'],
+  },
+  contract_evidence: {
+    type: 'contract_evidence', privacy: 'private', resize_mode: 'contain', quality: 0.82,
+    sizes: [{ label: 'sm', width: 320 }, { label: 'md', width: 1280 }], max_files: 10,
+    path_params: ['contract_id'],
+  },
+  user_profile: {
+    type: 'user_profile', privacy: 'public', resize_mode: 'cover', aspect_ratio: '1:1', quality: 0.80,
+    sizes: [{ label: 'sm', width: 320 }], path_params: ['user_id'],
+  },
 };
 
 export interface BranchExpenseImage {

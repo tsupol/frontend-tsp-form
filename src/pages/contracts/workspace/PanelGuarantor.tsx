@@ -5,7 +5,8 @@ import { Input, Select, Button, InputDatePicker, MaskedInput, useSnackbarContext
 import type { UploadedImage } from 'tsp-form';
 import { ShieldAlert, CheckCircle, XCircle, Keyboard, Search, Loader2, Trash2, AlertTriangle, CreditCard, ChevronDown, ChevronRight, Plus } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
-import { uploadFromImage, invalidateMediaUrl } from '../../../lib/upload';
+import { invalidateMediaUrl } from '../../../lib/upload';
+import { beMediaUploadFromImage } from '../../../lib/beMedia';
 import { toLocalDateStr, parseLocalDate, makeDatePickerFormat } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
 import { PanelSection } from './PanelSection';
@@ -116,7 +117,7 @@ export function PanelGuarantor({ onClose: _onClose }: Props) {
   // Persist the OCR-scanned ID card as the guarantor's ID_CARD_FRONT document.
   const persistScannedIdCard = async (custId: number, image: UploadedImage) => {
     try {
-      const results = await uploadFromImage({
+      const results = await beMediaUploadFromImage({
         type: 'customer_id_card',
         image,
         params: { customer_id: custId },
@@ -591,7 +592,7 @@ function GuarantorRow({ guarantor, expanded, onToggle, onRemove, removing }: {
     if (images.length === 0 || !guarantor.customerId) return;
     setUploading('ID_CARD');
     try {
-      const results = await uploadFromImage({
+      const results = await beMediaUploadFromImage({
         type: 'customer_id_card',
         image: images[0],
         params: { customer_id: guarantor.customerId },
