@@ -565,7 +565,7 @@ function ReconcileBody({
   const [tab, setTab] = useState<'reconcile' | 'breakdown'>('reconcile');
 
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <div className="@container flex flex-col h-full min-h-0">
       {/* Header strip */}
       <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
         {headerIcon}
@@ -576,7 +576,7 @@ function ReconcileBody({
       {/* Compact summary stats */}
       {summary && (
         <div className="flex-none px-4 py-3 border-b border-line">
-          <dl className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-2">
+          <dl className="grid grid-cols-2 @md:grid-cols-3 @lg:grid-cols-4 gap-x-3 gap-y-2">
             <Stat label={t('accounting.dayClose.expected')} value={fmtCurrency(netTotal(summary))} />
             <Stat label={t('accounting.dayClose.totalCash')} value={fmtCurrency(netCash(summary))} />
             <Stat label={t('accounting.dayClose.totalTransfer')} value={fmtCurrency(netTransfer(summary))} />
@@ -586,7 +586,7 @@ function ReconcileBody({
       )}
       {!summary && summaryFetched && fallbackBillCount > 0 && (
         <div className="flex-none px-4 py-3 border-b border-line">
-          <dl className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-2">
+          <dl className="grid grid-cols-2 @md:grid-cols-3 @lg:grid-cols-4 gap-x-3 gap-y-2">
             <Stat label={t('accounting.dayClose.billCount')} value={String(fallbackBillCount)} />
             <Stat label={t('accounting.dayClose.expected')} value={fmtCurrency(fallbackTotalAmount)} />
           </dl>
@@ -683,7 +683,7 @@ function ClosedSnapshot({ close, branchId }: { close: DayCloseHistoryRow; branch
   const remittanceLink = `/admin/accounting/remittance?branch_id=${branchId}&from=${close.close_date}&to=${close.close_date}`;
   const paymentsLink = `/admin/accounting/payments?branch_id=${branchId}&from=${close.close_date}&to=${close.close_date}`;
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <div className="@container flex flex-col h-full min-h-0">
       <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
         <Lock size={18} className="text-success shrink-0" />
         <span className="font-semibold">
@@ -715,7 +715,7 @@ function ClosedSnapshot({ close, branchId }: { close: DayCloseHistoryRow; branch
       </div>
 
       <div className="flex-none px-4 py-3 border-b border-line">
-        <dl className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-2">
+        <dl className="grid grid-cols-2 @md:grid-cols-3 @lg:grid-cols-4 gap-x-3 gap-y-2">
           <Stat label={t('accounting.dayClose.expected')} value={fmtCurrency(close.expected_amount)} />
           <Stat label={t('accounting.dayClose.actual')} value={fmtCurrency(close.actual_amount)} />
           <Stat
@@ -1028,7 +1028,7 @@ function DayCloseBreakdown({ branchId, closeDate }: { branchId: string; closeDat
   const integrityDiff = lhs - rhs;
 
   return (
-    <div className="flex flex-col divide-y divide-line">
+    <div className="@container flex flex-col divide-y divide-line">
       {/* Integrity badge */}
       <div className="px-4 py-2.5">
         {integrityOk ? (
@@ -1047,7 +1047,7 @@ function DayCloseBreakdown({ branchId, closeDate }: { branchId: string; closeDat
       {/* Drawer (cash flow) */}
       <div className="px-4 py-3">
         <ClusterTitle>{t('accounting.dayClose.clusterDrawer')}</ClusterTitle>
-        <dl className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-2">
+        <dl className="grid grid-cols-2 @md:grid-cols-3 @lg:grid-cols-4 gap-x-3 gap-y-2">
           <Stat label={t('accounting.dayClose.cashIn')} value={fmtCurrency(row.cash_amount)} />
           <Stat label={t('accounting.dayClose.transferIn')} value={fmtCurrency(row.transfer_amount)} />
           <Stat label={t('accounting.dayClose.refundCashOut')} value={fmtCurrency(row.refund_cash_out)} tone={row.refund_cash_out > 0 ? 'warning' : undefined} />
@@ -1058,7 +1058,7 @@ function DayCloseBreakdown({ branchId, closeDate }: { branchId: string; closeDat
       {/* Revenue */}
       <div className="px-4 py-3">
         <ClusterTitle>{t('accounting.dayClose.clusterRevenue')}</ClusterTitle>
-        <dl className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-2">
+        <dl className="grid grid-cols-2 @md:grid-cols-3 @lg:grid-cols-4 gap-x-3 gap-y-2">
           <Stat label={t('accounting.dayClose.revenueHolding')} value={fmtCurrency(row.revenue_holding)} />
           <Stat label={t('accounting.dayClose.revenueCompany')} value={fmtCurrency(row.revenue_company)} />
           {hasRefund && <Stat label={t('accounting.dayClose.cnHoldingRefund')} value={fmtCurrency(row.cn_holding_refund)} tone={row.cn_holding_refund > 0 ? 'warning' : undefined} />}
@@ -1070,7 +1070,7 @@ function DayCloseBreakdown({ branchId, closeDate }: { branchId: string; closeDat
       {hasWallet && (
         <div className="px-4 py-3">
           <ClusterTitle>{t('accounting.dayClose.clusterWallet')}</ClusterTitle>
-          <dl className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-2">
+          <dl className="grid grid-cols-2 @md:grid-cols-3 @lg:grid-cols-4 gap-x-3 gap-y-2">
             <Stat label={t('accounting.dayClose.walletUsedNet')} value={fmtCurrency(row.wallet_amount)} />
             <Stat label={t('accounting.dayClose.walletSaving')} value={fmtCurrency(row.wallet_saving)} />
             <Stat label={t('accounting.dayClose.walletCredit')} value={fmtCurrency(row.wallet_credit)} />
@@ -1082,7 +1082,7 @@ function DayCloseBreakdown({ branchId, closeDate }: { branchId: string; closeDat
       {/* Settle — the remit / owe direction */}
       <div className="px-4 py-3">
         <ClusterTitle>{t('accounting.dayClose.clusterSettle')}</ClusterTitle>
-        <dl className="grid grid-cols-2 gap-x-3 gap-y-2">
+        <dl className="grid grid-cols-1 @sm:grid-cols-2 gap-x-3 gap-y-2">
           <SettleRow
             label={t('accounting.dayClose.holding')}
             toRemit={row.holding_to_remit}
@@ -1097,6 +1097,56 @@ function DayCloseBreakdown({ branchId, closeDate }: { branchId: string; closeDat
           />
         </dl>
       </div>
+
+      {/* Activity counts — context; red-flags void anomalies */}
+      <div className="px-4 py-3">
+        <ClusterTitle>{t('accounting.dayClose.clusterActivity')}</ClusterTitle>
+        <dl className="grid grid-cols-2 @md:grid-cols-3 @lg:grid-cols-4 gap-x-3 gap-y-2">
+          <Stat label={t('accounting.dayClose.billCount')} value={String(row.bill_count)} />
+          <Stat label={t('accounting.dayClose.contractsOpened')} value={String(row.contracts_opened)} />
+          <Stat label={t('accounting.dayClose.contractsCompleted')} value={String(row.contracts_completed)} />
+          <Stat label={t('accounting.dayClose.contractsTerminated')} value={String(row.contracts_terminated)} />
+          <FlagStat
+            label={t('accounting.dayClose.billVoided')}
+            value={row.bill_voided_count}
+            flagged={row.bill_voided_count > 3}
+            flagLabel={t('accounting.dayClose.flagVoidedBillsHigh')}
+          />
+          <FlagStat
+            label={t('accounting.dayClose.contractsVoided')}
+            value={row.contracts_voided}
+            flagged={row.contracts_voided > 0}
+            flagLabel={t('accounting.dayClose.flagContractsVoided')}
+          />
+          {row.gift_cost !== 0 && (
+            <Stat label={t('accounting.dayClose.giftCost')} value={fmtCurrency(row.gift_cost)} />
+          )}
+        </dl>
+      </div>
+    </div>
+  );
+}
+
+/* A count stat that turns red + shows a ⚠ flag caption when the value crosses
+   an anomaly threshold (void rate, contract voided). */
+function FlagStat({
+  label, value, flagged, flagLabel,
+}: {
+  label: string;
+  value: number;
+  flagged: boolean;
+  flagLabel: string;
+}) {
+  return (
+    <div>
+      <dt className="text-xs text-subtle">{label}</dt>
+      <dd className={`text-base font-semibold tabular-nums ${flagged ? 'text-danger' : ''}`}>{value}</dd>
+      {flagged && (
+        <div className="inline-flex items-center gap-1 text-[11px] text-danger mt-0.5">
+          <AlertTriangle size={11} />
+          <span>{flagLabel}</span>
+        </div>
+      )}
     </div>
   );
 }

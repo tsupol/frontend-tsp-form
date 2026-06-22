@@ -3367,7 +3367,16 @@
       "holding": "Holding",
       "company": "Company",
       "toRemit": "to remit",
-      "owesBm": "owed to branch"
+      "owesBm": "owed to branch",
+      "clusterActivity": "Activity",
+      "contractsOpened": "Contracts opened",
+      "contractsCompleted": "Contracts completed",
+      "contractsTerminated": "Contracts terminated",
+      "contractsVoided": "Contracts voided",
+      "billVoided": "Voided bills",
+      "giftCost": "Gift cost",
+      "flagVoidedBillsHigh": "High void rate",
+      "flagContractsVoided": "Contract opened in error"
     },
     "dayCloseHistory": {
       "description": "Historical day close snapshots with audit flags."

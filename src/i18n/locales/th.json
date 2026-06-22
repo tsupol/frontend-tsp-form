@@ -3366,7 +3366,16 @@
       "holding": "Holding",
       "company": "Company",
       "toRemit": "นำส่ง",
-      "owesBm": "ค้างสาขา"
+      "owesBm": "ค้างสาขา",
+      "clusterActivity": "เกิดอะไรขึ้นวันนี้",
+      "contractsOpened": "สัญญาเปิดใหม่",
+      "contractsCompleted": "ผ่อนครบ",
+      "contractsTerminated": "ยกเลิก",
+      "contractsVoided": "สัญญา Void",
+      "billVoided": "บิล Void",
+      "giftCost": "ต้นทุนของแถม",
+      "flagVoidedBillsHigh": "Void ผิดบ่อย",
+      "flagContractsVoided": "เปิดสัญญาผิด"
     },
     "dayCloseHistory": {
       "description": "บันทึกประวัติการปิดวันพร้อมธงเตือน"
