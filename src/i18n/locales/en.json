@@ -1352,6 +1352,7 @@
     "receivingProgress": "Receiving Progress",
     "outstanding": "Outstanding",
     "created": "Created",
+    "createdByBranch": "Created by branch",
     "submitted": "Submitted",
     "approved": "Approved",
     "cancelled": "Cancelled",
