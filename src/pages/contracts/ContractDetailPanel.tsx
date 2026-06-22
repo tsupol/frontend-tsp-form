@@ -293,6 +293,8 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
   >(null);
   const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
   const [pdfModalOpen, setPdfModalOpen] = useState(false);
+  // Which signing the PDF modal should render; null = live current contract.
+  const [pdfSigningId, setPdfSigningId] = useState<number | null>(null);
   const notesDirtyRef = useRef(false);
   const [pendingTab, setPendingTab] = useState<DetailTab | null>(null);
   const navGuard = useNavGuard();
@@ -406,7 +408,7 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
             deliveryModalOpen={deliveryModalOpen}
             setDeliveryModalOpen={setDeliveryModalOpen}
             pdfModalOpen={pdfModalOpen}
-            setPdfModalOpen={setPdfModalOpen}
+            setPdfModalOpen={(o) => { if (o) setPdfSigningId(null); setPdfModalOpen(o); }}
           />
         )}
         {activeTab === 'money' && <MoneyTab contractId={contractId} contract={contract} t={t} />}
@@ -424,7 +426,7 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
           <DeviceTab contract={contract} onRequestAction={setRequestedAction} />
         )}
         {activeTab === 'signing' && (
-          <SigningTab contractId={contractId} onPrintPdf={() => setPdfModalOpen(true)} />
+          <SigningTab contractId={contractId} onPrintPdf={(signingId) => { setPdfSigningId(signingId); setPdfModalOpen(true); }} />
         )}
       </div>
 
@@ -468,6 +470,7 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
         open={pdfModalOpen}
         onClose={() => setPdfModalOpen(false)}
         contract={contract}
+        signingId={pdfSigningId}
       />
     </div>
   );

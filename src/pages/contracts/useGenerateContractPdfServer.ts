@@ -8,7 +8,9 @@ import type { ContractMin } from '../../lib/contractPdf/buildRenderData';
 
 export interface UseGenerateContractPdfServer {
   generating: boolean;
-  generate: (contract: ContractMin) => Promise<void>;
+  // signingId selects a specific signing's document (lease / addendum,
+  // sealed vs preview); omit to render the live current contract.
+  generate: (contract: ContractMin, signingId?: number) => Promise<void>;
   error: string | null;
 }
 
@@ -27,11 +29,11 @@ export function useGenerateContractPdfServer(): UseGenerateContractPdfServer {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const generate = useCallback(async (contract: ContractMin) => {
+  const generate = useCallback(async (contract: ContractMin, signingId?: number) => {
     setError(null);
     setGenerating(true);
     try {
-      const blob = await beMediaContractPdf({ contractId: contract.id });
+      const blob = await beMediaContractPdf({ contractId: contract.id, signingId });
       const code = contract.code_display ?? contract.code;
       triggerDownload(blob, `${code}.pdf`);
     } catch (err) {

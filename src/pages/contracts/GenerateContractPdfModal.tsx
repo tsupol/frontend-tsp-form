@@ -52,6 +52,9 @@ interface Props {
   open: boolean;
   onClose: () => void;
   contract: ContractMin | null;
+  // When set, renders that specific signing's document (lease / addendum,
+  // sealed vs preview). Omit → live current contract.
+  signingId?: number | null;
 }
 
 const SLOTS: { slot: SignatorySlot; labelKey: string }[] = [
@@ -60,7 +63,7 @@ const SLOTS: { slot: SignatorySlot; labelKey: string }[] = [
   { slot: 'WITNESS_2', labelKey: 'workspace.signatoryWitness2' },
 ];
 
-export function GenerateContractPdfModal({ open, onClose, contract }: Props) {
+export function GenerateContractPdfModal({ open, onClose, contract, signingId }: Props) {
   const { t } = useTranslation();
   const { addSnackbar } = useSnackbarContext();
   const { generating, generate } = useGenerateContractPdfServer();
@@ -150,7 +153,7 @@ export function GenerateContractPdfModal({ open, onClose, contract }: Props) {
   const handlePrint = async () => {
     if (!contract || blocked) return;
     try {
-      await generate(contract);
+      await generate(contract, signingId ?? undefined);
       onClose();
     } catch (err) {
       surfaceError(err, t, addSnackbar);

@@ -159,7 +159,7 @@ export function SigningTab({
   onPrintPdf,
 }: {
   contractId: number;
-  onPrintPdf?: () => void;
+  onPrintPdf?: (signingId: number) => void;
 }) {
   const { t } = useTranslation();
   const [voidSigningId, setVoidSigningId] = useState<number | null>(null);
@@ -280,7 +280,7 @@ export function SigningTab({
             expanded={expanded.has(s.signing_id)}
             onToggleExpand={() => toggleExpanded(s.signing_id)}
             onRequestVoid={() => setVoidSigningId(s.signing_id)}
-            onRequestPrint={onPrintPdf}
+            onRequestPrint={onPrintPdf ? () => onPrintPdf(s.signing_id) : undefined}
             onRequestSign={(party) => setSignTarget({
               signing_id: s.signing_id,
               party_role: party.party_role,
