@@ -3848,6 +3848,19 @@
     "slipStaffSubmitted": "ส่งโดยพนักงาน",
     "slipRejectReason": "เหตุผล",
 
+    "emoji": {
+      "button": "อิโมจิ",
+      "searchPlaceholder": "ค้นหาอิโมจิ",
+      "noResults": "ไม่พบอิโมจิ",
+      "cat": {
+        "recent": "ล่าสุด",
+        "smileys": "หน้ายิ้มและอารมณ์",
+        "gestures": "ท่าทาง",
+        "hearts": "หัวใจและสัญลักษณ์",
+        "objects": "สิ่งของ"
+      }
+    },
+
     "status": {
       "WAITING_REPLY": "รอตอบ",
       "RESOLVED": "เรียบร้อยแล้ว",

@@ -3849,6 +3849,19 @@
     "slipStaffSubmitted": "By staff",
     "slipRejectReason": "Reason",
 
+    "emoji": {
+      "button": "Emoji",
+      "searchPlaceholder": "Search emoji",
+      "noResults": "No emoji found",
+      "cat": {
+        "recent": "Recent",
+        "smileys": "Smileys & emotion",
+        "gestures": "Gestures",
+        "hearts": "Hearts & symbols",
+        "objects": "Objects"
+      }
+    },
+
     "status": {
       "WAITING_REPLY": "Waiting reply",
       "RESOLVED": "Resolved",

@@ -4,7 +4,7 @@
 
 import { useCallback, useState } from 'react';
 import { beMediaContractPdf } from '../../lib/beMedia';
-import type { ContractMin } from '../../lib/contractPdf/buildRenderData';
+import type { ContractMin } from '../../lib/contractPdf/contractMin';
 
 export interface UseGenerateContractPdfServer {
   generating: boolean;

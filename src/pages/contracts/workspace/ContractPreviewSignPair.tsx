@@ -12,7 +12,7 @@ import { CheckCircle, ScrollText, Eye, PenLine, AlertTriangle } from 'lucide-rea
 import { useMediaUrl } from '../../../hooks/useMediaUrl';
 import { ContractPreviewModal } from '../ContractPreviewModal';
 import { ContractSignModal } from './ContractSignModal';
-import type { ContractMin } from '../../../lib/contractPdf/buildRenderData';
+import type { ContractMin } from '../../../lib/contractPdf/contractMin';
 import type { UploadedImage } from 'tsp-form';
 
 export interface ReadinessError {

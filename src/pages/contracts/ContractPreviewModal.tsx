@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { Modal, Button } from 'tsp-form';
 import { Loader2, X, AlertTriangle, PenLine } from 'lucide-react';
 import { beMediaContractPdf, BeMediaError } from '../../lib/beMedia';
-import type { ContractMin } from '../../lib/contractPdf/buildRenderData';
+import type { ContractMin } from '../../lib/contractPdf/contractMin';
 import { PdfCanvasViewer } from '../../components/PdfCanvasViewer';
 
 interface Props {

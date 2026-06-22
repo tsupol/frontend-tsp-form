@@ -1,5 +1,4 @@
-import type { ResizeOptions, UploadedImage } from 'tsp-form';
-import { config } from '../config/config';
+import type { ResizeOptions } from 'tsp-form';
 import { normalizeKey, type MediaPrivacy } from './mediaPath';
 import { beMediaUrl, beMediaCanPresign, UPLOAD_SPECS } from './beMedia';
 
@@ -73,19 +72,6 @@ export function renameForExt(name: string, ext: string): string {
   return name.replace(/\.[^.]+$/, '') + '.' + ext;
 }
 
-type ServerResponse<T> =
-  | { success: true; data: T }
-  | { success: false; error: { code: string; message: string } };
-
-async function call<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${config.uploadUrl}${path}`, init);
-  const body = (await res.json()) as ServerResponse<T>;
-  if (!body.success) {
-    throw new Error(body.error?.message || `Upload API error (${res.status})`);
-  }
-  return body.data;
-}
-
 // ── Spec cache ────────────────────────────────────────────────────────
 const specCache = new Map<string, Promise<UploadSpec>>();
 
@@ -101,65 +87,6 @@ export function getUploadSpec(type: string): Promise<UploadSpec> {
     specCache.set(type, p);
   }
   return p;
-}
-
-// ── Upload (one resized file at one size) ─────────────────────────────
-export interface UploadOpts {
-  type: string;
-  file: File;
-  size?: string;
-  idx?: number;
-  params: Record<string, string | number>;
-}
-
-export async function uploadImage(opts: UploadOpts): Promise<UploadResult> {
-  const form = new FormData();
-  form.append('file', opts.file);
-  form.append('type', opts.type);
-  if (opts.size) form.append('size', opts.size);
-  if (opts.idx !== undefined) form.append('idx', String(opts.idx));
-  for (const [k, v] of Object.entries(opts.params)) {
-    form.append(k, String(v));
-  }
-  return call<UploadResult>('/upload', { method: 'POST', body: form });
-}
-
-// ── Upload all sizes for a type from one source UploadedImage ─────────
-// `files` maps size label → File. Missing sizes are skipped.
-export interface MultiUploadOpts {
-  type: string;
-  files: Record<string, File>;
-  idx?: number;
-  params: Record<string, string | number>;
-}
-
-export async function uploadImageMulti(opts: MultiUploadOpts): Promise<Record<string, UploadResult>> {
-  const spec = await getUploadSpec(opts.type);
-  const out: Record<string, UploadResult> = {};
-  // Sequential to keep memory/network sane for large originals.
-  for (const sz of spec.sizes) {
-    const file = opts.files[sz.label];
-    if (!file) continue;
-    out[sz.label] = await uploadImage({
-      type: opts.type,
-      file,
-      size: sz.label,
-      idx: opts.idx,
-      params: opts.params,
-    });
-  }
-  return out;
-}
-
-// ── Delete ────────────────────────────────────────────────────────────
-export async function deleteMedia(keys: string[]): Promise<void> {
-  const normalized = keys.map(normalizeKey).filter((k) => k.length > 0);
-  if (normalized.length === 0) return;
-  await call('/media', {
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ keys: normalized }),
-  });
 }
 
 // ── Private URL resolution (presigned) ────────────────────────────────
@@ -182,24 +109,13 @@ export async function privateMediaUrl(key: string): Promise<string> {
   if (inFlight) return inFlight;
 
   inFlight = (async () => {
-    // Route by key shape: chat/slip contract keys presign via be-media (the
-    // only private shapes its /media/url accepts today). Everything else
-    // (id-card, signatures, evidence) still goes to misc-go until be-media's
-    // presign regex is widened for those types.
-    if (beMediaCanPresign(k)) {
-      const url = await beMediaUrl(k);
-      // be-media returns no expires_in; cache for the local TTL window.
-      presignCache.set(k, { url, expiresAt: Date.now() + CACHE_TTL_MS });
-      return url;
+    if (!beMediaCanPresign(k)) {
+      throw new Error(`no presign route for key shape: ${k}`);
     }
-    const data = await call<{ url: string; expires_in: number }>(
-      `/media/url?key=${encodeURIComponent(k)}`,
-    );
-    presignCache.set(k, {
-      url: data.url,
-      expiresAt: Date.now() + Math.min(CACHE_TTL_MS, data.expires_in * 1000 - 60_000),
-    });
-    return data.url;
+    const url = await beMediaUrl(k);
+    // be-media returns no expires_in; cache for the local TTL window.
+    presignCache.set(k, { url, expiresAt: Date.now() + CACHE_TTL_MS });
+    return url;
   })().finally(() => {
     presignInFlight.delete(k);
   });
@@ -247,66 +163,3 @@ export function specToSizes(spec: UploadSpec | null | undefined): Record<string,
   return out;
 }
 
-/**
- * Upload all sizes in the spec from a single UploadedImage's variants.
- * Falls back to resizing `file` to the spec when no variants are present —
- * used by single-size flows (OCR ID-card capture, signature pad) so the raw
- * camera/upload frame doesn't get pushed to R2 unresized.
- */
-export async function uploadFromImage(opts: {
-  type: string;
-  image: UploadedImage;
-  idx?: number;
-  params: Record<string, string | number>;
-}): Promise<Record<string, UploadResult>> {
-  const spec = await getUploadSpec(opts.type);
-  const files: Record<string, File> = {};
-  for (const sz of spec.sizes) {
-    const v = opts.image.variants?.[sz.label]?.file;
-    if (v) files[sz.label] = v;
-  }
-  // Fallback: only one size in spec and no variants — resize the source file
-  // to the spec's width + webp before uploading.
-  if (Object.keys(files).length === 0 && spec.sizes.length === 1) {
-    const src = opts.image.file ?? opts.image.originalFile;
-    const sz = spec.sizes[0];
-    files[sz.label] = await resizeFileToWebp(src, sz.width, spec.quality);
-  }
-  return uploadImageMulti({
-    type: opts.type,
-    files,
-    idx: opts.idx,
-    params: opts.params,
-  });
-}
-
-/**
- * Downscale `src` to fit within `maxWidth × maxWidth` (contain) and encode
- * as webp (with JPEG fallback on browsers that don't support webp encode —
- * Safari < 17.4). Shrinks files dramatically vs raw camera PNG/JPEG and keeps
- * the misc-go uploaded copies small enough for downstream PDF embedding.
- */
-async function resizeFileToWebp(src: File, maxWidth: number, quality: number): Promise<File> {
-  const url = URL.createObjectURL(src);
-  try {
-    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const im = new Image();
-      im.onload = () => resolve(im);
-      im.onerror = () => reject(new Error('image load failed'));
-      im.src = url;
-    });
-    let w = img.naturalWidth, h = img.naturalHeight;
-    if (w > maxWidth || h > maxWidth) {
-      const ratio = Math.min(maxWidth / w, maxWidth / h);
-      w = Math.round(w * ratio);
-      h = Math.round(h * ratio);
-    }
-    const canvas = document.createElement('canvas');
-    canvas.width = w; canvas.height = h;
-    canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
-    const { blob, mime, ext } = await encodeCanvas(canvas, quality);
-    return new File([blob], renameForExt(src.name, ext), { type: mime });
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}

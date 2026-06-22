@@ -12,7 +12,7 @@ import { ContractPreviewSignPair, type ReadinessError } from './ContractPreviewS
 import { SignatoryEditor } from './SignatoryEditor';
 import { ConfidenceScoreEditor } from './ConfidenceScoreEditor';
 import { useContractGuarantors } from './useContractGuarantors';
-import type { ContractMin } from '../../../lib/contractPdf/buildRenderData';
+import type { ContractMin } from '../../../lib/contractPdf/contractMin';
 
 interface CustomerDocument {
   id: number;
