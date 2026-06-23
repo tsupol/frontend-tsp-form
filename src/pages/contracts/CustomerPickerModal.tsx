@@ -1,10 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useQueryClient } from '@tanstack/react-query';
 import { Modal, Button, Input, Select, MaskedInput, InputDatePicker } from 'tsp-form';
+import type { UploadedImage } from 'tsp-form';
 import { Search, Loader2, CheckCircle, XCircle, Keyboard } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { passesThaiCidChecksum } from '../../lib/ocr/extractIdCard';
 import { toLocalDateStr, parseLocalDate, makeDatePickerFormat } from '../../lib/format';
+import { beMediaUploadFromImage } from '../../lib/beMedia';
+import { invalidateMediaUrl } from '../../lib/upload';
+import { IdCardScanner, type DetectedIdCardFields } from '../../components/IdCardScanner';
+
+const KNOWN_TH_PREFIXES = new Set(['นาย', 'นาง', 'นางสาว']);
 
 const ID_TYPE_OPTIONS = [
   { value: 'CITIZEN_ID', label: 'Citizen ID' },
@@ -54,6 +61,7 @@ interface Props {
 
 export function CustomerPickerModal({ open, title, excludeCustomerIds = [], onClose, onPick }: Props) {
   const { t, i18n } = useTranslation();
+  const queryClient = useQueryClient();
 
   const [idType, setIdType] = useState<'CITIZEN_ID' | 'PASSPORT'>('CITIZEN_ID');
   const [idNumber, setIdNumber] = useState('');
@@ -72,13 +80,49 @@ export function CustomerPickerModal({ open, title, excludeCustomerIds = [], onCl
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  // OCR-scanned ID card — uploaded as ID_CARD_FRONT once we have a new
+  // customer_id (register path only; an existing customer keeps their docs).
+  const pendingScanRef = useRef<UploadedImage | null>(null);
+
   useEffect(() => {
     if (!open) return;
     setIdType('CITIZEN_ID'); setIdNumber(''); setPrefix(''); setFirstName('');
     setLastName(''); setDateOfBirth(''); setTel(''); setTel2('');
     setSelected(null); setResults([]); setHasSearched(false);
     setSubmitting(false); setError('');
+    pendingScanRef.current = null;
   }, [open]);
+
+  // Apply OCR-detected fields. Each scan overwrites the previous values so
+  // re-scanning works; skipped once an existing customer is selected.
+  const handleOcrDetected = (f: DetectedIdCardFields) => {
+    if (selected) return;
+    if (f.cid) { setIdType('CITIZEN_ID'); setIdNumber(f.cid); }
+    if (f.prefix && KNOWN_TH_PREFIXES.has(f.prefix)) setPrefix(f.prefix);
+    if (f.firstName) setFirstName(f.firstName);
+    if (f.lastName) setLastName(f.lastName);
+    if (f.dob) setDateOfBirth(f.dob);
+  };
+
+  // Persist the scanned ID card image as the customer's ID_CARD_FRONT document.
+  const persistScannedIdCard = async (custId: number, image: UploadedImage) => {
+    try {
+      const results = await beMediaUploadFromImage({
+        type: 'customer_id_card',
+        image,
+        params: { customer_id: custId },
+      });
+      const key = results.lg?.key ?? Object.values(results)[0]?.key;
+      if (!key) return;
+      await apiClient.rpc('fn_customer_document_upload', {
+        p_customer_id: custId,
+        p_doc_type: 'ID_CARD_FRONT',
+        p_file_url: `/${key}`,
+      });
+      invalidateMediaUrl(key);
+      queryClient.invalidateQueries({ queryKey: ['entity-media', 'CUSTOMER', custId] });
+    } catch { /* ignore — user can re-upload from the customer page */ }
+  };
 
   const canSearch = !!(idNumber.trim() || firstName.trim() || lastName.trim());
   const isExisting = !!selected;
@@ -167,6 +211,12 @@ export function CustomerPickerModal({ open, title, excludeCustomerIds = [], onCl
         setSubmitting(false);
         return;
       }
+      // Persist any scanned ID card before we attach/close.
+      if (pendingScanRef.current) {
+        const img = pendingScanRef.current;
+        pendingScanRef.current = null;
+        void persistScannedIdCard(res.customer_id, img);
+      }
       await submitWithCustomer(res.customer_id, res.full_name);
     } catch (err) {
       if (err instanceof ApiError) {
@@ -192,6 +242,25 @@ export function CustomerPickerModal({ open, title, excludeCustomerIds = [], onCl
             <div className="alert alert-danger mb-3">
               <XCircle size={16} />
               <span>{error}</span>
+            </div>
+          )}
+
+          {!selected && (
+            <div className="mb-3">
+              <IdCardScanner
+                onDetected={handleOcrDetected}
+                onPersist={(img) => { pendingScanRef.current = img; }}
+                disabled={submitting}
+                currentFields={{ cid: idNumber, prefix, firstName, lastName, dob: dateOfBirth }}
+                onCopyCid
+                onCopyField={(field, value) => {
+                  if (field === 'cid') { setIdType('CITIZEN_ID'); setIdNumber(value); }
+                  else if (field === 'prefix') { if (KNOWN_TH_PREFIXES.has(value)) setPrefix(value); }
+                  else if (field === 'firstName') setFirstName(value);
+                  else if (field === 'lastName') setLastName(value);
+                  else if (field === 'dob') setDateOfBirth(value);
+                }}
+              />
             </div>
           )}
 

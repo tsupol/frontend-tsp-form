@@ -51,6 +51,11 @@ interface Props {
   currentFields?: Partial<Record<IdCardField, string>>;
   /** Per-field copy handler. Required when `currentFields` is given. */
   onCopyField?: (field: IdCardField, value: string) => void;
+  /** Allow copying the detected CID into the form. Off by default because CID
+      is an immutable match-key once a customer exists (the co-lessee panel
+      disables it); on for the new-customer registration form where ID number
+      is still editable. */
+  onCopyCid?: boolean;
 }
 
 const EMPTY_FIELDS: DetectedIdCardFields = {
@@ -88,7 +93,7 @@ function progressLabel(p: ProgressEvent | null, t: (k: string, o?: Record<string
   }
 }
 
-export function IdCardScanner({ onDetected, onPersist, onClear, disabled, existingImageUrl, currentFields, onCopyField }: Props) {
+export function IdCardScanner({ onDetected, onPersist, onClear, disabled, existingImageUrl, currentFields, onCopyField, onCopyCid }: Props) {
   const { t } = useTranslation();
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [pickedFile, setPickedFile] = useState<File | null>(null);
@@ -302,8 +307,8 @@ export function IdCardScanner({ onDetected, onPersist, onClear, disabled, existi
                 current={currentFields.cid ?? ''}
                 detected={result.cid}
                 warn={result.cid != null && !result.cidValid ? t('ocr.cidChecksumBad') : null}
-                onCopy={() => {}}
-                noCopy
+                onCopy={(v) => onCopyField?.('cid', v)}
+                noCopy={!onCopyCid}
               />
               <MergeRow
                 label={t('ocr.fieldPrefix')}
@@ -393,9 +398,11 @@ function MergeRow({ label, current, detected, warn, onCopy, noCopy }: {
     <div className="flex items-center gap-2">
       <span className="text-subtle shrink-0 w-20">{label}</span>
       <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-        <span className="break-all text-subtle text-[10px] opacity-80">
-          {current || '—'}
-        </span>
+        {current && (
+          <span className="break-all text-subtle text-[10px] opacity-80">
+            {current}
+          </span>
+        )}
         <span className={`break-all ${canCopy ? 'font-medium text-primary-fg' : sameAsCurrent ? 'text-success' : ''}`}>
           {detected || <span className="text-subtle">—</span>}
         </span>

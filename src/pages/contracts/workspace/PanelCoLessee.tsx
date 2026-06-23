@@ -321,9 +321,12 @@ export function PanelCoLessee({ onClose: _onClose }: Props) {
                   lastName,
                   dob: dateOfBirth,
                 }}
+                onCopyCid
                 onCopyField={(field, value) => {
-                  // CID is immutable once committed — scanner never fires this for cid.
-                  if (field === 'prefix') {
+                  if (field === 'cid') {
+                    setIdType('CITIZEN_ID');
+                    setIdNumber(value);
+                  } else if (field === 'prefix') {
                     if (KNOWN_TH_PREFIXES.has(value)) setPrefix(value);
                   } else if (field === 'firstName') {
                     setFirstName(value);
