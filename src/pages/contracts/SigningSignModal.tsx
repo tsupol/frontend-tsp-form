@@ -24,7 +24,7 @@ import { Badge, Button, LabeledCheckbox, Modal } from 'tsp-form';
 import type { UploadedImage } from 'tsp-form';
 import { Loader2, XCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
-import { beMediaUploadFromImage } from '../../lib/beMedia';
+import { beMediaUpload } from '../../lib/beMedia';
 import { toStoragePath } from '../../lib/mediaPath';
 import { useAuth } from '../../contexts/AuthContext';
 import { SignatureCapture } from './workspace/SignatureCapture';
@@ -147,25 +147,33 @@ export function SigningSignModal({ open, onClose, contractId, party }: Props) {
       setError(t('common.errorGeneric'));
       return;
     }
+    // contract_signature is a single 'sm' size. SignatureCapture already
+    // resized to it (variants.sm); upload that file directly. `.file` mirrors
+    // variants.sm.file, with originalFile as a last resort.
+    const file = images[0].variants?.sm?.file ?? images[0].file ?? images[0].originalFile ?? null;
+    if (!file) {
+      setError(t('common.errorGeneric'));
+      return;
+    }
     setError('');
     setUploading(true);
     try {
-      const results = await beMediaUploadFromImage({
+      const uploaded = await beMediaUpload({
         type: 'contract_signature',
-        image: images[0],
+        file,
+        size: 'sm',
         params: { contract_id: contractId, customer_id: party.customer_id },
       });
-      // contract_signature has a single 'sm' size — pick it (or any first key).
-      const first = results.sm ?? Object.values(results)[0];
-      if (!first) throw new Error('Upload returned no result');
       const attached = await apiClient.rpc<{ media_id: number }>('fn_media_attach', {
         p_holding_id: user.holding_id,
-        p_storage_path: toStoragePath(first.key),
+        p_storage_path: toStoragePath(uploaded.key),
         p_variants_json: null,
         p_media_type: 'IMAGE',
         p_access_level: 'CONFIDENTIAL',
-        p_mime_type: 'image/webp',
-        p_file_size_bytes: null,
+        // Draw mode produces PNG, photo modes produce WebP — trust the file the
+        // server actually wrote (content_type), not a hardcoded guess.
+        p_mime_type: uploaded.content_type || file.type || 'image/webp',
+        p_file_size_bytes: file.size,
         p_original_filename: null,
         p_entity_type: 'CONTRACT',
         p_entity_id: contractId,

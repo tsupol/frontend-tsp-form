@@ -44,33 +44,9 @@ export function mimeFromKey(key: string): string {
   return (m && EXT_TO_MIME[m[1]]) || 'application/octet-stream';
 }
 
-/**
- * Encode a canvas as webp, falling back to JPEG when the browser does not
- * support webp encoding (Safari < 17.4 silently returns a PNG blob). Returns
- * the actual blob, MIME, and extension — never lies about the type.
- *
- * If JPEG also fails or silently degrades to PNG (no current browser does this,
- * but be loud if it ever happens), we throw instead of letting a huge PNG slip
- * through and break downstream PDF rendering.
- */
-export async function encodeCanvas(
-  canvas: HTMLCanvasElement,
-  quality: number,
-): Promise<{ blob: Blob; mime: string; ext: 'webp' | 'jpg' }> {
-  const webp = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/webp', quality));
-  if (webp && webp.type === 'image/webp') return { blob: webp, mime: 'image/webp', ext: 'webp' };
-  const jpeg = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/jpeg', quality));
-  if (!jpeg) throw new Error('canvas encode failed: browser returned no blob');
-  if (jpeg.type !== 'image/jpeg') {
-    throw new Error(`canvas encode failed: browser cannot produce webp or jpeg (got ${jpeg.type || 'unknown'})`);
-  }
-  return { blob: jpeg, mime: 'image/jpeg', ext: 'jpg' };
-}
-
-/** Swap a file's extension to match the encoded format. */
-export function renameForExt(name: string, ext: string): string {
-  return name.replace(/\.[^.]+$/, '') + '.' + ext;
-}
+// Canvas encoding + extension naming now live in tsp-form's resizeToVariants
+// (honest webp→jpeg fallback). The standalone encodeCanvas/renameForExt
+// helpers were removed once every resize path routed through it.
 
 // ── Spec cache ────────────────────────────────────────────────────────
 const specCache = new Map<string, Promise<UploadSpec>>();

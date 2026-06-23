@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Badge, Button, PopOver, Skeleton, useSnackbarContext,
+  Badge, Button, PopOver, Skeleton, useSnackbarContext, resizeToVariants,
 } from 'tsp-form';
 import {
   ChevronRight, CheckCircle, ExternalLink, FileText, Image as ImageIcon, Send, Smile, XCircle,
@@ -15,7 +15,7 @@ import { fmtCurrency, formatSmart } from '../../lib/format';
 import { DateTime } from '../../components/DateTime';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
 import { normalizeKey, toStoragePath } from '../../lib/mediaPath';
-import { encodeCanvas, renameForExt, mimeFromKey } from '../../lib/upload';
+import { mimeFromKey } from '../../lib/upload';
 import { beMediaUpload } from '../../lib/beMedia';
 import {
   SubmissionReviewDrawer,
@@ -266,11 +266,15 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
       // deterministic key collides (both overwrite one object). Timestamp is
       // unique per send and shared between this message's sm + lg variants.
       const idx = Date.now();
-      // Upload both variants: lg = full-screen source, sm = bubble thumbnail.
-      const [smFile, lgFile] = await Promise.all([
-        resizeImageToWebp(file, 320, 0.82),
-        resizeImageToWebp(file, 1280, 0.82),
-      ]);
+      // Resize to both variants in one pass: lg = full-screen source, sm =
+      // bubble thumbnail. webp output, JPEG fallback on Safari < 17.4 (mime
+      // reported honestly by resizeToVariants).
+      const variants = await resizeToVariants(file, {
+        sm: { maxWidth: 320, maxHeight: 320, quality: 0.82, format: 'webp', mode: 'contain' },
+        lg: { maxWidth: 1280, maxHeight: 1280, quality: 0.82, format: 'webp', mode: 'contain' },
+      });
+      const smFile = variants.sm.file;
+      const lgFile = variants.lg.file;
       const [smResult, lgResult] = await Promise.all([
         beMediaUpload({ type: 'chat_image', file: smFile, size: 'sm', params: { contract_id: contractId, idx } }),
         beMediaUpload({ type: 'chat_image', file: lgFile, size: 'lg', params: { contract_id: contractId, idx } }),
@@ -732,41 +736,6 @@ function ImageWithSkeleton({ src, alt }: { src: string; alt: string }) {
   );
 }
 
-async function resizeImageToWebp(file: File, maxDim: number, quality: number): Promise<File> {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = async () => {
-      URL.revokeObjectURL(url);
-      let { width: w, height: h } = img;
-      if (w > maxDim || h > maxDim) {
-        const ratio = Math.min(maxDim / w, maxDim / h);
-        w = Math.round(w * ratio);
-        h = Math.round(h * ratio);
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        reject(new Error('Canvas unsupported'));
-        return;
-      }
-      ctx.drawImage(img, 0, 0, w, h);
-      try {
-        const { blob, mime, ext } = await encodeCanvas(canvas, quality);
-        resolve(new File([blob], renameForExt(file.name, ext), { type: mime }));
-      } catch (err) {
-        reject(err instanceof Error ? err : new Error('Resize failed'));
-      }
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error('Image load failed'));
-    };
-    img.src = url;
-  });
-}
 
 function translateApiError(err: unknown, t: (k: string, opts?: Record<string, unknown>) => string): string {
   if (err instanceof ApiError) {

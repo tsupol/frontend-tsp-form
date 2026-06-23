@@ -2,14 +2,14 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { Badge, Button, Input, Select, Modal, TextArea, Tooltip, useSnackbarContext } from 'tsp-form';
+import { Badge, Button, Input, Select, Modal, TextArea, Tooltip, useSnackbarContext, resizeToVariants } from 'tsp-form';
 import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Upload, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, AlertTriangle } from 'lucide-react';
 import { useGenerateContractPdfServer } from './useGenerateContractPdfServer';
 import { GenerateContractPdfModal } from './GenerateContractPdfModal';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { ApiError } from '../../lib/api';
-import { getUploadSpec, specToResize, encodeCanvas, renameForExt, mimeFromKey } from '../../lib/upload';
+import { getUploadSpec, mimeFromKey } from '../../lib/upload';
 import { beMediaUploadFromImage, beMediaDelete } from '../../lib/beMedia';
 import { toStoragePath, normalizeKey } from '../../lib/mediaPath';
 import { useAuth } from '../../contexts/AuthContext';
@@ -1944,45 +1944,24 @@ function DeliveryModal({ open, contract, onClose, onSuccess }: {
     setUploading(true);
     try {
       const spec = await getUploadSpec('contract_evidence');
-      // Build resized variants matching the spec's sizes.
-      const resize = specToResize(spec)!;
-      const img = new Image();
-      const url = URL.createObjectURL(file);
-      const variants = await new Promise<Record<string, File>>((resolve) => {
-        img.onload = async () => {
-          URL.revokeObjectURL(url);
-          const out: Record<string, File> = {};
-          for (const sz of spec.sizes) {
-            const maxW = sz.width, maxH = sz.width;
-            let w = img.width, h = img.height;
-            if (w > maxW || h > maxH) {
-              const ratio = Math.min(maxW / w, maxH / h);
-              w = Math.round(w * ratio); h = Math.round(h * ratio);
-            }
-            const canvas = document.createElement('canvas');
-            canvas.width = w; canvas.height = h;
-            canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
-            const { blob, mime, ext } = await encodeCanvas(canvas, spec.quality);
-            out[sz.label] = new File([blob], renameForExt(file.name, ext), { type: mime });
-          }
-          resolve(out);
-        };
-        img.src = url;
-      });
-      void resize;
+      // Resize to the spec's variants via tsp-form's shared processor.
+      const sizes = Object.fromEntries(
+        spec.sizes.map((sz) => [
+          sz.label,
+          { maxWidth: sz.width, maxHeight: sz.width, quality: spec.quality, format: 'webp' as const, mode: 'contain' as const },
+        ]),
+      );
+      const variants = await resizeToVariants(file, sizes);
 
-      const fakeImage = {
-        id: Math.random().toString(36).slice(2),
-        originalFile: file,
-        originalWidth: img.width, originalHeight: img.height, originalSize: file.size,
-        file: variants.sm ?? variants.md ?? Object.values(variants)[0],
-        variants: Object.fromEntries(
-          Object.entries(variants).map(([k, f]) => [k, { file: f, preview: '', width: 0, height: 0, size: f.size }]),
-        ),
-      };
       const results = await beMediaUploadFromImage({
         type: 'contract_evidence',
-        image: fakeImage as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+        image: {
+          id: Math.random().toString(36).slice(2),
+          originalFile: file,
+          originalWidth: 0, originalHeight: 0, originalSize: file.size,
+          file: variants.sm?.file ?? variants.md?.file ?? Object.values(variants)[0]?.file,
+          variants,
+        },
         params: { contract_id: contract.id, idx: photos.length },
       });
       const primary = results.sm?.key ?? Object.values(results)[0]?.key;

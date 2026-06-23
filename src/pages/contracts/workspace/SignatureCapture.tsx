@@ -1,13 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from 'tsp-form';
+import { Button, resizeToVariants } from 'tsp-form';
 import type { UploadedImage } from 'tsp-form';
 import { CheckCircle, PenLine, Upload, Camera, Eraser, Undo2, Save, Loader2 } from 'lucide-react';
 import { useMediaUrl } from '../../../hooks/useMediaUrl';
 import { SignaturePad, type SignaturePadHandle } from '../../../components/SignaturePad';
-import { encodeCanvas, renameForExt } from '../../../lib/upload';
 
 type SigMode = 'draw' | 'upload' | 'camera';
+
+// Signature specs (contract_signature, branch_signatory_signature) store a
+// single 'sm' variant at 320px. Both the drawn pad and a photo of a paper
+// signature route through this so every consumer reads `variants.sm`
+// uniformly — no single-variant special-casing downstream.
+const SIG_SIZE = 320;
 
 interface Props {
   fileUrl: string | null;
@@ -21,49 +26,38 @@ interface Props {
   startInEditing?: boolean;
 }
 
-function fileToUploadedImage(file: File, w: number, h: number, blob: Blob, originalFile?: File): UploadedImage {
+// Wrap a single-variant `resizeToVariants` result as an UploadedImage with the
+// `variants` map populated (and top-level `file` mirrored from it for any
+// consumer still reading `.file`). `originalFile` is the untouched source.
+function toUploadedImage(
+  variants: Awaited<ReturnType<typeof resizeToVariants>>,
+  originalFile: File,
+): UploadedImage {
+  const sm = variants.sm;
   return {
     id: Math.random().toString(36).slice(2),
-    file,
-    originalFile: originalFile ?? file,
-    preview: URL.createObjectURL(blob),
-    width: w,
-    height: h,
-    originalWidth: w,
-    originalHeight: h,
-    size: blob.size,
-    originalSize: (originalFile ?? file).size,
+    file: sm?.file,
+    originalFile,
+    preview: sm?.preview,
+    width: sm?.width,
+    height: sm?.height,
+    originalWidth: sm?.width ?? 0,
+    originalHeight: sm?.height ?? 0,
+    size: sm?.size,
+    originalSize: originalFile.size,
+    variants,
   };
 }
 
-// Photo-of-paper-signature: resize and encode webp, JPEG fallback for browsers
-// without webp encode (Safari < 17.4). Never silently produces PNG — see
-// encodeCanvas in lib/upload.ts.
+// Photo-of-paper-signature → 320px webp (JPEG fallback on Safari < 17.4, mime
+// reported honestly by resizeToVariants).
 async function resizePhotoForUpload(file: File): Promise<UploadedImage> {
-  const url = URL.createObjectURL(file);
-  try {
-    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const im = new Image();
-      im.onload = () => resolve(im);
-      im.onerror = () => reject(new Error('image load failed'));
-      im.src = url;
-    });
-    const maxW = 1280, maxH = 1280;
-    let w = img.width, h = img.height;
-    if (w > maxW || h > maxH) {
-      const ratio = Math.min(maxW / w, maxH / h);
-      w = Math.round(w * ratio);
-      h = Math.round(h * ratio);
-    }
-    const canvas = document.createElement('canvas');
-    canvas.width = w; canvas.height = h;
-    canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
-    const { blob, mime, ext } = await encodeCanvas(canvas, 0.85);
-    const resized = new File([blob], renameForExt(file.name, ext), { type: mime });
-    return fileToUploadedImage(resized, w, h, blob, file);
-  } finally {
-    URL.revokeObjectURL(url);
-  }
+  const variants = await resizeToVariants(
+    file,
+    { sm: { maxWidth: SIG_SIZE, maxHeight: SIG_SIZE, quality: 0.85, format: 'webp', mode: 'contain' } },
+    'signature',
+  );
+  return toUploadedImage(variants, file);
 }
 
 export function SignatureCapture({ fileUrl, uploading, disabled, cacheBust = 0, onUpload, startInEditing = false }: Props) {
@@ -96,13 +90,16 @@ export function SignatureCapture({ fileUrl, uploading, disabled, cacheBust = 0, 
   const handleDrawSave = async () => {
     const blob = await padRef.current?.toBlob('image/png');
     if (!blob) return;
-    const file = new File([blob], `signature-${Date.now()}.png`, { type: 'image/png' });
-    // Read pad's rendered pixel size (DPR-scaled internally)
-    const dataUrl = padRef.current?.toDataURL('image/png') ?? '';
-    const tmp = new Image();
-    tmp.src = dataUrl;
-    await new Promise<void>((res) => { tmp.onload = () => res(); });
-    onUpload([fileToUploadedImage(file, tmp.naturalWidth, tmp.naturalHeight, blob)]);
+    const source = new File([blob], `signature-${Date.now()}.png`, { type: 'image/png' });
+    // Drawn line art → 320px PNG (lossless, preserves transparency). Goes
+    // through the same resizer so the output is a `variants.sm` like the
+    // photo path; mime is reported honestly (PNG here, never re-labelled).
+    const variants = await resizeToVariants(
+      source,
+      { sm: { maxWidth: SIG_SIZE, maxHeight: SIG_SIZE, format: 'png', mode: 'contain' } },
+      'signature',
+    );
+    onUpload([toUploadedImage(variants, source)]);
   };
 
   const handlePhotoFile = async (file: File) => {

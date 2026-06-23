@@ -1,9 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, Slider, ImageCropper, type ImageCropperRef } from 'tsp-form';
+import { Button, Modal, Slider, ImageCropper, type ImageCropperRef, resizeToVariants } from 'tsp-form';
 import type { ResizedVariant } from 'tsp-form';
 import { RotateCcw, RotateCw, Scissors, X } from 'lucide-react';
-import { encodeCanvas } from '../lib/upload';
 
 /* ── Aspect presets ──────────────────────────────────────────────────────
    ID-1 covers Thai national ID + driver's license (85.6×53.98mm → 1.586).
@@ -222,28 +221,16 @@ export async function buildWebpVariantsFromImage(
   targets: ResizedTarget[],
   quality: number,
 ): Promise<Record<string, ResizedVariant>> {
-  const out: Record<string, ResizedVariant> = {};
-  for (const t of targets) {
-    const maxW = t.width;
-    const maxH = t.width;
-    let w = img.naturalWidth;
-    let h = img.naturalHeight;
-    if (w > maxW || h > maxH) {
-      const ratio = Math.min(maxW / w, maxH / h);
-      w = Math.round(w * ratio);
-      h = Math.round(h * ratio);
-    }
-    const canvas = document.createElement('canvas');
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) continue;
-    ctx.drawImage(img, 0, 0, w, h);
-    const { blob, mime, ext } = await encodeCanvas(canvas, quality);
-    const f = new File([blob], `${baseName}-${t.label}.${ext}`, { type: mime });
-    out[t.label] = { file: f, preview: '', width: w, height: h, size: f.size };
-  }
-  return out;
+  // Thin wrapper over tsp-form's shared resizer. The cropped pixels arrive as
+  // an already-decoded HTMLImageElement (saves a decode pass); each target
+  // becomes a webp variant (JPEG fallback on Safari < 17.4, mime honest).
+  const sizes = Object.fromEntries(
+    targets.map((t) => [
+      t.label,
+      { maxWidth: t.width, maxHeight: t.width, quality, format: 'webp' as const, mode: 'contain' as const },
+    ]),
+  );
+  return resizeToVariants(img, sizes, baseName);
 }
 
 /** "lg" if present, else first available. Matches uploadFromImage's primary pick. */

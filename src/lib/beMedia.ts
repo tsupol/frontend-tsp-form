@@ -8,7 +8,7 @@
 //  - migration is gradual; keeping them in different files makes "which
 //    types still call misc-go direct?" greppable
 import type { UploadedImage, ResizeOptions } from 'tsp-form';
-import { encodeCanvas, renameForExt } from './upload';
+import { resizeToVariants } from 'tsp-form';
 
 const BE_MEDIA_URL =
   (import.meta.env.VITE_BE_MEDIA_URL as string | undefined) ??
@@ -99,8 +99,13 @@ export async function beMediaUploadFromImage(
 ): Promise<Record<string, BeMediaUploadResult>> {
   const sizes = opts.sizes ?? UPLOAD_SPECS[opts.type]?.sizes.map((s) => s.label) ?? [];
   const out: Record<string, BeMediaUploadResult> = {};
+  // Single-variant images (e.g. SignatureCapture, ImageCropper output) carry
+  // their bytes on the top-level `file`, not in a `variants` map. Fall back to
+  // it so those callers don't silently upload nothing. Only meaningful for
+  // single-size specs; multi-size types should still supply `variants`.
+  const fallbackFile = opts.image.file ?? opts.image.originalFile ?? null;
   for (const sz of sizes) {
-    const v = opts.image.variants?.[sz]?.file;
+    const v = opts.image.variants?.[sz]?.file ?? fallbackFile;
     if (!v) continue;
     out[sz] = await beMediaUpload({
       type: opts.type,
@@ -318,44 +323,20 @@ export async function uploadBranchExpenseSlipFromFile(
   expenseId: number,
   file: File,
 ): Promise<BranchExpenseImage> {
+  // Resize the single source to both spec sizes via tsp-form's shared
+  // processor, then upload each variant.
+  const variants = await resizeToVariants(file, BRANCH_EXPENSE_SLIP_RESIZE);
   const out: BranchExpenseImage = {};
   for (const sz of BRANCH_EXPENSE_SLIP_SIZES) {
-    const opts = BRANCH_EXPENSE_SLIP_RESIZE[sz];
-    const resized = await resizeFile(file, opts.maxWidth ?? 1200, opts.quality ?? 0.82);
+    const v = variants[sz]?.file;
+    if (!v) continue;
     const r = await beMediaUpload({
       type: BRANCH_EXPENSE_SLIP_TYPE,
-      file: resized,
+      file: v,
       size: sz,
       params: { expense_id: expenseId },
     });
     out[sz] = r.key;
   }
   return out;
-}
-
-async function resizeFile(src: File, maxWidth: number, quality: number): Promise<File> {
-  const url = URL.createObjectURL(src);
-  try {
-    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const im = new Image();
-      im.onload = () => resolve(im);
-      im.onerror = () => reject(new Error('image load failed'));
-      im.src = url;
-    });
-    let w = img.naturalWidth;
-    let h = img.naturalHeight;
-    if (w > maxWidth || h > maxWidth) {
-      const r = Math.min(maxWidth / w, maxWidth / h);
-      w = Math.round(w * r);
-      h = Math.round(h * r);
-    }
-    const canvas = document.createElement('canvas');
-    canvas.width = w;
-    canvas.height = h;
-    canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
-    const { blob, mime, ext } = await encodeCanvas(canvas, quality);
-    return new File([blob], renameForExt(src.name, ext), { type: mime });
-  } finally {
-    URL.revokeObjectURL(url);
-  }
 }
