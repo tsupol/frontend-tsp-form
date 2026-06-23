@@ -552,12 +552,17 @@ function TimelineRow({ item, showSender, currentUserId, lang, onOpenImage, onOpe
   const isStaff = m.sender_type === 'STAFF';
   const isOwn = isStaff && currentUserId === m.sender_id;
   const align = isStaff ? 'items-end' : 'items-start';
-  // Staff side only — customer side has one participant, naming them is noise.
-  // Own messages keep the "(You)" suffix so you can self-spot in a shared thread.
-  const baseName = m.sender_name ?? t('chat.unknownStaff', { defaultValue: 'Staff' });
-  const senderLabel = isStaff
-    ? (isOwn ? `${baseName} ${t('chat.youSuffix', { defaultValue: '(You)' })}` : baseName)
-    : null;
+  // Name both sides. A thread can hold more than one customer — LESSEE + any
+  // CO_LESSEE join the same chat from the app — so naming the customer sender
+  // tells staff which obligor said what. v_branch_chat_messages.sender_name
+  // resolves the ACTUAL sender (with prefix) for CUSTOMER rows (mig 016/07).
+  // Own staff messages keep the "(You)" suffix so you can self-spot.
+  const baseName = isStaff
+    ? (m.sender_name ?? t('chat.unknownStaff', { defaultValue: 'Staff' }))
+    : (m.sender_name ?? t('chat.unknownCustomer', { defaultValue: 'Customer' }));
+  const senderLabel = isStaff && isOwn
+    ? `${baseName} ${t('chat.youSuffix', { defaultValue: '(You)' })}`
+    : baseName;
 
   // LINE-style layout: sender name on top of a new run, bubble on its own
   // row with the wall-clock time on the *outside* edge (left of staff
@@ -648,12 +653,21 @@ function SlipEventCard({ submission, lang, onOpen }: {
             <Badge size="xs" color={submissionStatusColor(submission.status)}>
               {t(`paymentSubmissions.status_${submission.status}`)}
             </Badge>
+            {submission.submitter_role === 'CO_LESSEE' && (
+              <Badge size="xs" color="info">{t('paymentSubmissions.submitterRole_CO_LESSEE')}</Badge>
+            )}
             {submission.is_staff_submitted && (
               <Badge size="xs" color="info">{t('chat.slipStaffSubmitted')}</Badge>
             )}
           </div>
-          <div className="text-[11px] text-subtle mt-0.5 flex items-center gap-2">
-            <span>{t('chat.slipSubmitted')}</span>
+          <div className="text-[11px] text-subtle mt-0.5 flex items-center gap-2 flex-wrap">
+            {submission.code_display && (
+              <>
+                <span className="tabular-nums">{submission.code_display}</span>
+                <span>·</span>
+              </>
+            )}
+            <span>{submission.customer_name ?? t('chat.slipSubmitted')}</span>
             <span>·</span>
             <span>{formatSmart(submission.submitted_at, lang)}</span>
           </div>

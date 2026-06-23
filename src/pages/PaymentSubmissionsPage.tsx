@@ -194,7 +194,15 @@ export function PaymentSubmissionsPage() {
       cell: ({ row }) => (
         <div>
           <div className="text-sm font-medium truncate">{row.original.contract_code_display}</div>
-          <div className="text-xs text-subtle truncate">{row.original.customer_name ?? '—'}</div>
+          <div className="text-xs text-subtle truncate flex items-center gap-1">
+            <span className="truncate">{row.original.customer_name ?? '—'}</span>
+            {row.original.submitter_role === 'CO_LESSEE' && (
+              <Badge size="xs" color="info">{t('paymentSubmissions.submitterRole_CO_LESSEE')}</Badge>
+            )}
+          </div>
+          {row.original.code_display && (
+            <div className="text-[11px] text-subtle/80 tabular-nums truncate">{row.original.code_display}</div>
+          )}
         </div>
       ),
     },
@@ -259,6 +267,7 @@ export function PaymentSubmissionsPage() {
     { value: 'PENDING_REVIEW', label: t('paymentSubmissions.status_PENDING_REVIEW'), showCount: true },
     { value: 'APPROVED', label: t('paymentSubmissions.status_APPROVED') },
     { value: 'REJECTED', label: t('paymentSubmissions.status_REJECTED') },
+    { value: 'CANCELLED', label: t('paymentSubmissions.status_CANCELLED') },
   ];
 
   return (
@@ -425,9 +434,17 @@ export function PaymentSubmissionsPage() {
                       </Badge>
                       <span className="text-[11px] text-subtle">{formatSmart(row.submitted_at, i18n.language)}</span>
                     </div>
-                    <div className="text-sm font-medium mt-1 truncate">{row.contract_code_display}</div>
-                    <div className="text-xs text-subtle truncate">
-                      {row.customer_name ?? '—'} · {row.branch_name ?? '—'}
+                    <div className="text-sm font-medium mt-1 truncate flex items-center gap-1.5">
+                      <span className="truncate">{row.contract_code_display}</span>
+                      {row.code_display && (
+                        <span className="text-[11px] font-normal text-subtle/80 tabular-nums shrink-0">{row.code_display}</span>
+                      )}
+                    </div>
+                    <div className="text-xs text-subtle truncate flex items-center gap-1">
+                      <span className="truncate">{row.customer_name ?? '—'} · {row.branch_name ?? '—'}</span>
+                      {row.submitter_role === 'CO_LESSEE' && (
+                        <Badge size="xs" color="info">{t('paymentSubmissions.submitterRole_CO_LESSEE')}</Badge>
+                      )}
                     </div>
                     <div className="flex items-center gap-1 mt-1">
                       {row.submit_channel && (

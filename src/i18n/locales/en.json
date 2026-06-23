@@ -1507,8 +1507,13 @@
     "status_PENDING_REVIEW": "Pending review",
     "status_APPROVED": "Approved",
     "status_REJECTED": "Rejected",
+    "status_CANCELLED": "Cancelled",
     "by": "by",
-    "byCustomer": "Customer"
+    "byCustomer": "Customer",
+    "slipCode": "Slip code",
+    "submitterRole_PRIMARY": "Primary lessee",
+    "submitterRole_CO_LESSEE": "Co-lessee",
+    "cancelledByCustomer": "Cancelled by customer"
   },
   "approvals": {
     "title": "Approvals",
@@ -2709,6 +2714,7 @@
   "workspace": {
     "cardProduct": "Product & Finance Plan",
     "cardCustomer": "Customer",
+    "cardCommissionOwner": "Commission owner",
     "cardCoLessee": "Co-lessee",
     "cardContactRef": "Contact & Reference",
     "cardDocuments": "Documents",
@@ -2862,7 +2868,8 @@
     "commissionOwnerCancel": "Cancel",
     "commissionOwnerSave": "Save owner",
     "commissionOwnerPicker": "New owner",
-    "commissionOwnerSaved": "Owner changed"
+    "commissionOwnerSaved": "Owner changed",
+    "commissionOwnerLocked": "The commission owner is locked once the bill is opened."
   },
   "lessors": {
     "title": "Lessors",
@@ -3822,6 +3829,7 @@
     "emptyThread": "No messages yet",
     "unreadBelow": "Unread messages below",
     "unknownStaff": "Staff",
+    "unknownCustomer": "Customer",
     "youSuffix": "(You)",
     "imageMessage": "Photo",
     "you": "You",

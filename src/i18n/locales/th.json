@@ -1506,8 +1506,13 @@
     "status_PENDING_REVIEW": "รอตรวจ",
     "status_APPROVED": "อนุมัติแล้ว",
     "status_REJECTED": "ปฏิเสธแล้ว",
+    "status_CANCELLED": "ยกเลิกแล้ว",
     "by": "โดย",
-    "byCustomer": "ลูกค้า"
+    "byCustomer": "ลูกค้า",
+    "slipCode": "รหัสสลิป",
+    "submitterRole_PRIMARY": "ผู้เช่าหลัก",
+    "submitterRole_CO_LESSEE": "ผู้เช่าร่วม",
+    "cancelledByCustomer": "ลูกค้ายกเลิกสลิปแล้ว"
   },
   "approvals": {
     "title": "รายการอนุมัติ",
@@ -2222,7 +2227,7 @@
     "termMonths": "ระยะเวลา",
     "months": "เดือน",
     "totalPaid": "ชำระแล้ว",
-    "outstanding": "ค้างชำระ",
+    "outstanding": "ยอดคงค้าง",
     "insuranceDeposit": "เงินประกัน",
     "insuranceBalance": "ยอดประกันคงเหลือ",
     "creditBalance": "เครดิตคงเหลือ",
@@ -2230,7 +2235,7 @@
     "discount": "ส่วนลด",
     "paymentProgress": "ความคืบหน้าการชำระ",
     "nextDueDate": "ครบกำหนดถัดไป",
-    "nextDueAmount": "จำนวนที่ต้องชำระ",
+    "nextDueAmount": "ค้างชำระ",
     "lastPaymentDate": "ชำระล่าสุด",
     "overdue": "ค้างชำระ",
     "installments": "งวด",
@@ -2597,7 +2602,7 @@
     "receipt_title": "ใบเสร็จรับเงิน",
     "receipt_title_credit": "ใบลดหนี้",
     "receipt_title_journal": "ใบบันทึกบัญชี",
-    "invoice_title": "ใบแจ้งหนี้",
+    "invoice_title": "ใบเรียกเก็บเงิน",
     "receipt_billNo": "เลขที่บิล",
     "receipt_date": "วันที่",
     "receipt_createdAt": "สร้าง",
@@ -2708,6 +2713,7 @@
   "workspace": {
     "cardProduct": "สินค้า + แผนผ่อน",
     "cardCustomer": "ลูกค้า",
+    "cardCommissionOwner": "เจ้าของค่าคอม",
     "cardCoLessee": "ผู้เช่าร่วม",
     "cardContactRef": "ช่องทางติดต่อ + บุคคลอ้างอิง",
     "cardDocuments": "เอกสาร",
@@ -2816,7 +2822,7 @@
     "confidenceRequired": "ต้องให้คะแนนก่อนชำระ",
     "notRated": "ยังไม่ประเมิน",
     "billPreview": "สรุปบิล",
-    "previewInvoice": "พิมพ์ใบแจ้งหนี้",
+    "previewInvoice": "พิมพ์ใบเรียกเก็บเงิน",
     "openingBill": "กำลังเปิดบิล…",
     "cart_addAccessory": "เพิ่มอุปกรณ์",
     "cart_addGift": "เพิ่มของแถม",
@@ -2861,7 +2867,8 @@
     "commissionOwnerCancel": "ยกเลิก",
     "commissionOwnerSave": "บันทึกเจ้าของ",
     "commissionOwnerPicker": "เจ้าของใหม่",
-    "commissionOwnerSaved": "เปลี่ยนเจ้าของแล้ว"
+    "commissionOwnerSaved": "เปลี่ยนเจ้าของแล้ว",
+    "commissionOwnerLocked": "เจ้าของค่าคอมจะถูกล็อกเมื่อเปิดบิลแล้ว"
   },
   "lessors": {
     "title": "ผู้ให้เช่า",
@@ -3821,6 +3828,7 @@
     "emptyThread": "ยังไม่มีข้อความ",
     "unreadBelow": "ข้อความที่ยังไม่ได้อ่าน",
     "unknownStaff": "พนักงาน",
+    "unknownCustomer": "ลูกค้า",
     "youSuffix": "(คุณ)",
     "imageMessage": "รูปภาพ",
     "you": "คุณ",

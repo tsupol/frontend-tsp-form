@@ -13,6 +13,7 @@ import { CardProductPlan } from './workspace/CardProductPlan';
 import { CardSaving } from './workspace/CardSaving';
 import { CardInsurance } from './workspace/CardInsurance';
 import { CardCustomer } from './workspace/CardCustomer';
+import { CardCommissionOwner } from './workspace/CardCommissionOwner';
 import { CardCoLessee } from './workspace/CardCoLessee';
 import { CardDocuments } from './workspace/CardDocuments';
 import { CardHandover } from './workspace/CardHandover';
@@ -24,6 +25,7 @@ import { PanelReviewPay } from './workspace/PanelReviewPay';
 import { CardPostPayment } from './workspace/CardPostPayment';
 import { PanelProductPlan } from './workspace/PanelProductPlan';
 import { PanelCustomer } from './workspace/PanelCustomer';
+import { PanelCommissionOwner } from './workspace/PanelCommissionOwner';
 import { PanelCoLessee } from './workspace/PanelCoLessee';
 import { PanelDocuments } from './workspace/PanelDocuments';
 import { PanelSaving } from './workspace/PanelSaving';
@@ -297,6 +299,7 @@ function WorkspaceContent() {
   const panelTitle: Record<string, string> = {
     productPlan: t('workspace.cardProduct'),
     customer: t('workspace.cardCustomer'),
+    commissionOwner: t('workspace.cardCommissionOwner'),
     saving: t('workspace.cardSaving'),
     insurance: t('workspace.cardInsurance'),
     contactRef: t('workspace.cardContactRef'),
@@ -402,6 +405,7 @@ function WorkspaceContent() {
                   {/* Summary rows — full-width, separated by lines (no card chrome) */}
                   <div className="flex flex-col border-t border-line">
                     <CardCustomer onEdit={() => handleEditOpen('customer')} active={isCardActive('customer')} shake={shakingCards.has('customer')} />
+                    <CardCommissionOwner onEdit={() => handleEditOpen('commissionOwner')} active={isCardActive('commissionOwner')} shake={shakingCards.has('commissionOwner')} />
                     <CardProductPlan onEdit={() => handleEditOpen('productPlan')} active={isCardActive('productPlan')} shake={shakingCards.has('productPlan')} />
                     <CardSaving onEdit={() => handleEditOpen('saving')} active={isCardActive('saving')} shake={shakingCards.has('saving')} />
                     <CardInsurance onEdit={() => handleEditOpen('insurance')} active={isCardActive('insurance')} shake={shakingCards.has('insurance')} />
@@ -436,6 +440,7 @@ function WorkspaceContent() {
                   {openModal === 'saving' && <PanelSaving onClose={handleEditClose} />}
                   {openModal === 'insurance' && <PanelInsurance onClose={handleEditClose} />}
                   {openModal === 'customer' && <PanelCustomer onClose={handleEditClose} />}
+                  {openModal === 'commissionOwner' && <PanelCommissionOwner onClose={handleEditClose} />}
                   {openModal === 'contactRef' && <PanelContactRef onClose={handleEditClose} />}
                   {openModal === 'co_lessee' && <PanelCoLessee onClose={handleEditClose} />}
                   {openModal === 'documents' && <PanelDocuments onClose={handleEditClose} />}

@@ -3,10 +3,10 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Select, MaskedInput, useSnackbarContext } from 'tsp-form';
+import { Button, Select, MaskedInput } from 'tsp-form';
 import {
   Plus, Trash2, XCircle, Loader2, CheckCircle,
-  ChevronsRight, Link2, FileText, Printer, User,
+  ChevronsRight, Link2, FileText, Printer,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { fmtCurrency } from '../../../lib/format';
@@ -16,14 +16,7 @@ import { ERROR_TO_MODAL } from './WorkspaceTypes';
 import { BranchPaymentAccountField, useBranchPaymentAccount } from '../../../components/BranchPaymentAccountField';
 import { BillReceipt, type BillDetail } from './BillReceipt';
 import { BillCart, type DraftCartLine } from './BillCart';
-import { BranchPinInput } from '../../../components/BranchPinInput';
 import { signContractOpenParties } from './signContractOpenParties';
-
-interface BranchStaffUser {
-  id: number;
-  username: string;
-  branch_id: number | null;
-}
 
 /* ─────────────────────────────────────────────────────────────────────────────
    ⚠️  ONE-GO ACTIVATION — DO NOT FIRE BILL/ACTIVATE RPCs ON MOUNT.
@@ -57,7 +50,6 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { data, updateData, contract, invalidateContract, setOpenModal } = useWorkspace();
-  const { addSnackbar } = useSnackbarContext();
 
   const savingBalance = contract?.saving_balance ?? 0;
 
@@ -141,75 +133,8 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
     }));
   };
 
-  // ── Commission owner (pre-activation reassignment) ───────────────────
-  const branchId = contract?.branch_id ?? null;
-  const ownerId = contract?.commission_owner_id ?? null;
-  const ownerName = contract?.commission_owner_name ?? null;
-
-  const [ownerEditing, setOwnerEditing] = useState(false);
-  const [ownerPick, setOwnerPick] = useState<number | null>(null);
-  const [ownerPin, setOwnerPin] = useState('');
-  const [ownerSaving, setOwnerSaving] = useState(false);
-  const [ownerError, setOwnerError] = useState('');
-
-  const { data: branchStaff } = useQuery({
-    queryKey: ['branch-staff-users', branchId],
-    queryFn: () => apiClient.get<BranchStaffUser[]>(
-      `/v_users?is_active=is.true&branch_id=eq.${branchId}&order=username`,
-    ),
-    enabled: ownerEditing && branchId != null,
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const ownerOptions = useMemo(() => (branchStaff ?? []).map(u => ({
-    value: String(u.id),
-    label: u.username,
-  })), [branchStaff]);
-
-  const openOwnerEdit = () => {
-    setOwnerPick(ownerId);
-    setOwnerPin('');
-    setOwnerError('');
-    setOwnerEditing(true);
-  };
-
-  const cancelOwnerEdit = () => {
-    setOwnerEditing(false);
-    setOwnerPick(null);
-    setOwnerPin('');
-    setOwnerError('');
-  };
-
-  const saveOwner = async () => {
-    if (!data.contractId || ownerPick == null) return;
-    setOwnerSaving(true);
-    setOwnerError('');
-    try {
-      await apiClient.rpc('fn_contract_change_draft_owner', {
-        p_contract_id: data.contractId,
-        p_new_owner_id: ownerPick,
-        p_pin: ownerPin,
-      });
-      invalidateContract();
-      cancelOwnerEdit();
-      addSnackbar({
-        message: <div className="alert alert-success"><CheckCircle size={16} /><span>{t('workspace.commissionOwnerSaved')}</span></div>,
-      });
-    } catch (err) {
-      if (err instanceof ApiError) {
-        const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
-        setOwnerError(tr || err.message);
-      } else {
-        setOwnerError(String(err));
-      }
-    } finally {
-      setOwnerSaving(false);
-    }
-  };
-
-  const ownerPickValid = ownerPick != null && ownerPick !== ownerId;
-  const canSaveOwner = ownerPickValid && ownerPin.length === 6 && !ownerSaving;
+  // Commission owner moved to its own step (CardCommissionOwner /
+  // PanelCommissionOwner) — block below Customer in the left summary.
 
   // ── Unofficial invoice print ─────────────────────────────────────────
   // No bill exists in DRAFT, so we print the staged cart through the SAME
@@ -406,64 +331,6 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
   return (
     <div className="flex flex-col h-full max-w-2xl">
       <div className="flex-1 overflow-y-auto better-scroll p-4 flex flex-col gap-5">
-
-        {/* ── Section 0: Commission owner ─────────────────────── */}
-        <div>
-          <label className="form-label">{t('workspace.commissionOwner')}</label>
-          {!ownerEditing ? (
-            <div className="flex items-center gap-3 p-3 border border-line rounded-lg">
-              <User size={16} className="text-subtle shrink-0" />
-              <div className="flex flex-col min-w-0 flex-1">
-                <div className="text-sm font-medium truncate">
-                  {ownerName
-                    ? ownerName
-                    : ownerId != null
-                      ? <span className="text-subtle font-normal">{t('workspace.commissionOwnerUnknown', { id: ownerId, defaultValue: 'user #{{id}}' })}</span>
-                      : <span className="text-subtle">{t('workspace.commissionOwnerUnset')}</span>}
-                </div>
-                <div className="text-xs text-subtle">{t('workspace.commissionOwnerHint')}</div>
-              </div>
-              <Button size="sm" variant="outline" onClick={openOwnerEdit}>
-                {t('workspace.commissionOwnerChange')}
-              </Button>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3 p-3 border border-line rounded-lg">
-              <div className="flex flex-col">
-                <label className="form-label text-xs">{t('workspace.commissionOwnerPicker')}</label>
-                <Select
-                  options={ownerOptions}
-                  value={ownerPick != null ? String(ownerPick) : null}
-                  onChange={(val) => setOwnerPick(val ? Number(val) : null)}
-                  size="sm"
-                  searchable
-                  showChevron
-                />
-              </div>
-              <BranchPinInput value={ownerPin} onChange={setOwnerPin} required />
-              {ownerError && (
-                <div className="alert alert-danger">
-                  <XCircle size={14} />
-                  <span>{ownerError}</span>
-                </div>
-              )}
-              <div className="flex justify-end gap-2">
-                <Button size="sm" variant="ghost" onClick={cancelOwnerEdit} disabled={ownerSaving}>
-                  {t('workspace.commissionOwnerCancel')}
-                </Button>
-                <Button
-                  size="sm"
-                  color="primary"
-                  onClick={saveOwner}
-                  disabled={!canSaveOwner}
-                  startIcon={ownerSaving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
-                >
-                  {t('workspace.commissionOwnerSave')}
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
 
         {/* ── Section 1: Bill / Cart ───────────────────────────── */}
         <div>

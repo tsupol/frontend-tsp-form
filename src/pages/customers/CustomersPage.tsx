@@ -47,6 +47,42 @@ interface Customer {
   is_currently_locked: boolean;
 }
 
+// Row shape from fn_customer_search — a subset of the view columns the list
+// renders, plus a per-row total_count for pagination and a masked id_number.
+interface CustomerSearchRow {
+  id: number;
+  full_name: string;
+  first_name: string;
+  last_name: string;
+  prefix: string | null;
+  tel: string | null;
+  tel2: string | null;
+  id_type: string;
+  id_number: string; // masked, e.g. 1-****-****1-52-7
+  username: string | null; // masked
+  branch_id: number;
+  is_active: boolean;
+  match_field: string;
+  relevance: number;
+  total_count: number;
+  contracts: { count: number; active_count: number; overdue_count: number; outstanding_total: number };
+}
+
+interface CustomerSearchResponse {
+  customers: CustomerSearchRow[];
+  count: number;
+  query: string;
+  limit: number;
+  offset: number;
+}
+
+// The list renders either full view rows (browse) or masked search rows.
+type CustomerListRow = Customer | CustomerSearchRow;
+
+// A search row lacks the detail-panel fields (address, dob, raw id_number),
+// so it must never be used as the detail source — guard on a browse-only field.
+const isFullCustomer = (c: CustomerListRow): c is Customer => 'date_of_birth' in c;
+
 interface CustomerAddress {
   id: number;
   customer_id: number;
@@ -162,14 +198,27 @@ export function CustomersPage() {
   }, [search]);
 
   // ── List query ──
+  // No keyword → browse the raw view (full rows, ordered). With a keyword →
+  // fn_customer_search (trigram-fuzzy on names, LIKE on id/tel). The RPC masks
+  // id_number in results; the detail panel re-fetches the full row by id from
+  // v_customers, so the unmasked value is never lost.
+  const isSearching = debouncedSearch.length >= 2;
   const { data: customersData, isFetching } = useQuery({
     queryKey: ['customers', debouncedSearch, pageIndex, pageSize],
-    queryFn: () => {
-      const params: string[] = ['order=full_name.asc'];
-      if (debouncedSearch.length >= 2) {
-        params.push(`or=(full_name.ilike.*${debouncedSearch}*,id_number.ilike.*${debouncedSearch}*,tel.ilike.*${debouncedSearch}*)`);
+    queryFn: async (): Promise<{ data: CustomerListRow[]; totalCount: number }> => {
+      if (isSearching) {
+        const res = await apiClient.rpc<CustomerSearchResponse>('fn_customer_search', {
+          p_query: debouncedSearch,
+          p_limit: pageSize,
+          p_offset: pageIndex * pageSize,
+        });
+        return { data: res.customers, totalCount: res.customers[0]?.total_count ?? res.count };
       }
-      return apiClient.getPaginated<Customer>(`/v_customers?${params.join('&')}`, { page: pageIndex + 1, pageSize });
+      const page = await apiClient.getPaginated<Customer>(
+        '/v_customers?order=full_name.asc',
+        { page: pageIndex + 1, pageSize },
+      );
+      return { data: page.data, totalCount: page.totalCount };
     },
     placeholderData: keepPreviousData,
   });
@@ -177,7 +226,9 @@ export function CustomersPage() {
   const totalCount = customersData?.totalCount ?? 0;
 
   // Fallback fetch when deep-linked customer isn't in the current list page
-  const inList = selectedId ? customers.some(c => c.id === selectedId) : false;
+  // Only a FULL row counts as "in list" — a masked search row still needs the
+  // raw re-fetch for the detail panel.
+  const inList = selectedId ? customers.some(c => c.id === selectedId && isFullCustomer(c)) : false;
   const { data: selectedFromApi } = useQuery({
     queryKey: ['customer', selectedId],
     queryFn: async () => {
@@ -190,12 +241,13 @@ export function CustomersPage() {
   return (
     <PageNav panels={['list', 'detail']} defaultPanel={selectedId ? 'detail' : 'list'} className="h-dvh">
       {({ isMobile, isRoot, goTo, goBack }) => {
-        const selected = selectedId
-          ? (customers.find(c => c.id === selectedId) ?? selectedFromApi ?? null)
-          : null;
+        // Only a full view row can drive the detail panel. A search row (masked,
+        // partial) falls through to selectedFromApi, which re-fetches the raw row.
+        const fromList = selectedId ? customers.find(c => c.id === selectedId) : null;
+        const selected = (fromList && isFullCustomer(fromList) ? fromList : null) ?? selectedFromApi ?? null;
         const detailTitle = selected?.full_name ?? t('customer.title');
 
-        const handleSelect = (c: Customer) => {
+        const handleSelect = (c: CustomerListRow) => {
           if (c.id === selectedId) return;
           setSelectedId(c.id);
           if (isMobile) goTo('detail');
@@ -263,7 +315,10 @@ export function CustomersPage() {
                             {!c.is_active && <Badge size="xs" color="default">{t('customer.inactive')}</Badge>}
                           </div>
                           <div className="text-xs text-subtle tabular-nums">
-                            {formatCid(c.id_number)} · {formatTel(c.tel)}
+                            {/* search results return a pre-masked id_number
+                                (1-****-****1-52-7); only run formatCid on the
+                                raw 13-digit form from the browse view. */}
+                            {c.id_number?.includes('*') ? c.id_number : formatCid(c.id_number)} · {formatTel(c.tel)}
                           </div>
                         </button>
                       ))}

@@ -5,6 +5,7 @@ export type ModalId =
   | 'saving'
   | 'insurance'
   | 'customer'
+  | 'commissionOwner'
   | 'contactRef'
   | 'co_lessee'
   | 'documents'

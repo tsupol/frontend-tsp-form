@@ -7,13 +7,16 @@ import {
 } from 'tsp-form';
 import { XCircle, AlertTriangle, ImageOff, ExternalLink } from 'lucide-react';
 import { apiClient, ApiError } from '../lib/api';
+import { wsClient } from '../lib/api/ws';
 import { DateTime } from './DateTime';
 import { fmtCurrency } from '../lib/format';
 import { useAuth } from '../contexts/AuthContext';
 import { MediaLightbox, MediaThumbButton } from './MediaLightbox';
 import { normalizeKey } from '../lib/mediaPath';
 
-export type SubmissionStatus = 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED';
+export type SubmissionStatus = 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+
+export type SubmitterRole = 'PRIMARY' | 'CO_LESSEE';
 
 export interface SubmissionRow {
   id: number;
@@ -48,6 +51,11 @@ export interface SubmissionRow {
   submitted_by: number | null;
   submitter_username: string | null;
   is_staff_submitted: boolean;
+  // mig 311 (2026-06-23): slip code + actual-submitter attribution.
+  code: string | null;
+  code_display: string | null;
+  // 'CO_LESSEE' when a co-lessee submitted; null/'PRIMARY' for the primary lessee.
+  submitter_role: SubmitterRole | null;
 }
 
 interface EntityMedia {
@@ -71,13 +79,18 @@ interface BankAccount {
   is_promptpay: boolean;
 }
 
-export const submissionStatusColor = (s: SubmissionStatus): 'warning' | 'success' | 'danger' => {
+export const submissionStatusColor = (s: SubmissionStatus): 'warning' | 'success' | 'danger' | 'default' => {
   switch (s) {
     case 'PENDING_REVIEW': return 'warning';
     case 'APPROVED': return 'success';
     case 'REJECTED': return 'danger';
+    case 'CANCELLED': return 'default';
   }
 };
+
+// Pill color for the submitter-role badge (mig 311). Only rendered for co-lessees.
+export const submitterRoleColor = (r: SubmitterRole): 'info' | 'default' =>
+  r === 'CO_LESSEE' ? 'info' : 'default';
 
 export function SubmissionReviewDrawer({
   row, open, onClose, onSuccess,
@@ -94,14 +107,34 @@ export function SubmissionReviewDrawer({
   const [busy, setBusy] = useState<'approve' | 'reject' | 'reopen' | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [zoomedKey, setZoomedKey] = useState<string | null>(null);
+  // Set when the customer cancels this slip while the drawer is open — the
+  // `row` prop is a snapshot, so we track the live cancel locally to disable
+  // any review actions and show a banner (slip:contract WS, mig 313).
+  const [liveCancelled, setLiveCancelled] = useState(false);
 
   useEffect(() => {
     if (open) {
       setReason('');
       setBankAccountId('');
       setErrorMessage('');
+      setLiveCancelled(false);
     }
   }, [open, row?.id]);
+
+  // Listen for a customer cancel on this open slip. The slip:contract channel
+  // emits { type: 'slip_status_changed', submission_id, status: 'CANCELLED' }.
+  const contractId = row?.contract_id ?? null;
+  const submissionId = row?.id ?? null;
+  useEffect(() => {
+    if (!open || contractId === null || submissionId === null) return;
+    const unsub = wsClient.subscribe(`slip:contract:${contractId}`, (raw) => {
+      const p = raw as { type?: string; submission_id?: number; status?: string };
+      if (p?.type === 'slip_status_changed' && p.submission_id === submissionId && p.status === 'CANCELLED') {
+        setLiveCancelled(true);
+      }
+    });
+    return unsub;
+  }, [open, contractId, submissionId]);
 
   const { data: slipMedia = [], isFetching: slipsFetching } = useQuery({
     queryKey: ['payment-submission-slips', row?.id],
@@ -140,9 +173,11 @@ export function SubmissionReviewDrawer({
     );
   }
 
-  const isPending = row.status === 'PENDING_REVIEW';
-  const isRejected = row.status === 'REJECTED';
-  const allowed = row.allowed_actions ?? [];
+  // A live cancel (or a row that loaded already-cancelled) blocks all actions.
+  const effectiveStatus: SubmissionStatus = liveCancelled ? 'CANCELLED' : row.status;
+  const isPending = effectiveStatus === 'PENDING_REVIEW';
+  const isRejected = effectiveStatus === 'REJECTED';
+  const allowed = liveCancelled ? [] : (row.allowed_actions ?? []);
   const canApprove = allowed.includes('APPROVE');
   const canReject = allowed.includes('REJECT');
   const canReopen = allowed.includes('REOPEN');
@@ -204,9 +239,12 @@ export function SubmissionReviewDrawer({
         <div className="drawer-content">
           <div className="space-y-4">
             <div className="flex items-center gap-2 flex-wrap">
-              <Badge size="sm" color={submissionStatusColor(row.status)}>
-                {t(`paymentSubmissions.status_${row.status}`)}
+              <Badge size="sm" color={submissionStatusColor(effectiveStatus)}>
+                {t(`paymentSubmissions.status_${effectiveStatus}`)}
               </Badge>
+              {row.code_display && (
+                <Badge size="sm" color="default" className="tabular-nums">{row.code_display}</Badge>
+              )}
               {row.submit_channel && (
                 <Badge size="sm" color="default">{row.submit_channel}</Badge>
               )}
@@ -214,6 +252,13 @@ export function SubmissionReviewDrawer({
                 <Badge size="sm" color="info">{row.ocr_source}</Badge>
               )}
             </div>
+
+            {liveCancelled && (
+              <div className="alert alert-warning">
+                <AlertTriangle size={16} />
+                <div><div className="alert-description text-xs">{t('paymentSubmissions.cancelledByCustomer')}</div></div>
+              </div>
+            )}
 
             <div>
               <div className="form-label mb-1">{t('paymentSubmissions.slipImage')}</div>
@@ -257,7 +302,16 @@ export function SubmissionReviewDrawer({
                   <ExternalLink size={12} />
                 </Link>
               </DetailRow>
-              <DetailRow label={t('paymentSubmissions.customer')} value={row.customer_name ?? '—'} />
+              <DetailRow label={t('paymentSubmissions.customer')}>
+                <span className="text-right inline-flex items-center gap-1.5 flex-wrap justify-end">
+                  <span>{row.customer_name ?? '—'}</span>
+                  {row.submitter_role === 'CO_LESSEE' && (
+                    <Badge size="xs" color={submitterRoleColor('CO_LESSEE')}>
+                      {t('paymentSubmissions.submitterRole_CO_LESSEE')}
+                    </Badge>
+                  )}
+                </span>
+              </DetailRow>
               <DetailRow label={t('paymentSubmissions.customerTel')} value={row.customer_tel ?? '—'} />
               <DetailRow label={t('paymentSubmissions.branch')} value={row.branch_name ?? '—'} />
               <hr className="border-line my-2" />
