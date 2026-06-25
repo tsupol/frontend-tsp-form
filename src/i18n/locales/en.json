@@ -303,7 +303,7 @@
     "fin2Rates": "FIN2 Rates",
     "discountPolicies": "Discount Policies",
     "discountApprovals": "Discount Approvals",
-    "dealPartnerRates": "Deal Partner Rates",
+    "dealPartnerRates": "Partner Rates",
     "inventory": "Inventory",
     "stock": "Stock Dashboard",
     "lots": "Lots",
@@ -335,7 +335,6 @@
     "dunningConfig": "Dunning Config",
     "blacklist": "Blacklist",
     "icloud": "iCloud Pool",
-    "dealPartnerRates": "Partner Rates",
     "branchPin": "Branch PIN",
     "lessors": "Lessors",
     "branchSigners": "Branch signers",
@@ -393,28 +392,28 @@
     "missingFieldTooltip": "Backend not sending {{field}} yet",
     "actorBy": "by {{name}}",
     "event": {
-      "chat_to_staff":                       "Chat [waiting reply]",
-      "chat_status_attention":               "Chat [needs attention]",
+      "chat_to_staff": "Chat [waiting reply]",
+      "chat_status_attention": "Chat [needs attention]",
       "chat_status_attention.pending_reply": "Chat [waiting reply]",
-      "chat_status_attention.pending_tech":  "Chat [waiting tech]",
-      "chat_status_attention.pending_finance":"Chat [waiting finance]",
-      "chat_status_attention.pinned":        "Chat [pinned]",
-      "signing_required":                    "Signing required",
-      "signing_required_staff":              "Signing required",
-      "signing_voided_auto":                 "Signing voided",
-      "signing_voided_auto_staff":           "Signing voided",
-      "signing_voided_manual":               "Signing voided",
-      "signing_voided_manual_staff":         "Signing voided",
-      "signing_sealed_primary_swap_staff":   "Lessee changed",
-      "signing_sealed_add_colessee_staff":  "Co-lessee added",
-      "signing_sealed_remove_colessee_staff":"Co-lessee removed",
-      "signing_sealed_bind_staff":           "Device bound",
-      "slip_uploaded":                       "Slip uploaded [to review]",
-      "bill_paid_staff":                     "Bill paid",
-      "bill_voided_staff":                   "Bill voided"
+      "chat_status_attention.pending_tech": "Chat [waiting tech]",
+      "chat_status_attention.pending_finance": "Chat [waiting finance]",
+      "chat_status_attention.pinned": "Chat [pinned]",
+      "signing_required": "Signing required",
+      "signing_required_staff": "Signing required",
+      "signing_voided_auto": "Signing voided",
+      "signing_voided_auto_staff": "Signing voided",
+      "signing_voided_manual": "Signing voided",
+      "signing_voided_manual_staff": "Signing voided",
+      "signing_sealed_primary_swap_staff": "Lessee changed",
+      "signing_sealed_add_colessee_staff": "Co-lessee added",
+      "signing_sealed_remove_colessee_staff": "Co-lessee removed",
+      "signing_sealed_bind_staff": "Device bound",
+      "slip_uploaded": "Slip uploaded [to review]",
+      "bill_paid_staff": "Bill paid",
+      "bill_voided_staff": "Bill voided"
     },
     "signingType": {
-      "ADDENDUM":      "addendum",
+      "ADDENDUM": "addendum",
       "FULL_CONTRACT": "full contract"
     },
     "tab": {
@@ -1745,7 +1744,18 @@
     "seller": "Seller",
     "totalItems": "Total Items",
     "totalAmount": "Total Amount",
-    "condition": "Condition",
+    "condition": {
+      "EXCELLENT": "Excellent",
+      "GOOD": "Good",
+      "FAIR": "Fair",
+      "POOR": "Poor",
+      "NO_DAMAGE": "No damage",
+      "MINOR": "Minor scratches",
+      "MODERATE": "Moderate dents",
+      "MAJOR": "Major damage",
+      "CRACKED": "Cracked",
+      "BROKEN": "Broken"
+    },
     "poNo": "Buyback No.",
     "note": "Note",
     "notePlaceholder": "Optional note...",
@@ -1799,18 +1809,6 @@
       "BATTERY_HEALTH": "Battery health",
       "CONDITION_NOTES": "Notes",
       "CONNECTIVITY": "Connectivity"
-    },
-    "condition": {
-      "EXCELLENT": "Excellent",
-      "GOOD": "Good",
-      "FAIR": "Fair",
-      "POOR": "Poor",
-      "NO_DAMAGE": "No damage",
-      "MINOR": "Minor scratches",
-      "MODERATE": "Moderate dents",
-      "MAJOR": "Major damage",
-      "CRACKED": "Cracked",
-      "BROKEN": "Broken"
     },
     "grade": {
       "NEW": "New",
@@ -2301,7 +2299,6 @@
     "relation": "Relation",
     "code": "Contract Code",
     "progress": "Progress",
-    "saved": "Saved",
     "ageDays": "Age (days)",
     "savingDescription": "Saving contracts with deposit progress tracking",
     "noPendingPayment": "No contracts awaiting payment.",
@@ -2432,7 +2429,6 @@
     },
     "voidBill_warning": "This will void bill {{code}} ({{amount}}) and return the contract to DRAFT.",
     "selectCloseReason": "Select close reason",
-    "amount": "Amount",
     "toBranch": "Transfer to Branch",
     "selectBranch": "Select branch",
     "selectDevice": "Select device",
@@ -3877,7 +3873,6 @@
     "slipSubmitted": "Slip submitted",
     "slipStaffSubmitted": "By staff",
     "slipRejectReason": "Reason",
-
     "emoji": {
       "button": "Emoji",
       "searchPlaceholder": "Search emoji",
@@ -3890,7 +3885,6 @@
         "objects": "Objects"
       }
     },
-
     "status": {
       "WAITING_REPLY": "Waiting reply",
       "RESOLVED": "Resolved",
@@ -3948,5 +3942,26 @@
       "systemElevate": "Set Waiting reply (customer sent a message)",
       "systemClear": "Cleared (Resolved over 5 minutes)"
     }
+  },
+  "contractFee": {
+    "title": "Open service / fee bill",
+    "done": "Service / fee bill created",
+    "linesLabel": "Charges",
+    "emptyCart": "No charges yet — add a line below",
+    "addLine": "Add charge",
+    "lineDescription": "Description",
+    "owner_COMPANY": "Company",
+    "owner_HOLDING": "Holding",
+    "companySubtotal": "Company subtotal",
+    "holdingSubtotal": "Holding subtotal",
+    "paymentsLabel": "Payment",
+    "balance": "Balance",
+    "paid": "Paid",
+    "total": "Total",
+    "confirm": "Confirm & collect",
+    "blockEmptyCart": "Add at least one charge",
+    "blockUnbalanced": "Payment total must equal the bill total",
+    "blockNoBank": "Select a receiving account for the transfer",
+    "blockWalletInsufficient": "{{method}} balance is not enough"
   }
 }

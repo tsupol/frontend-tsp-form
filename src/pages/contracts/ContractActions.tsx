@@ -37,6 +37,7 @@ import { AppointmentCreateModal, AppointmentCancelModal } from './AppointmentMod
 import { RefundVoidModal } from './RefundVoidModal';
 import { TransferBranchModal } from './TransferBranchModal';
 import { ActionDoneView, type ActionDoneDetailRow } from './ActionDoneView';
+import { ContractFeeModal } from './ContractFeeModal';
 import { useContractInvalidate } from './useContractInvalidate';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -96,7 +97,8 @@ type ContractAction =
   | 'saving_deposit'
   | 'void_bill'
   | 'continue_pay'
-  | 'pay_installment';
+  | 'pay_installment'
+  | 'service_charge';
 
 // ── Action config ────────────────────────────────────────────────────────────
 
@@ -388,6 +390,19 @@ const ACTION_CONFIGS: Record<ContractAction, ActionConfig> = {
     needsNewOwner: false,
     successKey: 'contract.action_pay_installment_success',
   },
+  service_charge: {
+    rpc: '', // handled by ContractFeeModal (multi-step cart)
+    color: 'primary',
+    needsPin: false,
+    needsNote: false,
+    needsReason: false,
+    needsBranch: false,
+    needsDevice: false,
+    needsAmount: false,
+    needsCloseReason: false,
+    needsNewOwner: false,
+    successKey: 'contractFee.done',
+  },
   bind_loaner: {
     rpc: '', // handled by BindLoanerModal
     color: 'primary',
@@ -546,6 +561,7 @@ const FE_TO_BACKEND_ACTION: Record<ContractAction, string> = {
   void_bill: '',           // no backend equivalent — keep FE-only behavior
   continue_pay: 'PAY_OPEN_BILL',
   pay_installment: 'PAY_INSTALLMENT',
+  service_charge: 'SERVICE_CHARGE',
 };
 
 const BACKEND_TO_FE_ACTION: Record<string, ContractAction> = Object.entries(FE_TO_BACKEND_ACTION)
@@ -765,6 +781,7 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   const isAppointmentCancel = activeAction === 'appointment_cancel';
   const isRefundVoid = activeAction === 'settlement_refund_void';
   const isTransferBranch = activeAction === 'transfer_branch';
+  const isServiceCharge = activeAction === 'service_charge';
 
   const handleSuccess = (msgKey: string, override?: ReactNode) => {
     setActiveAction(null);
@@ -1089,8 +1106,17 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
         contract={contract}
         onClose={() => setActiveAction(null)}
       />
+      <ContractFeeModal
+        open={isServiceCharge}
+        contract={contract}
+        onClose={() => setActiveAction(null)}
+        onSuccess={() => {
+          onRefresh();
+          queryClient.invalidateQueries({ queryKey: ['contract-actions', contract.id] });
+        }}
+      />
       <ContractActionModal
-        open={!!activeAction && !isSavingDeposit && !isCancelSaving && !isEarlyPayoff && !isContinuePay && !isVoidBill && !isPayInstallment && !isComplete && !isTerminate && !isBindLoaner && !isUnbindLoaner && !isRepairRequest && !isAppointmentCreate && !isAppointmentCancel && !isRefundVoid && !isTransferBranch}
+        open={!!activeAction && !isSavingDeposit && !isCancelSaving && !isEarlyPayoff && !isContinuePay && !isVoidBill && !isPayInstallment && !isComplete && !isTerminate && !isBindLoaner && !isUnbindLoaner && !isRepairRequest && !isAppointmentCreate && !isAppointmentCancel && !isRefundVoid && !isTransferBranch && !isServiceCharge}
         action={activeAction}
         contract={contract}
         onClose={() => setActiveAction(null)}

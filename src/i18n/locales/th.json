@@ -302,7 +302,7 @@
     "fin2Rates": "อัตรา FIN2",
     "discountPolicies": "นโยบายส่วนลด",
     "discountApprovals": "อนุมัติส่วนลด",
-    "dealPartnerRates": "อัตรา Deal Partner",
+    "dealPartnerRates": "อัตราพาร์ทเนอร์",
     "inventory": "คลังสินค้า",
     "stock": "ภาพรวมสต็อก",
     "lots": "Lot",
@@ -334,7 +334,6 @@
     "dunningConfig": "ตั้งค่าระบบทวง",
     "blacklist": "บัญชีดำ",
     "icloud": "iCloud Pool",
-    "dealPartnerRates": "อัตราพาร์ทเนอร์",
     "branchPin": "PIN สาขา",
     "lessors": "ผู้ให้เช่า",
     "branchSigners": "ผู้ลงนามประจำสาขา",
@@ -392,28 +391,28 @@
     "missingFieldTooltip": "Backend ยังไม่ส่ง {{field}}",
     "actorBy": "โดย {{name}}",
     "event": {
-      "chat_to_staff":                       "แชท [รอตอบ]",
-      "chat_status_attention":               "แชท [ต้องการความสนใจ]",
+      "chat_to_staff": "แชท [รอตอบ]",
+      "chat_status_attention": "แชท [ต้องการความสนใจ]",
       "chat_status_attention.pending_reply": "แชท [รอตอบ]",
-      "chat_status_attention.pending_tech":  "แชท [รอฝ่ายเทคนิค]",
-      "chat_status_attention.pending_finance":"แชท [รอฝ่ายการเงิน]",
-      "chat_status_attention.pinned":        "แชท [มีการปักหมุด]",
-      "signing_required":                    "มีเอกสารรอเซ็น",
-      "signing_required_staff":              "มีเอกสารรอเซ็น",
-      "signing_voided_auto":                 "ยกเลิกเอกสาร",
-      "signing_voided_auto_staff":           "ยกเลิกเอกสาร",
-      "signing_voided_manual":               "ยกเลิกเอกสาร",
-      "signing_voided_manual_staff":         "ยกเลิกเอกสาร",
-      "signing_sealed_primary_swap_staff":   "เปลี่ยนผู้เช่า",
-      "signing_sealed_add_colessee_staff":  "เพิ่มผู้เช่าร่วม",
-      "signing_sealed_remove_colessee_staff":"ลบผู้เช่าร่วม",
-      "signing_sealed_bind_staff":           "ผูกเครื่อง",
-      "slip_uploaded":                       "มีสลิปเข้า [รอตรวจ]",
-      "bill_paid_staff":                     "บิล [ชำระแล้ว]",
-      "bill_voided_staff":                   "บิล [ยกเลิก]"
+      "chat_status_attention.pending_tech": "แชท [รอฝ่ายเทคนิค]",
+      "chat_status_attention.pending_finance": "แชท [รอฝ่ายการเงิน]",
+      "chat_status_attention.pinned": "แชท [มีการปักหมุด]",
+      "signing_required": "มีเอกสารรอเซ็น",
+      "signing_required_staff": "มีเอกสารรอเซ็น",
+      "signing_voided_auto": "ยกเลิกเอกสาร",
+      "signing_voided_auto_staff": "ยกเลิกเอกสาร",
+      "signing_voided_manual": "ยกเลิกเอกสาร",
+      "signing_voided_manual_staff": "ยกเลิกเอกสาร",
+      "signing_sealed_primary_swap_staff": "เปลี่ยนผู้เช่า",
+      "signing_sealed_add_colessee_staff": "เพิ่มผู้เช่าร่วม",
+      "signing_sealed_remove_colessee_staff": "ลบผู้เช่าร่วม",
+      "signing_sealed_bind_staff": "ผูกเครื่อง",
+      "slip_uploaded": "มีสลิปเข้า [รอตรวจ]",
+      "bill_paid_staff": "บิล [ชำระแล้ว]",
+      "bill_voided_staff": "บิล [ยกเลิก]"
     },
     "signingType": {
-      "ADDENDUM":      "เพิ่มเติม",
+      "ADDENDUM": "เพิ่มเติม",
       "FULL_CONTRACT": "ฉบับเต็ม"
     },
     "tab": {
@@ -1744,7 +1743,18 @@
     "seller": "ผู้ขาย",
     "totalItems": "จำนวนรวม",
     "totalAmount": "มูลค่ารวม",
-    "condition": "สภาพ",
+    "condition": {
+      "EXCELLENT": "ดีเยี่ยม",
+      "GOOD": "ดี",
+      "FAIR": "พอใช้",
+      "POOR": "ไม่ดี",
+      "NO_DAMAGE": "ไม่มีตำหนิ",
+      "MINOR": "รอยขีดข่วนเล็กน้อย",
+      "MODERATE": "รอยบุบปานกลาง",
+      "MAJOR": "เสียหายมาก",
+      "CRACKED": "ร้าว",
+      "BROKEN": "แตก"
+    },
     "poNo": "เลขที่รับซื้อคืน",
     "note": "หมายเหตุ",
     "notePlaceholder": "หมายเหตุ (ไม่บังคับ)...",
@@ -1798,18 +1808,6 @@
       "BATTERY_HEALTH": "สุขภาพแบตเตอรี่",
       "CONDITION_NOTES": "หมายเหตุ",
       "CONNECTIVITY": "การเชื่อมต่อ"
-    },
-    "condition": {
-      "EXCELLENT": "ดีเยี่ยม",
-      "GOOD": "ดี",
-      "FAIR": "พอใช้",
-      "POOR": "ไม่ดี",
-      "NO_DAMAGE": "ไม่มีตำหนิ",
-      "MINOR": "รอยขีดข่วนเล็กน้อย",
-      "MODERATE": "รอยบุบปานกลาง",
-      "MAJOR": "เสียหายมาก",
-      "CRACKED": "ร้าว",
-      "BROKEN": "แตก"
     },
     "grade": {
       "NEW": "ใหม่",
@@ -2146,7 +2144,7 @@
     "noCustomer": "ไม่มีลูกค้า",
     "overdueN": "ค้าง {{count}} งวด",
     "savingBadge": "ออม {{amount}}",
-    "saved": "ออม",
+    "saved": "ออมแล้ว",
     "showingCount": "{{count}} สัญญา",
     "paused": "พักงวด",
     "tab_overview": "ภาพรวม",
@@ -2300,12 +2298,11 @@
     "relation": "ความสัมพันธ์",
     "code": "รหัสสัญญา",
     "progress": "ความคืบหน้า",
-    "saved": "ออมแล้ว",
     "ageDays": "อายุ (วัน)",
     "savingDescription": "สัญญาออมพร้อมติดตามความคืบหน้า",
     "noPendingPayment": "ไม่มีสัญญาที่รอชำระเงิน",
     "due": "กำหนด",
-    "amount": "จำนวน",
+    "amount": "จำนวนเงิน",
     "paid": "ชำระ",
     "dueDate": "วันครบกำหนด",
     "dueAmount": "จำนวนที่ต้องชำระ",
@@ -2431,7 +2428,6 @@
     },
     "voidBill_warning": "ยกเลิกบิล {{code}} ({{amount}}) และคืนสัญญากลับเป็นสถานะร่าง",
     "selectCloseReason": "เลือกเหตุผลการปิด",
-    "amount": "จำนวนเงิน",
     "toBranch": "โอนไปสาขา",
     "selectBranch": "เลือกสาขา",
     "selectDevice": "เลือกเครื่อง",
@@ -3876,7 +3872,6 @@
     "slipSubmitted": "ส่งสลิป",
     "slipStaffSubmitted": "ส่งโดยพนักงาน",
     "slipRejectReason": "เหตุผล",
-
     "emoji": {
       "button": "อิโมจิ",
       "searchPlaceholder": "ค้นหาอิโมจิ",
@@ -3889,7 +3884,6 @@
         "objects": "สิ่งของ"
       }
     },
-
     "status": {
       "WAITING_REPLY": "รอตอบ",
       "RESOLVED": "เรียบร้อยแล้ว",
@@ -3947,5 +3941,26 @@
       "systemElevate": "ตั้ง รอตอบ (ลูกค้าส่งข้อความ)",
       "systemClear": "ล้าง flag (เรียบร้อยเกิน 5 นาที)"
     }
+  },
+  "contractFee": {
+    "title": "เปิดบิลค่าปรับ/บริการ",
+    "done": "เปิดบิลค่าปรับ/บริการแล้ว",
+    "linesLabel": "รายการเรียกเก็บ",
+    "emptyCart": "ยังไม่มีรายการ — เพิ่มด้านล่าง",
+    "addLine": "เพิ่มรายการ",
+    "lineDescription": "รายละเอียด",
+    "owner_COMPANY": "บริษัท",
+    "owner_HOLDING": "โฮลดิ้ง",
+    "companySubtotal": "ยอดฝั่งบริษัท",
+    "holdingSubtotal": "ยอดฝั่งโฮลดิ้ง",
+    "paymentsLabel": "การชำระเงิน",
+    "balance": "คงเหลือ",
+    "paid": "ชำระแล้ว",
+    "total": "รวม",
+    "confirm": "ยืนยันและรับชำระ",
+    "blockEmptyCart": "เพิ่มรายการอย่างน้อย 1 รายการ",
+    "blockUnbalanced": "ยอดชำระต้องเท่ากับยอดบิล",
+    "blockNoBank": "เลือกบัญชีรับเงินสำหรับการโอน",
+    "blockWalletInsufficient": "ยอด {{method}} ไม่เพียงพอ"
   }
 }
