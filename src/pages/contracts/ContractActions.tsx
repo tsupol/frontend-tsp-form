@@ -2573,6 +2573,7 @@ function PayInstallmentModal({ open, contract, onClose }: {
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
   const [errorKey, setErrorKey] = useState(0);
+  const contentRef = useRef<HTMLDivElement>(null);
   const [result, setResult] = useState<PayInstallmentResult | null>(null);
   /** R2 key of the slip the user uploaded in this modal session, before fn_media_attach. */
   const [slipKey, setSlipKey] = useState<string | null>(null);
@@ -2587,8 +2588,14 @@ function PayInstallmentModal({ open, contract, onClose }: {
     totalInstallments: number;
   } | null>(null);
 
+  // Reset ONLY on the closed→open transition. Keying this on nextDue/outstanding
+  // too made it re-run after a successful payment: onSuccess invalidates the
+  // contract, the refetched outstanding/nextDue change, the effect fires again
+  // while still open, and setView('form') wiped the just-shown done view — the
+  // "flash success then back to form" bug. A ref pins the reset to the open edge.
+  const wasOpen = useRef(false);
   useEffect(() => {
-    if (open) {
+    if (open && !wasOpen.current) {
       const defaultAmount = nextDue > 0 ? nextDue : (outstanding > 0 ? outstanding : 0);
       setAmount(defaultAmount > 0 ? String(defaultAmount) : '');
       setChannel('CASH');
@@ -2604,6 +2611,7 @@ function PayInstallmentModal({ open, contract, onClose }: {
       setSlipPreviewUrl(null);
       setSlipUploading(false);
     }
+    wasOpen.current = open;
   }, [open, nextDue, outstanding]);
 
   const setApiError = (err: unknown) => {
@@ -2616,6 +2624,13 @@ function PayInstallmentModal({ open, contract, onClose }: {
     }
     setErrorKey(k => k + 1);
   };
+
+  // The alert renders at the top of the scrollable body. If the user submitted
+  // while scrolled down (long form), the error would land off-screen and look
+  // like nothing happened — scroll the body back up so the error is always seen.
+  useEffect(() => {
+    if (error) contentRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [errorKey, error]);
 
   // Existing slip count drives the next ALBUM idx + sort_order.
   const { data: slipCount = 0 } = useQuery({
@@ -2806,11 +2821,16 @@ function PayInstallmentModal({ open, contract, onClose }: {
           </div>
 
           {view === 'form' && (
-            <div className="modal-content">
+            <div className="modal-content" ref={contentRef}>
               {error && (
-                <div key={errorKey} className="alert alert-danger mb-4 animate-pop-in">
-                  <XCircle size={16} />
-                  <span>{error}</span>
+                <div
+                  key={errorKey}
+                  className="animate-pop-in sticky -top-4 z-10 -mx-4 -mt-4 mb-4 bg-surface px-4 pt-4"
+                >
+                  <div className="alert alert-danger">
+                    <XCircle size={16} />
+                    <span>{error}</span>
+                  </div>
                 </div>
               )}
 

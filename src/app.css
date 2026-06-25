@@ -310,13 +310,21 @@ input[type="number"
         height: auto !important;
     }
     /* Bill receipt print — only applies when the print handler has added the
-       `printing-bill` class to <body> (see src/lib/printDoc.ts). We hide the
-       app root (#root) and let the off-screen print portal — the only other
-       direct body child — be the sole printed content. A plain body class is
-       used instead of `body:has(.bill-receipt)` because iOS Safari does NOT
-       evaluate `:has()` during print, which made the whole app print on iPad. */
-    body.printing-bill #root {
+       `printing-bill` class to <body> (see src/lib/printDoc.ts). A plain body
+       class is used instead of `body:has(.bill-receipt)` because iOS Safari does
+       NOT evaluate `:has()` during print, which made the whole app print on iPad.
+
+       We hide EVERY direct child of <body>, then re-show only the print portal.
+       Hiding just #root is not enough: the tsp-form Modal portals its own mount
+       node to <body> (a sibling of #root), so a receipt printed from inside an
+       open Modal (ActionDoneView, PayInstallment done view) would otherwise print
+       the modal on top of the receipt. Hiding all body children + re-showing the
+       portal isolates the receipt regardless of what else is mounted on body. */
+    body.printing-bill > * {
         display: none !important;
+    }
+    body.printing-bill .print-only-receipt {
+        display: contents !important;
     }
     .bill-receipt {
         margin: 0 !important;
@@ -339,14 +347,20 @@ input[type="number"
        Isolation matches the bill pattern (body class, not :has — iOS Safari).
        @page size is injected dynamically by the print handler so we don't
        fight the bill receipt's @page. */
-    body.printing-barcode-sticker #root {
+    body.printing-barcode-sticker > * {
         display: none !important;
+    }
+    body.printing-barcode-sticker .print-only-sticker {
+        display: contents !important;
     }
 
     /* Asset sticker print — XP-420B label printer, 75×25mm.
        Same pattern as the barcode sticker; @page injected dynamically. */
-    body.printing-asset-sticker #root {
+    body.printing-asset-sticker > * {
         display: none !important;
+    }
+    body.printing-asset-sticker .print-only-asset-sticker {
+        display: contents !important;
     }
     .asset-sticker, .barcode-sticker {
         margin: 0 !important;
@@ -367,8 +381,11 @@ input[type="number"
     /* Signing detail document print — 80mm thermal, same as the bill receipt.
        Isolation (body class, not :has — iOS Safari) + @page (80mm auto, the
        default) match the bill pattern. */
-    body.printing-signing-detail #root {
+    body.printing-signing-detail > * {
         display: none !important;
+    }
+    body.printing-signing-detail .print-only-signing-detail {
+        display: contents !important;
     }
     .signing-detail-print {
         width: 72mm;
