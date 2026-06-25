@@ -8,7 +8,38 @@ import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
 import { ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+// pdf.js v6 calls new TC39 methods (Map.prototype.getOrInsertComputed,
+// Math.sumPrecise) in BOTH the main thread and the worker. iPad Safari ≤18.5
+// lacks them → blank-white pages (getOrInsertComputed) and substituted fonts
+// with mis-stacked Thai marks (sumPrecise throws during font parse, so pdf.js
+// falls back off the embedded Sarabun). The main thread is polyfilled in
+// main.tsx (lib/pdfjsPolyfills); the worker is a separate realm, so inject the
+// same shims ahead of the real worker via a Blob module that imports it, then
+// point workerSrc at the Blob. Absolute URL so the worker's import resolves
+// regardless of the Blob's origin.
+function makePolyfilledWorkerSrc(realWorkerUrl: string): string {
+  const absolute = new URL(realWorkerUrl, location.href).href;
+  const shim =
+    `function d(p){if(typeof p.getOrInsertComputed==='function')return;` +
+    `Object.defineProperty(p,'getOrInsertComputed',{value:function(k,f){` +
+    `if(this.has(k))return this.get(k);const v=f(k);this.set(k,v);return v;},` +
+    `writable:true,configurable:true});}` +
+    `d(Map.prototype);d(WeakMap.prototype);` +
+    `if(typeof Math.sumPrecise!=='function'){Math.sumPrecise=function(it){var s=0;for(var v of it)s+=v;return s;};}` +
+    `import(${JSON.stringify(absolute)});`;
+  return URL.createObjectURL(new Blob([shim], { type: 'text/javascript' }));
+}
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = makePolyfilledWorkerSrc(workerSrc);
+
+// pdf.js v6 needs explicit URLs for its CMap / standard-font / wasm assets;
+// the bare-string defaults ("CMap"/"font"/"wasm") don't resolve under a bundler.
+// Copied from node_modules/pdfjs-dist into public/pdfjs/ by the pdfjs:assets npm
+// script (postinstall + build), so they're served at the app root.
+const PDFJS_ASSET_BASE = '/pdfjs/';
+const CMAP_URL = `${PDFJS_ASSET_BASE}cmaps/`;
+const STANDARD_FONT_URL = `${PDFJS_ASSET_BASE}standard_fonts/`;
+const WASM_URL = `${PDFJS_ASSET_BASE}wasm/`;
 
 interface Props {
   src: string;
@@ -34,7 +65,13 @@ export function PdfCanvasViewer({ src, className, loadingText, errorText }: Prop
 
   useEffect(() => {
     let cancelled = false;
-    const task = pdfjsLib.getDocument({ url: src });
+    const task = pdfjsLib.getDocument({
+      url: src,
+      cMapUrl: CMAP_URL,
+      cMapPacked: true,
+      standardFontDataUrl: STANDARD_FONT_URL,
+      wasmUrl: WASM_URL,
+    });
     let loaded: PDFDocumentProxy | null = null;
     setLoadError(null);
     setDoc(null);

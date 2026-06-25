@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "bake:emoji": "node scripts/bakeEmojiKeywords.mjs",
-    "build": "tsc -b && vite build",
+    "pdfjs:assets": "node scripts/copyPdfjsAssets.mjs",
+    "postinstall": "node scripts/copyPdfjsAssets.mjs",
+    "build": "node scripts/copyPdfjsAssets.mjs && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
