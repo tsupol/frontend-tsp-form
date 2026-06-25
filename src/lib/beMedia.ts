@@ -126,19 +126,29 @@ export async function beMediaUploadFromImage(
 //
 // NOTE: success is raw application/pdf, NOT the {ok,data} envelope — so this
 // does not go through `call()`. Errors come back as {ok:false,error:{code}}.
+// Single-doc preview kind (no snapshot needed — rendered from live data).
+export type BeMediaContractDoc = 'contract' | 'addendum_colessee' | 'addendum_device';
+
 export interface BeMediaContractPdfOpts {
   contractId: number;
+  // signingId → a specific signed/sealed snapshot (final doc).
   signingId?: number;
+  // doc → pre-signing preview of one doc kind from live data. When set,
+  // signingId is ignored server-side and the render is always a SAMPLE preview.
+  doc?: BeMediaContractDoc;
+  // Only for doc='addendum_colessee' — which co-lessee to render (default =
+  // newest co-lessee on the contract).
+  coLesseeCustomerId?: number;
 }
 
-export async function beMediaContractPdf(opts: BeMediaContractPdfOpts): Promise<Blob> {
+// Shared POST → application/pdf helper. `path` is appended to BE_MEDIA_URL;
+// `body` is sent as JSON. Errors come back as {ok:false,error:{code}}.
+async function postContractPdf(path: string, body: Record<string, unknown>): Promise<Blob> {
   const t = token();
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (t) headers['Authorization'] = `Bearer ${t}`;
-  const body: Record<string, number> = { contract_id: opts.contractId };
-  if (opts.signingId != null) body.signing_id = opts.signingId;
 
-  const res = await fetch(`${BE_MEDIA_URL}/contract/pdf`, {
+  const res = await fetch(`${BE_MEDIA_URL}${path}`, {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
@@ -156,6 +166,34 @@ export async function beMediaContractPdf(opts: BeMediaContractPdfOpts): Promise<
     throw new BeMediaError(code, message || `contract pdf ${res.status}`, res.status);
   }
   return res.blob();
+}
+
+export async function beMediaContractPdf(opts: BeMediaContractPdfOpts): Promise<Blob> {
+  const body: Record<string, unknown> = { contract_id: opts.contractId };
+  if (opts.doc) {
+    // Pre-signing preview path: doc wins, signing_id ignored server-side.
+    body.doc = opts.doc;
+    if (opts.doc === 'addendum_colessee' && opts.coLesseeCustomerId != null) {
+      body.co_lessee_customer_id = opts.coLesseeCustomerId;
+    }
+  } else if (opts.signingId != null) {
+    body.signing_id = opts.signingId;
+  }
+  return postContractPdf('/contract/pdf', body);
+}
+
+// Combined packet — everything the customer will SIGN, all as SAMPLE previews
+// (full lease → one co-lessee addendum per co-lessee → device addendum). Built
+// from live contract data; no snapshots required. Used in the new-contract
+// wizard (admin/contracts/new), NOT on the existing-contract detail page.
+export async function beMediaContractPreviewAll(contractId: number): Promise<Blob> {
+  return postContractPdf('/contract/pdf/preview-all', { contract_id: contractId });
+}
+
+// Combined packet — every SEALED signing in one PDF (full contract first, then
+// by sealed_at). 404 CONTRACT.NOT_FOUND.NO_SEALED_DOCS if nothing sealed yet.
+export async function beMediaContractPrintAll(contractId: number): Promise<Blob> {
+  return postContractPdf('/contract/pdf/print-all', { contract_id: contractId });
 }
 
 // Batch delete. Failures (per-key) come back in `failed`; harmless — the

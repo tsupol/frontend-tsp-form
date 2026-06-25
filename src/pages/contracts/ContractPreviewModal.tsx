@@ -8,21 +8,39 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Button } from 'tsp-form';
 import { Loader2, X, AlertTriangle, PenLine } from 'lucide-react';
-import { beMediaContractPdf, BeMediaError } from '../../lib/beMedia';
+import {
+  beMediaContractPdf,
+  beMediaContractPreviewAll,
+  beMediaContractPrintAll,
+  BeMediaError,
+  type BeMediaContractDoc,
+} from '../../lib/beMedia';
 import type { ContractMin } from '../../lib/contractPdf/contractMin';
 import { PdfCanvasViewer } from '../../components/PdfCanvasViewer';
+
+// Which document to render in the viewer. Defaults to previewAll (the wizard
+// "read before you sign" packet) when omitted.
+export interface PreviewTarget {
+  previewAll?: boolean;
+  printAll?: boolean;
+  signingId?: number;
+  doc?: BeMediaContractDoc;
+  coLesseeCustomerId?: number;
+}
 
 interface Props {
   open: boolean;
   onClose: () => void;
   contract: ContractMin | null;
+  // What to render. Omit → preview-all (wizard packet preview).
+  target?: PreviewTarget;
   // When provided, an "Accept & sign" primary button shows in the footer.
   // Caller is responsible for closing the preview after triggering its own
   // sign flow.
   onAcceptAndSign?: () => void;
 }
 
-export function ContractPreviewModal({ open, onClose, contract, onAcceptAndSign }: Props) {
+export function ContractPreviewModal({ open, onClose, contract, target, onAcceptAndSign }: Props) {
   const { t } = useTranslation();
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -41,7 +59,20 @@ export function ContractPreviewModal({ open, onClose, contract, onAcceptAndSign 
 
     (async () => {
       try {
-        const blob = await beMediaContractPdf({ contractId: contract.id });
+        let blob: Blob;
+        if (target?.printAll) {
+          blob = await beMediaContractPrintAll(contract.id);
+        } else if (target?.signingId != null || target?.doc) {
+          blob = await beMediaContractPdf({
+            contractId: contract.id,
+            signingId: target.signingId,
+            doc: target.doc,
+            coLesseeCustomerId: target.coLesseeCustomerId,
+          });
+        } else {
+          // Default + explicit previewAll → the wizard "to sign" packet.
+          blob = await beMediaContractPreviewAll(contract.id);
+        }
         if (cancelled) return;
         createdUrl = URL.createObjectURL(blob);
         setBlobUrl(createdUrl);
@@ -61,7 +92,7 @@ export function ContractPreviewModal({ open, onClose, contract, onAcceptAndSign 
       cancelled = true;
       if (createdUrl) URL.revokeObjectURL(createdUrl);
     };
-  }, [open, contract, t]);
+  }, [open, contract, target?.previewAll, target?.printAll, target?.signingId, target?.doc, target?.coLesseeCustomerId, t]);
 
   return (
     <Modal

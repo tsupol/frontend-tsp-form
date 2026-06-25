@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { Modal, Button, useSnackbarContext } from 'tsp-form';
 import { Loader2, Printer, XCircle, AlertTriangle, ExternalLink, Eye } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
-import { BeMediaError } from '../../lib/beMedia';
+import { BeMediaError, type BeMediaContractDoc } from '../../lib/beMedia';
 import { useGenerateContractPdfServer } from './useGenerateContractPdfServer';
 import { ContractPreviewModal } from './ContractPreviewModal';
 import { CLAUSE_6_REPO_THRESHOLD_DAYS } from '../../lib/contractPdf/constants';
@@ -52,9 +52,13 @@ interface Props {
   open: boolean;
   onClose: () => void;
   contract: ContractMin | null;
-  // When set, renders that specific signing's document (lease / addendum,
-  // sealed vs preview). Omit → live current contract.
+  // When set, renders that specific sealed signing's document. Omit → the
+  // Overview whole-packet flow (preview-all / print-all).
   signingId?: number | null;
+  // When set, this is a pre-signing SAMPLE preview of one doc kind (from a
+  // COLLECTING signing). Preview renders the doc; there's nothing sealed to
+  // print, so the Print button is hidden.
+  previewDoc?: BeMediaContractDoc | null;
 }
 
 const SLOTS: { slot: SignatorySlot; labelKey: string }[] = [
@@ -63,7 +67,7 @@ const SLOTS: { slot: SignatorySlot; labelKey: string }[] = [
   { slot: 'WITNESS_2', labelKey: 'workspace.signatoryWitness2' },
 ];
 
-export function GenerateContractPdfModal({ open, onClose, contract, signingId }: Props) {
+export function GenerateContractPdfModal({ open, onClose, contract, signingId, previewDoc }: Props) {
   const { t } = useTranslation();
   const { addSnackbar } = useSnackbarContext();
   const { generating, generate } = useGenerateContractPdfServer();
@@ -153,7 +157,10 @@ export function GenerateContractPdfModal({ open, onClose, contract, signingId }:
   const handlePrint = async () => {
     if (!contract || blocked) return;
     try {
-      await generate(contract, signingId ?? undefined);
+      // Specific sealed signing → that one doc. Otherwise Overview print =
+      // print-all (all sealed docs in one PDF). A doc-preview has nothing
+      // sealed to print, so the Print button is hidden in that mode.
+      await generate(contract, signingId != null ? { signingId } : { printAll: true });
       onClose();
     } catch (err) {
       surfaceError(err, t, addSnackbar);
@@ -283,20 +290,30 @@ export function GenerateContractPdfModal({ open, onClose, contract, signingId }:
         >
           {t('contract.previewContract', { defaultValue: 'Preview' })}
         </Button>
-        <Button
-          color="primary"
-          onClick={handlePrint}
-          disabled={generating || blocked}
-          startIcon={generating ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />}
-        >
-          {generating ? t('common.loading') : t('contract.printContractPdf', { defaultValue: 'Print contract PDF' })}
-        </Button>
+        {/* No sealed doc to print in doc-preview mode — Preview only. */}
+        {previewDoc == null && (
+          <Button
+            color="primary"
+            onClick={handlePrint}
+            disabled={generating || blocked}
+            startIcon={generating ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />}
+          >
+            {generating ? t('common.loading') : t('contract.printContractPdf', { defaultValue: 'Print contract PDF' })}
+          </Button>
+        )}
       </div>
 
       <ContractPreviewModal
         open={previewOpen}
         onClose={() => setPreviewOpen(false)}
         contract={contract}
+        // doc-preview (COLLECTING) → live SAMPLE of that doc kind; specific
+        // sealed signing → that signed doc; otherwise Overview preview-all.
+        target={
+          previewDoc != null ? { doc: previewDoc }
+          : signingId != null ? { signingId }
+          : { previewAll: true }
+        }
       />
     </Modal>
   );

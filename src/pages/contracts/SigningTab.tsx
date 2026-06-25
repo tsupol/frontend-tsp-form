@@ -23,9 +23,10 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Badge, Button, Switch, Tooltip } from 'tsp-form';
 import {
-  Bot, CheckCircle2, ChevronDown, ChevronRight, Circle, FileSignature, Info, PenLine,
+  Bot, CheckCircle2, ChevronDown, ChevronRight, Circle, Eye, FileSignature, Info, PenLine,
   Printer, Trash2, XCircle,
 } from 'lucide-react';
+import type { BeMediaContractDoc } from '../../lib/beMedia';
 import { apiClient } from '../../lib/api';
 import { formatCid, formatTel } from '../../lib/format';
 import { DateTime } from '../../components/DateTime';
@@ -141,6 +142,24 @@ function isSystemVoided(row: SigningHistoryRow): boolean {
   return row.status === 'VOIDED' && row.voided_by === 0;
 }
 
+// Map a signing's change_reason to the pre-signing preview doc kind. Used for
+// the COLLECTING "Preview" button, which renders from live data (no snapshot)
+// via the `doc=` path — pointing at an in-progress signing_id falls back to the
+// plain contract, so we resolve the right doc here.
+function previewDocFor(row: SigningHistoryRow): BeMediaContractDoc {
+  switch (row.change_reason) {
+    case 'ADD_CO_LESSEE': return 'addendum_colessee';
+    case 'BIND':          return 'addendum_device';
+    default:              return 'contract';
+  }
+}
+
+// What a signing card's PDF buttons request from the renderer.
+export interface SigningPdfTarget {
+  signingId?: number;
+  doc?: BeMediaContractDoc;
+}
+
 type SignTarget = {
   signing_id: number;
   party_role: PartyRole;
@@ -156,10 +175,10 @@ type SignTarget = {
 
 export function SigningTab({
   contractId,
-  onPrintPdf,
+  onRenderPdf,
 }: {
   contractId: number;
-  onPrintPdf?: (signingId: number) => void;
+  onRenderPdf?: (target: SigningPdfTarget) => void;
 }) {
   const { t } = useTranslation();
   const [voidSigningId, setVoidSigningId] = useState<number | null>(null);
@@ -280,7 +299,8 @@ export function SigningTab({
             expanded={expanded.has(s.signing_id)}
             onToggleExpand={() => toggleExpanded(s.signing_id)}
             onRequestVoid={() => setVoidSigningId(s.signing_id)}
-            onRequestPrint={onPrintPdf ? () => onPrintPdf(s.signing_id) : undefined}
+            onRequestPreview={onRenderPdf ? () => onRenderPdf({ doc: previewDocFor(s) }) : undefined}
+            onRequestPrint={onRenderPdf ? () => onRenderPdf({ signingId: s.signing_id }) : undefined}
             onRequestSign={(party) => setSignTarget({
               signing_id: s.signing_id,
               party_role: party.party_role,
@@ -326,7 +346,7 @@ export function SigningTab({
 
 function SigningCard({
   signing, isStale, parties, expanded, onToggleExpand,
-  onRequestVoid, onRequestSign, onRequestPrint, onRequestDetail,
+  onRequestVoid, onRequestSign, onRequestPreview, onRequestPrint, onRequestDetail,
 }: {
   signing: SigningHistoryRow;
   isStale: boolean;
@@ -335,6 +355,7 @@ function SigningCard({
   onToggleExpand: () => void;
   onRequestVoid: () => void;
   onRequestSign: (party: SigningPartyRow) => void;
+  onRequestPreview?: () => void;
   onRequestPrint?: () => void;
   onRequestDetail: () => void;
 }) {
@@ -342,7 +363,6 @@ function SigningCard({
   const ttl = formatTtl(signing.ttl_remaining);
   const isCollecting = signing.status === 'COLLECTING';
   const isActionable = isCollecting && !isStale;
-  const isSealed = signing.status === 'SEALED' || signing.status === 'SUPERSEDED';
   const systemVoided = isSystemVoided(signing);
   const muted = signing.status === 'VOIDED' || signing.status === 'SUPERSEDED' || isStale;
 
@@ -501,7 +521,9 @@ function SigningCard({
             </ul>
           )}
 
-          {/* Footer actions — View detail always; Print on SEALED/SUPERSEDED; Void on COLLECTING */}
+          {/* Footer actions — View detail always; Preview (live SAMPLE doc) on
+              COLLECTING; Print (sealed snapshot) on SEALED/SUPERSEDED; Void on
+              COLLECTING. */}
           <div className="px-3 py-2.5 border-t border-line/60 flex flex-wrap gap-1.5 justify-end bg-surface/30">
             <Button
               size="sm"
@@ -511,7 +533,17 @@ function SigningCard({
             >
               {t('signing.viewDetail', { defaultValue: 'View detail' })}
             </Button>
-            {isSealed && onRequestPrint && (
+            {isCollecting && onRequestPreview && (
+              <Button
+                size="sm"
+                variant="outline"
+                startIcon={<Eye size={13} />}
+                onClick={onRequestPreview}
+              >
+                {t('contract.previewContract', { defaultValue: 'Preview' })}
+              </Button>
+            )}
+            {(signing.status === 'SEALED' || signing.status === 'SUPERSEDED') && onRequestPrint && (
               <Button
                 size="sm"
                 variant="outline"

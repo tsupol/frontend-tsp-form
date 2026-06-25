@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { UploadedImage } from 'tsp-form';
-import { XCircle, CreditCard } from 'lucide-react';
+import { Button, useSnackbarContext, type UploadedImage } from 'tsp-form';
+import { XCircle, CreditCard, Eye, Printer, Loader2 } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { invalidateMediaUrl } from '../../../lib/upload';
-import { beMediaUploadFromImage } from '../../../lib/beMedia';
+import { beMediaUploadFromImage, BeMediaError } from '../../../lib/beMedia';
 import { useWorkspace } from './WorkspaceContext';
 import { IdPhotoUpload } from './IdPhotoUpload';
 import { ContractPreviewSignPair, type ReadinessError } from './ContractPreviewSignPair';
+import { ContractPreviewModal } from '../ContractPreviewModal';
+import { useGenerateContractPdfServer } from '../useGenerateContractPdfServer';
 import { SignatoryEditor } from './SignatoryEditor';
 import { ConfidenceScoreEditor } from './ConfidenceScoreEditor';
 import { useContractCoLessees } from './useContractCoLessees';
@@ -38,9 +40,12 @@ interface Props { onClose: () => void }
 export function PanelDocuments({ onClose: _onClose }: Props) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const { addSnackbar } = useSnackbarContext();
   const { data: workspace, contract, getCardStatus, invalidateDocs, invalidateCustomer } = useWorkspace();
   const contractId = workspace.contractId;
   const customerId = workspace.customerId;
+  const { generating: printing, generate } = useGenerateContractPdfServer();
+  const [previewAllOpen, setPreviewAllOpen] = useState(false);
 
   // Signatory used to be a prereq card — it now lives inline at the top of
   // this panel via <SignatoryEditor />, so it's no longer in the prereq list.
@@ -162,6 +167,29 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
   }
   const prereqsMet = missingPrereqs.length === 0;
 
+  // Whole-packet actions (wizard): Preview = preview-all (SAMPLE packet of
+  // everything to sign); Print = print-all (all sealed docs). Both need the
+  // contract prereqs met to render.
+  const handlePrintAll = async () => {
+    if (!previewContract || !prereqsMet) return;
+    try {
+      await generate(previewContract, { printAll: true });
+    } catch (err) {
+      let msg = '';
+      if (err instanceof BeMediaError) {
+        msg = t(err.code, { ns: 'apiErrors', defaultValue: err.message });
+      } else {
+        msg = err instanceof Error ? err.message : String(err);
+      }
+      addSnackbar({
+        message: (
+          <div className="alert alert-danger"><XCircle size={16} /><span>{msg}</span></div>
+        ),
+        type: 'error',
+      });
+    }
+  };
+
   // ── Generic upload helpers (parameterised by target customer) ───────
   const handleErr = (err: unknown) => {
     if (err instanceof ApiError) {
@@ -245,6 +273,26 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
         <SignatoryEditor />
       </div>
 
+      {/* ── Whole-packet actions — preview-all / print-all ──────────── */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          variant="outline"
+          startIcon={<Eye size={14} />}
+          onClick={() => setPreviewAllOpen(true)}
+          disabled={!previewContract || !prereqsMet}
+        >
+          {t('contract.previewContract', { defaultValue: 'Preview' })}
+        </Button>
+        <Button
+          color="primary"
+          startIcon={printing ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />}
+          onClick={handlePrintAll}
+          disabled={!previewContract || !prereqsMet || printing}
+        >
+          {printing ? t('common.loading') : t('contract.printContractPdf', { defaultValue: 'Print contract PDF' })}
+        </Button>
+      </div>
+
       {/* ── Lessee block — unchanged layout ─────────────────────────── */}
       <IdPhotoUpload
         icon={<CreditCard size={14} />}
@@ -310,6 +358,14 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
           </div>
         );
       })}
+
+      {/* preview-all: SAMPLE packet of everything to sign */}
+      <ContractPreviewModal
+        open={previewAllOpen}
+        onClose={() => setPreviewAllOpen(false)}
+        contract={previewContract}
+        target={{ previewAll: true }}
+      />
     </div>
   );
 }

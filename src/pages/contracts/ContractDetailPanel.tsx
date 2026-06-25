@@ -6,6 +6,7 @@ import { Badge, Button, Input, Select, Modal, TextArea, Tooltip, useSnackbarCont
 import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Upload, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, AlertTriangle } from 'lucide-react';
 import { useGenerateContractPdfServer } from './useGenerateContractPdfServer';
 import { GenerateContractPdfModal } from './GenerateContractPdfModal';
+import type { BeMediaContractDoc } from '../../lib/beMedia';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { ApiError } from '../../lib/api';
@@ -293,8 +294,10 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
   >(null);
   const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
   const [pdfModalOpen, setPdfModalOpen] = useState(false);
-  // Which signing the PDF modal should render; null = live current contract.
-  const [pdfSigningId, setPdfSigningId] = useState<number | null>(null);
+  // What the PDF modal should render. null = live current contract (Overview
+  // print). From the Signing tab: { signingId } for a sealed snapshot, or
+  // { doc } for a pre-signing SAMPLE preview of a COLLECTING signing.
+  const [pdfTarget, setPdfTarget] = useState<{ signingId?: number; doc?: BeMediaContractDoc } | null>(null);
   const notesDirtyRef = useRef(false);
   const [pendingTab, setPendingTab] = useState<DetailTab | null>(null);
   const navGuard = useNavGuard();
@@ -408,7 +411,7 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
             deliveryModalOpen={deliveryModalOpen}
             setDeliveryModalOpen={setDeliveryModalOpen}
             pdfModalOpen={pdfModalOpen}
-            setPdfModalOpen={(o) => { if (o) setPdfSigningId(null); setPdfModalOpen(o); }}
+            setPdfModalOpen={(o) => { if (o) setPdfTarget(null); setPdfModalOpen(o); }}
           />
         )}
         {activeTab === 'money' && <MoneyTab contractId={contractId} contract={contract} t={t} />}
@@ -426,7 +429,7 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
           <DeviceTab contract={contract} onRequestAction={setRequestedAction} />
         )}
         {activeTab === 'signing' && (
-          <SigningTab contractId={contractId} onPrintPdf={(signingId) => { setPdfSigningId(signingId); setPdfModalOpen(true); }} />
+          <SigningTab contractId={contractId} onRenderPdf={(target) => { setPdfTarget(target); setPdfModalOpen(true); }} />
         )}
       </div>
 
@@ -470,7 +473,8 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
         open={pdfModalOpen}
         onClose={() => setPdfModalOpen(false)}
         contract={contract}
-        signingId={pdfSigningId}
+        signingId={pdfTarget?.signingId ?? null}
+        previewDoc={pdfTarget?.doc ?? null}
       />
     </div>
   );
@@ -700,7 +704,7 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
           <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-line">
             <div>
               <div className="text-xs text-subtle">{t('contract.device')}</div>
-              <div className="text-sm">{contract.variant_name ?? contract.model_name ?? '—'}</div>
+              <div className="text-sm">{contract.product_display_name ?? contract.variant_name ?? contract.model_name ?? '—'}</div>
             </div>
             {contract.device_identifier && (
               <div>

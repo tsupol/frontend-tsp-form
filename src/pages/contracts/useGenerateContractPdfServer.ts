@@ -3,14 +3,31 @@
 // from the contract id — no client-side data assembly needed.
 
 import { useCallback, useState } from 'react';
-import { beMediaContractPdf } from '../../lib/beMedia';
+import {
+  beMediaContractPdf,
+  beMediaContractPreviewAll,
+  beMediaContractPrintAll,
+  type BeMediaContractDoc,
+} from '../../lib/beMedia';
 import type { ContractMin } from '../../lib/contractPdf/contractMin';
+
+// What to render:
+//  - { signingId }          → one sealed/final signed snapshot
+//  - { doc, coLesseeCustomerId? } → one pre-signing SAMPLE preview (live data)
+//  - { previewAll: true }   → combined SAMPLE packet of everything to sign
+//  - { printAll: true }     → combined PDF of all sealed signings
+//  - {} (none)              → live current contract
+export interface GeneratePdfTarget {
+  signingId?: number;
+  doc?: BeMediaContractDoc;
+  coLesseeCustomerId?: number;
+  previewAll?: boolean;
+  printAll?: boolean;
+}
 
 export interface UseGenerateContractPdfServer {
   generating: boolean;
-  // signingId selects a specific signing's document (lease / addendum,
-  // sealed vs preview); omit to render the live current contract.
-  generate: (contract: ContractMin, signingId?: number) => Promise<void>;
+  generate: (contract: ContractMin, target?: GeneratePdfTarget) => Promise<void>;
   error: string | null;
 }
 
@@ -29,11 +46,23 @@ export function useGenerateContractPdfServer(): UseGenerateContractPdfServer {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const generate = useCallback(async (contract: ContractMin, signingId?: number) => {
+  const generate = useCallback(async (contract: ContractMin, target?: GeneratePdfTarget) => {
     setError(null);
     setGenerating(true);
     try {
-      const blob = await beMediaContractPdf({ contractId: contract.id, signingId });
+      let blob: Blob;
+      if (target?.previewAll) {
+        blob = await beMediaContractPreviewAll(contract.id);
+      } else if (target?.printAll) {
+        blob = await beMediaContractPrintAll(contract.id);
+      } else {
+        blob = await beMediaContractPdf({
+          contractId: contract.id,
+          signingId: target?.signingId,
+          doc: target?.doc,
+          coLesseeCustomerId: target?.coLesseeCustomerId,
+        });
+      }
       const code = contract.code_display ?? contract.code;
       triggerDownload(blob, `${code}.pdf`);
     } catch (err) {
