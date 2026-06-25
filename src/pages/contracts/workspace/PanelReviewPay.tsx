@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { fmtCurrency } from '../../../lib/format';
+import { printWithMarker } from '../../../lib/printDoc';
 import { useWorkspace } from './WorkspaceContext';
 import type { PaymentMethod, PaymentLine, BillOpenResult } from './WorkspaceTypes';
 import { ERROR_TO_MODAL } from './WorkspaceTypes';
@@ -212,7 +213,7 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
     if (!draftBill) return;
     setPrintReady(true);
     requestAnimationFrame(() => requestAnimationFrame(() => {
-      window.print();
+      printWithMarker('bill');
       setPrintReady(false);
     }));
   }, [draftBill]);
@@ -531,7 +532,7 @@ function PostConfirmView({ billId, contractId, needsBindDevice, onNavigate, t }:
     }
     setPrintReady(true);
     requestAnimationFrame(() => requestAnimationFrame(() => {
-      window.print();
+      printWithMarker('bill');
       setPrintReady(false);
     }));
   }, [billId, queryClient]);

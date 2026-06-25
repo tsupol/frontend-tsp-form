@@ -2629,6 +2629,7 @@
     "receipt_change": "เงินทอน",
     "receipt_thankYou": "ขอบคุณที่ใช้บริการ",
     "receipt_print": "พิมพ์",
+    "receipt_download": "ดาวน์โหลด PDF",
     "bill_confirmed_title": "ยืนยันการชำระเงินแล้ว",
     "bill_confirmed_body": "บันทึกบิลเรียบร้อย พิมพ์ใบเสร็จหรือดำเนินการต่อได้เลย",
     "receipt_voidedNotice": "บิลนี้ถูกยกเลิก",
@@ -3507,7 +3508,8 @@
         "CANCEL_BILL": "ยกเลิกบิล",
         "VOID_BILL": "Void บิล (PAID)",
         "REVERSE_BILL": "ทำใบลดหนี้ (Reverse)",
-        "PRINT": "พิมพ์ใบเสร็จ"
+        "PRINT": "พิมพ์ใบเสร็จ",
+        "DOWNLOAD_PDF": "ดาวน์โหลด PDF"
       },
       "typeLabel": {
         "INVOICE": "เรียกเก็บ",

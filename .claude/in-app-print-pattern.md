@@ -57,41 +57,41 @@ receipt, not A4. That means:
 Only reach for A4 (with a dynamically-injected `@page`, see §3) if the document
 genuinely can't work in one 72mm column — most don't need it.
 
-### 2. `@media print` isolation in `src/app.css`, scoped with `body:has(.marker)`
+### 2. `@media print` isolation in `src/app.css`, scoped with a `body.printing-*` class
 
 ```css
 @media print {
-    body:has(.bill-receipt) * { visibility: hidden; }
-    body:has(.bill-receipt) .bill-receipt,
-    body:has(.bill-receipt) .bill-receipt * { visibility: visible; }
-    body:has(.bill-receipt) > *:not(:has(.bill-receipt)) { display: none !important; }
+    body.printing-bill #root { display: none !important; }
 }
 ```
 
-⚠ **GOTCHA 1 — scope every rule with `body:has(.your-marker)`.** Multiple print
-flows share one stylesheet. An unscoped `* { visibility: hidden }` blanks the
-*other* flows. The `:has()` guard means the rules only fire when that specific
-marker is actually mounted, and exactly one is ever mounted at print time.
+The printable is portaled to `document.body` (§4) — a sibling of `#root`. Hiding
+`#root` removes the entire app; the portal is then the only printed content. The
+print handler adds the `printing-*` class to `<body>` immediately before
+`window.print()` and removes it after — use the `printWithMarker(marker)` helper
+in `src/lib/printDoc.ts`, which does exactly that in a try/finally. One marker
+per flow: `bill`, `barcode-sticker`, `asset-sticker`, `signing-detail`.
 
-⚠ **GOTCHA 5 — exactly ONE element with the marker class at print time. A live
-on-screen preview must NOT carry it.** The third isolation rule
-(`body:has(.marker) > *:not(:has(.marker)) { display:none }`) only removes the
-body children that *don't* contain the printable. The first rule
-(`visibility:hidden`) keeps everything else's layout *height*. So if a second
-copy of the printable is mounted somewhere in the on-screen tree (e.g. a live
-preview pane on the same page that also prints), that copy's whole ancestor
-subtree *contains* a `.marker`, escapes the `display:none`, and survives as a
-full-height `visibility:hidden` block — which **pushes the portaled copy onto
-page 2.** (`print:hidden` on the preview's ancestor does NOT reliably fix this;
-the surviving `.marker` subtree still anchors layout.)
+⚠ **GOTCHA 1 — do NOT scope with `body:has(.marker)`. iOS Safari ignores
+`:has()` during print.** The original isolation used `body:has(.bill-receipt)`;
+on iPad none of the rules fired and the **whole website printed**. Safari's
+print render path doesn't evaluate `:has()`. Use the explicit `body.printing-*`
+class toggle instead — a plain class selector every browser honors. Each flow's
+rule must be scoped to its own class so the flows don't blank each other (only
+one class is ever on `<body>` at print time).
 
-The working production pages (`BillsPage`, etc.) avoid this by accident: they
-render the printable **only** in the body portal, never as an on-screen preview.
-If you legitimately need a live preview *and* print from the same page (e.g. the
-`/dev/bill-print` sandbox), give the preview a **different, print-inert class**
-(`BillDocRenderer`'s `preview` prop swaps `.bill-receipt` → `.bill-receipt-preview`,
-same screen look, absent from every `@media print` rule). The print portal keeps
-the real marker, so exactly one marked element exists when printing.
+⚠ **GOTCHA 5 — a live on-screen preview must live inside `#root`, and the
+printable marker class must stay off it.** With the `body.printing-* #root {
+display:none }` isolation, anything inside `#root` (the whole app, including any
+on-screen preview) is hidden at print time — so the portaled copy is the only
+thing printed. A live preview is therefore safe **as long as it is rendered in
+the normal app tree** (inside `#root`) and **does not carry the real marker
+class** (which the print CSS also styles). If you need a live preview on a page
+that also prints (e.g. the `/dev/bill-print` sandbox), give the preview a
+print-inert class (`BillDocRenderer`'s `preview` prop swaps `.bill-receipt` →
+`.bill-receipt-preview`, same screen look, absent from every `@media print`
+rule). The print portal — a direct body child outside `#root` — keeps the real
+marker.
 
 Also add a `@media screen` rule to hide the printable while it's briefly mounted
 during the flow. The wrapper must be `display:contents` (no box of its own), so
@@ -160,8 +160,9 @@ const handlePrint = useCallback(async () => {
 
   setPrintReady(true);
   // Two RAFs: React commits, browser paints, THEN open the dialog.
+  // printWithMarker adds body.printing-bill, calls window.print(), removes it.
   requestAnimationFrame(() => requestAnimationFrame(() => {
-    window.print();
+    printWithMarker('bill');
     setPrintReady(false);
   }));
 }, [queryClient, ...]);
@@ -192,11 +193,11 @@ appear in the output.
 
 1. Printable component in one marker class; takes id-or-object; `hidePrintButton`.
 2. Styled as a printed document — text + rules, NOT the screen modal's cards/badges/boxes.
-3. `@media print` block in `app.css` scoped with `body:has(.marker)` (3 rules).
+3. `@media print` block in `app.css` scoped with `body.printing-<marker> #root { display:none }` (NOT `:has()` — iOS Safari).
 4. `@media screen` rule: wrapper `display:contents` + park the printable off-screen.
 5. `@media print` resets the printable's `position`/`left`/`top`/`margin` so it starts at the top.
 6. `@page`: reuse 80mm default for receipts; inject+remove dynamically otherwise.
-7. Trigger: pre-warm queries → `setPrintReady(true)` → two RAFs → `window.print()`.
+7. Trigger: pre-warm queries → `setPrintReady(true)` → two RAFs → `printWithMarker(marker)`.
 8. `createPortal` to `document.body`, never inside a Modal.
 9. `print:hidden` on buttons/toolbars.
 10. Exactly ONE element with the marker class at print time — a live on-screen

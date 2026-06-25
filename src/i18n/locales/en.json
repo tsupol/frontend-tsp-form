@@ -2630,6 +2630,7 @@
     "receipt_change": "Change",
     "receipt_thankYou": "Thank you for your business.",
     "receipt_print": "Print",
+    "receipt_download": "Download PDF",
     "bill_confirmed_title": "Payment confirmed",
     "bill_confirmed_body": "The bill has been recorded. Print the receipt or continue.",
     "receipt_voidedNotice": "This bill has been voided.",
@@ -3508,7 +3509,8 @@
         "CANCEL_BILL": "Cancel bill",
         "VOID_BILL": "Void bill",
         "REVERSE_BILL": "Reverse (credit note)",
-        "PRINT": "Print"
+        "PRINT": "Print",
+        "DOWNLOAD_PDF": "Download PDF"
       },
       "typeLabel": {
         "INVOICE": "Invoice",

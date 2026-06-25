@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from 'tsp-form';
 import { Printer } from 'lucide-react';
 import { fmtCurrency } from '../lib/format';
+import { printWithMarker } from '../lib/printDoc';
 import {
   type BillDoc,
   type DocBlock,
@@ -254,7 +255,7 @@ export function BillDocRenderer({ doc, hidePrintButton, preview }: BillDocRender
     <div className="flex flex-col items-center gap-3">
       {!hidePrintButton && (
         <div className="print:hidden">
-          <Button size="sm" variant="outline" startIcon={<Printer size={14} />} onClick={() => window.print()}>
+          <Button size="sm" variant="outline" startIcon={<Printer size={14} />} onClick={() => printWithMarker('bill')}>
             {t('wizard.receipt_print', { defaultValue: 'พิมพ์' })}
           </Button>
         </div>

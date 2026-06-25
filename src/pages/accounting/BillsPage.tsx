@@ -9,13 +9,15 @@ import {
 } from 'tsp-form';
 import {
   ArrowRightFromLine, ArrowLeft, Plus, Trash2, XCircle, CheckCircle, Ban, Printer,
-  Wrench, ChevronDown, Copy, Search, X,
+  Wrench, ChevronDown, Copy, Search, X, Download, Loader2,
 } from 'lucide-react';
 import { FilterBar } from '../../components/FilterBar';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { fmtCurrency } from '../../lib/format';
+import { printWithMarker } from '../../lib/printDoc';
+import { useBillPdfDownload } from '../../hooks/useBillPdfDownload';
 import { buildBillActionToast, hasBill, type StandardBillResponse } from '../../lib/billActionToast';
 import { type Branch, type BillRow, type BillDetail, type BillPayment, todayISO } from './accountingTypes';
 import { useBillActions, type BillAction, type BillActionCode } from '../../hooks/useBillActions';
@@ -482,10 +484,15 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
     setPrintReady(true);
     // Two RAFs to let React commit + browser paint, then open the print dialog.
     requestAnimationFrame(() => requestAnimationFrame(() => {
-      window.print();
+      printWithMarker('bill');
       setPrintReady(false);
     }));
   }, [billId, queryClient]);
+
+  // Download PDF — device-independent fallback to browser print (iPad Safari
+  // can't isolate the receipt for window.print()). See useBillPdfDownload.
+  const { downloading: downloadingPdf, download: downloadPdf } = useBillPdfDownload();
+  const handleDownloadPdf = useCallback(() => downloadPdf(billId), [downloadPdf, billId]);
 
   const copyBillCode = useCallback((code: string) => {
     navigator.clipboard?.writeText(code).then(
@@ -667,15 +674,27 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
             {t(`accounting.bills.purposeLabel.${detail.bill_purpose}`, { defaultValue: detail.bill_purpose.replace(/_/g, ' ') })}
           </div>
         </div>
-        <Tooltip content={t('accounting.bills.actionLabel.PRINT', { defaultValue: 'Print' })} placement="bottom">
-          <Button
-            size="sm"
-            variant="outline"
-            startIcon={<Printer size={14} />}
-            aria-label={t('accounting.bills.actionLabel.PRINT', { defaultValue: 'Print' })}
-            onClick={handlePrint}
-          />
-        </Tooltip>
+        <div className="flex items-center gap-2">
+          <Tooltip content={t('accounting.bills.actionLabel.DOWNLOAD_PDF', { defaultValue: 'Download PDF' })} placement="bottom">
+            <Button
+              size="sm"
+              variant="outline"
+              startIcon={downloadingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+              aria-label={t('accounting.bills.actionLabel.DOWNLOAD_PDF', { defaultValue: 'Download PDF' })}
+              disabled={downloadingPdf}
+              onClick={handleDownloadPdf}
+            />
+          </Tooltip>
+          <Tooltip content={t('accounting.bills.actionLabel.PRINT', { defaultValue: 'Print' })} placement="bottom">
+            <Button
+              size="sm"
+              variant="outline"
+              startIcon={<Printer size={14} />}
+              aria-label={t('accounting.bills.actionLabel.PRINT', { defaultValue: 'Print' })}
+              onClick={handlePrint}
+            />
+          </Tooltip>
+        </div>
       </div>
 
       {/* Financial summary — 3-col key/value grid */}

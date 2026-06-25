@@ -6,6 +6,7 @@ import { Printer, RefreshCw, Download } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { BillDocRenderer } from '../../components/BillDocRenderer';
 import type { BillDoc } from '../../lib/billDoc';
+import { printWithMarker } from '../../lib/printDoc';
 import {
   adaptBillRender,
   SAMPLE_BILL_PAYLOAD,
@@ -71,7 +72,7 @@ export function DevBillPrintPage() {
     if (!doc) return;
     setPrintReady(true);
     requestAnimationFrame(() => requestAnimationFrame(() => {
-      window.print();
+      printWithMarker('bill');
       setPrintReady(false);
     }));
   }, [doc]);

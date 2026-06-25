@@ -309,23 +309,22 @@ input[type="number"
         padding: 0 !important;
         height: auto !important;
     }
-    /* Bill receipt print — only applies when a .bill-receipt is mounted.
-       Scoping with body:has() prevents these rules from blanking other
-       print flows (e.g. barcode sticker) that don't include a receipt. */
-    body:has(.bill-receipt) * {
-        visibility: hidden;
-    }
-    body:has(.bill-receipt) .bill-receipt,
-    body:has(.bill-receipt) .bill-receipt * {
-        visibility: visible;
-    }
-    body:has(.bill-receipt) > *:not(:has(.bill-receipt)) {
+    /* Bill receipt print — only applies when the print handler has added the
+       `printing-bill` class to <body> (see src/lib/printDoc.ts). We hide the
+       app root (#root) and let the off-screen print portal — the only other
+       direct body child — be the sole printed content. A plain body class is
+       used instead of `body:has(.bill-receipt)` because iOS Safari does NOT
+       evaluate `:has()` during print, which made the whole app print on iPad. */
+    body.printing-bill #root {
         display: none !important;
     }
     .bill-receipt {
         margin: 0 !important;
         width: 72mm;
         padding: 3mm 4mm;
+        position: static !important;
+        left: auto !important;
+        top: auto !important;
         background: #fff !important;
         color: #000 !important;
         box-shadow: none !important;
@@ -337,33 +336,23 @@ input[type="number"
     }
 
     /* Barcode sticker print — XP-420B label printer, 50×30mm.
-       Isolation matches the bill pattern. @page size is injected dynamically
-       by the print handler so we don't fight the bill receipt's @page. */
-    body:has(.barcode-sticker) * {
-        visibility: hidden;
-    }
-    body:has(.barcode-sticker) .barcode-sticker,
-    body:has(.barcode-sticker) .barcode-sticker * {
-        visibility: visible;
-    }
-    body:has(.barcode-sticker) > *:not(:has(.barcode-sticker)) {
+       Isolation matches the bill pattern (body class, not :has — iOS Safari).
+       @page size is injected dynamically by the print handler so we don't
+       fight the bill receipt's @page. */
+    body.printing-barcode-sticker #root {
         display: none !important;
     }
 
     /* Asset sticker print — XP-420B label printer, 75×25mm.
-       Same pattern as .barcode-sticker; @page injected dynamically. */
-    body:has(.asset-sticker) * {
-        visibility: hidden;
-    }
-    body:has(.asset-sticker) .asset-sticker,
-    body:has(.asset-sticker) .asset-sticker * {
-        visibility: visible;
-    }
-    body:has(.asset-sticker) > *:not(:has(.asset-sticker)) {
+       Same pattern as the barcode sticker; @page injected dynamically. */
+    body.printing-asset-sticker #root {
         display: none !important;
     }
-    .asset-sticker {
+    .asset-sticker, .barcode-sticker {
         margin: 0 !important;
+        position: static !important;
+        left: auto !important;
+        top: auto !important;
     }
 
     /* Thermal-print render hints — suppress subpixel positioning and LCD
@@ -376,15 +365,9 @@ input[type="number"
     }
 
     /* Signing detail document print — 80mm thermal, same as the bill receipt.
-       Isolation + @page (80mm auto, the default) match the bill pattern. */
-    body:has(.signing-detail-print) * {
-        visibility: hidden;
-    }
-    body:has(.signing-detail-print) .signing-detail-print,
-    body:has(.signing-detail-print) .signing-detail-print * {
-        visibility: visible;
-    }
-    body:has(.signing-detail-print) > *:not(:has(.signing-detail-print)) {
+       Isolation (body class, not :has — iOS Safari) + @page (80mm auto, the
+       default) match the bill pattern. */
+    body.printing-signing-detail #root {
         display: none !important;
     }
     .signing-detail-print {

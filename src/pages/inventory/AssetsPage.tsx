@@ -10,6 +10,7 @@ import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { CopyButton } from '../../components/CopyButton';
 import { fmtCurrency } from '../../lib/format';
+import { printWithMarker } from '../../lib/printDoc';
 import { buildBillActionToast, type StandardBillResponse } from '../../lib/billActionToast';
 import { useAuth } from '../../contexts/AuthContext';
 import { getBucketLabel, getBucketColor, getConditionLabel, getConditionTextColor, CONDITION_VALUES, codeDisplay } from './inventoryUtils';
@@ -1842,9 +1843,9 @@ export function useAssetStickerPrint() {
 
   const handlePrint = useCallback(async (asset: Asset) => {
     // Warm the external_ref query before mounting the sticker so it has data
-    // on first render — otherwise window.print() fires before .asset-sticker
-    // exists in DOM, the body:has(.asset-sticker) isolation rule never
-    // matches, and the whole UI prints.
+    // on first render — otherwise print fires before .asset-sticker exists in
+    // DOM and the off-screen portal that becomes the sole printed content
+    // (with #root hidden) would be empty.
     try {
       await queryClient.fetchQuery({
         queryKey: ['asset-label', asset.asset_id],
@@ -1866,7 +1867,7 @@ export function useAssetStickerPrint() {
       styleEl.textContent = '@media print { @page { size: 76mm 26mm; margin: 0; } }';
       document.head.appendChild(styleEl);
       try {
-        window.print();
+        printWithMarker('asset-sticker');
       } finally {
         styleEl.remove();
         setPrintAsset(null);

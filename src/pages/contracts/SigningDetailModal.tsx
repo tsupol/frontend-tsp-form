@@ -22,6 +22,7 @@ import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
 import { formatCid, formatTel } from '../../lib/format';
+import { printWithMarker } from '../../lib/printDoc';
 import { SnapshotOverviewDiff } from './SnapshotOverviewDiff';
 import { SigningDetailPrint, type SigningDetailPrintData, type PrintParty } from './SigningDetailPrint';
 
@@ -197,7 +198,7 @@ export function SigningDetailModal({ open, onClose, signingId, contractId, signi
     // Two RAFs: React commits, browser paints, then open the dialog. Prints on
     // 80mm thermal — reuses the bill receipt's default @page, no injection.
     requestAnimationFrame(() => requestAnimationFrame(() => {
-      window.print();
+      printWithMarker('signing-detail');
       setPrintReady(false);
     }));
   }, [data, payload]);

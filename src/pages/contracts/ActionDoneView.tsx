@@ -3,8 +3,10 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { Badge, Button } from 'tsp-form';
-import { AlertTriangle, ArrowRight, CheckCircle, Info, Printer, XOctagon } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CheckCircle, Info, Printer, Download, Loader2, XOctagon } from 'lucide-react';
 import { apiClient } from '../../lib/api';
+import { printWithMarker } from '../../lib/printDoc';
+import { useBillPdfDownload } from '../../hooks/useBillPdfDownload';
 import { BillReceipt } from './workspace/BillReceipt';
 
 export type ActionDoneTone = 'success' | 'warning' | 'danger' | 'neutral';
@@ -98,6 +100,7 @@ export function ActionDoneView({
 }: ActionDoneViewProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const { downloading: downloadingPdf, download: downloadPdf } = useBillPdfDownload();
   const [printReady, setPrintReady] = useState(false);
 
   // Direct print — no preview modal. Same portal pattern as BillsPage/ContractDetailPanel
@@ -121,7 +124,7 @@ export function ActionDoneView({
     }
     setPrintReady(true);
     requestAnimationFrame(() => requestAnimationFrame(() => {
-      window.print();
+      printWithMarker('bill');
       setPrintReady(false);
     }));
   }, [billId, queryClient]);
@@ -172,9 +175,19 @@ export function ActionDoneView({
 
       <div className="modal-footer">
         {billId != null ? (
-          <Button variant="outline" startIcon={<Printer size={16} />} onClick={handlePrintBill}>
-            {t('wizard.receipt_print')}
-          </Button>
+          <>
+            <Button
+              variant="outline"
+              startIcon={downloadingPdf ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+              disabled={downloadingPdf}
+              onClick={() => downloadPdf(billId)}
+            >
+              {t('wizard.receipt_download')}
+            </Button>
+            <Button variant="outline" startIcon={<Printer size={16} />} onClick={handlePrintBill}>
+              {t('wizard.receipt_print')}
+            </Button>
+          </>
         ) : secondaryAction && (
           <Button
             variant="outline"

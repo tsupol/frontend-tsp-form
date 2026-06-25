@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Badge, Button, Input, Modal, TextArea, Tooltip, useSnackbarContext, resizeToVariants } from 'tsp-form';
-import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Upload, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Upload, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, Download, AlertTriangle } from 'lucide-react';
 import { useGenerateContractPdfServer } from './useGenerateContractPdfServer';
 import { GenerateContractPdfModal } from './GenerateContractPdfModal';
 import type { BeMediaContractDoc } from '../../lib/beMedia';
@@ -11,6 +11,8 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { ApiError } from '../../lib/api';
 import { getUploadSpec, mimeFromKey } from '../../lib/upload';
+import { printWithMarker } from '../../lib/printDoc';
+import { useBillPdfDownload } from '../../hooks/useBillPdfDownload';
 import { beMediaUploadFromImage, beMediaDelete } from '../../lib/beMedia';
 import { toStoragePath, normalizeKey } from '../../lib/mediaPath';
 import { useAuth } from '../../contexts/AuthContext';
@@ -1686,6 +1688,7 @@ interface BillPaymentEmbedded {
 
 function BillsTab({ contractId, t }: { contractId: number; t: ReturnType<typeof useTranslation>['t'] }) {
   const queryClient = useQueryClient();
+  const { downloadingId, download: downloadPdf } = useBillPdfDownload();
 
   // Bill list (INVOICE only — CREDIT_NOTE/JOURNAL aren't shown here).
   const { data: bills, isLoading } = useQuery({
@@ -1746,7 +1749,7 @@ function BillsTab({ contractId, t }: { contractId: number; t: ReturnType<typeof 
     }
     setPrintReady(true);
     requestAnimationFrame(() => requestAnimationFrame(() => {
-      window.print();
+      printWithMarker('bill');
       setPrintReady(false);
       setPrintBillId(null);
     }));
@@ -1787,6 +1790,19 @@ function BillsTab({ contractId, t }: { contractId: number; t: ReturnType<typeof 
                   </Badge>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
+                  <Tooltip content={t('wizard.receipt_download')}>
+                    <Button
+                      variant="outline"
+                      color="default"
+                      size="sm"
+                      className="btn-icon-xs"
+                      disabled={downloadingId === bill.id}
+                      onClick={() => downloadPdf(bill.id)}
+                      aria-label={t('wizard.receipt_download')}
+                    >
+                      {downloadingId === bill.id ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                    </Button>
+                  </Tooltip>
                   <Tooltip content={t('wizard.receipt_print')}>
                     <Button
                       variant="outline"

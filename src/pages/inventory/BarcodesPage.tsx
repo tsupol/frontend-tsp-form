@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import { apiClient, ApiError } from '../../lib/api';
+import { printWithMarker } from '../../lib/printDoc';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { DateTime } from '../../components/DateTime';
 import { useBarcodeScanner } from '../../components/BarcodeScanner';
@@ -111,7 +112,7 @@ export function BarcodesPage() {
       styleEl.textContent = '@media print { @page { size: 76mm 26mm; margin: 0; } }';
       document.head.appendChild(styleEl);
       try {
-        window.print();
+        printWithMarker('barcode-sticker');
       } finally {
         styleEl.remove();
         setPrintRow(null);
