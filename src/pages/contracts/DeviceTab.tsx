@@ -19,6 +19,7 @@ interface ContractForDevice {
   device_condition_grade: string | null;
   loaner_device_id: number | null;
   model_name: string | null;
+  product_display_name: string | null;
   variant_name: string | null;
 }
 
@@ -149,7 +150,7 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
                 </div>
                 <div>
                   <div className="text-xs text-subtle">{t('contract.deviceModel')}</div>
-                  <div className="text-sm">{contract.variant_name ?? contract.model_name ?? '—'}</div>
+                  <div className="text-sm">{contract.product_display_name ?? contract.variant_name ?? contract.model_name ?? '—'}</div>
                 </div>
                 {primaryAsset?.imei && (
                   <div>

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { Badge, Button, Input, Select, Modal, TextArea, Tooltip, useSnackbarContext, resizeToVariants } from 'tsp-form';
+import { Badge, Button, Input, Modal, TextArea, Tooltip, useSnackbarContext, resizeToVariants } from 'tsp-form';
 import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Upload, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, AlertTriangle } from 'lucide-react';
 import { useGenerateContractPdfServer } from './useGenerateContractPdfServer';
 import { GenerateContractPdfModal } from './GenerateContractPdfModal';
@@ -59,6 +59,7 @@ interface ContractDetail {
   product_id: number | null;
   model_id: number | null;
   model_name: string | null;
+  product_display_name: string | null;
   variant_id: number | null;
   variant_name: string | null;
   rate_card_id: number | null;
@@ -429,7 +430,11 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
           <DeviceTab contract={contract} onRequestAction={setRequestedAction} />
         )}
         {activeTab === 'signing' && (
-          <SigningTab contractId={contractId} onRenderPdf={(target) => { setPdfTarget(target); setPdfModalOpen(true); }} />
+          <SigningTab
+            contractId={contractId}
+            contractCode={contract.code_display ?? contract.code}
+            onRenderPdf={(target) => { setPdfTarget(target); setPdfModalOpen(true); }}
+          />
         )}
       </div>
 
@@ -861,11 +866,12 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
         </div>
       )}
 
-      {/* Delivery */}
+      {/* Delivery — tracking number only (delivery evidence photos moved to
+          their own section; shipping method/date dropped). */}
       {isActive && (
-        <div className={`border rounded-md px-4 py-3 ${contract.shipped_at ? 'border-line' : 'border-warning-border bg-warning/5'}`}>
+        <div className={`border rounded-md px-4 py-3 ${contract.tracking_number ? 'border-line' : 'border-warning-border bg-warning/5'}`}>
           <div className="flex items-center justify-between mb-2">
-            <h3 className={`text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 ${contract.shipped_at ? 'text-subtle' : 'text-warning-fg'}`}>
+            <h3 className={`text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 ${contract.tracking_number ? 'text-subtle' : 'text-warning-fg'}`}>
               <Truck size={13} />
               {t('contract.shipping')}
             </h3>
@@ -878,12 +884,8 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
               <Pencil size={13} />
             </button>
           </div>
-          {contract.shipped_at ? (
-            <div className="grid grid-cols-2 gap-3">
-              <InfoCell label={t('contract.shippedAt')} value={<DateTime value={contract.shipped_at} showTime={false} />} />
-              {contract.shipping_method && <InfoCell label={t('contract.shippingMethod')} value={contract.shipping_method} />}
-              {contract.tracking_number && <InfoCell label={t('contract.trackingNumber')} value={contract.tracking_number} />}
-            </div>
+          {contract.tracking_number ? (
+            <InfoCell label={t('contract.trackingNumber')} value={contract.tracking_number} />
           ) : (
             <div className="text-sm text-warning-fg">{t('contract.deliveryNotRecorded')}</div>
           )}
@@ -1850,12 +1852,6 @@ function BillsTab({ contractId, t }: { contractId: number; t: ReturnType<typeof 
 
 // ── Delivery Modal ──────────────────────────────────────────────────────────
 
-const SHIPPING_OPTIONS = [
-  { value: 'PICKUP', label: 'Pickup at store' },
-  { value: 'DELIVERY', label: 'Delivery' },
-  { value: 'COURIER', label: 'Courier / Shipping' },
-];
-
 function DeliveryModal({ open, contract, onClose, onSuccess }: {
   open: boolean;
   contract: ContractDetail;
@@ -1866,7 +1862,6 @@ function DeliveryModal({ open, contract, onClose, onSuccess }: {
   const { addSnackbar } = useSnackbarContext();
   const { user } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [method, setMethod] = useState(contract.shipping_method ?? 'PICKUP');
   const [trackingNumber, setTrackingNumber] = useState(contract.tracking_number ?? '');
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -1876,11 +1871,10 @@ function DeliveryModal({ open, contract, onClose, onSuccess }: {
 
   useEffect(() => {
     if (open) {
-      setMethod(contract.shipping_method ?? 'PICKUP');
       setTrackingNumber(contract.tracking_number ?? '');
       setError('');
     }
-  }, [open, contract.shipping_method, contract.tracking_number]);
+  }, [open, contract.tracking_number]);
 
   // Contract photos (ATTACHMENT)
   const { data: photos = [], refetch: refetchPhotos } = useQuery({
@@ -1922,7 +1916,7 @@ function DeliveryModal({ open, contract, onClose, onSuccess }: {
   const mutation = useMutation({
     mutationFn: () => apiClient.rpc('fn_contract_update_delivery', {
       p_contract_id: contract.id,
-      p_shipping_method: method,
+      // Shipping method dropped from the UI — RPC defaults it to 'HAND'.
       p_tracking_number: trackingNumber.trim() || null,
       p_shipped_at: contract.shipped_at ?? new Date().toISOString(),
     }),
@@ -2011,15 +2005,9 @@ function DeliveryModal({ open, contract, onClose, onSuccess }: {
           )}
           <div className="form-grid">
             <div className="flex flex-col">
-              <label className="form-label">{t('contract.shippingMethod')}</label>
-              <Select options={SHIPPING_OPTIONS} value={method} onChange={(val) => setMethod(val as string)} showChevron />
+              <label className="form-label">{t('contract.trackingNumber')}</label>
+              <Input value={trackingNumber} onChange={(e) => setTrackingNumber(e.target.value)} placeholder={t('contract.trackingPlaceholder')} className="w-full" />
             </div>
-            {method !== 'PICKUP' && (
-              <div className="flex flex-col">
-                <label className="form-label">{t('contract.trackingNumber')}</label>
-                <Input value={trackingNumber} onChange={(e) => setTrackingNumber(e.target.value)} placeholder={t('contract.trackingPlaceholder')} className="w-full" />
-              </div>
-            )}
           </div>
 
           {/* Contract photos */}

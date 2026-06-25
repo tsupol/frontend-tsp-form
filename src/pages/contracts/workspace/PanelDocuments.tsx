@@ -2,10 +2,14 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, useSnackbarContext, type UploadedImage } from 'tsp-form';
-import { XCircle, CreditCard, Eye, Printer, Loader2 } from 'lucide-react';
+import { XCircle, CreditCard, Eye, Printer, Loader2, Smartphone, ImageOff } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { invalidateMediaUrl } from '../../../lib/upload';
 import { beMediaUploadFromImage, BeMediaError } from '../../../lib/beMedia';
+import { normalizeKey } from '../../../lib/mediaPath';
+import { useMediaUrl } from '../../../hooks/useMediaUrl';
+import { MediaLightbox } from '../../../components/MediaLightbox';
+import { ContractCaptureModal } from './ContractCaptureModal';
 import { useWorkspace } from './WorkspaceContext';
 import { IdPhotoUpload } from './IdPhotoUpload';
 import { ContractPreviewSignPair, type ReadinessError } from './ContractPreviewSignPair';
@@ -35,6 +39,15 @@ interface ContractDocument {
   uploaded_at: string;
 }
 
+interface ContractAttachment {
+  entity_media_id: number;
+  media_id: number;
+  sort_order: number;
+  storage_path: string;
+  variants_json: Record<string, string> | null;
+  caption: string | null;
+}
+
 interface Props { onClose: () => void }
 
 export function PanelDocuments({ onClose: _onClose }: Props) {
@@ -46,6 +59,19 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
   const customerId = workspace.customerId;
   const { generating: printing, generate } = useGenerateContractPdfServer();
   const [previewAllOpen, setPreviewAllOpen] = useState(false);
+  const [captureOpen, setCaptureOpen] = useState(false);
+  const [lightboxKey, setLightboxKey] = useState<string | null>(null);
+
+  // Contract attachment album — photos captured via the Mobile Capture Bridge
+  // (phone-scanned QR) land here as (CONTRACT, ATTACHMENT). Same view the
+  // detail panel reads; refetched as photos arrive in the capture modal.
+  const { data: attachments = [], refetch: refetchAttachments } = useQuery({
+    queryKey: ['contract-attachments', contractId],
+    queryFn: () => apiClient.get<ContractAttachment[]>(
+      `/v_entity_media?entity_type=eq.CONTRACT&entity_id=eq.${contractId}&usage_type=eq.ATTACHMENT&select=entity_media_id,media_id,sort_order,storage_path,variants_json,caption&order=sort_order`,
+    ),
+    enabled: !!contractId,
+  });
 
   // Signatory used to be a prereq card — it now lives inline at the top of
   // this panel via <SignatoryEditor />, so it's no longer in the prereq list.
@@ -293,6 +319,39 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
         </Button>
       </div>
 
+      {/* ── Contract photos — capture from phone (Mobile Capture Bridge) ─ */}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider">
+            {t('workspace.cardAttachments', { defaultValue: 'Contract photos' })}
+            <span className="ml-2 normal-case font-normal text-subtler">{attachments.length}</span>
+          </h3>
+          <Button
+            variant="outline"
+            size="sm"
+            startIcon={<Smartphone size={14} />}
+            onClick={() => setCaptureOpen(true)}
+          >
+            {t('workspace.captureFromPhone', { defaultValue: 'Capture from phone' })}
+          </Button>
+        </div>
+        {attachments.length === 0 ? (
+          <div className="text-xs text-subtler italic py-4 border border-dashed border-line rounded-md text-center">
+            {t('workspace.captureEmpty', { defaultValue: 'No photos yet. Scan the QR with a phone to add.' })}
+          </div>
+        ) : (
+          <div className="grid grid-cols-4 gap-2">
+            {attachments.map((m) => (
+              <AttachmentThumb
+                key={m.entity_media_id}
+                media={m}
+                onPreview={(key) => setLightboxKey(key)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* ── Lessee block — unchanged layout ─────────────────────────── */}
       <IdPhotoUpload
         icon={<CreditCard size={14} />}
@@ -366,6 +425,52 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
         contract={previewContract}
         target={{ previewAll: true }}
       />
+
+      {/* QR capture — phone scans, photos auto-attach to the contract album */}
+      <ContractCaptureModal
+        open={captureOpen}
+        onClose={() => setCaptureOpen(false)}
+        contractId={contractId}
+        contractCode={contract?.code_display ?? null}
+        onUploaded={() => refetchAttachments()}
+      />
+
+      <MediaLightbox
+        open={lightboxKey != null}
+        onClose={() => setLightboxKey(null)}
+        mediaKey={lightboxKey}
+        alt="Contract photo"
+      />
     </div>
+  );
+}
+
+// ── Attachment thumbnail ─────────────────────────────────────────────────────
+
+function AttachmentThumb({
+  media,
+  onPreview,
+}: {
+  media: ContractAttachment;
+  onPreview: (fullKey: string) => void;
+}) {
+  const v = media.variants_json ?? {};
+  const thumbKey = v.md || v.sm || v.lg || media.storage_path || null;
+  const fullKey = v.lg || v.md || media.storage_path || null;
+  const { url } = useMediaUrl(thumbKey ? normalizeKey(thumbKey) : null);
+
+  return (
+    <button
+      type="button"
+      onClick={() => fullKey && onPreview(normalizeKey(fullKey))}
+      className="aspect-square rounded-md border border-line overflow-hidden bg-surface flex items-center justify-center cursor-zoom-in p-0"
+      aria-label="Preview photo"
+    >
+      {url ? (
+        <img src={url} alt={media.caption ?? ''} className="w-full h-full object-cover" />
+      ) : (
+        <ImageOff size={18} className="text-subtler" />
+      )}
+    </button>
   );
 }

@@ -259,6 +259,19 @@ export const CONTRACT_PAYMENT_SLIP_RESIZE: Record<ContractPaymentSlipSize, Resiz
   lg: { maxWidth: 1800, maxHeight: 1800, mode: 'contain', format: 'webp', quality: 0.82 },
 };
 
+// ── contract_evidence — hardcoded spec (sm=320 / md=1280, private) ────
+// The CONTRACT/ATTACHMENT album (delivery proof, on-site photos). Private
+// bucket; reads resolve via presigned URL. Mirrors misc-go uploadspec.
+export const CONTRACT_EVIDENCE_TYPE = 'contract_evidence';
+export const CONTRACT_EVIDENCE_SIZES = ['sm', 'md'] as const;
+export type ContractEvidenceSize = (typeof CONTRACT_EVIDENCE_SIZES)[number];
+export const CONTRACT_EVIDENCE_MAX = 10;
+
+export const CONTRACT_EVIDENCE_RESIZE: Record<ContractEvidenceSize, ResizeOptions> = {
+  sm: { maxWidth: 320, maxHeight: 320, mode: 'contain', format: 'webp', quality: 0.82 },
+  md: { maxWidth: 1280, maxHeight: 1280, mode: 'contain', format: 'webp', quality: 0.82 },
+};
+
 // ── buyback_condition — hardcoded spec (sm=320 / md=1280, public) ─────
 // Mirrors misc-go pkg/uploadspec/spec.go `buyback_condition`. Public bucket,
 // so reads resolve via publicMediaUrl (no presign).

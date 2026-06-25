@@ -26,6 +26,8 @@ export interface ContractServerState {
   model_name: string | null;
   variant_id: number | null;
   variant_name: string | null;
+  // Canonical server-composed product label (mig 318-321) — render this, don't compose
+  product_display_name: string | null;
   // Catalog denormalized (mig 119) — naming matches v_assets
   brand_name: string | null;
   family_name: string | null;

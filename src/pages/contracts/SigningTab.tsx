@@ -33,6 +33,7 @@ import { DateTime } from '../../components/DateTime';
 import { SigningVoidModal } from './SigningVoidModal';
 import { SigningSignModal } from './SigningSignModal';
 import { SigningDetailModal } from './SigningDetailModal';
+import { ContractAttachments } from './ContractAttachments';
 
 type SigningStatus = 'COLLECTING' | 'SEALED' | 'SUPERSEDED' | 'VOIDED';
 type SigningCategory = 'CONTRACT' | 'AMENDMENT' | 'RECEIPT' | null;
@@ -175,9 +176,11 @@ type SignTarget = {
 
 export function SigningTab({
   contractId,
+  contractCode,
   onRenderPdf,
 }: {
   contractId: number;
+  contractCode: string | null;
   onRenderPdf?: (target: SigningPdfTarget) => void;
 }) {
   const { t } = useTranslation();
@@ -277,6 +280,10 @@ export function SigningTab({
 
   return (
     <div className="p-4 flex flex-col gap-3">
+      {/* Contract photo album (delivery/handover evidence) — contract-scoped,
+          works before and after signing. */}
+      <ContractAttachments contractId={contractId} contractCode={contractCode} />
+
       <Tooltip content={t('signing.auditToggleHint')}>
         <label className="self-end flex items-center gap-2 text-xs text-subtle cursor-pointer">
           <span>{t('signing.auditToggle')}</span>
