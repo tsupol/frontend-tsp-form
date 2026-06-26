@@ -60,13 +60,18 @@ export function RemittancePage() {
   const fromDate = fromParam === null ? initial.from : fromParam;
   const toDate = toParam === null ? initial.to : toParam;
   const typeFilter = searchParams.get('type') ?? '';
+  const chargeParam = searchParams.get('charge') ?? '';
+  const chargeFilter = useMemo(
+    () => (chargeParam ? chargeParam.split(',').filter(Boolean) : []),
+    [chargeParam],
+  );
 
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [isTypingRange, setIsTypingRange] = useState(false);
 
   const pendingPatchRef = useRef<Record<string, string> | null>(null);
-  const updateFilters = useCallback((patch: Partial<{ side: Side; branch_id: string; from: string; to: string; type: string }>) => {
+  const updateFilters = useCallback((patch: Partial<{ side: Side; branch_id: string; from: string; to: string; type: string; charge: string }>) => {
     if (pendingPatchRef.current) {
       Object.assign(pendingPatchRef.current, patch);
       return;
@@ -93,6 +98,17 @@ export function RemittancePage() {
     queryFn: () => apiClient.get<Branch[]>('/v_branches?is_active=is.true&order=name'),
   });
 
+  // Line-item charge types (down payment / installment / insurance / …) — data-driven
+  // from the ref view so labels stay localized and new codes appear without a deploy.
+  const { data: chargeTypes = [] } = useQuery({
+    queryKey: ['ref-charge-types'],
+    queryFn: () =>
+      apiClient.get<{ code: string; name_th: string; name_en: string }[]>(
+        '/v_ref_charge_types?select=code,name_th,name_en&order=name_th',
+      ),
+    staleTime: 60 * 60 * 1000,
+  });
+
   const endpoint = side === 'holding' ? 'v_holding_remittance' : 'v_company_revenue';
 
   // toExclusive — PostgREST lt. cutoff so the picker's inclusive upper bound is included
@@ -108,10 +124,11 @@ export function RemittancePage() {
   if (fromDate) params.set('bill_date', `gte.${fromDate}`);
   if (toDate) params.append('bill_date', `lt.${toExclusive}`);
   if (typeFilter) params.set('bill_type', `eq.${typeFilter}`);
+  if (chargeFilter.length) params.set('charge_type', `in.(${chargeFilter.join(',')})`);
   params.set('order', 'bill_date.desc,bill_id.desc');
 
   const { data: pageData, isFetching } = useQuery({
-    queryKey: ['accounting', 'remittance', side, branchId, fromDate, toDate, typeFilter, pageIndex, pageSize],
+    queryKey: ['accounting', 'remittance', side, branchId, fromDate, toDate, typeFilter, chargeParam, pageIndex, pageSize],
     queryFn: () => apiClient.getPaginated<RemittanceRevenueRow>(
       `/${endpoint}?${params.toString()}`,
       { page: pageIndex + 1, pageSize }
@@ -128,9 +145,10 @@ export function RemittancePage() {
   if (branchId) summaryParams.set('branch_id', `eq.${branchId}`);
   if (fromDate) summaryParams.set('bill_date', `gte.${fromDate}`);
   if (toDate) summaryParams.append('bill_date', `lt.${toExclusive}`);
+  if (chargeFilter.length) summaryParams.set('charge_type', `in.(${chargeFilter.join(',')})`);
   summaryParams.set('select', 'bill_type,amount');
   const { data: summaryRows = [] } = useQuery({
-    queryKey: ['accounting', 'remittance-summary', side, branchId, fromDate, toDate],
+    queryKey: ['accounting', 'remittance-summary', side, branchId, fromDate, toDate, chargeParam],
     queryFn: () => apiClient.get<{ bill_type: string; amount: number }[]>(
       `/${endpoint}?${summaryParams.toString()}`,
     ),
@@ -150,7 +168,8 @@ export function RemittancePage() {
     return { byType: m, totalCount: totalCountAll, totalAmount };
   }, [summaryRows]);
 
-  const activeFilterCount = (typeFilter ? 1 : 0) + (!isBranchUser && branchId ? 1 : 0);
+  const activeFilterCount =
+    (typeFilter ? 1 : 0) + (chargeFilter.length ? 1 : 0) + (!isBranchUser && branchId ? 1 : 0);
 
   const dateFilter: ReactNode = (
     <InputDateRangePicker
@@ -198,6 +217,20 @@ export function RemittancePage() {
       clearable
     />
   );
+  const chargeNode: ReactNode = (
+    <Select
+      multiple
+      value={chargeFilter}
+      onChange={(v) => updateFilters({ charge: (v as string[]).join(',') })}
+      options={chargeTypes.map(c => ({
+        value: c.code,
+        label: i18n.language === 'th' ? c.name_th : c.name_en,
+      }))}
+      size="sm"
+      showChevron
+      placeholder={t('accounting.remittance.allCharges')}
+    />
+  );
   const branchNode: ReactNode = (
     <Select
       value={branchId || null}
@@ -212,6 +245,7 @@ export function RemittancePage() {
   );
 
   const filterItems: FilterBarItem[] = [
+    { key: 'charge', width: 224, node: chargeNode, priority: 60 },
     { key: 'type', width: 176, node: typeNode, priority: 50 },
     { key: 'branch', width: 176, node: branchNode, priority: 10 },
   ];
