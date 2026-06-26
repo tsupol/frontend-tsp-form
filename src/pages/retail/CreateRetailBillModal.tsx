@@ -146,11 +146,21 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
     queryFn: () => apiClient.get<Branch[]>('/v_branches?is_active=is.true&order=name'),
   });
 
+  // Branch-level staff bill only for their own branch — lock the picker to it.
+  // Company/holding users (branch_id null) keep the full picker.
+  const ownBranchId = user?.branch_id ?? null;
+  const branchLocked = ownBranchId != null;
+  const selectableBranches = useMemo(
+    () => (branchLocked ? branches.filter(b => b.id === ownBranchId) : branches),
+    [branches, branchLocked, ownBranchId],
+  );
+
   useEffect(() => {
-    if (open && !branchId && branches.length > 0) {
-      setBranchId(branches[0].id);
+    if (open && !branchId) {
+      if (ownBranchId != null) setBranchId(ownBranchId);
+      else if (branches.length > 0) setBranchId(branches[0].id);
     }
-  }, [open, branches, branchId]);
+  }, [open, branches, branchId, ownBranchId]);
 
   const previewParams = useMemo(() => ({
     p_branch_id: branchId,
@@ -447,9 +457,10 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
                 value={branchId ? String(branchId) : null}
                 onChange={(v) => setBranchId(v ? Number(v) : null)}
                 placeholder={t('accounting.branch')}
-                options={branches.map(b => ({ label: b.name, value: String(b.id) }))}
+                options={selectableBranches.map(b => ({ label: b.name, value: String(b.id) }))}
                 size="sm"
                 showChevron
+                disabled={branchLocked}
               />
             </div>
             <div className="flex-1" />

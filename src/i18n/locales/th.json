@@ -1354,6 +1354,7 @@
     "receivingProgress": "ความคืบหน้าการรับ",
     "outstanding": "ค้างรับ",
     "created": "สร้างเมื่อ",
+    "createdBy": "ผู้สร้าง",
     "createdByBranch": "สาขาที่สร้าง",
     "submitted": "ส่งเมื่อ",
     "approved": "อนุมัติเมื่อ",

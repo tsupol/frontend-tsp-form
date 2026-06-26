@@ -92,6 +92,7 @@ interface PoDetail {
   approved_at: string | null;
   cancelled_at: string | null;
   created_by: number;
+  created_by_name: string | null;
   created_by_branch_name: string | null;
   created_at: string;
   lines: PoDetailLine[] | null;
@@ -684,6 +685,9 @@ function PoDetailPanel({
 
       {/* Timestamps */}
       <div className="flex-none px-4 py-2 border-b border-line flex flex-wrap gap-x-6 gap-y-1 text-xs text-subtle">
+        {detail.created_by_name && (
+          <span>{t('po.createdBy')}: <span className="text-fg">{detail.created_by_name}</span></span>
+        )}
         {detail.created_by_branch_name && (
           <span>{t('po.createdByBranch')}: <span className="text-fg">{detail.created_by_branch_name}</span></span>
         )}
