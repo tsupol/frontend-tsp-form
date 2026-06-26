@@ -384,6 +384,7 @@ function BulkActionModal({ action, users, open, onClose }: { action: 'deactivate
 // Create user form
 interface CreateUserFormData {
   username: string;
+  email: string;
   password: string;
   role_code: string;
   company_id: string;
@@ -408,7 +409,7 @@ function CreateUserModal({ open, onClose }: { open: boolean; onClose: () => void
     reset,
     formState: { errors, isDirty },
   } = useForm<CreateUserFormData>({
-    defaultValues: { username: '', password: '', role_code: '', company_id: '', branch_id: '' },
+    defaultValues: { username: '', email: '', password: '', role_code: '', company_id: '', branch_id: '' },
   });
 
   const roleCode = watch('role_code');
@@ -433,6 +434,7 @@ function CreateUserModal({ open, onClose }: { open: boolean; onClose: () => void
       await apiClient.rpc('user_create', {
         p_username: data.username,
         p_password: data.password,
+        p_email: data.email.trim(),
         p_role_code: data.role_code,
         p_company_id: needsCompany ? Number(data.company_id) : null,
         p_branch_id: needsBranch ? Number(data.branch_id) : null,
@@ -506,6 +508,21 @@ function CreateUserModal({ open, onClose }: { open: boolean; onClose: () => void
                 {...register('username', { required: t('auth.usernameRequired') })}
               />
               <FormErrorMessage error={errors.username} />
+            </div>
+
+            <div className="flex flex-col">
+              <label className="form-label" htmlFor="cu-email">{t('users.email')}</label>
+              <Input
+                id="cu-email"
+                type="email"
+                placeholder={t('users.enterEmail')}
+                error={!!errors.email}
+                {...register('email', {
+                  required: t('users.emailRequired'),
+                  pattern: { value: /^[^@\s]+@[^@\s]+\.[^@\s]+$/, message: t('users.emailInvalid') },
+                })}
+              />
+              <FormErrorMessage error={errors.email} />
             </div>
 
             <div className="flex flex-col">
