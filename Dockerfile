@@ -1,7 +1,9 @@
 FROM node:22-alpine AS build
 WORKDIR /app
+# --ignore-scripts: the postinstall hook (copyPdfjsAssets.mjs) needs ./scripts,
+# which isn't copied until the next layer. `npm run build` runs it anyway.
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --ignore-scripts
 COPY . .
 RUN npm run build
 
