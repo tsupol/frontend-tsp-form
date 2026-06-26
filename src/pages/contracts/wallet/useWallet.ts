@@ -8,6 +8,7 @@ import type {
   WalletAction,
   WalletMutationParams,
   WalletMutationResult,
+  ContractActionAvailability,
 } from './types';
 
 export function useWalletActions() {
@@ -37,6 +38,27 @@ export function useWalletAvailable(contractId: number, walletType: WalletType, e
         p_contract_id: contractId,
         p_wallet_type: walletType,
       }),
+    enabled,
+    staleTime: 30 * 1000,
+  });
+}
+
+// Authoritative per-action availability. The backend evaluates every gate
+// (state, balance, outstanding, permission); the UI must trust is_available /
+// blocking_reason rather than reconstructing the rules client-side.
+// See UI_FEEDBACK 2026-06-26_GUIDE_contract_actions_trust_is_available_field.
+export function useContractActionAvailability(contractId: number, enabled = true) {
+  return useQuery({
+    queryKey: ['contract-available-actions', contractId],
+    queryFn: async () => {
+      const resp = await apiClient.rpc<{ actions: ContractActionAvailability[] }>(
+        'fn_contract_available_actions',
+        { p_contract_id: contractId },
+      );
+      const byCode = new Map<string, ContractActionAvailability>();
+      for (const a of resp.actions) byCode.set(a.action_code, a);
+      return byCode;
+    },
     enabled,
     staleTime: 30 * 1000,
   });

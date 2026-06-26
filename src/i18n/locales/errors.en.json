@@ -18,6 +18,7 @@
   "blockingReason.no_insurance_balance": "No insurance balance available",
   "blockingReason.no_credit_balance": "No credit balance available",
   "blockingReason.no_late_fee_balance": "No outstanding late fee",
+  "blockingReason.outstanding_remaining": "Customer still has outstanding installments",
   "blockingReason.device_already_bound": "A device is already bound to this contract",
   "blockingReason.device_bucket_not_match": "Device is not in the required state for this action",
   "blockingReason.no_loaner": "No loaner device is bound",

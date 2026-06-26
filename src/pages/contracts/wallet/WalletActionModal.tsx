@@ -12,7 +12,9 @@ import {
   useWalletReasons,
   useWalletAvailable,
   useWalletMutation,
+  useContractActionAvailability,
 } from './useWallet';
+import { WALLET_ACTION_CODE } from './types';
 import type { WalletType, WalletAction, WalletChannel } from './types';
 
 interface BankAccount {
@@ -90,6 +92,9 @@ export function WalletActionForm({
     walletType,
     active,
   );
+  // Authoritative per-action gate — trust is_available from the backend evaluator
+  // rather than re-deriving it from balances/guards here.
+  const { data: actionAvailability } = useContractActionAvailability(contractId, active);
 
   const { data: bankAccounts } = useQuery({
     queryKey: ['bank-accounts', holdingId],
@@ -147,8 +152,17 @@ export function WalletActionForm({
   const selectedReason = reasons?.find(r => r.code === reasonCode);
   const reasonNeedsNote = selectedReason?.requires_note ?? false;
 
-  const blockingGuard =
-    action === 'CASHOUT' ? available?.guards.find(g => g.blocks_cashout) : undefined;
+  const actionCode = WALLET_ACTION_CODE[walletType][action];
+  const avail = actionCode ? actionAvailability?.get(actionCode) : undefined;
+  // Block submit only once availability has loaded and reports the action unavailable.
+  // While loading (avail === undefined) we don't pre-block — the RPC re-checks anyway.
+  const blockedReason =
+    avail && !avail.is_available
+      ? t(`blockingReason.${avail.blocking_reason}`, {
+          ns: 'apiErrors',
+          defaultValue: avail.blocking_reason ?? '',
+        })
+      : '';
 
   const canSubmit =
     parsedAmount > 0 &&
@@ -156,7 +170,7 @@ export function WalletActionForm({
     (!requiresChannel || channel === 'CASH' || (channel === 'TRANSFER' && bankAccountId)) &&
     (!requiresReason || (reasonCode && (!reasonNeedsNote || reasonNote.trim()))) &&
     (!requiresPin || pin.length === 6) &&
-    !blockingGuard;
+    !blockedReason;
 
   const handleSubmit = () => {
     setError('');
@@ -205,15 +219,10 @@ export function WalletActionForm({
         </div>
       </div>
 
-      {blockingGuard && (
+      {blockedReason && (
         <div className="alert alert-warning mb-4">
           <AlertTriangle size={16} />
-          <span>
-            {t(blockingGuard.error_code, {
-              ns: 'apiErrors',
-              defaultValue: blockingGuard.rule,
-            })}
-          </span>
+          <span>{blockedReason}</span>
         </div>
       )}
 

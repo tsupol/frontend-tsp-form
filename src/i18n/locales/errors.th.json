@@ -18,6 +18,7 @@
   "blockingReason.no_insurance_balance": "ไม่มียอดเงินประกัน",
   "blockingReason.no_credit_balance": "ไม่มียอดเครดิตคงเหลือ",
   "blockingReason.no_late_fee_balance": "ไม่มีค่าปรับล่าช้าค้างชำระ",
+  "blockingReason.outstanding_remaining": "ลูกค้ายังมียอดค้างชำระ",
   "blockingReason.device_already_bound": "เครื่องถูกผูกกับสัญญานี้แล้ว",
   "blockingReason.device_bucket_not_match": "สถานะของเครื่องไม่ตรงกับเงื่อนไขรายการนี้",
   "blockingReason.no_loaner": "ไม่มีเครื่องสำรองผูกอยู่",

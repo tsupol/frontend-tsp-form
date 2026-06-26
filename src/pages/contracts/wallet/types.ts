@@ -50,6 +50,23 @@ export interface WalletAvailable {
   cashout_rpc: string;
 }
 
+export interface ContractActionAvailability {
+  action_code: string;
+  is_available: boolean;
+  blocking_reason: string | null;
+  require_pin: boolean;
+}
+
+// Maps a wallet button (walletType + action) to the backend action_code returned
+// by fn_contract_available_actions. The backend owns every gate (state / balance /
+// outstanding / permission) — UI trusts is_available rather than re-deriving rules.
+// See UI_FEEDBACK 2026-06-26_GUIDE_contract_actions_trust_is_available_field.
+export const WALLET_ACTION_CODE: Record<WalletType, Partial<Record<WalletAction, string>>> = {
+  SAVING: { DEPOSIT: 'SAVING_DEPOSIT', CASHOUT: 'SAVING_CASHOUT' },
+  CREDIT: { CASHOUT: 'CREDIT_CASHOUT' },
+  INSURANCE: { DEPOSIT: 'INSURANCE_TOPUP', CASHOUT: 'INSURANCE_CASHOUT', DEDUCT: 'APPLY_INSURANCE' },
+};
+
 export interface WalletMutationParams {
   contractId: number;
   walletType: WalletType;

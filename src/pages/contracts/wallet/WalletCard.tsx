@@ -6,8 +6,9 @@ import { PiggyBank, CreditCard, ShieldCheck, Lock, ChevronDown, ChevronUp } from
 import { apiClient } from '../../../lib/api';
 import { fmtCurrency } from '../../../lib/format';
 import { DateTime } from '../../../components/DateTime';
-import { useWalletActions, useWalletAvailable } from './useWallet';
-import type { WalletType, WalletAction, WalletActionRow } from './types';
+import { useWalletActions, useContractActionAvailability } from './useWallet';
+import { WALLET_ACTION_CODE } from './types';
+import type { WalletType, WalletAction, ContractActionAvailability } from './types';
 
 interface ContractWalletInfo {
   id: number;
@@ -68,7 +69,7 @@ export function WalletCard({ contract, walletType, onAction }: WalletCardProps) 
     [actions, walletType],
   );
 
-  const { data: available } = useWalletAvailable(contract.id, walletType, isActive);
+  const { data: actionAvailability } = useContractActionAvailability(contract.id, isActive);
 
   // Cheap probe to know whether history exists — drives whether to render the expander.
   const { data: txnProbe } = useQuery({
@@ -120,8 +121,10 @@ export function WalletCard({ contract, walletType, onAction }: WalletCardProps) 
         {isActive && (
           <div className="flex flex-wrap gap-2 mt-3">
             {allowedActions.map(actionRow => {
-              const disabled = isActionDisabled(actionRow, contract, available, walletType, balance);
-              const reason = disabledReason(actionRow, contract, available, walletType, balance, t);
+              const actionCode = WALLET_ACTION_CODE[walletType][actionRow.action];
+              const avail = actionCode ? actionAvailability?.get(actionCode) : undefined;
+              const disabled = isActionDisabled(avail);
+              const reason = disabledReason(avail, t);
               const button = (
                 <Button
                   key={actionRow.action}
@@ -216,54 +219,24 @@ function isWalletActive(c: ContractWalletInfo, w: WalletType, balance: number): 
   return ['ACTIVE', 'WAIT_LEGAL_PROCESS'].includes(c.state) || balance > 0;
 }
 
-function isActionDisabled(
-  action: WalletActionRow,
-  c: ContractWalletInfo,
-  available: ReturnType<typeof useWalletAvailable>['data'],
-  walletType: WalletType,
-  balance: number,
-): true | string | false {
-  // State guard
-  if (action.allowed_states && !action.allowed_states.includes(c.state)) {
-    return true;
-  }
-  // Spending actions blocked when wallet is empty
-  if (action.amount_sign === 'NEGATIVE' && balance === 0) {
-    return true;
-  }
-  // CREDIT cashout: only when company portion > 0
-  if (walletType === 'CREDIT' && action.action === 'CASHOUT') {
-    if ((c.credit_balance_company ?? 0) === 0) return true;
-  }
-  // Pre-check guard blocks
-  if (action.action === 'CASHOUT' && available?.guards.some(g => g.blocks_cashout)) {
-    return true;
-  }
-  return false;
+// Trust the backend evaluator: an action is disabled iff fn_contract_available_actions
+// reports is_available=false (or didn't return the action at all). Never re-derive the
+// gate from state/balance/outstanding here — that drift caused a real cashout incident
+// (CT-2606-000024-2). See UI_FEEDBACK 2026-06-26_GUIDE_contract_actions_trust_is_available_field.
+function isActionDisabled(avail: ContractActionAvailability | undefined): boolean {
+  return !avail?.is_available;
 }
 
 function disabledReason(
-  action: WalletActionRow,
-  c: ContractWalletInfo,
-  available: ReturnType<typeof useWalletAvailable>['data'],
-  walletType: WalletType,
-  balance: number,
+  avail: ContractActionAvailability | undefined,
   t: ReturnType<typeof useTranslation>['t'],
 ): string {
-  if (action.allowed_states && !action.allowed_states.includes(c.state)) {
-    return t('wallet.disabled_state', { defaultValue: 'Not allowed in current contract state' });
-  }
-  if (action.amount_sign === 'NEGATIVE' && balance === 0) {
-    return t('wallet.disabled_empty', { defaultValue: 'Wallet is empty' });
-  }
-  if (walletType === 'CREDIT' && action.action === 'CASHOUT' && (c.credit_balance_company ?? 0) === 0) {
-    return t('wallet.credit_locked_hint');
-  }
-  if (action.action === 'CASHOUT') {
-    const guard = available?.guards.find(g => g.blocks_cashout);
-    if (guard) {
-      return t(guard.error_code, { ns: 'apiErrors', defaultValue: guard.rule });
-    }
+  if (avail?.is_available) return '';
+  if (avail?.blocking_reason) {
+    return t(`blockingReason.${avail.blocking_reason}`, {
+      ns: 'apiErrors',
+      defaultValue: avail.blocking_reason,
+    });
   }
   return '';
 }
