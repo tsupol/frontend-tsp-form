@@ -560,16 +560,6 @@ function SigningCard({
                 {t('contract.previewContract', { defaultValue: 'Preview' })}
               </Button>
             )}
-            {isActionable && onRequestSignQr && (
-              <Button
-                size="sm"
-                color="primary"
-                startIcon={<Smartphone size={13} />}
-                onClick={onRequestSignQr}
-              >
-                {t('workspace.signQr', { defaultValue: 'Sign' })}
-              </Button>
-            )}
             {(signing.status === 'SEALED' || signing.status === 'SUPERSEDED') && onRequestPrint && (
               <Button
                 size="sm"
@@ -589,6 +579,19 @@ function SigningCard({
                 onClick={onRequestVoid}
               >
                 {t('signing.voidConfirm')}
+              </Button>
+            )}
+            {/* Send this document to the iPad for the customer parties to sign
+                on the bridge. Mints contract-scoped; the roster covers this
+                signing's pending parties (lessee + co-lessees). */}
+            {isActionable && onRequestSignQr && (
+              <Button
+                size="sm"
+                color="primary"
+                startIcon={<Smartphone size={13} />}
+                onClick={onRequestSignQr}
+              >
+                {t('workspace.signQr', { defaultValue: 'Sign' })}
               </Button>
             )}
           </div>
