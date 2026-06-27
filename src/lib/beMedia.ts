@@ -327,8 +327,11 @@ export const UPLOAD_SPECS: Record<string, BeMediaSpec> = {
     sizes: [{ label: 'lg', width: 1800 }], path_params: ['customer_id'],
   },
   contract_signature: {
+    // mig 327: keyed by the signing-party (signing_id, party_role, party_index);
+    // customer_id is audit-only. contract_id gives the storage prefix.
     type: 'contract_signature', privacy: 'private', resize_mode: 'contain', quality: 0.82,
-    sizes: [{ label: 'sm', width: 320 }], path_params: ['contract_id', 'customer_id'],
+    sizes: [{ label: 'sm', width: 320 }],
+    path_params: ['contract_id', 'signing_id', 'party_role', 'party_index', 'customer_id'],
   },
   branch_signatory_signature: {
     type: 'branch_signatory_signature', privacy: 'private', resize_mode: 'contain', quality: 0.82,

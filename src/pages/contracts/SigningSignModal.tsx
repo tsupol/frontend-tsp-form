@@ -162,7 +162,16 @@ export function SigningSignModal({ open, onClose, contractId, party }: Props) {
         type: 'contract_signature',
         file,
         size: 'sm',
-        params: { contract_id: contractId, customer_id: party.customer_id },
+        // mig 327: the leaf is keyed by the signing-party natural key so one
+        // person signing two documents can't overwrite their own signature.
+        // signing_id/party_role/party_index are required; customer_id is audit-only.
+        params: {
+          contract_id: contractId,
+          signing_id: party.signing_id,
+          party_role: party.party_role,
+          party_index: party.party_index,
+          customer_id: party.customer_id,
+        },
       });
       const attached = await apiClient.rpc<{ media_id: number }>('fn_media_attach', {
         p_holding_id: user.holding_id,
