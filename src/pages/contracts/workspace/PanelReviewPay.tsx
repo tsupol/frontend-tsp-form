@@ -6,7 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Select, MaskedInput } from 'tsp-form';
 import {
   Plus, Trash2, XCircle, Loader2, CheckCircle,
-  ChevronsRight, Link2, FileText, Printer,
+  ChevronsRight, Link2, FileText, Printer, PenLine,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { fmtCurrency } from '../../../lib/format';
@@ -545,7 +545,7 @@ function PostConfirmView({ billId, contractId, needsBindDevice, onNavigate, t }:
           <CheckCircle size={56} className="text-success" />
           <div className="text-lg font-semibold">{t('wizard.bill_confirmed_title', { defaultValue: 'Payment confirmed' })}</div>
           <div className="text-sm text-subtle">
-            {t('wizard.bill_confirmed_body', { defaultValue: 'The bill has been recorded. Print the receipt or continue.' })}
+            {t('wizard.bill_confirmed_body_signing', { defaultValue: 'The bill has been recorded. Next, have the customer sign on the Signing tab.' })}
           </div>
         </div>
       </div>
@@ -555,7 +555,7 @@ function PostConfirmView({ billId, contractId, needsBindDevice, onNavigate, t }:
         </Button>
         {needsBindDevice && contractId != null && (
           <Button
-            color="primary"
+            variant="outline"
             startIcon={<Link2 size={16} />}
             onClick={() => onNavigate(`/admin/contracts/pending-pairing/${contractId}`)}
           >
@@ -564,12 +564,20 @@ function PostConfirmView({ billId, contractId, needsBindDevice, onNavigate, t }:
         )}
         {contractId != null && (
           <Button
-            variant={needsBindDevice ? 'outline' : 'solid'}
-            color={needsBindDevice ? undefined : 'primary'}
+            variant="outline"
             startIcon={<FileText size={16} />}
             onClick={() => onNavigate(`/admin/contracts/search/${contractId}`)}
           >
             {t('wizard.action_viewInContract')}
+          </Button>
+        )}
+        {contractId != null && (
+          <Button
+            color="primary"
+            startIcon={<PenLine size={16} />}
+            onClick={() => onNavigate(`/admin/contracts/search/${contractId}?tab=signing`)}
+          >
+            {t('wizard.action_goToSigning', { defaultValue: 'Go to signing' })}
           </Button>
         )}
       </div>
