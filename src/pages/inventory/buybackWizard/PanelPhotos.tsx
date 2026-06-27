@@ -1,39 +1,26 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button, Modal, TextArea, ImageUploader } from 'tsp-form';
+import { Button, Modal, TextArea, ImageUploader, resizeToVariants } from 'tsp-form';
 import type { UploadedImage } from 'tsp-form';
-import { Plus, X, XCircle, ImageOff, Pencil, Check } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
+import { Plus, X, XCircle, ImageOff, Pencil, Check, Smartphone } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useMediaUrl } from '../../../hooks/useMediaUrl';
 import { mimeFromKey } from '../../../lib/upload';
 import {
-  beMediaUploadFromImage,
+  beMediaUpload,
   beMediaDelete,
   BUYBACK_CONDITION_TYPE,
-  BUYBACK_CONDITION_SIZES,
   BUYBACK_CONDITION_RESIZE,
   BUYBACK_CONDITION_MAX,
 } from '../../../lib/beMedia';
-
-// be-media buyback spec (replaces the misc-go useUploadSpec hook). Shape
-// matches what useUploadSpec returned so the ImageUploader props + the
-// largest-variant pick below are unchanged.
-const BUYBACK_SPEC = {
-  spec: {
-    max_files: BUYBACK_CONDITION_MAX,
-    sizes: [
-      { label: 'sm', width: 320 },
-      { label: 'md', width: 1280 },
-    ],
-  },
-  resize: BUYBACK_CONDITION_RESIZE.md,
-  sizes: BUYBACK_CONDITION_RESIZE,
-} as const;
 import { toStoragePath, normalizeKey } from '../../../lib/mediaPath';
 import { MediaLightbox } from '../../../components/MediaLightbox';
+import { useMobileCaptureSession } from '../../contracts/workspace/useMobileCaptureSession';
 import { getLine } from './useBuyback';
+import { codeDisplay } from '../inventoryUtils';
 import type { BuybackDraft } from './types';
 
 interface EntityMedia {
@@ -53,9 +40,12 @@ interface EntityMedia {
 const USAGE_TYPE = 'BUYBACK_CONDITION';
 const ENTITY_TYPE = 'PO_LINE';
 
+// Condition photos are now a single private full-frame file per shot
+// (variants_json is null). Fall back to storage_path, but still read any legacy
+// variant keys for older rows that predate the private switch.
 function pickThumbKey(m: EntityMedia): string | null {
   const v = m.variants_json ?? {};
-  return v.md || v.lg || v.sm || v.thumb || v.original || m.storage_path || null;
+  return v.md || v.lg || v.sm || v.original || m.storage_path || null;
 }
 function pickFullKey(m: EntityMedia): string | null {
   const v = m.variants_json ?? {};
@@ -81,11 +71,11 @@ export function PanelPhotos({
   const queryClient = useQueryClient();
   const line = getLine(draft);
   const lineId = line?.po_line_id ?? null;
-  const upload = BUYBACK_SPEC;
 
   const [error, setError] = useState('');
   const [lightboxKey, setLightboxKey] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
   const [editCaptionFor, setEditCaptionFor] = useState<EntityMedia | null>(null);
 
   const { data: photos = [], refetch } = useQuery({
@@ -102,7 +92,7 @@ export function PanelPhotos({
     staleTime: 30 * 1000,
   });
 
-  const maxFiles = upload.spec?.max_files ?? 5;
+  const maxFiles = BUYBACK_CONDITION_MAX;
   const remaining = Math.max(0, maxFiles - photos.length);
   const editable = draft.status === 'DRAFT';
 
@@ -162,15 +152,24 @@ export function PanelPhotos({
             ))}
 
             {editable && remaining > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                startIcon={<Plus size={16} />}
-                onClick={() => setAddOpen(true)}
-                className="col-span-2"
-              >
-                {t('buybackWizard.addPhoto', { defaultValue: 'Add photo' })}
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  startIcon={<Plus size={16} />}
+                  onClick={() => setAddOpen(true)}
+                >
+                  {t('buybackWizard.addPhoto', { defaultValue: 'Add photo' })}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  startIcon={<Smartphone size={16} />}
+                  onClick={() => setQrOpen(true)}
+                >
+                  {t('buybackWizard.captureFromPhone', { defaultValue: 'Capture from phone' })}
+                </Button>
+              </>
             )}
 
             {!editable && photos.length === 0 && (
@@ -199,8 +198,17 @@ export function PanelPhotos({
           onClose={() => setAddOpen(false)}
           lineId={lineId}
           sortOrder={photos.length}
-          uploadSpec={upload}
           onAdded={() => { setAddOpen(false); refresh(); }}
+        />
+      )}
+
+      {lineId != null && (
+        <CaptureQrModal
+          open={qrOpen}
+          onClose={() => setQrOpen(false)}
+          lineId={lineId}
+          poCode={codeDisplay(draft.code_display, draft.po_no)}
+          onUploaded={refresh}
         />
       )}
 
@@ -281,20 +289,20 @@ function PhotoRow({
 }
 
 // ============================================================================
+// Desktop add — resize one frame to webp → upload to the PRIVATE bridge type →
+// attach as RESTRICTED entity_media (single file, no variants).
 
 function AddPhotoModal({
   open,
   onClose,
   lineId,
   sortOrder,
-  uploadSpec,
   onAdded,
 }: {
   open: boolean;
   onClose: () => void;
   lineId: number;
   sortOrder: number;
-  uploadSpec: typeof BUYBACK_SPEC;
   onAdded: () => void;
 }) {
   const { t } = useTranslation();
@@ -316,32 +324,31 @@ function AddPhotoModal({
       if (!picked) throw new Error(t('buybackWizard.errorPickImage', { defaultValue: 'Pick an image first' }));
       if (!user?.holding_id) throw new Error('Missing holding context');
 
-      const results = await beMediaUploadFromImage({
+      // The ImageUploader gives us one resized frame (top-level file). Re-derive
+      // a single webp variant defensively in case the source carries the raw
+      // file only, then upload the one frame to the bridge type.
+      const source = picked.file ?? picked.originalFile ?? null;
+      if (!source) throw new Error('No image data');
+      const variants = await resizeToVariants(source, { md: BUYBACK_CONDITION_RESIZE });
+      const frame = variants.md?.file ?? source;
+
+      const uploaded = await beMediaUpload({
         type: BUYBACK_CONDITION_TYPE,
-        image: picked,
-        sizes: BUYBACK_CONDITION_SIZES,
+        file: frame,
         params: { po_line_id: lineId, idx: sortOrder },
       });
 
-      const sizes = uploadSpec.spec?.sizes ?? [];
-      const largest = sizes.length > 0 ? sizes.reduce((a, b) => (b.width > a.width ? b : a)) : null;
-      const largestLabel = largest?.label ?? Object.keys(results)[0];
-      const primary = results[largestLabel];
-      if (!primary) throw new Error('Upload returned no primary file');
-      const variants: Record<string, string> = {};
-      for (const [label, r] of Object.entries(results)) {
-        if (label === largestLabel) continue;
-        variants[label] = toStoragePath(r.key);
-      }
-
       try {
+        // Private bucket → RESTRICTED (entity parties only). The table
+        // constraint requires variant values to be PUBLIC paths, so private
+        // single-file uploads pass null variants.
         await apiClient.rpc('fn_media_attach', {
           p_holding_id: user.holding_id,
-          p_storage_path: toStoragePath(primary.key),
-          p_variants_json: Object.keys(variants).length > 0 ? variants : null,
+          p_storage_path: toStoragePath(uploaded.key),
+          p_variants_json: null,
           p_media_type: 'IMAGE',
-          p_access_level: 'PUBLIC',
-          p_mime_type: mimeFromKey(primary.key),
+          p_access_level: 'RESTRICTED',
+          p_mime_type: mimeFromKey(uploaded.key),
           p_file_size_bytes: null,
           p_original_filename: null,
           p_entity_type: ENTITY_TYPE,
@@ -351,10 +358,9 @@ function AddPhotoModal({
           p_caption: caption.trim() || null,
         });
       } catch (err) {
-        // Attach failed → uploaded R2 objects are orphans. Sweep them.
-        const orphanKeys = Object.values(results).map((r) => r.key);
-        beMediaDelete(orphanKeys).catch((cleanupErr) => {
-          console.warn('R2 orphan cleanup failed for', orphanKeys, cleanupErr);
+        // Attach failed → the uploaded R2 object is an orphan. Sweep it.
+        beMediaDelete([uploaded.key]).catch((cleanupErr) => {
+          console.warn('R2 orphan cleanup failed for', uploaded.key, cleanupErr);
         });
         throw err;
       }
@@ -363,14 +369,11 @@ function AddPhotoModal({
     onError: (err) => setError(formatApiError(err, t)),
   });
 
-  // Local preview URL for the picked image (before upload). When ImageUploader
-  // runs in multi-size mode (sizes prop), `file`/`preview` at the top level are
-  // undefined — files live under `variants[label]`. Fall back to the largest
-  // variant's preview, then the smallest, then the original.
+  // Local preview URL for the picked image (before upload). Single-size mode
+  // populates the top-level `preview`; fall back to a variant preview.
   const previewUrl = picked
     ? (picked.preview
         ?? picked.variants?.md?.preview
-        ?? picked.variants?.sm?.preview
         ?? (picked.variants ? Object.values(picked.variants)[0]?.preview : undefined)
         ?? null)
     : null;
@@ -406,10 +409,9 @@ function AddPhotoModal({
               </div>
             ) : (
               <ImageUploader
-                resizeOptions={uploadSpec.resize}
-                sizes={uploadSpec.sizes}
+                resizeOptions={BUYBACK_CONDITION_RESIZE}
                 onUpload={(imgs) => imgs[0] && setPicked(imgs[0])}
-                disabled={!uploadSpec.spec || save.isPending}
+                disabled={save.isPending}
               />
             )}
           </div>
@@ -435,6 +437,91 @@ function AddPhotoModal({
         >
           {save.isPending ? t('common.loading') : t('common.add', { defaultValue: 'Add' })}
         </Button>
+      </div>
+    </Modal>
+  );
+}
+
+// ============================================================================
+// Mobile Capture Bridge — staff renders a QR; a phone scans it and uploads
+// condition photos straight into the same PO_LINE / BUYBACK_CONDITION album
+// (auto-attached). Mirrors the contract-attachment capture modal.
+
+function CaptureQrModal({
+  open,
+  onClose,
+  lineId,
+  poCode,
+  onUploaded,
+}: {
+  open: boolean;
+  onClose: () => void;
+  lineId: number;
+  poCode: string;
+  onUploaded: () => void;
+}) {
+  const { t } = useTranslation();
+  const { phase, session, status, error, uploadCount, start, cancel } = useMobileCaptureSession(
+    lineId,
+    poCode,
+    { entityType: 'BUYBACK_CONDITION', meta: { source: 'buyback-wizard-photos' } },
+  );
+
+  useEffect(() => {
+    if (open) start();
+    else cancel();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+  useEffect(() => () => { cancel(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Pull newly-arrived photos into the album list as they land.
+  useEffect(() => {
+    if (uploadCount > 0) onUploaded();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uploadCount]);
+
+  const friendlyError = error ? (t(error, { ns: 'apiErrors', defaultValue: '' }) || error) : '';
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="32rem" width="100%">
+      <div className="modal-header">
+        <h2 className="modal-title">{t('buybackWizard.captureFromPhone', { defaultValue: 'Capture from phone' })}</h2>
+        <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+      </div>
+
+      <div className="modal-content">
+        <p className="text-sm text-subtle mb-4">{poCode}</p>
+
+        {phase === 'error' ? (
+          <div className="alert alert-danger"><XCircle size={18} /><span>{friendlyError}</span></div>
+        ) : !session ? (
+          <div className="flex flex-col items-center justify-center py-12 text-subtle">
+            <Smartphone size={32} className="mb-2 animate-pulse" />
+            <span className="text-sm">{t('common.loading', { defaultValue: 'Loading...' })}</span>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-4">
+            <div className="rounded-lg border border-line bg-white p-4">
+              <QRCodeSVG value={session.qr_payload} size={224} />
+            </div>
+            <p className="text-sm text-subtle text-center">
+              {t('buybackWizard.captureScanHint', {
+                defaultValue: 'Scan the QR with a phone to open the camera and send condition photos.',
+              })}
+            </p>
+            <p className="text-sm font-medium">
+              {t('buybackWizard.captureCount', {
+                defaultValue: '{{count}} / {{max}} uploaded',
+                count: uploadCount,
+                max: status?.max_uploads ?? session.max_uploads,
+              })}
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="modal-footer">
+        <Button color="primary" onClick={onClose}>{t('common.done', { defaultValue: 'Done' })}</Button>
       </div>
     </Modal>
   );

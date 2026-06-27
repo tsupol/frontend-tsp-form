@@ -16,7 +16,6 @@ export interface BuybackLine {
   item_condition: string | null;
   condition_snapshot: Record<string, unknown> | null;
   note: string | null;
-  images: unknown[];
   asset_match_result: string | null;
   asset_intake_status: string | null;
   attempted_identifiers_json: { type: string; value: string }[] | null;

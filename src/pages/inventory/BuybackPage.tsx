@@ -12,6 +12,9 @@ import { codeDisplay } from './inventoryUtils';
 import { useAuth } from '../../contexts/AuthContext';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { ActionDoneView } from '../contracts/ActionDoneView';
+import { useMediaUrl } from '../../hooks/useMediaUrl';
+import { normalizeKey } from '../../lib/mediaPath';
+import { MediaLightbox } from '../../components/MediaLightbox';
 
 // ============================================================================
 // Types — uses dedicated v_buyback_list / v_buyback_detail views
@@ -48,11 +51,21 @@ interface BuybackListItem {
   } | null;
 }
 
+// Condition photos (entity_media PO_LINE / BUYBACK_CONDITION) as server-rendered
+// on v_buyback_detail.lines[].condition_photos. Private — paths resolve via
+// presigned URL. Replaces the dropped legacy `images` jsonb (mig 103).
+interface ConditionPhoto {
+  media_id: number;
+  sort_order: number;
+  usage_type: string;
+  access_level: string;
+  paths: { original?: string; sm?: string; md?: string; lg?: string } | null;
+}
+
 interface BuybackDetailLine {
   po_line_id: number;
   qty: number;
   note: string | null;
-  images: unknown[];
   model_id: number;
   sku_code: string;
   unit_cost: number;
@@ -68,6 +81,8 @@ interface BuybackDetailLine {
   matched_asset_id: number | null;
   asset_match_result: string | null;
   condition_snapshot: Record<string, unknown> | null;
+  condition_photos: ConditionPhoto[] | null;
+  warranty_expired_date: string | null;
   asset_intake_status: string | null;
   attempted_identifiers_json: { type: string; value: string }[] | null;
 }
@@ -76,6 +91,11 @@ interface BuybackDetail extends Omit<BuybackListItem, 'id' | 'total_price' | 'pr
   po_id: number;
   notes: string | null;
   approved_by: number | null;
+  // Reason readback (codes-only; UI translates). Null until rejected/cancelled.
+  rejected_by: number | null;
+  rejection_reason_code: string | null;
+  cancelled_by: number | null;
+  cancel_reason_code: string | null;
   lines: BuybackDetailLine[];
 }
 
@@ -84,13 +104,18 @@ interface Branch {
   name: string;
 }
 
-// fn_buyback_available_actions response (mig 114, 2026-05-27).
+// fn_buyback_available_actions — contract_version: 2 (2026-06-26).
+// Two-flag contract: render IFF is_permitted, disable IFF NOT is_enabled.
 interface BuybackAction {
   action_code: string;
   rpc_name: string;
   category: string;
-  is_available: boolean;
+  is_permitted: boolean;
+  is_enabled: boolean;
+  is_available: boolean; // deprecated alias (= is_enabled) this release
   blocking_reason: string | null;
+  needs_reason: boolean;
+  reason_group: 'CANCEL' | 'REJECT' | null;
   require_pin: boolean;
   sort_order: number;
   target_line_id: number | null;
@@ -102,10 +127,15 @@ interface BuybackActionsResponse {
   branch_id: number | null;
   auto_reject_after: string | null;
   auto_rejected: boolean;
+  contract_version: number;
   validate_ready: boolean | null;
-  validate_failing_checks: string[];
+  validate_failing_checks: string[] | null;
   actions: BuybackAction[];
 }
+
+// Modal-driven actions (those that open a form/confirm). Catalog actions
+// without a modal (edit/validate) are rendered disabled-with-hint.
+type BuybackActionKind = 'submit' | 'revert' | 'approve' | 'reject' | 'cancel' | 'cancelApproved';
 
 // ============================================================================
 // Status display
@@ -134,7 +164,7 @@ const ASSET_MATCH_COLOR: Record<string, 'success' | 'warning' | 'danger' | 'info
 interface BuybackReason {
   id: number;
   code: string;
-  label: string;
+  label: string; // Thai debug label — UI translates `code`, does not echo this
   reason_group: 'REJECT' | 'CANCEL';
   is_active: boolean;
 }
@@ -153,6 +183,8 @@ const PRIMARY_COLOR: Record<string, 'primary' | 'danger'> = {
   BUYBACK_REJECT: 'danger',
   BUYBACK_CONFIRM_INTAKE: 'primary',
   BUYBACK_REVERT_DRAFT: 'primary',
+  BUYBACK_CANCEL: 'danger',
+  BUYBACK_CANCEL_APPROVED: 'danger',
 };
 
 // Section grouping in the More menu (option B: Edit / Lifecycle / System).
@@ -171,9 +203,13 @@ interface ActionHandlers {
   onReject: () => void;
   onRevert: () => void;
   onIntake: () => void;
+  onCancel: () => void;
+  onCancelApproved: () => void;
   validateFailingChecks: string[];
 }
 
+// Render IFF is_permitted (callers already filter on this); disable IFF NOT
+// is_enabled; show blocking_reason as a tooltip when disabled.
 function renderBuybackActionButton(a: BuybackAction, h: ActionHandlers): React.ReactNode {
   const label = h.t(`buybackAction.${a.action_code}`, { defaultValue: a.action_code });
   const onClick: Record<string, () => void> = {
@@ -182,11 +218,13 @@ function renderBuybackActionButton(a: BuybackAction, h: ActionHandlers): React.R
     BUYBACK_REJECT: h.onReject,
     BUYBACK_REVERT_DRAFT: h.onRevert,
     BUYBACK_CONFIRM_INTAKE: h.onIntake,
+    BUYBACK_CANCEL: h.onCancel,
+    BUYBACK_CANCEL_APPROVED: h.onCancelApproved,
   };
   const handler = onClick[a.action_code];
-  // UPDATE_LINE / VALIDATE are catalog entries the FE doesn't open a modal for.
-  // Render them disabled with a wrench-style hint, like AssetsPage does for
-  // not-yet-wired actions.
+  // UPDATE_*/VALIDATE are catalog entries the FE doesn't open a modal for.
+  // Render them disabled with a hint, like AssetsPage does for not-yet-wired
+  // actions.
   const wired = !!handler;
 
   const lines: React.ReactNode[] = [<div key="l" className="font-medium">{label}</div>];
@@ -197,7 +235,7 @@ function renderBuybackActionButton(a: BuybackAction, h: ActionHandlers): React.R
       </div>,
     );
   }
-  if (!a.is_available && a.blocking_reason) {
+  if (!a.is_enabled && a.blocking_reason) {
     let reason: string;
     if (a.blocking_reason === 'validate_failed' && h.validateFailingChecks.length > 0) {
       reason = h.t('buyback.submitNotReady', {
@@ -212,7 +250,7 @@ function renderBuybackActionButton(a: BuybackAction, h: ActionHandlers): React.R
     lines.push(<div key="r" className="text-xs opacity-90">{reason}</div>);
   }
 
-  const color = h.primary && a.is_available && wired ? PRIMARY_COLOR[a.action_code] : undefined;
+  const color = h.primary && a.is_enabled && wired ? PRIMARY_COLOR[a.action_code] : undefined;
 
   return (
     <Tooltip
@@ -224,7 +262,7 @@ function renderBuybackActionButton(a: BuybackAction, h: ActionHandlers): React.R
         size="sm"
         variant={h.primary ? undefined : 'outline'}
         color={color}
-        disabled={!a.is_available || !wired}
+        disabled={!a.is_enabled || !wired}
         onClick={handler}
       >
         {label}
@@ -525,9 +563,10 @@ function BuybackDetailPanel({
   onRefresh: () => void;
   addSnackbar: (opts: { message: React.ReactNode }) => void;
 }) {
-  const [actionModal, setActionModal] = useState<'submit' | 'revert' | 'approve' | 'reject' | null>(null);
+  const [actionModal, setActionModal] = useState<BuybackActionKind | null>(null);
   const [intakeOpen, setIntakeOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [lightboxKey, setLightboxKey] = useState<string | null>(null);
   const moreTriggerRef = useRef<HTMLButtonElement>(null);
   const navigate = useNavigate();
 
@@ -545,9 +584,11 @@ function BuybackDetailPanel({
     staleTime: 30 * 1000,
   });
 
-  // All actions in catalog order, then sort_order. We do NOT filter
-  // permission_denied — disabled-with-tooltip is the convention.
+  // Two-flag contract: render IFF is_permitted (hide actions that aren't this
+  // role's — e.g. branch never sees Approve/Reject). Among permitted, keep
+  // disabled-with-tooltip for the not-right-now ones. Catalog order, then sort.
   const allActions = (actionsResp?.actions ?? [])
+    .filter(a => a.is_permitted)
     .slice()
     .sort((a, b) => a.sort_order - b.sort_order);
 
@@ -555,7 +596,7 @@ function BuybackDetailPanel({
   const PRIMARY_BY_STATUS: Record<string, string[]> = {
     DRAFT:            ['BUYBACK_SUBMIT'],
     PENDING_APPROVAL: ['BUYBACK_APPROVE', 'BUYBACK_REJECT'],
-    APPROVED:         ['BUYBACK_CONFIRM_INTAKE'],
+    APPROVED:         ['BUYBACK_CONFIRM_INTAKE', 'BUYBACK_CANCEL_APPROVED'],
     REJECTED:         ['BUYBACK_REVERT_DRAFT'],
   };
   const primaryCodes = PRIMARY_BY_STATUS[detail.status] ?? [];
@@ -623,6 +664,7 @@ function BuybackDetailPanel({
         {detail.submitted_at && <span>{t('buyback.submitted')}: <DateTime value={detail.submitted_at} /></span>}
         {detail.approved_at && <span>{t('buyback.approved')}: <DateTime value={detail.approved_at} /></span>}
         {detail.rejected_at && <span>{t('buyback.rejected')}: <DateTime value={detail.rejected_at} /></span>}
+        {detail.cancelled_at && <span>{t('buyback.cancelled', { defaultValue: 'Cancelled' })}: <DateTime value={detail.cancelled_at} /></span>}
       </div>
 
       {/* Auto-reject countdown */}
@@ -632,6 +674,30 @@ function BuybackDetailPanel({
           <span className="text-warning">
             {t('buyback.autoRejectAt', { defaultValue: 'Auto-rejects' })}: <DateTime value={detail.auto_reject_after} showTime />
           </span>
+        </div>
+      )}
+
+      {/* Reject / cancel reason readback (codes-only; UI translates). */}
+      {detail.status === 'REJECTED' && detail.rejection_reason_code && (
+        <div className="flex-none px-4 py-2 border-b border-line">
+          <div className={`alert ${detail.rejection_reason_code === 'AUTO_REJECT' ? 'alert-warning' : 'alert-danger'} text-xs`}>
+            <XCircle size={14} />
+            <span>
+              {t('buyback.rejectedReason', { defaultValue: 'Rejected' })}:{' '}
+              {t(`buyback.reason.${detail.rejection_reason_code}`, { defaultValue: detail.rejection_reason_code })}
+            </span>
+          </div>
+        </div>
+      )}
+      {detail.status === 'CANCELLED' && detail.cancel_reason_code && (
+        <div className="flex-none px-4 py-2 border-b border-line">
+          <div className="alert alert-danger text-xs">
+            <XCircle size={14} />
+            <span>
+              {t('buyback.cancelledReason', { defaultValue: 'Cancelled' })}:{' '}
+              {t(`buyback.reason.${detail.cancel_reason_code}`, { defaultValue: detail.cancel_reason_code })}
+            </span>
+          </div>
         </div>
       )}
 
@@ -652,7 +718,7 @@ function BuybackDetailPanel({
           <div className="p-8 text-center text-subtler">{t('common.noData')}</div>
         )}
         {lines.map((line) => (
-          <div key={line.po_line_id} className="px-4 py-2.5 border-b border-line flex flex-col gap-2">
+          <div key={line.po_line_id} className="px-4 py-3.5 border-b border-line flex flex-col gap-3.5">
             <div className="flex items-start gap-3">
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium truncate">
@@ -697,9 +763,9 @@ function BuybackDetailPanel({
 
             {/* Condition snapshot */}
             {line.condition_snapshot && Object.keys(line.condition_snapshot).length > 0 && (
-              <div className="rounded-md bg-surface border border-line px-3 py-2">
-                <div className="text-xs text-subtle mb-1">{t('buyback.conditionSnapshot', { defaultValue: 'Condition' })}</div>
-                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+              <div className="rounded-md bg-surface border border-line px-3 py-3">
+                <div className="text-xs text-subtle mb-2.5">{t('buyback.conditionSnapshot', { defaultValue: 'Condition' })}</div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs">
                   {Object.entries(line.condition_snapshot).map(([k, v]) => {
                     const label = t(`buyback.field.${k}`, { defaultValue: k });
                     const rawValue = v == null ? '' : String(v);
@@ -714,9 +780,9 @@ function BuybackDetailPanel({
                       display = t(`buyback.condition.${rawValue}`, { defaultValue: rawValue });
                     }
                     return (
-                      <div key={k} className="flex gap-1 min-w-0">
-                        <span className="text-subtle truncate">{label}:</span>
-                        <span className="font-medium truncate">{display}</span>
+                      <div key={k} className="flex flex-col gap-0.5 min-w-0">
+                        <span className="text-subtle truncate">{label}</span>
+                        <span className="font-medium break-words">{display}</span>
                       </div>
                     );
                   })}
@@ -724,26 +790,15 @@ function BuybackDetailPanel({
               </div>
             )}
 
-            {/* Photos */}
-            {Array.isArray(line.images) && line.images.length > 0 && (
+            {/* Condition photos (entity_media, private — presigned). */}
+            {line.condition_photos && line.condition_photos.length > 0 && (
               <div className="flex flex-wrap gap-2">
-                {(line.images as Array<{ url?: string; label?: string }>).map((img, i) => (
-                  img?.url ? (
-                    <a
-                      key={i}
-                      href={img.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block w-20 h-20 rounded-md border border-line overflow-hidden bg-surface hover:opacity-80"
-                      title={img.label ?? ''}
-                    >
-                      <img src={img.url} alt={img.label ?? `photo ${i + 1}`} className="w-full h-full object-cover" />
-                    </a>
-                  ) : (
-                    <div key={i} className="w-20 h-20 rounded-md border border-line flex items-center justify-center bg-surface text-subtle">
-                      <ImageOff size={20} />
-                    </div>
-                  )
+                {line.condition_photos.map((photo) => (
+                  <ConditionPhotoThumb
+                    key={photo.media_id}
+                    photo={photo}
+                    onPreview={setLightboxKey}
+                  />
                 ))}
               </div>
             )}
@@ -776,6 +831,8 @@ function BuybackDetailPanel({
             onReject: () => setActionModal('reject'),
             onRevert: () => setActionModal('revert'),
             onIntake: () => setIntakeOpen(true),
+            onCancel: () => setActionModal('cancel'),
+            onCancelApproved: () => setActionModal('cancelApproved'),
             validateFailingChecks: actionsResp?.validate_failing_checks ?? [],
           }))}
 
@@ -818,6 +875,8 @@ function BuybackDetailPanel({
                                 onReject: () => setActionModal('reject'),
                                 onRevert: () => setActionModal('revert'),
                                 onIntake: () => setIntakeOpen(true),
+                                onCancel: () => setActionModal('cancel'),
+                                onCancelApproved: () => setActionModal('cancelApproved'),
                                 validateFailingChecks: actionsResp?.validate_failing_checks ?? [],
                               })}
                             </div>
@@ -844,6 +903,8 @@ function BuybackDetailPanel({
           const msg = actionModal === 'submit' ? t('buyback.submitSuccess')
             : actionModal === 'approve' ? t('buyback.approveSuccess')
             : actionModal === 'reject' ? t('buyback.rejectSuccess')
+            : actionModal === 'cancel' ? t('buyback.cancelSuccess', { defaultValue: 'Buyback cancelled' })
+            : actionModal === 'cancelApproved' ? t('buyback.cancelSuccess', { defaultValue: 'Buyback cancelled' })
             : t('buyback.revertSuccess');
           setActionModal(null);
           onRefresh();
@@ -864,7 +925,46 @@ function BuybackDetailPanel({
         detail={detail}
         targetLineId={intakeAction?.target_line_id ?? null}
       />
+
+      <MediaLightbox
+        open={lightboxKey != null}
+        onClose={() => setLightboxKey(null)}
+        mediaKey={lightboxKey}
+        alt="Condition photo"
+      />
     </div>
+  );
+}
+
+// Single condition photo thumbnail — presigns the private key for display and
+// for the lightbox. Prefers a smaller variant for the thumb when present;
+// current rows are single-file (storage in `original`).
+function ConditionPhotoThumb({
+  photo,
+  onPreview,
+}: {
+  photo: ConditionPhoto;
+  onPreview: (key: string) => void;
+}) {
+  const p = photo.paths ?? {};
+  const thumbRaw = p.sm || p.md || p.original || p.lg || null;
+  const fullRaw = p.original || p.lg || p.md || p.sm || null;
+  const { url } = useMediaUrl(thumbRaw ? normalizeKey(thumbRaw) : null);
+  return (
+    <button
+      type="button"
+      onClick={() => fullRaw && onPreview(normalizeKey(fullRaw))}
+      className="block w-20 h-20 rounded-md border border-line overflow-hidden bg-surface hover:opacity-80 cursor-zoom-in p-0"
+      aria-label="Preview condition photo"
+    >
+      {url ? (
+        <img src={url} alt="" className="w-full h-full object-cover" />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center text-subtle">
+          <ImageOff size={20} />
+        </div>
+      )}
+    </button>
   );
 }
 
@@ -1020,7 +1120,7 @@ function BuybackIntakeModal({
 }
 
 // ============================================================================
-// Action Modal (submit, revert, approve, reject)
+// Action Modal (submit, revert, approve, reject, cancel, cancel_approved)
 // ============================================================================
 
 function BuybackActionModal({
@@ -1033,7 +1133,7 @@ function BuybackActionModal({
   onSuccess,
 }: {
   open: boolean;
-  action: 'submit' | 'revert' | 'approve' | 'reject' | null;
+  action: BuybackActionKind | null;
   onClose: () => void;
   detail: BuybackDetail;
   totalPrice: number;
@@ -1047,13 +1147,20 @@ function BuybackActionModal({
   const [reasonId, setReasonId] = useState<number | null>(null);
   const [error, setError] = useState('');
 
-  // Lazy-load reject reasons only when the reject modal opens
-  const { data: rejectReasons = [] } = useQuery({
-    queryKey: ['buyback-reject-reasons'],
+  // reject → REJECT group; cancel / cancelApproved → CANCEL group.
+  const reasonGroup: 'REJECT' | 'CANCEL' | null =
+    action === 'reject' ? 'REJECT'
+    : action === 'cancel' || action === 'cancelApproved' ? 'CANCEL'
+    : null;
+
+  // Lazy-load the matching reason group only when a reason is needed. UI
+  // translates `code`; the Thai `label` is not echoed as canonical.
+  const { data: reasons = [] } = useQuery({
+    queryKey: ['buyback-reasons', reasonGroup],
     queryFn: () => apiClient.get<BuybackReason[]>(
-      '/v_ref_buyback_reasons?reason_group=eq.REJECT&is_active=is.true',
+      `/v_buyback_reasons?reason_group=eq.${reasonGroup}&is_active=eq.true`,
     ),
-    enabled: open && action === 'reject',
+    enabled: open && reasonGroup !== null,
     staleTime: 30 * 60 * 1000,
   });
 
@@ -1069,11 +1176,13 @@ function BuybackActionModal({
     }
   }, [open, action, line]);
 
-  const titleMap: Record<string, string> = {
+  const titleMap: Record<BuybackActionKind, string> = {
     submit: t('buyback.submit'),
     revert: t('buyback.revertDraft'),
     approve: t('buyback.approve'),
     reject: t('buyback.reject'),
+    cancel: t('buyback.cancel', { defaultValue: 'Cancel buyback' }),
+    cancelApproved: t('buyback.cancelApproved', { defaultValue: 'Cancel approved buyback' }),
   };
 
   const mutation = useMutation({
@@ -1092,6 +1201,21 @@ function BuybackActionModal({
       }
       if (action === 'reject') {
         return apiClient.rpc('fn_inv_buyback_reject', {
+          p_po_id: detail.po_id,
+          p_reason_id: reasonId,
+          p_note: note.trim() || null,
+        });
+      }
+      if (action === 'cancel') {
+        return apiClient.rpc('fn_inv_buyback_cancel', {
+          p_po_id: detail.po_id,
+          p_reason_id: reasonId,
+          p_note: note.trim() || null,
+          p_branch_id: null,
+        });
+      }
+      if (action === 'cancelApproved') {
+        return apiClient.rpc('fn_inv_buyback_cancel_approved', {
           p_po_id: detail.po_id,
           p_reason_id: reasonId,
           p_note: note.trim() || null,
@@ -1123,11 +1247,12 @@ function BuybackActionModal({
   });
 
   const isSubmit = action === 'submit';
-  const isReject = action === 'reject';
+  const isDanger = action === 'reject' || action === 'cancel' || action === 'cancelApproved';
+  const needsReason = reasonGroup !== null;
   // Submit requires at least one identifier (Serial is always allowed; IMEI when applicable).
   const submitValid = !isSubmit || imei.trim().length > 0 || serial.trim().length > 0;
-  const rejectValid = !isReject || reasonId !== null;
-  const canSubmit = submitValid && rejectValid && !mutation.isPending;
+  const reasonValid = !needsReason || reasonId !== null;
+  const canSubmit = submitValid && reasonValid && !mutation.isPending;
 
   return (
     <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
@@ -1177,11 +1302,25 @@ function BuybackActionModal({
               </>
             )}
 
-            {isReject && (
+            {action === 'cancelApproved' && (
+              <div className="alert alert-warning">
+                <AlertTriangle size={16} />
+                <span>{t('buyback.cancelApprovedHint', { defaultValue: 'Cancels an approved buyback the customer never brought in. No stock has moved yet. Company-level action.' })}</span>
+              </div>
+            )}
+
+            {needsReason && (
               <div className="flex flex-col">
-                <label className="form-label">{t('buyback.rejectReason', { defaultValue: 'Reject reason' })} *</label>
+                <label className="form-label">
+                  {(action === 'cancel' || action === 'cancelApproved')
+                    ? t('buyback.cancelReason', { defaultValue: 'Cancel reason' })
+                    : t('buyback.rejectReason', { defaultValue: 'Reject reason' })} *
+                </label>
                 <Select
-                  options={rejectReasons.map(r => ({ value: String(r.id), label: r.label }))}
+                  options={reasons.map(r => ({
+                    value: String(r.id),
+                    label: t(`buyback.reason.${r.code}`, { defaultValue: r.code }),
+                  }))}
                   value={reasonId !== null ? String(reasonId) : null}
                   onChange={(val) => setReasonId(val ? Number(val) : null)}
                   placeholder={t('buyback.selectReason', { defaultValue: 'Select reason' })}
@@ -1206,7 +1345,7 @@ function BuybackActionModal({
         <div className="modal-footer">
           <Button onClick={onClose} disabled={mutation.isPending}>{t('common.cancel')}</Button>
           <Button
-            color={isReject ? 'danger' : 'primary'}
+            color={isDanger ? 'danger' : 'primary'}
             onClick={() => mutation.mutate()}
             disabled={!canSubmit}
           >

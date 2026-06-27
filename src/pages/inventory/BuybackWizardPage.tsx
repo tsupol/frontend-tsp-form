@@ -155,19 +155,14 @@ export function BuybackWizardPage() {
                 {isReadOnly && (
                   <Badge size="sm" color="info">{t(`buyback.status_${draft.status}`, { defaultValue: draft.status })}</Badge>
                 )}
-                <div className="flex-1" />
-                {draft && (
-                  <Button size="sm" variant="outline" onClick={() => navigate(`/admin/inventory/buyback/${draft.po_id}`)}>
-                    {t('buybackWizard.viewDetail', { defaultValue: 'View detail' })}
-                  </Button>
-                )}
               </div>
             )}
 
             <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
               <PageNavPanel id="summary" className={isMobile ? '' : 'w-5/12 xl:w-4/12 min-w-0 border-r border-line flex flex-col'}>
                 <div className="flex-1 overflow-y-auto better-scroll">
-                  <div className="p-4 flex flex-col gap-3">
+                  {/* Summary rows — full-width, separated by lines (no card chrome) */}
+                  <div className="flex flex-col border-t border-line">
                     <CardSetup draft={draft ?? null} active={isCardActive('setup')} onEdit={() => handleOpen('setup')} />
                     <CardCondition draft={draft ?? null} active={isCardActive('condition')} onEdit={() => handleOpen('condition')} />
                     <CardPhotos draft={draft ?? null} active={isCardActive('photos')} onEdit={() => handleOpen('photos')} />

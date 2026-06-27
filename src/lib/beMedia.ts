@@ -221,13 +221,16 @@ export async function beMediaUrl(key: string): Promise<string> {
 }
 
 // True for the private key shapes be-media's presign endpoint accepts.
-// Mirrors fn_media_url_check's regex (2026-06-22 5-types REPLY).
+// Mirrors fn_media_url_check's regex (2026-06-22 5-types REPLY + mig 81 which
+// added the buyback + asset_check shapes).
 export function beMediaCanPresign(key: string): boolean {
   const k = key.replace(/^\//, '');
   return (
     /^private\/contracts\/\d+\/(chat|slip|signature|evidence)-/.test(k) ||
     /^private\/customers\/\d+\/id-card-/.test(k) ||
-    /^private\/branches\/\d+\/signatory-/.test(k)
+    /^private\/branches\/\d+\/signatory-/.test(k) ||
+    /^private\/buyback\/\d+\/condition-/.test(k) ||
+    /^private\/asset_check\/\d+\/photo-/.test(k)
   );
 }
 
@@ -272,17 +275,22 @@ export const CONTRACT_EVIDENCE_RESIZE: Record<ContractEvidenceSize, ResizeOption
   md: { maxWidth: 1280, maxHeight: 1280, mode: 'contain', format: 'webp', quality: 0.82 },
 };
 
-// ── buyback_condition — hardcoded spec (sm=320 / md=1280, public) ─────
-// Mirrors misc-go pkg/uploadspec/spec.go `buyback_condition`. Public bucket,
-// so reads resolve via publicMediaUrl (no presign).
-export const BUYBACK_CONDITION_TYPE = 'buyback_condition';
-export const BUYBACK_CONDITION_SIZES = ['sm', 'md'] as const;
-export type BuybackConditionSize = (typeof BUYBACK_CONDITION_SIZES)[number];
-export const BUYBACK_CONDITION_MAX = 5;
+// ── buyback_condition_bridge — hardcoded spec (single md=1280, PRIVATE) ─
+// The canonical buyback condition-photo path (PO_LINE / BUYBACK_CONDITION).
+// Replaces the legacy PUBLIC `buyback_condition` type (sm/md, uploads/buyback/)
+// retired per UI_FEEDBACK/2026-06-26_HANDOFF_buyback_photo_upload_to_bridge.
+// The bridge leaf is `condition-{idx}.{ext}` — ONE full-frame file, no {size}
+// token — so this is a single-variant spec. Lands at
+// private/buyback/{po_line_id}/condition-{idx}.{ext} (nnf-private); reads resolve
+// via presigned URL (fn_media_url_check mig 81). Both the mobile QR bridge and
+// desktop direct upload use this same type.
+export const BUYBACK_CONDITION_TYPE = 'buyback_condition_bridge';
+export const BUYBACK_CONDITION_MAX = 10;
 
-export const BUYBACK_CONDITION_RESIZE: Record<BuybackConditionSize, ResizeOptions> = {
-  sm: { maxWidth: 320, maxHeight: 320, mode: 'contain', format: 'webp', quality: 0.82 },
-  md: { maxWidth: 1280, maxHeight: 1280, mode: 'contain', format: 'webp', quality: 0.82 },
+// Single resize used for the one uploaded frame. No size variants are emitted
+// (the leaf has no {size}); fed straight to resizeToVariants under one label.
+export const BUYBACK_CONDITION_RESIZE: ResizeOptions = {
+  maxWidth: 1280, maxHeight: 1280, mode: 'contain', format: 'webp', quality: 0.82,
 };
 
 // ── Hardcoded upload-spec registry ────────────────────────────────────
@@ -312,10 +320,10 @@ export const UPLOAD_SPECS: Record<string, BeMediaSpec> = {
     type: 'contract_payment_slip', privacy: 'private', resize_mode: 'contain', quality: 0.82,
     sizes: [{ label: 'lg', width: 1800 }], max_files: 5, path_params: ['contract_id'],
   },
-  buyback_condition: {
-    type: 'buyback_condition', privacy: 'public', resize_mode: 'contain', quality: 0.82,
-    sizes: [{ label: 'sm', width: 320 }, { label: 'md', width: 1280 }], max_files: 5,
-    path_params: ['po_line_id'],
+  buyback_condition_bridge: {
+    type: 'buyback_condition_bridge', privacy: 'private', resize_mode: 'contain', quality: 0.82,
+    sizes: [{ label: 'md', width: 1280 }], max_files: 10,
+    path_params: ['po_line_id', 'idx'],
   },
   branch_expense_slip: {
     type: 'branch_expense_slip', privacy: 'private', resize_mode: 'contain', quality: 0.82,

@@ -1880,6 +1880,20 @@
     "submitHint": "สแกน IMEI / Serial แล้วส่งขออนุมัติ",
     "alreadySubmitted": "ส่งแล้ว — สถานะคือ ",
     "checklist": "ตรวจสอบก่อนส่ง",
+    "check": {
+      "PO_STATUS": "สถานะแก้ไขได้",
+      "SINGLE_ITEM": "มีสินค้าชิ้นเดียว",
+      "IS_CONTRACTABLE": "ประเภทสินค้าที่รับซื้อได้",
+      "BUYBACK_PRICE": "ตั้งราคารับซื้อแล้ว",
+      "CONDITION_COMPLETE": "ประเมินสภาพแล้ว",
+      "IDENTIFIERS_PROVIDED": "สแกน Serial / IMEI แล้ว"
+    },
+    "checkReason": {
+      "NOT_SCANNED": "สแกน IMEI หรือ Serial ด้านล่าง",
+      "MISSING_FIELDS": "ข้อมูลสภาพยังไม่ครบ",
+      "NO_PRICE": "ตั้งราคารับซื้อ",
+      "NOT_CONTRACTABLE": "ประเภทสินค้านี้รับซื้อคืนไม่ได้"
+    },
     "savedSetup": "บันทึก Setup แล้ว",
     "savedCondition": "บันทึก Condition แล้ว",
     "viewDetail": "ดูรายละเอียด",

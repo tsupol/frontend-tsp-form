@@ -1,17 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, keepPreviousData } from '@tanstack/react-query';
 import { Input, Button } from 'tsp-form';
 import { XCircle, CheckCircle, Circle } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { getLine } from './useBuyback';
 import type { BuybackDraft } from './types';
 
+// fn_inv_buyback_validate is codes-only now (no Thai label) — each check is
+// { code, passed, reason, params }. UI translates code → label, reason → detail.
 interface ValidateCheck {
   code: string;
-  label: string;
   passed: boolean;
-  detail: string | null;
+  reason: string | null;
+  params: Record<string, unknown> | null;
 }
 
 interface ValidateResult {
@@ -43,15 +45,20 @@ export function PanelSubmit({
     setSerial(ex.find(i => i.type === 'SERIAL_NO')?.value ?? '');
   }, [draft]);
 
-  // Live validate with the typed identifiers
+  // Validate the draft's non-identifier checks (price, condition, product type,
+  // …). These don't depend on the typed IMEI/Serial, so key only on the draft —
+  // re-validating per keystroke caused the checklist to flash. The one
+  // identifier check (IDENTIFIERS_PROVIDED) is hidden and gated client-side
+  // below; the backend still re-checks identifiers at submit time.
   const validate = useQuery<ValidateResult>({
-    queryKey: ['buyback-validate', draft.po_id, imei.trim(), serial.trim()],
+    queryKey: ['buyback-validate', draft.po_id],
     queryFn: () => apiClient.rpc<ValidateResult>('fn_inv_buyback_validate', {
       p_po_id: draft.po_id,
-      p_identifiers: buildIdentifiers(imei, serial, line?.po_line_id ?? null),
+      p_identifiers: [],
       p_branch_id: null,
     }),
     enabled: draft.status === 'DRAFT',
+    placeholderData: keepPreviousData,
   });
 
   const submit = useMutation({
@@ -76,8 +83,13 @@ export function PanelSubmit({
   });
 
   const haveIdentifier = imei.trim().length > 0 || serial.trim().length > 0;
-  const ready = validate.data?.ready ?? false;
-  const canSubmit = haveIdentifier && ready && !submit.isPending;
+  // All non-identifier checks must pass (the identifier check is gated by
+  // haveIdentifier instead, since we validate without identifiers above). The
+  // backend re-validates everything at submit, so this is just the button gate.
+  const nonIdChecksPass = (validate.data?.checks ?? [])
+    .filter(c => c.code !== 'IDENTIFIERS_PROVIDED')
+    .every(c => c.passed);
+  const canSubmit = haveIdentifier && nonIdChecksPass && !!validate.data && !submit.isPending;
 
   return (
     <div className="flex flex-col h-full min-w-0 overflow-hidden">
@@ -119,16 +131,16 @@ export function PanelSubmit({
               </div>
             </div>
 
-            {/* Validate checklist — identifier-related checks (IDENTIFIERS_SCANNED,
-                IMEI_LUHN_VALID, NO_CONFLICT) are dropped: they vacuously pass on
-                empty input, and backend returns specific errors at submit time. */}
+            {/* Validate checklist — codes-only from the backend (UI translates).
+                The IDENTIFIERS_PROVIDED check is hidden: it always fails until the
+                IMEI/Serial above is scanned, which is what this very panel does. */}
             <div className="border border-line rounded-md p-3 bg-surface">
               <div className="text-xs text-subtle mb-2">
                 {t('buybackWizard.checklist', { defaultValue: 'Pre-submit checklist' })}
                 {validate.isFetching && <span className="ml-2 italic">{t('common.loading')}</span>}
               </div>
               {(() => {
-                const HIDDEN = new Set(['IDENTIFIERS_SCANNED', 'IMEI_LUHN_VALID', 'NO_CONFLICT']);
+                const HIDDEN = new Set(['IDENTIFIERS_PROVIDED', 'IDENTIFIERS_SCANNED', 'IMEI_LUHN_VALID', 'NO_CONFLICT']);
                 const visible = (validate.data?.checks ?? []).filter(c => !HIDDEN.has(c.code));
                 if (visible.length === 0) {
                   return <div className="text-xs text-subtler italic">{validate.isLoading ? t('common.loading') : '—'}</div>;
@@ -141,8 +153,12 @@ export function PanelSubmit({
                           ? <CheckCircle size={14} className="text-success shrink-0 mt-0.5" />
                           : <Circle size={14} className="text-fg/30 shrink-0 mt-0.5" />}
                         <div className="flex-1 min-w-0">
-                          <div className={c.passed ? 'text-fg' : 'text-fg'}>{stripParenthetical(c.label)}</div>
-                          {c.detail && <div className="text-subtle text-[11px]">{c.detail}</div>}
+                          <div className="text-fg">{t(`buybackWizard.check.${c.code}`, { defaultValue: c.code })}</div>
+                          {!c.passed && c.reason && (
+                            <div className="text-subtle text-[11px]">
+                              {t(`buybackWizard.checkReason.${c.reason}`, { defaultValue: c.reason })}
+                            </div>
+                          )}
                         </div>
                       </li>
                     ))}
@@ -162,12 +178,6 @@ export function PanelSubmit({
       </div>
     </div>
   );
-}
-
-// Strip a trailing parenthetical from a backend check label.
-// Example: "สินค้าประเภทเช่าซื้อ (is_contractable)" → "สินค้าประเภทเช่าซื้อ"
-function stripParenthetical(label: string): string {
-  return label.replace(/\s*\([^)]*\)\s*$/, '').trim();
 }
 
 function buildIdentifiers(imei: string, serial: string, lineId: number | null) {

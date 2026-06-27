@@ -6,6 +6,24 @@ import { CONDITION_KEYS } from './types';
 const QUERY_KEY = (poId: number | null) => ['buyback-draft', poId];
 const ACTIONS_KEY = (poId: number | null) => ['buyback-actions', poId];
 
+// fn_buyback_available_actions, contract_version: 2 (2026-06-26).
+export interface BuybackAction {
+  action_code: string;
+  rpc_name: string;
+  category: string;
+  // Two-flag contract: render IFF is_permitted, disable IFF NOT is_enabled.
+  is_permitted: boolean;
+  is_enabled: boolean;
+  // Deprecated alias kept by the backend this release (= is_enabled).
+  is_available: boolean;
+  blocking_reason: string | null;
+  needs_reason: boolean;
+  reason_group: 'CANCEL' | 'REJECT' | null;
+  require_pin: boolean;
+  sort_order: number;
+  target_line_id: number | null;
+}
+
 export interface BuybackActionsResponse {
   po_id: number;
   po_type: string;
@@ -13,18 +31,10 @@ export interface BuybackActionsResponse {
   branch_id: number | null;
   auto_reject_after: string | null;
   auto_rejected: boolean;
+  contract_version: number;
   validate_ready: boolean | null;
-  validate_failing_checks: string[];
-  actions: Array<{
-    action_code: string;
-    rpc_name: string;
-    category: string;
-    is_available: boolean;
-    blocking_reason: string | null;
-    require_pin: boolean;
-    sort_order: number;
-    target_line_id: number | null;
-  }>;
+  validate_failing_checks: string[] | null;
+  actions: BuybackAction[];
 }
 
 export function useBuybackDraft(poId: number | null) {
@@ -86,16 +96,6 @@ export function getConditionStatus(draft: BuybackDraft | null | undefined): Card
   const filled = CONDITION_KEYS.filter(k => snap[k] && String(snap[k]).trim().length > 0);
   if (filled.length === CONDITION_KEYS.length) return 'complete';
   if (filled.length > 0) return 'partial';
-  return 'empty';
-}
-
-export function getPhotosStatus(draft: BuybackDraft | null | undefined): CardStatus {
-  if (!draft) return 'locked';
-  const line = getLine(draft);
-  if (!line) return 'locked';
-  const n = Array.isArray(line.images) ? line.images.length : 0;
-  if (n >= 4) return 'complete';
-  if (n > 0) return 'partial';
   return 'empty';
 }
 

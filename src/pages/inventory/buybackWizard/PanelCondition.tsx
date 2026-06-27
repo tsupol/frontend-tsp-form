@@ -71,9 +71,9 @@ export function PanelCondition({
         p_buyback_price: null,
         p_item_condition: grade,
         p_condition_snapshot: payload,
-        p_images: null,
         p_note: null,
         p_branch_id: null,
+        p_warranty_expired_date: null,
       });
     },
     onSuccess: () => {

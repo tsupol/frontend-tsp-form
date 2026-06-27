@@ -1881,6 +1881,20 @@
     "submitHint": "Scan IMEI / Serial and submit for approval.",
     "alreadySubmitted": "Submitted — status is ",
     "checklist": "Pre-submit checklist",
+    "check": {
+      "PO_STATUS": "Status is editable",
+      "SINGLE_ITEM": "Single item",
+      "IS_CONTRACTABLE": "Eligible product type",
+      "BUYBACK_PRICE": "Buyback price set",
+      "CONDITION_COMPLETE": "Condition assessed",
+      "IDENTIFIERS_PROVIDED": "Serial / IMEI scanned"
+    },
+    "checkReason": {
+      "NOT_SCANNED": "Scan IMEI or Serial below",
+      "MISSING_FIELDS": "Some condition fields are missing",
+      "NO_PRICE": "Set a buyback price",
+      "NOT_CONTRACTABLE": "This product type can't be bought back"
+    },
     "savedSetup": "Setup saved",
     "savedCondition": "Condition saved",
     "viewDetail": "View detail",

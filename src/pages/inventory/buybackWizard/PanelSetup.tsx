@@ -122,7 +122,6 @@ export function PanelSetup({
             buyback_price: priceNum,
             item_condition: 'USED_A',
             condition_snapshot: {},
-            images: [],
             note: null,
           }],
           p_seller_name: seller.trim() || null,
@@ -141,9 +140,9 @@ export function PanelSetup({
         p_buyback_price: priceNum,
         p_item_condition: null,
         p_condition_snapshot: null,
-        p_images: null,
         p_note: null,
         p_branch_id: null,
+        p_warranty_expired_date: null,
       });
       // Note: seller_name / notes are PO-header fields. There's no documented
       // RPC for editing them post-create. We only set them on create_draft.
