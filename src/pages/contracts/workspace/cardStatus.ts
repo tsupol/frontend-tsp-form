@@ -45,11 +45,12 @@ export function getCardStatus(
     }
 
     case 'documents':
+      // Signature is no longer captured at draft — the customer signs on the
+      // capture bridge after the snapshot. The draft document requirement is the
+      // ID card only.
       if (!contract?.id) return 'locked';
       if (!docs || !customer) return 'empty';
-      if (customer.hasIdPhoto && docs.hasSignature) return 'complete';
-      if (customer.hasIdPhoto || docs.hasSignature) return 'partial';
-      return 'empty';
+      return customer.hasIdPhoto ? 'complete' : 'empty';
 
     case 'signatory': {
       if (!contract?.id) return 'locked';

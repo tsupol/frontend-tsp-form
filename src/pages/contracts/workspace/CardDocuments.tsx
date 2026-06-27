@@ -5,16 +5,16 @@ import { SummaryCard } from './SummaryCard';
 
 export function CardDocuments({ onEdit, active, shake }: { onEdit?: () => void; active?: boolean; shake?: boolean }) {
   const { t } = useTranslation();
-  const { customer, docs, contract, getCardStatus, isReadOnly } = useWorkspace();
+  const { customer, contract, getCardStatus, isReadOnly } = useWorkspace();
   const status = getCardStatus('documents');
 
   const hasIdPhoto = customer?.hasIdPhoto ?? false;
-  const hasSignature = docs?.hasSignature ?? false;
   const score = contract?.staff_confidence_score;
 
+  // Signature is captured on the bridge after the snapshot, not at draft — the
+  // draft document requirement is the ID card only.
   const items: Array<{ done: boolean; label: string; required: boolean }> = [
     { done: hasIdPhoto, label: t('workspace.docIdPhoto'), required: true },
-    { done: hasSignature, label: t('workspace.docSignature'), required: true },
   ];
 
   return (
