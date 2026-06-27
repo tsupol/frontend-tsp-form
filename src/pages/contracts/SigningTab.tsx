@@ -355,6 +355,12 @@ export function SigningTab({
         onClose={() => setSignQrOpen(false)}
         contractId={contractId}
         contractCode={contractCode}
+        onSigned={() => {
+          // Live-refresh the cards as parties sign on the bridge (the modal
+          // polls and fires this per upload) and once it closes.
+          historyQuery.refetch();
+          partyQuery.refetch();
+        }}
       />
     </div>
   );

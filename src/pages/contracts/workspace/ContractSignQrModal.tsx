@@ -47,11 +47,16 @@ export function ContractSignQrModal({
     if (!open) setCopied(false);
   }, [open]);
 
-  // Refresh the parent (contract state may flip to ACTIVE once sealed).
+  // Refresh the parent as parties sign (per upload) and when the session
+  // finishes — the snapshot seals and the contract may flip to ACTIVE then.
   useEffect(() => {
     if (uploadCount > 0) onSigned?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uploadCount]);
+  useEffect(() => {
+    if (phase === 'done') onSigned?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
 
   const handleClose = () => {
     cancel();
