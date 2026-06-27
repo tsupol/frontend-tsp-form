@@ -2209,6 +2209,7 @@
     "previewContract": "แสดงตัวอย่าง",
     "acceptAndSign": "ยอมรับและลงนาม",
     "signModalTitle": "ลงนามสัญญา",
+    "printContractPdf": "พิมพ์สัญญา PDF",
     "printContractPdfFe": "พิมพ์ (FE)",
     "printContractPdfServer": "พิมพ์ (เซิร์ฟเวอร์)",
     "previewModalTitle": "ตัวอย่างสัญญา",

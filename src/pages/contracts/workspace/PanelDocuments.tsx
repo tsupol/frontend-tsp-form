@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, useSnackbarContext, type UploadedImage } from 'tsp-form';
-import { XCircle, CreditCard, Eye, Printer, Loader2, Smartphone, ImageOff, MonitorSmartphone } from 'lucide-react';
+import { XCircle, CreditCard, Eye, Printer, Loader2, Smartphone, ImageOff, MonitorSmartphone, AlertTriangle } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { invalidateMediaUrl } from '../../../lib/upload';
 import { beMediaUploadFromImage, BeMediaError } from '../../../lib/beMedia';
@@ -13,7 +13,6 @@ import { ContractCaptureModal } from './ContractCaptureModal';
 import { ContractViewQrModal } from './ContractViewQrModal';
 import { useWorkspace } from './WorkspaceContext';
 import { IdPhotoUpload } from './IdPhotoUpload';
-import { ContractPreviewSignPair, type ReadinessError } from './ContractPreviewSignPair';
 import { ContractPreviewModal } from '../ContractPreviewModal';
 import { useGenerateContractPdfServer } from '../useGenerateContractPdfServer';
 import { SignatoryEditor } from './SignatoryEditor';
@@ -30,14 +29,9 @@ interface CustomerDocument {
   uploaded_at: string;
 }
 
-interface ContractDocument {
-  id: number;
-  contract_id: number;
-  customer_id: number | null;
-  customer_name: string | null;
-  doc_type: string;
-  file_url: string;
-  uploaded_at: string;
+interface ReadinessError {
+  code: string;
+  detail?: Record<string, unknown>;
 }
 
 interface ContractAttachment {
@@ -55,7 +49,7 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
-  const { data: workspace, contract, getCardStatus, invalidateDocs, invalidateCustomer } = useWorkspace();
+  const { data: workspace, contract, getCardStatus, invalidateCustomer } = useWorkspace();
   const contractId = workspace.contractId;
   const customerId = workspace.customerId;
   const { generating: printing, generate } = useGenerateContractPdfServer();
@@ -156,19 +150,6 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
     if (!idCardByCustomer.has(d.customer_id)) idCardByCustomer.set(d.customer_id, d);
   }
 
-  // All signature documents for this contract (lessee + co-lessees).
-  const { data: contractDocs = [] } = useQuery({
-    queryKey: ['contract-documents', contractId],
-    queryFn: () => apiClient.get<ContractDocument[]>(
-      `/v_contract_documents?contract_id=eq.${contractId}&doc_type=eq.SIGNATURE_PAD`
-    ),
-    enabled: !!contractId,
-  });
-  const signatureByCustomer = new Map<number, ContractDocument>();
-  for (const d of contractDocs) {
-    if (d.customer_id != null) signatureByCustomer.set(d.customer_id, d);
-  }
-
   const lesseeIdCard = customerId ? idCardByCustomer.get(customerId) ?? null : null;
 
   // Print-readiness — same cards as before, plus an ID-card per person on
@@ -251,34 +232,6 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
       queryClient.invalidateQueries({ queryKey: ['customer-documents-multi'] });
       setCacheBust(n => n + 1);
       if (targetCustomerId === customerId) invalidateCustomer();
-    } catch (err) {
-      handleErr(err);
-    } finally { setUploading(''); }
-  };
-
-  const uploadSignatureFor = (targetCustomerId: number) => async (images: UploadedImage[]) => {
-    if (!contractId || images.length === 0) return;
-    const tag = `SIGNATURE:${targetCustomerId}`;
-    setUploading(tag);
-    setError('');
-    try {
-      const results = await beMediaUploadFromImage({
-        type: 'contract_signature',
-        image: images[0],
-        params: { contract_id: contractId, customer_id: targetCustomerId },
-      });
-      const key = results.md?.key ?? results.sm?.key ?? Object.values(results)[0]?.key;
-      if (!key) throw new Error('Upload returned no key');
-      await apiClient.rpc('fn_contract_document_upload', {
-        p_contract_id: contractId,
-        p_doc_type: 'SIGNATURE_PAD',
-        p_file_url: `/${key}`,
-        p_customer_id: targetCustomerId,
-      });
-      invalidateMediaUrl(key);
-      queryClient.invalidateQueries({ queryKey: ['contract-documents', contractId] });
-      setCacheBust(n => n + 1);
-      invalidateDocs();
     } catch (err) {
       handleErr(err);
     } finally { setUploading(''); }
@@ -374,24 +327,27 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
         cacheBust={cacheBust}
       />
 
-      {/* The single source of "what's missing" is the BE readiness list,
-          rendered inside ContractPreviewSignPair below. The old client-side
-          prereq warning was redundant with it. */}
+      {/* Why-not-ready — the BE readiness list (preview/print/sign live in the
+          action buttons above; this just explains what's still missing). */}
+      {notReadyErrors && notReadyErrors.length > 0 && (
+        <div className="alert alert-warning">
+          <AlertTriangle size={16} />
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <div className="alert-title">
+              {t('workspace.docNotReadyTitle', { defaultValue: 'Complete these before previewing or signing' })}
+            </div>
+            <ul className="alert-description list-disc pl-5 flex flex-col gap-0.5">
+              {notReadyErrors.map((err, i) => (
+                <li key={`${err.code}-${i}`}>{readinessLabel(err, t)}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
 
-      <ContractPreviewSignPair
-        contract={previewContract}
-        fileUrl={customerId ? signatureByCustomer.get(customerId)?.file_url ?? null : null}
-        uploading={uploading === `SIGNATURE:${customerId}`}
-        onUpload={customerId ? uploadSignatureFor(customerId) : () => {}}
-        disabled={!customerId || !prereqsMet}
-        cacheBust={cacheBust}
-        notReadyErrors={notReadyErrors}
-      />
-
-      {/* ── Co-lessee blocks ────────────────────────────────────────── */}
+      {/* ── Co-lessee blocks — ID card only (signing happens on the bridge) ── */}
       {coLessees.map(g => {
         const gIdCard = idCardByCustomer.get(g.customer_id) ?? null;
-        const gSig = signatureByCustomer.get(g.customer_id) ?? null;
         return (
           <div key={g.customer_id} className="flex flex-col gap-6 pt-6 border-t border-line">
             <div className="text-sm font-semibold text-fg">
@@ -408,21 +364,6 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
               uploading={uploading === `ID_CARD:${g.customer_id}`}
               onUpload={uploadIdCardFor(g.customer_id)}
               cacheBust={cacheBust}
-            />
-            {/* notReadyErrors intentionally omitted — the why-not-ready list
-                is shown once on the lessee block above, not repeated here. */}
-            <ContractPreviewSignPair
-              contract={previewContract}
-              fileUrl={gSig?.file_url ?? null}
-              uploading={uploading === `SIGNATURE:${g.customer_id}`}
-              onUpload={uploadSignatureFor(g.customer_id)}
-              disabled={!prereqsMet}
-              cacheBust={cacheBust}
-              signatureOptional
-              pairLabel={t('workspace.docContractAndSignatureFor', {
-                defaultValue: 'Contract & signature — {{name}}',
-                name: g.customer_name,
-              })}
             />
           </div>
         );
@@ -491,4 +432,22 @@ function AttachmentThumb({
       )}
     </button>
   );
+}
+
+// BE readiness error → human line. SIGNATORY_INCOMPLETE carries detail.missing
+// (LESSOR / WITNESS_1 / WITNESS_2) so we append the specific slot.
+function readinessLabel(
+  err: ReadinessError,
+  t: ReturnType<typeof useTranslation>['t'],
+): string {
+  const base = t(err.code, { ns: 'apiErrors', defaultValue: err.code });
+  const missing = err.detail?.missing;
+  if (typeof missing === 'string' && missing) {
+    const slot = t(
+      `workspace.signatory${missing === 'LESSOR' ? 'Lessor' : missing === 'WITNESS_1' ? 'Witness1' : missing === 'WITNESS_2' ? 'Witness2' : ''}`,
+      { defaultValue: missing },
+    );
+    return `${base} — ${slot}`;
+  }
+  return base;
 }

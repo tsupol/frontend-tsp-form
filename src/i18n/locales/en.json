@@ -2210,6 +2210,7 @@
     "previewContract": "Preview",
     "acceptAndSign": "Accept & sign",
     "signModalTitle": "Sign contract",
+    "printContractPdf": "Print contract PDF",
     "printContractPdfFe": "Print (FE)",
     "printContractPdfServer": "Print (Server)",
     "previewModalTitle": "Contract preview",
