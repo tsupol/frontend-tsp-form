@@ -2135,6 +2135,8 @@
     "state_PENDING_APPROVAL": "Pending Approval",
     "state_APPROVED": "Approved",
     "state_PENDING_PAYMENT": "Pending Payment",
+    "state_PENDING_PAYMENT_AND_SIGN": "Pending Payment & Sign",
+    "state_PENDING_SIGN": "Pending Sign",
     "state_ACTIVE": "Active",
     "state_WAIT_LEGAL_PROCESS": "Awaiting Legal",
     "state_ON_LEGAL_PROCESS": "In Legal Process",

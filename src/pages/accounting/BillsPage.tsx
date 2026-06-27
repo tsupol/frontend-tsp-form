@@ -881,10 +881,14 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
           </div>
 
           <div className="flex items-center gap-3 justify-end">
+            {/* This button does add-payment AND confirm in one go (handlePay),
+                so it gates on ADD_PAYMENT — the action that's available on an
+                unpaid OPEN bill. CONFIRM_PAYMENT only turns available AFTER a
+                payment exists, so gating on it deadlocked the first payment. */}
             <Button
               color="primary"
               onClick={handlePay}
-              disabled={!isPayBalanced || paying || !isActionAvailable('CONFIRM_PAYMENT')}
+              disabled={!isPayBalanced || paying || !isActionAvailable('ADD_PAYMENT')}
               startIcon={<CheckCircle size={16} />}
             >
               {paying ? t('common.loading') : t('accounting.bills.confirmPay')}

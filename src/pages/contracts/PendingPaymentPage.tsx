@@ -46,7 +46,7 @@ export function PendingPaymentPage() {
     <ContractListPane
       title={t('nav.pendingPayment')}
       routePrefix="/admin/contracts/pending-payment"
-      states={['PENDING_PAYMENT']}
+      states={['PENDING_PAYMENT', 'PENDING_PAYMENT_AND_SIGN']}
       showStateFilter={false}
       renderRowRight={renderRowRight}
       emptyMessage={t('contract.noPendingPayment')}

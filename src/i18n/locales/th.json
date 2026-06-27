@@ -2134,6 +2134,8 @@
     "state_PENDING_APPROVAL": "รออนุมัติ",
     "state_APPROVED": "อนุมัติแล้ว",
     "state_PENDING_PAYMENT": "รอชำระ",
+    "state_PENDING_PAYMENT_AND_SIGN": "รอชำระและเซ็น",
+    "state_PENDING_SIGN": "รอเซ็น",
     "state_ACTIVE": "ใช้งาน",
     "state_WAIT_LEGAL_PROCESS": "รอดำเนินคดี",
     "state_ON_LEGAL_PROCESS": "ดำเนินคดี",
