@@ -66,10 +66,20 @@ export interface MobileCaptureSession {
   cancel: () => Promise<void>;
 }
 
+export interface CaptureSessionOptions {
+  /** Bridge entity_type to mint. Defaults to CONTRACT_ATTACHMENT. */
+  entityType?: string;
+  /** Extra meta merged into the session request. */
+  meta?: Record<string, unknown>;
+}
+
 export function useMobileCaptureSession(
   contractId: number | null,
   contractCode: string | null,
+  options?: CaptureSessionOptions,
 ): MobileCaptureSession {
+  const entityType = options?.entityType ?? 'CONTRACT_ATTACHMENT';
+  const extraMeta = options?.meta;
   const [phase, setPhase] = useState<Phase>('idle');
   const [session, setSession] = useState<RequestSessionData | null>(null);
   const [status, setStatus] = useState<StatusData | null>(null);
@@ -101,11 +111,11 @@ export function useMobileCaptureSession(
     setSession(null);
     apiClient
       .rpc<RequestSessionData>('fn_mobile_capture_request_session', {
-        p_entity_type: 'CONTRACT_ATTACHMENT',
+        p_entity_type: entityType,
         p_entity_id: contractId,
         p_ttl_minutes: null,
         p_max_uploads: null,
-        p_meta: { source: 'contract-wizard-documents' },
+        p_meta: { source: 'contract-wizard-documents', ...extraMeta },
         p_note: contractCode ? `Contract ${contractCode}` : null,
       })
       .then((data) => {
@@ -117,7 +127,7 @@ export function useMobileCaptureSession(
         setError(messageOf(err));
         setPhase('error');
       });
-  }, [contractId, contractCode, phase]);
+  }, [contractId, contractCode, phase, entityType, extraMeta]);
 
   // Poll while active.
   useEffect(() => {

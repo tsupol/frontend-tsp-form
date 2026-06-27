@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, useSnackbarContext, type UploadedImage } from 'tsp-form';
-import { XCircle, CreditCard, Eye, Printer, Loader2, Smartphone, ImageOff } from 'lucide-react';
+import { XCircle, CreditCard, Eye, Printer, Loader2, Smartphone, ImageOff, MonitorSmartphone } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { invalidateMediaUrl } from '../../../lib/upload';
 import { beMediaUploadFromImage, BeMediaError } from '../../../lib/beMedia';
@@ -10,6 +10,7 @@ import { normalizeKey } from '../../../lib/mediaPath';
 import { useMediaUrl } from '../../../hooks/useMediaUrl';
 import { MediaLightbox } from '../../../components/MediaLightbox';
 import { ContractCaptureModal } from './ContractCaptureModal';
+import { ContractViewQrModal } from './ContractViewQrModal';
 import { useWorkspace } from './WorkspaceContext';
 import { IdPhotoUpload } from './IdPhotoUpload';
 import { ContractPreviewSignPair, type ReadinessError } from './ContractPreviewSignPair';
@@ -60,6 +61,7 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
   const { generating: printing, generate } = useGenerateContractPdfServer();
   const [previewAllOpen, setPreviewAllOpen] = useState(false);
   const [captureOpen, setCaptureOpen] = useState(false);
+  const [viewQrOpen, setViewQrOpen] = useState(false);
   const [lightboxKey, setLightboxKey] = useState<string | null>(null);
 
   // Contract attachment album — photos captured via the Mobile Capture Bridge
@@ -317,6 +319,14 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
         >
           {printing ? t('common.loading') : t('contract.printContractPdf', { defaultValue: 'Print contract PDF' })}
         </Button>
+        <Button
+          variant="outline"
+          startIcon={<MonitorSmartphone size={14} />}
+          onClick={() => setViewQrOpen(true)}
+          disabled={!previewContract || !prereqsMet}
+        >
+          {t('workspace.contractViewQr', { defaultValue: 'Read on phone' })}
+        </Button>
       </div>
 
       {/* ── Contract photos — capture from phone (Mobile Capture Bridge) ─ */}
@@ -433,6 +443,14 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
         contractId={contractId}
         contractCode={contract?.code_display ?? null}
         onUploaded={() => refetchAttachments()}
+      />
+
+      {/* QR — let the customer read the contract on a 2nd device (read-only) */}
+      <ContractViewQrModal
+        open={viewQrOpen}
+        onClose={() => setViewQrOpen(false)}
+        contractId={contractId}
+        contractCode={contract?.code_display ?? null}
       />
 
       <MediaLightbox
