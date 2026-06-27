@@ -3816,8 +3816,6 @@
     "detail_noPayloadAgreed": "No terms recorded on this snapshot.",
     "backfill": "Backfilled",
     "signStaffPartyUnsupported": "Staff witness signatures are not yet supported in this UI.",
-    "witnessConfirm": "Confirm {{name}}",
-    "witnessChange": "Change",
     "witnessPick": "Select witness",
     "witnessAssign": "Assign",
     "partyAlreadySigned": "This party has already signed.",

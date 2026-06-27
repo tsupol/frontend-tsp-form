@@ -3815,8 +3815,6 @@
     "detail_noPayloadAgreed": "ไม่มีข้อมูลเงื่อนไขใน snapshot นี้",
     "backfill": "ย้อนหลัง",
     "signStaffPartyUnsupported": "ระบบยังไม่รองรับลายเซ็นพยานพนักงานในตอนนี้",
-    "witnessConfirm": "ยืนยัน {{name}}",
-    "witnessChange": "เปลี่ยน",
     "witnessPick": "เลือกพยาน",
     "witnessAssign": "กำหนด",
     "partyAlreadySigned": "คู่สัญญารายนี้เซ็นไปแล้ว",

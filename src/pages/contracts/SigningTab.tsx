@@ -229,17 +229,32 @@ export function SigningTab({
   const isLoading = historyQuery.isLoading || partyQuery.isLoading;
   const error = historyQuery.error ?? partyQuery.error;
 
-  // Newest non-VOIDED signing wins. Any COLLECTING older than that one is
-  // considered superseded by activity (a newer ceremony was opened or sealed)
-  // and shouldn't be signable — even though BE didn't auto-void it. Order is
-  // by version desc / created_at desc, so the first non-VOIDED in `signings`
-  // is the newest. Equal IDs to the newest are signable; everything older
-  // gets locked.
-  const newestActiveSigningId: number | null = useMemo(() => {
+  // Stale = a COLLECTING signing that's been re-opened by a NEWER COLLECTING
+  // signing of the SAME ceremony (same change_reason). Only then is the older
+  // one obsolete and shouldn't be signed.
+  //
+  // Crucially this is PER change_reason — a contract can have multiple distinct
+  // COLLECTING signings at once (e.g. CONTRACT_OPEN full contract + an
+  // ADD_CO_LESSEE addendum, both auto-created when the draft has a co-lessee).
+  // Those are different documents; neither supersedes the other, so both stay
+  // signable. The old "only the single newest signing is live" rule wrongly
+  // locked the full contract whenever a co-lessee addendum existed.
+  const staleSigningIds: Set<number> = useMemo(() => {
+    const newestByReason = new Map<string, number>();
     for (const s of signings) {
-      if (s.status !== 'VOIDED') return s.signing_id;
+      if (s.status !== 'COLLECTING') continue;
+      const key = s.change_reason ?? s.type;
+      // signings are ordered version desc, so the first COLLECTING per reason
+      // is the newest.
+      if (!newestByReason.has(key)) newestByReason.set(key, s.signing_id);
     }
-    return null;
+    const stale = new Set<number>();
+    for (const s of signings) {
+      if (s.status !== 'COLLECTING') continue;
+      const key = s.change_reason ?? s.type;
+      if (newestByReason.get(key) !== s.signing_id) stale.add(s.signing_id);
+    }
+    return stale;
   }, [signings]);
 
   // Auto-expand the newest COLLECTING row once per contract load. Falling back
@@ -304,7 +319,7 @@ export function SigningTab({
           <SigningCard
             key={s.signing_id}
             signing={s}
-            isStale={s.status === 'COLLECTING' && newestActiveSigningId !== null && s.signing_id !== newestActiveSigningId}
+            isStale={staleSigningIds.has(s.signing_id)}
             parties={partiesBySigning.get(s.signing_id) ?? []}
             expanded={expanded.has(s.signing_id)}
             onToggleExpand={() => toggleExpanded(s.signing_id)}

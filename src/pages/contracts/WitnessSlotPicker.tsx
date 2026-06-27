@@ -4,20 +4,20 @@
 // (LESSOR auto-signs; witnesses are chosen at signing time). Staff can pick the
 // witness here at the desk (or it can be done on the capture bridge — same RPC).
 //
-//   CASE 1 (designated_witness_id set, from the draft binding): pre-select that
-//           witness, Confirm assigns it. Staff may also change to another.
-//   CASE 2 (designated null): a dropdown of branch witnesses → pick → assign.
+// One consistent control: a dropdown of branch witnesses, pre-selected to the
+// draft-designated witness (if any), plus an Assign button. No separate
+// confirm/change buttons.
 //
 // One RPC for every case/channel: api.fn_signing_assign_witness(signing_id,
 // slot, witness_id) — it picks, applies the pre-registered signature, blocks
 // duplicates, and seals the signing if that was the last party.
 // See UI_FEEDBACK/2026-06-28_IMPLEMENT_witness_signing_direct_vs_bridge.
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Button, Select } from 'tsp-form';
-import { Check, Pencil, X } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useBranchWitnesses } from './workspace/useContractSignatories';
 
@@ -42,7 +42,6 @@ export function WitnessSlotPicker({
   onAssigned: () => void;
 }) {
   const { t } = useTranslation();
-  const [picking, setPicking] = useState(false);   // CASE 1 → user chose to change
   const [pickedId, setPickedId] = useState<string>('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -65,11 +64,7 @@ export function WitnessSlotPicker({
     staleTime: 60 * 1000,
   });
 
-  const designated = slotRow?.designated_witness_id ?? null;
-  const isCase2 = designated == null;
-  // Load the witness list for CASE 2, or when changing a CASE-1 pick.
-  const needList = isCase2 || picking;
-  const { data: witnesses = [] } = useBranchWitnesses(needList ? (branchId ?? null) : null);
+  const { data: witnesses = [] } = useBranchWitnesses(branchId ?? null);
 
   const options = useMemo(
     () => witnesses
@@ -81,18 +76,25 @@ export function WitnessSlotPicker({
     [witnesses],
   );
 
+  // Pre-select the draft-designated witness once the slot loads.
+  useEffect(() => {
+    if (!pickedId && slotRow?.designated_witness_id != null) {
+      setPickedId(String(slotRow.designated_witness_id));
+    }
+  }, [slotRow, pickedId]);
+
   if (!slotRow || slotRow.has_signed) return null;
 
-  const assign = async (witnessId: number) => {
+  const assign = async () => {
+    if (!pickedId) return;
     setBusy(true);
     setError('');
     try {
       await apiClient.rpc('fn_signing_assign_witness', {
         p_signing_id: signingId,
         p_slot: slot,
-        p_witness_id: witnessId,
+        p_witness_id: Number(pickedId),
       });
-      setPicking(false);
       onAssigned();
     } catch (err) {
       const msg = err instanceof ApiError
@@ -106,36 +108,6 @@ export function WitnessSlotPicker({
     }
   };
 
-  // CASE 1 (designated, not yet changing) → pre-selected name + Confirm + change.
-  if (designated != null && !picking) {
-    return (
-      <div className="flex flex-col items-end gap-1">
-        <div className="flex items-center gap-1.5">
-          <Button
-            size="sm"
-            color="primary"
-            startIcon={<Check size={13} />}
-            disabled={busy}
-            onClick={() => assign(designated)}
-          >
-            {t('signing.witnessConfirm', { defaultValue: 'Confirm {{name}}', name: slotRow.designated_name ?? '' })}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            startIcon={<Pencil size={13} />}
-            disabled={busy}
-            onClick={() => setPicking(true)}
-          >
-            {t('signing.witnessChange', { defaultValue: 'Change' })}
-          </Button>
-        </div>
-        {error && <span className="text-[11px] text-danger">{error}</span>}
-      </div>
-    );
-  }
-
-  // CASE 2, or CASE 1 in "change" mode → dropdown + assign.
   return (
     <div className="flex flex-col items-end gap-1">
       <div className="flex items-center gap-1.5">
@@ -154,19 +126,10 @@ export function WitnessSlotPicker({
           color="primary"
           startIcon={<Check size={13} />}
           disabled={busy || !pickedId}
-          onClick={() => pickedId && assign(Number(pickedId))}
+          onClick={assign}
         >
           {t('signing.witnessAssign', { defaultValue: 'Assign' })}
         </Button>
-        {picking && (
-          <Button
-            size="sm"
-            variant="ghost"
-            startIcon={<X size={13} />}
-            disabled={busy}
-            onClick={() => { setPicking(false); setPickedId(''); }}
-          />
-        )}
       </div>
       {error && <span className="text-[11px] text-danger">{error}</span>}
     </div>
