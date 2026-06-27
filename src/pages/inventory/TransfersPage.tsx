@@ -3,12 +3,13 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Modal, Input, TextArea, NumberSpinner, DataTable, PopOver, useSnackbarContext } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, ArrowLeftRight, CheckCircle, XCircle, Trash2, ExternalLink, Search, SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, ArrowLeftRight, CheckCircle, XCircle, Trash2, ExternalLink, Search, SlidersHorizontal, Plus, Smartphone, Package } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { DateTime } from '../../components/DateTime';
 import { CopyButton } from '../../components/CopyButton';
 import { fmtNum } from './inventoryUtils';
+import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 
@@ -37,6 +38,9 @@ interface TransferOrder {
   dispute_resolved_by: number | null;
   created_at: string;
   updated_at: string;
+  // Frozen sums (snap of lines), populated after approve.
+  total_original_cost: number | null;
+  total_current_cost: number | null;
 }
 
 interface TransferLine {
@@ -60,6 +64,11 @@ interface TransferLine {
   status: string;
   condition_ok: boolean | null;
   receive_note: string | null;
+  // Cost: live (DRAFT) vs frozen-at-approve (snap_*). Show snap once approved.
+  asset_current_cost_basis: number | null;
+  asset_original_cost_basis: number | null;
+  snap_current_cost_basis: number | null;
+  snap_original_cost_basis: number | null;
   from_branch_id: number;
   from_branch_name: string;
   to_branch_id: number;
@@ -72,6 +81,41 @@ interface Branch {
   id: number;
   name: string;
 }
+
+// v_transfer_destination_branches — destination picker
+interface DestinationBranch {
+  branch_id: number;
+  branch_name: string;
+  branch_code: string;
+  is_active: boolean;
+}
+
+// v_assets row (subset) — ASSET line picker (ON_HAND_AVAILABLE at source)
+interface AddableAsset {
+  asset_id: number;
+  asset_code: string | null;
+  asset_code_display: string | null;
+  serial_no: string | null;
+  imei: string | null;
+  product_display_name: string | null;
+  variant_name: string | null;
+  current_cost_basis: number | null;
+}
+
+// v_stock_lots row (subset) — LOT line picker (ON_HAND_AVAILABLE at source)
+interface AddableLot {
+  lot_id: number;
+  lot_code: string;
+  lot_code_display: string | null;
+  qty_on_hand: number;
+  unit_cost: number;
+  product_display_name?: string | null;
+  variant_name: string | null;
+  model_name: string | null;
+  brand_name: string | null;
+}
+
+const TRANSFER_MODE_VALUES = ['FREE_TRANSFER', 'COST_PRICE_INTERNAL'] as const;
 
 // ============================================================================
 // Status display
@@ -96,11 +140,7 @@ const LINE_STATUS_COLOR: Record<string, 'success' | 'warning' | 'danger' | 'info
 
 const TRANSFER_STATUS_VALUES = ['DRAFT', 'APPROVED', 'IN_TRANSIT', 'COMPLETED', 'DISPUTED', 'CANCELLED'] as const;
 
-const RECEIVE_ACTION_OPTIONS = [
-  { value: 'RECEIVED', label: 'Received' },
-  { value: 'RECEIVED_DAMAGED', label: 'Received (Damaged)' },
-  { value: 'NOT_RECEIVED', label: 'Not Received' },
-];
+const RECEIVE_ACTION_VALUES = ['RECEIVED', 'RECEIVED_DAMAGED', 'NOT_RECEIVED'] as const;
 
 // ============================================================================
 // Component
@@ -130,6 +170,7 @@ export function TransfersPage() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterOpen, setFilterOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const extraFilterCount = (filterStatus ? 1 : 0) + (filterBranchId !== null ? 1 : 0);
 
@@ -209,13 +250,27 @@ export function TransfersPage() {
               <div className="mobile-header-title mobile-header-title-truncate">
                 {isRoot ? t('nav.transfers') : selectedOrder?.transfer_no ?? ''}
               </div>
-              <div className="mobile-header-end w-12" />
+              <div className="mobile-header-end w-nav">
+                {isRoot && (
+                  <button
+                    className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
+                    onClick={() => setCreateOpen(true)}
+                    aria-label={t('transfer.createTransfer', { defaultValue: 'New transfer' })}
+                  >
+                    <Plus size={20} />
+                  </button>
+                )}
+              </div>
             </MobileHeader>
           )}
 
           {!isMobile && (
             <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
               <h1 className="heading-2 shrink-0">{t('nav.transfers')}</h1>
+              <div className="flex-1" />
+              <Button size="sm" color="primary" startIcon={<Plus size={16} />} onClick={() => setCreateOpen(true)}>
+                {t('transfer.createTransfer', { defaultValue: 'New transfer' })}
+              </Button>
             </div>
           )}
 
@@ -304,6 +359,9 @@ export function TransfersPage() {
                         </div>
                       </div>
                       <div className="text-right shrink-0 flex flex-col items-end">
+                        {order.total_current_cost != null && (
+                          <div className="text-sm font-medium tabular-nums">{fmtCurrency(order.total_current_cost)}</div>
+                        )}
                         <div className="text-xs text-subtle">
                           <DateTime value={order.created_at} /> ({fmtNum(order.total_lines ?? 0)})
                         </div>
@@ -346,9 +404,142 @@ export function TransfersPage() {
               )}
             </PageNavPanel>
           </div>
+
+          <CreateTransferModal
+            open={createOpen}
+            onClose={() => setCreateOpen(false)}
+            fromBranchId={defaultBranchId}
+            t={t}
+            onCreated={(newId) => {
+              setCreateOpen(false);
+              invalidate();
+              setSelectedId(newId);
+              if (isMobile) goTo('detail');
+            }}
+          />
         </>
       )}
     </PageNav>
+  );
+}
+
+// ============================================================================
+// Create Transfer Modal — pick destination + mode → DRAFT order
+// ============================================================================
+
+function CreateTransferModal({
+  open,
+  onClose,
+  fromBranchId,
+  t,
+  onCreated,
+}: {
+  open: boolean;
+  onClose: () => void;
+  fromBranchId: number | null;
+  t: ReturnType<typeof useTranslation>['t'];
+  onCreated: (newId: number) => void;
+}) {
+  const [toBranchId, setToBranchId] = useState<number | null>(null);
+  const [mode, setMode] = useState<string>('FREE_TRANSFER');
+  const [notes, setNotes] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (open) { setToBranchId(null); setMode('FREE_TRANSFER'); setNotes(''); setError(''); }
+  }, [open]);
+
+  const { data: destinations = [] } = useQuery({
+    queryKey: ['transfer-destinations'],
+    queryFn: () => apiClient.get<DestinationBranch[]>('/v_transfer_destination_branches?is_active=eq.true&order=branch_name'),
+    enabled: open,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Destination can't be the source branch (backend rejects TRANSFER_SAME_BRANCH).
+  const destOptions = useMemo(
+    () => destinations
+      .filter(b => b.branch_id !== fromBranchId)
+      .map(b => ({ value: String(b.branch_id), label: b.branch_name })),
+    [destinations, fromBranchId],
+  );
+
+  const mutation = useMutation({
+    mutationFn: () => apiClient.rpc<{ transfer_order_id: number }>('fn_inv_transfer_create', {
+      p_to_branch_id: toBranchId,
+      p_transfer_mode: mode,
+      p_notes: notes.trim() || null,
+      p_branch_id: null,
+    }),
+    onSuccess: (data) => onCreated(data.transfer_order_id),
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setError(translated || err.message);
+      } else {
+        setError(String(err));
+      }
+    },
+  });
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
+      <div className="flex flex-col overflow-hidden">
+        <div className="modal-header">
+          <h2 className="modal-title">{t('transfer.createTransfer', { defaultValue: 'New transfer' })}</h2>
+          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+        </div>
+        <div className="modal-content">
+          {error && (
+            <div className="alert alert-danger mb-4 animate-pop-in">
+              <XCircle size={16} />
+              <span>{error}</span>
+            </div>
+          )}
+          <div className="form-grid gap-4">
+            <div className="flex flex-col">
+              <label className="form-label">{t('transfer.to', { defaultValue: 'Destination branch' })} *</label>
+              <Select
+                options={destOptions}
+                value={toBranchId !== null ? String(toBranchId) : null}
+                onChange={(val) => setToBranchId(val ? Number(val) : null)}
+                placeholder={t('transfer.selectDestination', { defaultValue: 'Select branch' })}
+                showChevron
+              />
+            </div>
+            <div className="flex flex-col">
+              <label className="form-label">{t('transfer.mode', { defaultValue: 'Mode' })} *</label>
+              <Select
+                options={TRANSFER_MODE_VALUES.map(v => ({ value: v, label: t(`transfer.mode_${v}`, { defaultValue: v }) }))}
+                value={mode}
+                onChange={(val) => setMode((val as string) || 'FREE_TRANSFER')}
+                showChevron
+              />
+            </div>
+            <div className="flex flex-col">
+              <label className="form-label">{t('transfer.note')}</label>
+              <TextArea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder={t('transfer.notePlaceholder')}
+                rows={2}
+              />
+            </div>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <Button onClick={onClose} disabled={mutation.isPending}>{t('common.cancel')}</Button>
+          <Button
+            color="primary"
+            onClick={() => mutation.mutate()}
+            disabled={toBranchId === null || mutation.isPending}
+          >
+            {mutation.isPending ? t('common.loading') : t('transfer.createTransfer', { defaultValue: 'New transfer' })}
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
@@ -376,10 +567,11 @@ function TransferDetailPanel({
   const [approveModalOpen, setApproveModalOpen] = useState(false);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [receiveLine, setReceiveLine] = useState<TransferLine | null>(null);
+  const [addLineType, setAddLineType] = useState<'ASSET' | 'LOT' | null>(null);
 
   const canApprove = order.status === 'DRAFT';
   const canEditLines = order.status === 'DRAFT';
-  const canCancel = order.status === 'DRAFT' || order.status === 'APPROVED';
+  const canCancel = order.status === 'DRAFT';
   const canReceive = order.status === 'IN_TRANSIT' || order.status === 'DISPUTED';
 
   return (
@@ -411,7 +603,7 @@ function TransferDetailPanel({
         </div>
         <div>
           <div className="text-xs text-subtle">{t('transfer.mode')}</div>
-          <div className="font-semibold text-sm">{order.transfer_mode.replace(/_/g, ' ')}</div>
+          <div className="font-semibold text-sm">{t(`transfer.mode_${order.transfer_mode}`, { defaultValue: order.transfer_mode.replace(/_/g, ' ') })}</div>
         </div>
       </div>
 
@@ -452,10 +644,20 @@ function TransferDetailPanel({
 
       {/* Lines */}
       <div className="flex-1 overflow-auto better-scroll">
-        <div className="px-4 pt-3 pb-1">
+        <div className="px-4 pt-3 pb-1 flex items-center justify-between gap-2">
           <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider">
             {t('transfer.lines')} ({lines.length})
           </h3>
+          {canEditLines && (
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" startIcon={<Smartphone size={14} />} onClick={() => setAddLineType('ASSET')}>
+                {t('transfer.addAsset', { defaultValue: 'Add asset' })}
+              </Button>
+              <Button size="sm" variant="outline" startIcon={<Package size={14} />} onClick={() => setAddLineType('LOT')}>
+                {t('transfer.addLot', { defaultValue: 'Add lot' })}
+              </Button>
+            </div>
+          )}
         </div>
         {lines.length === 0 && !loading && (
           <div className="p-8 text-center text-subtler">{t('common.noData')}</div>
@@ -547,7 +749,242 @@ function TransferDetailPanel({
           });
         }}
       />
+
+      <AddLineModal
+        open={addLineType !== null}
+        lineType={addLineType}
+        order={order}
+        existingLines={lines}
+        t={t}
+        onClose={() => setAddLineType(null)}
+        onAdded={() => {
+          setAddLineType(null);
+          onRefresh();
+          addSnackbar({
+            message: (
+              <div className="alert alert-success">
+                <CheckCircle size={16} />
+                <span>{t('transfer.addLineSuccess', { defaultValue: 'Item added to transfer' })}</span>
+              </div>
+            ),
+          });
+        }}
+      />
     </div>
+  );
+}
+
+// ============================================================================
+// Add Line Modal — pick an ASSET or a LOT from the source branch (DRAFT only)
+// ============================================================================
+
+function AddLineModal({
+  open,
+  lineType,
+  order,
+  existingLines,
+  t,
+  onClose,
+  onAdded,
+}: {
+  open: boolean;
+  lineType: 'ASSET' | 'LOT' | null;
+  order: TransferOrder;
+  existingLines: TransferLine[];
+  t: ReturnType<typeof useTranslation>['t'];
+  onClose: () => void;
+  onAdded: () => void;
+}) {
+  const [search, setSearch] = useState('');
+  const [debounced, setDebounced] = useState('');
+  const [pickedId, setPickedId] = useState<number | null>(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (open) { setSearch(''); setDebounced(''); setPickedId(null); setError(''); }
+  }, [open, lineType]);
+
+  useEffect(() => {
+    const tm = setTimeout(() => setDebounced(search.trim()), 300);
+    return () => clearTimeout(tm);
+  }, [search]);
+
+  // Asset / lot ids already on this transfer — exclude from the picker.
+  const usedAssetIds = useMemo(
+    () => new Set(existingLines.filter(l => l.asset_id != null).map(l => l.asset_id)),
+    [existingLines],
+  );
+  const usedLotIds = useMemo(
+    () => new Set(existingLines.filter(l => l.stock_lot_id != null).map(l => l.stock_lot_id)),
+    [existingLines],
+  );
+
+  const { data: assets = [], isFetching: assetsFetching } = useQuery({
+    queryKey: ['transfer-addable-assets', order.from_branch_id, debounced],
+    queryFn: () => {
+      let url = `/v_assets?branch_id=eq.${order.from_branch_id}&current_bucket=eq.ON_HAND_AVAILABLE&order=updated_at.desc&limit=50`;
+      if (debounced) {
+        const term = encodeURIComponent(debounced);
+        url += `&or=(asset_code.ilike.*${term}*,serial_no.ilike.*${term}*,imei.ilike.*${term}*,product_display_name.ilike.*${term}*)`;
+      }
+      return apiClient.get<AddableAsset[]>(url);
+    },
+    enabled: open && lineType === 'ASSET',
+  });
+
+  const { data: lots = [], isFetching: lotsFetching } = useQuery({
+    queryKey: ['transfer-addable-lots', order.from_branch_id, debounced],
+    queryFn: () => {
+      let url = `/v_stock_lots?branch_id=eq.${order.from_branch_id}&current_bucket=eq.ON_HAND_AVAILABLE&qty_on_hand=gt.0&is_closed=is.false&order=created_at.desc&limit=50`;
+      if (debounced) {
+        const term = encodeURIComponent(debounced);
+        url += `&or=(lot_code.ilike.*${term}*,variant_name.ilike.*${term}*,model_name.ilike.*${term}*)`;
+      }
+      return apiClient.get<AddableLot[]>(url);
+    },
+    enabled: open && lineType === 'LOT',
+  });
+
+  const mutation = useMutation({
+    mutationFn: () => {
+      if (lineType === 'ASSET') {
+        return apiClient.rpc('fn_inv_transfer_add_line', {
+          p_transfer_order_id: order.transfer_order_id,
+          p_line_type: 'ASSET',
+          p_stock_lot_id: null,
+          p_asset_id: pickedId,
+          p_qty_requested: null,
+        });
+      }
+      // LOT — whole lot only (partial not supported); send the lot's full qty.
+      const lot = lots.find(l => l.lot_id === pickedId);
+      return apiClient.rpc('fn_inv_transfer_add_line', {
+        p_transfer_order_id: order.transfer_order_id,
+        p_line_type: 'LOT',
+        p_stock_lot_id: pickedId,
+        p_asset_id: null,
+        p_qty_requested: lot?.qty_on_hand ?? null,
+      });
+    },
+    onSuccess: onAdded,
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setError(translated || err.message);
+      } else {
+        setError(String(err));
+      }
+    },
+  });
+
+  const fetching = lineType === 'ASSET' ? assetsFetching : lotsFetching;
+  const title = lineType === 'ASSET'
+    ? t('transfer.addAsset', { defaultValue: 'Add asset' })
+    : t('transfer.addLot', { defaultValue: 'Add lot' });
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="32rem" width="100%">
+      <div className="flex flex-col overflow-hidden">
+        <div className="modal-header">
+          <h2 className="modal-title">{title}</h2>
+          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+        </div>
+        <div className="modal-content">
+          {error && (
+            <div className="alert alert-danger mb-4 animate-pop-in">
+              <XCircle size={16} />
+              <span>{error}</span>
+            </div>
+          )}
+          <div className="mb-3">
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t('common.search')}
+              size="sm"
+              startIcon={<Search size={16} />}
+              className="w-full"
+              autoFocus
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5 max-h-80 overflow-auto better-scroll">
+            {fetching && (
+              <div className="py-6 text-center text-subtler text-xs">{t('common.loading')}</div>
+            )}
+
+            {!fetching && lineType === 'ASSET' && assets
+              .filter(a => !usedAssetIds.has(a.asset_id))
+              .map(a => {
+                const picked = pickedId === a.asset_id;
+                return (
+                  <button
+                    key={a.asset_id}
+                    type="button"
+                    onClick={() => setPickedId(a.asset_id)}
+                    className={`w-full text-left px-3 py-2 rounded-md border transition-colors cursor-pointer ${picked ? 'border-primary bg-primary-soft' : 'border-line hover:bg-surface-hover'}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium truncate">{a.asset_code_display ?? a.asset_code ?? `#${a.asset_id}`}</span>
+                      {a.current_cost_basis != null && (
+                        <span className="text-xs tabular-nums text-subtle shrink-0">{fmtCurrency(a.current_cost_basis)}</span>
+                      )}
+                    </div>
+                    <div className="text-xs text-subtle truncate">{a.product_display_name ?? a.variant_name ?? ''}</div>
+                    {(a.serial_no || a.imei) && (
+                      <div className="text-[11px] text-fg/50 font-mono truncate">{a.serial_no ?? a.imei}</div>
+                    )}
+                  </button>
+                );
+              })}
+
+            {!fetching && lineType === 'LOT' && lots
+              .filter(l => !usedLotIds.has(l.lot_id))
+              .map(l => {
+                const picked = pickedId === l.lot_id;
+                return (
+                  <button
+                    key={l.lot_id}
+                    type="button"
+                    onClick={() => setPickedId(l.lot_id)}
+                    className={`w-full text-left px-3 py-2 rounded-md border transition-colors cursor-pointer ${picked ? 'border-primary bg-primary-soft' : 'border-line hover:bg-surface-hover'}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium truncate">{l.lot_code_display ?? l.lot_code}</span>
+                      <span className="text-xs tabular-nums text-subtle shrink-0">{l.qty_on_hand} × {fmtCurrency(l.unit_cost)}</span>
+                    </div>
+                    <div className="text-xs text-subtle truncate">
+                      {[l.brand_name, l.model_name].filter(Boolean).join(' ')}{l.variant_name ? ` · ${l.variant_name}` : ''}
+                    </div>
+                  </button>
+                );
+              })}
+
+            {!fetching && lineType === 'ASSET' && assets.filter(a => !usedAssetIds.has(a.asset_id)).length === 0 && (
+              <div className="py-6 text-center text-subtler text-xs">{t('transfer.noAddableAssets', { defaultValue: 'No available assets at the source branch.' })}</div>
+            )}
+            {!fetching && lineType === 'LOT' && lots.filter(l => !usedLotIds.has(l.lot_id)).length === 0 && (
+              <div className="py-6 text-center text-subtler text-xs">{t('transfer.noAddableLots', { defaultValue: 'No available lots at the source branch.' })}</div>
+            )}
+          </div>
+
+          {lineType === 'LOT' && (
+            <p className="text-[11px] text-subtle mt-2">{t('transfer.lotWholeOnly', { defaultValue: 'Lots transfer as a whole — the full on-hand quantity is moved.' })}</p>
+          )}
+        </div>
+        <div className="modal-footer">
+          <Button onClick={onClose} disabled={mutation.isPending}>{t('common.cancel')}</Button>
+          <Button
+            color="primary"
+            onClick={() => mutation.mutate()}
+            disabled={pickedId === null || mutation.isPending}
+          >
+            {mutation.isPending ? t('common.loading') : t('common.add', { defaultValue: 'Add' })}
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
@@ -766,7 +1203,7 @@ function ReceiveLineModal({
             <div className="flex flex-col">
               <label className="form-label">{t('transfer.receiveAction')}</label>
               <Select
-                options={RECEIVE_ACTION_OPTIONS}
+                options={RECEIVE_ACTION_VALUES.map(v => ({ value: v, label: t(`transfer.action_${v}`, { defaultValue: v }) }))}
                 value={action}
                 onChange={(val) => setAction((val as string) || null)}
                 placeholder={t('transfer.selectAction')}
@@ -877,6 +1314,23 @@ function TransferLineRow({
             {(line.variant_name || line.sku_code) && ` · ${line.variant_name ?? line.sku_code}`}
           </div>
           {line.serial_no && <div className="text-xs text-fg/50 font-mono truncate">{line.serial_no}</div>}
+          {(() => {
+            // Frozen snap_* after approve; live asset_*_cost_basis while DRAFT.
+            const frozen = line.snap_current_cost_basis;
+            const live = line.asset_current_cost_basis;
+            const cost = frozen ?? live;
+            if (cost == null) return null;
+            return (
+              <div className="text-xs text-subtle mt-0.5 tabular-nums">
+                {fmtCurrency(cost)}
+                <span className="text-fg/40 ml-1">
+                  {frozen != null
+                    ? t('transfer.costAtTransfer', { defaultValue: 'at transfer' })
+                    : t('transfer.costLive', { defaultValue: 'current' })}
+                </span>
+              </div>
+            );
+          })()}
           {line.receive_note && <div className="text-xs text-fg/50 mt-0.5 italic truncate">{line.receive_note}</div>}
         </div>
         <div className="shrink-0 flex flex-col items-end gap-1">

@@ -24,6 +24,9 @@ interface DraftContract {
   variant_id: number | null;
   model_name: string | null;
   variant_name: string | null;
+  // Delivered later on v_saving_contracts (brand+family+variant). Falls back to
+  // variant_name / model_name until the column lands — then upgrades for free.
+  product_display_name: string | null;
   commission_owner_id: number | null;
   owner_name: string | null;
   created_by: number | null;
@@ -206,7 +209,10 @@ export function DraftContractsPage() {
                           </div>
                           <div className="text-xs text-subtle truncate">
                             {contract.customer_name ?? t('contract.noCustomer')}
-                            {contract.model_name && ` · ${contract.model_name}`}
+                            {(() => {
+                              const product = contract.product_display_name ?? contract.variant_name ?? contract.model_name;
+                              return product ? ` · ${product}` : '';
+                            })()}
                           </div>
                           <div className="flex items-center justify-between text-xs text-subtle">
                             <span>{contract.branch_name}</span>
