@@ -35,6 +35,7 @@ export interface ContractSearchResult {
   last_name: string | null;
   model_name: string | null;
   variant_name: string | null;
+  product_display_name: string | null;
   commercial_model: string | null;
   term_months: number | null;
   agreed_price: number | null;
@@ -382,7 +383,7 @@ export function ContractListPane({
                             </div>
                             <div className="text-xs text-subtle truncate mt-0.5">
                               {contract.customer_name ?? t('contract.noCustomer')}
-                              {contract.model_name && ` · ${contract.model_name}`}
+                              {(contract.product_display_name ?? contract.model_name) && ` · ${contract.product_display_name ?? contract.model_name}`}
                             </div>
                             <div className="flex items-center gap-3 mt-1 text-xs text-subtle">
                               <span>{contract.branch_name}</span>

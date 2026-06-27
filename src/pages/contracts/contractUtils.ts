@@ -11,6 +11,7 @@ export function getStateColor(state: string): BadgeColor {
     case 'PENDING_APPROVAL': return 'warning';
     case 'APPROVED': return 'info';
     case 'PENDING_PAYMENT': return 'warning';
+    case 'PENDING_PAYMENT_AND_SIGN': return 'warning';
     case 'ACTIVE': return 'success';
     case 'WAIT_LEGAL_PROCESS': return 'warning';
     case 'ON_LEGAL_PROCESS': return 'danger';
