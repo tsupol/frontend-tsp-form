@@ -1,26 +1,22 @@
-// Bind signatures to the CONTRACT_OPEN snapshot at activation time.
+// Bind the STAFF signatures (LESSOR + WITNESS) to the CONTRACT_OPEN snapshot at
+// activation time. The customer parties (LESSEE / CO_LESSEE) are intentionally
+// left COLLECTING — they sign later on the capture bridge (iPad QR), not here.
+// See UI_FEEDBACK/2026-06-26_GUIDE_contract_signing_bridge_delivery_flow §6.1.
 //
-// Why this exists: fn_bill_contract_open auto-creates a COLLECTING
-// FULL_CONTRACT snapshot with one party row per required signer — and (mig 251)
-// that's LESSEE + every CO_LESSEE + LESSOR + both WITNESSes. None are
-// pre-signed (signature_media_id starts NULL). The contract only goes ACTIVE
-// once the bill is PAID *and* the snapshot is SEALED (all parties signed). The
-// old confirm flow paid but never signed, so contracts got stuck at
-// "paid, awaiting signature".
+// Why staff-only: fn_bill_contract_open auto-creates a COLLECTING FULL_CONTRACT
+// snapshot with one party row per required signer (LESSEE + every CO_LESSEE +
+// LESSOR + both WITNESSes), all unsigned. The snapshot seals only once EVERY
+// party is signed. LESSOR/WITNESS signatures are pre-registered staff sigs that
+// already carry a signature_media_id — we bind those now so the only parties
+// left COLLECTING are the customer-facing ones the bridge will collect.
 //
-// The signatures already exist from earlier steps — we do NOT re-capture:
-//   • LESSEE / CO_LESSEE → a SIGNATURE_PAD contract document (file_url) saved in
-//     the Documents step. We re-attach its storage_path as a CONTRACT/SIGNATURE
-//     media to mint the media_id fn_contract_signing_sign needs (option 2 — no
-//     new media row at capture time; mint it here on confirm).
-//   • LESSOR / WITNESS → the bound branch signatory already carries a
-//     signature_media_id; we reuse it directly.
+// We do NOT touch LESSEE/CO_LESSEE: no SIGNATURE_PAD pre-sign, no auto-bind.
+// Leaving them COLLECTING is what gives the bridge a roster to capture.
 //
-// Returns the roles it could NOT sign (no signature on file) so the caller can
-// surface them instead of silently leaving the contract un-activated.
+// Returns the staff roles it could NOT bind (no signatory media) so the caller
+// can surface a real mis-configuration instead of a silently stuck contract.
 
 import { apiClient } from '../../../lib/api';
-import { toStoragePath } from '../../../lib/mediaPath';
 
 interface SigningParty {
   signing_id: number;
@@ -33,20 +29,15 @@ interface SigningParty {
   has_signed: boolean;
 }
 
-interface SignatureDoc {
-  customer_id: number;
-  file_url: string;
-}
-
 interface SignatoryRow {
   slot: 'LESSOR' | 'WITNESS_1' | 'WITNESS_2';
   signature_media_id: number | null;
 }
 
 export interface SignPartiesResult {
-  /** Required parties with no signature on file — not signed. */
+  /** Staff parties (LESSOR/WITNESS) with no bound signatory media — a real config error. */
   unsigned: Array<{ role: string; name: string | null }>;
-  /** How many party signatures were submitted. */
+  /** How many staff party signatures were bound. */
   signedCount: number;
 }
 
@@ -55,42 +46,16 @@ const WITNESS_SLOT = (index: number): SignatoryRow['slot'] =>
   index === 0 ? 'WITNESS_1' : 'WITNESS_2';
 
 /**
- * Re-attach an existing signature image (file_url / storage key) as a
- * CONTRACT/SIGNATURE media and return the new media_id.
- */
-async function attachSignatureMedia(
-  holdingId: number,
-  contractId: number,
-  fileUrl: string,
-): Promise<number> {
-  const res = await apiClient.rpc<{ media_id: number }>('fn_media_attach', {
-    p_holding_id: holdingId,
-    p_storage_path: toStoragePath(fileUrl),
-    p_variants_json: null,
-    p_media_type: 'IMAGE',
-    p_access_level: 'CONFIDENTIAL',
-    p_mime_type: fileUrl.endsWith('.webp') ? 'image/webp' : 'image/png',
-    p_file_size_bytes: null,
-    p_original_filename: null,
-    p_entity_type: 'CONTRACT',
-    p_entity_id: contractId,
-    p_usage_type: 'SIGNATURE',
-    p_sort_order: 0,
-    p_caption: null,
-  });
-  return res.media_id;
-}
-
-/**
- * Sign every unsigned required party on the contract's COLLECTING
- * CONTRACT_OPEN snapshot, reusing already-captured signatures.
+ * Bind the STAFF signatures (LESSOR + WITNESS) on the contract's COLLECTING
+ * CONTRACT_OPEN snapshot. Customer parties (LESSEE/CO_LESSEE) are left
+ * COLLECTING for the capture bridge.
  *
- * Must be called AFTER fn_bill_contract_open (which creates the snapshot) and
- * BEFORE fn_bill_payment_confirm, so the snapshot can seal alongside payment.
+ * Must be called AFTER fn_bill_contract_open (which creates the snapshot). The
+ * snapshot will NOT seal here — it seals once the customer parties also sign on
+ * the bridge.
  */
 export async function signContractOpenParties(
   contractId: number,
-  holdingId: number,
 ): Promise<SignPartiesResult> {
   // The CONTRACT_OPEN snapshot is the current COLLECTING FULL_CONTRACT one.
   const snapshots = await apiClient.get<Array<{ signing_id: number }>>(
@@ -110,19 +75,14 @@ export async function signContractOpenParties(
       `&order=party_role,party_index`,
   );
 
-  const pending = parties.filter(p => !p.has_signed && p.signature_media_id == null);
-  if (pending.length === 0) return { unsigned: [], signedCount: 0 };
-
-  // Customer signatures captured in the Documents step (file_url per customer).
-  const sigDocs = await apiClient.get<SignatureDoc[]>(
-    `/v_contract_documents?contract_id=eq.${contractId}&doc_type=eq.SIGNATURE_PAD&select=customer_id,file_url`,
+  // Staff parties only — customer parties (LESSEE/CO_LESSEE) stay COLLECTING for
+  // the bridge, so we never bind them here.
+  const pending = parties.filter(
+    p => !p.has_signed
+      && p.signature_media_id == null
+      && (p.party_role === 'LESSOR' || p.party_role === 'WITNESS'),
   );
-  const sigByCustomer = new Map<number, string>();
-  for (const d of sigDocs) {
-    if (d.customer_id != null && !sigByCustomer.has(d.customer_id)) {
-      sigByCustomer.set(d.customer_id, d.file_url);
-    }
-  }
+  if (pending.length === 0) return { unsigned: [], signedCount: 0 };
 
   // Branch signatory media (LESSOR / WITNESS) — already real media_ids.
   const signatories = await apiClient.get<SignatoryRow[]>(
@@ -139,12 +99,7 @@ export async function signContractOpenParties(
   for (const party of pending) {
     let mediaId: number | null = null;
 
-    if (party.party_role === 'LESSEE' || party.party_role === 'CO_LESSEE') {
-      const fileUrl = party.customer_id != null ? sigByCustomer.get(party.customer_id) : undefined;
-      if (fileUrl) {
-        mediaId = await attachSignatureMedia(holdingId, contractId, fileUrl);
-      }
-    } else if (party.party_role === 'LESSOR') {
+    if (party.party_role === 'LESSOR') {
       mediaId = mediaBySlot.get('LESSOR') ?? null;
     } else if (party.party_role === 'WITNESS') {
       mediaId = mediaBySlot.get(WITNESS_SLOT(party.party_index)) ?? null;

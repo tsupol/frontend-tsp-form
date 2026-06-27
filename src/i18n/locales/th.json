@@ -2596,7 +2596,7 @@
     "addPayment": "เพิ่มการชำระ",
     "totalPayment": "ยอดชำระรวม",
     "confirmPayment": "ยืนยันและเปิดสัญญา",
-    "signMissingSignatures": "เปิดสัญญาไม่ได้ — ยังไม่มีลายเซ็นของ: {{who}}",
+    "signMissingStaffSignatures": "ดำเนินการไม่ได้ — ยังไม่ได้ตั้งผู้ลงนามของสาขาสำหรับ: {{who}}",
     "activateAndPay": "เปิดสัญญาและชำระ",
     "activatePayLater": "เปิดสัญญา ชำระภายหลัง",
     "activating": "กำลังเปิดสัญญา…",

@@ -259,26 +259,25 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
         }
       }
 
-      // 3. Bind signatures to the auto-created CONTRACT_OPEN snapshot. Opening
-      //    the bill creates a COLLECTING FULL_CONTRACT snapshot whose parties
-      //    (LESSEE + co-lessees + lessor + 2 witnesses) all start unsigned.
-      //    The contract only activates once PAID *and* SEALED, so we sign every
-      //    required party here from the already-captured signatures (customer
-      //    SIGNATURE_PAD docs + branch signatory media). Without this the bill
-      //    pays but the contract stays "paid, awaiting signature".
-      if (contract?.holding_id != null) {
-        const signRes = await signContractOpenParties(data.contractId, contract.holding_id);
-        if (signRes.unsigned.length > 0) {
-          const who = signRes.unsigned
-            .map(u => u.name || t(`signing.role_${u.role}`, { defaultValue: u.role }))
-            .join(', ');
-          throw new Error(
-            t('wizard.signMissingSignatures', {
-              defaultValue: 'Cannot activate — missing signature for: {{who}}',
-              who,
-            }),
-          );
-        }
+      // 3. Bind the STAFF signatures (LESSOR + WITNESS) on the auto-created
+      //    CONTRACT_OPEN snapshot. Opening the bill creates a COLLECTING
+      //    FULL_CONTRACT snapshot whose parties (LESSEE + co-lessees + lessor +
+      //    2 witnesses) all start unsigned. We bind only the pre-registered
+      //    staff signatures here; the customer parties (LESSEE/CO_LESSEE) stay
+      //    COLLECTING and sign later on the capture bridge (iPad QR). So the
+      //    contract does NOT activate at confirm — it sits at PENDING_SIGN until
+      //    the customer signs. (UI_FEEDBACK signing-bridge GUIDE §6.1.)
+      const signRes = await signContractOpenParties(data.contractId);
+      if (signRes.unsigned.length > 0) {
+        const who = signRes.unsigned
+          .map(u => u.name || t(`signing.role_${u.role}`, { defaultValue: u.role }))
+          .join(', ');
+        throw new Error(
+          t('wizard.signMissingStaffSignatures', {
+            defaultValue: 'Cannot proceed — branch signatory not set for: {{who}}',
+            who,
+          }),
+        );
       }
 
       // 4. Record payments.
@@ -291,7 +290,9 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
         });
       }
 
-      // 5. Confirm — server cascades to ACTIVE (paid + sealed).
+      // 5. Confirm payment. Contract moves to PENDING_SIGN (paid, awaiting the
+      //    customer signature on the bridge) — it activates only after the
+      //    snapshot seals once the customer has signed.
       await apiClient.rpc('fn_bill_payment_confirm', {
         p_bill_id: bill.bill_id,
         p_contract_id: data.contractId,

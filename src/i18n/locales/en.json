@@ -2597,7 +2597,7 @@
     "addPayment": "Add Payment",
     "totalPayment": "Total Payment",
     "confirmPayment": "Confirm & Activate",
-    "signMissingSignatures": "Cannot activate — missing signature for: {{who}}",
+    "signMissingStaffSignatures": "Cannot proceed — branch signatory not set for: {{who}}",
     "activateAndPay": "Activate & Pay",
     "activatePayLater": "Activate, pay later",
     "activating": "Activating…",
