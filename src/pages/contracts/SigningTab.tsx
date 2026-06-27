@@ -24,8 +24,9 @@ import { useQuery } from '@tanstack/react-query';
 import { Badge, Button, Switch, Tooltip } from 'tsp-form';
 import {
   Bot, CheckCircle2, ChevronDown, ChevronRight, Circle, Eye, FileSignature, Info, PenLine,
-  Printer, Trash2, XCircle,
+  Printer, Smartphone, Trash2, XCircle,
 } from 'lucide-react';
+import { ContractSignQrModal } from './workspace/ContractSignQrModal';
 import type { BeMediaContractDoc } from '../../lib/beMedia';
 import { apiClient } from '../../lib/api';
 import { formatCid, formatTel } from '../../lib/format';
@@ -186,6 +187,7 @@ export function SigningTab({
   const { t } = useTranslation();
   const [voidSigningId, setVoidSigningId] = useState<number | null>(null);
   const [signTarget, setSignTarget] = useState<SignTarget | null>(null);
+  const [signQrOpen, setSignQrOpen] = useState(false);
   const [detailTarget, setDetailTarget] = useState<{
     signing_id: number;
     signing_type: string;
@@ -284,6 +286,19 @@ export function SigningTab({
           works before and after signing. */}
       <ContractAttachments contractId={contractId} contractCode={contractCode} />
 
+      {/* Send the whole contract to a phone/iPad for the customer to sign on the
+          capture bridge. Shown when there's at least one COLLECTING signing. */}
+      {signings.some(s => s.status === 'COLLECTING') && (
+        <Button
+          variant="primary"
+          startIcon={<Smartphone size={14} />}
+          onClick={() => setSignQrOpen(true)}
+          className="self-start"
+        >
+          {t('workspace.signQr', { defaultValue: 'Sign on phone' })}
+        </Button>
+      )}
+
       <Tooltip content={t('signing.auditToggleHint')}>
         <label className="self-end flex items-center gap-2 text-xs text-subtle cursor-pointer">
           <span>{t('signing.auditToggle')}</span>
@@ -346,6 +361,12 @@ export function SigningTab({
         contractId={contractId}
         signingType={detailTarget?.signing_type ?? ''}
         changeReason={detailTarget?.change_reason ?? null}
+      />
+      <ContractSignQrModal
+        open={signQrOpen}
+        onClose={() => setSignQrOpen(false)}
+        contractId={contractId}
+        contractCode={contractCode}
       />
     </div>
   );
