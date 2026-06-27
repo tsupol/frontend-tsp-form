@@ -235,35 +235,72 @@ POST /rpc/fn_contract_validate_ready
 `CUSTOMER_ID_CARD_REQUIRED` (Step 7), `SIGNATORY_INCOMPLETE` (Step 8, with
 `detail.missing` = the slot).
 
-## Step 11 — Open Bill & Take Down Payment
+## Step 11 — Activate: EXACTLY the wizard's `PanelReviewPay` Confirm sequence
+
+> ⚠️ **Do NOT improvise the activation order.** This is the live sequence from
+> `src/pages/contracts/workspace/PanelReviewPay.tsx` `handleConfirm`. The common
+> mistake is `bill_open → payment_add → payment_confirm` while **skipping step 3
+> (staff-signature binding)** — that leaves LESSOR/WITNESS unsigned, so the snapshot
+> can never seal and the contract is stuck at PENDING_SIGN forever (this is how
+> contracts 751/752 broke). Run all 5 steps in order.
 
 ```
-// 1. Open the contract-open bill
+// 1. Open the contract-open bill. This creates a COLLECTING FULL_CONTRACT
+//    snapshot with one party row per signer (LESSEE + every CO_LESSEE + LESSOR +
+//    2 WITNESS), ALL unsigned (signature_media_id = null).
 POST /rpc/fn_bill_contract_open
 { "p_contract_id": <id> }
 // Returns bill_id, total_amount (= down_payment), lines[] (DOWN_PAYMENT, …)
 
-// 2. Add the payment
+// 2. (Wizard only) add any extra cart lines via fn_bill_line_item_add. The
+//    plain down-payment flow has none — skip if you added no add-ons.
+
+// 3. ⭐ BIND THE STAFF SIGNATURES (LESSOR + WITNESS) — the step that's easy to
+//    miss. The wizard does this between bill-open and payment. Customer parties
+//    (LESSEE/CO_LESSEE) are intentionally left unsigned for the bridge.
+//
+//    a. Find the COLLECTING full-contract snapshot:
+GET /v_contract_signing_visible?contract_id=eq.<id>&type=eq.FULL_CONTRACT&status=eq.COLLECTING&change_reason=eq.CONTRACT_OPEN&select=signing_id&order=version.desc&limit=1
+//       → signing_id
+
+//    b. Get each staff slot's pre-registered signature media:
+GET /v_contract_signatories?contract_id=eq.<id>&select=slot,signature_media_id
+//       → { LESSOR: media, WITNESS_1: media, WITNESS_2: media }
+
+//    c. Sign each staff party on that signing (party_index: WITNESS_1→0, WITNESS_2→1):
+POST /rpc/fn_contract_signing_sign
+{ "p_signing_id": <signing_id>, "p_party_role": "LESSOR",  "p_party_index": 0, "p_signature_media_id": <LESSOR media> }
+POST /rpc/fn_contract_signing_sign
+{ "p_signing_id": <signing_id>, "p_party_role": "WITNESS", "p_party_index": 0, "p_signature_media_id": <WITNESS_1 media> }
+POST /rpc/fn_contract_signing_sign
+{ "p_signing_id": <signing_id>, "p_party_role": "WITNESS", "p_party_index": 1, "p_signature_media_id": <WITNESS_2 media> }
+
+// 4. Add the payment
 POST /rpc/fn_bill_payment_add
-{
-  "p_bill_id": <bill_id>,
-  "p_method": "CASH",               // CASH, TRANSFER
-  "p_amount": <down_payment>,
-  "p_bank_account_id": null         // required for TRANSFER
-}
+{ "p_bill_id": <bill_id>, "p_method": "CASH", "p_amount": <down_payment>, "p_bank_account_id": null }
 // -> status: "PAID", remaining: 0
 
-// 3. Confirm the payment
+// 5. Confirm the payment
 POST /rpc/fn_bill_payment_confirm
 { "p_bill_id": <bill_id>, "p_contract_id": <id> }
 ```
 
-> ⚠️ **Confirm does NOT activate the contract.** It moves DRAFT → **`PENDING_SIGN`**
-> (`awaiting_signature: true`, `contract_activated: false`). The contract activates
-> only **after the signing flow is completed** (sign all parties → seal). That signing
-> flow is a separate sequence — see `UI_SUMMARY/42_CONTRACT_SIGNING.md` /
-> `60_CONTRACT_SIGNING_AND_PRINT.md` and `fn_contract_signing_create` →
-> `fn_contract_signing_sign` (per party) → seal.
+> ⚠️ **Confirm does NOT fully activate.** After step 5 the contract is **`PENDING_SIGN`**:
+> staff parties signed (step 3), customer parties (LESSEE/CO_LESSEE) still unsigned. It
+> activates only once the **customer signs and the snapshot seals** — on the capture
+> bridge (`CONTRACT_SIGNATURE` session) or per-party in-app sign. If you skipped step 3,
+> the staff parties are also unsigned and it can NEVER seal.
+>
+> **Co-lessee note:** with a co-lessee there are TWO signings — the full contract
+> (CONTRACT_OPEN) and the co-lessee addendum (ADD_CO_LESSEE). The lessee is a party on
+> BOTH and must sign BOTH; signing only the addendum leaves the full contract at 3/4 and
+> the contract stuck at PENDING_SIGN.
+>
+> **mig 346 (newer model, evolving):** the backend may auto-sign LESSOR at snapshot, and
+> witnesses can be assigned via `fn_signing_assign_witness(signing_id, slot, witness_id)`
+> + the `v_signing_witness_slots` view instead of the per-party `fn_contract_signing_sign`
+> above. If step 3 reports LESSOR already signed, that's mig 346 — skip it for LESSOR and
+> only assign the witnesses. Verify against live before assuming either path.
 
 ## Verification
 
@@ -271,7 +308,15 @@ POST /rpc/fn_bill_payment_confirm
 GET /v_contracts?id=eq.<id>&select=id,code_display,state,customer_name
 ```
 
-After Step 11 the state is `PENDING_SIGN`. After signing completes it becomes `ACTIVE`.
+After Step 11 the state is `PENDING_SIGN` with the staff parties signed. After the
+customer signs (bridge or in-app) and the snapshot seals, it becomes `ACTIVE`.
+
+Sanity-check the party state after step 11:
+```
+GET /v_contract_signing_party?contract_id=eq.<id>&select=signing_id,party_role,party_index,has_signed,signature_media_id&order=signing_id.desc,party_role
+```
+Expect LESSOR + both WITNESS `has_signed: true`; LESSEE (+ CO_LESSEE) `false`. If a
+staff party is `false`, step 3 was skipped — go bind it.
 
 ## Stale-doc notes (what changed since the old version)
 
@@ -280,3 +325,7 @@ After Step 11 the state is `PENDING_SIGN`. After signing completes it becomes `A
 - CITIZEN_ID now **checksum-validated** — example numbers must be valid mod-11.
 - **ID card + 3 signatory slots are hard readiness requirements** (were not in the old doc).
 - Final state after pay-confirm is **`PENDING_SIGN`**, not `ACTIVE` — signing is a separate gate.
+- **Activation = the wizard's exact 5-step sequence (Step 11).** The old doc omitted the
+  staff-signature binding (step 3), which silently stuck contracts unsigned. Always bind
+  LESSOR + WITNESS between bill-open and payment-confirm. Source of truth is
+  `PanelReviewPay.tsx` `handleConfirm`, not this doc — re-read it if behavior drifts.
