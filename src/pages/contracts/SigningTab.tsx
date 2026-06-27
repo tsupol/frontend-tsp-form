@@ -113,9 +113,9 @@ function cardBorderClass(s: SigningStatus): string {
   }
 }
 
-function roleColor(r: PartyRole): 'primary' | 'info' | 'default' {
+function roleColor(r: PartyRole): 'primary' | 'info' | 'secondary' | 'default' {
   switch (r) {
-    case 'LESSOR':    return 'primary';
+    case 'LESSOR':    return 'secondary';  // company/staff side — distinct from the customer
     case 'LESSEE':    return 'primary';
     case 'CO_LESSEE': return 'info';
     case 'WITNESS':   return 'default';
@@ -286,19 +286,6 @@ export function SigningTab({
           works before and after signing. */}
       <ContractAttachments contractId={contractId} contractCode={contractCode} />
 
-      {/* Send the whole contract to a phone/iPad for the customer to sign on the
-          capture bridge. Shown when there's at least one COLLECTING signing. */}
-      {signings.some(s => s.status === 'COLLECTING') && (
-        <Button
-          variant="primary"
-          startIcon={<Smartphone size={14} />}
-          onClick={() => setSignQrOpen(true)}
-          className="self-start"
-        >
-          {t('workspace.signQr', { defaultValue: 'Sign on phone' })}
-        </Button>
-      )}
-
       <Tooltip content={t('signing.auditToggleHint')}>
         <label className="self-end flex items-center gap-2 text-xs text-subtle cursor-pointer">
           <span>{t('signing.auditToggle')}</span>
@@ -323,6 +310,7 @@ export function SigningTab({
             onRequestVoid={() => setVoidSigningId(s.signing_id)}
             onRequestPreview={onRenderPdf ? () => onRenderPdf({ doc: previewDocFor(s) }) : undefined}
             onRequestPrint={onRenderPdf ? () => onRenderPdf({ signingId: s.signing_id }) : undefined}
+            onRequestSignQr={() => setSignQrOpen(true)}
             onRequestSign={(party) => setSignTarget({
               signing_id: s.signing_id,
               party_role: party.party_role,
@@ -374,7 +362,7 @@ export function SigningTab({
 
 function SigningCard({
   signing, isStale, parties, expanded, onToggleExpand,
-  onRequestVoid, onRequestSign, onRequestPreview, onRequestPrint, onRequestDetail,
+  onRequestVoid, onRequestSign, onRequestPreview, onRequestPrint, onRequestSignQr, onRequestDetail,
 }: {
   signing: SigningHistoryRow;
   isStale: boolean;
@@ -385,6 +373,7 @@ function SigningCard({
   onRequestSign: (party: SigningPartyRow) => void;
   onRequestPreview?: () => void;
   onRequestPrint?: () => void;
+  onRequestSignQr?: () => void;
   onRequestDetail: () => void;
 }) {
   const { t } = useTranslation();
@@ -569,6 +558,16 @@ function SigningCard({
                 onClick={onRequestPreview}
               >
                 {t('contract.previewContract', { defaultValue: 'Preview' })}
+              </Button>
+            )}
+            {isActionable && onRequestSignQr && (
+              <Button
+                size="sm"
+                color="primary"
+                startIcon={<Smartphone size={13} />}
+                onClick={onRequestSignQr}
+              >
+                {t('workspace.signQr', { defaultValue: 'Sign' })}
               </Button>
             )}
             {(signing.status === 'SEALED' || signing.status === 'SUPERSEDED') && onRequestPrint && (
