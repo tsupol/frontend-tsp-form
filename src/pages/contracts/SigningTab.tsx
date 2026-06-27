@@ -27,6 +27,7 @@ import {
   Printer, Smartphone, Trash2, XCircle,
 } from 'lucide-react';
 import { ContractSignQrModal } from './workspace/ContractSignQrModal';
+import { WitnessSlotPicker } from './WitnessSlotPicker';
 import type { BeMediaContractDoc } from '../../lib/beMedia';
 import { apiClient } from '../../lib/api';
 import { formatCid, formatTel } from '../../lib/format';
@@ -308,9 +309,11 @@ export function SigningTab({
             expanded={expanded.has(s.signing_id)}
             onToggleExpand={() => toggleExpanded(s.signing_id)}
             onRequestVoid={() => setVoidSigningId(s.signing_id)}
+            contractId={contractId}
             onRequestPreview={onRenderPdf ? () => onRenderPdf({ doc: previewDocFor(s) }) : undefined}
             onRequestPrint={onRenderPdf ? () => onRenderPdf({ signingId: s.signing_id }) : undefined}
             onRequestSignQr={() => setSignQrOpen(true)}
+            onWitnessAssigned={() => { historyQuery.refetch(); partyQuery.refetch(); }}
             onRequestSign={(party) => setSignTarget({
               signing_id: s.signing_id,
               party_role: party.party_role,
@@ -367,13 +370,15 @@ export function SigningTab({
 }
 
 function SigningCard({
-  signing, isStale, parties, expanded, onToggleExpand,
+  signing, isStale, parties, expanded, contractId, onToggleExpand,
   onRequestVoid, onRequestSign, onRequestPreview, onRequestPrint, onRequestSignQr, onRequestDetail,
+  onWitnessAssigned,
 }: {
   signing: SigningHistoryRow;
   isStale: boolean;
   parties: SigningPartyRow[];
   expanded: boolean;
+  contractId: number;
   onToggleExpand: () => void;
   onRequestVoid: () => void;
   onRequestSign: (party: SigningPartyRow) => void;
@@ -381,6 +386,7 @@ function SigningCard({
   onRequestPrint?: () => void;
   onRequestSignQr?: () => void;
   onRequestDetail: () => void;
+  onWitnessAssigned: () => void;
 }) {
   const { t } = useTranslation();
   const ttl = formatTtl(signing.ttl_remaining);
@@ -529,6 +535,13 @@ function SigningCard({
                       >
                         {t('signing.signConfirm')}
                       </Button>
+                    ) : isActionable && p.party_role === 'WITNESS' ? (
+                      <WitnessSlotPicker
+                        contractId={contractId}
+                        signingId={p.signing_id}
+                        slot={p.party_index === 0 ? 'WITNESS_1' : 'WITNESS_2'}
+                        onAssigned={onWitnessAssigned}
+                      />
                     ) : isCollecting && isStale ? (
                       <Tooltip content={t('signing.staleHint')}>
                         <span className="text-[11px] text-subtler">—</span>
