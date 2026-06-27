@@ -556,7 +556,7 @@ function SigningCard({
             >
               {t('signing.viewDetail', { defaultValue: 'View detail' })}
             </Button>
-            {isCollecting && onRequestPreview && (
+            {isActionable && onRequestPreview && (
               <Button
                 size="sm"
                 variant="outline"
