@@ -666,14 +666,14 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
             <div className="font-semibold text-sm">{detail.customer_name}</div>
           )}
           {detail.contract_code && (
-            <div className="text-xs font-mono mt-0.5">
+            <div className="text-sm font-mono mt-0.5">
               {detail.contract_id ? (
                 <Link
                   to={`/admin/contracts/search/${detail.contract_id}`}
                   className="text-primary-fg hover:underline inline-flex items-center gap-1"
                 >
                   {detail.contract_code}
-                  <ExternalLink size={11} />
+                  <ExternalLink size={13} />
                 </Link>
               ) : (
                 <span className="text-subtle">{detail.contract_code}</span>
