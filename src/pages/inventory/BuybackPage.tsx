@@ -46,6 +46,8 @@ interface BuybackListItem {
   product_summary: {
     brand_name: string | null;
     model_name: string | null;
+    variant_name: string | null;
+    product_display_name: string | null;
     item_condition: string | null;
     asset_match_result: string | null;
   } | null;
@@ -75,6 +77,7 @@ interface BuybackDetailLine {
   variant_id: number;
   family_name: string;
   variant_name: string;
+  product_display_name: string | null;
   buyback_price: number | null;
   final_asset_id: number | null;
   item_condition: string | null;
@@ -457,7 +460,7 @@ export function BuybackPage() {
                   const order = row.original;
                   const ps = order.product_summary;
                   const productLine = ps
-                    ? [ps.brand_name, ps.model_name].filter(Boolean).join(' ')
+                    ? ps.product_display_name ?? [ps.brand_name, ps.model_name].filter(Boolean).join(' ')
                     : null;
                   return (
                     <button
@@ -722,10 +725,10 @@ function BuybackDetailPanel({
             <div className="flex items-start gap-3">
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium truncate">
-                  {[line.brand_name, line.model_name].filter(Boolean).join(' ')}
+                  {line.product_display_name ?? [line.brand_name, line.model_name].filter(Boolean).join(' ')}
                 </div>
                 <div className="text-xs text-subtle truncate">
-                  {line.variant_name} · {line.sku_code}
+                  {line.product_display_name ? line.sku_code : `${line.variant_name} · ${line.sku_code}`}
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5 mt-1">
                   {line.item_condition && (
@@ -1088,7 +1091,7 @@ function BuybackIntakeModal({
                 <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
                   <div className="font-medium text-sm">{codeDisplay(detail.code_display, detail.po_no)}</div>
                   <div className="text-xs text-subtle">
-                    {[line.brand_name, line.model_name, line.variant_name].filter(Boolean).join(' · ')}
+                    {line.product_display_name ?? [line.brand_name, line.model_name, line.variant_name].filter(Boolean).join(' · ')}
                   </div>
                   <div className="text-xs text-subtle tabular-nums mt-1">
                     {fmtCurrency(line.buyback_price ?? line.unit_cost)}
@@ -1281,7 +1284,7 @@ function BuybackActionModal({
                   <span>{t('buyback.submitIdentifierHint', { defaultValue: 'Scan IMEI / Serial. At least one is required. Backend will reject duplicates or invalid IMEI checksums.' })}</span>
                 </div>
                 <div className="flex flex-col">
-                  <label className="form-label">IMEI</label>
+                  <label className="form-label">{t('asset.imei', { defaultValue: 'IMEI' })}</label>
                   <Input
                     value={imei}
                     onChange={(e) => setImei(e.target.value)}
@@ -1291,7 +1294,7 @@ function BuybackActionModal({
                   />
                 </div>
                 <div className="flex flex-col">
-                  <label className="form-label">Serial No.</label>
+                  <label className="form-label">{t('asset.serialNo', { defaultValue: 'Serial No.' })}</label>
                   <Input
                     value={serial}
                     onChange={(e) => setSerial(e.target.value)}

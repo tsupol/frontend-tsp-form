@@ -116,6 +116,7 @@
     "copyLink": "คัดลอกลิงก์",
     "save": "บันทึก",
     "cancel": "ยกเลิก",
+    "clear": "ล้าง",
     "delete": "ลบ",
     "remove": "ลบ",
     "edit": "แก้ไข",
@@ -1351,6 +1352,7 @@
     "allTypes": "ทุกประเภท"
   },
   "po": {
+    "contractable": "ทำสัญญาได้",
     "allStatuses": "ทุกสถานะ",
     "allOwnership": "ทุกประเภทเจ้าของ",
     "allTypes": "ทุกประเภท PO",
@@ -1896,6 +1898,8 @@
   },
   "buybackAction": {
     "BUYBACK_UPDATE_LINE": "แก้ไขรายการ",
+    "BUYBACK_UPDATE_HEADER": "แก้ไขข้อมูลส่วนหัว",
+    "BUYBACK_UPDATE_IDENTIFIERS": "แก้ไข Serial/IMEI",
     "BUYBACK_VALIDATE": "ตรวจสอบ",
     "BUYBACK_SUBMIT": "ส่งเพื่ออนุมัติ",
     "BUYBACK_APPROVE": "อนุมัติ",
@@ -1906,6 +1910,11 @@
     "BUYBACK_CANCEL_APPROVED": "ยกเลิกการซื้อคืนที่อนุมัติแล้ว"
   },
   "buybackWizard": {
+    "photosCount": "{{count}} รูป",
+    "captureFromPhone": "ถ่ายรูปจากมือถือ",
+    "captureScanHint": "สแกน QR ด้วยมือถือเพื่อเปิดกล้องและส่งรูปสภาพเครื่อง",
+    "captureCount": "อัปโหลดแล้ว {{count}} / {{max}}",
+    "barcodeNotFound": "ไม่พบบาร์โค้ด {{barcode}} ในระบบ",
     "cardSetup": "ตั้งค่า",
     "cardCondition": "สภาพ",
     "cardPhotos": "รูปภาพ",

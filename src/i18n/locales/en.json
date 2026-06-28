@@ -117,6 +117,7 @@
     "copyLink": "Copy link",
     "save": "Save",
     "cancel": "Cancel",
+    "clear": "Clear",
     "delete": "Delete",
     "remove": "Remove",
     "edit": "Edit",
@@ -1352,6 +1353,7 @@
     "allTypes": "All types"
   },
   "po": {
+    "contractable": "Contractable",
     "allStatuses": "All statuses",
     "allOwnership": "All ownership",
     "allTypes": "All types",
@@ -1897,6 +1899,8 @@
   },
   "buybackAction": {
     "BUYBACK_UPDATE_LINE": "Update line",
+    "BUYBACK_UPDATE_HEADER": "Update header",
+    "BUYBACK_UPDATE_IDENTIFIERS": "Update identifiers",
     "BUYBACK_VALIDATE": "Validate",
     "BUYBACK_SUBMIT": "Submit for Approval",
     "BUYBACK_APPROVE": "Approve",
@@ -1907,6 +1911,11 @@
     "BUYBACK_CANCEL_APPROVED": "Cancel Approved Buyback"
   },
   "buybackWizard": {
+    "photosCount": "{{count}} photo(s)",
+    "captureFromPhone": "Capture from phone",
+    "captureScanHint": "Scan the QR with a phone to open the camera and send condition photos.",
+    "captureCount": "{{count}} / {{max}} uploaded",
+    "barcodeNotFound": "Barcode {{barcode}} not registered",
     "cardSetup": "Setup",
     "cardCondition": "Condition",
     "cardPhotos": "Photos",
