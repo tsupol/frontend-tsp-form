@@ -103,7 +103,7 @@ export function useNavCounts() {
   const { data: pendingPaymentCountData } = useQuery({
     queryKey: ['nav', 'pending-payment-count', sk],
     queryFn: () => apiClient.getPaginated<{ id: number }>(
-      `/v_contract_detail?state=eq.PENDING_PAYMENT&select=id${sq}`,
+      `/v_contract_detail?state=in.(PENDING_PAYMENT_AND_SIGN,PENDING_PAYMENT,PENDING_SIGN)&select=id${sq}`,
       { page: 1, pageSize: 1 },
     ),
     refetchInterval: 60_000,
