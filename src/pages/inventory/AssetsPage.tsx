@@ -14,6 +14,7 @@ import { printWithMarker } from '../../lib/printDoc';
 import { buildBillActionToast, type StandardBillResponse } from '../../lib/billActionToast';
 import { useAuth } from '../../contexts/AuthContext';
 import { AssignIcloudModal, ReleaseIcloudModal } from '../contracts/IcloudModals';
+import { AssetScreenTimeSection } from '../../components/AssetScreenTimeSection';
 import { getBucketLabel, getBucketColor, getConditionLabel, getConditionTextColor, CONDITION_VALUES, codeDisplay } from './inventoryUtils';
 
 // ============================================================================
@@ -1134,6 +1135,10 @@ function AssetDetailPanel({
             </span>
           </div>
         </div>
+
+        {/* Screen Time passcode + recovery email — renders only if the
+            permission-scoped view returns a row (BM / company roles). */}
+        <AssetScreenTimeSection assetId={asset.asset_id} />
 
         {(asset.source_po_id || asset.source_lot_id) && (
           <div>

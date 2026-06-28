@@ -8,6 +8,7 @@ import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { getBucketLabel, getBucketColor, codeDisplay } from '../inventory/inventoryUtils';
 import { AssignIcloudModal, ReleaseIcloudModal } from './IcloudModals';
+import { AssetScreenTimeSection } from '../../components/AssetScreenTimeSection';
 
 interface ContractForDevice {
   id: number;
@@ -235,6 +236,12 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
                     </div>
                   )}
                 </div>
+              )}
+
+              {/* Screen Time passcode + recovery email — renders only if the
+                  permission-scoped view returns a row (BM / company roles). */}
+              {contract.device_id != null && (
+                <AssetScreenTimeSection assetId={contract.device_id} className="mt-2" />
               )}
 
               {isActive && (
