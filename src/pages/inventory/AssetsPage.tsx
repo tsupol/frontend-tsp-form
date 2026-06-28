@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useSearchParams, useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, Modal, TextArea, DataTable, PopOver, Tooltip, useSnackbarContext } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, Box, Search, SlidersHorizontal, XCircle, ChevronDown, ExternalLink, Wrench, Printer, Plus, CheckCircle, Pencil } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, Box, Search, SlidersHorizontal, XCircle, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Wrench, Printer, Plus, CheckCircle, Pencil, Cloud, CloudOff } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
@@ -13,6 +13,7 @@ import { fmtCurrency } from '../../lib/format';
 import { printWithMarker } from '../../lib/printDoc';
 import { buildBillActionToast, type StandardBillResponse } from '../../lib/billActionToast';
 import { useAuth } from '../../contexts/AuthContext';
+import { AssignIcloudModal, ReleaseIcloudModal } from '../contracts/IcloudModals';
 import { getBucketLabel, getBucketColor, getConditionLabel, getConditionTextColor, CONDITION_VALUES, codeDisplay } from './inventoryUtils';
 
 // ============================================================================
@@ -44,6 +45,7 @@ interface Asset {
   model_name: string;
   model_code: string;
   base_model_name: string;
+  product_display_name: string | null;
   is_contractable: boolean;
   is_sellable: boolean;
   family_name: string;
@@ -56,6 +58,7 @@ interface Asset {
   has_open_conflict: boolean;
   custodian_user_id: number | null;
   icloud_account_id: number | null;
+  icloud_apple_id: string | null;
   source_po_id: number | null;
   source_lot_id: number | null;
   created_by: number | null;
@@ -509,6 +512,7 @@ export function AssetsPage() {
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['assets'] });
+    queryClient.invalidateQueries({ queryKey: ['asset-detail-fallback'] });
     queryClient.invalidateQueries({ queryKey: ['asset-txns'] });
     queryClient.invalidateQueries({ queryKey: ['asset-actions'] });
   };
@@ -814,6 +818,83 @@ export function AssetsPage() {
 }
 
 // ============================================================================
+// Detail tabs
+// ============================================================================
+
+type AssetTab = 'overview' | 'icloud';
+const ASSET_TABS: AssetTab[] = ['overview', 'icloud'];
+
+function ScrollableTabs<T extends string>({ tabs, activeTab, onTabChange, renderLabel }: {
+  tabs: readonly T[];
+  activeTab: T;
+  onTabChange: (tab: T) => void;
+  renderLabel: (tab: T) => React.ReactNode;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 0);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
+  }, []);
+
+  useEffect(() => {
+    checkScroll();
+    const el = scrollRef.current;
+    if (!el) return;
+    el.addEventListener('scroll', checkScroll, { passive: true });
+    const ro = new ResizeObserver(checkScroll);
+    ro.observe(el);
+    return () => { el.removeEventListener('scroll', checkScroll); ro.disconnect(); };
+  }, [checkScroll]);
+
+  const scroll = (dir: 'left' | 'right') => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollBy({ left: dir === 'left' ? -120 : 120, behavior: 'smooth' });
+  };
+
+  return (
+    <div className="flex-none relative border-b border-line">
+      {canScrollLeft && (
+        <button
+          className="absolute left-0 top-0 bottom-0 z-10 w-7 flex items-center justify-center bg-bg border-r border-line cursor-pointer border-y-0 border-l-0"
+          onClick={() => scroll('left')}
+        >
+          <ChevronLeft size={14} className="text-subtle" />
+        </button>
+      )}
+      <div ref={scrollRef} className="flex px-2 overflow-x-auto hidden-scroll">
+        {tabs.map(tab => (
+          <button
+            key={tab}
+            className={`py-2 px-3 text-sm font-medium transition-colors cursor-pointer border-b-2 whitespace-nowrap ${
+              activeTab === tab
+                ? 'border-primary-fg text-primary-fg'
+                : 'border-transparent text-fg'
+            }`}
+            onClick={() => onTabChange(tab)}
+          >
+            {renderLabel(tab)}
+          </button>
+        ))}
+      </div>
+      {canScrollRight && (
+        <button
+          className="absolute right-0 top-0 bottom-0 z-10 w-7 flex items-center justify-center bg-bg border-l border-line cursor-pointer border-y-0 border-r-0"
+          onClick={() => scroll('right')}
+        >
+          <ChevronRight size={14} className="text-subtle" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
 // Detail panel
 // ============================================================================
 
@@ -834,6 +915,18 @@ function AssetDetailPanel({
   const [actionPreset, setActionPreset] = useState<Record<string, string> | undefined>(undefined);
   const [addIdentifierType, setAddIdentifierType] = useState<string | null>(null);
   const { handlePrint: printAssetSticker, portal: stickerPortal } = useAssetStickerPrint();
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const activeTab: AssetTab = (ASSET_TABS as readonly string[]).includes(tabParam ?? '')
+    ? (tabParam as AssetTab)
+    : 'overview';
+  const handleTabChange = (next: AssetTab) => {
+    const params = new URLSearchParams(searchParams);
+    if (next === 'overview') params.delete('tab');
+    else params.set('tab', next);
+    setSearchParams(params, { replace: true });
+  };
 
   const { data: txns } = useQuery({
     queryKey: ['asset-txns', asset.asset_id],
@@ -872,13 +965,28 @@ function AssetDetailPanel({
         </div>
       )}
 
+      {/* Tabs */}
+      <ScrollableTabs
+        tabs={ASSET_TABS}
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        renderLabel={(tab) => t(`asset.tab_${tab}`)}
+      />
+
+      {activeTab === 'icloud' && (
+        <AssetIcloudTab asset={asset} t={t} onRefresh={onRefresh} addSnackbar={addSnackbar} />
+      )}
+
+      {activeTab === 'overview' && (
+        <>
+
       {/* Product info */}
       <div className="flex-none px-4 py-3 border-b border-line bg-surface flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="text-xs text-subtle">
             {[asset.brand_name, asset.family_name, asset.model_name].filter(Boolean).join(' > ')}
           </div>
-          <div className="font-semibold text-sm mt-0.5">{asset.variant_name}</div>
+          <div className="font-semibold text-sm mt-0.5">{asset.product_display_name ?? asset.variant_name}</div>
           <div className="text-xs text-subtle">{asset.sku_code}</div>
           {asset.physical_color && (
             <div className="text-xs text-subtle mt-0.5">{t('asset.color')}: {asset.physical_color}</div>
@@ -1133,6 +1241,143 @@ function AssetDetailPanel({
             }),
           });
         }}
+      />
+        </>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// iCloud tab — manage the asset's iCloud pool account (Apple only)
+// Reuses the asset-scoped Assign/Release modals from the contract Device tab.
+// ============================================================================
+
+function AssetIcloudTab({
+  asset,
+  t,
+  onRefresh,
+  addSnackbar,
+}: {
+  asset: Asset;
+  t: ReturnType<typeof useTranslation>['t'];
+  onRefresh: () => void;
+  addSnackbar: (opts: { message: React.ReactNode }) => void;
+}) {
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [releaseOpen, setReleaseOpen] = useState(false);
+
+  const isApple = asset.brand_name === 'Apple';
+  const hasIcloud = asset.icloud_account_id != null;
+
+  if (!isApple) {
+    return (
+      <div className="flex-1 overflow-auto better-scroll p-4">
+        <div className="flex flex-col items-center justify-center text-center text-subtle py-10 gap-2">
+          <CloudOff size={28} className="opacity-40" />
+          <div className="text-sm">{t('asset.icloud_appleOnly')}</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 overflow-auto better-scroll p-4 flex flex-col gap-4">
+      <section className="border border-line rounded-md">
+        <header className="flex items-center gap-2 px-4 py-2.5 border-b border-line">
+          <Cloud size={16} className="text-subtle" />
+          <h3 className="text-sm font-semibold">iCloud</h3>
+        </header>
+        <div className="px-4 py-3 flex items-center gap-3">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            {hasIcloud ? (
+              <>
+                <Cloud size={16} className="text-success shrink-0" />
+                <div className="min-w-0">
+                  <div className="text-xs text-subtle">{t('asset.icloud_account')}</div>
+                  <div className="text-sm font-mono truncate">{asset.icloud_apple_id ?? '—'}</div>
+                </div>
+              </>
+            ) : (
+              <>
+                <CloudOff size={16} className="text-subtle shrink-0" />
+                <div>
+                  <div className="text-xs text-subtle">iCloud</div>
+                  <div className="text-sm text-subtle">{t('asset.icloud_notAssigned')}</div>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="flex gap-2 shrink-0">
+            {hasIcloud ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  startIcon={<Cloud size={14} />}
+                  onClick={() => setAssignOpen(true)}
+                >
+                  {t('asset.icloud_change')}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  color="danger"
+                  startIcon={<CloudOff size={14} />}
+                  onClick={() => setReleaseOpen(true)}
+                >
+                  {t('asset.icloud_release')}
+                </Button>
+              </>
+            ) : (
+              <Button
+                size="sm"
+                color="primary"
+                startIcon={<Cloud size={14} />}
+                onClick={() => setAssignOpen(true)}
+              >
+                {t('asset.icloud_assign')}
+              </Button>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <AssignIcloudModal
+        open={assignOpen}
+        onClose={() => setAssignOpen(false)}
+        onSuccess={() => {
+          setAssignOpen(false);
+          onRefresh();
+          addSnackbar({
+            message: (
+              <div className="alert alert-success">
+                <CheckCircle size={16} />
+                <span>{t('asset.icloud_assignSuccess')}</span>
+              </div>
+            ),
+          });
+        }}
+        assetId={asset.asset_id}
+        branchId={asset.branch_id}
+        currentAccountId={asset.icloud_account_id}
+      />
+      <ReleaseIcloudModal
+        open={releaseOpen}
+        onClose={() => setReleaseOpen(false)}
+        onSuccess={() => {
+          setReleaseOpen(false);
+          onRefresh();
+          addSnackbar({
+            message: (
+              <div className="alert alert-success">
+                <CheckCircle size={16} />
+                <span>{t('asset.icloud_releaseSuccess')}</span>
+              </div>
+            ),
+          });
+        }}
+        assetId={asset.asset_id}
       />
     </div>
   );
