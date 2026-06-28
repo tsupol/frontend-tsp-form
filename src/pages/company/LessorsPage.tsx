@@ -246,16 +246,19 @@ function LessorFormModal({ open, mode, lessor, companyId, onClose, onDone }: For
   }, [open, lessor, reset]);
 
   const handleSignatureUpload = async (imgs: UploadedImage[]) => {
-    if (!imgs[0] || !user) return;
+    if (!imgs[0] || !user || !companyId) return;
     setUploading(true);
     setSigError('');
     try {
+      // A lessor is a company entity. mig 78 added the company-keyed
+      // `company_lessor_signature` upload type so a company-admin (branch_id
+      // NULL) can upload — authorized on CONTRACT.LESSOR_MANAGE at company
+      // scope, no branch needed. Lands at private/companies/{company_id}/.
       const slug = `lessor-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const branchHint = user.branch_id ?? 0;
       const results = await beMediaUploadFromImage({
-        type: 'branch_signatory_signature',
+        type: 'company_lessor_signature',
         image: imgs[0],
-        params: { branch_id: branchHint, signatory_slug: slug },
+        params: { company_id: companyId, signatory_slug: slug },
       });
       const primary = results.md?.key ?? results.sm?.key ?? Object.values(results)[0]?.key;
       if (!primary) throw new Error('Upload returned no key');

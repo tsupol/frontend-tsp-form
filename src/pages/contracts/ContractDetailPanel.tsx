@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Badge, Button, Input, Modal, TextArea, Tooltip, useSnackbarContext, resizeToVariants } from 'tsp-form';
 import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Upload, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, Download, AlertTriangle } from 'lucide-react';
-import { useGenerateContractPdfServer } from './useGenerateContractPdfServer';
 import { GenerateContractPdfModal } from './GenerateContractPdfModal';
 import type { BeMediaContractDoc } from '../../lib/beMedia';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -411,10 +410,9 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
             t={t}
             queryClient={queryClient}
             onRequestBindDevice={() => setRequestedAction('bind_device')}
+            onNavigateSigning={() => handleTabChange('signing')}
             deliveryModalOpen={deliveryModalOpen}
             setDeliveryModalOpen={setDeliveryModalOpen}
-            pdfModalOpen={pdfModalOpen}
-            setPdfModalOpen={(o) => { if (o) setPdfTarget(null); setPdfModalOpen(o); }}
           />
         )}
         {activeTab === 'money' && <MoneyTab contractId={contractId} contract={contract} t={t} />}
@@ -585,15 +583,14 @@ function MediaRow({ label, media }: { label: string; media: EntityMedia[] }) {
 
 // ── Overview Tab ─────────────────────────────────────────────────────────────
 
-function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryModalOpen, setDeliveryModalOpen, setPdfModalOpen }: {
+function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigateSigning, deliveryModalOpen, setDeliveryModalOpen }: {
   contract: ContractDetail;
   t: ReturnType<typeof useTranslation>['t'];
   queryClient: ReturnType<typeof useQueryClient>;
   onRequestBindDevice: () => void;
+  onNavigateSigning: () => void;
   deliveryModalOpen: boolean;
   setDeliveryModalOpen: (open: boolean) => void;
-  pdfModalOpen: boolean;
-  setPdfModalOpen: (open: boolean) => void;
 }) {
   const isFin2 = contract.commercial_model === 'FIN2';
   const isActive = contract.state === 'ACTIVE' || contract.state === 'COMPLETED' || contract.state === 'TERMINATED';
@@ -602,9 +599,6 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
     contract.device_id == null &&
     !contract.is_used_asset;
   const [copiedField, setCopiedField] = useState<string | null>(null);
-  const { generating: printingPdf } = useGenerateContractPdfServer();
-  const [printBlockOpen, setPrintBlockOpen] = useState(false);
-  const [printBlockReasons, setPrintBlockReasons] = useState<string[]>([]);
   const [commissionModalOpen, setCommissionModalOpen] = useState(false);
 
   // Commission owner editable only while the contract is in DRAFT or SAVING
@@ -612,44 +606,26 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
   const commissionEditable =
     contract.state === 'DRAFT' || contract.state === 'SAVING';
 
-  // ID card (primary customer)
-  const { data: idCardDocs = [] } = useQuery({
-    queryKey: ['customer-documents-id-card', contract.customer_id],
-    queryFn: () => apiClient.get<Array<{ id: number; file_url: string }>>(
-      `/v_customer_documents?customer_id=eq.${contract.customer_id}&doc_type=eq.ID_CARD_FRONT&is_active=eq.true`,
-    ),
-    enabled: contract.customer_id != null,
+  // Live signing-needed signal: any COLLECTING signing that hasn't been
+  // superseded by a newer COLLECTING of the same change_reason (a contract can
+  // have several distinct COLLECTING signings at once — CONTRACT_OPEN +
+  // ADD_CO_LESSEE — none of which supersede the others). Mirrors the staleness
+  // rule in SigningTab. Drives the "documents need signing" alert below.
+  const { data: liveCollectingCount = 0 } = useQuery({
+    queryKey: ['contract-signing-collecting', contract.id],
+    queryFn: async () => {
+      const rows = await apiClient.get<Array<{ signing_id: number; status: string; change_reason: string | null; type: string }>>(
+        `/v_contract_signing_visible?contract_id=eq.${contract.id}&status=eq.COLLECTING&order=version.desc&select=signing_id,status,change_reason,type`,
+      );
+      const newestByReason = new Map<string, number>();
+      for (const s of rows) {
+        const key = s.change_reason ?? s.type;
+        if (!newestByReason.has(key)) newestByReason.set(key, s.signing_id);
+      }
+      return rows.filter(s => newestByReason.get(s.change_reason ?? s.type) === s.signing_id).length;
+    },
+    staleTime: 30_000,
   });
-
-  // Signature (per contract)
-  const { data: signatureDocs = [] } = useQuery({
-    queryKey: ['contract-documents-signature', contract.id],
-    queryFn: () => apiClient.get<Array<{ id: number; file_url: string; customer_id: number }>>(
-      `/v_contract_documents?contract_id=eq.${contract.id}&doc_type=eq.SIGNATURE_PAD`,
-    ),
-  });
-
-  const idCardKey = idCardDocs[0]?.file_url ?? null;
-  const signatureKey = signatureDocs[0]?.file_url ?? null;
-
-  // Print button requires a bound device. iCloud is no longer required.
-  const printReadiness = (() => {
-    const reasons: string[] = [];
-    if (contract.device_id == null) reasons.push(t('contract.printBlock_noDevice'));
-    return { ready: reasons.length === 0, reasons };
-  })();
-
-  // Client-side PDF generation (pdfmake + Sarabun Thai font). Downloads
-  // CT-XXXX.pdf to the user's machine; backend storage will come later when
-  // fn_contract_export_pdf lands.
-  const handlePrintPdf = () => {
-    if (!printReadiness.ready) {
-      setPrintBlockReasons(printReadiness.reasons);
-      setPrintBlockOpen(true);
-      return;
-    }
-    setPdfModalOpen(true);
-  };
 
   const copyValue = (field: string, value: string) => {
     navigator.clipboard.writeText(value).then(() => {
@@ -677,6 +653,28 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
             </div>
             <Button size="sm" color="primary" onClick={onRequestBindDevice} className="shrink-0">
               {t('contract.action_bind_device')}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Documents-need-signing reminder — live COLLECTING signing exists */}
+      {liveCollectingCount > 0 && (
+        <div className="border rounded-md px-4 py-3 border-warning-border bg-warning/5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <Pencil size={14} className="text-warning-fg shrink-0" />
+              <div className="min-w-0">
+                <div className="text-xs font-semibold uppercase tracking-wider text-warning-fg">
+                  {t('contract.signingNeeded')}
+                </div>
+                <div className="text-sm text-warning-fg/90 mt-0.5">
+                  {t('contract.signingNeededReminder', { count: liveCollectingCount })}
+                </div>
+              </div>
+            </div>
+            <Button size="sm" color="primary" onClick={onNavigateSigning} className="shrink-0">
+              {t('contract.goToSigning')}
             </Button>
           </div>
         </div>
@@ -740,44 +738,6 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
               </Button>
             )}
           </div>
-        </div>
-      </div>
-
-      {/* Documents — ID card, signature */}
-      <div className="border border-line rounded-md px-4 py-3">
-        <div className="flex items-center justify-between gap-2 mb-3">
-          <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider">
-            {t('contract.documents', { defaultValue: 'Documents' })}
-          </h3>
-          <Tooltip
-            content={printReadiness.ready
-              ? t('contract.downloadContractPdf', { defaultValue: 'Download contract PDF' })
-              : printReadiness.reasons.join(' · ')}
-            placement="top"
-          >
-            <Button
-              size="sm"
-              variant="outline"
-              startIcon={printingPdf ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />}
-              endIcon={!printReadiness.ready && !printingPdf ? <AlertTriangle size={14} className="text-warning-fg" /> : undefined}
-              onClick={handlePrintPdf}
-              disabled={printingPdf}
-            >
-              {t('contract.printContractPdf', { defaultValue: 'Print contract PDF' })}
-            </Button>
-          </Tooltip>
-        </div>
-        <div className="flex flex-wrap gap-4">
-          <DocumentPresence
-            icon={<IdCard size={14} />}
-            label={t('contract.idCard', { defaultValue: 'ID card' })}
-            present={!!idCardKey}
-          />
-          <DocumentPresence
-            icon={<Pencil size={14} />}
-            label={t('contract.signature', { defaultValue: 'Signature' })}
-            present={!!signatureKey}
-          />
         </div>
       </div>
 
@@ -923,25 +883,6 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, deliveryMo
         currentOwnerName={contract.commission_owner_name}
       />
 
-      <Modal open={printBlockOpen} onClose={() => setPrintBlockOpen(false)} maxWidth="28rem" width="100%">
-        <div className="modal-header">
-          <h2 className="modal-title">{t('contract.printBlock_title')}</h2>
-        </div>
-        <div className="modal-content">
-          <div className="alert alert-warning mb-3">
-            <AlertTriangle size={16} />
-            <span>{t('contract.printBlock_intro')}</span>
-          </div>
-          <ul className="list-disc pl-5 text-sm flex flex-col gap-1">
-            {printBlockReasons.map((r, i) => (
-              <li key={i}>{r}</li>
-            ))}
-          </ul>
-        </div>
-        <div className="modal-footer">
-          <Button color="primary" onClick={() => setPrintBlockOpen(false)}>{t('common.close')}</Button>
-        </div>
-      </Modal>
     </div>
   );
 }
@@ -2099,22 +2040,3 @@ function InfoCell({ label, value, highlight }: { label: string; value: React.Rea
   );
 }
 
-function DocumentPresence({
-  icon,
-  label,
-  present,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  present: boolean;
-}) {
-  return (
-    <div className="flex items-center gap-2 px-3 py-2 rounded border border-line bg-surface-shallow">
-      <span className="text-subtle shrink-0">{icon}</span>
-      <span className="text-sm">{label}</span>
-      {present
-        ? <CheckCircle size={14} className="text-success-fg shrink-0" />
-        : <XCircle size={14} className="text-subtler shrink-0" />}
-    </div>
-  );
-}

@@ -35,6 +35,7 @@ interface ContractDetail {
   model_name: string | null;
   variant_id: number | null;
   variant_name: string | null;
+  product_display_name: string | null;
   rate_card_id: number | null;
   cost_price: number | null;
   list_price: number | null;
@@ -268,14 +269,16 @@ function SavingOverviewTab({ contract, t }: { contract: ContractDetail; t: Retur
       </div>
 
       {/* ── Product & Plan ────────────────────────────────────────────── */}
-      {contract.model_name && (
+      {(contract.product_display_name || contract.model_name) && (
         <div className="border border-line rounded-md px-4 py-3">
           <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-3">{t('contract.productPlan')}</h3>
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
               <div className="text-xs text-subtle">{t('contract.device')}</div>
-              <div className="text-sm font-medium">{contract.model_name}</div>
-              {contract.variant_name && <div className="text-xs text-subtle">{contract.variant_name}</div>}
+              <div className="text-sm font-medium">{contract.product_display_name ?? contract.model_name}</div>
+              {!contract.product_display_name && contract.variant_name && (
+                <div className="text-xs text-subtle">{contract.variant_name}</div>
+              )}
             </div>
             <InfoCell label={t('contract.agreedPrice')} value={fmtCurrency(contract.agreed_price)} />
             <InfoCell label={t('contract.downPayment')} value={fmtCurrency(contract.down_payment)} />

@@ -166,9 +166,10 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
       });
     }
   }
-  // Signatory completeness — sign-pair rendering needs lessor + 2 witnesses
-  // bound. Surfaced inline via the embedded SignatoryEditor; here it just
-  // gates the sign-pair "Generate contract" button.
+  // Signatory completeness — only the LESSOR matters at draft (witnesses are
+  // picked at signing time, mig 345/346). A configured branch default lessor
+  // counts as ready since contract-open auto-binds it. Surfaced inline via the
+  // embedded SignatoryEditor; here it just gates the "Generate contract" button.
   const signatoryReady = getCardStatus('signatory') === 'complete';
   const missingPrereqs = [...missingCardPrereqs, ...missingIdCardPeople];
   if (!signatoryReady) {

@@ -10,6 +10,7 @@ export function CardProductPlan({ onEdit, active, shake }: { onEdit?: () => void
   const hasCustomer = !!contract?.customer_id;
   const status = !hasCustomer ? 'locked' as const : getCardStatus('productPlan');
 
+  const displayName = contract?.product_display_name ?? '';
   const modelName = contract?.model_name ?? '';
   const variantName = contract?.variant_name ?? '';
   const hasModel = !!contract?.model_id;
@@ -39,13 +40,17 @@ export function CardProductPlan({ onEdit, active, shake }: { onEdit?: () => void
       ) : (
         <div className="flex flex-col gap-1">
           <div className="font-medium">
-            {modelName}
-            {variantName && (
-              <span className="text-subtle font-normal"> · {
-                variantName.startsWith(modelName)
-                  ? variantName.slice(modelName.length).trim()
-                  : variantName
-              }</span>
+            {displayName || (
+              <>
+                {modelName}
+                {variantName && (
+                  <span className="text-subtle font-normal"> · {
+                    variantName.startsWith(modelName)
+                      ? variantName.slice(modelName.length).trim()
+                      : variantName
+                  }</span>
+                )}
+              </>
             )}
           </div>
           {hasRate ? (

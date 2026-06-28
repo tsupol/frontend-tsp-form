@@ -229,6 +229,7 @@ export function beMediaCanPresign(key: string): boolean {
     /^private\/contracts\/\d+\/(chat|slip|signature|evidence)-/.test(k) ||
     /^private\/customers\/\d+\/id-card-/.test(k) ||
     /^private\/branches\/\d+\/signatory-/.test(k) ||
+    /^private\/companies\/\d+\/signatory-/.test(k) ||
     /^private\/buyback\/\d+\/condition-/.test(k) ||
     /^private\/asset_check\/\d+\/photo-/.test(k)
   );
@@ -344,6 +345,13 @@ export const UPLOAD_SPECS: Record<string, BeMediaSpec> = {
   branch_signatory_signature: {
     type: 'branch_signatory_signature', privacy: 'private', resize_mode: 'contain', quality: 0.82,
     sizes: [{ label: 'sm', width: 320 }], path_params: ['branch_id', 'signatory_slug'],
+  },
+  company_lessor_signature: {
+    // mig 78: company-keyed lessor signature (a lessor is a company entity; the
+    // company-admin uploading it may have branch_id NULL). Same leaf/sizes as
+    // branch_signatory_signature, keyed by company_id instead of branch_id.
+    type: 'company_lessor_signature', privacy: 'private', resize_mode: 'contain', quality: 0.82,
+    sizes: [{ label: 'sm', width: 320 }], path_params: ['company_id', 'signatory_slug'],
   },
   contract_evidence: {
     type: 'contract_evidence', privacy: 'private', resize_mode: 'contain', quality: 0.82,

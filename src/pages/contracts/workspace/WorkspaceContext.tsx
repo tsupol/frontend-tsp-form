@@ -12,7 +12,7 @@ import { useContractDocuments, useInvalidateDocs } from './useContractDocuments'
 import type { ContractDocSummary } from './useContractDocuments';
 import { useContractCoLessees, useInvalidateCoLessees } from './useContractCoLessees';
 import type { CoLesseeRow } from './useContractCoLessees';
-import { useContractSignatories, useInvalidateSignatories } from './useContractSignatories';
+import { useContractSignatories, useBranchSignatoryDefaults, useInvalidateSignatories } from './useContractSignatories';
 import type { ContractSignatory } from './useContractSignatories';
 import { getCardStatus as deriveCardStatus } from './cardStatus';
 
@@ -71,6 +71,7 @@ interface WorkspaceContextValue {
   docs: ContractDocSummary | null;
   coLesseeList: CoLesseeRow[];
   signatories: ContractSignatory[];
+  branchHasLessorDefault: boolean;
 
   // Invalidation helpers — call after RPCs instead of updateData
   invalidateContract: () => void;
@@ -169,6 +170,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const signatoriesQuery = useContractSignatories(data.contractId);
   const signatories = signatoriesQuery.data ?? [];
+
+  // Branch default lessor — readiness/open auto-binds it when the contract has
+  // no explicit LESSOR, so a configured branch default means the signatory step
+  // is satisfied without a per-contract pick (mig 350/351).
+  const branchDefaultsQuery = useBranchSignatoryDefaults(contract?.branch_id ?? null);
+  const branchHasLessorDefault = (branchDefaultsQuery.data ?? []).some(
+    d => d.slot === 'LESSOR' && d.lessor_id != null,
+  );
 
   // Invalidation helpers
   const _invalidateContract = useInvalidateContract();
@@ -322,8 +331,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     return deriveCardStatus(card, contract, customer, docs, {
       count: coLesseeCount,
       allComplete: coLesseesAllComplete,
-    }, signatories);
-  }, [contract, customer, docs, coLesseeCount, coLesseesAllComplete, signatories]);
+    }, signatories, branchHasLessorDefault);
+  }, [contract, customer, docs, coLesseeCount, coLesseesAllComplete, signatories, branchHasLessorDefault]);
 
   // Phase flags
   const isPreDraft = !data.contractId;
@@ -343,6 +352,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     docs,
     coLesseeList,
     signatories,
+    branchHasLessorDefault,
     invalidateContract,
     invalidateCustomer,
     invalidateDocs,
@@ -366,7 +376,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     pendingModal,
     confirmPanelSwitch,
     cancelPanelSwitch,
-  }), [data, updateData, resetData, contract, contractLoading, customer, docs, coLesseeList, signatories, invalidateContract, invalidateCustomer, invalidateDocs, invalidateCoLessees, invalidateSignatories, invalidateAll, isFinancialLocked, openModal, setOpenModal, getCardStatus, isPreDraft, isPreBill, isPostBill, isPostPayment, isReadOnly, readinessKey, triggerReadinessRefetch, setPanelDirty, pendingModal, confirmPanelSwitch, cancelPanelSwitch]);
+  }), [data, updateData, resetData, contract, contractLoading, customer, docs, coLesseeList, signatories, branchHasLessorDefault, invalidateContract, invalidateCustomer, invalidateDocs, invalidateCoLessees, invalidateSignatories, invalidateAll, isFinancialLocked, openModal, setOpenModal, getCardStatus, isPreDraft, isPreBill, isPostBill, isPostPayment, isReadOnly, readinessKey, triggerReadinessRefetch, setPanelDirty, pendingModal, confirmPanelSwitch, cancelPanelSwitch]);
 
   return (
     <WorkspaceContext.Provider value={value}>

@@ -14,6 +14,7 @@ export function getCardStatus(
   docs: ContractDocSummary | null | undefined,
   coLessees: { count: number; allComplete: boolean },
   signatories?: ContractSignatory[] | null,
+  branchHasLessorDefault?: boolean,
 ): CardStatus {
   switch (card) {
     case 'productPlan':
@@ -53,15 +54,13 @@ export function getCardStatus(
       return customer.hasIdPhoto ? 'complete' : 'empty';
 
     case 'signatory': {
+      // Witnesses are chosen at signing time now (mig 345/346), not at draft.
+      // Only LESSOR matters here — and contract-open auto-binds the branch
+      // default lessor (mig 350/351), so a configured branch default is enough.
       if (!contract?.id) return 'locked';
       const list = signatories ?? [];
-      const has = (s: 'LESSOR' | 'WITNESS_1' | 'WITNESS_2') => list.some(x => x.slot === s);
-      const lessor = has('LESSOR');
-      const w1 = has('WITNESS_1');
-      const w2 = has('WITNESS_2');
-      const count = (lessor ? 1 : 0) + (w1 ? 1 : 0) + (w2 ? 1 : 0);
-      if (count === 3) return 'complete';
-      if (count > 0) return 'partial';
+      const lessorBound = list.some(x => x.slot === 'LESSOR');
+      if (lessorBound || branchHasLessorDefault) return 'complete';
       return 'empty';
     }
 

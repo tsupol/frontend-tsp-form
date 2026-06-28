@@ -31,6 +31,7 @@ interface SavingContract {
   variant_id: number | null;
   model_name: string | null;
   variant_name: string | null;
+  product_display_name: string | null;
   commission_owner_id: number | null;
   owner_name: string | null;
   created_by: number | null;
@@ -228,7 +229,7 @@ export function SavingContractsPage() {
                           </div>
                           <div className="text-xs text-subtle truncate">
                             {contract.customer_name ?? t('contract.noCustomer')}
-                            {contract.model_name && ` · ${contract.model_name}`}
+                            {contract.product_display_name && ` · ${contract.product_display_name}`}
                           </div>
                           {hasTarget && (
                             <div className="flex items-center gap-2">
