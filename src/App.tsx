@@ -63,6 +63,7 @@ import { TimelineOverviewPage } from './pages/collections/TimelineOverviewPage';
 import { BlacklistPage } from './pages/company/BlacklistPage';
 import { ICloudPoolPage } from './pages/company/ICloudPoolPage';
 import { BranchPinPage } from './pages/company/BranchPinPage';
+import { BranchFinanceModelsPage } from './pages/company/BranchFinanceModelsPage';
 import { LessorsPage } from './pages/company/LessorsPage';
 import { BranchSignersPage } from './pages/company/BranchSignersPage';
 import { BranchesPage } from './pages/BranchesPage';
@@ -849,6 +850,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <CompanyLayout><LessorsPage /></CompanyLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/company/finance-models"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <CompanyLayout><BranchFinanceModelsPage /></CompanyLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

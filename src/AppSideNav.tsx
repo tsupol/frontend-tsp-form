@@ -49,6 +49,7 @@ import {
   FlaskConical, PenLine, Image as ImageIcon, Bell,
   // Signatories (v2)
   Stamp,
+  Wallet,
 } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
 import { getRoleLabel } from './lib/roleLabel';
@@ -390,6 +391,9 @@ export const AppSideNav = () => {
         { key: 'signers', icon: <PenLine size="1rem" />, label: t('nav.branchSigners'), path: '/admin/company/signers' },
         { type: 'group', key: 'grp-finance', label: t('nav.groupFinance') },
         { key: 'bank-accounts', icon: <Landmark size="1rem" />, label: t('nav.bankAccounts'), path: '/admin/company/bank-accounts' },
+        ...(['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
+          { key: 'finance-models', icon: <Wallet size="1rem" />, label: t('nav.financeModels'), path: '/admin/company/finance-models' },
+        ] : []),
         { key: 'company-config', icon: <Building2 size="1rem" />, label: t('nav.companyConfig'), path: '/admin/company/config' },
         { type: 'group', key: 'grp-policy', label: t('nav.groupPolicy') },
         { key: 'holidays', icon: <CalendarDays size="1rem" />, label: t('nav.holidays'), path: '/admin/company/holidays' },

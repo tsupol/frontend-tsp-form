@@ -195,6 +195,21 @@ export function PanelProductPlan(_props: Props) {
 
   const branchId = contract?.branch_id ?? wizardData.branchId;
 
+  // Branch finance-model config (FIN1/FIN2 enablement). The quote RPC does NOT
+  // filter by branch config, so the UI must hide a plan the contract's branch
+  // can't sell on. Only hide on an explicit `false` — never hide because the
+  // read failed. PRICEBOOK is always available and isn't gated here.
+  const { data: branchModels } = useQuery({
+    queryKey: ['branch-commercial-models', branchId],
+    queryFn: () => apiClient.get<{ commercial_models: { FIN1?: boolean; FIN2?: boolean } }[]>(
+      `/v_branches?id=eq.${branchId}&select=commercial_models`,
+    ).then(rows => rows[0]?.commercial_models ?? null),
+    enabled: branchId != null,
+    staleTime: 60_000,
+  });
+  const fin1Enabled = branchModels?.FIN1 !== false;
+  const fin2Enabled = branchModels?.FIN2 !== false;
+
   const conditionFilterClause = conditionFilter === 'NEW'
     ? '&condition_grade=eq.NEW'
     : conditionFilter === 'USED'
@@ -940,7 +955,7 @@ export function PanelProductPlan(_props: Props) {
       {/* ── Quote tables ────────────────────────────────────────────── */}
       {((mode === 'new' && localVariantId) || (mode === 'used' && localTargetAssetId)) && dedupedQuotes.length > 0 && (
         <div className="flex flex-col gap-5">
-          {fin1Rows.length > 0 && (
+          {fin1Enabled && fin1Rows.length > 0 && (
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <Badge size="sm" color="info">FIN1</Badge>
@@ -950,7 +965,7 @@ export function PanelProductPlan(_props: Props) {
             </div>
           )}
 
-          {fin2Rows.length > 0 && (
+          {fin2Enabled && fin2Rows.length > 0 && (
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <Badge size="sm" color="warning">FIN2</Badge>

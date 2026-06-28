@@ -227,7 +227,7 @@ export function PriceCheckPage() {
             {/* ── Left: Search + Model List ── */}
             <PageNavPanel id="list" className={isMobile ? '' : 'w-4/12 xl:w-3/12 min-w-56 border-r border-line flex flex-col'}>
               {/* Search */}
-              <div className="flex-none px-4 py-2 border-b border-line">
+              <div className="flex-none p-2 border-b border-line">
                 <div className="input-group">
                   <Button
                     size="sm"
@@ -346,14 +346,23 @@ function ModelItem({ model, isSelected, onClick, onRemove }: {
   const [revealed, setRevealed] = useState(false);
   const touchRef = useRef<{ startX: number; startY: number; swiping: boolean } | null>(null);
 
+  // Swipe-to-delete is a touch affordance. On a non-touch (fine-pointer) device
+  // the behind-trash would bleed through the translucent selected-row bg, so
+  // only mount it on coarse-pointer devices; desktop uses the inline X instead.
+  const [isTouch, setIsTouch] = useState(false);
+  useEffect(() => {
+    setIsTouch(window.matchMedia('(pointer: coarse)').matches);
+  }, []);
+  const swipeEnabled = !!onRemove && isTouch;
+
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if (!onRemove) return;
+    if (!swipeEnabled) return;
     const touch = e.touches[0];
     touchRef.current = { startX: touch.clientX, startY: touch.clientY, swiping: false };
-  }, [onRemove]);
+  }, [swipeEnabled]);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!touchRef.current || !onRemove) return;
+    if (!touchRef.current || !swipeEnabled) return;
     const touch = e.touches[0];
     const dx = touch.clientX - touchRef.current.startX;
     const dy = touch.clientY - touchRef.current.startY;
@@ -370,10 +379,10 @@ function ModelItem({ model, isSelected, onClick, onRemove }: {
       const raw = base + dx;
       setOffsetX(Math.max(-REVEAL_WIDTH, Math.min(0, raw)));
     }
-  }, [onRemove, revealed]);
+  }, [swipeEnabled, revealed]);
 
   const handleTouchEnd = useCallback(() => {
-    if (!touchRef.current || !onRemove) return;
+    if (!touchRef.current || !swipeEnabled) return;
     const wasSwiping = touchRef.current.swiping;
     touchRef.current = null;
 
@@ -386,7 +395,7 @@ function ModelItem({ model, isSelected, onClick, onRemove }: {
       setOffsetX(0);
       setRevealed(false);
     }
-  }, [onRemove, offsetX]);
+  }, [swipeEnabled, offsetX]);
 
   const handleDelete = useCallback(() => {
     if (onRemove) onRemove();
@@ -400,8 +409,8 @@ function ModelItem({ model, isSelected, onClick, onRemove }: {
 
   return (
     <div className="relative overflow-hidden">
-      {/* Delete button behind */}
-      {onRemove && (
+      {/* Delete button behind — touch (swipe) only; desktop uses the inline X. */}
+      {swipeEnabled && (
         <button
           className="absolute right-0 top-0 bottom-0 flex items-center justify-center bg-danger text-white cursor-pointer border-none"
           style={{ width: REVEAL_WIDTH }}
@@ -478,6 +487,19 @@ function PricingDetail({ model, quoteData, loading, t }: {
     return Array.from(seen.values());
   }, [quoteData]);
 
+  // Live re-check of the logged-in user's branch FIN1/FIN2 config (JWT-driven).
+  // The quote RPC doesn't filter by branch, so hide a model the branch can't
+  // sell on. Returns 0 rows for a holding/company admin (no branch) → show all.
+  const { data: branchModels } = useQuery({
+    queryKey: ['my-branch-commercial-models'],
+    queryFn: () => apiClient.get<{ commercial_models: { FIN1?: boolean; FIN2?: boolean } }[]>(
+      '/v_my_branch_commercial_models?select=commercial_models',
+    ).then(rows => rows[0]?.commercial_models ?? null),
+    staleTime: 60_000,
+  });
+  const fin1Enabled = branchModels?.FIN1 !== false;
+  const fin2Enabled = branchModels?.FIN2 !== false;
+
   const fin1Rows = useMemo(() => dedupedQuotes.filter(r => r.finance_model === 'FIN1'), [dedupedQuotes]);
   const fin2Rows = useMemo(() => dedupedQuotes.filter(r => r.finance_model === 'FIN2'), [dedupedQuotes]);
   const fin1Terms = useMemo(() => [...new Set(fin1Rows.map(r => r.term_months))].sort((a, b) => a - b), [fin1Rows]);
@@ -504,7 +526,7 @@ function PricingDetail({ model, quoteData, loading, t }: {
         ) : (
           <div className="flex flex-col gap-6">
             {/* FIN1 — Fixed Rate */}
-            {fin1Rows.length > 0 && (
+            {fin1Enabled && fin1Rows.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <Badge size="sm" color="info">FIN1</Badge>
@@ -515,7 +537,7 @@ function PricingDetail({ model, quoteData, loading, t }: {
             )}
 
             {/* FIN2 — Negotiable */}
-            {fin2Rows.length > 0 && (
+            {fin2Enabled && fin2Rows.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <Badge size="sm" color="warning">FIN2</Badge>
