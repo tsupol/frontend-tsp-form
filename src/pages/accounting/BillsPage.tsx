@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
@@ -9,7 +9,7 @@ import {
 } from 'tsp-form';
 import {
   ArrowRightFromLine, ArrowLeft, Plus, Trash2, XCircle, CheckCircle, Ban, Printer,
-  Wrench, ChevronDown, Copy, Search, X, Download, Loader2,
+  Wrench, ChevronDown, Copy, Search, X, Download, Loader2, ExternalLink,
 } from 'lucide-react';
 import { FilterBar } from '../../components/FilterBar';
 import { apiClient, ApiError } from '../../lib/api';
@@ -666,7 +666,19 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
             <div className="font-semibold text-sm">{detail.customer_name}</div>
           )}
           {detail.contract_code && (
-            <div className="text-xs font-mono text-subtle mt-0.5">{detail.contract_code}</div>
+            <div className="text-xs font-mono mt-0.5">
+              {detail.contract_id ? (
+                <Link
+                  to={`/admin/contracts/search/${detail.contract_id}`}
+                  className="text-primary-fg hover:underline inline-flex items-center gap-1"
+                >
+                  {detail.contract_code}
+                  <ExternalLink size={11} />
+                </Link>
+              ) : (
+                <span className="text-subtle">{detail.contract_code}</span>
+              )}
+            </div>
           )}
           <div className="text-xs text-subtle mt-1">
             {t(`accounting.bills.typeLabel.${detail.bill_type}`, { defaultValue: detail.bill_type })}
