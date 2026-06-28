@@ -324,6 +324,7 @@
     "company": "บริษัท",
     "companyConfig": "ตั้งค่าบริษัท",
     "bankAccounts": "บัญชีธนาคาร",
+    "financeModels": "รูปแบบการเงิน",
     "holidays": "วันหยุด",
     "dunning": "ทวงถาม",
     "dunningSystem": "ระบบติดตามทวงยอด",
@@ -353,7 +354,7 @@
     "savingContracts": "ออม",
     "draftContracts": "ร่างใหม่",
     "pendingPairing": "รอผูกเครื่อง",
-    "pendingPayment": "รอชำระเงิน",
+    "pendingPayment": "รอชำระเงินและเซ็น",
     "newContract": "สร้างใหม่",
     "newBuyback": "สร้างรับซื้อคืน",
     "branches": "สาขา",
@@ -2602,6 +2603,7 @@
     "attachSlip_viewQueue": "ไปที่คิวตรวจสลิป"
   },
   "wizard": {
+    "barcodeNotFound": "ไม่พบบาร์โค้ด {{barcode}} ในระบบ",
     "title": "เปิดสัญญาใหม่",
     "stepOf": "ขั้นตอน {{current}} จาก {{total}}",
     "step_product": "เลือกสินค้า",
@@ -2998,6 +3000,15 @@
     "commissionOwnerSaved": "เปลี่ยนเจ้าของแล้ว",
     "commissionOwnerLocked": "เจ้าของค่าคอมจะถูกล็อกเมื่อเปิดบิลแล้ว"
   },
+  "financeModels": {
+    "title": "รูปแบบการเงิน",
+    "description": "เปิด/ปิด FIN1 / FIN2 รายสาขา ส่วน PRICEBOOK (ขายปลีก) เปิดใช้งานเสมอ",
+    "desc_FIN1": "ดอกเบี้ยคงที่",
+    "desc_FIN2": "กำไรคงที่",
+    "desc_PRICEBOOK": "ขายปลีก / เงินสด",
+    "alwaysOn": "เปิดเสมอ",
+    "saved": "อัปเดตรูปแบบการเงินแล้ว"
+  },
   "lessors": {
     "title": "ผู้ให้เช่า",
     "subtitle": "รายชื่อผู้ให้เช่าทั้งบริษัท — นิติบุคคล/บุคคลที่ลงนามสัญญาในนามบริษัท",
@@ -3075,6 +3086,7 @@
     "signatureRequired": "ต้องแนบรูปลายเซ็น"
   },
   "priceCheck": {
+    "barcodeNotFound": "ไม่พบบาร์โค้ด {{barcode}} ในระบบ",
     "title": "เช็คราคา",
     "searchPlaceholder": "ค้นหารุ่นสินค้า...",
     "noModels": "ไม่พบรุ่นสินค้า",

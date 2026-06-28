@@ -325,6 +325,7 @@
     "company": "Company",
     "companyConfig": "Company Config",
     "bankAccounts": "Bank Accounts",
+    "financeModels": "Finance Models",
     "holidays": "Holidays",
     "dunning": "Dunning",
     "dunningSystem": "Dunning System",
@@ -354,7 +355,7 @@
     "savingContracts": "Saving",
     "draftContracts": "Draft",
     "pendingPairing": "Pending Pairing",
-    "pendingPayment": "Pending Payment",
+    "pendingPayment": "Pending Payment & Signing",
     "newContract": "Create",
     "newBuyback": "Create Buyback",
     "branches": "Branches",
@@ -2603,6 +2604,7 @@
     "attachSlip_viewQueue": "Open review queue"
   },
   "wizard": {
+    "barcodeNotFound": "Barcode {{barcode}} not registered",
     "title": "Open Contract",
     "stepOf": "Step {{current}} of {{total}}",
     "step_product": "Select Product",
@@ -2999,6 +3001,15 @@
     "commissionOwnerSaved": "Owner changed",
     "commissionOwnerLocked": "The commission owner is locked once the bill is opened."
   },
+  "financeModels": {
+    "title": "Finance Models",
+    "description": "Enable or disable FIN1 / FIN2 per branch. PRICEBOOK (retail) is always available.",
+    "desc_FIN1": "Fixed interest",
+    "desc_FIN2": "Fixed profit",
+    "desc_PRICEBOOK": "Retail / cash",
+    "alwaysOn": "Always on",
+    "saved": "Finance model updated"
+  },
   "lessors": {
     "title": "Lessors",
     "subtitle": "Company-wide lessor pool. One row per legal lessor entity authorized to sign contracts.",
@@ -3076,6 +3087,7 @@
     "signatureRequired": "Signature image is required"
   },
   "priceCheck": {
+    "barcodeNotFound": "Barcode {{barcode}} not registered",
     "title": "Price Check",
     "searchPlaceholder": "Search product model...",
     "noModels": "No models found",
