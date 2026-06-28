@@ -822,8 +822,8 @@ export function AssetsPage() {
 // Detail tabs
 // ============================================================================
 
-type AssetTab = 'overview' | 'icloud';
-const ASSET_TABS: AssetTab[] = ['overview', 'icloud'];
+type AssetTab = 'overview' | 'security';
+const ASSET_TABS: AssetTab[] = ['overview', 'security'];
 
 function ScrollableTabs<T extends string>({ tabs, activeTab, onTabChange, renderLabel }: {
   tabs: readonly T[];
@@ -974,8 +974,8 @@ function AssetDetailPanel({
         renderLabel={(tab) => t(`asset.tab_${tab}`)}
       />
 
-      {activeTab === 'icloud' && (
-        <AssetIcloudTab asset={asset} t={t} onRefresh={onRefresh} addSnackbar={addSnackbar} />
+      {activeTab === 'security' && (
+        <AssetDeviceLockTab asset={asset} t={t} onRefresh={onRefresh} addSnackbar={addSnackbar} />
       )}
 
       {activeTab === 'overview' && (
@@ -1137,10 +1137,6 @@ function AssetDetailPanel({
           </div>
         </div>
 
-        {/* Screen Time passcode + recovery email — renders only if the
-            permission-scoped view returns a row (BM / company roles). */}
-        <AssetScreenTimeSection assetId={asset.asset_id} />
-
         {(asset.source_po_id || asset.source_lot_id) && (
           <div>
             <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-1">{t('asset.source')}</h3>
@@ -1257,11 +1253,12 @@ function AssetDetailPanel({
 }
 
 // ============================================================================
-// iCloud tab — manage the asset's iCloud pool account (Apple only)
-// Reuses the asset-scoped Assign/Release modals from the contract Device tab.
+// Device Lock tab — Screen Time passcode + recovery email (any device) and the
+// iCloud pool account (Apple only). Reuses the asset-scoped Assign/Release
+// modals from the contract Device tab.
 // ============================================================================
 
-function AssetIcloudTab({
+function AssetDeviceLockTab({
   asset,
   t,
   onRefresh,
@@ -1278,19 +1275,24 @@ function AssetIcloudTab({
   const isApple = asset.brand_name === 'Apple';
   const hasIcloud = asset.icloud_account_id != null;
 
-  if (!isApple) {
-    return (
-      <div className="flex-1 overflow-auto better-scroll p-4">
-        <div className="flex flex-col items-center justify-center text-center text-subtle py-10 gap-2">
-          <CloudOff size={28} className="opacity-40" />
-          <div className="text-sm">{t('asset.icloud_appleOnly')}</div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex-1 overflow-auto better-scroll p-4 flex flex-col gap-4">
+      {/* Screen Time passcode + recovery email — renders only if the
+          permission-scoped view returns a row (BM / company roles). */}
+      <AssetScreenTimeSection assetId={asset.asset_id} />
+
+      {!isApple ? (
+        <section className="border border-line rounded-md">
+          <header className="flex items-center gap-2 px-4 py-2.5 border-b border-line">
+            <Cloud size={16} className="text-subtle" />
+            <h3 className="text-sm font-semibold">iCloud</h3>
+          </header>
+          <div className="px-4 py-3 flex items-center gap-2 text-subtle">
+            <CloudOff size={16} className="shrink-0 opacity-60" />
+            <span className="text-sm">{t('asset.icloud_appleOnly')}</span>
+          </div>
+        </section>
+      ) : (
       <section className="border border-line rounded-md">
         <header className="flex items-center gap-2 px-4 py-2.5 border-b border-line">
           <Cloud size={16} className="text-subtle" />
@@ -1350,6 +1352,7 @@ function AssetIcloudTab({
           </div>
         </div>
       </section>
+      )}
 
       <AssignIcloudModal
         open={assignOpen}

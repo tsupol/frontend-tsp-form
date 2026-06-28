@@ -1259,7 +1259,7 @@
     "selectToView": "Select an asset to view details",
     "search": "Search code, serial, IMEI...",
     "tab_overview": "Overview",
-    "tab_icloud": "iCloud",
+    "tab_security": "Device Lock",
     "icloud_appleOnly": "iCloud applies to Apple devices only.",
     "icloud_account": "iCloud account",
     "icloud_notAssigned": "No iCloud account",

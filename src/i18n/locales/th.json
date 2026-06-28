@@ -1258,7 +1258,7 @@
     "selectToView": "เลือกสินทรัพย์เพื่อดูรายละเอียด",
     "search": "ค้นหารหัส, serial, IMEI...",
     "tab_overview": "ภาพรวม",
-    "tab_icloud": "iCloud",
+    "tab_security": "ล็อกเครื่อง",
     "icloud_appleOnly": "iCloud ใช้ได้เฉพาะเครื่อง Apple เท่านั้น",
     "icloud_account": "บัญชี iCloud",
     "icloud_notAssigned": "ยังไม่ผูก iCloud",
