@@ -763,7 +763,7 @@ export function AssetsPage() {
                           )}
                         </div>
                         <div className="text-xs text-subtle truncate">
-                          {asset.brand_name} {asset.family_name} · {asset.variant_name}
+                          {asset.product_display_name ?? `${asset.brand_name} ${asset.family_name} · ${asset.variant_name}`}
                         </div>
                         <div className="flex items-center gap-2 mt-1 -ml-0.5">
                           <Badge size="xs" color={getBucketColor(asset.current_bucket)}>
@@ -980,6 +980,7 @@ function AssetDetailPanel({
 
       {activeTab === 'overview' && (
         <>
+        <div className="flex-1 min-h-0 overflow-auto better-scroll flex flex-col">
 
       {/* Product info */}
       <div className="flex-none px-4 py-3 border-b border-line bg-surface flex items-start justify-between gap-2">
@@ -1119,8 +1120,8 @@ function AssetDetailPanel({
         </div>
       </div>
 
-      {/* Scrollable content: flags, source, txn history */}
-      <div className="flex-1 overflow-auto better-scroll p-4 flex flex-col gap-4">
+      {/* Flags, source, txn history */}
+      <div className="p-4 flex flex-col gap-4">
         <div className="flex gap-4">
           <div className="text-xs">
             <span className="text-subtle">{t('asset.contractable')}: </span>
@@ -1215,6 +1216,8 @@ function AssetDetailPanel({
             </div>
           </div>
         )}
+      </div>
+
       </div>
 
       <AssetActionBar
