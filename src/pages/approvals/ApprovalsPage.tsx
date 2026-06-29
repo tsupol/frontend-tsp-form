@@ -215,24 +215,26 @@ export function ApprovalsPage() {
                       <button
                         key={rowKey(r)}
                         type="button"
-                        className="w-full text-left px-4 py-2.5 transition-colors cursor-pointer"
+                        className="w-full text-left px-4 py-3 flex flex-col gap-1 transition-colors cursor-pointer"
                         onClick={() => select(r)}
                       >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <Badge size="sm" color={typeColor(r.type)}>{t(`approvals.type_${r.type}`)}</Badge>
-                            <Badge size="sm" color={statusColor(r.status)}>{t(`approvals.status_${r.status}`)}</Badge>
-                          </div>
-                          <DateTime value={r.requested_at} showTime={false} className="text-[11px] text-subtle shrink-0" />
+                        {/* Line 1: label + badges ............ amount */}
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-sm font-medium truncate">{r.display_label}</span>
+                          <Badge size="xs" color={typeColor(r.type)}>{t(`approvals.type_${r.type}`)}</Badge>
+                          <Badge size="xs" color={statusColor(r.status)}>{t(`approvals.status_${r.status}`)}</Badge>
+                          <span className="ml-auto text-sm font-medium tabular-nums shrink-0">{formatNumber(r.amount)}</span>
                         </div>
-                        <div className="text-sm font-medium mt-1 truncate">{r.display_label}</div>
-                        <div className="flex items-center justify-between gap-2 mt-0.5">
-                          <span className="text-xs text-subtle truncate">
+                        {/* Line 2: branch · customer ........... date */}
+                        <div className="flex items-center gap-1.5 text-xs text-subtle min-w-0">
+                          <span className="truncate">
                             {r.type === 'BUYBACK'
                               ? (r.branch_name ?? '—')
                               : `${r.customer_name ?? '—'} · ${r.branch_name ?? '—'}`}
                           </span>
-                          <span className="text-sm font-medium tabular-nums shrink-0">{formatNumber(r.amount)}</span>
+                          <span className="ml-auto shrink-0">
+                            <DateTime value={r.requested_at} showTime={false} />
+                          </span>
                         </div>
                       </button>
                     );
