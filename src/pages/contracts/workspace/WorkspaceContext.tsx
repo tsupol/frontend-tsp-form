@@ -248,6 +248,24 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
   }, [user?.branch_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Branch finance-model config (FIN1/FIN2 enablement). The draft is created
+  // before the user picks a quote, so we must seed p_commercial_model with a
+  // model the branch actually sells — hardcoding 'FIN1' fails on FIN1-off
+  // branches with BRANCH_COMMERCIAL_MODEL_NOT_ALLOWED. Only FIN1/FIN2 are
+  // valid at create time (PRICEBOOK can't open a draft via this RPC).
+  const { data: branchModels } = useQuery({
+    queryKey: ['branch-commercial-models', data.branchId],
+    queryFn: () => apiClient.get<{ commercial_models: { FIN1?: boolean; FIN2?: boolean } }[]>(
+      `/v_branches?id=eq.${data.branchId}&select=commercial_models`,
+    ).then(rows => rows[0]?.commercial_models ?? null),
+    enabled: data.branchId != null,
+    staleTime: 60_000,
+  });
+  // First enabled FIN model for the initial draft. Only hide on an explicit
+  // false (never because the read failed) — fall back to FIN1 if unknown.
+  const defaultDraftModel: 'FIN1' | 'FIN2' =
+    branchModels?.FIN1 === false && branchModels?.FIN2 !== false ? 'FIN2' : 'FIN1';
+
   // ── Draft auto-creation — triggers when customer is attached ─────────
   // Failed attempts are remembered per (customerId, branchId) so a 403/error
   // doesn't loop. User must reset (pick a different customer) to retry.
@@ -256,6 +274,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     if (!data.customerId) return;
     if (data.contractId) return;
     if (!data.branchId || !user) return;
+    // Wait for the branch model config before defaulting the model — firing
+    // with a hardcoded FIN1 on a FIN1-off branch would fail and cache the
+    // failure, blocking the legitimate retry once we know the right model.
+    if (branchModels === undefined) return;
     if (draftInFlight.current) return;
     if (data.draftError) return;
 
@@ -271,7 +293,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           p_holding_id: user.holding_id,
           p_company_id: user.company_id,
           p_branch_id: data.branchId,
-          p_commercial_model: data.selectedQuote?.finance_model ?? 'FIN1',
+          p_commercial_model: data.selectedQuote?.finance_model ?? defaultDraftModel,
           p_model_id: data.modelId,
           p_variant_id: data.variantId,
           p_customer_id: data.customerId,
@@ -297,7 +319,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     };
 
     createDraft();
-  }, [data.customerId, data.contractId, data.draftError, data.branchId, data.modelId, data.variantId, data.selectedQuote, user]);
+  }, [data.customerId, data.contractId, data.draftError, data.branchId, data.modelId, data.variantId, data.selectedQuote, user, branchModels, defaultDraftModel]);
 
   // ── Co-lessee completeness (server-derived) ──────────────────────────
   const coLesseeCount = coLesseeList.length;
