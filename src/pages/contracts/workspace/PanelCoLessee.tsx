@@ -7,7 +7,7 @@ import { ShieldAlert, CheckCircle, XCircle, Keyboard, Search, Loader2, Trash2, A
 import { apiClient, ApiError } from '../../../lib/api';
 import { invalidateMediaUrl } from '../../../lib/upload';
 import { beMediaUploadFromImage } from '../../../lib/beMedia';
-import { toLocalDateStr, parseLocalDate, makeDatePickerFormat } from '../../../lib/format';
+import { toLocalDateStr, parseLocalDate, makeDatePickerFormat, getAge, ADULT_AGE } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
 import { PanelSection } from './PanelSection';
 import { AddressFormPostal } from './AddressFormPostal';
@@ -258,14 +258,9 @@ export function PanelCoLessee({ onClose: _onClose }: Props) {
       <PanelSection title={t('workspace.cardCoLessee')} count={coLessees.length}
         alert={
           removeError ? <div className="alert alert-danger"><XCircle size={14} /><span>{removeError}</span></div>
-          : (workspace.customerId && coLessees.length === 0 && workspace.customerDateOfBirth && (() => {
-              const birth = new Date(workspace.customerDateOfBirth!);
-              const now = new Date();
-              let age = now.getFullYear() - birth.getFullYear();
-              const m = now.getMonth() - birth.getMonth();
-              if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--;
-              return age < 18;
-            })()) ? <div className="alert alert-warning"><AlertTriangle size={14} /><span>{t('workspace.coLesseeRequired')}</span></div>
+          : (workspace.customerId && coLessees.length === 0 && workspace.customerDateOfBirth
+              && getAge(workspace.customerDateOfBirth) < ADULT_AGE)
+            ? <div className="alert alert-warning"><AlertTriangle size={14} /><span>{t('workspace.coLesseeRequired')}</span></div>
           : undefined
         }
       >

@@ -3,7 +3,7 @@ import type { ContractServerState } from './useContractQuery';
 import type { CustomerSummary } from './useCustomerSummary';
 import type { ContractDocSummary } from './useContractDocuments';
 import type { ContractSignatory } from './useContractSignatories';
-import { getAge } from '../../../lib/format';
+import { getAge, ADULT_AGE } from '../../../lib/format';
 
 // ── Card status derivation ──────────────────────────────────────────────
 
@@ -38,7 +38,7 @@ export function getCardStatus(
 
     case 'co_lessee': {
       if (!contract?.customer_id) return 'locked';
-      const isMinor = customer?.dateOfBirth ? getAge(customer.dateOfBirth) < 18 : false;
+      const isMinor = customer?.dateOfBirth ? getAge(customer.dateOfBirth) < ADULT_AGE : false;
       if (isMinor && coLessees.count === 0) return 'warning';
       if (coLessees.count === 0) return 'complete';
       if (coLessees.allComplete) return 'complete';

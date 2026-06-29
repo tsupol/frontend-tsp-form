@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle } from 'lucide-react';
 import { apiClient } from '../../../lib/api';
-import { getAge } from '../../../lib/format';
+import { getAge, ADULT_AGE } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
 import { SummaryCard } from './SummaryCard';
 
@@ -12,7 +12,7 @@ export function CardCoLessee({ onEdit, active, shake }: { onEdit?: () => void; a
 
   const hasCustomer = !!contract?.customer_id;
   const dob = customer?.dateOfBirth;
-  const isMinor = dob ? getAge(dob) < 18 : false;
+  const isMinor = dob ? getAge(dob) < ADULT_AGE : false;
   const needsCoLessee = hasCustomer && isMinor;
   const coLessees = coLesseeList.map(g => ({ customerId: g.customer_id, fullName: g.customer_name, idNumber: g.id_number ?? '' }));
   const hasCoLessees = coLessees.length > 0;

@@ -47,6 +47,14 @@ export function parseLocalDate(str: string | null | undefined): Date | null {
   return new Date(str + 'T00:00:00');
 }
 
+/**
+ * Adult-age threshold for contract eligibility. Mirrors the backend's
+ * sale._adult_age_threshold() (currently 20). A customer below this needs an
+ * adult co-lessee to open a contract. Keep in sync with the backend if it
+ * changes — there's no view exposing it, so this is the single FE source.
+ */
+export const ADULT_AGE = 20;
+
 /** Calculate age from a DOB string (YYYY-MM-DD or ISO) */
 export function getAge(dob: string): number {
   const birth = new Date(dob);
