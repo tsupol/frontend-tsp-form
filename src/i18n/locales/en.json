@@ -1548,6 +1548,7 @@
   "approvals": {
     "title": "Approvals",
     "review": "Review Approval",
+    "selectToView": "Select an approval to review",
     "empty": "No approvals match the filters",
     "type": "Type",
     "label": "Item",

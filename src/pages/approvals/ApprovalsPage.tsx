@@ -2,17 +2,18 @@ import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
-  DataTable, DataTableColumnHeader, DataTableFooter, MobileHeader,
-  Badge, Select, Button, Drawer, TextArea,
+  PageNav, PageNavPanel, DataTable, MobileHeader,
+  Badge, Select, Button, TextArea,
   useSnackbarContext,
-  type ColumnDef, type RowExpansionState, type SortingState,
 } from 'tsp-form';
-import { ArrowRightFromLine, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, CheckCircle, XCircle, Inbox } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
+import { BuybackDetailPanel, type BuybackDetail } from '../inventory/BuybackPage';
 
 /* ───────────────────────────────────────────────────────────────────────────
- * Types — match api.v_approvals_all_statuses (doc 92)
+ * Types — match api.v_approvals_all_statuses (doc 59 / 92)
+ * TOC projection: list/headline fields only. Detail is fetched per-type.
  * ─────────────────────────────────────────────────────────────────────────── */
 
 type ApprovalType = 'NEGOTIATION' | 'BILL_LINE_DISCOUNT' | 'DEAL_PARTNER' | 'BUYBACK';
@@ -71,8 +72,13 @@ const typeColor = (type: ApprovalType): 'info' | 'primary' | 'secondary' | 'warn
   }
 };
 
+const rowKey = (r: ApprovalRow) => `${r.type}-${r.id}`;
+
 /* ───────────────────────────────────────────────────────────────────────────
- * Component
+ * Component — PageNav 2-panel. Narrow rail of custom stacked rows (click =
+ * select), right panel dispatches on row.type. Buyback reuses the real
+ * BuybackDetailPanel (capability-driven actions). The other three approve
+ * inline — this page is their home (no dedicated detail page exists).
  * ─────────────────────────────────────────────────────────────────────────── */
 
 export function ApprovalsPage() {
@@ -82,7 +88,6 @@ export function ApprovalsPage() {
 
   const [statusFilter, setStatusFilter] = useState<ApprovalStatus | null>('PENDING');
   const [typeFilter, setTypeFilter] = useState<ApprovalType | null>(null);
-  const [sorting, setSorting] = useState<SortingState>([]);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
 
@@ -94,7 +99,6 @@ export function ApprovalsPage() {
     const params: string[] = [];
     if (statusFilter) params.push(`status=eq.${statusFilter}`);
     if (typeFilter) params.push(`type=eq.${typeFilter}`);
-    // Pending → sort by request age; decided → by decision time; mixed → request age.
     params.push(statusFilter && statusFilter !== 'PENDING'
       ? 'order=decided_at.desc.nullslast'
       : 'order=requested_at.desc');
@@ -103,10 +107,7 @@ export function ApprovalsPage() {
 
   const { data, isFetching } = useQuery({
     queryKey: ['approvals-all', statusFilter, typeFilter, pageIndex, pageSize],
-    queryFn: () => apiClient.getPaginated<ApprovalRow>(
-      queryUrl,
-      { page: pageIndex + 1, pageSize },
-    ),
+    queryFn: () => apiClient.getPaginated<ApprovalRow>(queryUrl, { page: pageIndex + 1, pageSize }),
     placeholderData: keepPreviousData,
   });
 
@@ -115,81 +116,6 @@ export function ApprovalsPage() {
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['approvals-all'] });
-  };
-
-  const columns: ColumnDef<ApprovalRow>[] = useMemo(() => [
-    {
-      accessorKey: 'type',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('approvals.type')} />,
-      cell: ({ row }) => (
-        <Badge size="sm" color={typeColor(row.original.type)}>
-          {t(`approvals.type_${row.original.type}`)}
-        </Badge>
-      ),
-      className: 'w-32',
-    },
-    {
-      accessorKey: 'display_label',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('approvals.label')} />,
-      cell: ({ row }) => (
-        <div>
-          <div className="text-sm font-medium truncate">{row.original.display_label}</div>
-          <div className="text-xs text-subtle truncate">{row.original.customer_name}</div>
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'branch_name',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('approvals.branch')} />,
-      cell: ({ row }) => <div className="text-sm truncate">{row.original.branch_name ?? '—'}</div>,
-      className: 'max-lg:hidden',
-    },
-    {
-      accessorKey: 'product_name',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('approvals.product')} />,
-      cell: ({ row }) => <span className="text-sm truncate">{row.original.product_name ?? '—'}</span>,
-      className: 'max-xl:hidden',
-    },
-    {
-      accessorKey: 'amount',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('approvals.amount')} />,
-      cell: ({ row }) => (
-        <div className="text-right">
-          <div className="tabular-nums font-medium">{formatNumber(row.original.amount)}</div>
-          {row.original.discount_percent != null && (
-            <div className="text-xs text-subtle tabular-nums">{row.original.discount_percent}%</div>
-          )}
-        </div>
-      ),
-      className: 'w-28',
-    },
-    {
-      accessorKey: 'status',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('approvals.status')} />,
-      cell: ({ row }) => (
-        <Badge size="sm" color={statusColor(row.original.status)}>
-          {t(`approvals.status_${row.original.status}`)}
-        </Badge>
-      ),
-      className: 'w-28',
-    },
-    {
-      accessorKey: 'requested_at',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('approvals.requestedAt')} />,
-      cell: ({ row }) => <DateTime value={row.original.requested_at} showTime={false} className="text-xs text-subtle" />,
-      className: 'w-24 max-md:hidden',
-    },
-  ], [t]);
-
-  const handleRowExpansion = (
-    updater: RowExpansionState | ((prev: RowExpansionState) => RowExpansionState),
-  ) => {
-    const next = typeof updater === 'function' ? updater({}) : updater;
-    const clickedId = Object.keys(next).find(k => next[k]);
-    if (clickedId) {
-      const row = rows[Number(clickedId)];
-      if (row) setSelected(row);
-    }
   };
 
   const statusOptions: { value: ApprovalStatus; label: string }[] = [
@@ -210,149 +136,220 @@ export function ApprovalsPage() {
   ];
 
   return (
-    <>
-      <MobileHeader className="mobile-header-bordered md:hidden">
-        <div className="mobile-header-start">
-          <button
-            className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
-            aria-label="Open menu"
-            onClick={() => window.dispatchEvent(new CustomEvent('sidemenu:open'))}
-          >
-            <ArrowRightFromLine size={18} />
-          </button>
-        </div>
-        <div className="mobile-header-title">{t('approvals.title')}</div>
-        <div className="mobile-header-end w-nav" />
-      </MobileHeader>
+    <PageNav panels={['list', 'detail']} className="h-dvh">
+      {({ isMobile, isRoot, goTo, goBack }) => {
+        const select = (row: ApprovalRow) => { setSelected(row); if (isMobile) goTo('detail'); };
 
-      <div className="page-content responsive-dvh-mobile-header">
-        <div className="flex items-center justify-between mb-4 flex-none max-md:hidden">
-          <h1 className="heading-2">{t('approvals.title')}</h1>
-        </div>
+        return (
+          <>
+            {isMobile && (
+              <MobileHeader className="mobile-header-bordered">
+                <div className="mobile-header-start">
+                  {isRoot ? (
+                    <button
+                      className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
+                      aria-label="Open menu"
+                      onClick={() => window.dispatchEvent(new CustomEvent('sidemenu:open'))}
+                    >
+                      <ArrowRightFromLine size={18} />
+                    </button>
+                  ) : (
+                    <button
+                      className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
+                      onClick={goBack}
+                    >
+                      <ArrowLeft size={20} />
+                    </button>
+                  )}
+                </div>
+                <div className="mobile-header-title mobile-header-title-truncate">
+                  {isRoot ? t('approvals.title') : t('approvals.review')}
+                </div>
+                <div className="mobile-header-end w-12" />
+              </MobileHeader>
+            )}
 
-        {/* Filters */}
-        <div className="flex items-center gap-2 pb-4 flex-none">
-          <div className="flex-1 min-w-0 max-w-[16rem]">
-            <Select
-              options={statusOptions}
-              value={statusFilter}
-              onChange={val => setStatusFilter((val as ApprovalStatus) || null)}
-              placeholder={t('approvals.allStatuses')}
-              size="sm"
-              showChevron
-              searchable={false}
-              clearable
-            />
-          </div>
-          <div className="flex-1 min-w-0 max-w-[16rem]">
-            <Select
-              options={typeOptions}
-              value={typeFilter}
-              onChange={val => setTypeFilter((val as ApprovalType) || null)}
-              placeholder={t('approvals.allTypes')}
-              size="sm"
-              showChevron
-              clearable
-            />
-          </div>
-        </div>
-
-        <DataTable<ApprovalRow>
-          data={rows}
-          columns={columns}
-          sorting={sorting}
-          onSortingChange={setSorting}
-          expandOnRowClick
-          getRowCanExpand={() => true}
-          renderExpandedRow={() => null}
-          rowExpansion={{}}
-          onRowExpansionChange={handleRowExpansion}
-          enablePagination
-          pageIndex={pageIndex}
-          pageSize={pageSize}
-          pageSizeOptions={[15, 25, 50]}
-          rowCount={totalCount}
-          onPageChange={({ pageIndex: pi, pageSize: ps }) => { setPageIndex(pi); setPageSize(ps); }}
-          tableClassName="[&_tbody_tr]:cursor-pointer"
-          className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
-          noResults={<div className="p-8 text-center text-subtle">{t('approvals.empty')}</div>}
-        />
-
-        {/* Mobile cards */}
-        <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
-          <div className="flex-1 overflow-auto better-scroll pb-8">
-            {rows.length === 0 ? (
-              <div className="p-8 text-center text-subtle">{t('approvals.empty')}</div>
-            ) : (
-              <div className="flex flex-col divide-y divide-line">
-                {rows.map(row => (
-                  <div
-                    key={`${row.type}-${row.id}`}
-                    className="px-1 py-3 cursor-pointer active:bg-surface-hover"
-                    onClick={() => setSelected(row)}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <Badge size="sm" color={typeColor(row.type)}>{t(`approvals.type_${row.type}`)}</Badge>
-                        <Badge size="sm" color={statusColor(row.status)}>{t(`approvals.status_${row.status}`)}</Badge>
-                      </div>
-                      <DateTime value={row.requested_at} showTime={false} className="text-[11px] text-subtle" />
-                    </div>
-                    <div className="text-sm font-medium mt-1 truncate">{row.display_label}</div>
-                    <div className="text-xs text-subtle truncate">
-                      {row.customer_name ?? '—'} · {row.branch_name ?? '—'}
-                    </div>
-                    <div className="flex items-center justify-between mt-1 text-sm tabular-nums">
-                      <span className="truncate">{row.product_name ?? ''}</span>
-                      <span className="font-medium">{formatNumber(row.amount)}</span>
-                    </div>
-                  </div>
-                ))}
+            {!isMobile && (
+              <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
+                <h1 className="heading-2 shrink-0">{t('approvals.title')}</h1>
               </div>
             )}
-          </div>
-          {totalCount > 0 && (
-            <DataTableFooter
-              currentPage={pageIndex + 1}
-              totalPages={Math.ceil(totalCount / pageSize)}
-              onPageChange={p => setPageIndex(p - 1)}
-              pageSize={pageSize}
-              pageSizeOptions={[15, 25, 50]}
-              onPageSizeChange={ps => { setPageSize(ps); setPageIndex(0); }}
-              totalRows={totalCount}
-            />
-          )}
-        </div>
-      </div>
 
-      <ApprovalReviewDrawer
-        row={selected}
-        open={!!selected}
-        onClose={() => setSelected(null)}
-        onSuccess={(action) => {
-          setSelected(null);
-          refresh();
-          const key = action === 'approve' ? 'approvals.approveSuccess' : 'approvals.rejectSuccess';
-          addSnackbar({
-            type: 'success',
-            message: <div className="alert alert-success"><CheckCircle size={16} /><span>{t(key)}</span></div>,
-          });
-        }}
-      />
-    </>
+            <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
+              {/* ── List rail ── */}
+              <PageNavPanel id="list" className={isMobile ? '' : 'w-1/2 xl:w-5/12 border-r border-line flex flex-col'}>
+                <div className="flex-none flex items-center gap-2 p-2 border-b border-line">
+                  <div className="flex-1 min-w-0">
+                    <Select
+                      options={statusOptions}
+                      value={statusFilter}
+                      onChange={val => setStatusFilter((val as ApprovalStatus) || null)}
+                      placeholder={t('approvals.allStatuses')}
+                      size="sm"
+                      showChevron
+                      searchable={false}
+                      clearable
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <Select
+                      options={typeOptions}
+                      value={typeFilter}
+                      onChange={val => setTypeFilter((val as ApprovalType) || null)}
+                      placeholder={t('approvals.allTypes')}
+                      size="sm"
+                      showChevron
+                      clearable
+                    />
+                  </div>
+                </div>
+
+                <DataTable<ApprovalRow>
+                  data={rows}
+                  getRowProps={row => ({
+                    'data-state': selected != null && rowKey(selected) === rowKey(row.original) ? 'selected' : undefined,
+                  })}
+                  renderRow={row => {
+                    const r = row.original;
+                    return (
+                      <button
+                        key={rowKey(r)}
+                        type="button"
+                        className="w-full text-left px-4 py-2.5 transition-colors cursor-pointer"
+                        onClick={() => select(r)}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <Badge size="sm" color={typeColor(r.type)}>{t(`approvals.type_${r.type}`)}</Badge>
+                            <Badge size="sm" color={statusColor(r.status)}>{t(`approvals.status_${r.status}`)}</Badge>
+                          </div>
+                          <DateTime value={r.requested_at} showTime={false} className="text-[11px] text-subtle shrink-0" />
+                        </div>
+                        <div className="text-sm font-medium mt-1 truncate">{r.display_label}</div>
+                        <div className="flex items-center justify-between gap-2 mt-0.5">
+                          <span className="text-xs text-subtle truncate">
+                            {r.type === 'BUYBACK'
+                              ? (r.branch_name ?? '—')
+                              : `${r.customer_name ?? '—'} · ${r.branch_name ?? '—'}`}
+                          </span>
+                          <span className="text-sm font-medium tabular-nums shrink-0">{formatNumber(r.amount)}</span>
+                        </div>
+                      </button>
+                    );
+                  }}
+                  enablePagination
+                  pageIndex={pageIndex}
+                  pageSize={pageSize}
+                  pageSizeOptions={[15, 25, 50]}
+                  rowCount={totalCount}
+                  onPageChange={({ pageIndex: pi, pageSize: ps }) => { setPageIndex(pi); setPageSize(ps); }}
+                  className={`flex-1 min-h-0 panel-datatable ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
+                  noResults={<div className="p-8 text-center text-subtler">{t('approvals.empty')}</div>}
+                />
+              </PageNavPanel>
+
+              {/* ── Detail panel — dispatch on type ── */}
+              <PageNavPanel id="detail" className={isMobile ? '' : 'flex-1 min-w-0 flex flex-col'}>
+                {!selected ? (
+                  <div className="flex-1 h-full flex items-center justify-center text-subtler">
+                    <div className="text-center">
+                      <Inbox size={32} className="mx-auto mb-2 opacity-40" />
+                      {t('approvals.selectToView')}
+                    </div>
+                  </div>
+                ) : selected.type === 'BUYBACK' ? (
+                  <BuybackApprovalPanel
+                    row={selected}
+                    isMobile={isMobile}
+                    onRefresh={refresh}
+                  />
+                ) : (
+                  <SimpleApprovalPanel
+                    row={selected}
+                    onSuccess={action => {
+                      setSelected(null);
+                      if (isMobile) goBack();
+                      refresh();
+                      const key = action === 'approve' ? 'approvals.approveSuccess' : 'approvals.rejectSuccess';
+                      addSnackbar({
+                        type: 'success',
+                        message: <div className="alert alert-success"><CheckCircle size={16} /><span>{t(key)}</span></div>,
+                      });
+                    }}
+                  />
+                )}
+              </PageNavPanel>
+            </div>
+          </>
+        );
+      }}
+    </PageNav>
   );
 }
 
 /* ───────────────────────────────────────────────────────────────────────────
- * Drawer — dispatches on row.type per doc 21 mistake #1
+ * Buyback panel — reuse the real detail panel. It fetches its own capability
+ * catalog (fn_buyback_available_actions) and owns approve/reject/intake/PIN,
+ * so there is zero duplicated action logic. We only fetch v_buyback_detail.
  * ─────────────────────────────────────────────────────────────────────────── */
 
-function ApprovalReviewDrawer({
-  row, open, onClose, onSuccess,
+function BuybackApprovalPanel({
+  row, isMobile, onRefresh,
 }: {
-  row: ApprovalRow | null;
-  open: boolean;
-  onClose: () => void;
+  row: ApprovalRow;
+  isMobile: boolean;
+  onRefresh: () => void;
+}) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const { addSnackbar } = useSnackbarContext();
+
+  const { data: detail, isFetching } = useQuery({
+    queryKey: ['buyback-detail', row.id],
+    queryFn: async () => {
+      const rows = await apiClient.get<BuybackDetail[]>(`/v_buyback_detail?po_id=eq.${row.id}&limit=1`);
+      return rows[0] ?? null;
+    },
+    placeholderData: keepPreviousData,
+  });
+
+  const handleRefresh = () => {
+    // Refresh both this panel's detail/actions and the approvals list.
+    queryClient.invalidateQueries({ queryKey: ['buyback-detail'] });
+    queryClient.invalidateQueries({ queryKey: ['buyback-actions'] });
+    onRefresh();
+  };
+
+  if (!detail) {
+    return (
+      <div className="flex-1 h-full flex items-center justify-center text-subtler">
+        <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <BuybackDetailPanel
+      detail={detail}
+      loading={isFetching}
+      isMobile={isMobile}
+      t={t}
+      onRefresh={handleRefresh}
+      addSnackbar={addSnackbar}
+    />
+  );
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * Simple approval panel — NEGOTIATION / DEAL_PARTNER / BILL_LINE_DISCOUNT.
+ * Flat decide-RPC + reason. Dispatches the RPC on row.type (doc 21 mistake #1:
+ * row.id is type-specific).
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+function SimpleApprovalPanel({
+  row, onSuccess,
+}: {
+  row: ApprovalRow;
   onSuccess: (action: 'approve' | 'reject') => void;
 }) {
   const { t } = useTranslation();
@@ -360,32 +357,14 @@ function ApprovalReviewDrawer({
   const [busy, setBusy] = useState<'approve' | 'reject' | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
 
-  useEffect(() => {
-    if (open) { setReason(''); setErrorMessage(''); }
-  }, [open]);
-
-  if (!row) {
-    return (
-      <Drawer open={open} onClose={onClose} side="right" ariaLabel={t('approvals.review')}>
-        <div className="drawer-header">
-          <h2 className="drawer-title">{t('approvals.review')}</h2>
-          <button className="drawer-close-btn" onClick={onClose}>&times;</button>
-        </div>
-      </Drawer>
-    );
-  }
+  useEffect(() => { setReason(''); setErrorMessage(''); }, [row.type, row.id]);
 
   const isPending = row.status === 'PENDING';
 
-  /**
-   * Per doc 21 §"Mistake 1" — row.id is type-specific, dispatch to the right RPC.
-   */
   const buildRpcCall = (action: 'approve' | 'reject'): { rpc: string; params: Record<string, unknown> } => {
     const trimmed = reason.trim();
     switch (row.type) {
       case 'NEGOTIATION': {
-        // PostgREST overload-matches on the exact param set — always send
-        // every key the function declares (use null when blank).
         const rpc = action === 'approve' ? 'fn_negotiation_approve' : 'fn_negotiation_reject';
         const params: Record<string, unknown> = { p_request_id: row.id };
         if (action === 'reject') params.p_reason = trimmed || null;
@@ -393,9 +372,6 @@ function ApprovalReviewDrawer({
         return { rpc, params };
       }
       case 'BILL_LINE_DISCOUNT': {
-        // Single RPC with p_approved boolean. p_reason must always be sent
-        // (PostgREST resolves overloads by exact param set; the function
-        // signature requires all 3 — use null when the cashier left it blank).
         return {
           rpc: 'fn_bill_line_item_review_approval',
           params: {
@@ -414,13 +390,9 @@ function ApprovalReviewDrawer({
         else params.p_note = trimmed || null;
         return { rpc, params };
       }
-      case 'BUYBACK': {
-        const rpc = action === 'approve' ? 'fn_inv_buyback_approve' : 'fn_inv_buyback_reject';
-        const params: Record<string, unknown> = { p_po_id: row.id };
-        if (action === 'reject') params.p_reason = trimmed || null;
-        else params.p_note = trimmed || null;
-        return { rpc, params };
-      }
+      case 'BUYBACK':
+        // Buyback never routes here (handled by BuybackApprovalPanel).
+        return { rpc: 'fn_inv_buyback_approve', params: { p_po_id: row.id } };
     }
   };
 
@@ -449,50 +421,44 @@ function ApprovalReviewDrawer({
   };
 
   return (
-    <Drawer open={open} onClose={onClose} side="right" ariaLabel={t('approvals.review')}>
-      <div className="drawer-header">
-        <h2 className="drawer-title">{t('approvals.review')}</h2>
-        <button className="drawer-close-btn" onClick={onClose}>&times;</button>
+    <div className="relative flex flex-col h-full min-w-0 overflow-hidden">
+      <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
+        <Badge size="sm" color={typeColor(row.type)}>{t(`approvals.type_${row.type}`)}</Badge>
+        <Badge size="sm" color={statusColor(row.status)}>{t(`approvals.status_${row.status}`)}</Badge>
       </div>
-      <div className="drawer-content">
-        <div className="space-y-4">
-          <div className="space-y-2 text-sm">
-            <div className="flex items-center gap-2 flex-wrap">
-              <Badge size="sm" color={typeColor(row.type)}>{t(`approvals.type_${row.type}`)}</Badge>
-              <Badge size="sm" color={statusColor(row.status)}>{t(`approvals.status_${row.status}`)}</Badge>
-            </div>
 
-            <DetailRow label={t('approvals.label')} value={row.display_label} />
-            <DetailRow label={t('approvals.branch')} value={row.branch_name ?? '—'} />
-            <DetailRow label={t('approvals.customer')} value={row.customer_name ?? '—'} />
-            <DetailRow label={t('approvals.product')} value={row.product_name ?? '—'} />
-            <DetailRow label={t('approvals.requestedBy')} value={row.requested_by_name ?? '—'} />
-            <DetailRow label={t('approvals.requestedAt')}>
-              <DateTime value={row.requested_at} />
+      <div className="flex-1 overflow-auto better-scroll px-4 py-3">
+        <div className="space-y-2 text-sm">
+          <DetailRow label={t('approvals.label')} value={row.display_label} />
+          <DetailRow label={t('approvals.branch')} value={row.branch_name ?? '—'} />
+          <DetailRow label={t('approvals.customer')} value={row.customer_name ?? '—'} />
+          <DetailRow label={t('approvals.product')} value={row.product_name ?? '—'} />
+          <DetailRow label={t('approvals.requestedBy')} value={row.requested_by_name ?? '—'} />
+          <DetailRow label={t('approvals.requestedAt')}>
+            <DateTime value={row.requested_at} className="text-right text-xs" />
+          </DetailRow>
+          {row.decided_at && (
+            <DetailRow label={t('approvals.decidedAt')}>
+              <DateTime value={row.decided_at} className="text-right text-xs" />
             </DetailRow>
-            {row.decided_at && (
-              <DetailRow label={t('approvals.decidedAt')}>
-                <DateTime value={row.decided_at} />
-              </DetailRow>
-            )}
-            <hr className="border-line my-3" />
-            <DetailRow label={t('approvals.amount')} value={formatNumber(row.amount)} mono />
-            {row.discount_percent != null && (
-              <DetailRow label={t('approvals.discountPercent')} value={`${row.discount_percent}%`} mono />
-            )}
-          </div>
-
-          {errorMessage && (
-            <div className="alert alert-danger animate-pop-in">
-              <XCircle size={16} />
-              <div><div className="alert-description text-xs">{errorMessage}</div></div>
-            </div>
+          )}
+          <hr className="border-line my-3" />
+          <DetailRow label={t('approvals.amount')} value={formatNumber(row.amount)} mono />
+          {row.discount_percent != null && (
+            <DetailRow label={t('approvals.discountPercent')} value={`${row.discount_percent}%`} mono />
           )}
         </div>
+
+        {errorMessage && (
+          <div className="alert alert-danger animate-pop-in mt-4">
+            <XCircle size={16} />
+            <div><div className="alert-description text-xs">{errorMessage}</div></div>
+          </div>
+        )}
       </div>
 
       {isPending && (
-        <div className="drawer-footer border-t border-line sticky bottom-0 bg-bg">
+        <div className="flex-none border-t border-line px-4 py-3 bg-bg">
           <div className="space-y-2 w-full">
             <TextArea
               size="md"
@@ -505,14 +471,14 @@ function ApprovalReviewDrawer({
             />
             <div className="flex gap-2 w-full">
               <Button
-                color="success" size="sm" className="flex-1"
+                color="success" size="md" className="flex-1"
                 disabled={!!busy}
                 onClick={() => handleAction('approve')}
               >
                 {busy === 'approve' ? t('common.loading') : t('approvals.approve')}
               </Button>
               <Button
-                color="danger" size="sm" className="flex-1"
+                color="danger" size="md" className="flex-1"
                 disabled={!!busy || !reason.trim()}
                 onClick={() => handleAction('reject')}
               >
@@ -522,7 +488,7 @@ function ApprovalReviewDrawer({
           </div>
         </div>
       )}
-    </Drawer>
+    </div>
   );
 }
 
@@ -535,7 +501,7 @@ function DetailRow({ label, value, mono, children }: {
   return (
     <div className="flex items-start justify-between gap-4">
       <span className="text-subtle shrink-0">{label}</span>
-      {children ?? <span className={`text-right ${mono ? 'tabular-nums' : ''}`}>{value}</span>}
+      {children ?? <span className={`text-right text-xs ${mono ? 'tabular-nums' : ''}`}>{value}</span>}
     </div>
   );
 }

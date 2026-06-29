@@ -91,7 +91,7 @@ interface BuybackDetailLine {
   attempted_identifiers_json: { type: string; value: string }[] | null;
 }
 
-interface BuybackDetail extends Omit<BuybackListItem, 'id' | 'total_price' | 'product_summary'> {
+export interface BuybackDetail extends Omit<BuybackListItem, 'id' | 'total_price' | 'product_summary'> {
   po_id: number;
   notes: string | null;
   approved_by: number | null;
@@ -552,7 +552,7 @@ export function BuybackPage() {
 // Detail panel
 // ============================================================================
 
-function BuybackDetailPanel({
+export function BuybackDetailPanel({
   detail,
   loading,
   isMobile,
