@@ -184,6 +184,83 @@ export function formatSmart(
   return datePart;
 }
 
+/**
+ * Expressive "ago"-style relative time, returned as a two-part object so the
+ * caller can render the headline relative phrase prominently and the absolute
+ * date/time as a quieter second line.
+ *
+ *   < 1 min   → { rel: "just now",     abs: "14:32" }
+ *   < 1 hour  → { rel: "5 min ago",    abs: "14:27" }
+ *   < 24 hour → { rel: "3 hr ago",     abs: "11:32" }
+ *   yesterday → { rel: "Yesterday",    abs: "Yesterday 14:32" }
+ *   this week → { rel: "2 days ago",   abs: "Mon 14:32" }
+ *   older     → { rel: "2 May",        abs: "2 May 2026, 14:32" }
+ *
+ * Unlike `formatSmart` (a single bucketed string for dense tables), this leans
+ * into recency — reviewers triaging a slip queue care most about "how fresh".
+ */
+export function formatRelativeAgo(
+  value: string | null | undefined,
+  lang: string,
+): { rel: string; abs: string } {
+  if (!value) return { rel: '—', abs: '' };
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return { rel: '—', abs: '' };
+
+  const now = new Date();
+  const diffSec = Math.floor((now.getTime() - d.getTime()) / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHr = Math.floor(diffMin / 60);
+
+  const startOfDay = (x: Date) =>
+    new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const dayDiff = Math.floor((startOfDay(now) - startOfDay(d)) / 86_400_000);
+
+  const isTh = lang === 'th';
+  const locale = isTh ? 'th-TH-u-ca-gregory' : 'en-GB';
+  const timePart = d.toLocaleTimeString(locale, {
+    hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok', hour12: false,
+  });
+  const sameYear = d.getFullYear() === now.getFullYear();
+  const datePart = d.toLocaleDateString(locale, {
+    day: 'numeric', month: 'short',
+    ...(sameYear ? {} : { year: 'numeric' }),
+    timeZone: 'Asia/Bangkok',
+  });
+
+  // Future or just-now.
+  if (diffSec < 60) {
+    return { rel: isTh ? 'เมื่อกี้' : 'just now', abs: timePart };
+  }
+  if (diffMin < 60) {
+    return {
+      rel: isTh ? `${diffMin} นาทีที่แล้ว` : `${diffMin} min ago`,
+      abs: timePart,
+    };
+  }
+  // Within the same calendar day → hours ago.
+  if (dayDiff === 0) {
+    return {
+      rel: isTh ? `${diffHr} ชม.ที่แล้ว` : `${diffHr} hr ago`,
+      abs: timePart,
+    };
+  }
+  if (dayDiff === 1) {
+    return {
+      rel: isTh ? 'เมื่อวาน' : 'Yesterday',
+      abs: isTh ? `เมื่อวาน ${timePart}` : `Yesterday ${timePart}`,
+    };
+  }
+  if (dayDiff < 7) {
+    const dow = d.toLocaleDateString(locale, { weekday: 'short', timeZone: 'Asia/Bangkok' });
+    return {
+      rel: isTh ? `${dayDiff} วันที่แล้ว` : `${dayDiff} days ago`,
+      abs: `${dow} ${timePart}`,
+    };
+  }
+  return { rel: datePart, abs: `${datePart}, ${timePart}` };
+}
+
 /** Format Thai phone: 0xx-xxx-xxxx (mobile) or 0x-xxx-xxxx (landline) */
 export function formatTel(tel: string | null | undefined): string {
   if (!tel) return '—';

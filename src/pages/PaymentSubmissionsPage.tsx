@@ -2,14 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
-  DataTable, DataTableColumnHeader, DataTableFooter, MobileHeader,
+  DataTableFooter, MobileHeader,
   Badge, Select, Input, Button, PopOver,
   useSnackbarContext,
-  type ColumnDef, type RowExpansionState, type SortingState,
 } from 'tsp-form';
 import { ArrowRightFromLine, CheckCircle, Search, SlidersHorizontal } from 'lucide-react';
 import { apiClient } from '../lib/api';
-import { fmtCurrency, formatSmart } from '../lib/format';
+import { fmtCurrency, formatRelativeAgo } from '../lib/format';
 import { useAuth } from '../contexts/AuthContext';
 import { wsClient } from '../lib/api/ws';
 import {
@@ -46,7 +45,6 @@ export function PaymentSubmissionsPage() {
   const [branchFilter, setBranchFilter] = useState<number | null>(null);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [sorting, setSorting] = useState<SortingState>([]);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
   const [selected, setSelected] = useState<SubmissionRow | null>(null);
@@ -161,104 +159,66 @@ export function PaymentSubmissionsPage() {
     return unsub;
   }, [user, isBranchUser, queryClient]);
 
-  const columns: ColumnDef<SubmissionRow>[] = useMemo(() => [
-    {
-      accessorKey: 'submitted_at',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('paymentSubmissions.submittedAt')} />,
-      cell: ({ row }) => {
-        const r = row.original;
-        const byLabel = r.is_staff_submitted
-          ? `${t('paymentSubmissions.by')} ${r.submitter_username ?? '—'}`
-          : t('paymentSubmissions.byCustomer');
-        return (
-          <div>
-            <div className="text-xs">{formatSmart(r.submitted_at, i18n.language)}</div>
-            <div className="flex items-center gap-1 mt-0.5">
-              {r.submit_channel && (
-                <Badge size="xs" variant="outline" color="default">
-                  {r.submit_channel}
-                </Badge>
-              )}
-              <Badge size="xs" color={r.is_staff_submitted ? 'info' : 'default'}>
-                {byLabel}
-              </Badge>
-            </div>
-          </div>
-        );
-      },
-      className: 'w-40',
-    },
-    {
-      accessorKey: 'contract_code_display',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('paymentSubmissions.contract')} />,
-      cell: ({ row }) => (
-        <div>
-          <div className="text-sm font-medium truncate">{row.original.contract_code_display}</div>
-          <div className="text-xs text-subtle truncate flex items-center gap-1">
-            <span className="truncate">{row.original.customer_name ?? '—'}</span>
-            {row.original.submitter_role === 'CO_LESSEE' && (
+  // Shared 2-line row renderer for both desktop list and mobile cards.
+  // Line 1: contract + slip code (left) · amount + status (right)
+  // Line 2: customer · branch · sender (left) · relative time (right)
+  const renderRow = (row: SubmissionRow, layout: 'desktop' | 'mobile') => {
+    const ago = formatRelativeAgo(row.submitted_at, i18n.language);
+    const byLabel = row.is_staff_submitted
+      ? `${t('paymentSubmissions.by')} ${row.submitter_username ?? '—'}`
+      : t('paymentSubmissions.byCustomer');
+    const senderLine = [row.sender_bank, row.sender_account_no].filter(Boolean).join(' ');
+    return (
+      <div
+        key={row.id}
+        className={`cursor-pointer ${
+          layout === 'desktop'
+            ? 'px-3 py-3 border-b border-line hover:bg-surface-hover'
+            : 'px-1 py-3 active:bg-surface-hover'
+        }`}
+        onClick={() => setSelected(row)}
+      >
+        {/* Line 1 */}
+        <div className="flex items-baseline justify-between gap-3">
+          <div className="min-w-0 flex items-center gap-1.5">
+            <span className="text-sm font-medium truncate">{row.contract_code_display}</span>
+            {row.code_display && (
+              <span className="text-[11px] font-normal text-subtle/80 tabular-nums shrink-0">
+                {row.code_display}
+              </span>
+            )}
+            {row.submitter_role === 'CO_LESSEE' && (
               <Badge size="xs" color="info">{t('paymentSubmissions.submitterRole_CO_LESSEE')}</Badge>
             )}
           </div>
-          {row.original.code_display && (
-            <div className="text-[11px] text-subtle/80 tabular-nums truncate">{row.original.code_display}</div>
-          )}
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'branch_name',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('paymentSubmissions.branch')} />,
-      cell: ({ row }) => (
-        <span className="text-sm truncate">{row.original.branch_name ?? '—'}</span>
-      ),
-      className: 'max-lg:hidden w-40',
-    },
-    {
-      accessorKey: 'sender_bank',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('paymentSubmissions.sender')} />,
-      cell: ({ row }) => (
-        <div className="text-xs">
-          <div className="truncate">{row.original.sender_account_name ?? '—'}</div>
-          <div className="text-subtle truncate">
-            {row.original.sender_bank ?? '—'}
-            {row.original.sender_account_no ? ` · ${row.original.sender_account_no}` : ''}
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-sm font-semibold tabular-nums">{fmtCurrency(row.amount)}</span>
+            <Badge size="xs" color={statusColor(row.status)}>
+              {t(`paymentSubmissions.status_${row.status}`)}
+            </Badge>
           </div>
         </div>
-      ),
-      className: 'max-xl:hidden',
-    },
-    {
-      accessorKey: 'amount',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('paymentSubmissions.amount')} />,
-      cell: ({ row }) => (
-        <span className="tabular-nums font-medium">{fmtCurrency(row.original.amount)}</span>
-      ),
-      className: 'w-28 text-right',
-    },
-    {
-      accessorKey: 'status',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('common.status')} className="justify-end" />,
-      cell: ({ row }) => (
-        <div className="flex justify-end">
-          <Badge size="xs" color={statusColor(row.original.status)}>
-            {t(`paymentSubmissions.status_${row.original.status}`)}
-          </Badge>
+        {/* Line 2 */}
+        <div className="flex items-center justify-between gap-3 mt-1">
+          <div className="min-w-0 flex items-center gap-1.5 text-xs text-subtle">
+            <span className="truncate">
+              {row.customer_name ?? '—'} · {row.branch_name ?? '—'}
+              {senderLine ? ` · ${senderLine}` : ''}
+            </span>
+            {row.submit_channel && (
+              <Badge size="xs" variant="outline" color="default">{row.submit_channel}</Badge>
+            )}
+            <Badge size="xs" color={row.is_staff_submitted ? 'info' : 'default'}>{byLabel}</Badge>
+          </div>
+          <div className="shrink-0 flex items-baseline gap-1.5">
+            <span className="text-xs font-medium">{ago.rel}</span>
+            {ago.abs && ago.abs !== ago.rel && (
+              <span className="text-[11px] text-subtle/70 tabular-nums">{ago.abs}</span>
+            )}
+          </div>
         </div>
-      ),
-      className: 'w-32 text-right',
-    },
-  ], [t]);
-
-  const handleRowExpansion = (
-    updater: RowExpansionState | ((prev: RowExpansionState) => RowExpansionState),
-  ) => {
-    const next = typeof updater === 'function' ? updater({}) : updater;
-    const clickedId = Object.keys(next).find(k => next[k]);
-    if (clickedId) {
-      const row = rows[Number(clickedId)];
-      if (row) setSelected(row);
-    }
+      </div>
+    );
   };
 
   // Status pills replace the status Select — quick shortcut + pending count visibility.
@@ -394,26 +354,29 @@ export function PaymentSubmissionsPage() {
           );
         })()}
 
-        <DataTable<SubmissionRow>
-          data={rows}
-          columns={columns}
-          sorting={sorting}
-          onSortingChange={setSorting}
-          expandOnRowClick
-          getRowCanExpand={() => true}
-          renderExpandedRow={() => null}
-          rowExpansion={{}}
-          onRowExpansionChange={handleRowExpansion}
-          enablePagination
-          pageIndex={pageIndex}
-          pageSize={pageSize}
-          pageSizeOptions={[15, 25, 50]}
-          rowCount={totalCount}
-          onPageChange={({ pageIndex: pi, pageSize: ps }) => { setPageIndex(pi); setPageSize(ps); }}
-          tableClassName="[&_tbody_tr]:cursor-pointer"
-          className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
-          noResults={<div className="p-8 text-center text-subtle">{t('paymentSubmissions.empty')}</div>}
-        />
+        {/* Desktop list — custom 2-line rows (replaces the column DataTable) */}
+        <div className={`flex-1 min-h-0 hidden md:flex flex-col ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
+          <div className="flex-1 overflow-auto better-scroll">
+            {rows.length === 0 ? (
+              <div className="p-8 text-center text-subtle">{t('paymentSubmissions.empty')}</div>
+            ) : (
+              <div className="flex flex-col border-t border-line">
+                {rows.map(row => renderRow(row, 'desktop'))}
+              </div>
+            )}
+          </div>
+          {totalCount > 0 && (
+            <DataTableFooter
+              currentPage={pageIndex + 1}
+              totalPages={Math.ceil(totalCount / pageSize)}
+              onPageChange={p => setPageIndex(p - 1)}
+              pageSize={pageSize}
+              pageSizeOptions={[15, 25, 50]}
+              onPageSizeChange={ps => { setPageSize(ps); setPageIndex(0); }}
+              totalRows={totalCount}
+            />
+          )}
+        </div>
 
         {/* Mobile cards */}
         <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
@@ -422,50 +385,7 @@ export function PaymentSubmissionsPage() {
               <div className="p-8 text-center text-subtle">{t('paymentSubmissions.empty')}</div>
             ) : (
               <div className="flex flex-col divide-y divide-line">
-                {rows.map(row => (
-                  <div
-                    key={row.id}
-                    className="px-1 py-3 cursor-pointer active:bg-surface-hover"
-                    onClick={() => setSelected(row)}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <Badge size="xs" color={statusColor(row.status)}>
-                        {t(`paymentSubmissions.status_${row.status}`)}
-                      </Badge>
-                      <span className="text-[11px] text-subtle">{formatSmart(row.submitted_at, i18n.language)}</span>
-                    </div>
-                    <div className="text-sm font-medium mt-1 truncate flex items-center gap-1.5">
-                      <span className="truncate">{row.contract_code_display}</span>
-                      {row.code_display && (
-                        <span className="text-[11px] font-normal text-subtle/80 tabular-nums shrink-0">{row.code_display}</span>
-                      )}
-                    </div>
-                    <div className="text-xs text-subtle truncate flex items-center gap-1">
-                      <span className="truncate">{row.customer_name ?? '—'} · {row.branch_name ?? '—'}</span>
-                      {row.submitter_role === 'CO_LESSEE' && (
-                        <Badge size="xs" color="info">{t('paymentSubmissions.submitterRole_CO_LESSEE')}</Badge>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1 mt-1">
-                      {row.submit_channel && (
-                        <Badge size="xs" variant="outline" color="default">
-                          {row.submit_channel}
-                        </Badge>
-                      )}
-                      <Badge size="xs" color={row.is_staff_submitted ? 'info' : 'default'}>
-                        {row.is_staff_submitted
-                          ? `${t('paymentSubmissions.by')} ${row.submitter_username ?? '—'}`
-                          : t('paymentSubmissions.byCustomer')}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between mt-1 text-sm tabular-nums">
-                      <span className="text-xs text-subtle truncate">
-                        {row.sender_bank ?? ''} {row.sender_account_no ?? ''}
-                      </span>
-                      <span className="font-medium">{fmtCurrency(row.amount)}</span>
-                    </div>
-                  </div>
-                ))}
+                {rows.map(row => renderRow(row, 'mobile'))}
               </div>
             )}
           </div>
