@@ -97,11 +97,12 @@ Reference implementations: `src/pages/pricing/PricebookPage.tsx` (brand / family
 
 ## Color tokens — never fake a shade with `/opacity`
 
-The theme defines the muted ramps. Use the named token; never punch alpha on a color (`text-subtle/70`, `bg-primary/15`).
+The theme defines the muted ramps. Use the named token; **never** punch alpha on a color — `text-subtle/70`, `bg-primary/15`, `text-fg/40` are all wrong. No exceptions, including `text-fg/NN`.
 
 - **Muted text:** `text-subtle` (primary muted) → `text-subtler` (lighter). That's the whole ramp — there is no `text-muted`.
 - **Muted/tinted background:** every color has a `-soft` token — `bg-primary-soft`, `bg-danger-soft`, `bg-success-soft`, `bg-warning-soft`, `bg-info-soft`, `bg-surface-soft`. Use these for soft fills, never `bg-{color}/15`.
-- `text-fg/NN` (dimming the foreground for disabled placeholders / faint icons) is the one accepted opacity use — it's not a named-token case.
+- **`/NN` in existing code is wrong code, not a pattern.** It's pollution from past edits. When copying how something's done, ignore any `/NN` color and look elsewhere for the correct token.
+- If a case truly seems to need `/NN`, stop and ask first — discouraged, not a normal path.
 
 ## Inline links
 
