@@ -443,7 +443,7 @@ export function DunningTargetsPage() {
                       </div>
 
                       {/* Overdue summary — neutral surface when nothing is overdue */}
-                      <div className={`mb-4 px-3 py-2.5 rounded-md border ${selected.overdue_amount > 0 ? 'bg-danger/5 border-danger-border' : 'bg-surface border-line'}`}>
+                      <div className={`mb-4 px-3 py-2.5 rounded-md border ${selected.overdue_amount > 0 ? 'bg-danger-soft border-danger-border' : 'bg-surface border-line'}`}>
                         <div className="flex justify-between text-sm">
                           <span className="text-subtle">{t('legal.overdueAmount')}</span>
                           <span className={`tabular-nums font-semibold ${selected.overdue_amount > 0 ? 'text-danger' : 'text-fg'}`}>{fmt(selected.overdue_amount)}</span>

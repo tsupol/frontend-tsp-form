@@ -510,7 +510,7 @@ function DeliveryPhotoThumb({ media, onPreview, onRemove, disabled }: {
         onClick={onRemove}
         disabled={disabled}
         aria-label="Remove"
-        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-danger text-white flex items-center justify-center shadow-sm hover:bg-danger/90 disabled:opacity-50 disabled:cursor-not-allowed border-none p-0 cursor-pointer"
+        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-danger text-white flex items-center justify-center shadow-sm hover:bg-danger-soft disabled:opacity-50 disabled:cursor-not-allowed border-none p-0 cursor-pointer"
       >
         <Trash2 size={11} />
       </button>
@@ -638,7 +638,7 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
     <div className="p-4 flex flex-col gap-4">
       {/* Bind device reminder — NEW asset post-activate */}
       {needsDeviceBind && (
-        <div className="border rounded-md px-4 py-3 border-warning-border bg-warning/5">
+        <div className="border rounded-md px-4 py-3 border-warning-border bg-warning-soft">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 min-w-0">
               <Smartphone size={14} className="text-warning-fg shrink-0" />
@@ -660,7 +660,7 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
 
       {/* Documents-need-signing reminder — live COLLECTING signing exists */}
       {liveCollectingCount > 0 && (
-        <div className="border rounded-md px-4 py-3 border-warning-border bg-warning/5">
+        <div className="border rounded-md px-4 py-3 border-warning-border bg-warning-soft">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 min-w-0">
               <Pencil size={14} className="text-warning-fg shrink-0" />
@@ -831,7 +831,7 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
       {/* Delivery — tracking number only (delivery evidence photos moved to
           their own section; shipping method/date dropped). */}
       {isActive && (
-        <div className={`border rounded-md px-4 py-3 ${contract.tracking_number ? 'border-line' : 'border-warning-border bg-warning/5'}`}>
+        <div className={`border rounded-md px-4 py-3 ${contract.tracking_number ? 'border-line' : 'border-warning-border bg-warning-soft'}`}>
           <div className="flex items-center justify-between mb-2">
             <h3 className={`text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 ${contract.tracking_number ? 'text-subtle' : 'text-warning-fg'}`}>
               <Truck size={13} />

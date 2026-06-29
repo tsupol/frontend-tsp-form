@@ -1493,7 +1493,7 @@ function LotActionModal({
                     return (
                       <div
                         key={row.key}
-                        className={`rounded-md border p-3 ${rowInvalid ? 'border-danger bg-danger/5' : 'border-line bg-surface'}`}
+                        className={`rounded-md border p-3 ${rowInvalid ? 'border-danger bg-danger-soft' : 'border-line bg-surface'}`}
                       >
                         <div className="flex items-center justify-between mb-2">
                           <div className="text-xs font-medium text-subtle flex items-center gap-1.5">

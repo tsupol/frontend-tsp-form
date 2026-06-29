@@ -349,7 +349,7 @@ export function DayClosePage() {
                   <button
                     key={key}
                     className={`flex-none w-full text-left px-4 py-3 border-b border-line flex items-center gap-3 transition-colors cursor-pointer ${
-                      isSelected ? 'bg-warning/10' : 'hover:bg-surface-hover'
+                      isSelected ? 'bg-warning-soft' : 'hover:bg-surface-hover'
                     }`}
                     onClick={() => selectDate(key, isMobile ? goTo : undefined)}
                   >
@@ -1163,7 +1163,7 @@ function SettleRow({
 }) {
   const owes = owesBm > 0;
   return (
-    <div className={`rounded-md border px-3 py-2 ${owes ? 'border-warning/40 bg-warning/5' : 'border-line'}`}>
+    <div className={`rounded-md border px-3 py-2 ${owes ? 'border-warning/40 bg-warning-soft' : 'border-line'}`}>
       <div className="text-xs text-subtle">{label}</div>
       <div className={`text-base font-semibold tabular-nums ${owes ? 'text-warning-fg' : ''}`}>
         {owes ? `−${fmtCurrency(owesBm)}` : fmtCurrency(toRemit)}

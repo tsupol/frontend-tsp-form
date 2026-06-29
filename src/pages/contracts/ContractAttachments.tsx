@@ -440,7 +440,7 @@ function ManageThumb({
         onClick={onRemove}
         disabled={removing}
         aria-label="Remove"
-        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-danger text-white flex items-center justify-center shadow-sm hover:bg-danger/90 disabled:opacity-50 border-none p-0 cursor-pointer"
+        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-danger text-white flex items-center justify-center shadow-sm hover:bg-danger-soft disabled:opacity-50 border-none p-0 cursor-pointer"
       >
         <Trash2 size={11} />
       </button>

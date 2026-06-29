@@ -96,7 +96,7 @@ export function WalletCard({ contract, walletType, onAction }: WalletCardProps) 
 
   return (
     <div className="border border-line rounded-lg overflow-hidden">
-      <div className={`px-4 py-4 ${isActive && balance > 0 ? 'bg-info/5' : 'bg-surface'}`}>
+      <div className={`px-4 py-4 ${isActive && balance > 0 ? 'bg-info-soft' : 'bg-surface'}`}>
         <div className="flex items-center gap-2 mb-1">
           <Icon size={20} className={isActive && balance > 0 ? 'text-info' : 'text-fg/30'} />
           <span className="text-xs text-subtle">{t(WALLET_LABEL_KEY[walletType])}</span>

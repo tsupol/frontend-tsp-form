@@ -213,12 +213,12 @@ export function TransferBranchModal({ open, contract, onClose }: Props) {
             extras={
               <>
                 {result.notice && (
-                  <div className="px-3 py-2.5 rounded-md bg-info/5 border border-info-border text-sm">
+                  <div className="px-3 py-2.5 rounded-md bg-info-soft border border-info-border text-sm">
                     {result.notice}
                   </div>
                 )}
                 {!result.notice && result.has_device && result.device_identifier && (
-                  <div className="px-3 py-2.5 rounded-md bg-info/5 border border-info-border text-sm">
+                  <div className="px-3 py-2.5 rounded-md bg-info-soft border border-info-border text-sm">
                     {t('contract.transferBranch_doneDeviceWillFollow', {
                       device: result.device_identifier,
                       branch: toBranchName,

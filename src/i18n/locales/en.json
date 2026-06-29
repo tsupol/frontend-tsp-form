@@ -4170,5 +4170,22 @@
     "blockUnbalanced": "Payment total must equal the bill total",
     "blockNoBank": "Select a receiving account for the transfer",
     "blockWalletInsufficient": "{{method}} balance is not enough"
+  },
+  "lateFee": {
+    "title": "Collect late fee",
+    "done": "Late fee collected",
+    "accruedBalance": "Accrued late fee",
+    "collectAmount": "Amount to collect",
+    "waiveSome": "Waive part of it",
+    "note": "Note",
+    "notePlaceholder": "Reason (optional)",
+    "netCharged": "Net charged",
+    "collected": "Collected",
+    "waived": "Waived",
+    "remainingBalance": "Remaining late fee",
+    "confirm": "Confirm & collect",
+    "blockNoBalance": "No outstanding late fee",
+    "blockNoCollect": "Enter an amount to collect",
+    "blockWaiveExceeds": "Waive amount cannot exceed the collected amount"
   }
 }

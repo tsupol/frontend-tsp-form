@@ -232,7 +232,7 @@ function SavingOverviewTab({ contract, t }: { contract: ContractDetail; t: Retur
   return (
     <div className="p-4 flex flex-col gap-4">
       {/* ── Wallet Hero ───────────────────────────────────────────────── */}
-      <div className={`rounded-lg px-4 py-4 border ${balance > 0 ? 'border-info-border bg-info/5' : 'border-line bg-surface'}`}>
+      <div className={`rounded-lg px-4 py-4 border ${balance > 0 ? 'border-info-border bg-info-soft' : 'border-line bg-surface'}`}>
         <div className="flex items-center gap-2 mb-1">
           <PiggyBank size={20} className={balance > 0 ? 'text-info' : 'text-fg/30'} />
           <span className="text-xs text-subtle">{t('workspace.savingCurrentBalance')}</span>

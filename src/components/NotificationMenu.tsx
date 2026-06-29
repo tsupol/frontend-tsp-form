@@ -121,7 +121,7 @@ function MissingField({ field }: { field: string }) {
   const { t } = useTranslation();
   return (
     <Tooltip content={t('notifCenter.missingFieldTooltip', { field })}>
-      <span className="text-[11px] text-warning bg-warning/10 rounded px-1 py-0 inline-flex items-center align-middle border border-warning/30">
+      <span className="text-[11px] text-warning bg-warning-soft rounded px-1 py-0 inline-flex items-center align-middle border border-warning/30">
         [{field}]
       </span>
     </Tooltip>

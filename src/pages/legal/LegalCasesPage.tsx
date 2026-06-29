@@ -480,7 +480,7 @@ export function LegalCasesPage() {
                       </div>
 
                       {/* Overdue summary */}
-                      <div className="mb-4 px-3 py-2.5 rounded-md bg-danger/5 border border-danger-border">
+                      <div className="mb-4 px-3 py-2.5 rounded-md bg-danger-soft border border-danger-border">
                         <div className="flex justify-between text-sm">
                           <span className="text-subtle">{t('legal.overdueAmount')}</span>
                           <span className="tabular-nums font-semibold text-danger">{fmt(caseData.overdue_amount)}</span>

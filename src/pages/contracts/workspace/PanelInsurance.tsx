@@ -74,7 +74,7 @@ export function PanelInsurance({ onClose: _onClose }: Props) {
 
   return (
     <div className="p-4 flex flex-col gap-3">
-      <div className={`rounded-lg px-4 py-3 border ${current > 0 ? 'border-info-border bg-info/5' : 'border-line bg-surface'}`}>
+      <div className={`rounded-lg px-4 py-3 border ${current > 0 ? 'border-info-border bg-info-soft' : 'border-line bg-surface'}`}>
         <div className="text-xs text-subtle mb-1">{t('workspace.insuranceAmount')}</div>
         <div className="flex items-center gap-2">
           <Shield size={18} className={current > 0 ? 'text-info' : 'text-fg/30'} />

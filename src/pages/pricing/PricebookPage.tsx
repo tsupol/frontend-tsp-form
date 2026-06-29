@@ -1185,7 +1185,7 @@ export function PricebookPage() {
                                       <span className={`text-[11px] tabular-nums ${hasProfit ? '' : 'text-subtle'}`}>
                                         {hasProfit ? formatTHB(ft.profit) : '—'}
                                       </span>
-                                      <span className={`text-[10px] tabular-nums px-1.5 py-0.5 rounded ${hasProfit ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning-fg'}`}>{ft.term_months}m</span>
+                                      <span className={`text-[10px] tabular-nums px-1.5 py-0.5 rounded ${hasProfit ? 'bg-success-soft text-success' : 'bg-warning-soft text-warning-fg'}`}>{ft.term_months}m</span>
                                     </div>
                                   );
                                 })}

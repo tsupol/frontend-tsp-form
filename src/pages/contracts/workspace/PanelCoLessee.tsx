@@ -638,18 +638,29 @@ function CoLesseeRow({ coLessee, expanded, onToggle, onRemove, removing }: {
         </div>
         {confirmRemove ? (
           <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-            <button className="px-2 py-1 rounded text-xs font-medium bg-danger text-white hover:bg-danger/80 cursor-pointer border-none"
-              onClick={() => { setConfirmRemove(false); onRemove(); }} disabled={removing}>
-              {removing ? <Loader2 size={12} className="animate-spin" /> : t('common.confirm')}
-            </button>
-            <button className="px-2 py-1 rounded text-xs text-subtle hover:text-fg cursor-pointer bg-transparent border-none"
-              onClick={() => setConfirmRemove(false)}>{t('common.cancel')}</button>
+            <Button
+              color="danger"
+              size="sm"
+              disabled={removing}
+              startIcon={removing ? <Loader2 size={12} className="animate-spin" /> : undefined}
+              onClick={() => { setConfirmRemove(false); onRemove(); }}
+            >
+              {t('common.confirm')}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setConfirmRemove(false)}>
+              {t('common.cancel')}
+            </Button>
           </div>
         ) : (
-          <button className="p-1.5 rounded hover:bg-danger/10 cursor-pointer text-subtle hover:text-danger transition-colors bg-transparent border-none"
-            onClick={(e) => { e.stopPropagation(); setConfirmRemove(true); }} title={t('common.remove')}>
-            <Trash2 size={14} />
-          </button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="btn-icon-sm"
+            startIcon={<Trash2 size={14} />}
+            onClick={(e) => { e.stopPropagation(); setConfirmRemove(true); }}
+            title={t('common.remove')}
+            aria-label={t('common.remove')}
+          />
         )}
       </div>
 

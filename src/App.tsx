@@ -96,6 +96,7 @@ import { DevWatermarkPage } from './pages/dev/DevWatermarkPage';
 import { DevBillPrintPage } from './pages/dev/DevBillPrintPage';
 import { DevNotificationsPage } from './pages/dev/DevNotificationsPage';
 import { DevTokensPage } from './pages/dev/DevTokensPage';
+import { DevRemoveButtonsPage } from './pages/dev/DevRemoveButtonsPage';
 import { isLocalDev } from './lib/devEnv';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -645,6 +646,16 @@ function App() {
               <ProtectedRoute>
                 <AdminLayout>
                   <DevLayout><DevTokensPage /></DevLayout>
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dev/remove-buttons"
+            element={
+              <ProtectedRoute>
+                <AdminLayout>
+                  <DevLayout><DevRemoveButtonsPage /></DevLayout>
                 </AdminLayout>
               </ProtectedRoute>
             }

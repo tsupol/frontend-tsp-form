@@ -877,7 +877,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
 
           {/* Total check */}
           <div className={`flex justify-between items-center p-3 rounded-lg border mb-4 ${
-            isPayBalanced ? 'border-success-border bg-success/5' : 'border-warning-border bg-warning/5'
+            isPayBalanced ? 'border-success-border bg-success-soft' : 'border-warning-border bg-warning-soft'
           }`}>
             <span className="text-sm">{t('accounting.bills.payTotal')}</span>
             <span className={`font-semibold tabular-nums ${isPayBalanced ? 'text-success' : 'text-warning-fg'}`}>

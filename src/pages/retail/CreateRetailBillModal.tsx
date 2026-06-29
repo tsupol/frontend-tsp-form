@@ -542,7 +542,7 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
                     <div
                       key={idx}
                       className={`flex items-center gap-3 p-3 border-b border-line last:border-b-0 ${
-                        isDiscount ? 'bg-warning/5' : ''
+                        isDiscount ? 'bg-warning-soft' : ''
                       }`}
                     >
                       <Badge size="sm" color={isDiscount ? 'warning' : line.charge_type === 'SHIPPING_FEE' ? 'info' : 'default'}>
@@ -819,7 +819,7 @@ function ProductPickerModal({ open, branchId, cartQtys, onClose, onPick }: {
                 return (
                   <div
                     key={v.variant_id}
-                    className={`flex items-center gap-3 py-2.5 px-2 -mx-2 rounded-md ${isInCart ? 'bg-primary/5' : ''}`}
+                    className={`flex items-center gap-3 py-2.5 px-2 -mx-2 rounded-md ${isInCart ? 'bg-primary-soft' : ''}`}
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 min-w-0">

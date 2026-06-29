@@ -28,6 +28,7 @@ interface ContractForFee {
   id: number;
   code: string;
   code_display: string | null;
+  state: string;
   branch_id: number;
   company_id?: number | null;
   holding_id: number;
@@ -223,19 +224,21 @@ export function ContractFeeModal({ open, contract, onClose, onSuccess }: {
   };
 
   // ── Validation ──────────────────────────────────────────────────────────
-  const blockReasons: string[] = [];
-  if (lines.length === 0) blockReasons.push(t('contractFee.blockEmptyCart'));
-  if (lines.length > 0 && !isBalanced) blockReasons.push(t('contractFee.blockUnbalanced'));
+  // displayReasons surface only the non-obvious blockers (bank account, wallet
+  // funds). Empty-cart and unbalanced are already obvious from the cart + the
+  // running paid/total box, so we don't nag about them — the button just stays
+  // disabled. The server re-validates balance on confirm (BILL_PAYMENT.AMOUNT_MISMATCH).
+  const displayReasons: string[] = [];
   payments.forEach(p => {
     if (p.method === 'TRANSFER' && p.amount > 0 && !p.bank_account_id) {
-      blockReasons.push(t('contractFee.blockNoBank'));
+      displayReasons.push(t('contractFee.blockNoBank'));
     }
     const bal = walletBalance(p.method);
     if (bal != null && p.amount > bal) {
-      blockReasons.push(t('contractFee.blockWalletInsufficient', { method: t(`paymentMethod.${p.method}`) }));
+      displayReasons.push(t('contractFee.blockWalletInsufficient', { method: t(`paymentMethod.${p.method}`) }));
     }
   });
-  const canSubmit = blockReasons.length === 0 && !submitting && !!contract;
+  const canSubmit = lines.length > 0 && isBalanced && displayReasons.length === 0 && !submitting && !!contract;
 
   // ── Confirm — full server sequence ──────────────────────────────────────
   const handleConfirm = async () => {
@@ -334,8 +337,16 @@ export function ContractFeeModal({ open, contract, onClose, onSuccess }: {
             />
           ) : (
             <>
-              <div className="modal-content flex flex-col gap-4" style={{ paddingBottom: 0 }}>
-                <div className="text-xs text-subtle">{contractCode}</div>
+              <div className="modal-content flex flex-col gap-4">
+                {/* Contract target */}
+                <div className="px-3 py-2.5 rounded-md bg-surface border border-line">
+                  <div className="font-medium text-sm">{contractCode}</div>
+                  {contract?.state && (
+                    <div className="text-xs text-subtle">
+                      {t(`contract.state_${contract.state}`, { defaultValue: contract.state })}
+                    </div>
+                  )}
+                </div>
 
                 {/* ── Cart ──────────────────────────────────────────── */}
                 <div className="flex flex-col gap-2">
@@ -486,7 +497,7 @@ export function ContractFeeModal({ open, contract, onClose, onSuccess }: {
                   </div>
 
                   <div className={`flex justify-between items-center p-3 rounded-lg border mt-1 ${
-                    isBalanced ? 'border-success-border bg-success/5' : 'border-warning-border bg-warning/5'
+                    isBalanced ? 'border-success-border bg-success-soft' : 'border-warning-border bg-warning-soft'
                   }`}>
                     <span className="text-sm">
                       {t('contractFee.paid')} / {t('contractFee.total')}
@@ -506,11 +517,11 @@ export function ContractFeeModal({ open, contract, onClose, onSuccess }: {
               </div>
 
               <div className="modal-footer flex-col items-stretch gap-2">
-                {!canSubmit && blockReasons.length > 0 && lines.length > 0 && (
+                {displayReasons.length > 0 && (
                   <div className="alert alert-warning">
                     <AlertCircle size={16} />
                     <ul className="list-disc pl-4 text-sm space-y-0.5">
-                      {[...new Set(blockReasons)].map((r, i) => <li key={i}>{r}</li>)}
+                      {[...new Set(displayReasons)].map((r, i) => <li key={i}>{r}</li>)}
                     </ul>
                   </div>
                 )}

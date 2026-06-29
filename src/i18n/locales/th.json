@@ -4170,5 +4170,22 @@
     "blockUnbalanced": "ยอดชำระต้องเท่ากับยอดบิล",
     "blockNoBank": "เลือกบัญชีรับเงินสำหรับการโอน",
     "blockWalletInsufficient": "ยอด {{method}} ไม่เพียงพอ"
+  },
+  "lateFee": {
+    "title": "เก็บค่าปรับ",
+    "done": "เก็บค่าปรับแล้ว",
+    "accruedBalance": "ค่าปรับค้างชำระ",
+    "collectAmount": "จำนวนที่เรียกเก็บ",
+    "waiveSome": "ยกเว้นบางส่วน",
+    "note": "หมายเหตุ",
+    "notePlaceholder": "เหตุผล (ถ้ามี)",
+    "netCharged": "ยอดเรียกเก็บสุทธิ",
+    "collected": "เรียกเก็บ",
+    "waived": "ยกเว้น",
+    "remainingBalance": "ค่าปรับคงเหลือ",
+    "confirm": "ยืนยันและรับชำระ",
+    "blockNoBalance": "ไม่มีค่าปรับค้างชำระ",
+    "blockNoCollect": "ระบุจำนวนที่เรียกเก็บ",
+    "blockWaiveExceeds": "ยอดยกเว้นต้องไม่เกินยอดที่เรียกเก็บ"
   }
 }

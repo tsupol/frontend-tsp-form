@@ -19,7 +19,7 @@ Bill receipt (marker class `.bill-receipt`, component `BillReceipt`):
 - `src/pages/contracts/workspace/PanelReviewPay.tsx` — two flows: post-confirm
   receipt (`billId`) and the **draft invoice** (pre-built `bill` object, no bill
   row exists yet)
-- `src/pages/contracts/ActionDoneView.tsx`
+- `src/pages/contracts/ActionDoneView.tsx` — the shared modal success view; pass it `billId` and it renders the Download/Print footer using this pattern. See `.claude/action-done-view.md`.
 
 Stickers (same pattern, own marker class + dynamically-injected `@page`):
 - `src/pages/inventory/AssetsPage.tsx` (`.asset-sticker`, 76×26mm)

@@ -1086,7 +1086,7 @@ export function Fin2RatesPage() {
                                         <span className={`text-[11px] tabular-nums ${hasActive ? '' : 'text-subtle'}`}>
                                           {hasActive ? formatTHB(term.activeRate!.value) : '—'}
                                         </span>
-                                        <span className={`text-[10px] tabular-nums px-1.5 py-0.5 rounded ${hasActive ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning-fg'}`}>
+                                        <span className={`text-[10px] tabular-nums px-1.5 py-0.5 rounded ${hasActive ? 'bg-success-soft text-success' : 'bg-warning-soft text-warning-fg'}`}>
                                           {term.term_months}m
                                         </span>
                                       </div>

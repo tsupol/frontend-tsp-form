@@ -147,7 +147,7 @@ export function SignatureCapture({ fileUrl, uploading, disabled, cacheBust = 0, 
             <div className="w-full h-full bg-surface-shallow animate-pulse" />
           )}
           {justSaved && (
-            <div className="absolute inset-0 bg-success/10 flex items-center justify-center pointer-events-none">
+            <div className="absolute inset-0 bg-success-soft flex items-center justify-center pointer-events-none">
               <CheckCircle size={32} className="text-success drop-shadow" />
             </div>
           )}
@@ -207,7 +207,7 @@ export function SignatureCapture({ fileUrl, uploading, disabled, cacheBust = 0, 
           }`}>
             <SignaturePad ref={padRef} onChange={setSigEmpty} />
             {justSaved && (
-              <div className="absolute inset-0 bg-success/10 flex items-center justify-center pointer-events-none">
+              <div className="absolute inset-0 bg-success-soft flex items-center justify-center pointer-events-none">
                 <CheckCircle size={32} className="text-success drop-shadow" />
               </div>
             )}
@@ -248,7 +248,7 @@ export function SignatureCapture({ fileUrl, uploading, disabled, cacheBust = 0, 
           <div
             className={`flex items-center justify-center gap-2 py-4 px-6 border-2 border-dashed rounded-lg cursor-pointer transition-colors text-sm w-full ${
               justSaved
-                ? 'border-success bg-success/10 text-success'
+                ? 'border-success bg-success-soft text-success'
                 : 'border-line text-subtle hover:border-primary hover:bg-surface-hover'
             }`}
             onClick={() => !disabled && !uploading && !justSaved && uploadInputRef.current?.click()}

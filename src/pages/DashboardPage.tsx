@@ -596,7 +596,7 @@ function ReceivingAccount({
   if (account) {
     return (
       <div className="flex items-start gap-3 rounded-lg border border-line bg-surface px-4 py-3 max-w-full">
-        <span className="shrink-0 mt-0.5 flex h-8 w-8 items-center justify-center rounded-md bg-info/10 text-info">
+        <span className="shrink-0 mt-0.5 flex h-8 w-8 items-center justify-center rounded-md bg-info-soft text-info">
           <Landmark size={18} />
         </span>
         <div className="min-w-0">
@@ -619,7 +619,7 @@ function ReceivingAccount({
 
   if (noAccount) {
     return (
-      <div className="flex items-center gap-2 rounded-md border border-warning-border bg-warning/5 px-3 py-1.5 text-xs text-warning-fg max-w-full">
+      <div className="flex items-center gap-2 rounded-md border border-warning-border bg-warning-soft px-3 py-1.5 text-xs text-warning-fg max-w-full">
         <AlertCircle size={14} className="shrink-0" />
         <span className="truncate">{t('dashboard.noReceivingAccount')}</span>
       </div>
@@ -652,9 +652,9 @@ function CountCard({ icon, title, count, isLoading, isError, error, subtitle, to
 
   const toneClass =
     tone === 'danger'
-      ? 'border-danger-border bg-danger/5'
+      ? 'border-danger-border bg-danger-soft'
       : tone === 'warning'
-        ? 'border-warning-border bg-warning/5'
+        ? 'border-warning-border bg-warning-soft'
         : 'border-line bg-surface';
   const iconColor = tone === 'danger' ? 'text-danger' : tone === 'warning' ? 'text-warning-fg' : 'text-success';
 
@@ -732,9 +732,9 @@ function PendingDeviceBindCard({
   const tone = isEmpty ? 'ok' : maxDays >= 7 ? 'danger' : 'warning';
   const toneClass =
     tone === 'danger'
-      ? 'border-danger-border bg-danger/5'
+      ? 'border-danger-border bg-danger-soft'
       : tone === 'warning'
-        ? 'border-warning-border bg-warning/5'
+        ? 'border-warning-border bg-warning-soft'
         : 'border-line bg-surface';
   const iconColor =
     tone === 'danger' ? 'text-danger' : tone === 'warning' ? 'text-warning-fg' : 'text-success';
@@ -822,9 +822,9 @@ function PendingSignCard({
   const tone = isEmpty ? 'ok' : anyExpired ? 'danger' : 'warning';
   const toneClass =
     tone === 'danger'
-      ? 'border-danger-border bg-danger/5'
+      ? 'border-danger-border bg-danger-soft'
       : tone === 'warning'
-        ? 'border-warning-border bg-warning/5'
+        ? 'border-warning-border bg-warning-soft'
         : 'border-line bg-surface';
   const iconColor =
     tone === 'danger' ? 'text-danger' : tone === 'warning' ? 'text-warning-fg' : 'text-success';

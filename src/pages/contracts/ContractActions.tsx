@@ -38,6 +38,7 @@ import { RefundVoidModal } from './RefundVoidModal';
 import { TransferBranchModal } from './TransferBranchModal';
 import { ActionDoneView, type ActionDoneDetailRow } from './ActionDoneView';
 import { ContractFeeModal } from './ContractFeeModal';
+import { LateFeeCollectModal } from './LateFeeCollectModal';
 import { useContractInvalidate } from './useContractInvalidate';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -98,7 +99,8 @@ type ContractAction =
   | 'void_bill'
   | 'continue_pay'
   | 'pay_installment'
-  | 'service_charge';
+  | 'service_charge'
+  | 'late_fee_collect';
 
 // ── Action config ────────────────────────────────────────────────────────────
 
@@ -403,6 +405,19 @@ const ACTION_CONFIGS: Record<ContractAction, ActionConfig> = {
     needsNewOwner: false,
     successKey: 'contractFee.done',
   },
+  late_fee_collect: {
+    rpc: '', // handled by LateFeeCollectModal (single atomic fn_bill_late_fee_collect)
+    color: 'primary',
+    needsPin: false,
+    needsNote: false,
+    needsReason: false,
+    needsBranch: false,
+    needsDevice: false,
+    needsAmount: false,
+    needsCloseReason: false,
+    needsNewOwner: false,
+    successKey: 'lateFee.done',
+  },
   bind_loaner: {
     rpc: '', // handled by BindLoanerModal
     color: 'primary',
@@ -551,6 +566,7 @@ const FE_TO_BACKEND_ACTION: Record<ContractAction, string> = {
   continue_pay: 'PAY_OPEN_BILL',
   pay_installment: 'PAY_INSTALLMENT',
   service_charge: 'SERVICE_CHARGE',
+  late_fee_collect: 'LATE_FEE_COLLECT',
 };
 
 const BACKEND_TO_FE_ACTION: Record<string, ContractAction> = Object.entries(FE_TO_BACKEND_ACTION)
@@ -771,6 +787,7 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   const isRefundVoid = activeAction === 'settlement_refund_void';
   const isTransferBranch = activeAction === 'transfer_branch';
   const isServiceCharge = activeAction === 'service_charge';
+  const isLateFeeCollect = activeAction === 'late_fee_collect';
 
   const handleSuccess = (msgKey: string, override?: ReactNode) => {
     setActiveAction(null);
@@ -1104,8 +1121,17 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
           queryClient.invalidateQueries({ queryKey: ['contract-actions', contract.id] });
         }}
       />
+      <LateFeeCollectModal
+        open={isLateFeeCollect}
+        contract={contract}
+        onClose={() => setActiveAction(null)}
+        onSuccess={() => {
+          onRefresh();
+          queryClient.invalidateQueries({ queryKey: ['contract-actions', contract.id] });
+        }}
+      />
       <ContractActionModal
-        open={!!activeAction && !isSavingDeposit && !isCancelSaving && !isEarlyPayoff && !isContinuePay && !isVoidBill && !isPayInstallment && !isComplete && !isTerminate && !isBindLoaner && !isUnbindLoaner && !isRepairRequest && !isAppointmentCreate && !isAppointmentCancel && !isRefundVoid && !isTransferBranch && !isServiceCharge}
+        open={!!activeAction && !isSavingDeposit && !isCancelSaving && !isEarlyPayoff && !isContinuePay && !isVoidBill && !isPayInstallment && !isComplete && !isTerminate && !isBindLoaner && !isUnbindLoaner && !isRepairRequest && !isAppointmentCreate && !isAppointmentCancel && !isRefundVoid && !isTransferBranch && !isServiceCharge && !isLateFeeCollect}
         action={activeAction}
         contract={contract}
         onClose={() => setActiveAction(null)}
@@ -1522,7 +1548,7 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
                     }}
                   />
                   {deviceId && assetMap.get(deviceId) && (
-                    <div className="mt-2 px-3 py-2 rounded-md bg-info/5 border border-info-border">
+                    <div className="mt-2 px-3 py-2 rounded-md bg-info-soft border border-info-border">
                       <AssetSummaryLines asset={assetMap.get(deviceId)!} />
                     </div>
                   )}
@@ -1725,10 +1751,10 @@ function ContractActionDoneView({
           extras={
             <>
               {notice && (
-                <div className="px-3 py-2.5 rounded-md bg-info/5 border border-info-border text-sm">{notice}</div>
+                <div className="px-3 py-2.5 rounded-md bg-info-soft border border-info-border text-sm">{notice}</div>
               )}
               {movements && movements.length > 0 && (
-                <div className="mt-3 px-3 py-2.5 rounded-md bg-info/5 border border-info-border">
+                <div className="mt-3 px-3 py-2.5 rounded-md bg-info-soft border border-info-border">
                   <div className="text-xs text-subtle mb-1.5">
                     {t('contract.action_transfer_accept_done_device', { defaultValue: 'Device' })}
                   </div>
@@ -1747,7 +1773,7 @@ function ContractActionDoneView({
                 </div>
               )}
               {!notice && !movements && deviceTransferred && (
-                <div className="px-3 py-2 rounded-md bg-info/5 border border-info-border text-sm">
+                <div className="px-3 py-2 rounded-md bg-info-soft border border-info-border text-sm">
                   {t('contract.action_transfer_accept_done_deviceTransferred', { defaultValue: 'Device ownership transferred to new branch.' })}
                 </div>
               )}
@@ -1791,7 +1817,7 @@ function ContractActionDoneView({
           ] : undefined}
           extras={
             movements && movements.length > 0 ? (
-              <div className="px-3 py-2.5 rounded-md bg-info/5 border border-info-border">
+              <div className="px-3 py-2.5 rounded-md bg-info-soft border border-info-border">
                 <div className="text-xs text-subtle mb-1.5">
                   {t('contract.action_unbind_device_done_device', { defaultValue: 'Device returned to inventory' })}
                 </div>
@@ -1831,7 +1857,7 @@ function ContractActionDoneView({
           extras={
             <div className="flex flex-col gap-3">
               {asset && (
-                <div className="px-3 py-2.5 rounded-md bg-success/5 border border-success-border">
+                <div className="px-3 py-2.5 rounded-md bg-success-soft border border-success-border">
                   <div className="text-xs text-subtle mb-1.5">
                     {t('contract.action_bind_device_done_device', { defaultValue: 'Device bound' })}
                   </div>
@@ -1839,7 +1865,7 @@ function ContractActionDoneView({
                 </div>
               )}
               {movements && movements.length > 0 && (
-                <div className="px-3 py-2.5 rounded-md bg-info/5 border border-info-border">
+                <div className="px-3 py-2.5 rounded-md bg-info-soft border border-info-border">
                   <div className="text-xs text-subtle mb-1.5">
                     {t('contract.action_bind_device_done_movements', { defaultValue: 'Stock movement' })}
                   </div>
@@ -2114,7 +2140,7 @@ function CancelSavingModal({ open, contract, onClose, onSuccess }: {
           </div>
 
           {/* Saving balance display */}
-          <div className="mb-4 px-3 py-2.5 rounded-md bg-info/10 border border-info-border">
+          <div className="mb-4 px-3 py-2.5 rounded-md bg-info-soft border border-info-border">
             <div className="text-xs text-subtle">{t('contract.cancelSaving_balance')}</div>
             <div className="text-lg font-semibold tabular-nums">{fmtCurrency(savingBalance)}</div>
           </div>
@@ -2479,7 +2505,7 @@ function PendingPaymentModal({ open, contract, onClose, onSuccess }: {
 
             {/* Total check */}
             <div className={`flex justify-between items-center p-3 rounded-lg border ${
-              isBalanced ? 'border-success-border bg-success/5' : 'border-warning-border bg-warning/5'
+              isBalanced ? 'border-success-border bg-success-soft' : 'border-warning-border bg-warning-soft'
             }`}>
               <span className="text-sm">{t('wizard.totalPayment')}</span>
               <span className={`font-semibold tabular-nums ${isBalanced ? 'text-success' : 'text-warning-fg'}`}>
@@ -2828,14 +2854,14 @@ function PayInstallmentModal({ open, contract, onClose }: {
 
               {/* Outstanding summary */}
               <div className="mb-4 grid grid-cols-2 gap-3">
-                <div className="px-3 py-2.5 rounded-md bg-warning/10 border border-warning-border">
+                <div className="px-3 py-2.5 rounded-md bg-warning-soft border border-warning-border">
                   <div className="text-xs text-subtle">{t('contract.outstanding')}</div>
                   <div className="text-base font-semibold tabular-nums">{fmtCurrency(outstanding)}</div>
                   <div className="text-xs text-subtle mt-0.5">
                     {contract.paid_installment_count ?? 0}/{contract.total_installments ?? 0} {t('contract.payInstallment_paid')}
                   </div>
                 </div>
-                <div className="px-3 py-2.5 rounded-md bg-info/10 border border-info-border">
+                <div className="px-3 py-2.5 rounded-md bg-info-soft border border-info-border">
                   <div className="text-xs text-subtle">{t('contract.payInstallment_nextDue')}</div>
                   <div className="text-base font-semibold tabular-nums">{fmtCurrency(nextDue)}</div>
                   {contract.next_due_date && (
@@ -3516,7 +3542,7 @@ function PayInstallmentAfterSummary({
       </div>
 
       {creditDelta != null && creditDelta !== 0 && (
-        <div className="mt-3 px-3 py-2.5 rounded-md bg-info/5 border border-info-border flex items-center justify-between">
+        <div className="mt-3 px-3 py-2.5 rounded-md bg-info-soft border border-info-border flex items-center justify-between">
           <span className="text-sm">{t('paymentMethod.CREDIT_WALLET')}</span>
           <span className="text-sm tabular-nums">
             {fmtCurrency(before?.creditBalance ?? 0)}

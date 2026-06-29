@@ -140,7 +140,7 @@ function ReferenceRow({ reference, onDeleted }: { reference: CustomerReference; 
         <span className="font-medium text-sm flex-1 truncate">{reference.name} {reference.last_name}</span>
         {reference.relation && <Badge size="xs" color="default">{reference.relation}</Badge>}
         <button
-          className="p-1 rounded hover:bg-danger/10 cursor-pointer text-subtle hover:text-danger shrink-0 bg-transparent border-none"
+          className="p-1 rounded hover:bg-danger-soft cursor-pointer text-subtle hover:text-danger shrink-0 bg-transparent border-none"
           onClick={(e) => { e.stopPropagation(); handleDelete(); }}
           disabled={deleting}
         >

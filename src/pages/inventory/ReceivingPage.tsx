@@ -786,7 +786,7 @@ function ConfirmReceiptModal({
                   </div>
                 )}
                 {result.po_progress && (
-                  <div className="px-3 py-2.5 rounded-md bg-info/5 border border-info-border">
+                  <div className="px-3 py-2.5 rounded-md bg-info-soft border border-info-border">
                     <div className="text-xs text-subtle mb-1">
                       {t('receiving.poProgressLabel', { defaultValue: 'PO progress' })}: {codeDisplay(detail.po_code_display, detail.po_no)}
                     </div>
