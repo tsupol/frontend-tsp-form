@@ -461,18 +461,20 @@ function CaptureQrModal({
   onUploaded: () => void;
 }) {
   const { t } = useTranslation();
-  const { phase, session, status, error, uploadCount, start, cancel } = useMobileCaptureSession(
+  const { phase, session, status, error, uploadCount, start, stop } = useMobileCaptureSession(
     lineId,
     poCode,
     { entityType: 'BUYBACK_CONDITION', meta: { source: 'buyback-wizard-photos' } },
   );
 
+  // Closing/unmounting only stops local polling — the capture session lives on
+  // (phone may still be uploading; backend expires it on TTL).
   useEffect(() => {
     if (open) start();
-    else cancel();
+    else stop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
-  useEffect(() => () => { cancel(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => { stop(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Pull newly-arrived photos into the album list as they land.
   useEffect(() => {

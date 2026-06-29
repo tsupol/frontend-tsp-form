@@ -28,7 +28,7 @@ export function ContractCaptureModal({
   onUploaded: () => void;
 }) {
   const { t } = useTranslation();
-  const { phase, session, status, error, uploadCount, start, cancel } = useMobileCaptureSession(
+  const { phase, session, status, error, uploadCount, start, stop } = useMobileCaptureSession(
     contractId,
     contractCode,
   );
@@ -50,7 +50,9 @@ export function ContractCaptureModal({
   }, [uploadCount]);
 
   const handleClose = () => {
-    cancel();
+    // Don't cancel the capture session — the phone may still be uploading.
+    // The backend expires it on TTL. We only stop polling and hide the QR.
+    stop();
     onUploaded();
     onClose();
   };

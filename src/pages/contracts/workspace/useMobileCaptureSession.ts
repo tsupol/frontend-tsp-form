@@ -62,7 +62,13 @@ export interface MobileCaptureSession {
   uploadCount: number;
   /** Begin a session for the given contract. No-op if one is already in flight. */
   start: () => void;
-  /** Cancel (if active) and reset to idle. Safe to call on any phase. */
+  /**
+   * Stop polling and reset local state to idle WITHOUT cancelling the backend
+   * session — the phone may still be mid-upload; the server expires it on TTL.
+   * Use this when closing the staff UI but the capture window should live on.
+   */
+  stop: () => void;
+  /** Cancel the backend session (frees quota immediately) and reset to idle. */
   cancel: () => Promise<void>;
 }
 
@@ -156,6 +162,17 @@ export function useMobileCaptureSession(
     };
   }, [phase, session, stopPolling]);
 
+  // Local-only teardown: forget the session client-side, leave it running on
+  // the backend (TTL-expired). Does NOT clear sessionIdRef so a later cancel()
+  // could still target it if ever needed.
+  const stop = useCallback(() => {
+    stopPolling();
+    setPhase('idle');
+    setSession(null);
+    setStatus(null);
+    setError(null);
+  }, [stopPolling]);
+
   const cancel = useCallback(async () => {
     stopPolling();
     const id = sessionIdRef.current;
@@ -177,19 +194,11 @@ export function useMobileCaptureSession(
     }
   }, [stopPolling]);
 
-  // Cancel a still-active session if the component unmounts (e.g. wizard step change).
-  useEffect(() => {
-    return () => {
-      const id = sessionIdRef.current;
-      if (id != null) {
-        apiClient
-          .rpc('fn_mobile_capture_session_cancel', { p_session_id: id, p_reason: 'USER_CANCEL' })
-          .catch(() => {});
-      }
-    };
-  }, []);
+  // Note: intentionally NO unmount-cancel. The capture session must outlive the
+  // staff modal / wizard step — the phone may still be uploading and the backend
+  // expires the session on TTL. Only an explicit cancel() tears it down server-side.
 
   const uploadCount = status?.upload_count ?? 0;
 
-  return { phase, session, status, error, uploadCount, start, cancel };
+  return { phase, session, status, error, uploadCount, start, stop, cancel };
 }

@@ -30,7 +30,7 @@ export function ContractSignQrModal({
   onSigned?: () => void;
 }) {
   const { t } = useTranslation();
-  const { phase, session, error, uploadCount, start, cancel } = useMobileCaptureSession(
+  const { phase, session, error, uploadCount, start, stop } = useMobileCaptureSession(
     contractId,
     contractCode,
     { entityType: 'CONTRACT_SIGNATURE', meta: { source: 'contract-signing', mode: 'contract' } },
@@ -59,7 +59,9 @@ export function ContractSignQrModal({
   }, [phase]);
 
   const handleClose = () => {
-    cancel();
+    // Keep the signing session alive — phone may still be signing; BE expires
+    // it on TTL. Only stop local polling.
+    stop();
     onSigned?.();
     onClose();
   };

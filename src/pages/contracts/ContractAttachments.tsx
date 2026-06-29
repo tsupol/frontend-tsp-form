@@ -216,15 +216,17 @@ function ManageModal({
 
   // QR session — live, mirrors the draft wizard capture modal. Photos uploaded
   // from the phone auto-attach and show up in the same list via onChanged.
-  const { phase, session, status, error: qrError, uploadCount, start, cancel } =
+  const { phase, session, status, error: qrError, uploadCount, start, stop } =
     useMobileCaptureSession(contractId, contractCode);
 
+  // Closing/unmounting only stops local polling — the capture session lives on
+  // (phone may still be uploading; backend expires it on TTL).
   useEffect(() => {
     if (open) start();
-    else cancel();
+    else stop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
-  useEffect(() => () => { cancel(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => { stop(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (uploadCount > 0) onChanged();
     // eslint-disable-next-line react-hooks/exhaustive-deps

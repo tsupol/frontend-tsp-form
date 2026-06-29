@@ -28,14 +28,14 @@ export function ContractViewQrModal({
   contractCode: string | null;
 }) {
   const { t } = useTranslation();
-  const { phase, session, error, start, cancel } = useMobileCaptureSession(
+  const { phase, session, error, start, stop } = useMobileCaptureSession(
     contractId,
     contractCode,
     { entityType: 'CONTRACT_VIEW', meta: { source: 'contract-view-readonly' } },
   );
   const [copied, setCopied] = useState(false);
 
-  // Mint on open; cancel + reset on close.
+  // Mint on open; stop polling (but keep the session alive) on close.
   useEffect(() => {
     if (open) start();
     // `start` is stable per (contractId, contractCode) and guards re-entry.
@@ -47,7 +47,8 @@ export function ContractViewQrModal({
   }, [open]);
 
   const handleClose = () => {
-    cancel();
+    // Keep the view session alive — BE expires it on TTL. Only stop polling.
+    stop();
     onClose();
   };
 
