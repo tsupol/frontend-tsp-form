@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Modal, Input, Select, Button, InputDatePicker, Badge } from 'tsp-form';
+import { Modal, Input, Select, Button, InputDatePicker, Badge, useSnackbarContext } from 'tsp-form';
 import { AlertTriangle, ShieldAlert, CheckCircle, XCircle, Keyboard, ChevronDown, ChevronRight, Plus, Trash2, Star, Info } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
+import { translateApiError } from '../../../lib/apiErrors';
 import { toLocalDateStr, parseLocalDate } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
 import { AddressFormPostal } from './AddressFormPostal';
@@ -453,6 +454,8 @@ function ResultBanner({ result, t }: { result: CustomerRegisterResult; t: (key: 
 // ── Contact Row ──────────────────────────────────────────────────────────
 
 function ContactRow({ contact, onDeleted }: { contact: CustomerContact; onDeleted: () => void }) {
+  const { t } = useTranslation();
+  const { addSnackbar } = useSnackbarContext();
   const [deleting, setDeleting] = useState(false);
 
   const handleDelete = async () => {
@@ -460,7 +463,11 @@ function ContactRow({ contact, onDeleted }: { contact: CustomerContact; onDelete
     try {
       await apiClient.rpc('fn_customer_contact_delete', { p_id: contact.id });
       onDeleted();
-    } catch { /* silently fail */ } finally { setDeleting(false); }
+    } catch (err) {
+      // A delete that silently does nothing reads as success — surface it.
+      const msg = err instanceof ApiError ? translateApiError(err, t) : (err instanceof Error ? err.message : String(err));
+      addSnackbar({ message: <div className="alert alert-danger"><XCircle size={18} /><div><div className="alert-description">{msg}</div></div></div> });
+    } finally { setDeleting(false); }
   };
 
   return (

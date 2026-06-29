@@ -2913,6 +2913,8 @@
     "sigTakePhoto": "Take photo",
     "clickToReplace": "Click to replace",
     "clickOrDrag": "Click or drag image",
+    "idCardSaveFailed": "ID card photo not saved",
+    "idCardSaveFailedHint": "You can re-upload it from the Documents step.",
     "dropOrClick": "Click or drag to add",
     "recipientName": "Recipient Name",
     "recipientTel": "Recipient Phone",

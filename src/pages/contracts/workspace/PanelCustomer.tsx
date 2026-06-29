@@ -5,6 +5,7 @@ import { Input, Select, Button, InputDatePicker, Modal, MaskedInput } from 'tsp-
 import type { UploadedImage } from 'tsp-form';
 import { ShieldAlert, AlertTriangle, CheckCircle, XCircle, Keyboard, Search, Loader2 } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
+import { translateApiError } from '../../../lib/apiErrors';
 import { invalidateMediaUrl } from '../../../lib/upload';
 import { beMediaUploadFromImage } from '../../../lib/beMedia';
 import { toLocalDateStr, parseLocalDate, makeDatePickerFormat } from '../../../lib/format';
@@ -125,6 +126,10 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
   // UI state
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState('');
+  // ID-card photo save failures are surfaced separately (warning, not blocker)
+  // — the customer is already saved; only the photo didn't attach. Silent-
+  // swallowing here hid a real cross-holding DB collision from the desk.
+  const [idCardError, setIdCardError] = useState('');
   const [result, setResult] = useState<CustomerRegisterResult | null>(workspace.customerResult);
 
   // Pre-fill from existing customer when continuing a draft
@@ -298,6 +303,7 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
   // document. Best-effort — failures are silent because the user can still
   // re-upload from the Documents panel.
   const persistScannedIdCard = async (custId: number, image: UploadedImage) => {
+    setIdCardError('');
     try {
       const results = await beMediaUploadFromImage({
         type: 'customer_id_card',
@@ -305,7 +311,7 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
         params: { customer_id: custId },
       });
       const key = results.lg?.key ?? Object.values(results)[0]?.key;
-      if (!key) return;
+      if (!key) throw new Error('be-media returned no key');
       await apiClient.rpc('fn_customer_document_upload', {
         p_customer_id: custId,
         p_doc_type: 'ID_CARD_FRONT',
@@ -315,7 +321,13 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
       queryClient.invalidateQueries({ queryKey: ['customer-idcard', custId] });
       queryClient.invalidateQueries({ queryKey: ['customer-summary', custId] });
       queryClient.invalidateQueries({ queryKey: ['contract-readiness'] });
-    } catch { /* ignore — user can re-upload in Documents */ }
+    } catch (err) {
+      // The customer is saved; only the ID photo failed. Surface it as a
+      // warning (not a blocker) with the real backend reason — never swallow.
+      // A silent catch here hid a cross-holding DB collision in the field.
+      console.error('[id-card] persist failed', err);
+      setIdCardError(err instanceof ApiError ? translateApiError(err, t) : (err instanceof Error ? err.message : String(err)));
+    }
   };
 
   // OCR scanner callback — overwrite form fields with detected values. Skipped
@@ -334,9 +346,12 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
   };
 
   const handleOcrPersist = async (img: UploadedImage) => {
+    setIdCardError('');
     if (customerId) {
       await persistScannedIdCard(customerId, img);
     } else {
+      // No customer yet — hold the image; doAttach flushes it once the
+      // customer is created (and surfaces any failure there).
       pendingScanRef.current = img;
     }
   };
@@ -444,6 +459,17 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
           }
         }}
       />
+
+      {idCardError && (
+        <div className="alert alert-warning">
+          <AlertTriangle size={18} />
+          <div>
+            <div className="alert-title">{t('workspace.idCardSaveFailed', { defaultValue: 'ID card photo not saved' })}</div>
+            <div className="alert-description">{idCardError}</div>
+            <div className="alert-description">{t('workspace.idCardSaveFailedHint', { defaultValue: 'You can re-upload it from the Documents step.' })}</div>
+          </div>
+        </div>
+      )}
 
       {/* Form */}
       <div className="form-grid">

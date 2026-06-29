@@ -5,6 +5,7 @@ import { Input, Select, Button, InputDatePicker, MaskedInput, useSnackbarContext
 import type { UploadedImage } from 'tsp-form';
 import { ShieldAlert, CheckCircle, XCircle, Keyboard, Search, Loader2, Trash2, AlertTriangle, CreditCard, ChevronDown, ChevronRight, Plus } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
+import { translateApiError } from '../../../lib/apiErrors';
 import { invalidateMediaUrl } from '../../../lib/upload';
 import { beMediaUploadFromImage } from '../../../lib/beMedia';
 import { toLocalDateStr, parseLocalDate, makeDatePickerFormat, getAge, ADULT_AGE } from '../../../lib/format';
@@ -123,7 +124,7 @@ export function PanelCoLessee({ onClose: _onClose }: Props) {
         params: { customer_id: custId },
       });
       const key = results.lg?.key ?? Object.values(results)[0]?.key;
-      if (!key) return;
+      if (!key) throw new Error('be-media returned no key');
       await apiClient.rpc('fn_customer_document_upload', {
         p_customer_id: custId,
         p_doc_type: 'ID_CARD_FRONT',
@@ -133,7 +134,12 @@ export function PanelCoLessee({ onClose: _onClose }: Props) {
       queryClient.invalidateQueries({ queryKey: ['co-lessee-idcard', custId] });
       queryClient.invalidateQueries({ queryKey: ['co-lessee-status'] });
       queryClient.invalidateQueries({ queryKey: ['co-lessee-all-complete'] });
-    } catch { /* ignore — user can re-upload */ }
+    } catch (err) {
+      // Co-lessee is saved; only the ID photo failed. Surface the real reason
+      // (never swallow — this hid a cross-holding DB collision in the field).
+      console.error('[co-lessee id-card] persist failed', err);
+      setApiError(err instanceof ApiError ? translateApiError(err, t) : (err instanceof Error ? err.message : String(err)));
+    }
   };
 
   // Apply OCR-detected fields. Each scan overwrites the previous values so
@@ -181,7 +187,7 @@ export function PanelCoLessee({ onClose: _onClose }: Props) {
     setApiError(''); setResult(null);
   };
 
-  const attachCoLessee = async (custId: number, _fullName: string, _idNum: string) => {
+  const attachCoLessee = async (custId: number) => {
     if (!workspace.contractId) return;
     if (custId === workspace.customerId) {
       setApiError(t('workspace.coLesseeCannotBeSelf'));
@@ -219,7 +225,7 @@ export function PanelCoLessee({ onClose: _onClose }: Props) {
   const handleUseOrRegister = async () => {
     setApiError('');
     if (selectedCustomer) {
-      await attachCoLessee(selectedCustomer.id, selectedCustomer.full_name, selectedCustomer.id_number);
+      await attachCoLessee(selectedCustomer.id);
       return;
     }
     if (idType === 'CITIZEN_ID' && idNumber.replace(/\D/g, '').length !== 13) {
@@ -238,7 +244,7 @@ export function PanelCoLessee({ onClose: _onClose }: Props) {
         return;
       }
       setResult(res);
-      await attachCoLessee(res.customer_id, res.full_name, res.id_number);
+      await attachCoLessee(res.customer_id);
     } catch (err) {
       if (err instanceof ApiError) {
         const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
@@ -567,6 +573,13 @@ function CoLesseeRow({ coLessee, expanded, onToggle, onRemove, removing }: {
     || editTel !== (custInfo.tel ?? '')
   );
 
+  // Surface a mutation failure instead of swallowing it. The real backend
+  // reason (e.g. a cross-holding DB collision) must reach the desk.
+  const showError = (err: unknown) => {
+    const msg = err instanceof ApiError ? translateApiError(err, t) : (err instanceof Error ? err.message : String(err));
+    addSnackbar({ message: <div className="alert alert-danger"><XCircle size={18} /><div><div className="alert-description">{msg}</div></div></div> });
+  };
+
   const handleInfoSave = async () => {
     if (!custInfo) return;
     setInfoSaving(true);
@@ -582,7 +595,10 @@ function CoLesseeRow({ coLessee, expanded, onToggle, onRemove, removing }: {
       setInfoSaved(true);
       setTimeout(() => setInfoSaved(false), 2000);
       addSnackbar({ message: <div className="alert alert-success"><CheckCircle size={18} /><div><div className="alert-title">{t('common.saved')}</div></div></div> });
-    } catch {} finally { setInfoSaving(false); }
+    } catch (err) {
+      console.error('[co-lessee info] save failed', err);
+      showError(err);
+    } finally { setInfoSaving(false); }
   };
 
   // ── Uploads ─────────────────────────────────────────────────────────
@@ -604,7 +620,10 @@ function CoLesseeRow({ coLessee, expanded, onToggle, onRemove, removing }: {
       queryClient.invalidateQueries({ queryKey: ['co-lessee-idcard', coLessee.customerId] });
       queryClient.invalidateQueries({ queryKey: ['co-lessee-status'] }); queryClient.invalidateQueries({ queryKey: ['co-lessee-all-complete'] });
       setCacheBust(n => n + 1);
-    } catch {} finally { setUploading(''); }
+    } catch (err) {
+      console.error('[co-lessee id-card] upload failed', err);
+      showError(err);
+    } finally { setUploading(''); }
   };
 
   return (

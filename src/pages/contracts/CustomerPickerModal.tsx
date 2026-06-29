@@ -5,6 +5,7 @@ import { Modal, Button, Input, Select, MaskedInput, InputDatePicker } from 'tsp-
 import type { UploadedImage } from 'tsp-form';
 import { Search, Loader2, CheckCircle, XCircle, Keyboard } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import { translateApiError } from '../../lib/apiErrors';
 import { passesThaiCidChecksum } from '../../lib/ocr/extractIdCard';
 import { toLocalDateStr, parseLocalDate, makeDatePickerFormat } from '../../lib/format';
 import { beMediaUploadFromImage } from '../../lib/beMedia';
@@ -113,7 +114,7 @@ export function CustomerPickerModal({ open, title, excludeCustomerIds = [], onCl
         params: { customer_id: custId },
       });
       const key = results.lg?.key ?? Object.values(results)[0]?.key;
-      if (!key) return;
+      if (!key) throw new Error('be-media returned no key');
       await apiClient.rpc('fn_customer_document_upload', {
         p_customer_id: custId,
         p_doc_type: 'ID_CARD_FRONT',
@@ -121,7 +122,12 @@ export function CustomerPickerModal({ open, title, excludeCustomerIds = [], onCl
       });
       invalidateMediaUrl(key);
       queryClient.invalidateQueries({ queryKey: ['entity-media', 'CUSTOMER', custId] });
-    } catch { /* ignore — user can re-upload from the customer page */ }
+    } catch (err) {
+      // Customer is saved; only the ID photo failed. Surface the real reason
+      // (never swallow — this class of error hid a cross-holding DB collision).
+      console.error('[id-card] persist failed', err);
+      setError(err instanceof ApiError ? translateApiError(err, t) : (err instanceof Error ? err.message : String(err)));
+    }
   };
 
   const canSearch = !!(idNumber.trim() || firstName.trim() || lastName.trim());

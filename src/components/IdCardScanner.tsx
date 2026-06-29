@@ -186,7 +186,11 @@ export function IdCardScanner({ onDetected, onPersist, onClear, disabled, existi
           variants,
         };
         await onPersist(image);
-      } catch { /* user can re-upload from Documents */ }
+      } catch (err) {
+        // Local variant-build failure (onPersist surfaces its own errors in
+        // the host). Log rather than swallow silently so device debugging sees it.
+        console.error('[id-card] build/persist variant failed', err);
+      }
     };
 
     try {

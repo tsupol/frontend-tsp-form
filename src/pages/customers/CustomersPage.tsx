@@ -9,6 +9,7 @@ import {
 } from 'tsp-form';
 import { ArrowRightFromLine, ArrowLeft, Search, Users, CheckCircle, XCircle, Trash2, Star, Plus, Pencil, MapPin, UserPlus, ExternalLink } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import { translateApiError } from '../../lib/apiErrors';
 import { toLocalDateStr, parseLocalDate, formatTel, formatCid } from '../../lib/format';
 import { DateTime } from '../../components/DateTime';
 import { DatePicker } from '../../components/DatePicker';
@@ -653,6 +654,8 @@ function AddressCard({ label, address, onEdit }: {
 // ── Contact Row ─────────────────────────────────────────────────────────────
 
 function ContactRow({ contact, onDeleted }: { contact: CustomerContact; onDeleted: () => void }) {
+  const { t } = useTranslation();
+  const { addSnackbar } = useSnackbarContext();
   const [deleting, setDeleting] = useState(false);
 
   const handleDelete = async () => {
@@ -660,7 +663,11 @@ function ContactRow({ contact, onDeleted }: { contact: CustomerContact; onDelete
     try {
       await apiClient.rpc('fn_customer_contact_delete', { p_id: contact.id });
       onDeleted();
-    } catch { /* silently fail */ } finally { setDeleting(false); }
+    } catch (err) {
+      // A delete that silently does nothing reads as success — surface it.
+      const msg = err instanceof ApiError ? translateApiError(err, t) : (err instanceof Error ? err.message : String(err));
+      addSnackbar({ message: <div className="alert alert-danger"><XCircle size={18} /><div><div className="alert-description">{msg}</div></div></div> });
+    } finally { setDeleting(false); }
   };
 
   return (

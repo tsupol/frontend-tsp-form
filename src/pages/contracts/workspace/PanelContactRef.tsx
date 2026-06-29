@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Input, MaskedInput, Select, Switch, Badge } from 'tsp-form';
+import { Button, Input, MaskedInput, Select, Switch, Badge, useSnackbarContext } from 'tsp-form';
+import { translateApiError } from '../../../lib/apiErrors';
 import { Plus, Trash2, Star, XCircle, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { useWorkspace } from './WorkspaceContext';
@@ -92,8 +93,20 @@ export function PanelContactRef({ onClose: _onClose }: Props) {
 // ── Sub-components ──────────────────────────────────────────────────────
 
 function ContactRow({ contact, onDeleted }: { contact: CustomerContact; onDeleted: () => void }) {
+  const { t } = useTranslation();
+  const { addSnackbar } = useSnackbarContext();
   const [deleting, setDeleting] = useState(false);
-  const handleDelete = async () => { setDeleting(true); try { await apiClient.rpc('fn_customer_contact_delete', { p_id: contact.id }); onDeleted(); } catch {} finally { setDeleting(false); } };
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await apiClient.rpc('fn_customer_contact_delete', { p_id: contact.id });
+      onDeleted();
+    } catch (err) {
+      // A delete that does nothing with no feedback reads as success — surface it.
+      const msg = err instanceof ApiError ? translateApiError(err, t) : (err instanceof Error ? err.message : String(err));
+      addSnackbar({ message: <div className="alert alert-danger"><XCircle size={18} /><div><div className="alert-description">{msg}</div></div></div> });
+    } finally { setDeleting(false); }
+  };
   return (
     <div className="flex items-center gap-2 px-3 py-2 border border-success-border bg-success-soft rounded-lg text-sm">
       <Badge size="xs" color="info">{contact.contact_type}</Badge>
@@ -107,6 +120,7 @@ function ContactRow({ contact, onDeleted }: { contact: CustomerContact; onDelete
 
 function ReferenceRow({ reference, onDeleted }: { reference: CustomerReference; onDeleted: () => void }) {
   const { t } = useTranslation();
+  const { addSnackbar } = useSnackbarContext();
   const [expanded, setExpanded] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const handleDelete = async () => {
@@ -114,7 +128,10 @@ function ReferenceRow({ reference, onDeleted }: { reference: CustomerReference; 
     try {
       await apiClient.delete(`/v_customer_references?id=eq.${reference.id}`);
       onDeleted();
-    } catch {} finally { setDeleting(false); }
+    } catch (err) {
+      const msg = err instanceof ApiError ? translateApiError(err, t) : (err instanceof Error ? err.message : String(err));
+      addSnackbar({ message: <div className="alert alert-danger"><XCircle size={18} /><div><div className="alert-description">{msg}</div></div></div> });
+    } finally { setDeleting(false); }
   };
   return (
     <div className="border border-success-border bg-success-soft rounded-lg overflow-hidden transition-colors">
