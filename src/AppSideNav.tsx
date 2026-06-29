@@ -455,7 +455,10 @@ export const AppSideNav = () => {
                    style={{ opacity: collapsed ? 0 : 1, transition: 'opacity 0.3s ease' }}
                    onClick={() => handleToggle()}>
                 <img src="/nnf-favicon.svg" alt="" className="w-6 h-6 rounded shrink-0" />
-                <span className="font-semibold" style={{ transform: 'translateY(var(--text-shift-y, 0px))' }}>{t('nav.userArea')}</span>
+                <div className="flex flex-col min-w-0" style={{ transform: 'translateY(var(--text-shift-y, 0px))' }}>
+                  <span className="font-semibold leading-tight">{t('nav.userArea')}</span>
+                  <span className="text-[10px] text-subtler leading-none tabular-nums">{__BUILD_VERSION__}</span>
+                </div>
               </div>
               <button
                 className="hover:bg-surface w-8 h-8 shrink-0 cursor-pointer rounded-lg transition-all flex justify-center items-center"
