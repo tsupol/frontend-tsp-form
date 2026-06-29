@@ -194,7 +194,9 @@ export function formatSmart(
  *   < 24 hour → { rel: "3 hr ago",     abs: "11:32" }
  *   yesterday → { rel: "Yesterday",    abs: "Yesterday 14:32" }
  *   this week → { rel: "2 days ago",   abs: "Mon 14:32" }
- *   older     → { rel: "2 May",        abs: "2 May 2026, 14:32" }
+ *   this month→ { rel: "2 wk ago",     abs: "2 May, 14:32" }
+ *   this year → { rel: "3 mo ago",     abs: "2 May, 14:32" }
+ *   older     → { rel: "1 yr ago",     abs: "2 May 2025, 14:32" }
  *
  * Unlike `formatSmart` (a single bucketed string for dense tables), this leans
  * into recency — reviewers triaging a slip queue care most about "how fresh".
@@ -234,14 +236,14 @@ export function formatRelativeAgo(
   }
   if (diffMin < 60) {
     return {
-      rel: isTh ? `${diffMin} นาทีที่แล้ว` : `${diffMin} min ago`,
+      rel: isTh ? `${diffMin} นาที` : `${diffMin} min ago`,
       abs: timePart,
     };
   }
   // Within the same calendar day → hours ago.
   if (dayDiff === 0) {
     return {
-      rel: isTh ? `${diffHr} ชม.ที่แล้ว` : `${diffHr} hr ago`,
+      rel: isTh ? `${diffHr} ชม.` : `${diffHr} hr ago`,
       abs: timePart,
     };
   }
@@ -254,11 +256,29 @@ export function formatRelativeAgo(
   if (dayDiff < 7) {
     const dow = d.toLocaleDateString(locale, { weekday: 'short', timeZone: 'Asia/Bangkok' });
     return {
-      rel: isTh ? `${dayDiff} วันที่แล้ว` : `${dayDiff} days ago`,
+      rel: isTh ? `${dayDiff} วัน` : `${dayDiff} days ago`,
       abs: `${dow} ${timePart}`,
     };
   }
-  return { rel: datePart, abs: `${datePart}, ${timePart}` };
+  if (dayDiff < 30) {
+    const wk = Math.floor(dayDiff / 7);
+    return {
+      rel: isTh ? `${wk} สัปดาห์` : `${wk} wk ago`,
+      abs: `${datePart}, ${timePart}`,
+    };
+  }
+  if (dayDiff < 365) {
+    const mo = Math.floor(dayDiff / 30);
+    return {
+      rel: isTh ? `${mo} เดือน` : `${mo} mo ago`,
+      abs: `${datePart}, ${timePart}`,
+    };
+  }
+  const yr = Math.floor(dayDiff / 365);
+  return {
+    rel: isTh ? `${yr} ปี` : `${yr} yr ago`,
+    abs: `${datePart}, ${timePart}`,
+  };
 }
 
 /** Format Thai phone: 0xx-xxx-xxxx (mobile) or 0x-xxx-xxxx (landline) */

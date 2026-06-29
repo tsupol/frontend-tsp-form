@@ -183,7 +183,7 @@ export function PaymentSubmissionsPage() {
           <div className="min-w-0 flex items-center gap-1.5">
             <span className="text-sm font-medium truncate">{row.contract_code_display}</span>
             {row.code_display && (
-              <span className="text-[11px] font-normal text-subtle/80 tabular-nums shrink-0">
+              <span className="text-[11px] font-normal text-subtle tabular-nums shrink-0">
                 {row.code_display}
               </span>
             )}
@@ -213,7 +213,7 @@ export function PaymentSubmissionsPage() {
           <div className="shrink-0 flex items-baseline gap-1.5">
             <span className="text-xs font-medium">{ago.rel}</span>
             {ago.abs && ago.abs !== ago.rel && (
-              <span className="text-[11px] text-subtle/70 tabular-nums">{ago.abs}</span>
+              <span className="text-[11px] text-subtler tabular-nums">{ago.abs}</span>
             )}
           </div>
         </div>
