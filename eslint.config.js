@@ -19,5 +19,19 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    rules: {
+      // Honor the `_`-prefix convention for params that are interface-mandated
+      // but unused in a given implementation (e.g. a panel that receives the
+      // uniform `onClose` prop but handles closing elsewhere, or a callback
+      // signature param it doesn't need). This suppresses ONLY underscore-marked
+      // identifiers — genuinely dead code without the marker still errors, so it
+      // doesn't hide unintentional unused vars.
+      '@typescript-eslint/no-unused-vars': ['error', {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+        caughtErrorsIgnorePattern: '^_',
+        destructuredArrayIgnorePattern: '^_',
+      }],
+    },
   },
 ])
