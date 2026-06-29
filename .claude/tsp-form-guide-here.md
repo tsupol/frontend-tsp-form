@@ -95,6 +95,14 @@ Reference implementations: `src/pages/pricing/PricebookPage.tsx` (brand / family
 - **No edit icon button** on desktop list rows — single click opens the editor/detail panel
 - Mobile: single tap navigates to detail panel
 
+## Color tokens — never fake a shade with `/opacity`
+
+The theme defines the muted ramps. Use the named token; never punch alpha on a color (`text-subtle/70`, `bg-primary/15`).
+
+- **Muted text:** `text-subtle` (primary muted) → `text-subtler` (lighter). That's the whole ramp — there is no `text-muted`.
+- **Muted/tinted background:** every color has a `-soft` token — `bg-primary-soft`, `bg-danger-soft`, `bg-success-soft`, `bg-warning-soft`, `bg-info-soft`, `bg-surface-soft`. Use these for soft fills, never `bg-{color}/15`.
+- `text-fg/NN` (dimming the foreground for disabled placeholders / faint icons) is the one accepted opacity use — it's not a named-token case.
+
 ## Inline links
 
 Inline navigation links (clickable codes, IDs, references that route to another page) use **`text-primary-fg hover:underline`**. Never use `text-primary` — that's the brand fill color, not the link color.
