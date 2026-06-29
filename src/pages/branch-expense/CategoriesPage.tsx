@@ -193,7 +193,7 @@ function CategoryFormModal({
             <Input
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              placeholder="RENT, WATER, ELECTRIC ..."
+              placeholder={t('branchExpense.codePlaceholder')}
               disabled={editing !== null}
               className="w-full"
             />

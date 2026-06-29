@@ -345,14 +345,26 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
     });
   };
 
+  // qty is the desired final quantity for this variant. Already-in-cart →
+  // update that line's qty (the picker shows the current cart qty as the start).
+  // Not in cart → append a new RETAIL_SALE line. Clamp to available stock.
   const addProduct = (variant: SellableVariant, qty: number) => {
-    setLines(prev => [...prev, {
-      charge_type: 'RETAIL_SALE',
-      amount: variant.retail_price,
-      qty,
-      variant_id: variant.variant_id,
-      description: variant.full_name,
-    }]);
+    const finalQty = Math.min(Math.max(1, qty), variant.qty);
+    setLines(prev => {
+      const existingIdx = prev.findIndex(
+        l => l.charge_type === 'RETAIL_SALE' && l.variant_id === variant.variant_id,
+      );
+      if (existingIdx >= 0) {
+        return prev.map((l, i) => (i === existingIdx ? { ...l, qty: finalQty } : l));
+      }
+      return [...prev, {
+        charge_type: 'RETAIL_SALE',
+        amount: variant.retail_price,
+        qty: finalQty,
+        variant_id: variant.variant_id,
+        description: variant.full_name,
+      }];
+    });
     setProductPickerOpen(false);
   };
 
@@ -383,6 +395,23 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
     const sign = l.charge_type === 'RETAIL_DISCOUNT' ? -1 : 1;
     return s + sign * l.amount * (l.qty ?? 1);
   }, 0);
+  // Summary quantity — total units of product (RETAIL_SALE) across all cart lines.
+  const totalQty = lines.reduce(
+    (s, l) => (l.charge_type === 'RETAIL_SALE' ? s + (l.qty ?? 1) : s),
+    0,
+  );
+
+  // variant_id → qty currently in cart, so the picker can flag existing items
+  // and pre-fill the stepper / switch its button to "Update cart".
+  const cartQtys = useMemo(() => {
+    const m: Record<number, number> = {};
+    for (const l of lines) {
+      if (l.charge_type === 'RETAIL_SALE' && l.variant_id != null) {
+        m[l.variant_id] = (m[l.variant_id] ?? 0) + (l.qty ?? 1);
+      }
+    }
+    return m;
+  }, [lines]);
   const change = paymentAmount > total ? paymentAmount - total : 0;
   const allowedMethods = preview?.payments_required?.allowed_methods ?? ['CASH', 'TRANSFER'];
 
@@ -644,6 +673,9 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
 
           {/* Total + change */}
           <div className="flex flex-col items-end pt-2 pb-6 border-t border-line">
+            <div className="text-xs text-subtle mb-0.5 tabular-nums">
+              {t('retail.create.itemsSummary', { count: totalQty })}
+            </div>
             <div className="flex items-baseline gap-3">
               <span className="text-base text-subtle">{t('retail.create.total')}</span>
               <span className="heading-3 tabular-nums">{fmtCurrency(total)}</span>
@@ -675,6 +707,7 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
       <ProductPickerModal
         open={productPickerOpen}
         branchId={branchId}
+        cartQtys={cartQtys}
         onClose={() => setProductPickerOpen(false)}
         onPick={addProduct}
       />
@@ -698,9 +731,10 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
  * Product picker
  * ─────────────────────────────────────────────────────────────────────────── */
 
-function ProductPickerModal({ open, branchId, onClose, onPick }: {
+function ProductPickerModal({ open, branchId, cartQtys, onClose, onPick }: {
   open: boolean;
   branchId: number | null;
+  cartQtys: Record<number, number>;
   onClose: () => void;
   onPick: (variant: SellableVariant, qty: number) => void;
 }) {
@@ -776,12 +810,25 @@ function ProductPickerModal({ open, branchId, onClose, onPick }: {
           ) : (
             <div className="flex flex-col divide-y divide-line">
               {variants.map(v => {
-                const qty = pickedQtys[v.variant_id] ?? 1;
+                const inCartQty = cartQtys[v.variant_id] ?? 0;
+                const isInCart = inCartQty > 0;
+                // Default the stepper to the current cart qty so "Update cart"
+                // starts from where the line already is.
+                const qty = pickedQtys[v.variant_id] ?? (isInCart ? inCartQty : 1);
+                const changed = qty !== inCartQty;
                 return (
-                  <div key={v.variant_id} className="flex items-center gap-3 py-2.5">
+                  <div
+                    key={v.variant_id}
+                    className={`flex items-center gap-3 py-2.5 px-2 -mx-2 rounded-md ${isInCart ? 'bg-primary/5' : ''}`}
+                  >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 min-w-0">
                         <span className="text-sm font-medium truncate">{v.full_name}</span>
+                        {isInCart && (
+                          <Badge size="sm" color="primary" className="shrink-0">
+                            {t('retail.create.inCart', { count: inCartQty })}
+                          </Badge>
+                        )}
                         {v.barcodes.length > 0 && (
                           <Tooltip content={v.barcodes.join('\n')} placement="top">
                             <span className="inline-flex items-center gap-0.5 text-[10px] text-subtle shrink-0">
@@ -811,10 +858,11 @@ function ProductPickerModal({ open, branchId, onClose, onPick }: {
                     <Button
                       size="sm"
                       color="primary"
+                      variant={isInCart && !changed ? 'outline' : 'solid'}
                       onClick={() => onPick(v, qty)}
                       disabled={qty > v.qty}
                     >
-                      {t('retail.create.add')}
+                      {isInCart ? t('retail.create.updateCart') : t('retail.create.add')}
                     </Button>
                   </div>
                 );

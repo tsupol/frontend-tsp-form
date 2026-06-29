@@ -53,7 +53,8 @@ export interface ConditionSnapshot {
 export const OVERALL_CONDITION_VALUES = ['EXCELLENT', 'GOOD', 'FAIR', 'POOR'] as const;
 export const SCREEN_CONDITION_VALUES = ['NO_DAMAGE', 'MINOR', 'CRACKED', 'BROKEN'] as const;
 export const BODY_CONDITION_VALUES = ['NO_DAMAGE', 'MINOR', 'MODERATE', 'MAJOR'] as const;
-export const ITEM_CONDITION_VALUES = ['NEW', 'REFURBISHED', 'USED_A', 'USED_B'] as const;
+// Buyback intake only ever produces second-hand assets — NEW/REFURBISHED are not selectable here.
+export const ITEM_CONDITION_VALUES = ['USED_A', 'USED_B'] as const;
 
 export const OVERALL_CONDITION_OPTIONS = OVERALL_CONDITION_VALUES.map((v) => ({ value: v, labelKey: `buyback.condition.${v}` }));
 export const SCREEN_CONDITION_OPTIONS = SCREEN_CONDITION_VALUES.map((v) => ({ value: v, labelKey: `buyback.condition.${v}` }));

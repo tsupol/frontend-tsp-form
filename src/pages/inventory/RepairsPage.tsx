@@ -62,26 +62,10 @@ const REPAIR_STATUS_COLOR: Record<string, 'success' | 'warning' | 'danger' | 'in
 
 const REPAIR_STATUS_VALUES = ['OPEN', 'COMPLETED', 'CANCELLED'] as const;
 
-const RESULT_OPTIONS = [
-  { value: 'FIXED', label: 'Fixed' },
-  { value: 'UNFIXABLE', label: 'Unfixable' },
-];
-
-const ROUTE_FIXED_OPTIONS = [
-  { value: 'RETURN_TO_CUSTOMER', label: 'Return to Customer' },
-  { value: 'RETURN_TO_STOCK', label: 'Return to Stock' },
-  { value: 'QUARANTINE', label: 'Quarantine' },
-];
-
-const ROUTE_UNFIXABLE_OPTIONS = [
-  { value: 'DISPOSE', label: 'Dispose' },
-  { value: 'QUARANTINE', label: 'Quarantine' },
-];
-
-const LOANER_ACTION_OPTIONS = [
-  { value: 'RETURN', label: 'Return loaner' },
-  { value: 'SWAP', label: 'Swap (customer keeps loaner)' },
-];
+const RESULT_VALUES = ['FIXED', 'UNFIXABLE'] as const;
+const ROUTE_FIXED_VALUES = ['RETURN_TO_CUSTOMER', 'RETURN_TO_STOCK', 'QUARANTINE'] as const;
+const ROUTE_UNFIXABLE_VALUES = ['DISPOSE', 'QUARANTINE'] as const;
+const LOANER_ACTION_VALUES = ['RETURN', 'SWAP'] as const;
 
 // ============================================================================
 // Component
@@ -565,7 +549,7 @@ function CloseRepairModal({
             <div className="flex flex-col">
               <label className="form-label">{t('repair.result')}</label>
               <Select
-                options={RESULT_OPTIONS}
+                options={RESULT_VALUES.map(v => ({ value: v, label: t(`repair.result_${v}`) }))}
                 value={result}
                 onChange={(val) => setResult((val as string) || null)}
                 placeholder={t('repair.selectResult')}
@@ -620,7 +604,8 @@ function RouteRepairModal({
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
 
-  const routeOptions = order.result === 'FIXED' ? ROUTE_FIXED_OPTIONS : ROUTE_UNFIXABLE_OPTIONS;
+  const routeOptions = (order.result === 'FIXED' ? ROUTE_FIXED_VALUES : ROUTE_UNFIXABLE_VALUES)
+    .map(v => ({ value: v, label: t(`repair.route_${v}`) }));
   const hasLoaner = !!order.loaner_asset_id;
 
   useEffect(() => {
@@ -691,7 +676,7 @@ function RouteRepairModal({
                 <label className="form-label">{t('repair.loanerAction')}</label>
                 <div className="text-xs text-subtle mb-1">{codeDisplay(order.loaner_asset_code_display, order.loaner_asset_code)}</div>
                 <Select
-                  options={LOANER_ACTION_OPTIONS}
+                  options={LOANER_ACTION_VALUES.map(v => ({ value: v, label: t(`repair.loanerAction_${v}`) }))}
                   value={loanerAction}
                   onChange={(val) => setLoanerAction((val as string) || null)}
                   placeholder={t('repair.selectLoanerAction')}

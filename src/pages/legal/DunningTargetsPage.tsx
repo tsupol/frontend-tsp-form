@@ -46,14 +46,7 @@ interface Branch {
 
 const fmt = (n: number | null | undefined) => n == null ? '—' : n.toLocaleString('en-US');
 
-const BUCKET_OPTIONS = [
-  { value: 'CURRENT', label: 'Current' },
-  { value: 'OVERDUE_1_7', label: '1-7 days' },
-  { value: 'OVERDUE_8_15', label: '8-15 days' },
-  { value: 'OVERDUE_16_30', label: '16-30 days' },
-  { value: 'OVERDUE_31_45', label: '31-45 days' },
-  { value: 'OVERDUE_46_PLUS', label: '46+ days' },
-];
+const BUCKET_VALUES = ['CURRENT', 'OVERDUE_1_7', 'OVERDUE_8_15', 'OVERDUE_16_30', 'OVERDUE_31_45', 'OVERDUE_46_PLUS'] as const;
 
 const getBucketColor = (bucket: string) => {
   if (bucket === 'CURRENT') return 'success';
@@ -61,17 +54,8 @@ const getBucketColor = (bucket: string) => {
   return 'danger' as const;
 };
 
-const getBucketLabel = (bucket: string) => {
-  switch (bucket) {
-    case 'CURRENT': return 'Current';
-    case 'OVERDUE_1_7': return '1-7d';
-    case 'OVERDUE_8_15': return '8-15d';
-    case 'OVERDUE_16_30': return '16-30d';
-    case 'OVERDUE_31_45': return '31-45d';
-    case 'OVERDUE_46_PLUS': return '46+d';
-    default: return bucket;
-  }
-};
+const getBucketLabel = (bucket: string, t: (k: string, o?: Record<string, unknown>) => string) =>
+  t(`legal.bucket_${bucket}`, { defaultValue: bucket });
 
 function overdueDaysLabel(days: number): string {
   if (days <= 0) return '';
@@ -89,12 +73,12 @@ function toLocalDateStr(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-const SORT_OPTIONS = [
-  { value: 'first_overdue_due_date.asc', label: 'Oldest overdue' },
-  { value: 'first_overdue_due_date.desc', label: 'Newest overdue' },
-  { value: 'overdue_amount.desc', label: 'Highest amount' },
-  { value: 'overdue_installment_count.desc', label: 'Most installments' },
-  { value: 'branch_name.asc', label: 'Branch A→Z' },
+const SORT_OPTION_KEYS: Array<[string, string]> = [
+  ['first_overdue_due_date.asc', 'legal.sort_oldestOverdue'],
+  ['first_overdue_due_date.desc', 'legal.sort_newestOverdue'],
+  ['overdue_amount.desc', 'legal.sort_highestAmount'],
+  ['overdue_installment_count.desc', 'legal.sort_mostInstallments'],
+  ['branch_name.asc', 'legal.sort_branchAsc'],
 ];
 
 const getStateLabel = (state: string) => {
@@ -261,7 +245,7 @@ export function DunningTargetsPage() {
                   </div>
                   <div className="flex-1 min-w-0 hidden md:block">
                     <Select
-                      options={BUCKET_OPTIONS}
+                      options={BUCKET_VALUES.map(v => ({ value: v, label: t(`legal.bucketFull_${v}`) }))}
                       value={filterBucket}
                       onChange={(val) => { setFilterBucket((val as string) || null); setPageIndex(0); }}
                       placeholder={t('legal.allBuckets')}
@@ -292,7 +276,7 @@ export function DunningTargetsPage() {
                     <ChevronsUpDown size={14} className="shrink-0" />
                     <div className="flex-1">
                       <Select
-                        options={SORT_OPTIONS}
+                        options={SORT_OPTION_KEYS.map(([value, key]) => ({ value, label: t(key) }))}
                         value={sortBy}
                         onChange={(val) => setSortBy((val as string) ?? 'first_overdue_due_date.asc')}
                         size="sm"
@@ -338,7 +322,7 @@ export function DunningTargetsPage() {
                           searchable
                         />
                         <Select
-                          options={BUCKET_OPTIONS}
+                          options={BUCKET_VALUES.map(v => ({ value: v, label: t(`legal.bucketFull_${v}`) }))}
                           value={filterBucket}
                           onChange={(val) => { setFilterBucket((val as string) || null); setPageIndex(0); }}
                           placeholder={t('legal.allBuckets')}
@@ -363,7 +347,7 @@ export function DunningTargetsPage() {
                         />
                         <div className="text-xs font-medium text-subtle uppercase tracking-wide mt-1">{t('common.sortBy')}</div>
                         <Select
-                          options={SORT_OPTIONS}
+                          options={SORT_OPTION_KEYS.map(([value, key]) => ({ value, label: t(key) }))}
                           value={sortBy}
                           onChange={(val) => setSortBy((val as string) ?? 'first_overdue_due_date.asc')}
                           size="sm"
@@ -397,7 +381,7 @@ export function DunningTargetsPage() {
                           <div className="flex items-center justify-between mb-1">
                             <span className="font-medium text-sm truncate">{item.contract_code_display ?? item.contract_code}</span>
                             <Badge size="xs" color={getBucketColor(item.bucket_code)}>
-                              {getBucketLabel(item.bucket_code)}
+                              {getBucketLabel(item.bucket_code, t)}
                             </Badge>
                           </div>
                           <div className="flex items-center justify-between text-xs">
@@ -479,7 +463,7 @@ export function DunningTargetsPage() {
                         <div className="flex justify-between text-xs mt-1">
                           <span className="text-subtle">{t('legal.bucket')}</span>
                           <Badge size="xs" color={getBucketColor(selected.bucket_code)}>
-                            {getBucketLabel(selected.bucket_code)}
+                            {getBucketLabel(selected.bucket_code, t)}
                           </Badge>
                         </div>
                       </div>
@@ -496,7 +480,7 @@ export function DunningTargetsPage() {
                         </div>
                         {selected.commercial_model && (
                           <div className="flex justify-between text-xs">
-                            <span className="text-subtle">Model</span>
+                            <span className="text-subtle">{t('legal.detailModel')}</span>
                             <span>{selected.commercial_model}</span>
                           </div>
                         )}
@@ -523,18 +507,18 @@ export function DunningTargetsPage() {
                       {/* Payment info */}
                       <div className="px-3 py-2.5 rounded-md bg-surface border border-line text-sm space-y-1.5">
                         <div className="flex justify-between text-xs">
-                          <span className="text-subtle">Total Paid</span>
+                          <span className="text-subtle">{t('legal.detailTotalPaid')}</span>
                           <span className="tabular-nums">{fmt(selected.total_paid)}</span>
                         </div>
                         {selected.last_payment_date && (
                           <div className="flex justify-between text-xs">
-                            <span className="text-subtle">Last Payment</span>
+                            <span className="text-subtle">{t('legal.detailLastPayment')}</span>
                             <DateTime value={selected.last_payment_date} showTime={false} />
                           </div>
                         )}
                         {selected.next_due_date && (
                           <div className="flex justify-between text-xs">
-                            <span className="text-subtle">Next Due</span>
+                            <span className="text-subtle">{t('legal.detailNextDue')}</span>
                             <span>
                               <DateTime value={selected.next_due_date} showTime={false} />
                               {selected.next_due_amount != null && (
@@ -550,7 +534,7 @@ export function DunningTargetsPage() {
                   <div className="flex-1 h-full flex items-center justify-center text-subtler">
                     <div className="text-center">
                       <Search size={32} className="mx-auto mb-2 opacity-40" />
-                      <div>Select a contract to view details</div>
+                      <div>{t('legal.selectContractToView')}</div>
                     </div>
                   </div>
                 )}

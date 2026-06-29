@@ -24,10 +24,7 @@ interface CustomerDocument {
   file_url: string;
 }
 
-const ID_TYPE_OPTIONS = [
-  { value: 'CITIZEN_ID', label: 'Citizen ID' },
-  { value: 'PASSPORT', label: 'Passport' },
-];
+const ID_TYPE_VALUES = ['CITIZEN_ID', 'PASSPORT'] as const;
 const PREFIX_OPTIONS = [
   { value: '', label: '-' },
   { value: 'นาย', label: 'นาย' }, { value: 'นาง', label: 'นาง' }, { value: 'นางสาว', label: 'นางสาว' },
@@ -344,7 +341,7 @@ export function PanelCoLessee({ onClose: _onClose }: Props) {
               <div className="flex gap-3">
                 <div className="flex flex-col" style={{ width: '10rem' }}>
                   <label className="form-label">{t('wizard.idType')}</label>
-                  <Select options={ID_TYPE_OPTIONS} value={idType} onChange={(val) => setIdType((val as string) as 'CITIZEN_ID' | 'PASSPORT')} size="sm" disabled={!!selectedCustomer} />
+                  <Select options={ID_TYPE_VALUES.map(v => ({ value: v, label: t(`contract.idType_${v}`) }))} value={idType} onChange={(val) => setIdType((val as string) as 'CITIZEN_ID' | 'PASSPORT')} size="sm" disabled={!!selectedCustomer} />
                 </div>
                 <div className="flex flex-col flex-1 min-w-0">
                   <label className="form-label">{t('wizard.idNumber')}</label>
@@ -668,7 +665,7 @@ function CoLesseeRow({ coLessee, expanded, onToggle, onRemove, removing }: {
                   <div className="flex gap-3">
                     <div className="flex flex-col" style={{ width: '10rem' }}>
                       <label className="form-label">{t('wizard.idType')}</label>
-                      <Select options={ID_TYPE_OPTIONS} value={custInfo?.id_type ?? 'CITIZEN_ID'} onChange={() => {}} size="sm" disabled />
+                      <Select options={ID_TYPE_VALUES.map(v => ({ value: v, label: t(`contract.idType_${v}`) }))} value={custInfo?.id_type ?? 'CITIZEN_ID'} onChange={() => {}} size="sm" disabled />
                     </div>
                     <div className="flex flex-col flex-1 min-w-0">
                       <label className="form-label">{t('wizard.idNumber')}</label>

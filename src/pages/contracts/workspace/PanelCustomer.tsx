@@ -23,10 +23,7 @@ const thaiPhoneMask = (digits: string) => {
   return '###-###-####'; // mobile 06x, 08x, 09x
 };
 
-const ID_TYPE_OPTIONS = [
-  { value: 'CITIZEN_ID', label: 'Citizen ID' },
-  { value: 'PASSPORT', label: 'Passport' },
-];
+const ID_TYPE_VALUES = ['CITIZEN_ID', 'PASSPORT'] as const;
 
 const PREFIX_OPTIONS = [
   { value: '', label: '-' },
@@ -77,20 +74,22 @@ interface FieldComparison {
   changed: boolean;
 }
 
-const COMPARE_FIELDS: Array<{ key: keyof CustomerSnapshot; label: string }> = [
-  { key: 'idType', label: 'ID Type' },
-  { key: 'idNumber', label: 'ID Number' },
-  { key: 'prefix', label: 'Prefix' },
-  { key: 'firstName', label: 'First Name' },
-  { key: 'lastName', label: 'Last Name' },
-  { key: 'dateOfBirth', label: 'Date of Birth' },
-  { key: 'tel', label: 'Tel' },
-  { key: 'tel2', label: 'Tel 2' },
+const COMPARE_FIELDS: Array<{ key: keyof CustomerSnapshot; labelKey: string }> = [
+  { key: 'idType', labelKey: 'contract.compareField_idType' },
+  { key: 'idNumber', labelKey: 'contract.compareField_idNumber' },
+  { key: 'prefix', labelKey: 'contract.compareField_prefix' },
+  { key: 'firstName', labelKey: 'contract.compareField_firstName' },
+  { key: 'lastName', labelKey: 'contract.compareField_lastName' },
+  { key: 'dateOfBirth', labelKey: 'contract.compareField_dateOfBirth' },
+  { key: 'tel', labelKey: 'contract.compareField_tel' },
+  { key: 'tel2', labelKey: 'contract.compareField_tel2' },
 ];
 
+// `field` carries the i18n key; the render site resolves it with t(). The
+// downstream "ID changed?" check compares against the idType/idNumber keys.
 function compareFields(original: CustomerSnapshot, current: CustomerSnapshot): { all: FieldComparison[]; hasChanges: boolean } {
-  const all: FieldComparison[] = COMPARE_FIELDS.map(({ key, label }) => ({
-    field: label,
+  const all: FieldComparison[] = COMPARE_FIELDS.map(({ key, labelKey }) => ({
+    field: labelKey,
     value: current[key] || '—',
     original: original[key] || '—',
     changed: original[key] !== current[key],
@@ -249,7 +248,7 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
       const { all, hasChanges } = compareFields(originalRef.current, getCurrentSnapshot());
       if (hasChanges) {
         // Validate CID only if ID was changed
-        const idChanged = all.some(f => f.changed && (f.field === 'ID Number' || f.field === 'ID Type'));
+        const idChanged = all.some(f => f.changed && (f.field === 'contract.compareField_idNumber' || f.field === 'contract.compareField_idType'));
         if (idChanged && idType === 'CITIZEN_ID' && idNumber.replace(/\D/g, '').length !== 13) {
           setApiError(t('workspace.citizenIdLength'));
           return;
@@ -476,7 +475,7 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
         <div className="flex gap-3">
           <div className="flex flex-col" style={{ width: '10rem' }}>
             <label className="form-label">{t('wizard.idType')}</label>
-            <Select options={ID_TYPE_OPTIONS} value={idType} onChange={(val) => setIdType((val as string) as 'CITIZEN_ID' | 'PASSPORT')} size="sm" disabled={!!selectedCustomer} />
+            <Select options={ID_TYPE_VALUES.map(v => ({ value: v, label: t(`contract.idType_${v}`) }))} value={idType} onChange={(val) => setIdType((val as string) as 'CITIZEN_ID' | 'PASSPORT')} size="sm" disabled={!!selectedCustomer} />
           </div>
           <div className="flex flex-col flex-1 min-w-0">
             <label className="form-label">{t('wizard.idNumber')}</label>
@@ -653,7 +652,7 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
             <div className="border border-line rounded-lg divide-y divide-line text-sm">
               {confirmData.map((f, i) => (
                 <div key={i} className="px-3 py-2 flex items-center gap-3">
-                  <span className="font-medium w-28 shrink-0 text-subtle">{f.field}</span>
+                  <span className="font-medium w-28 shrink-0 text-subtle">{t(f.field)}</span>
                   <span className={`flex-1 ${f.changed ? 'text-success font-medium' : ''}`}>
                     {f.value}
                   </span>

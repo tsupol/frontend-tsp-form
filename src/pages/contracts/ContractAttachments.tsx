@@ -253,7 +253,7 @@ function ManageModal({
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    if (!user?.holding_id) { setError('Missing holding context'); return; }
+    if (!user?.holding_id) { setError(t('common.error')); return; }
     setUploading(true);
     setError('');
     const uploaded: Record<string, string> = {};

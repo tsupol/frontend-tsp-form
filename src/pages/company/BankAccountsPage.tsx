@@ -424,7 +424,7 @@ export function BankAccountsPage() {
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('settings.bankAccounts.colStatus')} />,
       cell: ({ row }) => (
         <div className="flex items-center gap-1.5">
-          {row.original.is_default && <Badge color="primary" size="sm">Default</Badge>}
+          {row.original.is_default && <Badge color="primary" size="sm">{t('common.default')}</Badge>}
           <Badge color={row.original.is_active ? 'success' : 'default'} size="sm">
             {row.original.is_active ? t('common.active') : t('common.inactive')}
           </Badge>
@@ -540,7 +540,7 @@ export function BankAccountsPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-sm truncate">{account.bank_name}</span>
-                        {account.is_default && <Badge color="primary" size="sm">Default</Badge>}
+                        {account.is_default && <Badge color="primary" size="sm">{t('common.default')}</Badge>}
                         {!account.is_active && <Badge color="default" size="sm">{t('common.inactive')}</Badge>}
                       </div>
                       <div className="text-xs text-subtle tabular-nums mt-0.5">{account.account_number} · {account.account_name}</div>

@@ -12,10 +12,7 @@ import type { CustomerRegisterResult, CustomerAddress, CustomerContact, Customer
 
 // ── Constants ────────────────────────────────────────────────────────────
 
-const ID_TYPE_OPTIONS = [
-  { value: 'CITIZEN_ID', label: 'Citizen ID' },
-  { value: 'PASSPORT', label: 'Passport' },
-];
+const ID_TYPE_VALUES = ['CITIZEN_ID', 'PASSPORT'] as const;
 
 const PREFIX_OPTIONS = [
   { value: '', label: '-' },
@@ -199,7 +196,7 @@ export function ModalCustomer({ open, onClose }: Props) {
               <div className="flex flex-col" style={{ width: '10rem' }}>
                 <label className="form-label">{t('wizard.idType')}</label>
                 <Select
-                  options={ID_TYPE_OPTIONS}
+                  options={ID_TYPE_VALUES.map(v => ({ value: v, label: t(`contract.idType_${v}`) }))}
                   value={idType}
                   onChange={(val) => setIdType((val as string) as 'CITIZEN_ID' | 'PASSPORT')}
                   size="sm"

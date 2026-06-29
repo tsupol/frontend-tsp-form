@@ -8,10 +8,7 @@ import { useWorkspace } from './WorkspaceContext';
 import { BranchPaymentAccountField } from '../../../components/BranchPaymentAccountField';
 import type { PaymentMethod, PaymentLine, BillOpenResult } from './WorkspaceTypes';
 
-const BASE_PAYMENT_METHODS = [
-  { value: 'CASH', label: 'Cash' },
-  { value: 'TRANSFER', label: 'Bank Transfer' },
-];
+const BASE_PAYMENT_METHOD_VALUES = ['CASH', 'TRANSFER'] as const;
 
 /**
  * Payment card for contract open bill.
@@ -30,7 +27,7 @@ export function CardPayment() {
   const totalAmount = existingBill?.total_amount ?? previewTotal;
 
   const paymentMethodOptions = useMemo(() => {
-    const opts = [...BASE_PAYMENT_METHODS];
+    const opts = BASE_PAYMENT_METHOD_VALUES.map(v => ({ value: v as string, label: t(`paymentMethod.${v}`) }));
     if (savingBalance > 0) {
       opts.push({ value: 'SAVING_WALLET', label: `${t('workspace.savingWallet')} (${fmtCurrency(savingBalance)})` });
     }

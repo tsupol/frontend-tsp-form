@@ -483,28 +483,17 @@ const ACTION_CONFIGS: Record<ContractAction, ActionConfig> = {
   },
 };
 
-const CLOSE_REASON_OPTIONS: Record<string, { value: string; label: string }[]> = {
-  complete: [
-    { value: 'NORMAL', label: 'Normal' },
-  ],
-  terminate: [
-    { value: 'TERMINATED', label: 'Terminated' },
-  ],
-  cancel: [
-    { value: 'CUSTOMER_CANCEL', label: 'Customer Cancel' },
-    { value: 'STAFF_CANCEL', label: 'Staff Cancel' },
-  ],
-  void: [
-    { value: 'VOIDED', label: 'Voided' },
-  ],
+const CLOSE_REASON_VALUES: Record<string, string[]> = {
+  complete: ['NORMAL'],
+  terminate: ['TERMINATED'],
+  cancel: ['CUSTOMER_CANCEL', 'STAFF_CANCEL'],
+  void: ['VOIDED'],
 };
 
-const CANCEL_CLOSE_REASON_OPTIONS = CLOSE_REASON_OPTIONS.cancel;
+const closeReasonOptions = (action: string | undefined, t: ReturnType<typeof useTranslation>['t']) =>
+  (CLOSE_REASON_VALUES[action ?? ''] ?? []).map(v => ({ value: v, label: t(`contract.closeReason_${v}`) }));
 
-const REFUND_CHANNEL_OPTIONS = [
-  { value: 'CASH', label: 'Cash' },
-  { value: 'TRANSFER', label: 'Transfer' },
-];
+const REFUND_CHANNEL_VALUES = ['CASH', 'TRANSFER'] as const;
 
 // ── Action Buttons ───────────────────────────────────────────────────────────
 
@@ -1473,7 +1462,7 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
                 <div className="flex flex-col">
                   <label className="form-label">{t('contract.closeReason')} *</label>
                   <Select
-                    options={CLOSE_REASON_OPTIONS[action!] ?? []}
+                    options={closeReasonOptions(action ?? undefined, t)}
                     value={closeReason}
                     onChange={(val) => setCloseReason((val as string) || null)}
                     placeholder={t('contract.selectCloseReason')}
@@ -2158,7 +2147,7 @@ function CancelSavingModal({ open, contract, onClose, onSuccess }: {
               <div className="flex flex-col">
                 <label className="form-label">{t('contract.cancelSaving_refundChannel')} *</label>
                 <Select
-                  options={REFUND_CHANNEL_OPTIONS}
+                  options={REFUND_CHANNEL_VALUES.map(v => ({ value: v, label: t(`contract.channel_${v.toLowerCase()}`) }))}
                   value={refundChannel}
                   onChange={(val) => setRefundChannel((val as string) || null)}
                   placeholder={t('contract.cancelSaving_selectChannel')}
@@ -2171,7 +2160,7 @@ function CancelSavingModal({ open, contract, onClose, onSuccess }: {
             <div className="flex flex-col">
               <label className="form-label">{t('contract.closeReason')} *</label>
               <Select
-                options={CANCEL_CLOSE_REASON_OPTIONS}
+                options={closeReasonOptions('cancel', t)}
                 value={closeReason}
                 onChange={(val) => setCloseReason((val as string) || null)}
                 placeholder={t('contract.selectCloseReason')}
@@ -2311,10 +2300,7 @@ interface PaymentLine {
   bank_account_id: number | null;
 }
 
-const BASE_METHODS = [
-  { value: 'CASH', label: 'Cash' },
-  { value: 'TRANSFER', label: 'Bank Transfer' },
-];
+const BASE_METHOD_VALUES = ['CASH', 'TRANSFER'] as const;
 
 function PendingPaymentModal({ open, contract, onClose, onSuccess }: {
   open: boolean;
@@ -2338,7 +2324,7 @@ function PendingPaymentModal({ open, contract, onClose, onSuccess }: {
   const totalAmount = bill?.total_amount ?? 0;
 
   const methodOptions = useMemo(() => {
-    const opts = [...BASE_METHODS];
+    const opts = BASE_METHOD_VALUES.map(v => ({ value: v as string, label: t(`paymentMethod.${v}`) }));
     if (savingBalance > 0) {
       opts.push({ value: 'SAVING_WALLET', label: `${t('workspace.savingWallet')} (${fmtCurrency(savingBalance)})` });
     }

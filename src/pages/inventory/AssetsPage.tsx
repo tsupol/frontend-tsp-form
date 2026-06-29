@@ -15,6 +15,7 @@ import { buildBillActionToast, type StandardBillResponse } from '../../lib/billA
 import { useAuth } from '../../contexts/AuthContext';
 import { AssignIcloudModal, ReleaseIcloudModal } from '../contracts/IcloudModals';
 import { AssetScreenTimeSection } from '../../components/AssetScreenTimeSection';
+import { ImeiInput } from '../../components/ImeiInput';
 import { getBucketLabel, getBucketColor, getConditionLabel, getConditionTextColor, CONDITION_VALUES, codeDisplay } from './inventoryUtils';
 
 // ============================================================================
@@ -178,7 +179,7 @@ const FOOTER_ACTION_ALLOWLIST: ReadonlySet<string> = new Set([
 // Actions wireable today via the generic modal.
 // The rest live in the allowlist but render disabled with "not yet implemented".
 type ExtraField =
-  | { kind: 'select'; name: string; labelKey: string; options: { value: string; label: string }[]; required?: boolean; default?: string }
+  | { kind: 'select'; name: string; labelKey: string; options: { value: string; labelKey: string }[]; required?: boolean; default?: string }
   | { kind: 'text'; name: string; labelKey: string; required?: boolean }
   | { kind: 'number'; name: string; labelKey: string; required?: boolean; min?: number; step?: number; defaultFromAsset?: keyof Asset }
   | { kind: 'branch'; name: string; labelKey: string; required?: boolean }
@@ -188,7 +189,7 @@ type ExtraField =
 type SimpleActionConfig = {
   rpc: string;
   color?: 'primary' | 'danger';
-  hasReason?: { options: { value: string; label: string }[]; required: boolean };
+  hasReason?: { options: { value: string; labelKey: string }[]; required: boolean };
   /** Extra fields injected into the params object. */
   extraFields?: ExtraField[];
   /**
@@ -205,35 +206,35 @@ type SimpleActionConfig = {
 };
 
 const SELL_REASON_OPTIONS = [
-  { value: 'OUTRIGHT_SALE', label: 'Outright sale' },
-  { value: 'BUYBACK_REVERSAL_SALE', label: 'Buyback reversal sale' },
+  { value: 'OUTRIGHT_SALE', labelKey: 'option.sellReason.OUTRIGHT_SALE' },
+  { value: 'BUYBACK_REVERSAL_SALE', labelKey: 'option.sellReason.BUYBACK_REVERSAL_SALE' },
 ];
 
 const SELL_CHANNEL_OPTIONS = [
-  { value: 'CASH', label: 'Cash' },
-  { value: 'TRANSFER', label: 'Bank transfer' },
+  { value: 'CASH', labelKey: 'option.sellChannel.CASH' },
+  { value: 'TRANSFER', labelKey: 'option.sellChannel.TRANSFER' },
 ];
 
 const QUARANTINE_REASON_OPTIONS = [
-  { value: 'DAMAGED', label: 'Damaged' },
-  { value: 'SUSPECT', label: 'Suspect' },
-  { value: 'INSPECTION', label: 'Inspection' },
-  { value: 'RETURNED_FROM_REPAIR', label: 'Returned from Repair' },
-  { value: 'OTHER', label: 'Other' },
+  { value: 'DAMAGED', labelKey: 'option.quarantineReason.DAMAGED' },
+  { value: 'SUSPECT', labelKey: 'option.quarantineReason.SUSPECT' },
+  { value: 'INSPECTION', labelKey: 'option.quarantineReason.INSPECTION' },
+  { value: 'RETURNED_FROM_REPAIR', labelKey: 'option.quarantineReason.RETURNED_FROM_REPAIR' },
+  { value: 'OTHER', labelKey: 'option.quarantineReason.OTHER' },
 ];
 
 const WRITE_OFF_REASON_OPTIONS = [
-  { value: 'MISSING', label: 'Missing' },
-  { value: 'THEFT', label: 'Theft' },
-  { value: 'DAMAGED_BEYOND_USE', label: 'Damaged Beyond Use' },
+  { value: 'MISSING', labelKey: 'option.writeOffReason.MISSING' },
+  { value: 'THEFT', labelKey: 'option.writeOffReason.THEFT' },
+  { value: 'DAMAGED_BEYOND_USE', labelKey: 'option.writeOffReason.DAMAGED_BEYOND_USE' },
 ];
 
 // Condition grades for revalue (asset condition can change after refurbishment, etc.)
 const REVALUE_CONDITION_OPTIONS = [
-  { value: 'NEW', label: 'New' },
-  { value: 'REFURBISHED', label: 'Refurbished' },
-  { value: 'USED_A', label: 'Used A' },
-  { value: 'USED_B', label: 'Used B' },
+  { value: 'NEW', labelKey: 'translation:inventory.conditionNEW' },
+  { value: 'REFURBISHED', labelKey: 'translation:inventory.conditionREFURBISHED' },
+  { value: 'USED_A', labelKey: 'translation:inventory.conditionUSED_A' },
+  { value: 'USED_B', labelKey: 'translation:inventory.conditionUSED_B' },
 ];
 
 const SIMPLE_ACTIONS: Record<string, SimpleActionConfig> = {
@@ -1835,7 +1836,10 @@ function AssetActionModal({
               <div className="flex flex-col">
                 <label className="form-label">{t('asset.reason')}{config.hasReason.required ? ' *' : ''}</label>
                 <Select
-                  options={config.hasReason.options}
+                  options={config.hasReason.options.map(o => ({
+                    value: o.value,
+                    label: t(o.labelKey, { ns: 'assetActions', defaultValue: o.value }),
+                  }))}
                   value={reason}
                   onChange={(val) => setReason((val as string) || null)}
                   placeholder={t('asset.selectReason')}
@@ -1856,7 +1860,10 @@ function AssetActionModal({
                   </label>
                   {f.kind === 'select' && (
                     <Select
-                      options={f.options}
+                      options={f.options.map(o => ({
+                        value: o.value,
+                        label: t(o.labelKey, { ns: 'assetActions', defaultValue: o.value }),
+                      }))}
                       value={extra[f.name] ?? null}
                       onChange={(val) => setVal(f.name, (val as string) || '')}
                       showChevron
@@ -2229,13 +2236,23 @@ function AddIdentifierModal({
           <div className="form-grid gap-4">
             <div className="flex flex-col">
               <label className="form-label">{identifierType} *</label>
-              <Input
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                placeholder={identifierType === 'IMEI' ? '15-digit IMEI' : t('identifierAdd.valuePlaceholder', { ns: 'assetActions', defaultValue: 'Value' })}
-                className="w-full"
-                autoFocus
-              />
+              {identifierType === 'IMEI' ? (
+                <ImeiInput
+                  value={value}
+                  onChange={setValue}
+                  placeholder={t('asset.imeiPlaceholder')}
+                  className="w-full"
+                  autoFocus
+                />
+              ) : (
+                <Input
+                  value={value}
+                  onChange={(e) => setValue(e.target.value)}
+                  placeholder={t('identifierAdd.valuePlaceholder', { ns: 'assetActions', defaultValue: 'Value' })}
+                  className="w-full"
+                  autoFocus
+                />
+              )}
             </div>
             <div className="flex flex-col">
               <label className="form-label">{t('identifierAdd.note', { ns: 'assetActions', defaultValue: 'Note' })}</label>

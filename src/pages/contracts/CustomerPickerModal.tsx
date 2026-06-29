@@ -14,10 +14,7 @@ import { IdCardScanner, type DetectedIdCardFields } from '../../components/IdCar
 
 const KNOWN_TH_PREFIXES = new Set(['นาย', 'นาง', 'นางสาว']);
 
-const ID_TYPE_OPTIONS = [
-  { value: 'CITIZEN_ID', label: 'Citizen ID' },
-  { value: 'PASSPORT', label: 'Passport' },
-];
+const ID_TYPE_VALUES = ['CITIZEN_ID', 'PASSPORT'] as const;
 const PREFIX_OPTIONS = [
   { value: '', label: '-' },
   { value: 'นาย', label: 'นาย' }, { value: 'นาง', label: 'นาง' }, { value: 'นางสาว', label: 'นางสาว' },
@@ -275,7 +272,7 @@ export function CustomerPickerModal({ open, title, excludeCustomerIds = [], onCl
               <div className="flex flex-col" style={{ width: '10rem' }}>
                 <label className="form-label">{t('wizard.idType')}</label>
                 <Select
-                  options={ID_TYPE_OPTIONS}
+                  options={ID_TYPE_VALUES.map(v => ({ value: v, label: t(`contract.idType_${v}`) }))}
                   value={idType}
                   onChange={(val) => setIdType(val as 'CITIZEN_ID' | 'PASSPORT')}
                   size="sm"

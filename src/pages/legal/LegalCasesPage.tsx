@@ -135,15 +135,7 @@ function overdueDuration(dateStr: string | null): string {
   return rem > 0 ? `${months}m ${rem}d` : `${months}m`;
 }
 
-const STATUS_OPTIONS = [
-  { value: 'QUEUED', label: 'Queued' },
-  { value: 'IN_PROGRESS', label: 'In Progress' },
-  { value: 'FIRST_LEGAL_NOTICE', label: '1st Notice' },
-  { value: 'SECOND_LEGAL_NOTICE', label: '2nd Notice' },
-  { value: 'COURT_PROCESS', label: 'Court' },
-  { value: 'CLOSED_REPOSSESSION_SUCCESS', label: 'Closed (Repossessed)' },
-  { value: 'CLOSED_RESOLVED_BY_PAYMENT', label: 'Closed (Paid)' },
-];
+const STATUS_VALUES = ['QUEUED', 'IN_PROGRESS', 'FIRST_LEGAL_NOTICE', 'SECOND_LEGAL_NOTICE', 'COURT_PROCESS', 'CLOSED_REPOSSESSION_SUCCESS', 'CLOSED_RESOLVED_BY_PAYMENT'] as const;
 
 const getStatusColor = (status: string) => {
   if (status === 'QUEUED') return 'default';
@@ -403,7 +395,7 @@ export function LegalCasesPage() {
                 </div>
                 <div style={{ width: '8rem' }}>
                   <Select
-                    options={STATUS_OPTIONS}
+                    options={STATUS_VALUES.map(v => ({ value: v, label: t(`legal.caseStatus_${v}`) }))}
                     value={filterStatus}
                     onChange={(val) => setFilterStatus((val as string) || null)}
                     placeholder={t('legal.allStatuses')}

@@ -10,10 +10,7 @@ import { useWorkspace } from './WorkspaceContext';
 import { AddressFormPostal } from './AddressFormPostal';
 import type { CustomerRegisterResult, CustomerAddress } from './WorkspaceTypes';
 
-const ID_TYPE_OPTIONS = [
-  { value: 'CITIZEN_ID', label: 'Citizen ID' },
-  { value: 'PASSPORT', label: 'Passport' },
-];
+const ID_TYPE_VALUES = ['CITIZEN_ID', 'PASSPORT'] as const;
 
 const PREFIX_OPTIONS = [
   { value: '', label: '-' },
@@ -148,7 +145,7 @@ export function ModalCoLessee({ open, onClose }: Props) {
             <div className="flex gap-3">
               <div className="flex flex-col" style={{ width: '10rem' }}>
                 <label className="form-label">{t('wizard.idType')}</label>
-                <Select options={ID_TYPE_OPTIONS} value={idType} onChange={(val) => setIdType((val as string) as 'CITIZEN_ID' | 'PASSPORT')} size="sm" />
+                <Select options={ID_TYPE_VALUES.map(v => ({ value: v, label: t(`contract.idType_${v}`) }))} value={idType} onChange={(val) => setIdType((val as string) as 'CITIZEN_ID' | 'PASSPORT')} size="sm" />
               </div>
               <div className="flex flex-col flex-1 min-w-0">
                 <label className="form-label">{t('wizard.idNumber')}</label>

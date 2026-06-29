@@ -15,6 +15,7 @@ import { ActionDoneView } from '../contracts/ActionDoneView';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
 import { normalizeKey } from '../../lib/mediaPath';
 import { MediaLightbox } from '../../components/MediaLightbox';
+import { ImeiInput } from '../../components/ImeiInput';
 
 // ============================================================================
 // Types — uses dedicated v_buyback_list / v_buyback_detail views
@@ -1285,9 +1286,9 @@ function BuybackActionModal({
                 </div>
                 <div className="flex flex-col">
                   <label className="form-label">{t('asset.imei', { defaultValue: 'IMEI' })}</label>
-                  <Input
+                  <ImeiInput
                     value={imei}
-                    onChange={(e) => setImei(e.target.value)}
+                    onChange={setImei}
                     placeholder={t('buyback.imeiPlaceholder', { defaultValue: '15-digit IMEI (optional)' })}
                     className="w-full"
                     autoFocus

@@ -350,7 +350,7 @@ export function CustomersPage() {
                   <div className="flex-1 h-full flex items-center justify-center text-subtler">
                     <div className="text-center">
                       <Users size={32} className="mx-auto mb-2 opacity-40" />
-                      <div>Select a customer to view details</div>
+                      <div>{t('customer.selectToView')}</div>
                     </div>
                   </div>
                 )}

@@ -381,6 +381,7 @@
   "inv.auth.repair_dispose_requires_admin": "การส่งสินทรัพย์ที่ซ่อมไม่ได้ไปจำหน่ายต้องได้รับการอนุมัติจากผู้ดูแลบริษัท",
   "INV.CONFLICT.BUYBACK_MATCH_CONFLICT": "พบความขัดแย้งของรหัสประจำเครื่อง มีการสร้างรายการ conflict แล้ว แก้ไขก่อนรับเข้าเสร็จสมบูรณ์",
   "inv.conflict.buyback_match_conflict": "พบความขัดแย้งของรหัสประจำเครื่อง มีการสร้างรายการ conflict แล้ว แก้ไขก่อนรับเข้าเสร็จสมบูรณ์",
+  "inv.conflict.buyback_identifier_reserved": "Serial/IMEI นี้ติดอยู่กับรายการรับซื้อคืนอื่นที่กำลังดำเนินการ (รออนุมัติหรืออนุมัติแล้ว)",
   "INV.CONFLICT.IDENTIFIER_CONFLICT": "{{type}} {{value}} ซ้ำกับเครื่องอื่นที่ยังใช้งานอยู่ใน holding นี้",
   "inv.conflict.identifier_conflict": "{{type}} {{value}} ซ้ำกับเครื่องอื่นที่ยังใช้งานอยู่ใน holding นี้",
   "INV.CONFLICT.REPAIR_LOANER_CONFLICT": "มอบเครื่องสำรองให้สัญญานี้ไม่ได้ เพราะมีเครื่องที่ผูกอยู่แล้ว อนุญาตหนึ่งเครื่องต่อสัญญา",

@@ -18,6 +18,7 @@ import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { getBucketLabel, getBucketColor, fmtNum, codeDisplay } from './inventoryUtils';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { ColorAutocomplete, ColorMatchBadge } from '../../components/ColorAutocomplete';
+import { ImeiInput } from '../../components/ImeiInput';
 
 // ============================================================================
 // Types — verified against live API 2026-05-08
@@ -186,12 +187,8 @@ export function LotsPage() {
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
 
-  const PO_TYPE_OPTIONS = [
-    { value: 'PURCHASE', label: 'Purchase' },
-    { value: 'BUYBACK', label: 'Buyback' },
-    { value: 'ADJUSTMENT', label: 'Adjustment' },
-    { value: 'DEAL_PARTNER', label: 'Deal Partner' },
-  ];
+  const PO_TYPE_OPTIONS = ['PURCHASE', 'BUYBACK', 'ADJUSTMENT', 'DEAL_PARTNER']
+    .map(v => ({ value: v, label: t(`po.type_${v}`) }));
 
   const bucketOptions = useMemo(
     () => BUCKET_VALUES.map(v => ({ value: v, label: getBucketLabel(v, t) })),
@@ -990,12 +987,7 @@ function LotActionBar({
 // lacks an IMEI identifier — the backend is authoritative; UI surfaces it.
 // ============================================================================
 
-const CONDITION_OPTIONS = [
-  { value: 'NEW', label: 'New' },
-  { value: 'REFURBISHED', label: 'Refurbished' },
-  { value: 'USED_A', label: 'Used A' },
-  { value: 'USED_B', label: 'Used B' },
-];
+const CONDITION_VALUES = ['NEW', 'REFURBISHED', 'USED_A', 'USED_B'] as const;
 
 interface DeviceRow {
   /** Local row id for keying — not sent to backend. */
@@ -1083,10 +1075,7 @@ interface DraftTransfer {
   created_at: string;
 }
 
-const TRANSFER_MODE_OPTIONS = [
-  { value: 'FREE_TRANSFER', label: 'Free transfer' },
-  { value: 'COST_PRICE_INTERNAL', label: 'Cost-price internal sale' },
-];
+const TRANSFER_MODE_VALUES = ['FREE_TRANSFER', 'COST_PRICE_INTERNAL'] as const;
 
 interface TransferCreateResult {
   transfer_order_id: number;
@@ -1535,10 +1524,10 @@ function LotActionModal({
                             </div>
                             <div className="flex-1 min-w-0 flex flex-col">
                               <label className="form-label">{t('convert.imei', { ns: 'lotActions', defaultValue: 'IMEI' })}</label>
-                              <Input
+                              <ImeiInput
                                 value={row.imei}
-                                onChange={(e) => setDevices(devices.map((r, i) => i === idx ? { ...r, imei: e.target.value } : r))}
-                                placeholder="15-digit IMEI"
+                                onChange={(v) => setDevices(devices.map((r, i) => i === idx ? { ...r, imei: v } : r))}
+                                placeholder={t('asset.imeiPlaceholder')}
                                 className="w-full"
                               />
                             </div>
@@ -1548,7 +1537,7 @@ function LotActionModal({
                             <div className="flex-1 min-w-0 flex flex-col">
                               <label className="form-label">{t('convert.conditionGrade', { ns: 'lotActions', defaultValue: 'Condition' })}</label>
                               <Select
-                                options={CONDITION_OPTIONS}
+                                options={CONDITION_VALUES.map(v => ({ value: v, label: t(`inventory.condition${v}`) }))}
                                 value="NEW"
                                 onChange={() => {}}
                                 showChevron
@@ -1653,7 +1642,7 @@ function LotActionModal({
                       {t('transfer.mode', { ns: 'lotActions', defaultValue: 'Transfer mode' })} *
                     </label>
                     <Select
-                      options={TRANSFER_MODE_OPTIONS}
+                      options={TRANSFER_MODE_VALUES.map(v => ({ value: v, label: t(`transfer.mode_${v}`) }))}
                       value={transferMode}
                       onChange={(v) => setTransferMode((v as string) || '')}
                       showChevron

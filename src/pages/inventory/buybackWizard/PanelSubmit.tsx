@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, keepPreviousData } from '@tanstack/react-query';
 import { Input, Button } from 'tsp-form';
-import { XCircle, CheckCircle, Circle } from 'lucide-react';
+import { XCircle, CheckCircle, Circle, Check } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
+import { validateIMEI, validateiPhoneSerial } from '../../../lib/validators';
+import { ImeiInput } from '../../../components/ImeiInput';
 import { getLine } from './useBuyback';
 import type { BuybackDraft } from './types';
 
@@ -82,14 +84,44 @@ export function PanelSubmit({
     },
   });
 
-  const haveIdentifier = imei.trim().length > 0 || serial.trim().length > 0;
+  const imeiTrimmed = imei.trim();
+  const serialTrimmed = serial.trim();
+  const haveIdentifier = imeiTrimmed.length > 0 || serialTrimmed.length > 0;
+
+  // Client-side identifier validation — catch malformed IMEI/Serial before the
+  // round-trip (backend still re-checks). Either field is optional, so only
+  // validate the ones that were actually typed. The Apple serial rule (11/12
+  // chars, no O/I) only fits Apple products — gate it on the line's brand;
+  // non-Apple serials are left as free text.
+  const isApple = /apple/i.test(line?.brand_name ?? '');
+
+  const imeiErrorKey = (() => {
+    if (!imeiTrimmed) return null;
+    const r = validateIMEI(imeiTrimmed);
+    if (r.valid) return null;
+    return imeiTrimmed.replace(/[\s-]/g, '').length === 15
+      ? 'buyback.imeiInvalidChecksum'
+      : 'buyback.imeiInvalidLength';
+  })();
+
+  const serialErrorKey = (() => {
+    if (!serialTrimmed || !isApple) return null;
+    const r = validateiPhoneSerial(serialTrimmed);
+    if (r.valid) return null;
+    return /[OI]/.test(serialTrimmed.toUpperCase()) || !/^[A-Za-z0-9]+$/.test(serialTrimmed)
+      ? 'buyback.serialInvalidChars'
+      : 'buyback.serialInvalidLength';
+  })();
+
+  const identifiersValid = !imeiErrorKey && !serialErrorKey;
+
   // All non-identifier checks must pass (the identifier check is gated by
   // haveIdentifier instead, since we validate without identifiers above). The
   // backend re-validates everything at submit, so this is just the button gate.
   const nonIdChecksPass = (validate.data?.checks ?? [])
     .filter(c => c.code !== 'IDENTIFIERS_PROVIDED')
     .every(c => c.passed);
-  const canSubmit = haveIdentifier && nonIdChecksPass && !!validate.data && !submit.isPending;
+  const canSubmit = haveIdentifier && identifiersValid && nonIdChecksPass && !!validate.data && !submit.isPending;
 
   return (
     <div className="flex flex-col h-full min-w-0 overflow-hidden">
@@ -111,23 +143,33 @@ export function PanelSubmit({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex flex-col">
-                <label className="form-label">IMEI</label>
-                <Input
+                <label className="form-label">{t('asset.imei')}</label>
+                <ImeiInput
                   value={imei}
-                  onChange={(e) => setImei(e.target.value)}
+                  onChange={setImei}
                   placeholder={t('buyback.imeiPlaceholder')}
                   className="w-full"
+                  error={!!imeiErrorKey}
+                  endIcon={imeiTrimmed && !imeiErrorKey ? <Check size={16} className="text-success" /> : undefined}
                   autoFocus
                 />
+                {imeiErrorKey && (
+                  <span className="text-xs text-danger mt-1">{t(imeiErrorKey)}</span>
+                )}
               </div>
               <div className="flex flex-col">
-                <label className="form-label">Serial No.</label>
+                <label className="form-label">{t('asset.serialNo')}</label>
                 <Input
                   value={serial}
                   onChange={(e) => setSerial(e.target.value)}
                   placeholder={t('buyback.serialPlaceholder')}
                   className="w-full"
+                  error={!!serialErrorKey}
+                  endIcon={serialTrimmed && isApple && !serialErrorKey ? <Check size={16} className="text-success" /> : undefined}
                 />
+                {serialErrorKey && (
+                  <span className="text-xs text-danger mt-1">{t(serialErrorKey)}</span>
+                )}
               </div>
             </div>
 

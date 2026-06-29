@@ -23,10 +23,7 @@ interface RefundTxn {
   created_at: string;
 }
 
-const CHANNEL_OPTIONS = [
-  { value: 'CASH', label: 'CASH' },
-  { value: 'TRANSFER', label: 'TRANSFER' },
-];
+const CHANNEL_VALUES = ['CASH', 'TRANSFER'] as const;
 
 export function RefundVoidModal({
   open, onClose, onSuccess, contractId,
@@ -144,7 +141,7 @@ export function RefundVoidModal({
                 <div className="flex flex-col">
                   <label className="form-label">{t('contract.refundVoid_channel')} *</label>
                   <Select
-                    options={CHANNEL_OPTIONS}
+                    options={CHANNEL_VALUES.map(v => ({ value: v, label: t(`contract.channel_${v.toLowerCase()}`) }))}
                     value={channel}
                     onChange={(val) => setChannel(val as string)}
                     showChevron

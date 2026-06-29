@@ -967,7 +967,7 @@ function ManageOptionsModal({ attribute, open, onClose, holdingId }: {
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('attributes.isDefault')} />,
       cell: ({ row }) => {
         const def = row.getValue('is_default') as boolean;
-        return def ? <Badge size="sm" color="primary">Default</Badge> : null;
+        return def ? <Badge size="sm" color="primary">{t('common.default')}</Badge> : null;
       },
     },
     {

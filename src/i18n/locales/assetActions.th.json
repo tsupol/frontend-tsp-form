@@ -62,5 +62,17 @@
   "identifierAdd.notePlaceholder": "เหตุผลที่เพิ่มภายหลัง (ไม่บังคับ)",
   "identifierAdd.valuePlaceholder": "ค่า",
   "identifierAdd.success": "เพิ่มเลขประจำเครื่องแล้ว",
+  "option.sellReason.OUTRIGHT_SALE": "ขายขาด",
+  "option.sellReason.BUYBACK_REVERSAL_SALE": "ขายกลับจากการซื้อคืน",
+  "option.sellChannel.CASH": "เงินสด",
+  "option.sellChannel.TRANSFER": "โอนเงิน",
+  "option.quarantineReason.DAMAGED": "ชำรุด",
+  "option.quarantineReason.SUSPECT": "ต้องสงสัย",
+  "option.quarantineReason.INSPECTION": "ตรวจสอบ",
+  "option.quarantineReason.RETURNED_FROM_REPAIR": "ส่งกลับจากการซ่อม",
+  "option.quarantineReason.OTHER": "อื่นๆ",
+  "option.writeOffReason.MISSING": "สูญหาย",
+  "option.writeOffReason.THEFT": "ถูกโจรกรรม",
+  "option.writeOffReason.DAMAGED_BEYOND_USE": "ชำรุดจนใช้งานไม่ได้",
   "notImplemented": "ยังไม่ได้เชื่อมในหน้านี้"
 }

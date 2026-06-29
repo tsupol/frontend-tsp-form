@@ -119,6 +119,7 @@ export function Step1DeviceInfo() {
               <AutocompleteInput
                 placeholder="353456789012348"
                 maxLength={17}
+                inputMode="numeric"
                 disabled={!hasSim}
                 value={field.value}
                 onChange={(value) => {

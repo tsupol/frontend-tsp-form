@@ -5,11 +5,7 @@ import { XCircle, Loader2 } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { useWorkspace } from './WorkspaceContext';
 
-const SHIPPING_OPTIONS = [
-  { value: 'PICKUP', label: 'Pickup at store' },
-  { value: 'DELIVERY', label: 'Delivery' },
-  { value: 'COURIER', label: 'Courier / Shipping' },
-];
+const SHIPPING_VALUES = ['PICKUP', 'DELIVERY', 'COURIER'] as const;
 
 interface Props {
   open: boolean;
@@ -73,7 +69,7 @@ export function ModalDelivery({ open, onClose }: Props) {
           <div className="flex flex-col">
             <label className="form-label">{t('wizard.shippingMethod')}</label>
             <Select
-              options={SHIPPING_OPTIONS}
+              options={SHIPPING_VALUES.map(v => ({ value: v, label: t(`contract.shipping_${v}`) }))}
               value={method}
               onChange={(val) => setMethod(val as string)}
               size="sm"

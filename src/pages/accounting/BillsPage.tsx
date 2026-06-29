@@ -42,11 +42,7 @@ interface PaymentLine {
 
 /* ── Constants ── */
 
-const TYPE_OPTIONS = [
-  { value: 'INVOICE', label: 'Invoice' },
-  { value: 'CREDIT_NOTE', label: 'Credit Note' },
-  { value: 'JOURNAL', label: 'Journal' },
-];
+const TYPE_VALUES = ['INVOICE', 'CREDIT_NOTE', 'JOURNAL'] as const;
 
 const LINE_TYPE_COLOR: Record<string, 'primary' | 'success' | 'secondary' | 'info' | 'warning'> = {
   CONTRACT: 'primary',
@@ -272,7 +268,7 @@ export function BillsPage() {
                         <Select
                           value={typeFilter || null}
                           onChange={(v) => updateFilters({ type: (v as string) ?? '' })}
-                          options={TYPE_OPTIONS}
+                          options={TYPE_VALUES.map(v => ({ value: v, label: t(`accounting.bills.typeLabel.${v}`) }))}
                           size="sm"
                           showChevron
                           placeholder={t('accounting.bills.type')}
@@ -413,10 +409,7 @@ export function BillsPage() {
 
 /* ── Detail Panel ── */
 
-const PAYMENT_METHOD_OPTIONS = [
-  { value: 'CASH', label: 'Cash' },
-  { value: 'TRANSFER', label: 'Bank Transfer' },
-];
+const PAYMENT_METHOD_VALUES = ['CASH', 'TRANSFER'] as const;
 
 function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChanged: (message?: ReactNode) => void }) {
   const { t } = useTranslation();
@@ -839,7 +832,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
                   <div className="flex flex-col" style={{ width: '10rem' }}>
                     <label className="form-label text-xs">{t('accounting.bills.method')}</label>
                     <Select
-                      options={PAYMENT_METHOD_OPTIONS}
+                      options={PAYMENT_METHOD_VALUES.map(v => ({ value: v, label: t(`paymentMethod.${v}`) }))}
                       value={payment.method}
                       onChange={(val) => updatePayment(idx, { method: val as PaymentMethod, bank_account_id: null })}
                       size="sm"

@@ -62,5 +62,17 @@
   "identifierAdd.notePlaceholder": "Why is this being added later? (optional)",
   "identifierAdd.valuePlaceholder": "Value",
   "identifierAdd.success": "Identifier added",
+  "option.sellReason.OUTRIGHT_SALE": "Outright sale",
+  "option.sellReason.BUYBACK_REVERSAL_SALE": "Buyback reversal sale",
+  "option.sellChannel.CASH": "Cash",
+  "option.sellChannel.TRANSFER": "Bank transfer",
+  "option.quarantineReason.DAMAGED": "Damaged",
+  "option.quarantineReason.SUSPECT": "Suspect",
+  "option.quarantineReason.INSPECTION": "Inspection",
+  "option.quarantineReason.RETURNED_FROM_REPAIR": "Returned from repair",
+  "option.quarantineReason.OTHER": "Other",
+  "option.writeOffReason.MISSING": "Missing",
+  "option.writeOffReason.THEFT": "Theft",
+  "option.writeOffReason.DAMAGED_BEYOND_USE": "Damaged beyond use",
   "notImplemented": "Not yet available in this page"
 }

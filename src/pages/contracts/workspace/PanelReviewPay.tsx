@@ -37,10 +37,7 @@ import { signContractOpenParties } from './signContractOpenParties';
    screen — that is the bug we are NOT going back to.
    ──────────────────────────────────────────────────────────────────────── */
 
-const BASE_PAYMENT_METHODS = [
-  { value: 'CASH', label: 'Cash' },
-  { value: 'TRANSFER', label: 'Bank Transfer' },
-];
+const BASE_PAYMENT_METHOD_VALUES = ['CASH', 'TRANSFER'] as const;
 
 interface ReadinessResult {
   ready: boolean;
@@ -90,7 +87,7 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
 
   // ── Payment rows ─────────────────────────────────────────────────────
   const paymentMethodOptions = useMemo(() => {
-    const opts = [...BASE_PAYMENT_METHODS];
+    const opts = BASE_PAYMENT_METHOD_VALUES.map(v => ({ value: v as string, label: t(`paymentMethod.${v}`) }));
     if (savingBalance > 0) {
       opts.push({ value: 'SAVING_WALLET', label: `${t('workspace.savingWallet')} (${fmtCurrency(savingBalance)})` });
     }

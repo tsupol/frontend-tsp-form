@@ -381,6 +381,7 @@
   "inv.auth.repair_dispose_requires_admin": "Routing an unrepairable asset to disposal requires company admin approval.",
   "INV.CONFLICT.BUYBACK_MATCH_CONFLICT": "Identifier matching found a conflict. A conflict record has been opened — resolve it before completing intake.",
   "inv.conflict.buyback_match_conflict": "Identifier matching found a conflict. A conflict record has been opened — resolve it before completing intake.",
+  "inv.conflict.buyback_identifier_reserved": "This Serial/IMEI is already on another in-progress buyback (pending or approved).",
   "INV.CONFLICT.IDENTIFIER_CONFLICT": "{{type}} {{value}} already belongs to another active asset in this holding.",
   "inv.conflict.identifier_conflict": "{{type}} {{value}} already belongs to another active asset in this holding.",
   "INV.CONFLICT.REPAIR_LOANER_CONFLICT": "Cannot assign a loaner: this contract already has an active device. Only one device per contract is allowed.",
