@@ -6,13 +6,14 @@ import {
 } from 'tsp-form';
 import {
   Plus, Trash2, ShoppingCart, Truck, Percent, ChevronsRight,
-  AlertCircle, CheckCircle, XCircle, Barcode, ScanBarcode,
+  AlertCircle, XCircle, Barcode, ScanBarcode,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { fmtCurrency } from '../../lib/format';
 import { useBarcodeScanner } from '../../components/BarcodeScanner';
 import { BranchPaymentAccountField } from '../../components/BranchPaymentAccountField';
+import { ActionDoneView } from '../contracts/ActionDoneView';
 
 /* ───────────────────────────────────────────────────────────────────────────
  * Types — match fn_bill_retail_preview / fn_bill_retail_submit (doc 38 §0)
@@ -122,13 +123,23 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
   const [previewing, setPreviewing] = useState(false);
   const [previewError, setPreviewError] = useState<string>('');
 
+  // Success state — replaces auto-close + snackbar (write-modal checklist §1/§2).
+  const [view, setView] = useState<'form' | 'done'>('form');
+  const [done, setDone] = useState<{
+    code: string;
+    mode: 'atomic' | 'approval';
+    change: number;
+    total: number;
+    billId: number;
+  } | null>(null);
+
   const [productPickerOpen, setProductPickerOpen] = useState(false);
   const [shippingOpen, setShippingOpen] = useState(false);
   const [discountForLineIdx, setDiscountForLineIdx] = useState<number | null>(null);
 
-  // Reset everything when modal closes/reopens
+  // Reset everything when modal opens (checklist §1: reset to 'form' on open).
   useEffect(() => {
-    if (!open) {
+    if (open) {
       setLines([]);
       setPaymentMethod('CASH');
       setPaymentAmount(0);
@@ -138,6 +149,8 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
       setProductPickerOpen(false);
       setShippingOpen(false);
       setDiscountForLineIdx(null);
+      setView('form');
+      setDone(null);
     }
   }, [open]);
 
@@ -213,14 +226,14 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
    *    later (after approver review) via fn_bill_payment_add/_confirm.
    */
   const submitMutation = useMutation({
-    mutationFn: async (): Promise<{ code: string; mode: 'atomic' | 'approval'; change: number }> => {
+    mutationFn: async (): Promise<{ code: string; mode: 'atomic' | 'approval'; change: number; billId: number }> => {
       if (!preview?.approvals?.any_required) {
         const res = await apiClient.rpc<SubmitResponse>('fn_bill_retail_submit', {
           ...previewParams,
           p_payment_reference: null,
           p_preview_token: preview?.preview_token,
         });
-        return { code: res.code_display, mode: 'atomic', change: res.change_amount };
+        return { code: res.code_display, mode: 'atomic', change: res.change_amount, billId: res.bill_id };
       }
 
       // 3-step approval flow
@@ -291,24 +304,14 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
         });
       }
 
-      return { code: created.code_display, mode: 'approval', change: 0 };
+      return { code: created.code_display, mode: 'approval', change: 0, billId };
     },
-    onSuccess: ({ code, mode, change }) => {
-      addSnackbar({
-        type: 'success',
-        message: (
-          <div className="alert alert-success">
-            <CheckCircle size={16} />
-            <span className="alert-description">
-              {mode === 'atomic'
-                ? t('retail.create.submitSuccess', { code, change: fmtCurrency(change) })
-                : t('retail.create.submitPendingApproval', { code })}
-            </span>
-          </div>
-        ),
-      });
+    onSuccess: ({ code, mode, change, billId }) => {
+      // Refresh the list behind the modal, then show the in-modal success view.
+      // The user prints/closes themselves (checklist §1/§2) — no snackbar, no auto-close.
       onSuccess();
-      onClose();
+      setDone({ code, mode, change, total, billId });
+      setView('done');
     },
     onError: (err) => {
       if (err instanceof ApiError) {
@@ -449,6 +452,33 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
           <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">×</button>
         </div>
 
+        {view === 'done' && done ? (
+          <ActionDoneView
+            headline={done.mode === 'atomic'
+              ? t('retail.create.doneHeadlineSale')
+              : t('retail.create.doneHeadlineApproval')}
+            contractCode={done.code}
+            tone={done.mode === 'atomic' ? 'success' : 'warning'}
+            detailRows={done.mode === 'atomic'
+              ? [
+                  { label: t('retail.create.doneRowTotal'), value: fmtCurrency(done.total), emphasis: true },
+                  ...(done.change > 0
+                    ? [{ label: t('retail.create.doneRowChange'), value: fmtCurrency(done.change) }]
+                    : []),
+                ]
+              : [{ label: t('retail.create.doneRowTotal'), value: fmtCurrency(done.total), emphasis: true }]}
+            extras={done.mode === 'approval' ? (
+              <div className="alert alert-info">
+                <AlertCircle size={16} />
+                <div className="alert-description">{t('retail.create.doneApprovalNote')}</div>
+              </div>
+            ) : undefined}
+            /* Print/PDF only for a PAID atomic sale — approval bills are OPEN, no receipt yet. */
+            billId={done.mode === 'atomic' ? done.billId : null}
+            onClose={onClose}
+          />
+        ) : (
+        <>
         <div className="modal-content flex flex-col gap-3" style={{ paddingBottom: 0 }}>
           {/* Branch + walk-in tag */}
           <div className="flex items-center gap-2">
@@ -638,6 +668,8 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
             {needsApproval ? t('retail.create.submitForApproval') : t('retail.create.checkout')}
           </Button>
         </div>
+        </>
+        )}
       </div>
 
       <ProductPickerModal

@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
 import {
@@ -7,12 +9,16 @@ import {
 } from 'tsp-form';
 import {
   ArrowRightFromLine, ArrowLeft, Plus, Wallet, Ban, AlertCircle, CheckCircle, XCircle, ChevronsRight,
+  Printer, Download, Loader2, ExternalLink,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { DateTime } from '../../components/DateTime';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { fmtCurrency } from '../../lib/format';
+import { printWithMarker } from '../../lib/printDoc';
+import { useBillPdfDownload } from '../../hooks/useBillPdfDownload';
+import { BillReceipt } from '../contracts/workspace/BillReceipt';
 import { buildBillActionToast, hasBill, type StandardBillResponse } from '../../lib/billActionToast';
 import { CreateRetailBillModal } from './CreateRetailBillModal';
 import { useBillActions, type BillAction, type BillBlockingReason } from '../../hooks/useBillActions';
@@ -281,6 +287,7 @@ export function RetailBillsPage() {
 
 function RetailBillDetail({ billId, isMobile }: { billId: number; isMobile: boolean }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [payOpen, setPayOpen] = useState(false);
   const [voidOpen, setVoidOpen] = useState(false);
@@ -291,6 +298,32 @@ function RetailBillDetail({ billId, isMobile }: { billId: number; isMobile: bool
   });
 
   const { data: actionsData, getAction } = useBillActions(billId);
+
+  // Print receipt — same body-portal pattern as BillsPage / ActionDoneView.
+  const [printReady, setPrintReady] = useState(false);
+  const { downloading: downloadingPdf, download: downloadPdf } = useBillPdfDownload();
+  const handlePrint = useCallback(async () => {
+    try {
+      const billRows = await queryClient.fetchQuery({
+        queryKey: ['bill-detail', billId],
+        queryFn: () => apiClient.get<BillDetail[]>(`/v_bill_detail?bill_id=eq.${billId}`).then(rows => rows[0] ?? null),
+      });
+      const bId = (billRows as BillDetail | null)?.branch_id;
+      if (bId != null) {
+        await queryClient.fetchQuery({
+          queryKey: ['branch-info', bId],
+          queryFn: () => apiClient.get(`/v_branches?id=eq.${bId}&select=id,name,address`).then((rows: unknown) => (rows as unknown[])[0] ?? null),
+        });
+      }
+    } catch {
+      // Fall through — receipt shows its own loading state.
+    }
+    setPrintReady(true);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      printWithMarker('bill');
+      setPrintReady(false);
+    }));
+  }, [billId, queryClient]);
 
   if (isLoading) return <div className="p-6 text-sm text-subtler">{t('common.loading')}</div>;
   const detail = details?.[0];
@@ -304,6 +337,10 @@ function RetailBillDetail({ billId, isMobile }: { billId: number; isMobile: bool
   const cancelBillAction = getAction('CANCEL_BILL');
   const showPayBtn = !!addPaymentAction?.is_available;
   const showVoidBtn = !!cancelBillAction?.is_available;
+  // Receipt only makes sense once money has moved — VOIDED has no receipt to print.
+  const showReceiptBtns = detail.status !== 'VOIDED';
+
+  const openBillPage = () => navigate(`/admin/accounting/bills/${billId}`);
 
   const onMutationSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ['retail', 'bill-detail', billId] });
@@ -340,6 +377,35 @@ function RetailBillDetail({ billId, isMobile }: { billId: number; isMobile: bool
               {t('retail.bills.void')}
             </Button>
           )}
+          {showReceiptBtns && (
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                startIcon={<Printer size={14} />}
+                onClick={handlePrint}
+              >
+                {t('retail.bills.printBill')}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                startIcon={downloadingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                disabled={downloadingPdf}
+                onClick={() => downloadPdf(billId)}
+              >
+                {t('wizard.receipt_download')}
+              </Button>
+            </>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            startIcon={<ExternalLink size={14} />}
+            onClick={openBillPage}
+          >
+            {t('retail.bills.openBillPage')}
+          </Button>
         </div>
       )}
 
@@ -370,8 +436,8 @@ function RetailBillDetail({ billId, isMobile }: { billId: number; isMobile: bool
       </div>
 
       {/* Mobile action row */}
-      {isMobile && (showPayBtn || showVoidBtn) && (
-        <div className="flex-none flex gap-2 px-4 py-3 border-b border-line">
+      {isMobile && (
+        <div className="flex-none flex flex-wrap gap-2 px-4 py-3 border-b border-line">
           {showPayBtn && (
             <Button
               size="sm"
@@ -395,6 +461,38 @@ function RetailBillDetail({ billId, isMobile }: { billId: number; isMobile: bool
               {t('retail.bills.void')}
             </Button>
           )}
+          {showReceiptBtns && (
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex-1"
+                startIcon={<Printer size={14} />}
+                onClick={handlePrint}
+              >
+                {t('retail.bills.printBill')}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex-1"
+                startIcon={downloadingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                disabled={downloadingPdf}
+                onClick={() => downloadPdf(billId)}
+              >
+                {t('wizard.receipt_download')}
+              </Button>
+            </>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex-1"
+            startIcon={<ExternalLink size={14} />}
+            onClick={openBillPage}
+          >
+            {t('retail.bills.openBillPage')}
+          </Button>
         </div>
       )}
 
@@ -470,6 +568,15 @@ function RetailBillDetail({ billId, isMobile }: { billId: number; isMobile: bool
         branchId={detail.branch_id}
         onSuccess={() => { setVoidOpen(false); onMutationSuccess(); }}
       />
+
+      {/* Print receipt — body portal so no panel ancestor becomes the @page
+          positioning context. Hidden on screen via .print-only-receipt. */}
+      {printReady && createPortal(
+        <div className="print-only-receipt" aria-hidden>
+          <BillReceipt billId={billId} hidePrintButton />
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }
