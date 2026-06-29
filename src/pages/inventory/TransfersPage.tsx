@@ -82,6 +82,24 @@ interface Branch {
   name: string;
 }
 
+// fn_transfer_available_actions — backend-driven button gating.
+// Receive/approve/cancel must be driven by this, NOT by order.status alone:
+// allowed_actions is per-order (anyone seeing an IN_TRANSIT order gets confirm_receive),
+// has_permission is per-user/branch (only the destination branch gets transfer_receive).
+// Gate = allowed_actions includes the action AND has_permission is true.
+interface TransferActions {
+  status: string;
+  from_branch_id: number;
+  to_branch_id: number;
+  allowed_actions: string[];
+  has_permission: {
+    transfer_create: boolean;
+    transfer_approve: boolean;
+    transfer_dispute: boolean;
+    transfer_receive: boolean;
+  };
+}
+
 // v_transfer_destination_branches — destination picker
 interface DestinationBranch {
   branch_id: number;
@@ -153,7 +171,7 @@ export function TransfersPage() {
   const { user } = useAuth();
 
   const isBranchUser = ['BRANCH_STAFF', 'BRANCH_MANAGER'].includes(user?.role_code ?? '');
-  const defaultBranchId = isBranchUser && user?.branch_id ? user.branch_id : null;
+  const ownBranchId = isBranchUser && user?.branch_id ? user.branch_id : null;
 
   const navigate = useNavigate();
   const { transferId: transferIdParam } = useParams<{ transferId?: string }>();
@@ -164,7 +182,10 @@ export function TransfersPage() {
   };
 
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
-  const [filterBranchId, setFilterBranchId] = useState<number | null>(defaultBranchId);
+  const [filterFromBranch, setFilterFromBranch] = useState<number | null>(null);
+  // Default the destination to the user's own branch — a branch lands on its
+  // inbound/receive queue (where order 14 etc. live), not its outbound list.
+  const [filterToBranch, setFilterToBranch] = useState<number | null>(ownBranchId);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
   const [search, setSearch] = useState('');
@@ -172,7 +193,7 @@ export function TransfersPage() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
 
-  const extraFilterCount = (filterStatus ? 1 : 0) + (filterBranchId !== null ? 1 : 0);
+  const extraFilterCount = (filterStatus ? 1 : 0) + (filterFromBranch !== null ? 1 : 0) + (filterToBranch !== null ? 1 : 0);
 
   useEffect(() => {
     const tm = setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -190,11 +211,12 @@ export function TransfersPage() {
   }, [branches]);
 
   const { data: listData, isFetching } = useQuery({
-    queryKey: ['transfer-orders', filterStatus, filterBranchId, debouncedSearch, pageIndex, pageSize],
+    queryKey: ['transfer-orders', filterStatus, filterFromBranch, filterToBranch, debouncedSearch, pageIndex, pageSize],
     queryFn: () => {
       let url = '/v_transfer_orders?order=created_at.desc';
       if (filterStatus) url += `&status=eq.${filterStatus}`;
-      if (filterBranchId) url += `&from_branch_id=eq.${filterBranchId}`;
+      if (filterFromBranch) url += `&from_branch_id=eq.${filterFromBranch}`;
+      if (filterToBranch) url += `&to_branch_id=eq.${filterToBranch}`;
       if (debouncedSearch) {
         const term = encodeURIComponent(debouncedSearch);
         url += `&transfer_no=ilike.*${term}*`;
@@ -214,7 +236,15 @@ export function TransfersPage() {
     placeholderData: keepPreviousData,
   });
 
-  useEffect(() => { setPageIndex(0); }, [filterStatus, filterBranchId, debouncedSearch]);
+  // Backend-driven button gating — which actions this user can take on this order.
+  const { data: actions } = useQuery({
+    queryKey: ['transfer-actions', selectedId],
+    queryFn: () => apiClient.rpc<TransferActions>('fn_transfer_available_actions', { p_transfer_order_id: selectedId }),
+    enabled: !!selectedId,
+    placeholderData: keepPreviousData,
+  });
+
+  useEffect(() => { setPageIndex(0); }, [filterStatus, filterFromBranch, filterToBranch, debouncedSearch]);
 
   // Fallback fetch so direct deep-links (id not on current page) still resolve.
   const { data: detailFallback } = useQuery({
@@ -228,6 +258,7 @@ export function TransfersPage() {
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['transfer-orders'] });
     queryClient.invalidateQueries({ queryKey: ['transfer-lines'] });
+    queryClient.invalidateQueries({ queryKey: ['transfer-actions'] });
   };
 
   return (
@@ -322,15 +353,30 @@ export function TransfersPage() {
                           showChevron
                           clearable
                         />
-                        <Select
-                          options={branchOptions}
-                          value={filterBranchId !== null ? String(filterBranchId) : null}
-                          onChange={(val) => setFilterBranchId(val ? Number(val) : null)}
-                          placeholder={t('inventory.allBranches')}
-                          size="sm"
-                          showChevron
-                          clearable
-                        />
+                        <div className="flex flex-col">
+                          <label className="form-label">{t('transfer.from')}</label>
+                          <Select
+                            options={branchOptions}
+                            value={filterFromBranch !== null ? String(filterFromBranch) : null}
+                            onChange={(val) => setFilterFromBranch(val ? Number(val) : null)}
+                            placeholder={t('transfer.allFromBranches', { defaultValue: 'All source branches' })}
+                            size="sm"
+                            showChevron
+                            clearable
+                          />
+                        </div>
+                        <div className="flex flex-col">
+                          <label className="form-label">{t('transfer.to')}</label>
+                          <Select
+                            options={branchOptions}
+                            value={filterToBranch !== null ? String(filterToBranch) : null}
+                            onChange={(val) => setFilterToBranch(val ? Number(val) : null)}
+                            placeholder={t('transfer.allToBranches', { defaultValue: 'All destination branches' })}
+                            size="sm"
+                            showChevron
+                            clearable
+                          />
+                        </div>
                       </div>
                     </PopOver>
                   </div>
@@ -388,6 +434,7 @@ export function TransfersPage() {
                 <TransferDetailPanel
                   order={selectedOrder}
                   lines={lines ?? []}
+                  actions={actions ?? null}
                   loading={linesFetching}
                   isMobile={isMobile}
                   t={t}
@@ -408,7 +455,7 @@ export function TransfersPage() {
           <CreateTransferModal
             open={createOpen}
             onClose={() => setCreateOpen(false)}
-            fromBranchId={defaultBranchId}
+            fromBranchId={ownBranchId}
             t={t}
             onCreated={(newId) => {
               setCreateOpen(false);
@@ -550,6 +597,7 @@ function CreateTransferModal({
 function TransferDetailPanel({
   order,
   lines,
+  actions,
   loading,
   isMobile,
   t,
@@ -558,6 +606,7 @@ function TransferDetailPanel({
 }: {
   order: TransferOrder;
   lines: TransferLine[];
+  actions: TransferActions | null;
   loading: boolean;
   isMobile: boolean;
   t: ReturnType<typeof useTranslation>['t'];
@@ -569,10 +618,16 @@ function TransferDetailPanel({
   const [receiveLine, setReceiveLine] = useState<TransferLine | null>(null);
   const [addLineType, setAddLineType] = useState<'ASSET' | 'LOT' | null>(null);
 
-  const canApprove = order.status === 'DRAFT';
-  const canEditLines = order.status === 'DRAFT';
-  const canCancel = order.status === 'DRAFT';
-  const canReceive = order.status === 'IN_TRANSIT' || order.status === 'DISPUTED';
+  // Backend-driven: action must be in allowed_actions AND the user must hold the permission.
+  // Until the actions query resolves, hide all action buttons (don't fall back to status alone —
+  // that's the bug being fixed: it shows Receive to the source branch, which the backend rejects).
+  const can = (action: string, perm: keyof TransferActions['has_permission']) =>
+    !!actions && actions.allowed_actions.includes(action) && actions.has_permission[perm];
+
+  const canApprove = can('approve', 'transfer_approve');
+  const canEditLines = can('add_line', 'transfer_create');
+  const canCancel = can('cancel', 'transfer_create');
+  const canReceive = can('confirm_receive', 'transfer_receive');
 
   return (
     <div className="relative flex flex-col h-full">
@@ -1133,8 +1188,6 @@ function ReceiveLineModal({
     },
   });
 
-  if (!line) return null;
-
   const needsNote = action === 'RECEIVED_DAMAGED' || action === 'NOT_RECEIVED';
 
   const handleDoneClose = () => {
@@ -1159,7 +1212,7 @@ function ReceiveLineModal({
           </h2>
           <button type="button" className="modal-close-btn" onClick={view === 'done' ? handleDoneClose : onClose} aria-label="Close">&times;</button>
         </div>
-        {view === 'done' && result && (
+        {view === 'done' && result && line && (
           <ActionDoneView
             headline={t('transfer.receiveLineDoneHeadline', { defaultValue: 'Receipt recorded' })}
             contractCode={line.line_type === 'ASSET' ? (line.asset_code ?? `line #${result.transfer_line_id}`) : `Lot #${line.stock_lot_id}`}
@@ -1179,7 +1232,7 @@ function ReceiveLineModal({
             onClose={handleDoneClose}
           />
         )}
-        {view === 'form' && <>
+        {view === 'form' && line && <>
         <div className="modal-content">
           {error && (
             <div className="alert alert-danger mb-4 animate-pop-in">

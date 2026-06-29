@@ -2,6 +2,8 @@
 
 ## General
 
+- **This file is an index, not a rulebook.** Detailed guidance lives in its topic's dedicated doc — components/styling → global `tsp-form-guide.md` + `.claude/tsp-form-guide-here.md`; nav-guarding → `.claude/nav-guard-pattern.md`; reporting/talk-style → `.claude/reporting-style.md`; printing → `.claude/in-app-print-pattern.md`; success modals → `.claude/action-done-view.md`; etc. **Placing new guidance, in order:** (1) if an established doc already owns the area (styling, nav-guarding, printing, …), put it there regardless of length — cohesion beats brevity; (2) else if it's short and self-contained, write it as a one-line bullet here; (3) else (real depth — examples, tables, gotchas, multiple cases) create a topic doc and leave a one-line pointer here. Don't create a doc just to hold a sentence — the indirection (extra file, pointer to keep in sync) costs more than it saves. Place by topic; never append a rule to whatever file happens to be open.
+- **Reporting multi-item findings/tasks — group by page/section the user sees**, not by status or backend concern. See `.claude/reporting-style.md`. Terse, page name first.
 - **`guarantor` is now `co_lessee`** (renamed 2026-06-22, ผู้ค้ำประกัน → ผู้เช่าร่วม). Pure rename, behavior unchanged. The full mapping (incl. the abbreviated `signing_sealed_add_colessee_staff` event_type and which i18n keys are backend-locked vs FE-internal) is in `.claude/_RENAME_SPEC.md` — a temporary historical artifact, not standing guidance. If you see `guarantor` anywhere in `src/`, it's a leftover; apply that spec. Don't introduce new `guarantor` naming.
 - **Never start the dev server** (`npm run dev` / `npx vite`) — the user already has it running. Only use `npm run build` or `npx tsc --noEmit` to check for errors.
 - **Never create a git branch — solo dev, commit straight to `main`.**
@@ -22,21 +24,12 @@
 - **MCP API debugging** — when calling RPCs via the `dev-api` MCP, read `.claude/mcp-api-debug.md` before assuming any RPC is missing or renamed (PGRST202 with a hint means wrong params, not missing function)
 - **Stale backend docs** — `UI_SUMMARY/` docs can drift from the running API. Before trusting documented flows/RPCs, check `.claude/stale-backend-docs.md` for known discrepancies. Full findings are filed in `D:/dev/nnf/UI_FEEDBACK/YYYY-MM-DD_topic.md`.
 - **Never create/commit a `UI_FEEDBACK/` doc without explicit permission** — it's outward-facing (BE reads + acts). Propose it in chat, get a yes, then file. Overrides any "surface backend gaps → file" rule. For backend bugs, also render a visible FE warning (`alert alert-warning`) rather than swallowing the error.
-- **Write-modal checklist — every new modal that mutates data MUST satisfy all four.** This rule has been broken repeatedly (most recently `SigningVoidModal`, `SigningSignModal`). The global `tsp-form-guide.md` has the long version; this is the inspect-the-diff version:
-  1. **`view: 'form' | 'done'` state.** On mutation success set `view='done'`, do NOT call `onClose()`. Reset to `'form'` in the `useEffect` that runs on `open`.
-  2. **`ActionDoneView` (or equivalent) in the `'done'` branch.** Shows what was saved + a single "Done" button. The user closes the modal themselves.
-  3. **`handleClose` that guards a dirty form.** Backdrop, ESC, close-X, and the Cancel button all route through one handler that pops a confirm-discard sub-modal when the form has unsaved input. Bypass when `view === 'done'`.
-  4. **`<Modal open={...}>` always mounted.** Never `{x && <Modal />}` — the conditional mount silently breaks the transition.
-  Anti-patterns to grep for in your own diff before claiming done: `onSuccess.*onClose\(\)`, `{[a-zA-Z]+ && <Modal`, raw `onClose={onClose}` on a Modal whose form has any input state. If any match, you missed the rule.
+- **Write-modal checklist** — every data-mutating modal MUST: (1) `view: 'form' | 'done'` state, success sets `'done'` and does NOT `onClose()`; (2) `ActionDoneView` in the done branch; (3) one `handleClose` that guards a dirty form; (4) `<Modal>` always mounted. Long version: global `tsp-form-guide.md` "Form modals: success step + nav guard" + `.claude/action-done-view.md`. Repeatedly broken — before claiming done, grep your diff for `onSuccess.*onClose\(\)`, `{[a-zA-Z]+ && <Modal`, and raw `onClose={onClose}` on a Modal with input state. Any match = rule missed.
 - **Playwright MCP** — before using Playwright, read `.claude/playwright-guide.md` for login shortcuts and performance rules (use `browser_run_code` to batch actions, `browser_snapshot` not screenshots)
 - **Action button end-icons** — backend-driven action footers (Contract, Asset) use `ExternalLink` for actions that live elsewhere and `Wrench` for not-yet-wired actions, with stacked tooltip lines. See `.claude/action-button-end-icons.md` before adding/wiring any action button.
+- **Backend-driven action buttons** — when a flow exposes a `fn_*_available_actions` capability RPC (`fn_contract_available_actions`, `fn_transfer_available_actions`, …), render buttons from its `allowed_actions` + `has_permission`/`is_available`, never from entity `status` alone. Status-only gating shows actions to the wrong branch/role and dies on submit (e.g. `INV.AUTH.BRANCH_MISMATCH`). The per-order field (`allowed_actions`) and the per-user field (`has_permission`) are both required — AND them; until the RPC resolves, hide the buttons (no status fallback).
 - **Dual nav menus** — each section's fan-out lives in both `src/AppSideNav.tsx` (global) and `src/pages/<section>/<Section>Layout.tsx` (page sub-nav). Update both when changing items/labels/icons/badges. Count badges share queries via `src/hooks/useNavCounts.ts`.
-- **No hardcoded English in user-facing strings.** Anything a user reads — Select `label`, Badge text, button labels, modal titles, table headers, placeholders, toast messages — must come from `t('...')`. Specifically forbidden patterns:
-  1. **Select options with literal labels:** `[{value: 'DRAFT', label: 'Draft'}]`. Instead: keep a `_VALUES` const of codes and resolve at the call site: `VALUES.map(v => ({value: v, label: t(\`section.status_${v}\`)}))`. The status_* translation keys for inventory (po, receiving, transfer, repair, buyback) and contracts already exist in `en.json` / `th.json` — reuse them.
-  2. **Badges rendering raw enum values:** `<Badge>{row.status}</Badge>` or `<Badge>{id.type}</Badge>`. Wrap in `t(\`section.status_${row.status}\`, { defaultValue: row.status })` so Thai users don't see `PENDING_APPROVAL`. The `defaultValue` is a safety net for new codes, not the primary path.
-  3. **String concatenation that includes a raw enum:** `{contract.state} · {something}`. Same fix — translate the enum portion first.
-  4. **Field labels mid-render:** `<span>{k}:</span>` where `k` is a JSON key (`OVERALL_CONDITION`, `BATTERY_HEALTH`). Map through `t(\`section.field.${k}\`, { defaultValue: k })`.
-  When you add a new enum/code, add Thai + English entries to `en.json` / `th.json` in the same commit. If you're unsure whether a translation key exists, grep `src/i18n/locales/en.json` for `status_<CODE>` before defaulting to a literal.
+- **No hardcoded English in user-facing strings** — everything a user reads comes from `t('...')` with both `en.json` + `th.json` entries in the same commit. **Completion gate:** before claiming any UI work done, re-scan every string you added/touched for literals (button labels + Select options most-missed) — missed literals get blamed on the user. Forbidden patterns + fixes: `.claude/i18n-strings.md`.
 
 ## tsp-form Component Usage
 
@@ -69,34 +62,7 @@ When using tsp-form components, follow this lookup order:
 4. **Context/hooks:** `C:\Users\tonsu\PhpstormProjects\tsp-form\src\context\`
 5. **CLAUDE.md:** `C:\Users\tonsu\PhpstormProjects\tsp-form\.claude\CLAUDE.md` — for conventions
 
-### Form Patterns (from tsp-form)
-
-- Form field container: use `.form-grid` class — provides `grid`, `gap-5`, and `pb-7`. Apply to the `<div>` wrapping form fields, not the `<form>` itself or buttons. Tailwind can override (e.g. `form-grid gap-3`).
-- Each field: `flex flex-col` (no gap) — label, input, and error message handle their own spacing
-- Labels: use `form-label` class (not manual `text-sm text-control-label`)
-- Error display: `FormErrorMessage` after each input
-- Forms in modals: `form-grid` goes inside `modal-content`, never on the same element (e.g. `<div className="modal-content"><div className="form-grid">...fields...</div></div>`)
-- **Select in flex rows:** Wrap `Select` in a `<div>` with fixed width when placing inline with other controls — without a container the Select width is buggy
-- **Input width:** `Input` does NOT auto-fill remaining width like `Select` — add `className="w-full"` when inside flex/input-group containers
-
-### Branch PIN Input
-
-- **Always use `<BranchPinInput>`** (`src/components/BranchPinInput.tsx`) for any PIN authorization field — never use raw `<Input type="password">` for PIN
-- Props: `value`, `onChange` (string), `label?` (defaults to `t('contract.pin')`), `required?`, `error?`, `disabled?`
-- Enforces 6-digit numeric input, shows password dots, includes label + `FormErrorMessage`
-- Usage: `<BranchPinInput value={pin} onChange={setPin} required />`
-
-### PopOver & Icon Buttons
-
-- **PopOver**: `import { PopOver } from 'tsp-form'` — portal-based, auto-flips. Props: `isOpen`, `onClose`, `trigger`, `placement`, `align`, `maxWidth`, `maxHeight`, `offset`
-- **Icon button**: Use `Button` with `className="btn-icon-sm"` (or `btn-icon`, `btn-icon-xs`, `btn-icon-lg`) — square button sized to match control height, SVG auto-sized via CSS
-
-### Alert & Snackbar
-
-- Alert is CSS-only: `<div className="alert alert-{variant}">` with optional icon, `alert-title`, `alert-description`
-- Variants: `alert-info`, `alert-success`, `alert-warning`, `alert-danger`
-- Use alert markup inside `addSnackbar({ message: <div className="alert alert-success">...</div> })` — CSS auto-strips padding/border inside `.snackbar-item`
-- Use `alert alert-danger` for API error display instead of manual `bg-danger/10 border border-danger` divs
+Form patterns, PopOver, Alert/Snackbar, icon buttons, etc. — all in the global `tsp-form-guide.md`. Project-specific component rules (BranchPinInput, alert-danger error display, masked/date inputs, color tokens, inline links) — `.claude/tsp-form-guide-here.md`. Don't restate either here.
 
 ## API
 
@@ -105,8 +71,7 @@ When using tsp-form components, follow this lookup order:
 - OpenAPI doc available at root endpoint
 - Backend is PostgREST (in development, may change)
 - Backend repo: `https://github.com/czynet/nnf` — cloned at `D:\dev\nnf` (pull before reading)
-- **be-media service** (`D:\dev\nnf\be-media`, lives inside the nnf repo — now replaces the old `nnf-misc-go`, which is superseded; don't read or deploy misc-go): Go file-upload + contract-PDF microservice. Storage is **Cloudflare R2** with two buckets: `nnf-public` (served via `R2_PUBLIC_URL` = `https://pub-ec97c2bdb4564779b166762d78a98593.r2.dev`, plain `<img src>` works) and `nnf-private` (no public access, must call `/media/url` for a 4 h presigned URL). Key routes: `GET /api/v1/upload/spec?type={type}` (resize contract), `POST /api/v1/upload` (one file at one size, deterministic keys — re-upload overwrites), `GET /api/v1/media/url?key=...` (resolve key → URL), `DELETE /api/v1/media` (batch delete, body: `{keys: [key1, key2]}`). Privacy is inferred from key prefix: `uploads/` → public, `private/` → private. **Deploy: `just deploy` from `D:\dev\nnf\be-media`** (NOT misc-go's old `direct-deploy`); every change under `be-media/` MUST add a `be-media/CHANGELOG.md` entry in the same commit. Upload-type registry + `R2_DIRECT_TYPES` live in `be-media/internal/`.
-- **R2 access via AWS CLI**: use endpoint `https://b4317a366d1f46b8a5c6a864c7447fbc.r2.cloudflarestorage.com` with `--region auto`. Credentials are in `D:\dev\nnf\be-media\.env` (`R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`). Token is bucket-scoped, so `aws s3 ls` (root, no bucket) returns AccessDenied — that's expected. List inside a bucket: `aws s3 ls s3://nnf-private/private/ --endpoint-url <r2-endpoint>`.
+- **be-media service** — Go file-upload + contract-PDF microservice (`D:\dev\nnf\be-media`, replaces the superseded `nnf-misc-go`). R2 storage, upload/media routes, `just deploy` + mandatory CHANGELOG, AWS-CLI access: `.claude/be-media.md`.
 - **Misc Infrastructure** (`D:\dev\nnf-misc-infrastructure`): Traefik reverse proxy with auto Let's Encrypt SSL. Server: `nnfsup@103.208.24.76`.
 - **Views:** Read endpoints use `v_[table_name]` views (e.g. `/v_users`), returns plain arrays (no v2 envelope)
 - **Writes:** Mutations use RPC functions (e.g. `/rpc/user_create`, `/rpc/user_update`)

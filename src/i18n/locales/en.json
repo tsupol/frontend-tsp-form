@@ -1725,6 +1725,8 @@
     "lines": "lines",
     "from": "From",
     "to": "To",
+    "allFromBranches": "All source branches",
+    "allToBranches": "All destination branches",
     "mode": "Mode",
     "route": "Route",
     "transferNo": "Transfer No.",

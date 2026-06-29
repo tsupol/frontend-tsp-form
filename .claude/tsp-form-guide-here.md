@@ -121,3 +121,14 @@ Inline navigation links (clickable codes, IDs, references that route to another 
 
 - Pair with a trailing `<ExternalLink size={12} />` when the target opens a different section/page so the affordance is obvious.
 - Don't substitute a separate icon `<Button>` next to a non-link label — make the label itself the link. Saves a column of action buttons in dense tables/lists.
+
+## Branch PIN input
+
+Always use `<BranchPinInput>` (`src/components/BranchPinInput.tsx`) for any PIN authorization field — never raw `<Input type="password">`. It enforces 6-digit numeric input, shows password dots, and includes its own label + `FormErrorMessage`.
+
+- Props: `value`, `onChange` (string), `label?` (defaults to `t('contract.pin')`), `required?`, `error?`, `disabled?`
+- Usage: `<BranchPinInput value={pin} onChange={setPin} required />`
+
+## API error display
+
+For an API error shown in a form/modal, use `<div className="alert alert-danger">` with an `XCircle` icon — never a hand-rolled `bg-danger/10 border border-danger` div. (See the catch-block translation pattern under API error handling in the project CLAUDE.md.)
