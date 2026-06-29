@@ -235,6 +235,7 @@
   "CONTRACT.VALIDATION.CO_LESSEE_REQUIRED_FOR_MINOR": "ต้องมีผู้เช่าร่วม (ลูกค้าอายุต่ำกว่า 18 ปี)",
   "CONTRACT.VALIDATION.REFERENCE_REQUIRED": "ต้องมีบุคคลอ้างอิงอย่างน้อย 1 คน",
   "CONTRACT.VALIDATION.MODEL_REQUIRED": "ต้องเลือกรุ่นสินค้า",
+  "CONTRACT.VALIDATION.ASSET_CROSS_HOLDING": "เครื่องนี้เป็นของอีก holding ผูกกับสัญญานี้ไม่ได้",
   "CONTRACT.VALIDATION.PRICING_REQUIRED": "ต้องเลือกแผนราคา",
   "CONTRACT.VALIDATION.RATE_CARD_REQUIRED": "ต้องระบุ Rate Card",
   "CONTRACT.VALIDATION.CUSTOMER_ADDRESS_REQUIRED": "ต้องกรอกที่อยู่บ้านลูกค้า",

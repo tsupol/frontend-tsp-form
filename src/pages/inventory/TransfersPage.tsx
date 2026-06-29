@@ -26,6 +26,7 @@ interface TransferOrder {
   to_branch_id: number;
   to_branch_name: string | null;
   transfer_no: string;
+  code_display: string;
   transfer_mode: string;
   status: string;
   total_lines: number;
@@ -154,6 +155,7 @@ const LINE_STATUS_COLOR: Record<string, 'success' | 'warning' | 'danger' | 'info
   RECEIVED: 'success',
   RECEIVED_DAMAGED: 'danger',
   NOT_RECEIVED: 'danger',
+  RETURNED_TO_SOURCE: 'warning',
 };
 
 const TRANSFER_STATUS_VALUES = ['DRAFT', 'APPROVED', 'IN_TRANSIT', 'COMPLETED', 'DISPUTED', 'CANCELLED'] as const;
@@ -218,7 +220,10 @@ export function TransfersPage() {
       if (filterFromBranch) url += `&from_branch_id=eq.${filterFromBranch}`;
       if (filterToBranch) url += `&to_branch_id=eq.${filterToBranch}`;
       if (debouncedSearch) {
-        const term = encodeURIComponent(debouncedSearch);
+        // transfer_no is dash-free (TF26060000036); the user sees/types the
+        // dashed code_display (TF-2606-000003-6). Strip dashes so the search
+        // matches what's on screen.
+        const term = encodeURIComponent(debouncedSearch.replace(/-/g, ''));
         url += `&transfer_no=ilike.*${term}*`;
       }
       return apiClient.getPaginated<TransferOrder>(url, { page: pageIndex + 1, pageSize });
@@ -279,7 +284,7 @@ export function TransfersPage() {
                 )}
               </div>
               <div className="mobile-header-title mobile-header-title-truncate">
-                {isRoot ? t('nav.transfers') : selectedOrder?.transfer_no ?? ''}
+                {isRoot ? t('nav.transfers') : selectedOrder?.code_display ?? ''}
               </div>
               <div className="mobile-header-end w-nav">
                 {isRoot && (
@@ -398,7 +403,7 @@ export function TransfersPage() {
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className="font-medium text-sm truncate">{order.transfer_no}</span>
+                          <span className="font-medium text-sm truncate">{order.code_display}</span>
                         </div>
                         <div className="text-[11px] text-subtle truncate mt-0.5">
                           {order.from_branch_name} → {order.to_branch_name ?? `Branch #${order.to_branch_id}`}
@@ -639,8 +644,8 @@ function TransferDetailPanel({
 
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
-          <span className="font-semibold">{order.transfer_no}</span>
-          <CopyButton value={order.transfer_no} />
+          <span className="font-semibold">{order.code_display}</span>
+          <CopyButton value={order.code_display} />
           <Badge size="xs" color={TRANSFER_STATUS_COLOR[order.status] ?? 'default'}>
             {t(`transfer.status_${order.status}`, order.status)}
           </Badge>
@@ -1099,7 +1104,7 @@ function ApproveTransferModal({
             </div>
           )}
           <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
-            <div className="font-medium text-sm">{order.transfer_no}</div>
+            <div className="font-medium text-sm">{order.code_display}</div>
             <div className="text-xs text-subtle">{order.from_branch_name} → {order.to_branch_name}</div>
             <div className="text-xs text-subtle">{order.total_lines} {t('transfer.lines')}</div>
           </div>
@@ -1517,7 +1522,7 @@ function CancelTransferModal({
             </div>
           )}
           <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
-            <div className="font-medium text-sm">{order.transfer_no}</div>
+            <div className="font-medium text-sm">{order.code_display}</div>
             <div className="text-xs text-subtle">
               {order.from_branch_name} → {order.to_branch_name ?? '?'}
             </div>

@@ -548,6 +548,8 @@
   "role": {
     "BRANCH_STAFF": "พนักงานสาขา",
     "BRANCH_MANAGER": "ผู้จัดการสาขา",
+    "BRANCH_COLLECTOR": "ฝ่ายเรียกเก็บสาขา",
+    "BRANCH_SALES": "เซลล์สาขา",
     "COMPANY_ADMIN": "ผู้ดูแลบริษัท",
     "COMPANY_ACCOUNTANT": "บัญชีบริษัท",
     "COMPANY_INVENTORY": "คลังบริษัท",
@@ -1759,6 +1761,7 @@
     "lineStatus_RECEIVED": "รับแล้ว",
     "lineStatus_RECEIVED_DAMAGED": "เสียหาย",
     "lineStatus_NOT_RECEIVED": "ไม่ได้รับ",
+    "lineStatus_RETURNED_TO_SOURCE": "ส่งกลับต้นทาง",
     "status_DRAFT": "ร่าง",
     "status_APPROVED": "อนุมัติแล้ว",
     "status_IN_TRANSIT": "กำลังจัดส่ง",

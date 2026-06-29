@@ -548,6 +548,8 @@
   "role": {
     "BRANCH_STAFF": "Branch Staff",
     "BRANCH_MANAGER": "Branch Manager",
+    "BRANCH_COLLECTOR": "Branch Collector",
+    "BRANCH_SALES": "Branch Sales",
     "COMPANY_ADMIN": "Company Admin",
     "COMPANY_ACCOUNTANT": "Company Accountant",
     "COMPANY_INVENTORY": "Company Inventory",
@@ -1759,6 +1761,7 @@
     "lineStatus_RECEIVED": "Received",
     "lineStatus_RECEIVED_DAMAGED": "Damaged",
     "lineStatus_NOT_RECEIVED": "Not Received",
+    "lineStatus_RETURNED_TO_SOURCE": "Returned to Source",
     "status_DRAFT": "Draft",
     "status_APPROVED": "Approved",
     "status_IN_TRANSIT": "In Transit",

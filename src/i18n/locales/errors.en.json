@@ -235,6 +235,7 @@
   "CONTRACT.VALIDATION.CO_LESSEE_REQUIRED_FOR_MINOR": "Co-lessee is required (customer is under 18)",
   "CONTRACT.VALIDATION.REFERENCE_REQUIRED": "At least 1 reference is required",
   "CONTRACT.VALIDATION.MODEL_REQUIRED": "Product model is required",
+  "CONTRACT.VALIDATION.ASSET_CROSS_HOLDING": "That device belongs to another holding and can't be bound to this contract",
   "CONTRACT.VALIDATION.PRICING_REQUIRED": "Pricing plan is required",
   "CONTRACT.VALIDATION.RATE_CARD_REQUIRED": "Rate card is required",
   "CONTRACT.VALIDATION.CUSTOMER_ADDRESS_REQUIRED": "Customer home address is required",
