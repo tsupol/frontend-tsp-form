@@ -510,7 +510,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
 
   const lines = detail.line_items ?? [];
   const existingPayments = detail.payments ?? [];
-  const lineTotal = lines.reduce((s, l) => s + l.amount, 0);
+  const lineTotal = lines.reduce((s, l) => s + l.extended_amount, 0);
   const existingPayTotal = existingPayments.reduce((s, p) => s + p.amount, 0);
   // Reversal rows (is_reversal) are bookkeeping mirrors — don't list them as their
   // own line. Instead, an original is "voided" when some reversal targets its id.
@@ -741,8 +741,13 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
                   {line.line_type}
                 </Badge>
                 <span className="flex-1 min-w-0 truncate">{line.description}</span>
+                {line.quantity > 1 && (
+                  <span className="text-xs text-subtle tabular-nums shrink-0">
+                    {fmtCurrency(line.amount)} × {line.quantity}
+                  </span>
+                )}
                 <span className="tabular-nums font-medium shrink-0">
-                  {fmtCurrency(line.amount)}
+                  {fmtCurrency(line.extended_amount)}
                 </span>
                 <span className={`text-xs shrink-0 font-medium ${line.owner_type === 'HOLDING' ? 'text-primary-fg' : 'text-warning-fg'}`}>
                   {line.owner_type === 'HOLDING' ? '→H' : '→C'}

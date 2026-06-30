@@ -324,6 +324,7 @@ export interface BillLineItem {
   description: string;
   amount: number;
   quantity: number;
+  extended_amount: number;
   owner_type: string;
   variant_id: number | null;
   ref_code: string | null;

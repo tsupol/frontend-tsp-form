@@ -1268,10 +1268,12 @@ function Fin2Calculator({ fin2Rows, fin2Terms, t, onUse }: {
             <span className="text-subtle">{t('priceCheck.term')}</span>
             <span className="text-right tabular-nums">{result.termMonths} {t('priceCheck.months')}</span>
             {(() => {
+              // A positive discountAmount = price LOWERED (lessor earns less) → red.
+              // Negative = price RAISED (paying above rate) → green. (Ohm 2026-07-01.)
               const cls = result.discountAmount > 0
-                ? 'text-success'
+                ? 'text-danger'
                 : result.discountAmount < 0
-                  ? 'text-danger'
+                  ? 'text-success'
                   : 'text-subtle';
               return (
                 <>
