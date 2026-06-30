@@ -1,19 +1,47 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useQuery } from '@tanstack/react-query';
 import { Button, Input, LabeledCheckbox } from 'tsp-form';
-import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, Package, PackageX, AlertTriangle } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { useWorkspace } from './WorkspaceContext';
 import { useContractHandover, useInvalidateHandover } from './useContractHandover';
 
 interface Props { onClose: () => void }
 
+// The bound asset's stock box state — distinct from the handover "give box to
+// customer" flag below. Shown as a hint so staff don't promise a box the
+// device doesn't have (or one that's stored at another branch).
+interface AssetBoxInfo {
+  asset_id: number;
+  has_box: boolean;
+  box_branch_id: number | null;
+  box_branch_name: string | null;
+}
+
 export function PanelHandover({ onClose: _onClose }: Props) {
   const { t } = useTranslation();
   const { contract } = useWorkspace();
   const contractId = contract?.id ?? null;
+  const targetAssetId = contract?.target_asset_id ?? null;
   const { data: handover } = useContractHandover(contractId);
   const invalidateHandover = useInvalidateHandover();
+
+  const { data: assetBox } = useQuery({
+    queryKey: ['handover-asset-box', targetAssetId],
+    queryFn: async (): Promise<AssetBoxInfo | null> => {
+      const rows = await apiClient.get<AssetBoxInfo[]>(
+        `/v_assets?asset_id=eq.${targetAssetId}&select=asset_id,has_box,box_branch_id,box_branch_name&limit=1`,
+      );
+      return rows[0] ?? null;
+    },
+    enabled: !!targetAssetId,
+    staleTime: 30_000,
+  });
+  const boxAtOtherBranch = !!assetBox?.has_box
+    && assetBox.box_branch_id != null
+    && contract?.branch_id != null
+    && assetBox.box_branch_id !== contract.branch_id;
 
   const [hasBox, setHasBox] = useState(false);
   const [hasChargerSet, setHasChargerSet] = useState(false);
@@ -65,6 +93,32 @@ export function PanelHandover({ onClose: _onClose }: Props) {
   return (
     <div className="flex flex-col h-full max-w-xl">
       <div className="flex-1 overflow-y-auto better-scroll p-4 flex flex-col gap-5">
+        {assetBox && (
+          <div className="flex flex-col gap-2">
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-md border text-sm ${
+              assetBox.has_box ? 'bg-success-soft border-success-border' : 'bg-surface border-line'
+            }`}>
+              {assetBox.has_box
+                ? <Package size={16} className="text-success shrink-0" />
+                : <PackageX size={16} className="text-subtle shrink-0" />}
+              <span>
+                {assetBox.has_box
+                  ? t('workspace.handoverStockHasBox', { defaultValue: 'This device has a box in stock' })
+                  : t('workspace.handoverStockNoBox', { defaultValue: 'This device has no box in stock' })}
+              </span>
+            </div>
+            {boxAtOtherBranch && (
+              <div className="alert alert-warning">
+                <AlertTriangle size={14} />
+                <span>{t('workspace.handoverBoxOtherBranch', {
+                  defaultValue: 'The box is stored at {{branch}} — collect it before handover.',
+                  branch: assetBox.box_branch_name ?? '',
+                })}</span>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="flex flex-col">
           <label className="form-label mb-3">{t('workspace.handoverIncludedItems')}</label>
           <div className="flex flex-col gap-3">
