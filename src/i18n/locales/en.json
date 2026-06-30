@@ -1983,6 +1983,7 @@
     "sellerPlaceholder": "Walk-in customer name",
     "sellerLocked": "Seller name is set at creation and not editable after.",
     "price": "Buyback price",
+    "hasBox": "Comes with box",
     "poNotes": "Notes",
     "poNotesPlaceholder": "Optional notes for this buyback",
     "errorPickProduct": "Pick a product first",

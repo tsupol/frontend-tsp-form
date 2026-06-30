@@ -13,6 +13,7 @@ export interface BuybackLine {
   variant_name: string | null;
   buyback_price: number | null;
   unit_cost: number | null;
+  has_box: boolean;
   item_condition: string | null;
   condition_snapshot: Record<string, unknown> | null;
   note: string | null;

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, keepPreviousData } from '@tanstack/react-query';
-import { Input, Button, Modal, Badge, TextArea, MaskedInput, useSnackbarContext } from 'tsp-form';
+import { Input, Button, Modal, Badge, TextArea, MaskedInput, LabeledCheckbox, useSnackbarContext } from 'tsp-form';
 import { Search, ScanBarcode, XCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { useFormSnapshot } from '../../../hooks/useFormSnapshot';
@@ -63,6 +63,7 @@ export function PanelSetup({
   const [seller, setSeller] = useState(draft?.supplier_name ?? '');
   const [price, setPrice] = useState<string>(line?.buyback_price != null ? String(line.buyback_price) : '');
   const [notes, setNotes] = useState(draft?.notes ?? '');
+  const [hasBox, setHasBox] = useState<boolean>(line?.has_box ?? true);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [error, setError] = useState('');
 
@@ -72,6 +73,7 @@ export function PanelSetup({
     seller,
     price,
     notes,
+    hasBox,
   });
 
   // Push dirty state up
@@ -92,6 +94,7 @@ export function PanelSetup({
     setSeller(draft.supplier_name ?? '');
     setNotes(draft.notes ?? '');
     setPrice(l?.buyback_price != null ? String(l.buyback_price) : '');
+    setHasBox(l?.has_box ?? true);
     if (l?.model_id && l?.variant_id) {
       setProduct({
         model_id: l.model_id,
@@ -122,6 +125,7 @@ export function PanelSetup({
             buyback_price: priceNum,
             item_condition: 'USED_A',
             condition_snapshot: {},
+            has_box: hasBox,
             note: null,
           }],
           p_seller_name: seller.trim() || null,
@@ -140,6 +144,7 @@ export function PanelSetup({
         p_buyback_price: priceNum,
         p_item_condition: null,
         p_condition_snapshot: null,
+        p_has_box: hasBox,
         p_note: null,
         p_branch_id: null,
         p_warranty_expired_date: null,
@@ -230,6 +235,15 @@ export function PanelSetup({
                 value={price}
                 onChange={(raw) => setPrice(raw)}
                 className="w-full"
+              />
+            </div>
+
+            {/* Has box — does this device come with its box? (mig 395) */}
+            <div className="flex flex-col min-w-0">
+              <LabeledCheckbox
+                label={t('buybackWizard.hasBox', { defaultValue: 'Comes with box' })}
+                checked={hasBox}
+                onChange={(e) => setHasBox(e.target.checked)}
               />
             </div>
 
