@@ -108,6 +108,17 @@
     "temporary": "Temporary account",
     "noReceivingAccount": "No receiving account is set for this branch. Set a default bank account before taking transfers."
   },
+  "bankChannel": {
+    "channel_STORE_FRONT": "Store front",
+    "channel_INSTALLMENT": "Installment",
+    "unset": "Not configured",
+    "override": "Override",
+    "empty": "No branches",
+    "editTitle": "Set channel account",
+    "account": "Account",
+    "accountPlaceholder": "Pick an account",
+    "saved": "Channel account updated"
+  },
   "common": {
     "loading": "Loading...",
     "default": "Default",
@@ -2133,6 +2144,8 @@
     "bankAccounts": {
       "title": "Bank Accounts",
       "description": "Manage branch bank accounts for payment collection.",
+      "tabAccounts": "Accounts",
+      "tabChannels": "Channel accounts",
       "addAccount": "Add Account",
       "editAccount": "Edit Account",
       "bankName": "Bank Name",

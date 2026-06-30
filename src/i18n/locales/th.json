@@ -108,6 +108,17 @@
     "temporary": "บัญชีชั่วคราว",
     "noReceivingAccount": "สาขานี้ยังไม่ได้ตั้งบัญชีรับโอน กรุณาตั้งบัญชีหลักก่อนรับชำระแบบโอน"
   },
+  "bankChannel": {
+    "channel_STORE_FRONT": "หน้าร้าน",
+    "channel_INSTALLMENT": "ค่างวด",
+    "unset": "ยังไม่ได้ตั้งค่า",
+    "override": "แทนที่ชั่วคราว",
+    "empty": "ไม่มีสาขา",
+    "editTitle": "ตั้งบัญชีตามช่องทาง",
+    "account": "บัญชี",
+    "accountPlaceholder": "เลือกบัญชี",
+    "saved": "อัปเดตบัญชีช่องทางแล้ว"
+  },
   "common": {
     "loading": "กำลังโหลด...",
     "default": "ค่าเริ่มต้น",
@@ -2133,6 +2144,8 @@
     "bankAccounts": {
       "title": "บัญชีธนาคาร",
       "description": "จัดการบัญชีธนาคารสาขาสำหรับรับชำระ",
+      "tabAccounts": "บัญชี",
+      "tabChannels": "บัญชีตามช่องทาง",
       "addAccount": "เพิ่มบัญชี",
       "editAccount": "แก้ไขบัญชี",
       "bankName": "ชื่อธนาคาร",

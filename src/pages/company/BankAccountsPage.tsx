@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { BankChannelConfig } from './BankChannelConfig';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -303,6 +304,14 @@ export function BankAccountsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editAccount, setEditAccount] = useState<BankAccount | null>(null);
 
+  // Channel config (STORE_FRONT / INSTALLMENT slot accounts) is a company-level
+  // act — COMPANY_ADMIN / COMPANY_ACCOUNTANT only (PAYMENT_CHANNEL.MANAGE).
+  const canManageChannels = user?.role_code === 'COMPANY_ADMIN'
+    || user?.role_code === 'COMPANY_ACCOUNTANT'
+    || user?.role_code === 'HOLDING_ADMIN'
+    || user?.role_code === 'SYSTEM_DEV';
+  const [tab, setTab] = useState<'accounts' | 'channels'>('accounts');
+
   const { data: accounts = [], isFetching, isLoading } = useQuery({
     queryKey: ['bank-accounts'],
     queryFn: () => apiClient.get<BankAccount[]>('/v_bank_accounts?order=branch_name,bank_name'),
@@ -480,11 +489,37 @@ export function BankAccountsPage() {
             <h1 className="heading-2">{t('settings.bankAccounts.title')}</h1>
             <p className="text-sm text-subtle mt-1">{t('settings.bankAccounts.description')}</p>
           </div>
-          <Button color="primary" startIcon={<Plus size={16} />} onClick={() => setCreateOpen(true)}>
-            {t('settings.bankAccounts.addAccount')}
-          </Button>
+          {tab === 'accounts' && (
+            <Button color="primary" startIcon={<Plus size={16} />} onClick={() => setCreateOpen(true)}>
+              {t('settings.bankAccounts.addAccount')}
+            </Button>
+          )}
         </div>
 
+        {/* Tabs — only when the user can manage channels */}
+        {canManageChannels && (
+          <div className="flex-none flex items-center gap-1 border-b border-line mb-4">
+            {(['accounts', 'channels'] as const).map((tk) => (
+              <button
+                key={tk}
+                type="button"
+                onClick={() => setTab(tk)}
+                className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors cursor-pointer bg-transparent ${
+                  tab === tk ? 'border-primary text-primary-fg' : 'border-transparent text-subtle hover:text-fg'
+                }`}
+              >
+                {tk === 'accounts'
+                  ? t('settings.bankAccounts.tabAccounts', { defaultValue: 'Accounts' })
+                  : t('settings.bankAccounts.tabChannels', { defaultValue: 'Channel accounts' })}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {tab === 'channels' ? (
+          <BankChannelConfig />
+        ) : (
+        <>
         {/* Filter bar */}
         <div className="flex-none pb-4">
           <div className="flex items-center gap-2">
@@ -569,6 +604,8 @@ export function BankAccountsPage() {
             />
           )}
         </div>
+        </>
+        )}
       </div>
 
       {/* Modals */}
