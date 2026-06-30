@@ -93,6 +93,9 @@ export function ContractAttachments({
   const refresh = () => {
     refetch();
     queryClient.invalidateQueries({ queryKey: ['contract-attachments-count', contractId] });
+    // Keep the detail panel's own photo list (ContractDetailPanel uses a
+    // separate 'contract-media' query) in sync when photos change here.
+    queryClient.invalidateQueries({ queryKey: ['contract-media', contractId] });
   };
 
   const strip = photos.slice(0, STRIP_LIMIT);
@@ -308,7 +311,7 @@ function ManageModal({
   return (
     <Modal open={open} onClose={onClose} maxWidth="40rem" width="100%">
       <div className="modal-header">
-        <h2 className="modal-title">{contractCode ?? t('contract.attachments', { defaultValue: 'Photos' })}</h2>
+        <h2 className="modal-title">{t('contract.attachmentsManageTitle', { defaultValue: 'Manage photos' })}</h2>
         <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
       </div>
 
@@ -394,7 +397,7 @@ function ManageModal({
       </div>
 
       <div className="modal-footer">
-        <Button onClick={onClose}>{t('common.done', { defaultValue: 'Done' })}</Button>
+        <Button onClick={onClose}>{t('common.close', { defaultValue: 'Close' })}</Button>
       </div>
 
       <MediaLightbox

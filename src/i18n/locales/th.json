@@ -2445,6 +2445,7 @@
     "deliverySaved": "บันทึกข้อมูลส่งมอบแล้ว",
     "attachments": "รูปภาพ",
     "attachmentsManage": "เพิ่ม / จัดการ",
+    "attachmentsManageTitle": "จัดการรูปภาพ",
     "attachmentsEmpty": "ยังไม่มีรูปภาพ เพิ่มรูปได้เลย",
     "attachmentsAddPhoto": "เพิ่ม",
     "attachmentsAtMax": "ครบจำนวนรูปสูงสุดแล้ว",

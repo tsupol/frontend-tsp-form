@@ -2445,6 +2445,7 @@
     "deliverySaved": "Delivery info saved",
     "attachments": "Photos",
     "attachmentsManage": "Add / manage",
+    "attachmentsManageTitle": "Manage photos",
     "attachmentsEmpty": "No photos yet. Add one.",
     "attachmentsAddPhoto": "Add",
     "attachmentsAtMax": "Maximum number of photos reached.",
