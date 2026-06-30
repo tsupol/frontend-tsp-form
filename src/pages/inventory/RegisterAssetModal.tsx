@@ -1,0 +1,323 @@
+import { useState, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useMutation, useQuery, keepPreviousData } from '@tanstack/react-query';
+import { Modal, Button, Input, Select, MaskedInput, LabeledCheckbox } from 'tsp-form';
+import { XCircle, CheckCircle, Search, Package } from 'lucide-react';
+import { apiClient, ApiError } from '../../lib/api';
+import { ImeiInput } from '../../components/ImeiInput';
+import { getConditionLabel, CONDITION_VALUES } from './inventoryUtils';
+
+// Direct asset registration — fn_inv_asset_register. Restricted (backend) to
+// EXTERNAL / DEAL_PARTNER branches; we only list those in the picker and show a
+// translated alert when the user has none. Not the PO/buyback intake path.
+
+interface BranchRow { id: number; name: string; branch_type: string; is_active: boolean }
+
+interface ProductSearchVariant { variant_id: number; sku_code: string; name: string; is_active: boolean }
+interface ProductSearchModel {
+  model_id: number;
+  model_name: string;
+  brand_name: string | null;
+  family_name: string | null;
+  variants: ProductSearchVariant[];
+}
+interface ProductSearchResponse { rows: ProductSearchModel[] }
+
+interface RegisterResult {
+  asset_id: number;
+  asset_code: string;
+  code_display?: string | null;
+}
+
+export function RegisterAssetModal({
+  open,
+  onClose,
+  onRegistered,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onRegistered: () => void;
+}) {
+  const { t } = useTranslation();
+
+  const [view, setView] = useState<'form' | 'done'>('form');
+  const [result, setResult] = useState<RegisterResult | null>(null);
+
+  const [branchId, setBranchId] = useState<string | null>(null);
+  const [keyword, setKeyword] = useState('');
+  const [debounced, setDebounced] = useState('');
+  const [modelId, setModelId] = useState<number | null>(null);
+  const [variantId, setVariantId] = useState<number | null>(null);
+  const [condition, setCondition] = useState<string>('NEW');
+  const [hasBox, setHasBox] = useState(true);
+  const [imei, setImei] = useState('');
+  const [serial, setSerial] = useState('');
+  const [costOverride, setCostOverride] = useState('');
+  const [retailOverride, setRetailOverride] = useState('');
+  const [error, setError] = useState('');
+
+  // Only EXTERNAL / DEAL_PARTNER branches may register (backend enforces).
+  const { data: branches = [] } = useQuery({
+    queryKey: ['branches-register'],
+    queryFn: () => apiClient.get<BranchRow[]>('/v_branches?is_active=is.true&order=name'),
+    enabled: open,
+  });
+  const eligibleBranches = useMemo(
+    () => branches.filter(b => b.branch_type === 'EXTERNAL' || b.branch_type === 'DEAL_PARTNER'),
+    [branches],
+  );
+  const branchOptions = useMemo(
+    () => eligibleBranches.map(b => ({ value: String(b.id), label: b.name })),
+    [eligibleBranches],
+  );
+
+  useEffect(() => {
+    if (open) {
+      setView('form'); setResult(null);
+      setBranchId(null); setKeyword(''); setDebounced('');
+      setModelId(null); setVariantId(null);
+      setCondition('NEW'); setHasBox(true);
+      setImei(''); setSerial('');
+      setCostOverride(''); setRetailOverride('');
+      setError('');
+    }
+  }, [open]);
+
+  useEffect(() => {
+    const tm = setTimeout(() => setDebounced(keyword.trim()), 300);
+    return () => clearTimeout(tm);
+  }, [keyword]);
+
+  const { data: searchData, isFetching } = useQuery({
+    queryKey: ['register-product-search', debounced],
+    queryFn: () => apiClient.rpc<ProductSearchResponse>('fn_product_search', {
+      p_q: debounced,
+      p_is_contractable: true,
+      p_is_active: true,
+      p_limit: 20,
+    }),
+    enabled: open && view === 'form',
+    placeholderData: keepPreviousData,
+  });
+  const models = searchData?.rows ?? [];
+  const selectedModel = useMemo(() => models.find(m => m.model_id === modelId) ?? null, [models, modelId]);
+  const activeVariants = useMemo(() => selectedModel?.variants.filter(v => v.is_active) ?? [], [selectedModel]);
+
+  useEffect(() => {
+    if (activeVariants.length === 0) { setVariantId(null); return; }
+    if (!activeVariants.some(v => v.variant_id === variantId)) setVariantId(activeVariants[0].variant_id);
+  }, [activeVariants, variantId]);
+
+  // Real grades only — 'USED' in CONDITION_VALUES is a filter meta-value, not a
+  // registrable grade.
+  const conditionOptions = useMemo(
+    () => CONDITION_VALUES.filter(v => v !== 'USED').map(v => ({ value: v, label: getConditionLabel(v, t) })),
+    [t],
+  );
+
+  const buildIdentifiers = () => {
+    const ids: { type: string; value: string }[] = [];
+    if (imei.trim()) ids.push({ type: 'IMEI', value: imei.trim() });
+    if (serial.trim()) ids.push({ type: 'SERIAL_NO', value: serial.trim() });
+    return ids;
+  };
+
+  const canSubmit = !!branchId && !!modelId && !!variantId
+    && (imei.trim() !== '' || serial.trim() !== '');
+
+  const mutation = useMutation({
+    mutationFn: () => apiClient.rpc<RegisterResult>('fn_inv_asset_register', {
+      p_branch_id: Number(branchId),
+      p_model_id: modelId,
+      p_variant_id: variantId,
+      p_condition_grade: condition,
+      p_identifiers: buildIdentifiers(),
+      p_physical_color: null,
+      p_cost_override: costOverride.trim() ? Number(costOverride) : null,
+      p_retail_override: retailOverride.trim() ? Number(retailOverride) : null,
+      p_dedupe_key: null,
+    }),
+    onSuccess: (data) => {
+      setResult(data);
+      setView('done');
+      onRegistered();
+    },
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        const translated =
+          (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') ||
+          (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setError(translated || err.message);
+      } else {
+        setError(String(err));
+      }
+    },
+  });
+
+  const noEligible = eligibleBranches.length === 0;
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="34rem" width="100%">
+      <div className="modal-header">
+        <h2 className="modal-title">{t('asset.registerTitle', { defaultValue: 'Register asset' })}</h2>
+        <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+      </div>
+
+      {view === 'done' && result ? (
+        <>
+          <div className="modal-content">
+            <div className="flex flex-col items-center gap-2 py-6">
+              <CheckCircle size={40} className="text-success" />
+              <p className="text-sm text-subtle">{t('asset.registerDone', { defaultValue: 'Asset registered' })}</p>
+              <p className="text-lg font-semibold font-mono">{result.code_display ?? result.asset_code}</p>
+            </div>
+          </div>
+          <div className="modal-footer">
+            <Button color="primary" onClick={onClose}>{t('common.done', { defaultValue: 'Done' })}</Button>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="modal-content">
+            {noEligible ? (
+              <div className="alert alert-warning">
+                <XCircle size={18} />
+                <span>{t('asset.registerNoBranch', {
+                  defaultValue: 'Asset registration is only available for external / deal-partner branches. You have none assigned.',
+                })}</span>
+              </div>
+            ) : (
+              <>
+                {error && (
+                  <div className="alert alert-danger mb-4 animate-pop-in">
+                    <XCircle size={16} />
+                    <span>{error}</span>
+                  </div>
+                )}
+
+                <div className="form-grid">
+                  {/* Branch */}
+                  <div className="flex flex-col">
+                    <label className="form-label">{t('asset.registerBranch', { defaultValue: 'Branch' })} *</label>
+                    <Select
+                      options={branchOptions}
+                      value={branchId}
+                      onChange={(v) => setBranchId((v as string) || null)}
+                      placeholder={t('asset.registerBranchPlaceholder', { defaultValue: 'External / partner branch' })}
+                      size="sm"
+                      searchable
+                      showChevron
+                    />
+                  </div>
+
+                  {/* Product search */}
+                  <div className="flex flex-col">
+                    <label className="form-label">{t('asset.registerProduct', { defaultValue: 'Product' })} *</label>
+                    <Input
+                      value={keyword}
+                      onChange={(e) => setKeyword(e.target.value)}
+                      placeholder={t('asset.registerProductSearch', { defaultValue: 'Search model or brand...' })}
+                      size="sm"
+                      className="w-full"
+                      startIcon={<Search size={14} />}
+                    />
+                    <div className="mt-2 max-h-44 overflow-auto better-scroll rounded-md border border-line divide-y divide-line">
+                      {isFetching && models.length === 0 ? (
+                        <div className="px-3 py-4 text-center text-xs text-subtler">{t('common.loading')}</div>
+                      ) : models.length === 0 ? (
+                        <div className="px-3 py-4 text-center text-xs text-subtler">{t('common.noData')}</div>
+                      ) : models.map(m => (
+                        <button
+                          key={m.model_id}
+                          type="button"
+                          onClick={() => setModelId(m.model_id)}
+                          className={`w-full text-left px-3 py-2 text-sm cursor-pointer transition-colors ${
+                            m.model_id === modelId ? 'bg-primary-soft' : 'hover:bg-surface-hover bg-transparent'
+                          }`}
+                        >
+                          <div className="font-medium truncate">{[m.brand_name, m.family_name, m.model_name].filter(Boolean).join(' ')}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Variant */}
+                  {selectedModel && (
+                    <div className="flex flex-col">
+                      <label className="form-label">{t('asset.registerVariant', { defaultValue: 'Variant' })} *</label>
+                      <Select
+                        options={activeVariants.map(v => ({ value: String(v.variant_id), label: v.name }))}
+                        value={variantId != null ? String(variantId) : null}
+                        onChange={(v) => setVariantId(v ? Number(v) : null)}
+                        size="sm"
+                        showChevron
+                      />
+                    </div>
+                  )}
+
+                  {/* Condition + has_box */}
+                  <div className="flex items-end gap-3">
+                    <div className="flex flex-col flex-1 min-w-0">
+                      <label className="form-label">{t('asset.registerCondition', { defaultValue: 'Condition' })} *</label>
+                      <Select
+                        options={conditionOptions}
+                        value={condition}
+                        onChange={(v) => setCondition(v as string)}
+                        size="sm"
+                        showChevron
+                      />
+                    </div>
+                    <div className="pb-1">
+                      <LabeledCheckbox
+                        label={t('asset.hasBox', { defaultValue: 'Has box' })}
+                        checked={hasBox}
+                        onChange={(e) => setHasBox(e.target.checked)}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Identifiers — at least one required; backend enforces IMEI for iPhone models */}
+                  <div className="flex flex-col">
+                    <label className="form-label">{t('asset.registerImei', { defaultValue: 'IMEI' })}</label>
+                    <ImeiInput value={imei} onChange={setImei} size="sm" className="w-full" placeholder="15 digits" />
+                  </div>
+                  <div className="flex flex-col">
+                    <label className="form-label">{t('asset.registerSerial', { defaultValue: 'Serial number' })}</label>
+                    <Input value={serial} onChange={(e) => setSerial(e.target.value)} size="sm" className="w-full" />
+                    <div className="text-xs text-subtle mt-1">{t('asset.registerIdHint', { defaultValue: 'Enter at least one identifier (IMEI or serial).' })}</div>
+                  </div>
+
+                  {/* Optional price overrides */}
+                  <div className="flex gap-3">
+                    <div className="flex flex-col flex-1 min-w-0">
+                      <label className="form-label">{t('asset.registerCostOverride', { defaultValue: 'Cost (override)' })}</label>
+                      <MaskedInput mask="number" decimalScale={2} value={costOverride} onChange={(raw) => setCostOverride(raw)} className="w-full" />
+                    </div>
+                    <div className="flex flex-col flex-1 min-w-0">
+                      <label className="form-label">{t('asset.registerRetailOverride', { defaultValue: 'Retail (override)' })}</label>
+                      <MaskedInput mask="number" decimalScale={2} value={retailOverride} onChange={(raw) => setRetailOverride(raw)} className="w-full" />
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {!noEligible && (
+            <div className="modal-footer">
+              <Button variant="ghost" onClick={onClose} disabled={mutation.isPending}>{t('common.cancel')}</Button>
+              <Button
+                color="primary"
+                startIcon={<Package size={16} />}
+                onClick={() => mutation.mutate()}
+                disabled={!canSubmit || mutation.isPending}
+              >
+                {mutation.isPending ? t('common.saving') : t('asset.registerSubmit', { defaultValue: 'Register' })}
+              </Button>
+            </div>
+          )}
+        </>
+      )}
+    </Modal>
+  );
+}

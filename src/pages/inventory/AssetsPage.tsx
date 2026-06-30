@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useSearchParams, useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, Modal, TextArea, DataTable, PopOver, Tooltip, Switch, useSnackbarContext } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, Box, Search, SlidersHorizontal, XCircle, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Wrench, Printer, Plus, CheckCircle, Pencil, Cloud, CloudOff, MoreVertical } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, Box, Search, SlidersHorizontal, XCircle, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Wrench, Printer, Plus, CheckCircle, Pencil, Cloud, CloudOff, MoreVertical, Package } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
@@ -17,6 +17,7 @@ import { AssignIcloudModal, ReleaseIcloudModal } from '../contracts/IcloudModals
 import { AssetScreenTimeSection } from '../../components/AssetScreenTimeSection';
 import { ImeiInput } from '../../components/ImeiInput';
 import { getBucketLabel, getBucketColor, getConditionLabel, getConditionTextColor, CONDITION_VALUES, codeDisplay } from './inventoryUtils';
+import { RegisterAssetModal } from './RegisterAssetModal';
 
 // ============================================================================
 // Types (verified against live API 2026-03-25)
@@ -402,6 +403,7 @@ export function AssetsPage() {
   const [pageSize, setPageSize] = useState(15);
   const printQueue = useAssetPrintQueue();
   const [queueModalOpen, setQueueModalOpen] = useState(false);
+  const [registerOpen, setRegisterOpen] = useState(false);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
   const mobileActionsTriggerRef = useRef<HTMLButtonElement>(null);
   const { handlePrintMany, portal: queuePrintPortal } = useAssetStickerPrint();
@@ -583,6 +585,14 @@ export function AssetsPage() {
               <button
                 type="button"
                 className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-left hover:bg-surface-hover cursor-pointer bg-transparent border-none"
+                onClick={() => { setMobileActionsOpen(false); setRegisterOpen(true); }}
+              >
+                <Package size={16} className="text-subtle" />
+                <span>{t('asset.registerTitle', { defaultValue: 'Register asset' })}</span>
+              </button>
+              <button
+                type="button"
+                className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-left hover:bg-surface-hover cursor-pointer bg-transparent border-none"
                 onClick={() => { setMobileActionsOpen(false); setQueueModalOpen(true); }}
               >
                 <Printer size={16} className="text-subtle" />
@@ -614,20 +624,30 @@ export function AssetsPage() {
                   <span>{t('inventory.available', { defaultValue: 'Available' })}</span>
                 </button>
               </div>
-              <div className="relative inline-flex ml-auto">
+              <div className="flex items-center gap-2 ml-auto">
                 <Button
                   variant="outline"
                   size="sm"
-                  startIcon={<Printer size={16} />}
-                  onClick={() => setQueueModalOpen(true)}
+                  startIcon={<Package size={16} />}
+                  onClick={() => setRegisterOpen(true)}
                 >
-                  {t('asset.printQueue', { defaultValue: 'Print queue' })}
+                  {t('asset.registerTitle', { defaultValue: 'Register asset' })}
                 </Button>
-                {printQueue.queue.length > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 bg-primary text-white text-[10px] rounded-full min-w-4 h-4 px-1 flex items-center justify-center leading-none pointer-events-none">
-                    {printQueue.queue.length}
-                  </span>
-                )}
+                <div className="relative inline-flex">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    startIcon={<Printer size={16} />}
+                    onClick={() => setQueueModalOpen(true)}
+                  >
+                    {t('asset.printQueue', { defaultValue: 'Print queue' })}
+                  </Button>
+                  {printQueue.queue.length > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 bg-primary text-white text-[10px] rounded-full min-w-4 h-4 px-1 flex items-center justify-center leading-none pointer-events-none">
+                      {printQueue.queue.length}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -911,6 +931,11 @@ export function AssetsPage() {
             onRemove={printQueue.remove}
             onClear={printQueue.clear}
             onPrintAll={() => handlePrintMany(printQueue.queue)}
+          />
+          <RegisterAssetModal
+            open={registerOpen}
+            onClose={() => setRegisterOpen(false)}
+            onRegistered={invalidate}
           />
           {queuePrintPortal}
         </>
