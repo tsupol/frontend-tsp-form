@@ -396,6 +396,9 @@ export function AssetsPage() {
   const filterTriggerRef = useRef<HTMLButtonElement>(null);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
+  const printQueue = useAssetPrintQueue();
+  const [queueModalOpen, setQueueModalOpen] = useState(false);
+  const { handlePrintMany, portal: queuePrintPortal } = useAssetStickerPrint();
   const navigate = useNavigate();
   const { assetId: assetIdParam } = useParams<{ assetId?: string }>();
   const selectedId = assetIdParam ? Number(assetIdParam) : null;
@@ -560,6 +563,21 @@ export function AssetsPage() {
                 >
                   <span>{t('inventory.available', { defaultValue: 'Available' })}</span>
                 </button>
+              </div>
+              <div className="relative inline-flex ml-auto">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  startIcon={<Printer size={16} />}
+                  onClick={() => setQueueModalOpen(true)}
+                >
+                  {t('asset.printQueue', { defaultValue: 'Print queue' })}
+                </Button>
+                {printQueue.queue.length > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 bg-primary text-white text-[10px] rounded-full min-w-4 h-4 px-1 flex items-center justify-center leading-none pointer-events-none">
+                    {printQueue.queue.length}
+                  </span>
+                )}
               </div>
             </div>
           )}
@@ -778,7 +796,29 @@ export function AssetsPage() {
                       <div className="text-right shrink-0">
                         <div className="text-sm font-medium tabular-nums">{fmtCurrency(asset.current_cost_basis)}</div>
                         <div className="text-xs text-subtle"><DateTime value={asset.created_at} /></div>
-                        <div className="text-xs text-subtle truncate">{asset.branch_name}</div>
+                        <div className="flex items-center justify-end gap-2 mt-0.5">
+                          <span className="text-xs text-subtle truncate">{asset.branch_name}</span>
+                          <Tooltip content={printQueue.ids.has(asset.asset_id)
+                            ? t('asset.removeFromQueue', { defaultValue: 'Remove from print queue' })
+                            : t('asset.addToQueue', { defaultValue: 'Add to print queue' })}>
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              aria-label={printQueue.ids.has(asset.asset_id)
+                                ? t('asset.removeFromQueue', { defaultValue: 'Remove from print queue' })
+                                : t('asset.addToQueue', { defaultValue: 'Add to print queue' })}
+                              onClick={(e) => { e.stopPropagation(); printQueue.toggle(asset); }}
+                              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); e.preventDefault(); printQueue.toggle(asset); } }}
+                              className={`inline-flex items-center justify-center w-6 h-6 rounded-md border shrink-0 cursor-pointer transition-colors ${
+                                printQueue.ids.has(asset.asset_id)
+                                  ? 'bg-primary-soft text-primary-fg border-primary'
+                                  : 'border-line text-subtle hover:bg-surface-hover'
+                              }`}
+                            >
+                              <Printer size={13} />
+                            </span>
+                          </Tooltip>
+                        </div>
                       </div>
                     </button>
                   );
@@ -813,6 +853,16 @@ export function AssetsPage() {
               )}
             </PageNavPanel>
           </div>
+
+          <PrintQueueModal
+            open={queueModalOpen}
+            onClose={() => setQueueModalOpen(false)}
+            queue={printQueue.queue}
+            onRemove={printQueue.remove}
+            onClear={printQueue.clear}
+            onPrintAll={() => handlePrintMany(printQueue.queue)}
+          />
+          {queuePrintPortal}
         </>
       )}
     </PageNav>
@@ -2100,9 +2150,87 @@ function AssetSticker({ asset }: { asset: Asset }) {
   );
 }
 
+// ============================================================================
+// Print queue — staff queue assets across pages, then batch-print stickers.
+// Persisted in localStorage so the queue survives opening an asset detail /
+// navigating away. Stores the full Asset row so the batch print + modal have
+// every sticker field without re-fetching. Never auto-clears — the modal has
+// an explicit Clear button.
+// ============================================================================
+
+const PRINT_QUEUE_KEY = 'asset-print-queue-v1';
+
+function readQueue(): Asset[] {
+  try {
+    const raw = localStorage.getItem(PRINT_QUEUE_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
+function useAssetPrintQueue() {
+  const [queue, setQueue] = useState<Asset[]>(() => readQueue());
+
+  // Mirror to localStorage + keep other tabs / instances in sync.
+  useEffect(() => {
+    try { localStorage.setItem(PRINT_QUEUE_KEY, JSON.stringify(queue)); } catch { /* quota */ }
+  }, [queue]);
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === PRINT_QUEUE_KEY) setQueue(readQueue());
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
+  const ids = useMemo(() => new Set(queue.map(a => a.asset_id)), [queue]);
+
+  const toggle = useCallback((asset: Asset) => {
+    setQueue(prev => prev.some(a => a.asset_id === asset.asset_id)
+      ? prev.filter(a => a.asset_id !== asset.asset_id)
+      : [...prev, asset]);
+  }, []);
+  const remove = useCallback((assetId: number) => {
+    setQueue(prev => prev.filter(a => a.asset_id !== assetId));
+  }, []);
+  const clear = useCallback(() => setQueue([]), []);
+
+  return { queue, ids, toggle, remove, clear };
+}
+
+const warmAssetLabel = (queryClient: ReturnType<typeof useQueryClient>, assetId: number) =>
+  queryClient.fetchQuery({
+    queryKey: ['asset-label', assetId],
+    queryFn: async () => {
+      const rows = await apiClient.get<AssetLabelRow[]>(
+        `/v_asset_label?asset_id=eq.${assetId}&select=asset_id,external_ref&limit=1`,
+      );
+      return Array.isArray(rows) ? rows[0] ?? null : null;
+    },
+  });
+
+const fireStickerPrint = (clear: () => void) => {
+  // Two rAFs — React commits, browser paints, then open print dialog.
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const styleEl = document.createElement('style');
+    styleEl.id = 'asset-sticker-print-page';
+    styleEl.textContent = '@media print { @page { size: 76mm 26mm; margin: 0; } }';
+    document.head.appendChild(styleEl);
+    try {
+      printWithMarker('asset-sticker');
+    } finally {
+      styleEl.remove();
+      clear();
+    }
+  }));
+};
+
 export function useAssetStickerPrint() {
   const queryClient = useQueryClient();
-  const [printAsset, setPrintAsset] = useState<Asset | null>(null);
+  // One stack of assets to print: a single sticker is just a length-1 batch.
+  const [printAssets, setPrintAssets] = useState<Asset[]>([]);
 
   const handlePrint = useCallback(async (asset: Asset) => {
     // Warm the external_ref query before mounting the sticker so it has data
@@ -2110,44 +2238,122 @@ export function useAssetStickerPrint() {
     // DOM and the off-screen portal that becomes the sole printed content
     // (with #root hidden) would be empty.
     try {
-      await queryClient.fetchQuery({
-        queryKey: ['asset-label', asset.asset_id],
-        queryFn: async () => {
-          const rows = await apiClient.get<AssetLabelRow[]>(
-            `/v_asset_label?asset_id=eq.${asset.asset_id}&select=asset_id,external_ref&limit=1`,
-          );
-          return Array.isArray(rows) ? rows[0] ?? null : null;
-        },
-      });
+      await warmAssetLabel(queryClient, asset.asset_id);
     } catch {
       // Fall through — sticker will print with external_ref blank if needed.
     }
-    setPrintAsset(asset);
-    // Two rAFs — React commits, browser paints, then open print dialog.
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      const styleEl = document.createElement('style');
-      styleEl.id = 'asset-sticker-print-page';
-      styleEl.textContent = '@media print { @page { size: 76mm 26mm; margin: 0; } }';
-      document.head.appendChild(styleEl);
-      try {
-        printWithMarker('asset-sticker');
-      } finally {
-        styleEl.remove();
-        setPrintAsset(null);
-      }
-    }));
+    setPrintAssets([asset]);
+    fireStickerPrint(() => setPrintAssets([]));
   }, [queryClient]);
 
-  const portal = printAsset
+  const handlePrintMany = useCallback(async (assets: Asset[]) => {
+    if (assets.length === 0) return;
+    // Warm every sticker's external_ref before mounting so all render with data.
+    await Promise.allSettled(assets.map(a => warmAssetLabel(queryClient, a.asset_id)));
+    setPrintAssets(assets);
+    fireStickerPrint(() => setPrintAssets([]));
+  }, [queryClient]);
+
+  const portal = printAssets.length > 0
     ? createPortal(
         <div className="print-only-asset-sticker" aria-hidden>
-          <AssetSticker asset={printAsset} />
+          {printAssets.map(a => <AssetSticker key={a.asset_id} asset={a} />)}
         </div>,
         document.body,
       )
     : null;
 
-  return { handlePrint, portal };
+  return { handlePrint, handlePrintMany, portal };
+}
+
+// Print-queue manager modal: lists queued assets, remove one / clear all,
+// print all (one sticker per asset on a continuous roll).
+function PrintQueueModal({
+  open, onClose, queue, onRemove, onClear, onPrintAll,
+}: {
+  open: boolean;
+  onClose: () => void;
+  queue: Asset[];
+  onRemove: (assetId: number) => void;
+  onClear: () => void;
+  onPrintAll: () => void;
+}) {
+  const { t } = useTranslation();
+  const [confirmClear, setConfirmClear] = useState(false);
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="32rem" width="100%">
+      <div className="modal-header">
+        <h2 className="modal-title">
+          {t('asset.printQueueTitle', { defaultValue: 'Print queue' })}
+          {queue.length > 0 && <span className="text-subtle font-normal"> ({queue.length})</span>}
+        </h2>
+        <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+      </div>
+
+      <div className="modal-content">
+        {queue.length === 0 ? (
+          <div className="py-10 text-center text-subtler text-sm">
+            {t('asset.printQueueEmpty', { defaultValue: 'No labels queued. Use the print toggle on a row to add one.' })}
+          </div>
+        ) : (
+          <div className="flex flex-col rounded-md border border-line overflow-hidden">
+            {queue.map((a) => (
+              <div key={a.asset_id} className="flex items-center gap-3 px-3 py-2 border-b border-line last:border-b-0">
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-xs truncate">{a.asset_code_display ?? a.asset_code}</div>
+                  <div className="text-xs text-subtle truncate">
+                    {a.product_display_name ?? `${a.brand_name} ${a.family_name} · ${a.variant_name}`}
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="btn-icon-sm"
+                  startIcon={<XCircle size={15} className="text-subtle" />}
+                  onClick={() => onRemove(a.asset_id)}
+                  aria-label={t('common.remove', { defaultValue: 'Remove' })}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="modal-footer">
+        <Button variant="ghost" color="danger" onClick={() => setConfirmClear(true)} disabled={queue.length === 0}>
+          {t('common.clear', { defaultValue: 'Clear' })}
+        </Button>
+        <Button
+          color="primary"
+          startIcon={<Printer size={16} />}
+          onClick={onPrintAll}
+          disabled={queue.length === 0}
+        >
+          {t('asset.printAll', { defaultValue: 'Print all' })}
+        </Button>
+      </div>
+
+      <Modal open={confirmClear} onClose={() => setConfirmClear(false)} maxWidth="24rem" width="100%">
+        <div className="modal-header">
+          <h2 className="modal-title">{t('asset.printQueueClearTitle', { defaultValue: 'Clear print queue?' })}</h2>
+        </div>
+        <div className="modal-content">
+          <p className="text-sm">
+            {t('asset.printQueueClearMessage', {
+              defaultValue: 'Remove all {{count}} queued labels? This cannot be undone.',
+              count: queue.length,
+            })}
+          </p>
+        </div>
+        <div className="modal-footer">
+          <Button variant="ghost" onClick={() => setConfirmClear(false)}>{t('common.cancel', { defaultValue: 'Cancel' })}</Button>
+          <Button color="danger" onClick={() => { onClear(); setConfirmClear(false); }}>
+            {t('common.clear', { defaultValue: 'Clear' })}
+          </Button>
+        </div>
+      </Modal>
+    </Modal>
+  );
 }
 
 // ============================================================================

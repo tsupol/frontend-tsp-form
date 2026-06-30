@@ -368,6 +368,17 @@ input[type="number"
         left: auto !important;
         top: auto !important;
     }
+    /* Batch print: one label per page. Each sticker breaks onto its own 76×26mm
+       page so a continuous-roll printer feeds one label per asset. The last one
+       must not emit a trailing blank page. */
+    body.printing-asset-sticker .print-only-asset-sticker .asset-sticker {
+        break-after: page;
+        page-break-after: always;
+    }
+    body.printing-asset-sticker .print-only-asset-sticker .asset-sticker:last-child {
+        break-after: auto;
+        page-break-after: auto;
+    }
 
     /* Thermal-print render hints — suppress subpixel positioning and LCD
        anti-aliasing which both turn into visible gray softening on the
