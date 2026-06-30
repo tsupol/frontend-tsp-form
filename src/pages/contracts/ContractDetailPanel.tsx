@@ -594,8 +594,13 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
 }) {
   const isFin2 = contract.commercial_model === 'FIN2';
   const isActive = contract.state === 'ACTIVE' || contract.state === 'COMPLETED' || contract.state === 'TERMINATED';
+  // Device can be bound before activation too — fn_contract_bind_device only
+  // checks permission + that nothing is bound (not ACTIVE), so include the
+  // pre-active signing/payment states so the reminder shows once a contract
+  // needs a device, not only after it activates.
   const needsDeviceBind =
-    (contract.state === 'ACTIVE' || contract.state === 'WAIT_LEGAL_PROCESS' || contract.state === 'ON_LEGAL_PROCESS') &&
+    (contract.state === 'ACTIVE' || contract.state === 'WAIT_LEGAL_PROCESS' || contract.state === 'ON_LEGAL_PROCESS'
+      || contract.state === 'PENDING_SIGN' || contract.state === 'PENDING_PAYMENT_AND_SIGN' || contract.state === 'PENDING_PAYMENT') &&
     contract.device_id == null &&
     !contract.is_used_asset;
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -636,28 +641,6 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
 
   return (
     <div className="p-4 flex flex-col gap-4">
-      {/* Bind device reminder — NEW asset post-activate */}
-      {needsDeviceBind && (
-        <div className="border rounded-md px-4 py-3 border-warning-border bg-warning-soft">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 min-w-0">
-              <Smartphone size={14} className="text-warning-fg shrink-0" />
-              <div className="min-w-0">
-                <div className="text-xs font-semibold uppercase tracking-wider text-warning-fg">
-                  {t('contract.deviceNotBound')}
-                </div>
-                <div className="text-sm text-warning-fg/90 mt-0.5">
-                  {t('contract.bindDeviceReminder')}
-                </div>
-              </div>
-            </div>
-            <Button size="sm" color="primary" onClick={onRequestBindDevice} className="shrink-0">
-              {t('contract.action_bind_device')}
-            </Button>
-          </div>
-        </div>
-      )}
-
       {/* Documents-need-signing reminder — live COLLECTING signing exists */}
       {liveCollectingCount > 0 && (
         <div className="border rounded-md px-4 py-3 border-warning-border bg-warning-soft">
@@ -675,6 +658,29 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
             </div>
             <Button size="sm" color="primary" onClick={onNavigateSigning} className="shrink-0">
               {t('contract.goToSigning')}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Bind device reminder — shown below signing; device can be bound even
+          before signing/activation. */}
+      {needsDeviceBind && (
+        <div className="border rounded-md px-4 py-3 border-warning-border bg-warning-soft">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <Smartphone size={14} className="text-warning-fg shrink-0" />
+              <div className="min-w-0">
+                <div className="text-xs font-semibold uppercase tracking-wider text-warning-fg">
+                  {t('contract.deviceNotBound')}
+                </div>
+                <div className="text-sm text-warning-fg/90 mt-0.5">
+                  {t('contract.bindDeviceReminder')}
+                </div>
+              </div>
+            </div>
+            <Button size="sm" color="primary" onClick={onRequestBindDevice} className="shrink-0">
+              {t('contract.action_bind_device')}
             </Button>
           </div>
         </div>

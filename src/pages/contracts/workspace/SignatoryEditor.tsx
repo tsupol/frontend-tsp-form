@@ -60,7 +60,7 @@ export function SignatoryEditor() {
     const defName = composeName(lessorDefault.person_prefix, lessorDefault.person_first_name, lessorDefault.person_last_name);
     options.push({
       value: USE_DEFAULT,
-      label: defName ? `${t('workspace.signatoryUseDefault')} — ${defName}` : t('workspace.signatoryUseDefault'),
+      label: defName ? `${t('workspace.signatoryDefaultShort')} — ${defName}` : t('workspace.signatoryUseDefault'),
     });
   }
   for (const l of lessorPool) {

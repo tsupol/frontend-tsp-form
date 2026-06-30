@@ -1,20 +1,29 @@
-// Bind the STAFF signatures (LESSOR + WITNESS) to the CONTRACT_OPEN snapshot at
-// activation time. The customer parties (LESSEE / CO_LESSEE) are intentionally
-// left COLLECTING — they sign later on the capture bridge (iPad QR), not here.
+// Bind the LESSOR staff signature to the CONTRACT_OPEN snapshot at activation
+// time. Customer parties (LESSEE / CO_LESSEE) AND witnesses are intentionally
+// left COLLECTING — they are collected later, not here.
 // See UI_FEEDBACK/2026-06-26_GUIDE_contract_signing_bridge_delivery_flow §6.1.
 //
-// Why staff-only: fn_bill_contract_open auto-creates a COLLECTING FULL_CONTRACT
+// Why LESSOR-only: fn_bill_contract_open auto-creates a COLLECTING FULL_CONTRACT
 // snapshot with one party row per required signer (LESSEE + every CO_LESSEE +
-// LESSOR + both WITNESSes), all unsigned. The snapshot seals only once EVERY
-// party is signed. LESSOR/WITNESS signatures are pre-registered staff sigs that
-// already carry a signature_media_id — we bind those now so the only parties
-// left COLLECTING are the customer-facing ones the bridge will collect.
+// LESSOR + N empty WITNESS placeholders), all unsigned. The snapshot seals only
+// once EVERY party is signed. LESSOR is the one pre-registered branch staff
+// signature that already carries a signature_media_id — we bind it now.
 //
-// We do NOT touch LESSEE/CO_LESSEE: no SIGNATURE_PAD pre-sign, no auto-bind.
-// Leaving them COLLECTING is what gives the bridge a roster to capture.
+// WITNESSES are NOT bound here. Since the witness-at-signing redesign (BE mig
+// 345/346/400) the snapshot emits `required_witness_count` EMPTY witness slots
+// straight from policy; they have no name and no media on purpose and are
+// assigned at the signing ceremony via fn_signing_assign_witness — never
+// pre-bound from branch signatories, and signing one directly is rejected
+// (CONTRACT.STATE.WITNESS_NOT_ASSIGNED). So an unbound WITNESS is the expected
+// state at payment, not a config error. Treating it as one wrongly blocked the
+// payment step when a branch has no witness signatory registered.
 //
-// Returns the staff roles it could NOT bind (no signatory media) so the caller
-// can surface a real mis-configuration instead of a silently stuck contract.
+// We do NOT touch LESSEE/CO_LESSEE/WITNESS: no pre-sign, no auto-bind. Leaving
+// them COLLECTING is what gives the ceremony/bridge a roster to capture.
+//
+// Returns the LESSOR role if it could NOT be bound (no signatory media) so the
+// caller can surface a real mis-configuration instead of a silently stuck
+// contract.
 
 import { apiClient } from '../../../lib/api';
 
@@ -34,25 +43,22 @@ interface SignatoryRow {
   signature_media_id: number | null;
 }
 
+// (Witnesses are assigned at the signing ceremony, not pre-bound here.)
+
 export interface SignPartiesResult {
-  /** Staff parties (LESSOR/WITNESS) with no bound signatory media — a real config error. */
+  /** LESSOR party with no bound signatory media — a real config error. */
   unsigned: Array<{ role: string; name: string | null }>;
   /** How many staff party signatures were bound. */
   signedCount: number;
 }
 
-// Witness party_index → signatory slot.
-const WITNESS_SLOT = (index: number): SignatoryRow['slot'] =>
-  index === 0 ? 'WITNESS_1' : 'WITNESS_2';
-
 /**
- * Bind the STAFF signatures (LESSOR + WITNESS) on the contract's COLLECTING
- * CONTRACT_OPEN snapshot. Customer parties (LESSEE/CO_LESSEE) are left
- * COLLECTING for the capture bridge.
+ * Bind the LESSOR staff signature on the contract's COLLECTING CONTRACT_OPEN
+ * snapshot. Customer parties (LESSEE/CO_LESSEE) and WITNESS placeholders are
+ * left COLLECTING for the ceremony/bridge.
  *
  * Must be called AFTER fn_bill_contract_open (which creates the snapshot). The
- * snapshot will NOT seal here — it seals once the customer parties also sign on
- * the bridge.
+ * snapshot will NOT seal here — it seals once the remaining parties also sign.
  */
 export async function signContractOpenParties(
   contractId: number,
@@ -75,16 +81,17 @@ export async function signContractOpenParties(
       `&order=party_role,party_index`,
   );
 
-  // Staff parties only — customer parties (LESSEE/CO_LESSEE) stay COLLECTING for
-  // the bridge, so we never bind them here.
+  // LESSOR only. Customer parties (LESSEE/CO_LESSEE) and WITNESS placeholders
+  // stay COLLECTING — witnesses are assigned at the signing ceremony via
+  // fn_signing_assign_witness, never pre-bound here (BE mig 345/346/400).
   const pending = parties.filter(
     p => !p.has_signed
       && p.signature_media_id == null
-      && (p.party_role === 'LESSOR' || p.party_role === 'WITNESS'),
+      && p.party_role === 'LESSOR',
   );
   if (pending.length === 0) return { unsigned: [], signedCount: 0 };
 
-  // Branch signatory media (LESSOR / WITNESS) — already real media_ids.
+  // Branch LESSOR signatory media — already a real media_id.
   const signatories = await apiClient.get<SignatoryRow[]>(
     `/v_contract_signatories?contract_id=eq.${contractId}&select=slot,signature_media_id`,
   ).catch(() => [] as SignatoryRow[]);
@@ -97,13 +104,7 @@ export async function signContractOpenParties(
   let signedCount = 0;
 
   for (const party of pending) {
-    let mediaId: number | null = null;
-
-    if (party.party_role === 'LESSOR') {
-      mediaId = mediaBySlot.get('LESSOR') ?? null;
-    } else if (party.party_role === 'WITNESS') {
-      mediaId = mediaBySlot.get(WITNESS_SLOT(party.party_index)) ?? null;
-    }
+    const mediaId = mediaBySlot.get('LESSOR') ?? null;
 
     if (mediaId == null) {
       unsigned.push({ role: party.party_role, name: party.frozen_full_name });

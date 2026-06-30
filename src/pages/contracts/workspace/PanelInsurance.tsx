@@ -70,7 +70,11 @@ export function PanelInsurance({ onClose: _onClose }: Props) {
 
   const disabled = isReadOnly || isFinancialLocked || !data.contractId;
   const downPayment = contract?.down_payment ?? 0;
-  const showZeroDownNote = isFin2 && downPayment === 0;
+  // FIN2 with no down payment collects ONLY the insurance fund at open — without
+  // it the bill total is 0 and the contract can't activate. So here insurance is
+  // required, not optional: show a single required alert instead of the generic
+  // "optional" hint + "recommended" note (which contradict each other).
+  const insuranceRequired = isFin2 && downPayment === 0 && current <= 0;
 
   return (
     <div className="p-4 flex flex-col gap-3">
@@ -84,12 +88,21 @@ export function PanelInsurance({ onClose: _onClose }: Props) {
         </div>
       </div>
 
-      <div className="alert alert-info">
-        <Info size={16} />
-        <div>
-          <div className="alert-description">{t('workspace.insuranceHint')}</div>
+      {insuranceRequired ? (
+        <div className="alert alert-warning">
+          <Info size={16} />
+          <div>
+            <div className="alert-description">{t('workspace.insuranceRequiredNote')}</div>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="alert alert-info">
+          <Info size={16} />
+          <div>
+            <div className="alert-description">{t('workspace.insuranceHint')}</div>
+          </div>
+        </div>
+      )}
 
       {!isFin2 ? (
         <div className="alert alert-info">
@@ -100,14 +113,6 @@ export function PanelInsurance({ onClose: _onClose }: Props) {
         </div>
       ) : (
         <>
-          {showZeroDownNote && (
-            <div className="alert alert-info">
-              <Info size={16} />
-              <div>
-                <div className="alert-description">{t('workspace.insuranceZeroDownNote')}</div>
-              </div>
-            </div>
-          )}
 
           {error && (
             <div className="alert alert-danger">

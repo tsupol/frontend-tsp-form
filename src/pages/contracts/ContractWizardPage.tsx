@@ -16,9 +16,7 @@ import { CardCustomer } from './workspace/CardCustomer';
 import { CardCommissionOwner } from './workspace/CardCommissionOwner';
 import { CardCoLessee } from './workspace/CardCoLessee';
 import { CardDocuments } from './workspace/CardDocuments';
-import { CardHandover } from './workspace/CardHandover';
 import { PanelSignatory } from './workspace/PanelSignatory';
-import { PanelHandover } from './workspace/PanelHandover';
 
 import { CardReviewPay } from './workspace/CardReviewPay';
 import { PanelReviewPay } from './workspace/PanelReviewPay';
@@ -255,6 +253,16 @@ function WorkspaceContent() {
     loadContract();
   }, [paramContractId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Sync URL once the draft contract gets an id ───────────────────────
+  // Started at /admin/contracts/new (no id). When the draft is created the
+  // contract gets an id; reflect it in the URL (replace, no history entry) so a
+  // page refresh resumes this contract instead of losing it back to a blank new.
+  useEffect(() => {
+    if (!data.contractId) return;
+    if (paramContractId) return; // already on /new/:id (resumed or already synced)
+    navigate(`/admin/contracts/new/${data.contractId}`, { replace: true });
+  }, [data.contractId, paramContractId, navigate]);
+
   // Track dirty — navGuard reads the ref on navigation attempts
   useEffect(() => {
     navGuard?.setDirtyRef(panelDirtyRef);
@@ -306,7 +314,6 @@ function WorkspaceContent() {
     co_lessee: t('workspace.cardCoLessee'),
     documents: t('workspace.cardDocuments'),
     signatory: t('workspace.cardSignatory'),
-    handover: t('workspace.cardHandover'),
   };
 
   return (
@@ -411,7 +418,6 @@ function WorkspaceContent() {
                     <CardInsurance onEdit={() => handleEditOpen('insurance')} active={isCardActive('insurance')} shake={shakingCards.has('insurance')} />
                     <CardContactRef onEdit={() => handleEditOpen('contactRef')} active={isCardActive('contactRef')} shake={shakingCards.has('contactRef')} />
                     <CardCoLessee onEdit={() => handleEditOpen('co_lessee')} active={isCardActive('co_lessee')} shake={shakingCards.has('co_lessee')} />
-                    <CardHandover onEdit={() => handleEditOpen('handover')} active={isCardActive('handover')} shake={shakingCards.has('handover')} />
                     <CardDocuments onEdit={() => handleEditOpen('documents')} active={isCardActive('documents')} shake={shakingCards.has('documents')} />
 
                     <div ref={reviewPayCardRef}>
@@ -445,7 +451,6 @@ function WorkspaceContent() {
                   {openModal === 'co_lessee' && <PanelCoLessee onClose={handleEditClose} />}
                   {openModal === 'documents' && <PanelDocuments onClose={handleEditClose} />}
                   {openModal === 'signatory' && <PanelSignatory onClose={handleEditClose} />}
-                  {openModal === 'handover' && <PanelHandover onClose={handleEditClose} />}
                   {openModal === 'reviewPay' && <PanelReviewPay onClose={handleEditClose} />}
                   {!openModal && !isMobile && (
                     <div className="flex items-center justify-center h-full text-subtle text-sm">

@@ -287,16 +287,18 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
           ) : (
             <div className="flex items-center justify-between gap-3">
               <div className="text-sm text-subtle">{t('contract.device_noPrimary')}</div>
-              {isActive && (
-                <Button
-                  size="sm"
-                  color="primary"
-                  startIcon={<Link2 size={14} />}
-                  onClick={() => onRequestAction('bind_device')}
-                >
-                  {t('contract.action_bind_device')}
-                </Button>
-              )}
+              {/* Binding does not require ACTIVE — fn_contract_bind_device only
+                  checks permission + that no device is bound, so allow binding
+                  the primary device before signing/activation too. (The inv
+                  issue-to-customer txn still only fires once ACTIVE.) */}
+              <Button
+                size="sm"
+                color="primary"
+                startIcon={<Link2 size={14} />}
+                onClick={() => onRequestAction('bind_device')}
+              >
+                {t('contract.action_bind_device')}
+              </Button>
             </div>
           )}
         </div>

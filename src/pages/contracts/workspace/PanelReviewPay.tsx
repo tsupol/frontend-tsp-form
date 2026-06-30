@@ -85,6 +85,14 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
   const cartChargeTotal = cartLines.reduce((sum, l) => sum + (l.as_gift ? 0 : l.amount), 0);
   const totalAmount = downPayment + insuranceDeposit + cartChargeTotal;
 
+  // FIN2 with no down payment collects only the insurance fund at contract open.
+  // If it's left at 0 the whole bill is 0 — nothing to charge, so activation
+  // can't proceed. Surface this as a clear blocker pointing at the Insurance
+  // step. (Reacts to FIN2/insurance changes via the contract query: editing the
+  // insurance deposit invalidates the contract and recomputes totalAmount here.)
+  const isFin2 = contract?.commercial_model === 'FIN2';
+  const needsInsuranceFund = isFin2 && totalAmount <= 0;
+
   // ── Payment rows ─────────────────────────────────────────────────────
   const paymentMethodOptions = useMemo(() => {
     const opts = BASE_PAYMENT_METHOD_VALUES.map(v => ({ value: v as string, label: t(`paymentMethod.${v}`) }));
@@ -448,6 +456,25 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
 
       {/* ── Footer ───────────────────────────────────────────── */}
       <div className="shrink-0 border-t border-line bg-bg flex flex-col">
+        {needsInsuranceFund && (
+          <>
+            <div className="px-4 py-2">
+              <div className="alert alert-danger">
+                <XCircle size={16} />
+                <div className="flex flex-col gap-1 min-w-0 flex-1">
+                  <button
+                    type="button"
+                    className="text-left bg-transparent border-none p-0 text-danger hover:underline cursor-pointer text-sm"
+                    onClick={() => setOpenModal('insurance')}
+                  >
+                    {t('wizard.fin2NeedsInsuranceFund')}
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="border-t border-line" />
+          </>
+        )}
         {readinessErrors.length > 0 && (
           <>
             <div className="px-4 py-2">
@@ -554,7 +581,7 @@ function PostConfirmView({ billId, contractId, needsBindDevice, onNavigate, t }:
           <Button
             variant="outline"
             startIcon={<Link2 size={16} />}
-            onClick={() => onNavigate(`/admin/contracts/pending-pairing/${contractId}`)}
+            onClick={() => onNavigate(`/admin/contracts/pending-pairing/${contractId}?tab=device`)}
           >
             {t('wizard.action_bindDevice')}
           </Button>
