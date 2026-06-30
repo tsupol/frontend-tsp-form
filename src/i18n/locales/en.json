@@ -2625,6 +2625,7 @@
     "toBranch": "Transfer to Branch",
     "selectBranch": "Select branch",
     "selectDevice": "Select device",
+    "agreedPrice": "Agreed price",
     "bindBoxAt": "Box: {{branch}}",
     "bindBoxOtherBranch": "(other branch)",
     "bindNoBox": "No box",

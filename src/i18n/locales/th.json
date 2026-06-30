@@ -2625,6 +2625,7 @@
     "toBranch": "โอนไปสาขา",
     "selectBranch": "เลือกสาขา",
     "selectDevice": "เลือกเครื่อง",
+    "agreedPrice": "ราคาที่ตกลง",
     "bindBoxAt": "กล่อง: {{branch}}",
     "bindBoxOtherBranch": "(คนละสาขา)",
     "bindNoBox": "ไม่มีกล่อง",

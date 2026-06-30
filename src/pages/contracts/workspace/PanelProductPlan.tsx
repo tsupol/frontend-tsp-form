@@ -1210,10 +1210,10 @@ function Fin2Calculator({ fin2Rows, fin2Terms, t, onUse }: {
   }, [resolved, termMonths, installmentAmount, clampedDown, total, financed, fin2Terms]);
 
   return (
-    <div className="mt-3 border border-line rounded-lg p-4 bg-surface-hover/50">
+    <div className="mt-3 border border-primary rounded-lg p-4 bg-primary-soft">
       <div className="flex items-center gap-1.5 mb-3">
-        <Calculator size={14} className="text-subtle" />
-        <span className="text-sm font-medium">{t('priceCheck.fin2Calc')}</span>
+        <Calculator size={14} className="text-primary-fg" />
+        <span className="text-sm font-medium text-primary-fg">{t('contract.agreedPrice', { defaultValue: 'Agreed price' })}</span>
       </div>
 
       <div className="flex gap-3 mb-3">
