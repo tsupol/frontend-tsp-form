@@ -17,7 +17,6 @@ import {
   XCircle,
   Smartphone,
   PenLine,
-  Landmark,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../lib/api';
 import { fmtCurrency } from '../lib/format';
@@ -25,7 +24,7 @@ import { DateTime } from '../components/DateTime';
 import { useAuth } from '../contexts/AuthContext';
 import { DashboardScopePicker } from '../components/DashboardScopePicker';
 import { PushSubscribeBanner } from '../components/PushSubscribeBanner';
-import { useBranchPaymentAccount, type BranchPaymentAccount } from '../components/BranchPaymentAccountField';
+import { useBranchPaymentAccounts, type BranchPaymentAccount } from '../components/BranchPaymentAccountField';
 import {
   defaultScopeFor,
   scopeQuery,
@@ -120,9 +119,10 @@ export function DashboardPage() {
   const isBranchUser = !!user?.branch_id;
   const today = todayISO();
 
-  // Today's receiving account — branch-level users only (JWT-scoped view).
-  const paymentAccountQuery = useBranchPaymentAccount(isBranchUser);
-  const paymentAccount = paymentAccountQuery.data ?? null;
+  // Today's receiving accounts — both channel slots (STORE_FRONT + INSTALLMENT),
+  // branch-level users only (JWT-scoped view).
+  const paymentAccountsQuery = useBranchPaymentAccounts(isBranchUser);
+  const paymentAccounts = paymentAccountsQuery.data ?? [];
 
   const [scope, setScope] = useState<Scope>(() => defaultScopeFor(user));
   const sk = scopeKey(scope);
@@ -323,8 +323,8 @@ export function DashboardPage() {
             <DashboardScopePicker scope={scope} onChange={setScope} />
             <ReceivingAccount
               show={isBranchUser}
-              account={paymentAccount}
-              noAccount={isBranchUser && paymentAccountQuery.isSuccess && !paymentAccount}
+              accounts={paymentAccounts}
+              noAccount={isBranchUser && paymentAccountsQuery.isSuccess && paymentAccounts.length === 0}
               t={t}
             />
           </div>
@@ -335,8 +335,8 @@ export function DashboardPage() {
           <DashboardScopePicker scope={scope} onChange={setScope} />
           <ReceivingAccount
             show={isBranchUser}
-            account={paymentAccount}
-            noAccount={isBranchUser && paymentAccountQuery.isSuccess && !paymentAccount}
+            accounts={paymentAccounts}
+            noAccount={isBranchUser && paymentAccountsQuery.isSuccess && paymentAccounts.length === 0}
             t={t}
           />
         </div>
@@ -582,36 +582,44 @@ export function DashboardPage() {
 // styled to match BranchPaymentAccountField (white, bold, wide tracking).
 function ReceivingAccount({
   show,
-  account,
+  accounts,
   noAccount,
   t,
 }: {
   show: boolean;
-  account: BranchPaymentAccount | null;
+  accounts: BranchPaymentAccount[];
   noAccount: boolean;
   t: (k: string, opts?: Record<string, unknown>) => string;
 }) {
   if (!show) return null;
 
-  if (account) {
+  if (accounts.length > 0) {
+    // Stable channel order: STORE_FRONT then INSTALLMENT.
+    const order: Record<string, number> = { STORE_FRONT: 0, INSTALLMENT: 1 };
+    const sorted = [...accounts].sort((a, b) => (order[a.channel] ?? 9) - (order[b.channel] ?? 9));
     return (
-      <div className="flex items-start gap-3 rounded-lg border border-line bg-surface px-4 py-3 max-w-full">
-        <span className="shrink-0 mt-0.5 flex h-8 w-8 items-center justify-center rounded-md bg-info-soft text-info">
-          <Landmark size={18} />
-        </span>
-        <div className="min-w-0">
-          <div className="text-xs text-subtle mb-1 flex items-center gap-2">
-            <span className="truncate">{t('dashboard.receivingAccount')}</span>
-            {account.source === 'OVERRIDE' && (
-              <Badge color="warning" size="sm">{t('dashboard.receivingAccountOverride')}</Badge>
-            )}
-          </div>
-          <div className="text-fg tabular-nums tracking-widest font-semibold truncate">
-            {account.account_number_display ?? account.account_number}
-          </div>
-          <div className="text-subtle text-xs truncate mt-0.5">
-            {account.bank_name} · {account.account_name}
-          </div>
+      <div className="rounded-lg border border-line bg-surface px-4 py-3 max-w-full">
+        <div className="text-xs text-subtle mb-2">{t('dashboard.receivingAccount')}</div>
+        <div className="flex divide-x divide-line">
+          {sorted.map((account) => (
+            <div key={account.channel} className="min-w-0 flex-1 px-3 first:pl-0 last:pr-0">
+              {/* line 1 — channel label + override badge */}
+              <div className="text-xs text-subtle mb-1 flex items-center gap-1.5">
+                <span className="truncate">{t(`bankChannel.channel_${account.channel}`, { defaultValue: account.channel })}</span>
+                {account.source === 'OVERRIDE' && (
+                  <Badge color="warning" size="sm">{t('dashboard.receivingAccountOverride')}</Badge>
+                )}
+              </div>
+              {/* line 2 — account number */}
+              <div className="text-fg tabular-nums tracking-widest font-semibold truncate">
+                {account.account_number_display ?? account.account_number}
+              </div>
+              {/* line 3 — bank */}
+              <div className="text-subtle text-xs truncate mt-0.5">{account.bank_name}</div>
+              {/* line 4 — account name */}
+              <div className="text-subtle text-xs truncate">{account.account_name}</div>
+            </div>
+          ))}
         </div>
       </div>
     );
