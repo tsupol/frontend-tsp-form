@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useSearchParams, useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, Modal, TextArea, DataTable, PopOver, Tooltip, Switch, useSnackbarContext } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, Box, Search, SlidersHorizontal, XCircle, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Wrench, Printer, Plus, CheckCircle, Pencil, Cloud, CloudOff } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, Box, Search, SlidersHorizontal, XCircle, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Wrench, Printer, Plus, CheckCircle, Pencil, Cloud, CloudOff, MoreVertical } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
@@ -402,6 +402,8 @@ export function AssetsPage() {
   const [pageSize, setPageSize] = useState(15);
   const printQueue = useAssetPrintQueue();
   const [queueModalOpen, setQueueModalOpen] = useState(false);
+  const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
+  const mobileActionsTriggerRef = useRef<HTMLButtonElement>(null);
   const { handlePrintMany, portal: queuePrintPortal } = useAssetStickerPrint();
   const navigate = useNavigate();
   const { assetId: assetIdParam } = useParams<{ assetId?: string }>();
@@ -546,9 +548,53 @@ export function AssetsPage() {
               <div className="mobile-header-title mobile-header-title-truncate">
                 {isRoot ? t('nav.assets') : codeDisplay(selectedAsset?.asset_code_display, selectedAsset?.asset_code)}
               </div>
-              <div className="mobile-header-end w-12" />
+              <div className="mobile-header-end w-12 flex items-center justify-center">
+                {isRoot && (
+                  <div className="relative inline-flex">
+                    <button
+                      ref={mobileActionsTriggerRef}
+                      type="button"
+                      className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
+                      onClick={() => setMobileActionsOpen(o => !o)}
+                      aria-label={t('common.actions', { defaultValue: 'Actions' })}
+                    >
+                      <MoreVertical size={20} />
+                    </button>
+                    {printQueue.queue.length > 0 && (
+                      <span className="absolute top-1.5 right-1.5 bg-primary text-white text-[10px] rounded-full min-w-4 h-4 px-1 flex items-center justify-center leading-none pointer-events-none">
+                        {printQueue.queue.length}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
             </MobileHeader>
           )}
+
+          <PopOver
+            isOpen={mobileActionsOpen}
+            onClose={() => setMobileActionsOpen(false)}
+            triggerRef={mobileActionsTriggerRef}
+            placement="bottom"
+            align="end"
+            maxWidth="16rem"
+          >
+            <div className="flex flex-col py-1">
+              <button
+                type="button"
+                className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-left hover:bg-surface-hover cursor-pointer bg-transparent border-none"
+                onClick={() => { setMobileActionsOpen(false); setQueueModalOpen(true); }}
+              >
+                <Printer size={16} className="text-subtle" />
+                <span>{t('asset.printQueue', { defaultValue: 'Print queue' })}</span>
+                {printQueue.queue.length > 0 && (
+                  <span className="ml-auto bg-primary text-white text-[10px] rounded-full min-w-4 h-4 px-1 flex items-center justify-center leading-none">
+                    {printQueue.queue.length}
+                  </span>
+                )}
+              </button>
+            </div>
+          </PopOver>
 
           {!isMobile && (
             <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
