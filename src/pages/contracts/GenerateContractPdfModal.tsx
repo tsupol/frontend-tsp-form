@@ -11,7 +11,6 @@ import { ContractPreviewModal } from './ContractPreviewModal';
 import { CLAUSE_6_REPO_THRESHOLD_DAYS } from '../../lib/contractPdf/constants';
 import {
   useCompanyLessors,
-  useBranchWitnesses,
   useBranchSignatoryDefaults,
   useContractSignatories,
   composeName,
@@ -61,10 +60,11 @@ interface Props {
   previewDoc?: BeMediaContractDoc | null;
 }
 
+// Only LESSOR is a branch signatory bound to the contract. Witnesses are now
+// assigned at the signing ceremony (mig 345/346/400), not from the branch
+// signatory book, so they are no longer part of print readiness here.
 const SLOTS: { slot: SignatorySlot; labelKey: string }[] = [
   { slot: 'LESSOR', labelKey: 'workspace.signatoryLessor' },
-  { slot: 'WITNESS_1', labelKey: 'workspace.signatoryWitness1' },
-  { slot: 'WITNESS_2', labelKey: 'workspace.signatoryWitness2' },
 ];
 
 export function GenerateContractPdfModal({ open, onClose, contract, signingId, previewDoc }: Props) {
@@ -86,7 +86,6 @@ export function GenerateContractPdfModal({ open, onClose, contract, signingId, p
   const companyId = branchRow?.company_id ?? null;
 
   const { data: lessorPool = [] } = useCompanyLessors(companyId);
-  const { data: witnessPool = [] } = useBranchWitnesses(branchId);
   const { data: defaults = [] } = useBranchSignatoryDefaults(branchId);
   const { data: bound = [] } = useContractSignatories(contractId);
   const { data: handover } = useContractHandover(contractId);
@@ -112,10 +111,8 @@ export function GenerateContractPdfModal({ open, onClose, contract, signingId, p
   // Resolved signatory per slot: contract binding wins; falls back to branch
   // default. Display only — no editing in this modal.
   const resolved = useMemo(() => {
-    const out: Record<SignatorySlot, { name: string; signature_media_id: number | null; source: 'bound' | 'default' | null }> = {
-      LESSOR:    { name: '', signature_media_id: null, source: null },
-      WITNESS_1: { name: '', signature_media_id: null, source: null },
-      WITNESS_2: { name: '', signature_media_id: null, source: null },
+    const out: Partial<Record<SignatorySlot, { name: string; signature_media_id: number | null; source: 'bound' | 'default' | null }>> = {
+      LESSOR: { name: '', signature_media_id: null, source: null },
     };
     for (const s of SLOTS) {
       const b = bound.find(x => x.slot === s.slot);
@@ -143,12 +140,9 @@ export function GenerateContractPdfModal({ open, onClose, contract, signingId, p
   }, [bound, defaults]);
 
   const lessorPoolEmpty = lessorPool.filter(l => l.is_active).length === 0;
-  const witnessPoolShort = witnessPool.filter(w => w.is_active).length < 2;
-  const missingPick = !resolved.LESSOR.signature_media_id || !resolved.WITNESS_1.signature_media_id || !resolved.WITNESS_2.signature_media_id;
-  const witnessDup = !!resolved.WITNESS_1.signature_media_id
-    && resolved.WITNESS_1.signature_media_id === resolved.WITNESS_2.signature_media_id;
+  const missingPick = !resolved.LESSOR?.signature_media_id;
   const noBankAccount = bankAccount === null;
-  const blocked = lessorPoolEmpty || witnessPoolShort || missingPick || witnessDup || noBankAccount;
+  const blocked = lessorPoolEmpty || missingPick || noBankAccount;
 
   const [previewOpen, setPreviewOpen] = useState(false);
 
@@ -189,29 +183,23 @@ export function GenerateContractPdfModal({ open, onClose, contract, signingId, p
                   <div key={s.slot} className="flex items-center gap-3 px-3 py-2 rounded-md border border-line bg-surface">
                     <div className="w-24 text-xs text-subtle shrink-0">{t(s.labelKey)}</div>
                     <div className="flex-1 min-w-0 text-sm truncate">
-                      {r.name || <span className="text-subtler italic">{t('common.notSet', { defaultValue: 'Not set' })}</span>}
+                      {r?.name || <span className="text-subtler italic">{t('common.notSet', { defaultValue: 'Not set' })}</span>}
                     </div>
-                    {r.source === 'default' && (
+                    {r?.source === 'default' && (
                       <span className="text-[11px] text-subtle italic shrink-0">
                         {t('contract.printDefaultBadge', { defaultValue: 'branch default' })}
                       </span>
                     )}
-                    {r.signature_media_id && <SignatureThumb mediaId={r.signature_media_id} size={24} />}
+                    {r?.signature_media_id && <SignatureThumb mediaId={r.signature_media_id} size={24} />}
                   </div>
                 );
               })}
             </div>
-            {(lessorPoolEmpty || witnessPoolShort) && (
+            {lessorPoolEmpty && (
               <div className="alert alert-danger">
                 <AlertTriangle size={14} />
                 <div className="flex flex-col gap-1">
-                  <span>
-                    {lessorPoolEmpty && witnessPoolShort
-                      ? t('contract.printBlock_signatoryBookEmpty', { defaultValue: 'Branch signatory book is missing a lessor and at least 2 active witnesses.' })
-                      : lessorPoolEmpty
-                        ? t('contract.printBlock_noLessorInBook', { defaultValue: 'Branch signatory book has no active lessor.' })
-                        : t('contract.printBlock_notEnoughWitnesses', { defaultValue: 'Branch signatory book needs at least 2 active witnesses.' })}
-                  </span>
+                  <span>{t('contract.printBlock_noLessorInBook', { defaultValue: 'Branch signatory book has no active lessor.' })}</span>
                   <Link to="/admin/company/signatories" className="text-sm underline inline-flex items-center gap-1 w-fit">
                     {t('contract.printBlock_openSignatoryBook', { defaultValue: 'Open Signatory Book' })}
                     <ExternalLink size={12} />
@@ -219,16 +207,10 @@ export function GenerateContractPdfModal({ open, onClose, contract, signingId, p
                 </div>
               </div>
             )}
-            {missingPick && !lessorPoolEmpty && !witnessPoolShort && (
+            {missingPick && !lessorPoolEmpty && (
               <div className="alert alert-warning">
                 <AlertTriangle size={14} />
                 <span>{t('contract.printBlock_noSignatoryBound', { defaultValue: 'No signatory bound and no branch default — set defaults on the Signatory Book first.' })}</span>
-              </div>
-            )}
-            {witnessDup && (
-              <div className="alert alert-danger">
-                <AlertTriangle size={14} />
-                <span>{t('workspace.signatoryDuplicateWitness')}</span>
               </div>
             )}
           </section>

@@ -198,13 +198,23 @@ export function SigningTab({
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [defaultedFor, setDefaultedFor] = useState<number | null>(null);
 
+  // While any signing is COLLECTING, parties may be signing on the bridge
+  // (iPad / phone web) right now. The QR modal only refreshes while it's open,
+  // and the staff usually close it after handing over the device — so poll the
+  // signing views on an interval so the cards live-sync without a manual reload.
+  // Stop polling once nothing is COLLECTING (all sealed/voided).
+  const hasCollecting = (historyData?: SigningHistoryRow[]) =>
+    (historyData ?? []).some(s => s.status === 'COLLECTING');
+
   const sourceView = showAudit ? 'v_contract_signing_history' : 'v_contract_signing_visible';
   const historyQuery = useQuery({
     queryKey: ['contract-signings', contractId, sourceView],
     queryFn: () => apiClient.get<SigningHistoryRow[]>(
       `/${sourceView}?contract_id=eq.${contractId}&order=version.desc,created_at.desc`,
     ),
-    staleTime: 30_000,
+    staleTime: 5_000,
+    refetchInterval: (query) => (hasCollecting(query.state.data) ? 5_000 : false),
+    refetchIntervalInBackground: false,
   });
 
   const partyQuery = useQuery({
@@ -212,7 +222,11 @@ export function SigningTab({
     queryFn: () => apiClient.get<SigningPartyRow[]>(
       `/v_contract_signing_party?contract_id=eq.${contractId}&order=signing_id.desc,party_index.asc`,
     ),
-    staleTime: 30_000,
+    staleTime: 5_000,
+    // Mirror the history poll while a signing is COLLECTING so per-party
+    // signed state stays in sync with the bridge.
+    refetchInterval: () => (hasCollecting(historyQuery.data) ? 5_000 : false),
+    refetchIntervalInBackground: false,
   });
 
   const partiesBySigning = useMemo(() => {
