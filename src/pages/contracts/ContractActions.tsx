@@ -2984,6 +2984,7 @@ function PayInstallmentModal({ open, contract, onClose }: {
                     <label className="form-label">{t('wizard.bankAccount')} *</label>
                     <BranchPaymentAccountField
                       active={channel === 'TRANSFER'}
+                      recommendChannel="INSTALLMENT"
                       onResolve={(id) => setBankAccountId(id != null ? String(id) : null)}
                     />
                   </div>

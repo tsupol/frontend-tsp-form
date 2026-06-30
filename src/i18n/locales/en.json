@@ -106,7 +106,8 @@
   },
   "bankAccount": {
     "temporary": "Temporary account",
-    "noReceivingAccount": "No receiving account is set for this branch. Set a default bank account before taking transfers."
+    "noReceivingAccount": "No receiving account is set for this branch. Set a default bank account before taking transfers.",
+    "pickChannel": "Which account received the transfer?"
   },
   "bankChannel": {
     "channel_STORE_FRONT": "Store front",
