@@ -2145,7 +2145,7 @@
       "title": "Bank Accounts",
       "description": "Manage branch bank accounts for payment collection.",
       "tabAccounts": "Accounts",
-      "tabChannels": "Channel accounts",
+      "tabChannels": "Channels",
       "addAccount": "Add Account",
       "editAccount": "Edit Account",
       "bankName": "Bank Name",

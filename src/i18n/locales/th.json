@@ -2145,7 +2145,7 @@
       "title": "บัญชีธนาคาร",
       "description": "จัดการบัญชีธนาคารสาขาสำหรับรับชำระ",
       "tabAccounts": "บัญชี",
-      "tabChannels": "บัญชีตามช่องทาง",
+      "tabChannels": "ช่องทาง",
       "addAccount": "เพิ่มบัญชี",
       "editAccount": "แก้ไขบัญชี",
       "bankName": "ชื่อธนาคาร",

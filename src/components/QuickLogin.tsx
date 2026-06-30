@@ -19,6 +19,7 @@ interface RoleDef {
 const ROLES: RoleDef[] = [
   { key: 'HOLD_ADMIN', label: 'HOLD_ADMIN', color: 'warning', username: 'ui_holding_admin' },
   { key: 'CO_ADMIN', label: 'CO_ADMIN', color: 'info', username: 'ui_company_admin_a' },
+  { key: 'CO_ACCT', label: 'CO_ACCT', color: 'info', username: 'ui_company_accountant_a' },
   { key: 'CO_INV', label: 'CO_INV', color: 'info', username: 'ui_company_inventory_a' },
   { key: 'BR_MGR', label: 'BR_MGR', color: 'success', usernameTemplate: 'ui_branch_manager' },
   { key: 'BR_STAFF', label: 'BR_STAFF', color: 'success', usernameTemplate: 'ui_branch_staff' },
