@@ -542,6 +542,8 @@
   "INV.VALIDATION.INSUFFICIENT_LOT_QTY": "จำนวนในล็อตไม่เพียงพอ",
   "inv.validation.insufficient_lot_qty": "จำนวนในล็อตไม่เพียงพอ",
   "INV.VALIDATION.INSUFFICIENT_STOCK": "สต็อกไม่เพียงพอ",
+  "INV.VALIDATION.HAS_BOX_REQUIRED": "ต้องระบุสถานะกล่อง",
+  "INV.VALIDATION.INVALID_BOX_BRANCH": "สาขาที่เก็บกล่องไม่ถูกต้อง",
   "inv.validation.insufficient_stock": "สต็อกไม่เพียงพอ",
   "INV.VALIDATION.INVALID_BUCKET": "สถานะ (bucket) ไม่ถูกต้อง",
   "inv.validation.invalid_bucket": "สถานะ (bucket) ไม่ถูกต้อง",

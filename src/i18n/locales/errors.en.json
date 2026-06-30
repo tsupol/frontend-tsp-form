@@ -542,6 +542,8 @@
   "INV.VALIDATION.INSUFFICIENT_LOT_QTY": "Insufficient lot quantity.",
   "inv.validation.insufficient_lot_qty": "Insufficient lot quantity.",
   "INV.VALIDATION.INSUFFICIENT_STOCK": "Insufficient stock.",
+  "INV.VALIDATION.HAS_BOX_REQUIRED": "Box status is required.",
+  "INV.VALIDATION.INVALID_BOX_BRANCH": "Invalid branch for box storage.",
   "inv.validation.insufficient_stock": "Insufficient stock.",
   "INV.VALIDATION.INVALID_BUCKET": "Invalid bucket.",
   "inv.validation.invalid_bucket": "Invalid bucket.",

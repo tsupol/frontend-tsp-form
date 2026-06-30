@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams, useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, Modal, TextArea, DataTable, PopOver, Tooltip, useSnackbarContext } from 'tsp-form';
+import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, Modal, TextArea, DataTable, PopOver, Tooltip, Switch, useSnackbarContext } from 'tsp-form';
 import { ArrowLeft, ArrowRightFromLine, Box, Search, SlidersHorizontal, XCircle, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Wrench, Printer, Plus, CheckCircle, Pencil, Cloud, CloudOff } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import { apiClient, ApiError } from '../../lib/api';
@@ -56,6 +56,10 @@ interface Asset {
   serial_no: string | null;
   imei: string | null;
   external_ref: string | null;
+  legacy_code: string | null;
+  has_box: boolean;
+  box_branch_id: number | null;
+  box_branch_name: string | null;
   battery_health: number | null;
   has_open_conflict: boolean;
   custodian_user_id: number | null;
@@ -1153,6 +1157,19 @@ function AssetDetailPanel({
       {/* External reference (TPA legacy ticket ID) */}
       <ExternalRefRow asset={asset} onChanged={onRefresh} t={t} addSnackbar={addSnackbar} />
 
+      {/* Legacy stock code (imported opening stock) — display only, hidden when absent */}
+      {asset.legacy_code && (
+        <div className="flex-none px-4 py-3 border-b border-line">
+          <div className="flex items-center gap-2">
+            <div className="text-xs text-subtle shrink-0">{t('asset.legacyCode', { defaultValue: 'Legacy code' })}</div>
+            <span className="text-sm font-mono">{asset.legacy_code}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Box (has_box / box branch) — inline badge + edit */}
+      <BoxRow asset={asset} onChanged={onRefresh} t={t} addSnackbar={addSnackbar} />
+
       {/* Financial info */}
       <div className="flex-none grid grid-cols-2 gap-3 px-4 py-3 border-b border-line">
         <div>
@@ -1567,6 +1584,166 @@ function ExternalRefRow({
         </div>
       )}
     </div>
+  );
+}
+
+// ============================================================================
+// Box row — has_box badge + which branch holds the box, with an edit modal
+// (fn_inv_asset_set_box). Separate from condition/revalue per mig 395.
+// ============================================================================
+
+function BoxRow({
+  asset,
+  onChanged,
+  t,
+  addSnackbar,
+}: {
+  asset: Asset;
+  onChanged: () => void;
+  t: ReturnType<typeof useTranslation>['t'];
+  addSnackbar: (opts: { message: React.ReactNode }) => void;
+}) {
+  const [editOpen, setEditOpen] = useState(false);
+  return (
+    <div className="flex-none px-4 py-3 border-b border-line">
+      <div className="flex items-center gap-2">
+        <div className="text-xs text-subtle shrink-0">{t('asset.box', { defaultValue: 'Box' })}</div>
+        <Badge size="xs" color={asset.has_box ? 'success' : 'default'}>
+          {asset.has_box ? t('asset.hasBox', { defaultValue: 'Has box' }) : t('asset.noBox', { defaultValue: 'No box' })}
+        </Badge>
+        {asset.has_box && asset.box_branch_name && (
+          <span className="text-xs text-subtle truncate">{asset.box_branch_name}</span>
+        )}
+        <Button
+          variant="ghost"
+          size="xs"
+          startIcon={<Pencil size={12} />}
+          onClick={() => setEditOpen(true)}
+          aria-label={t('common.edit', { defaultValue: 'Edit' })}
+        />
+      </div>
+      <SetBoxModal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        asset={asset}
+        t={t}
+        onSuccess={() => {
+          setEditOpen(false);
+          onChanged();
+          addSnackbar({
+            message: (
+              <div className="alert alert-success">
+                <CheckCircle size={16} />
+                <span>{t('asset.boxSaved', { defaultValue: 'Box status updated' })}</span>
+              </div>
+            ),
+          });
+        }}
+      />
+    </div>
+  );
+}
+
+function SetBoxModal({
+  open, onClose, asset, t, onSuccess,
+}: {
+  open: boolean;
+  onClose: () => void;
+  asset: Asset;
+  t: ReturnType<typeof useTranslation>['t'];
+  onSuccess: () => void;
+}) {
+  const [hasBox, setHasBox] = useState(asset.has_box);
+  const [boxBranchId, setBoxBranchId] = useState<string | null>(
+    asset.box_branch_id != null ? String(asset.box_branch_id) : null,
+  );
+  const [error, setError] = useState('');
+
+  const { data: branches = [] } = useQuery({
+    queryKey: ['branches'],
+    queryFn: () => apiClient.get<Branch[]>('/v_branches?order=name&is_active=is.true'),
+    enabled: open,
+  });
+  const branchOptions = useMemo(() => branches.map(b => ({ value: String(b.id), label: b.name })), [branches]);
+
+  // Reset to the asset's current values whenever reopened.
+  useEffect(() => {
+    if (open) {
+      setHasBox(asset.has_box);
+      setBoxBranchId(asset.box_branch_id != null ? String(asset.box_branch_id) : null);
+      setError('');
+    }
+  }, [open, asset.has_box, asset.box_branch_id]);
+
+  const mutation = useMutation({
+    mutationFn: () => apiClient.rpc('fn_inv_asset_set_box', {
+      p_asset_id: asset.asset_id,
+      p_has_box: hasBox,
+      // Branch only applies when keeping a box; backend ignores it / nulls otherwise.
+      p_box_branch_id: hasBox && boxBranchId ? Number(boxBranchId) : null,
+      p_note: null,
+    }),
+    onSuccess,
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        const translated =
+          (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') ||
+          (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setError(translated || err.message);
+      } else {
+        setError(String(err));
+      }
+    },
+  });
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="26rem" width="100%">
+      <div className="modal-header">
+        <h2 className="modal-title">{t('asset.editBox', { defaultValue: 'Edit box status' })}</h2>
+        <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+      </div>
+      <div className="modal-content">
+        {error && (
+          <div className="alert alert-danger mb-4 animate-pop-in">
+            <XCircle size={16} />
+            <span>{error}</span>
+          </div>
+        )}
+        <div className="px-3 py-2.5 rounded-md bg-surface border border-line mb-4">
+          <div className="font-medium text-sm">{asset.asset_code_display ?? asset.asset_code}</div>
+          <div className="text-xs text-subtle">{asset.product_display_name ?? asset.variant_name}</div>
+        </div>
+
+        <div className="form-grid">
+          <div className="flex items-center justify-between">
+            <label className="form-label mb-0">{t('asset.hasBox', { defaultValue: 'Has box' })}</label>
+            <Switch checked={hasBox} onChange={(e) => setHasBox((e.target as HTMLInputElement).checked)} />
+          </div>
+
+          {hasBox && (
+            <div className="flex flex-col">
+              <label className="form-label">{t('asset.boxBranch', { defaultValue: 'Box stored at' })}</label>
+              <Select
+                options={branchOptions}
+                value={boxBranchId}
+                onChange={(v) => setBoxBranchId((v as string) || null)}
+                placeholder={t('asset.boxBranchPlaceholder', { defaultValue: 'Branch holding the box' })}
+                size="sm"
+                searchable
+                showChevron
+              />
+              <div className="text-xs text-subtle mt-1">{t('asset.boxBranchHint', { defaultValue: 'Defaults to the asset\'s branch if left empty.' })}</div>
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={onClose} disabled={mutation.isPending}>{t('common.cancel')}</Button>
+        <Button color="primary" onClick={() => mutation.mutate()} disabled={mutation.isPending}>
+          {mutation.isPending ? t('common.saving') : t('common.save')}
+        </Button>
+      </div>
+    </Modal>
   );
 }
 
