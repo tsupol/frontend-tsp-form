@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button, Modal, Input, Select, TextArea, MaskedInput, Badge, Tooltip, PopOver, ImageUploader, LabeledCheckbox, useSnackbarContext } from 'tsp-form';
+import { Button, Modal, Input, Select, TextArea, MaskedInput, Badge, Tooltip, PopOver, ImageUploader, useSnackbarContext } from 'tsp-form';
 import type { UploadedImage } from 'tsp-form';
 import { CheckCircle, XCircle, X, Pencil, Plus, Trash2, Loader2, ChevronsRight, ChevronDown, ExternalLink, Wrench, ArrowRight, Info, Receipt, Paperclip, MessageSquare } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
@@ -1255,15 +1255,6 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
   const [error, setError] = useState('');
   const [errorKey, setErrorKey] = useState(0);
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
-  // Handover checklist — only applies to bind_device. Defaults to all-ticked
-  // because every device ships with these accessories; staff edits down if
-  // anything is missing. The mandatory `handoverConfirmed` flag is what
-  // actually gates submit so staff can't just blow through the screen.
-  const [handoverItems, setHandoverItems] = useState<Record<string, boolean>>({
-    charger: true, cable: true, box: true, earphones: true, manual: true,
-  });
-  const [handoverConfirmed, setHandoverConfirmed] = useState(false);
-
   const config = action ? ACTION_CONFIGS[action] : null;
   const hasDoneView = !!action && DONE_VIEW_ACTIONS.has(action);
 
@@ -1281,8 +1272,6 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
       setNewOwnerId(null);
       setError('');
       setResult(null);
-      setHandoverItems({ charger: true, cable: true, box: true, earphones: true, manual: true });
-      setHandoverConfirmed(false);
     }
   }, [open, action]);
 
@@ -1426,16 +1415,6 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
       if (config.needsAmount && amount) params.p_amount = Number(amount);
       if (config.needsNewOwner && newOwnerId) params.p_new_owner_id = Number(newOwnerId);
 
-      // Bind-device: append handover summary into p_note so the audit trail
-      // captures exactly what was handed over to the customer.
-      if (action === 'bind_device') {
-        const included = Object.entries(handoverItems).filter(([, v]) => v).map(([k]) => k);
-        const missing = Object.entries(handoverItems).filter(([, v]) => !v).map(([k]) => k);
-        const summary = `handover: included=[${included.join(',')}]`
-          + (missing.length ? ` missing=[${missing.join(',')}]` : '');
-        params.p_note = note.trim() ? `${note.trim()} | ${summary}` : summary;
-      }
-
       return apiClient.rpc<Record<string, unknown>>(config.rpc, params);
     },
     onSuccess: (res) => {
@@ -1468,7 +1447,6 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
     if (config.needsDevice && !deviceId) return false;
     if (config.needsAmount && (!amount || Number(amount) <= 0)) return false;
     if (config.needsNewOwner && !newOwnerId) return false;
-    if (action === 'bind_device' && !handoverConfirmed) return false;
     return true;
   })();
 
@@ -1578,30 +1556,6 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
                       <AssetSummaryLines asset={assetMap.get(deviceId)!} contractBranchId={contract.branch_id} />
                     </div>
                   )}
-                </div>
-              )}
-
-              {action === 'bind_device' && (
-                <div className="flex flex-col gap-2 border border-line rounded-md px-3 py-3">
-                  <div className="text-sm font-medium">{t('contract.handover_title')}</div>
-                  <div className="text-xs text-subtle">{t('contract.handover_hint')}</div>
-                  <div className="grid grid-cols-2 gap-1.5 mt-1">
-                    {(['charger', 'cable', 'box', 'earphones', 'manual'] as const).map(key => (
-                      <LabeledCheckbox
-                        key={key}
-                        label={t(`contract.handover_item_${key}`)}
-                        checked={handoverItems[key]}
-                        onChange={(e) => setHandoverItems(prev => ({ ...prev, [key]: e.target.checked }))}
-                      />
-                    ))}
-                  </div>
-                  <div className="mt-2 pt-2 border-t border-line">
-                    <LabeledCheckbox
-                      label={t('contract.handover_confirm')}
-                      checked={handoverConfirmed}
-                      onChange={(e) => setHandoverConfirmed(e.target.checked)}
-                    />
-                  </div>
                 </div>
               )}
 
