@@ -1164,11 +1164,19 @@ interface Asset {
   physical_color: string | null;
   serial_no: string | null;
   imei: string | null;
+  has_box: boolean;
+  box_branch_id: number | null;
+  box_branch_name: string | null;
 }
 
-function AssetSummaryLines({ asset, dense }: { asset: Asset; dense?: boolean }) {
+function AssetSummaryLines({ asset, dense, contractBranchId }: { asset: Asset; dense?: boolean; contractBranchId?: number | null }) {
+  const { t } = useTranslation();
   const code = asset.asset_code_display ?? asset.asset_code;
   const headlineParts = [asset.family_name, asset.model_name, asset.physical_color].filter(Boolean);
+  const boxAtOtherBranch = asset.has_box
+    && asset.box_branch_id != null
+    && contractBranchId != null
+    && asset.box_branch_id !== contractBranchId;
   return (
     <div className={`flex flex-col min-w-0 ${dense ? 'gap-0.5' : 'gap-1'}`}>
       <div className="text-sm font-medium truncate">
@@ -1181,6 +1189,16 @@ function AssetSummaryLines({ asset, dense }: { asset: Asset; dense?: boolean }) 
           {asset.serial_no && <span><span className="opacity-60">SN</span> {asset.serial_no}</span>}
         </div>
       )}
+      <div className="text-[11px] truncate flex items-center gap-1">
+        {asset.has_box ? (
+          <span className={boxAtOtherBranch ? 'text-warning' : 'text-subtle'}>
+            {t('contract.bindBoxAt', { defaultValue: 'Box: {{branch}}', branch: asset.box_branch_name ?? '—' })}
+            {boxAtOtherBranch && ` ${t('contract.bindBoxOtherBranch', { defaultValue: '(other branch)' })}`}
+          </span>
+        ) : (
+          <span className="text-subtler">{t('contract.bindNoBox', { defaultValue: 'No box' })}</span>
+        )}
+      </div>
     </div>
   );
 }
@@ -1278,7 +1296,7 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
     queryKey: ['assets-available', contract.branch_id, contract.model_id],
     queryFn: () => {
       const params = new URLSearchParams({
-        select: 'asset_id,asset_code,asset_code_display,family_name,model_name,variant_name,physical_color,serial_no,imei',
+        select: 'asset_id,asset_code,asset_code_display,family_name,model_name,variant_name,physical_color,serial_no,imei,has_box,box_branch_id,box_branch_name',
         current_bucket: 'eq.ON_HAND_AVAILABLE',
         branch_id: `eq.${contract.branch_id}`,
         order: 'asset_code',
@@ -1542,14 +1560,14 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
                       if (!a) return <span className="text-sm">{option.label}</span>;
                       return (
                         <div className="py-0.5">
-                          <AssetSummaryLines asset={a} dense />
+                          <AssetSummaryLines asset={a} dense contractBranchId={contract.branch_id} />
                         </div>
                       );
                     }}
                   />
                   {deviceId && assetMap.get(deviceId) && (
                     <div className="mt-2 px-3 py-2 rounded-md bg-info-soft border border-info-border">
-                      <AssetSummaryLines asset={assetMap.get(deviceId)!} />
+                      <AssetSummaryLines asset={assetMap.get(deviceId)!} contractBranchId={contract.branch_id} />
                     </div>
                   )}
                 </div>
