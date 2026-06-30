@@ -254,7 +254,7 @@ export function RepairsPage() {
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-baseline gap-1.5 min-w-0">
-                          <span className="font-medium text-sm truncate">{order.repair_no}</span>
+                          <span className="font-medium text-xs truncate">{order.repair_no}</span>
                         </div>
                         <div className="text-xs text-subtle truncate">
                           {[order.brand_name, order.model_name].filter(Boolean).join(' ')} · {codeDisplay(order.asset_code_display, order.asset_code)}
@@ -356,23 +356,23 @@ function RepairDetailPanel({
 
       <div className="flex-none grid grid-cols-2 gap-3 px-4 py-3 border-b border-line bg-surface">
         <div>
-          <div className="text-xs text-subtle">{t('repair.asset')}</div>
+          <div className="text-xs text-subtle mb-0.5">{t('repair.asset')}</div>
           <Link
             to={`/admin/inventory/assets/${order.asset_id}`}
-            className="inline-flex items-center gap-1 font-semibold text-sm text-primary-fg hover:underline"
+            className="inline-flex items-center gap-1 font-semibold text-xs leading-5 text-primary-fg hover:underline"
           >
             {codeDisplay(order.asset_code_display, order.asset_code)}
-            <ExternalLink size={12} />
+            <ExternalLink size={11} />
           </Link>
           <div className="text-xs text-subtle">
-            {[order.brand_name, order.family_name, order.model_name].filter(Boolean).join(' > ')}
+            {[order.brand_name, order.family_name, order.model_name, order.variant_name].filter(Boolean).join(' ')}
           </div>
-          <div className="text-xs text-subtle">{order.variant_name} · {order.sku_code}</div>
+          {order.sku_code && <div className="text-xs text-subtler font-mono truncate">{order.sku_code}</div>}
           {order.serial_no && <div className="text-xs text-fg/50 font-mono mt-0.5">{order.serial_no}</div>}
         </div>
         <div>
-          <div className="text-xs text-subtle">{t('repair.branch')}</div>
-          <div className="font-semibold text-sm">{order.branch_name}</div>
+          <div className="text-xs text-subtle mb-0.5">{t('repair.branch')}</div>
+          <div className="font-semibold text-xs leading-5">{order.branch_name}</div>
         </div>
       </div>
 

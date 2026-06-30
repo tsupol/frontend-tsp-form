@@ -51,6 +51,10 @@ interface TransferLine {
   asset_id: number | null;
   stock_lot_id: number | null;
   asset_code: string | null;
+  asset_code_display: string | null;
+  lot_code: string | null;
+  lot_code_display: string | null;
+  product_display_name: string | null;
   serial_no: string | null;
   variant_id: number | null;
   variant_name: string | null;
@@ -161,6 +165,14 @@ const LINE_STATUS_COLOR: Record<string, 'success' | 'warning' | 'danger' | 'info
 const TRANSFER_STATUS_VALUES = ['DRAFT', 'APPROVED', 'IN_TRANSIT', 'COMPLETED', 'DISPUTED', 'CANCELLED'] as const;
 
 const RECEIVE_ACTION_VALUES = ['RECEIVED', 'RECEIVED_DAMAGED', 'NOT_RECEIVED'] as const;
+
+// Dashed display code for a transfer line's asset/lot (mig 367). Returns null
+// when the view hasn't filled it, so call sites keep their raw-id fallback.
+function lineCode(line: Pick<TransferLine, 'line_type' | 'asset_code_display' | 'asset_code' | 'lot_code_display' | 'lot_code'>): string | null {
+  return line.line_type === 'ASSET'
+    ? (line.asset_code_display ?? line.asset_code)
+    : (line.lot_code_display ?? line.lot_code);
+}
 
 // ============================================================================
 // Component
@@ -403,7 +415,7 @@ export function TransfersPage() {
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className="font-medium text-sm truncate">{order.code_display}</span>
+                          <span className="font-medium text-xs truncate">{order.code_display}</span>
                         </div>
                         <div className="text-[11px] text-subtle truncate mt-0.5">
                           {order.from_branch_name} → {order.to_branch_name ?? `Branch #${order.to_branch_id}`}
@@ -654,16 +666,16 @@ function TransferDetailPanel({
 
       <div className="flex-none grid grid-cols-3 gap-3 px-4 py-3 border-b border-line bg-surface">
         <div>
-          <div className="text-xs text-subtle">{t('transfer.from')}</div>
-          <div className="font-semibold text-sm truncate">{order.from_branch_name}</div>
+          <div className="text-xs text-subtle mb-0.5">{t('transfer.from')}</div>
+          <div className="font-semibold text-xs leading-5 truncate">{order.from_branch_name}</div>
         </div>
         <div>
-          <div className="text-xs text-subtle">{t('transfer.to')}</div>
-          <div className="font-semibold text-sm truncate">{order.to_branch_name ?? `Branch #${order.to_branch_id}`}</div>
+          <div className="text-xs text-subtle mb-0.5">{t('transfer.to')}</div>
+          <div className="font-semibold text-xs leading-5 truncate">{order.to_branch_name ?? `Branch #${order.to_branch_id}`}</div>
         </div>
         <div>
-          <div className="text-xs text-subtle">{t('transfer.mode')}</div>
-          <div className="font-semibold text-sm">{t(`transfer.mode_${order.transfer_mode}`, { defaultValue: order.transfer_mode.replace(/_/g, ' ') })}</div>
+          <div className="text-xs text-subtle mb-0.5">{t('transfer.mode')}</div>
+          <div className="font-semibold text-xs leading-5">{t(`transfer.mode_${order.transfer_mode}`, { defaultValue: order.transfer_mode.replace(/_/g, ' ') })}</div>
         </div>
       </div>
 
@@ -1220,7 +1232,7 @@ function ReceiveLineModal({
         {view === 'done' && result && line && (
           <ActionDoneView
             headline={t('transfer.receiveLineDoneHeadline', { defaultValue: 'Receipt recorded' })}
-            contractCode={line.line_type === 'ASSET' ? (line.asset_code ?? `line #${result.transfer_line_id}`) : `Lot #${line.stock_lot_id}`}
+            contractCode={lineCode(line) ?? `line #${result.transfer_line_id}`}
             tone={tone}
             detailRows={[
               { label: t('transfer.receiveAction', { defaultValue: 'Action' }), value: result.action },
@@ -1247,10 +1259,10 @@ function ReceiveLineModal({
           )}
           <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
             <div className="font-medium text-sm">
-              {line.line_type === 'ASSET' ? line.asset_code : `Lot #${line.stock_lot_id}`}
+              {lineCode(line) ?? (line.line_type === 'ASSET' ? `Asset #${line.asset_id}` : `Lot #${line.stock_lot_id}`)}
             </div>
             <div className="text-xs text-subtle">
-              {[line.brand_name, line.model_name].filter(Boolean).join(' ')} · {line.variant_name ?? line.sku_code ?? ''}
+              {line.product_display_name ?? `${[line.brand_name, line.model_name].filter(Boolean).join(' ')} · ${line.variant_name ?? line.sku_code ?? ''}`}
             </div>
             {line.serial_no && <div className="text-xs text-fg/50 font-mono mt-0.5">{line.serial_no}</div>}
             {line.line_type === 'LOT' && line.qty_requested !== null && (
@@ -1352,7 +1364,7 @@ function TransferLineRow({
                 to={`/admin/inventory/assets/${line.asset_id}`}
                 className="inline-flex items-center gap-1 text-primary-fg hover:underline"
               >
-                {line.asset_code ?? `Asset #${line.asset_id}`}
+                {lineCode(line) ?? `Asset #${line.asset_id}`}
                 <ExternalLink size={11} />
               </Link>
             ) : line.line_type === 'LOT' && line.stock_lot_id ? (
@@ -1360,16 +1372,20 @@ function TransferLineRow({
                 to={`/admin/inventory/lots/${line.stock_lot_id}`}
                 className="inline-flex items-center gap-1 text-primary-fg hover:underline"
               >
-                Lot #{line.stock_lot_id}
+                {lineCode(line) ?? `Lot #${line.stock_lot_id}`}
                 <ExternalLink size={11} />
               </Link>
             ) : (
-              <span>{line.line_type === 'ASSET' ? `Asset #${line.asset_id}` : `Lot #${line.stock_lot_id}`}</span>
+              <span>{lineCode(line) ?? (line.line_type === 'ASSET' ? `Asset #${line.asset_id}` : `Lot #${line.stock_lot_id}`)}</span>
             )}
           </div>
           <div className="text-xs text-subtle truncate">
-            {[line.brand_name, line.model_name].filter(Boolean).join(' ')}
-            {(line.variant_name || line.sku_code) && ` · ${line.variant_name ?? line.sku_code}`}
+            {line.product_display_name ?? (
+              <>
+                {[line.brand_name, line.model_name].filter(Boolean).join(' ')}
+                {(line.variant_name || line.sku_code) && ` · ${line.variant_name ?? line.sku_code}`}
+              </>
+            )}
           </div>
           {line.serial_no && <div className="text-xs text-fg/50 font-mono truncate">{line.serial_no}</div>}
           {(() => {

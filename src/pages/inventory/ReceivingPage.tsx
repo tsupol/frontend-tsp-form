@@ -76,6 +76,8 @@ interface ReceiptLine {
   unit_cost: number;
   line_total: number;
   stock_lot_id: number | null;
+  lot_code: string | null;
+  product_display_name: string | null;
   is_unmatched: boolean;
 }
 
@@ -306,7 +308,7 @@ export function ReceivingPage() {
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className="font-medium text-sm truncate">{codeDisplay(receipt.code_display, receipt.receipt_no)}</span>
+                          <span className="font-medium text-xs truncate">{codeDisplay(receipt.code_display, receipt.receipt_no)}</span>
                           <Badge size="xs" color={RECEIPT_STATUS_COLOR[receipt.status] ?? 'default'}>
                             {t(`receiving.status_${receipt.status}`, receipt.status)}
                           </Badge>
@@ -423,23 +425,23 @@ function ReceiptDetailPanel({
 
       <div className="flex-none grid grid-cols-3 gap-3 px-4 py-3 border-b border-line bg-surface">
         <div>
-          <div className="text-xs text-subtle">{t('receiving.poRef')}</div>
+          <div className="text-xs text-subtle mb-0.5">{t('receiving.poRef')}</div>
           <Link
             to={`/admin/inventory/po/${detail.po_id}`}
-            className="inline-flex items-center gap-1 font-semibold text-sm text-primary-fg hover:underline"
+            className="inline-flex items-center gap-1 h-5 font-semibold text-xs text-primary-fg hover:underline"
           >
             {codeDisplay(detail.po_code_display, detail.po_no)}
-            <ExternalLink size={12} />
+            <ExternalLink size={11} className="shrink-0" />
           </Link>
           <div className="text-xs text-subtle">{detail.supplier_name}</div>
         </div>
         <div>
-          <div className="text-xs text-subtle">{t('receiving.branch')}</div>
-          <div className="font-semibold text-sm truncate">{detail.branch_name}</div>
+          <div className="text-xs text-subtle mb-0.5">{t('receiving.branch')}</div>
+          <div className="font-semibold text-xs leading-5 truncate">{detail.branch_name}</div>
         </div>
         <div>
-          <div className="text-xs text-subtle">{t('receiving.totalAmount')}</div>
-          <div className="font-semibold text-sm tabular-nums">
+          <div className="text-xs text-subtle mb-0.5">{t('receiving.totalAmount')}</div>
+          <div className="font-semibold text-xs leading-5 tabular-nums">
             {fmtCurrency(lines.reduce((sum, l) => sum + l.line_total, 0))}
           </div>
         </div>
@@ -583,11 +585,12 @@ function ReceiptLineRow({
   return (
     <div className="px-4 py-2.5 border-b border-line flex items-center gap-3">
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium truncate">{line.model_name}</div>
-        <div className="text-xs text-subtle truncate">
-          {line.variant_name} · {line.sku_code}
+        <div className="text-sm font-medium truncate">
+          {line.product_display_name ?? [line.brand_name, line.family_name, line.variant_name].filter(Boolean).join(' ')}
         </div>
-        <div className="text-xs text-subtle">{line.brand_name} · {line.family_name}</div>
+        {line.sku_code && (
+          <div className="text-xs text-subtler font-mono truncate">{line.sku_code}</div>
+        )}
         <div className="flex items-center gap-2 mt-1">
           {line.is_unmatched && (
             <Badge size="xs" color="warning">{t('receiving.unmatched')}</Badge>
@@ -598,7 +601,7 @@ function ReceiptLineRow({
               className="inline-flex items-center gap-1 text-xs text-primary-fg hover:underline tabular-nums"
               onClick={(e) => e.stopPropagation()}
             >
-              {t('receiving.viewLot', { id: line.stock_lot_id })}
+              {line.lot_code ?? t('receiving.viewLot', { id: line.stock_lot_id })}
               <ExternalLink size={12} />
             </Link>
           )}

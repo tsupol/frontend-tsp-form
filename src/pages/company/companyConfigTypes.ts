@@ -16,6 +16,7 @@ export interface CompanyConfig {
   repo_fee_per_case: number;
   max_co_lessees: number;
   deposit_max_days: number;
+  buyback_auto_reject_days: number;
   updated_by: number | null;
   updated_at: string;
 }
@@ -25,4 +26,6 @@ export type EditableField = {
   label: string;
   type: 'number' | 'boolean';
   group: string;
+  min?: number;
+  max?: number;
 };

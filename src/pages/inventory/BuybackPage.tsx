@@ -471,7 +471,7 @@ export function BuybackPage() {
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-baseline gap-1.5 min-w-0">
-                          <span className="font-medium text-sm truncate">{codeDisplay(order.code_display, order.po_no)}</span>
+                          <span className="font-medium text-xs truncate">{codeDisplay(order.code_display, order.po_no)}</span>
                         </div>
                         <div className="text-xs text-subtle truncate">{order.supplier_name}</div>
                         {productLine && (

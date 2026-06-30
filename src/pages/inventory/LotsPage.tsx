@@ -465,7 +465,7 @@ export function LotsPage() {
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className="font-medium text-sm truncate">{codeDisplay(lot.lot_code_display, lot.lot_code)}</span>
+                          <span className="font-medium text-xs truncate">{codeDisplay(lot.lot_code_display, lot.lot_code)}</span>
                           <Badge size="xs" color={getBucketColor(lot.current_bucket)}>
                             {getBucketLabel(lot.current_bucket, t)}
                           </Badge>

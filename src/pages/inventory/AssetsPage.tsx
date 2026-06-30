@@ -756,7 +756,7 @@ export function AssetsPage() {
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-baseline gap-1.5 min-w-0">
-                          <span className="font-medium text-sm truncate">{codeDisplay(asset.asset_code_display, asset.asset_code)}</span>
+                          <span className="font-medium text-xs truncate">{codeDisplay(asset.asset_code_display, asset.asset_code)}</span>
                           {asset.external_ref && (
                             <span className="text-[10px] font-mono text-subtle bg-surface px-1 py-0.5 rounded border border-line shrink-0">
                               EXT {asset.external_ref}

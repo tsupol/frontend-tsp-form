@@ -47,6 +47,7 @@ export function CompanyConfigDetailPage() {
     { key: 'pause_max_deferred', label: t('settings.config.pauseMaxDeferred'), type: 'number', group: 'pause' },
     { key: 'pause_enabled', label: t('settings.config.pauseEnabled'), type: 'boolean', group: 'pause' },
     { key: 'repo_fee_per_case', label: t('settings.config.repoFeePerCase'), type: 'number', group: 'legal' },
+    { key: 'buyback_auto_reject_days', label: t('settings.config.buybackAutoRejectDays'), type: 'number', group: 'buyback', min: 1, max: 365 },
   ];
 
   const groups = [
@@ -55,6 +56,7 @@ export function CompanyConfigDetailPage() {
     { key: 'commission', label: t('settings.config.groupCommission') },
     { key: 'pause', label: t('settings.config.groupPause') },
     { key: 'legal', label: t('settings.config.groupLegal') },
+    { key: 'buyback', label: t('settings.config.groupBuyback') },
   ];
 
   // Initialize form when config loads
@@ -83,6 +85,24 @@ export function CompanyConfigDetailPage() {
     if (!config || !user) return;
     setSaving(true);
     setErrorMessage('');
+
+    // Client-side range check for fields that declare min/max (DB enforces the
+    // same via CHECK, but reject early with a clear message).
+    const outOfRange = fields.find(f => {
+      if (f.type !== 'number') return false;
+      const v = formValues[f.key] as number;
+      return (f.min != null && v < f.min) || (f.max != null && v > f.max);
+    });
+    if (outOfRange) {
+      setSaving(false);
+      setErrorMessage(t('settings.config.outOfRange', {
+        field: outOfRange.label,
+        min: outOfRange.min,
+        max: outOfRange.max,
+        defaultValue: '{{field}} must be between {{min}} and {{max}}',
+      }));
+      return;
+    }
 
     const changes: Record<string, number | boolean> = {};
     for (const f of fields) {
@@ -225,6 +245,8 @@ export function CompanyConfigDetailPage() {
                         <Input
                           type="number"
                           className="w-full"
+                          min={field.min}
+                          max={field.max}
                           value={String(getValue(field.key) ?? '')}
                           onChange={(e) => setValue(field.key, Number(e.target.value))}
                         />

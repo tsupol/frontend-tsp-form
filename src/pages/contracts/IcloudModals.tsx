@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Modal, Select, TextArea } from 'tsp-form';
-import { XCircle } from 'lucide-react';
+import { XCircle, Eye, EyeOff, Copy, Check } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { BranchPinInput } from '../../components/BranchPinInput';
 
@@ -14,6 +14,9 @@ interface ICloudAccountRow {
   branch_name: string;
   is_active: boolean;
   c_device_count: number;
+  // Masked by permission in the view (ICLOUD.ACCOUNT_REVEAL_PASSWORD): the real
+  // password for those who may see it, null otherwise. No FE role check needed.
+  password: string | null;
 }
 
 function setApiError(
@@ -28,6 +31,48 @@ function setApiError(
   } else {
     setError(err instanceof Error ? err.message : String(err));
   }
+}
+
+// Inline credential row for a pool account's iCloud password. Only rendered
+// when the view returned a non-null password (caller already checked) — i.e.
+// the user holds ICLOUD.ACCOUNT_REVEAL_PASSWORD. Masked by default with a
+// reveal toggle + copy, since it's a credential.
+function IcloudPasswordRow({ password }: { password: string }) {
+  const { t } = useTranslation();
+  const [shown, setShown] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const copy = () => {
+    navigator.clipboard?.writeText(password).then(
+      () => { setCopied(true); setTimeout(() => setCopied(false), 2000); },
+      () => {},
+    );
+  };
+
+  return (
+    <div className="mt-2 flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-surface border border-line">
+      <span className="text-xs text-subtle shrink-0">{t('contract.icloud_password', { defaultValue: 'Password' })}</span>
+      <span className="text-sm font-mono flex-1 min-w-0 truncate select-all">
+        {shown ? password : '•'.repeat(Math.min(password.length, 12))}
+      </span>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="btn-icon-xs"
+        startIcon={shown ? <EyeOff size={14} /> : <Eye size={14} />}
+        onClick={() => setShown(s => !s)}
+        aria-label={shown ? t('common.hide', { defaultValue: 'Hide' }) : t('common.show', { defaultValue: 'Show' })}
+      />
+      <Button
+        variant="ghost"
+        size="sm"
+        className="btn-icon-xs"
+        startIcon={copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
+        onClick={copy}
+        aria-label={t('common.copy', { defaultValue: 'Copy' })}
+      />
+    </div>
+  );
 }
 
 // ── Assign iCloud ──────────────────────────────────────────────────────────
@@ -63,7 +108,7 @@ export function AssignIcloudModal({
   const { data: accounts = [] } = useQuery({
     queryKey: ['icloud-accounts-available', branchId],
     queryFn: () => apiClient.get<ICloudAccountRow[]>(
-      `/v_icloud_accounts?branch_id=eq.${branchId}&is_active=is.true&order=apple_id&select=id,apple_id,registration_email,branch_id,branch_name,is_active,c_device_count`,
+      `/v_icloud_accounts?branch_id=eq.${branchId}&is_active=is.true&order=apple_id&select=id,apple_id,registration_email,branch_id,branch_name,is_active,c_device_count,password`,
     ),
     staleTime: 30 * 1000,
     enabled: open,
@@ -77,6 +122,11 @@ export function AssignIcloudModal({
         label: `${a.apple_id} · ${a.c_device_count} devices`,
       })),
     [accounts, currentAccountId],
+  );
+
+  const selectedAccount = useMemo(
+    () => accounts.find(a => String(a.id) === accountId) ?? null,
+    [accounts, accountId],
   );
 
   const mutation = useMutation({
@@ -123,6 +173,9 @@ export function AssignIcloudModal({
                 searchable
               />
               <div className="text-xs text-subtle mt-1">{t('contract.icloud_assignHint')}</div>
+              {selectedAccount?.password && (
+                <IcloudPasswordRow password={selectedAccount.password} />
+              )}
             </div>
 
             <div className="flex flex-col">

@@ -101,6 +101,7 @@ interface PoDetail {
 interface PoReceiptLink {
   id: number;
   receipt_no: string;
+  code_display: string | null;
   status: string;
   branch_name: string;
   line_count: number;
@@ -441,11 +442,14 @@ export function PurchaseOrdersPage() {
                         if (isMobile) goTo('detail');
                       }}
                     >
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 flex flex-col gap-1.5">
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className="font-medium text-sm truncate">{codeDisplay(po.code_display, po.po_no)}</span>
+                          <span className="font-medium text-xs truncate">{codeDisplay(po.code_display, po.po_no)}</span>
+                          <span className="text-[11px] text-subtle shrink-0 ml-auto">
+                            <DateTime value={po.created_at} />
+                          </span>
                         </div>
-                        <div className="flex items-center gap-2 min-w-0 mt-0.5">
+                        <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
                           <Badge size="xs" color={PO_TYPE_COLOR[po.po_type] ?? 'default'}>
                             {poTypeLabel(po.po_type)}
                           </Badge>
@@ -460,12 +464,7 @@ export function PurchaseOrdersPage() {
                             {ownershipLabel(po.ownership)}
                           </Badge>
                         </div>
-                      </div>
-                      <div className="text-right shrink-0 min-w-0">
-                        <div className="text-xs text-subtle">
-                          <DateTime value={po.created_at} />
-                        </div>
-                        <div className="text-[11px] text-subtle mt-0.5 truncate">
+                        <div className="text-[11px] text-subtle truncate">
                           {[
                             po.branch_id != null ? branchNameMap.get(po.branch_id) : null,
                             po.supplier_name,
@@ -592,7 +591,7 @@ function PoDetailPanel({
     queryKey: ['po-receipts', detail.po_id],
     queryFn: () => apiClient.get<PoReceiptLink[]>(
       `/v_receipts?po_id=eq.${detail.po_id}`
-      + '&select=id,receipt_no,status,branch_name,line_count,total_qty,created_at'
+      + '&select=id,receipt_no,code_display,status,branch_name,line_count,total_qty,created_at'
       + '&order=created_at.desc',
     ),
     staleTime: 30 * 1000,
@@ -717,7 +716,7 @@ function PoDetailPanel({
                     to={`/admin/inventory/receiving/${r.id}`}
                     className="inline-flex items-center gap-1 text-primary-fg hover:underline text-xs font-medium tabular-nums"
                   >
-                    {r.receipt_no}
+                    {codeDisplay(r.code_display, r.receipt_no)}
                     <ExternalLink size={11} />
                   </Link>
                   <Badge size="xs" color={RECEIPT_STATUS_COLOR[r.status] ?? 'default'} className="ml-auto">
