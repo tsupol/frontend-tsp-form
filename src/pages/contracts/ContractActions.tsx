@@ -1164,6 +1164,7 @@ interface Asset {
   physical_color: string | null;
   serial_no: string | null;
   imei: string | null;
+  condition_grade: string | null;
   has_box: boolean;
   box_branch_id: number | null;
   box_branch_name: string | null;
@@ -1182,11 +1183,18 @@ function AssetSummaryLines({ asset, dense, contractBranchId }: { asset: Asset; d
       <div className="text-sm font-medium truncate">
         {headlineParts.length > 0 ? headlineParts.join(' ') : asset.variant_name}
       </div>
-      <div className="text-xs text-subtle font-mono truncate">{code}</div>
+      <div className="flex items-center gap-1.5 min-w-0">
+        <span className="text-xs text-subtle font-mono truncate">{code}</span>
+        {asset.condition_grade && (
+          <Badge size="xs" color={asset.condition_grade.startsWith('USED') ? 'warning' : 'default'}>
+            {t(`inventory.condition${asset.condition_grade}`, { defaultValue: asset.condition_grade })}
+          </Badge>
+        )}
+      </div>
       {(asset.imei || asset.serial_no) && (
         <div className="text-[11px] text-subtle font-mono truncate flex gap-2">
-          {asset.imei && <span><span className="opacity-60">IMEI</span> {asset.imei}</span>}
-          {asset.serial_no && <span><span className="opacity-60">SN</span> {asset.serial_no}</span>}
+          {asset.imei && <span key="imei"><span className="opacity-60">IMEI</span> {asset.imei}</span>}
+          {asset.serial_no && <span key="sn"><span className="opacity-60">SN</span> {asset.serial_no}</span>}
         </div>
       )}
       <div className="text-[11px] truncate flex items-center gap-1">
@@ -1296,7 +1304,7 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
     queryKey: ['assets-available', contract.branch_id, contract.model_id],
     queryFn: () => {
       const params = new URLSearchParams({
-        select: 'asset_id,asset_code,asset_code_display,family_name,model_name,variant_name,physical_color,serial_no,imei,has_box,box_branch_id,box_branch_name',
+        select: 'asset_id,asset_code,asset_code_display,family_name,model_name,variant_name,physical_color,serial_no,imei,condition_grade,has_box,box_branch_id,box_branch_name',
         current_bucket: 'eq.ON_HAND_AVAILABLE',
         branch_id: `eq.${contract.branch_id}`,
         order: 'asset_code',
