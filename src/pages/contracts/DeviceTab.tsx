@@ -1,14 +1,18 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { Badge, Button, useSnackbarContext } from 'tsp-form';
-import { Smartphone, ExternalLink, Wrench, ArrowDownToLine, ArrowUpFromLine, Link2, Link2Off, Cloud, CloudOff, CheckCircle } from 'lucide-react';
-import { apiClient } from '../../lib/api';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Badge, Button, Modal, Input, FormErrorMessage, useSnackbarContext } from 'tsp-form';
+import { Smartphone, ExternalLink, Wrench, ArrowDownToLine, ArrowUpFromLine, Link2, Link2Off, Cloud, CloudOff, CheckCircle, Pencil, XCircle, Loader2 } from 'lucide-react';
+import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { getBucketLabel, getBucketColor, codeDisplay } from '../inventory/inventoryUtils';
 import { AssignIcloudModal, ReleaseIcloudModal } from './IcloudModals';
 import { AssetScreenTimeSection } from '../../components/AssetScreenTimeSection';
+import { ImeiInput } from '../../components/ImeiInput';
+import { validateIMEI, validateiPhoneSerial } from '../../lib/validators';
+
+type IdentifierType = 'IMEI' | 'SERIAL_NO';
 
 interface ContractForDevice {
   id: number;
@@ -74,8 +78,11 @@ interface DeviceTabProps {
 export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
   const { t } = useTranslation();
   const { addSnackbar } = useSnackbarContext();
+  const queryClient = useQueryClient();
   const [icloudAssignOpen, setIcloudAssignOpen] = useState(false);
   const [icloudReleaseOpen, setIcloudReleaseOpen] = useState(false);
+  // Identifier (IMEI / SN) correction target for the primary device.
+  const [fixIdentifier, setFixIdentifier] = useState<{ type: IdentifierType; oldValue: string } | null>(null);
 
   // Loaner asset lookup (only when bound)
   const { data: loanerAsset } = useQuery({
@@ -156,13 +163,35 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
                 {primaryAsset?.imei && (
                   <div>
                     <div className="text-xs text-subtle">IMEI</div>
-                    <div className="text-sm font-mono">{primaryAsset.imei}</div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-mono">{primaryAsset.imei}</span>
+                      <button
+                        type="button"
+                        className="btn-icon-xs text-subtle hover:text-fg"
+                        aria-label={t('contract.identifierCorrectImei', { defaultValue: 'Correct IMEI' })}
+                        title={t('contract.identifierCorrectImei', { defaultValue: 'Correct IMEI' })}
+                        onClick={() => setFixIdentifier({ type: 'IMEI', oldValue: primaryAsset.imei! })}
+                      >
+                        <Pencil size={12} />
+                      </button>
+                    </div>
                   </div>
                 )}
                 {primaryAsset?.serial_no && (
                   <div>
                     <div className="text-xs text-subtle">SN</div>
-                    <div className="text-sm font-mono">{primaryAsset.serial_no}</div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-mono">{primaryAsset.serial_no}</span>
+                      <button
+                        type="button"
+                        className="btn-icon-xs text-subtle hover:text-fg"
+                        aria-label={t('contract.identifierCorrectSerial', { defaultValue: 'Correct serial number' })}
+                        title={t('contract.identifierCorrectSerial', { defaultValue: 'Correct serial number' })}
+                        onClick={() => setFixIdentifier({ type: 'SERIAL_NO', oldValue: primaryAsset.serial_no! })}
+                      >
+                        <Pencil size={12} />
+                      </button>
+                    </div>
                   </div>
                 )}
                 {!primaryAsset && contract.device_identifier && (
@@ -483,8 +512,165 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
             }}
             assetId={primaryAsset.asset_id}
           />
+          <CorrectIdentifierModal
+            open={fixIdentifier !== null}
+            onClose={() => setFixIdentifier(null)}
+            assetId={primaryAsset.asset_id}
+            branchId={primaryAsset.branch_id}
+            type={fixIdentifier?.type ?? 'IMEI'}
+            oldValue={fixIdentifier?.oldValue ?? ''}
+            isApple={primaryAsset.brand_name === 'Apple'}
+            onSuccess={() => {
+              setFixIdentifier(null);
+              queryClient.invalidateQueries({ queryKey: ['asset-summary', contract.device_id] });
+              addSnackbar({
+                message: (
+                  <div className="alert alert-success">
+                    <CheckCircle size={16} />
+                    <span>{t('contract.identifierCorrectSuccess', { defaultValue: 'Identifier corrected' })}</span>
+                  </div>
+                ),
+                type: 'success',
+              });
+            }}
+          />
         </>
       )}
     </div>
+  );
+}
+
+// Correct a primary device's IMEI / serial number (typo fix) via
+// fn_inv_identifier_correct. The backend enforces permission
+// (INVENTORY.IDENTIFIER_CORRECT), branch custody, and uniqueness — we just
+// collect the new value and surface any error.
+function CorrectIdentifierModal({
+  open, onClose, assetId, branchId, type, oldValue, isApple, onSuccess,
+}: {
+  open: boolean;
+  onClose: () => void;
+  assetId: number;
+  branchId: number;
+  type: IdentifierType;
+  oldValue: string;
+  // Apple serials have a strict format (11/12 chars, no O/I); only validate the
+  // serial format for Apple devices. IMEI (Luhn) is brand-agnostic.
+  isApple: boolean;
+  onSuccess: () => void;
+}) {
+  const { t } = useTranslation();
+  const [newValue, setNewValue] = useState('');
+  const [note, setNote] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  // Reset fields each time the modal opens for a fresh target.
+  const [seenOld, setSeenOld] = useState<string | null>(null);
+  if (open && seenOld !== oldValue) {
+    setSeenOld(oldValue);
+    setNewValue('');
+    setNote('');
+    setError('');
+  }
+  if (!open && seenOld !== null) setSeenOld(null);
+
+  const isImei = type === 'IMEI';
+  const trimmed = newValue.trim();
+
+  // Format validation (reuses the shared validators). IMEI → Luhn always;
+  // serial → Apple format only for Apple devices, else just non-empty.
+  const formatError: string | null = (() => {
+    if (trimmed.length === 0) return null; // don't nag on empty
+    if (isImei) {
+      return validateIMEI(trimmed).valid
+        ? null
+        : t('contract.identifierInvalidImei', { defaultValue: 'Invalid IMEI (checksum failed)' });
+    }
+    if (isApple) {
+      return validateiPhoneSerial(trimmed).valid
+        ? null
+        : t('contract.identifierInvalidSerial', { defaultValue: 'Invalid serial number' });
+    }
+    return null;
+  })();
+
+  const canSave = trimmed.length > 0 && trimmed !== oldValue && !saving && formatError == null;
+
+  const handleSave = async () => {
+    if (!canSave) return;
+    setSaving(true);
+    setError('');
+    try {
+      await apiClient.rpc('fn_inv_identifier_correct', {
+        p_asset_id: assetId,
+        p_identifier_type: type,
+        p_old_value: oldValue,
+        p_new_value: trimmed,
+        p_note: note.trim() || null,
+        p_branch_id: branchId,
+      });
+      onSuccess();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setError(translated || err.message);
+      } else {
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const label = isImei ? 'IMEI' : t('contract.serialNumber', { defaultValue: 'Serial number' });
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="26rem" width="100%">
+      <div className="modal-header">
+        <h2 className="modal-title">
+          {t('contract.identifierCorrectTitle', { defaultValue: 'Correct {{label}}', label })}
+        </h2>
+        <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+      </div>
+      <div className="modal-content">
+        <div className="form-grid">
+          {error && (
+            <div className="alert alert-danger">
+              <XCircle size={16} />
+              <span>{error}</span>
+            </div>
+          )}
+          <div className="flex flex-col">
+            <label className="form-label">{t('contract.identifierCorrectExisting', { defaultValue: 'Current value' })}</label>
+            <div className="text-sm font-mono px-3 py-2 rounded-md border border-line bg-surface text-subtle">{oldValue}</div>
+          </div>
+          <div className="flex flex-col">
+            <label className="form-label">{t('contract.identifierCorrectNew', { defaultValue: 'New {{label}}', label })}</label>
+            {isImei ? (
+              <ImeiInput value={newValue} onChange={setNewValue} className="w-full" placeholder="000000000000000" />
+            ) : (
+              <Input value={newValue} onChange={(e) => setNewValue(e.target.value)} className="w-full" />
+            )}
+            <FormErrorMessage error={formatError ? { message: formatError } : undefined} />
+          </div>
+          <div className="flex flex-col">
+            <label className="form-label">{t('contract.identifierCorrectNote', { defaultValue: 'Note (optional)' })}</label>
+            <Input value={note} onChange={(e) => setNote(e.target.value)} className="w-full" />
+          </div>
+        </div>
+      </div>
+      <div className="modal-footer">
+        <Button onClick={onClose} disabled={saving}>{t('common.cancel')}</Button>
+        <Button
+          color="primary"
+          onClick={handleSave}
+          disabled={!canSave}
+          startIcon={saving ? <Loader2 size={14} className="animate-spin" /> : undefined}
+        >
+          {saving ? t('common.loading') : t('common.save')}
+        </Button>
+      </div>
+    </Modal>
   );
 }

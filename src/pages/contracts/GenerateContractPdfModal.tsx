@@ -16,7 +16,6 @@ import {
   composeName,
   type SignatorySlot,
 } from './workspace/useContractSignatories';
-import { useContractHandover } from './workspace/useContractHandover';
 import { SignatureThumb } from './workspace/SignatureThumb';
 import { useState } from 'react';
 
@@ -88,7 +87,6 @@ export function GenerateContractPdfModal({ open, onClose, contract, signingId, p
   const { data: lessorPool = [] } = useCompanyLessors(companyId);
   const { data: defaults = [] } = useBranchSignatoryDefaults(branchId);
   const { data: bound = [] } = useContractSignatories(contractId);
-  const { data: handover } = useContractHandover(contractId);
 
   const { data: assetRow } = useQuery({
     queryKey: ['pdf-modal-asset', deviceId],
@@ -215,17 +213,17 @@ export function GenerateContractPdfModal({ open, onClose, contract, signingId, p
             )}
           </section>
 
-          {/* Handover — read-only */}
-          <section className="flex flex-col gap-2">
-            <div className="text-xs font-semibold text-subtle uppercase tracking-wider">{t('workspace.cardHandover')}</div>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <ReadOnlyRow label={t('workspace.handoverHasBox')} value={hasOrNot(handover?.has_box, t)} />
-              <ReadOnlyRow label={t('workspace.handoverHasChargerSet')} value={hasOrNot(handover?.has_charger_set, t)} />
-              <ReadOnlyRow label={t('workspace.handoverHasChargerCable')} value={hasOrNot(handover?.has_charger_cable, t)} />
+          {/* Battery health — used assets only (NEW devices read null). Handover
+              (box/cable/charger/pincode) moved to the BIND device addendum, so
+              it is not shown on the contract print. */}
+          {assetRow?.battery_health != null && (
+            <section className="flex flex-col gap-2">
+              <div className="text-xs font-semibold text-subtle uppercase tracking-wider">
+                {t('contract.batteryHealth', { defaultValue: 'Battery health (%)' })}
+              </div>
               <ReadOnlyRow label={t('contract.batteryHealth', { defaultValue: 'Battery health (%)' })} value={batteryDisplay} />
-              <ReadOnlyRow label={t('workspace.handoverUnlockCode')} value={handover?.device_unlock_code || '—'} colSpan={2} />
-            </div>
-          </section>
+            </section>
+          )}
 
           {/* Clause 6 — fixed default, no override */}
           <section className="flex flex-col gap-2">
@@ -308,13 +306,6 @@ function ReadOnlyRow({ label, value, colSpan }: { label: string; value: React.Re
       <div className="text-sm">{value}</div>
     </div>
   );
-}
-
-// "Has / does not have" — matches how the contract PDF prints handover items
-// (มี / ไม่มี) so the modal labels read the same as the printed document.
-function hasOrNot(v: boolean | undefined, t: (k: string, opts?: Record<string, unknown>) => string): string {
-  if (v == null) return '—';
-  return v ? t('common.has', { defaultValue: 'Has' }) : t('common.doesNotHave', { defaultValue: 'Does not have' });
 }
 
 function surfaceError(err: unknown, t: (k: string, opts?: Record<string, unknown>) => string, addSnackbar: (s: { message: React.ReactNode; type?: 'success' | 'error' }) => void) {
