@@ -230,40 +230,44 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
                       </>
                     )}
                   </div>
-                  {isActive && (
-                    <div className="flex gap-2 shrink-0">
-                      {primaryAsset.icloud_account_id == null ? (
+                  {/* Gate by device presence, not contract status: iCloud
+                      assign/change/release only needs a bound device +
+                      permission + branch match (fn_icloud_device_assign has no
+                      ACTIVE guard). We're already inside the hasPrimary branch,
+                      so a device exists — show the actions in PENDING_PAYMENT /
+                      PENDING_SIGN too, matching the inventory Assets page. */}
+                  <div className="flex gap-2 shrink-0">
+                    {primaryAsset.icloud_account_id == null ? (
+                      <Button
+                        size="sm"
+                        color="primary"
+                        startIcon={<Cloud size={14} />}
+                        onClick={() => setIcloudAssignOpen(true)}
+                      >
+                        {t('contract.icloud_assign')}
+                      </Button>
+                    ) : (
+                      <>
                         <Button
                           size="sm"
-                          color="primary"
+                          variant="outline"
                           startIcon={<Cloud size={14} />}
                           onClick={() => setIcloudAssignOpen(true)}
                         >
-                          {t('contract.icloud_assign')}
+                          {t('contract.icloud_change')}
                         </Button>
-                      ) : (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            startIcon={<Cloud size={14} />}
-                            onClick={() => setIcloudAssignOpen(true)}
-                          >
-                            {t('contract.icloud_change')}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            color="danger"
-                            startIcon={<CloudOff size={14} />}
-                            onClick={() => setIcloudReleaseOpen(true)}
-                          >
-                            {t('contract.icloud_release')}
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          color="danger"
+                          startIcon={<CloudOff size={14} />}
+                          onClick={() => setIcloudReleaseOpen(true)}
+                        >
+                          {t('contract.icloud_release')}
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </div>
               )}
 
