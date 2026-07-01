@@ -857,6 +857,15 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
     return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
   });
 
+  // Staff-on-behalf installment-slip submission. Moved out of the primary
+  // footer into the More menu (under PAYMENT) — as a top-level button it was
+  // being misused to upload down-payment slips. It's an FE-only action (not in
+  // `sale.ref_contract_actions`), limited to non-terminal states where customer
+  // installment slips can still come in.
+  const canAttachSlip = contract.state === 'ACTIVE'
+    || contract.state === 'WAIT_LEGAL_PROCESS'
+    || contract.state === 'ON_LEGAL_PROCESS';
+
   const renderActionButton = (a: BackendContractAction, primary = false) => {
     const feAction = BACKEND_TO_FE_ACTION[a.action_code];
     const config = feAction ? ACTION_CONFIGS[feAction] : null;
@@ -945,26 +954,6 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
         {showActionGrid && (
           <div className="flex flex-wrap items-center gap-2">
             {primaryActions.map(a => renderActionButton(a, true))}
-            {/*
-              Staff-on-behalf slip submission. Calls fn_payment_submission_create
-              with submit_channel='WEB' (per 2026-05-21 backend update) — the row
-              lands in /admin/payment-submissions for BM to approve. NOT in
-              `sale.ref_contract_actions` so it's not part of the BE-controlled
-              grid; rendered as a standalone inline button. Limited to non-terminal
-              states where customer slips can still come in.
-            */}
-            {(contract.state === 'ACTIVE'
-              || contract.state === 'WAIT_LEGAL_PROCESS'
-              || contract.state === 'ON_LEGAL_PROCESS') && (
-              <Button
-                variant="outline"
-                size="sm"
-                startIcon={<Paperclip size={14} />}
-                onClick={() => setAttachSlipOpen(true)}
-              >
-                {t('contract.attachSlip_action', { defaultValue: 'Submit Slip' })}
-              </Button>
-            )}
             <Button
               variant="outline"
               color="primary"
@@ -974,7 +963,7 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
             >
               {t('nav.chat')}
             </Button>
-            {secondaryActions.length > 0 && (
+            {(secondaryActions.length > 0 || canAttachSlip) && (
               <Button
                 ref={moreTriggerRef}
                 variant="outline"
@@ -1013,6 +1002,23 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
                   </div>
                 );
               })}
+              {canAttachSlip && (
+                <div className="flex flex-col gap-1.5">
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-subtle">
+                    {t(CATEGORY_LABEL_KEY.PAYMENT, { defaultValue: 'Payment' })}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      startIcon={<Paperclip size={14} />}
+                      onClick={() => { setMoreOpen(false); setAttachSlipOpen(true); }}
+                    >
+                      {t('contract.attachSlip_action', { defaultValue: 'Submit Slip' })}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </PopOver>
         )}
