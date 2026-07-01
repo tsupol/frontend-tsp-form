@@ -1790,6 +1790,7 @@
       "empty": "ไม่พบบิลขายปลีก",
       "selectToView": "เลือกบิลเพื่อดูรายละเอียด",
       "totalCharged": "ยอดรวม",
+      "qtyCount_other": "{{count}} ชิ้น",
       "totalPaid": "ยอดที่ชำระ",
       "customer": "ลูกค้า",
       "billDate": "วันที่บิล",

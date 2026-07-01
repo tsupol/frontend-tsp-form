@@ -1790,6 +1790,8 @@
       "empty": "No retail bills found",
       "selectToView": "Select a bill to view details",
       "totalCharged": "Total Charged",
+      "qtyCount_one": "{{count}} item",
+      "qtyCount_other": "{{count}} items",
       "totalPaid": "Total Paid",
       "customer": "Customer",
       "billDate": "Bill Date",

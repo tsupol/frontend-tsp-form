@@ -330,6 +330,7 @@ function RetailBillDetail({ billId, isMobile }: { billId: number; isMobile: bool
   if (!detail) return <div className="p-6 text-sm text-subtler">—</div>;
 
   const lines = detail.line_items ?? [];
+  const totalQty = lines.reduce((sum, l) => sum + (l.quantity || 0), 0);
   const payments = detail.payments ?? [];
   const statusColor = detail.status === 'PAID' ? 'success' : detail.status === 'VOIDED' ? 'default' : 'warning';
 
@@ -419,7 +420,10 @@ function RetailBillDetail({ billId, isMobile }: { billId: number; isMobile: bool
         </div>
         <div>
           <div className="text-xs text-subtle">{t('retail.bills.totalCharged')}</div>
-          <div className="font-semibold text-sm tabular-nums">{fmtCurrency(detail.total_amount)}</div>
+          <div className="font-semibold text-sm tabular-nums flex items-baseline gap-1.5">
+            {fmtCurrency(detail.total_amount)}
+            <span className="text-xs font-normal text-subtle">{t('retail.bills.qtyCount', { count: totalQty })}</span>
+          </div>
         </div>
         <div>
           <div className="text-xs text-subtle">{t('retail.bills.totalPaid')}</div>
