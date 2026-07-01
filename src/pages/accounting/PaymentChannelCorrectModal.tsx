@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, Button, Input } from 'tsp-form';
+import { Modal, Button, Input, Badge } from 'tsp-form';
 import { XCircle, Loader2, CheckCircle, Banknote, ArrowLeftRight } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { fmtCurrency } from '../../lib/format';
@@ -131,8 +131,10 @@ export function PaymentChannelCorrectModal({ open, payment, onClose, onSuccess }
         }`}
       >
         {icon}
-        <span className="text-sm font-medium">{t(`accounting.payments.m_${value}`)}</span>
-        {isCurrent && <span className="text-xs text-subtle">{t('accounting.payments.correct.currentTag')}</span>}
+        <span className="inline-flex items-center gap-1.5">
+          <span className="text-sm font-medium">{t(`accounting.payments.m_${value}`)}</span>
+          {isCurrent && <Badge size="sm">{t('accounting.payments.correct.currentTag')}</Badge>}
+        </span>
       </button>
     );
   };
