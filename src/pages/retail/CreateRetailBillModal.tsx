@@ -34,6 +34,12 @@ interface SellableVariant {
 
 type PaymentMethod = 'CASH' | 'TRANSFER';
 
+interface PaymentRow {
+  method: PaymentMethod;
+  amount: number;
+  bank_account_id: number | null;
+}
+
 interface CartLine {
   charge_type: 'RETAIL_SALE' | 'SHIPPING_FEE' | 'RETAIL_DISCOUNT';
   amount: number;
@@ -91,13 +97,6 @@ interface PreviewResponse {
   blockers?: Blocker[];
 }
 
-interface SubmitResponse {
-  bill_id: number;
-  code_display: string;
-  status: 'PAID';
-  change_amount: number;
-}
-
 interface CreateRetailBillModalProps {
   open: boolean;
   onClose: () => void;
@@ -115,9 +114,8 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
 
   const [branchId, setBranchId] = useState<number | null>(user?.branch_id ?? null);
   const [lines, setLines] = useState<CartLine[]>([]);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
-  const [paymentAmount, setPaymentAmount] = useState<number>(0);
-  const [bankAccountId, setBankAccountId] = useState<number | null>(null);
+  // Split payment (cart pattern): one row per payment; CASH + TRANSFER only.
+  const [payments, setPayments] = useState<PaymentRow[]>([{ method: 'CASH', amount: 0, bank_account_id: null }]);
 
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [previewing, setPreviewing] = useState(false);
@@ -141,9 +139,7 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
   useEffect(() => {
     if (open) {
       setLines([]);
-      setPaymentMethod('CASH');
-      setPaymentAmount(0);
-      setBankAccountId(null);
+      setPayments([{ method: 'CASH', amount: 0, bank_account_id: null }]);
       setPreview(null);
       setPreviewError('');
       setProductPickerOpen(false);
@@ -175,14 +171,20 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
     }
   }, [open, branches, branchId, ownBranchId]);
 
+  // Preview validates stock + discount policy; the real payment is recorded via
+  // the cart (fn_bill_payment_add) at submit. Pass the bill total as a nominal
+  // single CASH payment so preview's balance/stock checks pass.
   const previewParams = useMemo(() => ({
     p_branch_id: branchId,
     p_customer_id: null,
     p_line_items: lines,
-    p_payment_method: paymentMethod,
-    p_payment_amount: paymentAmount,
-    p_bank_account_id: bankAccountId,
-  }), [branchId, lines, paymentMethod, paymentAmount, bankAccountId]);
+    p_payment_method: 'CASH' as PaymentMethod,
+    p_payment_amount: lines.reduce((s, l) => {
+      const sign = l.charge_type === 'RETAIL_DISCOUNT' ? -1 : 1;
+      return s + sign * l.amount * (l.qty ?? 1);
+    }, 0),
+    p_bank_account_id: null,
+  }), [branchId, lines]);
 
   const runPreview = useCallback(async () => {
     if (!open || !branchId || lines.length === 0) {
@@ -209,15 +211,17 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
     }
   }, [open, branchId, lines.length, previewParams, t]);
 
-  // Re-preview on structural boundaries
+  // Re-preview when the cart (lines/branch) changes. Payment rows don't affect
+  // preview — they're recorded via the cart at submit.
   useEffect(() => {
     runPreview();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, branchId, lines, paymentMethod, paymentAmount, bankAccountId]);
+  }, [open, branchId, lines]);
 
   /**
    * Submission strategy:
-   *  - No discount needing approval → atomic fn_bill_retail_submit (PAID immediately).
+   *  - No discount needing approval → cart pattern (fn_bill_create → payment_add
+   *    ×N → confirm), so payment can be split across CASH + TRANSFER.
    *  - Discount needs approval → 3-step flow per doc 25:
    *      fn_bill_create (REVENUE lines)
    *      → fn_bill_line_item_add (each DISCOUNT line)
@@ -228,12 +232,38 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
   const submitMutation = useMutation({
     mutationFn: async (): Promise<{ code: string; mode: 'atomic' | 'approval'; change: number; billId: number }> => {
       if (!preview?.approvals?.any_required) {
-        const res = await apiClient.rpc<SubmitResponse>('fn_bill_retail_submit', {
-          ...previewParams,
-          p_payment_reference: null,
-          p_preview_token: preview?.preview_token,
+        // Split-payment cart: create the bill (revenue lines), record each
+        // payment row, then confirm (stock deducts on confirm). CASH + TRANSFER
+        // only; amounts must sum to the bill total (no overpay — change is
+        // handled at the counter, not sent to the server).
+        const created = await apiClient.rpc<{ bill_id: number; code_display: string }>('fn_bill_create', {
+          p_branch_id: branchId,
+          p_customer_id: null,
+          p_contract_id: null,
+          p_bill_purpose: 'RETAIL',
+          p_line_items: lines.map(l => ({
+            line_type: l.charge_type === 'RETAIL_DISCOUNT' ? 'DISCOUNT' : 'REVENUE',
+            charge_type: l.charge_type,
+            description: l.description ?? null,
+            amount: l.amount,
+            quantity: l.qty ?? 1,
+            variant_id: l.variant_id ?? null,
+          })),
         });
-        return { code: res.code_display, mode: 'atomic', change: res.change_amount, billId: res.bill_id };
+        const billId = created.bill_id;
+
+        for (const p of payments) {
+          if (p.amount <= 0) continue;
+          await apiClient.rpc('fn_bill_payment_add', {
+            p_bill_id: billId,
+            p_method: p.method,
+            p_amount: p.amount,
+            p_bank_account_id: p.method === 'TRANSFER' ? p.bank_account_id : null,
+          });
+        }
+
+        await apiClient.rpc('fn_bill_payment_confirm', { p_bill_id: billId });
+        return { code: created.code_display, mode: 'atomic', change: 0, billId };
       }
 
       // 3-step approval flow
@@ -412,18 +442,29 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
     }
     return m;
   }, [lines]);
-  const change = paymentAmount > total ? paymentAmount - total : 0;
-  const allowedMethods = preview?.payments_required?.allowed_methods ?? ['CASH', 'TRANSFER'];
+  const totalPaid = payments.reduce((s, p) => s + (p.amount || 0), 0);
+  const remaining = Math.max(0, total - totalPaid);
+  const change = totalPaid > total ? totalPaid - total : 0;
+
+  const updatePayment = (idx: number, patch: Partial<PaymentRow>) =>
+    setPayments(prev => prev.map((p, i) => (i === idx ? { ...p, ...patch } : p)));
+  const addPaymentRow = () =>
+    setPayments(prev => [...prev, { method: 'CASH', amount: Math.max(0, total - prev.reduce((s, p) => s + (p.amount || 0), 0)), bank_account_id: null }]);
+  const removePaymentRow = (idx: number) =>
+    setPayments(prev => prev.filter((_, i) => i !== idx));
 
   const needsApproval = !!preview?.approvals?.any_required;
 
   const blockReasons: string[] = [];
   if (!branchId) blockReasons.push(t('retail.create.blockNoBranch'));
   if (lines.length === 0) blockReasons.push(t('retail.create.blockEmptyCart'));
-  // Payment-side checks only apply to atomic flow. Approval flow defers payment.
-  if (!needsApproval) {
-    if (paymentMethod === 'TRANSFER' && !bankAccountId) blockReasons.push(t('retail.create.blockNoBank'));
-    if (lines.length > 0 && paymentAmount < total) blockReasons.push(t('retail.create.blockInsufficient'));
+  // Payment-side checks only apply to the pay-now flow. Approval flow defers payment.
+  if (!needsApproval && lines.length > 0) {
+    if (payments.some(p => p.method === 'TRANSFER' && p.amount > 0 && !p.bank_account_id)) {
+      blockReasons.push(t('retail.create.blockNoBank'));
+    }
+    // Must pay the exact bill total (no overpay — change is a counter matter).
+    if (Math.abs(totalPaid - total) >= 0.01) blockReasons.push(t('retail.create.blockInsufficient'));
   }
   preview?.guards?.custom_guards?.forEach(g => {
     if (g.ok === false && g.message_th) blockReasons.push(g.message_th);
@@ -632,37 +673,65 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
             </div>
           )}
 
-          {/* Payment method + amount (atomic flow only — approval flow defers payment) */}
+          {/* Split payment — one row per payment (CASH + TRANSFER). Approval flow
+              defers payment, so no rows there. */}
           {!needsApproval && (
-            <>
-              <div className="input-group">
-                <div className="w-28 shrink-0">
-                  <Select
-                    value={paymentMethod}
-                    onChange={(v) => { setPaymentMethod((v as PaymentMethod) ?? 'CASH'); setBankAccountId(null); }}
-                    options={allowedMethods.map(m => ({ label: t(`paymentMethod.${m}`, { defaultValue: m }), value: m }))}
-                    size="sm"
-                    searchable={false}
-                  />
-                </div>
-                <div className="input-group-divider" />
-                <MaskedInput
-                  mask="number"
-                  decimalScale={2}
-                  value={paymentAmount ? String(paymentAmount) : ''}
-                  onChange={(raw) => setPaymentAmount(parseFloat(raw) || 0)}
-                  placeholder={t('retail.create.amountPlaceholder')}
-                  size="sm"
-                  className="w-full"
-                  endIcon={<ChevronsRight size={14} />}
-                  onEndIconClick={total > 0 ? () => setPaymentAmount(total) : undefined}
-                />
+            <div className="flex flex-col gap-2">
+              <label className="form-label">{t('retail.create.paymentsLabel', { defaultValue: 'Payment' })}</label>
+              <div className="flex flex-col gap-3">
+                {payments.map((p, idx) => (
+                  <div key={idx} className="border border-line rounded-lg p-3 flex flex-col gap-3">
+                    <div className="flex gap-3 items-end">
+                      <div className="flex flex-col" style={{ width: '11rem' }}>
+                        <label className="form-label text-xs">{t('wizard.method')}</label>
+                        <Select
+                          options={(['CASH', 'TRANSFER'] as PaymentMethod[]).map(m => ({ label: t(`paymentMethod.${m}`, { defaultValue: m }), value: m }))}
+                          value={p.method}
+                          onChange={(v) => updatePayment(idx, { method: (v as PaymentMethod) ?? 'CASH', bank_account_id: null })}
+                          size="sm"
+                          searchable={false}
+                        />
+                      </div>
+                      <div className="flex flex-col flex-1 min-w-0">
+                        <label className="form-label text-xs">{t('contract.amount')}</label>
+                        <MaskedInput
+                          mask="number"
+                          decimalScale={2}
+                          value={p.amount ? String(p.amount) : ''}
+                          onChange={(raw) => updatePayment(idx, { amount: parseFloat(raw) || 0 })}
+                          size="sm"
+                          className="w-full"
+                          placeholder="0.00"
+                          endIcon={<ChevronsRight size={14} />}
+                          onEndIconClick={() => {
+                            const others = payments.reduce((s, q, i) => (i === idx ? s : s + (q.amount || 0)), 0);
+                            updatePayment(idx, { amount: Math.max(0, total - others) });
+                          }}
+                        />
+                      </div>
+                      {payments.length > 1 && (
+                        <Button
+                          size="sm"
+                          className="shrink-0"
+                          startIcon={<Trash2 size={14} />}
+                          onClick={() => removePaymentRow(idx)}
+                          aria-label={t('common.remove', { defaultValue: 'Remove' })}
+                        />
+                      )}
+                    </div>
+                    {p.method === 'TRANSFER' && (
+                      <BranchPaymentAccountField
+                        active={p.method === 'TRANSFER'}
+                        onResolve={(id) => updatePayment(idx, { bank_account_id: id })}
+                      />
+                    )}
+                  </div>
+                ))}
+                <Button size="sm" startIcon={<Plus size={14} />} onClick={addPaymentRow} className="self-start">
+                  {t('retail.create.addPayment', { defaultValue: 'Add payment' })}
+                </Button>
               </div>
-              <BranchPaymentAccountField
-                active={paymentMethod === 'TRANSFER'}
-                onResolve={setBankAccountId}
-              />
-            </>
+            </div>
           )}
           {needsApproval && (
             <div className="alert alert-info">
@@ -680,7 +749,13 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
               <span className="text-base text-subtle">{t('retail.create.total')}</span>
               <span className="heading-3 tabular-nums">{fmtCurrency(total)}</span>
             </div>
-            {paymentAmount > total && (
+            {remaining > 0 && totalPaid > 0 && (
+              <div className="flex items-baseline gap-3 text-sm mt-1">
+                <span className="text-subtle">{t('retail.create.remaining', { defaultValue: 'Remaining' })}</span>
+                <span className="font-medium tabular-nums text-warning-fg">{fmtCurrency(remaining)}</span>
+              </div>
+            )}
+            {change > 0 && (
               <div className="flex items-baseline gap-3 text-sm mt-1">
                 <span className="text-subtle">{t('retail.create.change')}</span>
                 <span className="font-medium tabular-nums text-success">{fmtCurrency(change)}</span>
