@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Badge } from 'tsp-form';
 import {
-  CalendarCheck, Scale, ArrowUpRight, Receipt, ShieldAlert, Banknote,
+  CalendarCheck, Scale, ArrowUpRight, Receipt, ShieldAlert, Banknote, FileSpreadsheet,
 } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -19,6 +19,12 @@ export function AccountingLayout({ children }: { children: ReactNode }) {
   const navGuard = useNavGuard();
   const { user } = useAuth();
   const canSeeAudit = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(user?.role_code ?? '');
+  // ETL daily reports — REPORT.DAILY.READ audience: BM + company office roles
+  // (admin / accountant / inventory) + holding + sysdev.
+  const canSeeReports = [
+    'BRANCH_MANAGER', 'COMPANY_ADMIN', 'COMPANY_ACCOUNTANT', 'COMPANY_INVENTORY',
+    'HOLDING_ADMIN', 'SYSTEM_DEV',
+  ].includes(user?.role_code ?? '');
   const { unclosedCount } = useNavCounts();
 
   const navItems: NavItem[] = useMemo(() => [
@@ -30,11 +36,14 @@ export function AccountingLayout({ children }: { children: ReactNode }) {
     { type: 'link', path: '/admin/accounting/payments', labelKey: 'nav.payments', icon: Banknote },
     { type: 'group', labelKey: 'nav.groupReports' },
     { type: 'link', path: '/admin/accounting/balance', labelKey: 'nav.branchBalance', icon: Scale },
+    ...(canSeeReports ? [
+      { type: 'link' as const, path: '/admin/accounting/reports', labelKey: 'nav.dailyReports', icon: FileSpreadsheet },
+    ] : []),
     ...(canSeeAudit ? [
       { type: 'group' as const, labelKey: 'nav.groupAudit' },
       { type: 'link' as const, path: '/admin/accounting/audit-flags', labelKey: 'nav.auditFlags', icon: ShieldAlert },
     ] : []),
-  ], [canSeeAudit, unclosedCount]);
+  ], [canSeeAudit, canSeeReports, unclosedCount]);
 
   return (
     <div className="flex min-h-full">

@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { Badge } from 'tsp-form';
-import { ChevronDown, ChevronRight, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { ChevronDown, ChevronRight, CheckCircle2, AlertTriangle, ExternalLink } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { fmtCurrency } from '../../lib/format';
 import { type BillRow, type BillDetail } from './accountingTypes';
@@ -150,29 +151,44 @@ function BillRowItem({ bill, expanded, onToggle }: { bill: BillRow; expanded: bo
 
   return (
     <div className="border-b border-line">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="w-full text-left px-3 py-2.5 flex items-center gap-2 hover:bg-surface-hover transition-colors cursor-pointer"
-      >
-        <span className="shrink-0 text-fg/40">
+      <div className="px-3 py-2.5 flex items-center gap-2 hover:bg-surface-hover transition-colors">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="shrink-0 text-subtle cursor-pointer bg-transparent border-none p-0"
+          aria-label={expanded ? 'Collapse' : 'Expand'}
+        >
           {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        </span>
+        </button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="font-mono text-xs font-medium">{bill.code_display}</span>
+            <Link
+              to={`/admin/accounting/bills/${bill.id}`}
+              className="font-mono text-xs font-medium text-primary-fg hover:underline inline-flex items-center gap-1"
+            >
+              {bill.code_display}
+              <ExternalLink size={11} />
+            </Link>
             <Badge color={typeColor} size="sm">{bill.bill_type_label_short || bill.bill_type}</Badge>
             <Badge color={statusColor} size="sm">{displayStatus}</Badge>
           </div>
-          <div className="text-xs text-subtle truncate mt-0.5">
+          <button
+            type="button"
+            onClick={onToggle}
+            className="text-xs text-subtle truncate mt-0.5 block w-full text-left bg-transparent border-none p-0 cursor-pointer"
+          >
             {bill.customer_name || bill.primary_description || '—'}
             {bill.contract_code && <span className="font-mono ml-1.5">· {bill.contract_code}</span>}
-          </div>
+          </button>
         </div>
-        <div className="text-right shrink-0 text-sm tabular-nums">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="text-right shrink-0 text-sm tabular-nums bg-transparent border-none p-0 cursor-pointer"
+        >
           {fmtCurrency(bill.total_amount)}
-        </div>
-      </button>
+        </button>
+      </div>
 
       {expanded && <BillExpand billId={bill.id} />}
     </div>

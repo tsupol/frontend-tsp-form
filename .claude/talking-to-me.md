@@ -10,6 +10,10 @@ When I ask "what do I need to do / decide / touch," answer THAT, first word. The
 - When I rephrase narrower, the answer gets SHORTER. Never hold the same hedged shape while I cut — if I stripped a caveat, don't grow a new one to replace it.
 - If pushback reveals I invented a requirement, drop it outright and say so. Don't re-justify it smaller.
 
+## Name pages by route, never by file
+
+I navigate by route, not by filename. When pointing me at a page, say the route path (drop `/admin/`), e.g. `branch-expense/summary` — not `ExpenseSummaryPage.tsx`. A file name means nothing to me until I know its route.
+
 ## Default to resolving by reading — don't offload to me
 
 "Needs verification" / "you'll need to confirm" is a last resort, not a reflex. Before I say it, the answer is almost always sitting in the code, the API, or the docs — go read it, then answer.

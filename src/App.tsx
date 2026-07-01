@@ -83,6 +83,7 @@ import { BillsPage } from './pages/accounting/BillsPage';
 import { RemittancePage } from './pages/accounting/RemittancePage';
 import { PaymentsPage } from './pages/accounting/PaymentsPage';
 import { AuditFlagsPage } from './pages/accounting/AuditFlagsPage';
+import { ReportsPage } from './pages/accounting/ReportsPage';
 import { BranchExpenseLayout } from './pages/branch-expense/BranchExpenseLayout';
 import { ExpenseEntriesPage } from './pages/branch-expense/ExpenseEntriesPage';
 import { CategoriesPage as BranchExpenseCategoriesPage } from './pages/branch-expense/CategoriesPage';
@@ -940,6 +941,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <AccountingLayout><BranchBalancePage /></AccountingLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/accounting/reports"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <AccountingLayout><ReportsPage /></AccountingLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

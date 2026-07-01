@@ -38,7 +38,7 @@ import {
   // Fanout child icons — Commission
   UserCheck, ClipboardCheck,
   // Fanout child icons — Accounting
-  CalendarCheck, ArrowUpRight, Receipt, ShieldAlert, Banknote,
+  CalendarCheck, ArrowUpRight, Receipt, ShieldAlert, Banknote, FileSpreadsheet,
   // Fanout child icons — Branch expense
   Tag as TagIcon, BarChart3 as BarChartIcon, BookOpen as BookIcon,
   // Fanout child icons — Collections
@@ -301,6 +301,9 @@ export const AppSideNav = () => {
         { key: 'payments', icon: <Banknote size="1rem" />, label: t('nav.payments'), path: '/admin/accounting/payments' },
         { type: 'group', key: 'grp-acct-reports', label: t('nav.groupReports') },
         { key: 'branch-balance', icon: <Scale size="1rem" />, label: t('nav.branchBalance'), path: '/admin/accounting/balance' },
+        ...(['BRANCH_MANAGER', 'COMPANY_ADMIN', 'COMPANY_ACCOUNTANT', 'COMPANY_INVENTORY', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
+          { key: 'daily-reports', icon: <FileSpreadsheet size="1rem" />, label: t('nav.dailyReports'), path: '/admin/accounting/reports' },
+        ] : []),
         ...(['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
           { type: 'group' as const, key: 'grp-acct-audit', label: t('nav.groupAudit') },
           { key: 'audit-flags', icon: <ShieldAlert size="1rem" />, label: t('nav.auditFlags'), path: '/admin/accounting/audit-flags' },
