@@ -4037,7 +4037,21 @@
       "payer": "Payer",
       "bill": "Bill",
       "billDate": "Bill Date",
-      "subtotal": "Subtotal"
+      "subtotal": "Subtotal",
+      "correct": {
+        "title": "Correct payment channel",
+        "hint": "Fix a wrongly-recorded channel. The amount is locked — only the channel changes.",
+        "currentTag": "Current",
+        "transferAccountNote": "The branch's default receiving account will be used.",
+        "reason": "Reason",
+        "reasonPlaceholder": "e.g. customer transferred, recorded as cash by mistake",
+        "confirm": "Confirm correction",
+        "done": "Channel corrected",
+        "noChange": "No change — channel was already set",
+        "oldChannel": "Was",
+        "newChannel": "Now",
+        "amount": "Amount"
+      }
     },
     "rr": {
       "date": "Date",

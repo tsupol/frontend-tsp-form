@@ -5,8 +5,9 @@ import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import {
   MobileHeader, DataTable, Select, Badge, InputDateRangePicker,
 } from 'tsp-form';
+import { useQueryClient } from '@tanstack/react-query';
 import {
-  ArrowRightFromLine, Keyboard,
+  ArrowRightFromLine, Keyboard, ArrowLeftRight,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -16,6 +17,7 @@ import {
   fmtCurrency, toLocalDateStr, parseLocalDate, makeDateRangePickerFormat,
 } from '../../lib/format';
 import type { Branch, PaymentRow } from './accountingTypes';
+import { PaymentChannelCorrectModal } from './PaymentChannelCorrectModal';
 
 interface BankAccountOption {
   id: number;
@@ -66,9 +68,13 @@ function defaultRange() {
 
 export function PaymentsPage() {
   const { t, i18n } = useTranslation();
-  const { user } = useAuth();
+  const { user, can } = useAuth();
+  const queryClient = useQueryClient();
   const isBranchUser = ['BRANCH_STAFF', 'BRANCH_MANAGER'].includes(user?.role_code ?? '');
   const userBranchId = isBranchUser && user?.branch_id ? String(user.branch_id) : '';
+  const canCorrectChannel = can('PAYMENT.CHANNEL_CORRECT');
+
+  const [correctPayment, setCorrectPayment] = useState<PaymentRow | null>(null);
 
   const initial = defaultRange();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -383,6 +389,7 @@ export function PaymentsPage() {
           data={rows}
           renderRow={(row) => {
             const p = row.original;
+            const correctable = canCorrectChannel && !p.is_reversal && (p.method === 'CASH' || p.method === 'TRANSFER');
             return (
               <div
                 key={p.payment_id}
@@ -398,6 +405,17 @@ export function PaymentsPage() {
                   <span className="ml-auto text-sm font-medium tabular-nums shrink-0">
                     {fmtCurrency(p.amount)}
                   </span>
+                  {correctable && (
+                    <button
+                      type="button"
+                      className="btn-icon-sm shrink-0"
+                      title={t('accounting.payments.correct.title')}
+                      aria-label={t('accounting.payments.correct.title')}
+                      onClick={() => setCorrectPayment(p)}
+                    >
+                      <ArrowLeftRight size={15} />
+                    </button>
+                  )}
                 </div>
                 <div className="flex items-center gap-1.5 text-xs text-subtle min-w-0">
                   <span className="truncate">
@@ -422,6 +440,16 @@ export function PaymentsPage() {
           noResults={<div className="p-8 text-center text-subtler">{t('accounting.empty')}</div>}
         />
       </div>
+
+      <PaymentChannelCorrectModal
+        open={!!correctPayment}
+        payment={correctPayment}
+        onClose={() => setCorrectPayment(null)}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['accounting', 'payments'] });
+          queryClient.invalidateQueries({ queryKey: ['accounting', 'payments-summary'] });
+        }}
+      />
     </>
   );
 }

@@ -669,5 +669,12 @@
   "AUTH.CUSTOMER.NO_PRIMARY_CUSTOMER": "No primary customer is set for this contract",
   "AUTH.CUSTOMER.PASSWORD_TOO_LONG": "Password is too long",
   "AUTH.CUSTOMER.REFRESH_FAILED": "Session refresh failed — please sign in again",
-  "AUTH.PERMISSION_DENIED": "Permission denied"
+  "AUTH.PERMISSION_DENIED": "Permission denied",
+  "SALE.NOT_FOUND.PAYMENT": "Payment not found",
+  "SALE.VALIDATION.PAYMENT_CHANNEL_METHOD": "Channel must be Cash or Transfer",
+  "SALE.CONFLICT.PAYMENT_CHANNEL_SOURCE": "This payment's channel can't be changed",
+  "SALE.CONFLICT.PAYMENT_CHANNEL_BILL_VOIDED": "The bill has been voided",
+  "SALE.CONFLICT.PAYMENT_CHANNEL_DAY_CLOSED": "The day is already closed — this payment can no longer be changed",
+  "SALE.VALIDATION.PAYMENT_CHANNEL_BANK_REQUIRED": "A receiving account is required for Transfer",
+  "SALE.VALIDATION.PAYMENT_CHANNEL_BANK_INVALID": "That account does not belong to this branch"
 }

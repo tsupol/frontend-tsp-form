@@ -669,5 +669,12 @@
   "AUTH.CUSTOMER.NO_PRIMARY_CUSTOMER": "ยังไม่ได้กำหนดลูกค้าหลักของสัญญานี้",
   "AUTH.CUSTOMER.PASSWORD_TOO_LONG": "รหัสผ่านยาวเกินกำหนด",
   "AUTH.CUSTOMER.REFRESH_FAILED": "ต่ออายุ session ไม่สำเร็จ — กรุณาเข้าสู่ระบบใหม่",
-  "AUTH.PERMISSION_DENIED": "ไม่มีสิทธิ์ทำรายการนี้"
+  "AUTH.PERMISSION_DENIED": "ไม่มีสิทธิ์ทำรายการนี้",
+  "SALE.NOT_FOUND.PAYMENT": "ไม่พบรายการชำระ",
+  "SALE.VALIDATION.PAYMENT_CHANNEL_METHOD": "ช่องทางต้องเป็นเงินสดหรือโอนเท่านั้น",
+  "SALE.CONFLICT.PAYMENT_CHANNEL_SOURCE": "รายการนี้แก้ช่องทางไม่ได้",
+  "SALE.CONFLICT.PAYMENT_CHANNEL_BILL_VOIDED": "บิลถูกยกเลิกแล้ว",
+  "SALE.CONFLICT.PAYMENT_CHANNEL_DAY_CLOSED": "ปิดวันแล้ว — แก้รายการนี้ไม่ได้",
+  "SALE.VALIDATION.PAYMENT_CHANNEL_BANK_REQUIRED": "เลือกโอนต้องระบุบัญชีรับเงิน",
+  "SALE.VALIDATION.PAYMENT_CHANNEL_BANK_INVALID": "บัญชีนี้ไม่ใช่ของสาขานี้"
 }
