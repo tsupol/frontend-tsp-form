@@ -407,7 +407,8 @@ export function PaymentsPage() {
                   </span>
                   {correctable && (
                     <Button
-                      variant="ghost"
+                      variant="outline"
+                      size="sm"
                       className="btn-icon-sm shrink-0"
                       startIcon={<ArrowLeftRight size={15} />}
                       title={t('accounting.payments.correct.title')}
