@@ -1,11 +1,11 @@
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Button, MaskedInput, Modal, PopOver, Input } from 'tsp-form';
-import { Plus, Trash2, Truck, Gift, ShoppingBag } from 'lucide-react';
+import { Plus, Trash2, Truck, Gift, ShoppingBag, Pencil } from 'lucide-react';
 import { apiClient } from '../../../lib/api';
 import { fmtCurrency } from '../../../lib/format';
-import { SellableVariantPickerModal, type SellableVariant } from '../../../components/SellableVariantPickerModal';
+import { ProductPickerModal, type SellableVariant } from '../../../components/ProductPickerModal';
 
 /* ─────────────────────────────────────────────────────────────────────────────
    ⚠️  CLIENT-SIDE DRAFT CART — DO NOT WIRE THIS TO LIVE BILL RPCs.
@@ -45,6 +45,10 @@ export interface DraftCartLine {
   variant_id: number | null;
   /** True for charge_type='GIFT': add as ACCESSORY_SALE then convert to gift. */
   as_gift: boolean;
+  /** Catalog total (retail_price × qty) at add time. Lets the cart show the
+      original price and detect a walk-in negotiated override. Null for
+      free-form lines that never had a catalog price. */
+  catalog_amount?: number | null;
 }
 
 interface AddableRow {
@@ -84,6 +88,7 @@ export function BillCart({ branchId, systemLines, lines, onChange, rowAction }: 
   const [freeForm, setFreeForm] = useState<{ chargeType: string; lineType: string; name: string } | null>(null);
   const [freeFormDesc, setFreeFormDesc] = useState('');
   const [freeFormAmount, setFreeFormAmount] = useState('');
+  const [priceEdit, setPriceEdit] = useState<DraftCartLine | null>(null);
 
   const { data: addable = [] } = useQuery({
     queryKey: ['bill-addable', 'CONTRACT_OPEN'],
@@ -110,19 +115,38 @@ export function BillCart({ branchId, systemLines, lines, onChange, rowAction }: 
   const handleSellablePick = (variant: SellableVariant, qty: number) => {
     if (!sellablePick) return;
     const asGift = sellablePick.chargeType === 'GIFT';
-    onChange([
-      ...lines,
-      {
-        id: nextCartId(),
-        charge_type: 'ACCESSORY_SALE',
-        line_type: 'REVENUE',
-        description: variant.full_name,
-        amount: asGift ? 0 : variant.retail_price * qty,
-        quantity: qty,
-        variant_id: variant.variant_id,
-        as_gift: asGift,
-      },
-    ]);
+    const catalogTotal = variant.retail_price * qty;
+    // Dedupe by variant + gift-ness: re-picking the same accessory updates the
+    // existing line's qty instead of adding a duplicate (matches the retail
+    // New Bill picker). An accessory and a gift of the same variant stay
+    // distinct lines. Re-picking resets to catalog price for the new qty — a
+    // prior manual override is intentionally cleared, since re-picking is an
+    // explicit "update this item".
+    const existing = lines.find(
+      l => l.variant_id === variant.variant_id && l.as_gift === asGift,
+    );
+    if (existing) {
+      onChange(lines.map(l =>
+        l.id === existing.id
+          ? { ...l, quantity: qty, amount: asGift ? 0 : catalogTotal, catalog_amount: catalogTotal }
+          : l,
+      ));
+    } else {
+      onChange([
+        ...lines,
+        {
+          id: nextCartId(),
+          charge_type: 'ACCESSORY_SALE',
+          line_type: 'REVENUE',
+          description: variant.full_name,
+          amount: asGift ? 0 : catalogTotal,
+          quantity: qty,
+          variant_id: variant.variant_id,
+          as_gift: asGift,
+          catalog_amount: catalogTotal,
+        },
+      ]);
+    }
     setSellablePick(null);
   };
 
@@ -150,6 +174,27 @@ export function BillCart({ branchId, systemLines, lines, onChange, rowAction }: 
 
   const handleRemove = (id: string) => {
     onChange(lines.filter(l => l.id !== id));
+  };
+
+  // variant_id → qty currently in cart for the pick's line type (gift vs sale),
+  // so the picker flags existing items and switches its button to "Update".
+  const pickIsGift = sellablePick?.chargeType === 'GIFT';
+  const cartQtys = useMemo(() => {
+    const m: Record<number, number> = {};
+    for (const l of lines) {
+      if (l.variant_id != null && l.as_gift === pickIsGift) {
+        m[l.variant_id] = (m[l.variant_id] ?? 0) + l.quantity;
+      }
+    }
+    return m;
+  }, [lines, pickIsGift]);
+
+  // Walk-in negotiated price: staff override an accessory's price via the
+  // price modal. The overridden amount is submitted verbatim
+  // (fn_bill_line_item_add honors p_amount — no catalog re-clamp).
+  const handlePriceSave = (id: string, amount: number) => {
+    onChange(lines.map(l => (l.id === id ? { ...l, amount } : l)));
+    setPriceEdit(null);
   };
 
   const total = systemLines.reduce((sum, l) => sum + l.amount, 0)
@@ -186,6 +231,25 @@ export function BillCart({ branchId, systemLines, lines, onChange, rowAction }: 
                   <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
                     {line.as_gift ? (
                       <span className="text-subtle">{fmtCurrency(0)}</span>
+                    ) : line.variant_id != null ? (
+                      <div className="flex flex-col items-end gap-0.5">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="btn-icon-xs"
+                            startIcon={<Pencil size={12} />}
+                            onClick={() => setPriceEdit(line)}
+                            aria-label={t('workspace.cart_editPrice', { defaultValue: 'Adjust price' })}
+                          />
+                          <span className="tabular-nums">{fmtCurrency(line.amount)}</span>
+                        </div>
+                        {line.catalog_amount != null && line.amount !== line.catalog_amount && (
+                          <span className="text-[10px] text-subtle line-through">
+                            {fmtCurrency(line.catalog_amount)}
+                          </span>
+                        )}
+                      </div>
                     ) : (
                       fmtCurrency(line.amount)
                     )}
@@ -246,13 +310,20 @@ export function BillCart({ branchId, systemLines, lines, onChange, rowAction }: 
         {rowAction && <div className="ml-auto">{rowAction}</div>}
       </div>
 
-      <SellableVariantPickerModal
+      <ProductPickerModal
         open={sellablePick != null}
         branchId={branchId}
+        cartQtys={cartQtys}
         onClose={() => setSellablePick(null)}
         onPick={handleSellablePick}
         titleKey={sellablePick?.chargeType === 'GIFT' ? 'workspace.cart_pickGift' : 'workspace.cart_pickAccessory'}
         addLabelKey={sellablePick?.chargeType === 'GIFT' ? 'workspace.cart_giveAsGift' : 'retail.create.add'}
+      />
+
+      <PriceOverrideModal
+        line={priceEdit}
+        onClose={() => setPriceEdit(null)}
+        onSave={handlePriceSave}
       />
 
       <Modal open={freeForm != null} onClose={() => setFreeForm(null)} maxWidth="24rem" width="100%">
@@ -298,5 +369,94 @@ export function BillCart({ branchId, systemLines, lines, onChange, rowAction }: 
         </div>
       </Modal>
     </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Walk-in negotiated price for an accessory line. Prefills the current amount,
+   shows the catalog price for reference + a one-tap reset. Saved amount is a
+   line total (submitted verbatim to fn_bill_line_item_add). Modal stays mounted;
+   `line` prop drives visibility.
+   ──────────────────────────────────────────────────────────────────────────── */
+function PriceOverrideModal({
+  line,
+  onClose,
+  onSave,
+}: {
+  line: DraftCartLine | null;
+  onClose: () => void;
+  onSave: (id: string, amount: number) => void;
+}) {
+  const { t } = useTranslation();
+  const [value, setValue] = useState('');
+
+  // Prefill with the line's current amount each time a new line is targeted.
+  const [seenId, setSeenId] = useState<string | null>(null);
+  if (line && seenId !== line.id) {
+    setSeenId(line.id);
+    setValue(String(line.amount));
+  }
+  if (!line && seenId !== null) setSeenId(null);
+
+  const parsed = parseFloat(value);
+  const canSave = Number.isFinite(parsed) && parsed >= 0;
+  const catalog = line?.catalog_amount ?? null;
+
+  return (
+    <Modal open={line != null} onClose={onClose} maxWidth="22rem" width="100%">
+      <div className="modal-header">
+        <h2 className="modal-title">{t('workspace.cart_editPrice', { defaultValue: 'Adjust price' })}</h2>
+        <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+      </div>
+      <div className="modal-content">
+        <div className="form-grid">
+          <div className="px-3 py-2.5 rounded-md bg-surface border border-line">
+            <div className="text-sm font-medium">{line?.description}</div>
+            {line != null && line.quantity > 1 && (
+              <div className="text-xs text-subtle mt-0.5">× {line.quantity}</div>
+            )}
+          </div>
+          <div className="flex flex-col">
+            <label className="form-label">{t('workspace.cart_newPrice', { defaultValue: 'Price (฿)' })}</label>
+            <MaskedInput
+              mask="number"
+              decimalScale={2}
+              value={value}
+              onChange={(raw) => setValue(raw)}
+              size="sm"
+              className="w-full"
+              placeholder="0"
+              autoFocus
+            />
+            {catalog != null && (
+              <div className="flex items-center gap-2 mt-1.5">
+                <span className="text-xs text-subtle">
+                  {t('workspace.cart_catalogPrice', { defaultValue: 'Catalog' })}: {fmtCurrency(catalog)}
+                </span>
+                {parsed !== catalog && (
+                  <button
+                    type="button"
+                    onClick={() => setValue(String(catalog))}
+                    className="text-xs text-primary-fg hover:underline bg-transparent border-none p-0 cursor-pointer"
+                  >
+                    {t('workspace.cart_resetPrice', { defaultValue: 'Reset' })}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="modal-footer">
+        <Button variant="outline" onClick={onClose}>{t('common.cancel')}</Button>
+        <Button
+          color="primary"
+          onClick={() => line && canSave && onSave(line.id, parsed)}
+          disabled={!canSave}
+        >
+          {t('common.save')}
+        </Button>
+      </div>
+    </Modal>
   );
 }

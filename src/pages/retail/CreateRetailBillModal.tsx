@@ -2,35 +2,24 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import {
-  Modal, Button, Select, Badge, Input, MaskedInput, NumberSpinner, TextArea, Tooltip, useSnackbarContext,
+  Modal, Button, Select, Badge, Input, MaskedInput, TextArea, useSnackbarContext,
 } from 'tsp-form';
 import {
   Plus, Trash2, ShoppingCart, Truck, Percent, ChevronsRight,
-  AlertCircle, XCircle, Barcode, ScanBarcode,
+  AlertCircle, XCircle,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { fmtCurrency } from '../../lib/format';
-import { useBarcodeScanner } from '../../components/BarcodeScanner';
 import { BranchPaymentAccountField } from '../../components/BranchPaymentAccountField';
 import { ActionDoneView } from '../contracts/ActionDoneView';
+import { ProductPickerModal, type SellableVariant } from '../../components/ProductPickerModal';
 
 /* ───────────────────────────────────────────────────────────────────────────
  * Types — match fn_bill_retail_preview / fn_bill_retail_submit (doc 38 §0)
  * ─────────────────────────────────────────────────────────────────────────── */
 
 interface Branch { id: number; name: string }
-
-interface SellableVariant {
-  variant_id: number;
-  full_name: string;
-  brand_name: string;
-  model_name: string;
-  variant_name: string;
-  retail_price: number;
-  qty: number;
-  barcodes: string[];
-}
 
 type PaymentMethod = 'CASH' | 'TRANSFER';
 
@@ -799,158 +788,6 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
         onSave={addDiscount}
       />
     </Modal>
-  );
-}
-
-/* ───────────────────────────────────────────────────────────────────────────
- * Product picker
- * ─────────────────────────────────────────────────────────────────────────── */
-
-function ProductPickerModal({ open, branchId, cartQtys, onClose, onPick }: {
-  open: boolean;
-  branchId: number | null;
-  cartQtys: Record<number, number>;
-  onClose: () => void;
-  onPick: (variant: SellableVariant, qty: number) => void;
-}) {
-  const { t } = useTranslation();
-  const [search, setSearch] = useState('');
-  const [debounced, setDebounced] = useState('');
-  const [pickedQtys, setPickedQtys] = useState<Record<number, number>>({});
-  const { open: openScanner, scannerEl } = useBarcodeScanner({ onScan: setSearch });
-
-  useEffect(() => {
-    if (!open) {
-      setSearch('');
-      setDebounced('');
-      setPickedQtys({});
-    }
-  }, [open]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(search.trim()), 250);
-    return () => clearTimeout(timer);
-  }, [search]);
-
-  const { data: variants = [], isFetching } = useQuery({
-    queryKey: ['retail-create', 'sellable', branchId, debounced],
-    queryFn: () => {
-      let url = `/v_branch_sellable_stock_priced?branch_id=eq.${branchId}&qty=gt.0&order=brand_name,model_name&limit=50`;
-      if (debounced) {
-        const term = debounced.replace(/\s+/g, '*');
-        const enc = encodeURIComponent(term);
-        const isBarcode = /^\d{8,}$/.test(debounced);
-        const orParts = [`full_name.ilike.*${enc}*`];
-        if (isBarcode) orParts.push(`barcodes.cs.{${debounced}}`);
-        url += `&or=(${orParts.join(',')})`;
-      }
-      return apiClient.get<SellableVariant[]>(url);
-    },
-    enabled: open && !!branchId,
-    staleTime: 30 * 1000,
-  });
-
-  return (
-    <>
-    {scannerEl}
-    <Modal open={open} onClose={onClose} maxWidth="40rem" width="100%" ariaLabel="Add Product">
-      <div className="flex flex-col overflow-hidden" style={{ height: '70dvh' }}>
-        <div className="modal-header">
-          <h2 className="modal-title">{t('retail.create.productPickerTitle')}</h2>
-          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">×</button>
-        </div>
-        <div className="modal-content">
-          <div className="input-group mb-3">
-            <Button
-              size="sm"
-              variant="outline"
-              startIcon={<ScanBarcode size={16} />}
-              onClick={openScanner}
-              aria-label={t('barcodeScanner.title', { defaultValue: 'Scan barcode' })}
-            />
-            <div className="input-group-divider" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={t('retail.create.searchProducts')}
-              size="sm"
-              className="w-full"
-              autoFocus
-            />
-          </div>
-          {isFetching && variants.length === 0 ? (
-            <div className="p-8 text-center text-subtler text-sm">{t('common.loading')}</div>
-          ) : variants.length === 0 ? (
-            <div className="p-8 text-center text-subtler text-sm">{t('retail.create.noProducts')}</div>
-          ) : (
-            <div className="flex flex-col divide-y divide-line">
-              {variants.map(v => {
-                const inCartQty = cartQtys[v.variant_id] ?? 0;
-                const isInCart = inCartQty > 0;
-                // Default the stepper to the current cart qty so "Update cart"
-                // starts from where the line already is.
-                const qty = pickedQtys[v.variant_id] ?? (isInCart ? inCartQty : 1);
-                const changed = qty !== inCartQty;
-                return (
-                  <div
-                    key={v.variant_id}
-                    className={`flex items-center gap-3 py-2.5 px-2 -mx-2 rounded-md ${isInCart ? 'bg-primary-soft' : ''}`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="text-sm font-medium truncate">{v.full_name}</span>
-                        {isInCart && (
-                          <Badge size="sm" color="primary" className="shrink-0">
-                            {t('retail.create.inCart', { count: inCartQty })}
-                          </Badge>
-                        )}
-                        {v.barcodes.length > 0 && (
-                          <Tooltip content={v.barcodes.join('\n')} placement="top">
-                            <span className="inline-flex items-center gap-0.5 text-[10px] text-subtle shrink-0">
-                              <Barcode size={12} />
-                              {v.barcodes.length > 1 && <span className="tabular-nums">{v.barcodes.length}</span>}
-                            </span>
-                          </Tooltip>
-                        )}
-                      </div>
-                      <div className="text-xs text-subtle flex items-center gap-2">
-                        <span>{t('retail.create.stock')}: {v.qty}</span>
-                        <span className="font-medium tabular-nums">{fmtCurrency(v.retail_price)}</span>
-                      </div>
-                    </div>
-                    <div className="shrink-0 w-24">
-                      <NumberSpinner
-                        value={qty}
-                        onChange={(val) => setPickedQtys(prev => ({
-                          ...prev,
-                          [v.variant_id]: Math.max(1, val === '' ? 1 : Number(val)),
-                        }))}
-                        min={1}
-                        max={v.qty}
-                        scale="sm"
-                      />
-                    </div>
-                    <Button
-                      size="sm"
-                      color="primary"
-                      variant={isInCart && !changed ? 'outline' : 'solid'}
-                      onClick={() => onPick(v, qty)}
-                      disabled={qty > v.qty}
-                    >
-                      {isInCart ? t('retail.create.updateCart') : t('retail.create.add')}
-                    </Button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-        <div className="modal-footer">
-          <Button onClick={onClose}>{t('common.close')}</Button>
-        </div>
-      </div>
-    </Modal>
-    </>
   );
 }
 
