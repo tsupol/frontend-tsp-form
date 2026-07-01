@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import {
-  MobileHeader, DataTable, Select, Badge, InputDateRangePicker,
+  MobileHeader, DataTable, Select, Badge, InputDateRangePicker, Button,
 } from 'tsp-form';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -406,15 +406,14 @@ export function PaymentsPage() {
                     {fmtCurrency(p.amount)}
                   </span>
                   {correctable && (
-                    <button
-                      type="button"
+                    <Button
+                      variant="ghost"
                       className="btn-icon-sm shrink-0"
+                      startIcon={<ArrowLeftRight size={15} />}
                       title={t('accounting.payments.correct.title')}
                       aria-label={t('accounting.payments.correct.title')}
                       onClick={() => setCorrectPayment(p)}
-                    >
-                      <ArrowLeftRight size={15} />
-                    </button>
+                    />
                   )}
                 </div>
                 <div className="flex items-center gap-1.5 text-xs text-subtle min-w-0">
