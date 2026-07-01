@@ -12,10 +12,22 @@ different, unused server** — ignore `.claude/paas-dock-deploy.md` (kept only a
 
 ## This frontend
 
-- Deploy: `just direct-deploy` from this repo root (builds the Dockerfile locally,
-  `docker save`/`scp`/`docker load`/`docker run` on the server). `npm run build`
-  must pass first — `tsc -b` runs inside the image build.
+- **Deploy: `just deploy`** from this repo root. Builds locally (`npm run build`)
+  and tar-ships **only `dist/`** over ssh into `/home/nnfsup/nnf-ui-dist`. No image
+  transfer, no container restart — nginx serves the new files immediately. Seconds,
+  not minutes.
+- **Why it works:** the `nnf-ui` container is a **persistent `nginx:alpine`** that
+  mounts `/home/nnfsup/nnf-ui-dist` (html) + `/home/nnfsup/nnf-ui-conf/default.conf`.
+  `just deploy` only swaps files in the mounted dir. **If that container is ever
+  missing, `deploy` copies into a dir nothing serves (silent no-op)** — recreate it
+  with `just serve`.
+- **Edited `nginx.conf`? Run `just serve`, not `just deploy`** — `serve` re-pushes
+  the conf and recreates the container. `deploy` never touches nginx config.
 - Container: `nnf-ui` · URL: https://nnfui.czynet.dev
+- Windows has no rsync, so the ship is tar-of-whole-`dist/` (~a few MB gzipped), not
+  file-delta. Fine at this size; don't "optimize" it into a broken rsync call.
+- Fallback: `just deploy-image` is the old full-image build+scp path (slow), kept in
+  case the static setup ever needs replacing.
 - Other just recipes: `just status`, `just logs` (tails `nnf-ui`), `just restart`,
   `just ssh`. All target the same host via the vars at the top of `justfile`.
 
