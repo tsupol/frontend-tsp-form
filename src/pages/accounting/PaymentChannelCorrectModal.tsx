@@ -54,8 +54,9 @@ export function PaymentChannelCorrectModal({ open, payment, onClose, onSuccess }
 
   const resetForm = () => {
     setView('form');
-    // Default to the OTHER channel — the point is to switch.
-    setMethod(currentMethod === 'CASH' ? 'TRANSFER' : 'CASH');
+    // Start on the CURRENT channel so an untouched form is not dirty (no
+    // spurious nav-guard). The user picks the other channel to make a change.
+    setMethod(currentMethod);
     setReason('');
     setError('');
     setSubmitting(false);
@@ -119,9 +120,14 @@ export function PaymentChannelCorrectModal({ open, payment, onClose, onSuccess }
     return (
       <button
         type="button"
+        disabled={isCurrent}
         onClick={() => setMethod(value)}
         className={`flex-1 flex flex-col items-center gap-1.5 px-3 py-3 rounded-lg border transition-colors ${
-          selected ? 'border-primary bg-primary-soft text-primary-fg' : 'border-line bg-surface hover:bg-surface-subtle'
+          isCurrent
+            ? 'border-line bg-surface-subtle text-subtle cursor-not-allowed'
+            : selected
+              ? 'border-primary bg-primary-soft text-primary-fg'
+              : 'border-line bg-surface hover:bg-surface-subtle'
         }`}
       >
         {icon}
