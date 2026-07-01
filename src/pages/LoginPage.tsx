@@ -23,6 +23,17 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [showQuickLogin, setShowQuickLogin] = useState(
+    () => localStorage.getItem('quickLoginVisible') === '1',
+  );
+
+  const toggleQuickLogin = () => {
+    setShowQuickLogin((prev) => {
+      const next = !prev;
+      localStorage.setItem('quickLoginVisible', next ? '1' : '0');
+      return next;
+    });
+  };
 
   const reasonRef = useRef(searchParams.get('reason'));
   const errorCodeRef = useRef(searchParams.get('error_code'));
@@ -103,12 +114,14 @@ export function LoginPage() {
           </div>
         )}
 
-        <QuickLogin
-          onSelect={(username, password) => {
-            setValue('username', username);
-            setValue('password', password);
-          }}
-        />
+        {showQuickLogin && (
+          <QuickLogin
+            onSelect={(username, password) => {
+              setValue('username', username);
+              setValue('password', password);
+            }}
+          />
+        )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="mt-8">
           <div className="grid gap-7 pb-10">
@@ -156,6 +169,15 @@ export function LoginPage() {
         </form>
         </div>
       </div>
+
+      <button
+        type="button"
+        aria-label=""
+        title=""
+        onClick={toggleQuickLogin}
+        className="fixed bottom-0 right-0 w-4 h-4 bg-line/40 hover:bg-line/60 cursor-default focus:outline-none"
+        tabIndex={-1}
+      />
     </div>
   );
 }
