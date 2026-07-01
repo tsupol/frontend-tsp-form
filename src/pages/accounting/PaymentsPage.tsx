@@ -393,40 +393,51 @@ export function PaymentsPage() {
             return (
               <div
                 key={p.payment_id}
-                className="w-full px-4 py-3 flex flex-col gap-1"
+                className="w-full px-4 py-3 flex items-center gap-3"
               >
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="font-mono text-sm font-medium truncate">{p.code_display}</span>
-                  <Badge color={METHOD_COLOR[p.method] ?? 'default'} size="sm">
-                    {t(`accounting.payments.m_${p.method}`, { defaultValue: p.method })}
-                  </Badge>
-                  <Badge color={TYPE_COLOR[p.bill_type] ?? 'default'} size="sm">{t(`accounting.bills.typeLabel.${p.bill_type}`, { defaultValue: p.bill_type })}</Badge>
-                  {p.is_reversal && <Badge color="danger" size="sm">VOID</Badge>}
-                  <span className="ml-auto text-sm font-medium tabular-nums shrink-0">
-                    {fmtCurrency(p.amount)}
+                {/* Left: identity + refs */}
+                <div className="flex flex-col gap-1 min-w-0 flex-1">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-mono text-sm font-medium truncate">{p.code_display}</span>
+                    <Badge color={METHOD_COLOR[p.method] ?? 'default'} size="sm">
+                      {t(`accounting.payments.m_${p.method}`, { defaultValue: p.method })}
+                    </Badge>
+                    <Badge color={TYPE_COLOR[p.bill_type] ?? 'default'} size="sm">{t(`accounting.bills.typeLabel.${p.bill_type}`, { defaultValue: p.bill_type })}</Badge>
+                    {p.is_reversal && <Badge color="danger" size="sm">VOID</Badge>}
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs text-subtle min-w-0">
+                    <span className="truncate">
+                      <span className="font-mono">{p.bill_code_display}</span>
+                      {p.bank_name && <> · <span>{p.bank_name} {p.account_number}</span></>}
+                      {p.payer_name && <> · <span>{p.payer_name}</span></>}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Amount + date column */}
+                <div className="flex flex-col items-end shrink-0">
+                  <span className="text-sm font-medium tabular-nums">{fmtCurrency(p.amount)}</span>
+                  <span className="text-xs text-fg/50">
+                    <DateTime value={p.bill_date} showTime={false} />
                   </span>
-                  {correctable && (
+                </div>
+
+                {/* Action — reserve space when hidden so amounts stay aligned */}
+                {canCorrectChannel && (
+                  correctable ? (
                     <Button
                       variant="outline"
                       size="sm"
-                      className="btn-icon-sm shrink-0"
+                      className="shrink-0"
                       startIcon={<ArrowLeftRight size={15} />}
                       title={t('accounting.payments.correct.title')}
                       aria-label={t('accounting.payments.correct.title')}
                       onClick={() => setCorrectPayment(p)}
                     />
-                  )}
-                </div>
-                <div className="flex items-center gap-1.5 text-xs text-subtle min-w-0">
-                  <span className="truncate">
-                    <span className="font-mono">{p.bill_code_display}</span>
-                    {p.bank_name && <> · <span>{p.bank_name} {p.account_number}</span></>}
-                    {p.payer_name && <> · <span>{p.payer_name}</span></>}
-                  </span>
-                  <span className="ml-auto text-fg/50 shrink-0">
-                    <DateTime value={p.bill_date} showTime={false} />
-                  </span>
-                </div>
+                  ) : (
+                    <span className="shrink-0" style={{ width: '1.75rem' }} aria-hidden />
+                  )
+                )}
               </div>
             );
           }}
