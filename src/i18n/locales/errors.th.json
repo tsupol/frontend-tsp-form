@@ -662,7 +662,7 @@
   "SNAPSHOT_WRITE_CONFLICT": "มีการเขียนข้อมูลพร้อมกัน — กรุณาลองใหม่",
   "SNAPSHOT_CONTEXT_REQUIRED": "ระบบ: ไม่ได้ส่ง context ของการเซ็น",
   "SALE.STATE.CANNOT_CANCEL_BILL_WITH_SEALED_SIGNING": "บิลนี้มีเอกสารเซ็นปิดผนึกแล้ว — ให้ใช้ \"ยกเลิกสัญญา\" แทน",
-  "SALE.STATE.CANNOT_UNBIND_WITH_SEALED_BIND_ADDENDUM": "เอกสาร BIND ถูกปิดผนึกแล้ว — ให้ใช้ \"ยกเลิกสัญญา\" แทน",
+  "SALE.STATE.CANNOT_UNBIND_WITH_SEALED_BIND_ADDENDUM": "เอกสาร BIND ถูกปิดผนึกแล้ว ให้ยกเลิกเอกสารนี้ในแท็บลงนามก่อน แล้วจึงถอดเครื่อง",
   "SALE.STATE.CANNOT_REMOVE_CO_LESSEE_WITH_SEALED_ADDENDUM": "เอกสารเพิ่มผู้เช่าร่วมถูกปิดผนึกแล้ว — ให้ใช้ \"ยกเลิกสัญญา\" แทน",
   "SALE.STATE.CANNOT_DETACH_PRIMARY_WITH_SEALED_FULL_CONTRACT": "มีสัญญาฉบับเต็มที่ปิดผนึกแล้ว — ให้ใช้ \"ยกเลิกสัญญา\" แทน",
   "SALE.VALIDATION.CO_LESSEE_IS_CUSTOMER": "ผู้เช่าร่วมต้องไม่ใช่ลูกค้าหลัก",

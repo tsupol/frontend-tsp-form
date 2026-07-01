@@ -735,7 +735,7 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   onRefresh: () => void;
   requestedAction?: ContractAction | null;
   onRequestedActionConsumed?: () => void;
-  onNavigateTab?: (tab: 'overview' | 'device' | 'notes' | 'customers' | 'money') => void;
+  onNavigateTab?: (tab: 'overview' | 'device' | 'notes' | 'customers' | 'money' | 'signing') => void;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -1142,6 +1142,7 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
         contract={contract}
         onClose={() => setActiveAction(null)}
         onSuccess={handleSuccess}
+        onNavigateTab={onNavigateTab}
       />
       <AttachSlipModal
         open={attachSlipOpen}
@@ -1239,12 +1240,13 @@ const DONE_VIEW_ACTIONS: ReadonlySet<ContractAction> = new Set([
   'bind_device',
 ]);
 
-function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
+function ContractActionModal({ open, action, contract, onClose, onSuccess, onNavigateTab }: {
   open: boolean;
   action: ContractAction | null;
   contract: ContractForActions;
   onClose: () => void;
   onSuccess: (msgKey: string) => void;
+  onNavigateTab?: (tab: 'overview' | 'device' | 'notes' | 'customers' | 'money' | 'signing') => void;
 }) {
   const { t } = useTranslation();
   const invalidate = useContractInvalidate(contract.id);
@@ -1259,6 +1261,7 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
   const [amount, setAmount] = useState('');
   const [newOwnerId, setNewOwnerId] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const [errorKey, setErrorKey] = useState(0);
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const config = action ? ACTION_CONFIGS[action] : null;
@@ -1277,6 +1280,7 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
       setAmount('');
       setNewOwnerId(null);
       setError('');
+      setErrorCode(null);
       setResult(null);
     }
   }, [open, action]);
@@ -1437,8 +1441,10 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
         const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
           || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
         setError(translated || err.message);
+        setErrorCode(err.code ?? err.messageKey ?? null);
       } else {
         setError(String(err));
+        setErrorCode(null);
       }
       setErrorKey(k => k + 1);
     },
@@ -1483,7 +1489,21 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess }: {
             {error && (
               <div key={errorKey} className="alert alert-danger mb-4 animate-pop-in">
                 <XCircle size={16} />
-                <span>{error}</span>
+                <div className="flex flex-col gap-1">
+                  <span>{error}</span>
+                  {/* Unbind blocked by a sealed BIND addendum → point the user at
+                      the Signing tab to void it first (BM + PIN). */}
+                  {errorCode === 'SALE.STATE.CANNOT_UNBIND_WITH_SEALED_BIND_ADDENDUM' && onNavigateTab && (
+                    <button
+                      type="button"
+                      onClick={() => { onClose(); onNavigateTab('signing'); }}
+                      className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer self-start"
+                    >
+                      {t('contract.goToSigningTabToVoidAddendum', { defaultValue: 'Void the addendum in the Signing tab' })}
+                      <ExternalLink size={12} />
+                    </button>
+                  )}
+                </div>
               </div>
             )}
 

@@ -57,6 +57,10 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
   const [captureOpen, setCaptureOpen] = useState(false);
   const [viewQrOpen, setViewQrOpen] = useState(false);
   const [lightboxKey, setLightboxKey] = useState<string | null>(null);
+  // While a mobile-capture session is live, keep polling the album even after
+  // the QR modal closes — the phone may still be uploading until the backend
+  // session TTL. Holds the session's expiry; polling stops once it passes.
+  const [captureExpiresAt, setCaptureExpiresAt] = useState<string | null>(null);
 
   // Contract attachment album — photos captured via the Mobile Capture Bridge
   // (phone-scanned QR) land here as (CONTRACT, ATTACHMENT). Same view the
@@ -67,6 +71,8 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
       `/v_entity_media?entity_type=eq.CONTRACT&entity_id=eq.${contractId}&usage_type=eq.ATTACHMENT&select=entity_media_id,media_id,sort_order,storage_path,variants_json,caption&order=sort_order`,
     ),
     enabled: !!contractId,
+    // Poll for phone uploads while a capture session is live (survives modal close).
+    refetchInterval: captureExpiresAt && new Date(captureExpiresAt).getTime() > Date.now() ? 3000 : false,
   });
 
   // Signatory used to be a prereq card — it now lives inline at the top of
@@ -385,6 +391,7 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
         contractId={contractId}
         contractCode={contract?.code_display ?? null}
         onUploaded={() => refetchAttachments()}
+        onSessionActive={setCaptureExpiresAt}
       />
 
       {/* QR — let the customer read the contract on a 2nd device (read-only) */}

@@ -6,6 +6,7 @@ import { PiggyBank, XCircle, Loader2, Check } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { fmtCurrency } from '../../../lib/format';
 import { DateTime } from '../../../components/DateTime';
+import { BranchPaymentAccountField } from '../../../components/BranchPaymentAccountField';
 import { useWorkspace } from './WorkspaceContext';
 import { PanelSection } from './PanelSection';
 
@@ -70,6 +71,10 @@ export function PanelSaving({ onClose: _onClose }: Props) {
   // Deposit form state
   const [amount, setAmount] = useState('');
   const [channel, setChannel] = useState<string>('CASH');
+  // Receiving bank account for TRANSFER deposits — resolved from the branch
+  // channel-slot picker (BranchPaymentAccountField), same as the money-tab
+  // wallet modal. fn_bill_wallet requires it when channel is TRANSFER.
+  const [bankAccountId, setBankAccountId] = useState<string>('');
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
   const [errorKey, setErrorKey] = useState(0);
@@ -92,12 +97,15 @@ export function PanelSaving({ onClose: _onClose }: Props) {
         p_action: 'DEPOSIT',
         p_amount: Number(amount),
         p_channel: channel,
+        p_bank_account_id: channel === 'TRANSFER' && bankAccountId ? Number(bankAccountId) : undefined,
         p_branch_id: data.branchId,
         p_note: note.trim() || undefined,
       });
     },
     onSuccess: () => {
       setAmount('');
+      setChannel('CASH');
+      setBankAccountId('');
       setNote('');
       setError('');
       invalidateContract();
@@ -118,7 +126,10 @@ export function PanelSaving({ onClose: _onClose }: Props) {
   });
 
   const parsedAmount = Number(amount);
-  const canSubmit = parsedAmount > 0 && !mutation.isPending;
+  const canSubmit =
+    parsedAmount > 0 &&
+    !mutation.isPending &&
+    (channel === 'CASH' || (channel === 'TRANSFER' && !!bankAccountId));
 
   return (
     <div className="p-4 flex flex-col">
@@ -211,6 +222,15 @@ export function PanelSaving({ onClose: _onClose }: Props) {
                   />
                 </div>
               </div>
+              {channel === 'TRANSFER' && (
+                <div className="flex flex-col">
+                  <label className="form-label">{t('wallet.bankAccount')} *</label>
+                  <BranchPaymentAccountField
+                    active={channel === 'TRANSFER'}
+                    onResolve={(id) => setBankAccountId(id != null ? String(id) : '')}
+                  />
+                </div>
+              )}
               <div className="flex flex-col">
                 <label className="form-label">{t('contract.note')}</label>
                 <Input

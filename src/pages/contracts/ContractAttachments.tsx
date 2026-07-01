@@ -81,6 +81,10 @@ export function ContractAttachments({
   const queryClient = useQueryClient();
   const [manageOpen, setManageOpen] = useState(false);
   const [lightboxKey, setLightboxKey] = useState<string | null>(null);
+  // Keep polling the album while a mobile-capture session is live, even after
+  // the Manage-photos modal closes — the phone may keep uploading until the
+  // backend session TTL. Holds the session's expiry; polling stops once past.
+  const [captureExpiresAt, setCaptureExpiresAt] = useState<string | null>(null);
 
   const { data: photos = [], refetch } = useQuery({
     queryKey: ['contract-attachments', contractId],
@@ -88,6 +92,7 @@ export function ContractAttachments({
       `/v_entity_media?entity_type=eq.${ENTITY_TYPE}&entity_id=eq.${contractId}&usage_type=eq.${USAGE_TYPE}&select=entity_media_id,media_id,sort_order,caption,storage_path,variants_json&order=sort_order`,
     ),
     staleTime: 30 * 1000,
+    refetchInterval: captureExpiresAt && new Date(captureExpiresAt).getTime() > Date.now() ? 3000 : false,
   });
 
   const refresh = () => {
@@ -160,6 +165,7 @@ export function ContractAttachments({
         contractCode={contractCode}
         photos={photos}
         onChanged={refresh}
+        onSessionActive={setCaptureExpiresAt}
       />
     </div>
   );
@@ -200,6 +206,7 @@ function ManageModal({
   contractCode,
   photos,
   onChanged,
+  onSessionActive,
 }: {
   open: boolean;
   onClose: () => void;
@@ -207,6 +214,9 @@ function ManageModal({
   contractCode: string | null;
   photos: ContractAttachment[];
   onChanged: () => void;
+  /** Reports the live capture session's expiry so the album keeps polling after
+   *  this modal closes. */
+  onSessionActive?: (expiresAt: string) => void;
 }) {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -234,6 +244,11 @@ function ManageModal({
     if (uploadCount > 0) onChanged();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uploadCount]);
+  // Report the session's TTL up so the album keeps polling after close.
+  useEffect(() => {
+    if (session?.expires_at) onSessionActive?.(session.expires_at);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.expires_at]);
 
   const handleRemove = async (m: ContractAttachment) => {
     setRemovingId(m.entity_media_id);

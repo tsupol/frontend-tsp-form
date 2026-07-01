@@ -6,7 +6,7 @@ import {
 } from 'tsp-form';
 import {
   Plus, Trash2, ShoppingCart, Truck, Percent, ChevronsRight,
-  AlertCircle, XCircle,
+  AlertCircle, XCircle, Pencil,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -31,11 +31,15 @@ interface PaymentRow {
 
 interface CartLine {
   charge_type: 'RETAIL_SALE' | 'SHIPPING_FEE' | 'RETAIL_DISCOUNT';
+  /** Unit price for RETAIL_SALE (× qty for the line total); line amount otherwise. */
   amount: number;
   qty?: number;
   variant_id?: number | null;
   target_line_index?: number;
   description?: string;
+  /** Catalog unit price at add time — lets the cart show the original price and
+      detect a manual override. Only set for RETAIL_SALE lines. */
+  catalog_price?: number | null;
 }
 
 interface PreviewLine {
@@ -123,6 +127,7 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
   const [productPickerOpen, setProductPickerOpen] = useState(false);
   const [shippingOpen, setShippingOpen] = useState(false);
   const [discountForLineIdx, setDiscountForLineIdx] = useState<number | null>(null);
+  const [priceEditIdx, setPriceEditIdx] = useState<number | null>(null);
 
   // Reset everything when modal opens (checklist §1: reset to 'form' on open).
   useEffect(() => {
@@ -134,6 +139,7 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
       setProductPickerOpen(false);
       setShippingOpen(false);
       setDiscountForLineIdx(null);
+      setPriceEditIdx(null);
       setView('form');
       setDone(null);
     }
@@ -374,7 +380,11 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
         l => l.charge_type === 'RETAIL_SALE' && l.variant_id === variant.variant_id,
       );
       if (existingIdx >= 0) {
-        return prev.map((l, i) => (i === existingIdx ? { ...l, qty: finalQty } : l));
+        // Re-picking resets to catalog price for the new qty — a prior manual
+        // override is intentionally cleared (re-picking is an explicit "update").
+        return prev.map((l, i) => (i === existingIdx
+          ? { ...l, qty: finalQty, amount: variant.retail_price, catalog_price: variant.retail_price }
+          : l));
       }
       return [...prev, {
         charge_type: 'RETAIL_SALE',
@@ -382,6 +392,7 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
         qty: finalQty,
         variant_id: variant.variant_id,
         description: variant.full_name,
+        catalog_price: variant.retail_price,
       }];
     });
     setProductPickerOpen(false);
@@ -404,6 +415,13 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
       description: reason || undefined,
     }]);
     setDiscountForLineIdx(null);
+  };
+
+  // Walk-in negotiated unit price for a product line. Submitted verbatim
+  // (fn_bill_create / fn_bill_payment honor p_amount — no catalog re-clamp).
+  const savePrice = (idx: number, unitPrice: number) => {
+    setLines(prev => prev.map((l, i) => (i === idx ? { ...l, amount: unitPrice } : l)));
+    setPriceEditIdx(null);
   };
 
   // Don't trust preview.bill.total_amount — fn_bill_retail_preview currently
@@ -590,12 +608,29 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
                         )}
                       </div>
                       <div className="text-right shrink-0">
-                        <div className="text-sm font-medium tabular-nums">
-                          {isDiscount ? '−' : ''}{fmtCurrency(line.amount * (line.qty ?? 1))}
+                        <div className="flex items-center justify-end gap-1.5">
+                          {line.charge_type === 'RETAIL_SALE' && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="btn-icon-xs"
+                              startIcon={<Pencil size={12} />}
+                              onClick={() => setPriceEditIdx(idx)}
+                              aria-label={t('retail.create.editPrice')}
+                            />
+                          )}
+                          <span className="text-sm font-medium tabular-nums">
+                            {isDiscount ? '−' : ''}{fmtCurrency(line.amount * (line.qty ?? 1))}
+                          </span>
                         </div>
                         {(line.qty ?? 1) > 1 && (
-                          <div className="text-xs text-fg/50">
+                          <div className="text-xs text-subtle">
                             {fmtCurrency(line.amount)} × {line.qty}
+                          </div>
+                        )}
+                        {line.catalog_price != null && line.amount !== line.catalog_price && (
+                          <div className="text-[10px] text-subtle line-through tabular-nums">
+                            {fmtCurrency(line.catalog_price * (line.qty ?? 1))}
                           </div>
                         )}
                       </div>
@@ -787,6 +822,12 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
         onClose={() => setDiscountForLineIdx(null)}
         onSave={addDiscount}
       />
+      <PriceModal
+        line={priceEditIdx != null ? lines[priceEditIdx] ?? null : null}
+        lineIdx={priceEditIdx}
+        onClose={() => setPriceEditIdx(null)}
+        onSave={savePrice}
+      />
     </Modal>
   );
 }
@@ -938,6 +979,94 @@ function DiscountModal({ open, saleLines, initialTargetIdx, onClose, onSave }: {
             {t('common.add', { defaultValue: 'Add' })}
           </Button>
         </div>
+      </div>
+    </Modal>
+  );
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * Price override modal — walk-in negotiated unit price for a product line.
+ * Edits the unit price (line total = unit × qty). Prefills current, shows the
+ * catalog price + one-tap reset. Modal stays mounted; `line` drives visibility.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+function PriceModal({ line, lineIdx, onClose, onSave }: {
+  line: CartLine | null;
+  lineIdx: number | null;
+  onClose: () => void;
+  onSave: (idx: number, unitPrice: number) => void;
+}) {
+  const { t } = useTranslation();
+  const [value, setValue] = useState('');
+
+  // Prefill with the line's current unit price each time a new line is targeted.
+  const [seenIdx, setSeenIdx] = useState<number | null>(null);
+  if (line && lineIdx != null && seenIdx !== lineIdx) {
+    setSeenIdx(lineIdx);
+    setValue(String(line.amount));
+  }
+  if (!line && seenIdx !== null) setSeenIdx(null);
+
+  const parsed = parseFloat(value);
+  const canSave = Number.isFinite(parsed) && parsed >= 0;
+  const catalog = line?.catalog_price ?? null;
+  const qty = line?.qty ?? 1;
+
+  return (
+    <Modal open={line != null} onClose={onClose} maxWidth="22rem" width="100%" ariaLabel="Adjust price">
+      <div className="modal-header">
+        <h2 className="modal-title">{t('retail.create.editPrice')}</h2>
+        <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">×</button>
+      </div>
+      <div className="modal-content form-grid">
+        <div className="px-3 py-2.5 rounded-md bg-surface border border-line">
+          <div className="text-sm font-medium">{line?.description}</div>
+          {qty > 1 && <div className="text-xs text-subtle mt-0.5">× {qty}</div>}
+        </div>
+        <div className="flex flex-col">
+          <label className="form-label">{t('retail.create.newPrice')}</label>
+          <MaskedInput
+            mask="number"
+            decimalScale={2}
+            value={value}
+            onChange={setValue}
+            size="sm"
+            className="w-full"
+            placeholder="0.00"
+            autoFocus
+          />
+          {catalog != null && (
+            <div className="flex items-center gap-2 mt-1.5">
+              <span className="text-xs text-subtle">
+                {t('retail.create.catalogPrice')}: {fmtCurrency(catalog)}
+              </span>
+              {parsed !== catalog && (
+                <button
+                  type="button"
+                  onClick={() => setValue(String(catalog))}
+                  className="text-xs text-primary-fg hover:underline bg-transparent border-none p-0 cursor-pointer"
+                >
+                  {t('retail.create.resetPrice')}
+                </button>
+              )}
+            </div>
+          )}
+          {qty > 1 && canSave && (
+            <div className="text-xs text-subtle mt-1.5 tabular-nums">
+              {t('retail.create.lineTotal')}: {fmtCurrency(parsed * qty)}
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="modal-footer">
+        <Button variant="outline" onClick={onClose}>{t('common.cancel')}</Button>
+        <Button
+          color="primary"
+          disabled={!canSave || lineIdx == null}
+          onClick={() => lineIdx != null && canSave && onSave(lineIdx, parsed)}
+        >
+          {t('common.save')}
+        </Button>
       </div>
     </Modal>
   );

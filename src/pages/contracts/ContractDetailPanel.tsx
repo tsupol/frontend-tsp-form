@@ -606,6 +606,19 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [commissionModalOpen, setCommissionModalOpen] = useState(false);
 
+  // Real device identifiers — the contract view only carries `device_identifier`
+  // (= the asset's primary identifier, which is EITHER imei OR serial). Labeling
+  // that "IMEI" lies for serial-only devices. Read the asset row like the Device
+  // tab does so we can show IMEI and Serial honestly and separately.
+  const { data: deviceAsset } = useQuery({
+    queryKey: ['asset-summary', contract.device_id],
+    queryFn: () => apiClient.get<{ imei: string | null; serial_no: string | null }[]>(
+      `/v_assets?asset_id=eq.${contract.device_id}&select=imei,serial_no&limit=1`,
+    ).then(rows => rows[0] ?? null),
+    enabled: contract.device_id != null,
+    staleTime: 30 * 1000,
+  });
+
   // Commission owner editable only while the contract is in DRAFT or SAVING
   // (sale._is_editable). Server enforces the rest as a race-condition net.
   const commissionEditable =
@@ -717,9 +730,24 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
               <div className="text-xs text-subtle">{t('contract.device')}</div>
               <div className="text-sm">{contract.product_display_name ?? contract.variant_name ?? contract.model_name ?? '—'}</div>
             </div>
-            {contract.device_identifier && (
+            {/* Honest identifiers: IMEI and Serial are separate on the asset. Only
+                fall back to the ambiguous view field (labeled "IMEI / SN") before
+                the asset row loads. */}
+            {deviceAsset?.imei && (
               <div>
                 <div className="text-xs text-subtle">IMEI</div>
+                <div className="text-sm font-mono">{deviceAsset.imei}</div>
+              </div>
+            )}
+            {deviceAsset?.serial_no && (
+              <div>
+                <div className="text-xs text-subtle">{t('contract.serialNumber', { defaultValue: 'Serial number' })}</div>
+                <div className="text-sm font-mono">{deviceAsset.serial_no}</div>
+              </div>
+            )}
+            {!deviceAsset && contract.device_identifier && (
+              <div>
+                <div className="text-xs text-subtle">IMEI / SN</div>
                 <div className="text-sm font-mono">{contract.device_identifier}</div>
               </div>
             )}

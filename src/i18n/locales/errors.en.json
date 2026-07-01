@@ -662,7 +662,7 @@
   "SNAPSHOT_WRITE_CONFLICT": "Another write is in progress on this signing — please retry",
   "SNAPSHOT_CONTEXT_REQUIRED": "Internal: signing context not provided",
   "SALE.STATE.CANNOT_CANCEL_BILL_WITH_SEALED_SIGNING": "This bill has a sealed signing — use Void Contract instead",
-  "SALE.STATE.CANNOT_UNBIND_WITH_SEALED_BIND_ADDENDUM": "The bind addendum is sealed — use Void Contract instead",
+  "SALE.STATE.CANNOT_UNBIND_WITH_SEALED_BIND_ADDENDUM": "The bind addendum is sealed. Void it first in the Signing tab, then unbind the device.",
   "SALE.STATE.CANNOT_REMOVE_CO_LESSEE_WITH_SEALED_ADDENDUM": "The add-co-lessee addendum is sealed — use Void Contract instead",
   "SALE.STATE.CANNOT_DETACH_PRIMARY_WITH_SEALED_FULL_CONTRACT": "A sealed full contract exists — use Void Contract instead",
   "SALE.VALIDATION.CO_LESSEE_IS_CUSTOMER": "Co-lessee cannot be the primary customer",

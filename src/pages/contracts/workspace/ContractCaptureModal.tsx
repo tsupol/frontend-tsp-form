@@ -20,12 +20,17 @@ export function ContractCaptureModal({
   contractId,
   contractCode,
   onUploaded,
+  onSessionActive,
 }: {
   open: boolean;
   onClose: () => void;
   contractId: number | null;
   contractCode: string | null;
   onUploaded: () => void;
+  /** Reports the live session's expiry when it becomes active, so the host can
+   *  keep refetching the album after this modal closes (photos may keep landing
+   *  until the backend session TTL). */
+  onSessionActive?: (expiresAt: string) => void;
 }) {
   const { t } = useTranslation();
   const { phase, session, status, error, uploadCount, start, stop } = useMobileCaptureSession(
@@ -42,6 +47,13 @@ export function ContractCaptureModal({
     // double-start while requesting/active.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  // Tell the host how long the session lives so its album keeps polling after
+  // this modal closes.
+  useEffect(() => {
+    if (session?.expires_at) onSessionActive?.(session.expires_at);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.expires_at]);
 
   // Refresh the parent gallery as photos arrive and when the modal closes.
   useEffect(() => {

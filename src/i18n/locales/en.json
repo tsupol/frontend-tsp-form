@@ -1685,7 +1685,12 @@
       "discountTarget": "Apply to",
       "discountExceedsLine": "Discount exceeds line amount",
       "discountReason": "Reason",
-      "discountReasonPlaceholder": "Why this discount?"
+      "discountReasonPlaceholder": "Why this discount?",
+      "editPrice": "Adjust price",
+      "newPrice": "Price (฿)",
+      "catalogPrice": "Catalog",
+      "resetPrice": "Reset",
+      "lineTotal": "Line total"
     },
     "bills": {
       "title": "Retail Bills",
@@ -2550,6 +2555,7 @@
     "action_deposit_device": "Deposit Device",
     "action_return_deposit": "Return Device",
     "action_unbind_device": "Unbind Device",
+    "goToSigningTabToVoidAddendum": "Void the addendum in the Signing tab",
     "action_bind_device": "Bind Device",
     "action_bind_loaner": "Bind Loaner",
     "action_unbind_loaner": "Unbind Loaner",
@@ -4049,6 +4055,9 @@
     "voidConfirm": "Void",
     "voidReasonPlaceholder": "Why are you voiding this document?",
     "voidHint": "Only this signing document moves to VOIDED state. The contract itself continues normally and a new signing can be issued. Captured signatures stay on the audit trail.",
+    "voidAddendumTitle": "Void addendum",
+    "voidAddendumConfirm": "Void addendum",
+    "voidAddendumHint": "Voiding this sealed addendum lets you unbind the device. To fully cancel the contract, then unbind the device and void the contract-open bill.",
     "signTitle": "Capture signature",
     "signConfirm": "Sign",
     "consentTitle": "Confirm before signing",

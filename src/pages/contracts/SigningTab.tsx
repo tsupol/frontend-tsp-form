@@ -186,7 +186,7 @@ export function SigningTab({
   onRenderPdf?: (target: SigningPdfTarget) => void;
 }) {
   const { t } = useTranslation();
-  const [voidSigningId, setVoidSigningId] = useState<number | null>(null);
+  const [voidTarget, setVoidTarget] = useState<{ signingId: number; isSealedAddendum: boolean } | null>(null);
   const [signTarget, setSignTarget] = useState<SignTarget | null>(null);
   const [signQrOpen, setSignQrOpen] = useState(false);
   const [detailTarget, setDetailTarget] = useState<{
@@ -337,7 +337,10 @@ export function SigningTab({
             parties={partiesBySigning.get(s.signing_id) ?? []}
             expanded={expanded.has(s.signing_id)}
             onToggleExpand={() => toggleExpanded(s.signing_id)}
-            onRequestVoid={() => setVoidSigningId(s.signing_id)}
+            onRequestVoid={() => setVoidTarget({
+              signingId: s.signing_id,
+              isSealedAddendum: s.status === 'SEALED' && s.type === 'ADDENDUM',
+            })}
             contractId={contractId}
             onRequestPreview={onRenderPdf ? () => onRenderPdf({ doc: previewDocFor(s) }) : undefined}
             onRequestPrint={onRenderPdf ? () => onRenderPdf({ signingId: s.signing_id }) : undefined}
@@ -363,10 +366,11 @@ export function SigningTab({
       )}
 
       <SigningVoidModal
-        open={voidSigningId !== null}
-        onClose={() => setVoidSigningId(null)}
+        open={voidTarget !== null}
+        onClose={() => setVoidTarget(null)}
         contractId={contractId}
-        signingId={voidSigningId ?? 0}
+        signingId={voidTarget?.signingId ?? 0}
+        isSealedAddendum={voidTarget?.isSealedAddendum ?? false}
       />
       <SigningSignModal
         open={signTarget !== null}
@@ -421,6 +425,11 @@ function SigningCard({
   const ttl = formatTtl(signing.ttl_remaining);
   const isCollecting = signing.status === 'COLLECTING';
   const isActionable = isCollecting && !isStale;
+  // A SEALED addendum (e.g. the BIND addendum) can be voided by a BRANCH_MANAGER
+  // (mig 425) — required before the device can be unbound / the contract
+  // cancelled. The FULL_CONTRACT snapshot is never voidable here (the RPC
+  // rejects it); cancel that via the CONTRACT_OPEN bill instead.
+  const canVoidSealedAddendum = signing.status === 'SEALED' && signing.type === 'ADDENDUM';
   const systemVoided = isSystemVoided(signing);
   const muted = signing.status === 'VOIDED' || signing.status === 'SUPERSEDED' || isStale;
 
@@ -588,7 +597,7 @@ function SigningCard({
 
           {/* Footer actions — View detail always; Preview (live SAMPLE doc) on
               COLLECTING; Print (sealed snapshot) on SEALED/SUPERSEDED; Void on
-              COLLECTING. */}
+              COLLECTING drafts and on SEALED ADDENDUMs (BM + PIN). */}
           <div className="px-3 py-2.5 border-t border-line/60 flex flex-wrap gap-1.5 justify-end bg-surface/30">
             <Button
               size="sm"
@@ -627,6 +636,17 @@ function SigningCard({
                 onClick={onRequestVoid}
               >
                 {t('signing.voidConfirm')}
+              </Button>
+            )}
+            {canVoidSealedAddendum && (
+              <Button
+                size="sm"
+                variant="outline"
+                color="danger"
+                startIcon={<Trash2 size={13} />}
+                onClick={onRequestVoid}
+              >
+                {t('signing.voidAddendumConfirm', { defaultValue: 'Void addendum' })}
               </Button>
             )}
             {/* Send this document to the iPad for the customer parties to sign

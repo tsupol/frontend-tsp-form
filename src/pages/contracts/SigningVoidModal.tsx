@@ -1,9 +1,12 @@
-// Void a COLLECTING signing.
+// Void a signing.
 //
-// RPC: api.fn_contract_signing_void(p_signing_id, p_void_reason)
-// Permission: CONTRACT.SIGNING.VOID (BS/BM) for COLLECTING; SEALED requires
-// CONTRACT.SIGNING.VOID_SEALED (HOLDING_ADMIN only) — UI exposes the button
-// only for COLLECTING here.
+// RPC: api.fn_contract_signing_void(p_signing_id, p_void_reason, p_pin)
+//   - p_pin is REQUIRED, always (mig 426, 2026-07-01).
+// Permission: CONTRACT.SIGNING.VOID (BS/BM) for COLLECTING drafts;
+//   CONTRACT.SIGNING.VOID_SEALED (now BRANCH_MANAGER too, mig 425) for a SEALED
+//   ADDENDUM — needed to unbind a device / cancel an ACTIVE contract whose BIND
+//   addendum is sealed. The FULL_CONTRACT / CONTRACT_OPEN snapshot can never be
+//   voided here (cancel via the CONTRACT_OPEN bill instead).
 //
 // Follows the tsp-form modal pattern: success step inside the modal (no
 // auto-close); dirty-form close guard.
@@ -14,6 +17,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, Modal, TextArea } from 'tsp-form';
 import { XCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import { BranchPinInput } from '../../components/BranchPinInput';
 import { ActionDoneView } from './ActionDoneView';
 
 interface Props {
@@ -21,6 +25,9 @@ interface Props {
   onClose: () => void;
   contractId: number;
   signingId: number;
+  /** SEALED addendum void reads differently from a COLLECTING draft void —
+   *  drives the title/hint copy. */
+  isSealedAddendum?: boolean;
 }
 
 interface VoidResult {
@@ -41,11 +48,12 @@ function describeApiError(
   return String(err);
 }
 
-export function SigningVoidModal({ open, onClose, contractId, signingId }: Props) {
+export function SigningVoidModal({ open, onClose, contractId, signingId, isSealedAddendum = false }: Props) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [view, setView] = useState<'form' | 'done'>('form');
   const [reason, setReason] = useState('');
+  const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [result, setResult] = useState<VoidResult | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
@@ -54,6 +62,7 @@ export function SigningVoidModal({ open, onClose, contractId, signingId }: Props
     if (open) {
       setView('form');
       setReason('');
+      setPin('');
       setError('');
       setResult(null);
       setConfirmClose(false);
@@ -64,17 +73,22 @@ export function SigningVoidModal({ open, onClose, contractId, signingId }: Props
     mutationFn: () => apiClient.rpc<VoidResult>('fn_contract_signing_void', {
       p_signing_id: signingId,
       p_void_reason: reason.trim(),
+      p_pin: pin,
     }),
     onSuccess: (res) => {
       setResult(res);
       setView('done');
       queryClient.invalidateQueries({ queryKey: ['contract-signings', contractId] });
       queryClient.invalidateQueries({ queryKey: ['contract-signing-parties', contractId] });
+      // Voiding a SEALED bind addendum unblocks device unbind — refresh the
+      // capability + device data so the Device tab updates without a reload.
+      queryClient.invalidateQueries({ queryKey: ['contract-actions', contractId] });
+      queryClient.invalidateQueries({ queryKey: ['contract-detail', contractId] });
     },
     onError: (err) => setError(describeApiError(err, t)),
   });
 
-  const isDirty = view === 'form' && reason.trim().length > 0;
+  const isDirty = view === 'form' && (reason.trim().length > 0 || pin.length > 0);
 
   const handleClose = () => {
     if (view === 'done') { onClose(); return; }
@@ -87,14 +101,18 @@ export function SigningVoidModal({ open, onClose, contractId, signingId }: Props
     onClose();
   };
 
-  const canSubmit = reason.trim().length > 0 && !mutation.isPending;
+  const canSubmit = reason.trim().length > 0 && pin.length === 6 && !mutation.isPending;
 
   return (
     <>
       <Modal open={open} onClose={handleClose} maxWidth="28rem" width="100%">
         <div className="modal-header">
           <h2 className="modal-title">
-            {view === 'done' ? t('signing.voidDoneTitle') : t('signing.voidTitle')}
+            {view === 'done'
+              ? t('signing.voidDoneTitle')
+              : isSealedAddendum
+                ? t('signing.voidAddendumTitle', { defaultValue: 'Void addendum' })
+                : t('signing.voidTitle')}
           </h2>
           <button type="button" className="modal-close-btn" onClick={handleClose} aria-label="Close">&times;</button>
         </div>
@@ -118,8 +136,13 @@ export function SigningVoidModal({ open, onClose, contractId, signingId }: Props
                     rows={3}
                   />
                 </div>
+                <BranchPinInput value={pin} onChange={setPin} required />
               </div>
-              <div className="text-xs text-subtle mt-3">{t('signing.voidHint')}</div>
+              <div className="text-xs text-subtle mt-3">
+                {isSealedAddendum
+                  ? t('signing.voidAddendumHint', { defaultValue: 'Voiding this sealed addendum lets you unbind the device. To fully cancel the contract, then unbind the device and void the contract-open bill.' })
+                  : t('signing.voidHint')}
+              </div>
             </div>
             <div className="modal-footer">
               <Button onClick={handleClose}>{t('common.cancel')}</Button>
@@ -135,7 +158,7 @@ export function SigningVoidModal({ open, onClose, contractId, signingId }: Props
             headline={t('signing.voidDoneHeadline')}
             contractCode={`SGN-${result.signing_id}`}
             tone="warning"
-            stateTransition={{ from: 'COLLECTING', to: result.state }}
+            stateTransition={{ from: isSealedAddendum ? 'SEALED' : 'COLLECTING', to: result.state }}
             detailRows={[
               { label: t('signing.voidReason'), value: reason.trim() },
             ]}

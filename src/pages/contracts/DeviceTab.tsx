@@ -113,7 +113,22 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
     staleTime: 30 * 1000,
   });
 
-  const isActive = contract.state === 'ACTIVE';
+  // Drive device-action visibility from the backend capability RPC, not the
+  // contract status. A device can be bound before ACTIVE (mig 353) and unbind /
+  // repair availability is per-state — status-only gating hid these buttons in
+  // pre-ACTIVE bound states, leaving the More menu (which just points back here)
+  // as the only path. Shares the query cache with ContractActionButtons.
+  const { data: actionsResp } = useQuery({
+    queryKey: ['contract-actions', contract.id],
+    queryFn: () => apiClient.rpc<{ actions: { action_code: string; is_available: boolean }[] }>(
+      'fn_contract_available_actions',
+      { p_contract_id: contract.id },
+    ),
+    staleTime: 30 * 1000,
+  });
+  const canDo = (code: string): boolean =>
+    actionsResp?.actions?.find(a => a.action_code === code)?.is_available ?? false;
+
   const hasPrimary = contract.device_id != null;
   const hasLoaner = contract.loaner_device_id != null;
   const primaryBucket = contract.device_current_bucket;
@@ -277,43 +292,51 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
                 <AssetScreenTimeSection assetId={contract.device_id} className="mt-2" />
               )}
 
-              {isActive && (
+              {(canDo('DEVICE_REPAIR_REQUEST') || canDo('UNBIND_DEVICE') || canDo('CUSTOMER_DEPOSIT_DEVICE') || canDo('RETURN_DEPOSIT')) && (
                 <div className="flex flex-wrap gap-2 pt-2 border-t border-line mt-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    color="primary"
-                    startIcon={<Wrench size={14} />}
-                    disabled={!primaryWithCustomer}
-                    onClick={() => onRequestAction('device_repair_request')}
-                  >
-                    {t('contract.action_device_repair_request')}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    color="danger"
-                    startIcon={<Link2Off size={14} />}
-                    onClick={() => onRequestAction('unbind_device')}
-                  >
-                    {t('contract.action_unbind_device')}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    startIcon={<ArrowDownToLine size={14} />}
-                    onClick={() => onRequestAction('deposit_device')}
-                  >
-                    {t('contract.action_deposit_device')}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    startIcon={<ArrowUpFromLine size={14} />}
-                    onClick={() => onRequestAction('return_deposit')}
-                  >
-                    {t('contract.action_return_deposit')}
-                  </Button>
+                  {canDo('DEVICE_REPAIR_REQUEST') && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      color="primary"
+                      startIcon={<Wrench size={14} />}
+                      disabled={!primaryWithCustomer}
+                      onClick={() => onRequestAction('device_repair_request')}
+                    >
+                      {t('contract.action_device_repair_request')}
+                    </Button>
+                  )}
+                  {canDo('UNBIND_DEVICE') && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      color="danger"
+                      startIcon={<Link2Off size={14} />}
+                      onClick={() => onRequestAction('unbind_device')}
+                    >
+                      {t('contract.action_unbind_device')}
+                    </Button>
+                  )}
+                  {canDo('CUSTOMER_DEPOSIT_DEVICE') && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      startIcon={<ArrowDownToLine size={14} />}
+                      onClick={() => onRequestAction('deposit_device')}
+                    >
+                      {t('contract.action_deposit_device')}
+                    </Button>
+                  )}
+                  {canDo('RETURN_DEPOSIT') && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      startIcon={<ArrowUpFromLine size={14} />}
+                      onClick={() => onRequestAction('return_deposit')}
+                    >
+                      {t('contract.action_return_deposit')}
+                    </Button>
+                  )}
                 </div>
               )}
             </div>
@@ -392,7 +415,7 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
                 )}
               </div>
 
-              {isActive && (
+              {canDo('UNBIND_LOANER') && (
                 <div className="flex flex-wrap gap-2 pt-2 border-t border-line mt-2">
                   <Button
                     size="sm"
@@ -409,7 +432,7 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
           ) : (
             <div className="flex items-center justify-between gap-3">
               <div className="text-sm text-subtle">{t('contract.device_noLoaner')}</div>
-              {isActive && !primaryWithCustomer && (
+              {canDo('BIND_LOANER') && (
                 <Button
                   size="sm"
                   variant="outline"
@@ -422,7 +445,7 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
             </div>
           )}
 
-          {isActive && !hasLoaner && primaryWithCustomer && (
+          {!hasLoaner && primaryWithCustomer && !canDo('BIND_LOANER') && (
             <div className="text-xs text-subtle mt-2">
               {t('contract.device_loanerHint')}
             </div>
