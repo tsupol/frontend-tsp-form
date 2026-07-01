@@ -485,7 +485,17 @@ export function AssetsPage() {
       if (filterBrand) url += `&brand_name=eq.${encodeURIComponent(filterBrand)}`;
       if (filterFamily) url += `&family_name=eq.${encodeURIComponent(filterFamily)}`;
       if (debouncedSearch) {
-        url += `&or=(asset_code.ilike.*${debouncedSearch}*,serial_no.ilike.*${debouncedSearch}*,imei.ilike.*${debouncedSearch}*)`;
+        // Match both the raw term (dashed serials + the displayed dashed code)
+        // and a dash-stripped term (raw asset_code / imei are stored without
+        // dashes). Users type either "AT-2604-000101-3" or "AT26040001013".
+        const stripped = debouncedSearch.replace(/-/g, '');
+        const conds = [
+          `asset_code_display.ilike.*${debouncedSearch}*`,
+          `serial_no.ilike.*${debouncedSearch}*`,
+          `asset_code.ilike.*${stripped}*`,
+          `imei.ilike.*${stripped}*`,
+        ];
+        url += `&or=(${conds.join(',')})`;
       }
       return apiClient.getPaginated<Asset>(url, { page: pageIndex + 1, pageSize });
     },

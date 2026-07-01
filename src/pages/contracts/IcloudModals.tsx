@@ -37,7 +37,7 @@ function setApiError(
 // when the view returned a non-null password (caller already checked) — i.e.
 // the user holds ICLOUD.ACCOUNT_REVEAL_PASSWORD. Masked by default with a
 // reveal toggle + copy, since it's a credential.
-function IcloudPasswordRow({ password }: { password: string }) {
+export function IcloudPasswordRow({ password }: { password: string }) {
   const { t } = useTranslation();
   const [shown, setShown] = useState(false);
   const [copied, setCopied] = useState(false);

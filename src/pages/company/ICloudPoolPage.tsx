@@ -16,6 +16,7 @@ import {
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { DateTime } from '../../components/DateTime';
+import { IcloudPasswordRow } from '../contracts/IcloudModals';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -26,6 +27,9 @@ interface ICloudAccount {
   branch_id: number;
   branch_name: string;
   apple_id: string;
+  // Masked by permission in the view (ICLOUD.ACCOUNT_REVEAL_PASSWORD): real
+  // password for those who may see it, null otherwise. No FE role check needed.
+  password: string | null;
   registration_email: string | null;
   is_active: boolean;
   note: string | null;
@@ -500,17 +504,15 @@ function ToggleModal({ open, onClose, account }: {
 }
 
 // ── Password placeholder ─────────────────────────────────────────────────────
-// The password is intentionally omitted from `v_icloud_accounts` and there is
-// no reveal RPC yet. Filed backend feedback at
-// D:/dev/nnf/UI_FEEDBACK/2026-05-07_icloud_password_reveal.md asking for a
-// `fn_icloud_account_reveal_password` RPC. Until then, "Edit" is the only
-// way to set/rotate the value.
+// Fallback shown when `v_icloud_accounts.password` is null — i.e. the current
+// user lacks ICLOUD.ACCOUNT_REVEAL_PASSWORD (BE masks it per permission). When
+// the view returns a real password, IcloudPasswordRow is rendered instead.
 
 function PasswordPlaceholder() {
   const { t } = useTranslation();
   return (
     <div className="flex items-center gap-2">
-      <div className="flex-1 min-w-0 font-mono text-sm px-2 py-1.5 rounded bg-fg/5 truncate">
+      <div className="flex-1 min-w-0 font-mono text-sm px-2 py-1.5 rounded bg-surface truncate">
         ••••••••
       </div>
       <Tooltip content={t('settings.icloud.passwordNotReadable')}>
@@ -571,7 +573,9 @@ function AccountDetailPanel({ account, onEdit, onToggle }: {
               <span className="font-mono">{account.apple_id}</span>
             </Field>
             <Field label={t('settings.icloud.password')}>
-              <PasswordPlaceholder />
+              {account.password
+                ? <IcloudPasswordRow password={account.password} />
+                : <PasswordPlaceholder />}
             </Field>
             <Field label={t('settings.icloud.registrationEmail')}>
               {account.registration_email
