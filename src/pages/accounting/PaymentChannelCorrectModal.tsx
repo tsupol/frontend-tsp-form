@@ -126,8 +126,8 @@ export function PaymentChannelCorrectModal({ open, payment, onClose, onSuccess }
           isCurrent
             ? 'border-line bg-surface-subtle text-subtle cursor-not-allowed'
             : selected
-              ? 'border-primary bg-primary-soft text-primary-fg'
-              : 'border-line bg-surface hover:bg-surface-subtle'
+              ? 'border-primary bg-primary-soft text-primary-fg cursor-pointer'
+              : 'border-line bg-surface hover:bg-surface-subtle cursor-pointer'
         }`}
       >
         {icon}
