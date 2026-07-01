@@ -1,16 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { Badge, Button, Modal, MaskedInput, Select, TextArea, Tooltip, useSnackbarContext } from 'tsp-form';
-import { CheckCircle, XCircle, PiggyBank, CreditCard, ShieldCheck, ArrowRight, ChevronsRight, Loader2, Plus, Trash2 } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Badge, Button, Modal, MaskedInput, Select, TextArea, useSnackbarContext } from 'tsp-form';
+import { CheckCircle, XCircle, PiggyBank, CreditCard, ShieldCheck, ArrowRight, ChevronsRight, Loader2, Plus, Trash2, Receipt } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { BranchPaymentAccountField } from '../../components/BranchPaymentAccountField';
 import { fmtCurrency } from '../../lib/format';
-import { useWalletAvailable } from './wallet/useWallet';
+import { useWalletAvailable, useWalletActions } from './wallet/useWallet';
 import { WalletActionForm } from './wallet/WalletActionModal';
 import type { WalletType, WalletAction } from './wallet/types';
 import { ActionDoneView, type ActionDoneDetailRow } from './ActionDoneView';
+import { ContractFeeModal } from './ContractFeeModal';
 import { useContractInvalidate } from './useContractInvalidate';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -21,6 +22,7 @@ interface ContractForClosure {
   code_display: string | null;
   state: string;
   commercial_model: string | null;
+  branch_id: number;
   holding_id: number;
   saving_balance: number | null;
   credit_balance: number | null;
@@ -171,6 +173,7 @@ type ReturnCondition = typeof RETURN_CONDITIONS[number];
 export function CompleteContractModal({ open, contract, action, onClose, onSuccess: _onSuccess }: Props) {
   const { t } = useTranslation();
   const { addSnackbar } = useSnackbarContext();
+  const queryClient = useQueryClient();
   const invalidate = useContractInvalidate(contract.id);
 
   const isEarlyPayoff = action.kind === 'complete' && action.closeReason === 'EARLY_PAYOFF';
@@ -178,6 +181,9 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
 
   const [view, setView] = useState<View>(initialView);
   const [clearTarget, setClearTarget] = useState<ClearTarget | null>(null);
+  // Stacked fee/service-bill modal opened from the wallet gate — settle an
+  // outstanding late fee / service charge without leaving the close flow.
+  const [feeModalOpen, setFeeModalOpen] = useState(false);
   const [note, setNote] = useState('');
   const [pin, setPin] = useState('');
   const [terminateReason, setTerminateReason] = useState<TerminateReason>('CUSTOMER_REQUEST');
@@ -200,6 +206,7 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
     if (open) {
       setView(initialView);
       setClearTarget(null);
+      setFeeModalOpen(false);
       setNote('');
       setPin('');
       setTerminateReason('CUSTOMER_REQUEST');
@@ -379,6 +386,7 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
   };
 
   return (
+    <>
     <Modal open={open} onClose={onClose} maxWidth="32rem" width="100%">
       <div className="flex flex-col overflow-hidden">
         <div className="modal-header">
@@ -475,6 +483,7 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
                   setClearTarget(target);
                   setView('clear-wallet');
                 }}
+                onOpenFeeModal={() => setFeeModalOpen(true)}
                 onContinue={() => setView('confirm')}
               />
             </>
@@ -530,6 +539,32 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
         </div>
       </div>
     </Modal>
+
+    {/* Stacked on top of the close flow — settle a late fee / service charge,
+        then the wallet gate refetches balances on close. */}
+    <ContractFeeModal
+      open={feeModalOpen}
+      contract={feeModalOpen ? {
+        id: contract.id,
+        code: contract.code,
+        code_display: contract.code_display,
+        state: contract.state,
+        branch_id: contract.branch_id,
+        holding_id: contract.holding_id,
+        saving_balance: contract.saving_balance,
+        credit_balance: contract.credit_balance,
+        insurance_balance: contract.insurance_balance,
+      } : null}
+      onClose={() => setFeeModalOpen(false)}
+      onSuccess={() => {
+        setFeeModalOpen(false);
+        invalidate();
+        // The gate reads balances from useWalletAvailable — not covered by
+        // useContractInvalidate. Refetch so a wallet-funded fee updates the rows.
+        queryClient.invalidateQueries({ queryKey: ['wallet-available', contract.id] });
+      }}
+    />
+    </>
   );
 }
 
@@ -693,11 +728,13 @@ function WalletsView({
   contract,
   action,
   onClear,
+  onOpenFeeModal,
   onContinue,
 }: {
   contract: ContractForClosure;
   action: ClosureAction;
   onClear: (target: ClearTarget) => void;
+  onOpenFeeModal: () => void;
   onContinue: () => void;
 }) {
   const { t } = useTranslation();
@@ -706,6 +743,20 @@ function WalletsView({
   const saving = useWalletAvailable(contract.id, 'SAVING', true);
   const credit = useWalletAvailable(contract.id, 'CREDIT', true);
   const insurance = useWalletAvailable(contract.id, 'INSURANCE', true);
+
+  // Which clear-actions the backend actually supports per wallet (v_wallet_actions).
+  // DEDUCT is not offered for any wallet today — offering it anyway makes the row
+  // fire fn_bill_wallet(INSURANCE, DEDUCT) → WALLET_ACTION_NOT_SUPPORTED.
+  const { data: walletActions } = useWalletActions();
+  const allowedByWallet = useMemo(() => {
+    const map: Record<WalletType, Set<WalletAction>> = {
+      SAVING: new Set(), CREDIT: new Set(), INSURANCE: new Set(),
+    };
+    for (const row of walletActions ?? []) {
+      if (row.allowed) map[row.wallet_type]?.add(row.action);
+    }
+    return map;
+  }, [walletActions]);
 
   const data: Record<WalletType, ReturnType<typeof useWalletAvailable>['data']> = {
     SAVING: saving.data,
@@ -740,12 +791,21 @@ function WalletsView({
             balance={liveBalance[walletType]}
             cashable={cashable[walletType]}
             available={data[walletType]}
+            allowedActions={allowedByWallet[walletType]}
             onClear={a => onClear({ walletType, action: a })}
           />
         ))}
       </div>
 
-      <div className="flex justify-end">
+      <div className="flex justify-between items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          startIcon={<Receipt size={14} />}
+          onClick={onOpenFeeModal}
+        >
+          {t('contractFee.title')}
+        </Button>
         <Button color="primary" disabled={!allClear} onClick={onContinue}>
           {t('common.continue')}
         </Button>
@@ -759,17 +819,25 @@ function WalletGateRow({
   balance,
   cashable,
   available,
+  allowedActions,
   onClear,
 }: {
   walletType: WalletType;
   balance: number;
   cashable: number;
   available: ReturnType<typeof useWalletAvailable>['data'];
+  /** Clear-actions the backend supports for this wallet (from v_wallet_actions). */
+  allowedActions: Set<WalletAction>;
   onClear: (action: WalletAction) => void;
 }) {
   const { t } = useTranslation();
   const Icon = WALLET_ICON[walletType];
   const cleared = balance === 0;
+
+  // Only offer actions the backend actually supports for this wallet. DEDUCT is
+  // not allowed for any wallet today, so it's simply not rendered.
+  const canCashout = allowedActions.has('CASHOUT');
+  const canDeduct = allowedActions.has('DEDUCT');
 
   // Cashout gating: balance must be cashable AND no BE guard blocks it
   const blockingGuard = available?.guards.find(g => g.blocks_cashout);
@@ -783,44 +851,65 @@ function WalletGateRow({
   // Deduct gating: only blocked when balance = 0 (i.e. row is "cleared" — already handled below)
   const deductDisabled = balance === 0;
 
+  // Show the cashout-disabled reason inline in the card — a Tooltip renders
+  // behind the modal (portal z-order), so an inline line is the reliable place.
+  const showCashoutReason = !cleared && canCashout && cashoutDisabled && !!cashoutDisabledReason;
+  // Uncleared, but no clear-action is available at all → dead-end; tell the user why.
+  const noClearPath = !cleared && (!canCashout || cashoutDisabled) && !canDeduct;
+
   return (
     <div
-      className={`flex items-center gap-3 px-3 py-2.5 rounded-md border ${
+      className={`flex flex-col gap-1.5 px-3 py-2.5 rounded-md border ${
         cleared ? 'border-line bg-surface' : 'border-warning-border bg-warning-soft'
       }`}
     >
-      <Icon size={18} className={cleared ? 'text-fg/40' : 'text-warning-fg'} />
-      <span className="text-sm flex-1">{t(WALLET_LABEL_KEY[walletType])}</span>
-      {cleared ? (
-        <span className="flex items-center gap-1.5 text-xs text-success">
-          <CheckCircle size={14} />
-          {t('contract.complete_wallet_clear', { defaultValue: 'Cleared' })}
-        </span>
-      ) : (
-        <>
-          <span className="text-sm font-semibold tabular-nums">{fmtCurrency(balance)}</span>
-          <Tooltip content={cashoutDisabledReason} disabled={!cashoutDisabled || !cashoutDisabledReason}>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => onClear('CASHOUT')}
-              disabled={cashoutDisabled}
-              className={cashoutDisabled ? 'pointer-events-none' : ''}
-              endIcon={<ArrowRight size={14} />}
-            >
-              {t('wallet.action_cashout')}
-            </Button>
-          </Tooltip>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => onClear('DEDUCT')}
-            disabled={deductDisabled}
-            endIcon={<ArrowRight size={14} />}
-          >
-            {t('wallet.action_deduct')}
-          </Button>
-        </>
+      <div className="flex items-center gap-3">
+        <Icon size={18} className={cleared ? 'text-fg/40' : 'text-warning-fg'} />
+        <span className="text-sm flex-1">{t(WALLET_LABEL_KEY[walletType])}</span>
+        {cleared ? (
+          <span className="flex items-center gap-1.5 text-xs text-success">
+            <CheckCircle size={14} />
+            {t('contract.complete_wallet_clear', { defaultValue: 'Cleared' })}
+          </span>
+        ) : (
+          <>
+            <span className="text-sm font-semibold tabular-nums">{fmtCurrency(balance)}</span>
+            {canCashout && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onClear('CASHOUT')}
+                disabled={cashoutDisabled}
+                endIcon={<ArrowRight size={14} />}
+              >
+                {t('wallet.action_cashout')}
+              </Button>
+            )}
+            {canDeduct && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onClear('DEDUCT')}
+                disabled={deductDisabled}
+                endIcon={<ArrowRight size={14} />}
+              >
+                {t('wallet.action_deduct')}
+              </Button>
+            )}
+          </>
+        )}
+      </div>
+      {showCashoutReason && (
+        <div className="text-xs text-warning-fg pl-[30px]">
+          {cashoutDisabledReason}
+        </div>
+      )}
+      {noClearPath && !showCashoutReason && (
+        <div className="text-xs text-warning-fg pl-[30px]">
+          {t('contract.gate_no_clear_path', {
+            defaultValue: 'This balance cannot be cleared here — resolve it from the Wallets tab.',
+          })}
+        </div>
       )}
     </div>
   );

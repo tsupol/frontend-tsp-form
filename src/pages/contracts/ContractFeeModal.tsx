@@ -447,11 +447,6 @@ export function ContractFeeModal({ open, contract, onClose, onSuccess }: {
                                 size="sm"
                                 searchable={false}
                               />
-                              {bal != null && (
-                                <span className="text-[11px] text-subtle mt-1 tabular-nums">
-                                  {t('contractFee.balance')}: {fmtCurrency(bal)}
-                                </span>
-                              )}
                             </div>
                             <div className="flex flex-col flex-1 min-w-0">
                               <label className="form-label text-xs">{t('contract.amount')}</label>
@@ -482,6 +477,11 @@ export function ContractFeeModal({ open, contract, onClose, onSuccess }: {
                               />
                             )}
                           </div>
+                          {bal != null && (
+                            <span className="text-[11px] text-subtle -mt-1 tabular-nums">
+                              {t('contractFee.balance')}: {fmtCurrency(bal)}
+                            </span>
+                          )}
                           {p.method === 'TRANSFER' && (
                             <BranchPaymentAccountField
                               active={p.method === 'TRANSFER'}

@@ -715,8 +715,18 @@ function getPrimaryActionCodes(contract: ContractForActions): string[] {
 
   codes.push('EARLY_PAYOFF');
 
+  // Complete surfaces as a primary only when the backend says it's completable
+  // (outstanding cleared etc.) — filtered by is_available at render, so it never
+  // shows as a perpetually-disabled button on every ACTIVE contract.
+  codes.push('COMPLETE_CONTRACT');
+
   return codes.slice(0, 5);
 }
+
+// Primaries normally show even when unavailable (disabled + tooltip). These ones
+// hide entirely until available, so they don't clutter the footer with a
+// disabled button that only makes sense in a specific end-state.
+const HIDE_UNTIL_AVAILABLE_PRIMARY: ReadonlySet<string> = new Set(['COMPLETE_CONTRACT']);
 
 const CATEGORY_LABEL_KEY: Record<string, string> = {
   LIFECYCLE: 'contract.actionCategory.lifecycle',
@@ -842,7 +852,8 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   // Preserve primaryCodes order so RESUME/PAY_INSTALLMENT etc. appear left-to-right consistently
   const primaryActions = primaryCodes
     .map(c => allowedActions.find(a => a.action_code === c))
-    .filter((a): a is BackendContractAction => !!a);
+    .filter((a): a is BackendContractAction => !!a)
+    .filter(a => a.is_available || !HIDE_UNTIL_AVAILABLE_PRIMARY.has(a.action_code));
   // More menu shows every action — primaries are also listed here so staff have one consistent place to find any action
   const secondaryActions = allowedActions;
 

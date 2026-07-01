@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Badge, Button, Input, Modal, TextArea, Tooltip, useSnackbarContext, resizeToVariants } from 'tsp-form';
-import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Upload, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, Download } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Upload, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, Download, Pause, Play, Square, Ban, Settings2 } from 'lucide-react';
 import { GenerateContractPdfModal } from './GenerateContractPdfModal';
 import type { BeMediaContractDoc } from '../../lib/beMedia';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -292,6 +292,10 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
     | 'unbind_loaner'
     | 'device_repair_request'
     | 'detach_customer'
+    | 'pause'
+    | 'resume'
+    | 'terminate'
+    | 'void'
     | null
   >(null);
   const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
@@ -411,6 +415,7 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
             queryClient={queryClient}
             onRequestBindDevice={() => setRequestedAction('bind_device')}
             onNavigateSigning={() => handleTabChange('signing')}
+            onRequestManageAction={setRequestedAction}
             deliveryModalOpen={deliveryModalOpen}
             setDeliveryModalOpen={setDeliveryModalOpen}
           />
@@ -581,14 +586,100 @@ function MediaRow({ label, media }: { label: string; media: EntityMedia[] }) {
   );
 }
 
+// ── Manage-contract section ──────────────────────────────────────────────────
+// Lifecycle state actions (pause/resume, terminate, void) promoted onto the
+// Overview tab so they aren't buried in the footer's "More" menu. Reads the same
+// fn_contract_available_actions capability the footer uses (shared query cache),
+// so gating/tooltips stay identical; the actual modals live in
+// ContractActionButtons, reached via the panel's requestedAction plumbing.
+
+export type ManageAction = 'pause' | 'resume' | 'terminate' | 'void';
+
+interface ManageActionRow {
+  action_code: string;
+  is_available: boolean;
+  blocking_reason: string | null;
+}
+
+// Backend action_code → the requestedAction the footer machinery consumes.
+// Pause/Resume are mutually exclusive per is_paused; the capability decides which.
+const MANAGE_ACTION_MAP: { code: string; action: ManageAction; icon: typeof Pause; danger?: boolean }[] = [
+  { code: 'PAUSE_CONTRACT',     action: 'pause',     icon: Pause },
+  { code: 'RESUME_CONTRACT',    action: 'resume',    icon: Play },
+  { code: 'TERMINATE_CONTRACT', action: 'terminate', icon: Square, danger: true },
+  { code: 'VOID_CONTRACT',      action: 'void',      icon: Ban,    danger: true },
+];
+
+function ManageContractSection({
+  contractId,
+  t,
+  onRequestManageAction,
+}: {
+  contractId: number;
+  t: ReturnType<typeof useTranslation>['t'];
+  onRequestManageAction: (action: ManageAction) => void;
+}) {
+  const { data: actionsResp } = useQuery({
+    queryKey: ['contract-actions', contractId],
+    queryFn: () => apiClient.rpc<{ actions: ManageActionRow[] }>('fn_contract_available_actions', {
+      p_contract_id: contractId,
+    }),
+    staleTime: 30 * 1000,
+  });
+
+  const byCode = new Map((actionsResp?.actions ?? []).map(a => [a.action_code, a]));
+  // Only render actions the capability actually knows about for this contract
+  // (e.g. RESUME only appears when paused). Hides the whole section if none apply.
+  const rows = MANAGE_ACTION_MAP.filter(m => byCode.has(m.code));
+  if (rows.length === 0) return null;
+
+  return (
+    <div className="border border-line rounded-md px-4 py-3">
+      <div className="flex items-center gap-2 mb-3">
+        <Settings2 size={14} className="text-subtle" />
+        <h3 className="text-sm font-semibold">{t('contract.manageContract', { defaultValue: 'Manage contract' })}</h3>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {rows.map(({ code, action, icon: Icon, danger }) => {
+          const cap = byCode.get(code)!;
+          const label = t(code, { ns: 'contractActions', defaultValue: code });
+          const blockingText = !cap.is_available && cap.blocking_reason
+            ? t(`blockingReason.${cap.blocking_reason}`, { ns: 'apiErrors', defaultValue: cap.blocking_reason })
+            : '';
+          const btn = (
+            <Button
+              size="sm"
+              variant="outline"
+              color={danger ? 'danger' : undefined}
+              disabled={!cap.is_available}
+              startIcon={<Icon size={14} />}
+              onClick={() => onRequestManageAction(action)}
+            >
+              {label}
+            </Button>
+          );
+          return blockingText ? (
+            <Tooltip key={code} content={blockingText} placement="top">
+              <span className="inline-flex">{btn}</span>
+            </Tooltip>
+          ) : (
+            <span key={code} className="inline-flex">{btn}</span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── Overview Tab ─────────────────────────────────────────────────────────────
 
-function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigateSigning, deliveryModalOpen, setDeliveryModalOpen }: {
+function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigateSigning, onRequestManageAction, deliveryModalOpen, setDeliveryModalOpen }: {
   contract: ContractDetail;
   t: ReturnType<typeof useTranslation>['t'];
   queryClient: ReturnType<typeof useQueryClient>;
   onRequestBindDevice: () => void;
   onNavigateSigning: () => void;
+  onRequestManageAction: (action: ManageAction) => void;
   deliveryModalOpen: boolean;
   setDeliveryModalOpen: (open: boolean) => void;
 }) {
@@ -887,6 +978,14 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
           )}
         </div>
       )}
+
+      {/* Manage contract — lifecycle state actions (pause/resume, terminate,
+          void) promoted here from the footer's More menu. */}
+      <ManageContractSection
+        contractId={contract.id}
+        t={t}
+        onRequestManageAction={onRequestManageAction}
+      />
 
       {/* Meta info */}
       <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-subtle pb-4">
