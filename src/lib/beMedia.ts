@@ -241,12 +241,15 @@ export function beMediaCanPresign(key: string): boolean {
 // resize contract per type. Source: misc-go pkg/uploadspec/spec.go and the
 // proposal-reply that locked these values (thumb 240, lg 1200).
 export const BRANCH_EXPENSE_SLIP_TYPE = 'branch_expense_slip';
-export const BRANCH_EXPENSE_SLIP_SIZES = ['thumb', 'lg'] as const;
+// SINGLE variant: be-media's leaf is `slip-{idx}-lg.{ext}` (no {size} token), so
+// every size collapses to the same key — uploading a separate thumb just
+// overwrites the lg. One 1200px 'lg' file per photo; the gallery mirrors it into
+// `thumb` so read-side `img.thumb || img.lg` fallbacks resolve.
+export const BRANCH_EXPENSE_SLIP_SIZES = ['lg'] as const;
 export type BranchExpenseSlipSize = (typeof BRANCH_EXPENSE_SLIP_SIZES)[number];
 export const BRANCH_EXPENSE_SLIP_MAX = 5;
 
 export const BRANCH_EXPENSE_SLIP_RESIZE: Record<BranchExpenseSlipSize, ResizeOptions> = {
-  thumb: { maxWidth: 240, maxHeight: 240, mode: 'contain', format: 'webp', quality: 0.82 },
   lg: { maxWidth: 1200, maxHeight: 1200, mode: 'contain', format: 'webp', quality: 0.82 },
 };
 
@@ -328,8 +331,9 @@ export const UPLOAD_SPECS: Record<string, BeMediaSpec> = {
   },
   branch_expense_slip: {
     type: 'branch_expense_slip', privacy: 'private', resize_mode: 'contain', quality: 0.82,
-    sizes: [{ label: 'thumb', width: 240 }, { label: 'lg', width: 1200 }], max_files: 5,
-    path_params: ['expense_id'],
+    // Single 'lg' variant — leaf slip-{idx}-lg.{ext} has no {size} token.
+    sizes: [{ label: 'lg', width: 1200 }], max_files: 5,
+    path_params: ['expense_id', 'idx'],
   },
   customer_id_card: {
     type: 'customer_id_card', privacy: 'private', resize_mode: 'contain', quality: 0.82,
@@ -388,7 +392,9 @@ export async function uploadBranchExpenseSlip(
     params: { expense_id: expenseId, idx },
     sizes: BRANCH_EXPENSE_SLIP_SIZES,
   });
-  return { thumb: results.thumb?.key, lg: results.lg?.key };
+  const key = results.lg?.key;
+  // Single file — mirror into thumb so read-side thumb||lg fallbacks resolve.
+  return { thumb: key, lg: key };
 }
 
 // Resize a raw File source (no ImageUploader involved) to both sizes and
@@ -399,20 +405,16 @@ export async function uploadBranchExpenseSlipFromFile(
   idx: number,
   file: File,
 ): Promise<BranchExpenseImage> {
-  // Resize the single source to both spec sizes via tsp-form's shared
-  // processor, then upload each variant.
+  // Single 'lg' variant (leaf has no {size} token). Resize once, upload once,
+  // mirror the key into thumb + lg.
   const variants = await resizeToVariants(file, BRANCH_EXPENSE_SLIP_RESIZE);
-  const out: BranchExpenseImage = {};
-  for (const sz of BRANCH_EXPENSE_SLIP_SIZES) {
-    const v = variants[sz]?.file;
-    if (!v) continue;
-    const r = await beMediaUpload({
-      type: BRANCH_EXPENSE_SLIP_TYPE,
-      file: v,
-      size: sz,
-      params: { expense_id: expenseId, idx },
-    });
-    out[sz] = r.key;
-  }
-  return out;
+  const v = variants.lg?.file;
+  if (!v) return {};
+  const r = await beMediaUpload({
+    type: BRANCH_EXPENSE_SLIP_TYPE,
+    file: v,
+    size: 'lg',
+    params: { expense_id: expenseId, idx },
+  });
+  return { thumb: r.key, lg: r.key };
 }

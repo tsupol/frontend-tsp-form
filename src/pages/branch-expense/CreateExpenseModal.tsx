@@ -431,12 +431,19 @@ function SlipThumb({ file, disabled, onRemove }: {
   disabled: boolean;
   onRemove: () => void;
 }) {
-  const url = useMemo(() => URL.createObjectURL(file), [file]);
-  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+  // Create + revoke the object URL in one effect so StrictMode's
+  // mount→unmount→remount doesn't revoke a URL the <img> is still using
+  // (revoking the memoized URL on the first unmount was causing ERR_FILE_NOT_FOUND).
+  const [url, setUrl] = useState<string>('');
+  useEffect(() => {
+    const u = URL.createObjectURL(file);
+    setUrl(u);
+    return () => URL.revokeObjectURL(u);
+  }, [file]);
   return (
     <div className="relative group w-20 h-20 shrink-0">
       <div className="block w-full h-full rounded-md border border-line overflow-hidden bg-surface">
-        <img src={url} alt="" className="w-full h-full object-cover" />
+        {url && <img src={url} alt="" className="w-full h-full object-cover" />}
       </div>
       <button
         type="button"
