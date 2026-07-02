@@ -39,6 +39,7 @@ interface BarcodeRow {
   model_name: string | null;
   family_name: string | null;
   brand_name: string | null;
+  product_display_name: string | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -72,6 +73,7 @@ function sourceLabel(t: ReturnType<typeof useTranslation>['t'], src: string | nu
     case 'MANUAL_SCAN': return t('barcodes.sourceManual');
     case 'WEB_LOOKUP': return t('barcodes.sourceWeb');
     case 'IMPORT': return t('barcodes.sourceImport');
+    case 'INTERNAL_GENERATED': return t('barcodes.sourceGenerated');
     default: return src ?? '—';
   }
 }
@@ -392,6 +394,7 @@ export function BarcodesPage() {
         open={!!viewRow}
         row={viewRow}
         onClose={() => setViewRow(null)}
+        onPrint={handlePrint}
       />
 
       {/* Print sticker — portaled to body so no panel/modal ancestor pushes
@@ -764,32 +767,9 @@ function jsbarcodeFormat(barcodeType: string | null, raw: string): string {
   return 'EAN13';
 }
 
-function BarcodeSvg({ value, type }: { value: string; type: string | null }) {
-  const ref = useRef<SVGSVGElement>(null);
-  useEffect(() => {
-    if (!ref.current) return;
-    try {
-      JsBarcode(ref.current, value, {
-        format: jsbarcodeFormat(type, value),
-        width: 2,
-        height: 80,
-        displayValue: true,
-        fontSize: 16,
-        margin: 8,
-        background: '#ffffff',
-        lineColor: '#000000',
-      });
-    } catch {
-      // Invalid for selected format — show plain digits as fallback.
-      if (ref.current) ref.current.innerHTML = '';
-    }
-  }, [value, type]);
-  return <svg ref={ref} className="max-w-full" />;
-}
-
 // ── Print sticker (XP-420B 76×26mm — shared with asset sticker) ──────────────
 
-function BarcodeSticker({ row }: { row: BarcodeRow }) {
+function BarcodeSticker({ row, preview = false }: { row: BarcodeRow; preview?: boolean }) {
   const svgRef = useRef<SVGSVGElement>(null);
   useEffect(() => {
     if (!svgRef.current) return;
@@ -799,9 +779,13 @@ function BarcodeSticker({ row }: { row: BarcodeRow }) {
         // Wider narrow-bar — see AssetSticker for the 203-DPI rationale.
         width: 2.2,
         height: 60,
-        displayValue: true,
-        fontSize: 11,
-        textMargin: 1,
+        // Number rendered separately below (centered) — JsBarcode's baked-in
+        // text is anchored to the encoded value's start and pushes the bars
+        // off-center on EAN (the leading digit sits outside the guard bars).
+        displayValue: false,
+        // flat = uniform bar height, no EAN guard descenders ("teeth"). Those
+        // only exist to frame the baked-in number, which we render separately.
+        flat: true,
         margin: 0,
         background: '#ffffff',
         lineColor: '#000000',
@@ -814,27 +798,32 @@ function BarcodeSticker({ row }: { row: BarcodeRow }) {
     }
   }, [row]);
 
-  const headline = [row.brand_name, row.family_name].filter(Boolean).join(' ');
+  const title = row.product_display_name
+    ?? [row.brand_name, row.family_name, row.variant_name].filter(Boolean).join(' ');
+
+  // Preview swaps .barcode-sticker → .barcode-sticker-preview so the on-screen
+  // copy is never caught by any @media print rule (GOTCHA 5 in the print doc):
+  // the real marker gets parked off-screen / hidden during print.
+  const cls = preview ? 'barcode-sticker barcode-sticker-preview' : 'barcode-sticker';
 
   return (
-    <div className="barcode-sticker">
+    <div className={cls}>
       <div className="barcode-sticker-left">
-        {headline && <div className="barcode-sticker-title">{headline}</div>}
-        {row.variant_name && (
-          <div className="barcode-sticker-line barcode-sticker-line-sub">
-            <span>{row.variant_name}</span>
-          </div>
-        )}
+        {title && <div className="barcode-sticker-title">{title}</div>}
       </div>
-      <svg ref={svgRef} className="barcode-sticker-barcode" />
+      <div className="barcode-sticker-code-group">
+        <svg ref={svgRef} className="barcode-sticker-barcode" />
+        <div className="barcode-sticker-number">{row.barcode}</div>
+      </div>
     </div>
   );
 }
 
-function ViewBarcodeModal({ open, onClose, row }: {
+function ViewBarcodeModal({ open, onClose, row, onPrint }: {
   open: boolean;
   onClose: () => void;
   row: BarcodeRow | null;
+  onPrint: (r: BarcodeRow) => void;
 }) {
   const { t } = useTranslation();
 
@@ -855,14 +844,16 @@ function ViewBarcodeModal({ open, onClose, row }: {
   return (
     <Modal open={open} onClose={onClose} maxWidth="30rem" width="100%">
       <div className="modal-header">
-        <h2 className="modal-title">{t('barcodes.viewTitle', { defaultValue: 'Barcode detail' })}</h2>
+        <h2 className="modal-title">{t('barcodes.viewTitle')}</h2>
         <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">×</button>
       </div>
       <div className="modal-content">
         {r && (
           <>
+            {/* WYSIWYG preview of the printed sticker (product_display_name +
+                centered barcode). Uses the same BarcodeSticker as print. */}
             <div className="flex justify-center p-4 bg-white rounded-md border border-line">
-              <BarcodeSvg value={r.barcode} type={r.barcode_type} />
+              <BarcodeSticker row={r} preview />
             </div>
 
             <div className="mt-4 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-2 text-sm">
@@ -873,13 +864,20 @@ function ViewBarcodeModal({ open, onClose, row }: {
                 {!r.is_active && <Badge size="xs" color="default">{t('barcodes.inactive')}</Badge>}
               </div>
 
+              {r.product_display_name && (
+                <>
+                  <div className="text-subtle">{t('barcodes.product')}</div>
+                  <div className="font-medium">{r.product_display_name}</div>
+                </>
+              )}
+
               <div className="text-subtle">{t('barcodes.variant')}</div>
               <div>
                 <div className="font-medium">{r.variant_name ?? '—'}</div>
                 {r.sku_code && <div className="text-xs text-subtler font-mono">{r.sku_code}</div>}
               </div>
 
-              <div className="text-subtle">{t('barcodes.pickModel')}</div>
+              <div className="text-subtle">{t('barcodes.model')}</div>
               <div>
                 <div>{r.model_name ?? '—'}</div>
                 <div className="text-xs text-subtle">
@@ -887,16 +885,26 @@ function ViewBarcodeModal({ open, onClose, row }: {
                 </div>
               </div>
 
-              <div className="text-subtle">{t('barcodes.source', { defaultValue: 'Source' })}</div>
+              <div className="text-subtle">{t('barcodes.source')}</div>
               <div>{sourceLabel(t, r.source)}</div>
 
-              <div className="text-subtle">{t('common.createdAt', { defaultValue: 'Created' })}</div>
+              <div className="text-subtle">{t('common.createdAt')}</div>
               <div><DateTime value={r.created_at} showTime /></div>
             </div>
           </>
         )}
       </div>
       <div className="modal-footer">
+        {r && (
+          <Button
+            type="button"
+            color="primary"
+            startIcon={<Printer size={16} />}
+            onClick={() => { onClose(); onPrint(r); }}
+          >
+            {t('barcodes.printSticker')}
+          </Button>
+        )}
         <Button type="button" variant="ghost" onClick={onClose}>{t('common.close')}</Button>
       </div>
     </Modal>
