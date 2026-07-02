@@ -70,6 +70,9 @@ export function ExpenseDetailPanel({ entryId, onClosed }: Props) {
         {/* Header */}
         <div className="flex-none border-b border-line px-4 py-3 flex items-center gap-3">
           <div className="flex-1 min-w-0">
+            {entry.code_display && (
+              <div className="text-xs font-mono text-subtler truncate">{entry.code_display}</div>
+            )}
             <div className="text-base font-semibold truncate">{entry.item_name_th}</div>
             <div className="text-xs text-subtle truncate">
               {entry.category_name_th}

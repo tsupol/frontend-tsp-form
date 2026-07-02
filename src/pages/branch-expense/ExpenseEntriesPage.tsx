@@ -451,6 +451,12 @@ export function ExpenseEntriesPage() {
                           <span className="text-xs text-subtler shrink-0 truncate">{r.category_name_th}</span>
                         </div>
                         <div className="text-xs text-subtle flex items-center gap-1.5 min-w-0">
+                          {r.code_display && (
+                            <>
+                              <span className="font-mono text-subtler shrink-0">{r.code_display}</span>
+                              <span>·</span>
+                            </>
+                          )}
                           <DateTime value={r.expense_date} showTime={false} />
                           {r.payee_name && (
                             <>

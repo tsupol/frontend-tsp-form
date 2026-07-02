@@ -33,6 +33,11 @@ export interface ExpenseItem {
 
 export interface ExpenseEntry {
   id: number;
+  // Our document number (EX-YYMM-NNNNNN-C), auto-generated at create, read-only.
+  // `code` is the dash-less search form; `code_display` is what we render.
+  // Distinct from receipt_no (the vendor's receipt number).
+  code: string;
+  code_display: string;
   branch_id: number;
   branch_code: string;
   branch_name: string;
