@@ -10,6 +10,7 @@ import { getRoleLabel } from '../../lib/roleLabel';
 import { fmtCurrency } from '../../lib/format';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { BranchPaymentAccountField } from '../../components/BranchPaymentAccountField';
+import { ColorSwatch } from '../../components/ColorAutocomplete';
 import { DateTime } from '../../components/DateTime';
 import { useAuth } from '../../contexts/AuthContext';
 import { mimeFromKey } from '../../lib/upload';
@@ -1205,6 +1206,8 @@ interface Asset {
   model_name: string;
   variant_name: string;
   physical_color: string | null;
+  master_color_hex: string | null;
+  master_color_name_en: string | null;
   serial_no: string | null;
   imei: string | null;
   condition_grade: string | null;
@@ -1223,8 +1226,11 @@ function AssetSummaryLines({ asset, dense, contractBranchId }: { asset: Asset; d
     && asset.box_branch_id !== contractBranchId;
   return (
     <div className={`flex flex-col min-w-0 ${dense ? 'gap-0.5' : 'gap-1'}`}>
-      <div className="text-sm font-medium truncate">
-        {headlineParts.length > 0 ? headlineParts.join(' ') : asset.variant_name}
+      <div className="text-sm font-medium truncate flex items-center gap-1.5 min-w-0">
+        {asset.physical_color && (asset.master_color_hex || asset.master_color_name_en) && (
+          <ColorSwatch hex={asset.master_color_hex} title={asset.master_color_name_en ?? undefined} />
+        )}
+        <span className="truncate">{headlineParts.length > 0 ? headlineParts.join(' ') : asset.variant_name}</span>
       </div>
       <div className="flex items-center gap-1.5 min-w-0">
         <span className="text-xs text-subtle font-mono truncate">{code}</span>
@@ -1339,7 +1345,7 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
     queryKey: ['assets-available', contract.branch_id, contract.model_id],
     queryFn: () => {
       const params = new URLSearchParams({
-        select: 'asset_id,asset_code,asset_code_display,family_name,model_name,variant_name,physical_color,serial_no,imei,condition_grade,has_box,box_branch_id,box_branch_name',
+        select: 'asset_id,asset_code,asset_code_display,family_name,model_name,variant_name,physical_color,master_color_hex,master_color_name_en,serial_no,imei,condition_grade,has_box,box_branch_id,box_branch_name',
         current_bucket: 'eq.ON_HAND_AVAILABLE',
         branch_id: `eq.${contract.branch_id}`,
         order: 'asset_code',

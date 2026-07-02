@@ -9,6 +9,7 @@ import { DateTime } from '../../components/DateTime';
 import { getBucketLabel, getBucketColor, codeDisplay } from '../inventory/inventoryUtils';
 import { AssignIcloudModal, ReleaseIcloudModal } from './IcloudModals';
 import { AssetScreenTimeSection } from '../../components/AssetScreenTimeSection';
+import { ColorSwatch } from '../../components/ColorAutocomplete';
 import { ImeiInput } from '../../components/ImeiInput';
 import { validateIMEI, validateiPhoneSerial } from '../../lib/validators';
 
@@ -39,6 +40,9 @@ interface AssetSummary {
   external_ref: string | null;
   model_name: string;
   variant_name: string;
+  physical_color: string | null;
+  master_color_hex: string | null;
+  master_color_name_en: string | null;
   brand_name: string;
   branch_id: number;
   branch_name: string;
@@ -88,7 +92,7 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
   const { data: loanerAsset } = useQuery({
     queryKey: ['asset-summary', contract.loaner_device_id],
     queryFn: () => apiClient.get<AssetSummary[]>(
-      `/v_assets?asset_id=eq.${contract.loaner_device_id}&select=asset_id,asset_code,asset_code_display,current_bucket,condition_grade,serial_no,imei,external_ref,model_name,variant_name,brand_name,branch_id,branch_name,icloud_account_id,icloud_apple_id&limit=1`,
+      `/v_assets?asset_id=eq.${contract.loaner_device_id}&select=asset_id,asset_code,asset_code_display,current_bucket,condition_grade,serial_no,imei,external_ref,model_name,variant_name,physical_color,master_color_hex,master_color_name_en,brand_name,branch_id,branch_name,icloud_account_id,icloud_apple_id&limit=1`,
     ).then(rows => rows[0] ?? null),
     enabled: contract.loaner_device_id != null,
     staleTime: 30 * 1000,
@@ -98,7 +102,7 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
   const { data: primaryAsset } = useQuery({
     queryKey: ['asset-summary', contract.device_id],
     queryFn: () => apiClient.get<AssetSummary[]>(
-      `/v_assets?asset_id=eq.${contract.device_id}&select=asset_id,asset_code,asset_code_display,current_bucket,condition_grade,serial_no,imei,external_ref,model_name,variant_name,brand_name,branch_id,branch_name,icloud_account_id,icloud_apple_id&limit=1`,
+      `/v_assets?asset_id=eq.${contract.device_id}&select=asset_id,asset_code,asset_code_display,current_bucket,condition_grade,serial_no,imei,external_ref,model_name,variant_name,physical_color,master_color_hex,master_color_name_en,brand_name,branch_id,branch_name,icloud_account_id,icloud_apple_id&limit=1`,
     ).then(rows => rows[0] ?? null),
     enabled: contract.device_id != null,
     staleTime: 30 * 1000,
@@ -173,7 +177,14 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
                 </div>
                 <div>
                   <div className="text-xs text-subtle">{t('contract.deviceModel')}</div>
-                  <div className="text-sm">{contract.product_display_name ?? contract.variant_name ?? contract.model_name ?? '—'}</div>
+                  <div className="text-sm flex items-center gap-1.5 min-w-0">
+                    <span className="w-3 h-3 shrink-0 inline-flex">
+                      {primaryAsset?.physical_color && (primaryAsset.master_color_hex || primaryAsset.master_color_name_en) && (
+                        <ColorSwatch size="sm" hex={primaryAsset.master_color_hex} title={`${primaryAsset.physical_color}${primaryAsset.master_color_name_en ? ` · ${primaryAsset.master_color_name_en}` : ''}`} />
+                      )}
+                    </span>
+                    <span className="truncate">{contract.product_display_name ?? contract.variant_name ?? contract.model_name ?? '—'}</span>
+                  </div>
                 </div>
                 {primaryAsset?.imei && (
                   <div>
@@ -398,7 +409,14 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
                 {loanerAsset?.variant_name && (
                   <div>
                     <div className="text-xs text-subtle">{t('contract.deviceModel')}</div>
-                    <div className="text-sm">{loanerAsset.variant_name}</div>
+                    <div className="text-sm flex items-center gap-1.5 min-w-0">
+                      <span className="w-3 h-3 shrink-0 inline-flex">
+                        {loanerAsset.physical_color && (loanerAsset.master_color_hex || loanerAsset.master_color_name_en) && (
+                          <ColorSwatch size="sm" hex={loanerAsset.master_color_hex} title={`${loanerAsset.physical_color}${loanerAsset.master_color_name_en ? ` · ${loanerAsset.master_color_name_en}` : ''}`} />
+                        )}
+                      </span>
+                      <span className="truncate">{loanerAsset.variant_name}</span>
+                    </div>
                   </div>
                 )}
                 {loanerAsset?.imei && (

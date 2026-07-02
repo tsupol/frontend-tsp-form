@@ -917,6 +917,8 @@
     "colorMappingHint": "The SKU and variant name are generated automatically from the color.",
     "newColor": "New color",
     "existingColor": "Existing color",
+    "masterColorMapped": "Swatch colour: {{color}}",
+    "masterColorOnSave": "New colour — swatch is set automatically on save",
     "currentVariant": "Current variant",
     "changeColor": "Change color",
     "cancelColorChange": "Keep current color",

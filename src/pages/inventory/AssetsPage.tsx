@@ -9,6 +9,7 @@ import JsBarcode from 'jsbarcode';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { CopyButton } from '../../components/CopyButton';
+import { ColorSwatch } from '../../components/ColorAutocomplete';
 import { fmtCurrency, makeDatePickerFormat, toLocalDateStr } from '../../lib/format';
 import { printWithMarker } from '../../lib/printDoc';
 import { buildBillActionToast, type StandardBillResponse } from '../../lib/billActionToast';
@@ -45,6 +46,8 @@ interface Asset {
   sku_code: string;
   variant_name: string;
   manufacturer_color: string | null;
+  master_color_hex: string | null;
+  master_color_name_en: string | null;
   model_name: string;
   model_code: string;
   base_model_name: string;
@@ -1140,7 +1143,12 @@ function AssetDetailPanel({
           <div className="font-semibold text-sm mt-0.5">{asset.product_display_name ?? asset.variant_name}</div>
           <div className="text-xs text-subtle">{asset.sku_code}</div>
           {asset.physical_color && (
-            <div className="text-xs text-subtle mt-0.5">{t('asset.color')}: {asset.physical_color}</div>
+            <div className="text-xs text-subtle mt-0.5 inline-flex items-center gap-1.5">
+              {asset.master_color_hex !== undefined && (asset.master_color_hex || asset.master_color_name_en) && (
+                <ColorSwatch hex={asset.master_color_hex} title={asset.master_color_name_en ?? undefined} />
+              )}
+              <span>{t('asset.color')}: {asset.physical_color}</span>
+            </div>
           )}
         </div>
         <Button

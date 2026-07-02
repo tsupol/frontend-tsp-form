@@ -9,7 +9,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { apiClient } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { useAuth } from '../../contexts/AuthContext';
-import { ColorAutocomplete, ColorMatchBadge } from '../../components/ColorAutocomplete';
+import { ColorAutocomplete, ColorMatchBadge, ColorSwatch, useMasterColorPreview } from '../../components/ColorAutocomplete';
 import { useBarcodeScanner } from '../../components/BarcodeScanner';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -467,7 +467,36 @@ function CreateModelModal({ open, onClose, holdingId, companyId, families, brand
   );
 }
 
+// ── Master-colour preview hint (Add/Edit variant modals) ─────────────────────
+
+/** Under the colour field: shows the master swatch a typed colour maps to.
+ *  The master colour is backend-derived at save, so a brand-new colour has no
+ *  preview yet — we say so instead of showing a swatch. */
+function MasterColorHint({ value }: { value: string }) {
+  const { t } = useTranslation();
+  const master = useMasterColorPreview(value);
+  if (!value.trim()) return null;
+  return (
+    <div className="flex items-center gap-1.5 mt-1.5 text-[11px] text-subtle">
+      {master ? (
+        <>
+          <ColorSwatch hex={master.master_color_hex} title={master.master_color_name_en ?? undefined} />
+          <span>{t('models.masterColorMapped', { color: master.master_color_name_en ?? '—' })}</span>
+        </>
+      ) : (
+        <span className="text-subtler">{t('models.masterColorOnSave')}</span>
+      )}
+    </div>
+  );
+}
+
 // ── Model variants section (list + add/edit/toggle) ──────────────────────────
+
+interface VariantColor {
+  master_color_hex: string | null;
+  master_color_name_en: string | null;
+  manufacturer_color: string | null;
+}
 
 function ModelVariantsSection({ modelId, variants }: { modelId: number; variants: ModelVariant[] }) {
   const { t } = useTranslation();
@@ -477,6 +506,22 @@ function ModelVariantsSection({ modelId, variants }: { modelId: number; variants
   const [addOpen, setAddOpen] = useState(false);
   const [editVariant, setEditVariant] = useState<ModelVariant | null>(null);
   const [manageVariant, setManageVariant] = useState<ModelVariant | null>(null);
+
+  // Master colour (swatch hex) isn't on fn_product_search's nested variants —
+  // pull it from v_product_variant_list (mig 450) and merge by variant_id.
+  const { data: colorRows = [] } = useQuery({
+    queryKey: ['variant-colors', modelId],
+    queryFn: () =>
+      apiClient.get<({ variant_id: number } & VariantColor)[]>(
+        `/v_product_variant_list?model_id=eq.${modelId}&select=variant_id,manufacturer_color,master_color_hex,master_color_name_en`,
+      ),
+    staleTime: 60 * 1000,
+  });
+  const colorByVariant = useMemo(() => {
+    const map = new Map<number, VariantColor>();
+    for (const r of colorRows) map.set(r.variant_id, r);
+    return map;
+  }, [colorRows]);
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['models-search'] });
@@ -543,6 +588,7 @@ function ModelVariantsSection({ modelId, variants }: { modelId: number; variants
             <VariantRow
               key={v.variant_id}
               variant={v}
+              color={colorByVariant.get(v.variant_id) ?? null}
               onEdit={() => setEditVariant(v)}
               onManageBarcodes={() => setManageVariant(v)}
               onToggleActive={() => handleToggleActive(v)}
@@ -577,8 +623,9 @@ function ModelVariantsSection({ modelId, variants }: { modelId: number; variants
   );
 }
 
-function VariantRow({ variant, onEdit, onManageBarcodes, onToggleActive }: {
+function VariantRow({ variant, color, onEdit, onManageBarcodes, onToggleActive }: {
   variant: ModelVariant;
+  color: VariantColor | null;
   onEdit: () => void;
   onManageBarcodes: () => void;
   onToggleActive: () => void;
@@ -610,9 +657,23 @@ function VariantRow({ variant, onEdit, onManageBarcodes, onToggleActive }: {
       }`}
     >
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="font-medium text-sm truncate">{variant.name}</div>
-          <div className="text-[11px] font-mono text-subtle truncate mt-0.5">{variant.sku_code}</div>
+        <div className="min-w-0 flex-1 flex items-start gap-2">
+          {color?.manufacturer_color && (
+            <span className="mt-0.5">
+              <ColorSwatch
+                hex={color.master_color_hex}
+                title={
+                  color.master_color_name_en && color.master_color_name_en !== color.manufacturer_color
+                    ? `${color.manufacturer_color} · ${color.master_color_name_en}`
+                    : color.manufacturer_color
+                }
+              />
+            </span>
+          )}
+          <div className="min-w-0 flex-1">
+            <div className="font-medium text-sm truncate">{variant.name}</div>
+            <div className="text-[11px] font-mono text-subtle truncate mt-0.5">{variant.sku_code}</div>
+          </div>
         </div>
         <div className="flex items-center gap-1 shrink-0">
           <Badge size="sm" color={variant.is_active ? 'success' : 'danger'}>
@@ -847,6 +908,7 @@ function AddVariantModal({ open, onClose, modelId, onSuccess }: {
               placeholder={t('models.manufacturerColorPlaceholder')}
               autoFocus
             />
+            <MasterColorHint value={color} />
           </div>
           <div className="flex items-center justify-between">
             <label className="form-label mb-0" htmlFor="av-active">{t('brandsModels.active')}</label>
@@ -1108,6 +1170,7 @@ function EditVariantModal({ open, onClose, variant, onSuccess }: {
   });
 
   const currentColor = detail?.manufacturer_color?.trim() ?? '';
+  const currentMaster = useMasterColorPreview(currentColor);
 
   useEffect(() => {
     if (open && variant) {
@@ -1190,18 +1253,30 @@ function EditVariantModal({ open, onClose, variant, onSuccess }: {
               {editingColor && <ColorMatchBadge value={color} />}
             </div>
             {editingColor ? (
-              <ColorAutocomplete
-                id="ev-color"
-                value={color}
-                onChange={setColor}
-                placeholder={t('models.manufacturerColorPlaceholder')}
-                autoFocus
-                endIcon={<X size={14} />}
-                onEndIconClick={cancelEditingColor}
-              />
+              <>
+                <ColorAutocomplete
+                  id="ev-color"
+                  value={color}
+                  onChange={setColor}
+                  placeholder={t('models.manufacturerColorPlaceholder')}
+                  autoFocus
+                  endIcon={<X size={14} />}
+                  onEndIconClick={cancelEditingColor}
+                />
+                <MasterColorHint value={color} />
+              </>
             ) : (
               <div className="card flex items-center justify-between gap-2 py-2">
-                <span className="text-sm">{currentColor || <span className="text-subtler">—</span>}</span>
+                <span className="text-sm inline-flex items-center gap-2 min-w-0">
+                  {currentColor ? (
+                    <>
+                      {currentMaster && <ColorSwatch hex={currentMaster.master_color_hex} title={currentMaster.master_color_name_en ?? undefined} />}
+                      <span className="truncate">{currentColor}</span>
+                    </>
+                  ) : (
+                    <span className="text-subtler">—</span>
+                  )}
+                </span>
                 <Button
                   type="button"
                   size="sm"

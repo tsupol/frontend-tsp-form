@@ -17,6 +17,7 @@ import { toStoragePath, normalizeKey } from '../../lib/mediaPath';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
+import { ColorSwatch } from '../../components/ColorAutocomplete';
 import { fmtCurrency } from '../../lib/format';
 import { getStateColor, getStateLabel } from './contractUtils';
 import { ContractActionButtons } from './ContractActions';
@@ -702,10 +703,13 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
   // (= the asset's primary identifier, which is EITHER imei OR serial). Labeling
   // that "IMEI" lies for serial-only devices. Read the asset row like the Device
   // tab does so we can show IMEI and Serial honestly and separately.
+  // Distinct key from the Device tab's ['asset-summary', device_id] query — that
+  // one selects asset_code too; sharing a key lets whichever runs first win the
+  // cache, and this slim projection would blank out the code on the Device tab.
   const { data: deviceAsset } = useQuery({
-    queryKey: ['asset-summary', contract.device_id],
-    queryFn: () => apiClient.get<{ imei: string | null; serial_no: string | null }[]>(
-      `/v_assets?asset_id=eq.${contract.device_id}&select=imei,serial_no&limit=1`,
+    queryKey: ['asset-overview-device', contract.device_id],
+    queryFn: () => apiClient.get<{ imei: string | null; serial_no: string | null; physical_color: string | null; master_color_hex: string | null; master_color_name_en: string | null }[]>(
+      `/v_assets?asset_id=eq.${contract.device_id}&select=imei,serial_no,physical_color,master_color_hex,master_color_name_en&limit=1`,
     ).then(rows => rows[0] ?? null),
     enabled: contract.device_id != null,
     staleTime: 30 * 1000,
@@ -820,7 +824,16 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
           <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-line">
             <div>
               <div className="text-xs text-subtle">{t('contract.device')}</div>
-              <div className="text-sm">{contract.product_display_name ?? contract.variant_name ?? contract.model_name ?? '—'}</div>
+              <div className="text-sm flex items-center gap-1.5 min-w-0">
+                {contract.device_id != null && (
+                  <span className="w-3 h-3 shrink-0 inline-flex">
+                    {deviceAsset?.physical_color && (deviceAsset.master_color_hex || deviceAsset.master_color_name_en) && (
+                      <ColorSwatch size="sm" hex={deviceAsset.master_color_hex} title={`${deviceAsset.physical_color}${deviceAsset.master_color_name_en ? ` · ${deviceAsset.master_color_name_en}` : ''}`} />
+                    )}
+                  </span>
+                )}
+                <span className="truncate">{contract.product_display_name ?? contract.variant_name ?? contract.model_name ?? '—'}</span>
+              </div>
             </div>
             {/* Honest identifiers: IMEI and Serial are separate on the asset. Only
                 fall back to the ambiguous view field (labeled "IMEI / SN") before

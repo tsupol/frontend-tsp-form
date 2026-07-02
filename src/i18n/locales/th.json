@@ -917,6 +917,8 @@
     "colorMappingHint": "ระบบจะสร้างรหัส SKU และชื่อตัวเลือกจากชื่อสีโดยอัตโนมัติ",
     "newColor": "สีใหม่",
     "existingColor": "สีที่มีอยู่",
+    "masterColorMapped": "สีตัวอย่าง: {{color}}",
+    "masterColorOnSave": "สีใหม่ — ตัวอย่างสีจะถูกกำหนดอัตโนมัติเมื่อบันทึก",
     "currentVariant": "ตัวเลือกปัจจุบัน",
     "changeColor": "เปลี่ยนสี",
     "cancelColorChange": "ใช้สีเดิม",

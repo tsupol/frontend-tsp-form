@@ -99,8 +99,18 @@ input[type="number"
     animation: fade-in 150ms ease-out;
 }
 
+/* Colour-swatch inset ring — dark by default (light theme), light in dark theme.
+   Referenced by ColorSwatch (ModelsPage). Light default MUST precede the dark
+   override: [data-theme="dark"] also matches :root, so equal specificity means
+   source order decides the winner. */
+:root {
+    --swatch-ring: rgba(0, 0, 0, 0.18);
+}
+
 [data-theme="dark"] {
     --color-skeleton: #1c1c1e;
+    /* light ring so dark colour swatches stay visible on the dark surface */
+    --swatch-ring: rgba(255, 255, 255, 0.22);
 }
 
 .page-header {

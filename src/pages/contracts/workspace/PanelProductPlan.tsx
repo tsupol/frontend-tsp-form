@@ -9,6 +9,7 @@ import { getConditionLabel, getConditionTextColor } from '../../inventory/invent
 import { useWorkspace } from './WorkspaceContext';
 import type { Quote } from './WorkspaceTypes';
 import { useBarcodeScanner } from '../../../components/BarcodeScanner';
+import { ColorSwatch } from '../../../components/ColorAutocomplete';
 import { lookupBarcode } from '../../../lib/barcodeLookup';
 
 // ── Types ───────────────────────────────────────────────────────────────
@@ -87,6 +88,9 @@ interface StockAsset {
   current_cost_basis: number;
   serial_no: string | null;
   imei: string | null;
+  physical_color: string | null;
+  master_color_hex: string | null;
+  master_color_name_en: string | null;
 }
 
 /** Where the user is browsing — affects the search list, not the submit path */
@@ -887,7 +891,12 @@ export function PanelProductPlan(_props: Props) {
                             {getConditionLabel(asset.condition_grade, t)}
                           </span>
                         </div>
-                        <div className="text-xs text-subtle truncate">{asset.brand_name} {asset.family_name} {asset.model_name} · {asset.variant_name}</div>
+                        <div className="flex items-center gap-1.5 text-xs text-subtle min-w-0">
+                          {asset.physical_color && (asset.master_color_hex || asset.master_color_name_en) && (
+                            <ColorSwatch hex={asset.master_color_hex} title={`${asset.physical_color}${asset.master_color_name_en ? ` · ${asset.master_color_name_en}` : ''}`} />
+                          )}
+                          <span className="truncate">{asset.brand_name} {asset.family_name} {asset.model_name} · {asset.variant_name}</span>
+                        </div>
                         <div className="flex items-center gap-3 text-xs text-subtle mt-0.5">
                           <span>{t('wizard.costBasis')} {fmtCurrency(asset.current_cost_basis)}</span>
                           {asset.imei && <span>IMEI: {asset.imei}</span>}

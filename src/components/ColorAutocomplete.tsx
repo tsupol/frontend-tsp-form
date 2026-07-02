@@ -5,35 +5,88 @@ import { Input, Badge, PopOver } from 'tsp-form';
 import { apiClient } from '../lib/api';
 import { fuzzyScore } from '../lib/fuzzy';
 
-/** Distinct manufacturer_color values across the holding, frequency-ranked.
- *  Lets type-in colour fields stay consistent ("Jet Black", not
- *  "jet-black" / "JetBlack"). */
+/** Master-colour swatch. `hex` null (MIXED/UNKNOWN/TRANSPARENT) → neutral checker.
+ *  Apple-style: perfect circle, soft inset ring (theme-aware `--swatch-ring`)
+ *  instead of a hard border so light colours stay visible without a heavy outline. */
+export function ColorSwatch({ hex, title, size = 'md' }: { hex: string | null; title?: string; size?: 'sm' | 'md' }) {
+  const insetRing = 'inset 0 0 0 1px var(--swatch-ring)';
+  return (
+    <span
+      className={`inline-block rounded-full shrink-0 ${size === 'sm' ? 'w-3 h-3' : 'w-4 h-4'}`}
+      title={title}
+      style={
+        hex
+          ? { backgroundColor: hex, boxShadow: insetRing }
+          : {
+              backgroundImage:
+                'linear-gradient(45deg, var(--color-surface-soft) 25%, transparent 25%, transparent 75%, var(--color-surface-soft) 75%), linear-gradient(45deg, var(--color-surface-soft) 25%, transparent 25%, transparent 75%, var(--color-surface-soft) 75%)',
+              backgroundSize: '6px 6px',
+              backgroundPosition: '0 0, 3px 3px',
+              boxShadow: insetRing,
+            }
+      }
+    />
+  );
+}
+
+/** Master colour a typed manufacturer_color maps to — for the swatch preview. */
+export interface MasterColorInfo {
+  master_color_hex: string | null;
+  master_color_name_en: string | null;
+}
+
+/** Distinct manufacturer_color values across the holding, frequency-ranked, plus
+ *  the master-colour each maps to (backend-derived — mig 450). Lets type-in colour
+ *  fields stay consistent ("Jet Black", not "jet-black" / "JetBlack") and preview
+ *  the swatch the backend will assign. */
 export function useManufacturerColorSuggestions() {
   return useQuery({
     queryKey: ['manufacturer-color-distinct'],
     queryFn: async () => {
-      const rows = await apiClient.get<{ manufacturer_color: string | null }[]>(
-        '/v_product_variant_list?select=manufacturer_color&manufacturer_color=not.is.null&limit=10000',
+      const rows = await apiClient.get<
+        ({ manufacturer_color: string | null } & MasterColorInfo)[]
+      >(
+        '/v_product_variant_list?select=manufacturer_color,master_color_hex,master_color_name_en&manufacturer_color=not.is.null&limit=10000',
       );
       const counts = new Map<string, number>();
+      // lowercased manufacturer_color → its master colour (backend-derived)
+      const masterByColor = new Map<string, MasterColorInfo>();
       for (const r of rows) {
         const c = r.manufacturer_color?.trim();
         if (!c) continue;
         counts.set(c, (counts.get(c) ?? 0) + 1);
+        const key = c.toLowerCase();
+        if (!masterByColor.has(key)) {
+          masterByColor.set(key, {
+            master_color_hex: r.master_color_hex,
+            master_color_name_en: r.master_color_name_en,
+          });
+        }
       }
-      return Array.from(counts.entries())
+      const colors = Array.from(counts.entries())
         .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
         .map(([color]) => color);
+      return { colors, masterByColor };
     },
     staleTime: 5 * 60 * 1000,
   });
 }
 
 export function useColorMatch(value: string) {
-  const { data: allColors = [] } = useManufacturerColorSuggestions();
+  const { data } = useManufacturerColorSuggestions();
+  const allColors = data?.colors ?? [];
   const trimmed = value.trim();
   const isKnown = !!trimmed && allColors.some(c => c.toLowerCase() === trimmed.toLowerCase());
   return { allColors, trimmed, isKnown, isNew: !!trimmed && !isKnown };
+}
+
+/** Master colour the typed value maps to, or null if the colour is new/unknown.
+ *  Preview only — the backend derives the real master colour at save. */
+export function useMasterColorPreview(value: string): MasterColorInfo | null {
+  const { data } = useManufacturerColorSuggestions();
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) return null;
+  return data?.masterByColor.get(trimmed) ?? null;
 }
 
 export function ColorMatchBadge({ value }: { value: string }) {
