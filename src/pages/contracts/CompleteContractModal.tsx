@@ -114,14 +114,14 @@ interface CompleteResult {
   asset_movements: AssetMovement[] | null;
 }
 
-// fn_contract_terminate success payload (similar shape; subset)
+// fn_contract_terminate success payload (mig 432: no longer bundles device
+// return — no return_condition / asset_movements; device is unbound as a
+// separate step before terminate).
 interface TerminateResult {
   id: number;
   state: 'TERMINATED';
   close_reason: string;
-  return_condition?: string;
-  device_returned?: boolean;
-  asset_movements?: AssetMovement[] | null;
+  installments_terminated?: number;
 }
 
 // Snapshot of contract state at modal-open for before/after diffing
@@ -165,9 +165,6 @@ const TERMINATE_REASONS = [
 ] as const;
 type TerminateReason = typeof TERMINATE_REASONS[number];
 
-const RETURN_CONDITIONS = ['READY', 'NEEDS_INSPECTION', 'DAMAGED'] as const;
-type ReturnCondition = typeof RETURN_CONDITIONS[number];
-
 // ── Modal ────────────────────────────────────────────────────────────────────
 
 export function CompleteContractModal({ open, contract, action, onClose, onSuccess: _onSuccess }: Props) {
@@ -187,7 +184,6 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
   const [note, setNote] = useState('');
   const [pin, setPin] = useState('');
   const [terminateReason, setTerminateReason] = useState<TerminateReason>('CUSTOMER_REQUEST');
-  const [returnCondition, setReturnCondition] = useState<ReturnCondition>('NEEDS_INSPECTION');
   const [error, setError] = useState('');
   const [errorKey, setErrorKey] = useState(0);
 
@@ -210,7 +206,6 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
       setNote('');
       setPin('');
       setTerminateReason('CUSTOMER_REQUEST');
-      setReturnCondition('NEEDS_INSPECTION');
       setError('');
       setPayments([{ method: '', amount: 0, bank_account_id: null }]);
       setConflictBill(null);
@@ -351,7 +346,6 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
         return apiClient.rpc<TerminateResult>('fn_contract_terminate', {
           p_contract_id: contract.id,
           p_close_reason: terminateReason,
-          p_return_condition: returnCondition,
           p_note: note.trim() || undefined,
           p_pin: pin,
         });
@@ -515,8 +509,6 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
               onPinChange={setPin}
               terminateReason={terminateReason}
               onTerminateReasonChange={setTerminateReason}
-              returnCondition={returnCondition}
-              onReturnConditionChange={setReturnCondition}
               onBack={() => setView('wallets')}
               onConfirm={() => {
                 setError('');
@@ -617,11 +609,10 @@ function DoneView({
       value: fmtCurrency(insuranceAmount),
     });
   }
-  if (!isComplete && (completeResult as TerminateResult).return_condition) {
-    const rc = (completeResult as TerminateResult).return_condition!;
+  if (!isComplete && (completeResult as TerminateResult).installments_terminated != null) {
     rows.push({
-      label: t('contract.return_condition', { defaultValue: 'Return condition' }),
-      value: t(`contract.return_condition_${rc}`, { defaultValue: rc }),
+      label: t('contract.terminate_done_installmentsTerminated', { defaultValue: 'Installments terminated' }),
+      value: String((completeResult as TerminateResult).installments_terminated),
     });
   }
   rows.push({
@@ -925,8 +916,6 @@ function ConfirmView({
   onPinChange,
   terminateReason,
   onTerminateReasonChange,
-  returnCondition,
-  onReturnConditionChange,
   onBack,
   onConfirm,
   isPending,
@@ -938,8 +927,6 @@ function ConfirmView({
   onPinChange: (v: string) => void;
   terminateReason: TerminateReason;
   onTerminateReasonChange: (v: TerminateReason) => void;
-  returnCondition: ReturnCondition;
-  onReturnConditionChange: (v: ReturnCondition) => void;
   onBack: () => void;
   onConfirm: () => void;
   isPending: boolean;
@@ -966,7 +953,7 @@ function ConfirmView({
         ) : (
           <span className="font-medium text-warning-fg">
             {t('contract.terminate_warning', {
-              defaultValue: 'Terminating returns the device to inventory.',
+              defaultValue: 'Terminating closes the contract early. The device must already be unbound.',
             })}
           </span>
         )}
@@ -974,33 +961,18 @@ function ConfirmView({
 
       {/* Terminate-specific fields */}
       {action.kind === 'terminate' && (
-        <>
-          <div className="flex flex-col">
-            <label className="form-label">{t('contract.terminate_reason', { defaultValue: 'Reason' })} *</label>
-            <Select
-              options={TERMINATE_REASONS.map(r => ({
-                value: r,
-                label: t(`contract.terminate_reason_${r}`, { defaultValue: r }),
-              }))}
-              value={terminateReason}
-              onChange={v => onTerminateReasonChange(v as TerminateReason)}
-              searchable={false}
-            />
-          </div>
-
-          <div className="flex flex-col">
-            <label className="form-label">{t('contract.return_condition', { defaultValue: 'Return condition' })} *</label>
-            <Select
-              options={RETURN_CONDITIONS.map(c => ({
-                value: c,
-                label: t(`contract.return_condition_${c}`, { defaultValue: c }),
-              }))}
-              value={returnCondition}
-              onChange={v => onReturnConditionChange(v as ReturnCondition)}
-              searchable={false}
-            />
-          </div>
-        </>
+        <div className="flex flex-col">
+          <label className="form-label">{t('contract.terminate_reason', { defaultValue: 'Reason' })} *</label>
+          <Select
+            options={TERMINATE_REASONS.map(r => ({
+              value: r,
+              label: t(`contract.terminate_reason_${r}`, { defaultValue: r }),
+            }))}
+            value={terminateReason}
+            onChange={v => onTerminateReasonChange(v as TerminateReason)}
+            searchable={false}
+          />
+        </div>
       )}
 
       <div className="flex flex-col">

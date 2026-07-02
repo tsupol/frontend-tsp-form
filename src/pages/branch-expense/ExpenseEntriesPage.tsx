@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   PageNav, PageNavPanel, MobileHeader, DataTable, Button, Select,
-  InputDateRangePicker, Input, MaskedInput, Badge, PopOver,
+  InputDateRangePicker, Input, MaskedInput, PopOver,
 } from 'tsp-form';
 import {
   ArrowRightFromLine, ArrowLeft, Plus, Keyboard, Image as ImageIcon,
@@ -16,7 +16,7 @@ import { fmtCurrency, toLocalDateStr, parseLocalDate, makeDateRangePickerFormat 
 import { publicMediaUrl, normalizeKey } from '../../lib/mediaPath';
 import { CreateExpenseModal } from './CreateExpenseModal';
 import { ExpenseDetailPanel } from './ExpenseDetailPanel';
-import type { ExpenseCategory, ExpenseEntry } from './branchExpenseTypes';
+import type { ExpenseCategory, ExpenseItem, ExpenseEntry } from './branchExpenseTypes';
 
 interface Branch {
   id: number;
@@ -25,13 +25,16 @@ interface Branch {
   company_id: number;
 }
 
+const COMPANY_RECORD_ROLES = ['COMPANY_ADMIN', 'COMPANY_ACCOUNTANT'];
+
 export function ExpenseEntriesPage() {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const qc = useQueryClient();
   const role = user?.role_code ?? '';
   const isBranchUser = ['BRANCH_STAFF', 'BRANCH_MANAGER'].includes(role);
-  const canRecord = role === 'BRANCH_MANAGER';
+  // branch_manager records for own branch; company_admin/accountant for any branch.
+  const canRecord = role === 'BRANCH_MANAGER' || COMPANY_RECORD_ROLES.includes(role);
 
   const today = toLocalDateStr(new Date());
   const monthAgo = (() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return toLocalDateStr(d); })();
@@ -75,6 +78,15 @@ export function ExpenseEntriesPage() {
     enabled: user?.company_id != null,
   });
 
+  // Selectable items — feeds the record modal's grouped item picker.
+  const { data: items = [] } = useQuery({
+    queryKey: ['branch-expense', 'items', user?.company_id, 'selectable'],
+    queryFn: () => apiClient.get<ExpenseItem[]>(
+      `/v_branch_expense_items?company_id=eq.${user?.company_id}&is_selectable=eq.true&order=category_sort_order,item_sort_order`
+    ),
+    enabled: user?.company_id != null && canRecord,
+  });
+
   const queryString = useMemo(() => {
     const params: string[] = [];
     if (dateFrom) params.push(`expense_date=gte.${dateFrom}`);
@@ -83,13 +95,13 @@ export function ExpenseEntriesPage() {
     if (categoryId) params.push(`category_id=eq.${categoryId}`);
     if (statusFilter === 'active') params.push('is_voided=is.false');
     if (statusFilter === 'voided') params.push('is_voided=is.true');
-    if (amountMin) params.push(`current_amount=gte.${amountMin}`);
-    if (amountMax) params.push(`current_amount=lte.${amountMax}`);
-    // PostgREST OR across vendor + note. Asterisks for substring; ilike is case-insensitive.
-    // Wrap the value in case the user typed parens or commas.
+    if (amountMin) params.push(`amount=gte.${amountMin}`);
+    if (amountMax) params.push(`amount=lte.${amountMax}`);
+    // PostgREST OR across vendor + payee + note. Asterisks for substring; ilike is
+    // case-insensitive. Strip parens/commas the user may have typed.
     if (debouncedSearch.length >= 2) {
       const term = debouncedSearch.replace(/[*,()]/g, '');
-      params.push(`or=(vendor.ilike.*${term}*,note.ilike.*${term}*)`);
+      params.push(`or=(vendor.ilike.*${term}*,payee_name.ilike.*${term}*,note.ilike.*${term}*)`);
     }
     params.push('order=expense_date.desc,id.desc');
     return params.join('&');
@@ -434,14 +446,18 @@ export function ExpenseEntriesPage() {
                       <div className="flex-1 min-w-0 flex flex-col gap-0.5">
                         <div className="flex items-center gap-2 min-w-0">
                           <span className={`text-sm font-medium truncate ${r.is_voided ? 'line-through text-subtle' : ''}`}>
-                            {r.category_name_th}
+                            {r.item_name_th}
                           </span>
-                          {r.adjustment_count > 0 && !r.is_voided && (
-                            <Badge color="warning" size="xs">{r.adjustment_count} adj</Badge>
-                          )}
+                          <span className="text-xs text-subtler shrink-0 truncate">{r.category_name_th}</span>
                         </div>
                         <div className="text-xs text-subtle flex items-center gap-1.5 min-w-0">
                           <DateTime value={r.expense_date} showTime={false} />
+                          {r.payee_name && (
+                            <>
+                              <span>·</span>
+                              <span className="truncate">{r.payee_name}</span>
+                            </>
+                          )}
                           {r.vendor && (
                             <>
                               <span>·</span>
@@ -457,7 +473,7 @@ export function ExpenseEntriesPage() {
                         </div>
                       </div>
                       <div className={`text-sm font-semibold tabular-nums shrink-0 ${r.is_voided ? 'line-through text-subtle' : ''}`}>
-                        ฿{fmtCurrency(r.current_amount)}
+                        ฿{fmtCurrency(r.amount)}
                       </div>
                     </button>
                   );
@@ -496,7 +512,9 @@ export function ExpenseEntriesPage() {
             open={creating}
             onClose={() => setCreating(false)}
             onSaved={onCreated}
-            categories={categories}
+            items={items}
+            branches={isBranchUser ? undefined : branches}
+            fixedBranchId={isBranchUser ? (user?.branch_id ?? null) : null}
           />
         </>
       )}

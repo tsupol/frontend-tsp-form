@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Modal, Button, Input, Select, InputDatePicker, MaskedInput, ImageUploader,
   useSnackbarContext,
   type UploadedImage,
 } from 'tsp-form';
-import { Calendar, Keyboard, CheckCircle, XCircle, X, Plus } from 'lucide-react';
+import { Calendar, Keyboard, CheckCircle, XCircle, X, Plus, Search, ChevronRight } from 'lucide-react';
 import { fmtCurrency } from '../../lib/format';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -17,26 +17,38 @@ import {
   BRANCH_EXPENSE_SLIP_RESIZE, BRANCH_EXPENSE_SLIP_MAX,
   type BranchExpenseImage,
 } from '../../lib/beMedia';
-import type { ExpenseCategory, ExpenseEntry, AttachResponse } from './branchExpenseTypes';
+import { PaymentMethodChips } from './PaymentMethodChips';
+import type { ExpenseItem, ExpenseEntry, AttachResponse, ExpensePaymentMethod } from './branchExpenseTypes';
+
+interface BranchOption { id: number; code: string; name: string }
 
 interface CreateExpenseModalProps {
   open: boolean;
   onClose: () => void;
   onSaved: () => void;
-  categories: ExpenseCategory[];
+  items: ExpenseItem[];
+  // Company users pick a branch; branch users have it implied (pass fixedBranchId).
+  branches?: BranchOption[];
+  fixedBranchId?: number | null;
 }
 
 type Phase = 'form' | 'attach' | 'done';
 
-export function CreateExpenseModal({ open, onClose, onSaved, categories }: CreateExpenseModalProps) {
+export function CreateExpenseModal({ open, onClose, onSaved, items, branches, fixedBranchId }: CreateExpenseModalProps) {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const { addSnackbar } = useSnackbarContext();
 
   const [phase, setPhase] = useState<Phase>('form');
-  const [categoryId, setCategoryId] = useState<string>('');
+  const [branchId, setBranchId] = useState<string>('');
+  const [itemId, setItemId] = useState<string>('');
+  const [itemPickerOpen, setItemPickerOpen] = useState(false);
+  const [itemSearch, setItemSearch] = useState('');
   const [amount, setAmount] = useState<string>('');
+  const [paymentMethod, setPaymentMethod] = useState<ExpensePaymentMethod | ''>('');
   const [vendor, setVendor] = useState('');
+  const [payeeName, setPayeeName] = useState('');
+  const [receiptNo, setReceiptNo] = useState('');
   const [note, setNote] = useState('');
   const [expenseDate, setExpenseDate] = useState(() => toLocalDateStr(new Date()));
   const [isTyping, setIsTyping] = useState(false);
@@ -46,12 +58,20 @@ export function CreateExpenseModal({ open, onClose, onSaved, categories }: Creat
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [savedEntry, setSavedEntry] = useState<ExpenseEntry | null>(null);
 
+  const needsBranch = !fixedBranchId && (branches?.length ?? 0) > 0;
+
   useEffect(() => {
     if (open) {
       setPhase('form');
-      setCategoryId('');
+      setBranchId(fixedBranchId ? String(fixedBranchId) : '');
+      setItemId('');
+      setItemPickerOpen(false);
+      setItemSearch('');
       setAmount('');
+      setPaymentMethod('');
       setVendor('');
+      setPayeeName('');
+      setReceiptNo('');
       setNote('');
       setExpenseDate(toLocalDateStr(new Date()));
       setPendingPhotos([]);
@@ -59,9 +79,12 @@ export function CreateExpenseModal({ open, onClose, onSaved, categories }: Creat
       setBusy(false);
       setSavedEntry(null);
     }
-  }, [open]);
+  }, [open, fixedBranchId]);
 
-  const isDirty = categoryId !== '' || amount !== '' || vendor !== '' || note !== '' || pendingPhotos.length > 0;
+  const selectedItem = useMemo(() => items.find(i => String(i.item_id) === itemId) ?? null, [items, itemId]);
+
+  const isDirty = itemId !== '' || amount !== '' || vendor !== '' || payeeName !== ''
+    || receiptNo !== '' || note !== '' || pendingPhotos.length > 0;
 
   const handleClose = () => {
     if (phase === 'done') { onClose(); return; }
@@ -71,9 +94,12 @@ export function CreateExpenseModal({ open, onClose, onSaved, categories }: Creat
 
   const forceClose = () => { setConfirmDiscard(false); onClose(); };
 
+  const effectiveBranchId = fixedBranchId ?? (branchId ? Number(branchId) : null);
+
   const submit = async () => {
     setError(null);
-    if (!categoryId) { setError(t('branchExpense.errCategoryRequired')); return; }
+    if (!effectiveBranchId) { setError(t('branchExpense.errBranchRequired')); return; }
+    if (!itemId) { setError(t('branchExpense.errItemRequired')); return; }
     const amt = Number(amount);
     if (!amt || amt <= 0) { setError(t('branchExpense.errAmountPositive')); return; }
 
@@ -81,11 +107,14 @@ export function CreateExpenseModal({ open, onClose, onSaved, categories }: Creat
     try {
       // STEP 1 — create the entry (no images yet — expense_id needed for keys)
       const created = await apiClient.rpc<ExpenseEntry>('fn_branch_expense_create', {
-        p_branch_id: user?.branch_id,
-        p_category_id: Number(categoryId),
+        p_branch_id: effectiveBranchId,
+        p_item_id: Number(itemId),
         p_amount: amt,
         p_expense_date: expenseDate,
+        p_payment_method: paymentMethod || null,
         p_vendor: vendor.trim() || null,
+        p_payee_name: payeeName.trim() || null,
+        p_receipt_no: receiptNo.trim() || null,
         p_note: note.trim() || null,
         p_images: [],
       });
@@ -109,7 +138,13 @@ export function CreateExpenseModal({ open, onClose, onSaved, categories }: Creat
         }
       }
 
-      setSavedEntry(created);
+      // Enrich the create result with the picked item's display names for the
+      // done screen (the create RPC returns ids only).
+      setSavedEntry({
+        ...created,
+        item_name_th: selectedItem?.item_name_th ?? created.item_name_th,
+        category_name_th: selectedItem?.category_name_th ?? created.category_name_th,
+      });
       setPhase('done');
       onSaved();
       addSnackbar({
@@ -135,7 +170,7 @@ export function CreateExpenseModal({ open, onClose, onSaved, categories }: Creat
     }
   };
 
-  const categoryOptions = categories.map(c => ({ value: String(c.id), label: c.name_th }));
+  const branchOptions = (branches ?? []).map(b => ({ value: String(b.id), label: `${b.code} · ${b.name}` }));
   const dpFormat = makeDatePickerFormat(i18n.language);
 
   return (
@@ -154,11 +189,13 @@ export function CreateExpenseModal({ open, onClose, onSaved, categories }: Creat
               <div className="flex flex-col items-center gap-3 py-4">
                 <CheckCircle size={40} className="text-success" />
                 <div className="text-2xl font-semibold tabular-nums">
-                  ฿{fmtCurrency(savedEntry.current_amount)}
+                  ฿{fmtCurrency(savedEntry.amount)}
                 </div>
-                <div className="text-sm text-subtle">
-                  {categories.find(c => c.id === savedEntry.category_id)?.name_th
-                    ?? `#${savedEntry.category_id}`}
+                <div className="text-sm text-subtle text-center">
+                  {savedEntry.item_name_th ?? `#${savedEntry.item_id}`}
+                  {savedEntry.category_name_th && (
+                    <span className="text-subtler"> · {savedEntry.category_name_th}</span>
+                  )}
                 </div>
                 <div className="text-xs text-subtle">
                   {savedEntry.expense_date}
@@ -174,15 +211,38 @@ export function CreateExpenseModal({ open, onClose, onSaved, categories }: Creat
           <>
             <div className="modal-content">
               <div className="form-grid">
+                {/* Branch — company users only */}
+                {needsBranch && (
+                  <div className="flex flex-col">
+                    <label className="form-label">{t('branchExpense.branch')}</label>
+                    <Select
+                      options={branchOptions}
+                      value={branchId || null}
+                      onChange={(v) => setBranchId((v as string) ?? '')}
+                      placeholder={t('branchExpense.pickBranch')}
+                      showChevron
+                    />
+                  </div>
+                )}
+
+                {/* Item picker — grouped by category, searchable */}
                 <div className="flex flex-col">
-                  <label className="form-label">{t('branchExpense.category')}</label>
-                  <Select
-                    options={categoryOptions}
-                    value={categoryId || null}
-                    onChange={(v) => setCategoryId((v as string) ?? '')}
-                    placeholder={t('branchExpense.pickCategory')}
-                    showChevron
-                  />
+                  <label className="form-label">{t('branchExpense.item')}</label>
+                  <button
+                    type="button"
+                    onClick={() => setItemPickerOpen(true)}
+                    className="flex items-center justify-between gap-2 w-full px-3 h-10 rounded-md border border-line bg-surface text-left text-sm cursor-pointer hover:bg-surface-hover transition-colors"
+                  >
+                    {selectedItem ? (
+                      <span className="min-w-0 truncate">
+                        {selectedItem.item_name_th}
+                        <span className="text-subtle"> · {selectedItem.category_name_th}</span>
+                      </span>
+                    ) : (
+                      <span className="text-subtle">{t('branchExpense.pickItem')}</span>
+                    )}
+                    <ChevronRight size={16} className="shrink-0 text-subtle" />
+                  </button>
                 </div>
 
                 <div className="flex flex-col">
@@ -193,7 +253,13 @@ export function CreateExpenseModal({ open, onClose, onSaved, categories }: Creat
                     value={amount}
                     onChange={(raw) => setAmount(raw)}
                     className="w-full"
+                    inputMode="decimal"
                   />
+                </div>
+
+                <div className="flex flex-col">
+                  <label className="form-label">{t('branchExpense.paymentMethod')}</label>
+                  <PaymentMethodChips value={paymentMethod} onChange={setPaymentMethod} />
                 </div>
 
                 <div className="flex flex-col">
@@ -225,11 +291,31 @@ export function CreateExpenseModal({ open, onClose, onSaved, categories }: Creat
                 </div>
 
                 <div className="flex flex-col">
+                  <label className="form-label">{t('branchExpense.payeeName')}</label>
+                  <Input
+                    value={payeeName}
+                    onChange={(e) => setPayeeName(e.target.value)}
+                    placeholder={t('branchExpense.payeeNamePlaceholder')}
+                    className="w-full"
+                  />
+                </div>
+
+                <div className="flex flex-col">
                   <label className="form-label">{t('branchExpense.vendor')}</label>
                   <Input
                     value={vendor}
                     onChange={(e) => setVendor(e.target.value)}
                     placeholder={t('branchExpense.vendorPlaceholder')}
+                    className="w-full"
+                  />
+                </div>
+
+                <div className="flex flex-col">
+                  <label className="form-label">{t('branchExpense.receiptNo')}</label>
+                  <Input
+                    value={receiptNo}
+                    onChange={(e) => setReceiptNo(e.target.value)}
+                    placeholder={t('branchExpense.receiptNoPlaceholder')}
                     className="w-full"
                   />
                 </div>
@@ -318,6 +404,16 @@ export function CreateExpenseModal({ open, onClose, onSaved, categories }: Creat
         )}
       </Modal>
 
+      {/* Item picker — grouped accordion + search */}
+      <ItemPickerModal
+        open={itemPickerOpen}
+        items={items}
+        search={itemSearch}
+        onSearchChange={setItemSearch}
+        onPick={(id) => { setItemId(String(id)); setItemPickerOpen(false); }}
+        onClose={() => setItemPickerOpen(false)}
+      />
+
       <Modal open={confirmDiscard} onClose={() => setConfirmDiscard(false)} maxWidth="24rem" width="100%">
         <div className="modal-header"><h2 className="modal-title">{t('common.unsavedChanges')}</h2></div>
         <div className="modal-content"><p>{t('common.unsavedChangesMessage')}</p></div>
@@ -327,5 +423,82 @@ export function CreateExpenseModal({ open, onClose, onSaved, categories }: Creat
         </div>
       </Modal>
     </>
+  );
+}
+
+// ── Item picker (grouped by category, searchable) ────────────────────────────
+
+function ItemPickerModal({ open, items, search, onSearchChange, onPick, onClose }: {
+  open: boolean;
+  items: ExpenseItem[];
+  search: string;
+  onSearchChange: (v: string) => void;
+  onPick: (itemId: number) => void;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+
+  const groups = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    const filtered = term
+      ? items.filter(i =>
+          i.item_name_th.toLowerCase().includes(term)
+          || i.category_name_th.toLowerCase().includes(term)
+          || (i.old_code ?? '').toLowerCase().includes(term))
+      : items;
+    const byCat = new Map<number, { name: string; items: ExpenseItem[] }>();
+    for (const it of filtered) {
+      if (!byCat.has(it.category_id)) byCat.set(it.category_id, { name: it.category_name_th, items: [] });
+      byCat.get(it.category_id)!.items.push(it);
+    }
+    return [...byCat.values()];
+  }, [items, search]);
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="30rem" width="100%">
+      <div className="modal-header">
+        <h2 className="modal-title">{t('branchExpense.pickItem')}</h2>
+        <button type="button" className="modal-close-btn" onClick={onClose}>×</button>
+      </div>
+      <div className="modal-content">
+        <div className="mb-3">
+          <Input
+            value={search}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder={t('branchExpense.searchItemPlaceholder')}
+            size="sm"
+            className="w-full"
+            startIcon={<Search size={14} />}
+            autoFocus
+          />
+        </div>
+        {groups.length === 0 ? (
+          <div className="py-8 text-center text-subtler text-sm">{t('branchExpense.noItems')}</div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {groups.map((g, gi) => (
+              <div key={gi}>
+                <div className="text-xs font-semibold text-subtle uppercase tracking-wide mb-1.5">{g.name}</div>
+                <div className="flex flex-col">
+                  {g.items.map(it => (
+                    <button
+                      key={it.item_id}
+                      type="button"
+                      onClick={() => onPick(it.item_id)}
+                      className="flex items-center justify-between gap-2 px-3 py-2 text-sm text-left bg-transparent border-none cursor-pointer hover:bg-surface-hover rounded-md"
+                    >
+                      <span className="truncate">{it.item_name_th}</span>
+                      {it.old_code && (
+                        <span className="text-xs text-subtler shrink-0">{t('branchExpense.oldCode', { code: it.old_code })}</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </Modal>
   );
 }
