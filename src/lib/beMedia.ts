@@ -373,14 +373,19 @@ export interface BranchExpenseImage {
 // tsp-form ImageUploader (configured with BRANCH_EXPENSE_SLIP_RESIZE as
 // `sizes`), pushes both variants to be-media, returns the gallery shape the
 // fn_branch_expense_photos_attach RPC expects.
+//
+// `idx` = the photo's slot in the gallery — be-media's leaf is
+// `slip-{idx}-lg.{ext}`, so idx is a REQUIRED form field (omit → LEAF_BUILD_FAILED
+// "unresolved token {idx}"). Both size variants of one photo share the same idx.
 export async function uploadBranchExpenseSlip(
   expenseId: number,
+  idx: number,
   image: UploadedImage,
 ): Promise<BranchExpenseImage> {
   const results = await beMediaUploadFromImage({
     type: BRANCH_EXPENSE_SLIP_TYPE,
     image,
-    params: { expense_id: expenseId },
+    params: { expense_id: expenseId, idx },
     sizes: BRANCH_EXPENSE_SLIP_SIZES,
   });
   return { thumb: results.thumb?.key, lg: results.lg?.key };
@@ -391,6 +396,7 @@ export async function uploadBranchExpenseSlip(
 // e.g. a programmatic capture path or an existing-key rewrite.
 export async function uploadBranchExpenseSlipFromFile(
   expenseId: number,
+  idx: number,
   file: File,
 ): Promise<BranchExpenseImage> {
   // Resize the single source to both spec sizes via tsp-form's shared
@@ -404,7 +410,7 @@ export async function uploadBranchExpenseSlipFromFile(
       type: BRANCH_EXPENSE_SLIP_TYPE,
       file: v,
       size: sz,
-      params: { expense_id: expenseId },
+      params: { expense_id: expenseId, idx },
     });
     out[sz] = r.key;
   }

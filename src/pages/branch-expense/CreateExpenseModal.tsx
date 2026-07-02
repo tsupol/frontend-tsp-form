@@ -122,8 +122,8 @@ export function CreateExpenseModal({ open, onClose, onSaved, items, branches, fi
       if (pendingPhotos.length > 0) {
         setPhase('attach');
         const gallery: BranchExpenseImage[] = [];
-        for (const img of pendingPhotos) {
-          const slot = await uploadBranchExpenseSlip(created.id, img);
+        for (let i = 0; i < pendingPhotos.length; i++) {
+          const slot = await uploadBranchExpenseSlip(created.id, i, pendingPhotos[i]);
           gallery.push(slot);
         }
         const attach = await apiClient.rpc<AttachResponse>('fn_branch_expense_photos_attach', {
