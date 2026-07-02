@@ -52,6 +52,7 @@
   "revalue.conditionGrade": "New condition grade",
   "revalue.batteryHealth": "Battery health (%)",
   "revalue.warrantyExpired": "Warranty expiry date",
+  "revalue.hasBox": "Has box",
   "internalUse.custodian": "Custodian (user)",
   "identifierCorrect.existing": "Identifier to correct",
   "identifierCorrect.newValue": "New value",

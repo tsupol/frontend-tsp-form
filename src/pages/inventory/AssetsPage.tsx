@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams, useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, Modal, TextArea, DataTable, PopOver, Tooltip, Switch, MaskedInput, InputDatePicker, useSnackbarContext } from 'tsp-form';
+import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, Modal, TextArea, DataTable, PopOver, Tooltip, Switch, MaskedInput, InputDatePicker, LabeledCheckbox, useSnackbarContext } from 'tsp-form';
 import { ArrowLeft, ArrowRightFromLine, Box, Search, SlidersHorizontal, XCircle, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Wrench, Printer, Plus, CheckCircle, Pencil, Cloud, CloudOff, MoreVertical, Package, Keyboard } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import { apiClient, ApiError } from '../../lib/api';
@@ -194,6 +194,9 @@ type ExtraField =
   // Battery health — integer 0–100, folded into p_condition_snapshot under `snapshotKey`
   // (default BATTERY_HEALTH). Never a top-level param; backend drops non-integer / out-of-range silently.
   | { kind: 'battery'; name: string; labelKey: string; required?: boolean; snapshotKey?: string; defaultFromAsset?: keyof Asset }
+  // Boolean checkbox. Sent as true/false. NULL (unchanged) semantics handled by only
+  // sending the param when the box was touched — see `booleanTouched` below.
+  | { kind: 'checkbox'; name: string; labelKey: string; defaultFromAsset?: keyof Asset }
   | { kind: 'identifier'; typeName: string; oldName: string; labelKey: string; required?: boolean };
 
 type SimpleActionConfig = {
@@ -319,6 +322,7 @@ const SIMPLE_ACTIONS: Record<string, SimpleActionConfig> = {
       { kind: 'select', name: 'p_condition_grade', labelKey: 'revalue.conditionGrade', options: REVALUE_CONDITION_OPTIONS },
       { kind: 'battery', name: 'p_battery_health', labelKey: 'revalue.batteryHealth', defaultFromAsset: 'battery_health' },
       { kind: 'date', name: 'p_warranty_expired_date', labelKey: 'revalue.warrantyExpired', defaultFromAsset: 'warranty_expired_date' },
+      { kind: 'checkbox', name: 'p_has_box', labelKey: 'revalue.hasBox', defaultFromAsset: 'has_box' },
     ],
     successKey: 'success.revalue',
   },
@@ -2047,6 +2051,9 @@ function AssetActionModal({
           // date default is an ISO string → keep the YYYY-MM-DD portion for the picker
           if (v != null) initial[f.name] = f.kind === 'date' ? String(v).slice(0, 10) : String(v);
         }
+        if (f.kind === 'checkbox' && f.defaultFromAsset != null) {
+          initial[f.name] = asset[f.defaultFromAsset] ? 'true' : 'false';
+        }
       });
       if (presetExtra) Object.assign(initial, presetExtra);
       setExtra(initial);
@@ -2078,6 +2085,14 @@ function AssetActionModal({
       if (config.hasReason && reason) params.p_reason_code = reason;
 
       config.extraFields?.forEach(f => {
+        if (f.kind === 'checkbox') {
+          // Partial update: only send when the value changed from the asset's current
+          // state, so an untouched box stays NULL (backend keeps the existing value).
+          const current = f.defaultFromAsset != null ? !!asset[f.defaultFromAsset] : false;
+          const next = extra[f.name] === 'true';
+          if (next !== current) params[f.name] = next;
+          return;
+        }
         if (f.kind === 'identifier') {
           // Stored as JSON: { type, value } in extra[oldName] (parsed below).
           const raw = extra[f.oldName];
@@ -2129,7 +2144,7 @@ function AssetActionModal({
 
   const reasonValid = !config?.hasReason?.required || !!reason;
   const extraValid = (config?.extraFields ?? []).every(f => {
-    if (!f.required) return true;
+    if (f.kind === 'checkbox' || !f.required) return true;
     if (f.kind === 'identifier') return isFieldFilled(f.oldName);
     return isFieldFilled(f.name);
   });
@@ -2181,6 +2196,18 @@ function AssetActionModal({
               const labelText = t(f.labelKey, { ns: 'assetActions', defaultValue: f.labelKey });
               const setVal = (name: string, value: string) =>
                 setExtra(prev => ({ ...prev, [name]: value }));
+
+              if (f.kind === 'checkbox') {
+                return (
+                  <div key={fieldKey} className="flex flex-col">
+                    <LabeledCheckbox
+                      label={labelText}
+                      checked={extra[f.name] === 'true'}
+                      onChange={(e) => setVal(f.name, e.target.checked ? 'true' : 'false')}
+                    />
+                  </div>
+                );
+              }
 
               return (
                 <div key={fieldKey} className="flex flex-col">
