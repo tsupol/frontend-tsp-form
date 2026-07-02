@@ -490,8 +490,8 @@ input[type="number"
 }
 
 /* Asset sticker — XP-420B 75×25mm thermal label.
-   Two-column layout: left (code, model, variant, barcode) wider, right
-   (external ref, condition, serial, imei) narrower. */
+   Single-column stack: code + condition/EXT row, product name, storage/
+   battery/color line, IMEI/SN row, then the barcode spanning the bottom. */
 .asset-sticker {
     box-sizing: border-box;
     width: 76mm;
@@ -508,35 +508,41 @@ input[type="number"
     /* Bold everything for thermal punch; SN / IMEI tags opt out below. */
     font-weight: 700;
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: 1fr auto;
-    column-gap: 1.5mm;
-    row-gap: 0.5mm;
+    /* Four text rows sit at their natural height; the 1fr row before the
+       barcode absorbs slack so the barcode stays pinned to the bottom. */
+    grid-template-rows: auto auto auto auto 1fr auto;
+    row-gap: 0.4mm;
     overflow: hidden;
 }
-.asset-sticker .asset-sticker-left {
+/* Two-item row: first item left, second pinned right. */
+.asset-sticker .asset-sticker-row {
     display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    gap: 0.3mm;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1.5mm;
     min-width: 0;
     overflow: hidden;
 }
-.asset-sticker .asset-sticker-right {
+.asset-sticker .asset-sticker-meta {
     display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    gap: 0.4mm;
+    align-items: baseline;
+    gap: 1.2mm;
     font-size: 8pt;
     line-height: 1.1;
-    min-width: 0;
-    overflow: hidden;
+    white-space: nowrap;
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
 }
-.asset-sticker .asset-sticker-right > div {
+.asset-sticker .asset-sticker-ids {
+    font-size: 8pt;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+}
+.asset-sticker .asset-sticker-ids > span {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-variant-numeric: tabular-nums;
+    min-width: 0;
 }
 .asset-sticker .asset-sticker-tag {
     font-size: 6pt;
@@ -552,6 +558,16 @@ input[type="number"
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    min-width: 0;
+}
+.asset-sticker .asset-sticker-name {
+    font-size: 8.5pt;
+    font-weight: 700;
+    line-height: 1.05;
+    margin-bottom: 0.2mm;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .asset-sticker .asset-sticker-line {
     display: flex;
@@ -562,7 +578,7 @@ input[type="number"
     width: 100%;
 }
 .asset-sticker .asset-sticker-line-sub {
-    font-size: 8.5pt;
+    font-size: 7.5pt;
 }
 .asset-sticker .asset-sticker-line > span {
     overflow: hidden;
@@ -571,8 +587,8 @@ input[type="number"
     min-width: 0;
 }
 .asset-sticker .asset-sticker-barcode {
-    grid-column: 1 / -1;
     justify-self: center;
+    align-self: end;
     width: 55mm;
     height: 8mm;
     shape-rendering: crispEdges;

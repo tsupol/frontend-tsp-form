@@ -2377,30 +2377,36 @@ function AssetSticker({ asset }: { asset: Asset }) {
     defaultValue: asset.condition_grade,
   });
 
+  const productName = asset.product_display_name
+    ?? [asset.family_name, asset.base_model_name].filter(Boolean).join(' ');
+
   return (
     <div className="asset-sticker">
-      <div className="asset-sticker-left">
+      {/* Row 1: code (left) · EXT + condition (right) */}
+      <div className="asset-sticker-row">
         <div className="asset-sticker-code">{asset.asset_code_display ?? asset.asset_code}</div>
-        <div className="asset-sticker-line">
-          <span>{asset.family_name}</span>
-          {asset.base_model_name && <span>{asset.base_model_name}</span>}
-        </div>
-        <div className="asset-sticker-line asset-sticker-line-sub">
-          {modelNameSuffix && <span>{modelNameSuffix}</span>}
-          {asset.battery_health != null && <span>Bat {asset.battery_health}%</span>}
-          {colorTh && <span>{colorTh}</span>}
+        <div className="asset-sticker-meta">
+          {label?.external_ref && (
+            <span><span className="asset-sticker-tag">EXT</span> {label.external_ref}</span>
+          )}
+          <span>{conditionTh}</span>
         </div>
       </div>
-      <div className="asset-sticker-right">
-        {label?.external_ref && (
-          <div><span className="asset-sticker-tag">EXT</span> {label.external_ref}</div>
-        )}
-        <div>{conditionTh}</div>
-        {asset.serial_no && (
-          <div><span className="asset-sticker-tag">SN</span> {asset.serial_no}</div>
-        )}
+      {/* Row 2: product display name, full width */}
+      <div className="asset-sticker-name">{productName}</div>
+      {/* Row 3: storage · battery · color, full width */}
+      <div className="asset-sticker-line asset-sticker-line-sub">
+        {modelNameSuffix && <span>{modelNameSuffix}</span>}
+        {asset.battery_health != null && <span>Bat {asset.battery_health}%</span>}
+        {colorTh && <span>{colorTh}</span>}
+      </div>
+      {/* Row 4: IMEI (left) · SN (right) */}
+      <div className="asset-sticker-row asset-sticker-ids">
         {asset.imei && (
-          <div><span className="asset-sticker-tag">IMEI</span> {asset.imei}</div>
+          <span><span className="asset-sticker-tag">IMEI</span> {asset.imei}</span>
+        )}
+        {asset.serial_no && (
+          <span><span className="asset-sticker-tag">SN</span> {asset.serial_no}</span>
         )}
       </div>
       <svg ref={svgRef} className="asset-sticker-barcode" />
