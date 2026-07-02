@@ -1,15 +1,19 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, keepPreviousData } from '@tanstack/react-query';
-import { Modal, Button, Input, Select, MaskedInput, LabeledCheckbox } from 'tsp-form';
-import { XCircle, CheckCircle, Search, Package } from 'lucide-react';
+import { Modal, Button, Input, Select, MaskedInput, LabeledCheckbox, InputDatePicker } from 'tsp-form';
+import { XCircle, CheckCircle, Search, Package, Keyboard } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import { makeDatePickerFormat, toLocalDateStr } from '../../lib/format';
 import { ImeiInput } from '../../components/ImeiInput';
 import { getConditionLabel, CONDITION_VALUES } from './inventoryUtils';
 
-// Direct asset registration — fn_inv_asset_register. Restricted (backend) to
-// EXTERNAL / DEAL_PARTNER branches; we only list those in the picker and show a
-// translated alert when the user has none. Not the PO/buyback intake path.
+// Direct device intake — fn_inv_asset_register. For our own shops (INTERNAL) and
+// company-owned consignment branches (EXTERNAL): the device lands straight in
+// ON_HAND_AVAILABLE, no PO / receipt / approval. DEAL_PARTNER is intentionally
+// excluded here — those branches own their own devices, so letting them self-
+// register would let them push stock in unchecked (their intake goes through the
+// approval path, not this screen). Not the PO/buyback intake path.
 
 interface BranchRow { id: number; name: string; branch_type: string; is_active: boolean }
 
@@ -38,7 +42,7 @@ export function RegisterAssetModal({
   onClose: () => void;
   onRegistered: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const [view, setView] = useState<'form' | 'done'>('form');
   const [result, setResult] = useState<RegisterResult | null>(null);
@@ -50,20 +54,25 @@ export function RegisterAssetModal({
   const [variantId, setVariantId] = useState<number | null>(null);
   const [condition, setCondition] = useState<string>('NEW');
   const [hasBox, setHasBox] = useState(true);
+  const [battery, setBattery] = useState('');
+  const [warranty, setWarranty] = useState('');
+  const [typingWarranty, setTypingWarranty] = useState(false);
   const [imei, setImei] = useState('');
   const [serial, setSerial] = useState('');
   const [costOverride, setCostOverride] = useState('');
   const [retailOverride, setRetailOverride] = useState('');
   const [error, setError] = useState('');
 
-  // Only EXTERNAL / DEAL_PARTNER branches may register (backend enforces).
+  // INTERNAL (own shops) + EXTERNAL (company-owned consignment) may register here.
+  // DEAL_PARTNER is excluded — they own their devices; self-register would let them
+  // push stock in without approval.
   const { data: branches = [] } = useQuery({
     queryKey: ['branches-register'],
     queryFn: () => apiClient.get<BranchRow[]>('/v_branches?is_active=is.true&order=name'),
     enabled: open,
   });
   const eligibleBranches = useMemo(
-    () => branches.filter(b => b.branch_type === 'EXTERNAL' || b.branch_type === 'DEAL_PARTNER'),
+    () => branches.filter(b => b.branch_type === 'INTERNAL' || b.branch_type === 'EXTERNAL'),
     [branches],
   );
   const branchOptions = useMemo(
@@ -71,12 +80,20 @@ export function RegisterAssetModal({
     [eligibleBranches],
   );
 
+  // Preselect when there's exactly one eligible branch (shop staff see only theirs).
+  useEffect(() => {
+    if (open && !branchId && eligibleBranches.length === 1) {
+      setBranchId(String(eligibleBranches[0].id));
+    }
+  }, [open, branchId, eligibleBranches]);
+
   useEffect(() => {
     if (open) {
       setView('form'); setResult(null);
       setBranchId(null); setKeyword(''); setDebounced('');
       setModelId(null); setVariantId(null);
       setCondition('NEW'); setHasBox(true);
+      setBattery(''); setWarranty(''); setTypingWarranty(false);
       setImei(''); setSerial('');
       setCostOverride(''); setRetailOverride('');
       setError('');
@@ -136,6 +153,12 @@ export function RegisterAssetModal({
       p_cost_override: costOverride.trim() ? Number(costOverride) : null,
       p_retail_override: retailOverride.trim() ? Number(retailOverride) : null,
       p_dedupe_key: null,
+      p_external_ref: null,
+      p_has_box: hasBox,
+      p_legacy_code: null,
+      // Battery health rides in the condition snapshot (key UPPERCASE, 0–100).
+      p_condition_snapshot: battery.trim() ? { BATTERY_HEALTH: Number(battery) } : null,
+      p_warranty_expired_date: warranty || null,
     }),
     onSuccess: (data) => {
       setResult(data);
@@ -183,7 +206,7 @@ export function RegisterAssetModal({
               <div className="alert alert-warning">
                 <XCircle size={18} />
                 <span>{t('asset.registerNoBranch', {
-                  defaultValue: 'Asset registration is only available for external / deal-partner branches. You have none assigned.',
+                  defaultValue: 'You have no branch that can register devices into stock.',
                 })}</span>
               </div>
             ) : (
@@ -203,7 +226,7 @@ export function RegisterAssetModal({
                       options={branchOptions}
                       value={branchId}
                       onChange={(v) => setBranchId((v as string) || null)}
-                      placeholder={t('asset.registerBranchPlaceholder', { defaultValue: 'External / partner branch' })}
+                      placeholder={t('asset.registerBranchPlaceholder', { defaultValue: 'Select branch' })}
                       size="sm"
                       searchable
                       showChevron
@@ -272,6 +295,56 @@ export function RegisterAssetModal({
                         label={t('asset.hasBox', { defaultValue: 'Has box' })}
                         checked={hasBox}
                         onChange={(e) => setHasBox(e.target.checked)}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Battery health + warranty expiry */}
+                  <div className="flex gap-3">
+                    <div className="flex flex-col flex-1 min-w-0">
+                      <label className="form-label">{t('asset.registerBattery', { defaultValue: 'Battery health (%)' })}</label>
+                      <MaskedInput
+                        mask="number"
+                        decimalScale={0}
+                        value={battery}
+                        onChange={(raw) => {
+                          // Clamp to 0–100. Empty stays empty.
+                          if (raw === '') { setBattery(''); return; }
+                          const n = parseInt(raw, 10);
+                          if (isNaN(n)) return;
+                          setBattery(String(Math.max(0, Math.min(100, n))));
+                        }}
+                        placeholder="1-100"
+                        className="w-full"
+                        suffix="%"
+                      />
+                    </div>
+                    <div className="flex flex-col flex-1 min-w-0">
+                      <label className="form-label">{t('asset.registerWarranty', { defaultValue: 'Warranty expiry date' })}</label>
+                      <InputDatePicker
+                        value={warranty ? new Date(warranty + 'T00:00:00') : null}
+                        onChange={(v) => setWarranty(toLocalDateStr(v))}
+                        dateFormat={makeDatePickerFormat(i18n.language)}
+                        locale={i18n.language}
+                        calendar="gregorian"
+                        size="sm"
+                        endIcon={<Keyboard size={16} />}
+                        onEndIconClick={() => setTypingWarranty(w => !w)}
+                        typingMode={typingWarranty}
+                        onTypingModeChange={setTypingWarranty}
+                        typingMask="##/##/####"
+                        typingPlaceholder="DD/MM/YYYY"
+                        parseTypedDate={(raw) => {
+                          if (raw.length !== 8) return null;
+                          const day = parseInt(raw.slice(0, 2), 10);
+                          const month = parseInt(raw.slice(2, 4), 10);
+                          let year = parseInt(raw.slice(4, 8), 10);
+                          if (year > 2400) year -= 543;
+                          if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+                          const d = new Date(year, month - 1, day);
+                          if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+                          return d;
+                        }}
                       />
                     </div>
                   </div>
