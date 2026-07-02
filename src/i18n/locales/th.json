@@ -2558,6 +2558,7 @@
     "device": "เครื่อง",
     "financials": "สรุปการเงิน",
     "agreedPrice": "ราคาตกลง",
+    "totalToCollect": "ยอดรวมให้เก็บทั้งหมด",
     "downPayment": "เงินดาวน์",
     "installmentAmount": "ค่างวด",
     "termMonths": "ระยะเวลา",

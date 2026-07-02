@@ -76,7 +76,8 @@ interface ContractDetail {
   saving_target_amount: number | null;
   snapshot_term_months: number | null;
   snapshot_installment_amount: number | null;
-  snapshot_total_financed: number | null;
+  snapshot_installment_total: number | null;
+  snapshot_down_amount: number | null;
   agreed_total_financed: number | null;
   discount_amount: number | null;
   discount_percent: number | null;
@@ -870,12 +871,22 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
       <div className="border border-line rounded-md px-4 py-3">
         <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-3">{t('contract.financials')}</h3>
         <div className="grid grid-cols-2 gap-3">
-          <InfoCell label={t('contract.agreedPrice')} value={fmtCurrency(contract.agreed_price)} />
-          <InfoCell label={t('contract.downPayment')} value={fmtCurrency(contract.down_payment)} />
-          <InfoCell label={t('contract.installmentAmount')} value={fmtCurrency(contract.installment_amount)} />
+          {/* Total to collect = down + (installment × months), from the agreed rate
+              snapshot. The view precomputes it as agreed_total_financed; this — not
+              agreed_price — is the number the money owner cares about. */}
+          <InfoCell
+            label={t('contract.totalToCollect')}
+            value={fmtCurrency(contract.agreed_total_financed)}
+            highlight={contract.agreed_total_financed != null && contract.agreed_total_financed > 0}
+          />
+          <InfoCell label={t('contract.downPayment')} value={fmtCurrency(contract.snapshot_down_amount ?? contract.down_payment)} />
+          <InfoCell label={t('contract.installmentAmount')} value={fmtCurrency(contract.snapshot_installment_amount ?? contract.installment_amount)} />
           <InfoCell
             label={t('contract.termMonths')}
-            value={contract.value_month ? `${contract.value_month} ${t('contract.months')}` : '—'}
+            value={(() => {
+              const term = contract.snapshot_term_months ?? contract.value_month;
+              return term ? `${term} ${t('contract.months')}` : '—';
+            })()}
           />
           <InfoCell label={t('contract.totalPaid')} value={fmtCurrency(contract.total_paid)} />
           <InfoCell label={t('contract.outstanding')} value={fmtCurrency(contract.outstanding_amount)} highlight={contract.outstanding_amount != null && contract.outstanding_amount > 0} />

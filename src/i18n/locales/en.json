@@ -2559,6 +2559,7 @@
     "device": "Device",
     "financials": "Financial Summary",
     "agreedPrice": "Agreed Price",
+    "totalToCollect": "Total to Collect",
     "downPayment": "Down Payment",
     "installmentAmount": "Installment",
     "termMonths": "Term",
