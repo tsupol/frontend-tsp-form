@@ -2060,7 +2060,7 @@
     "serialPlaceholder": "Serial number (optional)",
     "imeiInvalidLength": "IMEI must be 15 digits",
     "imeiInvalidChecksum": "Invalid IMEI — check digit doesn’t match",
-    "serialInvalidLength": "Serial must be 11 or 12 characters",
+    "serialInvalidLength": "Serial must be 10 to 12 characters",
     "serialInvalidChars": "Serial must be letters/numbers, no O or I",
     "rejectReason": "Reject reason",
     "selectReason": "Select reason",

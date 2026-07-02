@@ -2059,7 +2059,7 @@
     "serialPlaceholder": "หมายเลขเครื่อง (ไม่บังคับ)",
     "imeiInvalidLength": "IMEI ต้องมี 15 หลัก",
     "imeiInvalidChecksum": "IMEI ไม่ถูกต้อง — เลขตรวจสอบไม่ตรง",
-    "serialInvalidLength": "หมายเลขเครื่องต้องมี 11 หรือ 12 ตัวอักษร",
+    "serialInvalidLength": "หมายเลขเครื่องต้องมี 10 ถึง 12 ตัวอักษร",
     "serialInvalidChars": "หมายเลขเครื่องต้องเป็นตัวอักษร/ตัวเลข ห้ามมี O หรือ I",
     "rejectReason": "เหตุผลปฏิเสธ",
     "selectReason": "เลือกเหตุผล",

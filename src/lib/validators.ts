@@ -51,7 +51,8 @@ function luhnCheck(digits: string): boolean {
 
 /**
  * Validates iPhone Serial Number
- * - 12 characters (post-2021) or 11 characters (older)
+ * - 12 characters (post-2021), 11 characters (older), or 10 characters
+ *   (randomized serials on 2024+ devices)
  * - Alphanumeric, typically uppercase
  * - No O or I (to avoid confusion with 0 and 1)
  */
@@ -63,9 +64,9 @@ export function validateiPhoneSerial(serial: string): { valid: boolean; error?: 
     return { valid: false, error: 'Serial number is required' };
   }
 
-  // Check length (11 or 12 characters)
-  if (cleaned.length !== 11 && cleaned.length !== 12) {
-    return { valid: false, error: 'Serial must be 11 or 12 characters' };
+  // Check length (10, 11, or 12 characters)
+  if (cleaned.length < 10 || cleaned.length > 12) {
+    return { valid: false, error: 'Serial must be 10 to 12 characters' };
   }
 
   // Check alphanumeric only
