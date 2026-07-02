@@ -555,7 +555,8 @@ function ReferenceAddForm({ customerId, onSuccess }: { customerId: number; onSuc
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
-    if (!name.trim()) return;
+    // tel + relation are NOT NULL at the DB level — require them (blank previously 500'd).
+    if (!name.trim() || !tel.trim() || !relation.trim()) return;
     setSaving(true);
     setError('');
     try {
@@ -563,8 +564,8 @@ function ReferenceAddForm({ customerId, onSuccess }: { customerId: number; onSuc
         p_customer_id: customerId,
         p_name: name.trim(),
         p_last_name: lastName.trim() || null,
-        p_tel: tel.trim() || null,
-        p_relation: relation.trim() || null,
+        p_tel: tel.trim(),
+        p_relation: relation.trim(),
         p_facebook: null,
         p_line_id: null,
       });
@@ -595,14 +596,14 @@ function ReferenceAddForm({ customerId, onSuccess }: { customerId: number; onSuc
       </div>
       <div className="flex gap-3">
         <div className="flex flex-col flex-1">
-          <Input size="sm" value={tel} onChange={e => setTel(e.target.value)} className="w-full" placeholder={t('customer.refTel')} />
+          <Input size="sm" value={tel} onChange={e => setTel(e.target.value)} className="w-full" placeholder={`${t('customer.refTel')} *`} />
         </div>
         <div className="flex flex-col flex-1">
-          <Input size="sm" value={relation} onChange={e => setRelation(e.target.value)} className="w-full" placeholder={t('customer.refRelation')} />
+          <Input size="sm" value={relation} onChange={e => setRelation(e.target.value)} className="w-full" placeholder={`${t('customer.refRelation')} *`} />
         </div>
       </div>
       <div className="flex justify-end">
-        <Button color="primary" size="sm" onClick={handleSave} disabled={saving || !name.trim()} startIcon={<Plus size={12} />}>
+        <Button color="primary" size="sm" onClick={handleSave} disabled={saving || !name.trim() || !tel.trim() || !relation.trim()} startIcon={<Plus size={12} />}>
           {t('common.add')}
         </Button>
       </div>

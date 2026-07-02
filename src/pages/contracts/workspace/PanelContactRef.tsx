@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Input, MaskedInput, Select, Switch, Badge, useSnackbarContext } from 'tsp-form';
 import { translateApiError } from '../../../lib/apiErrors';
-import { Plus, Trash2, Star, XCircle, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Pencil, Trash2, Star, XCircle, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { useWorkspace } from './WorkspaceContext';
 import { PanelSection } from './PanelSection';
@@ -80,7 +80,7 @@ export function PanelContactRef({ onClose: _onClose }: Props) {
         {references.length > 0 && (
           <div className="flex flex-col gap-2 mb-4">
             {references.map(r => (
-              <ReferenceRow key={r.id} reference={r} onDeleted={handleReferenceDeleted} />
+              <ReferenceRow key={r.id} reference={r} onDeleted={handleReferenceDeleted} onEdited={handleReferenceSuccess} />
             ))}
           </div>
         )}
@@ -118,27 +118,73 @@ function ContactRow({ contact, onDeleted }: { contact: CustomerContact; onDelete
   );
 }
 
-function ReferenceRow({ reference, onDeleted }: { reference: CustomerReference; onDeleted: () => void }) {
+function ReferenceRow({ reference, onDeleted, onEdited }: { reference: CustomerReference; onDeleted: () => void; onEdited: () => void }) {
   const { t } = useTranslation();
   const { addSnackbar } = useSnackbarContext();
   const [expanded, setExpanded] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  const [name, setName] = useState(reference.name);
+  const [lastName, setLastName] = useState(reference.last_name ?? '');
+  const [tel, setTel] = useState(reference.tel ?? '');
+  const [relation, setRelation] = useState(reference.relation ?? '');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const startEdit = () => {
+    setName(reference.name);
+    setLastName(reference.last_name ?? '');
+    setTel(reference.tel ?? '');
+    setRelation(reference.relation ?? '');
+    setError('');
+    setEditing(true);
+    setExpanded(true);
+  };
+
   const handleDelete = async () => {
     setDeleting(true);
     try {
-      await apiClient.delete(`/v_customer_references?id=eq.${reference.id}`);
+      // v_customer_references is read-only — writes must go through the RPC (mig 441).
+      await apiClient.rpc('fn_customer_reference_delete', { p_reference_id: reference.id });
       onDeleted();
     } catch (err) {
       const msg = err instanceof ApiError ? translateApiError(err, t) : (err instanceof Error ? err.message : String(err));
       addSnackbar({ message: <div className="alert alert-danger"><XCircle size={18} /><div><div className="alert-description">{msg}</div></div></div> });
     } finally { setDeleting(false); }
   };
+
+  const handleSave = async () => {
+    // tel + relation are NOT NULL at the DB level — require them.
+    if (!name.trim() || !tel.trim() || !relation.trim()) return;
+    setSaving(true); setError('');
+    try {
+      await apiClient.rpc('fn_customer_reference_update', {
+        p_reference_id: reference.id,
+        p_name: name.trim(),
+        p_last_name: lastName.trim(),
+        p_tel: tel.trim(),
+        p_relation: relation.trim(),
+      });
+      setEditing(false);
+      onEdited();
+    } catch (err) {
+      if (err instanceof ApiError) { const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : ''); setError(tr || err.code || err.message); } else setError(String(err));
+    } finally { setSaving(false); }
+  };
+
   return (
     <div className="border border-success-border bg-success-soft rounded-lg overflow-hidden transition-colors">
       <div className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-surface-hover transition-colors" onClick={() => setExpanded(!expanded)}>
         {expanded ? <ChevronDown size={14} className="text-subtle shrink-0" /> : <ChevronRight size={14} className="text-subtle shrink-0" />}
         <span className="font-medium text-sm flex-1 truncate">{reference.name} {reference.last_name}</span>
         {reference.relation && <Badge size="xs" color="default">{reference.relation}</Badge>}
+        <button
+          className="p-1 rounded hover:bg-surface-hover cursor-pointer text-subtle hover:text-primary-fg shrink-0 bg-transparent border-none"
+          onClick={(e) => { e.stopPropagation(); startEdit(); }}
+        >
+          <Pencil size={13} />
+        </button>
         <button
           className="p-1 rounded hover:bg-danger-soft cursor-pointer text-subtle hover:text-danger shrink-0 bg-transparent border-none"
           onClick={(e) => { e.stopPropagation(); handleDelete(); }}
@@ -147,7 +193,7 @@ function ReferenceRow({ reference, onDeleted }: { reference: CustomerReference; 
           <Trash2 size={13} />
         </button>
       </div>
-      {expanded && (
+      {expanded && !editing && (
         <div className="border-t border-line px-3 py-2 text-sm flex flex-col gap-1">
           {reference.tel && (
             <div className="flex gap-2">
@@ -164,6 +210,39 @@ function ReferenceRow({ reference, onDeleted }: { reference: CustomerReference; 
           {!reference.tel && !reference.relation && (
             <span className="text-subtle text-xs">{t('common.noData')}</span>
           )}
+        </div>
+      )}
+      {expanded && editing && (
+        <div className="border-t border-line px-3 py-2">
+          {error && <div className="alert alert-danger text-xs mb-3"><XCircle size={14} /><span>{error}</span></div>}
+          <div className="form-grid">
+            <div className="flex gap-3">
+              <div className="flex flex-col flex-1">
+                <label className="form-label">{t('customer.refName')} *</label>
+                <Input size="sm" value={name} onChange={e => setName(e.target.value)} className="w-full" />
+              </div>
+              <div className="flex flex-col flex-1">
+                <label className="form-label">{t('customer.refLastName')}</label>
+                <Input size="sm" value={lastName} onChange={e => setLastName(e.target.value)} className="w-full" />
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <div className="flex flex-col flex-1">
+                <label className="form-label">{t('customer.refTel')} *</label>
+                <MaskedInput size="sm" dynamicMask={thaiPhoneMask} value={tel} onChange={(raw) => setTel(raw)} className="w-full" />
+              </div>
+              <div className="flex flex-col flex-1">
+                <label className="form-label">{t('customer.refRelation')} *</label>
+                <Input size="sm" value={relation} onChange={e => setRelation(e.target.value)} className="w-full" />
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>{t('common.cancel')}</Button>
+            <Button size="sm" color="primary" onClick={handleSave} disabled={saving || !name.trim() || !tel.trim() || !relation.trim()}>
+              {saving ? t('common.loading') : t('common.save')}
+            </Button>
+          </div>
         </div>
       )}
     </div>
@@ -224,10 +303,11 @@ function ReferenceAddForm({ customerId, onSuccess }: { customerId: number; onSuc
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
-    if (!name.trim()) return;
+    // tel + relation are NOT NULL at the DB level — require them (blank previously 500'd).
+    if (!name.trim() || !tel.trim() || !relation.trim()) return;
     setSaving(true); setError('');
     try {
-      await apiClient.rpc('fn_customer_reference_add', { p_customer_id: customerId, p_name: name.trim(), p_last_name: lastName.trim() || null, p_tel: tel.trim() || null, p_relation: relation.trim() || null, p_facebook: null, p_line_id: null });
+      await apiClient.rpc('fn_customer_reference_add', { p_customer_id: customerId, p_name: name.trim(), p_last_name: lastName.trim() || null, p_tel: tel.trim(), p_relation: relation.trim(), p_facebook: null, p_line_id: null });
       setName(''); setLastName(''); setTel(''); setRelation(''); onSuccess();
     } catch (err) {
       if (err instanceof ApiError) { const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : ''); setError(tr || err.code || err.message); } else setError(String(err));
@@ -250,17 +330,17 @@ function ReferenceAddForm({ customerId, onSuccess }: { customerId: number; onSuc
         </div>
         <div className="flex gap-3">
           <div className="flex flex-col flex-1">
-            <label className="form-label">{t('customer.refTel')}</label>
+            <label className="form-label">{t('customer.refTel')} *</label>
             <MaskedInput size="sm" dynamicMask={thaiPhoneMask} value={tel} onChange={(raw) => setTel(raw)} className="w-full" />
           </div>
           <div className="flex flex-col flex-1">
-            <label className="form-label">{t('customer.refRelation')}</label>
+            <label className="form-label">{t('customer.refRelation')} *</label>
             <Input size="sm" value={relation} onChange={e => setRelation(e.target.value)} className="w-full" />
           </div>
         </div>
       </div>
       <div className="flex justify-end">
-        <Button color="primary" onClick={handleSave} disabled={saving || !name.trim()} startIcon={<Plus size={12} />}>{t('common.add')}</Button>
+        <Button color="primary" onClick={handleSave} disabled={saving || !name.trim() || !tel.trim() || !relation.trim()} startIcon={<Plus size={12} />}>{t('common.add')}</Button>
       </div>
     </div>
   );
