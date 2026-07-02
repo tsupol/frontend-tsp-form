@@ -5,14 +5,15 @@ import { useTranslation } from 'react-i18next';
 import { Badge, PopOver, Tooltip } from 'tsp-form';
 import {
   Bell, MessageSquare, FileText, CreditCard, AlertTriangle, CheckCheck,
-  ExternalLink,
+  ExternalLink, ClipboardCheck,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { apiClient } from '../lib/api';
+import { fmtCurrency } from '../lib/format';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
-type NotifCategory = 'contract' | 'chat' | 'payment' | 'system';
+type NotifCategory = 'contract' | 'chat' | 'payment' | 'approval' | 'system';
 
 type NotificationRow = {
   notification_id: number;
@@ -31,8 +32,14 @@ type NotificationRow = {
     signing_id?: number;
     new_lessee_name?: string;
     bill_code?: string;
-    amount?: number;
+    amount?: number | string;
     staff_name?: string;
+    // Buyback approval (PART_022 mig 100) — routes to /admin/approvals.
+    po_id?: number;
+    po_type?: string;
+    po_code?: string;
+    branch_name?: string;
+    requested_by_name?: string;
   } | null;
   contract_ids: number[] | null;
   created_at: string;
@@ -68,6 +75,7 @@ function resolveCategory(evt: string, fallback: string): NotifCategory | string 
   if (evt.startsWith('chat_')) return 'chat';
   if (evt.startsWith('signing_') || evt.startsWith('bind_') || evt.startsWith('contract_')) return 'contract';
   if (evt.startsWith('bill_') || evt === 'slip_uploaded') return 'payment';
+  if (evt.endsWith('_approval_required_staff') || evt.startsWith('buyback_')) return 'approval';
   return fallback;
 }
 
@@ -76,6 +84,7 @@ function iconForCategory(category: string) {
     case 'contract': return <FileText size={14} />;
     case 'chat':     return <MessageSquare size={14} />;
     case 'payment': return <CreditCard size={14} />;
+    case 'approval': return <ClipboardCheck size={14} />;
     default:         return <AlertTriangle size={14} />;
   }
 }
@@ -90,11 +99,16 @@ function customerNameOf(row: NotificationRow): string | null {
   return row.payload?.customer_full_name ?? null;
 }
 
-// FE owns deeplinks. event_type + contract_id → route.
+// FE owns deeplinks. event_type + payload → route.
 function deeplinkFor(row: NotificationRow): string | null {
+  const evt = row.event_type;
+  // Buyback approval (PART_022 mig 100) — no contract_id; the approval lives on
+  // the Approvals page (BUYBACK type). Routed before the contract_id guard below.
+  if (evt === 'buyback_approval_required_staff' || row.payload?.po_type === 'BUYBACK') {
+    return '/admin/approvals';
+  }
   const cid = row.payload?.contract_id ?? row.contract_ids?.[0];
   if (!cid) return null;
-  const evt = row.event_type;
   if (evt.startsWith('chat_')) return `/admin/chat?contract=${cid}`;
   if (evt.startsWith('signing_')) return `/admin/contracts/search/${cid}?tab=signing`;
   if (evt.startsWith('bill_') || evt === 'slip_uploaded') return `/admin/contracts/search/${cid}?tab=money`;
@@ -379,25 +393,37 @@ export function NotificationMenuItem({ collapsed, isMobile, unreadCount }: Props
                           {relativeTime(t, row.created_at)}
                         </span>
                       </div>
-                      <div className="text-xs leading-snug truncate mt-0.5 inline-flex items-center gap-1.5 min-w-0 flex-wrap">
-                        {customer ? <span className="text-subtle truncate">{customer}</span> : <MissingField field="customer_full_name" />}
-                        <span className="text-subtle">·</span>
-                        {code ? (
-                          <span
-                            role="link"
-                            tabIndex={0}
-                            onClick={(e) => handleContractClick(e, row)}
-                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleContractClick(e as unknown as React.MouseEvent, row); }}
-                            className="text-primary-fg hover:underline inline-flex items-center gap-1 cursor-pointer shrink-0"
-                          >
-                            {code}
-                            <ExternalLink size={11} />
-                          </span>
-                        ) : (
-                          <MissingField field="contract_code" />
-                        )}
-                        {extras}
-                      </div>
+                      {cat === 'approval' ? (
+                        <div className="text-xs leading-snug truncate mt-0.5 inline-flex items-center gap-1.5 min-w-0 flex-wrap">
+                          {row.payload?.po_code && <span className="text-primary-fg font-medium truncate">{row.payload.po_code}</span>}
+                          {row.payload?.branch_name && (
+                            <><span className="text-subtle">·</span><span className="text-subtle truncate">{row.payload.branch_name}</span></>
+                          )}
+                          {row.payload?.amount != null && (
+                            <><span className="text-subtle">·</span><span className="text-subtle tabular-nums shrink-0">฿{fmtCurrency(Number(row.payload.amount))}</span></>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-xs leading-snug truncate mt-0.5 inline-flex items-center gap-1.5 min-w-0 flex-wrap">
+                          {customer ? <span className="text-subtle truncate">{customer}</span> : <MissingField field="customer_full_name" />}
+                          <span className="text-subtle">·</span>
+                          {code ? (
+                            <span
+                              role="link"
+                              tabIndex={0}
+                              onClick={(e) => handleContractClick(e, row)}
+                              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleContractClick(e as unknown as React.MouseEvent, row); }}
+                              className="text-primary-fg hover:underline inline-flex items-center gap-1 cursor-pointer shrink-0"
+                            >
+                              {code}
+                              <ExternalLink size={11} />
+                            </span>
+                          ) : (
+                            <MissingField field="contract_code" />
+                          )}
+                          {extras}
+                        </div>
+                      )}
                       {actor && (
                         <div className="text-[11px] text-subtle/80 mt-0.5 truncate">
                           {t('notifCenter.actorBy', { name: actor })}

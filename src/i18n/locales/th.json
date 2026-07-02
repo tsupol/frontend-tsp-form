@@ -538,7 +538,8 @@
       "signing_sealed_bind_staff": "ผูกเครื่อง",
       "slip_uploaded": "มีสลิปเข้า [รอตรวจ]",
       "bill_paid_staff": "บิล [ชำระแล้ว]",
-      "bill_voided_staff": "บิล [ยกเลิก]"
+      "bill_voided_staff": "บิล [ยกเลิก]",
+      "buyback_approval_required_staff": "ซื้อคืนรออนุมัติ"
     },
     "signingType": {
       "ADDENDUM": "เพิ่มเติม",

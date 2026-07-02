@@ -538,7 +538,8 @@
       "signing_sealed_bind_staff": "Device bound",
       "slip_uploaded": "Slip uploaded [to review]",
       "bill_paid_staff": "Bill paid",
-      "bill_voided_staff": "Bill voided"
+      "bill_voided_staff": "Bill voided",
+      "buyback_approval_required_staff": "Buyback approval required"
     },
     "signingType": {
       "ADDENDUM": "addendum",
