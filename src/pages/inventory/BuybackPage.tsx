@@ -819,7 +819,7 @@ export function BuybackDetailPanel({
           {detail.status === 'DRAFT' && (
             <Button
               size="sm"
-              variant="outline"
+              color="primary"
               startIcon={<Pencil size={14} />}
               onClick={() => navigate(`/admin/inventory/buyback/new/${detail.po_id}`)}
             >
