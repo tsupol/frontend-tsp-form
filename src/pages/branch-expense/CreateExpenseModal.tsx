@@ -8,7 +8,6 @@ import {
 import { Calendar, Keyboard, CheckCircle, XCircle, X, Plus, Search, ChevronRight } from 'lucide-react';
 import { fmtCurrency } from '../../lib/format';
 import { apiClient, ApiError } from '../../lib/api';
-import { useAuth } from '../../contexts/AuthContext';
 import {
   toLocalDateStr, parseLocalDate, makeDatePickerFormat,
 } from '../../lib/format';
@@ -36,7 +35,6 @@ type Phase = 'form' | 'attach' | 'done';
 
 export function CreateExpenseModal({ open, onClose, onSaved, items, branches, fixedBranchId }: CreateExpenseModalProps) {
   const { t, i18n } = useTranslation();
-  const { user } = useAuth();
   const { addSnackbar } = useSnackbarContext();
 
   const [phase, setPhase] = useState<Phase>('form');

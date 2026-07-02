@@ -2076,7 +2076,7 @@ function DeliveryModal({ open, contract, onClose, onSuccess }: {
   const handleUploadPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
     e.target.value = '';
-    if (files.length === 0 || !user) return;
+    if (files.length === 0 || !user || user.holding_id == null) return;
     setUploading(true);
     try {
       const spec = await getUploadSpec('contract_evidence');
