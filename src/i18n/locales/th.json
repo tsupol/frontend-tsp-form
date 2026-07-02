@@ -2571,6 +2571,7 @@
     "attachmentsAddPhoto": "เพิ่ม",
     "attachmentsAtMax": "ครบจำนวนรูปสูงสุดแล้ว",
     "attachmentsAdded": "เพิ่มรูปภาพแล้ว",
+    "attachmentsAddedCount": "เพิ่มรูปภาพ {{count}} รูปแล้ว",
     "attachmentsQrTitle": "หรือถ่ายจากโทรศัพท์",
     "attachmentsQrHint": "สแกนเพื่อเปิดกล้อง รูปจะแนบอัตโนมัติ",
     "attachmentsQrCount": "อัปโหลดแล้ว {{count}} / {{max}}",

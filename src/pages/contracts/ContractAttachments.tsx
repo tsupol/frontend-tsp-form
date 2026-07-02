@@ -265,15 +265,11 @@ function ManageModal({
     }
   };
 
-  // Pick (camera/file) → resize-only to sm/md webp → upload each → attach.
-  // No crop: delivery evidence keeps the whole frame.
-  const handlePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    if (!user?.holding_id) { setError(t('common.error')); return; }
-    setUploading(true);
-    setError('');
+  // Resize-only to sm/md webp → upload each variant → attach. No crop:
+  // delivery evidence keeps the whole frame. `sortOrder` is the target index
+  // for this photo — passed in so a multi-file loop can advance it per file
+  // instead of reading the stale `photos.length`.
+  const uploadOne = async (file: File, holdingId: number, sortOrder: number) => {
     const uploaded: Record<string, string> = {};
     try {
       const variants = await resizeToVariants(file, CONTRACT_EVIDENCE_RESIZE);
@@ -284,7 +280,7 @@ function ManageModal({
           type: CONTRACT_EVIDENCE_TYPE,
           file: f,
           size: sz,
-          params: { contract_id: contractId, idx: photos.length },
+          params: { contract_id: contractId, idx: sortOrder },
         });
         uploaded[sz] = r.key;
       }
@@ -294,7 +290,7 @@ function ManageModal({
       // Private/CONFIDENTIAL — the table constraint requires variant values to
       // be PUBLIC paths, so private uploads pass null variants.
       await apiClient.rpc('fn_media_attach', {
-        p_holding_id: user.holding_id,
+        p_holding_id: holdingId,
         p_storage_path: toStoragePath(primary),
         p_variants_json: null,
         p_media_type: 'IMAGE',
@@ -305,15 +301,45 @@ function ManageModal({
         p_entity_type: ENTITY_TYPE,
         p_entity_id: contractId,
         p_usage_type: USAGE_TYPE,
-        p_sort_order: photos.length,
+        p_sort_order: sortOrder,
         p_caption: null,
       });
+    } catch (err) {
+      // Roll back this file's uploaded variants; let the caller surface the error.
+      if (Object.keys(uploaded).length > 0) beMediaDelete(Object.values(uploaded)).catch(() => {});
+      throw err;
+    }
+  };
+
+  // Pick one or many (file/photo library) → upload sequentially, capped at the
+  // remaining slots up to CONTRACT_EVIDENCE_MAX.
+  const handlePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = '';
+    if (files.length === 0) return;
+    if (!user?.holding_id) { setError(t('common.error')); return; }
+
+    const remaining = CONTRACT_EVIDENCE_MAX - photos.length;
+    const batch = files.slice(0, Math.max(0, remaining));
+    if (batch.length === 0) return;
+
+    setUploading(true);
+    setError('');
+    let done = 0;
+    try {
+      // Sequential so sort_order stays stable and be-media isn't hammered.
+      for (let i = 0; i < batch.length; i++) {
+        await uploadOne(batch[i], user.holding_id, photos.length + i);
+        done++;
+      }
       addSnackbar({
-        message: <div className="alert alert-success"><CheckCircle size={16} /><span>{t('contract.attachmentsAdded', { defaultValue: 'Photo added' })}</span></div>,
+        message: <div className="alert alert-success"><CheckCircle size={16} /><span>{t('contract.attachmentsAddedCount', { count: done, defaultValue: '{{count}} photo(s) added' })}</span></div>,
       });
       onChanged();
     } catch (err) {
-      if (Object.keys(uploaded).length > 0) beMediaDelete(Object.values(uploaded)).catch(() => {});
+      // Some may have succeeded before the failure — refresh so they show,
+      // and report the error for the file that broke.
+      if (done > 0) onChanged();
       setError(formatApiError(err, t));
     } finally {
       setUploading(false);
@@ -338,13 +364,15 @@ function ManageModal({
           </div>
         )}
 
-        {/* Hidden input — `capture` opens the rear camera on mobile, falls back
-            to the file picker on desktop. Resize-only, no crop. */}
+        {/* Hidden input — opens the file / photo library (computer + iPad) and
+            allows picking several images at once. No `capture`: it would force
+            a single rear-camera shot and disable multi-select. iPad's picker
+            still offers "Take Photo". Resize-only, no crop. */}
         <input
           ref={fileInputRef}
           type="file"
           accept="image/*"
-          capture="environment"
+          multiple
           className="hidden"
           onChange={handlePick}
         />

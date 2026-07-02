@@ -2572,6 +2572,7 @@
     "attachmentsAddPhoto": "Add",
     "attachmentsAtMax": "Maximum number of photos reached.",
     "attachmentsAdded": "Photo added",
+    "attachmentsAddedCount": "{{count}} photo(s) added",
     "attachmentsQrTitle": "Or capture from a phone",
     "attachmentsQrHint": "Scan to open the camera. Photos attach automatically.",
     "attachmentsQrCount": "{{count}} / {{max}} uploaded",

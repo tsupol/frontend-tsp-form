@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Badge, Button, Input, Modal, TextArea, Tooltip, useSnackbarContext, resizeToVariants } from 'tsp-form';
-import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Upload, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, Download, Pause, Play, Square, Ban, Settings2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, Download, Pause, Play, Square, Ban, Settings2 } from 'lucide-react';
 import { GenerateContractPdfModal } from './GenerateContractPdfModal';
 import type { BeMediaContractDoc } from '../../lib/beMedia';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -875,7 +875,7 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
           <InfoCell label={t('contract.installmentAmount')} value={fmtCurrency(contract.installment_amount)} />
           <InfoCell
             label={t('contract.termMonths')}
-            value={contract.snapshot_term_months ? `${contract.snapshot_term_months} ${t('contract.months')}` : '—'}
+            value={contract.value_month ? `${contract.value_month} ${t('contract.months')}` : '—'}
           />
           <InfoCell label={t('contract.totalPaid')} value={fmtCurrency(contract.total_paid)} />
           <InfoCell label={t('contract.outstanding')} value={fmtCurrency(contract.outstanding_amount)} highlight={contract.outstanding_amount != null && contract.outstanding_amount > 0} />
@@ -2025,55 +2025,69 @@ function DeliveryModal({ open, contract, onClose, onSuccess }: {
     },
   });
 
+  // Resize per the upload spec → upload variants → attach one photo. `sortOrder`
+  // passed in so a multi-file loop advances it per file.
+  const uploadOnePhoto = async (
+    file: File,
+    holdingId: number,
+    spec: Awaited<ReturnType<typeof getUploadSpec>>,
+    sortOrder: number,
+  ) => {
+    const sizes = Object.fromEntries(
+      spec.sizes.map((sz) => [
+        sz.label,
+        { maxWidth: sz.width, maxHeight: sz.width, quality: spec.quality, format: 'webp' as const, mode: 'contain' as const },
+      ]),
+    );
+    const variants = await resizeToVariants(file, sizes);
+
+    const results = await beMediaUploadFromImage({
+      type: 'contract_evidence',
+      image: {
+        id: Math.random().toString(36).slice(2),
+        originalFile: file,
+        originalWidth: 0, originalHeight: 0, originalSize: file.size,
+        file: variants.sm?.file ?? variants.md?.file ?? Object.values(variants)[0]?.file,
+        variants,
+      },
+      params: { contract_id: contract.id, idx: sortOrder },
+    });
+    const primary = results.sm?.key ?? Object.values(results)[0]?.key;
+    if (!primary) throw new Error('Upload returned no key');
+    // Private media — backend chk_media_variants_keys requires variant
+    // values to be PUBLIC paths regardless of access_level, so pass null.
+    await apiClient.rpc('fn_media_attach', {
+      p_holding_id: holdingId,
+      p_storage_path: toStoragePath(primary),
+      p_variants_json: null,
+      p_media_type: 'IMAGE',
+      p_access_level: 'CONFIDENTIAL',
+      p_mime_type: mimeFromKey(primary),
+      p_file_size_bytes: (variants.sm ?? Object.values(variants)[0]).size,
+      p_original_filename: file.name,
+      p_entity_type: 'CONTRACT',
+      p_entity_id: contract.id,
+      p_usage_type: 'ATTACHMENT',
+      p_sort_order: sortOrder,
+      p_caption: null,
+    });
+  };
+
   const handleUploadPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const files = Array.from(e.target.files ?? []);
     e.target.value = '';
-    if (!file || !user) return;
+    if (files.length === 0 || !user) return;
     setUploading(true);
     try {
       const spec = await getUploadSpec('contract_evidence');
-      // Resize to the spec's variants via tsp-form's shared processor.
-      const sizes = Object.fromEntries(
-        spec.sizes.map((sz) => [
-          sz.label,
-          { maxWidth: sz.width, maxHeight: sz.width, quality: spec.quality, format: 'webp' as const, mode: 'contain' as const },
-        ]),
-      );
-      const variants = await resizeToVariants(file, sizes);
-
-      const results = await beMediaUploadFromImage({
-        type: 'contract_evidence',
-        image: {
-          id: Math.random().toString(36).slice(2),
-          originalFile: file,
-          originalWidth: 0, originalHeight: 0, originalSize: file.size,
-          file: variants.sm?.file ?? variants.md?.file ?? Object.values(variants)[0]?.file,
-          variants,
-        },
-        params: { contract_id: contract.id, idx: photos.length },
-      });
-      const primary = results.sm?.key ?? Object.values(results)[0]?.key;
-      if (!primary) throw new Error('Upload returned no key');
-      // Private media — backend chk_media_variants_keys requires variant
-      // values to be PUBLIC paths regardless of access_level, so pass null.
-      await apiClient.rpc('fn_media_attach', {
-        p_holding_id: user.holding_id,
-        p_storage_path: toStoragePath(primary),
-        p_variants_json: null,
-        p_media_type: 'IMAGE',
-        p_access_level: 'CONFIDENTIAL',
-        p_mime_type: mimeFromKey(primary),
-        p_file_size_bytes: (variants.sm ?? Object.values(variants)[0]).size,
-        p_original_filename: file.name,
-        p_entity_type: 'CONTRACT',
-        p_entity_id: contract.id,
-        p_usage_type: 'ATTACHMENT',
-        p_sort_order: 0,
-        p_caption: null,
-      });
+      // Sequential so sort_order stays stable and be-media isn't hammered.
+      for (let i = 0; i < files.length; i++) {
+        await uploadOnePhoto(files[i], user.holding_id, spec, photos.length + i);
+      }
       refetchPhotos();
     } catch {
       setError(t('contract.uploadFailed'));
+      refetchPhotos();
     } finally {
       setUploading(false);
     }
@@ -2125,7 +2139,7 @@ function DeliveryModal({ open, contract, onClose, onSuccess }: {
                   />
                 );
               })}
-              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleUploadPhoto} />
+              <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={handleUploadPhoto} />
               <button
                 type="button"
                 className="w-20 h-20 flex flex-col items-center justify-center gap-1 rounded border-2 border-dashed border-line hover:border-primary hover:bg-surface-hover transition-colors cursor-pointer text-subtle bg-transparent"
@@ -2134,7 +2148,7 @@ function DeliveryModal({ open, contract, onClose, onSuccess }: {
               >
                 {uploading
                   ? <Loader2 size={16} className="animate-spin" />
-                  : <><Upload size={16} /><span className="text-[10px]">{t('common.add')}</span></>
+                  : <><Camera size={16} /><span className="text-[10px]">{t('common.add')}</span></>
                 }
               </button>
             </div>
