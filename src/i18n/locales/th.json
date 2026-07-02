@@ -2146,6 +2146,7 @@
     "screen": "หน้าจอ",
     "body": "ตัวเครื่อง",
     "batteryHealth": "สุขภาพแบตเตอรี่ (%)",
+    "warrantyExpired": "วันหมดประกัน",
     "connectivity": "การเชื่อมต่อ",
     "conditionNotes": "หมายเหตุ",
     "conditionNotesPlaceholder": "หมายเหตุเพิ่มเติมเกี่ยวกับสภาพ",

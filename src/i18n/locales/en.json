@@ -2147,6 +2147,7 @@
     "screen": "Screen",
     "body": "Body",
     "batteryHealth": "Battery health (%)",
+    "warrantyExpired": "Warranty expiry date",
     "connectivity": "Connectivity",
     "conditionNotes": "Notes",
     "conditionNotesPlaceholder": "Anything else worth noting about the condition",

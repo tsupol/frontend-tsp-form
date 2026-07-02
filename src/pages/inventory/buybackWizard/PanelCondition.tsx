@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation } from '@tanstack/react-query';
-import { Button, Select, TextArea, MaskedInput } from 'tsp-form';
-import { XCircle } from 'lucide-react';
+import { Button, Select, TextArea, MaskedInput, InputDatePicker } from 'tsp-form';
+import { XCircle, Keyboard } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
+import { makeDatePickerFormat, toLocalDateStr } from '../../../lib/format';
 import { useFormSnapshot } from '../../../hooks/useFormSnapshot';
 import { getLine } from './useBuyback';
 import {
@@ -23,7 +24,7 @@ export function PanelCondition({
   onSaved: () => void;
   onClose: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const line = getLine(draft);
   const snap = (line?.condition_snapshot ?? {}) as Record<string, string>;
 
@@ -32,10 +33,12 @@ export function PanelCondition({
   const [screen, setScreen] = useState<string>(snap.SCREEN_CONDITION ?? '');
   const [body, setBody] = useState<string>(snap.BODY_CONDITION ?? '');
   const [battery, setBattery] = useState<string>(snap.BATTERY_HEALTH ?? '');
+  const [warranty, setWarranty] = useState<string>(line?.warranty_expired_date?.slice(0, 10) ?? '');
+  const [typingWarranty, setTypingWarranty] = useState(false);
   const [notes, setNotes] = useState<string>(snap.CONDITION_NOTES ?? '');
   const [error, setError] = useState('');
 
-  const formSnapshot = useFormSnapshot({ grade, overall, screen, body, battery, notes });
+  const formSnapshot = useFormSnapshot({ grade, overall, screen, body, battery, warranty, notes });
 
   useEffect(() => {
     if (dirtyRef) dirtyRef.current = formSnapshot.isDirty;
@@ -49,6 +52,7 @@ export function PanelCondition({
     setScreen(s.SCREEN_CONDITION ?? '');
     setBody(s.BODY_CONDITION ?? '');
     setBattery(s.BATTERY_HEALTH ?? '');
+    setWarranty(l?.warranty_expired_date?.slice(0, 10) ?? '');
     setNotes(s.CONDITION_NOTES ?? '');
     formSnapshot.resetNext();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -73,7 +77,7 @@ export function PanelCondition({
         p_condition_snapshot: payload,
         p_note: null,
         p_branch_id: null,
-        p_warranty_expired_date: null,
+        p_warranty_expired_date: warranty || null,
       });
     },
     onSuccess: () => {
@@ -169,6 +173,33 @@ export function PanelCondition({
                   placeholder="1-100"
                   className="w-full"
                   suffix="%"
+                />
+              </div>
+              <div className="flex flex-col">
+                <label className="form-label">{t('buybackWizard.warrantyExpired', { defaultValue: 'Warranty expiry date' })}</label>
+                <InputDatePicker
+                  value={warranty ? new Date(warranty + 'T00:00:00') : null}
+                  onChange={(v) => setWarranty(toLocalDateStr(v))}
+                  dateFormat={makeDatePickerFormat(i18n.language)}
+                  locale={i18n.language}
+                  calendar="gregorian"
+                  endIcon={<Keyboard size={16} />}
+                  onEndIconClick={() => setTypingWarranty(t => !t)}
+                  typingMode={typingWarranty}
+                  onTypingModeChange={setTypingWarranty}
+                  typingMask="##/##/####"
+                  typingPlaceholder="DD/MM/YYYY"
+                  parseTypedDate={(raw) => {
+                    if (raw.length !== 8) return null;
+                    const day = parseInt(raw.slice(0, 2), 10);
+                    const month = parseInt(raw.slice(2, 4), 10);
+                    let year = parseInt(raw.slice(4, 8), 10);
+                    if (year > 2400) year -= 543;
+                    if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+                    const d = new Date(year, month - 1, day);
+                    if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+                    return d;
+                  }}
                 />
               </div>
             </div>

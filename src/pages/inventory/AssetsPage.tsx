@@ -3,13 +3,13 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams, useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, Modal, TextArea, DataTable, PopOver, Tooltip, Switch, useSnackbarContext } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, Box, Search, SlidersHorizontal, XCircle, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Wrench, Printer, Plus, CheckCircle, Pencil, Cloud, CloudOff, MoreVertical, Package } from 'lucide-react';
+import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, Modal, TextArea, DataTable, PopOver, Tooltip, Switch, MaskedInput, InputDatePicker, useSnackbarContext } from 'tsp-form';
+import { ArrowLeft, ArrowRightFromLine, Box, Search, SlidersHorizontal, XCircle, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Wrench, Printer, Plus, CheckCircle, Pencil, Cloud, CloudOff, MoreVertical, Package, Keyboard } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { CopyButton } from '../../components/CopyButton';
-import { fmtCurrency } from '../../lib/format';
+import { fmtCurrency, makeDatePickerFormat, toLocalDateStr } from '../../lib/format';
 import { printWithMarker } from '../../lib/printDoc';
 import { buildBillActionToast, type StandardBillResponse } from '../../lib/billActionToast';
 import { useAuth } from '../../contexts/AuthContext';
@@ -62,6 +62,7 @@ interface Asset {
   box_branch_id: number | null;
   box_branch_name: string | null;
   battery_health: number | null;
+  warranty_expired_date: string | null;
   has_open_conflict: boolean;
   custodian_user_id: number | null;
   icloud_account_id: number | null;
@@ -189,6 +190,10 @@ type ExtraField =
   | { kind: 'number'; name: string; labelKey: string; required?: boolean; min?: number; step?: number; defaultFromAsset?: keyof Asset }
   | { kind: 'branch'; name: string; labelKey: string; required?: boolean }
   | { kind: 'user'; name: string; labelKey: string; required?: boolean }
+  | { kind: 'date'; name: string; labelKey: string; required?: boolean; defaultFromAsset?: keyof Asset }
+  // Battery health — integer 0–100, folded into p_condition_snapshot under `snapshotKey`
+  // (default BATTERY_HEALTH). Never a top-level param; backend drops non-integer / out-of-range silently.
+  | { kind: 'battery'; name: string; labelKey: string; required?: boolean; snapshotKey?: string; defaultFromAsset?: keyof Asset }
   | { kind: 'identifier'; typeName: string; oldName: string; labelKey: string; required?: boolean };
 
 type SimpleActionConfig = {
@@ -307,9 +312,13 @@ const SIMPLE_ACTIONS: Record<string, SimpleActionConfig> = {
   ASSET_REVALUE: {
     rpc: 'fn_inv_asset_revalue',
     extraFields: [
-      { kind: 'number', name: 'p_new_cost_basis', labelKey: 'revalue.newCostBasis', required: true, min: 0, defaultFromAsset: 'current_cost_basis' },
+      // Cost is optional — NULL keeps the current cost and creates no inventory_txn,
+      // so staff can update only battery/warranty/grade. min stays >0 when a value is given.
+      { kind: 'number', name: 'p_new_cost_basis', labelKey: 'revalue.newCostBasis', min: 0, defaultFromAsset: 'current_cost_basis' },
       { kind: 'text', name: 'p_reason', labelKey: 'revalue.reason', required: true },
       { kind: 'select', name: 'p_condition_grade', labelKey: 'revalue.conditionGrade', options: REVALUE_CONDITION_OPTIONS },
+      { kind: 'battery', name: 'p_battery_health', labelKey: 'revalue.batteryHealth', defaultFromAsset: 'battery_health' },
+      { kind: 'date', name: 'p_warranty_expired_date', labelKey: 'revalue.warrantyExpired', defaultFromAsset: 'warranty_expired_date' },
     ],
     successKey: 'success.revalue',
   },
@@ -1988,10 +1997,13 @@ function AssetActionModal({
   t: ReturnType<typeof useTranslation>['t'];
   onSuccess: (msgKey: string, response: Partial<StandardBillResponse>) => void;
 }) {
+  const { i18n } = useTranslation();
   const [reason, setReason] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [extra, setExtra] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
+  // Per-field date-picker typing-mode toggle, keyed by field name.
+  const [typingDate, setTypingDate] = useState<Record<string, boolean>>({});
 
   const config = action ? SIMPLE_ACTIONS[action.action_code] : null;
 
@@ -2026,12 +2038,14 @@ function AssetActionModal({
       setReason(null);
       setNote('');
       setError('');
+      setTypingDate({});
       const initial: Record<string, string> = {};
       config?.extraFields?.forEach(f => {
         if (f.kind === 'select' && f.default) initial[f.name] = f.default;
-        if (f.kind === 'number' && f.defaultFromAsset != null) {
+        if ((f.kind === 'number' || f.kind === 'battery' || f.kind === 'date') && f.defaultFromAsset != null) {
           const v = asset[f.defaultFromAsset];
-          if (v != null) initial[f.name] = String(v);
+          // date default is an ISO string → keep the YYYY-MM-DD portion for the picker
+          if (v != null) initial[f.name] = f.kind === 'date' ? String(v).slice(0, 10) : String(v);
         }
       });
       if (presetExtra) Object.assign(initial, presetExtra);
@@ -2082,7 +2096,14 @@ function AssetActionModal({
         if (v && v.trim()) {
           if (f.kind === 'number') params[f.name] = Number(v);
           else if (f.kind === 'branch' || f.kind === 'user') params[f.name] = Number(v);
-          else params[f.name] = v.trim();
+          else if (f.kind === 'battery') {
+            // Fold into p_condition_snapshot as an integer 0–100 under the given key
+            // (default BATTERY_HEALTH). Non-integer / out-of-range is dropped by the input.
+            const snapshot = (params.p_condition_snapshot as Record<string, number> | undefined) ?? {};
+            snapshot[f.snapshotKey ?? 'BATTERY_HEALTH'] = Number(v);
+            params.p_condition_snapshot = snapshot;
+          }
+          else params[f.name] = v.trim(); // text + date (date is already YYYY-MM-DD)
         }
       });
 
@@ -2192,6 +2213,49 @@ function AssetActionModal({
                       min={f.min}
                       step={f.step}
                       className="w-full"
+                    />
+                  )}
+                  {f.kind === 'battery' && (
+                    <MaskedInput
+                      mask="number"
+                      decimalScale={0}
+                      value={extra[f.name] ?? ''}
+                      onChange={(raw) => {
+                        // Integer 0–100. Empty stays empty. Backend drops anything else.
+                        if (raw === '') { setVal(f.name, ''); return; }
+                        const n = parseInt(raw, 10);
+                        if (isNaN(n)) return;
+                        setVal(f.name, String(Math.max(0, Math.min(100, n))));
+                      }}
+                      placeholder="1-100"
+                      suffix="%"
+                      className="w-full"
+                    />
+                  )}
+                  {f.kind === 'date' && (
+                    <InputDatePicker
+                      value={extra[f.name] ? new Date(extra[f.name] + 'T00:00:00') : null}
+                      onChange={(v) => setVal(f.name, toLocalDateStr(v))}
+                      dateFormat={makeDatePickerFormat(i18n.language)}
+                      locale={i18n.language}
+                      calendar="gregorian"
+                      endIcon={<Keyboard size={16} />}
+                      onEndIconClick={() => setTypingDate(p => ({ ...p, [f.name]: !p[f.name] }))}
+                      typingMode={!!typingDate[f.name]}
+                      onTypingModeChange={(on) => setTypingDate(p => ({ ...p, [f.name]: on }))}
+                      typingMask="##/##/####"
+                      typingPlaceholder="DD/MM/YYYY"
+                      parseTypedDate={(raw) => {
+                        if (raw.length !== 8) return null;
+                        const day = parseInt(raw.slice(0, 2), 10);
+                        const month = parseInt(raw.slice(2, 4), 10);
+                        let year = parseInt(raw.slice(4, 8), 10);
+                        if (year > 2400) year -= 543;
+                        if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+                        const d = new Date(year, month - 1, day);
+                        if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+                        return d;
+                      }}
                     />
                   )}
                   {f.kind === 'branch' && (

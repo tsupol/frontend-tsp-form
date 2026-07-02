@@ -16,6 +16,7 @@ export interface BuybackLine {
   has_box: boolean;
   item_condition: string | null;
   condition_snapshot: Record<string, unknown> | null;
+  warranty_expired_date: string | null;
   note: string | null;
   asset_match_result: string | null;
   asset_intake_status: string | null;
