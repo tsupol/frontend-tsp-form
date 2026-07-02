@@ -405,6 +405,7 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
   const [editAddressType, setEditAddressType] = useState<string | null>(null);
   const [addContactOpen, setAddContactOpen] = useState(false);
   const [addReferenceOpen, setAddReferenceOpen] = useState(false);
+  const [editReference, setEditReference] = useState<CustomerReference | null>(null);
   const [contractModalId, setContractModalId] = useState<number | null>(null);
 
   // Reset modals when customer changes
@@ -413,6 +414,7 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
     setEditAddressType(null);
     setAddContactOpen(false);
     setAddReferenceOpen(false);
+    setEditReference(null);
   }, [customerId]);
 
   const invalidateLogin = useInvalidateLoginInfo();
@@ -530,13 +532,12 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
           ) : (
             <div className="divide-y divide-line">
               {references.map(r => (
-                <div key={r.id} className="px-3 py-2.5 flex items-center justify-between text-sm">
-                  <div>
-                    <span className="font-medium">{r.name} {r.last_name}</span>
-                    {r.relation && <span className="text-subtle ml-1.5">({r.relation})</span>}
-                  </div>
-                  <span className="text-xs tabular-nums text-subtle">{r.tel ?? '—'}</span>
-                </div>
+                <ReferenceRow
+                  key={r.id}
+                  reference={r}
+                  onEdit={() => setEditReference(r)}
+                  onDeleted={() => { refreshAll(); showSuccess(t('customer.referenceDeleted')); }}
+                />
               ))}
             </div>
           )}
@@ -604,6 +605,13 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
         onClose={() => setAddReferenceOpen(false)}
         customerId={customerId}
         onSuccess={() => { setAddReferenceOpen(false); refreshAll(); showSuccess(t('customer.referenceSaved')); }}
+      />
+
+      <EditReferenceModal
+        open={!!editReference}
+        reference={editReference}
+        onClose={() => setEditReference(null)}
+        onSuccess={() => { setEditReference(null); refreshAll(); showSuccess(t('customer.referenceUpdated')); }}
       />
 
       <Modal open={!!contractModalId} onClose={() => setContractModalId(null)} maxWidth="56rem" width="100%">
@@ -1093,7 +1101,9 @@ function AddReferenceModal({ open, onClose, customerId, onSuccess }: {
   }, [open]);
 
   const handleSave = async () => {
-    if (!name.trim()) return;
+    // tel + relation are NOT NULL at the DB level (verified live) despite the
+    // delivery doc marking them optional — require them so add never 500s.
+    if (!name.trim() || !tel.trim() || !relation.trim()) return;
     setSaving(true);
     setError('');
     try {
@@ -1101,8 +1111,8 @@ function AddReferenceModal({ open, onClose, customerId, onSuccess }: {
         p_customer_id: customerId,
         p_name: name.trim(),
         p_last_name: lastName.trim() || null,
-        p_tel: tel.trim() || null,
-        p_relation: relation.trim() || null,
+        p_tel: tel.trim(),
+        p_relation: relation.trim(),
         p_facebook: null,
         p_line_id: null,
       });
@@ -1137,11 +1147,11 @@ function AddReferenceModal({ open, onClose, customerId, onSuccess }: {
           </div>
           <div className="flex gap-3">
             <div className="flex flex-col flex-1">
-              <label className="form-label">{t('customer.refTel')}</label>
+              <label className="form-label">{t('customer.refTel')} *</label>
               <PhoneInput value={tel} onChange={(raw) => setTel(raw)} className="w-full" />
             </div>
             <div className="flex flex-col flex-1">
-              <label className="form-label">{t('customer.refRelation')}</label>
+              <label className="form-label">{t('customer.refRelation')} *</label>
               <Input value={relation} onChange={e => setRelation(e.target.value)} className="w-full" />
             </div>
           </div>
@@ -1149,7 +1159,135 @@ function AddReferenceModal({ open, onClose, customerId, onSuccess }: {
       </div>
       <div className="modal-footer">
         <Button variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
-        <Button color="primary" onClick={handleSave} disabled={saving || !name.trim()}>
+        <Button color="primary" onClick={handleSave} disabled={saving || !name.trim() || !tel.trim() || !relation.trim()}>
+          {saving ? t('common.loading') : t('common.save')}
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
+// ── Reference Row (edit + soft-delete) ──────────────────────────────────────
+// Writes go through RPCs — v_customer_references is read-only (mig 441).
+
+function ReferenceRow({ reference, onEdit, onDeleted }: {
+  reference: CustomerReference; onEdit: () => void; onDeleted: () => void;
+}) {
+  const { t } = useTranslation();
+  const { addSnackbar } = useSnackbarContext();
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await apiClient.rpc('fn_customer_reference_delete', { p_reference_id: reference.id });
+      onDeleted();
+    } catch (err) {
+      // A delete that silently does nothing reads as success — surface it.
+      const msg = err instanceof ApiError ? translateApiError(err, t) : (err instanceof Error ? err.message : String(err));
+      addSnackbar({ message: <div className="alert alert-danger"><XCircle size={18} /><div><div className="alert-description">{msg}</div></div></div> });
+    } finally { setDeleting(false); }
+  };
+
+  return (
+    <div className="flex items-center justify-between px-3 py-2.5 text-sm">
+      <div className="min-w-0">
+        <div>
+          <span className="font-medium">{reference.name} {reference.last_name}</span>
+          {reference.relation && <span className="text-subtle ml-1.5">({reference.relation})</span>}
+        </div>
+        {reference.tel && <div className="text-xs tabular-nums text-subtle">{reference.tel}</div>}
+      </div>
+      <div className="flex items-center gap-1 shrink-0">
+        <Button variant="ghost" className="btn-icon-xs" onClick={onEdit} startIcon={<Pencil size={12} />} />
+        <Button variant="ghost" className="btn-icon-xs text-subtle hover:text-danger" onClick={handleDelete} disabled={deleting} startIcon={<Trash2 size={12} />} />
+      </div>
+    </div>
+  );
+}
+
+// ── Edit Reference Modal ────────────────────────────────────────────────────
+
+function EditReferenceModal({ open, reference, onClose, onSuccess }: {
+  open: boolean; reference: CustomerReference | null; onClose: () => void; onSuccess: () => void;
+}) {
+  const { t } = useTranslation();
+  const [name, setName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [tel, setTel] = useState('');
+  const [relation, setRelation] = useState('');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open && reference) {
+      setName(reference.name);
+      setLastName(reference.last_name ?? '');
+      setTel(reference.tel ?? '');
+      setRelation(reference.relation ?? '');
+      setError('');
+    }
+  }, [open, reference]);
+
+  const handleSave = async () => {
+    // tel + relation are NOT NULL at the DB level (verified live) despite the
+    // delivery doc marking them optional — require them so we never save blanks.
+    if (!reference || !name.trim() || !tel.trim() || !relation.trim()) return;
+    setSaving(true);
+    setError('');
+    try {
+      // Send the whole visible object (doc recommends this for clear patch results).
+      await apiClient.rpc('fn_customer_reference_update', {
+        p_reference_id: reference.id,
+        p_name: name.trim(),
+        p_last_name: lastName.trim(),
+        p_tel: tel.trim(),
+        p_relation: relation.trim(),
+      });
+      onSuccess();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setError(translated || err.message);
+      } else setError(String(err));
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
+      <div className="modal-header">
+        <h2 className="modal-title">{t('customer.editReference')}</h2>
+        <button type="button" className="modal-close-btn" onClick={onClose}>&times;</button>
+      </div>
+      <div className="modal-content">
+        {error && <div className="alert alert-danger mb-3"><XCircle size={14} /><span>{error}</span></div>}
+        <div className="form-grid">
+          <div className="flex gap-3">
+            <div className="flex flex-col flex-1">
+              <label className="form-label">{t('customer.refName')} *</label>
+              <Input value={name} onChange={e => setName(e.target.value)} className="w-full" />
+            </div>
+            <div className="flex flex-col flex-1">
+              <label className="form-label">{t('customer.refLastName')}</label>
+              <Input value={lastName} onChange={e => setLastName(e.target.value)} className="w-full" />
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <div className="flex flex-col flex-1">
+              <label className="form-label">{t('customer.refTel')} *</label>
+              <PhoneInput value={tel} onChange={(raw) => setTel(raw)} className="w-full" />
+            </div>
+            <div className="flex flex-col flex-1">
+              <label className="form-label">{t('customer.refRelation')} *</label>
+              <Input value={relation} onChange={e => setRelation(e.target.value)} className="w-full" />
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
+        <Button color="primary" onClick={handleSave} disabled={saving || !name.trim() || !tel.trim() || !relation.trim()}>
           {saving ? t('common.loading') : t('common.save')}
         </Button>
       </div>
