@@ -3,8 +3,9 @@ import { useTranslation } from 'react-i18next';
 import {
   Modal, Button, Input, Select, InputDatePicker, MaskedInput,
   useSnackbarContext,
+  type SelectItem,
 } from 'tsp-form';
-import { Calendar, Keyboard, CheckCircle, XCircle, Search, ChevronRight, Camera, Loader2, Trash2 } from 'lucide-react';
+import { Calendar, Keyboard, CheckCircle, XCircle, Camera, Loader2, Trash2 } from 'lucide-react';
 import { fmtCurrency } from '../../lib/format';
 import { apiClient, ApiError } from '../../lib/api';
 import {
@@ -39,8 +40,6 @@ export function CreateExpenseModal({ open, onClose, onSaved, items, branches, fi
   const [phase, setPhase] = useState<Phase>('form');
   const [branchId, setBranchId] = useState<string>('');
   const [itemId, setItemId] = useState<string>('');
-  const [itemPickerOpen, setItemPickerOpen] = useState(false);
-  const [itemSearch, setItemSearch] = useState('');
   const [amount, setAmount] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<ExpensePaymentMethod | ''>('');
   const [vendor, setVendor] = useState('');
@@ -63,8 +62,6 @@ export function CreateExpenseModal({ open, onClose, onSaved, items, branches, fi
       setPhase('form');
       setBranchId(fixedBranchId ? String(fixedBranchId) : '');
       setItemId('');
-      setItemPickerOpen(false);
-      setItemSearch('');
       setAmount('');
       setPaymentMethod('');
       setVendor('');
@@ -80,6 +77,21 @@ export function CreateExpenseModal({ open, onClose, onSaved, items, branches, fi
   }, [open, fixedBranchId]);
 
   const selectedItem = useMemo(() => items.find(i => String(i.item_id) === itemId) ?? null, [items, itemId]);
+
+  // Grouped options: a group header per category, items under it. Select renders
+  // the group labels natively and keeps a header only when it has visible children.
+  const itemOptions = useMemo<SelectItem[]>(() => {
+    const out: SelectItem[] = [];
+    let lastCat: number | null = null;
+    for (const it of items) {
+      if (it.category_id !== lastCat) {
+        out.push({ type: 'group', label: it.category_name_th });
+        lastCat = it.category_id;
+      }
+      out.push({ value: String(it.item_id), label: it.item_name_th });
+    }
+    return out;
+  }, [items]);
 
   const isDirty = itemId !== '' || amount !== '' || vendor !== '' || payeeName !== ''
     || receiptNo !== '' || note !== '' || pendingPhotos.length > 0;
@@ -223,24 +235,28 @@ export function CreateExpenseModal({ open, onClose, onSaved, items, branches, fi
                   </div>
                 )}
 
-                {/* Item picker — grouped by category, searchable */}
+                {/* Item picker — grouped by category (Select renders group
+                    headers natively), searchable across item + category. */}
                 <div className="flex flex-col">
                   <label className="form-label">{t('branchExpense.item')}</label>
-                  <button
-                    type="button"
-                    onClick={() => setItemPickerOpen(true)}
-                    className="flex items-center justify-between gap-2 w-full px-3 h-10 rounded-md border border-line bg-surface text-left text-sm cursor-pointer hover:bg-surface-hover transition-colors"
-                  >
-                    {selectedItem ? (
-                      <span className="min-w-0 truncate">
-                        {selectedItem.item_name_th}
-                        <span className="text-subtle"> · {selectedItem.category_name_th}</span>
-                      </span>
-                    ) : (
-                      <span className="text-subtle">{t('branchExpense.pickItem')}</span>
-                    )}
-                    <ChevronRight size={16} className="shrink-0 text-subtle" />
-                  </button>
+                  <Select
+                    options={itemOptions}
+                    value={itemId || null}
+                    onChange={(v) => setItemId((v as string) ?? '')}
+                    placeholder={t('branchExpense.pickItem')}
+                    showChevron
+                    renderOption={(opt, { selected }) => {
+                      const it = items.find(i => String(i.item_id) === opt.value);
+                      return (
+                        <div className="flex items-center justify-between gap-2 min-w-0 w-full">
+                          <span className={`truncate ${selected ? 'font-medium' : ''}`}>{opt.label}</span>
+                          {it?.old_code && (
+                            <span className="text-[11px] text-subtler shrink-0">{t('branchExpense.oldCode', { code: it.old_code })}</span>
+                          )}
+                        </div>
+                      );
+                    }}
+                  />
                 </div>
 
                 <div className="flex flex-col">
@@ -395,16 +411,6 @@ export function CreateExpenseModal({ open, onClose, onSaved, items, branches, fi
         )}
       </Modal>
 
-      {/* Item picker — grouped accordion + search */}
-      <ItemPickerModal
-        open={itemPickerOpen}
-        items={items}
-        search={itemSearch}
-        onSearchChange={setItemSearch}
-        onPick={(id) => { setItemId(String(id)); setItemPickerOpen(false); }}
-        onClose={() => setItemPickerOpen(false)}
-      />
-
       <Modal open={confirmDiscard} onClose={() => setConfirmDiscard(false)} maxWidth="24rem" width="100%">
         <div className="modal-header"><h2 className="modal-title">{t('common.unsavedChanges')}</h2></div>
         <div className="modal-content"><p>{t('common.unsavedChangesMessage')}</p></div>
@@ -442,82 +448,5 @@ function SlipThumb({ file, disabled, onRemove }: {
         <Trash2 size={11} />
       </button>
     </div>
-  );
-}
-
-// ── Item picker (grouped by category, searchable) ────────────────────────────
-
-function ItemPickerModal({ open, items, search, onSearchChange, onPick, onClose }: {
-  open: boolean;
-  items: ExpenseItem[];
-  search: string;
-  onSearchChange: (v: string) => void;
-  onPick: (itemId: number) => void;
-  onClose: () => void;
-}) {
-  const { t } = useTranslation();
-
-  const groups = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    const filtered = term
-      ? items.filter(i =>
-          i.item_name_th.toLowerCase().includes(term)
-          || i.category_name_th.toLowerCase().includes(term)
-          || (i.old_code ?? '').toLowerCase().includes(term))
-      : items;
-    const byCat = new Map<number, { name: string; items: ExpenseItem[] }>();
-    for (const it of filtered) {
-      if (!byCat.has(it.category_id)) byCat.set(it.category_id, { name: it.category_name_th, items: [] });
-      byCat.get(it.category_id)!.items.push(it);
-    }
-    return [...byCat.values()];
-  }, [items, search]);
-
-  return (
-    <Modal open={open} onClose={onClose} maxWidth="30rem" width="100%">
-      <div className="modal-header">
-        <h2 className="modal-title">{t('branchExpense.pickItem')}</h2>
-        <button type="button" className="modal-close-btn" onClick={onClose}>×</button>
-      </div>
-      <div className="modal-content">
-        <div className="mb-3">
-          <Input
-            value={search}
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder={t('branchExpense.searchItemPlaceholder')}
-            size="sm"
-            className="w-full"
-            startIcon={<Search size={14} />}
-            autoFocus
-          />
-        </div>
-        {groups.length === 0 ? (
-          <div className="py-8 text-center text-subtler text-sm">{t('branchExpense.noItems')}</div>
-        ) : (
-          <div className="flex flex-col gap-4">
-            {groups.map((g, gi) => (
-              <div key={gi}>
-                <div className="text-xs font-semibold text-subtle uppercase tracking-wide mb-1.5">{g.name}</div>
-                <div className="flex flex-col">
-                  {g.items.map(it => (
-                    <button
-                      key={it.item_id}
-                      type="button"
-                      onClick={() => onPick(it.item_id)}
-                      className="flex items-center justify-between gap-2 px-3 py-2 text-sm text-left bg-transparent border-none cursor-pointer hover:bg-surface-hover rounded-md"
-                    >
-                      <span className="truncate">{it.item_name_th}</span>
-                      {it.old_code && (
-                        <span className="text-xs text-subtler shrink-0">{t('branchExpense.oldCode', { code: it.old_code })}</span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </Modal>
   );
 }
