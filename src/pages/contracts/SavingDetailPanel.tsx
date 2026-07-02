@@ -220,11 +220,13 @@ function SavingOverviewTab({ contract, t }: { contract: ContractDetail; t: Retur
   const hasTarget = target > 0;
   const pct = hasTarget ? Math.min(100, (balance / target) * 100) : 0;
 
-  // Saving transactions
+  // All contract transactions (saving deposits/cashouts, service fees, etc.).
+  // Not filtered to txn_type=SAVING — a fee charged on a saving contract must
+  // show here too, otherwise it silently vanishes from the customer's history.
   const { data: txns } = useQuery({
     queryKey: ['contract-saving-txns', contract.id],
     queryFn: () => apiClient.get<ContractTxn[]>(
-      `/v_contract_txns?contract_id=eq.${contract.id}&txn_type=eq.SAVING&order=created_at.desc`
+      `/v_contract_txns?contract_id=eq.${contract.id}&order=created_at.desc`
     ),
     staleTime: 30 * 1000,
   });
@@ -342,7 +344,10 @@ function SavingOverviewTab({ contract, t }: { contract: ContractDetail; t: Retur
                   {txn.amount > 0 ? '+' : ''}{fmtCurrency(txn.amount)}
                 </span>
                 <div className="flex-1 min-w-0">
-                  {txn.note && <div className="text-xs text-subtle truncate">{txn.note}</div>}
+                  <div className="text-xs text-subtle truncate">
+                    {t(`contract.txnType_${txn.txn_type}`, { defaultValue: txn.txn_type })}
+                    {txn.note ? ` · ${txn.note}` : ''}
+                  </div>
                   <div className="text-xs text-subtler">{txn.created_by_name}</div>
                 </div>
                 <div className="text-xs text-subtle shrink-0">

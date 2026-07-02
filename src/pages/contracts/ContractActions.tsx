@@ -51,6 +51,8 @@ interface ContractForActions {
   commercial_model: string | null;
   branch_id: number;
   holding_id: number;
+  company_id?: number | null;
+  customer_id?: number | null;
   model_id: number | null;
   variant_id: number | null;
   device_id: number | null;
@@ -159,15 +161,18 @@ const ACTION_CONFIGS: Record<ContractAction, ActionConfig> = {
     successKey: 'contract.action_cancel_success',
   },
   void: {
+    // mig 435: fn_contract_void(p_contract_id, p_reason, p_pin). Resolves the
+    // CONTRACT_OPEN bill itself and delegates to fn_bill_cancel. No p_close_reason
+    // / p_note anymore — the free-text reason maps to p_reason.
     rpc: 'fn_contract_void',
     color: 'danger',
     needsPin: true,
-    needsNote: true,
-    needsReason: false,
+    needsNote: false,
+    needsReason: true,
     needsBranch: false,
     needsDevice: false,
     needsAmount: false,
-    needsCloseReason: true,
+    needsCloseReason: false,
     needsNewOwner: false,
     successKey: 'contract.action_void_success',
   },
@@ -857,6 +862,12 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   // More menu shows every action — primaries are also listed here so staff have one consistent place to find any action
   const secondaryActions = allowedActions;
 
+  // SAVING contracts don't show the action grid (wizard state), so SERVICE_CHARGE
+  // is surfaced as a standalone footer button. Respect the capability RPC:
+  // only offer it when the backend says it's available for this contract/user.
+  const canServiceChargeSaving = contract.state === 'SAVING'
+    && allowedActions.some(a => a.action_code === 'SERVICE_CHARGE' && a.is_available);
+
   const groupedSecondary = secondaryActions.reduce<Record<string, BackendContractAction[]>>((acc, a) => {
     const cat = CATEGORY_OVERRIDE[a.action_code] ?? a.category;
     (acc[cat] ||= []).push(a);
@@ -931,15 +942,29 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
     <>
       <div className="flex-none border-t border-line flex flex-col gap-2 px-4 py-3">
         {isWizardState && (
-          <Button
-            size="sm"
-            color="primary"
-            startIcon={<Pencil size={14} />}
-            className="self-start"
-            onClick={() => navigate(`/admin/contracts/new/${contract.id}`)}
-          >
-            {t('contract.continueDraft')}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              color="primary"
+              startIcon={<Pencil size={14} />}
+              onClick={() => navigate(`/admin/contracts/new/${contract.id}`)}
+            >
+              {t('contract.continueDraft')}
+            </Button>
+            {/* Charge a service fee on a SAVING contract the customer abandoned
+                before opening. The action grid (which normally hosts SERVICE_CHARGE)
+                isn't shown for wizard states, so surface it as a standalone button. */}
+            {canServiceChargeSaving && (
+              <Button
+                size="sm"
+                variant="outline"
+                startIcon={<Receipt size={14} />}
+                onClick={() => setActiveAction('service_charge')}
+              >
+                {t('SERVICE_CHARGE', { ns: 'contractActions' })}
+              </Button>
+            )}
+          </div>
         )}
 
         {isPendingPayment && (
@@ -1729,25 +1754,30 @@ function ContractActionDoneView({
     }
 
     case 'void': {
-      const reversed = (result.reversed_bill ?? null) as { bill_id?: number; bill_code?: string; total_amount?: number } | null;
+      // fn_contract_void → fn_bill_cancel Case D response: emits a CREDIT_NOTE
+      // reversing the CONTRACT_OPEN bill. Keys: contract_state, reason,
+      // credit_note_code/id, total_amount (negative — the reversal amount).
+      const creditNoteCode = result.credit_note_code ? String(result.credit_note_code) : null;
+      const creditNoteId = result.credit_note_id != null ? Number(result.credit_note_id) : null;
+      const reversedAmount = result.total_amount != null ? Number(result.total_amount) : null;
       const rows: ActionDoneDetailRow[] = [];
-      if (reversed?.bill_code) {
-        rows.push({ label: t('contract.action_void_done_reversedBill', { defaultValue: 'Reversed bill' }), value: reversed.bill_code });
+      if (creditNoteCode) {
+        rows.push({ label: t('contract.action_void_done_reversedBill', { defaultValue: 'Reversal note' }), value: creditNoteCode });
       }
-      if (reversed?.total_amount != null) {
-        rows.push({ label: t('contract.action_void_done_reversedAmount', { defaultValue: 'Reversed amount' }), value: fmtCurrency(reversed.total_amount), emphasis: true });
+      if (reversedAmount != null) {
+        rows.push({ label: t('contract.action_void_done_reversedAmount', { defaultValue: 'Reversed amount' }), value: fmtCurrency(Math.abs(reversedAmount)), emphasis: true });
       }
-      if (result.close_reason) {
-        rows.push({ label: t('contract.action_void_done_closeReason', { defaultValue: 'Close reason' }), value: String(result.close_reason) });
+      if (result.reason) {
+        rows.push({ label: t('contract.action_void_done_closeReason', { defaultValue: 'Reason' }), value: String(result.reason) });
       }
       return (
         <ActionDoneView
           headline={t('contract.action_void_done_headline', { defaultValue: 'Contract voided' })}
           contractCode={contractCode}
           tone="danger"
-          stateTransition={{ from: contractState, to: String(result.state ?? 'VOIDED'), toColor: 'danger' }}
+          stateTransition={{ from: contractState, to: String(result.contract_state ?? 'VOIDED'), toColor: 'danger' }}
           detailRows={rows}
-          billId={reversed?.bill_id ?? null}
+          billId={creditNoteId}
           onClose={onClose}
         />
       );

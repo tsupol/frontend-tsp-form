@@ -69,7 +69,7 @@ function buildUpdatePatch(
 ): Record<string, unknown> {
   const patch: Record<string, unknown> = { p_branch_id: orig.id };
   const strField = (
-    key: 'name' | 'address' | 'phone' | 'line_id' | 'google_map_url' | 'facebook_url',
+    key: 'code' | 'name' | 'address' | 'phone' | 'line_id' | 'google_map_url' | 'facebook_url',
     rpcKey: string,
   ) => {
     const before = (orig[key] as string | null | undefined) ?? '';
@@ -77,6 +77,7 @@ function buildUpdatePatch(
     if (before === after) return;
     patch[rpcKey] = after;
   };
+  strField('code', 'p_code');
   strField('name', 'p_name');
   strField('address', 'p_address');
   strField('phone', 'p_phone');
@@ -505,12 +506,10 @@ export function BranchesPage() {
                 />
               </div>
             )}
-            {modalMode === 'create' && (
-              <div className="flex flex-col">
-                <label className="form-label">{t('org.code')}</label>
-                <Input value={modalData.code ?? ''} onChange={(e) => updateField('code', e.target.value)} placeholder={t('org.codePlaceholder')} size="md" className="w-full" />
-              </div>
-            )}
+            <div className="flex flex-col">
+              <label className="form-label">{t('org.code')}</label>
+              <Input value={modalData.code ?? ''} onChange={(e) => updateField('code', e.target.value)} placeholder={t('org.codePlaceholder')} size="md" className="w-full" />
+            </div>
             <div className="flex flex-col">
               <label className="form-label">{t('org.name')}</label>
               <Input value={modalData.name} onChange={(e) => updateField('name', e.target.value)} size="md" className="w-full" />
