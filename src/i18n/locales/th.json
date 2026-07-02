@@ -3561,6 +3561,7 @@
     "editReference": "แก้ไขบุคคลอ้างอิง",
     "referenceUpdated": "แก้ไขบุคคลอ้างอิงสำเร็จ",
     "referenceDeleted": "ลบบุคคลอ้างอิงสำเร็จ",
+    "confirmDeleteReference": "ลบบุคคลอ้างอิง \"{{name}}\" หรือไม่? การลบไม่สามารถย้อนกลับได้",
     "noCustomers": "ไม่พบลูกค้า",
     "noContracts": "ไม่มีสัญญาที่เกี่ยวข้อง",
     "noContacts": "ไม่มีเบอร์ติดต่อ",

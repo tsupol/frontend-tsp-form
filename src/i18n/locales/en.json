@@ -3562,6 +3562,7 @@
     "editReference": "Edit Reference",
     "referenceUpdated": "Reference updated",
     "referenceDeleted": "Reference deleted",
+    "confirmDeleteReference": "Delete reference \"{{name}}\"? This can't be undone.",
     "noCustomers": "No customers found",
     "noContracts": "No related contracts",
     "noContacts": "No contacts",

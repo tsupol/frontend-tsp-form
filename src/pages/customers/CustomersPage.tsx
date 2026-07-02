@@ -14,6 +14,7 @@ import { toLocalDateStr, parseLocalDate, formatTel, formatCid } from '../../lib/
 import { DateTime } from '../../components/DateTime';
 import { DatePicker } from '../../components/DatePicker';
 import { PhoneInput } from '../../components/PhoneInput';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { CustomerLoginCard, useInvalidateLoginInfo } from '../../components/CustomerLoginCard';
 import { ContractDetailPanel } from '../contracts/ContractDetailPanel';
 
@@ -1175,12 +1176,14 @@ function ReferenceRow({ reference, onEdit, onDeleted }: {
 }) {
   const { t } = useTranslation();
   const { addSnackbar } = useSnackbarContext();
+  const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const handleDelete = async () => {
     setDeleting(true);
     try {
       await apiClient.rpc('fn_customer_reference_delete', { p_reference_id: reference.id });
+      setConfirming(false);
       onDeleted();
     } catch (err) {
       // A delete that silently does nothing reads as success — surface it.
@@ -1200,8 +1203,16 @@ function ReferenceRow({ reference, onEdit, onDeleted }: {
       </div>
       <div className="flex items-center gap-1 shrink-0">
         <Button variant="ghost" className="btn-icon-xs" onClick={onEdit} startIcon={<Pencil size={12} />} />
-        <Button variant="ghost" className="btn-icon-xs text-subtle hover:text-danger" onClick={handleDelete} disabled={deleting} startIcon={<Trash2 size={12} />} />
+        <Button variant="ghost" className="btn-icon-xs text-subtle hover:text-danger" onClick={() => setConfirming(true)} startIcon={<Trash2 size={12} />} />
       </div>
+      <ConfirmDialog
+        open={confirming}
+        onClose={() => setConfirming(false)}
+        onConfirm={handleDelete}
+        message={t('customer.confirmDeleteReference', { name: `${reference.name} ${reference.last_name ?? ''}`.trim() })}
+        confirmLabel={t('common.delete')}
+        pending={deleting}
+      />
     </div>
   );
 }

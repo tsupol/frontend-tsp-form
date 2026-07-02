@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Input, MaskedInput, Select, Switch, Badge, useSnackbarContext } from 'tsp-form';
 import { translateApiError } from '../../../lib/apiErrors';
+import { ConfirmDialog } from '../../../components/ConfirmDialog';
 import { Plus, Pencil, Trash2, Star, XCircle, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { useWorkspace } from './WorkspaceContext';
@@ -123,6 +124,7 @@ function ReferenceRow({ reference, onDeleted, onEdited }: { reference: CustomerR
   const { addSnackbar } = useSnackbarContext();
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const [name, setName] = useState(reference.name);
@@ -147,6 +149,7 @@ function ReferenceRow({ reference, onDeleted, onEdited }: { reference: CustomerR
     try {
       // v_customer_references is read-only — writes must go through the RPC (mig 441).
       await apiClient.rpc('fn_customer_reference_delete', { p_reference_id: reference.id });
+      setConfirming(false);
       onDeleted();
     } catch (err) {
       const msg = err instanceof ApiError ? translateApiError(err, t) : (err instanceof Error ? err.message : String(err));
@@ -187,12 +190,19 @@ function ReferenceRow({ reference, onDeleted, onEdited }: { reference: CustomerR
         </button>
         <button
           className="p-1 rounded hover:bg-danger-soft cursor-pointer text-subtle hover:text-danger shrink-0 bg-transparent border-none"
-          onClick={(e) => { e.stopPropagation(); handleDelete(); }}
-          disabled={deleting}
+          onClick={(e) => { e.stopPropagation(); setConfirming(true); }}
         >
           <Trash2 size={13} />
         </button>
       </div>
+      <ConfirmDialog
+        open={confirming}
+        onClose={() => setConfirming(false)}
+        onConfirm={handleDelete}
+        message={t('customer.confirmDeleteReference', { name: `${reference.name} ${reference.last_name ?? ''}`.trim() })}
+        confirmLabel={t('common.delete')}
+        pending={deleting}
+      />
       {expanded && !editing && (
         <div className="border-t border-line px-3 py-2 text-sm flex flex-col gap-1">
           {reference.tel && (
