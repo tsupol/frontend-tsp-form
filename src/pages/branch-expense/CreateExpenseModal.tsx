@@ -1,19 +1,18 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Modal, Button, Input, Select, InputDatePicker, MaskedInput, ImageUploader,
+  Modal, Button, Input, Select, InputDatePicker, MaskedInput,
   useSnackbarContext,
-  type UploadedImage,
 } from 'tsp-form';
-import { Calendar, Keyboard, CheckCircle, XCircle, X, Plus, Search, ChevronRight } from 'lucide-react';
+import { Calendar, Keyboard, CheckCircle, XCircle, Search, ChevronRight, Camera, Loader2, Trash2 } from 'lucide-react';
 import { fmtCurrency } from '../../lib/format';
 import { apiClient, ApiError } from '../../lib/api';
 import {
   toLocalDateStr, parseLocalDate, makeDatePickerFormat,
 } from '../../lib/format';
 import {
-  uploadBranchExpenseSlip, beMediaDelete,
-  BRANCH_EXPENSE_SLIP_RESIZE, BRANCH_EXPENSE_SLIP_MAX,
+  uploadBranchExpenseSlipFromFile, beMediaDelete,
+  BRANCH_EXPENSE_SLIP_MAX,
   type BranchExpenseImage,
 } from '../../lib/beMedia';
 import { PaymentMethodChips } from './PaymentMethodChips';
@@ -50,7 +49,8 @@ export function CreateExpenseModal({ open, onClose, onSaved, items, branches, fi
   const [note, setNote] = useState('');
   const [expenseDate, setExpenseDate] = useState(() => toLocalDateStr(new Date()));
   const [isTyping, setIsTyping] = useState(false);
-  const [pendingPhotos, setPendingPhotos] = useState<UploadedImage[]>([]);
+  const [pendingPhotos, setPendingPhotos] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
@@ -123,7 +123,7 @@ export function CreateExpenseModal({ open, onClose, onSaved, items, branches, fi
         setPhase('attach');
         const gallery: BranchExpenseImage[] = [];
         for (let i = 0; i < pendingPhotos.length; i++) {
-          const slot = await uploadBranchExpenseSlip(created.id, i, pendingPhotos[i]);
+          const slot = await uploadBranchExpenseSlipFromFile(created.id, i, pendingPhotos[i]);
           gallery.push(slot);
         }
         const attach = await apiClient.rpc<AttachResponse>('fn_branch_expense_photos_attach', {
@@ -335,49 +335,42 @@ export function CreateExpenseModal({ open, onClose, onSaved, items, branches, fi
                       ({pendingPhotos.length}/{BRANCH_EXPENSE_SLIP_MAX})
                     </span>
                   </label>
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                    {pendingPhotos.map((p, i) => {
-                      const preview = p.variants?.thumb?.preview
-                        ?? p.variants?.lg?.preview
-                        ?? p.preview
-                        ?? '';
-                      return (
-                        <div
-                          key={i}
-                          className="h-24 rounded-md border border-line overflow-hidden bg-surface flex items-center justify-center gap-2 p-2 relative"
-                        >
-                          <img
-                            src={preview}
-                            alt=""
-                            className="max-h-full w-auto object-contain block rounded"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setPendingPhotos(prev => prev.filter((_, j) => j !== i))}
-                            disabled={busy}
-                            aria-label={t('common.remove')}
-                            className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 hover:bg-black/80 text-danger flex items-center justify-center cursor-pointer border-none"
-                          >
-                            <X size={14} />
-                          </button>
-                        </div>
-                      );
-                    })}
-                    {pendingPhotos.length < BRANCH_EXPENSE_SLIP_MAX && (
-                      <ImageUploader
-                        multiple
-                        sizes={BRANCH_EXPENSE_SLIP_RESIZE}
+                  {/* Hidden multi-file input (computer + iPad photo library).
+                      No `capture`: it would force one rear-camera shot and kill
+                      multi-select. iPad's picker still offers "Take Photo". */}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files ?? []);
+                      e.target.value = '';
+                      if (files.length === 0) return;
+                      setPendingPhotos(prev => [...prev, ...files].slice(0, BRANCH_EXPENSE_SLIP_MAX));
+                    }}
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    {pendingPhotos.map((file, i) => (
+                      <SlipThumb
+                        key={i}
+                        file={file}
                         disabled={busy}
-                        onUpload={(imgs) => {
-                          setPendingPhotos(prev => [...prev, ...imgs].slice(0, BRANCH_EXPENSE_SLIP_MAX));
-                        }}
-                        className="!h-24 !border !border-dashed !border-line !rounded-md"
-                        placeholder={
-                          <div className="flex items-center justify-center text-subtle">
-                            <Plus size={24} />
-                          </div>
-                        }
+                        onRemove={() => setPendingPhotos(prev => prev.filter((_, j) => j !== i))}
                       />
+                    ))}
+                    {pendingPhotos.length < BRANCH_EXPENSE_SLIP_MAX && (
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={busy}
+                        className="w-20 h-20 shrink-0 rounded-md border-2 border-dashed border-line flex flex-col items-center justify-center gap-1 text-subtle hover:border-primary hover:text-primary hover:bg-surface-hover transition-colors cursor-pointer bg-transparent disabled:opacity-50"
+                      >
+                        {phase === 'attach'
+                          ? <Loader2 size={18} className="animate-spin" />
+                          : <><Camera size={18} /><span className="text-[10px] font-medium">{t('branchExpense.addPhoto')}</span></>}
+                      </button>
                     )}
                   </div>
                 </div>
@@ -421,6 +414,34 @@ export function CreateExpenseModal({ open, onClose, onSaved, items, branches, fi
         </div>
       </Modal>
     </>
+  );
+}
+
+// ── Slip thumbnail (local file preview + remove) ─────────────────────────────
+// Matches the contract "Manage photos" tile style: w-20 square, object-cover,
+// floating round trash button.
+function SlipThumb({ file, disabled, onRemove }: {
+  file: File;
+  disabled: boolean;
+  onRemove: () => void;
+}) {
+  const url = useMemo(() => URL.createObjectURL(file), [file]);
+  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+  return (
+    <div className="relative group w-20 h-20 shrink-0">
+      <div className="block w-full h-full rounded-md border border-line overflow-hidden bg-surface">
+        <img src={url} alt="" className="w-full h-full object-cover" />
+      </div>
+      <button
+        type="button"
+        onClick={onRemove}
+        disabled={disabled}
+        aria-label="Remove"
+        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-danger text-white flex items-center justify-center shadow-sm hover:bg-danger-soft disabled:opacity-50 border-none p-0 cursor-pointer"
+      >
+        <Trash2 size={11} />
+      </button>
+    </div>
   );
 }
 
