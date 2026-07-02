@@ -2,8 +2,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Modal, Input, NumberSpinner, DataTable, PopOver, useSnackbarContext } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, PackagePlus, CheckCircle, XCircle, Plus, Trash2, ScanBarcode, ExternalLink, Search, SlidersHorizontal } from 'lucide-react';
+import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Modal, Input, NumberSpinner, DataTable, PopOver, LabeledCheckbox, useSnackbarContext } from 'tsp-form';
+import { ArrowLeft, ArrowRightFromLine, PackagePlus, CheckCircle, XCircle, Plus, Trash2, ScanBarcode, ExternalLink, Search, SlidersHorizontal, AlertTriangle } from 'lucide-react';
 import { useBarcodeScanner } from '../../components/BarcodeScanner';
 import { CurrencyInput } from '../../components/CurrencyInput';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
@@ -664,6 +664,15 @@ interface ConfirmReceiptResult {
   };
 }
 
+// fn_inv_receipt_over_check projection — advisory over-receipt warning.
+interface OverCheckResult {
+  po_line_id: number;
+  qty_ordered: number;
+  projected_total: number;
+  will_exceed: boolean;
+  over_by: number;
+}
+
 function ConfirmReceiptModal({
   open,
   onClose,
@@ -681,6 +690,7 @@ function ConfirmReceiptModal({
   const [view, setView] = useState<'form' | 'done'>('form');
   const [error, setError] = useState('');
   const [result, setResult] = useState<ConfirmReceiptResult | null>(null);
+  const [ackOverReceipt, setAckOverReceipt] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -688,8 +698,30 @@ function ConfirmReceiptModal({
       setView('form');
       setError('');
       setResult(null);
+      setAckOverReceipt(false);
     }
   }, [open]);
+
+  // Advisory over-receipt check (per line). Over-receipt is allowed by design —
+  // this only warns so the user confirms intentionally. Runs when the modal opens.
+  const { data: overChecks, isFetching: overChecking } = useQuery({
+    queryKey: ['receipt-over-check', detail.receipt_id, (detail.lines ?? []).map(l => `${l.receipt_line_id}:${l.qty_received}`).join(',')],
+    enabled: open && (detail.lines ?? []).length > 0,
+    queryFn: async () => {
+      const checks = await Promise.all((detail.lines ?? []).map(l =>
+        apiClient.rpc<OverCheckResult>('fn_inv_receipt_over_check', {
+          p_po_line_id: l.po_line_id,
+          p_incoming_qty: l.qty_received,
+          p_receipt_id: detail.receipt_id,
+          p_exclude_receipt_line_id: l.receipt_line_id,
+        }).then(data => ({ line: l, check: data })).catch(() => null)
+      ));
+      return checks.filter((c): c is { line: ReceiptLine; check: OverCheckResult } => c != null);
+    },
+  });
+
+  const overLines = (overChecks ?? []).filter(c => c.check.will_exceed);
+  const hasOver = overLines.length > 0;
 
   const lineByVariant = useMemo(
     () => new Map((detail.lines ?? []).map(l => [l.variant_id, l])),
@@ -837,13 +869,44 @@ function ConfirmReceiptModal({
             </div>
           </div>
           <p className="text-sm text-subtle">{t('receiving.confirmReceiptMessage')}</p>
+
+          {/* Over-receipt advisory — receiving more than the PO ordered is allowed,
+              but ask for an explicit acknowledgement so it isn't a misclick. */}
+          {hasOver && (
+            <div className="alert alert-warning mt-4 flex-col items-start gap-2">
+              <div className="flex items-center gap-2">
+                <AlertTriangle size={16} />
+                <span className="font-medium">{t('receiving.overReceiptTitle', { defaultValue: 'Receiving more than the PO ordered' })}</span>
+              </div>
+              <ul className="text-xs flex flex-col gap-1 w-full">
+                {overLines.map(({ line, check }) => (
+                  <li key={line.receipt_line_id} className="flex items-center justify-between gap-2">
+                    <span className="truncate">{line.product_display_name || `${line.brand_name} ${line.model_name} ${line.variant_name}`}</span>
+                    <span className="tabular-nums shrink-0">
+                      {t('receiving.overReceiptLine', {
+                        defaultValue: '{{projected}} / {{ordered}} (+{{over}})',
+                        projected: fmtNum(check.projected_total),
+                        ordered: fmtNum(check.qty_ordered),
+                        over: fmtNum(check.over_by),
+                      })}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <LabeledCheckbox
+                label={t('receiving.overReceiptAck', { defaultValue: 'I confirm receiving over the ordered quantity' })}
+                checked={ackOverReceipt}
+                onChange={(e) => setAckOverReceipt(e.target.checked)}
+              />
+            </div>
+          )}
         </div>
         <div className="modal-footer">
           <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button
             color="primary"
             onClick={() => mutation.mutate()}
-            disabled={mutation.isPending}
+            disabled={mutation.isPending || overChecking || (hasOver && !ackOverReceipt)}
           >
             {mutation.isPending ? t('common.loading') : t('receiving.confirmReceipt')}
           </Button>
