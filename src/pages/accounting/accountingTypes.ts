@@ -146,39 +146,6 @@ export interface CompanyBalanceRow {
   device_with_customer_count: number;
 }
 
-// v_payments row — used by Payments page (mig 139 adds bill_date / bill_type / bill_status)
-export interface PaymentRow {
-  payment_id: number;
-  code: string;
-  code_display: string;
-  holding_id: number;
-  company_id: number;
-  branch_id: number;
-  method: string;
-  amount: number;
-  bank_account_id: number | null;
-  bank_name: string | null;
-  account_number: string | null;
-  payer_type: string | null;
-  payer_id: number | null;
-  payer_name: string | null;
-  bill_id: number;
-  bill_code: string;
-  bill_code_display: string;
-  contract_id: number | null;
-  charge_types: string[] | null;
-  days_early: number | null;
-  is_reversal: boolean;
-  ref_voided_id: number | null;
-  void_note: string | null;
-  created_by: number;
-  created_at: string;
-  // mig 139
-  bill_date: string;
-  bill_type: string;
-  bill_status: string;
-}
-
 // v_settlement_tender_lines — "ชำระ (เก็บเงิน)" list. Bill-status-shaped (VOIDED
 // excluded, INVOICE/CREDIT_NOTE only). `amount` is already signed: CREDIT_NOTE /
 // direction=OUT rows come through negative, so sum(amount) = net (IN − OUT).

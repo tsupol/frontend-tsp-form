@@ -415,7 +415,6 @@
     "dayClose": "Day Close",
     "dayCloseHistory": "Day Close History",
     "branchBalance": "Outstanding Balance",
-    "remittance": "Remittance",
     "payments": "Payments Received",
     "reconcileByItem": "Remit Amount",
     "reconcileByChannel": "Money Check",
@@ -4112,19 +4111,6 @@
       "ct_PARTNER_COMMISSION": "Commission",
       "ct_COMMISSION_WITHDRAW": "Com. withdraw",
       "ct_SETTLEMENT_REFUND": "Settlement"
-    },
-    "remittance": {
-      "title": "Remittance",
-      "description": "Bill lines collected from customers — split holding/company by line.",
-      "tab_holding": "To Holding",
-      "tab_company": "To Company",
-      "billType": "Bill Type",
-      "allTypes": "All types",
-      "allCharges": "All line types",
-      "summaryTitle": "Summary",
-      "lineCount": "Lines",
-      "totalAmount": "Total Amount",
-      "subtotal": "Subtotal"
     },
     "payments": {
       "title": "Payments Received",

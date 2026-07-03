@@ -415,7 +415,6 @@
     "dayClose": "ปิดวัน",
     "dayCloseHistory": "ประวัติปิดวัน",
     "branchBalance": "ยอดคงค้าง",
-    "remittance": "เรียกเก็บ (นำส่ง)",
     "payments": "ชำระ (เก็บเงิน)",
     "reconcileByItem": "ยอดนำส่ง",
     "reconcileByChannel": "ตรวจเงิน",
@@ -4111,19 +4110,6 @@
       "ct_PARTNER_COMMISSION": "คอมมิชชั่น",
       "ct_COMMISSION_WITHDRAW": "เบิกคอมมิชชั่น",
       "ct_SETTLEMENT_REFUND": "เงินคืนเจรจา"
-    },
-    "remittance": {
-      "title": "รายการเรียกเก็บ (นำส่ง)",
-      "description": "บิลที่เรียกเก็บจากลูกค้า แยกฝั่งนำส่ง Holding / Company ระดับ line item",
-      "tab_holding": "นำส่ง Holding",
-      "tab_company": "นำส่ง Company",
-      "billType": "ประเภทบิล",
-      "allTypes": "ทุกประเภท",
-      "allCharges": "ทุกประเภทรายการ",
-      "summaryTitle": "สรุป",
-      "lineCount": "รายการ",
-      "totalAmount": "ยอดรวม",
-      "subtotal": "ยอดย่อย"
     },
     "payments": {
       "title": "รายการชำระ (เก็บเงิน)",
