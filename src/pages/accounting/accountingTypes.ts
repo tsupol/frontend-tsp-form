@@ -267,6 +267,67 @@ export interface DayCloseBreakdownRow {
   data_source: 'LIVE' | 'SNAPSHOT';
 }
 
+// v_dayclose_bucket_breakdown — the 6-bucket day-close model (1 row per branch+date).
+// sold / refund per bucket; net = sold − refund. Wallet also carries `usage`.
+// Same fields appear on v_day_close_history (frozen snapshot) after close.
+export interface DayCloseBucketRow {
+  holding_id: number;
+  company_id: number;
+  branch_id: number;
+  bill_date: string;
+  // sold (INVOICE)
+  holding_own: number;
+  company_retail: number;
+  company_wallet: number;
+  company_fee: number;
+  company_other: number;
+  company_total: number;      // sum of the 4 company sold buckets
+  total_amount: number;
+  line_count: number;
+  // refund (CREDIT_NOTE)
+  holding_own_refund: number;
+  company_retail_refund: number;
+  company_wallet_refund: number;
+  company_fee_refund: number;
+  company_other_refund: number;
+  company_refund_total: number;
+  total_refund: number;
+  // internal / wallet
+  journal_total: number;          // JOURNAL: write-off, commission (no cash)
+  company_wallet_usage: number;   // paid-with-wallet (SAVING_WITHDRAW / CREDIT_USED / INSURANCE_*)
+}
+
+export type DayCloseBucketKey =
+  | 'HOLDING_OWN' | 'COMPANY_RETAIL' | 'COMPANY_WALLET'
+  | 'COMPANY_FEE' | 'COMPANY_OTHER' | 'WALLET_USAGE' | 'JOURNAL';
+
+// v_dayclose_bucket_lines — line items inside one bucket (filter by txn_bucket).
+export interface DayCloseBucketLine {
+  branch_id: number;
+  bill_date: string;
+  txn_bucket: DayCloseBucketKey;
+  is_refund: boolean;
+  is_journal: boolean;
+  bill_id: number;
+  bill_code: string;
+  bill_type: string;
+  bill_purpose: string;
+  created_at: string;
+  customer_id: number | null;
+  contract_id: number | null;
+  contract_code: string | null;
+  line_id: number;
+  line_type: string;
+  charge_type: string;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  unit_amount: number;
+  ext_amount: number;          // line total = amount × quantity (negative for refunds)
+  owner_type: string | null;
+  variant_id: number | null;
+}
+
 export interface UnclosedDayRow {
   holding_id: number;
   company_id: number;

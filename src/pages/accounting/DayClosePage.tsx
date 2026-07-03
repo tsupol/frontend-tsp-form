@@ -21,6 +21,7 @@ import {
   todayISO, netCash, netTransfer, netTotal,
 } from './accountingTypes';
 import { BillReconcilePanel } from './BillReconcilePanel';
+import { DayCloseBuckets } from './DayCloseBuckets';
 import { ActionDoneView, type ActionDoneDetailRow } from '../contracts/ActionDoneView';
 
 const UNCLOSED_PREFIX = '__unclosed__';
@@ -1018,9 +1019,6 @@ function DayCloseBreakdown({ branchId, closeDate }: { branchId: string; closeDat
       : null;
   }
 
-  const hasWallet = row.wallet_amount !== 0 || row.jrn_wallet_consumed !== 0;
-  const hasRefund = row.cn_holding_refund !== 0 || row.cn_company_refund !== 0 || row.refund_cash_out !== 0;
-
   // Integrity: cash + transfer (signed) should equal the net settle obligation.
   const lhs = row.cash_amount + row.transfer_amount;
   const rhs = (row.holding_to_remit - row.holding_owes_bm) + (row.company_to_remit - row.company_owes_bm);
@@ -1055,47 +1053,11 @@ function DayCloseBreakdown({ branchId, closeDate }: { branchId: string; closeDat
         </dl>
       </div>
 
-      {/* Revenue */}
-      <div className="px-4 py-3">
-        <ClusterTitle>{t('accounting.dayClose.clusterRevenue')}</ClusterTitle>
-        <dl className="grid grid-cols-2 @md:grid-cols-3 @lg:grid-cols-4 gap-x-3 gap-y-2">
-          <Stat label={t('accounting.dayClose.revenueHolding')} value={fmtCurrency(row.revenue_holding)} />
-          <Stat label={t('accounting.dayClose.revenueCompany')} value={fmtCurrency(row.revenue_company)} />
-          {hasRefund && <Stat label={t('accounting.dayClose.cnHoldingRefund')} value={fmtCurrency(row.cn_holding_refund)} tone={row.cn_holding_refund > 0 ? 'warning' : undefined} />}
-          {hasRefund && <Stat label={t('accounting.dayClose.cnCompanyRefund')} value={fmtCurrency(row.cn_company_refund)} tone={row.cn_company_refund > 0 ? 'warning' : undefined} />}
-        </dl>
-      </div>
-
-      {/* Wallet (only when used) */}
-      {hasWallet && (
-        <div className="px-4 py-3">
-          <ClusterTitle>{t('accounting.dayClose.clusterWallet')}</ClusterTitle>
-          <dl className="grid grid-cols-2 @md:grid-cols-3 @lg:grid-cols-4 gap-x-3 gap-y-2">
-            <Stat label={t('accounting.dayClose.walletUsedNet')} value={fmtCurrency(row.wallet_amount)} />
-            <Stat label={t('accounting.dayClose.walletSaving')} value={fmtCurrency(row.wallet_saving)} />
-            <Stat label={t('accounting.dayClose.walletCredit')} value={fmtCurrency(row.wallet_credit)} />
-            <Stat label={t('accounting.dayClose.walletInsurance')} value={fmtCurrency(row.wallet_insurance)} />
-          </dl>
-        </div>
-      )}
-
-      {/* Settle — the remit / owe direction */}
-      <div className="px-4 py-3">
-        <ClusterTitle>{t('accounting.dayClose.clusterSettle')}</ClusterTitle>
-        <dl className="grid grid-cols-1 @sm:grid-cols-2 gap-x-3 gap-y-2">
-          <SettleRow
-            label={t('accounting.dayClose.holding')}
-            toRemit={row.holding_to_remit}
-            owesBm={row.holding_owes_bm}
-            t={t}
-          />
-          <SettleRow
-            label={t('accounting.dayClose.company')}
-            toRemit={row.company_to_remit}
-            owesBm={row.company_owes_bm}
-            t={t}
-          />
-        </dl>
+      {/* 6-bucket destination table (sold / refund / net + expand + Excel).
+          Replaces the old Revenue / Wallet / Settle clusters (mapping in
+          UI_DEPRECATION_HISTORY §23). Reads the bucket views by bill_date. */}
+      <div className="px-1 py-1">
+        <DayCloseBuckets branchId={branchId} billDate={closeDate} />
       </div>
 
       {/* Activity counts — context; red-flags void anomalies */}
@@ -1151,26 +1113,3 @@ function FlagStat({
   );
 }
 
-/* One side of the settle (holding | company). Shows whichever of to-remit /
-   owes-bm is non-zero — they're mutually exclusive in the view. */
-function SettleRow({
-  label, toRemit, owesBm, t,
-}: {
-  label: string;
-  toRemit: number;
-  owesBm: number;
-  t: ReturnType<typeof useTranslation>['t'];
-}) {
-  const owes = owesBm > 0;
-  return (
-    <div className={`rounded-md border px-3 py-2 ${owes ? 'border-warning/40 bg-warning-soft' : 'border-line'}`}>
-      <div className="text-xs text-subtle">{label}</div>
-      <div className={`text-base font-semibold tabular-nums ${owes ? 'text-warning-fg' : ''}`}>
-        {owes ? `−${fmtCurrency(owesBm)}` : fmtCurrency(toRemit)}
-      </div>
-      <div className="text-[11px] text-subtler">
-        {owes ? t('accounting.dayClose.owesBm') : t('accounting.dayClose.toRemit')}
-      </div>
-    </div>
-  );
-}

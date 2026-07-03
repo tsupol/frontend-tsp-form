@@ -3862,7 +3862,36 @@
       "billVoided": "บิล Void",
       "giftCost": "ต้นทุนของแถม",
       "flagVoidedBillsHigh": "Void ผิดบ่อย",
-      "flagContractsVoided": "เปิดสัญญาผิด"
+      "flagContractsVoided": "เปิดสัญญาผิด",
+      "bucket": {
+        "destination": "ปลายทางเงิน",
+        "sold": "ขาย",
+        "refund": "คืน",
+        "net": "สุทธิ",
+        "holding": "Holding",
+        "companyRetail": "บริษัท · ขายปลีก",
+        "companyWallet": "บริษัท · Wallet",
+        "companyFee": "บริษัท · ค่าธรรมเนียม",
+        "companyOther": "บริษัท · อื่นๆ",
+        "journal": "บันทึกภายใน (Journal)",
+        "walletIn": "IN (ฝาก)",
+        "walletOut": "OUT (ถอน)",
+        "walletUsage": "USAGE (จ่ายด้วย wallet)",
+        "settlement": "รวมนำส่ง",
+        "expand": "ดูรายละเอียด",
+        "exportDay": "ส่งออกทั้งวันเป็น Excel",
+        "exportBucket": "Excel",
+        "colBucket": "กลุ่ม",
+        "colBill": "บิล",
+        "colRefund": "คืนเงิน",
+        "colChargeType": "ประเภทรายการ",
+        "colDesc": "รายละเอียด",
+        "colQty": "จำนวน",
+        "colUnit": "ต่อหน่วย",
+        "colAmount": "ยอด",
+        "colContract": "สัญญา",
+        "colCustomer": "รหัสลูกค้า"
+      }
     },
     "dayCloseHistory": {
       "description": "บันทึกประวัติการปิดวันพร้อมธงเตือน"

@@ -3863,7 +3863,36 @@
       "billVoided": "Voided bills",
       "giftCost": "Gift cost",
       "flagVoidedBillsHigh": "High void rate",
-      "flagContractsVoided": "Contract opened in error"
+      "flagContractsVoided": "Contract opened in error",
+      "bucket": {
+        "destination": "Destination",
+        "sold": "Sold",
+        "refund": "Refund",
+        "net": "Net",
+        "holding": "Holding",
+        "companyRetail": "Company · Retail",
+        "companyWallet": "Company · Wallet",
+        "companyFee": "Company · Fee",
+        "companyOther": "Company · Other",
+        "journal": "Journal (internal)",
+        "walletIn": "IN (deposit)",
+        "walletOut": "OUT (cash-out)",
+        "walletUsage": "USAGE (paid with wallet)",
+        "settlement": "Settlement total",
+        "expand": "Expand",
+        "exportDay": "Export day to Excel",
+        "exportBucket": "Excel",
+        "colBucket": "Bucket",
+        "colBill": "Bill",
+        "colRefund": "Refund",
+        "colChargeType": "Charge type",
+        "colDesc": "Description",
+        "colQty": "Qty",
+        "colUnit": "Unit",
+        "colAmount": "Amount",
+        "colContract": "Contract",
+        "colCustomer": "Customer ID"
+      }
     },
     "dayCloseHistory": {
       "description": "Historical day close snapshots with audit flags."
