@@ -681,7 +681,7 @@ function ClosedSnapshot({ close, branchId }: { close: DayCloseHistoryRow; branch
   const navigate = useNavigate();
   // Default to the breakdown — on a closed day that's the figure being looked up.
   const [tab, setTab] = useState<'breakdown' | 'reconcile'>('breakdown');
-  const remittanceLink = `/admin/accounting/remittance?branch_id=${branchId}&from=${close.close_date}&to=${close.close_date}`;
+  const remittanceLink = `/admin/accounting/reconcile-item?branch_id=${branchId}&from=${close.close_date}&to=${close.close_date}`;
   const paymentsLink = `/admin/accounting/payments?branch_id=${branchId}&from=${close.close_date}&to=${close.close_date}`;
   return (
     <div className="@container flex flex-col h-full min-h-0">

@@ -38,7 +38,7 @@ import {
   // Fanout child icons — Commission
   UserCheck, ClipboardCheck,
   // Fanout child icons — Accounting
-  CalendarCheck, ArrowUpRight, Receipt, ShieldAlert, Banknote, FileSpreadsheet, Coins,
+  CalendarCheck, Receipt, ShieldAlert, Banknote, FileSpreadsheet, Coins,
   // Fanout child icons — Branch expense
   Tag as TagIcon, BarChart3 as BarChartIcon, BookOpen as BookIcon,
   // Fanout child icons — Collections
@@ -300,7 +300,6 @@ export const AppSideNav = () => {
           label: t('nav.dayClose'),
           path: '/admin/accounting/day-close',
         },
-        { key: 'remittance', icon: <ArrowUpRight size="1rem" />, label: t('nav.remittance'), path: '/admin/accounting/remittance' },
         { type: 'group', key: 'grp-acct-reports', label: t('nav.groupReports') },
         { key: 'branch-balance', icon: <Scale size="1rem" />, label: t('nav.branchBalance'), path: '/admin/accounting/balance' },
         ...(['BRANCH_MANAGER', 'COMPANY_ADMIN', 'COMPANY_ACCOUNTANT', 'COMPANY_INVENTORY', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [

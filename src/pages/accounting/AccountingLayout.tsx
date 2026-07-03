@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Badge } from 'tsp-form';
 import {
-  CalendarCheck, Scale, ArrowUpRight, Receipt, ShieldAlert, Banknote, FileSpreadsheet,
+  CalendarCheck, Scale, Receipt, ShieldAlert, Banknote, FileSpreadsheet,
   ClipboardList, Coins,
 } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
@@ -36,7 +36,6 @@ export function AccountingLayout({ children }: { children: ReactNode }) {
     { type: 'link', path: '/admin/accounting/reconcile-item', labelKey: 'nav.reconcileByItem', icon: ClipboardList },
     { type: 'link', path: '/admin/accounting/reconcile-channel', labelKey: 'nav.reconcileByChannel', icon: Coins },
     { type: 'link', path: '/admin/accounting/day-close', labelKey: 'nav.dayClose', icon: CalendarCheck, badge: unclosedCount },
-    { type: 'link', path: '/admin/accounting/remittance', labelKey: 'nav.remittance', icon: ArrowUpRight },
     { type: 'group', labelKey: 'nav.groupReports' },
     { type: 'link', path: '/admin/accounting/balance', labelKey: 'nav.branchBalance', icon: Scale },
     ...(canSeeReports ? [

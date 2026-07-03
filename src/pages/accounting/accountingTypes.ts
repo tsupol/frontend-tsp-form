@@ -146,31 +146,6 @@ export interface CompanyBalanceRow {
   device_with_customer_count: number;
 }
 
-export interface RemittanceRevenueRow {
-  line_id: number;
-  holding_id: number;
-  company_id: number;
-  company_name: string;
-  branch_id: number;
-  branch_name: string;
-  branch_code: string;
-  bill_date: string;
-  bill_id: number;
-  bill_code: string;
-  contract_id: number | null;
-  contract_code: string | null;
-  charge_type: string;
-  charge_name_th: string;
-  description: string;
-  amount: number;
-  bill_status: string;
-  day_closed: boolean;
-  bill_code_display: string;
-  contract_code_display: string | null;
-  // mig 138 — bill type tag for filtering
-  bill_type: string;
-}
-
 // v_payments row — used by Payments page (mig 139 adds bill_date / bill_type / bill_status)
 export interface PaymentRow {
   payment_id: number;
