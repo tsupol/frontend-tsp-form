@@ -1,13 +1,12 @@
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import {
-  MobileHeader, DataTable, Select, Badge, InputDateRangePicker, Button,
+  MobileHeader, DataTable, Select, Badge, InputDateRangePicker,
 } from 'tsp-form';
-import { useQueryClient } from '@tanstack/react-query';
 import {
-  ArrowRightFromLine, Keyboard, ArrowLeftRight,
+  ArrowRightFromLine, Keyboard, ExternalLink, Wallet, HandCoins,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -16,46 +15,25 @@ import { FilterBar, type FilterBarItem } from '../../components/FilterBar';
 import {
   fmtCurrency, toLocalDateStr, parseLocalDate, makeDateRangePickerFormat,
 } from '../../lib/format';
-import type { Branch, PaymentRow } from './accountingTypes';
-import { PaymentChannelCorrectModal } from './PaymentChannelCorrectModal';
+import type { Branch, SettlementTenderLine } from './accountingTypes';
 
-interface BankAccountOption {
-  id: number;
-  branch_id: number;
-  bank_name: string;
-  account_number: string;
-  account_name: string;
-  is_active: boolean;
-}
+// Methods that can appear in v_settlement_tender_lines, grouped under their tender_class.
+const PHYSICAL_METHODS = ['CASH', 'TRANSFER'] as const;
+const WALLET_METHODS = ['SAVING_WALLET', 'CREDIT_WALLET', 'INSURANCE_WALLET'] as const;
+const ALL_METHODS = [...PHYSICAL_METHODS, ...WALLET_METHODS] as const;
 
-const METHODS = ['CASH', 'TRANSFER', 'SAVING_WALLET', 'CREDIT_WALLET', 'INSURANCE_WALLET', 'WAIVE', 'HOLDING_BUDGET'] as const;
-
-const METHOD_COLOR: Record<string, 'success' | 'primary' | 'secondary' | 'info' | 'warning' | 'default'> = {
+const METHOD_COLOR: Record<string, 'success' | 'primary' | 'secondary'> = {
   CASH: 'success',
   TRANSFER: 'primary',
   SAVING_WALLET: 'secondary',
   CREDIT_WALLET: 'secondary',
   INSURANCE_WALLET: 'secondary',
-  WAIVE: 'info',
-  HOLDING_BUDGET: 'info',
 };
-
-const TYPE_VALUES = ['INVOICE', 'CREDIT_NOTE', 'JOURNAL'] as const;
 
 const BADGE_TEXT_COLOR: Record<string, string> = {
   success: 'text-success',
   primary: 'text-primary-fg',
-  danger: 'text-danger',
-  warning: 'text-warning',
-  info: 'text-info',
   secondary: 'text-secondary-fg',
-  default: 'text-fg',
-};
-
-const TYPE_COLOR: Record<string, 'primary' | 'danger' | 'warning'> = {
-  INVOICE: 'primary',
-  CREDIT_NOTE: 'danger',
-  JOURNAL: 'warning',
 };
 
 function defaultRange() {
@@ -68,13 +46,10 @@ function defaultRange() {
 
 export function PaymentsPage() {
   const { t, i18n } = useTranslation();
-  const { user, can } = useAuth();
-  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const isBranchUser = ['BRANCH_STAFF', 'BRANCH_MANAGER'].includes(user?.role_code ?? '');
   const userBranchId = isBranchUser && user?.branch_id ? String(user.branch_id) : '';
-  const canCorrectChannel = can('PAYMENT.CHANNEL_CORRECT');
-
-  const [correctPayment, setCorrectPayment] = useState<PaymentRow | null>(null);
 
   const initial = defaultRange();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -84,15 +59,13 @@ export function PaymentsPage() {
   const fromDate = fromParam === null ? initial.from : fromParam;
   const toDate = toParam === null ? initial.to : toParam;
   const methodFilter = searchParams.get('method') ?? '';
-  const typeFilter = searchParams.get('type') ?? '';
-  const bankAccountFilter = searchParams.get('bank_account_id') ?? '';
 
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [isTypingRange, setIsTypingRange] = useState(false);
 
   const pendingPatchRef = useRef<Record<string, string> | null>(null);
-  const updateFilters = useCallback((patch: Partial<{ branch_id: string; from: string; to: string; method: string; type: string; bank_account_id: string }>) => {
+  const updateFilters = useCallback((patch: Partial<{ branch_id: string; from: string; to: string; method: string }>) => {
     if (pendingPatchRef.current) {
       Object.assign(pendingPatchRef.current, patch);
       return;
@@ -119,16 +92,6 @@ export function PaymentsPage() {
     queryFn: () => apiClient.get<Branch[]>('/v_branches?is_active=is.true&order=name'),
   });
 
-  const { data: bankAccounts = [] } = useQuery({
-    queryKey: ['bank-accounts-active', branchId],
-    queryFn: () => apiClient.get<BankAccountOption[]>(
-      branchId
-        ? `/v_bank_accounts?is_active=is.true&branch_id=eq.${branchId}&order=is_default.desc,bank_name`
-        : '/v_bank_accounts?is_active=is.true&order=bank_name',
-    ),
-    staleTime: 5 * 60 * 1000,
-  });
-
   const toExclusive = useMemo(() => {
     const d = parseLocalDate(toDate);
     if (!d) return toDate;
@@ -141,14 +104,12 @@ export function PaymentsPage() {
   if (fromDate) params.set('bill_date', `gte.${fromDate}`);
   if (toDate) params.append('bill_date', `lt.${toExclusive}`);
   if (methodFilter) params.set('method', `eq.${methodFilter}`);
-  if (typeFilter) params.set('bill_type', `eq.${typeFilter}`);
-  if (bankAccountFilter) params.set('bank_account_id', `eq.${bankAccountFilter}`);
-  params.set('order', 'bill_date.desc,payment_id.desc');
+  params.set('order', 'created_at.desc');
 
   const { data: pageData, isFetching } = useQuery({
-    queryKey: ['accounting', 'payments', branchId, fromDate, toDate, methodFilter, typeFilter, bankAccountFilter, pageIndex, pageSize],
-    queryFn: () => apiClient.getPaginated<PaymentRow>(
-      `/v_payments?${params.toString()}`,
+    queryKey: ['accounting', 'settlement-tender', branchId, fromDate, toDate, methodFilter, pageIndex, pageSize],
+    queryFn: () => apiClient.getPaginated<SettlementTenderLine>(
+      `/v_settlement_tender_lines?${params.toString()}`,
       { page: pageIndex + 1, pageSize }
     ),
     placeholderData: keepPreviousData,
@@ -156,36 +117,38 @@ export function PaymentsPage() {
   const rows = pageData?.data ?? [];
   const totalCount = pageData?.totalCount ?? 0;
 
+  // Summary — fetch the amount+method+tender_class of every row in range (no method
+  // filter so all channels always show) and roll up net per method client-side.
   const summaryParams = new URLSearchParams();
   if (branchId) summaryParams.set('branch_id', `eq.${branchId}`);
   if (fromDate) summaryParams.set('bill_date', `gte.${fromDate}`);
   if (toDate) summaryParams.append('bill_date', `lt.${toExclusive}`);
-  if (bankAccountFilter) summaryParams.set('bank_account_id', `eq.${bankAccountFilter}`);
-  summaryParams.set('select', 'method,bill_type,amount');
+  summaryParams.set('select', 'method,tender_class,direction,amount');
   const { data: summaryRows = [] } = useQuery({
-    queryKey: ['accounting', 'payments-summary', branchId, fromDate, toDate, bankAccountFilter],
-    queryFn: () => apiClient.get<{ method: string; bill_type: string; amount: number }[]>(
-      `/v_payments?${summaryParams.toString()}`,
+    queryKey: ['accounting', 'settlement-tender-summary', branchId, fromDate, toDate],
+    queryFn: () => apiClient.get<Pick<SettlementTenderLine, 'method' | 'tender_class' | 'direction' | 'amount'>[]>(
+      `/v_settlement_tender_lines?${summaryParams.toString()}`,
     ),
   });
+
+  // amount is already signed (OUT/CREDIT_NOTE negative) → net = Σ amount.
   const summary = useMemo(() => {
-    const byMethod = new Map<string, { count: number; amount: number }>();
-    const byType = new Map<string, { count: number; amount: number }>();
-    let totalAmount = 0;
+    const byMethod = new Map<string, { net: number; hasRefund: boolean }>();
+    let physicalNet = 0;
+    let walletNet = 0;
     for (const r of summaryRows) {
-      const m = byMethod.get(r.method) ?? { count: 0, amount: 0 };
-      m.count += 1; m.amount += Number(r.amount) || 0; byMethod.set(r.method, m);
-      const tt = byType.get(r.bill_type) ?? { count: 0, amount: 0 };
-      tt.count += 1; tt.amount += Number(r.amount) || 0; byType.set(r.bill_type, tt);
-      totalAmount += Number(r.amount) || 0;
+      const amt = Number(r.amount) || 0;
+      const slot = byMethod.get(r.method) ?? { net: 0, hasRefund: false };
+      slot.net += amt;
+      if (r.direction === 'OUT') slot.hasRefund = true;
+      byMethod.set(r.method, slot);
+      if (r.tender_class === 'PHYSICAL') physicalNet += amt;
+      else walletNet += amt;
     }
-    return { byMethod, byType, totalAmount, totalCount: summaryRows.length };
+    return { byMethod, physicalNet, walletNet, total: physicalNet + walletNet };
   }, [summaryRows]);
 
-  const visibleMethods = METHODS.filter(m => (summary.byMethod.get(m)?.count ?? 0) > 0);
-
-  const activeFilterCount =
-    (methodFilter ? 1 : 0) + (typeFilter ? 1 : 0) + (!isBranchUser && branchId ? 1 : 0) + (bankAccountFilter ? 1 : 0);
+  const activeFilterCount = (methodFilter ? 1 : 0) + (!isBranchUser && branchId ? 1 : 0);
 
   const dateFilter: ReactNode = (
     <InputDateRangePicker
@@ -222,90 +185,21 @@ export function PaymentsPage() {
       }}
     />
   );
-  // Channel select — merges method + bank account into one control.
-  // Bank accounts only matter for method=TRANSFER, so they live under the Transfer group.
-  // Value encoding (Select side only; URL stays split as method / bank_account_id):
-  //   ''                       → no filter
-  //   'CASH' / 'WAIVE' / …     → method only
-  //   'TRANSFER'               → method=TRANSFER, no bank filter
-  //   'TRANSFER:<id>'          → method=TRANSFER, bank_account_id=<id>
-  const channelValue =
-    methodFilter === 'TRANSFER' && bankAccountFilter
-      ? `TRANSFER:${bankAccountFilter}`
-      : methodFilter || null;
-
-  const channelOptions = [
-    ...METHODS
-      .filter(m => m !== 'TRANSFER')
-      .map(m => ({ value: m, label: t(`accounting.payments.m_${m}`) })),
-    { value: 'TRANSFER', label: t('accounting.payments.m_TRANSFER') },
-    ...bankAccounts.map(b => ({
-      value: `TRANSFER:${b.id}`,
-      label: `${b.bank_name} · ${b.account_number}`,
-    })),
-  ];
-
-  const bankById = new Map(bankAccounts.map(b => [b.id, b]));
-  const renderChannelOption = (opt: { value: string; label: string }) => {
-    if (opt.value.startsWith('TRANSFER:')) {
-      const id = Number(opt.value.slice('TRANSFER:'.length));
-      const b = bankById.get(id);
-      if (b) {
-        return (
-          <div className="flex flex-col leading-tight py-0.5 min-w-0">
-            <div className="text-sm truncate">
-              {t('accounting.payments.m_TRANSFER')}
-              <span className="text-subtle"> · {b.bank_name}</span>
-            </div>
-            <div className="text-xs text-subtle truncate">{b.account_number}</div>
-          </div>
-        );
-      }
-    }
-    return <span className="text-sm">{opt.label}</span>;
-  };
-
-  const onChannelChange = (raw: string | string[] | null | undefined) => {
-    const v = (raw as string) ?? '';
-    if (!v) {
-      updateFilters({ method: '', bank_account_id: '' });
-      return;
-    }
-    if (v.startsWith('TRANSFER:')) {
-      updateFilters({ method: 'TRANSFER', bank_account_id: v.slice('TRANSFER:'.length) });
-      return;
-    }
-    updateFilters({ method: v, bank_account_id: '' });
-  };
-
   const methodNode: ReactNode = (
     <Select
-      value={channelValue}
-      onChange={onChannelChange}
-      options={channelOptions}
-      renderOption={renderChannelOption}
+      value={methodFilter || null}
+      onChange={(v) => updateFilters({ method: (v as string) ?? '' })}
+      options={ALL_METHODS.map(m => ({ value: m, label: t(`accounting.payments.m_${m}`) }))}
       size="sm"
       showChevron
       placeholder={t('accounting.payments.allMethods')}
-      clearable
-      searchable
-    />
-  );
-  const typeNode: ReactNode = (
-    <Select
-      value={typeFilter || null}
-      onChange={(v) => updateFilters({ type: (v as string) ?? '' })}
-      options={TYPE_VALUES.map(v => ({ value: v, label: t(`accounting.bills.typeLabel.${v}`) }))}
-      size="sm"
-      showChevron
-      placeholder={t('accounting.payments.allTypes')}
       clearable
     />
   );
   const branchNode: ReactNode = (
     <Select
       value={branchId || null}
-      onChange={(v) => updateFilters({ branch_id: (v as string) ?? '', bank_account_id: '' })}
+      onChange={(v) => updateFilters({ branch_id: (v as string) ?? '' })}
       placeholder={t('accounting.branch')}
       options={branches.map(b => ({ label: b.name, value: String(b.id) }))}
       size="sm"
@@ -314,10 +208,8 @@ export function PaymentsPage() {
       disabled={isBranchUser}
     />
   );
-  // Priority: higher = inlined first / dropped last.
   const filterItems: FilterBarItem[] = [
-    { key: 'method', width: 224, node: methodNode, priority: 50 },
-    { key: 'type', width: 176, node: typeNode, priority: 30 },
+    { key: 'method', width: 200, node: methodNode, priority: 50 },
     { key: 'branch', width: 176, node: branchNode, priority: 10 },
   ];
 
@@ -353,91 +245,88 @@ export function PaymentsPage() {
           activeCount={activeFilterCount}
         />
 
-        {/* Channel breakdown */}
+        {/* Channel breakdown — grouped by tender_class → method, net per method */}
         <div className="flex-none px-4 py-3 border-b border-line">
           <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-2">
             {t('accounting.payments.channelTitle')}
           </h3>
-          <dl className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-2">
-            {visibleMethods.map(m => {
-              const s = summary.byMethod.get(m) ?? { count: 0, amount: 0 };
-              return (
-                <Stat
-                  key={m}
-                  label={
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className={`font-medium ${BADGE_TEXT_COLOR[METHOD_COLOR[m] ?? 'default']}`}>
-                        {t(`accounting.payments.m_${m}`)}
-                      </span>
-                      <span>{s.count} {t('accounting.payments.paymentCount')}</span>
-                    </span>
-                  }
-                  value={fmtCurrency(s.amount)}
-                />
-              );
-            })}
-            <Stat
-              label={<span className="font-medium">{t('accounting.payments.totalAmount')}</span>}
-              value={fmtCurrency(summary.totalAmount)}
-              emphasis
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
+            <TenderGroup
+              icon={<HandCoins size={15} className="text-success" />}
+              label={t('accounting.payments.tc_PHYSICAL')}
+              net={summary.physicalNet}
+              methods={PHYSICAL_METHODS}
+              byMethod={summary.byMethod}
             />
-          </dl>
+            <TenderGroup
+              icon={<Wallet size={15} className="text-secondary-fg" />}
+              label={t('accounting.payments.tc_WALLET')}
+              net={summary.walletNet}
+              methods={WALLET_METHODS}
+              byMethod={summary.byMethod}
+            />
+          </div>
+          <div className="mt-3 pt-2 border-t border-line flex items-center justify-between">
+            <span className="text-sm font-medium">{t('accounting.payments.totalAmount')}</span>
+            <span className="text-base font-semibold tabular-nums text-primary-fg">
+              {fmtCurrency(summary.total)}
+            </span>
+          </div>
         </div>
 
-        {/* Payments list */}
-        <DataTable<PaymentRow>
+        {/* Tender lines */}
+        <DataTable<SettlementTenderLine>
           data={rows}
           renderRow={(row) => {
             const p = row.original;
-            const correctable = canCorrectChannel && !p.is_reversal && (p.method === 'CASH' || p.method === 'TRANSFER');
+            const isRefund = p.direction === 'OUT';
             return (
               <div
                 key={p.payment_id}
                 className="w-full px-4 py-3 flex items-center gap-3"
               >
-                {/* Left: identity + refs */}
                 <div className="flex flex-col gap-1 min-w-0 flex-1">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="font-mono text-sm font-medium truncate">{p.code_display}</span>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/admin/accounting/bills/${p.bill_id}`)}
+                      className="font-mono text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer truncate"
+                    >
+                      {p.bill_code}
+                      <ExternalLink size={12} />
+                    </button>
                     <Badge color={METHOD_COLOR[p.method] ?? 'default'} size="sm">
                       {t(`accounting.payments.m_${p.method}`, { defaultValue: p.method })}
                     </Badge>
-                    <Badge color={TYPE_COLOR[p.bill_type] ?? 'default'} size="sm">{t(`accounting.bills.typeLabel.${p.bill_type}`, { defaultValue: p.bill_type })}</Badge>
-                    {p.is_reversal && <Badge color="danger" size="sm">VOID</Badge>}
+                    {isRefund && <Badge color="danger" size="sm">{t('accounting.payments.refundTag')}</Badge>}
                   </div>
                   <div className="flex items-center gap-1.5 text-xs text-subtle min-w-0">
                     <span className="truncate">
-                      <span className="font-mono">{p.bill_code_display}</span>
-                      {p.bank_name && <> · <span>{p.bank_name} {p.account_number}</span></>}
+                      {p.customer_name?.trim() && <span>{p.customer_name}</span>}
+                      {p.contract_code && (
+                        <> · <button
+                          type="button"
+                          onClick={() => p.contract_id && navigate(`/admin/contracts/search/${p.contract_id}`)}
+                          className="font-mono text-primary-fg hover:underline inline-flex items-center gap-0.5 bg-transparent border-none p-0 cursor-pointer"
+                        >
+                          {p.contract_code}
+                          <ExternalLink size={11} />
+                        </button></>
+                      )}
+                      {p.bank_name && <> · <span>{p.bank_name} {p.account_number_display}</span></>}
                       {p.payer_name && <> · <span>{p.payer_name}</span></>}
                     </span>
                   </div>
                 </div>
 
-                {/* Amount + date column */}
                 <div className="flex flex-col items-end shrink-0">
-                  <span className="text-sm font-medium tabular-nums">{fmtCurrency(p.amount)}</span>
-                  <span className="text-xs text-fg/50">
+                  <span className={`text-sm font-medium tabular-nums ${isRefund ? 'text-danger' : ''}`}>
+                    {fmtCurrency(p.amount)}
+                  </span>
+                  <span className="text-xs text-subtler">
                     <DateTime value={p.bill_date} showTime={false} />
                   </span>
                 </div>
-
-                {/* Action — reserve space when hidden so amounts stay aligned */}
-                {canCorrectChannel && (
-                  correctable ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="shrink-0"
-                      startIcon={<ArrowLeftRight size={15} />}
-                      title={t('accounting.payments.correct.title')}
-                      aria-label={t('accounting.payments.correct.title')}
-                      onClick={() => setCorrectPayment(p)}
-                    />
-                  ) : (
-                    <span className="shrink-0" style={{ width: '1.75rem' }} aria-hidden />
-                  )
-                )}
               </div>
             );
           }}
@@ -451,25 +340,49 @@ export function PaymentsPage() {
           noResults={<div className="p-8 text-center text-subtler">{t('accounting.empty')}</div>}
         />
       </div>
-
-      <PaymentChannelCorrectModal
-        open={!!correctPayment}
-        payment={correctPayment}
-        onClose={() => setCorrectPayment(null)}
-        onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ['accounting', 'payments'] });
-          queryClient.invalidateQueries({ queryKey: ['accounting', 'payments-summary'] });
-        }}
-      />
     </>
   );
 }
 
-function Stat({ label, value, emphasis }: { label: React.ReactNode; value: React.ReactNode; emphasis?: boolean }) {
+function TenderGroup({
+  icon, label, net, methods, byMethod,
+}: {
+  icon: ReactNode;
+  label: string;
+  net: number;
+  methods: readonly string[];
+  byMethod: Map<string, { net: number; hasRefund: boolean }>;
+}) {
+  const { t } = useTranslation();
+  const visible = methods.filter(m => byMethod.has(m));
   return (
     <div>
-      <dt className="text-xs text-subtle">{label}</dt>
-      <dd className={`tabular-nums font-semibold ${emphasis ? 'text-base text-primary-fg' : 'text-sm'}`}>{value}</dd>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="inline-flex items-center gap-1.5 text-sm font-medium">
+          {icon}
+          {label}
+        </span>
+        <span className="text-sm font-semibold tabular-nums">{fmtCurrency(net)}</span>
+      </div>
+      <dl className="pl-6 flex flex-col gap-1">
+        {visible.length === 0 && (
+          <span className="text-xs text-subtler">—</span>
+        )}
+        {visible.map(m => {
+          const s = byMethod.get(m)!;
+          const color = METHOD_COLOR[m] ?? 'secondary';
+          return (
+            <div key={m} className="flex items-center justify-between">
+              <dt className={`text-xs ${BADGE_TEXT_COLOR[color] ?? 'text-fg'}`}>
+                {t(`accounting.payments.m_${m}`)}
+              </dt>
+              <dd className={`text-xs tabular-nums ${s.net < 0 ? 'text-danger' : ''}`}>
+                {fmtCurrency(s.net)}
+              </dd>
+            </div>
+          );
+        })}
+      </dl>
     </div>
   );
 }

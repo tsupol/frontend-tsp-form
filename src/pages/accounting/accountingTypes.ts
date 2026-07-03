@@ -204,6 +204,44 @@ export interface PaymentRow {
   bill_status: string;
 }
 
+// v_settlement_tender_lines — "ชำระ (เก็บเงิน)" list. Bill-status-shaped (VOIDED
+// excluded, INVOICE/CREDIT_NOTE only). `amount` is already signed: CREDIT_NOTE /
+// direction=OUT rows come through negative, so sum(amount) = net (IN − OUT).
+// tender_class PHYSICAL = CASH+TRANSFER (cash in hand) · WALLET = the wallet methods.
+export interface SettlementTenderLine {
+  payment_id: number;
+  payment_code: string;
+  holding_id: number;
+  company_id: number;
+  branch_id: number;
+  branch_name: string;
+  bill_date: string;
+  created_at: string;
+  method: string;
+  tender_class: 'PHYSICAL' | 'WALLET';
+  direction: 'IN' | 'OUT';
+  amount: number;
+  bank_account_id: number | null;
+  bank_name: string | null;
+  account_name: string | null;
+  account_number_display: string | null;
+  reference: string | null;
+  ocr_amount: number | null;
+  ocr_date: string | null;
+  ocr_bank: string | null;
+  ocr_payer_name: string | null;
+  payer_type: string | null;
+  payer_name: string | null;
+  bill_id: number;
+  bill_code: string;
+  bill_type: string;
+  bill_purpose: string;
+  contract_id: number | null;
+  contract_code: string | null;
+  customer_id: number | null;
+  customer_name: string;
+}
+
 // v_day_close_breakdown — unified day-close view (1 row per branch+date).
 // data_source = 'LIVE' (not yet closed, computed from bills) | 'SNAPSHOT' (closed).
 // Same column shape either way; UI branches on is_closed / data_source.

@@ -29,11 +29,11 @@ export function AccountingLayout({ children }: { children: ReactNode }) {
 
   const navItems: NavItem[] = useMemo(() => [
     { type: 'group', labelKey: 'nav.groupDaily' },
-    { type: 'link', path: '/admin/accounting/day-close', labelKey: 'nav.dayClose', icon: CalendarCheck, badge: unclosedCount },
     { type: 'link', path: '/admin/accounting/bills', labelKey: 'nav.bills', icon: Receipt },
+    { type: 'link', path: '/admin/accounting/payments', labelKey: 'nav.payments', icon: Banknote },
     { type: 'group', labelKey: 'nav.groupCashflow' },
     { type: 'link', path: '/admin/accounting/remittance', labelKey: 'nav.remittance', icon: ArrowUpRight },
-    { type: 'link', path: '/admin/accounting/payments', labelKey: 'nav.payments', icon: Banknote },
+    { type: 'link', path: '/admin/accounting/day-close', labelKey: 'nav.dayClose', icon: CalendarCheck, badge: unclosedCount },
     { type: 'group', labelKey: 'nav.groupReports' },
     { type: 'link', path: '/admin/accounting/balance', labelKey: 'nav.branchBalance', icon: Scale },
     ...(canSeeReports ? [
