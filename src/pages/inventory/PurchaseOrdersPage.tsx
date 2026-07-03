@@ -181,11 +181,15 @@ export function PurchaseOrdersPage() {
   const isThai = i18n.language === 'th';
 
   const canCreate = ['BRANCH_MANAGER', 'COMPANY_ADMIN', 'COMPANY_INVENTORY', 'HOLDING_ADMIN'].includes(user?.role_code ?? '');
+  // Branch-scope users only ever see their own branch's POs (RLS), so the branch
+  // filter is noise for them — expose it only to company/holding-scope roles.
+  const canFilterBranch = ['COMPANY_ADMIN', 'COMPANY_INVENTORY', 'COMPANY_ACCOUNTANT', 'COMPANY_COLLECTOR', 'COMPANY_REPO', 'HOLDING_ADMIN'].includes(user?.role_code ?? '');
 
   // ── Filters ─────────────────────────────────────────────────────────
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
   const [filterOwnership, setFilterOwnership] = useState<string | null>(null);
   const [filterPoType, setFilterPoType] = useState<string | null>(null);
+  const [filterBranchId, setFilterBranchId] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -274,14 +278,22 @@ export function PurchaseOrdersPage() {
     return m;
   }, [allBranches]);
 
+  const branchOptions = useMemo(
+    () => (allBranches ?? []).map(b => ({ value: String(b.id), label: b.name })),
+    [allBranches],
+  );
+
   // ── PO list (all 3 types: PURCHASE / BUYBACK / DEAL_PARTNER) ─────────
   const { data: listData, isFetching } = useQuery({
-    queryKey: ['purchase-orders', filterStatus, filterOwnership, filterPoType, search, pageIndex, pageSize],
+    queryKey: ['purchase-orders', filterStatus, filterOwnership, filterPoType, filterBranchId, search, pageIndex, pageSize],
     queryFn: () => {
       let url = '/v_purchase_orders?order=created_at.desc';
       if (filterStatus) url += `&status=eq.${filterStatus}`;
       if (filterOwnership) url += `&ownership=eq.${filterOwnership}`;
       if (filterPoType) url += `&po_type=eq.${filterPoType}`;
+      // Company-level POs (branch_id = NULL, created centrally by C_A/C_I) drop out
+      // when a branch is selected — they aren't that branch's.
+      if (filterBranchId) url += `&branch_id=eq.${filterBranchId}`;
       if (search) {
         const term = encodeURIComponent(`*${search}*`);
         url += `&or=(po_no.ilike.${term},code_display.ilike.${term},supplier_name.ilike.${term})`;
@@ -303,7 +315,7 @@ export function PurchaseOrdersPage() {
     placeholderData: keepPreviousData,
   });
 
-  useEffect(() => { setPageIndex(0); }, [filterStatus, filterOwnership, filterPoType, search]);
+  useEffect(() => { setPageIndex(0); }, [filterStatus, filterOwnership, filterPoType, filterBranchId, search]);
 
   // Don't auto-clear the selection based on list membership: the user can deep-link
   // to /po/:id, and the list may be filtered / paginated so the row isn't visible.
@@ -409,6 +421,19 @@ export function PurchaseOrdersPage() {
                     clearable
                   />
                 </div>
+                {canFilterBranch && (
+                  <div className="flex-1 min-w-0 hidden lg:block">
+                    <Select
+                      options={branchOptions}
+                      value={filterBranchId}
+                      onChange={(v) => setFilterBranchId((v as string) || null)}
+                      placeholder={t('po.allBranches')}
+                      size="sm"
+                      showChevron
+                      clearable
+                    />
+                  </div>
+                )}
                 {canCreate && isMobile && (
                   <Button
                     color="primary"
