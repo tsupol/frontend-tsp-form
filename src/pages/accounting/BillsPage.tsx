@@ -519,7 +519,10 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
   );
   const originalPayments = existingPayments.filter(p => !p.is_reversal);
   const balanced = Math.abs(lineTotal - existingPayTotal) < 0.01;
-  const isCancelled = detail.is_voided || detail.status === 'VOIDED';
+  // A bill cancelled by credit note keeps status='PAID' and is_voided=false —
+  // its only signal in v_bill_detail is cancel_info being populated. Fold that
+  // in so the header badge + banner match the list (which reads is_cancelled).
+  const isCancelled = detail.is_voided || detail.status === 'VOIDED' || detail.cancel_info != null;
   const displayStatus = isCancelled ? 'VOIDED' : detail.status;
   const statusColor = isCancelled
     ? 'default'
