@@ -82,6 +82,8 @@ import { BranchBalancePage } from './pages/accounting/BranchBalancePage';
 import { BillsPage } from './pages/accounting/BillsPage';
 import { RemittancePage } from './pages/accounting/RemittancePage';
 import { PaymentsPage } from './pages/accounting/PaymentsPage';
+import { ReconcileItemPage } from './pages/accounting/ReconcileItemPage';
+import { ReconcileChannelPage } from './pages/accounting/ReconcileChannelPage';
 import { AuditFlagsPage } from './pages/accounting/AuditFlagsPage';
 import { ReportsPage } from './pages/accounting/ReportsPage';
 import { BranchExpenseLayout } from './pages/branch-expense/BranchExpenseLayout';
@@ -961,6 +963,26 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <AccountingLayout><RemittancePage /></AccountingLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/accounting/reconcile-item"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <AccountingLayout><ReconcileItemPage /></AccountingLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/accounting/reconcile-channel"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <AccountingLayout><ReconcileChannelPage /></AccountingLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

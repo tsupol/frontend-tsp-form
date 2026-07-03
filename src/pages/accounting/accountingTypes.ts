@@ -242,6 +242,105 @@ export interface SettlementTenderLine {
   customer_name: string;
 }
 
+// fn_reconcile_by_item — Step 1 "ยอดนำส่ง". Flat line-level rows (UI groups
+// owner→bill→line). remit_amount = the countable value (amount×qty + JOURNAL rule);
+// never show raw `amount`. CREDIT_NOTE rows are negative. is_remittable=false → "ไม่นับ".
+export interface ReconcileItemRow {
+  owner_type: 'HOLDING' | 'COMPANY';
+  line_id: number;
+  branch_code: string;
+  branch_name: string;
+  bill_date: string;
+  bill_id: number;
+  bill_code: string;
+  contract_id: number | null;
+  contract_code: string | null;
+  customer_name: string;
+  charge_type: string;
+  charge_name_th: string;
+  description: string;
+  amount: number;
+  quantity: number;
+  remit_amount: number;
+  is_remittable: boolean;
+  bill_type: string;
+  day_closed: boolean;
+}
+
+export interface ReconcileItemBranch {
+  branch_id: number;
+  branch_code: string;
+  branch_name: string;
+  total: number;
+  holding_total: number;
+  company_total: number;
+}
+
+export interface ReconcileScope {
+  mode: 'BRANCH' | 'COMPANY_ALL';
+  company_id: number | null;
+  branch_id: number | null;
+  date_from: string;
+  date_to: string;
+}
+
+export interface ReconcileItemResult {
+  scope: ReconcileScope;
+  count: number;
+  total_amount: number;
+  holding_total: number;
+  company_total: number;
+  by_branch: ReconcileItemBranch[];
+  rows: ReconcileItemRow[];
+}
+
+// fn_reconcile_by_channel — Step 2 "ตรวจเงิน". summary net_* from day_close (authoritative).
+// counted_*/diff_* are null until the day is counted (ปิดวัน). payments[] = gross slips for matching.
+export interface ReconcileChannelSummary {
+  net_cash: number;
+  net_transfer: number;
+  wallet: number;
+  physical: number;        // net_cash + net_transfer
+  remit_total: number;     // physical + wallet (= Step 1 total)
+  counted_cash: number | null;
+  counted_transfer: number | null;
+  diff_cash: number | null;
+  diff_transfer: number | null;
+  shortage: number;
+  overage: number;
+}
+
+export interface ReconcileChannelPayment {
+  payment_id: number;
+  method: string;
+  amount: number;
+  bank_name: string | null;
+  account_number: string | null;
+  payer_name: string | null;
+  code: string;
+  bill_code: string;
+  is_reversal: boolean;
+  branch_id: number;
+  created_at: string;
+}
+
+export interface ReconcileChannelBranch {
+  branch_id: number;
+  net_cash: number;
+  net_transfer: number;
+  physical: number;
+  wallet: number;
+  shortage: number;
+  overage: number;
+}
+
+export interface ReconcileChannelResult {
+  scope: ReconcileScope;
+  summary: ReconcileChannelSummary;
+  by_branch: ReconcileChannelBranch[];
+  payments: ReconcileChannelPayment[];
+}
+
 // v_day_close_breakdown — unified day-close view (1 row per branch+date).
 // data_source = 'LIVE' (not yet closed, computed from bills) | 'SNAPSHOT' (closed).
 // Same column shape either way; UI branches on is_closed / data_source.
