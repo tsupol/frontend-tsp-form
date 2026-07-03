@@ -3832,6 +3832,7 @@
       "creditNoteAmount": "Credit Note Total",
       "journalAmount": "Journal Total",
       "drillRemittance": "View remittance lines →",
+      "drillReconcile": "Money check →",
       "drillPayments": "View payments →",
       "breakdownTitle": "Breakdown",
       "remitTitle": "Remittance",

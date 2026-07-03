@@ -3831,6 +3831,7 @@
       "creditNoteAmount": "ยอดรวม Credit Note",
       "journalAmount": "ยอดรวม Journal",
       "drillRemittance": "ดูรายการเรียกเก็บ →",
+      "drillReconcile": "ตรวจเงิน →",
       "drillPayments": "ดูรายการชำระ →",
       "breakdownTitle": "สรุปวัน",
       "remitTitle": "นำส่ง",

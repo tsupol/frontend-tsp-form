@@ -7,7 +7,7 @@ import {
 } from 'tsp-form';
 import {
   ArrowRightFromLine, ArrowLeft, CalendarCheck, AlertTriangle, CheckCircle2, Lock, Sparkles, Keyboard, XCircle, Clock, ChevronsRight,
-  ArrowUpRight, Banknote,
+  Coins, Banknote,
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { apiClient, ApiError } from '../../lib/api';
@@ -681,7 +681,7 @@ function ClosedSnapshot({ close, branchId }: { close: DayCloseHistoryRow; branch
   const navigate = useNavigate();
   // Default to the breakdown — on a closed day that's the figure being looked up.
   const [tab, setTab] = useState<'breakdown' | 'reconcile'>('breakdown');
-  const remittanceLink = `/admin/accounting/reconcile-item?branch_id=${branchId}&from=${close.close_date}&to=${close.close_date}`;
+  const remittanceLink = `/admin/accounting/reconcile-channel?branch_id=${branchId}&from=${close.close_date}&to=${close.close_date}`;
   const paymentsLink = `/admin/accounting/payments?branch_id=${branchId}&from=${close.close_date}&to=${close.close_date}`;
   return (
     <div className="@container flex flex-col h-full min-h-0">
@@ -692,14 +692,14 @@ function ClosedSnapshot({ close, branchId }: { close: DayCloseHistoryRow; branch
         </span>
         <Badge color="success" size="sm">{t('accounting.dayClose.closedBadge')}</Badge>
         <div className="ml-auto flex items-center gap-1.5 shrink-0">
-          <Tooltip content={t('accounting.dayClose.drillRemittance')} placement="bottom">
+          <Tooltip content={t('accounting.dayClose.drillReconcile')} placement="bottom">
             <Button
               size="sm"
               variant="outline"
               className="btn-icon-sm"
-              startIcon={<ArrowUpRight size={16} />}
+              startIcon={<Coins size={16} />}
               onClick={() => navigate(remittanceLink)}
-              aria-label={t('accounting.dayClose.drillRemittance')}
+              aria-label={t('accounting.dayClose.drillReconcile')}
             />
           </Tooltip>
           <Tooltip content={t('accounting.dayClose.drillPayments')} placement="bottom">
