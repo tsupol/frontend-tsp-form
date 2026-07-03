@@ -167,6 +167,8 @@ function AccountModal({ open, onClose, account, branches }: {
           p_promptpay_id: data.promptpay_id || null,
           p_note: data.note || null,
           p_updated_by: user.user_id,
+          // Same stale-overload disambiguation as create (see fn_bank_account_create below).
+          p_account_number_display: null,
         });
         addSnackbar({
           message: <div className="alert alert-success"><CheckCircle size={16} /><span className="alert-description">{t('settings.bankAccounts.updated')}</span></div>,
@@ -182,6 +184,11 @@ function AccountModal({ open, onClose, account, branches }: {
           p_is_default: data.is_default,
           p_note: data.note || null,
           p_created_by: user.user_id,
+          // Send the display param so PostgREST picks the current 9-arg overload.
+          // The DB still has a stale 8-arg fn_bank_account_create alongside the
+          // 9-arg one (mig 53 CREATE OR REPLACE'd but never dropped the old
+          // signature), so omitting it makes the call ambiguous (PGRST203).
+          p_account_number_display: null,
         });
         addSnackbar({
           message: <div className="alert alert-success"><CheckCircle size={16} /><span className="alert-description">{t('settings.bankAccounts.created')}</span></div>,

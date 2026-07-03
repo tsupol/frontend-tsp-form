@@ -2,14 +2,15 @@ import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { MobileHeader, Badge, Select, Input, Button } from 'tsp-form';
-import { Boxes, ScanBarcode, ArrowRightFromLine, ShoppingCart, Smartphone } from 'lucide-react';
+import { MobileHeader, Badge, Select, Input, Button, PopOver, MenuItem } from 'tsp-form';
+import { Boxes, ScanBarcode, ArrowRightFromLine, ShoppingCart, Smartphone, MoreHorizontal, PackageMinus } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { fmtNum } from './inventoryUtils';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { useBarcodeScanner } from '../../components/BarcodeScanner';
+import { RetailWriteOffModal, type RetailWriteOffTarget } from './RetailWriteOffModal';
 
 // ============================================================================
 // Branch Stock — two views of "what's on the shelf at branch X":
@@ -81,6 +82,7 @@ export function BranchStockPage() {
   const [filterBranchId, setFilterBranchId] = useState<number | null>(initialBranchId);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [writeOffTarget, setWriteOffTarget] = useState<RetailWriteOffTarget | null>(null);
   const { open: openScanner, scannerEl } = useBarcodeScanner({
     onScan: (val) => { setSearch(val); setDebouncedSearch(val); },
   });
@@ -264,6 +266,7 @@ export function BranchStockPage() {
             rows={retailRows ?? []}
             branchName={branchName}
             isFetching={retailFetching}
+            onWriteOff={setWriteOffTarget}
             t={t}
           />
         )}
@@ -276,6 +279,12 @@ export function BranchStockPage() {
           />
         )}
       </div>
+
+      <RetailWriteOffModal
+        target={writeOffTarget}
+        onClose={() => setWriteOffTarget(null)}
+        onDone={() => setWriteOffTarget(null)}
+      />
     </div>
   );
 }
@@ -284,11 +293,13 @@ function RetailList({
   rows,
   branchName,
   isFetching,
+  onWriteOff,
   t,
 }: {
   rows: SellableRow[];
   branchName: (id: number) => string;
   isFetching: boolean;
+  onWriteOff: (target: RetailWriteOffTarget) => void;
   t: (key: string, opts?: Record<string, unknown>) => string;
 }) {
   if (!isFetching && rows.length === 0) {
@@ -302,11 +313,16 @@ function RetailList({
     <div className="flex flex-col pb-8">
       {rows.map((row) => (
         <div
-          key={`${row.branch_id}-${row.variant_id}`}
+          key={`${row.branch_id}-${row.variant_id}-${row.bucket}`}
           className="w-full px-4 py-2.5 border-b border-line flex items-center gap-3"
         >
           <div className="flex-1 min-w-0">
-            <div className="font-medium text-sm truncate">{row.full_name}</div>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="font-medium text-sm truncate">{row.full_name}</span>
+              {row.bucket === 'IN_TRANSIT_OUTBOUND' && (
+                <Badge size="xs" color="info">{t('branchStock.inTransit')}</Badge>
+              )}
+            </div>
             <div className="text-xs text-subtle truncate">
               {[row.brand_name, row.model_name, row.variant_name].filter(Boolean).join(' · ')}
             </div>
@@ -319,9 +335,92 @@ function RetailList({
             <div className="text-xs text-subtle tabular-nums">{fmtCurrency(row.total_value ?? 0)}</div>
             <div className="text-[11px] text-subtler tabular-nums">{fmtCurrency(row.avg_cost ?? 0)} {t('branchStock.each', { defaultValue: 'each' })}</div>
           </div>
+          <RetailRowMenu row={row} onWriteOff={onWriteOff} t={t} />
+
         </div>
       ))}
     </div>
+  );
+}
+
+// Row action menu. The evaluator (which actions apply + permission) is queried
+// only when the menu opens, so the list doesn't fire one request per row.
+interface StockAction {
+  action_code: string;
+  is_available: boolean;
+  has_permission: boolean;
+}
+
+function RetailRowMenu({
+  row,
+  onWriteOff,
+  t,
+}: {
+  row: SellableRow;
+  onWriteOff: (target: RetailWriteOffTarget) => void;
+  t: (key: string, opts?: Record<string, unknown>) => string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  // Only ON_HAND_AVAILABLE stock is actionable (in-transit can't be written off).
+  // The menu button stays visible but disabled on other buckets.
+  const actionable = row.bucket === 'ON_HAND_AVAILABLE';
+
+  const { data: actions } = useQuery({
+    queryKey: ['stock-actions', row.branch_id, row.variant_id],
+    queryFn: () => apiClient.rpc<{ actions: StockAction[]; total_qty: number }>(
+      'fn_branch_stock_available_actions',
+      { p_branch_id: row.branch_id, p_variant_id: row.variant_id },
+    ),
+    enabled: open && actionable,
+    staleTime: 30 * 1000,
+  });
+
+  const writeOff = actions?.actions.find(a => a.action_code === 'STOCK_LOSS_JOURNAL');
+  const canWriteOff = !!writeOff?.is_available && !!writeOff?.has_permission;
+  const availableQty = actions?.total_qty ?? row.qty;
+
+  return (
+    <PopOver
+      isOpen={open}
+      onClose={() => setOpen(false)}
+      placement="bottom"
+      align="end"
+      offset={4}
+      trigger={
+        <button
+          type="button"
+          disabled={!actionable}
+          className="p-1 rounded transition-colors bg-transparent border-none text-current shrink-0 enabled:cursor-pointer enabled:hover:bg-surface-hover disabled:opacity-30 disabled:cursor-not-allowed"
+          onClick={() => { if (actionable) setOpen(o => !o); }}
+          aria-label={t('common.actions', { defaultValue: 'Actions' })}
+        >
+          <MoreHorizontal size={18} className="opacity-70" />
+        </button>
+      }
+    >
+      <div className="py-1 min-w-[180px]">
+        {canWriteOff ? (
+          <MenuItem
+            icon={<PackageMinus size={14} />}
+            label={t('branchStock.writeOff.action')}
+            onClick={() => {
+              setOpen(false);
+              onWriteOff({
+                variantId: row.variant_id,
+                branchId: row.branch_id,
+                available: availableQty,
+                displayName: row.full_name,
+              });
+            }}
+          />
+        ) : (
+          <div className="px-3 py-2 text-xs text-subtler">
+            {actions ? t('branchStock.writeOff.noActions') : t('common.loading')}
+          </div>
+        )}
+      </div>
+    </PopOver>
   );
 }
 

@@ -1251,7 +1251,26 @@
     "leaseTab": "Lease",
     "search": "Search by name, model, variant",
     "each": "each",
-    "units": "units"
+    "units": "units",
+    "inTransit": "In transit",
+    "writeOff": {
+      "action": "Write off",
+      "noActions": "No actions available",
+      "title": "Write off stock",
+      "available": "{{count}} available",
+      "qty": "Quantity to write off",
+      "qtyRange": "Enter 1–{{max}}",
+      "reason": "Reason",
+      "reasonPlaceholder": "Select a reason",
+      "note": "Note",
+      "notePlaceholder": "Optional — recommended for \"Other\"",
+      "confirm": "Write off",
+      "insufficient": "Only {{available}} available",
+      "done": "Stock written off",
+      "qtyLost": "Written off",
+      "remaining": "Remaining",
+      "value": "Value"
+    }
   },
   "barcodes": {
     "title": "Product Barcodes",

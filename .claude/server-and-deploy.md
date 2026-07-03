@@ -16,6 +16,13 @@ different, unused server** — ignore `.claude/paas-dock-deploy.md` (kept only a
   and tar-ships **only `dist/`** over ssh into `/home/nnfsup/nnf-ui-dist`. No image
   transfer, no container restart — nginx serves the new files immediately. Seconds,
   not minutes.
+- **Gotcha (this Windows box):** `just` runs recipes under Git Bash, which can't
+  resolve `npm` (`/bin/bash: .../npm: No such file or directory`, exit 127) — so
+  `just deploy` dies at its `build` step. Work around it by running the two halves
+  in their own shells: **build in PowerShell** (`npm run build`), then **ship in
+  Bash** (the `ssh rm -rf …` + `tar -C dist -czf - . | ssh … "tar -C /home/nnfsup/nnf-ui-dist -xzf -"`
+  from the `deploy` recipe). Same result as the recipe. Don't "fix" the justfile
+  without being asked.
 - **Why it works:** the `nnf-ui` container is a **persistent `nginx:alpine`** that
   mounts `/home/nnfsup/nnf-ui-dist` (html) + `/home/nnfsup/nnf-ui-conf/default.conf`.
   `just deploy` only swaps files in the mounted dir. **If that container is ever

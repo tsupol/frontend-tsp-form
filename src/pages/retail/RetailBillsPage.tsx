@@ -351,62 +351,11 @@ function RetailBillDetail({ billId, isMobile }: { billId: number; isMobile: bool
 
   return (
     <div className="flex flex-col h-full">
-      {/* Desktop header — thin status row with code + badge + actions */}
+      {/* Desktop header — thin status row with code + badge (actions live in the footer) */}
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
           <span className="font-semibold font-mono">{detail.bill_code_display}</span>
           <Badge color={statusColor} size="sm">{t(`retail.status_${detail.status}`, { defaultValue: detail.status })}</Badge>
-          <div className="flex-1" />
-          {showPayBtn && (
-            <Button
-              size="sm"
-              color="primary"
-              startIcon={<Wallet size={14} />}
-              onClick={() => setPayOpen(true)}
-            >
-              {t('retail.bills.takePayment')}
-            </Button>
-          )}
-          {showVoidBtn && (
-            <Button
-              size="sm"
-              variant="outline"
-              color="danger"
-              startIcon={<Ban size={14} />}
-              onClick={() => setVoidOpen(true)}
-            >
-              {t('retail.bills.void')}
-            </Button>
-          )}
-          {showReceiptBtns && (
-            <>
-              <Button
-                size="sm"
-                variant="outline"
-                startIcon={<Printer size={14} />}
-                onClick={handlePrint}
-              >
-                {t('retail.bills.printBill')}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                startIcon={downloadingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-                disabled={downloadingPdf}
-                onClick={() => downloadPdf(billId)}
-              >
-                {t('wizard.receipt_download')}
-              </Button>
-            </>
-          )}
-          <Button
-            size="sm"
-            variant="outline"
-            startIcon={<ExternalLink size={14} />}
-            onClick={openBillPage}
-          >
-            {t('retail.bills.openBillPage')}
-          </Button>
         </div>
       )}
 
@@ -438,67 +387,6 @@ function RetailBillDetail({ billId, isMobile }: { billId: number; isMobile: bool
           <span>{t('retail.bills.createdAt')}: <DateTime value={detail.created_at} /></span>
         )}
       </div>
-
-      {/* Mobile action row */}
-      {isMobile && (
-        <div className="flex-none flex flex-wrap gap-2 px-4 py-3 border-b border-line">
-          {showPayBtn && (
-            <Button
-              size="sm"
-              color="primary"
-              className="flex-1"
-              startIcon={<Wallet size={14} />}
-              onClick={() => setPayOpen(true)}
-            >
-              {t('retail.bills.takePayment')}
-            </Button>
-          )}
-          {showVoidBtn && (
-            <Button
-              size="sm"
-              variant="outline"
-              color="danger"
-              className="flex-1"
-              startIcon={<Ban size={14} />}
-              onClick={() => setVoidOpen(true)}
-            >
-              {t('retail.bills.void')}
-            </Button>
-          )}
-          {showReceiptBtns && (
-            <>
-              <Button
-                size="sm"
-                variant="outline"
-                className="flex-1"
-                startIcon={<Printer size={14} />}
-                onClick={handlePrint}
-              >
-                {t('retail.bills.printBill')}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="flex-1"
-                startIcon={downloadingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-                disabled={downloadingPdf}
-                onClick={() => downloadPdf(billId)}
-              >
-                {t('wizard.receipt_download')}
-              </Button>
-            </>
-          )}
-          <Button
-            size="sm"
-            variant="outline"
-            className="flex-1"
-            startIcon={<ExternalLink size={14} />}
-            onClick={openBillPage}
-          >
-            {t('retail.bills.openBillPage')}
-          </Button>
-        </div>
-      )}
 
       {/* Blocked-action hint — show why ADD_PAYMENT or CANCEL_BILL is unavailable.
           status_not_allowed is suppressed: status alone is already obvious from the badge. */}
@@ -555,6 +443,65 @@ function RetailBillDetail({ billId, isMobile }: { billId: number; isMobile: bool
               </span>
             </div>
           ))
+        )}
+      </div>
+
+      {/* Sticky action footer */}
+      <div className="flex-none border-t border-line px-4 py-3 flex flex-wrap items-center justify-end gap-2">
+        {showReceiptBtns && (
+          <>
+            <Button
+              size="sm"
+              variant="outline"
+              className={isMobile ? 'flex-1' : undefined}
+              startIcon={<Printer size={14} />}
+              onClick={handlePrint}
+            >
+              {t('retail.bills.printBill')}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className={isMobile ? 'flex-1' : undefined}
+              startIcon={downloadingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+              disabled={downloadingPdf}
+              onClick={() => downloadPdf(billId)}
+            >
+              {t('wizard.receipt_download')}
+            </Button>
+          </>
+        )}
+        <Button
+          size="sm"
+          variant="outline"
+          className={isMobile ? 'flex-1' : undefined}
+          startIcon={<ExternalLink size={14} />}
+          onClick={openBillPage}
+        >
+          {t('retail.bills.openBillPage')}
+        </Button>
+        {showVoidBtn && (
+          <Button
+            size="sm"
+            variant="outline"
+            color="danger"
+            className={isMobile ? 'flex-1' : undefined}
+            startIcon={<Ban size={14} />}
+            onClick={() => setVoidOpen(true)}
+          >
+            {t('retail.bills.void')}
+          </Button>
+        )}
+        {showPayBtn && (
+          <Button
+            size="sm"
+            color="primary"
+            className={isMobile ? 'flex-1' : undefined}
+            startIcon={<Wallet size={14} />}
+            onClick={() => setPayOpen(true)}
+          >
+            {t('retail.bills.takePayment')}
+          </Button>
         )}
       </div>
 
