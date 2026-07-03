@@ -162,10 +162,10 @@ export const AppSideNav = () => {
   const location = useLocation();
   const { t } = useTranslation();
   const navGuard = useNavGuard();
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   const role = user?.role_code ?? '';
   const canApprove = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
-  const canChat = role === 'BRANCH_STAFF' || role === 'BRANCH_MANAGER';
+  const canChat = can('CONTRACT.CHAT');
 
   const {
     pendingApprovals,

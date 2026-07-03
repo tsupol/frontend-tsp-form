@@ -27,8 +27,6 @@ import { CHAT_STATUS_VALUES, type ChatInboxRow, type ChatStatus } from './chatTy
 import { chatStatusBadgeColor } from './chatStatus';
 import { ChatStatusLogModal } from './ChatStatusLogModal';
 
-const BRANCH_ROLES = ['BRANCH_STAFF', 'BRANCH_MANAGER'];
-
 const STATUS_ICONS: Record<ChatStatus, React.ReactNode> = {
   WAITING_REPLY:   <MessageSquareWarning size={14} />,
   WAITING_FINANCE: <Wallet size={14} />,
@@ -74,8 +72,10 @@ interface ActionsMenuProps {
 
 export function ChatThreadActionsMenu({ contractId, inboxRow }: ActionsMenuProps) {
   const { t } = useTranslation();
-  const { user } = useAuth();
-  const canEdit = BRANCH_ROLES.includes(user?.role_code ?? '');
+  const { can } = useAuth();
+  const canSetStatus = can('CHAT.STATUS_SET');
+  const canSetNote = can('CHAT.NOTE_SET');
+  const canEdit = canSetStatus || canSetNote;
 
   const [open, setOpen] = useState(false);
   const [statusModalTarget, setStatusModalTarget] = useState<ChatStatus | null>(null);
@@ -116,19 +116,23 @@ export function ChatThreadActionsMenu({ contractId, inboxRow }: ActionsMenuProps
         }
       >
         <div className="py-1 min-w-[200px]">
-          <div className="px-3 pt-1.5 pb-1 text-[11px] uppercase tracking-wide text-subtle">
-            {t('chat.setStatus.title')}
-          </div>
-          {CHAT_STATUS_VALUES.map(s => (
-            <MenuItem
-              key={s}
-              icon={STATUS_ICONS[s]}
-              label={t(`chat.setStatus.${s.toLowerCase()}`)}
-              onClick={() => { setOpen(false); setStatusModalTarget(s); }}
-            />
-          ))}
-          <div className="border-t border-line my-1" />
-          {!inboxRow.pinned_note && (
+          {canSetStatus && (
+            <>
+              <div className="px-3 pt-1.5 pb-1 text-[11px] uppercase tracking-wide text-subtle">
+                {t('chat.setStatus.title')}
+              </div>
+              {CHAT_STATUS_VALUES.map(s => (
+                <MenuItem
+                  key={s}
+                  icon={STATUS_ICONS[s]}
+                  label={t(`chat.setStatus.${s.toLowerCase()}`)}
+                  onClick={() => { setOpen(false); setStatusModalTarget(s); }}
+                />
+              ))}
+              <div className="border-t border-line my-1" />
+            </>
+          )}
+          {canSetNote && !inboxRow.pinned_note && (
             <MenuItem
               icon={<Pin size={14} />}
               label={t('chat.pinnedNote.add')}
@@ -179,8 +183,8 @@ export function ChatPinnedNoteRow({ contractId, inboxRow, lang }: {
   lang: string;
 }) {
   const { t } = useTranslation();
-  const { user } = useAuth();
-  const canEdit = BRANCH_ROLES.includes(user?.role_code ?? '');
+  const { can } = useAuth();
+  const canEdit = can('CHAT.NOTE_SET');
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);

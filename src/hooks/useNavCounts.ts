@@ -11,10 +11,11 @@ import { defaultScopeFor, scopeQuery, scopeQueryRollup, scopeKey } from '../lib/
 // dashboard scope picker). Backend RLS leaks on these views — must send the
 // explicit scope filter, see UI_FEEDBACK/2026-05-06_dashboard_endpoints.md.
 export function useNavCounts() {
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   const role = user?.role_code ?? '';
   const canApprove = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
   const isBranchUser = role === 'BRANCH_STAFF' || role === 'BRANCH_MANAGER';
+  const canChat = can('CONTRACT.CHAT');
 
   const scope = defaultScopeFor(user);
   const sk = scopeKey(scope);
@@ -143,13 +144,14 @@ export function useNavCounts() {
   const legalCasesQueuedCount = legalQueuedData?.totalCount ?? 0;
 
   // Chat unread — sum unread_count from v_branch_chat_list (RLS-scoped to branch).
-  // Only branch users have access; the view returns empty for company/holding roles.
+  // Gated on the CONTRACT.CHAT capability, not role — any branch role with chat
+  // access (incl. BRANCH_COLLECTOR); the view returns empty for others.
   const { data: unreadChatRows } = useQuery({
     queryKey: ['nav', 'chat-unread', sk],
     queryFn: () => apiClient.get<{ unread_count: number }[]>(
       `/v_branch_chat_list?select=unread_count&unread_count=gt.0`,
     ),
-    enabled: isBranchUser,
+    enabled: canChat,
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
     retry: false,
