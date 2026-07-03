@@ -1512,7 +1512,9 @@
     "disposeSuccess": "ทำลายสินทรัพย์แล้ว",
     "disposeReverseSuccess": "ยกเลิกการทำลายแล้ว",
     "writeOffSuccess": "ตัดบัญชีสินทรัพย์แล้ว",
-    "internalUseSuccess": "มอบหมายใช้ภายในแล้ว"
+    "internalUseSuccess": "มอบหมายใช้ภายในแล้ว",
+    "registerExternalRef": "เลขอ้างอิงภายนอก",
+    "registerExternalRefPlaceholder": "เช่น เลขที่ใบส่งของผู้ขาย"
   },
   "lot": {
     "search": "ค้นหาด้วยรหัส lot, SKU, รุ่น, PO",
@@ -1664,6 +1666,7 @@
     "overReceiptTitle": "กำลังรับเกินจำนวนที่สั่งใน PO",
     "overReceiptLine": "{{projected}} / {{ordered}} (+{{over}})",
     "overReceiptAck": "ยืนยันการรับเกินจำนวนที่สั่ง",
+    "overReceiptAddLine": "สั่ง {{ordered}} · เหลือรับได้อีก {{remaining}} · รายการนี้ทำให้ยอดรวมเป็น {{projected}} (เกิน {{over}})",
     "cancelReceiptMessage": "ยกเลิกใบรับสินค้านี้? ไม่สามารถย้อนกลับได้",
     "confirmSuccess": "ยืนยันรับสินค้าแล้ว — สร้าง Lot แล้ว",
     "cancelSuccess": "ยกเลิกใบรับสินค้าแล้ว",

@@ -61,6 +61,7 @@ export function RegisterAssetModal({
   const [serial, setSerial] = useState('');
   const [costOverride, setCostOverride] = useState('');
   const [retailOverride, setRetailOverride] = useState('');
+  const [externalRef, setExternalRef] = useState('');
   const [error, setError] = useState('');
 
   // INTERNAL (own shops) + EXTERNAL (company-owned consignment) may register here.
@@ -96,6 +97,7 @@ export function RegisterAssetModal({
       setBattery(''); setWarranty(''); setTypingWarranty(false);
       setImei(''); setSerial('');
       setCostOverride(''); setRetailOverride('');
+      setExternalRef('');
       setError('');
     }
   }, [open]);
@@ -153,7 +155,7 @@ export function RegisterAssetModal({
       p_cost_override: costOverride.trim() ? Number(costOverride) : null,
       p_retail_override: retailOverride.trim() ? Number(retailOverride) : null,
       p_dedupe_key: null,
-      p_external_ref: null,
+      p_external_ref: externalRef.trim() || null,
       p_has_box: hasBox,
       p_legacy_code: null,
       // Battery health rides in the condition snapshot (key UPPERCASE, 0–100).
@@ -370,6 +372,19 @@ export function RegisterAssetModal({
                       <label className="form-label">{t('asset.registerRetailOverride', { defaultValue: 'Retail (override)' })}</label>
                       <MaskedInput mask="number" decimalScale={2} value={retailOverride} onChange={(raw) => setRetailOverride(raw)} className="w-full" />
                     </div>
+                  </div>
+
+                  {/* Optional external reference — free text tying this asset to an
+                      outside document (supplier invoice, partner ref). Not validated. */}
+                  <div className="flex flex-col">
+                    <label className="form-label">{t('asset.registerExternalRef', { defaultValue: 'External ref' })}</label>
+                    <Input
+                      value={externalRef}
+                      onChange={(e) => setExternalRef(e.target.value)}
+                      size="sm"
+                      className="w-full"
+                      placeholder={t('asset.registerExternalRefPlaceholder', { defaultValue: 'e.g. supplier invoice no.' })}
+                    />
                   </div>
                 </div>
               </>

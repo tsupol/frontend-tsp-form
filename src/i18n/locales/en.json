@@ -1512,7 +1512,9 @@
     "disposeSuccess": "Asset disposed",
     "disposeReverseSuccess": "Dispose reversed",
     "writeOffSuccess": "Asset written off",
-    "internalUseSuccess": "Asset assigned for internal use"
+    "internalUseSuccess": "Asset assigned for internal use",
+    "registerExternalRef": "External ref",
+    "registerExternalRefPlaceholder": "e.g. supplier invoice no."
   },
   "lot": {
     "search": "Search by lot code, SKU, model, PO",
@@ -1664,6 +1666,7 @@
     "overReceiptTitle": "Receiving more than the PO ordered",
     "overReceiptLine": "{{projected}} / {{ordered}} (+{{over}})",
     "overReceiptAck": "I confirm receiving over the ordered quantity",
+    "overReceiptAddLine": "Ordered {{ordered}}, {{remaining}} still open. This line brings the total to {{projected}} (+{{over}} over).",
     "cancelReceiptMessage": "Cancel this receipt? This cannot be undone.",
     "confirmSuccess": "Receipt confirmed — stock lots created",
     "cancelSuccess": "Receipt cancelled",
