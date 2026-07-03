@@ -4,7 +4,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   DataTable, DataTableColumnHeader, DataTableFooter, Button, Input, Select,
-  PopOver, MenuItem, MenuSeparator, Badge, Modal, Switch, MobileHeader,
+  PopOver, MenuItem, MenuSeparator, Badge, Modal, Switch, MobileHeader, Tooltip,
   useSnackbarContext, FormErrorMessage,
   type ColumnDef, type SortingState,
 } from 'tsp-form';
@@ -82,7 +82,7 @@ function RowActions({ account, onEdit, onToggle, onSetDefault }: {
       <div className="py-1 min-w-[160px]">
         <MenuItem icon={<Pencil size={14} />} label={t('common.edit')} onClick={() => { setOpen(false); onEdit(account); }} />
         {!account.is_default && account.is_active && (
-          <MenuItem icon={<Star size={14} />} label={t('settings.bankAccounts.setDefault')} onClick={() => { setOpen(false); onSetDefault(account); }} />
+          <MenuItem icon={<Star size={14} />} label={t('settings.bankAccounts.setFallback')} onClick={() => { setOpen(false); onSetDefault(account); }} />
         )}
         <MenuSeparator />
         <MenuItem
@@ -167,8 +167,6 @@ function AccountModal({ open, onClose, account, branches }: {
           p_promptpay_id: data.promptpay_id || null,
           p_note: data.note || null,
           p_updated_by: user.user_id,
-          // Same stale-overload disambiguation as create (see fn_bank_account_create below).
-          p_account_number_display: null,
         });
         addSnackbar({
           message: <div className="alert alert-success"><CheckCircle size={16} /><span className="alert-description">{t('settings.bankAccounts.updated')}</span></div>,
@@ -184,11 +182,6 @@ function AccountModal({ open, onClose, account, branches }: {
           p_is_default: data.is_default,
           p_note: data.note || null,
           p_created_by: user.user_id,
-          // Send the display param so PostgREST picks the current 9-arg overload.
-          // The DB still has a stale 8-arg fn_bank_account_create alongside the
-          // 9-arg one (mig 53 CREATE OR REPLACE'd but never dropped the old
-          // signature), so omitting it makes the call ambiguous (PGRST203).
-          p_account_number_display: null,
         });
         addSnackbar({
           message: <div className="alert alert-success"><CheckCircle size={16} /><span className="alert-description">{t('settings.bankAccounts.created')}</span></div>,
@@ -270,7 +263,7 @@ function AccountModal({ open, onClose, account, branches }: {
             </div>
             {!isEdit && (
               <div className="flex flex-col">
-                <label className="form-label">{t('settings.bankAccounts.isDefault')}</label>
+                <label className="form-label">{t('settings.bankAccounts.isFallback')}</label>
                 <Controller
                   name="is_default"
                   control={control}
@@ -278,6 +271,7 @@ function AccountModal({ open, onClose, account, branches }: {
                     <Switch checked={field.value} onChange={(e) => field.onChange((e.target as HTMLInputElement).checked)} />
                   )}
                 />
+                <p className="text-xs text-subtle mt-1">{t('settings.bankAccounts.fallbackHint')}</p>
               </div>
             )}
           </div>
@@ -394,7 +388,7 @@ export function BankAccountsPage() {
         message: (
           <div className="alert alert-success">
             <CheckCircle size={16} />
-            <span className="alert-description">{t('settings.bankAccounts.defaultSet')}</span>
+            <span className="alert-description">{t('settings.bankAccounts.fallbackSet')}</span>
           </div>
         ),
         type: 'success',
@@ -440,7 +434,11 @@ export function BankAccountsPage() {
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('settings.bankAccounts.colStatus')} />,
       cell: ({ row }) => (
         <div className="flex items-center gap-1.5">
-          {row.original.is_default && <Badge color="primary" size="sm">{t('common.default')}</Badge>}
+          {row.original.is_default && (
+            <Tooltip content={t('settings.bankAccounts.fallbackHint')} placement="top">
+              <Badge color="default" size="sm">{t('settings.bankAccounts.fallbackBadge')}</Badge>
+            </Tooltip>
+          )}
           <Badge color={row.original.is_active ? 'success' : 'default'} size="sm">
             {row.original.is_active ? t('common.active') : t('common.inactive')}
           </Badge>
@@ -582,7 +580,7 @@ export function BankAccountsPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-sm truncate">{account.bank_name}</span>
-                        {account.is_default && <Badge color="primary" size="sm">{t('common.default')}</Badge>}
+                        {account.is_default && <Badge color="default" size="sm">{t('settings.bankAccounts.fallbackBadge')}</Badge>}
                         {!account.is_active && <Badge color="default" size="sm">{t('common.inactive')}</Badge>}
                       </div>
                       <div className="text-xs text-subtle tabular-nums mt-0.5">{account.account_number} · {account.account_name}</div>
