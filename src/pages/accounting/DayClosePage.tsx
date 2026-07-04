@@ -71,10 +71,18 @@ export function DayClosePage() {
 
   const effectiveBranchId = branchId || userBranchId || (branches[0]?.id ? String(branches[0].id) : '');
 
-  // Sync state ← URL: when params change, mirror them to state
+  // Sync state ← URL: when params change, mirror them to state. Don't clobber
+  // an internal key (__unclosed__X / __today__) that already resolves to the
+  // same bare urlDate — otherwise selecting an unclosed day round-trips through
+  // the bare date, unmounting the detail body for a tick (flicker on re-select).
   useEffect(() => {
     if (urlBranchId && urlBranchId !== branchId) setBranchId(urlBranchId);
-    if (urlDate && urlDate !== selectedDate) setSelectedDate(urlDate);
+    if (urlDate && urlDate !== selectedDate) {
+      const resolvesToUrlDate =
+        (selectedDate.startsWith(UNCLOSED_PREFIX) && selectedDate.slice(UNCLOSED_PREFIX.length) === urlDate) ||
+        (selectedDate === TODAY_KEY && urlDate === today);
+      if (!resolvesToUrlDate) setSelectedDate(urlDate);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlBranchId, urlDate]);
 
@@ -679,8 +687,9 @@ function ReconcileBody({
 function ClosedSnapshot({ close, branchId }: { close: DayCloseHistoryRow; branchId: string }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  // Default to the breakdown — on a closed day that's the figure being looked up.
-  const [tab, setTab] = useState<'breakdown' | 'reconcile'>('breakdown');
+  // Overview first — the "what happened this day" glance; drill into remittance
+  // buckets or the bill list from there.
+  const [tab, setTab] = useState<'overview' | 'breakdown' | 'reconcile'>('overview');
   const remittanceLink = `/admin/accounting/reconcile-channel?branch_id=${branchId}&from=${close.close_date}&to=${close.close_date}`;
   const paymentsLink = `/admin/accounting/payments?branch_id=${branchId}&from=${close.close_date}&to=${close.close_date}`;
   return (
@@ -725,28 +734,22 @@ function ClosedSnapshot({ close, branchId }: { close: DayCloseHistoryRow; branch
         </div>
       </div>
 
-      {/* Reconciliation block — the money-match (net vs counted vs diff per
-          channel), merged with expected/actual/shortage/overage + edit. */}
-      <div className="flex-none px-4 py-3 border-b border-line">
-        <ReconcileBlock close={close} branchId={branchId} />
-        {close.note && (
-          <div className="text-sm text-subtle mt-3">
-            <span className="font-medium">{t('accounting.dayClose.note')}:</span> {close.note}
-          </div>
-        )}
-      </div>
-
-      {/* Tabs: Remittance (breakdown) | Reconcile (read-only bill list) */}
+      {/* Tabs: Overview (glance) | Remittance (buckets) | Reconcile (bill list) */}
       <DetailTabs
         tab={tab}
         onChange={setTab}
         tabs={[
+          { key: 'overview', label: t('accounting.dayClose.overviewTitle') },
           { key: 'breakdown', label: t('accounting.dayClose.remitTitle') },
           { key: 'reconcile', label: t('accounting.dayClose.reconcileTitle') },
         ]}
       />
       <div className="flex-1 min-h-0">
-        {tab === 'breakdown' ? (
+        {tab === 'overview' ? (
+          <div className="h-full overflow-y-auto better-scroll">
+            {branchId && <DayCloseOverview close={close} branchId={branchId} closeDate={close.close_date} />}
+          </div>
+        ) : tab === 'breakdown' ? (
           <div className="h-full overflow-y-auto better-scroll">
             {branchId && <DayCloseBreakdown branchId={branchId} closeDate={close.close_date} />}
           </div>
@@ -1182,8 +1185,12 @@ function DetailTabs<K extends string>({
   );
 }
 
-function Stat({ label, value, tone, small }: { label: string; value: React.ReactNode; tone?: 'danger' | 'warning'; small?: boolean }) {
-  const toneClass = tone === 'danger' ? 'text-danger' : tone === 'warning' ? 'text-warning-fg' : '';
+function Stat({ label, value, tone, small }: { label: React.ReactNode; value: React.ReactNode; tone?: 'danger' | 'warning' | 'info' | 'success'; small?: boolean }) {
+  const toneClass = tone === 'danger' ? 'text-danger'
+    : tone === 'warning' ? 'text-warning-fg'
+    : tone === 'info' ? 'text-info-fg'
+    : tone === 'success' ? 'text-success'
+    : '';
   return (
     <div>
       <dt className="text-xs text-subtle">{label}</dt>
@@ -1227,7 +1234,7 @@ function DayCloseBreakdown({ branchId, closeDate }: { branchId: string; closeDat
   const integrityDiff = lhs - rhs;
 
   return (
-    <div className="@container flex flex-col divide-y divide-line">
+    <div className="@container flex flex-col divide-y divide-line border-b border-line">
       {/* Integrity badge */}
       <div className="px-4 py-2.5">
         {integrityOk ? (
@@ -1243,6 +1250,49 @@ function DayCloseBreakdown({ branchId, closeDate }: { branchId: string; closeDat
         )}
       </div>
 
+      {/* 6-bucket destination table (sold / refund / net + expand + Excel).
+          Replaces the old Revenue / Wallet / Settle clusters (mapping in
+          UI_DEPRECATION_HISTORY §23). Reads the bucket views by bill_date. */}
+      <div className="px-1 py-1">
+        <DayCloseBuckets branchId={branchId} billDate={closeDate} />
+      </div>
+    </div>
+  );
+}
+
+/* ── Overview tab ──────────────────────────────────────────────────────────
+   The "what happened this day" glance: money totals (expected/counted),
+   drawer cash-flow, and Activity (contracts + bill counts). Reads the same
+   breakdown view as the remittance tab; the count/diff figures come from the
+   close snapshot (props). */
+function DayCloseOverview({ close, branchId, closeDate }: { close: DayCloseHistoryRow; branchId: string; closeDate: string }) {
+  const { t } = useTranslation();
+  const { data, isFetching } = useQuery({
+    queryKey: ['accounting', 'day-close-breakdown', branchId, closeDate],
+    queryFn: () => apiClient.get<DayCloseBreakdownRow[]>(
+      `/v_day_close_breakdown?branch_id=eq.${branchId}&close_date=eq.${closeDate}&limit=1`
+    ),
+    enabled: !!branchId && !!closeDate,
+  });
+  const row = data?.[0];
+  if (!row) {
+    return isFetching
+      ? <div className="px-4 py-6 text-sm text-subtler">{t('common.loading')}</div>
+      : null;
+  }
+
+  return (
+    <div className="@container flex flex-col divide-y divide-line border-b border-line">
+      {/* Cash reconciliation — net vs counted vs diff per channel + นับเงิน edit */}
+      <div className="px-4 py-3">
+        <ReconcileBlock close={close} branchId={branchId} />
+        {close.note && (
+          <div className="text-sm text-subtle mt-3">
+            <span className="font-medium">{t('accounting.dayClose.note')}:</span> {close.note}
+          </div>
+        )}
+      </div>
+
       {/* Drawer (cash flow) */}
       <div className="px-4 py-3">
         <ClusterTitle>{t('accounting.dayClose.clusterDrawer')}</ClusterTitle>
@@ -1254,101 +1304,27 @@ function DayCloseBreakdown({ branchId, closeDate }: { branchId: string; closeDat
         </dl>
       </div>
 
-      {/* 6-bucket destination table (sold / refund / net + expand + Excel).
-          Replaces the old Revenue / Wallet / Settle clusters (mapping in
-          UI_DEPRECATION_HISTORY §23). Reads the bucket views by bill_date. */}
-      <div className="px-1 py-1">
-        <DayCloseBuckets branchId={branchId} billDate={closeDate} />
-      </div>
-
-      {/* Activity counts — context; contracts compressed to one o/c/t/v stat
-          (tooltip spells them out), void anomalies kept as flag stats. */}
+      {/* Contracts — full labeled, colored stats */}
       <div className="px-4 py-3">
-        <ClusterTitle>{t('accounting.dayClose.clusterActivity')}</ClusterTitle>
-        <dl className="grid grid-cols-2 @md:grid-cols-3 @lg:grid-cols-4 gap-x-3 gap-y-2">
-          <Stat label={t('accounting.dayClose.billCount')} value={String(row.bill_count)} />
-          <ContractLifecycleStat
-            opened={row.contracts_opened}
-            completed={row.contracts_completed}
-            terminated={row.contracts_terminated}
-            voided={row.contracts_voided}
-          />
-          <FlagStat
-            label={t('accounting.dayClose.billVoided')}
-            value={row.bill_voided_count}
-            flagged={row.bill_voided_count > 3}
-            flagLabel={t('accounting.dayClose.flagVoidedBillsHigh')}
-          />
+        <ClusterTitle>{t('accounting.dayClose.contracts')}</ClusterTitle>
+        <dl className="grid grid-cols-2 @md:grid-cols-4 gap-x-3 gap-y-2">
+          <Stat label={t('accounting.dayClose.contractsOpened')} value={String(row.contracts_opened)} tone={row.contracts_opened > 0 ? 'info' : undefined} />
+          <Stat label={t('accounting.dayClose.contractsCompleted')} value={String(row.contracts_completed)} tone={row.contracts_completed > 0 ? 'success' : undefined} />
+          <Stat label={t('accounting.dayClose.contractsTerminated')} value={String(row.contracts_terminated)} tone={row.contracts_terminated > 0 ? 'warning' : undefined} />
+          <Stat label={t('accounting.dayClose.contractsVoided')} value={String(row.contracts_voided)} tone={row.contracts_voided > 0 ? 'danger' : undefined} />
+        </dl>
+      </div>
+      <div className="px-4 py-3">
+        <ClusterTitle>{t('accounting.dayClose.bills')}</ClusterTitle>
+        <dl className="grid grid-cols-2 @md:grid-cols-4 gap-x-3 gap-y-2">
+          <Stat label={t('accounting.dayClose.billTotal')} value={String(row.bill_count)} />
+          <Stat label={t('accounting.dayClose.billJournal')} value={String(row.journal_count)} />
+          <Stat label={t('accounting.dayClose.billVoided')} value={String(row.bill_voided_count)} tone={row.bill_voided_count > 0 ? 'danger' : undefined} />
           {row.gift_cost !== 0 && (
             <Stat label={t('accounting.dayClose.giftCost')} value={fmtCurrency(row.gift_cost)} />
           )}
         </dl>
       </div>
-    </div>
-  );
-}
-
-/* Contract lifecycle as a single "opened/completed/terminated/voided" stat —
-   value reads e.g. "1 / 2 / 0 / 0", full labels in the tooltip. Turns red + ⚠
-   when any contract was voided (the one anomaly worth surfacing here). */
-function ContractLifecycleStat({
-  opened, completed, terminated, voided,
-}: {
-  opened: number;
-  completed: number;
-  terminated: number;
-  voided: number;
-}) {
-  const { t } = useTranslation();
-  const flagged = voided > 0;
-  return (
-    <div>
-      <dt className="text-xs text-subtle">{t('accounting.dayClose.contractsLifecycle')}</dt>
-      <Tooltip
-        placement="bottom"
-        content={
-          <div className="text-xs space-y-0.5 tabular-nums">
-            <div>{t('accounting.dayClose.contractsOpened')}: {opened}</div>
-            <div>{t('accounting.dayClose.contractsCompleted')}: {completed}</div>
-            <div>{t('accounting.dayClose.contractsTerminated')}: {terminated}</div>
-            <div className={flagged ? 'text-danger' : ''}>{t('accounting.dayClose.contractsVoided')}: {voided}</div>
-          </div>
-        }
-      >
-        <dd className={`text-base font-semibold tabular-nums cursor-default w-fit ${flagged ? 'text-danger' : ''}`}>
-          {opened} / {completed} / {terminated} / {voided}
-        </dd>
-      </Tooltip>
-      {flagged && (
-        <div className="inline-flex items-center gap-1 text-[11px] text-danger mt-0.5">
-          <AlertTriangle size={11} />
-          <span>{t('accounting.dayClose.flagContractsVoided')}</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* A count stat that turns red + shows a ⚠ flag caption when the value crosses
-   an anomaly threshold (void rate, contract voided). */
-function FlagStat({
-  label, value, flagged, flagLabel,
-}: {
-  label: string;
-  value: number;
-  flagged: boolean;
-  flagLabel: string;
-}) {
-  return (
-    <div>
-      <dt className="text-xs text-subtle">{label}</dt>
-      <dd className={`text-base font-semibold tabular-nums ${flagged ? 'text-danger' : ''}`}>{value}</dd>
-      {flagged && (
-        <div className="inline-flex items-center gap-1 text-[11px] text-danger mt-0.5">
-          <AlertTriangle size={11} />
-          <span>{flagLabel}</span>
-        </div>
-      )}
     </div>
   );
 }

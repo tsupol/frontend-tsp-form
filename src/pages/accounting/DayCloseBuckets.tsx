@@ -1,12 +1,25 @@
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button } from 'tsp-form';
-import { ChevronRight, ChevronDown, Download, Loader2 } from 'lucide-react';
+import { Button, Tooltip } from 'tsp-form';
+import {
+  ChevronRight, ChevronDown, Download, Loader2,
+  Truck, ShoppingBag, Wallet, ReceiptText, CircleDot, BookText, Scale,
+} from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { fmtCurrency } from '../../lib/format';
 import { downloadXlsx, type XlsxColumn } from '../../lib/xlsx';
 import type { DayCloseBucketRow, DayCloseBucketLine, DayCloseBucketKey } from './accountingTypes';
+
+/* Bucket destination icon — lucide, chosen by meaning, with a tooltip so the
+   user learns what each destination is. Muted color; the label sits beside it. */
+function BucketIcon({ icon, tip }: { icon: ReactNode; tip: string }) {
+  return (
+    <Tooltip content={tip} placement="right">
+      <span className="text-subtle cursor-help inline-flex shrink-0">{icon}</span>
+    </Tooltip>
+  );
+}
 
 /* ── Day-close 6-bucket model ──────────────────────────────────────────────
    Replaces the old Revenue / Wallet / Settle clusters. Every non-voided line
@@ -17,7 +30,7 @@ import type { DayCloseBucketRow, DayCloseBucketLine, DayCloseBucketKey } from '.
 
 interface BucketDef {
   key: DayCloseBucketKey;      // txn_bucket value used for line drill-down
-  icon: string;                // leading emoji marker
+  icon: ReactNode;             // leading destination icon (lucide)
   labelKey: string;            // i18n key for the bucket name
   sold: keyof DayCloseBucketRow;
   refund?: keyof DayCloseBucketRow;
@@ -25,11 +38,11 @@ interface BucketDef {
 
 // Rows 1–5 in doc order. Wallet is special-cased (3 flows) and rendered inline.
 const BUCKETS: BucketDef[] = [
-  { key: 'HOLDING_OWN',    icon: '🚚', labelKey: 'accounting.dayClose.bucket.holding',       sold: 'holding_own',    refund: 'holding_own_refund' },
-  { key: 'COMPANY_RETAIL', icon: '🛍️', labelKey: 'accounting.dayClose.bucket.companyRetail', sold: 'company_retail', refund: 'company_retail_refund' },
+  { key: 'HOLDING_OWN',    icon: <Truck size={15} />,       labelKey: 'accounting.dayClose.bucket.holding',       sold: 'holding_own',    refund: 'holding_own_refund' },
+  { key: 'COMPANY_RETAIL', icon: <ShoppingBag size={15} />, labelKey: 'accounting.dayClose.bucket.companyRetail', sold: 'company_retail', refund: 'company_retail_refund' },
   // COMPANY_WALLET handled separately (IN / OUT / USAGE)
-  { key: 'COMPANY_FEE',    icon: '🧾', labelKey: 'accounting.dayClose.bucket.companyFee',    sold: 'company_fee',    refund: 'company_fee_refund' },
-  { key: 'COMPANY_OTHER',  icon: '•',  labelKey: 'accounting.dayClose.bucket.companyOther',  sold: 'company_other',  refund: 'company_other_refund' },
+  { key: 'COMPANY_FEE',    icon: <ReceiptText size={15} />, labelKey: 'accounting.dayClose.bucket.companyFee',    sold: 'company_fee',    refund: 'company_fee_refund' },
+  { key: 'COMPANY_OTHER',  icon: <CircleDot size={15} />,   labelKey: 'accounting.dayClose.bucket.companyOther',  sold: 'company_other',  refund: 'company_other_refund' },
 ];
 
 export function DayCloseBuckets({ branchId, billDate }: { branchId: string; billDate: string }) {
@@ -120,7 +133,7 @@ export function DayCloseBuckets({ branchId, billDate }: { branchId: string; bill
 
       {/* Bucket 6 — JOURNAL (internal, no cash) */}
       <BucketLine
-        icon="📒"
+        icon={<BookText size={15} />}
         label={t('accounting.dayClose.bucket.journal')}
         sold={row.journal_total}
         refund={null}
@@ -137,7 +150,10 @@ export function DayCloseBuckets({ branchId, billDate }: { branchId: string; bill
 
       {/* Settlement total */}
       <div className="flex items-center px-4 py-3 border-t-2 border-line font-semibold">
-        <span className="flex-1 text-sm">📊 {t('accounting.dayClose.bucket.settlement')}</span>
+        <span className="flex-1 text-sm inline-flex items-center gap-2">
+          <Scale size={15} className="text-subtle" />
+          {t('accounting.dayClose.bucket.settlement')}
+        </span>
         <span className="text-base tabular-nums">{fmtCurrency(settlement)}</span>
       </div>
 
@@ -208,7 +224,10 @@ function WalletBucket({
   return (
     <>
       <div className="flex items-center px-4 py-2 border-b border-line text-sm">
-        <span className="flex-1 font-medium">💜 {t('accounting.dayClose.bucket.companyWallet')}</span>
+        <span className="flex-1 font-medium inline-flex items-center gap-2">
+          <BucketIcon icon={<Wallet size={15} />} tip={t('accounting.dayClose.bucket.companyWallet')} />
+          {t('accounting.dayClose.bucket.companyWallet')}
+        </span>
       </div>
       <WalletFlow label={t('accounting.dayClose.bucket.walletIn')} value={row.company_wallet} col="sold" />
       <WalletFlow label={t('accounting.dayClose.bucket.walletOut')} value={row.company_wallet_refund} col="refund" />
@@ -249,7 +268,7 @@ function WalletFlow({ label, value, col }: { label: string; value: number; col: 
 function BucketLine({
   icon, label, sold, refund, net, expandable, expanded, onToggle,
 }: {
-  icon: string;
+  icon: ReactNode;
   label: string;
   sold: number;
   refund: number | null;
@@ -261,7 +280,9 @@ function BucketLine({
   const { t } = useTranslation();
   return (
     <div className="flex items-center px-4 py-2.5 border-b border-line text-sm hover:bg-surface-hover transition-colors">
-      <span className="flex-1 font-medium">{icon} {label}</span>
+      <span className="flex-1 font-medium inline-flex items-center gap-2">
+        <BucketIcon icon={icon} tip={label} />{label}
+      </span>
       <span className="w-24 text-right tabular-nums">{fmtCurrency(sold)}</span>
       <span className="w-24 text-right tabular-nums text-subtle">{refund == null ? '—' : fmtCurrency(refund)}</span>
       <span className="w-24 text-right tabular-nums font-semibold">{fmtCurrency(net)}</span>
