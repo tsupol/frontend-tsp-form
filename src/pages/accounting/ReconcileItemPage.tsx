@@ -11,31 +11,18 @@ import {
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { FilterBar, type FilterBarItem } from '../../components/FilterBar';
+import { DateTime } from '../../components/DateTime';
 import {
   fmtCurrency, toLocalDateStr, parseLocalDate, makeDateRangePickerFormat,
 } from '../../lib/format';
-import type { Branch, ReconcileItemResult, ReconcileItemRow } from './accountingTypes';
+import type { Branch, ReconcileItemResult, ReconcileItemGroup, ReconcileItemRow } from './accountingTypes';
 
 type OwnerType = 'HOLDING' | 'COMPANY';
 
 function defaultRange() {
   const today = new Date();
   const to = toLocalDateStr(today);
-  const fromD = new Date(today);
-  fromD.setDate(fromD.getDate() - 6);
-  return { from: toLocalDateStr(fromD), to };
-}
-
-// One bill's worth of lines, pre-summed for the bill-level row.
-interface BillGroup {
-  bill_id: number;
-  bill_code: string;
-  contract_id: number | null;
-  contract_code: string | null;
-  customer_name: string;
-  bill_type: string;
-  remit: number;
-  lines: ReconcileItemRow[];
+  return { from: to, to };
 }
 
 export function ReconcileItemPage() {
@@ -54,8 +41,7 @@ export function ReconcileItemPage() {
   const toDate = toParam === null ? initial.to : toParam;
 
   const [isTypingRange, setIsTypingRange] = useState(false);
-  const [expandedOwners, setExpandedOwners] = useState<Set<OwnerType>>(new Set());
-  const [expandedBills, setExpandedBills] = useState<Set<number>>(new Set());
+  const [openGroup, setOpenGroup] = useState<string | null>(null);
 
   const pendingPatchRef = useRef<Record<string, string> | null>(null);
   const updateFilters = useCallback((patch: Partial<{ branch_id: string; from: string; to: string }>) => {
@@ -84,8 +70,6 @@ export function ReconcileItemPage() {
     queryFn: () => apiClient.get<Branch[]>('/v_branches?is_active=is.true&order=name'),
   });
 
-  // The RPC is per-company: company_id comes from the chosen branch. branch_id=null
-  // → company-all mode (only meaningful once a branch — hence a company — is picked).
   const selectedBranch = branches.find(b => String(b.id) === branchId);
   const companyId = selectedBranch?.company_id ?? null;
   const allBranches = branchId === '__ALL__';
@@ -102,44 +86,19 @@ export function ReconcileItemPage() {
     placeholderData: keepPreviousData,
   });
 
-  // Group flat rows → owner → bill. Bill row = Σ remit_amount of its lines.
-  const byOwner = useMemo(() => {
-    const map: Record<OwnerType, Map<number, BillGroup>> = {
-      HOLDING: new Map(),
-      COMPANY: new Map(),
-    };
+  const groups = data?.groups ?? [];
+  // rows already ordered (owner → subgroup → time) by the RPC; bucket by subgroup.
+  const rowsBySubgroup = useMemo(() => {
+    const m = new Map<string, ReconcileItemRow[]>();
     for (const r of data?.rows ?? []) {
-      const bucket = map[r.owner_type];
-      let g = bucket.get(r.bill_id);
-      if (!g) {
-        g = {
-          bill_id: r.bill_id,
-          bill_code: r.bill_code,
-          contract_id: r.contract_id,
-          contract_code: r.contract_code,
-          customer_name: r.customer_name,
-          bill_type: r.bill_type,
-          remit: 0,
-          lines: [],
-        };
-        bucket.set(r.bill_id, g);
-      }
-      g.remit += Number(r.remit_amount) || 0;
-      g.lines.push(r);
+      const arr = m.get(r.subgroup) ?? [];
+      arr.push(r);
+      m.set(r.subgroup, arr);
     }
-    return map;
+    return m;
   }, [data?.rows]);
 
-  const toggleOwner = (o: OwnerType) => setExpandedOwners(prev => {
-    const next = new Set(prev);
-    next.has(o) ? next.delete(o) : next.add(o);
-    return next;
-  });
-  const toggleBill = (id: number) => setExpandedBills(prev => {
-    const next = new Set(prev);
-    next.has(id) ? next.delete(id) : next.add(id);
-    return next;
-  });
+  const owners: OwnerType[] = ['HOLDING', 'COMPANY'];
 
   const dateFilter: ReactNode = (
     <InputDateRangePicker
@@ -195,8 +154,6 @@ export function ReconcileItemPage() {
     { key: 'branch', width: 200, node: branchNode, priority: 10 },
   ];
 
-  const owners: OwnerType[] = ['HOLDING', 'COMPANY'];
-
   return (
     <>
       <MobileHeader className="mobile-header-scrolled-shadow md:hidden">
@@ -228,134 +185,145 @@ export function ReconcileItemPage() {
           activeCount={0}
         />
 
+        {/* Scope totals — remit total + holding/company split */}
+        {branchId && (groups.length > 0) && (
+          <div className="flex-none px-4 py-3 border-b border-line flex flex-wrap items-baseline gap-x-5 gap-y-1">
+            <span className="text-sm">
+              <span className="text-subtle">{t('accounting.reconcile.totalRemit')}: </span>
+              <span className="text-lg font-bold tabular-nums text-primary-fg">{fmtCurrency(data?.total_amount ?? 0)}</span>
+            </span>
+            <span className="text-sm text-subtle inline-flex items-center gap-1.5">
+              <Truck size={14} className="text-primary-fg" />{t('accounting.reconcile.owner_HOLDING')}
+              <span className="tabular-nums font-medium text-fg">{fmtCurrency(data?.holding_total ?? 0)}</span>
+            </span>
+            <span className="text-sm text-subtle inline-flex items-center gap-1.5">
+              <Building2 size={14} className="text-secondary-fg" />{t('accounting.reconcile.owner_COMPANY')}
+              <span className="tabular-nums font-medium text-fg">{fmtCurrency(data?.company_total ?? 0)}</span>
+            </span>
+          </div>
+        )}
+
         <div className={`flex-1 min-h-0 overflow-auto better-scroll ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
           {!branchId && (
             <div className="p-8 text-center text-subtler">{t('accounting.reconcile.pickBranch')}</div>
           )}
-          {branchId && (data?.rows.length ?? 0) === 0 && (
+          {branchId && groups.length === 0 && (
             <div className="p-8 text-center text-subtler">{t('accounting.reconcile.noData')}</div>
           )}
-          {branchId && (data?.rows.length ?? 0) > 0 && (
-            <div className="max-w-3xl mx-auto p-4">
+          {branchId && groups.length > 0 && (
+            <div className="max-w-3xl mx-auto">
+              {/* Sub-group header row (columns) */}
+              <div className="flex items-center px-4 py-2 text-[11px] font-semibold text-subtle uppercase tracking-wider border-b border-line">
+                <span className="flex-1">{t('accounting.reconcile.group')}</span>
+                <span className="w-24 text-right">{t('accounting.reconcile.sales')}</span>
+                <span className="w-24 text-right">{t('accounting.reconcile.refund')}</span>
+                <span className="w-24 text-right pr-3">{t('accounting.reconcile.net')}</span>
+                <span className="w-8 shrink-0" />
+              </div>
+
               {owners.map(owner => {
-                const bills = [...byOwner[owner].values()];
-                if (bills.length === 0) return null;
-                const ownerTotal = owner === 'HOLDING' ? (data?.holding_total ?? 0) : (data?.company_total ?? 0);
-                const open = expandedOwners.has(owner);
+                const ownerGroups = groups.filter(g => g.owner_type === owner);
+                if (ownerGroups.length === 0) return null;
                 return (
-                  <div key={owner} className="border-b border-line">
-                    {/* Owner row */}
-                    <button
-                      type="button"
-                      onClick={() => toggleOwner(owner)}
-                      className="w-full flex items-center gap-2 py-3 text-left bg-transparent border-none cursor-pointer"
-                    >
-                      {open ? <ChevronDown size={16} className="text-subtle" /> : <ChevronRight size={16} className="text-subtle" />}
-                      {owner === 'HOLDING' ? <Truck size={16} className="text-primary-fg" /> : <Building2 size={16} className="text-secondary-fg" />}
-                      <span className="font-medium">{t(`accounting.reconcile.owner_${owner}`)}</span>
-                      <span className="ml-auto tabular-nums font-semibold">{fmtCurrency(ownerTotal)}</span>
-                    </button>
-
-                    {/* Bills under this owner */}
-                    {open && (
-                      <div className="pb-2">
-                        {bills.map(bill => {
-                          const billOpen = expandedBills.has(bill.bill_id);
-                          return (
-                            <div key={bill.bill_id} className="pl-6">
-                              <div className="flex items-center gap-2 py-2 border-t border-line">
-                                <button
-                                  type="button"
-                                  onClick={() => toggleBill(bill.bill_id)}
-                                  className="shrink-0 bg-transparent border-none cursor-pointer p-0 text-subtle"
-                                  aria-label="expand"
-                                >
-                                  {billOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                                </button>
-                                <div className="flex flex-col min-w-0 flex-1">
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    <button
-                                      type="button"
-                                      onClick={() => navigate(`/admin/accounting/bills/${bill.bill_id}`)}
-                                      className="font-mono text-sm text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer truncate"
-                                    >
-                                      {bill.bill_code}
-                                      <ExternalLink size={11} />
-                                    </button>
-                                    {bill.bill_type === 'CREDIT_NOTE' && (
-                                      <Badge color="danger" size="sm">{t('accounting.reconcile.refund')}</Badge>
-                                    )}
-                                  </div>
-                                  {(bill.customer_name.trim() || bill.contract_code) && (
-                                    <div className="flex items-center gap-1.5 text-xs text-subtle min-w-0">
-                                      {bill.customer_name.trim() && <span className="truncate">{bill.customer_name}</span>}
-                                      {bill.contract_code && (
-                                        <>
-                                          {bill.customer_name.trim() && <span>·</span>}
-                                          <button
-                                            type="button"
-                                            onClick={() => bill.contract_id && navigate(`/admin/contracts/search/${bill.contract_id}`)}
-                                            className="font-mono text-primary-fg hover:underline inline-flex items-center gap-0.5 bg-transparent border-none p-0 cursor-pointer"
-                                          >
-                                            {bill.contract_code}
-                                            <ExternalLink size={10} />
-                                          </button>
-                                        </>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-                                <span className={`shrink-0 text-sm tabular-nums font-medium ${bill.remit < 0 ? 'text-danger' : ''}`}>
-                                  {fmtCurrency(bill.remit)}
-                                </span>
-                              </div>
-
-                              {/* Charge lines under this bill */}
-                              {billOpen && (
-                                <div className="pl-6 pb-1">
-                                  {bill.lines.map(line => (
-                                    <div key={line.line_id} className="flex items-center gap-2 py-1.5 border-t border-line/60">
-                                      <div className="flex flex-col min-w-0 flex-1">
-                                        <div className="flex items-center gap-1.5 min-w-0">
-                                          <span className="text-xs text-subtle truncate">
-                                            {line.charge_name_th || line.charge_type}
-                                          </span>
-                                          {!line.is_remittable && (
-                                            <Badge color="warning" size="xs">{t('accounting.reconcile.notCounted')}</Badge>
-                                          )}
-                                        </div>
-                                        <span className="text-xs text-subtler truncate">
-                                          {line.description}
-                                          {line.quantity > 1 && <> · {fmtCurrency(line.amount)} × {line.quantity}</>}
-                                        </span>
-                                      </div>
-                                      <span className={`shrink-0 text-xs tabular-nums ${line.remit_amount < 0 ? 'text-danger' : line.is_remittable ? '' : 'text-subtler'}`}>
-                                        {fmtCurrency(line.remit_amount)}
-                                      </span>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
+                  <div key={owner}>
+                    {/* Owner section header */}
+                    <div className="flex items-center gap-2 px-4 py-2 bg-surface-soft border-b border-line">
+                      {owner === 'HOLDING'
+                        ? <Truck size={15} className="text-primary-fg" />
+                        : <Building2 size={15} className="text-secondary-fg" />}
+                      <span className="font-semibold text-sm">{t(`accounting.reconcile.owner_${owner}`)}</span>
+                    </div>
+                    {ownerGroups.map(g => (
+                      <GroupRow
+                        key={g.subgroup}
+                        group={g}
+                        rows={rowsBySubgroup.get(g.subgroup) ?? []}
+                        open={openGroup === g.subgroup}
+                        onToggle={() => setOpenGroup(o => o === g.subgroup ? null : g.subgroup)}
+                        navigate={navigate}
+                        t={t}
+                      />
+                    ))}
                   </div>
                 );
               })}
-
-              {/* Grand total */}
-              <div className="flex items-center justify-between py-3 mt-1">
-                <span className="font-semibold">{t('accounting.reconcile.totalRemit')}</span>
-                <span className="text-lg font-bold tabular-nums text-primary-fg">
-                  {fmtCurrency(data?.total_amount ?? 0)}
-                </span>
-              </div>
             </div>
           )}
         </div>
       </div>
     </>
+  );
+}
+
+/* One subgroup: folded header (name · count · ขาย/คืน/สุทธิ), expand → its rows. */
+function GroupRow({
+  group, rows, open, onToggle, navigate, t,
+}: {
+  group: ReconcileItemGroup;
+  rows: ReconcileItemRow[];
+  open: boolean;
+  onToggle: () => void;
+  navigate: ReturnType<typeof useNavigate>;
+  t: ReturnType<typeof useTranslation>['t'];
+}) {
+  const label = t(`accounting.reconcile.subgroup.${group.subgroup}`, { defaultValue: group.name_th });
+  return (
+    <div>
+      <div className="flex items-stretch min-h-11 border-b border-line text-sm">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex-1 flex items-center pl-4 gap-2 min-w-0 text-left bg-transparent border-none cursor-pointer hover:bg-surface-hover transition-colors"
+        >
+          <span className="flex-1 inline-flex items-baseline gap-2 min-w-0">
+            <span className="font-medium truncate">{label}</span>
+            <span className="text-xs text-subtler shrink-0">{group.count} {t('accounting.reconcile.items')}</span>
+          </span>
+          <span className="w-24 text-right tabular-nums">{fmtCurrency(group.sales)}</span>
+          <span className={`w-24 text-right tabular-nums ${group.refund !== 0 ? 'text-warning-fg' : 'text-subtle'}`}>
+            {group.refund === 0 ? '—' : fmtCurrency(group.refund)}
+          </span>
+          <span className="w-24 text-right tabular-nums font-semibold pr-3">{fmtCurrency(group.total)}</span>
+        </button>
+        <button
+          type="button"
+          onClick={onToggle}
+          className="w-8 shrink-0 flex items-center justify-center text-subtle hover:bg-surface-hover cursor-pointer bg-transparent border-none"
+          aria-label={t('accounting.reconcile.expand', { defaultValue: 'Expand' })}
+        >
+          {open ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+        </button>
+      </div>
+
+      {open && (
+        <div className="bg-surface-soft border-b border-line">
+          {rows.map(r => (
+            <div key={r.line_id} className="flex items-center gap-2 pl-8 pr-4 py-2 border-t border-line/60 text-xs">
+              <span className="text-subtler shrink-0 tabular-nums w-24">
+                <DateTime value={r.bill_created_at} />
+              </span>
+              <button
+                type="button"
+                onClick={() => navigate(`/admin/accounting/bills/${r.bill_id}`)}
+                className="font-mono text-primary-fg hover:underline inline-flex items-center gap-0.5 bg-transparent border-none p-0 cursor-pointer shrink-0"
+              >
+                {r.bill_code}
+                <ExternalLink size={10} />
+              </button>
+              <span className="flex-1 min-w-0 truncate text-subtle">
+                {r.customer_name?.trim() && <>{r.customer_name} · </>}
+                {r.charge_name_th || r.charge_type}
+                {!r.is_remittable && (
+                  <Badge color="warning" size="xs">{t('accounting.reconcile.notCounted')}</Badge>
+                )}
+              </span>
+              <span className={`shrink-0 tabular-nums ${r.remit_amount < 0 ? 'text-danger' : ''}`}>
+                {fmtCurrency(r.remit_amount)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

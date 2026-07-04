@@ -230,15 +230,18 @@ export interface SettlementTenderLine {
   customer_name: string;
 }
 
-// fn_reconcile_by_item — Step 1 "ยอดนำส่ง". Flat line-level rows (UI groups
-// owner→bill→line). remit_amount = the countable value (amount×qty + JOURNAL rule);
-// never show raw `amount`. CREDIT_NOTE rows are negative. is_remittable=false → "ไม่นับ".
+// fn_reconcile_by_item — Step 1 "ตรวจบิล". Flat line-level rows the UI groups by
+// `subgroup` (10-group taxonomy, mig 495/496). remit_amount = the countable value
+// (amount×qty + JOURNAL rule); never show raw `amount`. CREDIT_NOTE rows negative.
+// is_remittable=false → "ไม่นับ". DB sorts rows owner→subgroup(sort_order)→time.
 export interface ReconcileItemRow {
+  subgroup: string;               // matches groups[].subgroup
   owner_type: 'HOLDING' | 'COMPANY';
   line_id: number;
   branch_code: string;
   branch_name: string;
   bill_date: string;
+  bill_created_at: string;        // bill issue time — for row ordering + export
   bill_id: number;
   bill_code: string;
   contract_id: number | null;
@@ -253,6 +256,25 @@ export interface ReconcileItemRow {
   is_remittable: boolean;
   bill_type: string;
   day_closed: boolean;
+  contract_value_month: number | null;
+  contract_installment_amount: number | null;
+  asset_external_ref: string | null;
+}
+
+// groups[] — one folded subgroup header (mig 495 + 499). sales/refund/total =
+// ขาย/คืน/สุทธิ: sales = Σ remit INVOICE, refund = Σ remit CREDIT_NOTE (positive),
+// total = sales − refund (the remit figure). Empty subgroups are omitted.
+export interface ReconcileItemGroup {
+  subgroup: string;
+  name_th: string;
+  name_en: string;
+  owner_type: 'HOLDING' | 'COMPANY';
+  sort_order: number;
+  sales: number;
+  refund: number;
+  total: number;
+  gross: number;
+  count: number;
 }
 
 export interface ReconcileItemBranch {
@@ -279,6 +301,7 @@ export interface ReconcileItemResult {
   holding_total: number;
   company_total: number;
   by_branch: ReconcileItemBranch[];
+  groups: ReconcileItemGroup[];
   rows: ReconcileItemRow[];
 }
 
@@ -402,6 +425,11 @@ export interface DayCloseBucketRow {
   bill_date: string;
   // sold (INVOICE)
   holding_own: number;
+  // holding_own sub-split (mig 025/17) — sum = holding_own
+  holding_down_payment: number;
+  holding_installment: number;   // incl. EARLY_PAYOFF
+  holding_retail: number;
+  holding_other: number;
   company_retail: number;
   company_wallet: number;
   company_fee: number;
