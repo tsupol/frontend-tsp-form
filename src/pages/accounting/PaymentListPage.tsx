@@ -1,12 +1,12 @@
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
-  MobileHeader, DataTable, Select, Badge, Input, InputDateRangePicker,
+  MobileHeader, DataTable, Select, Badge, Input, Switch, Tooltip, InputDateRangePicker,
 } from 'tsp-form';
 import {
-  ArrowRightFromLine, Keyboard, ExternalLink, Search, Truck, Building2,
+  ArrowRightFromLine, Keyboard, ArrowLeftRight, ExternalLink, Search,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -15,10 +15,37 @@ import { FilterBar, type FilterBarItem } from '../../components/FilterBar';
 import {
   fmtCurrency, toLocalDateStr, parseLocalDate, makeDateRangePickerFormat,
 } from '../../lib/format';
-import type { Branch, ReconcileItemResult, ReconcileItemRow } from './accountingTypes';
+import type { Branch, PaymentRow } from './accountingTypes';
+import { PaymentChannelCorrectModal } from './PaymentChannelCorrectModal';
 
-type OwnerType = 'HOLDING' | 'COMPANY';
-const TYPE_VALUES = ['INVOICE', 'CREDIT_NOTE'] as const;
+interface BankAccountOption {
+  id: number;
+  branch_id: number;
+  bank_name: string;
+  account_number: string;
+  account_name: string;
+  is_active: boolean;
+}
+
+const METHODS = ['CASH', 'TRANSFER', 'SAVING_WALLET', 'CREDIT_WALLET', 'INSURANCE_WALLET', 'WAIVE', 'HOLDING_BUDGET'] as const;
+const TYPE_VALUES = ['INVOICE', 'CREDIT_NOTE', 'JOURNAL'] as const;
+
+const METHOD_COLOR: Record<string, 'success' | 'primary' | 'secondary' | 'info' | 'default'> = {
+  CASH: 'success',
+  TRANSFER: 'primary',
+  SAVING_WALLET: 'secondary',
+  CREDIT_WALLET: 'secondary',
+  INSURANCE_WALLET: 'secondary',
+  WAIVE: 'info',
+  HOLDING_BUDGET: 'info',
+};
+const BADGE_TEXT_COLOR: Record<string, string> = {
+  success: 'text-success',
+  primary: 'text-primary-fg',
+  info: 'text-info-fg',
+  secondary: 'text-secondary-fg',
+  default: 'text-fg',
+};
 const TYPE_COLOR: Record<string, 'primary' | 'danger' | 'warning'> = {
   INVOICE: 'primary',
   CREDIT_NOTE: 'danger',
@@ -33,19 +60,20 @@ function defaultRange() {
   return { from: toLocalDateStr(fromD), to };
 }
 
-/* รายการชำระ — the flat, filterable line list (restores the retired Remittance
-   page's capability: scan every remittable line over a date range, filter by
-   owner / bill-type / charge-type, search bill/customer/contract). Sourced from
-   fn_reconcile_by_item (VOIDED-excluded, remit_amount shaped) — NOT raw revenue
-   views. The RPC returns the full scoped set in one call (bounded by branch +
-   date range), so owner/type/charge/search filtering + paging happen client-side,
-   same single-call model as the ยอดนำส่ง page. */
+/* รายการชำระ (เก็บเงิน) — flat per-payment list (PM-xxxx) from api.v_payments.
+   Distinct from the ชำระ group/net summary page (v_settlement_tender_lines).
+   Shows voided payments (strikethrough + badge, net totals) and lets a manager
+   correct a payment's channel (CASH↔TRANSFER) via fn_bill_payment_correct_channel. */
 export function PaymentListPage() {
   const { t, i18n } = useTranslation();
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const isBranchUser = ['BRANCH_STAFF', 'BRANCH_MANAGER'].includes(user?.role_code ?? '');
   const userBranchId = isBranchUser && user?.branch_id ? String(user.branch_id) : '';
+  const canCorrectChannel = can('PAYMENT.CHANNEL_CORRECT');
+
+  const [correctPayment, setCorrectPayment] = useState<PaymentRow | null>(null);
 
   const initial = defaultRange();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -54,21 +82,19 @@ export function PaymentListPage() {
   const toParam = searchParams.get('to');
   const fromDate = fromParam === null ? initial.from : fromParam;
   const toDate = toParam === null ? initial.to : toParam;
-  const ownerFilter = (searchParams.get('owner') as OwnerType | null) ?? '';
+  const methodFilter = searchParams.get('method') ?? '';
   const typeFilter = searchParams.get('type') ?? '';
-  const chargeParam = searchParams.get('charge') ?? '';
-  const chargeFilter = useMemo(
-    () => (chargeParam ? chargeParam.split(',').filter(Boolean) : []),
-    [chargeParam],
-  );
+  const bankAccountFilter = searchParams.get('bank_account_id') ?? '';
   const search = searchParams.get('q') ?? '';
+  // Default: show voided + reversal rows. Toggle off (voided=0) to hide them.
+  const showVoided = searchParams.get('voided') !== '0';
 
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [isTypingRange, setIsTypingRange] = useState(false);
 
   const pendingPatchRef = useRef<Record<string, string> | null>(null);
-  const updateFilters = useCallback((patch: Partial<{ branch_id: string; from: string; to: string; owner: string; type: string; charge: string; q: string }>) => {
+  const updateFilters = useCallback((patch: Partial<{ branch_id: string; from: string; to: string; method: string; type: string; bank_account_id: string; q: string; voided: string }>) => {
     if (pendingPatchRef.current) {
       Object.assign(pendingPatchRef.current, patch);
       return;
@@ -95,69 +121,74 @@ export function PaymentListPage() {
     queryFn: () => apiClient.get<Branch[]>('/v_branches?is_active=is.true&order=name'),
   });
 
-  // Charge types from the ref view — labels stay localized, new codes appear
-  // without a deploy.
-  const { data: chargeTypes = [] } = useQuery({
-    queryKey: ['ref-charge-types'],
-    queryFn: () =>
-      apiClient.get<{ code: string; name_th: string; name_en: string }[]>(
-        '/v_ref_charge_types?select=code,name_th,name_en&order=name_th',
-      ),
-    staleTime: 60 * 60 * 1000,
+  const { data: bankAccounts = [] } = useQuery({
+    queryKey: ['bank-accounts-active', branchId],
+    queryFn: () => apiClient.get<BankAccountOption[]>(
+      branchId
+        ? `/v_bank_accounts?is_active=is.true&branch_id=eq.${branchId}&order=is_default.desc,bank_name`
+        : '/v_bank_accounts?is_active=is.true&order=bank_name',
+    ),
+    staleTime: 5 * 60 * 1000,
   });
 
-  // RPC is per-company: company comes from the chosen branch. branch_id=null →
-  // company-all mode (only meaningful once a branch/company is picked).
-  const selectedBranch = branches.find(b => String(b.id) === branchId);
-  const companyId = selectedBranch?.company_id ?? null;
-  const allBranches = branchId === '__ALL__';
+  const toExclusive = useMemo(() => {
+    const d = parseLocalDate(toDate);
+    if (!d) return toDate;
+    d.setDate(d.getDate() + 1);
+    return toLocalDateStr(d);
+  }, [toDate]);
 
-  const { data, isFetching } = useQuery({
-    queryKey: ['accounting', 'reconcile-item', branchId, companyId, fromDate, toDate],
-    queryFn: () => apiClient.rpc<ReconcileItemResult>('fn_reconcile_by_item', {
-      p_company_id: companyId,
-      p_branch_id: allBranches ? null : (branchId ? Number(branchId) : null),
-      p_date_from: fromDate,
-      p_date_to: toDate,
-    }),
-    enabled: !!branchId && (allBranches ? !!companyId : !!selectedBranch),
+  const params = new URLSearchParams();
+  if (branchId) params.set('branch_id', `eq.${branchId}`);
+  if (fromDate) params.set('bill_date', `gte.${fromDate}`);
+  if (toDate) params.append('bill_date', `lt.${toExclusive}`);
+  if (methodFilter) params.set('method', `eq.${methodFilter}`);
+  if (typeFilter) params.set('bill_type', `eq.${typeFilter}`);
+  if (bankAccountFilter) params.set('bank_account_id', `eq.${bankAccountFilter}`);
+  if (!showVoided) { params.set('is_voided', 'eq.false'); params.set('is_reversal', 'eq.false'); }
+  if (search.trim()) params.set('or', `(code_display.ilike.*${search.trim()}*,payer_name.ilike.*${search.trim()}*,bill_code_display.ilike.*${search.trim()}*)`);
+  params.set('order', 'bill_date.desc,payment_id.desc');
+
+  const { data: pageData, isFetching } = useQuery({
+    queryKey: ['accounting', 'payment-list', branchId, fromDate, toDate, methodFilter, typeFilter, bankAccountFilter, search, showVoided, pageIndex, pageSize],
+    queryFn: () => apiClient.getPaginated<PaymentRow>(
+      `/v_payments?${params.toString()}`,
+      { page: pageIndex + 1, pageSize }
+    ),
     placeholderData: keepPreviousData,
   });
+  const rows = pageData?.data ?? [];
+  const totalCount = pageData?.totalCount ?? 0;
 
-  // Apply owner / type / charge / search client-side over the scoped rows.
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return (data?.rows ?? []).filter(r => {
-      if (ownerFilter && r.owner_type !== ownerFilter) return false;
-      if (typeFilter && r.bill_type !== typeFilter) return false;
-      if (chargeFilter.length && !chargeFilter.includes(r.charge_type)) return false;
-      if (q) {
-        const hay = `${r.bill_code} ${r.customer_name} ${r.contract_code ?? ''} ${r.charge_name_th} ${r.description}`.toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
-      return true;
-    });
-  }, [data?.rows, ownerFilter, typeFilter, chargeFilter, search]);
-
-  // Totals of the filtered subset (live).
-  const totals = useMemo(() => {
-    let holding = 0, company = 0;
-    for (const r of filtered) {
-      if (r.owner_type === 'HOLDING') holding += Number(r.remit_amount) || 0;
-      else company += Number(r.remit_amount) || 0;
+  // Per-method net summary (respects the same filters, minus method).
+  const summaryParams = new URLSearchParams();
+  if (branchId) summaryParams.set('branch_id', `eq.${branchId}`);
+  if (fromDate) summaryParams.set('bill_date', `gte.${fromDate}`);
+  if (toDate) summaryParams.append('bill_date', `lt.${toExclusive}`);
+  if (bankAccountFilter) summaryParams.set('bank_account_id', `eq.${bankAccountFilter}`);
+  if (!showVoided) { summaryParams.set('is_voided', 'eq.false'); summaryParams.set('is_reversal', 'eq.false'); }
+  summaryParams.set('select', 'method,amount');
+  const { data: summaryRows = [] } = useQuery({
+    queryKey: ['accounting', 'payment-list-summary', branchId, fromDate, toDate, bankAccountFilter, showVoided],
+    queryFn: () => apiClient.get<{ method: string; amount: number }[]>(
+      `/v_payments?${summaryParams.toString()}`,
+    ),
+  });
+  const summary = useMemo(() => {
+    const byMethod = new Map<string, { count: number; amount: number }>();
+    let totalAmount = 0;
+    for (const r of summaryRows) {
+      const m = byMethod.get(r.method) ?? { count: 0, amount: 0 };
+      m.count += 1; m.amount += Number(r.amount) || 0; byMethod.set(r.method, m);
+      totalAmount += Number(r.amount) || 0;
     }
-    return { holding, company, total: holding + company, count: filtered.length };
-  }, [filtered]);
-
-  // Client-side page slice.
-  const pageRows = useMemo(
-    () => filtered.slice(pageIndex * pageSize, pageIndex * pageSize + pageSize),
-    [filtered, pageIndex, pageSize],
-  );
+    return { byMethod, totalAmount };
+  }, [summaryRows]);
+  const visibleMethods = METHODS.filter(m => (summary.byMethod.get(m)?.count ?? 0) > 0);
 
   const activeFilterCount =
-    (ownerFilter ? 1 : 0) + (typeFilter ? 1 : 0) + (chargeFilter.length ? 1 : 0) +
-    (search.trim() ? 1 : 0) + (!isBranchUser && branchId && !allBranches ? 1 : 0);
+    (methodFilter ? 1 : 0) + (typeFilter ? 1 : 0) + (!isBranchUser && branchId ? 1 : 0) +
+    (bankAccountFilter ? 1 : 0) + (search.trim() ? 1 : 0) + (!showVoided ? 1 : 0);
 
   const dateFilter: ReactNode = (
     <InputDateRangePicker
@@ -204,15 +235,52 @@ export function PaymentListPage() {
       className="w-full"
     />
   );
-  const ownerNode: ReactNode = (
+
+  // Channel select — merges method + bank account into one control (bank matters
+  // only for TRANSFER). Value: '' | method | 'TRANSFER' | 'TRANSFER:<id>'.
+  const channelValue =
+    methodFilter === 'TRANSFER' && bankAccountFilter ? `TRANSFER:${bankAccountFilter}` : methodFilter || null;
+  const channelOptions = [
+    ...METHODS.filter(m => m !== 'TRANSFER').map(m => ({ value: m, label: t(`accounting.payments.m_${m}`) })),
+    { value: 'TRANSFER', label: t('accounting.payments.m_TRANSFER') },
+    ...bankAccounts.map(b => ({ value: `TRANSFER:${b.id}`, label: `${b.bank_name} · ${b.account_number}` })),
+  ];
+  const bankById = new Map(bankAccounts.map(b => [b.id, b]));
+  const renderChannelOption = (opt: { value: string; label: string }) => {
+    if (opt.value.startsWith('TRANSFER:')) {
+      const id = Number(opt.value.slice('TRANSFER:'.length));
+      const b = bankById.get(id);
+      if (b) {
+        return (
+          <div className="flex flex-col leading-tight py-0.5 min-w-0">
+            <div className="text-sm truncate">
+              {t('accounting.payments.m_TRANSFER')}<span className="text-subtle"> · {b.bank_name}</span>
+            </div>
+            <div className="text-xs text-subtle truncate">{b.account_number}</div>
+          </div>
+        );
+      }
+    }
+    return <span className="text-sm">{opt.label}</span>;
+  };
+  const onChannelChange = (raw: string | string[] | null | undefined) => {
+    const v = (raw as string) ?? '';
+    if (!v) { updateFilters({ method: '', bank_account_id: '' }); return; }
+    if (v.startsWith('TRANSFER:')) { updateFilters({ method: 'TRANSFER', bank_account_id: v.slice('TRANSFER:'.length) }); return; }
+    updateFilters({ method: v, bank_account_id: '' });
+  };
+
+  const methodNode: ReactNode = (
     <Select
-      value={ownerFilter || null}
-      onChange={(v) => updateFilters({ owner: (v as string) ?? '' })}
-      options={(['HOLDING', 'COMPANY'] as OwnerType[]).map(o => ({ value: o, label: t(`accounting.reconcile.owner_${o}`) }))}
+      value={channelValue}
+      onChange={onChannelChange}
+      options={channelOptions}
+      renderOption={renderChannelOption}
       size="sm"
       showChevron
-      placeholder={t('accounting.paymentList.allOwners')}
+      placeholder={t('accounting.payments.allMethods')}
       clearable
+      searchable
     />
   );
   const typeNode: ReactNode = (
@@ -222,46 +290,35 @@ export function PaymentListPage() {
       options={TYPE_VALUES.map(v => ({ value: v, label: t(`accounting.bills.typeLabel.${v}`) }))}
       size="sm"
       showChevron
-      placeholder={t('accounting.paymentList.allTypes')}
+      placeholder={t('accounting.payments.allTypes')}
       clearable
-    />
-  );
-  const chargeNode: ReactNode = (
-    <Select
-      multiple
-      value={chargeFilter}
-      onChange={(v) => updateFilters({ charge: (v as string[]).join(',') })}
-      options={chargeTypes.map(c => ({
-        value: c.code,
-        label: i18n.language === 'th' ? c.name_th : c.name_en,
-      }))}
-      size="sm"
-      showChevron
-      placeholder={t('accounting.paymentList.allCharges')}
     />
   );
   const branchNode: ReactNode = (
     <Select
       value={branchId || null}
-      onChange={(v) => updateFilters({ branch_id: (v as string) ?? '' })}
-      placeholder={t('accounting.reconcile.pickBranch')}
-      options={[
-        ...(isBranchUser ? [] : [{ label: t('accounting.reconcile.allBranches'), value: '__ALL__' }]),
-        ...branches.map(b => ({ label: b.name, value: String(b.id) })),
-      ]}
+      onChange={(v) => updateFilters({ branch_id: (v as string) ?? '', bank_account_id: '' })}
+      placeholder={t('accounting.branch')}
+      options={branches.map(b => ({ label: b.name, value: String(b.id) }))}
       size="sm"
       showChevron
-      clearable={false}
+      clearable={!isBranchUser}
       disabled={isBranchUser}
     />
   );
+  const voidedNode: ReactNode = (
+    <label className="flex items-center gap-2 text-sm text-subtle whitespace-nowrap px-1">
+      <Switch size="sm" checked={showVoided} onChange={(e) => updateFilters({ voided: e.target.checked ? '' : '0' })} />
+      {t('accounting.paymentList.showVoided')}
+    </label>
+  );
 
   const filterItems: FilterBarItem[] = [
-    { key: 'search', width: 208, node: searchNode, priority: 70 },
-    { key: 'charge', width: 208, node: chargeNode, priority: 60 },
-    { key: 'type', width: 168, node: typeNode, priority: 50 },
-    { key: 'owner', width: 160, node: ownerNode, priority: 40 },
+    { key: 'search', width: 208, node: searchNode, priority: 60 },
+    { key: 'method', width: 224, node: methodNode, priority: 50 },
+    { key: 'type', width: 168, node: typeNode, priority: 30 },
     { key: 'branch', width: 176, node: branchNode, priority: 10 },
+    { key: 'voided', width: 150, node: voidedNode, priority: 20 },
   ];
 
   return (
@@ -291,95 +348,110 @@ export function PaymentListPage() {
           className="flex-none p-2 border-b border-line"
           leading={dateFilter}
           leadingMinWidth={224}
-          leadingMaxWidth={240}
           items={filterItems}
           activeCount={activeFilterCount}
         />
 
-        {/* Summary — filtered subset totals (holding / company / total) */}
+        {/* Per-method net summary */}
         <div className="flex-none px-4 py-3 border-b border-line">
-          <dl className="grid grid-cols-3 gap-x-3 gap-y-2">
+          <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-2">
+            {t('accounting.payments.channelTitle')}
+          </h3>
+          <dl className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-2">
+            {visibleMethods.map(m => {
+              const s = summary.byMethod.get(m) ?? { count: 0, amount: 0 };
+              return (
+                <Stat
+                  key={m}
+                  label={
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className={`font-medium ${BADGE_TEXT_COLOR[METHOD_COLOR[m] ?? 'default']}`}>
+                        {t(`accounting.payments.m_${m}`)}
+                      </span>
+                      <span>{s.count} {t('accounting.payments.paymentCount')}</span>
+                    </span>
+                  }
+                  value={fmtCurrency(s.amount)}
+                />
+              );
+            })}
             <Stat
-              label={
-                <span className="inline-flex items-center gap-1.5">
-                  <Truck size={13} className="text-primary-fg" />
-                  {t('accounting.reconcile.owner_HOLDING')}
-                </span>
-              }
-              value={fmtCurrency(totals.holding)}
-            />
-            <Stat
-              label={
-                <span className="inline-flex items-center gap-1.5">
-                  <Building2 size={13} className="text-secondary-fg" />
-                  {t('accounting.reconcile.owner_COMPANY')}
-                </span>
-              }
-              value={fmtCurrency(totals.company)}
-            />
-            <Stat
-              label={<span className="font-medium">{t('accounting.paymentList.total', { count: totals.count })}</span>}
-              value={fmtCurrency(totals.total)}
+              label={<span className="font-medium">{t('accounting.payments.totalAmount')}</span>}
+              value={fmtCurrency(summary.totalAmount)}
               emphasis
             />
           </dl>
         </div>
 
-        {/* Line items — flat, client-paginated */}
-        <DataTable<ReconcileItemRow>
-          data={pageRows}
+        {/* Payment list */}
+        <DataTable<PaymentRow>
+          data={rows}
           renderRow={(row) => {
-            const r = row.original;
+            const p = row.original;
+            const correctable = canCorrectChannel && !p.is_reversal && !p.is_voided
+              && p.bill_status !== 'VOIDED' && (p.method === 'CASH' || p.method === 'TRANSFER');
             return (
-              <div key={r.line_id} className="w-full px-4 py-3 flex flex-col gap-1">
+              <div key={p.payment_id} className="w-full px-4 py-3 flex flex-col gap-1">
                 <div className="flex items-center gap-2 min-w-0">
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/admin/accounting/bills/${r.bill_id}`)}
-                    className="font-mono text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer truncate"
-                  >
-                    {r.bill_code}
-                    <ExternalLink size={11} />
-                  </button>
-                  <Badge color={TYPE_COLOR[r.bill_type] ?? 'default'} size="sm">
-                    {t(`accounting.bills.typeLabel.${r.bill_type}`, { defaultValue: r.bill_type })}
-                  </Badge>
-                  <Badge color="secondary" size="sm">{r.charge_name_th || r.charge_type}</Badge>
-                  {!r.is_remittable && (
-                    <Badge color="warning" size="xs">{t('accounting.reconcile.notCounted')}</Badge>
-                  )}
-                  <span className={`ml-auto text-sm font-medium tabular-nums shrink-0 ${r.remit_amount < 0 ? 'text-danger' : ''}`}>
-                    {fmtCurrency(r.remit_amount)}
+                  <span className={`font-mono text-sm font-medium truncate ${p.is_voided ? 'line-through text-subtler' : ''}`}>
+                    {p.code_display}
                   </span>
+                  <Badge color={METHOD_COLOR[p.method] ?? 'default'} size="sm">
+                    {t(`accounting.payments.m_${p.method}`, { defaultValue: p.method })}
+                  </Badge>
+                  <Badge color={TYPE_COLOR[p.bill_type] ?? 'default'} size="sm">
+                    {t(`accounting.bills.typeLabel.${p.bill_type}`, { defaultValue: p.bill_type })}
+                  </Badge>
+                  {p.is_voided && (
+                    <Tooltip content={p.voided_at ? <DateTime value={p.voided_at} /> : t('accounting.paymentList.voided')}>
+                      <Badge color="danger" size="sm">{t('accounting.paymentList.voided')}</Badge>
+                    </Tooltip>
+                  )}
+                  {p.is_reversal && <Badge color="warning" size="sm">{t('accounting.paymentList.reversal')}</Badge>}
+                  <span className={`ml-auto text-sm font-medium tabular-nums shrink-0 ${p.amount < 0 ? 'text-danger' : ''} ${p.is_voided ? 'line-through text-subtler' : ''}`}>
+                    {fmtCurrency(p.amount)}
+                  </span>
+                  {correctable && (
+                    <Tooltip content={t('accounting.payments.correct.title')}>
+                      <button
+                        type="button"
+                        className="btn-icon-sm shrink-0"
+                        aria-label={t('accounting.payments.correct.title')}
+                        onClick={() => setCorrectPayment(p)}
+                      >
+                        <ArrowLeftRight size={15} />
+                      </button>
+                    </Tooltip>
+                  )}
                 </div>
                 <div className="flex items-center gap-1.5 text-xs text-subtle min-w-0">
                   <span className="truncate inline-flex items-center gap-1.5 min-w-0">
-                    {[
-                      r.customer_name?.trim() ? <span key="cust" className="truncate">{r.customer_name}</span> : null,
-                      r.contract_code ? (
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/admin/accounting/bills/${p.bill_id}`)}
+                      className="font-mono text-primary-fg hover:underline inline-flex items-center gap-0.5 bg-transparent border-none p-0 cursor-pointer"
+                    >
+                      {p.bill_code_display}
+                      <ExternalLink size={10} />
+                    </button>
+                    {p.contract_id && (
+                      <>
+                        <span className="text-subtler">·</span>
                         <button
-                          key="contract"
                           type="button"
-                          onClick={() => r.contract_id && navigate(`/admin/contracts/search/${r.contract_id}`)}
+                          onClick={() => navigate(`/admin/contracts/search/${p.contract_id}`)}
                           className="font-mono text-primary-fg hover:underline inline-flex items-center gap-0.5 bg-transparent border-none p-0 cursor-pointer"
                         >
-                          {r.contract_code}
+                          CT#{p.contract_id}
                           <ExternalLink size={10} />
                         </button>
-                      ) : null,
-                      r.description ? <span key="desc" className="truncate">{r.description}</span> : null,
-                      !isBranchUser && r.branch_name ? <span key="branch">{r.branch_name}</span> : null,
-                    ]
-                      .filter(Boolean)
-                      .map((node, i) => (
-                        <span key={i} className="inline-flex items-center gap-1.5 min-w-0">
-                          {i > 0 && <span className="text-subtler">·</span>}
-                          {node}
-                        </span>
-                      ))}
+                      </>
+                    )}
+                    {p.bank_name && <span className="truncate">· {p.bank_name} {p.account_number}</span>}
+                    {p.payer_name && <span className="truncate">· {p.payer_name}</span>}
                   </span>
                   <span className="ml-auto text-subtler shrink-0">
-                    <DateTime value={r.bill_date} showTime={false} />
+                    <DateTime value={p.bill_date} showTime={false} />
                   </span>
                 </div>
               </div>
@@ -389,16 +461,22 @@ export function PaymentListPage() {
           pageIndex={pageIndex}
           pageSize={pageSize}
           pageSizeOptions={[25, 50, 100]}
-          rowCount={totals.count}
+          rowCount={totalCount}
           onPageChange={({ pageIndex: pi, pageSize: ps }) => { setPageIndex(pi); setPageSize(ps); }}
           className={`flex-1 min-h-0 padded-datatable ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
-          noResults={
-            <div className="p-8 text-center text-subtler">
-              {!branchId ? t('accounting.reconcile.pickBranch') : t('accounting.empty')}
-            </div>
-          }
+          noResults={<div className="p-8 text-center text-subtler">{t('accounting.empty')}</div>}
         />
       </div>
+
+      <PaymentChannelCorrectModal
+        open={!!correctPayment}
+        payment={correctPayment}
+        onClose={() => setCorrectPayment(null)}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['accounting', 'payment-list'] });
+          queryClient.invalidateQueries({ queryKey: ['accounting', 'payment-list-summary'] });
+        }}
+      />
     </>
   );
 }

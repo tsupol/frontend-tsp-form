@@ -290,9 +290,9 @@ export const AppSideNav = () => {
       children: [
         { type: 'group', key: 'grp-acct-daily', label: t('nav.groupDaily') },
         { key: 'bills', icon: <Receipt size="1rem" />, label: t('nav.bills'), path: '/admin/accounting/bills' },
-        { key: 'payments', icon: <Banknote size="1rem" />, label: t('nav.payments'), path: '/admin/accounting/payments' },
-        { type: 'group', key: 'grp-acct-cashflow', label: t('nav.groupCashflow') },
         { key: 'payment-list', icon: <ArrowUpRight size="1rem" />, label: t('nav.paymentList'), path: '/admin/accounting/payment-list' },
+        { type: 'group', key: 'grp-acct-cashflow', label: t('nav.groupCashflow') },
+        { key: 'payments', icon: <Banknote size="1rem" />, label: t('nav.payments'), path: '/admin/accounting/payments' },
         { key: 'reconcile-item', icon: <ClipboardList size="1rem" />, label: t('nav.reconcileByItem'), path: '/admin/accounting/reconcile-item' },
         { key: 'reconcile-channel', icon: <Coins size="1rem" />, label: t('nav.reconcileByChannel'), path: '/admin/accounting/reconcile-channel' },
         {

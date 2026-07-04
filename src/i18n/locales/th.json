@@ -1491,6 +1491,18 @@
     "updated": "อัปเดต",
     "registeredBy": "ลงทะเบียนโดย",
     "color": "สี",
+    "correctVariant": {
+      "button": "แก้สี",
+      "title": "แก้สี",
+      "doneTitle": "แก้สีแล้ว",
+      "pick": "เลือกสีที่ถูกต้อง (รุ่นเดียวกัน)",
+      "current": "สีปัจจุบัน",
+      "note": "หมายเหตุ (ไม่บังคับ)",
+      "submit": "แก้สี",
+      "blockedTitle": "แก้ที่นี่ไม่ได้",
+      "blockedContract": "เครื่องนี้ผูกสัญญาแล้ว — ต้องแจ้ง admin ให้แก้",
+      "blockedGeneric": "เครื่องนี้แก้ที่นี่ไม่ได้"
+    },
     "contractable": "ทำสัญญาได้",
     "sellable": "ขายได้",
     "yes": "ใช่",
@@ -3895,6 +3907,9 @@
         "holding": "Holding",
         "companyRetail": "Company · ขายปลีก",
         "companyWallet": "Company · Wallet",
+        "walletInsurance": "Wallet · ประกัน",
+        "walletSaving": "Wallet · ออม",
+        "walletCredit": "Wallet · เครดิต",
         "companyFee": "Company · ค่าธรรมเนียม",
         "companyOther": "Company · อื่นๆ",
         "journal": "บันทึกภายใน (Journal)",
@@ -4190,11 +4205,11 @@
     },
     "paymentList": {
       "title": "รายการชำระ",
-      "searchPlaceholder": "ค้นหา บิล / ลูกค้า / สัญญา",
-      "allOwners": "ทุกปลายทาง",
-      "allTypes": "ทุกประเภท",
-      "allCharges": "ทุกรายการ",
-      "total": "รวม ({{count}} รายการ)"
+      "searchPlaceholder": "ค้นหา PM / ผู้จ่าย / บิล",
+      "showVoided": "แสดงที่ยกเลิก",
+      "voided": "ยกเลิกแล้ว",
+      "reversal": "ตัวกลับรายการ",
+      "contract": "สัญญา"
     },
     "reconcile": {
       "itemTitle": "ยอดนำส่ง",

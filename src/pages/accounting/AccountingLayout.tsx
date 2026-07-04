@@ -31,9 +31,9 @@ export function AccountingLayout({ children }: { children: ReactNode }) {
   const navItems: NavItem[] = useMemo(() => [
     { type: 'group', labelKey: 'nav.groupDaily' },
     { type: 'link', path: '/admin/accounting/bills', labelKey: 'nav.bills', icon: Receipt },
-    { type: 'link', path: '/admin/accounting/payments', labelKey: 'nav.payments', icon: Banknote },
-    { type: 'group', labelKey: 'nav.groupCashflow' },
     { type: 'link', path: '/admin/accounting/payment-list', labelKey: 'nav.paymentList', icon: ArrowUpRight },
+    { type: 'group', labelKey: 'nav.groupCashflow' },
+    { type: 'link', path: '/admin/accounting/payments', labelKey: 'nav.payments', icon: Banknote },
     { type: 'link', path: '/admin/accounting/reconcile-item', labelKey: 'nav.reconcileByItem', icon: ClipboardList },
     { type: 'link', path: '/admin/accounting/reconcile-channel', labelKey: 'nav.reconcileByChannel', icon: Coins },
     { type: 'link', path: '/admin/accounting/day-close', labelKey: 'nav.dayClose', icon: CalendarCheck, badge: unclosedCount },

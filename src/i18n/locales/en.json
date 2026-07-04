@@ -1491,6 +1491,18 @@
     "updated": "Updated",
     "registeredBy": "Registered by",
     "color": "Color",
+    "correctVariant": {
+      "button": "Correct colour",
+      "title": "Correct colour",
+      "doneTitle": "Colour corrected",
+      "pick": "Pick the correct colour (same model)",
+      "current": "Current",
+      "note": "Note (optional)",
+      "submit": "Correct colour",
+      "blockedTitle": "Cannot correct here",
+      "blockedContract": "This device is bound to a contract — ask an admin to correct it.",
+      "blockedGeneric": "This device cannot be corrected here."
+    },
     "contractable": "Contractable",
     "sellable": "Sellable",
     "yes": "Yes",
@@ -3896,6 +3908,9 @@
         "holding": "Holding",
         "companyRetail": "Company · Retail",
         "companyWallet": "Company · Wallet",
+        "walletInsurance": "Wallet · Insurance",
+        "walletSaving": "Wallet · Saving",
+        "walletCredit": "Wallet · Credit",
         "companyFee": "Company · Fee",
         "companyOther": "Company · Other",
         "journal": "Journal (internal)",
@@ -4191,11 +4206,11 @@
     },
     "paymentList": {
       "title": "Payment List",
-      "searchPlaceholder": "Search bill / customer / contract",
-      "allOwners": "All destinations",
-      "allTypes": "All types",
-      "allCharges": "All charges",
-      "total": "Total ({{count}} lines)"
+      "searchPlaceholder": "Search PM / payer / bill",
+      "showVoided": "Show voided",
+      "voided": "Voided",
+      "reversal": "Reversal",
+      "contract": "Contract"
     },
     "reconcile": {
       "itemTitle": "Remit Amount",

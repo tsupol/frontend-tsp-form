@@ -4,7 +4,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Tooltip } from 'tsp-form';
 import {
   ChevronRight, ChevronDown, Download, Loader2,
-  Truck, ShoppingBag, Wallet, ReceiptText, CircleDot, BookText, Scale,
+  Truck, ShoppingBag, ReceiptText, CircleDot, BookText, Scale,
+  Shield, PiggyBank, CreditCard,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { fmtCurrency } from '../../lib/format';
@@ -16,7 +17,7 @@ import type { DayCloseBucketRow, DayCloseBucketLine, DayCloseBucketKey } from '.
 function BucketIcon({ icon, tip }: { icon: ReactNode; tip: string }) {
   return (
     <Tooltip content={tip} placement="right">
-      <span className="text-subtle cursor-help inline-flex shrink-0">{icon}</span>
+      <span className="text-subtle cursor-help inline-flex items-center justify-center shrink-0 leading-none">{icon}</span>
     </Tooltip>
   );
 }
@@ -104,12 +105,12 @@ export function DayCloseBuckets({ branchId, billDate }: { branchId: string; bill
   return (
     <div className="flex flex-col">
       {/* Header row */}
-      <div className="flex items-center px-4 py-2 text-[11px] font-semibold text-subtle uppercase tracking-wider border-b border-line">
+      <div className="flex items-center pl-4 py-2 text-[11px] font-semibold text-subtle uppercase tracking-wider border-b border-line">
         <span className="flex-1">{t('accounting.dayClose.bucket.destination')}</span>
         <span className="w-24 text-right">{t('accounting.dayClose.bucket.sold')}</span>
         <span className="w-24 text-right">{t('accounting.dayClose.bucket.refund')}</span>
-        <span className="w-24 text-right">{t('accounting.dayClose.bucket.net')}</span>
-        <span className="w-8" />
+        <span className="w-24 text-right pr-3">{t('accounting.dayClose.bucket.net')}</span>
+        <span className="w-11 shrink-0" />
       </div>
 
       {/* Buckets 1–2 */}
@@ -207,8 +208,11 @@ function BucketRow({
   );
 }
 
-/* Wallet bucket — 3 flows: IN (deposit), OUT (cash-out), USAGE (paid w/ wallet).
-   Only USAGE drills to lines (WALLET_USAGE txn_bucket). */
+/* Wallet — the deposit total splits into 3 kinds (insurance / saving / credit,
+   mig 025/17), each shown as its own bucket row (peer of retail/fee/other) per
+   the day-close doc. Below them, the wallet-level OUT (cash-out) and USAGE
+   (paid-with-wallet) flows — these have no per-kind split. Only USAGE drills to
+   lines (WALLET_USAGE txn_bucket). */
 function WalletBucket({
   row, expanded, onToggle, branchId, billDate, fetchLines,
 }: {
@@ -221,26 +225,40 @@ function WalletBucket({
 }) {
   const { t } = useTranslation();
   const usage = row.company_wallet_usage;
+  const kinds = [
+    { key: 'walletInsurance', value: row.company_wallet_insurance, icon: <Shield size={15} /> },
+    { key: 'walletSaving', value: row.company_wallet_saving, icon: <PiggyBank size={15} /> },
+    { key: 'walletCredit', value: row.company_wallet_credit, icon: <CreditCard size={15} /> },
+  ];
   return (
     <>
-      <div className="flex items-center px-4 py-2 border-b border-line text-sm">
-        <span className="flex-1 font-medium inline-flex items-center gap-2">
-          <BucketIcon icon={<Wallet size={15} />} tip={t('accounting.dayClose.bucket.companyWallet')} />
-          {t('accounting.dayClose.bucket.companyWallet')}
-        </span>
-      </div>
-      <WalletFlow label={t('accounting.dayClose.bucket.walletIn')} value={row.company_wallet} col="sold" />
+      {kinds.map(k => (
+        <div key={k.key} className="flex items-center pl-4 pr-0 min-h-11 border-b border-line text-sm">
+          <span className="flex-1 font-medium inline-flex items-center gap-2 min-w-0">
+            <BucketIcon icon={k.icon} tip={t(`accounting.dayClose.bucket.${k.key}`)} />
+            {t(`accounting.dayClose.bucket.${k.key}`)}
+          </span>
+          <span className="w-24 text-right tabular-nums">{fmtCurrency(k.value)}</span>
+          <span className="w-24 text-right tabular-nums text-subtle">—</span>
+          <span className="w-24 text-right tabular-nums font-semibold pr-3">{fmtCurrency(k.value)}</span>
+          <span className="w-11 shrink-0" />
+        </div>
+      ))}
+
+      {/* Wallet-level flows (no per-kind split) */}
       <WalletFlow label={t('accounting.dayClose.bucket.walletOut')} value={row.company_wallet_refund} col="refund" />
-      <div className="flex items-center pl-8 pr-4 py-2 border-b border-line text-sm">
-        <span className="flex-1 text-subtle">{t('accounting.dayClose.bucket.walletUsage')}</span>
-        <span className="w-24" />
-        <span className="w-24" />
-        <span className="w-24 text-right tabular-nums">{fmtCurrency(usage)}</span>
+      <div className="flex items-stretch min-h-11 border-b border-line text-sm">
+        <div className="flex-1 flex items-center pl-8 gap-2 min-w-0">
+          <span className="flex-1 text-subtle">{t('accounting.dayClose.bucket.walletUsage')}</span>
+          <span className="w-24" />
+          <span className="w-24" />
+          <span className="w-24 text-right tabular-nums pr-3">{fmtCurrency(usage)}</span>
+        </div>
         <button type="button" onClick={onToggle}
           disabled={usage === 0}
-          className="w-8 flex justify-center text-subtle disabled:opacity-30 cursor-pointer disabled:cursor-default bg-transparent border-none"
+          className="w-11 shrink-0 flex items-center justify-center text-subtle hover:bg-primary-soft hover:text-primary-fg disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-subtle cursor-pointer disabled:cursor-default bg-transparent border-none"
           aria-label={t('accounting.dayClose.bucket.expand')}>
-          {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+          {expanded ? <ChevronDown size={22} /> : <ChevronRight size={22} />}
         </button>
       </div>
       {expanded && (
@@ -254,12 +272,12 @@ function WalletBucket({
 
 function WalletFlow({ label, value, col }: { label: string; value: number; col: 'sold' | 'refund' }) {
   return (
-    <div className="flex items-center pl-8 pr-4 py-2 border-b border-line text-sm">
+    <div className="flex items-center pl-8 py-2 border-b border-line text-sm">
       <span className="flex-1 text-subtle">{label}</span>
       <span className={`w-24 text-right tabular-nums ${col === 'sold' ? '' : 'invisible'}`}>{fmtCurrency(value)}</span>
       <span className={`w-24 text-right tabular-nums ${col === 'refund' ? '' : 'invisible'}`}>{fmtCurrency(value)}</span>
-      <span className="w-24" />
-      <span className="w-8" />
+      <span className="w-24 pr-3" />
+      <span className="w-11 shrink-0" />
     </div>
   );
 }
@@ -279,18 +297,20 @@ function BucketLine({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="flex items-center px-4 py-2.5 border-b border-line text-sm hover:bg-surface-hover transition-colors">
-      <span className="flex-1 font-medium inline-flex items-center gap-2">
-        <BucketIcon icon={icon} tip={label} />{label}
-      </span>
-      <span className="w-24 text-right tabular-nums">{fmtCurrency(sold)}</span>
-      <span className="w-24 text-right tabular-nums text-subtle">{refund == null ? '—' : fmtCurrency(refund)}</span>
-      <span className="w-24 text-right tabular-nums font-semibold">{fmtCurrency(net)}</span>
+    <div className="flex items-stretch min-h-11 border-b border-line text-sm">
+      <div className="flex-1 flex items-center pl-4 gap-2 min-w-0">
+        <span className="flex-1 font-medium inline-flex items-center gap-2 min-w-0">
+          <BucketIcon icon={icon} tip={label} />{label}
+        </span>
+        <span className="w-24 text-right tabular-nums">{fmtCurrency(sold)}</span>
+        <span className="w-24 text-right tabular-nums text-subtle">{refund == null ? '—' : fmtCurrency(refund)}</span>
+        <span className="w-24 text-right tabular-nums font-semibold pr-3">{fmtCurrency(net)}</span>
+      </div>
       <button type="button" onClick={onToggle}
         disabled={!expandable}
-        className="w-8 flex justify-center text-subtle disabled:opacity-30 cursor-pointer disabled:cursor-default bg-transparent border-none"
+        className="w-11 shrink-0 flex items-center justify-center text-subtle hover:bg-primary-soft hover:text-primary-fg disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-subtle cursor-pointer disabled:cursor-default bg-transparent border-none"
         aria-label={t('accounting.dayClose.bucket.expand')}>
-        {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+        {expanded ? <ChevronDown size={22} /> : <ChevronRight size={22} />}
       </button>
     </div>
   );

@@ -101,7 +101,7 @@ export function DayClosePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveBranchId, selectedDate]);
 
-  const { data: unclosedDays = [] } = useQuery({
+  const { data: unclosedDays = [], isFetched: unclosedFetched } = useQuery({
     queryKey: ['accounting', 'unclosed-days', effectiveBranchId],
     queryFn: () => apiClient.get<UnclosedDayRow[]>(
       `/v_branch_daily_unclosed?branch_id=eq.${effectiveBranchId}&order=bill_date`
@@ -159,6 +159,20 @@ export function DayClosePage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unclosedDays, selectedDate]);
+
+  // Reverse normalize: an __unclosed__ selection that just left the unclosed list
+  // (e.g. we closed it) must fall back to a bare (history) date so it renders as a
+  // closed day — otherwise selectedUnclosedDate stays set, the history query stays
+  // disabled, and nothing renders. Only strip once the list has loaded.
+  useEffect(() => {
+    if (!selectedDate.startsWith(UNCLOSED_PREFIX)) return;
+    if (!unclosedFetched) return;
+    const bare = selectedDate.slice(UNCLOSED_PREFIX.length);
+    if (!unclosedDays.some(u => u.bill_date === bare)) {
+      setSelectedDate(bare === today ? TODAY_KEY : bare);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unclosedDays, unclosedFetched, selectedDate]);
 
   const selectedIsToday = selectedDate === TODAY_KEY || selectedDate === today;
   const selectedUnclosedDate = selectedDate.startsWith(UNCLOSED_PREFIX)
