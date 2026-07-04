@@ -685,12 +685,22 @@ function ClosedSnapshot({ close, branchId }: { close: DayCloseHistoryRow; branch
   const paymentsLink = `/admin/accounting/payments?branch_id=${branchId}&from=${close.close_date}&to=${close.close_date}`;
   return (
     <div className="@container flex flex-col h-full min-h-0">
+      {/* Header: date + closed badge + who/when, drill icons */}
       <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
         <Lock size={18} className="text-success shrink-0" />
-        <span className="font-semibold">
-          <DateTime value={close.close_date} showTime={false} />
-        </span>
-        <Badge color="success" size="sm">{t('accounting.dayClose.closedBadge')}</Badge>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold">
+              <DateTime value={close.close_date} showTime={false} />
+            </span>
+            <Badge color="success" size="sm">{t('accounting.dayClose.closedBadge')}</Badge>
+          </div>
+          {close.closed_by_name && (
+            <div className="text-[11px] text-subtler truncate">
+              {t('accounting.dayClose.closedBy')} {close.closed_by_name} · <DateTime value={close.closed_at} />
+            </div>
+          )}
+        </div>
         <div className="ml-auto flex items-center gap-1.5 shrink-0">
           <Tooltip content={t('accounting.dayClose.drillReconcile')} placement="bottom">
             <Button
@@ -715,35 +725,15 @@ function ClosedSnapshot({ close, branchId }: { close: DayCloseHistoryRow; branch
         </div>
       </div>
 
+      {/* Reconciliation block — the money-match (net vs counted vs diff per
+          channel), merged with expected/actual/shortage/overage + edit. */}
       <div className="flex-none px-4 py-3 border-b border-line">
-        <dl className="grid grid-cols-2 @md:grid-cols-3 @lg:grid-cols-4 gap-x-3 gap-y-2">
-          <Stat label={t('accounting.dayClose.expected')} value={fmtCurrency(close.expected_amount)} />
-          <Stat label={t('accounting.dayClose.actual')} value={fmtCurrency(close.actual_amount)} />
-          <Stat
-            label={t('accounting.dayClose.shortage')}
-            value={fmtCurrency(close.shortage)}
-            tone={close.shortage > 0 ? 'danger' : undefined}
-          />
-          <Stat
-            label={t('accounting.dayClose.overage')}
-            value={fmtCurrency(close.overage)}
-            tone={close.overage > 0 ? 'warning' : undefined}
-          />
-          <Stat label={t('accounting.dayClose.totalCash')} value={fmtCurrency(close.total_cash)} />
-          <Stat label={t('accounting.dayClose.totalTransfer')} value={fmtCurrency(close.total_transfer)} />
-          <Stat label={t('accounting.dayClose.billCount')} value={String(close.bill_count)} />
-          <Stat label={t('accounting.dayClose.closedAt')} value={<DateTime value={close.closed_at} />} small />
-        </dl>
+        <ReconcileBlock close={close} branchId={branchId} />
         {close.note && (
           <div className="text-sm text-subtle mt-3">
             <span className="font-medium">{t('accounting.dayClose.note')}:</span> {close.note}
           </div>
         )}
-      </div>
-
-      {/* Cash/transfer count (step 3) — nullable, editable after close */}
-      <div className="flex-none px-4 py-3 border-b border-line">
-        <CountCard close={close} branchId={branchId} />
       </div>
 
       {/* Tabs: Remittance (breakdown) | Reconcile (read-only bill list) */}
@@ -768,13 +758,14 @@ function ClosedSnapshot({ close, branchId }: { close: DayCloseHistoryRow; branch
   );
 }
 
-/* ── Cash/transfer count (step 3, mig 480) ─────────────────────────────────
-   "ปิดวันแล้ว" ≠ "นับแล้ว" — counting is a separate, non-blocking step that can
-   be filled/edited any time after close. Shows net (system) vs counted (staff)
-   vs diff per channel, and lets the user enter/edit both counts. Wallet has no
-   count field (company reconciles it). */
+/* ── Reconciliation block (mig 480) ────────────────────────────────────────
+   The one thing a manager resolves on a locked day: does the money match?
+   Merges the old expected/actual/shortage/overage stat grid WITH the cash/
+   transfer count — net (system) vs counted (staff) vs diff, per channel, plus
+   a physical total row. Counting is nullable + editable any time after close;
+   "ปิดแล้ว" ≠ "นับแล้ว". Wallet has no count (company reconciles it). */
 
-function CountCard({ close, branchId }: { close: DayCloseHistoryRow; branchId: string }) {
+function ReconcileBlock({ close, branchId }: { close: DayCloseHistoryRow; branchId: string }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const canCount = ['BRANCH_MANAGER', 'COMPANY_ADMIN', 'COMPANY_ACCOUNTANT', 'HOLDING_ADMIN'].includes(
@@ -784,6 +775,11 @@ function CountCard({ close, branchId }: { close: DayCloseHistoryRow; branchId: s
   const bothCounted = close.counted_cash != null && close.counted_transfer != null;
   const someCounted = close.counted_cash != null || close.counted_transfer != null;
   const countStatus: 'none' | 'partial' | 'full' = bothCounted ? 'full' : someCounted ? 'partial' : 'none';
+
+  // Physical total row: net = system cash+transfer; counted/diff only once both counted.
+  const netTotalVal = close.net_cash + close.net_transfer;
+  const countedTotal = bothCounted ? (close.counted_cash! + close.counted_transfer!) : null;
+  const diffTotal = countedTotal != null ? countedTotal - netTotalVal : null;
 
   const [editing, setEditing] = useState(false);
   const [cash, setCash] = useState('');
@@ -826,7 +822,7 @@ function CountCard({ close, branchId }: { close: DayCloseHistoryRow; branchId: s
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <ClusterTitle>{t('accounting.dayClose.countTitle')}</ClusterTitle>
+        <ClusterTitle>{t('accounting.dayClose.reconcileMoneyTitle')}</ClusterTitle>
         <div className="flex items-center gap-2">
           {countStatus === 'full' && <Badge color="success" size="sm">{t('accounting.dayClose.countedFull')}</Badge>}
           {countStatus === 'partial' && <Badge color="warning" size="sm">{t('accounting.dayClose.countedPartial')}</Badge>}
@@ -836,34 +832,39 @@ function CountCard({ close, branchId }: { close: DayCloseHistoryRow; branchId: s
 
       {!editing ? (
         <>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm tabular-nums">
-              <thead>
-                <tr className="text-xs text-subtle text-right">
-                  <th className="text-left font-medium py-1">{t('accounting.dayClose.countChannel')}</th>
-                  <th className="font-medium py-1">{t('accounting.dayClose.countNet')}</th>
-                  <th className="font-medium py-1">{t('accounting.dayClose.countCounted')}</th>
-                  <th className="font-medium py-1">{t('accounting.dayClose.countDiff')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <CountRow
-                  icon={<Banknote size={14} className="text-success shrink-0" />}
-                  label={t('accounting.dayClose.totalCash')}
-                  net={close.net_cash}
-                  counted={close.counted_cash}
-                  diff={close.diff_cash}
-                />
-                <CountRow
-                  icon={<Coins size={14} className="text-info-fg shrink-0" />}
-                  label={t('accounting.dayClose.totalTransfer')}
-                  net={close.net_transfer}
-                  counted={close.counted_transfer}
-                  diff={close.diff_transfer}
-                />
-              </tbody>
-            </table>
-          </div>
+          <table className="w-full text-sm tabular-nums">
+            <thead>
+              <tr className="text-xs text-subtle">
+                <th className="text-left font-medium py-1">{t('accounting.dayClose.countChannel')}</th>
+                <th className="text-right font-medium py-1">{t('accounting.dayClose.countNet')}</th>
+                <th className="text-right font-medium py-1">{t('accounting.dayClose.countCounted')}</th>
+                <th className="text-right font-medium py-1">{t('accounting.dayClose.countDiff')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <CountRow
+                icon={<Banknote size={14} className="text-success shrink-0" />}
+                label={t('accounting.dayClose.totalCash')}
+                net={close.net_cash}
+                counted={close.counted_cash}
+                diff={close.diff_cash}
+              />
+              <CountRow
+                icon={<Coins size={14} className="text-info-fg shrink-0" />}
+                label={t('accounting.dayClose.totalTransfer')}
+                net={close.net_transfer}
+                counted={close.counted_transfer}
+                diff={close.diff_transfer}
+              />
+              <CountRow
+                label={t('accounting.dayClose.physicalTotal')}
+                net={netTotalVal}
+                counted={countedTotal}
+                diff={diffTotal}
+                emphasis
+              />
+            </tbody>
+          </table>
           <div className="mt-2 flex items-center justify-between gap-2">
             <span className="text-xs text-subtler">{t('accounting.dayClose.walletNoCount')}</span>
             {canCount && (
@@ -931,26 +932,28 @@ function CountCard({ close, branchId }: { close: DayCloseHistoryRow; branchId: s
 }
 
 function CountRow({
-  icon, label, net, counted, diff,
+  icon, label, net, counted, diff, emphasis,
 }: {
-  icon: React.ReactNode;
+  icon?: React.ReactNode;
   label: string;
   net: number;
   counted: number | null;
   diff: number | null;
+  emphasis?: boolean;
 }) {
+  const rowCls = emphasis ? 'border-t-2 border-line font-semibold' : 'border-t border-line';
   return (
-    <tr className="border-t border-line">
+    <tr className={rowCls}>
       <td className="py-1.5">
         <span className="inline-flex items-center gap-1.5">{icon}{label}</span>
       </td>
       <td className="py-1.5 text-right">{fmtCurrency(net)}</td>
       <td className="py-1.5 text-right">
-        {counted != null ? fmtCurrency(counted) : <span className="text-subtler">—</span>}
+        {counted != null ? fmtCurrency(counted) : <span className="text-subtler font-normal">—</span>}
       </td>
       <td className="py-1.5 text-right">
         {diff == null ? (
-          <span className="text-subtler">—</span>
+          <span className="text-subtler font-normal">—</span>
         ) : (
           <span className={diff < 0 ? 'text-danger' : diff > 0 ? 'text-warning-fg' : 'text-success'}>
             {diff > 0 ? '+' : ''}{fmtCurrency(diff)}
@@ -1258,31 +1261,70 @@ function DayCloseBreakdown({ branchId, closeDate }: { branchId: string; closeDat
         <DayCloseBuckets branchId={branchId} billDate={closeDate} />
       </div>
 
-      {/* Activity counts — context; red-flags void anomalies */}
+      {/* Activity counts — context; contracts compressed to one o/c/t/v stat
+          (tooltip spells them out), void anomalies kept as flag stats. */}
       <div className="px-4 py-3">
         <ClusterTitle>{t('accounting.dayClose.clusterActivity')}</ClusterTitle>
         <dl className="grid grid-cols-2 @md:grid-cols-3 @lg:grid-cols-4 gap-x-3 gap-y-2">
           <Stat label={t('accounting.dayClose.billCount')} value={String(row.bill_count)} />
-          <Stat label={t('accounting.dayClose.contractsOpened')} value={String(row.contracts_opened)} />
-          <Stat label={t('accounting.dayClose.contractsCompleted')} value={String(row.contracts_completed)} />
-          <Stat label={t('accounting.dayClose.contractsTerminated')} value={String(row.contracts_terminated)} />
+          <ContractLifecycleStat
+            opened={row.contracts_opened}
+            completed={row.contracts_completed}
+            terminated={row.contracts_terminated}
+            voided={row.contracts_voided}
+          />
           <FlagStat
             label={t('accounting.dayClose.billVoided')}
             value={row.bill_voided_count}
             flagged={row.bill_voided_count > 3}
             flagLabel={t('accounting.dayClose.flagVoidedBillsHigh')}
           />
-          <FlagStat
-            label={t('accounting.dayClose.contractsVoided')}
-            value={row.contracts_voided}
-            flagged={row.contracts_voided > 0}
-            flagLabel={t('accounting.dayClose.flagContractsVoided')}
-          />
           {row.gift_cost !== 0 && (
             <Stat label={t('accounting.dayClose.giftCost')} value={fmtCurrency(row.gift_cost)} />
           )}
         </dl>
       </div>
+    </div>
+  );
+}
+
+/* Contract lifecycle as a single "opened/completed/terminated/voided" stat —
+   value reads e.g. "1 / 2 / 0 / 0", full labels in the tooltip. Turns red + ⚠
+   when any contract was voided (the one anomaly worth surfacing here). */
+function ContractLifecycleStat({
+  opened, completed, terminated, voided,
+}: {
+  opened: number;
+  completed: number;
+  terminated: number;
+  voided: number;
+}) {
+  const { t } = useTranslation();
+  const flagged = voided > 0;
+  return (
+    <div>
+      <dt className="text-xs text-subtle">{t('accounting.dayClose.contractsLifecycle')}</dt>
+      <Tooltip
+        placement="bottom"
+        content={
+          <div className="text-xs space-y-0.5 tabular-nums">
+            <div>{t('accounting.dayClose.contractsOpened')}: {opened}</div>
+            <div>{t('accounting.dayClose.contractsCompleted')}: {completed}</div>
+            <div>{t('accounting.dayClose.contractsTerminated')}: {terminated}</div>
+            <div className={flagged ? 'text-danger' : ''}>{t('accounting.dayClose.contractsVoided')}: {voided}</div>
+          </div>
+        }
+      >
+        <dd className={`text-base font-semibold tabular-nums cursor-default w-fit ${flagged ? 'text-danger' : ''}`}>
+          {opened} / {completed} / {terminated} / {voided}
+        </dd>
+      </Tooltip>
+      {flagged && (
+        <div className="inline-flex items-center gap-1 text-[11px] text-danger mt-0.5">
+          <AlertTriangle size={11} />
+          <span>{t('accounting.dayClose.flagContractsVoided')}</span>
+        </div>
+      )}
     </div>
   );
 }
