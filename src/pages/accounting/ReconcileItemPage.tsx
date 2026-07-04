@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
@@ -16,13 +16,20 @@ import {
   fmtCurrency, toLocalDateStr, parseLocalDate, makeDateRangePickerFormat,
 } from '../../lib/format';
 import type { Branch, ReconcileItemResult, ReconcileItemGroup, ReconcileItemRow } from './accountingTypes';
+import { MiniPager } from './MiniPager';
 
 type OwnerType = 'HOLDING' | 'COMPANY';
 
+const ROWS_PER_PAGE = 10;
+
 function defaultRange() {
+  // Time-aware: a fresh day has no data yet, so default to the last 7 days
+  // rather than today-only (which renders empty at the start of the day).
   const today = new Date();
   const to = toLocalDateStr(today);
-  return { from: to, to };
+  const fromD = new Date(today);
+  fromD.setDate(fromD.getDate() - 6);
+  return { from: toLocalDateStr(fromD), to };
 }
 
 export function ReconcileItemPage() {
@@ -212,13 +219,13 @@ export function ReconcileItemPage() {
           )}
           {branchId && groups.length > 0 && (
             <div className="max-w-3xl mx-auto">
-              {/* Sub-group header row (columns) */}
-              <div className="flex items-center px-4 py-2 text-[11px] font-semibold text-subtle uppercase tracking-wider border-b border-line">
-                <span className="flex-1">{t('accounting.reconcile.group')}</span>
+              {/* Sub-group header row (columns) — mirrors GroupRow exactly */}
+              <div className="flex items-center pr-4 py-2 text-[11px] font-semibold text-subtle uppercase tracking-wider border-b border-line">
+                <span className="w-8 shrink-0" />
+                <span className="flex-1 min-w-0">{t('accounting.reconcile.group')}</span>
                 <span className="w-24 text-right">{t('accounting.reconcile.sales')}</span>
                 <span className="w-24 text-right">{t('accounting.reconcile.refund')}</span>
-                <span className="w-24 text-right pr-3">{t('accounting.reconcile.net')}</span>
-                <span className="w-8 shrink-0" />
+                <span className="w-24 text-right">{t('accounting.reconcile.net')}</span>
               </div>
 
               {owners.map(owner => {
@@ -226,11 +233,13 @@ export function ReconcileItemPage() {
                 if (ownerGroups.length === 0) return null;
                 return (
                   <div key={owner}>
-                    {/* Owner section header */}
-                    <div className="flex items-center gap-2 px-4 py-2 bg-surface-soft border-b border-line">
-                      {owner === 'HOLDING'
-                        ? <Truck size={15} className="text-primary-fg" />
-                        : <Building2 size={15} className="text-secondary-fg" />}
+                    {/* Owner section header — icon sits in the chevron column, label aligns with group labels */}
+                    <div className="flex items-center pr-4 py-2 bg-surface-soft border-b border-line">
+                      <span className="w-8 shrink-0 flex items-center justify-center">
+                        {owner === 'HOLDING'
+                          ? <Truck size={15} className="text-primary-fg" />
+                          : <Building2 size={15} className="text-secondary-fg" />}
+                      </span>
                       <span className="font-semibold text-sm">{t(`accounting.reconcile.owner_${owner}`)}</span>
                     </div>
                     {ownerGroups.map(g => (
@@ -267,39 +276,38 @@ function GroupRow({
   t: ReturnType<typeof useTranslation>['t'];
 }) {
   const label = t(`accounting.reconcile.subgroup.${group.subgroup}`, { defaultValue: group.name_th });
+  const [page, setPage] = useState(1);
+  const totalPages = Math.ceil(rows.length / ROWS_PER_PAGE);
+  useEffect(() => { if (!open) setPage(1); }, [open]);
+  const pageRows = rows.slice((page - 1) * ROWS_PER_PAGE, page * ROWS_PER_PAGE);
   return (
     <div>
-      <div className="flex items-stretch min-h-11 border-b border-line text-sm">
+      {/* Only the leading chevron is interactive; the row body is not hoverable. */}
+      <div className="flex items-center pr-4 min-h-11 border-b border-line text-sm">
         <button
           type="button"
           onClick={onToggle}
-          className="flex-1 flex items-center pl-4 gap-2 min-w-0 text-left bg-transparent border-none cursor-pointer hover:bg-surface-hover transition-colors"
-        >
-          <span className="flex-1 inline-flex items-baseline gap-2 min-w-0">
-            <span className="font-medium truncate">{label}</span>
-            <span className="text-xs text-subtler shrink-0">{group.count} {t('accounting.reconcile.items')}</span>
-          </span>
-          <span className="w-24 text-right tabular-nums">{fmtCurrency(group.sales)}</span>
-          <span className={`w-24 text-right tabular-nums ${group.refund !== 0 ? 'text-warning-fg' : 'text-subtle'}`}>
-            {group.refund === 0 ? '—' : fmtCurrency(group.refund)}
-          </span>
-          <span className="w-24 text-right tabular-nums font-semibold pr-3">{fmtCurrency(group.total)}</span>
-        </button>
-        <button
-          type="button"
-          onClick={onToggle}
-          className="w-8 shrink-0 flex items-center justify-center text-subtle hover:bg-surface-hover cursor-pointer bg-transparent border-none"
+          className="w-8 shrink-0 self-stretch flex items-center justify-center text-subtle hover:text-fg cursor-pointer bg-transparent border-none transition-colors"
           aria-label={t('accounting.reconcile.expand', { defaultValue: 'Expand' })}
         >
           {open ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
         </button>
+        <span className="flex-1 inline-flex items-baseline gap-2 min-w-0">
+          <span className="font-medium truncate">{label}</span>
+          <span className="text-xs text-subtler shrink-0">{group.count} {t('accounting.reconcile.items')}</span>
+        </span>
+        <span className="w-24 text-right tabular-nums">{fmtCurrency(group.sales)}</span>
+        <span className={`w-24 text-right tabular-nums ${group.refund !== 0 ? 'text-warning-fg' : 'text-subtle'}`}>
+          {group.refund === 0 ? '—' : fmtCurrency(group.refund)}
+        </span>
+        <span className="w-24 text-right tabular-nums font-semibold">{fmtCurrency(group.total)}</span>
       </div>
 
       {open && (
         <div className="bg-surface-soft border-b border-line">
-          {rows.map(r => (
+          {pageRows.map(r => (
             <div key={r.line_id} className="flex items-center gap-2 pl-8 pr-4 py-2 border-t border-line/60 text-xs">
-              <span className="text-subtler shrink-0 tabular-nums w-24">
+              <span className="text-subtler shrink-0 tabular-nums w-28">
                 <DateTime value={r.bill_created_at} />
               </span>
               <button
@@ -322,6 +330,7 @@ function GroupRow({
               </span>
             </div>
           ))}
+          <MiniPager page={page} totalPages={totalPages} onPage={setPage} />
         </div>
       )}
     </div>

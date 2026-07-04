@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
@@ -16,8 +16,11 @@ import {
   fmtCurrency, toLocalDateStr, parseLocalDate, makeDateRangePickerFormat,
 } from '../../lib/format';
 import type { Branch, ReconcileChannelResult, ReconcileChannelPayment } from './accountingTypes';
+import { MiniPager } from './MiniPager';
 
 type Channel = 'CASH' | 'TRANSFER' | 'WALLET';
+
+const SLIPS_PER_PAGE = 10;
 
 function defaultRange() {
   const today = new Date();
@@ -234,20 +237,40 @@ export function ReconcileChannelPage() {
                 <span className="w-20" />
               </div>
 
-              {/* Wallet — not counted, draw from company */}
-              <div className="flex items-start gap-3 py-3 px-2 border-t border-line bg-secondary-soft rounded-md">
-                <Wallet size={16} className="text-secondary-fg mt-0.5" />
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium">{t('accounting.reconcile.wallet')}</div>
-                  <div className="text-xs text-subtle">{t('accounting.reconcile.walletHint')}</div>
-                  {summary.wallet > 0 && (
-                    <div className="text-xs text-secondary-fg mt-0.5">
-                      {t('accounting.reconcile.drawFromCompany', { amount: fmtCurrency(summary.wallet) })}
-                    </div>
+              {/* Wallet action helper — in/usage/cashout/net + action badge (mig 488).
+                  Not a mano-count line: it tells the branch to withdraw from / remit surplus to company. */}
+              <div className="mt-1 py-3 px-3 border-t border-line bg-secondary-soft rounded-md">
+                <div className="flex items-center gap-2">
+                  <Wallet size={16} className="text-secondary-fg" />
+                  <span className="font-medium flex-1">{t('accounting.reconcile.wallet')}</span>
+                  {summary.wallet_action !== 'NONE' && (
+                    <Badge color={summary.wallet_action === 'WITHDRAW_FROM_COMPANY' ? 'warning' : 'success'}>
+                      {t(`accounting.reconcile.walletAction_${summary.wallet_action}`, {
+                        amount: fmtCurrency(summary.wallet_action_amount),
+                      })}
+                    </Badge>
                   )}
                 </div>
-                <span className="w-24 text-right tabular-nums font-medium">{fmtCurrency(summary.wallet)}</span>
-                <span className="w-20" />
+                <div className="mt-2 space-y-1 text-xs text-subtle">
+                  <div className="flex items-center justify-between">
+                    <span>{t('accounting.reconcile.walletIn')}</span>
+                    <span className="tabular-nums text-fg">+{fmtCurrency(summary.wallet_in)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>{t('accounting.reconcile.walletUsage')}</span>
+                    <span className="tabular-nums text-fg">−{fmtCurrency(summary.wallet_usage)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>{t('accounting.reconcile.walletCashout')}</span>
+                    <span className="tabular-nums text-fg">−{fmtCurrency(summary.wallet_cashout)}</span>
+                  </div>
+                  <div className="flex items-center justify-between pt-1 border-t border-line/60 font-medium text-fg">
+                    <span>{t('accounting.reconcile.walletNet')}</span>
+                    <span className={`tabular-nums ${summary.wallet_net < 0 ? 'text-warning-fg' : summary.wallet_net > 0 ? 'text-success' : ''}`}>
+                      {summary.wallet_net > 0 ? '+' : ''}{fmtCurrency(summary.wallet_net)}
+                    </span>
+                  </div>
+                </div>
               </div>
 
               {/* Remit total (= Step 1) */}
@@ -302,6 +325,10 @@ function ChannelRow({
 }) {
   const { t } = useTranslation();
   const hasSlips = payments.length > 0;
+  const [page, setPage] = useState(1);
+  const totalPages = Math.ceil(payments.length / SLIPS_PER_PAGE);
+  useEffect(() => { if (!open) setPage(1); }, [open]);
+  const pageSlips = payments.slice((page - 1) * SLIPS_PER_PAGE, page * SLIPS_PER_PAGE);
   return (
     <div className="border-t border-line">
       <div className="flex items-center gap-3 py-3 px-2">
@@ -330,7 +357,7 @@ function ChannelRow({
 
       {open && hasSlips && (
         <div className="pl-9 pb-2">
-          {payments.map(p => (
+          {pageSlips.map(p => (
             <div key={p.payment_id} className="flex items-center gap-2 py-1.5 border-t border-line/60">
               <div className="flex flex-col min-w-0 flex-1">
                 <div className="flex items-center gap-1.5 min-w-0">
@@ -348,6 +375,7 @@ function ChannelRow({
               </span>
             </div>
           ))}
+          <MiniPager page={page} totalPages={totalPages} onPage={setPage} />
         </div>
       )}
     </div>

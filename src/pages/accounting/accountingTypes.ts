@@ -319,6 +319,14 @@ export interface ReconcileChannelSummary {
   diff_transfer: number | null;
   shortage: number;
   overage: number;
+  // wallet action helper (mig 488) — wallet_net = wallet_in − wallet_usage − wallet_cashout.
+  // Tells the branch what to do; does NOT change remit_total/physical (those stay bill-based).
+  wallet_in: number;
+  wallet_usage: number;
+  wallet_cashout: number;
+  wallet_net: number;
+  wallet_action: 'WITHDRAW_FROM_COMPANY' | 'REMIT_SURPLUS' | 'NONE';
+  wallet_action_amount: number;
 }
 
 export interface ReconcileChannelPayment {
