@@ -7,7 +7,7 @@ import { Smartphone, ExternalLink, Wrench, ArrowDownToLine, ArrowUpFromLine, Lin
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { getBucketLabel, getBucketColor, codeDisplay } from '../inventory/inventoryUtils';
-import { AssignIcloudModal, ReleaseIcloudModal } from './IcloudModals';
+import { AssignIcloudModal, ReleaseIcloudModal, IcloudPasswordRow } from './IcloudModals';
 import { AssetScreenTimeSection } from '../../components/AssetScreenTimeSection';
 import { ColorSwatch } from '../../components/ColorAutocomplete';
 import { ImeiInput } from '../../components/ImeiInput';
@@ -105,6 +105,21 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
       `/v_assets?asset_id=eq.${contract.device_id}&select=asset_id,asset_code,asset_code_display,current_bucket,condition_grade,serial_no,imei,external_ref,model_name,variant_name,physical_color,master_color_hex,master_color_name_en,brand_name,branch_id,branch_name,icloud_account_id,icloud_apple_id&limit=1`,
     ).then(rows => rows[0] ?? null),
     enabled: contract.device_id != null,
+    staleTime: 30 * 1000,
+  });
+
+  // Password of the bound iCloud account — masked-by-permission column on
+  // v_icloud_accounts (ICLOUD.ACCOUNT_REVEAL_PASSWORD). v_assets exposes only the
+  // apple_id, so fetch the account by id to get the inline password. Non-null
+  // only for callers who may reveal (BM own-branch / COMPANY/HOLDING admin);
+  // null for BRANCH_STAFF, in which case IcloudPasswordRow isn't rendered.
+  const boundIcloudId = primaryAsset?.icloud_account_id ?? null;
+  const { data: icloudPassword = null } = useQuery({
+    queryKey: ['contract-asset-icloud-password', boundIcloudId],
+    queryFn: () => apiClient.get<{ password: string | null }[]>(
+      `/v_icloud_accounts?id=eq.${boundIcloudId}&select=password&limit=1`,
+    ).then(rows => rows[0]?.password ?? null),
+    enabled: boundIcloudId != null,
     staleTime: 30 * 1000,
   });
 
@@ -236,7 +251,8 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
 
               {/* iCloud — Apple-only */}
               {primaryAsset?.brand_name === 'Apple' && (
-                <div className="flex items-center gap-2 pt-2 border-t border-line mt-2">
+                <div className="pt-2 border-t border-line mt-2">
+                <div className="flex items-center gap-2">
                   <div className="flex items-center gap-2 flex-1 min-w-0">
                     {primaryAsset.icloud_account_id ? (
                       <>
@@ -294,6 +310,12 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
                       </>
                     )}
                   </div>
+                </div>
+                {/* Bound account's password, inline — only when the view returned
+                    a non-null value (caller holds ICLOUD.ACCOUNT_REVEAL_PASSWORD). */}
+                {primaryAsset.icloud_account_id && icloudPassword && (
+                  <IcloudPasswordRow password={icloudPassword} />
+                )}
                 </div>
               )}
 
