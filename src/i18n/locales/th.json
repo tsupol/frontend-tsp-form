@@ -416,6 +416,7 @@
     "dayCloseHistory": "ประวัติปิดวัน",
     "branchBalance": "ยอดคงค้าง",
     "payments": "ชำระ (เก็บเงิน)",
+    "paymentList": "รายการชำระ",
     "reconcileByItem": "ยอดนำส่ง",
     "reconcileByChannel": "ตรวจเงิน",
     "bills": "บิล",
@@ -4182,6 +4183,14 @@
       "totalRows": "รายการ",
       "totalAmount": "ยอดรวม",
       "billType": "ประเภทบิล"
+    },
+    "paymentList": {
+      "title": "รายการชำระ",
+      "searchPlaceholder": "ค้นหา บิล / ลูกค้า / สัญญา",
+      "allOwners": "ทุกปลายทาง",
+      "allTypes": "ทุกประเภท",
+      "allCharges": "ทุกรายการ",
+      "total": "รวม ({{count}} รายการ)"
     },
     "reconcile": {
       "itemTitle": "ยอดนำส่ง",

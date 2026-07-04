@@ -671,6 +671,9 @@ interface OverCheckResult {
   projected_total: number;
   will_exceed: boolean;
   over_by: number;
+  // remaining_before = qty still open on the line before this incoming qty
+  // (ordered − confirmed − other draft lines). Drives the inline "remaining" hint.
+  remaining_before: number;
 }
 
 function ConfirmReceiptModal({
@@ -1333,6 +1336,26 @@ function AddReceiptLineModal({
     }
   }, [mode, selectedPoLine, unitCost]);
 
+  const qtyNum = typeof qty === 'number' ? qty : 0;
+
+  // Advisory over-receipt check at add-line time (matched mode only). Same RPC the
+  // confirm step uses — accounts for already-confirmed + other draft lines on this
+  // receipt. p_exclude_receipt_line_id is null: this is a brand-new line, so its qty
+  // is purely additive. Over-receipt is allowed by design; we only warn here.
+  const { data: overCheck } = useQuery({
+    queryKey: ['add-line-over-check', detail.receipt_id, poLineId, qtyNum],
+    enabled: open && mode === 'matched' && !!poLineId && qtyNum > 0,
+    queryFn: () =>
+      apiClient.rpc<OverCheckResult>('fn_inv_receipt_over_check', {
+        p_po_line_id: poLineId,
+        p_incoming_qty: qtyNum,
+        p_receipt_id: detail.receipt_id,
+        p_exclude_receipt_line_id: null,
+      }).catch(() => null),
+    placeholderData: keepPreviousData,
+  });
+  const willOverReceive = mode === 'matched' && !!overCheck?.will_exceed;
+
   const mutation = useMutation({
     mutationFn: () => {
       const params: Record<string, unknown> = {
@@ -1364,7 +1387,6 @@ function AddReceiptLineModal({
     },
   });
 
-  const qtyNum = typeof qty === 'number' ? qty : 0;
   const qtyValid = qtyNum > 0;
   const canSubmit =
     qtyValid
@@ -1496,6 +1518,27 @@ function AddReceiptLineModal({
                 <span className="font-semibold text-fg tabular-nums">
                   {fmtCurrency(qtyNum * Number(unitCost))}
                 </span>
+              </div>
+            )}
+
+            {/* Over-receipt advisory at add-line time — over-receipt is allowed by
+                design (supplier extras / substitution), so this warns but does not
+                block. The confirm step still gates on an explicit acknowledgement. */}
+            {willOverReceive && overCheck && (
+              <div className="alert alert-warning flex-col items-start gap-1.5">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle size={16} />
+                  <span className="font-medium">{t('receiving.overReceiptTitle')}</span>
+                </div>
+                <p className="text-xs">
+                  {t('receiving.overReceiptAddLine', {
+                    defaultValue: 'Ordered {{ordered}}, {{remaining}} still open. This line brings the total to {{projected}} (+{{over}} over).',
+                    ordered: fmtNum(overCheck.qty_ordered),
+                    remaining: fmtNum(overCheck.remaining_before),
+                    projected: fmtNum(overCheck.projected_total),
+                    over: fmtNum(overCheck.over_by),
+                  })}
+                </p>
               </div>
             )}
           </div>

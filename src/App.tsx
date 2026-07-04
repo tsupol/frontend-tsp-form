@@ -81,6 +81,7 @@ import { DayClosePage } from './pages/accounting/DayClosePage';
 import { BranchBalancePage } from './pages/accounting/BranchBalancePage';
 import { BillsPage } from './pages/accounting/BillsPage';
 import { PaymentsPage } from './pages/accounting/PaymentsPage';
+import { PaymentListPage } from './pages/accounting/PaymentListPage';
 import { ReconcileItemPage } from './pages/accounting/ReconcileItemPage';
 import { ReconcileChannelPage } from './pages/accounting/ReconcileChannelPage';
 import { AuditFlagsPage } from './pages/accounting/AuditFlagsPage';
@@ -982,6 +983,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <AccountingLayout><PaymentsPage /></AccountingLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/accounting/payment-list"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <AccountingLayout><PaymentListPage /></AccountingLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

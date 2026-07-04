@@ -416,6 +416,7 @@
     "dayCloseHistory": "Day Close History",
     "branchBalance": "Outstanding Balance",
     "payments": "Payments Received",
+    "paymentList": "Payment List",
     "reconcileByItem": "Remit Amount",
     "reconcileByChannel": "Money Check",
     "bills": "Bills",
@@ -4183,6 +4184,14 @@
       "totalRows": "Rows",
       "totalAmount": "Total Amount",
       "billType": "Bill Type"
+    },
+    "paymentList": {
+      "title": "Payment List",
+      "searchPlaceholder": "Search bill / customer / contract",
+      "allOwners": "All destinations",
+      "allTypes": "All types",
+      "allCharges": "All charges",
+      "total": "Total ({{count}} lines)"
     },
     "reconcile": {
       "itemTitle": "Remit Amount",
