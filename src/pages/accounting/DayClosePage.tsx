@@ -136,7 +136,8 @@ export function DayClosePage() {
     ),
     enabled: !!effectiveBranchId,
   });
-  const todayAlreadyClosed = (todayCheck?.length ?? 0) > 0;
+  const todayClose = todayCheck?.[0] ?? null;
+  const todayAlreadyClosed = !!todayClose;
 
   const { data: auditRows = [] } = useQuery({
     queryKey: ['accounting', 'day-close-audit', effectiveBranchId, pageIndex, pageSize],
@@ -187,6 +188,14 @@ export function DayClosePage() {
   const selectedClose = selectedCloseData?.[0] ?? null;
   const selectedNotFound = isHistoryDate && selectedFetched && !selectedFetching && !selectedClose;
   const summary = todaySummary?.[0];
+
+  // Whether any concrete detail branch will render. Used to guarantee the panel
+  // is never blank (a closed-today day previously matched no branch → black).
+  const showsUnclosed = !!selectedUnclosed;
+  const showsTodayReconcile = selectedIsToday && !todayAlreadyClosed;
+  const showsClosedPast = !!selectedClose && !selectedIsToday && !selectedUnclosedDate;
+  const showsClosedToday = selectedIsToday && !!todayClose;
+  const detailHasContent = showsUnclosed || showsTodayReconcile || showsClosedPast || showsClosedToday || selectedNotFound;
 
   // Selected day is closeable (today or an unclosed previous day)
   const closingDate = selectedUnclosedDate ?? today;
@@ -434,12 +443,6 @@ export function DayClosePage() {
             </PageNavPanel>
 
             <PageNavPanel id="detail" className="flex-1 min-h-0 flex flex-col">
-              {!selectedClose && !selectedIsToday && !selectedUnclosedDate && selectedFetching && (
-                <div className="flex-1 h-full flex items-center justify-center text-subtler p-8">
-                  {t('common.loading')}
-                </div>
-              )}
-
               {selectedNotFound && (
                 <div className="flex-1 h-full flex items-center justify-center p-8">
                   <div className="alert alert-info max-w-md">
@@ -454,9 +457,13 @@ export function DayClosePage() {
                 </div>
               )}
 
-              {!selectedClose && !selectedIsToday && !selectedUnclosedDate && !selectedFetching && !selectedNotFound && (
+              {/* Fallback — never leave the panel blank. Shows a loading spinner
+                  while a query is in flight, otherwise a "select a date" hint. */}
+              {!detailHasContent && (
                 <div className="flex-1 h-full flex items-center justify-center text-subtler p-8">
-                  {t('accounting.dayClose.selectToView')}
+                  {selectedFetching
+                    ? t('common.loading')
+                    : t('accounting.dayClose.selectToView')}
                 </div>
               )}
 
@@ -519,9 +526,15 @@ export function DayClosePage() {
                 />
               )}
 
-              {/* Closed snapshot view */}
+              {/* Closed snapshot — a past closed day */}
               {selectedClose && !selectedIsToday && !selectedUnclosedDate && (
                 <ClosedSnapshot close={selectedClose} branchId={effectiveBranchId} />
+              )}
+
+              {/* Closed snapshot — TODAY already closed (before midnight). The
+                  history query is disabled for today, so use the today-check row. */}
+              {showsClosedToday && todayClose && (
+                <ClosedSnapshot close={todayClose} branchId={effectiveBranchId} />
               )}
             </PageNavPanel>
           </div>
