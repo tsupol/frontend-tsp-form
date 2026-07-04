@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useSearchParams, useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, Modal, TextArea, DataTable, PopOver, Tooltip, Switch, MaskedInput, InputDatePicker, LabeledCheckbox, useSnackbarContext } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, Box, Search, SlidersHorizontal, XCircle, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Wrench, Printer, Plus, CheckCircle, Pencil, Cloud, CloudOff, MoreVertical, Package, Keyboard } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, Box, Search, SlidersHorizontal, XCircle, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Wrench, Printer, Plus, CheckCircle, Pencil, Cloud, CloudOff, MoreVertical, Package, Keyboard, AlertTriangle } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
@@ -14,7 +14,8 @@ import { fmtCurrency, makeDatePickerFormat, toLocalDateStr } from '../../lib/for
 import { printWithMarker } from '../../lib/printDoc';
 import { buildBillActionToast, type StandardBillResponse } from '../../lib/billActionToast';
 import { useAuth } from '../../contexts/AuthContext';
-import { AssignIcloudModal, ReleaseIcloudModal } from '../contracts/IcloudModals';
+import { AssignIcloudModal, ReleaseIcloudModal, IcloudPasswordRow } from '../contracts/IcloudModals';
+import { ActionDoneView } from '../contracts/ActionDoneView';
 import { AssetScreenTimeSection } from '../../components/AssetScreenTimeSection';
 import { ImeiInput } from '../../components/ImeiInput';
 import { getBucketLabel, getBucketColor, getConditionLabel, getConditionTextColor, CONDITION_VALUES, codeDisplay } from './inventoryUtils';
@@ -1067,7 +1068,13 @@ function AssetDetailPanel({
   const [activeAction, setActiveAction] = useState<BackendAssetAction | null>(null);
   const [actionPreset, setActionPreset] = useState<Record<string, string> | undefined>(undefined);
   const [addIdentifierType, setAddIdentifierType] = useState<string | null>(null);
+  const [correctVariantOpen, setCorrectVariantOpen] = useState(false);
   const { handlePrint: printAssetSticker, portal: stickerPortal } = useAssetStickerPrint();
+  // INVENTORY.VARIANT_CORRECT audience (per DELIVERY doc). Client-side visibility
+  // only; the RPC re-checks permission + contract-binding.
+  const { user } = useAuth();
+  const canCorrectVariant = ['BRANCH_MANAGER', 'COMPANY_INVENTORY', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV']
+    .includes(user?.role_code ?? '');
 
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
@@ -1134,31 +1141,44 @@ function AssetDetailPanel({
         <>
         <div className="flex-1 min-h-0 overflow-auto better-scroll flex flex-col">
 
-      {/* Product info */}
-      <div className="flex-none px-4 py-3 border-b border-line bg-surface flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="text-xs text-subtle">
-            {[asset.brand_name, asset.family_name, asset.model_name].filter(Boolean).join(' > ')}
-          </div>
-          <div className="font-semibold text-sm mt-0.5">{asset.product_display_name ?? asset.variant_name}</div>
-          <div className="text-xs text-subtle">{asset.sku_code}</div>
-          {asset.physical_color && (
-            <div className="text-xs text-subtle mt-0.5 inline-flex items-center gap-1.5">
-              {asset.master_color_hex !== undefined && (asset.master_color_hex || asset.master_color_name_en) && (
-                <ColorSwatch hex={asset.master_color_hex} title={asset.master_color_name_en ?? undefined} />
-              )}
-              <span>{t('asset.color')}: {asset.physical_color}</span>
-            </div>
-          )}
+      {/* Product info — single stack; last row pairs the colour with the print
+          sticker button (colour left, action right). */}
+      <div className="flex-none px-4 py-4 border-b border-line bg-surface flex flex-col gap-1.5 min-w-0">
+        <div className="text-xs text-subtle">
+          {[asset.brand_name, asset.family_name, asset.model_name].filter(Boolean).join(' > ')}
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          startIcon={<Printer size={14} />}
-          onClick={() => printAssetSticker(asset)}
-        >
-          {t('asset.printSticker', { defaultValue: 'Print sticker' })}
-        </Button>
+        <div className="font-semibold text-sm">{asset.product_display_name ?? asset.variant_name}</div>
+        <div className="text-xs text-subtle">{asset.sku_code}</div>
+        {/* Last row: colour (variant master colour + correct pencil) + print. */}
+        <div className="flex items-center justify-between gap-2 mt-0.5">
+          <div className="text-xs text-subtle inline-flex items-center gap-2.5 min-w-0">
+            {(asset.master_color_hex || asset.master_color_name_en) && (
+              <ColorSwatch hex={asset.master_color_hex} title={asset.master_color_name_en ?? undefined} />
+            )}
+            <span className="truncate">{t('asset.color')}: {asset.master_color_name_en ?? asset.manufacturer_color ?? asset.variant_name}</span>
+            {canCorrectVariant && (
+              <Tooltip content={t('asset.correctVariant.button', { defaultValue: 'Correct colour' })}>
+                <button
+                  type="button"
+                  onClick={() => setCorrectVariantOpen(true)}
+                  className="text-subtle hover:text-fg cursor-pointer bg-transparent border-none p-0 inline-flex shrink-0"
+                  aria-label={t('asset.correctVariant.button', { defaultValue: 'Correct colour' })}
+                >
+                  <Pencil size={12} />
+                </button>
+              </Tooltip>
+            )}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="shrink-0"
+            startIcon={<Printer size={14} />}
+            onClick={() => printAssetSticker(asset)}
+          >
+            {t('asset.printSticker', { defaultValue: 'Print sticker' })}
+          </Button>
+        </div>
       </div>
       {stickerPortal}
 
@@ -1416,9 +1436,235 @@ function AssetDetailPanel({
           });
         }}
       />
+
+      <CorrectVariantModal
+        open={correctVariantOpen}
+        asset={asset}
+        t={t}
+        onClose={() => setCorrectVariantOpen(false)}
+        onSuccess={onRefresh}
+      />
         </>
       )}
     </div>
+  );
+}
+
+// ============================================================================
+// Correct-variant modal — fix a mis-imported colour/variant on an unbound asset.
+// fn_inv_asset_variant_options → swatch picker (same model only) →
+// fn_inv_asset_correct_variant. Blocked if the asset is bound to a contract.
+// ============================================================================
+
+interface VariantOption {
+  variant_id: number;
+  variant_name: string;
+  manufacturer_color: string | null;
+  master_color_code: string | null;
+  master_color_name_en: string | null;
+  master_color_name_th: string | null;
+  rgb_hex: string | null;
+  product_display_name: string | null;
+  is_active: boolean;
+  is_current: boolean;
+}
+interface VariantOptionsResponse {
+  asset: { asset_id: number; model_id: number; asset_code: string; current_variant_id: number; product_display_name: string | null };
+  options: VariantOption[];
+  is_correctable: boolean;
+  block_reason: string | null;
+}
+
+function CorrectVariantModal({
+  open, asset, t, onClose, onSuccess,
+}: {
+  open: boolean;
+  asset: Asset;
+  t: ReturnType<typeof useTranslation>['t'];
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const { i18n } = useTranslation();
+  const [view, setView] = useState<'form' | 'done'>('form');
+  const [selectedVariant, setSelectedVariant] = useState<number | null>(null);
+  const [note, setNote] = useState('');
+  const [error, setError] = useState('');
+  const [confirmClose, setConfirmClose] = useState(false);
+  const [savedName, setSavedName] = useState('');
+
+  // Options load only while open (fresh each open — variant set is small).
+  const { data, isFetching } = useQuery({
+    queryKey: ['asset-variant-options', asset.asset_id],
+    queryFn: () => apiClient.rpc<VariantOptionsResponse>('fn_inv_asset_variant_options', {
+      p_asset_id: asset.asset_id,
+    }),
+    enabled: open,
+  });
+
+  useEffect(() => {
+    if (open) {
+      setView('form');
+      setSelectedVariant(null);
+      setNote('');
+      setError('');
+      setConfirmClose(false);
+      setSavedName('');
+    }
+  }, [open]);
+
+  const isDirty = selectedVariant != null || note.trim() !== '';
+  const forceClose = () => { setConfirmClose(false); onClose(); };
+  const handleClose = () => {
+    if (view === 'done') { forceClose(); return; }
+    if (isDirty) { setConfirmClose(true); return; }
+    forceClose();
+  };
+
+  const mutation = useMutation({
+    mutationFn: () => apiClient.rpc<{ variant: { variant_name: string; product_display_name?: string } }>(
+      'fn_inv_asset_correct_variant',
+      { p_asset_id: asset.asset_id, p_new_variant_id: selectedVariant, p_note: note.trim() || null },
+    ),
+    onSuccess: (res) => {
+      const opt = data?.options.find(o => o.variant_id === selectedVariant);
+      setSavedName(opt?.product_display_name ?? opt?.variant_name ?? res?.variant?.variant_name ?? '');
+      onSuccess();
+      setView('done');
+    },
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        const translated =
+          (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') ||
+          (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setError(translated || err.message);
+      } else {
+        setError(String(err));
+      }
+    },
+  });
+
+  const colorName = (o: VariantOption) =>
+    (i18n.language === 'th' ? o.master_color_name_th : o.master_color_name_en)
+    ?? o.manufacturer_color ?? o.variant_name;
+
+  return (
+    <>
+      <Modal open={open} onClose={handleClose} maxWidth="30rem" width="100%">
+        <div className="modal-header">
+          <h2 className="modal-title">
+            {view === 'done'
+              ? t('asset.correctVariant.doneTitle', { defaultValue: 'Colour corrected' })
+              : t('asset.correctVariant.title', { defaultValue: 'Correct colour' })}
+          </h2>
+          <button type="button" className="modal-close-btn" onClick={handleClose}>&times;</button>
+        </div>
+
+        {view === 'form' && (
+          <>
+            <div className="modal-content">
+              {/* Target box */}
+              <div className="px-3 py-2.5 rounded-md bg-surface border border-line mb-4">
+                <div className="font-medium text-sm">{asset.asset_code}</div>
+                <div className="text-xs text-subtle">{asset.product_display_name ?? asset.variant_name}</div>
+              </div>
+
+              {error && (
+                <div className="alert alert-danger mb-4">
+                  <XCircle size={18} />
+                  <div><div className="alert-description">{error}</div></div>
+                </div>
+              )}
+
+              {isFetching && !data && (
+                <div className="py-6 text-center text-sm text-subtler">{t('common.loading')}</div>
+              )}
+
+              {data && !data.is_correctable && (
+                <div className="alert alert-warning">
+                  <AlertTriangle size={18} />
+                  <div>
+                    <div className="alert-title">{t('asset.correctVariant.blockedTitle', { defaultValue: 'Cannot correct here' })}</div>
+                    <div className="alert-description">
+                      {data.block_reason === 'ASSET_BOUND_TO_CONTRACT'
+                        ? t('asset.correctVariant.blockedContract', { defaultValue: 'This device is bound to a contract — ask an admin to correct it.' })
+                        : (data.block_reason ?? t('asset.correctVariant.blockedGeneric', { defaultValue: 'This device cannot be corrected here.' }))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {data && data.is_correctable && (
+                <>
+                  <div className="text-xs text-subtle mb-2">{t('asset.correctVariant.pick', { defaultValue: 'Pick the correct colour (same model)' })}</div>
+                  <div className="grid grid-cols-1 gap-1.5">
+                    {data.options.map(o => {
+                      const active = selectedVariant === o.variant_id;
+                      return (
+                        <button
+                          key={o.variant_id}
+                          type="button"
+                          disabled={o.is_current}
+                          onClick={() => setSelectedVariant(o.variant_id)}
+                          className={`flex items-center gap-2.5 px-3 py-2 rounded-md border text-left transition-colors ${
+                            active ? 'border-primary-fg bg-primary-soft'
+                            : o.is_current ? 'border-line bg-surface-soft cursor-default'
+                            : 'border-line hover:bg-surface-hover cursor-pointer'
+                          }`}
+                        >
+                          <ColorSwatch hex={o.rgb_hex} title={colorName(o)} />
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm truncate">{colorName(o)}</div>
+                            <div className="text-xs text-subtler truncate">{o.product_display_name ?? o.variant_name}</div>
+                          </div>
+                          {o.is_current && (
+                            <Badge color="secondary" size="sm">{t('asset.correctVariant.current', { defaultValue: 'Current' })}</Badge>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex flex-col mt-4">
+                    <label className="form-label">{t('asset.correctVariant.note', { defaultValue: 'Note (optional)' })}</label>
+                    <TextArea value={note} onChange={(e) => setNote(e.target.value)} className="w-full" size="sm" rows={2} />
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="modal-footer">
+              <Button variant="ghost" onClick={handleClose} disabled={mutation.isPending}>{t('common.cancel')}</Button>
+              <Button
+                color="primary"
+                onClick={() => { setError(''); mutation.mutate(); }}
+                disabled={mutation.isPending || !data?.is_correctable || selectedVariant == null}
+              >
+                {mutation.isPending ? t('common.loading') : t('asset.correctVariant.submit', { defaultValue: 'Correct colour' })}
+              </Button>
+            </div>
+          </>
+        )}
+
+        {view === 'done' && (
+          <ActionDoneView
+            headline={t('asset.correctVariant.doneTitle', { defaultValue: 'Colour corrected' })}
+            contractCode={asset.asset_code}
+            detailRows={[
+              { label: t('asset.color'), value: savedName },
+            ]}
+            onClose={onClose}
+          />
+        )}
+      </Modal>
+
+      <Modal open={confirmClose} onClose={() => setConfirmClose(false)} maxWidth="24rem" width="100%">
+        <div className="modal-header"><h2 className="modal-title">{t('common.unsavedChanges')}</h2></div>
+        <div className="modal-content"><p>{t('common.unsavedChangesMessage')}</p></div>
+        <div className="modal-footer">
+          <Button variant="ghost" onClick={() => setConfirmClose(false)}>{t('common.cancel')}</Button>
+          <Button color="danger" onClick={forceClose}>{t('common.discard')}</Button>
+        </div>
+      </Modal>
+    </>
   );
 }
 
@@ -1445,6 +1691,19 @@ function AssetDeviceLockTab({
   const isApple = asset.brand_name === 'Apple';
   const hasIcloud = asset.icloud_account_id != null;
 
+  // Password of the bound iCloud account — masked-by-permission column on
+  // v_icloud_accounts (ICLOUD.ACCOUNT_REVEAL_PASSWORD). v_assets exposes only the
+  // apple_id, so fetch the account by id to get the inline password. Non-null
+  // only for callers who may reveal (BM own-branch / COMPANY/HOLDING admin);
+  // null for BRANCH_STAFF, in which case IcloudPasswordRow isn't rendered.
+  const { data: icloudPassword = null } = useQuery({
+    queryKey: ['asset-icloud-password', asset.icloud_account_id],
+    queryFn: () => apiClient.get<{ password: string | null }[]>(
+      `/v_icloud_accounts?id=eq.${asset.icloud_account_id}&select=password&limit=1`,
+    ).then(rows => rows[0]?.password ?? null),
+    enabled: hasIcloud,
+  });
+
   return (
     <div className="flex-1 overflow-auto better-scroll p-4 flex flex-col gap-4">
       {/* Screen Time passcode + recovery email — renders only if the
@@ -1468,58 +1727,64 @@ function AssetDeviceLockTab({
           <Cloud size={16} className="text-subtle" />
           <h3 className="text-sm font-semibold">iCloud</h3>
         </header>
-        <div className="px-4 py-3 flex items-center gap-3">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            {hasIcloud ? (
-              <>
-                <Cloud size={16} className="text-success shrink-0" />
-                <div className="min-w-0">
-                  <div className="text-xs text-subtle">{t('asset.icloud_account')}</div>
-                  <div className="text-sm font-mono truncate">{asset.icloud_apple_id ?? '—'}</div>
-                </div>
-              </>
-            ) : (
-              <>
-                <CloudOff size={16} className="text-subtle shrink-0" />
-                <div>
-                  <div className="text-xs text-subtle">iCloud</div>
-                  <div className="text-sm text-subtle">{t('asset.icloud_notAssigned')}</div>
-                </div>
-              </>
-            )}
-          </div>
-          <div className="flex gap-2 shrink-0">
-            {hasIcloud ? (
-              <>
+        <div className="px-4 py-3 flex flex-col gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              {hasIcloud ? (
+                <>
+                  <Cloud size={16} className="text-success shrink-0" />
+                  <div className="min-w-0">
+                    <div className="text-xs text-subtle">{t('asset.icloud_account')}</div>
+                    <div className="text-sm font-mono truncate">{asset.icloud_apple_id ?? '—'}</div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <CloudOff size={16} className="text-subtle shrink-0" />
+                  <div>
+                    <div className="text-xs text-subtle">iCloud</div>
+                    <div className="text-sm text-subtle">{t('asset.icloud_notAssigned')}</div>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="flex gap-2 shrink-0">
+              {hasIcloud ? (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    startIcon={<Cloud size={14} />}
+                    onClick={() => setAssignOpen(true)}
+                  >
+                    {t('asset.icloud_change')}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    color="danger"
+                    startIcon={<CloudOff size={14} />}
+                    onClick={() => setReleaseOpen(true)}
+                  >
+                    {t('asset.icloud_release')}
+                  </Button>
+                </>
+              ) : (
                 <Button
                   size="sm"
-                  variant="outline"
+                  color="primary"
                   startIcon={<Cloud size={14} />}
                   onClick={() => setAssignOpen(true)}
                 >
-                  {t('asset.icloud_change')}
+                  {t('asset.icloud_assign')}
                 </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  color="danger"
-                  startIcon={<CloudOff size={14} />}
-                  onClick={() => setReleaseOpen(true)}
-                >
-                  {t('asset.icloud_release')}
-                </Button>
-              </>
-            ) : (
-              <Button
-                size="sm"
-                color="primary"
-                startIcon={<Cloud size={14} />}
-                onClick={() => setAssignOpen(true)}
-              >
-                {t('asset.icloud_assign')}
-              </Button>
-            )}
+              )}
+            </div>
           </div>
+          {/* Bound account's password, full-width below the account row — only
+              when the view returned a non-null value (caller holds
+              ICLOUD.ACCOUNT_REVEAL_PASSWORD). */}
+          {hasIcloud && icloudPassword && <IcloudPasswordRow password={icloudPassword} />}
         </div>
       </section>
       )}
