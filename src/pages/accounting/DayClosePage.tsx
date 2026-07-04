@@ -741,6 +741,11 @@ function ClosedSnapshot({ close, branchId }: { close: DayCloseHistoryRow; branch
         )}
       </div>
 
+      {/* Cash/transfer count (step 3) — nullable, editable after close */}
+      <div className="flex-none px-4 py-3 border-b border-line">
+        <CountCard close={close} branchId={branchId} />
+      </div>
+
       {/* Tabs: Remittance (breakdown) | Reconcile (read-only bill list) */}
       <DetailTabs
         tab={tab}
@@ -760,6 +765,199 @@ function ClosedSnapshot({ close, branchId }: { close: DayCloseHistoryRow; branch
         )}
       </div>
     </div>
+  );
+}
+
+/* ── Cash/transfer count (step 3, mig 480) ─────────────────────────────────
+   "ปิดวันแล้ว" ≠ "นับแล้ว" — counting is a separate, non-blocking step that can
+   be filled/edited any time after close. Shows net (system) vs counted (staff)
+   vs diff per channel, and lets the user enter/edit both counts. Wallet has no
+   count field (company reconciles it). */
+
+function CountCard({ close, branchId }: { close: DayCloseHistoryRow; branchId: string }) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const canCount = ['BRANCH_MANAGER', 'COMPANY_ADMIN', 'COMPANY_ACCOUNTANT', 'HOLDING_ADMIN'].includes(
+    useAuth().user?.role_code ?? '',
+  );
+
+  const bothCounted = close.counted_cash != null && close.counted_transfer != null;
+  const someCounted = close.counted_cash != null || close.counted_transfer != null;
+  const countStatus: 'none' | 'partial' | 'full' = bothCounted ? 'full' : someCounted ? 'partial' : 'none';
+
+  const [editing, setEditing] = useState(false);
+  const [cash, setCash] = useState('');
+  const [transfer, setTransfer] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const beginEdit = () => {
+    setCash(close.counted_cash != null ? String(close.counted_cash) : '');
+    setTransfer(close.counted_transfer != null ? String(close.counted_transfer) : '');
+    setError('');
+    setEditing(true);
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      await apiClient.rpc('fn_day_close_update_count', {
+        p_branch_id: Number(branchId),
+        p_close_date: close.close_date,
+        p_counted_cash: cash === '' ? null : parseFloat(cash),
+        p_counted_transfer: transfer === '' ? null : parseFloat(transfer),
+      });
+      await queryClient.invalidateQueries({ queryKey: ['accounting'] });
+      setEditing(false);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setError(translated || err.message);
+      } else {
+        setError(t('common.error'));
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <ClusterTitle>{t('accounting.dayClose.countTitle')}</ClusterTitle>
+        <div className="flex items-center gap-2">
+          {countStatus === 'full' && <Badge color="success" size="sm">{t('accounting.dayClose.countedFull')}</Badge>}
+          {countStatus === 'partial' && <Badge color="warning" size="sm">{t('accounting.dayClose.countedPartial')}</Badge>}
+          {countStatus === 'none' && <Badge color="default" size="sm">{t('accounting.dayClose.notCounted')}</Badge>}
+        </div>
+      </div>
+
+      {!editing ? (
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm tabular-nums">
+              <thead>
+                <tr className="text-xs text-subtle text-right">
+                  <th className="text-left font-medium py-1">{t('accounting.dayClose.countChannel')}</th>
+                  <th className="font-medium py-1">{t('accounting.dayClose.countNet')}</th>
+                  <th className="font-medium py-1">{t('accounting.dayClose.countCounted')}</th>
+                  <th className="font-medium py-1">{t('accounting.dayClose.countDiff')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <CountRow
+                  icon={<Banknote size={14} className="text-success shrink-0" />}
+                  label={t('accounting.dayClose.totalCash')}
+                  net={close.net_cash}
+                  counted={close.counted_cash}
+                  diff={close.diff_cash}
+                />
+                <CountRow
+                  icon={<Coins size={14} className="text-info-fg shrink-0" />}
+                  label={t('accounting.dayClose.totalTransfer')}
+                  net={close.net_transfer}
+                  counted={close.counted_transfer}
+                  diff={close.diff_transfer}
+                />
+              </tbody>
+            </table>
+          </div>
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <span className="text-xs text-subtler">{t('accounting.dayClose.walletNoCount')}</span>
+            {canCount && (
+              <Button size="sm" variant="outline" onClick={beginEdit}>
+                {someCounted ? t('accounting.dayClose.editCounts') : t('accounting.dayClose.enterCounts')}
+              </Button>
+            )}
+          </div>
+        </>
+      ) : (
+        <div className="form-grid gap-3">
+          {error && (
+            <div className="alert alert-danger">
+              <XCircle size={18} />
+              <div><div className="alert-description">{error}</div></div>
+            </div>
+          )}
+          <div className="flex flex-col">
+            <label className="form-label flex items-center gap-1.5">
+              <Banknote size={14} className="text-success" />
+              {t('accounting.dayClose.countCash')}
+              <span className="text-subtler font-normal">· {t('accounting.dayClose.countNet')} {fmtCurrency(close.net_cash)}</span>
+            </label>
+            <MaskedInput
+              mask="number"
+              decimalScale={2}
+              value={cash}
+              onChange={(raw) => setCash(raw)}
+              className="w-full"
+              size="sm"
+              endIcon={<ChevronsRight size={14} />}
+              onEndIconClick={() => setCash(String(close.net_cash ?? 0))}
+            />
+          </div>
+          <div className="flex flex-col">
+            <label className="form-label flex items-center gap-1.5">
+              <Coins size={14} className="text-info-fg" />
+              {t('accounting.dayClose.countTransfer')}
+              <span className="text-subtler font-normal">· {t('accounting.dayClose.countNet')} {fmtCurrency(close.net_transfer)}</span>
+            </label>
+            <MaskedInput
+              mask="number"
+              decimalScale={2}
+              value={transfer}
+              onChange={(raw) => setTransfer(raw)}
+              className="w-full"
+              size="sm"
+              endIcon={<ChevronsRight size={14} />}
+              onEndIconClick={() => setTransfer(String(close.net_transfer ?? 0))}
+            />
+          </div>
+          <p className="text-xs text-subtler">{t('accounting.dayClose.countHint')}</p>
+          <div className="flex items-center justify-end gap-2">
+            <Button size="sm" variant="ghost" onClick={() => setEditing(false)} disabled={saving}>
+              {t('common.cancel')}
+            </Button>
+            <Button size="sm" color="primary" onClick={save} disabled={saving}>
+              {saving ? t('common.loading') : t('common.save')}
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CountRow({
+  icon, label, net, counted, diff,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  net: number;
+  counted: number | null;
+  diff: number | null;
+}) {
+  return (
+    <tr className="border-t border-line">
+      <td className="py-1.5">
+        <span className="inline-flex items-center gap-1.5">{icon}{label}</span>
+      </td>
+      <td className="py-1.5 text-right">{fmtCurrency(net)}</td>
+      <td className="py-1.5 text-right">
+        {counted != null ? fmtCurrency(counted) : <span className="text-subtler">—</span>}
+      </td>
+      <td className="py-1.5 text-right">
+        {diff == null ? (
+          <span className="text-subtler">—</span>
+        ) : (
+          <span className={diff < 0 ? 'text-danger' : diff > 0 ? 'text-warning-fg' : 'text-success'}>
+            {diff > 0 ? '+' : ''}{fmtCurrency(diff)}
+          </span>
+        )}
+      </td>
+    </tr>
   );
 }
 

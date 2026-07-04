@@ -45,6 +45,14 @@ export interface DayCloseHistoryRow {
   company_item_count: number;
   invoice_amount: number;
   credit_note_amount: number;
+  // mig 480 — step-3 count (cash/transfer): net = system, counted = staff (nullable),
+  // diff = counted − net (null until counted). Counting is a separate, editable-after-close step.
+  net_cash: number;
+  net_transfer: number;
+  counted_cash: number | null;
+  counted_transfer: number | null;
+  diff_cash: number | null;
+  diff_transfer: number | null;
 }
 
 export interface DayCloseAuditRow {

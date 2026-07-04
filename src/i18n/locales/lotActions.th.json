@@ -30,7 +30,7 @@
   "convert.allValid": "ข้อมูลผ่านการตรวจสอบครบทั้ง {{count}} เครื่อง กดบันทึกเพื่อลงทะเบียน",
   "transfer.toBranch": "สาขาปลายทาง",
   "transfer.selectBranch": "เลือกสาขาปลายทาง",
-  "transfer.noEligibleBranch": "ไม่มีสาขาปลายทางในบริษัทเดียวกัน",
+  "transfer.noEligibleBranch": "ไม่มีสาขาปลายทางใน Company เดียวกัน",
   "transfer.qty": "จำนวน",
   "transfer.mode": "ประเภทการโอน",
   "transfer.note": "หมายเหตุ",
