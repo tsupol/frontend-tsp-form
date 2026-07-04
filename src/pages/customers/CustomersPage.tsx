@@ -748,9 +748,12 @@ function EditInfoModal({ open, onClose, customer, onSuccess }: {
     setSaving(true);
     setError('');
     try {
-      await apiClient.rpc('fn_customer_register_or_update', {
-        p_id_type: customer.id_type,
-        p_id_number: customer.id_number,
+      // Edit path is keyed by customer_id, NOT id_number — the displayed id is
+      // masked, so sending it as p_id_number to fn_customer_register_or_update
+      // fails citizen-id validation. fn_customer_update_contact never touches
+      // the citizen id and updates only the contact fields below.
+      await apiClient.rpc('fn_customer_update_contact', {
+        p_customer_id: customer.id,
         p_prefix: form.prefix || null,
         p_first_name: form.first_name.trim(),
         p_last_name: form.last_name.trim(),
