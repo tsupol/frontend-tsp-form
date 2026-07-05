@@ -348,12 +348,12 @@ export function BillsPage() {
                       {/* Line 1: code + badges ............... amount */}
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="font-mono text-sm font-medium truncate">{b.code_display}</span>
-                        <Badge color={typeColor} size="sm">{b.bill_type}</Badge>
-                        <Badge color={statusColor} size="sm">{cancelled ? 'VOIDED' : b.status}</Badge>
+                        <Badge color={typeColor} size="xs">{b.bill_type}</Badge>
+                        <Badge color={statusColor} size="xs">{cancelled ? 'VOIDED' : b.status}</Badge>
                         {b.is_in_closed_day ? (
-                          <Badge color="default" size="sm">{t('accounting.bills.dayClosedBadge')}</Badge>
+                          <Badge color="default" size="xs">{t('accounting.bills.dayClosedBadge')}</Badge>
                         ) : (
-                          <Badge color="warning" size="sm">{t('accounting.bills.dayUnclosedBadge')}</Badge>
+                          <Badge color="warning" size="xs">{t('accounting.bills.dayUnclosedBadge')}</Badge>
                         )}
                         <span className="ml-auto text-sm font-medium tabular-nums shrink-0">{fmtCurrency(b.total_amount)}</span>
                       </div>
@@ -646,7 +646,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
         >
           <Copy size={14} />
         </button>
-        <Badge color={statusColor} size="sm">{displayStatus}</Badge>
+        <Badge color={statusColor} size="xs">{displayStatus}</Badge>
       </div>
 
       {/* Cancellation banner — visible when bill is voided */}
@@ -758,34 +758,38 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
             {lines.map((line) => {
               const lineCorrectable = canCorrectLines && line.amount_correctable === true;
               return (
-                <div key={line.line_id} className="flex items-center gap-2 text-sm py-1.5 border-b border-line last:border-b-0">
-                  <Badge color={LINE_TYPE_COLOR[line.line_type] ?? 'default'} size="sm">
-                    {line.line_type}
-                  </Badge>
-                  <span className="flex-1 min-w-0 truncate">{line.description}</span>
-                  {line.quantity > 1 && (
-                    <span className="text-xs text-subtle tabular-nums shrink-0">
-                      {fmtCurrency(line.amount)} × {line.quantity}
+                <div key={line.line_id} className="flex flex-col gap-1 py-2 border-b border-line last:border-b-0">
+                  {/* Top row: type badge · qty · amount · owner · correct */}
+                  <div className="flex items-center gap-2 text-sm">
+                    <Badge color={LINE_TYPE_COLOR[line.line_type] ?? 'default'} size="xs">
+                      {line.line_type}
+                    </Badge>
+                    {line.quantity > 1 && (
+                      <span className="text-xs text-subtle tabular-nums">
+                        {fmtCurrency(line.amount)} × {line.quantity}
+                      </span>
+                    )}
+                    <span className="tabular-nums font-medium ml-auto shrink-0">
+                      {fmtCurrency(line.extended_amount)}
                     </span>
-                  )}
-                  <span className="tabular-nums font-medium shrink-0">
-                    {fmtCurrency(line.extended_amount)}
-                  </span>
-                  <span className={`text-xs shrink-0 font-medium ${line.owner_type === 'HOLDING' ? 'text-primary-fg' : 'text-warning-fg'}`}>
-                    {line.owner_type === 'HOLDING' ? '→H' : '→C'}
-                  </span>
-                  {lineCorrectable && (
-                    <Tooltip content={t('accounting.bills.correctLine.title')} placement="left">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="btn-icon-sm shrink-0"
-                        startIcon={<Pencil size={14} />}
-                        onClick={() => setCorrectLine(line)}
-                        aria-label={t('accounting.bills.correctLine.title')}
-                      />
-                    </Tooltip>
-                  )}
+                    <span className={`text-xs shrink-0 font-medium ${line.owner_type === 'HOLDING' ? 'text-primary-fg' : 'text-warning-fg'}`}>
+                      {line.owner_type === 'HOLDING' ? '→H' : '→C'}
+                    </span>
+                    {lineCorrectable && (
+                      <Tooltip content={t('accounting.bills.correctLine.title')} placement="left">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="btn-icon-sm shrink-0"
+                          startIcon={<Pencil size={14} />}
+                          onClick={() => setCorrectLine(line)}
+                          aria-label={t('accounting.bills.correctLine.title')}
+                        />
+                      </Tooltip>
+                    )}
+                  </div>
+                  {/* Description — wraps up to 2 lines, slightly smaller */}
+                  <span className="text-xs text-subtle line-clamp-2 leading-snug">{line.description}</span>
                 </div>
               );
             })}
@@ -818,7 +822,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
                   && isActionAvailable('VOID_PAYMENT');
                 return (
                   <div key={pay.id} className="flex items-center gap-2 text-sm py-1.5 border-b border-line last:border-b-0">
-                    <Badge color={isVoided ? 'default' : (METHOD_COLOR[pay.method] ?? 'default')} size="sm">
+                    <Badge color={isVoided ? 'default' : (METHOD_COLOR[pay.method] ?? 'default')} size="xs">
                       {pay.method}
                     </Badge>
                     <span className={`flex-1 min-w-0 break-words ${isVoided ? 'text-subtler line-through' : 'text-subtle'}`}>
@@ -837,7 +841,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
                       {pay.reference && <span className="opacity-70 block">· {pay.reference}</span>}
                     </span>
                     {isVoided && (
-                      <Badge color="default" size="sm">{t('accounting.bills.paymentVoided', { defaultValue: 'Voided' })}</Badge>
+                      <Badge color="default" size="xs">{t('accounting.bills.paymentVoided', { defaultValue: 'Voided' })}</Badge>
                     )}
                     <span className={`tabular-nums font-medium shrink-0 ${isVoided ? 'text-subtler line-through' : ''}`}>
                       {fmtCurrency(pay.amount)}
