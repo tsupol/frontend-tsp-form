@@ -892,14 +892,15 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
             value={fmtCurrency(contract.agreed_total_financed)}
             highlight={contract.agreed_total_financed != null && contract.agreed_total_financed > 0}
           />
-          <InfoCell label={t('contract.downPayment')} value={fmtCurrency(contract.snapshot_down_amount ?? contract.down_payment)} />
-          <InfoCell label={t('contract.installmentAmount')} value={fmtCurrency(contract.snapshot_installment_amount ?? contract.installment_amount)} />
+          {/* Read the live agreed columns, NOT snapshot_* — the snapshot values
+              drift (e.g. snapshot_down_amount=0, snapshot_installment≠agreed) and
+              show wrong numbers. Per BE (Ohm, 2026-07-06): installment_amount /
+              value_month / down_payment are the source of truth here. */}
+          <InfoCell label={t('contract.downPayment')} value={fmtCurrency(contract.down_payment)} />
+          <InfoCell label={t('contract.installmentAmount')} value={fmtCurrency(contract.installment_amount)} />
           <InfoCell
             label={t('contract.termMonths')}
-            value={(() => {
-              const term = contract.snapshot_term_months ?? contract.value_month;
-              return term ? `${term} ${t('contract.months')}` : '—';
-            })()}
+            value={contract.value_month ? `${contract.value_month} ${t('contract.months')}` : '—'}
           />
           <InfoCell label={t('contract.totalPaid')} value={fmtCurrency(contract.total_paid)} />
           <InfoCell label={t('contract.outstanding')} value={fmtCurrency(contract.outstanding_amount)} highlight={contract.outstanding_amount != null && contract.outstanding_amount > 0} />
