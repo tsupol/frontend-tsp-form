@@ -4079,6 +4079,7 @@
         "PRINT": "Print",
         "DOWNLOAD_PDF": "Download PDF"
       },
+      "billType": "Type",
       "typeLabel": {
         "INVOICE": "Invoice",
         "CREDIT_NOTE": "Credit Note",
@@ -4200,6 +4201,7 @@
       "summaryTitle": "Summary",
       "paymentCount": "Payments",
       "totalAmount": "Total Amount",
+      "createdAt": "Recorded",
       "m_CASH": "Cash",
       "m_TRANSFER": "Transfer",
       "m_SAVING_WALLET": "Saving Wallet",
@@ -4249,7 +4251,10 @@
       "showVoided": "Show voided",
       "voided": "Voided",
       "reversal": "Reversal",
-      "contract": "Contract"
+      "contract": "Contract",
+      "selectToView": "Select a payment to view details",
+      "amount": "Amount",
+      "date": "Date"
     },
     "reconcile": {
       "itemTitle": "Remit Amount",

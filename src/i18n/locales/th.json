@@ -4077,6 +4077,7 @@
         "PRINT": "พิมพ์ใบเสร็จ",
         "DOWNLOAD_PDF": "ดาวน์โหลด PDF"
       },
+      "billType": "ประเภท",
       "typeLabel": {
         "INVOICE": "เรียกเก็บ",
         "CREDIT_NOTE": "คืนเงิน",
@@ -4198,6 +4199,7 @@
       "summaryTitle": "สรุป",
       "paymentCount": "รายการ",
       "totalAmount": "ยอดรวม",
+      "createdAt": "บันทึกเมื่อ",
       "m_CASH": "เงินสด",
       "m_TRANSFER": "โอน",
       "m_SAVING_WALLET": "กระเป๋าออม",
@@ -4247,7 +4249,10 @@
       "showVoided": "แสดงที่ยกเลิก",
       "voided": "ยกเลิกแล้ว",
       "reversal": "ตัวกลับรายการ",
-      "contract": "สัญญา"
+      "contract": "สัญญา",
+      "selectToView": "เลือกรายการชำระเพื่อดูรายละเอียด",
+      "amount": "จำนวนเงิน",
+      "date": "วันที่"
     },
     "reconcile": {
       "itemTitle": "ยอดนำส่ง",
