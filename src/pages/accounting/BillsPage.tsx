@@ -1203,6 +1203,22 @@ function VoidPaymentModal({
 
 const BILL_CATEGORY_ORDER = ['PAYMENT', 'LINE', 'APPROVAL', 'LIFECYCLE', 'PRINT'];
 
+// ⚠️ DELIBERATE DEVIATION from the usual "render every action the capability RPC
+// returns" pattern (Asset/Contract action bars show all). On the ACCOUNTING
+// bills-review page, most of fn_bill_available_actions' catalog does NOT belong:
+//   • PAYMENT (ADD/CONFIRM/VOID_PAYMENT) — already handled INLINE here (the pay
+//     form + the per-payment void button), so footer copies would be redundant.
+//   • LINE (ADD/EDIT/REMOVE_LINE, CONVERT_TO_GIFT) — bill-BUILDING actions that
+//     live in the retail cart / contract wizard, never in bill review. They're
+//     also never is_available on a settled bill here → pure Wrench clutter.
+//   • APPROVAL (SUBMIT/REVIEW/CANCEL_APPROVAL) — the discount/line approval
+//     workflow, owned by the approvals pages.
+// So this footer intentionally shows ONLY the LIFECYCLE category (cancel / void /
+// reverse the whole bill) — the real bill-level ops for an accountant reviewing a
+// bill. Do NOT "restore" the other categories to match the show-all pattern:
+// that was the bug (a wall of not-wired Wrench buttons). Keep it scoped.
+const FOOTER_CATEGORIES: ReadonlySet<string> = new Set(['LIFECYCLE']);
+
 // Per-status: which actions get rendered as primary buttons (first row).
 // The rest collapse under "More". Empty array → everything goes under More.
 const PRIMARY_BY_STATUS: Record<string, BillActionCode[]> = {
@@ -1230,9 +1246,12 @@ function BillActionBar({ actions, suppressLifecycle, onVoidOrCancel }: BillActio
   const [moreOpen, setMoreOpen] = useState(false);
   const moreTriggerRef = useRef<HTMLButtonElement>(null);
 
-  // Filter BE actions: hide permission_denied (don't tease the user with things
-  // they can't do at all), and suppress LIFECYCLE on already-voided bills.
+  // Filter BE actions: scope to this page's suitable categories (see
+  // FOOTER_CATEGORIES note above), hide permission_denied (don't tease the user
+  // with things they can't do at all), and suppress LIFECYCLE on already-voided
+  // bills.
   const visibleBeActions = actions
+    .filter(a => FOOTER_CATEGORIES.has(a.category))
     .filter(a => a.blocking_reason !== 'permission_denied')
     .filter(a => !(suppressLifecycle && a.category === 'LIFECYCLE'))
     .slice()
