@@ -9,17 +9,19 @@ import {
 } from 'tsp-form';
 import {
   ArrowRightFromLine, ArrowLeft, Plus, Trash2, XCircle, CheckCircle, Ban, Printer,
-  Wrench, ChevronDown, Copy, Search, X, Download, Loader2, ExternalLink,
+  Wrench, ChevronDown, Copy, Search, X, Download, Loader2, ExternalLink, Pencil,
 } from 'lucide-react';
 import { FilterBar } from '../../components/FilterBar';
 import { apiClient, ApiError } from '../../lib/api';
+import { useAuth } from '../../contexts/AuthContext';
 import { DateTime } from '../../components/DateTime';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { fmtCurrency } from '../../lib/format';
 import { printWithMarker } from '../../lib/printDoc';
 import { useBillPdfDownload } from '../../hooks/useBillPdfDownload';
 import { buildBillActionToast, hasBill, type StandardBillResponse } from '../../lib/billActionToast';
-import { type Branch, type BillRow, type BillDetail, type BillPayment, todayISO } from './accountingTypes';
+import { type Branch, type BillRow, type BillDetail, type BillPayment, type BillLineItem, todayISO } from './accountingTypes';
+import { CorrectLineModal } from './CorrectLineModal';
 import { useBillActions, type BillAction, type BillActionCode } from '../../hooks/useBillActions';
 import { BillReceipt } from '../contracts/workspace/BillReceipt';
 
@@ -415,6 +417,8 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
+  const { can } = useAuth();
+  const canCorrectLine = can('BILL.CORRECT_LINE');
 
   // Detail query
   const { data: details, isLoading } = useQuery({
@@ -451,6 +455,9 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
 
   // Void-single-payment state — the payment row the BM chose to void
   const [voidPayment, setVoidPayment] = useState<BillPayment | null>(null);
+
+  // Line-amount correction — the line the user chose to fix (opens the modal)
+  const [correctLine, setCorrectLine] = useState<BillLineItem | null>(null);
 
   // Print: render receipt off-screen in this page and call window.print().
   // No modal — tsp-form Modal portals into a fixed/overflow-hidden container
@@ -527,6 +534,16 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
   const statusColor = isCancelled
     ? 'default'
     : detail.status === 'PAID' ? 'success' : detail.status === 'OPEN' ? 'danger' : 'warning';
+
+  // ── "แก้ยอด" (manual line amount correction) gating ──────────────────────
+  // Show per-line when ALL of: bill-level can_correct_now, this line's
+  // amount_correctable, the user has BILL.CORRECT_LINE, AND at least one
+  // correctable (CASH/TRANSFER) payment exists to rebalance against. Read
+  // straight from the view flags — never recompute. See
+  // UI_FEEDBACK/2026-07-05_IMPLEMENT_bill_line_amount_correction.md.
+  const hasCorrectablePayment = originalPayments.some(p => p.correctable);
+  const canCorrectLines = !isCancelled && detail.can_correct_now === true
+    && canCorrectLine && hasCorrectablePayment;
 
   // Payment form helpers
   const totalPayment = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
@@ -738,25 +755,40 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
             {t('accounting.bills.lineItems')} ({lines.length})
           </h3>
           <div className="flex flex-col">
-            {lines.map((line) => (
-              <div key={line.line_id} className="flex items-center gap-2 text-sm py-1.5 border-b border-line last:border-b-0">
-                <Badge color={LINE_TYPE_COLOR[line.line_type] ?? 'default'} size="sm">
-                  {line.line_type}
-                </Badge>
-                <span className="flex-1 min-w-0 truncate">{line.description}</span>
-                {line.quantity > 1 && (
-                  <span className="text-xs text-subtle tabular-nums shrink-0">
-                    {fmtCurrency(line.amount)} × {line.quantity}
+            {lines.map((line) => {
+              const lineCorrectable = canCorrectLines && line.amount_correctable === true;
+              return (
+                <div key={line.line_id} className="flex items-center gap-2 text-sm py-1.5 border-b border-line last:border-b-0">
+                  <Badge color={LINE_TYPE_COLOR[line.line_type] ?? 'default'} size="sm">
+                    {line.line_type}
+                  </Badge>
+                  <span className="flex-1 min-w-0 truncate">{line.description}</span>
+                  {line.quantity > 1 && (
+                    <span className="text-xs text-subtle tabular-nums shrink-0">
+                      {fmtCurrency(line.amount)} × {line.quantity}
+                    </span>
+                  )}
+                  <span className="tabular-nums font-medium shrink-0">
+                    {fmtCurrency(line.extended_amount)}
                   </span>
-                )}
-                <span className="tabular-nums font-medium shrink-0">
-                  {fmtCurrency(line.extended_amount)}
-                </span>
-                <span className={`text-xs shrink-0 font-medium ${line.owner_type === 'HOLDING' ? 'text-primary-fg' : 'text-warning-fg'}`}>
-                  {line.owner_type === 'HOLDING' ? '→H' : '→C'}
-                </span>
-              </div>
-            ))}
+                  <span className={`text-xs shrink-0 font-medium ${line.owner_type === 'HOLDING' ? 'text-primary-fg' : 'text-warning-fg'}`}>
+                    {line.owner_type === 'HOLDING' ? '→H' : '→C'}
+                  </span>
+                  {lineCorrectable && (
+                    <Tooltip content={t('accounting.bills.correctLine.title')} placement="left">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="btn-icon-sm shrink-0"
+                        startIcon={<Pencil size={14} />}
+                        onClick={() => setCorrectLine(line)}
+                        aria-label={t('accounting.bills.correctLine.title')}
+                      />
+                    </Tooltip>
+                  )}
+                </div>
+              );
+            })}
           </div>
           <div className="mt-2 pt-2 border-t border-line text-sm font-semibold flex justify-between">
             <span>{t('accounting.bills.totalCharged')}</span>
@@ -984,6 +1016,19 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
         payment={voidPayment}
         onClose={() => setVoidPayment(null)}
         onVoided={() => {
+          queryClient.invalidateQueries({ queryKey: ['accounting', 'bill-detail', billId] });
+          queryClient.invalidateQueries({ queryKey: ['bill-actions', billId] });
+          onBillChanged();
+        }}
+      />
+
+      {/* ── Correct line amount modal ── */}
+      <CorrectLineModal
+        line={correctLine}
+        payments={originalPayments}
+        billTotal={detail.total_amount}
+        onClose={() => setCorrectLine(null)}
+        onCorrected={() => {
           queryClient.invalidateQueries({ queryKey: ['accounting', 'bill-detail', billId] });
           queryClient.invalidateQueries({ queryKey: ['bill-actions', billId] });
           onBillChanged();

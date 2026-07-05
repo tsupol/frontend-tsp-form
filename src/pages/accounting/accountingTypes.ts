@@ -580,6 +580,10 @@ export interface BillLineItem {
   ref_code: string | null;
   ref_type: string | null;
   ref_id: number | null;
+  // true = manual revenue line not bound to a contract ledger — amount editable
+  // via fn_bill_correct_manual_line on a PAID bill before day-close.
+  amount_correctable?: boolean;
+  product_display_name?: string | null;
 }
 
 export interface BillPayment {
@@ -596,6 +600,9 @@ export interface BillPayment {
   ref_voided_id: number | null;
   void_note: string | null;
   reference: string | null;
+  // true = CASH/TRANSFER, non-reversal — this payment can be rebalanced when
+  // correcting a line amount (wallet payments are not adjustable).
+  correctable?: boolean;
 }
 
 export interface BillCancelInfo {
@@ -622,6 +629,9 @@ export interface BillDetail {
   customer_name: string | null;
   contract_code: string | null;
   contract_id: number | null;
+  // true = bill is PAID and the day is not yet closed → manual-line correction
+  // is allowed. Gates the "แก้ยอด" button alongside per-line/per-payment flags.
+  can_correct_now?: boolean;
   line_items: BillLineItem[];
   payments: BillPayment[] | null;
   cancel_info: BillCancelInfo | null;

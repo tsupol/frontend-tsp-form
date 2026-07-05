@@ -4078,6 +4078,21 @@
         "DOWNLOAD_PDF": "ดาวน์โหลด PDF"
       },
       "billType": "ประเภท",
+      "correctLine": {
+        "title": "แก้ยอด",
+        "doneTitle": "แก้ยอดเรียบร้อย",
+        "newAmount": "ยอดใหม่",
+        "newUnitPrice": "ราคา/ชิ้น ใหม่",
+        "newLineTotal": "ยอดรวมรายการใหม่",
+        "newBillTotal": "ยอดบิลใหม่",
+        "adjustPayment": "ช่องที่จะปรับให้ยอดตรง",
+        "balanceOk": "ยอดตรงแล้ว — ช่องนี้จะเป็น {{amount}} (เดิม {{from}})",
+        "balanceImpossible": "เงินสด/โอนไม่พอครอบส่วนต่าง — ต้องยกเลิกทั้งบิลแทน",
+        "reason": "เหตุผล",
+        "reasonPlaceholder": "เช่น ลงราคาผิด",
+        "confirm": "ยืนยันแก้ยอด",
+        "unit": "ชิ้น"
+      },
       "typeLabel": {
         "INVOICE": "เรียกเก็บ",
         "CREDIT_NOTE": "คืนเงิน",

@@ -4080,6 +4080,21 @@
         "DOWNLOAD_PDF": "Download PDF"
       },
       "billType": "Type",
+      "correctLine": {
+        "title": "Correct amount",
+        "doneTitle": "Amount corrected",
+        "newAmount": "New amount",
+        "newUnitPrice": "New price / unit",
+        "newLineTotal": "New line total",
+        "newBillTotal": "New bill total",
+        "adjustPayment": "Payment to rebalance",
+        "balanceOk": "Balanced — this payment becomes {{amount}} (was {{from}})",
+        "balanceImpossible": "Cash/transfer can't cover this drop — cancel the whole bill instead.",
+        "reason": "Reason",
+        "reasonPlaceholder": "e.g. keyed the price in wrong",
+        "confirm": "Confirm correction",
+        "unit": "unit"
+      },
       "typeLabel": {
         "INVOICE": "Invoice",
         "CREDIT_NOTE": "Credit Note",
