@@ -623,11 +623,3 @@ function PaymentDetailPanel({
   );
 }
 
-function Stat({ label, value, emphasis }: { label: ReactNode; value: ReactNode; emphasis?: boolean }) {
-  return (
-    <div>
-      <dt className="text-xs text-subtle">{label}</dt>
-      <dd className={`tabular-nums font-semibold ${emphasis ? 'text-base text-primary-fg' : 'text-sm'}`}>{value}</dd>
-    </div>
-  );
-}

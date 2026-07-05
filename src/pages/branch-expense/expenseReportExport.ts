@@ -188,7 +188,7 @@ export async function downloadExpenseReportPdf(
 
 export async function downloadExpenseReportXlsx(
   rows: ExpenseReportRow[],
-  meta: ExpenseReportMeta,
+  _meta: ExpenseReportMeta,
   t: TFunction,
   filename: string,
 ): Promise<void> {
