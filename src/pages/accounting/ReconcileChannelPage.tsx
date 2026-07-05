@@ -3,10 +3,10 @@ import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import {
-  MobileHeader, Select, Badge, InputDateRangePicker,
+  MobileHeader, Select, Badge, InputDateRangePicker, Button,
 } from 'tsp-form';
 import {
-  ArrowRightFromLine, Keyboard, ChevronRight, ChevronDown, Banknote, Landmark, Wallet,
+  ArrowRightFromLine, Keyboard, ChevronRight, ChevronDown, Banknote, Landmark, Wallet, Download,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -16,6 +16,7 @@ import {
   fmtCurrency, toLocalDateStr, parseLocalDate, makeDateRangePickerFormat,
 } from '../../lib/format';
 import type { Branch, ReconcileChannelResult, ReconcileChannelPayment } from './accountingTypes';
+import { exportReconcileChannel } from './dayCloseExport';
 import { MiniPager } from './MiniPager';
 
 type Channel = 'CASH' | 'TRANSFER' | 'WALLET';
@@ -46,6 +47,7 @@ export function ReconcileChannelPage() {
 
   const [isTypingRange, setIsTypingRange] = useState(false);
   const [expanded, setExpanded] = useState<Set<Channel>>(new Set());
+  const [exporting, setExporting] = useState(false);
 
   const pendingPatchRef = useRef<Record<string, string> | null>(null);
   const updateFilters = useCallback((patch: Partial<{ branch_id: string; from: string; to: string }>) => {
@@ -106,6 +108,23 @@ export function ReconcileChannelPage() {
     next.has(c) ? next.delete(c) : next.add(c);
     return next;
   });
+
+  const handleExport = async () => {
+    if (!summary) return;
+    setExporting(true);
+    try {
+      const branchLabel = selectedBranch?.name ?? (allBranches ? 'all' : branchId);
+      await exportReconcileChannel(
+        summary,
+        data?.payments ?? [],
+        t,
+        `moneycheck_${branchLabel}_${fromDate}_${toDate}`,
+      );
+    } finally {
+      setExporting(false);
+    }
+  };
+  const canExport = !!summary && !exporting;
 
   const dateFilter: ReactNode = (
     <InputDateRangePicker
@@ -176,12 +195,32 @@ export function ReconcileChannelPage() {
         <div className="mobile-header-title mobile-header-title-truncate">
           {t('accounting.reconcile.channelTitle')}
         </div>
-        <div className="mobile-header-end w-nav" />
+        <div className="mobile-header-end w-nav flex items-center justify-center">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="btn-icon-sm"
+            startIcon={<Download size={16} />}
+            onClick={handleExport}
+            disabled={!canExport}
+            aria-label={t('accounting.reconcile.export')}
+          />
+        </div>
       </MobileHeader>
 
       <div className="flex flex-col h-dvh">
         <div className="flex-none px-4 py-2.5 border-b border-line items-center gap-4 max-md:hidden flex">
           <h1 className="heading-2 shrink-0">{t('accounting.reconcile.channelTitle')}</h1>
+          <Button
+            size="sm"
+            variant="outline"
+            className="ml-auto"
+            startIcon={<Download size={16} />}
+            onClick={handleExport}
+            disabled={!canExport}
+          >
+            {exporting ? t('accounting.reconcile.exporting') : t('accounting.reconcile.export')}
+          </Button>
         </div>
 
         <FilterBar
@@ -204,6 +243,7 @@ export function ReconcileChannelPage() {
                 <span className="w-24 text-right">{t('accounting.reconcile.system')}</span>
                 <span className="w-24 text-right">{t('accounting.reconcile.counted')}</span>
                 <span className="w-20 text-right">{t('accounting.reconcile.diff')}</span>
+                <span className="w-24 text-right">{t('accounting.reconcile.shortOver')}</span>
               </div>
 
               {/* Cash */}
@@ -213,6 +253,8 @@ export function ReconcileChannelPage() {
                 net={summary.net_cash}
                 counted={summary.counted_cash}
                 diff={summary.diff_cash}
+                shortage={summary.cash_shortage}
+                overage={summary.cash_overage}
                 open={expanded.has('CASH')}
                 onToggle={() => toggle('CASH')}
                 payments={paymentsByMethod.get('CASH') ?? []}
@@ -224,6 +266,8 @@ export function ReconcileChannelPage() {
                 net={summary.net_transfer}
                 counted={summary.counted_transfer}
                 diff={summary.diff_transfer}
+                shortage={summary.transfer_shortage}
+                overage={summary.transfer_overage}
                 open={expanded.has('TRANSFER')}
                 onToggle={() => toggle('TRANSFER')}
                 payments={paymentsByMethod.get('TRANSFER') ?? []}
@@ -235,6 +279,7 @@ export function ReconcileChannelPage() {
                 <span className="w-24 text-right tabular-nums font-semibold">{fmtCurrency(summary.physical)}</span>
                 <span className="w-24" />
                 <span className="w-20" />
+                <span className="w-24" />
               </div>
 
               {/* Wallet action helper — in/usage/cashout/net + action badge (mig 488).
@@ -280,25 +325,10 @@ export function ReconcileChannelPage() {
                   {fmtCurrency(summary.remit_total)}
                 </span>
                 <span className="w-20" />
+                <span className="w-24" />
               </div>
 
-              {/* Shortage / overage — only meaningful once counted */}
-              {(summary.shortage > 0 || summary.overage > 0) && (
-                <div className="flex items-center gap-4 justify-end mt-2 px-2 text-sm">
-                  {summary.shortage > 0 && (
-                    <span className="text-danger">
-                      {t('accounting.reconcile.shortage')}: {fmtCurrency(summary.shortage)}
-                    </span>
-                  )}
-                  {summary.overage > 0 && (
-                    <span className="text-warning">
-                      {t('accounting.reconcile.overage')}: {fmtCurrency(summary.overage)}
-                    </span>
-                  )}
-                </div>
-              )}
-
-              {summary.counted_cash === null && (
+              {(summary.diff_cash === null || summary.diff_transfer === null) && (
                 <div className="mt-3 text-center text-xs text-subtler">
                   {t('accounting.reconcile.notClosedYet')}
                 </div>
@@ -312,19 +342,25 @@ export function ReconcileChannelPage() {
 }
 
 function ChannelRow({
-  icon, label, net, counted, diff, open, onToggle, payments,
+  icon, label, net, counted, diff, shortage, overage, open, onToggle, payments,
 }: {
   icon: ReactNode;
   label: string;
   net: number;
   counted: number | null;
   diff: number | null;
+  shortage: number;
+  overage: number;
   open: boolean;
   onToggle: () => void;
   payments: ReconcileChannelPayment[];
 }) {
   const { t } = useTranslation();
   const hasSlips = payments.length > 0;
+  // 3 states (§89): counted === null → รอนับ (grey); shortage=overage=0 → ตรง ✓;
+  // else the shortage (red) / overage (amber) amount. Use counted, not the value,
+  // to detect "uncounted" — the range summary COALESCEs shortage to 0 even then.
+  const uncounted = counted === null;
   const [page, setPage] = useState(1);
   const totalPages = Math.ceil(payments.length / SLIPS_PER_PAGE);
   useEffect(() => { if (!open) setPage(1); }, [open]);
@@ -352,6 +388,17 @@ function ChannelRow({
         </span>
         <span className={`w-20 text-right tabular-nums ${diff ? (diff < 0 ? 'text-danger' : 'text-warning') : 'text-subtle'}`}>
           {diff === null ? '—' : fmtCurrency(diff)}
+        </span>
+        <span className="w-24 text-right tabular-nums text-xs">
+          {uncounted ? (
+            <span className="text-subtler">{t('accounting.reconcile.pendingCount')}</span>
+          ) : shortage > 0 ? (
+            <span className="text-danger">−{fmtCurrency(shortage)}</span>
+          ) : overage > 0 ? (
+            <span className="text-warning-fg">+{fmtCurrency(overage)}</span>
+          ) : (
+            <span className="text-success">✓ {t('accounting.reconcile.matched')}</span>
+          )}
         </span>
       </div>
 

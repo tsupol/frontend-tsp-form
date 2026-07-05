@@ -200,6 +200,8 @@
   "SALE.STATE.BILL_NOT_OPEN": "Bill is not open for editing",
   "SALE.STATE.PREVIOUS_DAY_NOT_CLOSED": "Previous day has not been closed yet",
   "SALE.STATE.DAY_ALREADY_CLOSED": "Day is already closed",
+  "SALE.STATE.ALREADY_CLOSED": "Day is already closed",
+  "SALE.STATE.HAS_PENDING_BILLS": "There are unpaid/uncancelled bills to clear before closing the day",
   "SALE.STATE.PAUSE_DEVICE_BOUND": "Cannot pause while device is bound",
   "SALE.STATE.PAUSE_DISABLED": "Pause is disabled for this company",
   "SALE.STATE.PAUSE_MAX_REACHED": "Maximum deferred installments reached",

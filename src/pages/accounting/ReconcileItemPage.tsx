@@ -3,10 +3,10 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import {
-  MobileHeader, Select, Badge, InputDateRangePicker,
+  MobileHeader, Select, Badge, InputDateRangePicker, Button,
 } from 'tsp-form';
 import {
-  ArrowRightFromLine, Keyboard, ChevronRight, ChevronDown, ExternalLink, Truck, Building2,
+  ArrowRightFromLine, Keyboard, ChevronRight, ChevronDown, ExternalLink, Truck, Building2, Download,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -16,6 +16,7 @@ import {
   fmtCurrency, toLocalDateStr, parseLocalDate, makeDateRangePickerFormat,
 } from '../../lib/format';
 import type { Branch, ReconcileItemResult, ReconcileItemGroup, ReconcileItemRow } from './accountingTypes';
+import { exportReconcileItems } from './dayCloseExport';
 import { MiniPager } from './MiniPager';
 
 type OwnerType = 'HOLDING' | 'COMPANY';
@@ -49,6 +50,7 @@ export function ReconcileItemPage() {
 
   const [isTypingRange, setIsTypingRange] = useState(false);
   const [openGroup, setOpenGroup] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const pendingPatchRef = useRef<Record<string, string> | null>(null);
   const updateFilters = useCallback((patch: Partial<{ branch_id: string; from: string; to: string }>) => {
@@ -106,6 +108,23 @@ export function ReconcileItemPage() {
   }, [data?.rows]);
 
   const owners: OwnerType[] = ['HOLDING', 'COMPANY'];
+
+  const handleExport = async () => {
+    if (!data || groups.length === 0) return;
+    setExporting(true);
+    try {
+      const branchLabel = selectedBranch?.name ?? (allBranches ? 'all' : branchId);
+      await exportReconcileItems(
+        data.groups,
+        data.rows,
+        t,
+        `remit_${branchLabel}_${fromDate}_${toDate}`,
+      );
+    } finally {
+      setExporting(false);
+    }
+  };
+  const canExport = !!data && groups.length > 0 && !exporting;
 
   const dateFilter: ReactNode = (
     <InputDateRangePicker
@@ -176,12 +195,32 @@ export function ReconcileItemPage() {
         <div className="mobile-header-title mobile-header-title-truncate">
           {t('accounting.reconcile.itemTitle')}
         </div>
-        <div className="mobile-header-end w-nav" />
+        <div className="mobile-header-end w-nav flex items-center justify-center">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="btn-icon-sm"
+            startIcon={<Download size={16} />}
+            onClick={handleExport}
+            disabled={!canExport}
+            aria-label={t('accounting.reconcile.export')}
+          />
+        </div>
       </MobileHeader>
 
       <div className="flex flex-col h-dvh">
         <div className="flex-none px-4 py-2.5 border-b border-line items-center gap-4 max-md:hidden flex">
           <h1 className="heading-2 shrink-0">{t('accounting.reconcile.itemTitle')}</h1>
+          <Button
+            size="sm"
+            variant="outline"
+            className="ml-auto"
+            startIcon={<Download size={16} />}
+            onClick={handleExport}
+            disabled={!canExport}
+          >
+            {exporting ? t('accounting.reconcile.exporting') : t('accounting.reconcile.export')}
+          </Button>
         </div>
 
         <FilterBar

@@ -19,8 +19,10 @@ export interface DayCloseHistoryRow {
   total_amount: number;
   expected_amount: number;
   actual_amount: number;
-  shortage: number;
-  overage: number;
+  // mig 501/502 — shortage/overage recomputed from net vs counted, per-channel then summed
+  // (no netting). NULL when the day isn't counted yet ("รอนับ"), NOT 0 ("นับแล้วตรง").
+  shortage: number | null;
+  overage: number | null;
   holding_amount: number;
   company_amount: number;
   bill_count: number;
@@ -53,6 +55,11 @@ export interface DayCloseHistoryRow {
   counted_transfer: number | null;
   diff_cash: number | null;
   diff_transfer: number | null;
+  // mig 501/502 — per-channel shortage/overage. NULL until that channel is counted.
+  cash_shortage: number | null;
+  cash_overage: number | null;
+  transfer_shortage: number | null;
+  transfer_overage: number | null;
 }
 
 export interface DayCloseAuditRow {
@@ -315,8 +322,15 @@ export interface ReconcileChannelSummary {
   remit_total: number;     // physical + wallet (= Step 1 total)
   counted_cash: number | null;
   counted_transfer: number | null;
-  diff_cash: number | null;
+  diff_cash: number | null;      // null until counted — the "รอนับ" signal for the range summary
   diff_transfer: number | null;
+  // mig 501/502 — per-channel + combined shortage/overage. In this range-aggregate summary
+  // they COALESCE to 0 (not null) even when uncounted; use diff_cash/diff_transfer === null
+  // to tell "รอนับ" (uncounted) from "ตรง" (counted, matched).
+  cash_shortage: number;
+  cash_overage: number;
+  transfer_shortage: number;
+  transfer_overage: number;
   shortage: number;
   overage: number;
   // wallet action helper (mig 488) — wallet_net = wallet_in − wallet_usage − wallet_cashout.
@@ -349,6 +363,16 @@ export interface ReconcileChannelBranch {
   net_transfer: number;
   physical: number;
   wallet: number;
+  wallet_in: number;
+  wallet_usage: number;
+  wallet_cashout: number;
+  wallet_net: number;
+  wallet_action: 'WITHDRAW_FROM_COMPANY' | 'REMIT_SURPLUS' | 'NONE';
+  wallet_action_amount: number;
+  cash_shortage: number;
+  cash_overage: number;
+  transfer_shortage: number;
+  transfer_overage: number;
   shortage: number;
   overage: number;
 }

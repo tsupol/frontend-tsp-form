@@ -7,7 +7,7 @@ import {
 } from 'tsp-form';
 import {
   ArrowRightFromLine, ArrowLeft, CalendarCheck, AlertTriangle, CheckCircle2, Lock, Sparkles, Keyboard, XCircle, Clock, ChevronsRight,
-  Coins, Banknote,
+  Coins, Banknote, Download,
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { apiClient, ApiError } from '../../lib/api';
@@ -22,6 +22,8 @@ import {
 } from './accountingTypes';
 import { BillReconcilePanel } from './BillReconcilePanel';
 import { DayCloseBuckets } from './DayCloseBuckets';
+import { exportReconcileItems } from './dayCloseExport';
+import type { ReconcileItemResult } from './accountingTypes';
 import { ActionDoneView, type ActionDoneDetailRow } from '../contracts/ActionDoneView';
 
 const UNCLOSED_PREFIX = '__unclosed__';
@@ -439,8 +441,8 @@ export function DayClosePage() {
                       </div>
                       <div className="text-right shrink-0 text-sm tabular-nums">
                         <div>{fmtCurrency(h.expected_amount)}</div>
-                        {h.shortage > 0 && <div className="text-xs text-danger">-{fmtCurrency(h.shortage)}</div>}
-                        {h.overage > 0 && <div className="text-xs text-warning-fg">+{fmtCurrency(h.overage)}</div>}
+                        {(h.shortage ?? 0) > 0 && <div className="text-xs text-danger">-{fmtCurrency(h.shortage!)}</div>}
+                        {(h.overage ?? 0) > 0 && <div className="text-xs text-warning-fg">+{fmtCurrency(h.overage!)}</div>}
                       </div>
                     </button>
                   );
@@ -561,7 +563,8 @@ export function DayClosePage() {
       onClose={() => setCloseModalOpen(false)}
       branchId={effectiveBranchId}
       closingDate={closingDate}
-      expected={closingSummary ? netTotal(closingSummary) : 0}
+      netCash={closingSummary ? netCash(closingSummary) : 0}
+      netTransfer={closingSummary ? netTransfer(closingSummary) : 0}
       onSuccess={() => {
         queryClient.invalidateQueries({ queryKey: ['accounting'] });
       }}
@@ -717,8 +720,26 @@ function ClosedSnapshot({ close, branchId }: { close: DayCloseHistoryRow; branch
   // Overview first — the "what happened this day" glance; drill into remittance
   // buckets or the bill list from there.
   const [tab, setTab] = useState<'overview' | 'breakdown' | 'reconcile'>('overview');
+  const [exporting, setExporting] = useState(false);
   const remittanceLink = `/admin/accounting/reconcile-channel?branch_id=${branchId}&from=${close.close_date}&to=${close.close_date}`;
   const paymentsLink = `/admin/accounting/payments?branch_id=${branchId}&from=${close.close_date}&to=${close.close_date}`;
+
+  // ③ line-detail export — reuse fn_reconcile_by_item scoped to the closed day
+  // (same taxonomy as ① → numbers match + contract_code comes free).
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const res = await apiClient.rpc<ReconcileItemResult>('fn_reconcile_by_item', {
+        p_company_id: close.company_id,
+        p_branch_id: Number(branchId),
+        p_date_from: close.close_date,
+        p_date_to: close.close_date,
+      });
+      await exportReconcileItems(res.groups, res.rows, t, `dayclose_${branchId}_${close.close_date}`);
+    } finally {
+      setExporting(false);
+    }
+  };
   return (
     <div className="@container flex flex-col h-full min-h-0">
       {/* Header: date + closed badge + who/when, drill icons */}
@@ -738,6 +759,17 @@ function ClosedSnapshot({ close, branchId }: { close: DayCloseHistoryRow; branch
           )}
         </div>
         <div className="ml-auto flex items-center gap-1.5 shrink-0">
+          <Tooltip content={t('accounting.reconcile.export')} placement="bottom">
+            <Button
+              size="sm"
+              variant="outline"
+              className="btn-icon-sm"
+              startIcon={<Download size={16} />}
+              onClick={handleExport}
+              disabled={exporting}
+              aria-label={t('accounting.reconcile.export')}
+            />
+          </Tooltip>
           <Tooltip content={t('accounting.dayClose.drillReconcile')} placement="bottom">
             <Button
               size="sm"
@@ -997,61 +1029,83 @@ function CountRow({
 /* ── Close-day modal ── */
 
 function CloseDayModal({
-  open, onClose, branchId, closingDate, expected, onSuccess,
+  open, onClose, branchId, closingDate, netCash: netCashVal, netTransfer: netTransferVal, onSuccess,
 }: {
   open: boolean;
   onClose: () => void;
   branchId: string;
   closingDate: string;
-  expected: number;
+  netCash: number;
+  netTransfer: number;
   onSuccess: () => void;
 }) {
   const { t } = useTranslation();
   const today = todayISO();
   const [view, setView] = useState<'form' | 'done'>('form');
-  const [actualAmount, setActualAmount] = useState<string>('');
+  // Two counted amounts (สด / โอน), each nullable — a blank channel is "not counted yet".
+  const [countedCash, setCountedCash] = useState<string>('');
+  const [countedTransfer, setCountedTransfer] = useState<string>('');
   const [note, setNote] = useState<string>('');
+  const [confirmClose, setConfirmClose] = useState(false);
   const [closing, setClosing] = useState(false);
   const [error, setError] = useState('');
-  // Snapshot at submit time so the done view reflects what was actually closed,
-  // even if the form fields are reset before the user dismisses.
-  const [closedAmount, setClosedAmount] = useState<number>(0);
-  const [closedNote, setClosedNote] = useState<string>('');
+  // Snapshot at submit time so the done view reflects what was actually closed.
+  const [closed, setClosed] = useState<{ cash: number | null; transfer: number | null; note: string } | null>(null);
 
   // Reset on open
   useEffect(() => {
     if (open) {
       setView('form');
-      setActualAmount('');
+      setCountedCash('');
+      setCountedTransfer('');
       setNote('');
+      setConfirmClose(false);
       setError('');
-      setClosedAmount(0);
-      setClosedNote('');
+      setClosed(null);
     }
   }, [open]);
 
-  const diff = useMemo(() => {
-    const actual = parseFloat(actualAmount || '0');
-    return actual - expected;
-  }, [actualAmount, expected]);
+  const netPhysical = netCashVal + netTransferVal;
+  const cashNum = countedCash === '' ? null : parseFloat(countedCash);
+  const transferNum = countedTransfer === '' ? null : parseFloat(countedTransfer);
+  // Per-channel diff = counted − net, only once that channel is counted.
+  const diffCash = cashNum === null ? null : cashNum - netCashVal;
+  const diffTransfer = transferNum === null ? null : transferNum - netTransferVal;
+  // Combined shortage/overage across the counted channels (no netting).
+  const shortage = Math.max(0, -(diffCash ?? 0)) + Math.max(0, -(diffTransfer ?? 0));
+  const overage = Math.max(0, diffCash ?? 0) + Math.max(0, diffTransfer ?? 0);
+  const bothCounted = cashNum !== null && transferNum !== null;
+  const mismatch = bothCounted && (shortage > 0 || overage > 0);
+  // Enforce a note only when both channels are counted AND don't match (§89 §5).
+  const noteRequired = mismatch;
+  const canSubmit = !closing && (!noteRequired || note.trim().length > 0);
+  const isDirty = countedCash !== '' || countedTransfer !== '' || note.trim().length > 0;
 
-  const closedDiff = closedAmount - expected;
+  const handleCloseAttempt = () => {
+    if (view === 'done' || !isDirty) { onClose(); return; }
+    setConfirmClose(true);
+  };
 
-  const handleClose = async () => {
+  const doClose = async () => {
     setClosing(true);
     setError('');
-    const start = Date.now();
     try {
-      const actual = parseFloat(actualAmount || '0');
+      // Freeze the snapshot (note only) …
       await apiClient.rpc('fn_day_close_create', {
         p_branch_id: Number(branchId),
         p_close_date: closingDate,
-        p_actual_amount: actual,
         p_note: note || null,
       });
-      // Stash for the done view, then switch.
-      setClosedAmount(actual);
-      setClosedNote(note);
+      // … then record the two counts (either can be left blank = count later).
+      if (cashNum !== null || transferNum !== null) {
+        await apiClient.rpc('fn_day_close_update_count', {
+          p_branch_id: Number(branchId),
+          p_close_date: closingDate,
+          p_counted_cash: cashNum,
+          p_counted_transfer: transferNum,
+        });
+      }
+      setClosed({ cash: cashNum, transfer: transferNum, note });
       onSuccess();
       setView('done');
     } catch (err) {
@@ -1063,42 +1117,32 @@ function CloseDayModal({
         setError(t('common.error'));
       }
     } finally {
-      const elapsed = Date.now() - start;
-      if (elapsed < 300) await new Promise(r => setTimeout(r, 300 - elapsed));
       setClosing(false);
     }
   };
 
+  const closedDiffCash = closed?.cash == null ? null : closed.cash - netCashVal;
+  const closedDiffTransfer = closed?.transfer == null ? null : closed.transfer - netTransferVal;
+  const closedShort = Math.max(0, -(closedDiffCash ?? 0)) + Math.max(0, -(closedDiffTransfer ?? 0));
+  const closedOver = Math.max(0, closedDiffCash ?? 0) + Math.max(0, closedDiffTransfer ?? 0);
+
+  const fmtDiff = (d: number | null) =>
+    d == null
+      ? <span className="text-subtler">—</span>
+      : <span className={`tabular-nums ${d < 0 ? 'text-danger' : d > 0 ? 'text-warning-fg' : 'text-success'}`}>{d > 0 ? '+' : ''}{fmtCurrency(d)}</span>;
+
   const doneRows: ActionDoneDetailRow[] = [
-    {
-      label: t('accounting.dayClose.closeForDate'),
-      value: <DateTime value={closingDate} showTime={false} />,
-    },
-    {
-      label: t('accounting.dayClose.expected'),
-      value: fmtCurrency(expected),
-    },
-    {
-      label: t('accounting.dayClose.actualAmount'),
-      value: fmtCurrency(closedAmount),
-      emphasis: true,
-    },
-    {
-      label: t('accounting.dayClose.difference'),
-      value: (
-        <span className={`tabular-nums ${closedDiff < 0 ? 'text-danger' : closedDiff > 0 ? 'text-warning-fg' : 'text-success'}`}>
-          {closedDiff >= 0 ? '+' : ''}{fmtCurrency(closedDiff)}
-        </span>
-      ),
-    },
-    ...(closedNote ? [{
-      label: t('accounting.dayClose.noteOptional').replace(/\s*\(.*\)$/, ''),
-      value: closedNote,
-    }] : []),
+    { label: t('accounting.dayClose.closeForDate'), value: <DateTime value={closingDate} showTime={false} /> },
+    { label: t('accounting.dayClose.countCash'), value: closed?.cash == null ? t('accounting.dayClose.notCountedYet') : fmtCurrency(closed.cash) },
+    { label: t('accounting.dayClose.countTransfer'), value: closed?.transfer == null ? t('accounting.dayClose.notCountedYet') : fmtCurrency(closed.transfer) },
+    ...(closedShort > 0 ? [{ label: t('accounting.dayClose.shortage'), value: <span className="text-danger tabular-nums">{fmtCurrency(closedShort)}</span> }] : []),
+    ...(closedOver > 0 ? [{ label: t('accounting.dayClose.overage'), value: <span className="text-warning-fg tabular-nums">{fmtCurrency(closedOver)}</span> }] : []),
+    ...(closed?.note ? [{ label: t('accounting.dayClose.note'), value: closed.note }] : []),
   ];
 
   return (
-    <Modal open={open} onClose={() => !closing && onClose()} maxWidth="26rem" width="100%">
+    <>
+    <Modal open={open} onClose={handleCloseAttempt} maxWidth="30rem" width="100%">
       <div className="modal-header">
         <h2 className="modal-title">
           {view === 'done'
@@ -1118,63 +1162,88 @@ function CloseDayModal({
             )}
             <p className="text-sm text-subtle">{t('accounting.dayClose.confirmMessage')}</p>
 
-            <div className="mt-3 text-sm space-y-1">
-              {closingDate !== today && (
-                <div>
-                  <span className="text-subtle">{t('accounting.dayClose.closeForDate')}:</span>{' '}
-                  <span className="font-semibold"><DateTime value={closingDate} showTime={false} /></span>
-                </div>
-              )}
-              <div>
-                <span className="text-subtle">{t('accounting.dayClose.expected')}:</span>{' '}
-                <span className="font-semibold tabular-nums">{fmtCurrency(expected)}</span>
+            {closingDate !== today && (
+              <div className="mt-3 text-sm">
+                <span className="text-subtle">{t('accounting.dayClose.closeForDate')}:</span>{' '}
+                <span className="font-semibold"><DateTime value={closingDate} showTime={false} /></span>
               </div>
-            </div>
+            )}
+
+            {/* Two-channel count table: system net vs staff counted vs diff */}
+            <table className="w-full text-sm tabular-nums mt-4">
+              <thead>
+                <tr className="text-xs text-subtle">
+                  <th className="text-left font-medium py-1">{t('accounting.dayClose.countChannel')}</th>
+                  <th className="text-right font-medium py-1">{t('accounting.dayClose.countNet')}</th>
+                  <th className="text-right font-medium py-1 w-32">{t('accounting.dayClose.countCounted')}</th>
+                  <th className="text-right font-medium py-1">{t('accounting.dayClose.countDiff')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <CountInputRow
+                  icon={<Banknote size={14} className="text-success shrink-0" />}
+                  label={t('accounting.dayClose.totalCash')}
+                  net={netCashVal}
+                  value={countedCash}
+                  onChange={setCountedCash}
+                  diff={fmtDiff(diffCash)}
+                />
+                <CountInputRow
+                  icon={<Coins size={14} className="text-info-fg shrink-0" />}
+                  label={t('accounting.dayClose.totalTransfer')}
+                  net={netTransferVal}
+                  value={countedTransfer}
+                  onChange={setCountedTransfer}
+                  diff={fmtDiff(diffTransfer)}
+                />
+                <tr className="border-t-2 border-line font-semibold">
+                  <td className="py-1.5">{t('accounting.dayClose.physicalTotal')}</td>
+                  <td className="py-1.5 text-right">{fmtCurrency(netPhysical)}</td>
+                  <td className="py-1.5 text-right">
+                    {bothCounted ? fmtCurrency((cashNum ?? 0) + (transferNum ?? 0)) : <span className="text-subtler font-normal">—</span>}
+                  </td>
+                  <td className="py-1.5 text-right">
+                    {bothCounted ? fmtDiff(((cashNum ?? 0) + (transferNum ?? 0)) - netPhysical) : <span className="text-subtler font-normal">—</span>}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            {mismatch && (
+              <div className="mt-2 text-xs text-warning-fg inline-flex items-center gap-1.5">
+                <AlertTriangle size={13} />
+                {shortage > 0 && <span>{t('accounting.dayClose.shortage')} {fmtCurrency(shortage)}</span>}
+                {overage > 0 && <span>{t('accounting.dayClose.overage')} {fmtCurrency(overage)}</span>}
+              </div>
+            )}
 
             <div className="form-grid mt-4">
               <div className="flex flex-col">
-                <label className="form-label">{t('accounting.dayClose.actualAmount')}</label>
-                <MaskedInput
-                  mask="number"
-                  decimalScale={2}
-                  value={actualAmount}
-                  onChange={(raw) => setActualAmount(raw)}
-                  className="w-full"
-                  size="sm"
-                  endIcon={<ChevronsRight size={14} />}
-                  onEndIconClick={() => setActualAmount(String(expected ?? 0))}
-                />
-              </div>
-              <div className="flex flex-col">
-                <label className="form-label">{t('accounting.dayClose.noteOptional')}</label>
+                <label className="form-label">
+                  {noteRequired ? t('accounting.dayClose.noteRequired') : t('accounting.dayClose.noteOptional')}
+                </label>
                 <TextArea
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   className="w-full"
                   size="sm"
                   rows={3}
+                  error={noteRequired && note.trim().length === 0}
                 />
               </div>
-              {actualAmount && (
-                <div className="text-sm">
-                  <span className="text-subtle">{t('accounting.dayClose.difference')}: </span>
-                  <span className={`font-semibold tabular-nums ${diff < 0 ? 'text-danger' : diff > 0 ? 'text-warning-fg' : 'text-success'}`}>
-                    {diff >= 0 ? '+' : ''}{fmtCurrency(diff)}
-                  </span>
-                </div>
-              )}
+              <p className="text-xs text-subtler">{t('accounting.dayClose.countLaterHint')}</p>
             </div>
           </div>
           <div className="modal-footer">
-            <Button onClick={onClose} disabled={closing}>{t('common.cancel')}</Button>
-            <Button color="primary" onClick={handleClose} disabled={closing || !actualAmount}>
+            <Button onClick={handleCloseAttempt} disabled={closing}>{t('common.cancel')}</Button>
+            <Button color="primary" onClick={doClose} disabled={!canSubmit}>
               {closing ? t('common.loading') : t('accounting.dayClose.closeDay')}
             </Button>
           </div>
         </>
       )}
 
-      {view === 'done' && (
+      {view === 'done' && closed && (
         <ActionDoneView
           headline={t('accounting.dayClose.closeSuccess')}
           contractCode={t('accounting.dayClose.title', { defaultValue: 'Day Close' })}
@@ -1183,6 +1252,50 @@ function CloseDayModal({
         />
       )}
     </Modal>
+
+    <Modal open={confirmClose} onClose={() => setConfirmClose(false)} maxWidth="24rem" width="100%">
+      <div className="modal-header"><h2 className="modal-title">{t('common.unsavedChanges')}</h2></div>
+      <div className="modal-content"><p>{t('common.unsavedChangesMessage')}</p></div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={() => setConfirmClose(false)}>{t('common.cancel')}</Button>
+        <Button color="danger" onClick={() => { setConfirmClose(false); onClose(); }}>{t('common.discard')}</Button>
+      </div>
+    </Modal>
+    </>
+  );
+}
+
+/* Editable channel row inside the close modal (system net · [counted input] · diff). */
+function CountInputRow({
+  icon, label, net, value, onChange, diff,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  net: number;
+  value: string;
+  onChange: (v: string) => void;
+  diff: React.ReactNode;
+}) {
+  return (
+    <tr className="border-t border-line">
+      <td className="py-1.5">
+        <span className="inline-flex items-center gap-1.5">{icon}{label}</span>
+      </td>
+      <td className="py-1.5 text-right">{fmtCurrency(net)}</td>
+      <td className="py-1 pl-2">
+        <MaskedInput
+          mask="number"
+          decimalScale={2}
+          value={value}
+          onChange={(raw) => onChange(raw)}
+          className="w-full"
+          size="sm"
+          endIcon={<ChevronsRight size={14} />}
+          onEndIconClick={() => onChange(String(net ?? 0))}
+        />
+      </td>
+      <td className="py-1.5 text-right">{diff}</td>
+    </tr>
   );
 }
 

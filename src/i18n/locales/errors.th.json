@@ -200,6 +200,8 @@
   "SALE.STATE.BILL_NOT_OPEN": "บิลไม่อยู่ในสถานะเปิด",
   "SALE.STATE.PREVIOUS_DAY_NOT_CLOSED": "ยังไม่ได้ปิดวันก่อนหน้า",
   "SALE.STATE.DAY_ALREADY_CLOSED": "ปิดวันแล้ว",
+  "SALE.STATE.ALREADY_CLOSED": "ปิดวันแล้ว",
+  "SALE.STATE.HAS_PENDING_BILLS": "มีบิลค้างที่ยังไม่จ่าย/ยกเลิก ต้องเคลียร์ก่อนปิดวัน",
   "SALE.STATE.PAUSE_DEVICE_BOUND": "ไม่สามารถ pause ขณะมีเครื่องผูกอยู่",
   "SALE.STATE.PAUSE_DISABLED": "Pause ถูกปิดใช้งานสำหรับ Company นี้",
   "SALE.STATE.PAUSE_MAX_REACHED": "ถึงจำนวนงวดเลื่อนสูงสุดแล้ว",
