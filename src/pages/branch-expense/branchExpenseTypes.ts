@@ -95,6 +95,41 @@ export interface ExpenseSummaryByItemRow extends ExpenseSummaryRow {
   item_name_th: string;
 }
 
+// v_branch_expense_report — one row per expense entry, laid out for the
+// date-range band report (PDF/Excel). See
+// UI_FEEDBACK/2026-07-05_IMPLEMENT_expense_report_print.md.
+export interface ExpenseReportRow {
+  id: number;
+  code_display: string;
+  branch_id: number;
+  branch_code: string;
+  branch_name: string;
+  category_id: number;
+  category_code: string;
+  category_name_th: string;
+  category_sort_order: number;
+  item_id: number;
+  item_code: string;
+  item_name_th: string;
+  item_sort_order: number;
+  amount: number;
+  expense_date: string;
+  payment_method: string | null;
+  payment_method_name_th: string | null;
+  vendor: string | null;
+  payee_name: string | null;
+  receipt_no: string | null;
+  note: string | null;
+  image_count: number;
+  recorded_at: string;
+  recorded_by: number;
+  recorded_by_name: string | null;
+  is_voided: boolean;
+  voided_at: string | null;
+  voided_by: number | null;
+  voided_reason: string | null;
+}
+
 export interface AttachResponse {
   id: number;
   image_count: number;

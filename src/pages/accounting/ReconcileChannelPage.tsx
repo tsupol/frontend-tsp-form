@@ -6,7 +6,7 @@ import {
   MobileHeader, Select, Badge, InputDateRangePicker, Button,
 } from 'tsp-form';
 import {
-  ArrowRightFromLine, Keyboard, ChevronRight, ChevronDown, Banknote, Landmark, Wallet, Download,
+  ArrowRightFromLine, Keyboard, ChevronRight, ChevronDown, Banknote, Landmark, Wallet, FileSpreadsheet, Loader2,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -200,7 +200,7 @@ export function ReconcileChannelPage() {
             size="sm"
             variant="ghost"
             className="btn-icon-sm"
-            startIcon={<Download size={16} />}
+            startIcon={exporting ? <Loader2 size={16} className="animate-spin" /> : <FileSpreadsheet size={16} />}
             onClick={handleExport}
             disabled={!canExport}
             aria-label={t('accounting.reconcile.export')}
@@ -215,7 +215,7 @@ export function ReconcileChannelPage() {
             size="sm"
             variant="outline"
             className="ml-auto"
-            startIcon={<Download size={16} />}
+            startIcon={exporting ? <Loader2 size={16} className="animate-spin" /> : <FileSpreadsheet size={16} />}
             onClick={handleExport}
             disabled={!canExport}
           >

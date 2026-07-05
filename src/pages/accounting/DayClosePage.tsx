@@ -7,7 +7,7 @@ import {
 } from 'tsp-form';
 import {
   ArrowRightFromLine, ArrowLeft, CalendarCheck, AlertTriangle, CheckCircle2, Lock, Sparkles, Keyboard, XCircle, Clock, ChevronsRight,
-  Coins, Banknote, Download,
+  Coins, Banknote, FileSpreadsheet, Loader2,
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { apiClient, ApiError } from '../../lib/api';
@@ -764,7 +764,7 @@ function ClosedSnapshot({ close, branchId }: { close: DayCloseHistoryRow; branch
               size="sm"
               variant="outline"
               className="btn-icon-sm"
-              startIcon={<Download size={16} />}
+              startIcon={exporting ? <Loader2 size={16} className="animate-spin" /> : <FileSpreadsheet size={16} />}
               onClick={handleExport}
               disabled={exporting}
               aria-label={t('accounting.reconcile.export')}

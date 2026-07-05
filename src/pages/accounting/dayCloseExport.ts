@@ -119,10 +119,19 @@ export async function exportReconcileChannel(
     // Blank separator, then the slip header re-stated by the column titles.
     summaryRow('', null),
   ];
+  // Map the fine payment_method code to the same channel label the page shows
+  // (CASH → cash, TRANSFER → transfer, *_WALLET → wallet).
+  const methodLabel = (method: string): string => {
+    if (method === 'CASH') return t('accounting.reconcile.cash');
+    if (method === 'TRANSFER') return t('accounting.reconcile.transfer');
+    if (method.endsWith('WALLET')) return t('accounting.reconcile.wallet');
+    return method;
+  };
+
   for (const p of payments) {
     out.push({
       code: p.code,
-      method: p.method,
+      method: methodLabel(p.method),
       amount: p.amount,
       bank_name: p.bank_name ?? '',
       account_number: p.account_number ?? '',
