@@ -245,8 +245,9 @@
       "vsLastWeek": "เทียบวันเดียวกันสัปดาห์ก่อน",
       "noBaseline": "ไม่มีฐานเทียบ (สัปดาห์ก่อนยังไม่ปิดวัน)"
     },
-    "branchLeaderboard": "ยอดสาขาวันนี้",
-    "branchLeaderboardHint": "เรียงตามยอดรับรวม",
+    "branchRanking": "อันดับสาขาวันนี้",
+    "branchRankingHint": "ทุกสาขา เรียงตามยอดรับรวมวันนี้",
+    "rankPageOf": "หน้า {{page}} / {{total}}",
     "flag": {
       "voidHigh": "Void เยอะ",
       "voidAmountHigh": "ยอด void สูง",
@@ -664,6 +665,11 @@
     "lastname": "นามสกุล",
     "nickname": "ชื่อเล่น",
     "tel": "โทรศัพท์",
+    "dateOfBirth": "วันเกิด",
+    "address": "ที่อยู่",
+    "personalInfo": "ข้อมูลส่วนตัว",
+    "editProfile": "แก้ไขโปรไฟล์",
+    "profileUpdated": "อัปเดตโปรไฟล์สำเร็จ",
     "profileImage": "รูปโปรไฟล์",
     "uploadImage": "อัปโหลดรูป",
     "uploading": "กำลังอัปโหลด...",

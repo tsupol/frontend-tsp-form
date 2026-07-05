@@ -245,8 +245,9 @@
       "vsLastWeek": "vs same day last week",
       "noBaseline": "No baseline (last week not closed)"
     },
-    "branchLeaderboard": "Branches today",
-    "branchLeaderboardHint": "Ranked by received total",
+    "branchRanking": "Branch ranking today",
+    "branchRankingHint": "All branches ranked by today's received total",
+    "rankPageOf": "Page {{page}} / {{total}}",
     "flag": {
       "voidHigh": "Void count high",
       "voidAmountHigh": "Void amount high",
@@ -664,6 +665,11 @@
     "lastname": "Last Name",
     "nickname": "Nickname",
     "tel": "Phone",
+    "dateOfBirth": "Date of Birth",
+    "address": "Address",
+    "personalInfo": "Personal Information",
+    "editProfile": "Edit Profile",
+    "profileUpdated": "Profile updated",
     "profileImage": "Profile Image",
     "uploadImage": "Upload Image",
     "uploading": "Uploading...",

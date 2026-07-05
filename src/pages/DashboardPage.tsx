@@ -1,11 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { MobileHeader, Badge } from 'tsp-form';
+import { MobileHeader, Badge, Button } from 'tsp-form';
 import {
   ArrowRightFromLine,
   CheckCircle2,
+  ChevronLeft,
   ChevronRight,
   TrendingUp,
   TrendingDown,
@@ -263,13 +264,27 @@ export function DashboardPage() {
     ? { pct: ((todayReceived - lastWeekTotal) / lastWeekTotal) * 100, lastWeek: lastWeekTotal }
     : null;
 
-  // ── Branch leaderboard — only when scope > branch ────────────────────
+  // ── Branch ranking — only when scope > branch ────────────────────────
+  // Shows EVERY branch in scope (including zero-sales ones at ฿0), ranked by
+  // today's received_total. The summary view only holds branches WITH bills
+  // today, so we left-join the full branch list against it client-side and
+  // paginate. (Was a top-5 leaderboard — hid quiet branches, which read as
+  // "only N branches showing".)
   const showLeaderboard = scope.kind !== 'branch';
+  const [rankPage, setRankPage] = useState(0);
+
+  // Always 6 ROWS per page; page size scales with the grid's column count so a
+  // page is exactly 6 rows tall at any width. Cols track the grid breakpoints
+  // below (1 / md:2 / xl:3) via matchMedia.
+  const RANK_ROWS = 6;
+  const rankCols = useRankCols();
+  const RANK_PAGE_SIZE = RANK_ROWS * rankCols;
+
   const leaderboardQuery = useQuery({
     queryKey: ['dashboard', 'leaderboard', sk, today],
     queryFn: () =>
       apiClient.get<BranchTodaySummaryRow[]>(
-        `/v_branch_today_summary?bill_date=eq.${today}${sq}&order=received_total.desc&limit=5`,
+        `/v_branch_today_summary?bill_date=eq.${today}${sq}&order=received_total.desc`,
       ),
     enabled: showLeaderboard,
   });
@@ -279,11 +294,40 @@ export function DashboardPage() {
       apiClient.get<Branch[]>('/v_branches?is_active=is.true&branch_type=eq.INTERNAL&select=id,name,company_id&order=name'),
     enabled: showLeaderboard,
   });
-  const branchNameById = useMemo(() => {
-    const m = new Map<number, string>();
-    (branchesQuery.data ?? []).forEach((b) => m.set(b.id, b.name));
-    return m;
-  }, [branchesQuery.data]);
+
+  // Full ranked list: every in-scope branch, joined to today's summary (or ฿0).
+  const rankedBranches = useMemo(() => {
+    const summaryByBranch = new Map<number, BranchTodaySummaryRow>();
+    (leaderboardQuery.data ?? []).forEach((r) => summaryByBranch.set(r.branch_id, r));
+
+    // Restrict the branch universe to the current scope. Company scope → that
+    // company's branches; holding/all → whichever branches came back (RLS-scoped).
+    const branches = (branchesQuery.data ?? []).filter((b) =>
+      scope.kind === 'company' ? b.company_id === scope.companyId : true,
+    );
+
+    return branches
+      .map((b) => {
+        const s = summaryByBranch.get(b.id);
+        return {
+          branch_id: b.id,
+          name: b.name,
+          received_total: s?.received_total ?? 0,
+          received_cash: s?.received_cash ?? 0,
+          received_transfer: s?.received_transfer ?? 0,
+          received_wallet: s?.received_wallet ?? 0,
+        };
+      })
+      .sort((a, b) => (b.received_total - a.received_total) || a.name.localeCompare(b.name));
+  }, [leaderboardQuery.data, branchesQuery.data, scope]);
+
+  const rankTotalPages = Math.max(1, Math.ceil(rankedBranches.length / RANK_PAGE_SIZE));
+  const rankPageRows = rankedBranches.slice(rankPage * RANK_PAGE_SIZE, rankPage * RANK_PAGE_SIZE + RANK_PAGE_SIZE);
+  const rankMax = Math.max(1, ...rankedBranches.map((x) => x.received_total));
+
+  // Reset to page 1 when scope changes (branch set shifts) or the column count
+  // changes (page size changes, current page may no longer exist).
+  useEffect(() => { setRankPage(0); }, [sk, rankCols]);
 
   return (
     <>
@@ -526,46 +570,77 @@ export function DashboardPage() {
           )}
         </section>
 
-        {/* ── Branch leaderboard (CA/HA only) ──────────────────────────── */}
+        {/* ── Branch ranking (CA/HA only) ──────────────────────────────── */}
         {showLeaderboard && (
           <section>
             <div className="border border-line bg-surface rounded-lg p-4">
-              <h3 className="text-sm font-semibold mb-1">{t('dashboard.branchLeaderboard')}</h3>
-              <div className="text-xs text-subtle mb-3">{t('dashboard.branchLeaderboardHint')}</div>
-              {(leaderboardQuery.data ?? []).length === 0 ? (
+              <h3 className="text-sm font-semibold mb-1">{t('dashboard.branchRanking')}</h3>
+              <div className="text-xs text-subtle mb-3">{t('dashboard.branchRankingHint')}</div>
+              {leaderboardQuery.isLoading || branchesQuery.isLoading ? (
+                <div className="text-sm text-subtle py-6 text-center">—</div>
+              ) : rankedBranches.length === 0 ? (
                 <div className="text-sm text-subtle py-6 text-center">
                   {t('common.noData')}
                 </div>
               ) : (
-                <ul className="divide-y divide-line">
-                  {(leaderboardQuery.data ?? []).map((b) => {
-                    const rows = leaderboardQuery.data ?? [];
-                    const max = Math.max(1, ...rows.map((x) => x.received_total ?? 0));
-                    const pct = ((b.received_total ?? 0) / max) * 100;
-                    return (
-                      <li key={b.branch_id} className="py-2">
-                        <div className="flex items-center justify-between gap-2 text-sm mb-1">
-                          <span className="truncate">
-                            {branchNameById.get(b.branch_id) ?? `#${b.branch_id}`}
-                          </span>
-                          <span className="font-medium whitespace-nowrap">
-                            {fmtCurrency(b.received_total)}
-                          </span>
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-6 gap-y-3">
+                    {rankPageRows.map((b, i) => {
+                      const rank = rankPage * RANK_PAGE_SIZE + i + 1;
+                      const pct = (b.received_total / rankMax) * 100;
+                      return (
+                        <div key={b.branch_id}>
+                          <div className="flex items-center justify-between gap-2 text-sm mb-1">
+                            <span className="truncate flex items-center gap-2 min-w-0">
+                              <span className="text-subtle tabular-nums w-6 shrink-0">{rank}.</span>
+                              <span className="truncate">{b.name}</span>
+                            </span>
+                            <span className="font-medium whitespace-nowrap tabular-nums">
+                              {fmtCurrency(b.received_total)}
+                            </span>
+                          </div>
+                          <div className="h-1.5 bg-line rounded-sm overflow-hidden ml-8">
+                            <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
+                          </div>
+                          <div className="text-xs text-subtle mt-1 ml-8">
+                            {t('dashboard.kpi.cashTransferWallet', {
+                              cash: fmtCurrency(b.received_cash),
+                              transfer: fmtCurrency(b.received_transfer),
+                              wallet: fmtCurrency(b.received_wallet),
+                            })}
+                          </div>
                         </div>
-                        <div className="h-1.5 bg-line rounded-sm overflow-hidden">
-                          <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
-                        </div>
-                        <div className="text-xs text-subtle mt-1">
-                          {t('dashboard.kpi.cashTransferWallet', {
-                            cash: fmtCurrency(b.received_cash),
-                            transfer: fmtCurrency(b.received_transfer),
-                            wallet: fmtCurrency(b.received_wallet),
-                          })}
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
+                      );
+                    })}
+                  </div>
+                  {rankTotalPages > 1 && (
+                    <div className="mt-4 flex items-center justify-end gap-3 text-sm">
+                      <span className="text-subtle tabular-nums">
+                        {t('dashboard.rankPageOf', { page: rankPage + 1, total: rankTotalPages })}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="btn-icon-sm"
+                          startIcon={<ChevronLeft size={16} />}
+                          disabled={rankPage === 0}
+                          onClick={() => setRankPage((p) => Math.max(0, p - 1))}
+                          aria-label={t('common.previous', { defaultValue: 'Previous' })}
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="btn-icon-sm"
+                          startIcon={<ChevronRight size={16} />}
+                          disabled={rankPage >= rankTotalPages - 1}
+                          onClick={() => setRankPage((p) => Math.min(rankTotalPages - 1, p + 1))}
+                          aria-label={t('common.next', { defaultValue: 'Next' })}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </section>
@@ -1001,6 +1076,25 @@ function DeltaLine({
 
 function has<T>(v: T | null | undefined): v is T {
   return v !== null && v !== undefined;
+}
+
+// Column count for the branch-ranking grid, tracking its Tailwind breakpoints
+// (1 col default, md:2 ≥768px, xl:3 ≥1280px). Drives page size = 6 rows × cols.
+function useRankCols(): number {
+  const [cols, setCols] = useState(1);
+  useEffect(() => {
+    const xl = window.matchMedia('(min-width: 1280px)');
+    const md = window.matchMedia('(min-width: 768px)');
+    const update = () => setCols(xl.matches ? 3 : md.matches ? 2 : 1);
+    update();
+    xl.addEventListener('change', update);
+    md.addEventListener('change', update);
+    return () => {
+      xl.removeEventListener('change', update);
+      md.removeEventListener('change', update);
+    };
+  }, []);
+  return cols;
 }
 
 // Empty-state row keyed to which view we queried. Zero-fills only the columns

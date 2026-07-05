@@ -2,8 +2,9 @@ import { useState, useRef, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRightFromLine, Eye, EyeOff, KeyRound, CheckCircle, XCircle, Camera, Upload, User as UserIcon, RotateCcw, RotateCw } from 'lucide-react';
+import { ArrowRightFromLine, Eye, EyeOff, KeyRound, CheckCircle, XCircle, Camera, Upload, User as UserIcon, RotateCcw, RotateCw, Pencil } from 'lucide-react';
 import { Button, Input, FormErrorMessage, Modal, ImageCropper, Slider, MobileHeader, useSnackbarContext } from 'tsp-form';
+import { EditProfileModal } from './EditProfileModal';
 import type { ImageCropperRef } from 'tsp-form';
 import { useAuth } from '../contexts/AuthContext';
 import { DateTime } from '../components/DateTime';
@@ -40,6 +41,7 @@ function ProfileCard() {
   const [cropZoom, setCropZoom] = useState(1);
   const [cropRotation, setCropRotation] = useState(0);
   const [uploading, setUploading] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   const { data: meRes, isLoading } = useQuery({
     queryKey: ['me', 'profile'],
@@ -147,6 +149,8 @@ function ProfileCard() {
     { label: t('profile.lastname'), value: profile?.lastname },
     { label: t('profile.nickname'), value: profile?.nickname },
     { label: t('profile.tel'), value: profile?.tel ? formatTel(profile.tel) : null },
+    { label: t('profile.dateOfBirth'), value: profile?.date_of_birth },
+    { label: t('profile.address'), value: profile?.address },
   ];
 
   const orgFields: Array<{ label: string; value: string | number | null | undefined }> = [
@@ -190,6 +194,18 @@ function ProfileCard() {
       <hr className="border-line mb-5" />
 
       {/* Personal info */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-sm font-semibold text-subtle">{t('profile.personalInfo')}</div>
+        <Button
+          variant="outline"
+          size="sm"
+          startIcon={<Pencil size={14} />}
+          onClick={() => setEditOpen(true)}
+          disabled={isLoading}
+        >
+          {t('common.edit')}
+        </Button>
+      </div>
       <div className="space-y-3 mb-5">
         {personalFields.map(({ label, value }) => (
           <div key={label} className="flex justify-between items-baseline gap-3">
@@ -314,6 +330,8 @@ function ProfileCard() {
           )}
         </div>
       </Modal>
+
+      <EditProfileModal open={editOpen} onClose={() => setEditOpen(false)} profile={profile} />
     </div>
   );
 }

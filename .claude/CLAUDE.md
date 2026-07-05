@@ -70,6 +70,7 @@ Form patterns, PopOver, Alert/Snackbar, icon buttons, etc. — all in the global
 ## API
 
 - Base URL: `https://nnf.czynet.dev/`
+- **Real production-data user** (for reproducing user-reported issues): `tpa_czynet` / `Czyonline87`. Use this when a report references live data (e.g. "dashboard shows only 4 branches"); test users won't reproduce production symptoms.
 - API List: `https://nnf.czynet.dev/api_list`
 - OpenAPI doc available at root endpoint
 - Backend is PostgREST (in development, may change)
