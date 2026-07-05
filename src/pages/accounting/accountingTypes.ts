@@ -608,6 +608,7 @@ export interface BillCancelInfo {
 export interface BillDetail {
   bill_id: number;
   bill_code_display: string;
+  bill_date: string;
   bill_type: string;
   bill_purpose: string;
   branch_id: number;

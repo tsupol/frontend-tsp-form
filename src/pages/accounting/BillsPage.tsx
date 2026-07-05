@@ -787,7 +787,18 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
                       {pay.method}
                     </Badge>
                     <span className={`flex-1 min-w-0 break-words ${isVoided ? 'text-subtler line-through' : 'text-subtle'}`}>
-                      {pay.bank_name ? `${pay.bank_name} ${pay.account_number ?? ''}` : pay.code_display}
+                      {/* Payment code (PM-xxxx) always shown — cash or transfer — and
+                          links to the payment-list page filtered to this payment. */}
+                      <Link
+                        to={`/admin/accounting/payment-list?q=${encodeURIComponent(pay.code_display)}&from=${detail.bill_date}&to=${detail.bill_date}`}
+                        className="text-primary-fg hover:underline font-mono inline-flex items-center gap-1"
+                      >
+                        {pay.code_display}
+                        <ExternalLink size={12} />
+                      </Link>
+                      {pay.bank_name && (
+                        <span className="block">{pay.bank_name} {pay.account_number ?? ''}</span>
+                      )}
                       {pay.reference && <span className="opacity-70 block">· {pay.reference}</span>}
                     </span>
                     {isVoided && (
