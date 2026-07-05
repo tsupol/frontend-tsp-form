@@ -775,12 +775,15 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
             <div className="flex flex-col">
               {originalPayments.map((pay) => {
                 const isVoided = voidedPaymentIds.has(pay.id);
-                // Single reversal door (mig 264): payment void only on OPEN/PARTIAL
-                // bills. Once PAID the DB blocks fn_bill_payment_void
-                // (PAYMENT_VOID_NOT_ALLOWED_FOR_BILL_PURPOSE) — cancel the whole
-                // bill instead. VOID_PAYMENT.is_available from the action evaluator
-                // already encodes that rule + permission + day-closed block.
-                const canVoid = !isVoided && !isCancelled && isActionAvailable('VOID_PAYMENT');
+                // Payment void is OPEN/PARTIAL only. On a PAID bill the DB hard-blocks
+                // fn_bill_payment_void (mig 517, PAYMENT_VOID_NOT_ALLOWED_ON_PAID_BILL)
+                // — use cancel-bill / correct-line / correct-channel instead. The
+                // capability RPC does NOT encode this (a BRANCH_MANAGER still passes
+                // the permission check), so guard on status explicitly, never on
+                // VOID_PAYMENT.is_available alone.
+                // See UI_FEEDBACK/2026-07-05_NOTICE_no_payment_void_on_paid_bill.md
+                const canVoid = !isVoided && !isCancelled && displayStatus !== 'PAID'
+                  && isActionAvailable('VOID_PAYMENT');
                 return (
                   <div key={pay.id} className="flex items-center gap-2 text-sm py-1.5 border-b border-line last:border-b-0">
                     <Badge color={isVoided ? 'default' : (METHOD_COLOR[pay.method] ?? 'default')} size="sm">
