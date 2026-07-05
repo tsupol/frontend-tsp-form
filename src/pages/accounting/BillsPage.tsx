@@ -1224,7 +1224,7 @@ const FOOTER_CATEGORIES: ReadonlySet<string> = new Set(['LIFECYCLE']);
 const PRIMARY_BY_STATUS: Record<string, BillActionCode[]> = {
   OPEN: ['CANCEL_BILL'],
   PARTIAL: ['CANCEL_BILL'],
-  PAID: ['VOID_BILL', 'REVERSE_BILL'],
+  PAID: ['VOID_BILL'],
   VOIDED: [],
 };
 
@@ -1252,6 +1252,10 @@ function BillActionBar({ actions, suppressLifecycle, onVoidOrCancel }: BillActio
   // bills.
   const visibleBeActions = actions
     .filter(a => FOOTER_CATEGORIES.has(a.category))
+    // REVERSE_BILL is a DEPRECATED alias — fn_bill_reverse just calls
+    // fn_bill_cancel (same signature, same effect). Drop it so it isn't a
+    // redundant duplicate of Cancel/Void (and doesn't show as a not-wired wrench).
+    .filter(a => a.action_code !== 'REVERSE_BILL')
     .filter(a => a.blocking_reason !== 'permission_denied')
     .filter(a => !(suppressLifecycle && a.category === 'LIFECYCLE'))
     .slice()
