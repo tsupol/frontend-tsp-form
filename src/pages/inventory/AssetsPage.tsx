@@ -20,6 +20,7 @@ import { AssetScreenTimeSection } from '../../components/AssetScreenTimeSection'
 import { ImeiInput } from '../../components/ImeiInput';
 import { getBucketLabel, getBucketColor, getConditionLabel, getConditionTextColor, CONDITION_VALUES, codeDisplay } from './inventoryUtils';
 import { RegisterAssetModal } from './RegisterAssetModal';
+import { SellExternalModal } from './SellExternalModal';
 
 // ============================================================================
 // Types (verified against live API 2026-03-25)
@@ -178,12 +179,18 @@ const FOOTER_ACTION_ALLOWLIST: ReadonlySet<string> = new Set([
   // LIFECYCLE
   'ASSET_WRITE_OFF_JOURNAL',
   // SALE
-  'ASSET_SELL_AT_COST',
+  'ASSET_SELL_B2B',        // partner sale (ขายให้คู่ค้า) — dedicated SellExternalModal, not the generic one
   'ASSET_SELL',
   'ASSET_DISPOSAL',
   // ADJUSTMENT
   'ASSET_REVALUE',
   'ASSET_IDENTIFIER_CORRECT',
+]);
+
+// Actions that open their own dedicated modal instead of the generic AssetActionModal.
+// They're "wired" (button enabled) but routed to a bespoke component in the detail panel.
+const DEDICATED_MODAL_ACTIONS: ReadonlySet<string> = new Set([
+  'ASSET_SELL_B2B',   // partner sale → SellExternalModal
 ]);
 
 // Actions wireable today via the generic modal.
@@ -296,15 +303,9 @@ const SIMPLE_ACTIONS: Record<string, SimpleActionConfig> = {
     ],
     successKey: 'success.sell',
   },
-  ASSET_SELL_AT_COST: {
-    rpc: 'fn_inv_sell_at_cost',
-    color: 'primary',
-    paramShape: 'asset_array',
-    extraFields: [
-      { kind: 'branch', name: 'p_buyer_branch_id', labelKey: 'sellAtCost.buyerBranch', required: true },
-    ],
-    successKey: 'success.sell_at_cost',
-  },
+  // ASSET_SELL_B2B (partner sale) is intentionally NOT here — it uses the
+  // dedicated SellExternalModal (buyer picker → multi-asset preview → sell →
+  // print → PIN cancel), not the generic single-field modal. See DEDICATED_MODAL_ACTIONS.
   ASSET_DISPOSAL: {
     rpc: 'fn_inv_asset_disposal',
     color: 'danger',
@@ -343,7 +344,7 @@ const SIMPLE_ACTIONS: Record<string, SimpleActionConfig> = {
 
 // Up to 4 actions surfaced inline as primary buttons; rest go behind "More actions".
 const PRIMARY_BY_BUCKET: Record<string, string[]> = {
-  ON_HAND_AVAILABLE: ['ASSET_SELL', 'ASSET_QUARANTINE_ADMIT', 'ASSET_REPAIR_REQUEST'],
+  ON_HAND_AVAILABLE: ['ASSET_SELL', 'ASSET_SELL_B2B', 'ASSET_QUARANTINE_ADMIT', 'ASSET_REPAIR_REQUEST'],
   QUARANTINED: ['ASSET_QUARANTINE_RELEASE', 'ASSET_SELL', 'ASSET_REPAIR_REQUEST', 'ASSET_WRITE_OFF_JOURNAL'],
   IN_REPAIR: [],
   IN_USE_INTERNAL: ['ASSET_INTERNAL_USE_RELEASE'],
@@ -1069,6 +1070,7 @@ function AssetDetailPanel({
   const [actionPreset, setActionPreset] = useState<Record<string, string> | undefined>(undefined);
   const [addIdentifierType, setAddIdentifierType] = useState<string | null>(null);
   const [correctVariantOpen, setCorrectVariantOpen] = useState(false);
+  const [sellExternalOpen, setSellExternalOpen] = useState(false);
   const { handlePrint: printAssetSticker, portal: stickerPortal } = useAssetStickerPrint();
   // INVENTORY.VARIANT_CORRECT audience (per DELIVERY doc). Client-side visibility
   // only; the RPC re-checks permission + contract-binding.
@@ -1411,6 +1413,11 @@ function AssetDetailPanel({
         t={t}
         onPick={(action) => {
           setActionPreset(undefined);
+          // Partner sale has its own multi-step modal; everything else uses the generic one.
+          if (action.action_code === 'ASSET_SELL_B2B') {
+            setSellExternalOpen(true);
+            return;
+          }
           setActiveAction(action);
         }}
       />
@@ -1443,6 +1450,25 @@ function AssetDetailPanel({
         t={t}
         onClose={() => setCorrectVariantOpen(false)}
         onSuccess={onRefresh}
+      />
+
+      <SellExternalModal
+        open={sellExternalOpen}
+        onClose={() => setSellExternalOpen(false)}
+        seedAsset={{
+          asset_id: asset.asset_id,
+          asset_code: asset.asset_code,
+          asset_code_display: asset.asset_code_display,
+          product_display_name: asset.product_display_name,
+          variant_name: asset.variant_name,
+          serial_no: asset.serial_no,
+          imei: asset.imei,
+          external_ref: asset.external_ref,
+          condition_grade: asset.condition_grade,
+          branch_id: asset.branch_id,
+          current_bucket: asset.current_bucket,
+        }}
+        onSold={onRefresh}
       />
         </>
       )}
@@ -2129,6 +2155,13 @@ function AssetActionBar({
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const moreTriggerRef = useRef<HTMLButtonElement>(null);
+  const { user, can } = useAuth();
+
+  // Partner sale is BRANCH_MANAGER-only (INVENTORY.SELL_EXTERNAL). fn_asset_available_actions
+  // reports bucket availability but does NOT gate on permission — the doc requires the FE to
+  // hide the button for non-BM (RPC is only the backstop). Gate on the capability; fall back
+  // to role_code if capabilities aren't loaded.
+  const canSellExternal = can('INVENTORY.SELL_EXTERNAL') || user?.role_code === 'BRANCH_MANAGER';
 
   const { data: actionsResp } = useQuery({
     queryKey: ['asset-actions', asset.asset_id],
@@ -2141,6 +2174,7 @@ function AssetActionBar({
   const allowedActions = (actionsResp?.actions ?? [])
     .filter(a => FOOTER_ACTION_ALLOWLIST.has(a.action_code))
     .filter(a => a.blocking_reason !== 'permission_denied')
+    .filter(a => a.action_code !== 'ASSET_SELL_B2B' || canSellExternal)
     .slice()
     .sort((a, b) => a.sort_order - b.sort_order);
 
@@ -2166,7 +2200,7 @@ function AssetActionBar({
 
   const renderActionButton = (a: BackendAssetAction, primary = false) => {
     const config = SIMPLE_ACTIONS[a.action_code];
-    const wired = !!config;
+    const wired = !!config || DEDICATED_MODAL_ACTIONS.has(a.action_code);
     const label = t(a.action_code, { ns: 'assetActions', defaultValue: a.action_code });
     const placement = ACTION_PLACEMENT[a.action_code];
     let endIcon: React.ReactNode = undefined;

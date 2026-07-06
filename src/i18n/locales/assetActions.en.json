@@ -1,6 +1,6 @@
 {
   "ASSET_APPROVE": "Approve asset",
-  "ASSET_SELL_AT_COST": "Sell at cost",
+  "ASSET_SELL_B2B": "Sell to partner",
   "ASSET_SELL": "Sell",
   "ASSET_DISPOSAL": "Dispose for value",
   "ASSET_QUARANTINE_ADMIT": "Quarantine",
@@ -35,7 +35,6 @@
   "success.repair_request": "Repair request created",
   "success.internal_use_release": "Asset released from internal use",
   "success.sell": "Asset sold (bill posted)",
-  "success.sell_at_cost": "Asset sold at cost",
   "success.disposal": "Asset disposed for value",
   "success.write_off_journal": "Asset written off (journal posted)",
   "success.internal_use_assign": "Asset assigned to internal use",
@@ -44,7 +43,6 @@
   "sell.reason": "Sale reason",
   "sell.salePrice": "Sale price",
   "sell.channel": "Payment channel",
-  "sellAtCost.buyerBranch": "Buyer branch",
   "disposal.buyerBranch": "Scrap buyer branch",
   "disposal.sellPrice": "Sell price",
   "revalue.newCostBasis": "New cost basis (leave blank to keep)",

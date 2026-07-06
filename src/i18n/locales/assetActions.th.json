@@ -1,6 +1,6 @@
 {
   "ASSET_APPROVE": "อนุมัติเครื่อง",
-  "ASSET_SELL_AT_COST": "ขายราคาทุน",
+  "ASSET_SELL_B2B": "ขายให้คู่ค้า",
   "ASSET_SELL": "ขาย",
   "ASSET_DISPOSAL": "จำหน่ายเป็นเงิน",
   "ASSET_QUARANTINE_ADMIT": "พักเครื่อง",
@@ -35,7 +35,6 @@
   "success.repair_request": "สร้างใบส่งซ่อมแล้ว",
   "success.internal_use_release": "ยกเลิกการใช้งานภายในแล้ว",
   "success.sell": "ขายเรียบร้อย (ออกบิลแล้ว)",
-  "success.sell_at_cost": "ขายราคาทุนเรียบร้อย",
   "success.disposal": "จำหน่ายเป็นเงินเรียบร้อย",
   "success.write_off_journal": "ตัดจำหน่ายเรียบร้อย (ลงบัญชีแล้ว)",
   "success.internal_use_assign": "มอบหมายใช้งานภายในเรียบร้อย",
@@ -44,7 +43,6 @@
   "sell.reason": "เหตุผลการขาย",
   "sell.salePrice": "ราคาขาย",
   "sell.channel": "ช่องทางชำระเงิน",
-  "sellAtCost.buyerBranch": "สาขาผู้รับ",
   "disposal.buyerBranch": "สาขาผู้รับซื้อซาก",
   "disposal.sellPrice": "ราคาขาย",
   "revalue.newCostBasis": "มูลค่าใหม่ (เว้นว่างเพื่อคงราคาเดิม)",

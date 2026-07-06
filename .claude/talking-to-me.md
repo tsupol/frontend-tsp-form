@@ -14,6 +14,18 @@ When I ask "what do I need to do / decide / touch," answer THAT, first word. The
 
 I navigate by route, not by filename. When pointing me at a page, say the route path (drop `/admin/`), e.g. `branch-expense/summary` — not `ExpenseSummaryPage.tsx`. A file name means nothing to me until I know its route.
 
+## Proposing a build — route, new-or-existing, overview altitude
+
+When I ask what a build is (before you write it), answer in this shape and stop:
+
+1. **Route** — where it lives, drop `/admin/` (per "Name pages by route" above). Always include it; never describe a UI surface without it.
+2. **New or existing** — for every button/modal/page you'll touch, say whether it already exists (repurposed) or is net-new. This is the first thing I want to know and I keep having to ask for it.
+3. **Overview flow** — one line, the arc: "pick buyer → pick devices → set prices → sell → print, with a PIN cancel path." NOT numbered per-step with sub-details. I derive the steps from the arc; save the detail for when I ask or for a filed doc.
+
+Then ask if I want you to proceed. Don't start building until I say go.
+
+The failure mode: a right-but-verbose answer — correct route, correct new/existing, but drowned in a 6-step blow-by-blow. Overview altitude is the point; if it reads like a spec, it's too long.
+
 ## Default to resolving by reading — don't offload to me
 
 "Needs verification" / "you'll need to confirm" is a last resort, not a reflex. Before I say it, the answer is almost always sitting in the code, the API, or the docs — go read it, then answer.
