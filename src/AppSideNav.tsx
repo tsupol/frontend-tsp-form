@@ -304,6 +304,7 @@ export const AppSideNav = () => {
         { type: 'group', key: 'grp-acct-reports', label: t('nav.groupReports') },
         { key: 'branch-balance', icon: <Scale size="1rem" />, label: t('nav.branchBalance'), path: '/admin/accounting/balance' },
         ...(['BRANCH_MANAGER', 'COMPANY_ADMIN', 'COMPANY_ACCOUNTANT', 'COMPANY_INVENTORY', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
+          { key: 'contracts-opened', icon: <TrendingUp size="1rem" />, label: t('nav.contractsOpened'), path: '/admin/accounting/contracts-opened' },
           { key: 'daily-reports', icon: <FileSpreadsheet size="1rem" />, label: t('nav.dailyReports'), path: '/admin/accounting/reports' },
         ] : []),
         ...(['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [

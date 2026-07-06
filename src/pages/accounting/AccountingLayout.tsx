@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Badge } from 'tsp-form';
 import {
   CalendarCheck, Scale, Receipt, ShieldAlert, Banknote, FileSpreadsheet,
-  ClipboardList, Coins, ArrowUpRight,
+  ClipboardList, Coins, ArrowUpRight, TrendingUp,
 } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -40,6 +40,7 @@ export function AccountingLayout({ children }: { children: ReactNode }) {
     { type: 'group', labelKey: 'nav.groupReports' },
     { type: 'link', path: '/admin/accounting/balance', labelKey: 'nav.branchBalance', icon: Scale },
     ...(canSeeReports ? [
+      { type: 'link' as const, path: '/admin/accounting/contracts-opened', labelKey: 'nav.contractsOpened', icon: TrendingUp },
       { type: 'link' as const, path: '/admin/accounting/reports', labelKey: 'nav.dailyReports', icon: FileSpreadsheet },
     ] : []),
     ...(canSeeAudit ? [

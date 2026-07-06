@@ -445,8 +445,22 @@
     "bills": "บิล",
     "auditFlags": "ธงตรวจสอบ",
     "dailyReports": "รายงานประจำวัน",
+    "contractsOpened": "รายงานเปิดสัญญา",
     "notifications": "การแจ้งเตือน",
     "branchExpense": "ค่าใช้จ่ายสาขา"
+  },
+  "contractsOpened": {
+    "title": "รายงานเปิดสัญญา",
+    "allBranches": "ทุกสาขา",
+    "sumContracts": "จำนวนสัญญา",
+    "sumAgreed": "ยอดจัด",
+    "sumDown": "เงินดาวน์",
+    "downHint": "เงินสดที่เก็บได้",
+    "legendDown": "เงินดาวน์",
+    "legendFinanced": "ยอดผ่อน",
+    "tipDay": "วันที่",
+    "tipContracts": "จำนวนสัญญา",
+    "noData": "ไม่มีสัญญาที่เปิดในเดือนนี้"
   },
   "reports": {
     "title": "รายงานประจำวัน",

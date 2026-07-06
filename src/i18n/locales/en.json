@@ -446,8 +446,22 @@
     "bills": "Bills",
     "auditFlags": "Audit Flags",
     "dailyReports": "Daily Reports",
+    "contractsOpened": "Contracts Opened",
     "notifications": "Notifications",
     "branchExpense": "Branch Expense"
+  },
+  "contractsOpened": {
+    "title": "Contracts Opened",
+    "allBranches": "All branches",
+    "sumContracts": "Contracts",
+    "sumAgreed": "Financed amount",
+    "sumDown": "Down payment",
+    "downHint": "Cash collected",
+    "legendDown": "Down payment",
+    "legendFinanced": "Installment (financed)",
+    "tipDay": "Day",
+    "tipContracts": "Contracts",
+    "noData": "No contracts opened this month"
   },
   "reports": {
     "title": "Daily Reports",

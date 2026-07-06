@@ -86,6 +86,7 @@ import { ReconcileItemPage } from './pages/accounting/ReconcileItemPage';
 import { ReconcileChannelPage } from './pages/accounting/ReconcileChannelPage';
 import { AuditFlagsPage } from './pages/accounting/AuditFlagsPage';
 import { ReportsPage } from './pages/accounting/ReportsPage';
+import { ContractsOpenedReportPage } from './pages/accounting/ContractsOpenedReportPage';
 import { BranchExpenseLayout } from './pages/branch-expense/BranchExpenseLayout';
 import { ExpenseEntriesPage } from './pages/branch-expense/ExpenseEntriesPage';
 import { CategoriesPage as BranchExpenseCategoriesPage } from './pages/branch-expense/CategoriesPage';
@@ -953,6 +954,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <AccountingLayout><ReportsPage /></AccountingLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/accounting/contracts-opened"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <AccountingLayout><ContractsOpenedReportPage /></AccountingLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
