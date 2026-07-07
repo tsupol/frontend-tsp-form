@@ -1294,6 +1294,10 @@ function AssetDetailPanel({
       {/* Box (has_box / box branch) — inline badge + edit */}
       <BoxRow asset={asset} onChanged={onRefresh} t={t} addSnackbar={addSnackbar} />
 
+      {/* Warranty expiry — display + dedicated set/clear (fn_inv_asset_set_warranty).
+          Lighter than revalue: works in any bucket, INVENTORY.ASSET_REVALUE only. */}
+      <WarrantyRow asset={asset} onChanged={onRefresh} t={t} addSnackbar={addSnackbar} />
+
       {/* Financial info */}
       <div className="flex-none grid grid-cols-2 gap-3 px-4 py-3 border-b border-line">
         <div>
@@ -2128,6 +2132,177 @@ function SetBoxModal({
               <div className="text-xs text-subtle mt-1">{t('asset.boxBranchHint', { defaultValue: 'Defaults to the asset\'s branch if left empty.' })}</div>
             </div>
           )}
+        </div>
+      </div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={onClose} disabled={mutation.isPending}>{t('common.cancel')}</Button>
+        <Button color="primary" onClick={() => mutation.mutate()} disabled={mutation.isPending}>
+          {mutation.isPending ? t('common.saving') : t('common.save')}
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
+// ============================================================================
+// Warranty row — warranty_expired_date display + dedicated set/clear edit
+// (fn_inv_asset_set_warranty, mig 115). Separate from revalue: works in any
+// bucket (metadata edit, even WITH_CUSTOMER) and can CLEAR to NULL. Edit
+// control requires INVENTORY.ASSET_REVALUE.
+// ============================================================================
+
+function WarrantyRow({
+  asset,
+  onChanged,
+  t,
+  addSnackbar,
+}: {
+  asset: Asset;
+  onChanged: () => void;
+  t: ReturnType<typeof useTranslation>['t'];
+  addSnackbar: (opts: { message: React.ReactNode }) => void;
+}) {
+  const { can } = useAuth();
+  const canEdit = can('INVENTORY.ASSET_REVALUE');
+  const [editOpen, setEditOpen] = useState(false);
+
+  return (
+    <div className="flex-none px-4 py-3 border-b border-line">
+      <div className="flex items-center gap-2">
+        <div className="text-xs text-subtle shrink-0">{t('asset.warranty', { defaultValue: 'Warranty' })}</div>
+        {asset.warranty_expired_date ? (
+          <span className="text-sm">
+            <DateTime value={asset.warranty_expired_date} />
+          </span>
+        ) : (
+          <span className="text-sm text-subtler italic">{t('asset.warrantyNone', { defaultValue: 'Not set' })}</span>
+        )}
+        {canEdit && (
+          <Button
+            variant="ghost"
+            size="xs"
+            startIcon={<Pencil size={12} />}
+            onClick={() => setEditOpen(true)}
+            aria-label={t('asset.editWarranty', { defaultValue: 'Edit warranty date' })}
+          />
+        )}
+      </div>
+      <SetWarrantyModal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        asset={asset}
+        t={t}
+        onSuccess={(cleared) => {
+          setEditOpen(false);
+          onChanged();
+          addSnackbar({
+            message: (
+              <div className="alert alert-success">
+                <CheckCircle size={16} />
+                <span>{cleared
+                  ? t('asset.warrantyCleared', { defaultValue: 'Warranty date cleared' })
+                  : t('asset.warrantySaved', { defaultValue: 'Warranty date updated' })}</span>
+              </div>
+            ),
+          });
+        }}
+      />
+    </div>
+  );
+}
+
+function SetWarrantyModal({
+  open, onClose, asset, t, onSuccess,
+}: {
+  open: boolean;
+  onClose: () => void;
+  asset: Asset;
+  t: ReturnType<typeof useTranslation>['t'];
+  onSuccess: (cleared: boolean) => void;
+}) {
+  const { i18n } = useTranslation();
+  const [dateStr, setDateStr] = useState(asset.warranty_expired_date ?? '');
+  const [typing, setTyping] = useState(false);
+  const [error, setError] = useState('');
+
+  // Reset to the asset's current value whenever reopened.
+  useEffect(() => {
+    if (open) {
+      setDateStr(asset.warranty_expired_date ?? '');
+      setTyping(false);
+      setError('');
+    }
+  }, [open, asset.warranty_expired_date]);
+
+  const mutation = useMutation({
+    mutationFn: () => apiClient.rpc<{ cleared: boolean }>('fn_inv_asset_set_warranty', {
+      p_asset_id: asset.asset_id,
+      // Empty → null clears the warranty (backend supports explicit NULL).
+      p_warranty_expired_date: dateStr || null,
+      p_note: null,
+    }),
+    onSuccess: () => onSuccess(!dateStr),
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        const translated =
+          (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') ||
+          (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setError(translated || err.message);
+      } else {
+        setError(String(err));
+      }
+    },
+  });
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="26rem" width="100%">
+      <div className="modal-header">
+        <h2 className="modal-title">{t('asset.editWarranty', { defaultValue: 'Edit warranty date' })}</h2>
+        <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+      </div>
+      <div className="modal-content">
+        {error && (
+          <div className="alert alert-danger mb-4 animate-pop-in">
+            <XCircle size={16} />
+            <span>{error}</span>
+          </div>
+        )}
+        <div className="px-3 py-2.5 rounded-md bg-surface border border-line mb-4">
+          <div className="font-medium text-sm">{asset.asset_code_display ?? asset.asset_code}</div>
+          <div className="text-xs text-subtle">{asset.product_display_name ?? asset.variant_name}</div>
+        </div>
+
+        <div className="form-grid">
+          <div className="flex flex-col">
+            <label className="form-label">{t('asset.warrantyDate', { defaultValue: 'Warranty expiry date' })}</label>
+            <InputDatePicker
+              value={dateStr ? new Date(dateStr + 'T00:00:00') : null}
+              onChange={(v) => setDateStr(toLocalDateStr(v))}
+              dateFormat={makeDatePickerFormat(i18n.language)}
+              locale={i18n.language}
+              calendar="gregorian"
+              endIcon={dateStr
+                ? <XCircle size={16} />
+                : <Keyboard size={16} />}
+              onEndIconClick={() => { if (dateStr) setDateStr(''); else setTyping((p) => !p); }}
+              typingMode={typing}
+              onTypingModeChange={setTyping}
+              typingMask="##/##/####"
+              typingPlaceholder="DD/MM/YYYY"
+              parseTypedDate={(raw) => {
+                if (raw.length !== 8) return null;
+                const day = parseInt(raw.slice(0, 2), 10);
+                const month = parseInt(raw.slice(2, 4), 10);
+                let year = parseInt(raw.slice(4, 8), 10);
+                if (year > 2400) year -= 543;
+                if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+                const d = new Date(year, month - 1, day);
+                if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+                return d;
+              }}
+            />
+            <div className="text-xs text-subtle mt-1">{t('asset.warrantyHint', { defaultValue: 'Leave empty and save to clear the warranty date.' })}</div>
+          </div>
         </div>
       </div>
       <div className="modal-footer">
