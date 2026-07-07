@@ -6,11 +6,12 @@ import {
   MobileHeader, Select, Badge, InputDateRangePicker, Button,
 } from 'tsp-form';
 import {
-  ArrowRightFromLine, Keyboard, ChevronRight, ChevronDown, Banknote, Landmark, Wallet, FileSpreadsheet, Loader2,
+  ArrowRightFromLine, Keyboard, ChevronRight, ChevronDown, Banknote, Landmark, Wallet, FileSpreadsheet, Loader2, Receipt, Image as ImageIcon,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { DateTime } from '../../components/DateTime';
+import { MediaLightbox } from '../../components/MediaLightbox';
 import { FilterBar, type FilterBarItem } from '../../components/FilterBar';
 import {
   fmtCurrency, toLocalDateStr, parseLocalDate, makeDateRangePickerFormat,
@@ -48,6 +49,9 @@ export function ReconcileChannelPage() {
   const [isTypingRange, setIsTypingRange] = useState(false);
   const [expanded, setExpanded] = useState<Set<Channel>>(new Set());
   const [exporting, setExporting] = useState(false);
+  const [slipOnly, setSlipOnly] = useState(false);
+  // Slip image lightbox (private key → presigned via useMediaUrl inside).
+  const [slipImageKey, setSlipImageKey] = useState<string | null>(null);
 
   const pendingPatchRef = useRef<Record<string, string> | null>(null);
   const updateFilters = useCallback((patch: Partial<{ branch_id: string; from: string; to: string }>) => {
@@ -77,8 +81,10 @@ export function ReconcileChannelPage() {
   });
 
   const selectedBranch = branches.find(b => String(b.id) === branchId);
-  const companyId = selectedBranch?.company_id ?? null;
   const allBranches = branchId === '__ALL__';
+  // "All branches" has no selected branch to derive the company from — use the
+  // user's own company (JWT). RLS still scopes the RPC to what they may see.
+  const companyId = allBranches ? (user?.company_id ?? null) : (selectedBranch?.company_id ?? null);
 
   const { data, isFetching } = useQuery({
     queryKey: ['accounting', 'reconcile-channel', branchId, companyId, fromDate, toDate],
@@ -93,15 +99,22 @@ export function ReconcileChannelPage() {
   });
 
   const summary = data?.summary;
+  // "เฉพาะจากสลิป" filters the expandable payment lists (client-side — payments[]
+  // arrives un-paginated). The channel totals above stay unchanged.
+  const shownPayments = useMemo(
+    () => slipOnly ? (data?.payments ?? []).filter(p => p.from_slip_submission) : (data?.payments ?? []),
+    [data?.payments, slipOnly],
+  );
   const paymentsByMethod = useMemo(() => {
     const m = new Map<string, ReconcileChannelPayment[]>();
-    for (const p of data?.payments ?? []) {
+    for (const p of shownPayments) {
       const arr = m.get(p.method) ?? [];
       arr.push(p);
       m.set(p.method, arr);
     }
     return m;
-  }, [data?.payments]);
+  }, [shownPayments]);
+  const hasSlipPayments = (summary?.slip_payment_count ?? 0) > 0;
 
   const toggle = (c: Channel) => setExpanded(prev => {
     const next = new Set(prev);
@@ -114,9 +127,10 @@ export function ReconcileChannelPage() {
     setExporting(true);
     try {
       const branchLabel = selectedBranch?.name ?? (allBranches ? 'all' : branchId);
+      // Export what's on screen — respects the "เฉพาะจากสลิป" filter.
       await exportReconcileChannel(
         summary,
-        data?.payments ?? [],
+        shownPayments,
         t,
         `moneycheck_${branchLabel}_${fromDate}_${toDate}`,
       );
@@ -176,8 +190,20 @@ export function ReconcileChannelPage() {
       disabled={isBranchUser}
     />
   );
+  const slipToggleNode: ReactNode = (
+    <Button
+      size="sm"
+      variant={slipOnly ? undefined : 'outline'}
+      color={slipOnly ? 'primary' : undefined}
+      startIcon={<Receipt size={14} />}
+      onClick={() => setSlipOnly(v => !v)}
+    >
+      {t('accounting.reconcile.slipOnly', { defaultValue: 'From slip only' })}
+    </Button>
+  );
   const filterItems: FilterBarItem[] = [
     { key: 'branch', width: 200, node: branchNode, priority: 10 },
+    ...(hasSlipPayments ? [{ key: 'slip', width: 150, node: slipToggleNode, priority: 8 }] : []),
   ];
 
   return (
@@ -258,6 +284,7 @@ export function ReconcileChannelPage() {
                 open={expanded.has('CASH')}
                 onToggle={() => toggle('CASH')}
                 payments={paymentsByMethod.get('CASH') ?? []}
+                onViewSlip={setSlipImageKey}
               />
               {/* Transfer */}
               <ChannelRow
@@ -271,6 +298,7 @@ export function ReconcileChannelPage() {
                 open={expanded.has('TRANSFER')}
                 onToggle={() => toggle('TRANSFER')}
                 payments={paymentsByMethod.get('TRANSFER') ?? []}
+                onViewSlip={setSlipImageKey}
               />
 
               {/* Must-count subtotal */}
@@ -328,6 +356,21 @@ export function ReconcileChannelPage() {
                 <span className="w-24" />
               </div>
 
+              {/* Slip-origin NOTE — these are already inside net_transfer, shown
+                  only so the closer knows how much came from the slip team. */}
+              {hasSlipPayments && (
+                <div className="mt-2 flex items-start gap-2 px-2 py-2 rounded-md bg-info-soft text-xs">
+                  <Receipt size={14} className="text-info-fg shrink-0 mt-0.5" />
+                  <span className="text-info-fg">
+                    {t('accounting.reconcile.slipNote', {
+                      defaultValue: '{{count}} payment(s) · ฿{{total}} came from the slip-checking team',
+                      count: summary.slip_payment_count,
+                      total: fmtCurrency(summary.slip_payment_total),
+                    })}
+                  </span>
+                </div>
+              )}
+
               {(summary.diff_cash === null || summary.diff_transfer === null) && (
                 <div className="mt-3 text-center text-xs text-subtler">
                   {t('accounting.reconcile.notClosedYet')}
@@ -337,12 +380,19 @@ export function ReconcileChannelPage() {
           )}
         </div>
       </div>
+
+      <MediaLightbox
+        open={slipImageKey !== null}
+        onClose={() => setSlipImageKey(null)}
+        mediaKey={slipImageKey}
+        alt={t('accounting.reconcile.slipImageAlt', { defaultValue: 'Payment slip' })}
+      />
     </>
   );
 }
 
 function ChannelRow({
-  icon, label, net, counted, diff, shortage, overage, open, onToggle, payments,
+  icon, label, net, counted, diff, shortage, overage, open, onToggle, payments, onViewSlip,
 }: {
   icon: ReactNode;
   label: string;
@@ -354,6 +404,7 @@ function ChannelRow({
   open: boolean;
   onToggle: () => void;
   payments: ReconcileChannelPayment[];
+  onViewSlip: (key: string) => void;
 }) {
   const { t } = useTranslation();
   const hasSlips = payments.length > 0;
@@ -407,9 +458,17 @@ function ChannelRow({
           {pageSlips.map(p => (
             <div key={p.payment_id} className="flex items-center gap-2 py-1.5 border-t border-line/60">
               <div className="flex flex-col min-w-0 flex-1">
-                <div className="flex items-center gap-1.5 min-w-0">
+                <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
                   <span className="font-mono text-xs truncate">{p.code}</span>
                   {p.is_reversal && <Badge color="danger" size="xs">{t('accounting.reconcile.refund')}</Badge>}
+                  {p.from_slip_submission && (
+                    <Badge color="info" size="xs">
+                      <span className="inline-flex items-center gap-1">
+                        <Receipt size={10} />
+                        {p.submission_code ?? t('accounting.reconcile.fromSlip', { defaultValue: 'From slip' })}
+                      </span>
+                    </Badge>
+                  )}
                 </div>
                 <span className="text-xs text-subtle truncate">
                   {p.bank_name && <>{p.bank_name} {p.account_number} · </>}
@@ -417,6 +476,16 @@ function ChannelRow({
                   <DateTime value={p.created_at} showTime={true} />
                 </span>
               </div>
+              {p.from_slip_submission && p.slip_key && (
+                <button
+                  type="button"
+                  onClick={() => onViewSlip(p.slip_key!)}
+                  className="shrink-0 inline-flex items-center gap-1 text-xs text-primary-fg hover:underline bg-transparent border-none p-0 cursor-pointer"
+                >
+                  <ImageIcon size={13} />
+                  {t('accounting.reconcile.viewSlip', { defaultValue: 'View slip' })}
+                </button>
+              )}
               <span className={`shrink-0 text-xs tabular-nums ${p.amount < 0 ? 'text-danger' : ''}`}>
                 {fmtCurrency(p.amount)}
               </span>

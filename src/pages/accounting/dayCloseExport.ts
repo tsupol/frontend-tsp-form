@@ -103,12 +103,14 @@ export async function exportReconcileChannel(
     { key: 'account_number', label: t('accounting.reconcile.account'), type: 'text', width: 16 },
     { key: 'payer_name', label: t('accounting.reconcile.payer'), width: 22 },
     { key: 'bill_code', label: t('accounting.reconcile.billCode'), type: 'text', width: 18 },
+    { key: 'from_slip', label: t('accounting.reconcile.fromSlipCol', { defaultValue: 'From slip' }), width: 12 },
+    { key: 'submission_code', label: t('accounting.reconcile.submissionCode', { defaultValue: 'Slip ref' }), type: 'text', width: 18 },
     { key: 'created_at', label: t('accounting.dayClose.billDate'), type: 'date', width: 18 },
   ];
 
   // Summary block first (as `code`/`amount` cells so it lands in the same columns).
   const summaryRow = (label: string, amount: number | null): Record<string, unknown> => ({
-    code: label, method: '', amount, bank_name: '', account_number: '', payer_name: '', bill_code: '', created_at: '',
+    code: label, method: '', amount, bank_name: '', account_number: '', payer_name: '', bill_code: '', from_slip: '', submission_code: '', created_at: '',
   });
   const out: Record<string, unknown>[] = [
     summaryRow(t('accounting.reconcile.cash'), summary.net_cash),
@@ -116,9 +118,20 @@ export async function exportReconcileChannel(
     summaryRow(t('accounting.reconcile.mustCount'), summary.physical),
     summaryRow(t('accounting.reconcile.wallet'), summary.wallet),
     summaryRow(t('accounting.reconcile.totalRemit'), summary.remit_total),
-    // Blank separator, then the slip header re-stated by the column titles.
-    summaryRow('', null),
   ];
+  // Slip-origin note (only when present) — count + total from the slip team.
+  if (summary.slip_payment_count > 0) {
+    out.push(summaryRow(
+      t('accounting.reconcile.slipNote', {
+        defaultValue: '{{count}} payment(s) · ฿{{total}} came from the slip-checking team',
+        count: summary.slip_payment_count,
+        total: summary.slip_payment_total,
+      }),
+      summary.slip_payment_total,
+    ));
+  }
+  // Blank separator, then the slip header re-stated by the column titles.
+  out.push(summaryRow('', null));
   // Map the fine payment_method code to the same channel label the page shows
   // (CASH → cash, TRANSFER → transfer, *_WALLET → wallet).
   const methodLabel = (method: string): string => {
@@ -137,6 +150,8 @@ export async function exportReconcileChannel(
       account_number: p.account_number ?? '',
       payer_name: p.payer_name ?? '',
       bill_code: p.bill_code,
+      from_slip: p.from_slip_submission ? t('common.yes', { defaultValue: 'Yes' }) : '',
+      submission_code: p.submission_code ?? '',
       created_at: p.created_at,
     });
   }

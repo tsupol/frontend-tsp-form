@@ -343,6 +343,10 @@ export interface ReconcileChannelSummary {
   wallet_net: number;
   wallet_action: 'WITHDRAW_FROM_COMPANY' | 'REMIT_SURPLUS' | 'NONE';
   wallet_action_amount: number;
+  // mig 528 — slip-origin NOTE. These payments are already inside net_transfer;
+  // this is only "how much came from the slip-checking team", never subtracted.
+  slip_payment_count: number;
+  slip_payment_total: number;
 }
 
 export interface ReconcileChannelPayment {
@@ -357,6 +361,10 @@ export interface ReconcileChannelPayment {
   is_reversal: boolean;
   branch_id: number;
   created_at: string;
+  // mig 528 — slip-submission origin (came from the slip-checking department)
+  from_slip_submission: boolean;
+  submission_code: string | null;   // SS-xxxx display ref; null when not from a slip
+  slip_key: string | null;          // storage key for the slip image; null when no image
 }
 
 export interface ReconcileChannelBranch {
