@@ -6,7 +6,6 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Badge, Button } from 'tsp-form';
 import { AlertCircle, RefreshCw, Pencil } from 'lucide-react';
-import { DateTime } from '../../components/DateTime';
 import { useDunningStages } from './useDunningStages';
 import { DunningStageEditModal } from './DunningStageEditModal';
 import { DunningStageResetModal } from './DunningStageResetModal';
@@ -138,13 +137,6 @@ function StageRow({ row, extraField, onEdit, onReset }: {
           <Button size="sm" variant="ghost" className="btn-icon-sm" onClick={onReset} startIcon={<RefreshCw size={14} />} />
         )}
       </div>
-
-      {/* Audit footer — only when custom */}
-      {isCustom && eff.updated_at && (
-        <div className="col-span-full text-[11px] text-subtler">
-          {t('dunningSystem.lastUpdated')} <DateTime value={eff.updated_at} />
-        </div>
-      )}
     </div>
   );
 }
