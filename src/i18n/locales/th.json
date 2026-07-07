@@ -3831,7 +3831,7 @@
   "accounting": {
     "installmentCheck": {
       "title": "ตรวจชำระค่างวด",
-      "export": "Export Excel",
+      "export": "Excel",
       "exporting": "กำลังส่งออก…",
       "allBranches": "ทุกสาขา",
       "channels": "ช่องทาง:",

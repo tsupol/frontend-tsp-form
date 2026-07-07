@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState, type ReactNode } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import {
@@ -7,7 +7,7 @@ import {
 } from 'tsp-form';
 import {
   ArrowRightFromLine, Keyboard, FileSpreadsheet, Loader2, Repeat, Flag,
-  Landmark, Smartphone, User, Receipt, Image as ImageIcon,
+  Landmark, Smartphone, User, Receipt, Image as ImageIcon, ExternalLink,
 } from 'lucide-react';
 import { ApiError, apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -32,6 +32,7 @@ function todayStr() {
 export function InstallmentCheckPage() {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const isBranchUser = ['BRANCH_STAFF', 'BRANCH_MANAGER'].includes(user?.role_code ?? '');
   const userBranchId = isBranchUser && user?.branch_id ? String(user.branch_id) : '';
 
@@ -315,13 +316,27 @@ export function InstallmentCheckPage() {
                     )}
                   </div>
 
-                  {/* Line 2 — bill · contract · customer */}
+                  {/* Line 2 — bill · contract · customer (bill + contract link out) */}
                   <div className="flex items-center gap-1.5 text-xs text-subtle mt-1.5 flex-wrap">
                     <Receipt size={12} className="shrink-0" />
-                    <span className="font-mono">{r.bill_code}</span>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/admin/accounting/bills/${r.bill_id}`)}
+                      className="font-mono text-primary-fg hover:underline inline-flex items-center gap-0.5 bg-transparent border-none p-0 cursor-pointer"
+                    >
+                      {r.bill_code}
+                      <ExternalLink size={10} />
+                    </button>
                     <span className="text-line">|</span>
                     <User size={12} className="shrink-0" />
-                    <span className="font-mono">{r.contract_code}</span>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/admin/contracts/search/${r.contract_id}`)}
+                      className="font-mono text-primary-fg hover:underline inline-flex items-center gap-0.5 bg-transparent border-none p-0 cursor-pointer"
+                    >
+                      {r.contract_code}
+                      <ExternalLink size={10} />
+                    </button>
                     <span className="text-fg">{r.customer_name}</span>
                     {r.customer_tel && <span>· {r.customer_tel}</span>}
                   </div>

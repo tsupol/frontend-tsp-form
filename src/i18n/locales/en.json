@@ -3833,7 +3833,7 @@
   "accounting": {
     "installmentCheck": {
       "title": "Installment Check",
-      "export": "Export Excel",
+      "export": "Excel",
       "exporting": "Exporting…",
       "allBranches": "All branches",
       "channels": "Channels:",
