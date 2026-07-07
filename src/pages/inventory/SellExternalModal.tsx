@@ -122,7 +122,6 @@ export function SellExternalModal({
   const [cancelOpen, setCancelOpen] = useState(false);
 
   // Buyer picker search state (declared before the reset effect that clears it).
-  const [buyerSearch, setBuyerSearch] = useState('');
   const [debouncedBuyerSearch, setDebouncedBuyerSearch] = useState('');
   const [selectedBuyer, setSelectedBuyer] = useState<ExternalBuyerBranch | null>(null);
   const buyerDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -135,7 +134,6 @@ export function SellExternalModal({
       setView('form');
       setBuyerId(null);
       setSelectedBuyer(null);
-      setBuyerSearch('');
       setDebouncedBuyerSearch('');
       setAssetIds(seedAsset ? [seedAsset.asset_id] : []);
       setPrices({});
@@ -153,7 +151,6 @@ export function SellExternalModal({
   // loading them all. Empty term loads a first batch; the selected option is
   // pinned so it stays visible after the results change.
   const handleBuyerSearch = useCallback((term: string) => {
-    setBuyerSearch(term);
     if (buyerDebounceRef.current) clearTimeout(buyerDebounceRef.current);
     buyerDebounceRef.current = setTimeout(() => setDebouncedBuyerSearch(term.trim()), 300);
   }, []);
@@ -318,13 +315,6 @@ export function SellExternalModal({
                     startIcon={<Search size={16} />}
                     showChevron
                   />
-                  {!buyersFetching && buyerOptions.length === 0 && (
-                    <div className="text-xs text-subtle mt-1">
-                      {buyerSearch.trim()
-                        ? t('sellExternal.noBuyersMatch', { defaultValue: 'No partner branch matches your search.' })
-                        : t('sellExternal.noBuyers', { defaultValue: 'No partner branches available.' })}
-                    </div>
-                  )}
                 </div>
 
                 {/* Device list + price preview */}

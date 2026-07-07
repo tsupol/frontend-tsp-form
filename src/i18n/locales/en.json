@@ -1451,8 +1451,6 @@
     "journalNote": "This is a partner sale — the amount does NOT count toward day-close.",
     "buyer": "Buyer (partner branch)",
     "buyerPlaceholder": "Search partner branch",
-    "noBuyers": "No partner branches available.",
-    "noBuyersMatch": "No partner branch matches your search.",
     "devices": "Devices",
     "addDevice": "Add device",
     "addDevicePlaceholder": "Search available devices at this branch",
