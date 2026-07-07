@@ -352,9 +352,13 @@ export const AppSideNav = () => {
       children: [
         { type: 'group', key: 'grp-bxp-record', label: t('branchExpense.groupRecord') },
         { key: 'bxp-entries', icon: <BookIcon size="1rem" />, label: t('branchExpense.entries'), path: '/admin/branch-expense/entries' },
-        ...(['COMPANY_ADMIN', 'COMPANY_ACCOUNTANT', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
+        // Report is open to branch roles too (RLS scopes them to their own
+        // branch) — DELIVERY 2026-07-05. Config stays company-only.
+        ...(['COMPANY_ADMIN', 'COMPANY_ACCOUNTANT', 'HOLDING_ADMIN', 'SYSTEM_DEV', 'BRANCH_MANAGER', 'BRANCH_STAFF'].includes(role) ? [
           { type: 'group' as const, key: 'grp-bxp-reports', label: t('branchExpense.groupReports') },
           { key: 'bxp-summary', icon: <BarChartIcon size="1rem" />, label: t('branchExpense.summary'), path: '/admin/branch-expense/summary' },
+        ] : []),
+        ...(['COMPANY_ADMIN', 'COMPANY_ACCOUNTANT', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
           { type: 'group' as const, key: 'grp-bxp-config', label: t('branchExpense.groupConfig') },
           { key: 'bxp-categories', icon: <TagIcon size="1rem" />, label: t('branchExpense.categories'), path: '/admin/branch-expense/categories' },
         ] : []),

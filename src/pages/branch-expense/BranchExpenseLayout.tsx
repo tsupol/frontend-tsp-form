@@ -16,7 +16,9 @@ export function BranchExpenseLayout({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const role = user?.role_code ?? '';
   const canManageCategory = ['COMPANY_ADMIN', 'COMPANY_ACCOUNTANT', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
-  const canSeeSummary = canManageCategory;
+  // Report is open to branch roles too — RLS scopes a branch_manager/staff to
+  // their own branch (BRANCH_EXPENSE.VIEW). Per DELIVERY 2026-07-05.
+  const canSeeSummary = canManageCategory || ['BRANCH_MANAGER', 'BRANCH_STAFF'].includes(role);
 
   const navItems: NavItem[] = useMemo(() => [
     { type: 'group', labelKey: 'branchExpense.groupRecord' },
