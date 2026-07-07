@@ -148,7 +148,7 @@ export function PaymentListPage() {
   if (typeFilter) params.set('bill_type', `eq.${typeFilter}`);
   if (bankAccountFilter) params.set('bank_account_id', `eq.${bankAccountFilter}`);
   if (!showVoided) { params.set('is_voided', 'eq.false'); params.set('is_reversal', 'eq.false'); }
-  if (search.trim()) params.set('or', `(code_display.ilike.*${search.trim()}*,payer_name.ilike.*${search.trim()}*,bill_code_display.ilike.*${search.trim()}*)`);
+  if (search.trim()) params.set('or', `(code_display.ilike.*${search.trim()}*,payer_name.ilike.*${search.trim()}*,bill_code_display.ilike.*${search.trim()}*,contract_code_display.ilike.*${search.trim()}*)`);
   params.set('order', 'bill_date.desc,payment_id.desc');
 
   const { data: pageData, isFetching } = useQuery({
@@ -479,7 +479,7 @@ export function PaymentListPage() {
                                   onClick={(e) => { e.stopPropagation(); navigate(`/admin/contracts/search/${p.contract_id}`); }}
                                   className="font-mono text-primary-fg hover:underline inline-flex items-center gap-0.5 cursor-pointer"
                                 >
-                                  CT#{p.contract_id}
+                                  {p.contract_code_display ?? `CT#${p.contract_id}`}
                                   <ExternalLink size={10} />
                                 </span>
                               </>
@@ -613,7 +613,7 @@ function PaymentDetailPanel({
               onClick={() => navigate(`/admin/contracts/search/${p.contract_id}`)}
               className="text-primary-fg hover:underline font-mono inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer self-start"
             >
-              CT#{p.contract_id}
+              {p.contract_code_display ?? `CT#${p.contract_id}`}
               <ExternalLink size={13} />
             </button>
           )}

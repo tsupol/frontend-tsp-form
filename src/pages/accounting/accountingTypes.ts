@@ -183,6 +183,8 @@ export interface PaymentRow {
   bill_code: string;
   bill_code_display: string;          // BL-xxxx
   contract_id: number | null;
+  contract_code: string | null;          // raw, e.g. CT26060001166 (mig 526)
+  contract_code_display: string | null;  // friendly, e.g. CT-2606-000116-6; null for retail/fee
   charge_types: string[] | null;
   days_early: number | null;
   is_reversal: boolean;               // this row IS a reversal (negative)
