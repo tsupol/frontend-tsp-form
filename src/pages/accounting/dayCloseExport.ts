@@ -7,6 +7,7 @@ import { downloadXlsx, type XlsxColumn } from '../../lib/xlsx';
 import type {
   ReconcileItemGroup, ReconcileItemRow,
   ReconcileChannelSummary, ReconcileChannelPayment,
+  InstallmentCheckRow, InstallmentCheckByMethod,
 } from './accountingTypes';
 
 // ── ① / ③ : line-level remittance export (rows grouped by subgroup) ──────────
@@ -153,6 +154,71 @@ export async function exportReconcileChannel(
       from_slip: p.from_slip_submission ? t('common.yes', { defaultValue: 'Yes' }) : '',
       submission_code: p.submission_code ?? '',
       created_at: p.created_at,
+    });
+  }
+
+  await downloadXlsx(out, columns, filename);
+}
+
+// ── ตรวจชำระค่างวด : installment-payment check export ─────────────────────────
+
+// Column order follows the statement-reconcile flow (transfer time → ref → payer →
+// customer → contract → device). A summary header block (total + per-method) sits
+// on top, then a blank row, then one row per payment. method/kind are translated.
+export async function exportInstallmentCheck(
+  rows: InstallmentCheckRow[],
+  byMethod: InstallmentCheckByMethod[],
+  totalAmount: number,
+  t: TFunction,
+  filename: string,
+): Promise<void> {
+  const columns: XlsxColumn[] = [
+    { key: 'transfer_at', label: t('accounting.installmentCheck.transferAt'), type: 'date', width: 18 },
+    { key: 'payment_code', label: t('accounting.installmentCheck.paymentCode'), type: 'text', width: 20 },
+    { key: 'method', label: t('accounting.installmentCheck.method'), width: 14 },
+    { key: 'amount', label: t('accounting.installmentCheck.amount'), type: 'number', width: 14 },
+    { key: 'transaction_ref', label: t('accounting.installmentCheck.transactionRef'), type: 'text', width: 20 },
+    { key: 'sender_account_name', label: t('accounting.installmentCheck.senderName'), width: 22 },
+    { key: 'sender_bank', label: t('accounting.installmentCheck.senderBank'), width: 16 },
+    { key: 'customer_name', label: t('accounting.installmentCheck.customer'), width: 22 },
+    { key: 'customer_tel', label: t('accounting.installmentCheck.customerTel'), type: 'text', width: 14 },
+    { key: 'contract_code', label: t('accounting.installmentCheck.contractCode'), type: 'text', width: 20 },
+    { key: 'device_serial', label: t('accounting.installmentCheck.serial'), type: 'text', width: 18 },
+    { key: 'device_imei', label: t('accounting.installmentCheck.imei'), type: 'text', width: 18 },
+    { key: 'kind', label: t('accounting.installmentCheck.kind'), width: 16 },
+  ];
+
+  const blank = (): Record<string, unknown> =>
+    Object.fromEntries(columns.map(c => [c.key, '']));
+
+  // Summary header: grand total, then one line per method (count + total).
+  const summaryRow = (label: string, amount: number | null): Record<string, unknown> => ({
+    ...blank(), transfer_at: label, amount,
+  });
+  const out: Record<string, unknown>[] = [
+    summaryRow(t('accounting.installmentCheck.totalLabel', { count: rows.length }), totalAmount),
+    ...byMethod.map(m => summaryRow(
+      `${t(`paymentMethod.${m.method}`, { defaultValue: m.method })} (${m.count})`,
+      m.total,
+    )),
+    blank(),
+  ];
+
+  for (const r of rows) {
+    out.push({
+      transfer_at: r.transfer_at ?? r.paid_at,
+      payment_code: r.payment_code,
+      method: t(`paymentMethod.${r.method}`, { defaultValue: r.method }),
+      amount: r.amount,
+      transaction_ref: r.transaction_ref ?? '',
+      sender_account_name: r.sender_account_name ?? '',
+      sender_bank: r.sender_bank ?? '',
+      customer_name: r.customer_name,
+      customer_tel: r.customer_tel ?? '',
+      contract_code: r.contract_code,
+      device_serial: r.device_serial ?? '',
+      device_imei: r.device_imei ?? '',
+      kind: t(`accounting.installmentCheck.kind_${r.kind}`, { defaultValue: r.kind }),
     });
   }
 

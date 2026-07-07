@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Badge } from 'tsp-form';
 import {
   CalendarCheck, Scale, Receipt, ShieldAlert, Banknote, FileSpreadsheet,
-  ClipboardList, Coins, ArrowUpRight, TrendingUp,
+  ClipboardList, Coins, ArrowUpRight, TrendingUp, ListChecks,
 } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -36,6 +36,7 @@ export function AccountingLayout({ children }: { children: ReactNode }) {
     { type: 'link', path: '/admin/accounting/payments', labelKey: 'nav.payments', icon: Banknote },
     { type: 'link', path: '/admin/accounting/reconcile-item', labelKey: 'nav.reconcileByItem', icon: ClipboardList },
     { type: 'link', path: '/admin/accounting/reconcile-channel', labelKey: 'nav.reconcileByChannel', icon: Coins },
+    { type: 'link', path: '/admin/accounting/installment-check', labelKey: 'nav.installmentCheck', icon: ListChecks },
     { type: 'link', path: '/admin/accounting/day-close', labelKey: 'nav.dayClose', icon: CalendarCheck, badge: unclosedCount },
     { type: 'group', labelKey: 'nav.groupReports' },
     { type: 'link', path: '/admin/accounting/balance', labelKey: 'nav.branchBalance', icon: Scale },

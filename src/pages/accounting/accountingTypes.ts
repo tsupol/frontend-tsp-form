@@ -394,6 +394,63 @@ export interface ReconcileChannelResult {
   payments: ReconcileChannelPayment[];
 }
 
+// fn_installment_check — "ตรวจชำระค่างวด". Read-only report: 1 row = 1 payment
+// (PAID, non-void bill, INSTALLMENT / EARLY_PAYOFF). rows[] arrives un-paginated
+// (whole range → export straight from it). method + kind are codes (UI translates).
+export interface InstallmentCheckRow {
+  payment_id: number;
+  payment_code: string;              // PM-… (display format, has check digit)
+  method: string;                    // CASH / TRANSFER / SAVING_WALLET / CREDIT_WALLET / INSURANCE_WALLET
+  amount: number;
+  kind: 'INSTALLMENT' | 'EARLY_PAYOFF';
+  days_early: number | null;
+  paid_at: string;                   // system-recorded time (≠ transfer_at)
+  transfer_at: string | null;        // real transfer time from slip; null when not a slip
+  bill_id: number;
+  bill_code: string;                 // BL-…
+  bill_date: string;
+  contract_id: number;
+  contract_code: string;             // CT-…
+  customer_name: string;
+  customer_tel: string | null;
+  asset_code: string | null;         // AT-…
+  product_display_name: string | null;
+  device_serial: string | null;
+  device_imei: string | null;
+  device_external_ref: string | null;
+  receiver_bank: string | null;
+  receiver_account: string | null;
+  sender_account_name: string | null;
+  sender_bank: string | null;
+  sender_account_no: string | null;
+  transaction_ref: string | null;    // bank reference — best statement-match key
+  slip_media_id: number | null;
+  slip_key: string | null;           // storage key for slip image; null = no slip (cash/keyed)
+}
+
+export interface InstallmentCheckByMethod {
+  method: string;
+  count: number;
+  total: number;
+}
+
+export interface InstallmentCheckScope {
+  mode: 'BRANCH' | 'COMPANY_ALL';
+  company_id: number;
+  branch_id: number | null;
+  date_from: string;
+  date_to: string;
+  methods: string[] | null;
+}
+
+export interface InstallmentCheckResult {
+  scope: InstallmentCheckScope;
+  count: number;
+  total_amount: number;
+  by_method: InstallmentCheckByMethod[];
+  rows: InstallmentCheckRow[];
+}
+
 // v_day_close_breakdown — unified day-close view (1 row per branch+date).
 // data_source = 'LIVE' (not yet closed, computed from bills) | 'SNAPSHOT' (closed).
 // Same column shape either way; UI branches on is_closed / data_source.

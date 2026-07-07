@@ -207,10 +207,16 @@ export class ApiClient {
 
     const auth = status === 401 && !isPermissionDenied;
 
-    const errorCode = isPermissionDenied ? 'PERMISSION_DENIED' : `HTTP_${status}`;
+    // RAISE'd business errors (RPCs) come back as raw PostgREST bodies
+    // {code:"P0001", message:"AUTH.AUTH.FORBIDDEN"} — not a v2 envelope. Surface
+    // the raw message so callers can branch on it (e.g. FORBIDDEN scope checks).
+    const pgMessage = typeof data === 'object' && data !== null && 'message' in data
+      ? (data as { message: string }).message : '';
+
+    const errorCode = isPermissionDenied ? 'PERMISSION_DENIED' : (pgMessage || `HTTP_${status}`);
     const errorMessage = isPermissionDenied
       ? `Permission denied: ${endpoint}`
-      : `Request failed: ${endpoint} (HTTP ${status})`;
+      : (pgMessage || `Request failed: ${endpoint} (HTTP ${status})`);
 
     return new ApiError({
       code: errorCode,

@@ -84,6 +84,7 @@ import { PaymentsPage } from './pages/accounting/PaymentsPage';
 import { PaymentListPage } from './pages/accounting/PaymentListPage';
 import { ReconcileItemPage } from './pages/accounting/ReconcileItemPage';
 import { ReconcileChannelPage } from './pages/accounting/ReconcileChannelPage';
+import { InstallmentCheckPage } from './pages/accounting/InstallmentCheckPage';
 import { AuditFlagsPage } from './pages/accounting/AuditFlagsPage';
 import { ReportsPage } from './pages/accounting/ReportsPage';
 import { ContractsOpenedReportPage } from './pages/accounting/ContractsOpenedReportPage';
@@ -984,6 +985,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <AccountingLayout><ReconcileChannelPage /></AccountingLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/accounting/installment-check"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <AccountingLayout><InstallmentCheckPage /></AccountingLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

@@ -38,7 +38,7 @@ import {
   // Fanout child icons — Commission
   UserCheck, ClipboardCheck,
   // Fanout child icons — Accounting
-  CalendarCheck, Receipt, ShieldAlert, Banknote, FileSpreadsheet, Coins, ArrowUpRight,
+  CalendarCheck, Receipt, ShieldAlert, Banknote, FileSpreadsheet, Coins, ArrowUpRight, ListChecks,
   // Fanout child icons — Branch expense
   Tag as TagIcon, BarChart3 as BarChartIcon, BookOpen as BookIcon,
   // Fanout child icons — Collections
@@ -295,6 +295,7 @@ export const AppSideNav = () => {
         { key: 'payments', icon: <Banknote size="1rem" />, label: t('nav.payments'), path: '/admin/accounting/payments' },
         { key: 'reconcile-item', icon: <ClipboardList size="1rem" />, label: t('nav.reconcileByItem'), path: '/admin/accounting/reconcile-item' },
         { key: 'reconcile-channel', icon: <Coins size="1rem" />, label: t('nav.reconcileByChannel'), path: '/admin/accounting/reconcile-channel' },
+        { key: 'installment-check', icon: <ListChecks size="1rem" />, label: t('nav.installmentCheck'), path: '/admin/accounting/installment-check' },
         {
           key: 'day-close',
           ...iconWithCount(<CalendarCheck size="1rem" />, unclosedCount),
