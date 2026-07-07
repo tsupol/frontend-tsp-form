@@ -4667,6 +4667,13 @@
       "noteCleared": "cleared the note",
       "systemElevate": "Set Waiting reply (customer sent a message)",
       "systemClear": "Cleared (Resolved over 5 minutes)"
+    },
+    "markUnread": {
+      "action": "Mark as unread",
+      "success": "Marked as unread",
+      "already": "Already unread",
+      "noMessages": "No customer messages to mark",
+      "failed": "Couldn't mark as unread"
     }
   },
   "contractFee": {

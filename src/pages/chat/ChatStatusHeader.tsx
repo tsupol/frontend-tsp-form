@@ -17,7 +17,7 @@ import {
   Badge, Button, MenuItem, Modal, PopOver, TextArea, useSnackbarContext,
 } from 'tsp-form';
 import {
-  CheckCircle, ClipboardCheck, History, MessageSquareWarning, MoreHorizontal,
+  CheckCircle, ClipboardCheck, History, Mail, MessageSquareWarning, MoreHorizontal,
   Pencil, Pin, PinOff, Wallet, Wrench, XCircle,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
@@ -73,6 +73,8 @@ interface ActionsMenuProps {
 export function ChatThreadActionsMenu({ contractId, inboxRow }: ActionsMenuProps) {
   const { t } = useTranslation();
   const { can } = useAuth();
+  const queryClient = useQueryClient();
+  const { addSnackbar } = useSnackbarContext();
   const canSetStatus = can('CHAT.STATUS_SET');
   const canSetNote = can('CHAT.NOTE_SET');
   const canEdit = canSetStatus || canSetNote;
@@ -88,12 +90,44 @@ export function ChatThreadActionsMenu({ contractId, inboxRow }: ActionsMenuProps
     onNoteSuccess: () => setNoteModalOpen(false),
   });
 
-  if (!canEdit) {
-    // Read-only roles still need history access? Per DELIVERED §5, view-only
-    // roles do not see the audit drill-down (read perm = write perm). So we
-    // render nothing here.
-    return null;
-  }
+  // Mark-as-unread (staff-only RPC). Flips the latest CUSTOMER message back to
+  // unread so the thread re-surfaces in the inbox — for when staff opened a
+  // thread by accident and don't want to forget to reply. chat_mark_unread
+  // accepts code or code_display. had_messages=false ⇒ nothing to mark.
+  const markUnreadMutation = useMutation({
+    mutationFn: () => apiClient.rpc<{ marked_unread: number; unread_count: number; had_messages: boolean }>(
+      'chat_mark_unread',
+      { p_contract_code: inboxRow.contract_code_display || inboxRow.contract_code },
+    ),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['chat-inbox'] });
+      queryClient.invalidateQueries({ queryKey: ['nav', 'chat-unread'] });
+      const msgKey = !data.had_messages
+        ? 'chat.markUnread.noMessages'
+        : data.marked_unread === 0
+          ? 'chat.markUnread.already'
+          : 'chat.markUnread.success';
+      addSnackbar({
+        type: data.had_messages ? 'success' : 'info',
+        message: (
+          <div className={data.had_messages ? 'alert alert-success' : 'alert alert-info'}>
+            {data.had_messages ? <CheckCircle size={16} /> : <Mail size={16} />}
+            <span>{t(msgKey)}</span>
+          </div>
+        ),
+      });
+    },
+    onError: (err) => {
+      addSnackbar({
+        type: 'error',
+        message: (
+          <div className="alert alert-danger">
+            <XCircle size={16} /><span>{describeApiError(err, t, 'chat.markUnread.failed')}</span>
+          </div>
+        ),
+      });
+    },
+  });
 
   return (
     <>
@@ -132,6 +166,11 @@ export function ChatThreadActionsMenu({ contractId, inboxRow }: ActionsMenuProps
               <div className="border-t border-line my-1" />
             </>
           )}
+          <MenuItem
+            icon={<Mail size={14} />}
+            label={t('chat.markUnread.action')}
+            onClick={() => { setOpen(false); markUnreadMutation.mutate(); }}
+          />
           {canSetNote && !inboxRow.pinned_note && (
             <MenuItem
               icon={<Pin size={14} />}
@@ -139,11 +178,13 @@ export function ChatThreadActionsMenu({ contractId, inboxRow }: ActionsMenuProps
               onClick={() => { setOpen(false); setNoteModalOpen(true); }}
             />
           )}
-          <MenuItem
-            icon={<History size={14} />}
-            label={t('chat.auditLog.open')}
-            onClick={() => { setOpen(false); setLogModalOpen(true); }}
-          />
+          {canEdit && (
+            <MenuItem
+              icon={<History size={14} />}
+              label={t('chat.auditLog.open')}
+              onClick={() => { setOpen(false); setLogModalOpen(true); }}
+            />
+          )}
         </div>
       </PopOver>
 
