@@ -202,6 +202,7 @@ export function ReconcileChannelPage() {
     </Button>
   );
   const filterItems: FilterBarItem[] = [
+    { key: 'date', width: 260, node: dateFilter, priority: 20 },
     { key: 'branch', width: 200, node: branchNode, priority: 10 },
     ...(hasSlipPayments ? [{ key: 'slip', width: 150, node: slipToggleNode, priority: 8 }] : []),
   ];
@@ -251,8 +252,6 @@ export function ReconcileChannelPage() {
 
         <FilterBar
           className="flex-none p-2 border-b border-line"
-          leading={dateFilter}
-          leadingMinWidth={224}
           items={filterItems}
           activeCount={0}
         />
