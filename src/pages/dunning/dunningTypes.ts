@@ -44,7 +44,9 @@ export interface DunningStageRow {
   stage: string;            // stable code, e.g. "overdue_8d"
   description: string;
   template: DunningStageTemplate;
-  effective: DunningStageEffective;
+  // null when the holding has no override for this stage — the template (system
+  // default) is then what's actually applied. Callers must fall back to template.
+  effective: DunningStageEffective | null;
   // Notif only: top-level event_type (read-only label, no _set param)
   event_type?: string;
 }
@@ -111,12 +113,13 @@ export const MODULE_CONFIG: Record<DunningModule, DunningModuleConfig> = {
   },
 };
 
-// Read the per-module extra value from a row's `effective` block in a
-// type-safe way. Returns undefined for notif (no extra).
+// Read the per-module extra value from a row's applied config in a type-safe
+// way. Falls back to the template when the holding has no override.
+// Returns undefined for notif (no extra).
 export function getEffectiveExtra(
   row: DunningStageRow,
   cfg: DunningModuleConfig,
 ): string | undefined {
   if (!cfg.extraField) return undefined;
-  return row.effective[cfg.extraField];
+  return (row.effective ?? row.template)[cfg.extraField];
 }

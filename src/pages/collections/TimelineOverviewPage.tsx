@@ -127,7 +127,9 @@ export function TimelineOverviewPage() {
 }
 
 function StageDot({ row, laneColor }: { row: DunningStageRow; laneColor: string }) {
-  const eff = row.effective;
+  // effective is null when the holding hasn't overridden this stage — the
+  // template (system default) is then what's actually applied.
+  const eff = row.effective ?? row.template;
   const isOpenEnded = eff.day_to == null;
   const left = positionPct(eff.day_from);
   const isPointStage = eff.day_to != null && eff.day_to === eff.day_from;
@@ -170,17 +172,17 @@ function StageDot({ row, laneColor }: { row: DunningStageRow; laneColor: string 
 
 function StageTooltip({ row }: { row: DunningStageRow }) {
   const { t } = useTranslation();
-  const eff = row.effective;
+  // No holding override → the template is what applies (and it's not "custom").
+  const eff = row.effective ?? row.template;
   const dayLabel = eff.day_to == null
     ? `${formatDay(eff.day_from)}…`
     : eff.day_to === eff.day_from
       ? formatDay(eff.day_from)
       : `${formatDay(eff.day_from)} → ${formatDay(eff.day_to)}`;
   const extra = row.event_type
-    ?? (row.effective as { reason_code?: string; intent_type?: string; action_code?: string })
-       .reason_code
-    ?? (row.effective as { intent_type?: string }).intent_type
-    ?? (row.effective as { action_code?: string }).action_code
+    ?? eff.reason_code
+    ?? eff.intent_type
+    ?? eff.action_code
     ?? null;
   return (
     <div className="text-xs leading-tight">
@@ -189,7 +191,7 @@ function StageTooltip({ row }: { row: DunningStageRow }) {
       <div className="mt-1 flex gap-2 items-center">
         <span className="tabular-nums">{dayLabel}</span>
         {extra && <span className="font-mono text-[10px] text-subtle">{extra}</span>}
-        {eff.is_custom && <Badge size="xs" color="info">{t('dunningSystem.custom')}</Badge>}
+        {row.effective?.is_custom && <Badge size="xs" color="info">{t('dunningSystem.custom')}</Badge>}
       </div>
     </div>
   );

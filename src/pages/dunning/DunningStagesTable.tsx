@@ -89,8 +89,10 @@ function StageRow({ row, extraField, onEdit, onReset }: {
   onReset: () => void;
 }) {
   const { t } = useTranslation();
-  const eff = row.effective;
-  const isCustom = eff.is_custom;
+  // effective is null when the holding hasn't overridden this stage — fall back
+  // to the template (system default), which is then what's applied.
+  const eff = row.effective ?? row.template;
+  const isCustom = row.effective?.is_custom ?? false;
   const dayLabel = formatDayWindow(eff.day_from, eff.day_to);
   const extraValue = extraField ? eff[extraField] : row.event_type;
 

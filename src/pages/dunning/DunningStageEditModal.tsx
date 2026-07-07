@@ -78,10 +78,13 @@ export function DunningStageEditModal({ open, onClose, module, row }: Props) {
       setView('form');
       setConfirmClose(false);
       setErrorMessage('');
-      setDayFrom(String(row.effective.day_from));
-      setDayTo(row.effective.day_to == null ? '' : String(row.effective.day_to));
-      setPriority(String(row.effective.priority));
-      setActive(row.effective.active);
+      // No holding override yet → seed from the template (system default),
+      // which is what's currently applied and the baseline being overridden.
+      const applied = row.effective ?? row.template;
+      setDayFrom(String(applied.day_from));
+      setDayTo(applied.day_to == null ? '' : String(applied.day_to));
+      setPriority(String(applied.priority));
+      setActive(applied.active);
       setExtra(getEffectiveExtra(row, config) ?? '');
       // Baseline the snapshot on the next render — by then the setState
       // calls above will have flushed and `values` reflects the hydrated
@@ -106,9 +109,10 @@ export function DunningStageEditModal({ open, onClose, module, row }: Props) {
     if (!row) return;
     setErrorMessage('');
 
-    // Send only fields that changed vs effective. Use undefined to skip;
-    // the hook strips undefined keys before calling the RPC.
-    const eff = row.effective;
+    // Send only fields that changed vs the applied config. Use undefined to
+    // skip; the hook strips undefined keys before calling the RPC. When there's
+    // no override yet, diff against the template (the current effective value).
+    const eff = row.effective ?? row.template;
     const nextDayFrom = parseInt(dayFrom, 10);
     const nextDayTo = dayTo === '' ? null : parseInt(dayTo, 10);
     const nextPriority = parseInt(priority, 10);
