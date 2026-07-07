@@ -47,6 +47,7 @@
   "disposal.sellPrice": "Sell price",
   "revalue.newCostBasis": "New cost basis (leave blank to keep)",
   "revalue.reason": "Reason",
+  "revalue.reasonPlaceholder": "Select a reason",
   "revalue.conditionGrade": "New condition grade",
   "revalue.batteryHealth": "Battery health (%)",
   "revalue.warrantyExpired": "Warranty expiry date",

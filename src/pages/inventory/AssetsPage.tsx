@@ -197,6 +197,10 @@ const DEDICATED_MODAL_ACTIONS: ReadonlySet<string> = new Set([
 // The rest live in the allowlist but render disabled with "not yet implemented".
 type ExtraField =
   | { kind: 'select'; name: string; labelKey: string; options: { value: string; labelKey: string }[]; required?: boolean; default?: string }
+  // Reason code sourced from inv.ref_reason_codes (FK-enforced). Options fetched
+  // from v_ref_reason_codes filtered by txnGroup — NEVER free text, or the RPC
+  // coerces unknown codes to OTHER (mig 116). Label is the view's Thai `label`.
+  | { kind: 'reasonCode'; name: string; labelKey: string; txnGroup: string; required?: boolean }
   | { kind: 'text'; name: string; labelKey: string; required?: boolean }
   | { kind: 'number'; name: string; labelKey: string; required?: boolean; min?: number; step?: number; defaultFromAsset?: keyof Asset }
   | { kind: 'branch'; name: string; labelKey: string; required?: boolean }
@@ -323,7 +327,7 @@ const SIMPLE_ACTIONS: Record<string, SimpleActionConfig> = {
       // Cost is optional — NULL keeps the current cost and creates no inventory_txn,
       // so staff can update only battery/warranty/grade. min stays >0 when a value is given.
       { kind: 'number', name: 'p_new_cost_basis', labelKey: 'revalue.newCostBasis', min: 0, defaultFromAsset: 'current_cost_basis' },
-      { kind: 'text', name: 'p_reason', labelKey: 'revalue.reason', required: true },
+      { kind: 'reasonCode', name: 'p_reason', labelKey: 'revalue.reason', txnGroup: 'ADJUST', required: true },
       { kind: 'select', name: 'p_condition_grade', labelKey: 'revalue.conditionGrade', options: REVALUE_CONDITION_OPTIONS },
       { kind: 'battery', name: 'p_battery_health', labelKey: 'revalue.batteryHealth', defaultFromAsset: 'battery_health' },
       { kind: 'date', name: 'p_warranty_expired_date', labelKey: 'revalue.warrantyExpired', defaultFromAsset: 'warranty_expired_date' },
@@ -344,7 +348,7 @@ const SIMPLE_ACTIONS: Record<string, SimpleActionConfig> = {
 
 // Up to 4 actions surfaced inline as primary buttons; rest go behind "More actions".
 const PRIMARY_BY_BUCKET: Record<string, string[]> = {
-  ON_HAND_AVAILABLE: ['ASSET_SELL', 'ASSET_SELL_B2B', 'ASSET_QUARANTINE_ADMIT', 'ASSET_REPAIR_REQUEST'],
+  ON_HAND_AVAILABLE: ['ASSET_SELL', 'ASSET_SELL_B2B', 'ASSET_REPAIR_REQUEST'],
   QUARANTINED: ['ASSET_QUARANTINE_RELEASE', 'ASSET_SELL', 'ASSET_REPAIR_REQUEST', 'ASSET_WRITE_OFF_JOURNAL'],
   IN_REPAIR: [],
   IN_USE_INTERNAL: ['ASSET_INTERNAL_USE_RELEASE'],
@@ -2496,6 +2500,22 @@ function AssetActionModal({
   // Determine if any extra field needs branches/users so we can lazy-load
   const needsBranches = !!config?.extraFields?.some(f => f.kind === 'branch');
   const needsUsers = !!config?.extraFields?.some(f => f.kind === 'user');
+  const reasonCodeField = config?.extraFields?.find(
+    (f): f is Extract<ExtraField, { kind: 'reasonCode' }> => f.kind === 'reasonCode',
+  );
+
+  const { data: reasonCodes = [] } = useQuery({
+    queryKey: ['ref-reason-codes', reasonCodeField?.txnGroup],
+    queryFn: () => apiClient.get<{ code: string; label: string }[]>(
+      `/v_ref_reason_codes?txn_group=eq.${reasonCodeField!.txnGroup}&is_active=eq.true&order=label`
+    ),
+    enabled: open && !!reasonCodeField,
+    staleTime: 5 * 60 * 1000,
+  });
+  const reasonCodeOptions = useMemo(
+    () => reasonCodes.map(r => ({ value: r.code, label: r.label })),
+    [reasonCodes],
+  );
 
   const { data: branches = [] } = useQuery({
     queryKey: ['branches-active'],
@@ -2704,6 +2724,16 @@ function AssetActionModal({
                       }))}
                       value={extra[f.name] ?? null}
                       onChange={(val) => setVal(f.name, (val as string) || '')}
+                      showChevron
+                    />
+                  )}
+                  {f.kind === 'reasonCode' && (
+                    <Select
+                      options={reasonCodeOptions}
+                      value={extra[f.name] ?? null}
+                      onChange={(val) => setVal(f.name, (val as string) || '')}
+                      placeholder={t('revalue.reasonPlaceholder', { ns: 'assetActions', defaultValue: 'Select a reason' })}
+                      searchable
                       showChevron
                     />
                   )}

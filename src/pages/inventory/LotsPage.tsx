@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
 import {
   PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, Modal, TextArea, NumberSpinner,
-  DataTable, PopOver, Tooltip, useSnackbarContext,
+  DataTable, PopOver, Tooltip, LabeledCheckbox, useSnackbarContext,
 } from 'tsp-form';
 import {
   ArrowLeft, ArrowRight, ArrowRightFromLine, Boxes, Search, CheckCircle, XCircle, ChevronDown, Wrench, Plus, Trash2, ExternalLink, SlidersHorizontal, AlertCircle, ListChecks,
@@ -182,6 +182,9 @@ export function LotsPage() {
   const [filterPoType, setFilterPoType] = useState<string | null>(null);
   const [filterContractable, setFilterContractable] = useState<string | null>(null);
   const [filterPoId, setFilterPoId] = useState<number | null>(initialPoId);
+  // Closed lots (qty depleted, is_closed=true) are archived/done — hidden from the
+  // default "to-do" list; toggle to show them (rendered muted). Per NOTICE 2026-07-07.
+  const [showClosed, setShowClosed] = useState(false);
   const [filterPopoverOpen, setFilterPopoverOpen] = useState(false);
   const filterTriggerRef = useRef<HTMLButtonElement>(null);
   const [pageIndex, setPageIndex] = useState(0);
@@ -210,6 +213,7 @@ export function LotsPage() {
     isMdOrBelow && filterBranchId != null,
     isLgOrBelow && filterPoType != null,
     isXlOrBelow && filterContractable != null,
+    showClosed,   // lives only in the popover at every breakpoint
   ].filter(Boolean).length;
 
   useEffect(() => {
@@ -228,9 +232,11 @@ export function LotsPage() {
   );
 
   const { data: listData, isFetching } = useQuery({
-    queryKey: ['lots', debouncedSearch, filterBucket, filterBranchId, filterPoType, filterContractable, filterPoId, pageIndex, pageSize],
+    queryKey: ['lots', debouncedSearch, filterBucket, filterBranchId, filterPoType, filterContractable, filterPoId, showClosed, pageIndex, pageSize],
     queryFn: () => {
       let url = '/v_stock_lots?order=created_at.desc';
+      // Default list is the "to-do" set — closed lots stay out until toggled on.
+      if (!showClosed) url += '&is_closed=eq.false';
       if (filterBucket) url += `&current_bucket=eq.${filterBucket}`;
       if (filterBranchId) url += `&branch_id=eq.${filterBranchId}`;
       if (filterPoType) url += `&po_type=eq.${filterPoType}`;
@@ -247,7 +253,7 @@ export function LotsPage() {
   const list = listData?.data ?? [];
   const totalCount = listData?.totalCount ?? 0;
 
-  useEffect(() => { setPageIndex(0); }, [debouncedSearch, filterBucket, filterBranchId, filterPoType, filterContractable, filterPoId]);
+  useEffect(() => { setPageIndex(0); }, [debouncedSearch, filterBucket, filterBranchId, filterPoType, filterContractable, filterPoId, showClosed]);
 
   // Detail uses the same view (no v_lot_detail exists). Fetch by id even if
   // not in the current page, so direct deep-link `/lots/123` still works.
@@ -383,6 +389,11 @@ export function LotsPage() {
                 >
                   <div className="flex flex-col gap-3 p-3">
                     <div className="text-xs font-medium text-subtle uppercase tracking-wide">{t('common.filters')}</div>
+                    <LabeledCheckbox
+                      label={t('lot.showClosed', { defaultValue: 'Show closed lots' })}
+                      checked={showClosed}
+                      onChange={(e) => setShowClosed(e.target.checked)}
+                    />
                     <div className="sm:hidden flex flex-col gap-2">
                       <Select
                         options={bucketOptions}
@@ -429,7 +440,7 @@ export function LotsPage() {
                     </div>
                   </div>
                 </PopOver>
-                <div className="relative inline-flex shrink-0 xl:hidden">
+                <div className="relative inline-flex shrink-0">
                   <Button
                     ref={filterTriggerRef}
                     size="sm"
@@ -460,15 +471,23 @@ export function LotsPage() {
                   return (
                     <button
                       key={lot.lot_id}
-                      className="w-full text-left px-4 py-2.5 flex items-center gap-3 transition-colors cursor-pointer"
+                      className={`w-full text-left px-4 py-2.5 flex items-center gap-3 transition-colors cursor-pointer ${lot.is_closed ? 'opacity-60' : ''}`}
                       onClick={() => { setSelectedId(lot.lot_id); if (isMobile) goTo('detail'); }}
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 min-w-0">
                           <span className="font-medium text-xs truncate">{codeDisplay(lot.lot_code_display, lot.lot_code)}</span>
-                          <Badge size="xs" color={getBucketColor(lot.current_bucket)}>
-                            {getBucketLabel(lot.current_bucket, t)}
-                          </Badge>
+                          {/* Closed lot: bucket is stale (residual location, not status) —
+                              show a neutral "ปิด/หมด" derived from is_closed instead. */}
+                          {lot.is_closed ? (
+                            <Badge size="xs" color="default">
+                              {t('lot.closed', { defaultValue: 'Closed' })}
+                            </Badge>
+                          ) : (
+                            <Badge size="xs" color={getBucketColor(lot.current_bucket)}>
+                              {getBucketLabel(lot.current_bucket, t)}
+                            </Badge>
+                          )}
                         </div>
                         <div className="text-xs text-subtle truncate mt-0.5">
                           {[lot.brand_name, lot.family_name, lot.model_name].filter(Boolean).join(' ')}
@@ -690,11 +709,12 @@ function LotDetailPanel({
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
           <span className="font-semibold">{codeDisplay(lot.lot_code_display, lot.lot_code)}</span>
           <CopyButton value={codeDisplay(lot.lot_code_display, lot.lot_code)} />
-          <Badge size="xs" color={getBucketColor(lot.current_bucket)}>
-            {getBucketLabel(lot.current_bucket, t)}
-          </Badge>
-          {lot.is_closed && (
+          {lot.is_closed ? (
             <Badge size="xs" color="default">{t('lot.closed')}</Badge>
+          ) : (
+            <Badge size="xs" color={getBucketColor(lot.current_bucket)}>
+              {getBucketLabel(lot.current_bucket, t)}
+            </Badge>
           )}
         </div>
       )}

@@ -47,6 +47,7 @@
   "disposal.sellPrice": "ราคาขาย",
   "revalue.newCostBasis": "มูลค่าใหม่ (เว้นว่างเพื่อคงราคาเดิม)",
   "revalue.reason": "เหตุผล",
+  "revalue.reasonPlaceholder": "เลือกเหตุผล",
   "revalue.conditionGrade": "สภาพเครื่องใหม่",
   "revalue.batteryHealth": "สุขภาพแบต (%)",
   "revalue.warrantyExpired": "วันหมดประกัน",
