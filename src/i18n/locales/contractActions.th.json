@@ -33,7 +33,7 @@
   "HOLDING_REFUND": "คืนเงิน Holding",
   "HOLDING_REFUND_VOID": "Void การคืนเงิน Holding",
   "PAY_OPEN_BILL": "จ่ายบิลค้าง",
-  "PAY_INSTALLMENT": "จ่ายค่างวด",
+  "PAY_INSTALLMENT": "รับชำระค่างวด",
   "EARLY_PAYOFF": "ปิดสัญญาก่อนกำหนด",
   "ADD_ADDON": "เพิ่ม Add-on",
   "SERVICE_CHARGE": "ค่าบริการ",

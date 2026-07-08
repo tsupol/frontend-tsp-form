@@ -33,7 +33,7 @@
   "HOLDING_REFUND": "Holding refund",
   "HOLDING_REFUND_VOID": "Void holding refund",
   "PAY_OPEN_BILL": "Pay open bill",
-  "PAY_INSTALLMENT": "Pay installment",
+  "PAY_INSTALLMENT": "Record Payment",
   "EARLY_PAYOFF": "Early payoff",
   "ADD_ADDON": "Add add-on",
   "SERVICE_CHARGE": "Service charge",
