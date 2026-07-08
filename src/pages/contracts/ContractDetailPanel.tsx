@@ -2077,14 +2077,20 @@ function DeliveryModal({ open, contract, onClose, onSuccess }: {
       },
       params: { contract_id: contract.id, idx: sortOrder },
     });
-    const primary = results.sm?.key ?? Object.values(results)[0]?.key;
+    // Primary = md (1280px) so the lightbox viewer loads full-res; variants_json
+    // carries both sizes so thumbs use sm and the viewer uses md. Private paths
+    // in variants_json are accepted since mig 282 (chk_media_variants_keys allows
+    // an all-private map); ChatThreadPanel does the same.
+    const primary = results.md?.key ?? results.sm?.key ?? Object.values(results)[0]?.key;
     if (!primary) throw new Error('Upload returned no key');
-    // Private media — backend chk_media_variants_keys requires variant
-    // values to be PUBLIC paths regardless of access_level, so pass null.
+    const variantsJson: Record<string, string> = {};
+    for (const [sz, r] of Object.entries(results)) {
+      if (r?.key) variantsJson[sz] = toStoragePath(r.key);
+    }
     await apiClient.rpc('fn_media_attach', {
       p_holding_id: holdingId,
       p_storage_path: toStoragePath(primary),
-      p_variants_json: null,
+      p_variants_json: variantsJson,
       p_media_type: 'IMAGE',
       p_access_level: 'CONFIDENTIAL',
       p_mime_type: mimeFromKey(primary),
