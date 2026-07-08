@@ -438,6 +438,16 @@ export interface InstallmentCheckRow {
   transaction_ref: string | null;    // bank reference — best statement-match key
   slip_media_id: number | null;
   slip_key: string | null;           // storage key for slip image; null = no slip (cash/keyed)
+  // mig 538 — this installment payment was reversed (credit note; bill stays PAID).
+  // Struck through, badged, and NOT counted in total_amount/by_method.
+  is_reversed: boolean;
+  // mig 540 — which installment number(s) this payment covers (ascending). One payment
+  // can cover >1 (early payoff / top-up). installment_count = installment_nos.length.
+  installment_nos: number[];
+  installment_count: number;
+  // mig 541 — TRANSFER origin: false = โอนหน้าร้าน (staff-recorded), true = โอนหลังร้าน
+  // (customer sent slip → slip-check approved). Never guess from slip_media_id.
+  from_slip_submission: boolean;
 }
 
 export interface InstallmentCheckByMethod {
@@ -457,8 +467,10 @@ export interface InstallmentCheckScope {
 
 export interface InstallmentCheckResult {
   scope: InstallmentCheckScope;
-  count: number;
-  total_amount: number;
+  count: number;             // all rows (incl. reversed)
+  total_amount: number;      // counted only — reversed rows excluded (mig 539)
+  reversed_count: number;    // how many rows are reversed
+  reversed_total: number;    // Σ amount of reversed rows
   by_method: InstallmentCheckByMethod[];
   rows: InstallmentCheckRow[];
 }

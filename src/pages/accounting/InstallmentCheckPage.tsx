@@ -17,13 +17,31 @@ import { FilterBar, type FilterBarItem } from '../../components/FilterBar';
 import {
   fmtCurrency, toLocalDateStr, parseLocalDate, makeDateRangePickerFormat,
 } from '../../lib/format';
-import type { Branch, InstallmentCheckResult } from './accountingTypes';
+import type { Branch, InstallmentCheckResult, InstallmentCheckRow } from './accountingTypes';
 import { exportInstallmentCheck } from './dayCloseExport';
 
-// Toggleable channels. TRANSFER is the default (bank statement only shows transfers);
-// the rest are opt-in. Order matters — it's how the toggle chips render.
-const METHOD_OPTIONS = ['TRANSFER', 'CASH', 'SAVING_WALLET', 'CREDIT_WALLET', 'INSURANCE_WALLET'] as const;
-const DEFAULT_METHODS = ['TRANSFER'];
+// Toggleable channels. Transfer is split into front-store vs back-office (slip) —
+// both are method=TRANSFER to the RPC; the split is decided client-side on
+// from_slip_submission (spec: never guess from slip_media_id). The other codes map
+// 1:1 to payment methods. Order matters — it's how the toggle chips render.
+const CHANNEL_OPTIONS = ['TRANSFER_FRONT', 'TRANSFER_BACK', 'CASH', 'SAVING_WALLET', 'CREDIT_WALLET', 'INSURANCE_WALLET'] as const;
+const DEFAULT_CHANNELS = ['TRANSFER_FRONT', 'TRANSFER_BACK'];
+
+// A selected channel → the RPC payment method it needs fetched. Both transfer
+// sides need TRANSFER; the front/back distinction is applied client-side.
+const channelToMethod = (channel: string): string =>
+  channel === 'TRANSFER_FRONT' || channel === 'TRANSFER_BACK' ? 'TRANSFER' : channel;
+
+// Format installment_nos into a chip label: single → "งวด 3", contiguous run →
+// "งวด 1–12", gaps → "งวด 1, 3, 5".
+function fmtInstallmentNos(nos: number[], t: ReturnType<typeof useTranslation>['t']): string {
+  if (!nos || nos.length === 0) return '';
+  if (nos.length === 1) return t('accounting.installmentCheck.installmentNo_one', { list: nos[0] });
+  const contiguous = nos.every((v, i) => i === 0 || v === nos[i - 1] + 1);
+  return contiguous
+    ? t('accounting.installmentCheck.installmentNo_range', { from: nos[0], to: nos[nos.length - 1] })
+    : t('accounting.installmentCheck.installmentNo_list', { list: nos.join(', ') });
+}
 
 function todayStr() {
   return toLocalDateStr(new Date());
@@ -42,14 +60,18 @@ export function InstallmentCheckPage() {
   const toParam = searchParams.get('to');
   const fromDate = fromParam === null ? todayStr() : fromParam;
   const toDate = toParam === null ? todayStr() : toParam;
-  // methods: absent param = default (TRANSFER only); "__ALL__" = all channels (null to RPC);
-  // otherwise a comma list of selected method codes.
+  // channels: absent param = default (both transfer sides); "__ALL__" = every channel;
+  // otherwise a comma list of selected channel codes (front/back are UI-only).
   const methodsParam = searchParams.get('methods');
-  const selectedMethods: string[] | null = methodsParam === null
-    ? DEFAULT_METHODS
+  const selectedChannels: string[] | null = methodsParam === null
+    ? DEFAULT_CHANNELS
     : methodsParam === '__ALL__'
       ? null
       : methodsParam.split(',').filter(Boolean);
+  // The RPC fetches by payment method — dedup the channel→method mapping. null = all.
+  const selectedMethods: string[] | null = selectedChannels === null
+    ? null
+    : [...new Set(selectedChannels.map(channelToMethod))];
 
   const [isTypingRange, setIsTypingRange] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -105,26 +127,46 @@ export function InstallmentCheckPage() {
   });
 
   const isForbidden = error instanceof ApiError && error.message === 'AUTH.AUTH.FORBIDDEN';
-  const rows = data?.rows ?? [];
 
-  const toggleMethod = (m: string) => {
-    const current = selectedMethods ?? [...METHOD_OPTIONS];
-    const next = current.includes(m) ? current.filter(x => x !== m) : [...current, m];
-    // Empty selection is meaningless — fall back to the default.
-    updateFilters({ methods: next.length ? next.join(',') : DEFAULT_METHODS.join(',') });
+  const channelOn = (c: string) => selectedChannels === null || selectedChannels.includes(c);
+  // Whether a fetched row survives the channel filter. Only TRANSFER needs the
+  // client-side front/back split (from_slip_submission); all other methods pass
+  // through once their channel is on (the RPC already scoped them).
+  const rowInSelectedChannel = (r: InstallmentCheckRow): boolean => {
+    if (selectedChannels === null) return true;
+    if (r.method === 'TRANSFER') {
+      return r.from_slip_submission ? channelOn('TRANSFER_BACK') : channelOn('TRANSFER_FRONT');
+    }
+    return channelOn(r.method);
   };
-  const setAllMethods = () => updateFilters({ methods: '__ALL__' });
-  const isMethodOn = (m: string) => selectedMethods === null || selectedMethods.includes(m);
+  const rows = (data?.rows ?? []).filter(rowInSelectedChannel);
+
+  // Summary is recomputed from the filtered rows so counted/reversed and the
+  // per-channel chips reflect the front/back selection, not the raw RPC totals.
+  const countedRows = rows.filter(r => !r.is_reversed);
+  const countedTotal = countedRows.reduce((s, r) => s + r.amount, 0);
+  const reversedRows = rows.filter(r => r.is_reversed);
+  const reversedTotal = reversedRows.reduce((s, r) => s + r.amount, 0);
+
+  const toggleChannel = (c: string) => {
+    const current = selectedChannels ?? [...CHANNEL_OPTIONS];
+    const next = current.includes(c) ? current.filter(x => x !== c) : [...current, c];
+    // Empty selection is meaningless — fall back to the default.
+    updateFilters({ methods: next.length ? next.join(',') : DEFAULT_CHANNELS.join(',') });
+  };
+  const setAllChannels = () => updateFilters({ methods: '__ALL__' });
 
   const handleExport = async () => {
     if (!data || rows.length === 0) return;
     setExporting(true);
     try {
       const branchLabel = selectedBranch?.name ?? (allBranches ? t('accounting.installmentCheck.allBranches') : branchId);
+      // Pass the counted (reversal-excluded) total so Excel's header matches the
+      // on-screen figure under the current front/back filter.
       await exportInstallmentCheck(
         rows,
         data.by_method,
-        data.total_amount,
+        countedTotal,
         t,
         `${t('accounting.installmentCheck.title')}_${branchLabel}_${fromDate}_${toDate}`,
       );
@@ -241,25 +283,27 @@ export function InstallmentCheckPage() {
         {/* Channel toggles */}
         <div className="flex-none flex items-center gap-2 flex-wrap px-3 py-2 border-b border-line">
           <span className="text-xs font-medium text-subtle shrink-0">{t('accounting.installmentCheck.channels')}</span>
-          {METHOD_OPTIONS.map(m => (
+          {CHANNEL_OPTIONS.map(c => (
             <button
-              key={m}
+              key={c}
               type="button"
-              onClick={() => toggleMethod(m)}
+              onClick={() => toggleChannel(c)}
               className={`text-xs px-2.5 py-1 rounded-full border transition-colors cursor-pointer ${
-                isMethodOn(m)
+                channelOn(c)
                   ? 'bg-primary-soft border-primary-fg text-primary-fg font-medium'
                   : 'border-line text-subtle hover:bg-item-hover-bg'
               }`}
             >
-              {t(`paymentMethod.${m}`)}
+              {c === 'TRANSFER_FRONT' || c === 'TRANSFER_BACK'
+                ? t(`accounting.installmentCheck.channel_${c}`)
+                : t(`paymentMethod.${c}`)}
             </button>
           ))}
           <button
             type="button"
-            onClick={setAllMethods}
+            onClick={setAllChannels}
             className={`text-xs px-2.5 py-1 rounded-full border transition-colors cursor-pointer ${
-              selectedMethods === null
+              selectedChannels === null
                 ? 'bg-primary-soft border-primary-fg text-primary-fg font-medium'
                 : 'border-line text-subtle hover:bg-item-hover-bg'
             }`}
@@ -273,40 +317,73 @@ export function InstallmentCheckPage() {
             <div className="p-8 text-center text-danger">{t('accounting.installmentCheck.forbidden')}</div>
           ) : !branchId ? (
             <div className="p-8 text-center text-subtler">{t('accounting.reconcile.pickBranch')}</div>
-          ) : data && data.count === 0 ? (
+          ) : data && rows.length === 0 ? (
             <div className="p-8 text-center text-subtler">{t('accounting.installmentCheck.empty')}</div>
           ) : data ? (
             <div className="max-w-3xl mx-auto p-4">
-              {/* Summary chips */}
+              {/* Summary chips — counted excludes reversed; reversed shown separately. */}
               <div className="flex items-center gap-x-4 gap-y-1 flex-wrap pb-3 mb-1 border-b border-line">
                 <span className="font-semibold">
-                  {t('accounting.installmentCheck.totalLabel', { count: data.count })}
+                  {t('accounting.installmentCheck.totalLabel', { count: rows.length })}
                   {' · '}
-                  <span className="text-primary-fg tabular-nums">{fmtCurrency(data.total_amount)}</span>
-                </span>
-                {data.by_method.map(m => (
-                  <span key={m.method} className="text-xs text-subtle">
-                    {t(`paymentMethod.${m.method}`)}{' '}
-                    <span className="text-fg tabular-nums">{m.count}/{fmtCurrency(m.total)}</span>
+                  <span className="text-primary-fg tabular-nums">
+                    {t('accounting.installmentCheck.countedLabel', { count: countedRows.length, amount: fmtCurrency(countedTotal) })}
                   </span>
-                ))}
+                  {reversedRows.length > 0 && (
+                    <>
+                      {' · '}
+                      <span className="text-danger tabular-nums font-normal">
+                        {t('accounting.installmentCheck.reversedLabel', { count: reversedRows.length, amount: fmtCurrency(reversedTotal) })}
+                      </span>
+                    </>
+                  )}
+                </span>
               </div>
 
-              {rows.map(r => (
+              {rows.map(r => {
+                // Channel label: transfers split front/back on from_slip_submission
+                // (spec ④ — never guess from slip_media_id).
+                const channelLabel = r.method === 'TRANSFER'
+                  ? t(`accounting.installmentCheck.channel_${r.from_slip_submission ? 'TRANSFER_BACK' : 'TRANSFER_FRONT'}`)
+                  : t(`paymentMethod.${r.method}`);
+                const installmentChip = fmtInstallmentNos(r.installment_nos, t);
+                return (
                 <div key={r.payment_id} className="py-3 border-b border-line/70">
                   {/* Line 1 — payment code + amount + transfer time */}
                   <div className="flex items-baseline gap-2 flex-wrap">
                     {r.kind === 'EARLY_PAYOFF'
                       ? <Flag size={14} className="text-warning-fg shrink-0 self-center" />
                       : <Repeat size={14} className="text-subtle shrink-0 self-center" />}
-                    <span className="font-mono text-sm font-medium">{r.payment_code}</span>
+                    {/* Payment code → payment-list, filtered to this payment (shows voided/reversed there). */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const p = new URLSearchParams({ q: r.payment_code, from: fromDate, to: toDate });
+                        if (!allBranches && branchId) p.set('branch_id', branchId);
+                        navigate(`/admin/accounting/payment-list?${p.toString()}`);
+                      }}
+                      className={`font-mono text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-0.5 bg-transparent border-none p-0 cursor-pointer ${r.is_reversed ? 'line-through text-subtler' : ''}`}
+                    >
+                      {r.payment_code}
+                      <ExternalLink size={10} />
+                    </button>
                     <Badge color={r.kind === 'EARLY_PAYOFF' ? 'warning' : 'secondary'} size="xs">
                       {t(`accounting.installmentCheck.kind_${r.kind}`)}
                     </Badge>
-                    <span className="ml-auto tabular-nums font-semibold">{fmtCurrency(r.amount)}</span>
+                    {installmentChip && (
+                      <Badge color={r.kind === 'EARLY_PAYOFF' ? 'warning' : 'default'} size="xs">
+                        {installmentChip}
+                      </Badge>
+                    )}
+                    {r.is_reversed && (
+                      <Badge color="danger" size="xs">{t('accounting.installmentCheck.reversed')}</Badge>
+                    )}
+                    <span className={`ml-auto tabular-nums font-semibold ${r.is_reversed ? 'line-through text-subtler' : ''}`}>
+                      {fmtCurrency(r.amount)}
+                    </span>
                   </div>
                   <div className="text-xs text-subtle mt-0.5">
-                    {t(`paymentMethod.${r.method}`)}
+                    {channelLabel}
                     {' · '}
                     {r.transfer_at
                       ? <>{t('accounting.installmentCheck.transferredAt')} <DateTime value={r.transfer_at} showTime={true} /></>
@@ -377,7 +454,8 @@ export function InstallmentCheckPage() {
                     </div>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="p-8 text-center text-subtler">{t('accounting.reconcile.pickBranch')}</div>

@@ -191,8 +191,10 @@ export async function exportInstallmentCheck(
   const columns: XlsxColumn[] = [
     { key: 'transfer_at', label: t('accounting.installmentCheck.transferAt'), type: 'date', width: 18 },
     { key: 'payment_code', label: t('accounting.installmentCheck.paymentCode'), type: 'text', width: 20 },
-    { key: 'method', label: t('accounting.installmentCheck.method'), width: 14 },
+    { key: 'channel', label: t('accounting.installmentCheck.method'), width: 16 },
+    { key: 'installment_nos', label: t('accounting.installmentCheck.installmentNoCol'), type: 'text', width: 12 },
     { key: 'amount', label: t('accounting.installmentCheck.amount'), type: 'number', width: 14 },
+    { key: 'status', label: t('accounting.installmentCheck.statusCol'), width: 14 },
     { key: 'transaction_ref', label: t('accounting.installmentCheck.transactionRef'), type: 'text', width: 20 },
     { key: 'sender_account_name', label: t('accounting.installmentCheck.senderName'), width: 22 },
     { key: 'sender_bank', label: t('accounting.installmentCheck.senderBank'), width: 16 },
@@ -201,6 +203,7 @@ export async function exportInstallmentCheck(
     { key: 'contract_code', label: t('accounting.installmentCheck.contractCode'), type: 'text', width: 20 },
     { key: 'device_serial', label: t('accounting.installmentCheck.serial'), type: 'text', width: 18 },
     { key: 'device_imei', label: t('accounting.installmentCheck.imei'), type: 'text', width: 18 },
+    { key: 'device_external_ref', label: t('accounting.installmentCheck.externalRefCol'), type: 'text', width: 14 },
     { key: 'kind', label: t('accounting.installmentCheck.kind'), width: 16 },
   ];
 
@@ -220,12 +223,29 @@ export async function exportInstallmentCheck(
     blank(),
   ];
 
+  // Channel label: transfers split front/back on from_slip_submission (spec ⑤).
+  const channelLabel = (r: InstallmentCheckRow): string =>
+    r.method === 'TRANSFER'
+      ? t(`accounting.installmentCheck.channel_${r.from_slip_submission ? 'TRANSFER_BACK' : 'TRANSFER_FRONT'}`)
+      : t(`paymentMethod.${r.method}`, { defaultValue: r.method });
+
+  // Installment range as TEXT (leading apostrophe keeps Excel from date-coercing
+  // "1–12" / "1, 3, 5").
+  const installmentText = (nos: number[]): string => {
+    if (!nos || nos.length === 0) return '';
+    if (nos.length === 1) return String(nos[0]);
+    const contiguous = nos.every((v, i) => i === 0 || v === nos[i - 1] + 1);
+    return contiguous ? `${nos[0]}–${nos[nos.length - 1]}` : nos.join(', ');
+  };
+
   for (const r of rows) {
     out.push({
       transfer_at: r.transfer_at ?? r.paid_at,
       payment_code: r.payment_code,
-      method: t(`paymentMethod.${r.method}`, { defaultValue: r.method }),
+      channel: channelLabel(r),
+      installment_nos: installmentText(r.installment_nos),
       amount: r.amount,
+      status: r.is_reversed ? t('accounting.installmentCheck.reversed') : '',
       transaction_ref: r.transaction_ref ?? '',
       sender_account_name: r.sender_account_name ?? '',
       sender_bank: r.sender_bank ?? '',
@@ -234,6 +254,7 @@ export async function exportInstallmentCheck(
       contract_code: r.contract_code,
       device_serial: r.device_serial ?? '',
       device_imei: r.device_imei ?? '',
+      device_external_ref: r.device_external_ref ?? '',
       kind: t(`accounting.installmentCheck.kind_${r.kind}`, { defaultValue: r.kind }),
     });
   }
