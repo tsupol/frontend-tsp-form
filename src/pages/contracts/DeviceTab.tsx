@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, Modal, Input, FormErrorMessage, useSnackbarContext } from 'tsp-form';
 import { Smartphone, ExternalLink, Wrench, ArrowDownToLine, ArrowUpFromLine, Link2, Link2Off, Cloud, CloudOff, CheckCircle, Pencil, XCircle, Loader2 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
@@ -183,10 +183,12 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
                       {primaryAsset ? codeDisplay(primaryAsset.asset_code_display, primaryAsset.asset_code) : `#${contract.device_id}`}
                       <ExternalLink size={11} />
                     </Link>
-                    {primaryAsset?.external_ref && (
-                      <span className="text-[10px] font-mono text-subtle bg-surface px-1 py-0.5 rounded border border-line">
-                        EXT {primaryAsset.external_ref}
-                      </span>
+                    {primaryAsset && (
+                      <ExternalRefBadge
+                        assetId={primaryAsset.asset_id}
+                        externalRef={primaryAsset.external_ref}
+                        onSaved={() => queryClient.invalidateQueries({ queryKey: ['asset-summary', contract.device_id] })}
+                      />
                     )}
                   </div>
                 </div>
@@ -421,10 +423,12 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
                       {loanerAsset ? codeDisplay(loanerAsset.asset_code_display, loanerAsset.asset_code) : `#${contract.loaner_device_id}`}
                       <ExternalLink size={11} />
                     </Link>
-                    {loanerAsset?.external_ref && (
-                      <span className="text-[10px] font-mono text-subtle bg-surface px-1 py-0.5 rounded border border-line">
-                        EXT {loanerAsset.external_ref}
-                      </span>
+                    {loanerAsset && (
+                      <ExternalRefBadge
+                        assetId={loanerAsset.asset_id}
+                        externalRef={loanerAsset.external_ref}
+                        onSaved={() => queryClient.invalidateQueries({ queryKey: ['asset-summary', contract.loaner_device_id] })}
+                      />
                     )}
                   </div>
                 </div>
@@ -604,6 +608,104 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
         </>
       )}
     </div>
+  );
+}
+
+// External ref (TPA reference) — inline-editable badge next to the asset code.
+// Shows "EXT xxx" (or a subtle "add ref" affordance when empty), swaps to an
+// input on the pencil. Writes via fn_inv_asset_update_external_ref (same RPC the
+// AssetsPage detail uses) and refetches the asset summary on success.
+function ExternalRefBadge({
+  assetId, externalRef, onSaved,
+}: {
+  assetId: number;
+  externalRef: string | null;
+  onSaved: () => void;
+}) {
+  const { t } = useTranslation();
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(externalRef ?? '');
+  const [error, setError] = useState('');
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      apiClient.rpc<{ asset_id: number; external_ref: string | null; changed: boolean }>(
+        'fn_inv_asset_update_external_ref',
+        { p_asset_id: assetId, p_external_ref: value.trim() || null, p_note: null },
+      ),
+    onSuccess: () => { setEditing(false); setError(''); onSaved(); },
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        setError(
+          (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '')
+          || err.message,
+        );
+      } else {
+        setError(String(err));
+      }
+    },
+  });
+
+  const startEdit = () => { setValue(externalRef ?? ''); setError(''); setEditing(true); };
+  const cancelEdit = () => { setEditing(false); setError(''); setValue(externalRef ?? ''); };
+
+  if (editing) {
+    return (
+      <span className="inline-flex items-center gap-1">
+        <Input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          size="sm"
+          placeholder={t('asset.externalRef_placeholder', { defaultValue: 'TPA ticket ID' })}
+          className="w-28"
+          autoFocus
+          error={!!error}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') mutation.mutate();
+            if (e.key === 'Escape') cancelEdit();
+          }}
+        />
+        <Button
+          size="xs"
+          color="primary"
+          className="btn-icon-xs"
+          startIcon={mutation.isPending ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />}
+          onClick={() => mutation.mutate()}
+          disabled={mutation.isPending}
+          aria-label={t('common.save')}
+        />
+        <Button
+          size="xs"
+          variant="ghost"
+          className="btn-icon-xs"
+          startIcon={<XCircle size={12} />}
+          onClick={cancelEdit}
+          disabled={mutation.isPending}
+          aria-label={t('common.cancel')}
+        />
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1">
+      {externalRef ? (
+        <span className="text-[10px] font-mono text-subtle bg-surface px-1 py-0.5 rounded border border-line">
+          EXT {externalRef}
+        </span>
+      ) : (
+        <span className="text-[10px] text-subtler italic">{t('asset.externalRef', { defaultValue: 'TPA Reference' })}</span>
+      )}
+      <button
+        type="button"
+        className="btn-icon-xs text-subtle hover:text-fg"
+        aria-label={t('asset.externalRef', { defaultValue: 'TPA Reference' })}
+        onClick={startEdit}
+      >
+        <Pencil size={11} />
+      </button>
+    </span>
   );
 }
 
