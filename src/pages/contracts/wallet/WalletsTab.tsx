@@ -5,12 +5,14 @@ import { CheckCircle } from 'lucide-react';
 import { WalletCard } from './WalletCard';
 import { WalletActionModal } from './WalletActionModal';
 import type { WalletType, WalletAction } from './types';
+import { useCompanyFeatures, type CompanyFeatureCode } from '../../../hooks/useCompanyFeatures';
 
 interface ContractForWallets {
   id: number;
   code: string;
   code_display: string | null;
   holding_id: number;
+  company_id: number;
   state: string;
   saving_balance: number | null;
   credit_balance: number | null;
@@ -30,6 +32,11 @@ const WALLET_ORDER: WalletType[] = ['SAVING', 'CREDIT', 'INSURANCE'];
 export function WalletsTab({ contract }: WalletsTabProps) {
   const { t } = useTranslation();
   const { addSnackbar } = useSnackbarContext();
+  const features = useCompanyFeatures(contract.company_id);
+  // Hide a wallet the company has turned off. WALLET_ORDER codes match feature
+  // codes 1:1. Server also blocks disabled-wallet money, this just removes the
+  // dead-end button.
+  const visibleWallets = WALLET_ORDER.filter(w => features.isEnabled(w as CompanyFeatureCode));
   const [activeAction, setActiveAction] = useState<{
     walletType: WalletType;
     action: WalletAction;
@@ -49,7 +56,10 @@ export function WalletsTab({ contract }: WalletsTabProps) {
 
   return (
     <div className="p-4 flex flex-col gap-4">
-      {WALLET_ORDER.map(walletType => (
+      {visibleWallets.length === 0 && (
+        <div className="p-6 text-center text-subtler text-sm">{t('wallet.allDisabled', { defaultValue: 'No wallets enabled for this company' })}</div>
+      )}
+      {visibleWallets.map(walletType => (
         <WalletCard
           key={walletType}
           contract={contract}

@@ -17,6 +17,7 @@ export interface CompanyConfig {
   max_co_lessees: number;
   deposit_max_days: number;
   buyback_auto_reject_days: number;
+  pay_pending_limit: number;
   updated_by: number | null;
   updated_at: string;
 }

@@ -9,6 +9,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 
 import { WorkspaceProvider, useWorkspace } from './workspace/WorkspaceContext';
+import { useCompanyFeatures } from '../../hooks/useCompanyFeatures';
 import { CardProductPlan } from './workspace/CardProductPlan';
 import { CardSaving } from './workspace/CardSaving';
 import { CardInsurance } from './workspace/CardInsurance';
@@ -44,7 +45,10 @@ function WorkspaceContent() {
   const { user } = useAuth();
   const navGuard = useNavGuard();
   const loadedRef = useRef(false);
-  const { data, updateData, resetData, openModal, setOpenModal, isPostPayment, getCardStatus, panelDirtyRef, pendingModal, confirmPanelSwitch, cancelPanelSwitch } = useWorkspace();
+  const { data, contract, updateData, resetData, openModal, setOpenModal, isPostPayment, getCardStatus, panelDirtyRef, pendingModal, confirmPanelSwitch, cancelPanelSwitch } = useWorkspace();
+  // Hide the saving / insurance wizard steps when the company has that wallet off
+  // (mig 530). company_id comes from the draft's server state once it exists.
+  const companyFeatures = useCompanyFeatures(contract?.company_id ?? null);
   const [shakingCards] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState(false);
   const reviewPayCardRef = useRef<HTMLDivElement | null>(null);
@@ -414,8 +418,8 @@ function WorkspaceContent() {
                     <CardCustomer onEdit={() => handleEditOpen('customer')} active={isCardActive('customer')} shake={shakingCards.has('customer')} />
                     <CardCommissionOwner onEdit={() => handleEditOpen('commissionOwner')} active={isCardActive('commissionOwner')} shake={shakingCards.has('commissionOwner')} />
                     <CardProductPlan onEdit={() => handleEditOpen('productPlan')} active={isCardActive('productPlan')} shake={shakingCards.has('productPlan')} />
-                    <CardSaving onEdit={() => handleEditOpen('saving')} active={isCardActive('saving')} shake={shakingCards.has('saving')} />
-                    <CardInsurance onEdit={() => handleEditOpen('insurance')} active={isCardActive('insurance')} shake={shakingCards.has('insurance')} />
+                    {companyFeatures.saving && <CardSaving onEdit={() => handleEditOpen('saving')} active={isCardActive('saving')} shake={shakingCards.has('saving')} />}
+                    {companyFeatures.insurance && <CardInsurance onEdit={() => handleEditOpen('insurance')} active={isCardActive('insurance')} shake={shakingCards.has('insurance')} />}
                     <CardContactRef onEdit={() => handleEditOpen('contactRef')} active={isCardActive('contactRef')} shake={shakingCards.has('contactRef')} />
                     <CardCoLessee onEdit={() => handleEditOpen('co_lessee')} active={isCardActive('co_lessee')} shake={shakingCards.has('co_lessee')} />
                     <CardDocuments onEdit={() => handleEditOpen('documents')} active={isCardActive('documents')} shake={shakingCards.has('documents')} />

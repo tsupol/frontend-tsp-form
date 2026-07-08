@@ -3,12 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  MobileHeader, Button, Input, Switch, useSnackbarContext,
+  MobileHeader, Button, Input, Switch, Badge, useSnackbarContext,
 } from 'tsp-form';
 import { ArrowLeft, CheckCircle, XCircle, Save } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import type { CompanyConfig, EditableField } from './companyConfigTypes';
+import type { CompanyFeatureCode } from '../../hooks/useCompanyFeatures';
 
 // ── Detail Page ──────────────────────────────────────────────────────────────
 
@@ -48,6 +49,8 @@ export function CompanyConfigDetailPage() {
     { key: 'pause_enabled', label: t('settings.config.pauseEnabled'), type: 'boolean', group: 'pause' },
     { key: 'repo_fee_per_case', label: t('settings.config.repoFeePerCase'), type: 'number', group: 'legal' },
     { key: 'buyback_auto_reject_days', label: t('settings.config.buybackAutoRejectDays'), type: 'number', group: 'buyback', min: 1, max: 365 },
+    // pay_pending_limit: 0 = pay only what's due, 99 = allow pay-ahead (mig 533). Fill policy.
+    { key: 'pay_pending_limit', label: t('settings.config.payPendingLimit'), type: 'number', group: 'policy', min: 0, max: 99 },
   ];
 
   const groups = [
@@ -57,6 +60,7 @@ export function CompanyConfigDetailPage() {
     { key: 'pause', label: t('settings.config.groupPause') },
     { key: 'legal', label: t('settings.config.groupLegal') },
     { key: 'buyback', label: t('settings.config.groupBuyback') },
+    { key: 'policy', label: t('settings.config.groupPolicy') },
   ];
 
   // Initialize form when config loads
@@ -259,14 +263,192 @@ export function CompanyConfigDetailPage() {
           })}
         </div>
 
-        {/* Footer */}
-        <div className="sticky bottom-0 flex items-center justify-end gap-2 py-3 bg-bg border-t border-line md:border-t-0">
+        {/* Footer (config fields — saves via fn_config_update) */}
+        <div className="sticky bottom-0 flex items-center justify-end gap-2 py-3 bg-bg border-t border-line md:border-t-0 z-10">
           <Button onClick={handleReset} disabled={saving || !isDirty}>{t('common.cancel')}</Button>
           <Button color="primary" startIcon={<Save size={16} />} onClick={handleSave} disabled={saving || !isDirty}>
             {saving ? t('common.saving') : t('common.save')}
           </Button>
         </div>
+
+        {/* Wallet features + bill-line owner — separate views/RPCs, own save flow. */}
+        <hr className="border-line mt-2 mb-6" />
+        <WalletFeaturesSection companyId={config.company_id} />
+        <hr className="border-line mt-6 mb-6" />
+        <ChargeOwnerSection companyId={config.company_id} />
       </div>
     </>
   );
+}
+
+// ── Wallet features (SAVING / CREDIT / INSURANCE) ──────────────────────────────
+// Each toggle writes immediately via fn_company_feature_set (no shared save
+// button — one RPC per flip, like a settings switch). Default-safe: a company
+// with no rows reads all-enabled from the view.
+function WalletFeaturesSection({ companyId }: { companyId: number }) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const { addSnackbar } = useSnackbarContext();
+  const [error, setError] = useState('');
+  const [pending, setPending] = useState<string | null>(null);
+
+  const { data: rows = [], isLoading } = useQuery({
+    queryKey: ['company-features', companyId],
+    queryFn: () => apiClient.get<CompanyFeatureRow[]>(`/v_company_features?company_id=eq.${companyId}`),
+  });
+
+  const setFeature = async (code: string, enabled: boolean) => {
+    setPending(code);
+    setError('');
+    try {
+      await apiClient.rpc('fn_company_feature_set', {
+        p_company_id: companyId,
+        p_feature_code: code,
+        p_enabled: enabled,
+      });
+      await queryClient.invalidateQueries({ queryKey: ['company-features', companyId] });
+      addSnackbar({
+        message: (
+          <div className="alert alert-success"><CheckCircle size={16} /><span className="alert-description">{t('settings.config.saved')}</span></div>
+        ),
+        type: 'success',
+      });
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError((err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '') || err.message);
+      }
+    } finally {
+      setPending(null);
+    }
+  };
+
+  const order: CompanyFeatureCode[] = ['SAVING', 'CREDIT', 'INSURANCE'];
+  const byCode = (c: string) => rows.find(r => r.feature_code === c);
+
+  return (
+    <div>
+      <h4 className="text-sm font-semibold text-fg uppercase tracking-wider mb-1">{t('settings.config.groupWallet')}</h4>
+      <p className="text-xs text-subtle mb-3">{t('settings.config.walletHint')}</p>
+      {error && (
+        <div className="alert alert-danger mb-3"><XCircle size={16} /><div><div className="alert-description text-xs">{error}</div></div></div>
+      )}
+      <div className="form-grid md:grid-cols-3">
+        {order.map(code => {
+          const row = byCode(code);
+          const enabled = row ? row.is_enabled : true;
+          return (
+            <div key={code} className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-md border border-line">
+              <span className="text-sm">{t(`settings.config.feature_${code}`)}</span>
+              <Switch
+                size="sm"
+                checked={enabled}
+                disabled={isLoading || pending === code}
+                onChange={(e) => setFeature(code, (e.target as HTMLInputElement).checked)}
+              />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Bill-line owner override ───────────────────────────────────────────────────
+// Coarse wildcard override: book EVERY charge to HOLDING or to COMPANY via a
+// single '*' row. When no '*' row exists, money books by each charge type's own
+// owner_type (= TPA default) — shown as "ตามค่าเริ่มต้น" but not selectable, since
+// the current fn_company_charge_owner_set can only set HOLDING/COMPANY, not clear
+// the row. (Clearing needs a BE clear-RPC — see note.)
+function ChargeOwnerSection({ companyId }: { companyId: number }) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const { addSnackbar } = useSnackbarContext();
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const { data: rows = [], isLoading } = useQuery({
+    queryKey: ['company-charge-owners', companyId],
+    queryFn: () => apiClient.get<ChargeOwnerRow[]>(`/v_company_charge_owners?company_id=eq.${companyId}`),
+  });
+
+  const wildcard = rows.find(r => r.charge_type_code === '*');
+  // 'default' = no '*' override present (books per charge type).
+  const mode: 'default' | 'HOLDING' | 'COMPANY' = wildcard?.owner_type ?? 'default';
+
+  const apply = async (owner: 'HOLDING' | 'COMPANY') => {
+    if (owner === mode) return;
+    setSaving(true);
+    setError('');
+    try {
+      await apiClient.rpc('fn_company_charge_owner_set', {
+        p_company_id: companyId,
+        p_charge_type_code: '*',
+        p_owner_type: owner,
+      });
+      await queryClient.invalidateQueries({ queryKey: ['company-charge-owners', companyId] });
+      addSnackbar({
+        message: (
+          <div className="alert alert-success"><CheckCircle size={16} /><span className="alert-description">{t('settings.config.saved')}</span></div>
+        ),
+        type: 'success',
+      });
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError((err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '') || err.message);
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="pb-6">
+      <h4 className="text-sm font-semibold text-fg uppercase tracking-wider mb-1">{t('settings.config.groupOwner')}</h4>
+      <p className="text-xs text-subtle mb-3">{t('settings.config.ownerHint')}</p>
+      {error && (
+        <div className="alert alert-danger mb-3"><XCircle size={16} /><div><div className="alert-description text-xs">{error}</div></div></div>
+      )}
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-subtle shrink-0">{t('settings.config.ownerCurrent')}:</span>
+        <Badge color={mode === 'HOLDING' ? 'warning' : mode === 'COMPANY' ? 'info' : 'default'}>
+          {mode === 'default' ? t('settings.config.ownerDefault') : t(`settings.config.owner_${mode}`)}
+        </Badge>
+      </div>
+      <div className="flex flex-wrap gap-2 mt-3">
+        <Button
+          variant={mode === 'HOLDING' ? undefined : 'outline'}
+          color={mode === 'HOLDING' ? 'primary' : undefined}
+          disabled={isLoading || saving}
+          onClick={() => apply('HOLDING')}
+        >
+          {t('settings.config.ownerAllHolding')}
+        </Button>
+        <Button
+          variant={mode === 'COMPANY' ? undefined : 'outline'}
+          color={mode === 'COMPANY' ? 'primary' : undefined}
+          disabled={isLoading || saving}
+          onClick={() => apply('COMPANY')}
+        >
+          {t('settings.config.ownerAllCompany')}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+interface CompanyFeatureRow {
+  company_id: number;
+  company_code: string;
+  feature_code: CompanyFeatureCode;
+  feature_name_th: string;
+  is_enabled: boolean;
+}
+
+interface ChargeOwnerRow {
+  company_id: number;
+  company_code: string;
+  charge_type_code: string;
+  owner_type: 'HOLDING' | 'COMPANY';
+  note: string | null;
+  updated_at: string;
 }

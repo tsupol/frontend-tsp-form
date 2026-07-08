@@ -41,6 +41,7 @@ import { ActionDoneView, type ActionDoneDetailRow } from './ActionDoneView';
 import { ContractFeeModal } from './ContractFeeModal';
 import { LateFeeCollectModal } from './LateFeeCollectModal';
 import { useContractInvalidate } from './useContractInvalidate';
+import { useCompanyFeatures } from '../../hooks/useCompanyFeatures';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -2681,6 +2682,13 @@ function PayInstallmentModal({ open, contract, onClose }: {
 
   const setApiError = (err: unknown) => {
     if (err instanceof ApiError) {
+      // Friendly copy for the CREDIT-off overpayment reject (server backstop for
+      // the client-side overpayBlocked guard) — the raw BE message is technical.
+      if (err.code?.includes('OVERPAYMENT_NOT_ALLOWED') || err.messageKey?.includes('overpayment')) {
+        setError(t('contract.payInstallment_overpayBlocked', { outstanding: fmtCurrency(outstanding) }));
+        setErrorKey(k => k + 1);
+        return;
+      }
       const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
         || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
       setError(translated || err.message);
@@ -2808,6 +2816,13 @@ function PayInstallmentModal({ open, contract, onClose }: {
     : Infinity;
   const walletExceeded = parsedAmount > walletBalance;
 
+  // Overpayment: a company with CREDIT disabled can't hold customer credit, so the
+  // backend rejects an installment payment above the outstanding amount (whole bill
+  // fails). Block it client-side with a friendly message; credit-enabled companies
+  // overflow into credit as before, so no block there. (§3b, doc 123.)
+  const features = useCompanyFeatures(contract.company_id ?? null);
+  const overpayBlocked = !features.credit && outstanding > 0 && parsedAmount > outstanding + 0.001;
+
   // Auto credit applied for CASH/TRANSFER (informational)
   const autoCredit = channel === 'CASH' || channel === 'TRANSFER'
     ? Math.min(creditBalance, parsedAmount)
@@ -2870,6 +2885,7 @@ function PayInstallmentModal({ open, contract, onClose }: {
   const canSubmit = (() => {
     if (parsedAmount <= 0) return false;
     if (walletExceeded) return false;
+    if (overpayBlocked) return false;
     if (channel === 'TRANSFER' && !bankAccountId) return false;
     return true;
   })();
@@ -2985,6 +3001,14 @@ function PayInstallmentModal({ open, contract, onClose }: {
                       {t('contract.payInstallment_walletExceeded', {
                         balance: fmtCurrency(walletBalance),
                         defaultValue: 'Amount exceeds wallet balance ({{balance}})',
+                      })}
+                    </div>
+                  )}
+                  {overpayBlocked && (
+                    <div className="text-xs text-danger mt-1">
+                      {t('contract.payInstallment_overpayBlocked', {
+                        outstanding: fmtCurrency(outstanding),
+                        defaultValue: 'Amount exceeds the outstanding balance — this company collects at most the amount due ({{outstanding}})',
                       })}
                     </div>
                   )}
