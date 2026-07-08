@@ -284,15 +284,21 @@ function ManageModal({
         });
         uploaded[sz] = r.key;
       }
-      const primary = uploaded.sm ?? Object.values(uploaded)[0];
+      // Primary = md (1280px) so the lightbox viewer loads full-res; variants_json
+      // carries both sizes so thumbs use sm and the viewer uses md. Private paths
+      // in variants_json are accepted since mig 282 (chk_media_variants_keys allows
+      // an all-private map); ChatThreadPanel does the same.
+      const primary = uploaded.md ?? uploaded.sm ?? Object.values(uploaded)[0];
       if (!primary) throw new Error('Upload returned no key');
+      const variantsJson: Record<string, string> = {};
+      for (const sz of CONTRACT_EVIDENCE_SIZES) {
+        if (uploaded[sz]) variantsJson[sz] = toStoragePath(uploaded[sz]);
+      }
 
-      // Private/CONFIDENTIAL — the table constraint requires variant values to
-      // be PUBLIC paths, so private uploads pass null variants.
       await apiClient.rpc('fn_media_attach', {
         p_holding_id: holdingId,
         p_storage_path: toStoragePath(primary),
-        p_variants_json: null,
+        p_variants_json: variantsJson,
         p_media_type: 'IMAGE',
         p_access_level: 'CONFIDENTIAL',
         p_mime_type: mimeFromKey(primary),
