@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  MobileHeader, Button, Input, Switch, Badge, useSnackbarContext,
+  MobileHeader, Button, Input, Switch, useSnackbarContext,
 } from 'tsp-form';
 import { ArrowLeft, CheckCircle, XCircle, Save } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
@@ -354,11 +354,9 @@ function WalletFeaturesSection({ companyId }: { companyId: number }) {
 }
 
 // ── Bill-line owner override ───────────────────────────────────────────────────
-// Coarse wildcard override: book EVERY charge to HOLDING or to COMPANY via a
-// single '*' row. When no '*' row exists, money books by each charge type's own
-// owner_type (= TPA default) — shown as "ตามค่าเริ่มต้น" but not selectable, since
-// the current fn_company_charge_owner_set can only set HOLDING/COMPANY, not clear
-// the row. (Clearing needs a BE clear-RPC — see note.)
+// One boolean (mig 546): override_owner_to_holding. On = force every bill line of
+// the company to HOLDING; off (default) = each line keeps its natural owner, like
+// TPA. Toggling off IS the "back to default" — there's no stored COMPANY state.
 function ChargeOwnerSection({ companyId }: { companyId: number }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -366,26 +364,25 @@ function ChargeOwnerSection({ companyId }: { companyId: number }) {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const { data: rows = [], isLoading } = useQuery({
-    queryKey: ['company-charge-owners', companyId],
-    queryFn: () => apiClient.get<ChargeOwnerRow[]>(`/v_company_charge_owners?company_id=eq.${companyId}`),
+  const { data: override = false, isLoading } = useQuery({
+    queryKey: ['company-owner-override', companyId],
+    queryFn: async () => {
+      const rows = await apiClient.get<{ override_owner_to_holding: boolean }[]>(
+        `/v_company_config?company_id=eq.${companyId}&select=override_owner_to_holding`,
+      );
+      return rows[0]?.override_owner_to_holding ?? false;
+    },
   });
 
-  const wildcard = rows.find(r => r.charge_type_code === '*');
-  // 'default' = no '*' override present (books per charge type).
-  const mode: 'default' | 'HOLDING' | 'COMPANY' = wildcard?.owner_type ?? 'default';
-
-  const apply = async (owner: 'HOLDING' | 'COMPANY') => {
-    if (owner === mode) return;
+  const setOverride = async (next: boolean) => {
     setSaving(true);
     setError('');
     try {
-      await apiClient.rpc('fn_company_charge_owner_set', {
+      await apiClient.rpc('fn_company_set_owner_override', {
         p_company_id: companyId,
-        p_charge_type_code: '*',
-        p_owner_type: owner,
+        p_override: next,
       });
-      await queryClient.invalidateQueries({ queryKey: ['company-charge-owners', companyId] });
+      await queryClient.invalidateQueries({ queryKey: ['company-owner-override', companyId] });
       addSnackbar({
         message: (
           <div className="alert alert-success"><CheckCircle size={16} /><span className="alert-description">{t('settings.config.saved')}</span></div>
@@ -408,29 +405,14 @@ function ChargeOwnerSection({ companyId }: { companyId: number }) {
       {error && (
         <div className="alert alert-danger mb-3"><XCircle size={16} /><div><div className="alert-description text-xs">{error}</div></div></div>
       )}
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-subtle shrink-0">{t('settings.config.ownerCurrent')}:</span>
-        <Badge color={mode === 'HOLDING' ? 'warning' : mode === 'COMPANY' ? 'info' : 'default'}>
-          {mode === 'default' ? t('settings.config.ownerDefault') : t(`settings.config.owner_${mode}`)}
-        </Badge>
-      </div>
-      <div className="flex flex-wrap gap-2 mt-3">
-        <Button
-          variant={mode === 'HOLDING' ? undefined : 'outline'}
-          color={mode === 'HOLDING' ? 'primary' : undefined}
+      <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-md border border-line">
+        <span className="text-sm">{t('settings.config.ownerAllHolding')}</span>
+        <Switch
+          size="sm"
+          checked={override}
           disabled={isLoading || saving}
-          onClick={() => apply('HOLDING')}
-        >
-          {t('settings.config.ownerAllHolding')}
-        </Button>
-        <Button
-          variant={mode === 'COMPANY' ? undefined : 'outline'}
-          color={mode === 'COMPANY' ? 'primary' : undefined}
-          disabled={isLoading || saving}
-          onClick={() => apply('COMPANY')}
-        >
-          {t('settings.config.ownerAllCompany')}
-        </Button>
+          onChange={(e) => setOverride((e.target as HTMLInputElement).checked)}
+        />
       </div>
     </div>
   );
@@ -442,13 +424,4 @@ interface CompanyFeatureRow {
   feature_code: CompanyFeatureCode;
   feature_name_th: string;
   is_enabled: boolean;
-}
-
-interface ChargeOwnerRow {
-  company_id: number;
-  company_code: string;
-  charge_type_code: string;
-  owner_type: 'HOLDING' | 'COMPANY';
-  note: string | null;
-  updated_at: string;
 }
