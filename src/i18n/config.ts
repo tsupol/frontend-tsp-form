@@ -40,6 +40,13 @@ i18n
   .init({
     resources,
     fallbackLng: 'en',
+    // Normalize region tags (e.g. navigator's "th-TH" / "en-US") down to the
+    // base language. Without this, i18n.language stays "th-TH" for users who
+    // never toggled the switcher, so every `i18n.language === 'th'` check reads
+    // false and they see English name_en labels. supportedLngs keeps the
+    // detected value inside the two we ship.
+    load: 'languageOnly',
+    supportedLngs: ['en', 'th'],
     detection: {
       order: ['localStorage', 'navigator'],
       caches: ['localStorage'],
@@ -48,5 +55,14 @@ i18n
       escapeValue: false,
     },
   });
+
+// One-time repair for users who cached a region tag ("th-TH") in localStorage
+// before load:'languageOnly' shipped. The localStorage detector reads that raw
+// value back on boot, so i18n.language can still resolve to "th-TH" for them and
+// every `=== 'th'` check keeps failing. Collapse it to the base language once so
+// they self-heal on next load without having to toggle the switcher.
+if (i18n.language && i18n.language.includes('-')) {
+  i18n.changeLanguage(i18n.language.split('-')[0]);
+}
 
 export default i18n;
