@@ -5,6 +5,7 @@ import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tansta
 import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Modal, Input, TextArea, NumberSpinner, DataTable, PopOver, useSnackbarContext } from 'tsp-form';
 import { ArrowLeft, ArrowRightFromLine, ArrowLeftRight, CheckCircle, XCircle, Trash2, ExternalLink, Search, SlidersHorizontal, Plus, Smartphone, Package } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import { translateApiError } from '../../lib/apiErrors';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { DateTime } from '../../components/DateTime';
 import { CopyButton } from '../../components/CopyButton';
@@ -536,15 +537,7 @@ function CreateTransferModal({
       p_branch_id: null,
     }),
     onSuccess: (data) => onCreated(data.transfer_order_id),
-    onError: (err) => {
-      if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
-        setError(translated || err.message);
-      } else {
-        setError(String(err));
-      }
-    },
+    onError: (err) => setError(translateApiError(err, t)),
   });
 
   return (

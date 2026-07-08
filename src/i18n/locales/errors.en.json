@@ -472,6 +472,7 @@
   "inv.state.asset_bound_to_contract": "This device is bound to a contract — a branch can't change its colour. Ask an admin.",
   "INV.VALIDATION.VARIANT_UNCHANGED": "That's already the current colour.",
   "inv.validation.variant_unchanged": "That's already the current colour.",
+  "inv.validation.transfer_destination_internal_only": "Cannot transfer to {{branch_code}} {{branch_name}} — it is an external branch. To send stock to an external partner, use the B2B wholesale sale.",
   "INV.STATE.ASSET_NOT_REVALUABLE": "Asset cannot be revalued in its current state (in transit, with customer, in repair, or exited).",
   "inv.state.asset_not_revaluable": "Asset cannot be revalued in its current state (in transit, with customer, in repair, or exited).",
   "INV.STATE.BUYBACK_INTAKE_ALREADY_DONE": "This buyback line has already been intaked.",

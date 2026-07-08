@@ -33,17 +33,26 @@ export async function exportReconcileItems(
   t: TFunction,
   filename: string,
 ): Promise<void> {
+  // HOLDING_INSTALLMENT arrives as two groups (front/back) sharing a subgroup but
+  // differing on from_slip; key on subgroup + from_slip so each side's rows stay
+  // under its own header (mirrors the on-screen split, mig 542).
+  const key = (subgroup: string, fromSlip: boolean | null) =>
+    fromSlip === null ? subgroup : `${subgroup}:${fromSlip ? 'slip' : 'front'}`;
   const rowsBySubgroup = new Map<string, ReconcileItemRow[]>();
   for (const r of rows) {
-    const arr = rowsBySubgroup.get(r.subgroup) ?? [];
+    const k = key(r.subgroup, r.from_slip);
+    const arr = rowsBySubgroup.get(k) ?? [];
     arr.push(r);
-    rowsBySubgroup.set(r.subgroup, arr);
+    rowsBySubgroup.set(k, arr);
   }
 
   const out: ItemExportRow[] = [];
   for (const g of groups) {
-    const groupLabel = t(`accounting.reconcile.subgroup.${g.subgroup}`, { defaultValue: g.name_th });
-    for (const r of rowsBySubgroup.get(g.subgroup) ?? []) {
+    const baseLabel = t(`accounting.reconcile.subgroup.${g.subgroup}`, { defaultValue: g.name_th });
+    const groupLabel = g.from_slip === null
+      ? baseLabel
+      : `${baseLabel} ${t(g.from_slip ? 'accounting.reconcile.channelBackSuffix' : 'accounting.reconcile.channelFrontSuffix')}`;
+    for (const r of rowsBySubgroup.get(key(g.subgroup, g.from_slip)) ?? []) {
       out.push({
         subgroup: groupLabel,
         bill_date: r.bill_date,
@@ -113,31 +122,38 @@ export async function exportReconcileChannel(
   const summaryRow = (label: string, amount: number | null): Record<string, unknown> => ({
     code: label, method: '', amount, bank_name: '', account_number: '', payer_name: '', bill_code: '', from_slip: '', submission_code: '', created_at: '',
   });
+  // 3 channels: cash / transfer-front-store / transfer-back-office (slip-checked).
+  // The two transfer lines net to net_transfer (migs 537/543).
   const out: Record<string, unknown>[] = [
     summaryRow(t('accounting.reconcile.cash'), summary.net_cash),
-    summaryRow(t('accounting.reconcile.transfer'), summary.net_transfer),
-    summaryRow(t('accounting.reconcile.mustCount'), summary.physical),
-    summaryRow(t('accounting.reconcile.wallet'), summary.wallet),
-    summaryRow(t('accounting.reconcile.totalRemit'), summary.remit_total),
+    summaryRow(t('accounting.reconcile.transferFront'), summary.transfer_front_total),
+    summaryRow(t('accounting.reconcile.transferBack'), summary.slip_payment_total),
   ];
-  // Slip-origin note (only when present) — count + total from the slip team.
-  if (summary.slip_payment_count > 0) {
+  // Reversed note on the back-office channel, only when some slip payment was reversed.
+  if (summary.slip_reversed_total !== 0) {
     out.push(summaryRow(
-      t('accounting.reconcile.slipNote', {
-        defaultValue: '{{count}} payment(s) · ฿{{total}} came from the slip-checking team',
+      t('accounting.reconcile.transferBackDetail', {
         count: summary.slip_payment_count,
-        total: summary.slip_payment_total,
+        reversed: Math.abs(summary.slip_reversed_total),
+        net: summary.slip_payment_total,
       }),
       summary.slip_payment_total,
     ));
   }
+  out.push(
+    summaryRow(t('accounting.reconcile.mustCount'), summary.physical),
+    summaryRow(t('accounting.reconcile.wallet'), summary.wallet),
+    summaryRow(t('accounting.reconcile.totalRemit'), summary.remit_total),
+  );
   // Blank separator, then the slip header re-stated by the column titles.
   out.push(summaryRow('', null));
   // Map the fine payment_method code to the same channel label the page shows
   // (CASH → cash, TRANSFER → transfer, *_WALLET → wallet).
-  const methodLabel = (method: string): string => {
+  const methodLabel = (method: string, fromSlip: boolean): string => {
     if (method === 'CASH') return t('accounting.reconcile.cash');
-    if (method === 'TRANSFER') return t('accounting.reconcile.transfer');
+    if (method === 'TRANSFER') {
+      return fromSlip ? t('accounting.reconcile.transferBack') : t('accounting.reconcile.transferFront');
+    }
     if (method.endsWith('WALLET')) return t('accounting.reconcile.wallet');
     return method;
   };
@@ -145,7 +161,7 @@ export async function exportReconcileChannel(
   for (const p of payments) {
     out.push({
       code: p.code,
-      method: methodLabel(p.method),
+      method: methodLabel(p.method, p.from_slip_submission),
       amount: p.amount,
       bank_name: p.bank_name ?? '',
       account_number: p.account_number ?? '',

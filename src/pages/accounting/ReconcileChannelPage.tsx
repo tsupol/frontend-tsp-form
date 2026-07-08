@@ -300,6 +300,34 @@ export function ReconcileChannelPage() {
                 onViewSlip={setSlipImageKey}
               />
 
+              {/* Transfer breakdown — how net_transfer arrived: front-store (staff-
+                  recorded) vs back-office (slip-checked). Both already inside
+                  net_transfer above; this only shows the split so the closer knows
+                  which side each baht came from (migs 537/543). */}
+              <div className="pl-9 pr-2 pb-1 flex flex-col gap-1 text-xs">
+                <div className="flex items-center gap-3 py-1">
+                  <span className="flex-1 text-subtle">{t('accounting.reconcile.transferFront')}</span>
+                  <span className="w-24 text-right tabular-nums text-fg">{fmtCurrency(summary.transfer_front_total)}</span>
+                  <span className="w-24" /><span className="w-20" /><span className="w-24" />
+                </div>
+                <div className="flex flex-col py-1">
+                  <div className="flex items-center gap-3">
+                    <span className="flex-1 text-subtle">{t('accounting.reconcile.transferBack')}</span>
+                    <span className="w-24 text-right tabular-nums text-fg">{fmtCurrency(summary.slip_payment_total)}</span>
+                    <span className="w-24" /><span className="w-20" /><span className="w-24" />
+                  </div>
+                  {summary.slip_reversed_total !== 0 && (
+                    <span className="text-subtler mt-0.5">
+                      {t('accounting.reconcile.transferBackDetail', {
+                        count: summary.slip_payment_count,
+                        reversed: fmtCurrency(Math.abs(summary.slip_reversed_total)),
+                        net: fmtCurrency(summary.slip_payment_total),
+                      })}
+                    </span>
+                  )}
+                </div>
+              </div>
+
               {/* Must-count subtotal */}
               <div className="flex items-center gap-3 py-3 px-2 border-t-2 border-line">
                 <span className="flex-1 font-medium">{t('accounting.reconcile.mustCount')}</span>
@@ -354,21 +382,6 @@ export function ReconcileChannelPage() {
                 <span className="w-20" />
                 <span className="w-24" />
               </div>
-
-              {/* Slip-origin NOTE — these are already inside net_transfer, shown
-                  only so the closer knows how much came from the slip team. */}
-              {hasSlipPayments && (
-                <div className="mt-2 flex items-start gap-2 px-2 py-2 rounded-md bg-info-soft text-xs">
-                  <Receipt size={14} className="text-info-fg shrink-0 mt-0.5" />
-                  <span className="text-info-fg">
-                    {t('accounting.reconcile.slipNote', {
-                      defaultValue: '{{count}} payment(s) · ฿{{total}} came from the slip-checking team',
-                      count: summary.slip_payment_count,
-                      total: fmtCurrency(summary.slip_payment_total),
-                    })}
-                  </span>
-                </div>
-              )}
 
               {(summary.diff_cash === null || summary.diff_transfer === null) && (
                 <div className="mt-3 text-center text-xs text-subtler">

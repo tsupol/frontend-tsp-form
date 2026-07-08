@@ -23,6 +23,12 @@ type OwnerType = 'HOLDING' | 'COMPANY';
 
 const ROWS_PER_PAGE = 10;
 
+// Identity of a rendered group. HOLDING_INSTALLMENT is split into two (front/back)
+// by from_slip, so the key folds from_slip in; every other bucket has from_slip=null
+// and keys on subgroup alone.
+const groupKey = (subgroup: string, fromSlip: boolean | null): string =>
+  fromSlip === null ? subgroup : `${subgroup}:${fromSlip ? 'slip' : 'front'}`;
+
 function defaultRange() {
   // Time-aware: a fresh day has no data yet, so default to the last 7 days
   // rather than today-only (which renders empty at the start of the day).
@@ -96,13 +102,17 @@ export function ReconcileItemPage() {
   });
 
   const groups = data?.groups ?? [];
-  // rows already ordered (owner → subgroup → time) by the RPC; bucket by subgroup.
+  // rows already ordered (owner → subgroup → time) by the RPC; bucket by
+  // subgroup + from_slip. HOLDING_INSTALLMENT arrives as two groups (front/back)
+  // that share a subgroup but differ on from_slip — keying on subgroup alone would
+  // merge them, so the composite key keeps each side's rows under its own header.
   const rowsBySubgroup = useMemo(() => {
     const m = new Map<string, ReconcileItemRow[]>();
     for (const r of data?.rows ?? []) {
-      const arr = m.get(r.subgroup) ?? [];
+      const key = groupKey(r.subgroup, r.from_slip);
+      const arr = m.get(key) ?? [];
       arr.push(r);
-      m.set(r.subgroup, arr);
+      m.set(key, arr);
     }
     return m;
   }, [data?.rows]);
@@ -281,17 +291,20 @@ export function ReconcileItemPage() {
                       </span>
                       <span className="font-semibold text-sm">{t(`accounting.reconcile.owner_${owner}`)}</span>
                     </div>
-                    {ownerGroups.map(g => (
-                      <GroupRow
-                        key={g.subgroup}
-                        group={g}
-                        rows={rowsBySubgroup.get(g.subgroup) ?? []}
-                        open={openGroup === g.subgroup}
-                        onToggle={() => setOpenGroup(o => o === g.subgroup ? null : g.subgroup)}
-                        navigate={navigate}
-                        t={t}
-                      />
-                    ))}
+                    {ownerGroups.map(g => {
+                      const key = groupKey(g.subgroup, g.from_slip);
+                      return (
+                        <GroupRow
+                          key={key}
+                          group={g}
+                          rows={rowsBySubgroup.get(key) ?? []}
+                          open={openGroup === key}
+                          onToggle={() => setOpenGroup(o => o === key ? null : key)}
+                          navigate={navigate}
+                          t={t}
+                        />
+                      );
+                    })}
                   </div>
                 );
               })}
@@ -314,7 +327,12 @@ function GroupRow({
   navigate: ReturnType<typeof useNavigate>;
   t: ReturnType<typeof useTranslation>['t'];
 }) {
-  const label = t(`accounting.reconcile.subgroup.${group.subgroup}`, { defaultValue: group.name_th });
+  const baseLabel = t(`accounting.reconcile.subgroup.${group.subgroup}`, { defaultValue: group.name_th });
+  // HOLDING_INSTALLMENT arrives as two groups; suffix the channel so the closer sees
+  // "ค่างวด (หน้าร้าน)" vs "ค่างวด (หลังร้าน)". Other buckets (from_slip null) keep the plain name.
+  const label = group.from_slip === null
+    ? baseLabel
+    : `${baseLabel} ${t(group.from_slip ? 'accounting.reconcile.channelBackSuffix' : 'accounting.reconcile.channelFrontSuffix')}`;
   const [page, setPage] = useState(1);
   const totalPages = Math.ceil(rows.length / ROWS_PER_PAGE);
   useEffect(() => { if (!open) setPage(1); }, [open]);

@@ -268,6 +268,9 @@ export interface ReconcileItemRow {
   contract_value_month: number | null;
   contract_installment_amount: number | null;
   asset_external_ref: string | null;
+  // mig 542 — installment channel side: false = front-store (cash + front transfer),
+  // true = back-office (paid via slip). null for every non-installment bucket.
+  from_slip: boolean | null;
 }
 
 // groups[] — one folded subgroup header (mig 495 + 499). sales/refund/total =
@@ -284,6 +287,9 @@ export interface ReconcileItemGroup {
   total: number;
   gross: number;
   count: number;
+  // mig 542 — HOLDING_INSTALLMENT splits into two groups by channel: false =
+  // front-store, true = back-office (slip). null for every other bucket (not split).
+  from_slip: boolean | null;
 }
 
 export interface ReconcileItemBranch {
@@ -343,10 +349,16 @@ export interface ReconcileChannelSummary {
   wallet_net: number;
   wallet_action: 'WITHDRAW_FROM_COMPANY' | 'REMIT_SURPLUS' | 'NONE';
   wallet_action_amount: number;
-  // mig 528 — slip-origin NOTE. These payments are already inside net_transfer;
-  // this is only "how much came from the slip-checking team", never subtracted.
+  // Transfer split (migs 537/543) — net_transfer breaks into two channels by how the
+  // money arrived. transfer_front = staff-recorded (no slip); slip_payment = came via
+  // the slip-checking dept. Both are net (reversal-aware); slip_reversed_total is the
+  // reversed portion of the slip channel (negative). Invariant:
+  // transfer_front_total + slip_payment_total = net_transfer.
+  transfer_front_count: number;
+  transfer_front_total: number;
   slip_payment_count: number;
   slip_payment_total: number;
+  slip_reversed_total: number;
 }
 
 export interface ReconcileChannelPayment {

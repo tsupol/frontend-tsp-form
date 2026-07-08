@@ -11,9 +11,11 @@ export function translateApiError(err: unknown, t: TFunction): string {
   if (!(err instanceof ApiError)) {
     return t('common.error');
   }
+  // Pass the backend's error params through as interpolation values, so catalog
+  // strings like "...to {{branch_code}} {{branch_name}}..." fill in the facts.
   const tryKey = (key: string | undefined): string => {
     if (!key) return '';
-    const value = t(key, { ns: 'apiErrors', defaultValue: '' });
+    const value = t(key, { ns: 'apiErrors', defaultValue: '', ...err.messageParams });
     return typeof value === 'string' ? value : '';
   };
   // Skip the "unexpected" sentinel — it has no useful translation and
