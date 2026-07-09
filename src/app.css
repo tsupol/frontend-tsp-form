@@ -622,6 +622,13 @@ input[type="number"
     white-space: nowrap;
     min-width: 0;
 }
+/* Warranty pins to the right edge of the sub-line; never shrink/ellipsize it. */
+.asset-sticker .asset-sticker-line .asset-sticker-warranty {
+    margin-left: auto;
+    padding-left: 1.5mm;
+    flex-shrink: 0;
+    overflow: visible;
+}
 .asset-sticker .asset-sticker-barcode {
     justify-self: center;
     align-self: end;

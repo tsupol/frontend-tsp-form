@@ -2983,6 +2983,21 @@ function AssetSticker({ asset }: { asset: Asset }) {
   const productName = asset.product_display_name
     ?? [asset.family_name, asset.base_model_name].filter(Boolean).join(' ');
 
+  // Warranty expiry — compact DD/MM/YY in Bangkok tz. Not every asset has one
+  // (fn_inv_asset_set_warranty is optional), so render the span only when set.
+  const warrantyShort = (() => {
+    if (!asset.warranty_expired_date) return '';
+    const d = new Date(asset.warranty_expired_date);
+    if (Number.isNaN(d.getTime())) return '';
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Bangkok',
+      day: '2-digit',
+      month: '2-digit',
+      year: '2-digit',
+    }).format(d);
+    return parts; // "09/07/26"
+  })();
+
   return (
     <div className="asset-sticker">
       {/* Row 1: code (left) · EXT + condition (right) */}
@@ -2997,11 +3012,16 @@ function AssetSticker({ asset }: { asset: Asset }) {
       </div>
       {/* Row 2: product display name, full width */}
       <div className="asset-sticker-name">{productName}</div>
-      {/* Row 3: storage · battery · color, full width */}
+      {/* Row 3: storage · battery · color (left) · warranty (right) */}
       <div className="asset-sticker-line asset-sticker-line-sub">
         {modelNameSuffix && <span>{modelNameSuffix}</span>}
         {asset.battery_health != null && <span>Bat {asset.battery_health}%</span>}
         {colorTh && <span>{colorTh}</span>}
+        {warrantyShort && (
+          <span className="asset-sticker-warranty">
+            <span className="asset-sticker-tag">WTY</span> {warrantyShort}
+          </span>
+        )}
       </div>
       {/* Row 4: IMEI (left) · SN (right) */}
       <div className="asset-sticker-row asset-sticker-ids">
