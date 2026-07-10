@@ -189,7 +189,7 @@ export function SellExternalModal({
   const { data: sellable = [] } = useQuery({
     queryKey: ['sell-external-sellable', branchId],
     queryFn: () => apiClient.get<SellExternalAsset[]>(
-      `/v_assets?branch_id=eq.${branchId}&current_bucket=eq.ON_HAND_AVAILABLE&order=created_at.desc&limit=200`
+      `/v_assets?branch_id=eq.${branchId}&current_bucket=eq.ON_HAND_AVAILABLE&order=asset_id.desc&limit=200`
       + '&select=asset_id,asset_code,asset_code_display,product_display_name,variant_name,serial_no,imei,external_ref,condition_grade,branch_id,current_bucket',
     ),
     enabled: open && addPickerOpen && branchId != null,

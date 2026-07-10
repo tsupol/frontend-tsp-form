@@ -622,7 +622,7 @@ function LotDetailPanel({
   const { data: assetCountData } = useQuery({
     queryKey: ['lot-assets', lot.lot_id],
     queryFn: () => apiClient.getPaginated<AssetFromLot>(
-      `/v_assets?source_lot_id=eq.${lot.lot_id}&order=created_at.desc&select=asset_id`,
+      `/v_assets?source_lot_id=eq.${lot.lot_id}&order=asset_id.desc&select=asset_id`,
       { page: 1, pageSize: 1 },
     ),
     staleTime: 30 * 1000,

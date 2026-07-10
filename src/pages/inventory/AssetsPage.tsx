@@ -500,7 +500,12 @@ export function AssetsPage() {
   const { data: listData, isFetching } = useQuery({
     queryKey: ['assets', debouncedSearch, filterBucket, filterBranchId, filterCondition, filterBrand, filterFamily, sourceLotId, sourcePoId, variantId, pageIndex, pageSize],
     queryFn: () => {
-      let url = '/v_assets?order=created_at.desc';
+      // Order by asset_id DESC, never created_at: batch lot→asset conversion writes
+      // every device in one transaction so they share the exact same created_at →
+      // ordering by it has no tiebreaker and scrambles within-batch. asset_id is
+      // unique + tracks external_ref 1:1, so it's newest-first AND deterministic
+      // across pages. (BE NOTICE 2026-07-10 / fn_asset_search mig 577.)
+      let url = '/v_assets?order=asset_id.desc';
       if (sourceLotId) url += `&source_lot_id=eq.${sourceLotId}`;
       if (sourcePoId) url += `&source_po_id=eq.${sourcePoId}`;
       if (variantId) url += `&variant_id=eq.${variantId}`;
