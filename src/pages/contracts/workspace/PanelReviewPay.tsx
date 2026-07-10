@@ -6,7 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Select, MaskedInput } from 'tsp-form';
 import {
   Plus, Trash2, XCircle, Loader2, CheckCircle,
-  ChevronsRight, Link2, FileText, Printer, PenLine,
+  ChevronsRight, Link2, FileText, Printer, PenLine, AlertTriangle, CreditCard,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { fmtCurrency } from '../../../lib/format';
@@ -226,6 +226,12 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
   // ── Confirm & Activate (the ONLY user action that mutates state) ─────
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  // Set when the sequence got past step 1 (bill opened server-side) but a later
+  // step threw. The contract is now at PENDING_PAYMENT_AND_SIGN with an orphaned
+  // open bill — we must NOT let the user re-run fn_bill_contract_open (it would
+  // fail on the existing bill). Instead we show a recovery view pointing at the
+  // bill. billId is already stored in workspace data at step 1.
+  const [billOpenFailed, setBillOpenFailed] = useState(false);
 
   const canConfirm = readinessReady
     && isBalanced
@@ -237,11 +243,16 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
     if (!canConfirm || !data.contractId) return;
     setLoading(true);
     setError('');
+    // Tracks the bill opened at step 1 so the catch can tell "failed before any
+    // server state changed" from "bill opened, later step failed" (updateData is
+    // async, so data.billId isn't reliable inside this closure).
+    let openedBillId: number | null = null;
     try {
       // 1. Open the bill — DRAFT/SAVING → PENDING_PAYMENT.
       const bill = await apiClient.rpc<BillOpenResult>('fn_bill_contract_open', {
         p_contract_id: data.contractId,
       });
+      openedBillId = bill.bill_id;
       updateData({ billId: bill.bill_id, billCode: bill.bill_code, billData: bill });
 
       // 2. Add each cart line. GIFT entries are a two-step: add as
@@ -313,6 +324,15 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
       } else {
         setError(err instanceof Error ? err.message : String(err));
       }
+      // If the bill was already opened before the failure (payment or staff-sign
+      // step threw), the contract is stuck at PENDING_PAYMENT_AND_SIGN with an
+      // open bill. Switch to the recovery view — re-clicking Confirm here would
+      // re-open a second bill and dead-end. The bill still needs payment, which
+      // happens on the Pending Payment page.
+      if (openedBillId != null) {
+        setBillOpenFailed(true);
+        invalidateContract();
+      }
     } finally {
       setLoading(false);
     }
@@ -329,6 +349,20 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
         billId={data.billId}
         contractId={data.contractId ?? null}
         needsBindDevice={needsBindDevice}
+        onNavigate={navigate}
+        t={t}
+      />
+    );
+  }
+
+  // Bill opened but a later step (payment / staff-sign) failed. Recovery view —
+  // the bill exists and still needs payment on the Pending Payment page.
+  if (billOpenFailed && data.billId) {
+    return (
+      <PostFailView
+        billCode={data.billCode || null}
+        contractId={data.contractId ?? null}
+        error={error}
         onNavigate={navigate}
         t={t}
       />
@@ -612,6 +646,65 @@ function PostConfirmView({ billId, contractId, needsBindDevice, onNavigate, t }:
         </div>,
         document.body,
       )}
+    </div>
+  );
+}
+
+interface PostFailViewProps {
+  billCode: string | null;
+  contractId: number | null;
+  error: string;
+  onNavigate: (to: string) => void;
+  t: ReturnType<typeof useTranslation>['t'];
+}
+
+// Shown when the bill was opened but a later step (payment or staff signature)
+// failed. The contract sits at PENDING_PAYMENT_AND_SIGN with an open, unpaid
+// bill. There is no "retry" here — retrying Confirm would re-open a second bill.
+// The bill is settled on the Pending Payment page instead.
+function PostFailView({ billCode, contractId, error, onNavigate, t }: PostFailViewProps) {
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex-1 overflow-y-auto better-scroll p-6 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3 text-center max-w-sm">
+          <AlertTriangle size={56} className="text-warning-fg" />
+          <div className="text-lg font-semibold">
+            {t('wizard.bill_open_payment_failed_title', { defaultValue: 'Payment not completed' })}
+          </div>
+          <div className="text-sm text-subtle">
+            {t('wizard.bill_open_payment_failed_body', {
+              defaultValue: 'The bill {{billCode}} was created but payment was not completed. Go to the Pending Payment page to record the payment.',
+              billCode: billCode ?? '',
+            })}
+          </div>
+          {error && (
+            <div className="alert alert-danger w-full text-left">
+              <XCircle size={16} />
+              <div><div className="alert-description">{error}</div></div>
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="shrink-0 border-t border-line bg-bg px-4 py-3 flex justify-end gap-2 print:hidden">
+        {contractId != null && (
+          <Button
+            variant="outline"
+            startIcon={<FileText size={16} />}
+            onClick={() => onNavigate(`/admin/contracts/search/${contractId}`)}
+          >
+            {t('wizard.action_viewInContract')}
+          </Button>
+        )}
+        {contractId != null && (
+          <Button
+            color="primary"
+            startIcon={<CreditCard size={16} />}
+            onClick={() => onNavigate(`/admin/contracts/pending-payment/${contractId}`)}
+          >
+            {t('wizard.action_goToPendingPayment', { defaultValue: 'Go to bill' })}
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

@@ -2,15 +2,50 @@
 
 End-to-end API flow to create a contract from scratch and drive it to signing/activation.
 
-> **Verified live 2026-06-27** by running the whole flow as `mcp_branch_manager_a1`
-> (holding 1 / company 1 / branch 1). Result: customer 168034, contract 743
-> (CT-2606-000029-1), reached **PENDING_SIGN** after down-payment confirm.
+> ## ⛔ DEFAULT: STOP BEFORE ACTIVATE
+>
+> When the user asks for "a contract" / "a test contract" without qualification,
+> build it through **Step 10 (`validate_ready: true`) and STOP.** Do **NOT** run
+> Step 11 (bill-open / payment / activation). The user does not need to say "stop
+> before activate" — that is the default. Only run Step 11 if they **explicitly**
+> ask to activate / pay / open the bill / drive it to PENDING_SIGN or ACTIVE.
+>
+> ## Which customer to use
+>
+> Reuse these existing customers (branch A1 / company 1) — they already have
+> HOME+WORK addresses, a contact, a reference, and an ID card, so Steps 2/6/7 are
+> already satisfied and can be skipped (verify with the reads below, don't assume):
+>
+> | Customer | id | DOB | Use for |
+> |---|---|---|---|
+> | **John Tester** | 168035 | 1990-05-20 | **default** — plain adult contract |
+> | Abu Dabi | 166869 | 2000-10-10 | another adult |
+> | Still Young | 167107 | 2007-06-18 (19 now) | ⚠️ NOT a minor anymore — only use if explicitly testing him |
+> | Damien Rice | 166875 | 2019-10-10 (age 6) | **underage** — triggers `CO_LESSEE_REQUIRED_FOR_MINOR`, needs an adult co-lessee |
+>
+> **Minor threshold = under 18** (from `validate_ready`, mig 120): a primary under
+> 18 requires a co-lessee aged ≥ 18. Only Damien Rice actually trips this.
+
+> **Verified live 2026-07-10** as `mcp_branch_manager_a1` (holding 1 / company 1 /
+> branch 1). Built contract **1087** (CT-2607-000223-8) for John Tester (168035),
+> iPad 10.2" 128GB Gold, FIN1 6mo 10% down → **stopped at DRAFT, `validate_ready:
+> true`** (default: not activated). Earlier full-activation run: customer 168034,
+> contract 743, reached PENDING_SIGN.
 >
 > All RPCs are PostgREST **named-param** (`POST /rpc/<fn>` with a JSON body of `p_*`
 > keys). Optional params can be omitted, but if you send a PostgREST RPC overload,
 > send every key you intend (pass `null` for blanks) — partial bodies can trigger
 > PGRST202. Reads use `v_*` views (plain arrays). Writes return the v2 envelope
 > `{ ok, data }`.
+>
+> **Skip work already done:** for an existing customer, read their addresses /
+> contacts / references / ID card first and skip any step already satisfied:
+> ```
+> GET /v_customer_addresses?customer_id=eq.<id>&select=address_type   # want HOME + WORK
+> GET /v_customer_contacts?customer_id=eq.<id>&select=id              # want ≥1
+> GET /v_customer_references?customer_id=eq.<id>&select=id            # want ≥1
+> GET /v_customer_documents?customer_id=eq.<id>&doc_type=eq.ID_CARD_FRONT&is_active=eq.true&select=id  # want ≥1
+> ```
 
 ## Prerequisites
 
@@ -236,6 +271,10 @@ POST /rpc/fn_contract_validate_ready
 `detail.missing` = the slot).
 
 ## Step 11 — Activate: EXACTLY the wizard's `PanelReviewPay` Confirm sequence
+
+> ⛔ **OPT-IN ONLY.** Do not run this step unless the user explicitly asked to
+> activate / pay / open the bill. The default is to stop at Step 10. (See the
+> banner at the top of this doc.)
 
 > ⚠️ **Do NOT improvise the activation order.** This is the live sequence from
 > `src/pages/contracts/workspace/PanelReviewPay.tsx` `handleConfirm`. The common
