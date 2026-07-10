@@ -12,7 +12,7 @@ import { apiClient, ApiError } from '../../../lib/api';
 import { fmtCurrency } from '../../../lib/format';
 import { printWithMarker } from '../../../lib/printDoc';
 import { useWorkspace } from './WorkspaceContext';
-import type { PaymentMethod, PaymentLine, BillOpenResult } from './WorkspaceTypes';
+import type { PaymentMethod, PaymentLine, BillOpenResult, ContractOpenState } from './WorkspaceTypes';
 import { ERROR_TO_MODAL } from './WorkspaceTypes';
 import { BranchPaymentAccountField, useBranchPaymentAccount } from '../../../components/BranchPaymentAccountField';
 import { BillReceipt, type BillDetail } from './BillReceipt';
@@ -255,6 +255,17 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
       openedBillId = bill.bill_id;
       updateData({ billId: bill.bill_id, billCode: bill.bill_code, billData: bill });
 
+      // Idempotent (mig 576): the contract was ALREADY open — a prior attempt
+      // opened the bill (+ lines) and possibly got interrupted mid-payment. Do
+      // NOT re-run the add-lines / payment sequence against the existing bill;
+      // send the user onward by the returned contract_state instead. This is the
+      // recovery for the old "stuck at PENDING_PAYMENT_AND_SIGN" dead-end.
+      if (bill.already_open) {
+        setBillOpenFailed(true);
+        invalidateContract();
+        return;
+      }
+
       // 2. Add each cart line. GIFT entries are a two-step: add as
       //    ACCESSORY_SALE then convert. (The backend has no batch add.)
       for (const line of cartLines) {
@@ -362,6 +373,7 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
       <PostFailView
         billCode={data.billCode || null}
         contractId={data.contractId ?? null}
+        contractState={data.billData?.contract_state}
         error={error}
         onNavigate={navigate}
         t={t}
@@ -653,6 +665,8 @@ function PostConfirmView({ billId, contractId, needsBindDevice, onNavigate, t }:
 interface PostFailViewProps {
   billCode: string | null;
   contractId: number | null;
+  /** Contract state from the idempotent open (mig 576) — routes the primary CTA. */
+  contractState?: ContractOpenState;
   error: string;
   onNavigate: (to: string) => void;
   t: ReturnType<typeof useTranslation>['t'];
@@ -662,21 +676,31 @@ interface PostFailViewProps {
 // failed. The contract sits at PENDING_PAYMENT_AND_SIGN with an open, unpaid
 // bill. There is no "retry" here — retrying Confirm would re-open a second bill.
 // The bill is settled on the Pending Payment page instead.
-function PostFailView({ billCode, contractId, error, onNavigate, t }: PostFailViewProps) {
+function PostFailView({ billCode, contractId, contractState, error, onNavigate, t }: PostFailViewProps) {
+  // Route the primary CTA by the contract's state (idempotent open, mig 576):
+  //   PENDING_SIGN / ACTIVE → paid already, go to the contract (signing lives there)
+  //   PENDING_PAYMENT(_AND_SIGN) / unknown → still needs payment → Pending Payment page
+  const paidAwaitingSign = contractState === 'PENDING_SIGN' || contractState === 'ACTIVE';
+  const title = paidAwaitingSign
+    ? t('wizard.bill_open_awaiting_sign_title', { defaultValue: 'Paid — awaiting signature' })
+    : t('wizard.bill_open_payment_failed_title', { defaultValue: 'Payment not completed' });
+  const body = paidAwaitingSign
+    ? t('wizard.bill_open_awaiting_sign_body', {
+        defaultValue: 'Bill {{billCode}} is paid. Go to the contract to complete signing.',
+        billCode: billCode ?? '',
+      })
+    : t('wizard.bill_open_payment_failed_body', {
+        defaultValue: 'The bill {{billCode}} was created but payment was not completed. Go to the Pending Payment page to record the payment.',
+        billCode: billCode ?? '',
+      });
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto better-scroll p-6 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3 text-center max-w-sm">
           <AlertTriangle size={56} className="text-warning-fg" />
-          <div className="text-lg font-semibold">
-            {t('wizard.bill_open_payment_failed_title', { defaultValue: 'Payment not completed' })}
-          </div>
-          <div className="text-sm text-subtle">
-            {t('wizard.bill_open_payment_failed_body', {
-              defaultValue: 'The bill {{billCode}} was created but payment was not completed. Go to the Pending Payment page to record the payment.',
-              billCode: billCode ?? '',
-            })}
-          </div>
+          <div className="text-lg font-semibold">{title}</div>
+          <div className="text-sm text-subtle">{body}</div>
           {error && (
             <div className="alert alert-danger w-full text-left">
               <XCircle size={16} />
@@ -686,23 +710,31 @@ function PostFailView({ billCode, contractId, error, onNavigate, t }: PostFailVi
         </div>
       </div>
       <div className="shrink-0 border-t border-line bg-bg px-4 py-3 flex justify-end gap-2 print:hidden">
-        {contractId != null && (
+        {contractId != null && paidAwaitingSign ? (
           <Button
-            variant="outline"
+            color="primary"
             startIcon={<FileText size={16} />}
             onClick={() => onNavigate(`/admin/contracts/search/${contractId}`)}
           >
-            {t('wizard.action_viewInContract')}
+            {t('wizard.action_goToContractSign', { defaultValue: 'Go to contract' })}
           </Button>
-        )}
-        {contractId != null && (
-          <Button
-            color="primary"
-            startIcon={<CreditCard size={16} />}
-            onClick={() => onNavigate(`/admin/contracts/pending-payment/${contractId}`)}
-          >
-            {t('wizard.action_goToPendingPayment', { defaultValue: 'Go to bill' })}
-          </Button>
+        ) : contractId != null && (
+          <>
+            <Button
+              variant="outline"
+              startIcon={<FileText size={16} />}
+              onClick={() => onNavigate(`/admin/contracts/search/${contractId}`)}
+            >
+              {t('wizard.action_viewInContract')}
+            </Button>
+            <Button
+              color="primary"
+              startIcon={<CreditCard size={16} />}
+              onClick={() => onNavigate(`/admin/contracts/pending-payment/${contractId}`)}
+            >
+              {t('wizard.action_goToPendingPayment', { defaultValue: 'Go to bill' })}
+            </Button>
+          </>
         )}
       </div>
     </div>

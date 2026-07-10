@@ -147,9 +147,25 @@ export interface DraftCreateResult {
   contract_code: string;
 }
 
+// fn_bill_contract_open response (idempotent since mig 576, 2026-07-10). The
+// call now returns ok:true with `already_open` instead of throwing when the
+// contract is already open — always carries enough to route the user onward.
+export type ContractOpenState =
+  | 'PENDING_PAYMENT' | 'PENDING_SIGN' | 'PENDING_PAYMENT_AND_SIGN' | 'ACTIVE';
+
 export interface BillOpenResult {
+  /** true = contract was already open; DON'T re-run the open sequence — route by contract_state. */
+  already_open?: boolean;
+  /** the contract's state after (or as of) this call — drives where the UI sends the user. */
+  contract_state?: ContractOpenState;
   bill_id: number;
   bill_code: string;
+  bill_code_display?: string;
+  bill_status?: string;
+  contract_id?: number;
+  contract_code?: string;
+  contract_code_display?: string;
+  snapshot_id?: number;
   down_payment: number;
   insurance_deposit: number;
   total_amount: number;

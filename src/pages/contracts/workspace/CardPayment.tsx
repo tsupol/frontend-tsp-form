@@ -75,6 +75,14 @@ export function CardPayment() {
           billCode: bill.bill_code,
           billData: bill,
         });
+        // Idempotent (mig 576): the contract was already open past the payment
+        // stage (paid → signing, or active). Don't re-add payments to a settled
+        // bill — mark confirmed so the panel advances instead of erroring.
+        if (bill.already_open && (bill.contract_state === 'PENDING_SIGN' || bill.contract_state === 'ACTIVE')) {
+          updateData({ billConfirmed: true });
+          invalidateContract();
+          return;
+        }
       }
 
       // Step 2: Add each payment
