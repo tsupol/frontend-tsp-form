@@ -12,6 +12,8 @@ import { fmtCurrency } from '../../lib/format';
 import { getStateColor, getStateLabel, stateOptions } from './contractUtils';
 import { ContractDetailPanel } from './ContractDetailPanel';
 import { ContractDetailSlot } from './ContractDetailSlot';
+import { OwnerBadge } from '../../components/OwnerBadge';
+import type { OwnerType } from '../../lib/ownerTypes';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -52,6 +54,9 @@ export interface ContractSearchResult {
   last_payment_date: string | null;
   total_installments: number | null;
   close_reason: string | null;
+  owner_type: string | null;
+  owner_id: number | null;
+  owner_name: string | null;
   is_my_branch: boolean;
   created_at: string;
 }
@@ -390,6 +395,7 @@ export function ContractListPane({
                             </div>
                             <div className="flex items-center gap-3 mt-1 text-xs text-subtle">
                               <span>{contract.branch_name}</span>
+                              <OwnerBadge size="xs" ownerType={contract.owner_type as OwnerType | null} ownerName={contract.owner_name} />
                               {contract.overdue_count != null && contract.overdue_count > 0 && (
                                 <span className="text-danger font-medium">
                                   {t('contract.overdueN', { count: contract.overdue_count })}

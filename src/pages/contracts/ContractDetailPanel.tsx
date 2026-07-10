@@ -32,6 +32,8 @@ import { CustomerPickerModal } from './CustomerPickerModal';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { MediaLightbox, MediaThumbButton } from '../../components/MediaLightbox';
 import { CustomerLoginCard, useCustomerLoginInfo, useInvalidateLoginInfo, type CustomerLoginInfo } from '../../components/CustomerLoginCard';
+import { OwnerBadge } from '../../components/OwnerBadge';
+import type { OwnerType } from '../../lib/ownerTypes';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -43,6 +45,9 @@ interface ContractDetail {
   company_id: number;
   branch_id: number;
   branch_name: string;
+  owner_type: string | null;
+  owner_id: number | null;
+  owner_name: string | null;
   state: string;
   close_reason: string | null;
   close_reason_note: string | null;
@@ -394,6 +399,7 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
           {contract.is_paused && (
             <Badge size="xs" color="warning">{t('contract.paused')}</Badge>
           )}
+          <OwnerBadge size="sm" ownerType={contract.owner_type as OwnerType | null} ownerName={contract.owner_name} />
           {contract.commercial_model && (
             <span className="text-xs text-subtle">{contract.commercial_model}</span>
           )}

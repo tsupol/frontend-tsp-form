@@ -1,4 +1,7 @@
 {
+  "inv.validation.invalid_channel": "Unknown intake channel",
+  "inv.validation.invalid_owner_type": "Unknown owner type",
+  "inv.validation.owner_type_not_allowed": "This owner is not allowed for this branch",
   "barcode.not_found": "Barcode not found",
   "barcode.duplicate": "This barcode is already attached to another variant",
   "barcode.invalid": "Invalid barcode format",

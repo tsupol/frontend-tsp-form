@@ -16,6 +16,8 @@ import { useMediaUrl } from '../../hooks/useMediaUrl';
 import { normalizeKey } from '../../lib/mediaPath';
 import { MediaLightbox } from '../../components/MediaLightbox';
 import { ImeiInput } from '../../components/ImeiInput';
+import { OwnerBadge } from '../../components/OwnerBadge';
+import type { OwnerType } from '../../lib/ownerTypes';
 
 // ============================================================================
 // Types — uses dedicated v_buyback_list / v_buyback_detail views
@@ -31,6 +33,9 @@ interface BuybackListItem {
   company_name: string;
   branch_id: number | null;
   branch_name: string | null;
+  owner_type: OwnerType | null;
+  owner_id: number | null;
+  owner_name: string | null;
   status: string;
   supplier_name: string;
   c_total_lines: number;
@@ -483,6 +488,7 @@ export function BuybackPage() {
                           <Badge size="xs" color={BUYBACK_STATUS_COLOR[order.status] ?? 'default'}>
                             {t(`buyback.status_${order.status}`, order.status)}
                           </Badge>
+                          <OwnerBadge size="xs" ownerType={order.owner_type} ownerName={order.owner_name} />
                           {order.is_auto_rejected && (
                             <Badge size="xs" color="danger">
                               {t('buyback.autoRejected', { defaultValue: 'Auto-rejected' })}
@@ -639,6 +645,7 @@ export function BuybackDetailPanel({
           <Badge size="xs" color={BUYBACK_STATUS_COLOR[detail.status] ?? 'default'}>
             {t(`buyback.status_${detail.status}`, detail.status)}
           </Badge>
+          <OwnerBadge size="xs" ownerType={detail.owner_type} ownerName={detail.owner_name} />
           {detail.is_auto_rejected && (
             <Badge size="xs" color="danger">
               {t('buyback.autoRejected', { defaultValue: 'Auto-rejected' })}

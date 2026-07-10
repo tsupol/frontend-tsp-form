@@ -19,6 +19,8 @@ import { getBucketLabel, getBucketColor, fmtNum, codeDisplay } from './inventory
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { ColorAutocomplete, ColorMatchBadge } from '../../components/ColorAutocomplete';
 import { ImeiInput } from '../../components/ImeiInput';
+import { OwnerBadge } from '../../components/OwnerBadge';
+import type { OwnerType } from '../../lib/ownerTypes';
 
 // ============================================================================
 // Types — verified against live API 2026-05-08
@@ -26,8 +28,9 @@ import { ImeiInput } from '../../components/ImeiInput';
 //   current_bucket, qty_received, qty_on_hand, qty_consumed, unit_cost,
 //   on_hand_value, is_closed, closed_at, variant_id, model_id,
 //   sku_code, variant_name, model_name, family_name, brand_name,
-//   po_id, po_no, po_type, source_lot_id, created_by, created_at, updated_at.
-//   NOT in view: owner_type, branch_name, is_contractable.
+//   po_id, po_no, po_type, source_lot_id, created_by, created_at, updated_at,
+//   owner_type, owner_id, owner_name (added 2026-07-11).
+//   NOT in view: branch_name, is_contractable.
 // fn_lot_available_actions response wraps actions[] with per-lot context:
 //   lot_id, current_bucket, qty_on_hand, is_closed, owner_type, actions[].
 // ============================================================================
@@ -59,6 +62,9 @@ interface Lot {
   po_code_display: string | null;
   po_type: string | null;
   source_lot_id: number | null;
+  owner_type: string | null;
+  owner_id: number | null;
+  owner_name: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -488,6 +494,7 @@ export function LotsPage() {
                               {getBucketLabel(lot.current_bucket, t)}
                             </Badge>
                           )}
+                          <OwnerBadge ownerType={lot.owner_type as OwnerType | null} ownerName={lot.owner_name} size="xs" />
                         </div>
                         <div className="text-xs text-subtle truncate mt-0.5">
                           {[lot.brand_name, lot.family_name, lot.model_name].filter(Boolean).join(' ')}
@@ -801,8 +808,9 @@ function LotDetailPanel({
       )}
 
       {/* Branch + timestamps — quiet metadata footer */}
-      <div className="flex-none px-4 py-2 border-b border-line flex flex-wrap gap-x-4 gap-y-1 text-xs text-subtle">
+      <div className="flex-none px-4 py-2 border-b border-line flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-subtle">
         <span><span className="text-subtler">{t('lot.branch')}:</span> {branchName || '—'}</span>
+        <span className="inline-flex items-center gap-1.5"><span className="text-subtler">{t('lot.owner')}:</span> <OwnerBadge ownerType={lot.owner_type as OwnerType | null} ownerName={lot.owner_name} size="xs" /></span>
         <span><span className="text-subtler">{t('lot.created')}:</span> <DateTime value={lot.created_at} /></span>
         {lot.closed_at && (
           <span><span className="text-subtler">{t('lot.closedAt')}:</span> <DateTime value={lot.closed_at} /></span>

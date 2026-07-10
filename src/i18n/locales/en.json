@@ -386,6 +386,7 @@
     "retail": "Retail",
     "company": "Company",
     "companyConfig": "Company Config",
+    "ownerConfig": "Stock Owner",
     "bankAccounts": "Bank Accounts",
     "financeModels": "Finance Models",
     "holidays": "Holidays",
@@ -453,6 +454,41 @@
     "contractsOpened": "Contracts Opened",
     "notifications": "Notifications",
     "branchExpense": "Branch Expense"
+  },
+  "ownerType": {
+    "HOLDING": "Holding",
+    "COMPANY": "Company",
+    "BRANCH": "Branch"
+  },
+  "branchType": {
+    "INTERNAL": "Internal",
+    "EXTERNAL": "External",
+    "DEAL_PARTNER": "Deal Partner"
+  },
+  "channel": {
+    "PURCHASE": "Purchase",
+    "ASSET_REGISTER": "Asset Register",
+    "DEAL_PARTNER": "Deal Partner",
+    "STOCK_GAIN": "Stock Gain",
+    "BUYBACK": "Buyback"
+  },
+  "ownerConfig": {
+    "title": "Stock Owner Settings",
+    "description": "Set the default owner (Holding / Company / Branch) for each intake channel.",
+    "company": "Company",
+    "branch": "Branch",
+    "channel": "Channel",
+    "owner": "Owner",
+    "branchType": "Branch type",
+    "allowOverride": "Let staff choose at intake",
+    "selectBranch": "Select a branch to override…",
+    "templateTitle": "Company template",
+    "templateHint": "Changes apply to newly-created branches. For existing branches, use \"Reset to template\" in the Branch override tab.",
+    "branchTitle": "Branch override",
+    "branchHint": "Override the owner for a specific branch. Owner options are limited to what the branch allows.",
+    "resetToTemplate": "Reset to template",
+    "saved": "Saved",
+    "resyncDone": "Branch reset to company template"
   },
   "contractsOpened": {
     "title": "Contracts Opened",
@@ -1629,6 +1665,7 @@
     "bucket": "Status",
     "branch": "Branch",
     "company": "Company",
+    "owner": "Owner",
     "externalRef": "TPA Reference",
     "externalRef_placeholder": "TPA ticket ID",
     "externalRef_saved": "TPA reference updated",
@@ -1697,6 +1734,7 @@
     "unitCost": "Unit cost",
     "onHandValue": "Value on hand",
     "branch": "Branch",
+    "owner": "Owner",
     "created": "Created",
     "closed": "Closed",
     "closedAt": "Closed at",

@@ -385,6 +385,7 @@
     "retail": "ขายปลีก",
     "company": "Company",
     "companyConfig": "ตั้งค่า Company",
+    "ownerConfig": "เจ้าของสต๊อก",
     "bankAccounts": "บัญชีธนาคาร",
     "financeModels": "รูปแบบการเงิน",
     "holidays": "วันหยุด",
@@ -452,6 +453,41 @@
     "contractsOpened": "รายงานเปิดสัญญา",
     "notifications": "การแจ้งเตือน",
     "branchExpense": "ค่าใช้จ่ายสาขา"
+  },
+  "ownerType": {
+    "HOLDING": "Holding",
+    "COMPANY": "Company",
+    "BRANCH": "สาขา"
+  },
+  "branchType": {
+    "INTERNAL": "สาขาภายใน",
+    "EXTERNAL": "External",
+    "DEAL_PARTNER": "Deal Partner"
+  },
+  "channel": {
+    "PURCHASE": "ซื้อจาก supplier",
+    "ASSET_REGISTER": "ลงทะเบียนสินทรัพย์",
+    "DEAL_PARTNER": "รับจาก partner",
+    "STOCK_GAIN": "ปรับเพิ่มสต๊อก",
+    "BUYBACK": "ซื้อคืนจากลูกค้า"
+  },
+  "ownerConfig": {
+    "title": "ตั้งค่าเจ้าของสต๊อก",
+    "description": "กำหนดเจ้าของ default (Holding / Company / สาขา) ของแต่ละช่องทางรับสต๊อกเข้า",
+    "company": "บริษัท",
+    "branch": "สาขา",
+    "channel": "ช่องทาง",
+    "owner": "เจ้าของ",
+    "branchType": "ประเภทสาขา",
+    "allowOverride": "ให้พนักงานเลือกตอนทำรายการ",
+    "selectBranch": "เลือกสาขาเพื่อตั้งค่าเฉพาะ…",
+    "templateTitle": "Template ของบริษัท",
+    "templateHint": "การแก้มีผลกับสาขาที่สร้างใหม่ — สาขาเดิมกด \"รีเซ็ตตาม template\" ในแท็บตั้งค่าเฉพาะสาขา",
+    "branchTitle": "ตั้งค่าเฉพาะสาขา",
+    "branchHint": "แก้เจ้าของเฉพาะบางสาขา — ตัวเลือกเจ้าของจำกัดตามที่สาขานั้นอนุญาต",
+    "resetToTemplate": "รีเซ็ตตาม template",
+    "saved": "บันทึกแล้ว",
+    "resyncDone": "รีเซ็ตสาขาตาม template บริษัทแล้ว"
   },
   "contractsOpened": {
     "title": "รายงานเปิดสัญญา",
@@ -1628,6 +1664,7 @@
     "bucket": "สถานะ",
     "branch": "สาขา",
     "company": "Company",
+    "owner": "เจ้าของ",
     "externalRef": "TPA Reference",
     "externalRef_placeholder": "TPA ticket ID",
     "externalRef_saved": "อัพเดท TPA reference เรียบร้อย",
@@ -1696,6 +1733,7 @@
     "unitCost": "ทุน/หน่วย",
     "onHandValue": "มูลค่าคงเหลือ",
     "branch": "สาขา",
+    "owner": "เจ้าของ",
     "created": "สร้างเมื่อ",
     "closed": "ปิดแล้ว",
     "closedAt": "ปิดเมื่อ",

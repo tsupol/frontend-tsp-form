@@ -20,6 +20,8 @@ import { fmtNum, codeDisplay } from './inventoryUtils';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { useBarcodeScanner } from '../../components/BarcodeScanner';
 import { lookupBarcode } from '../../lib/barcodeLookup';
+import { OwnerBadge } from '../../components/OwnerBadge';
+import type { OwnerType } from '../../lib/ownerTypes';
 
 // ============================================================================
 // Types — verified against live API 2026-05-02
@@ -42,6 +44,9 @@ interface PoListRow {
   po_type: string;
   status: string;
   ownership: string;
+  owner_type: OwnerType | null;
+  owner_id: number | null;
+  owner_name: string | null;
   supplier_name: string | null;
   supplier_ref: string | null;
   total_lines: number;
@@ -75,6 +80,9 @@ interface PoDetail {
   company_id: number;
   company_name: string;
   ownership: string;
+  owner_type: OwnerType | null;
+  owner_id: number | null;
+  owner_name: string | null;
   po_type: string;
   status: string;
   supplier_name: string | null;
@@ -247,11 +255,6 @@ export function PurchaseOrdersPage() {
     })),
     [poTypeRefs, isThai],
   );
-
-  const ownershipLabel = (code: string): string => {
-    const r = ownershipRefs?.find(x => x.code === code);
-    return r ? (isThai ? r.name_th : r.name_en) : code;
-  };
 
   const statusLabel = (code: string): string => {
     const r = statusRefs?.find(x => x.code === code);
@@ -481,13 +484,7 @@ export function PurchaseOrdersPage() {
                           <Badge size="xs" color={STATUS_COLOR[po.status] ?? 'default'}>
                             {statusLabel(po.status)}
                           </Badge>
-                          <Badge
-                            size="xs"
-                            variant="outline"
-                            color={po.ownership === 'HOLDING' ? 'info' : po.ownership === 'COMPANY' ? 'secondary' : 'default'}
-                          >
-                            {ownershipLabel(po.ownership)}
-                          </Badge>
+                          <OwnerBadge size="xs" ownerType={po.owner_type} ownerName={po.owner_name} />
                         </div>
                         <div className="text-[11px] text-subtle truncate">
                           {[
@@ -521,7 +518,6 @@ export function PurchaseOrdersPage() {
                   detail={poDetail}
                   loading={detailFetching}
                   isMobile={isMobile}
-                  ownershipLabel={ownershipLabel}
                   statusLabel={statusLabel}
                   onRefresh={invalidate}
                   addSnackbar={addSnackbar}
@@ -575,7 +571,6 @@ function PoDetailPanel({
   detail,
   loading,
   isMobile,
-  ownershipLabel,
   statusLabel,
   onRefresh,
   addSnackbar,
@@ -583,7 +578,6 @@ function PoDetailPanel({
   detail: PoDetail;
   loading: boolean;
   isMobile: boolean;
-  ownershipLabel: (c: string) => string;
   statusLabel: (c: string) => string;
   onRefresh: () => void;
   addSnackbar: (opts: { message: React.ReactNode }) => void;
@@ -660,7 +654,7 @@ function PoDetailPanel({
           <Badge size="xs" color={STATUS_COLOR[detail.status] ?? 'default'}>
             {statusLabel(detail.status)}
           </Badge>
-          <Badge size="xs" color="default">{ownershipLabel(detail.ownership)}</Badge>
+          <OwnerBadge size="xs" ownerType={detail.owner_type} ownerName={detail.owner_name} />
         </div>
       )}
 

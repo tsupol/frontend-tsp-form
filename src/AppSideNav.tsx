@@ -409,6 +409,9 @@ export const AppSideNav = () => {
           { key: 'finance-models', icon: <Wallet size="1rem" />, label: t('nav.financeModels'), path: '/admin/company/finance-models' },
         ] : []),
         { key: 'company-config', icon: <Building2 size="1rem" />, label: t('nav.companyConfig'), path: '/admin/company/config' },
+        ...(['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
+          { key: 'owner-config', icon: <Boxes size="1rem" />, label: t('nav.ownerConfig'), path: '/admin/company/owner-config' },
+        ] : []),
         { type: 'group', key: 'grp-policy', label: t('nav.groupPolicy') },
         { key: 'holidays', icon: <CalendarDays size="1rem" />, label: t('nav.holidays'), path: '/admin/company/holidays' },
         { key: 'blacklist', icon: <ShieldBan size="1rem" />, label: t('nav.blacklist'), path: '/admin/company/blacklist' },

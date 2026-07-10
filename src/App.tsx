@@ -65,6 +65,7 @@ import { BlacklistPage } from './pages/company/BlacklistPage';
 import { ICloudPoolPage } from './pages/company/ICloudPoolPage';
 import { BranchPinPage } from './pages/company/BranchPinPage';
 import { BranchFinanceModelsPage } from './pages/company/BranchFinanceModelsPage';
+import { OwnerConfigPage } from './pages/company/OwnerConfigPage';
 import { LessorsPage } from './pages/company/LessorsPage';
 import { BranchSignersPage } from './pages/company/BranchSignersPage';
 import { BranchesPage } from './pages/BranchesPage';
@@ -887,6 +888,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <CompanyLayout><BranchFinanceModelsPage /></CompanyLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/company/owner-config"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <CompanyLayout><OwnerConfigPage /></CompanyLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

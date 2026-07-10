@@ -22,6 +22,8 @@ import { getBucketLabel, getBucketColor, getConditionLabel, getConditionTextColo
 import { RegisterAssetModal } from './RegisterAssetModal';
 import { SellExternalModal } from './SellExternalModal';
 import { SellOutRequestModal } from './SellOutRequestModal';
+import { OwnerBadge } from '../../components/OwnerBadge';
+import type { OwnerType } from '../../lib/ownerTypes';
 
 // ============================================================================
 // Types (verified against live API 2026-03-25)
@@ -34,6 +36,9 @@ interface Asset {
   company_name: string;
   branch_id: number;
   branch_name: string;
+  owner_type: string | null;
+  owner_id: number | null;
+  owner_name: string | null;
   asset_code: string;
   asset_code_display: string | null;
   current_bucket: string;
@@ -902,6 +907,7 @@ export function AssetsPage() {
                           <span className={`text-xs ${getConditionTextColor(asset.condition_grade)}`}>
                             {getConditionLabel(asset.condition_grade, t)}
                           </span>
+                          <OwnerBadge ownerType={asset.owner_type as OwnerType | null} ownerName={asset.owner_name} size="xs" />
                         </div>
                       </div>
                       <div className="text-right shrink-0">
@@ -1281,7 +1287,7 @@ function AssetDetailPanel({
 
 
       {/* Branch & Company */}
-      <div className="flex-none grid grid-cols-2 gap-3 px-4 py-3 border-b border-line">
+      <div className="flex-none grid grid-cols-3 gap-3 px-4 py-3 border-b border-line">
         <div>
           <div className="text-xs text-subtle">{t('asset.branch')}</div>
           <div className="font-semibold text-sm">{asset.branch_name}</div>
@@ -1289,6 +1295,10 @@ function AssetDetailPanel({
         <div>
           <div className="text-xs text-subtle">{t('asset.company')}</div>
           <div className="font-semibold text-sm">{asset.company_name}</div>
+        </div>
+        <div>
+          <div className="text-xs text-subtle">{t('asset.owner')}</div>
+          <div className="mt-0.5"><OwnerBadge ownerType={asset.owner_type as OwnerType | null} ownerName={asset.owner_name} size="sm" /></div>
         </div>
       </div>
 

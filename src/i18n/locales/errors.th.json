@@ -1,4 +1,7 @@
 {
+  "inv.validation.invalid_channel": "ไม่รู้จักช่องทางรับเข้านี้",
+  "inv.validation.invalid_owner_type": "ไม่รู้จักประเภทเจ้าของนี้",
+  "inv.validation.owner_type_not_allowed": "สาขานี้ไม่อนุญาตให้เลือกเจ้าของนี้",
   "barcode.not_found": "ไม่พบบาร์โค้ดในระบบ",
   "barcode.duplicate": "บาร์โค้ดนี้ถูกผูกกับสินค้าตัวอื่นแล้ว",
   "barcode.invalid": "รูปแบบบาร์โค้ดไม่ถูกต้อง",
