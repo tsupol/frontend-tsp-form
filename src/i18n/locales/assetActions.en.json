@@ -1,6 +1,7 @@
 {
   "ASSET_APPROVE": "Approve asset",
   "ASSET_SELL_B2B": "Sell to partner",
+  "ASSET_SELL_OUT": "Sell out",
   "ASSET_SELL": "Sell",
   "ASSET_DISPOSAL": "Dispose for value",
   "ASSET_QUARANTINE_ADMIT": "Quarantine",
@@ -76,5 +77,6 @@
   "option.writeOffReason.MISSING": "Missing",
   "option.writeOffReason.THEFT": "Theft",
   "option.writeOffReason.DAMAGED_BEYOND_USE": "Damaged beyond use",
-  "notImplemented": "Not yet available in this page"
+  "notImplemented": "Not yet available in this page",
+  "requiresBranchManager": "Requires branch manager"
 }

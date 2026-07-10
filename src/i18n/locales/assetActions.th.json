@@ -1,6 +1,7 @@
 {
   "ASSET_APPROVE": "อนุมัติเครื่อง",
   "ASSET_SELL_B2B": "ขายให้คู่ค้า",
+  "ASSET_SELL_OUT": "ขายออก",
   "ASSET_SELL": "ขาย",
   "ASSET_DISPOSAL": "จำหน่ายเป็นเงิน",
   "ASSET_QUARANTINE_ADMIT": "พักเครื่อง",
@@ -76,5 +77,6 @@
   "option.writeOffReason.MISSING": "สูญหาย",
   "option.writeOffReason.THEFT": "ถูกโจรกรรม",
   "option.writeOffReason.DAMAGED_BEYOND_USE": "ชำรุดจนใช้งานไม่ได้",
-  "notImplemented": "ยังไม่ได้เชื่อมในหน้านี้"
+  "notImplemented": "ยังไม่ได้เชื่อมในหน้านี้",
+  "requiresBranchManager": "ต้องเป็นหัวหน้าสาขา"
 }

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useSearchParams, useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, Modal, TextArea, DataTable, PopOver, Tooltip, Switch, MaskedInput, InputDatePicker, LabeledCheckbox, useSnackbarContext } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, Box, Search, SlidersHorizontal, XCircle, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Wrench, Printer, Plus, CheckCircle, Pencil, Cloud, CloudOff, MoreVertical, Package, Keyboard, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, Box, Search, SlidersHorizontal, XCircle, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Wrench, Printer, Plus, CheckCircle, Pencil, Cloud, CloudOff, MoreVertical, Package, Keyboard, AlertTriangle, Lock } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
@@ -21,6 +21,7 @@ import { ImeiInput } from '../../components/ImeiInput';
 import { getBucketLabel, getBucketColor, getConditionLabel, getConditionTextColor, CONDITION_VALUES, codeDisplay } from './inventoryUtils';
 import { RegisterAssetModal } from './RegisterAssetModal';
 import { SellExternalModal } from './SellExternalModal';
+import { SellOutRequestModal } from './SellOutRequestModal';
 
 // ============================================================================
 // Types (verified against live API 2026-03-25)
@@ -178,9 +179,11 @@ const FOOTER_ACTION_ALLOWLIST: ReadonlySet<string> = new Set([
   'ASSET_REPAIR_REQUEST',
   // LIFECYCLE
   'ASSET_WRITE_OFF_JOURNAL',
-  // SALE
+  // SALE — assets sell only two ways now: SELL_OUT (approval flow) and SELL_B2B
+  // (EXTERNAL branch). Legacy retail-outright ASSET_SELL is retired BE-side
+  // (NOTICE 2026-07-10) — no longer returned by the RPC, do not surface.
   'ASSET_SELL_B2B',        // partner sale (ขายให้คู่ค้า) — dedicated SellExternalModal, not the generic one
-  'ASSET_SELL',
+  'ASSET_SELL_OUT',        // fraud-controlled outright sale (ขายออก) — dedicated SellOutRequestModal
   'ASSET_DISPOSAL',
   // ADJUSTMENT
   'ASSET_REVALUE',
@@ -191,6 +194,7 @@ const FOOTER_ACTION_ALLOWLIST: ReadonlySet<string> = new Set([
 // They're "wired" (button enabled) but routed to a bespoke component in the detail panel.
 const DEDICATED_MODAL_ACTIONS: ReadonlySet<string> = new Set([
   'ASSET_SELL_B2B',   // partner sale → SellExternalModal
+  'ASSET_SELL_OUT',   // outright sale request → SellOutRequestModal
 ]);
 
 // Actions wireable today via the generic modal.
@@ -348,8 +352,8 @@ const SIMPLE_ACTIONS: Record<string, SimpleActionConfig> = {
 
 // Up to 4 actions surfaced inline as primary buttons; rest go behind "More actions".
 const PRIMARY_BY_BUCKET: Record<string, string[]> = {
-  ON_HAND_AVAILABLE: ['ASSET_SELL', 'ASSET_SELL_B2B', 'ASSET_REPAIR_REQUEST'],
-  QUARANTINED: ['ASSET_QUARANTINE_RELEASE', 'ASSET_SELL', 'ASSET_REPAIR_REQUEST', 'ASSET_WRITE_OFF_JOURNAL'],
+  ON_HAND_AVAILABLE: ['ASSET_SELL_OUT', 'ASSET_SELL_B2B', 'ASSET_REPAIR_REQUEST'],
+  QUARANTINED: ['ASSET_SELL_OUT', 'ASSET_QUARANTINE_RELEASE', 'ASSET_REPAIR_REQUEST', 'ASSET_WRITE_OFF_JOURNAL'],
   IN_REPAIR: [],
   IN_USE_INTERNAL: ['ASSET_INTERNAL_USE_RELEASE'],
   WITH_CUSTOMER_ACTIVE: ['ASSET_REPAIR_REQUEST'],
@@ -1075,6 +1079,7 @@ function AssetDetailPanel({
   const [addIdentifierType, setAddIdentifierType] = useState<string | null>(null);
   const [correctVariantOpen, setCorrectVariantOpen] = useState(false);
   const [sellExternalOpen, setSellExternalOpen] = useState(false);
+  const [sellOutOpen, setSellOutOpen] = useState(false);
   const { handlePrint: printAssetSticker, portal: stickerPortal } = useAssetStickerPrint();
   // INVENTORY.VARIANT_CORRECT audience (per DELIVERY doc). Client-side visibility
   // only; the RPC re-checks permission + contract-binding.
@@ -1421,9 +1426,14 @@ function AssetDetailPanel({
         t={t}
         onPick={(action) => {
           setActionPreset(undefined);
-          // Partner sale has its own multi-step modal; everything else uses the generic one.
+          // Partner sale and sell-out each have their own dedicated modal;
+          // everything else uses the generic one.
           if (action.action_code === 'ASSET_SELL_B2B') {
             setSellExternalOpen(true);
+            return;
+          }
+          if (action.action_code === 'ASSET_SELL_OUT') {
+            setSellOutOpen(true);
             return;
           }
           setActiveAction(action);
@@ -1477,6 +1487,24 @@ function AssetDetailPanel({
           current_bucket: asset.current_bucket,
         }}
         onSold={onRefresh}
+      />
+
+      <SellOutRequestModal
+        open={sellOutOpen}
+        onClose={() => setSellOutOpen(false)}
+        asset={{
+          asset_id: asset.asset_id,
+          asset_code: asset.asset_code,
+          asset_code_display: asset.asset_code_display,
+          product_display_name: asset.product_display_name,
+          variant_name: asset.variant_name,
+          serial_no: asset.serial_no,
+          external_ref: asset.external_ref,
+          condition_grade: asset.condition_grade,
+          branch_id: asset.branch_id,
+          current_bucket: asset.current_bucket,
+        }}
+        onCreated={onRefresh}
       />
         </>
       )}
@@ -2342,6 +2370,11 @@ function AssetActionBar({
   // to role_code if capabilities aren't loaded.
   const canSellExternal = can('INVENTORY.SELL_EXTERNAL') || user?.role_code === 'BRANCH_MANAGER';
 
+  // Sell-out (ขายออก) is BRANCH_MANAGER-only (INVENTORY.SELL_REQUEST). Same as
+  // B2B: fn_asset_available_actions reports bucket availability but not permission,
+  // so hide for non-BM (RPC is the backstop).
+  const canSellOut = can('INVENTORY.SELL_REQUEST') || user?.role_code === 'BRANCH_MANAGER';
+
   const { data: actionsResp } = useQuery({
     queryKey: ['asset-actions', asset.asset_id],
     queryFn: () => apiClient.rpc<AssetActionsResponse>('fn_asset_available_actions', {
@@ -2350,14 +2383,33 @@ function AssetActionBar({
     staleTime: 30 * 1000,
   });
 
+  // FE permission gates for the two dedicated sale actions. When the user lacks
+  // the role we DON'T hide the button — we keep it visible-but-disabled with a
+  // "requires X" tooltip, so staff can see the action exists and why they can't
+  // use it (rather than it silently vanishing). Maps action_code → i18n reason key.
+  const permissionGate: Record<string, boolean> = {
+    ASSET_SELL_B2B: canSellExternal,
+    ASSET_SELL_OUT: canSellOut,
+  };
+  const gateReasonKey: Record<string, string> = {
+    ASSET_SELL_B2B: 'requiresBranchManager',
+    ASSET_SELL_OUT: 'requiresBranchManager',
+  };
+
   const allowedActions = (actionsResp?.actions ?? [])
     .filter(a => FOOTER_ACTION_ALLOWLIST.has(a.action_code))
+    // BE permission_denied still hides (avoids a wall of disabled buttons for
+    // every manager-only bucket move). The two sale actions above are the
+    // deliberate exception — they gate in the FE and show disabled-with-reason.
     .filter(a => a.blocking_reason !== 'permission_denied')
-    .filter(a => a.action_code !== 'ASSET_SELL_B2B' || canSellExternal)
     .slice()
     .sort((a, b) => a.sort_order - b.sort_order);
 
-  const primaryCodes = PRIMARY_BY_BUCKET[asset.current_bucket] ?? [];
+  // A FE-gated action the user can't use is demoted out of the inline primary
+  // row into "More" — that's where a disabled "requires X" entry belongs, so the
+  // quick row stays actionable. It's still shown (disabled + reason), never hidden.
+  const isGated = (code: string) => code in permissionGate && !permissionGate[code];
+  const primaryCodes = (PRIMARY_BY_BUCKET[asset.current_bucket] ?? []).filter(c => !isGated(c));
   const primarySet = new Set(primaryCodes);
   const primaryActions = primaryCodes
     .map(c => allowedActions.find(a => a.action_code === c))
@@ -2382,6 +2434,9 @@ function AssetActionBar({
     const wired = !!config || DEDICATED_MODAL_ACTIONS.has(a.action_code);
     const label = t(a.action_code, { ns: 'assetActions', defaultValue: a.action_code });
     const placement = ACTION_PLACEMENT[a.action_code];
+    // FE role gate: if this action is permission-gated in the FE and the user
+    // fails it, show it disabled with a "requires X" reason (never hide it).
+    const gated = a.action_code in permissionGate && !permissionGate[a.action_code];
     let endIcon: React.ReactNode = undefined;
     const lines: string[] = [label];
     if (placement?.kind === 'elsewhere') {
@@ -2390,6 +2445,10 @@ function AssetActionBar({
     } else if (placement?.kind === 'not_wired' || !wired) {
       endIcon = <Wrench size={12} />;
       lines.push(t('notImplemented', { ns: 'assetActions', defaultValue: 'Not yet wired in this page' }));
+    }
+    if (gated) {
+      endIcon = <Lock size={12} />;
+      lines.push(t(gateReasonKey[a.action_code], { ns: 'assetActions', defaultValue: 'You do not have permission for this action' }));
     }
     if (!a.is_available && a.blocking_reason) {
       lines.push(t(`blockingReason.${a.blocking_reason}`, { ns: 'apiErrors', defaultValue: a.blocking_reason }));
@@ -2408,8 +2467,8 @@ function AssetActionBar({
         <Button
           variant={primary ? undefined : 'outline'}
           size="sm"
-          color={primary && a.is_available && wired ? (config?.color ?? 'primary') : config?.color}
-          disabled={!a.is_available || !wired}
+          color={primary && a.is_available && wired && !gated ? (config?.color ?? 'primary') : config?.color}
+          disabled={!a.is_available || !wired || gated}
           endIcon={endIcon}
           onClick={() => {
             onPick(a);

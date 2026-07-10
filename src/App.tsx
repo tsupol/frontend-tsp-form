@@ -32,6 +32,7 @@ import { BranchStockPage } from './pages/inventory/BranchStockPage';
 import { ReceivingPage } from './pages/inventory/ReceivingPage';
 import { LotsPage } from './pages/inventory/LotsPage';
 import { AssetsPage } from './pages/inventory/AssetsPage';
+import { AssetSalesPage } from './pages/inventory/AssetSalesPage';
 import { PurchaseOrdersPage } from './pages/inventory/PurchaseOrdersPage';
 import { TransfersPage } from './pages/inventory/TransfersPage';
 import { RepairsPage } from './pages/inventory/RepairsPage';
@@ -497,6 +498,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <InventoryLayout><BarcodesPage /></InventoryLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/inventory/asset-sales/:saleId?"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <InventoryLayout><AssetSalesPage /></InventoryLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

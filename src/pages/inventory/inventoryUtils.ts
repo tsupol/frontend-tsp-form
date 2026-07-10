@@ -35,6 +35,8 @@ export const BUCKET_CONFIG: Record<string, { labelKey: string; color: BucketBadg
   DISPOSED_SOLD_SCRAP: { labelKey: 'inventory.disposedScrap', color: 'default' },
   SOLD_B2B_EXTERNAL: { labelKey: 'inventory.soldB2B', color: 'default' },
   SOLD_B2C_EXTERNAL: { labelKey: 'inventory.soldB2C', color: 'default' },
+  SOLD_OUTRIGHT: { labelKey: 'inventory.soldOutright', color: 'default' },
+  PENDING_SALE_APPROVAL: { labelKey: 'inventory.pendingSaleApproval', color: 'warning' },
   WRITTEN_OFF: { labelKey: 'inventory.writtenOff', color: 'default' },
 };
 

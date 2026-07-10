@@ -231,7 +231,8 @@ export function beMediaCanPresign(key: string): boolean {
     /^private\/branches\/\d+\/signatory-/.test(k) ||
     /^private\/companies\/\d+\/signatory-/.test(k) ||
     /^private\/buyback\/\d+\/condition-/.test(k) ||
-    /^private\/asset_check\/\d+\/photo-/.test(k)
+    /^private\/asset_check\/\d+\/photo-/.test(k) ||
+    /^private\/sell_out\/\d+\/condition-/.test(k)
   );
 }
 
@@ -297,6 +298,21 @@ export const BUYBACK_CONDITION_RESIZE: ResizeOptions = {
   maxWidth: 1280, maxHeight: 1280, mode: 'contain', format: 'webp', quality: 0.82,
 };
 
+// ── sell_out_condition_bridge — hardcoded spec (single md=1280, PRIVATE) ─
+// Sell-out condition photos (ASSET_SELL_REQUEST / SELL_CONDITION) — evidence for
+// a fraud-controlled outright asset sale (usually a defective device sold back to
+// a dealer). Mirrors buyback_condition_bridge exactly: single full-frame private
+// file, leaf condition-{idx}.{ext}, lands at private/sell_out/{request_id}/
+// condition-{idx}.{ext} (confirmed live via fn_media_upload_check). Both the QR
+// bridge and desktop direct upload use this one type. Attach only while the
+// request is PENDING_APPROVAL (locked on approve); MEDIA.SELL_CONDITION.MANAGE.
+export const SELL_OUT_CONDITION_TYPE = 'sell_out_condition_bridge';
+export const SELL_OUT_CONDITION_MAX = 10;
+
+export const SELL_OUT_CONDITION_RESIZE: ResizeOptions = {
+  maxWidth: 1280, maxHeight: 1280, mode: 'contain', format: 'webp', quality: 0.82,
+};
+
 // ── Hardcoded upload-spec registry ────────────────────────────────────
 // be-media has no /upload/spec endpoint; these mirror misc-go's
 // pkg/uploadspec/spec.go so getUploadSpec() can serve them client-side
@@ -328,6 +344,11 @@ export const UPLOAD_SPECS: Record<string, BeMediaSpec> = {
     type: 'buyback_condition_bridge', privacy: 'private', resize_mode: 'contain', quality: 0.82,
     sizes: [{ label: 'md', width: 1280 }], max_files: 10,
     path_params: ['po_line_id', 'idx'],
+  },
+  sell_out_condition_bridge: {
+    type: 'sell_out_condition_bridge', privacy: 'private', resize_mode: 'contain', quality: 0.82,
+    sizes: [{ label: 'md', width: 1280 }], max_files: 10,
+    path_params: ['request_id', 'idx'],
   },
   branch_expense_slip: {
     type: 'branch_expense_slip', privacy: 'private', resize_mode: 'contain', quality: 0.82,

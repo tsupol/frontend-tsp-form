@@ -344,6 +344,8 @@ export const AppSideNav = () => {
           label: <span className="text-primary-fg font-medium">{t('nav.newBuyback')}</span>,
           path: '/admin/inventory/buyback/new',
         },
+        { type: 'group', key: 'grp-inv-sales', label: t('nav.groupSales') },
+        { key: 'asset-sales', icon: <Receipt size="1rem" />, label: t('nav.assetSales'), path: '/admin/inventory/asset-sales' },
       ],
     },
     {
