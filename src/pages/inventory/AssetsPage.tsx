@@ -505,12 +505,15 @@ export function AssetsPage() {
   const { data: listData, isFetching } = useQuery({
     queryKey: ['assets', debouncedSearch, filterBucket, filterBranchId, filterCondition, filterBrand, filterFamily, sourceLotId, sourcePoId, variantId, pageIndex, pageSize],
     queryFn: () => {
-      // Order by asset_id DESC, never created_at: batch lot→asset conversion writes
-      // every device in one transaction so they share the exact same created_at →
-      // ordering by it has no tiebreaker and scrambles within-batch. asset_id is
-      // unique + tracks external_ref 1:1, so it's newest-first AND deterministic
-      // across pages. (BE NOTICE 2026-07-10 / fn_asset_search mig 577.)
-      let url = '/v_assets?order=asset_id.desc';
+      // Own-branch first, then asset_id DESC. is_my_branch (v_assets mig 579)
+      // floats the caller's own-branch rows to the top for multi-branch viewers;
+      // a single-branch-scoped user sees no difference (expected). nullslast keeps
+      // any null flag at the bottom. Never order by created_at: batch lot→asset
+      // conversion writes every device in one transaction so they share the exact
+      // same created_at → no tiebreaker, scrambles within-batch. asset_id is unique
+      // + tracks external_ref 1:1, so it's newest-first AND deterministic across
+      // pages. (BE NOTICE 2026-07-10 / fn_asset_search mig 577, is_my_branch mig 579.)
+      let url = '/v_assets?order=is_my_branch.desc.nullslast,asset_id.desc';
       if (sourceLotId) url += `&source_lot_id=eq.${sourceLotId}`;
       if (sourcePoId) url += `&source_po_id=eq.${sourcePoId}`;
       if (variantId) url += `&variant_id=eq.${variantId}`;
@@ -1141,6 +1144,7 @@ function AssetDetailPanel({
           <Badge size="xs" color={getBucketColor(asset.current_bucket)}>
             {getBucketLabel(asset.current_bucket, t)}
           </Badge>
+          <OwnerBadge ownerType={asset.owner_type as OwnerType | null} ownerName={asset.owner_name} size="xs" />
           <span className={`text-xs ${getConditionTextColor(asset.condition_grade)}`}>
             {getConditionLabel(asset.condition_grade, t)}
           </span>

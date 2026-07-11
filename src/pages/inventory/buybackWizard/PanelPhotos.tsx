@@ -136,48 +136,50 @@ export function PanelPhotos({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
-            {photos.map((m) => (
-              <PhotoRow
-                key={m.entity_media_id}
-                media={m}
-                editable={editable && !m.is_locked && !remove.isPending}
-                onPreview={() => {
-                  const full = pickFullKey(m);
-                  if (full) setLightboxKey(normalizeKey(full));
-                }}
-                onRemove={() => remove.mutate(m)}
-                onEditCaption={() => setEditCaptionFor(m)}
-              />
-            ))}
+          {photos.length > 0 && (
+            <div className="grid grid-cols-2 gap-3">
+              {photos.map((m) => (
+                <PhotoRow
+                  key={m.entity_media_id}
+                  media={m}
+                  editable={editable && !m.is_locked && !remove.isPending}
+                  onPreview={() => {
+                    const full = pickFullKey(m);
+                    if (full) setLightboxKey(normalizeKey(full));
+                  }}
+                  onRemove={() => remove.mutate(m)}
+                  onEditCaption={() => setEditCaptionFor(m)}
+                />
+              ))}
+            </div>
+          )}
 
-            {editable && remaining > 0 && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  startIcon={<Plus size={16} />}
-                  onClick={() => setAddOpen(true)}
-                >
-                  {t('buybackWizard.addPhoto', { defaultValue: 'Add photo' })}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  startIcon={<Smartphone size={16} />}
-                  onClick={() => setQrOpen(true)}
-                >
-                  {t('buybackWizard.captureFromPhone', { defaultValue: 'Capture from phone' })}
-                </Button>
-              </>
-            )}
+          {editable && remaining > 0 && (
+            <div className={`flex flex-wrap gap-2 ${photos.length > 0 ? 'mt-3' : ''}`}>
+              <Button
+                variant="outline"
+                size="sm"
+                startIcon={<Plus size={16} />}
+                onClick={() => setAddOpen(true)}
+              >
+                {t('buybackWizard.addPhoto', { defaultValue: 'Add photo' })}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                startIcon={<Smartphone size={16} />}
+                onClick={() => setQrOpen(true)}
+              >
+                {t('buybackWizard.captureFromPhone', { defaultValue: 'Capture from phone' })}
+              </Button>
+            </div>
+          )}
 
-            {!editable && photos.length === 0 && (
-              <div className="col-span-2 text-xs text-subtler italic text-center py-6 border border-dashed border-line rounded-md">
-                {t('buybackWizard.noPhotos', { defaultValue: 'No photos.' })}
-              </div>
-            )}
-          </div>
+          {!editable && photos.length === 0 && (
+            <div className="text-xs text-subtler italic text-center py-6 border border-dashed border-line rounded-md">
+              {t('buybackWizard.noPhotos', { defaultValue: 'No photos.' })}
+            </div>
+          )}
         </div>
       </div>
 

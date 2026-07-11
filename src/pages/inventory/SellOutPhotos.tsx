@@ -140,28 +140,30 @@ export function SellOutConditionPhotos({
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-2">
-        {photos.map((m) => (
-          <PhotoThumb
-            key={m.entity_media_id}
-            media={m}
-            editable={editable}
-            onRemove={() => remove.mutate(m)}
-            disabled={remove.isPending}
-          />
-        ))}
+      {photos.length > 0 && (
+        <div className="grid grid-cols-3 gap-2">
+          {photos.map((m) => (
+            <PhotoThumb
+              key={m.entity_media_id}
+              media={m}
+              editable={editable}
+              onRemove={() => remove.mutate(m)}
+              disabled={remove.isPending}
+            />
+          ))}
+        </div>
+      )}
 
-        {editable && remaining > 0 && (
-          <>
-            <Button variant="outline" size="sm" startIcon={<Plus size={16} />} onClick={() => setAddOpen(true)}>
-              {t('sellOut.addPhoto', { defaultValue: 'Add photo' })}
-            </Button>
-            <Button variant="outline" size="sm" startIcon={<Smartphone size={16} />} onClick={() => setQrOpen(true)}>
-              {t('sellOut.captureFromPhone', { defaultValue: 'Capture from phone' })}
-            </Button>
-          </>
-        )}
-      </div>
+      {editable && remaining > 0 && (
+        <div className={`flex flex-wrap gap-2 ${photos.length > 0 ? 'mt-2' : ''}`}>
+          <Button variant="outline" size="sm" startIcon={<Plus size={16} />} onClick={() => setAddOpen(true)}>
+            {t('sellOut.addPhoto', { defaultValue: 'Add photo' })}
+          </Button>
+          <Button variant="outline" size="sm" startIcon={<Smartphone size={16} />} onClick={() => setQrOpen(true)}>
+            {t('sellOut.captureFromPhone', { defaultValue: 'Capture from phone' })}
+          </Button>
+        </div>
+      )}
 
       <SellOutAddPhotoModal
         open={addOpen}
@@ -228,21 +230,23 @@ export function SellOutPhotoGrid({
       {error && (
         <div className="alert alert-danger mb-3"><XCircle size={16} /><span>{error}</span></div>
       )}
-      <div className="grid grid-cols-3 gap-2">
-        {photos.map((m) => (
-          <PhotoThumb key={m.entity_media_id} media={m} editable onRemove={() => remove.mutate(m)} disabled={remove.isPending} />
-        ))}
-        {remaining > 0 && (
-          <>
-            <Button variant="outline" size="sm" startIcon={<Plus size={16} />} onClick={onAddPhoto}>
-              {t('sellOut.addPhoto', { defaultValue: 'Add photo' })}
-            </Button>
-            <Button variant="outline" size="sm" startIcon={<Smartphone size={16} />} onClick={onCaptureFromPhone}>
-              {t('sellOut.captureFromPhone', { defaultValue: 'Capture from phone' })}
-            </Button>
-          </>
-        )}
-      </div>
+      {photos.length > 0 && (
+        <div className="grid grid-cols-3 gap-2">
+          {photos.map((m) => (
+            <PhotoThumb key={m.entity_media_id} media={m} editable onRemove={() => remove.mutate(m)} disabled={remove.isPending} />
+          ))}
+        </div>
+      )}
+      {remaining > 0 && (
+        <div className={`flex flex-wrap gap-2 ${photos.length > 0 ? 'mt-2' : ''}`}>
+          <Button variant="outline" size="sm" startIcon={<Plus size={16} />} onClick={onAddPhoto}>
+            {t('sellOut.addPhoto', { defaultValue: 'Add photo' })}
+          </Button>
+          <Button variant="outline" size="sm" startIcon={<Smartphone size={16} />} onClick={onCaptureFromPhone}>
+            {t('sellOut.captureFromPhone', { defaultValue: 'Capture from phone' })}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
