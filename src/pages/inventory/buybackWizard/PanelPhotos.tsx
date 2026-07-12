@@ -18,6 +18,7 @@ import {
 } from '../../../lib/beMedia';
 import { toStoragePath, normalizeKey } from '../../../lib/mediaPath';
 import { MediaLightbox } from '../../../components/MediaLightbox';
+import { ConfirmDialog } from '../../../components/ConfirmDialog';
 import { useMobileCaptureSession } from '../../contracts/workspace/useMobileCaptureSession';
 import { getLine } from './useBuyback';
 import { codeDisplay } from '../inventoryUtils';
@@ -77,6 +78,7 @@ export function PanelPhotos({
   const [addOpen, setAddOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
   const [editCaptionFor, setEditCaptionFor] = useState<EntityMedia | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState<EntityMedia | null>(null);
 
   const { data: photos = [], refetch } = useQuery({
     queryKey: ['buyback-photos', lineId],
@@ -116,7 +118,7 @@ export function PanelPhotos({
         });
       }
     },
-    onSuccess: () => { setError(''); refresh(); },
+    onSuccess: () => { setError(''); setConfirmRemove(null); refresh(); },
     onError: (err) => setError(formatApiError(err, t)),
   });
 
@@ -147,7 +149,7 @@ export function PanelPhotos({
                     const full = pickFullKey(m);
                     if (full) setLightboxKey(normalizeKey(full));
                   }}
-                  onRemove={() => remove.mutate(m)}
+                  onRemove={() => setConfirmRemove(m)}
                   onEditCaption={() => setEditCaptionFor(m)}
                 />
               ))}
@@ -218,6 +220,15 @@ export function PanelPhotos({
         media={editCaptionFor}
         onClose={() => setEditCaptionFor(null)}
         onSaved={() => { setEditCaptionFor(null); refresh(); }}
+      />
+
+      <ConfirmDialog
+        open={confirmRemove != null}
+        onClose={() => setConfirmRemove(null)}
+        onConfirm={() => confirmRemove && remove.mutate(confirmRemove)}
+        message={t('buybackWizard.confirmRemovePhoto', { defaultValue: 'Remove this photo?' })}
+        confirmLabel={t('common.remove', { defaultValue: 'Remove' })}
+        pending={remove.isPending}
       />
     </div>
   );

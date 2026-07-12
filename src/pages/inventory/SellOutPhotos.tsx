@@ -17,14 +17,16 @@ import {
   SELL_OUT_CONDITION_MAX,
 } from '../../lib/beMedia';
 import { toStoragePath, normalizeKey } from '../../lib/mediaPath';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { useMobileCaptureSession } from '../contracts/workspace/useMobileCaptureSession';
 
 // ============================================================================
 // Sell-out condition photos — shared album component for the ASSET_SELL_REQUEST
-// / SELL_CONDITION media, used by BOTH the create-request success step and the
-// asset-sale ledger detail. Photos attach only while the request is
-// PENDING_APPROVAL (BE locks them on approval), so `editable` gates the add/
-// remove controls; otherwise it's a read-only grid.
+// / SELL_CONDITION media, used by BOTH the draft-editing step and the
+// asset-sale ledger detail. Photos attach only while the request is DRAFT
+// (BE freezes them on submit — INV.STATE.SELL_REQUEST_NOT_DRAFT otherwise), so
+// `editable` (= status is DRAFT) gates the add/remove controls; otherwise it's
+// a read-only grid.
 //
 // Backend was cut over to direct-R2 on 2026-07-10 (RESOLVED note): both
 // sell_out_condition (staff-web) and sell_out_condition_bridge (QR) now upload
@@ -84,29 +86,82 @@ export function SellOutConditionPhotos({
   code,
   editable,
   compact,
+  onRequestDraft,
+  requestDraftPending,
 }: {
-  requestId: number;
+  /** null = no draft yet; the Add/Capture buttons call onRequestDraft first. */
+  requestId: number | null;
   code: string;
   editable: boolean;
   /** Tighter header (used in dense detail panels). */
   compact?: boolean;
+  /** When requestId is null, Add/Capture invoke this to lazily create the draft
+      (the parent then re-renders with a real requestId). */
+  onRequestDraft?: () => void;
+  /** Disables the Add/Capture buttons while the lazy draft-create is in flight. */
+  requestDraftPending?: boolean;
 }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [error, setError] = useState('');
   const [addOpen, setAddOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState<SellOutEntityMedia | null>(null);
+  // When Add/Capture is clicked before a draft exists, remember which one so we
+  // can open it automatically once the parent's lazy create yields a requestId
+  // — one click instead of two (create, then open).
+  const [pendingOpen, setPendingOpen] = useState<'add' | 'qr' | null>(null);
+  // Adaptive polling clock — reset whenever a QR capture window opens, so the
+  // grid self-refreshes as phone uploads land even after the modal closes. The
+  // photo album (unlike the QR session) has no push channel; BE designed the
+  // bridge around polling (fn_mobile_capture_session_status). Fast for 2 min,
+  // slow until 5 min, then quiet. Component unmount (switching entity) stops it.
+  const [captureSince, setCaptureSince] = useState<number | null>(null);
 
   const { data: photos = [] } = useQuery({
-    queryKey: sellOutPhotosKey(requestId),
+    queryKey: sellOutPhotosKey(requestId ?? 0),
     queryFn: () => apiClient.get<SellOutEntityMedia[]>(
       `/v_entity_media?entity_type=eq.${ENTITY_TYPE}&entity_id=eq.${requestId}&usage_type=eq.${USAGE_TYPE}&order=sort_order`,
     ),
+    enabled: requestId != null,
     staleTime: 30 * 1000,
+    // fast-then-quiet: 3s for the first 2 min after a capture window opens,
+    // 15s until 5 min, then stop.
+    refetchInterval: () => {
+      if (captureSince == null) return false;
+      const elapsed = Date.now() - captureSince;
+      if (elapsed < 2 * 60 * 1000) return 3_000;
+      if (elapsed < 5 * 60 * 1000) return 15_000;
+      return false;
+    },
+    refetchIntervalInBackground: false,
   });
 
-  const refresh = () => queryClient.invalidateQueries({ queryKey: sellOutPhotosKey(requestId) });
+  const refresh = () => queryClient.invalidateQueries({ queryKey: sellOutPhotosKey(requestId ?? 0) });
   const remaining = Math.max(0, SELL_OUT_CONDITION_MAX - photos.length);
+  // No draft yet → Add/Capture create it first (via onRequestDraft). With a
+  // draft → open the internal add/QR modals directly.
+  const noDraft = requestId == null;
+
+  // Once the lazily-created draft arrives, open whichever modal the user asked
+  // for — turns the "create then open" two-click into one.
+  useEffect(() => {
+    if (requestId == null || pendingOpen == null) return;
+    if (pendingOpen === 'qr') { setCaptureSince(Date.now()); setQrOpen(true); }
+    else setAddOpen(true);
+    setPendingOpen(null);
+  }, [requestId, pendingOpen]);
+
+  // Add/Capture click: with a draft, open directly; without one, flag intent and
+  // kick off the lazy create — the effect above opens the modal when it lands.
+  const handleAdd = () => {
+    if (noDraft) { setPendingOpen('add'); onRequestDraft?.(); }
+    else setAddOpen(true);
+  };
+  const handleCapture = () => {
+    if (noDraft) { setPendingOpen('qr'); onRequestDraft?.(); }
+    else { setCaptureSince(Date.now()); setQrOpen(true); }
+  };
 
   const remove = useMutation({
     mutationFn: async (m: SellOutEntityMedia) => {
@@ -116,7 +171,7 @@ export function SellOutConditionPhotos({
         beMediaDelete(keys).catch((err) => console.warn('R2 cleanup failed for', keys, err));
       }
     },
-    onSuccess: () => { setError(''); refresh(); },
+    onSuccess: () => { setError(''); setConfirmRemove(null); refresh(); },
     onError: (err) => setError(translateErr(err, t)),
   });
 
@@ -147,7 +202,7 @@ export function SellOutConditionPhotos({
               key={m.entity_media_id}
               media={m}
               editable={editable}
-              onRemove={() => remove.mutate(m)}
+              onRemove={() => setConfirmRemove(m)}
               disabled={remove.isPending}
             />
           ))}
@@ -156,27 +211,48 @@ export function SellOutConditionPhotos({
 
       {editable && remaining > 0 && (
         <div className={`flex flex-wrap gap-2 ${photos.length > 0 ? 'mt-2' : ''}`}>
-          <Button variant="outline" size="sm" startIcon={<Plus size={16} />} onClick={() => setAddOpen(true)}>
+          <Button
+            variant="outline"
+            size="sm"
+            startIcon={<Plus size={16} />}
+            onClick={handleAdd}
+            disabled={requestDraftPending || pendingOpen != null}
+          >
             {t('sellOut.addPhoto', { defaultValue: 'Add photo' })}
           </Button>
-          <Button variant="outline" size="sm" startIcon={<Smartphone size={16} />} onClick={() => setQrOpen(true)}>
+          <Button
+            variant="outline"
+            size="sm"
+            startIcon={<Smartphone size={16} />}
+            onClick={handleCapture}
+            disabled={requestDraftPending || pendingOpen != null}
+          >
             {t('sellOut.captureFromPhone', { defaultValue: 'Capture from phone' })}
           </Button>
         </div>
       )}
 
+      <ConfirmDialog
+        open={confirmRemove != null}
+        onClose={() => setConfirmRemove(null)}
+        onConfirm={() => confirmRemove && remove.mutate(confirmRemove)}
+        message={t('sellOut.confirmRemovePhoto', { defaultValue: 'Remove this photo?' })}
+        confirmLabel={t('common.remove', { defaultValue: 'Remove' })}
+        pending={remove.isPending}
+      />
+
       <SellOutAddPhotoModal
         open={addOpen}
         onClose={() => setAddOpen(false)}
-        requestId={requestId}
+        requestId={requestId ?? 0}
         onAdded={() => { setAddOpen(false); refresh(); }}
       />
       <SellOutCaptureQrModal
         open={qrOpen}
         onClose={() => setQrOpen(false)}
-        requestId={requestId}
+        requestId={requestId ?? 0}
         code={code}
-        onUploaded={refresh}
+        onUploaded={() => { setCaptureSince(Date.now()); refresh(); }}
       />
     </div>
   );
@@ -200,6 +276,7 @@ export function SellOutPhotoGrid({
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [error, setError] = useState('');
+  const [confirmRemove, setConfirmRemove] = useState<SellOutEntityMedia | null>(null);
 
   const { data: photos = [] } = useQuery({
     queryKey: sellOutPhotosKey(requestId),
@@ -216,7 +293,7 @@ export function SellOutPhotoGrid({
       const keys = collectMediaKeys(m);
       if (keys.length > 0) beMediaDelete(keys).catch((err) => console.warn('R2 cleanup failed for', keys, err));
     },
-    onSuccess: () => { setError(''); queryClient.invalidateQueries({ queryKey: sellOutPhotosKey(requestId) }); },
+    onSuccess: () => { setError(''); setConfirmRemove(null); queryClient.invalidateQueries({ queryKey: sellOutPhotosKey(requestId) }); },
     onError: (err) => setError(translateErr(err, t)),
   });
 
@@ -233,7 +310,7 @@ export function SellOutPhotoGrid({
       {photos.length > 0 && (
         <div className="grid grid-cols-3 gap-2">
           {photos.map((m) => (
-            <PhotoThumb key={m.entity_media_id} media={m} editable onRemove={() => remove.mutate(m)} disabled={remove.isPending} />
+            <PhotoThumb key={m.entity_media_id} media={m} editable onRemove={() => setConfirmRemove(m)} disabled={remove.isPending} />
           ))}
         </div>
       )}
@@ -247,6 +324,15 @@ export function SellOutPhotoGrid({
           </Button>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmRemove != null}
+        onClose={() => setConfirmRemove(null)}
+        onConfirm={() => confirmRemove && remove.mutate(confirmRemove)}
+        message={t('sellOut.confirmRemovePhoto', { defaultValue: 'Remove this photo?' })}
+        confirmLabel={t('common.remove', { defaultValue: 'Remove' })}
+        pending={remove.isPending}
+      />
     </div>
   );
 }

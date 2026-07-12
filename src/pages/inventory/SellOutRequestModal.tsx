@@ -1,29 +1,33 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import { useMutation } from '@tanstack/react-query';
 import { Modal, Button, TextArea, Input } from 'tsp-form';
-import { XCircle, ChevronsRight } from 'lucide-react';
+import { XCircle, ChevronsRight, ExternalLink } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useQuery } from '@tanstack/react-query';
 import { CurrencyInput } from '../../components/CurrencyInput';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { fmtCurrency } from '../../lib/format';
 import { codeDisplay } from './inventoryUtils';
-import { SellOutPhotoGrid, SellOutAddPhotoModal, SellOutCaptureQrModal, sellOutPhotosKey } from './SellOutPhotos';
+import { SellOutConditionPhotos } from './SellOutPhotos';
 
 // ============================================================================
 // Sell-Out (ขายออก) — open a fraud-controlled outright-sale request for one
 // contractable asset (ON_HAND_AVAILABLE / QUARANTINED). Usually selling a
 // defective device back to a dealer. Spec: UI_SUMMARY/124_ASSET_SELL_OUT_FLOW.md
 //
-//   BRANCH_MANAGER opens the request (proposed price + supplier + photos) →
-//   asset locks into PENDING_SALE_APPROVAL → COMPANY_ADMIN approves the price →
-//   branch confirms + collects (Screen D). Price is frozen at approval.
+//   BRANCH_MANAGER creates a DRAFT (proposed price + supplier) → attaches
+//   condition photos (only while DRAFT) → submits for approval (asset locks
+//   into PENDING_SALE_APPROVAL, photos freeze) → COMPANY_ADMIN approves →
+//   branch confirms + collects. Price is frozen at approval.
 //
-// This modal is Screen A: create the request, then attach condition photos
-// (only possible while PENDING_APPROVAL, so photos come AFTER create). The
-// "ขายออก" button that opens this is a standalone BRANCH_MANAGER-only button —
-// it is NOT in fn_asset_available_actions.
+// This modal is Screen A. Three views: 'form' (enter details) → 'draft'
+// (attach photos + submit) → 'done' (submitted, pending approval). Create no
+// longer locks the asset — submit does. Closing on 'draft' keeps the draft;
+// it's resumable from the Asset Sales ledger. The "ขายออก" button that opens
+// this is a standalone BRANCH_MANAGER-only button — NOT in
+// fn_asset_available_actions.
 // ============================================================================
 
 // Minimal asset shape the modal needs.
@@ -63,6 +67,14 @@ interface CreateResponse {
   price_snapshot: Record<string, unknown>;
 }
 
+interface SubmitResponse {
+  request_id: number;
+  status: string;
+  asset_id: number;
+  locked_bucket: string;
+  origin_bucket: string;
+}
+
 type ViewState = 'form' | 'done';
 
 function translateErr(err: unknown, t: ReturnType<typeof useTranslation>['t']): string {
@@ -90,6 +102,7 @@ export function SellOutRequestModal({
   onCreated: () => void;
 }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
 
   const [view, setView] = useState<ViewState>('form');
   const [price, setPrice] = useState('');
@@ -97,15 +110,12 @@ export function SellOutRequestModal({
   const [supplierName, setSupplierName] = useState('');
   const [supplierRef, setSupplierRef] = useState('');
   const [error, setError] = useState('');
+  // Set when create fails with SELL_REQUEST_ALREADY_OPEN — the open request on
+  // this asset, so the alert can link straight to it (the error carries no id,
+  // so we look it up from the ledger view).
+  const [existingRequest, setExistingRequest] = useState<{ id: number; code: string; status: string } | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
   const [result, setResult] = useState<CreateResponse | null>(null);
-  // Photo sub-modals are hoisted to the top level (siblings of the parent Modal,
-  // NOT nested inside its content via extras). Nesting a <Modal> inside another
-  // Modal's subtree desyncs tsp-form's shared modal-open context and the parent
-  // renders as a bare backdrop. Mirrors SellExternalModal's CancelSaleModal.
-  const [addPhotoOpen, setAddPhotoOpen] = useState(false);
-  const [qrOpen, setQrOpen] = useState(false);
-  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (open) {
@@ -115,10 +125,9 @@ export function SellOutRequestModal({
       setSupplierName('');
       setSupplierRef('');
       setError('');
+      setExistingRequest(null);
       setConfirmClose(false);
       setResult(null);
-      setAddPhotoOpen(false);
-      setQrOpen(false);
     }
   }, [open, asset]);
 
@@ -135,11 +144,11 @@ export function SellOutRequestModal({
 
   const isDirty = price.trim() !== '' || note.trim() !== '' || supplierName.trim() !== '' || supplierRef.trim() !== '';
 
-  // Fire the list refresh on CLOSE, not on success. Refreshing while the success
-  // view is open would refetch the asset list; the asset just moved to
+  // Fire the list refresh on CLOSE, not on success. Refreshing while a later
+  // view is open would refetch the asset list; on submit the asset moves to
   // PENDING_SALE_APPROVAL and drops out of the current filter, so selectedAsset
   // briefly goes null → the host AssetDetailPanel (which owns this modal)
-  // unmounts mid-success → the modal dies and leaves an orphaned backdrop.
+  // unmounts mid-flow → the modal dies and leaves an orphaned backdrop.
   // Deferring keeps the host mounted until the user is done.
   const forceClose = () => {
     setConfirmClose(false);
@@ -147,14 +156,18 @@ export function SellOutRequestModal({
     onClose();
   };
   const handleClose = () => {
-    // Once the request is created (done view), it exists server-side; closing is
-    // safe (photos are optional and attach independently). Only guard the
-    // pre-create form.
-    if (view !== 'form') { forceClose(); return; }
+    // 'done': submitted, safe. A live draft (result set) stays a DRAFT server-
+    // side — resumable from the Asset Sales ledger, so closing is safe. Only
+    // guard un-persisted typed input (no draft yet).
+    if (view === 'done' || result) { forceClose(); return; }
     if (isDirty) { setConfirmClose(true); return; }
     forceClose();
   };
 
+  // Create the DRAFT. Called lazily — either by the photo album (first Add /
+  // Capture) or by Submit when no draft exists yet. Price freezes at create
+  // (there's no update-price RPC), so the price field locks once result is set.
+  // Returns the created row so callers can chain (Submit creates-then-submits).
   const createMutation = useMutation({
     mutationFn: () => apiClient.rpc<CreateResponse>('fn_asset_sell_request_create', {
       p_asset_id: asset!.asset_id,
@@ -164,17 +177,57 @@ export function SellOutRequestModal({
       p_supplier_ref: supplierRef.trim() || null,
       p_branch_id: asset!.branch_id,
     }),
-    onSuccess: (data) => {
-      setResult(data);
-      setView('done');
-      // NB: do NOT refresh the asset list here — see forceClose. The refresh
-      // fires on close so the host panel stays mounted through the success view.
+    onSuccess: (data) => setResult(data),
+    onError: async (err) => {
+      setError(translateErr(err, t));
+      // On "already open", find that request so the alert can link to it.
+      if (err instanceof ApiError && err.code === 'INV.STATE.SELL_REQUEST_ALREADY_OPEN' && asset) {
+        try {
+          const rows = await apiClient.get<{ id: number; code_display: string; status: string }[]>(
+            `/v_asset_sell_requests?asset_id=eq.${asset.asset_id}&status=in.(DRAFT,PENDING_APPROVAL,APPROVED)&select=id,code_display,status&order=created_at.desc&limit=1`,
+          );
+          if (rows[0]) setExistingRequest({ id: rows[0].id, code: rows[0].code_display, status: rows[0].status });
+        } catch { /* best-effort — the plain message still shows */ }
+      }
     },
+  });
+
+  // Ensure a draft exists, return its id. Reuses the current result if present.
+  const ensureDraft = async (): Promise<number> => {
+    if (result) return result.request_id;
+    const data = await createMutation.mutateAsync();
+    return data.request_id;
+  };
+
+  const submitMutation = useMutation({
+    mutationFn: async () => {
+      const requestId = await ensureDraft(); // create-then-submit if no draft yet
+      return apiClient.rpc<SubmitResponse>('fn_asset_sell_request_submit', {
+        p_request_id: requestId,
+        p_branch_id: asset!.branch_id,
+      });
+    },
+    onSuccess: () => setView('done'),
+    onError: (err) => setError(translateErr(err, t)),
+  });
+
+  const cancelDraftMutation = useMutation({
+    mutationFn: () => apiClient.rpc('fn_asset_sell_request_cancel', {
+      p_request_id: result!.request_id,
+      p_note: null,
+      p_branch_id: asset!.branch_id,
+    }),
+    // Draft discarded — nothing to keep. Clear result so forceClose skips the
+    // list refresh (asset never left its bucket) and just closes.
+    onSuccess: () => { setResult(null); onClose(); },
     onError: (err) => setError(translateErr(err, t)),
   });
 
   const priceNum = Number(price);
-  const canSubmit = asset != null && price.trim() !== '' && priceNum > 0 && !createMutation.isPending;
+  const hasDraft = result != null;
+  const priceValid = price.trim() !== '' && priceNum > 0;
+  const busy = createMutation.isPending || submitMutation.isPending || cancelDraftMutation.isPending;
+  const canSubmit = asset != null && priceValid && !busy;
 
   return (
     <>
@@ -182,7 +235,7 @@ export function SellOutRequestModal({
         <div className="modal-header">
           <h2 className="modal-title">
             {view === 'done'
-              ? t('sellOut.doneTitle', { defaultValue: 'Sell-out request opened' })
+              ? t('sellOut.doneTitle', { defaultValue: 'Submitted for approval' })
               : t('sellOut.title', { defaultValue: 'Sell out (ขายออก)' })}
           </h2>
           <button type="button" className="modal-close-btn" onClick={handleClose} aria-label="Close">&times;</button>
@@ -194,7 +247,19 @@ export function SellOutRequestModal({
               {error && (
                 <div className="alert alert-danger mb-4 animate-pop-in">
                   <XCircle size={16} />
-                  <span>{error}</span>
+                  <div className="flex flex-col gap-1 min-w-0">
+                    <span>{error}</span>
+                    {existingRequest && (
+                      <button
+                        type="button"
+                        onClick={() => { onClose(); navigate(`/admin/inventory/asset-sales/${existingRequest.id}`); }}
+                        className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer self-start"
+                      >
+                        {t('sellOut.openExistingRequest', { defaultValue: 'Open existing request' })} {existingRequest.code}
+                        <ExternalLink size={12} />
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -214,45 +279,89 @@ export function SellOutRequestModal({
               )}
 
               <div className="form-grid gap-4">
-                {/* Proposed price */}
+                {/* Proposed price — locks once a draft exists (no update-price RPC). */}
                 <div className="flex flex-col">
                   <label className="form-label">{t('sellOut.proposedPrice', { defaultValue: 'Proposed sell price' })} *</label>
                   <CurrencyInput
                     value={price}
                     onChange={setPrice}
-                    endIcon={suggested != null && Number(price) !== suggested ? <ChevronsRight size={14} /> : undefined}
-                    onEndIconClick={suggested != null ? () => setPrice(String(suggested)) : undefined}
+                    disabled={hasDraft}
+                    endIcon={!hasDraft && suggested != null && Number(price) !== suggested ? <ChevronsRight size={14} /> : undefined}
+                    onEndIconClick={!hasDraft && suggested != null ? () => setPrice(String(suggested)) : undefined}
                     className="w-full"
                   />
+                  {hasDraft && (
+                    <span className="text-xs text-subtler mt-1">{t('sellOut.priceLockedHint', { defaultValue: 'Price is locked once photos are added. Discard to change it.' })}</span>
+                  )}
                 </div>
 
-                {/* Supplier (dealer) */}
+                {/* Supplier (dealer) — optional */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="flex flex-col">
                     <label className="form-label">{t('sellOut.supplierName', { defaultValue: 'Dealer / buyer name' })}</label>
-                    <Input value={supplierName} onChange={(e) => setSupplierName(e.target.value)} className="w-full" />
+                    <Input value={supplierName} onChange={(e) => setSupplierName(e.target.value)} disabled={hasDraft} className="w-full" />
                   </div>
                   <div className="flex flex-col">
                     <label className="form-label">{t('sellOut.supplierRef', { defaultValue: 'Reference no.' })}</label>
-                    <Input value={supplierRef} onChange={(e) => setSupplierRef(e.target.value)} className="w-full" />
+                    <Input value={supplierRef} onChange={(e) => setSupplierRef(e.target.value)} disabled={hasDraft} className="w-full" />
                   </div>
                 </div>
 
                 {/* Note */}
                 <div className="flex flex-col">
                   <label className="form-label">{t('sellOut.note', { defaultValue: 'Note (reason)' })}</label>
-                  <TextArea value={note} onChange={(e) => setNote(e.target.value)} rows={2} className="w-full" />
+                  <TextArea value={note} onChange={(e) => setNote(e.target.value)} disabled={hasDraft} rows={2} className="w-full" />
+                </div>
+
+                {/* Condition photos — first Add/Capture lazily creates the draft
+                    (needs a valid price first), then attaches. The album renders
+                    its own "Condition photos" header, so only the placeholder
+                    branch carries a label. */}
+                <div className="flex flex-col">
+                  {!priceValid && !hasDraft ? (
+                    <>
+                      <label className="form-label">{t('sellOut.photos', { defaultValue: 'Condition photos' })}</label>
+                      <div className="text-xs text-subtler border border-dashed border-line rounded-md px-3 py-4 text-center">
+                        {t('sellOut.photosNeedPrice', { defaultValue: 'Enter a sell price to add condition photos.' })}
+                      </div>
+                    </>
+                  ) : (
+                    <SellOutConditionPhotos
+                      requestId={result?.request_id ?? null}
+                      code={result?.code ?? asset?.asset_code ?? ''}
+                      editable
+                      onRequestDraft={() => {
+                        // Guard: never fire a second create if one is in flight
+                        // or a draft already exists (idempotent).
+                        if (createMutation.isPending || result) return;
+                        setError('');
+                        createMutation.mutate();
+                      }}
+                      requestDraftPending={createMutation.isPending}
+                    />
+                  )}
                 </div>
               </div>
             </div>
             <div className="modal-footer">
-              <Button variant="ghost" onClick={handleClose} disabled={createMutation.isPending}>{t('common.cancel')}</Button>
+              {hasDraft ? (
+                <Button
+                  variant="ghost"
+                  color="danger"
+                  onClick={() => { setError(''); cancelDraftMutation.mutate(); }}
+                  disabled={busy}
+                >
+                  {cancelDraftMutation.isPending ? t('common.loading') : t('sellOut.cancelDraft', { defaultValue: 'Discard draft' })}
+                </Button>
+              ) : (
+                <Button variant="ghost" onClick={handleClose} disabled={busy}>{t('common.cancel')}</Button>
+              )}
               <Button
                 color="primary"
-                onClick={() => { setError(''); createMutation.mutate(); }}
+                onClick={() => { setError(''); submitMutation.mutate(); }}
                 disabled={!canSubmit}
               >
-                {createMutation.isPending ? t('common.loading') : t('sellOut.submit', { defaultValue: 'Open request' })}
+                {submitMutation.isPending ? t('common.loading') : t('sellOut.submitForApproval', { defaultValue: 'Submit for approval' })}
               </Button>
             </div>
           </>
@@ -260,7 +369,7 @@ export function SellOutRequestModal({
 
         {view === 'done' && result && (
           <ActionDoneView
-            headline={t('sellOut.doneTitle', { defaultValue: 'Sell-out request opened' })}
+            headline={t('sellOut.doneTitle', { defaultValue: 'Submitted for approval' })}
             contractCode={result.code}
             detailRows={[
               { label: t('sellOut.proposedPrice', { defaultValue: 'Proposed price' }), value: fmtCurrency(result.proposed_price), emphasis: true },
@@ -271,43 +380,14 @@ export function SellOutRequestModal({
                 <div className="alert alert-info">
                   <span>{t('sellOut.pendingHint', { defaultValue: 'The device is locked until a company admin approves the price.' })}</span>
                 </div>
-                {/* Optional condition photos — added after the request exists,
-                    while it's still PENDING_APPROVAL. Not a gate: the success is
-                    already shown above; this is a follow-on. The add/QR modals
-                    live OUTSIDE this Modal (below) — extras only holds the grid. */}
-                <SellOutPhotoGrid
-                  requestId={result.request_id}
-                  onAddPhoto={() => setAddPhotoOpen(true)}
-                  onCaptureFromPhone={() => setQrOpen(true)}
-                />
+                {/* Photos are frozen at submit — read-only view of the set. */}
+                <SellOutConditionPhotos requestId={result.request_id} code={result.code} editable={false} compact />
               </div>
             }
             onClose={forceClose}
           />
         )}
       </Modal>
-
-      {/* Photo sub-modals — siblings of the parent Modal, not nested in extras. */}
-      {result && (
-        <>
-          <SellOutAddPhotoModal
-            open={addPhotoOpen}
-            onClose={() => setAddPhotoOpen(false)}
-            requestId={result.request_id}
-            onAdded={() => {
-              setAddPhotoOpen(false);
-              queryClient.invalidateQueries({ queryKey: sellOutPhotosKey(result.request_id) });
-            }}
-          />
-          <SellOutCaptureQrModal
-            open={qrOpen}
-            onClose={() => setQrOpen(false)}
-            requestId={result.request_id}
-            code={result.code}
-            onUploaded={() => queryClient.invalidateQueries({ queryKey: sellOutPhotosKey(result.request_id) })}
-          />
-        </>
-      )}
 
       {/* Unsaved-changes guard (pre-create only) */}
       <Modal open={confirmClose} onClose={() => setConfirmClose(false)} maxWidth="24rem" width="100%">

@@ -646,6 +646,12 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
         >
           <Copy size={14} />
         </button>
+        <Badge
+          color={detail.bill_type === 'INVOICE' ? 'primary' : detail.bill_type === 'CREDIT_NOTE' ? 'danger' : 'warning'}
+          size="xs"
+        >
+          {detail.bill_type}
+        </Badge>
         <Badge color={statusColor} size="xs">{displayStatus}</Badge>
       </div>
 

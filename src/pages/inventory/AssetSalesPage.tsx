@@ -1,13 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   PageNav, PageNavPanel, MobileHeader, DataTable,
   Badge, Select, Button, useSnackbarContext,
 } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, Package, ExternalLink, ArrowRight } from 'lucide-react';
-import { apiClient } from '../../lib/api';
+import { ArrowLeft, ArrowRightFromLine, Package, ExternalLink, ArrowRight, XCircle } from 'lucide-react';
+import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { CopyButton } from '../../components/CopyButton';
 import { fmtCurrency } from '../../lib/format';
@@ -26,7 +26,7 @@ import { SellOutConditionPhotos } from './SellOutPhotos';
 
 type SaleType = 'SELL_OUT' | 'B2B_EXTERNAL';
 type SaleStatus =
-  | 'PENDING_APPROVAL' | 'APPROVED' | 'COMPLETED'
+  | 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'COMPLETED'
   | 'REJECTED' | 'CANCELLED' | 'REVERSED';
 
 export interface AssetSaleRow {
@@ -75,6 +75,7 @@ export interface AssetSaleRow {
 // ── status / sale-type presentation ──
 const saleStatusColor = (s: SaleStatus): 'warning' | 'info' | 'success' | 'danger' | 'default' => {
   switch (s) {
+    case 'DRAFT': return 'default';
     case 'PENDING_APPROVAL': return 'warning';
     case 'APPROVED': return 'info';
     case 'COMPLETED': return 'success';
@@ -140,6 +141,7 @@ export function AssetSalesPage() {
     { value: 'B2B_EXTERNAL', label: t('assetSales.type_B2B_EXTERNAL') },
   ];
   const statusOptions: { value: SaleStatus; label: string }[] = [
+    { value: 'DRAFT', label: t('assetSales.status_DRAFT') },
     { value: 'PENDING_APPROVAL', label: t('assetSales.status_PENDING_APPROVAL') },
     { value: 'APPROVED', label: t('assetSales.status_APPROVED') },
     { value: 'COMPLETED', label: t('assetSales.status_COMPLETED') },
@@ -308,10 +310,36 @@ function AssetSaleDetailPanel({
   const navigate = useNavigate();
   const [cancelOpen, setCancelOpen] = useState(false);
   const [commitOpen, setCommitOpen] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const isSellOut = row.sale_type === 'SELL_OUT';
-  const canCancel = isSellOut && (row.status === 'PENDING_APPROVAL' || row.status === 'APPROVED');
+  const isDraft = isSellOut && row.status === 'DRAFT';
+  // Cancel works on any pre-commit state (DRAFT / PENDING_APPROVAL / APPROVED).
+  const canCancel = isSellOut && (row.status === 'DRAFT' || row.status === 'PENDING_APPROVAL' || row.status === 'APPROVED');
   const canCommit = isSellOut && row.status === 'APPROVED';
+
+  // Submit a resumed DRAFT for approval — locks the asset, freezes photos.
+  const submitMutation = useMutation({
+    mutationFn: () => apiClient.rpc('fn_asset_sell_request_submit', {
+      p_request_id: row.id,
+      p_branch_id: row.branch_id,
+    }),
+    onSuccess: () => {
+      onRefresh();
+      addSnackbar({ message: <div className="alert alert-success"><span>{t('assetSales.submittedMsg', { defaultValue: 'Submitted for approval' })}</span></div> });
+    },
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        setSubmitError(
+          (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') ||
+          (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '') ||
+          err.message,
+        );
+      } else {
+        setSubmitError(String(err));
+      }
+    },
+  });
 
   return (
     <div className="relative flex flex-col h-full min-w-0 overflow-hidden">
@@ -324,9 +352,16 @@ function AssetSaleDetailPanel({
         </div>
       )}
 
-      <div className="flex-1 overflow-auto better-scroll px-4 py-3 flex flex-col gap-4">
+      <div className="flex-1 overflow-auto better-scroll">
+        {/* Price summary band */}
+        <div className="grid grid-cols-3 gap-3 px-4 py-3 border-b border-line bg-surface">
+          <Field label={t('assetSales.proposedPrice')} value={fmtCurrency(row.proposed_price)} emphasis />
+          <Field label={t('assetSales.cost')} value={fmtCurrency(row.cost_basis)} />
+          <Field label={t('assetSales.catalog')} value={fmtCurrency(row.catalog_cost)} />
+        </div>
+
         {/* Asset */}
-        <section>
+        <section className="px-4 py-2.5 border-b border-line">
           <SectionLabel>{t('assetSales.asset')}</SectionLabel>
           <button
             type="button"
@@ -343,15 +378,8 @@ function AssetSaleDetailPanel({
           </div>
         </section>
 
-        {/* Price */}
-        <section className="grid grid-cols-3 gap-3">
-          <Field label={t('assetSales.proposedPrice')} value={fmtCurrency(row.proposed_price)} emphasis />
-          <Field label={t('assetSales.cost')} value={fmtCurrency(row.cost_basis)} />
-          <Field label={t('assetSales.catalog')} value={fmtCurrency(row.catalog_cost)} />
-        </section>
-
         {/* Counterparty */}
-        <section>
+        <section className="px-4 py-2.5 border-b border-line">
           <SectionLabel>{t('assetSales.counterparty')}</SectionLabel>
           <div className="text-sm">{row.counterparty ?? '—'}</div>
           {row.supplier_ref && <div className="text-xs text-subtle mt-0.5">{t('assetSales.supplierRef')}: {row.supplier_ref}</div>}
@@ -360,7 +388,7 @@ function AssetSaleDetailPanel({
 
         {/* Bill link */}
         {row.bill_id && (
-          <section>
+          <section className="px-4 py-2.5 border-b border-line">
             <SectionLabel>{t('assetSales.bill')}</SectionLabel>
             <div className="flex items-center gap-2">
               <button
@@ -383,26 +411,27 @@ function AssetSaleDetailPanel({
 
         {/* Note */}
         {row.note && (
-          <section>
+          <section className="px-4 py-2.5 border-b border-line">
             <SectionLabel>{t('assetSales.note')}</SectionLabel>
             <div className="text-sm text-subtle whitespace-pre-wrap">{row.note}</div>
           </section>
         )}
 
         {/* Condition photos — editable (add / QR / remove) only while a SELL_OUT
-            request is PENDING_APPROVAL; read-only otherwise (BE locks on approval).
-            The shared component renders nothing when read-only with no photos. */}
-        <section>
+            request is DRAFT; read-only otherwise (BE freezes on submit). The
+            shared component returns null when read-only with no photos → the
+            section collapses to empty and `empty:hidden` drops its border. */}
+        <section className="px-4 py-2.5 border-b border-line empty:hidden">
           <SellOutConditionPhotos
             requestId={row.id}
             code={row.code_display}
-            editable={isSellOut && row.status === 'PENDING_APPROVAL'}
+            editable={isDraft}
             compact
           />
         </section>
 
         {/* Timeline */}
-        <section>
+        <section className="px-4 py-2.5 border-b border-line">
           <SectionLabel>{t('assetSales.timeline')}</SectionLabel>
           <div className="flex flex-col gap-1.5 text-xs">
             <TimelineRow label={t('assetSales.requestedBy')} name={row.requested_by_name} at={row.created_at} />
@@ -416,18 +445,41 @@ function AssetSaleDetailPanel({
       </div>
 
       {/* Actions (SELL_OUT only) */}
-      {(canCancel || canCommit) && (
-        <div className="flex-none border-t border-line px-4 py-3 flex items-center gap-2">
-          {canCommit && (
-            <Button color="primary" size="sm" onClick={() => setCommitOpen(true)}>
-              {t('assetSales.confirmSale')}
-            </Button>
+      {(canCancel || canCommit || isDraft) && (
+        <div className="flex-none border-t border-line px-4 py-3 flex flex-col gap-2">
+          {isDraft && (
+            <div className="alert alert-info">
+              <span>{t('sellOut.draftHint', { defaultValue: 'Attach condition photos, then submit for approval. The device is not locked until you submit.' })}</span>
+            </div>
           )}
-          {canCancel && (
-            <Button variant="outline" color="danger" size="sm" onClick={() => setCancelOpen(true)}>
-              {t('assetSales.cancelRequest')}
-            </Button>
+          {submitError && (
+            <div className="alert alert-danger">
+              <XCircle size={16} />
+              <span>{submitError}</span>
+            </div>
           )}
+          <div className="flex items-center gap-2">
+            {isDraft && (
+              <Button
+                color="primary"
+                size="sm"
+                onClick={() => { setSubmitError(''); submitMutation.mutate(); }}
+                disabled={submitMutation.isPending}
+              >
+                {submitMutation.isPending ? t('common.loading') : t('sellOut.submitForApproval', { defaultValue: 'Submit for approval' })}
+              </Button>
+            )}
+            {canCommit && (
+              <Button color="primary" size="sm" onClick={() => setCommitOpen(true)}>
+                {t('assetSales.confirmSale')}
+              </Button>
+            )}
+            {canCancel && (
+              <Button variant="outline" color="danger" size="sm" onClick={() => setCancelOpen(true)}>
+                {isDraft ? t('sellOut.cancelDraft', { defaultValue: 'Discard draft' }) : t('assetSales.cancelRequest')}
+              </Button>
+            )}
+          </div>
         </div>
       )}
 
