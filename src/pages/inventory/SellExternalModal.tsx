@@ -13,7 +13,7 @@ import { getBucketLabel, getBucketColor, codeDisplay } from './inventoryUtils';
 // ============================================================================
 // Sell External B2B (ขายให้คู่ค้า) — sell ON_HAND_AVAILABLE assets out of stock
 // to an EXTERNAL partner branch. One bill = many assets, one buyer.
-// Spec: nnf/UI_SUMMARY/63_ASSET_SELL_AT_COST_FLOW.md
+// Spec: nnf/UI_SUMMARY/63_ASSET_SELL_B2B_FLOW.md
 //
 // Bill is a JOURNAL — money does NOT count toward day-close (counted_in_daily=false).
 // Atomic: one call closes the bill (PAID) and moves every asset to SOLD_B2B_EXTERNAL.
