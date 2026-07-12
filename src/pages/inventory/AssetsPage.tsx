@@ -1092,6 +1092,7 @@ function AssetDetailPanel({
   const [actionPreset, setActionPreset] = useState<Record<string, string> | undefined>(undefined);
   const [addIdentifierType, setAddIdentifierType] = useState<string | null>(null);
   const [correctVariantOpen, setCorrectVariantOpen] = useState(false);
+  const [correctModelOpen, setCorrectModelOpen] = useState(false);
   const [sellExternalOpen, setSellExternalOpen] = useState(false);
   const [sellOutOpen, setSellOutOpen] = useState(false);
   const { handlePrint: printAssetSticker, portal: stickerPortal } = useAssetStickerPrint();
@@ -1099,6 +1100,12 @@ function AssetDetailPanel({
   // only; the RPC re-checks permission + contract-binding.
   const { user } = useAuth();
   const canCorrectVariant = ['BRANCH_MANAGER', 'COMPANY_INVENTORY', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV']
+    .includes(user?.role_code ?? '');
+  // INVENTORY.MODEL_CORRECT audience (NOTICE 2026-07-12, mig 585) — admin-only,
+  // crosses model families (vs correct-variant which is same-model colour only).
+  // Client-side visibility only; the RPC re-checks permission, contract-binding,
+  // category, and IMEI. Preflight also disables submit when not correctable.
+  const canCorrectModel = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV']
     .includes(user?.role_code ?? '');
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1170,8 +1177,20 @@ function AssetDetailPanel({
       {/* Product info — single stack; last row pairs the colour with the print
           sticker button (colour left, action right). */}
       <div className="flex-none px-4 py-4 border-b border-line bg-surface flex flex-col gap-1.5 min-w-0">
-        <div className="text-xs text-subtle">
-          {[asset.brand_name, asset.family_name, asset.model_name].filter(Boolean).join(' > ')}
+        <div className="text-xs text-subtle inline-flex items-center gap-2 min-w-0">
+          <span className="truncate">{[asset.brand_name, asset.family_name, asset.model_name].filter(Boolean).join(' > ')}</span>
+          {canCorrectModel && (
+            <Tooltip content={t('asset.correctModel.button', { defaultValue: 'Correct model' })}>
+              <button
+                type="button"
+                onClick={() => setCorrectModelOpen(true)}
+                className="text-subtle hover:text-fg cursor-pointer bg-transparent border-none p-0 inline-flex shrink-0"
+                aria-label={t('asset.correctModel.button', { defaultValue: 'Correct model' })}
+              >
+                <Pencil size={12} />
+              </button>
+            </Tooltip>
+          )}
         </div>
         <div className="font-semibold text-sm">{asset.product_display_name ?? asset.variant_name}</div>
         <div className="text-xs text-subtle">{asset.sku_code}</div>
@@ -1489,6 +1508,14 @@ function AssetDetailPanel({
         onSuccess={onRefresh}
       />
 
+      <CorrectModelModal
+        open={correctModelOpen}
+        asset={asset}
+        t={t}
+        onClose={() => setCorrectModelOpen(false)}
+        onSuccess={onRefresh}
+      />
+
       <SellExternalModal
         open={sellExternalOpen}
         onClose={() => setSellExternalOpen(false)}
@@ -1731,6 +1758,357 @@ function CorrectVariantModal({
             contractCode={asset.asset_code}
             detailRows={[
               { label: t('asset.color'), value: savedName },
+            ]}
+            onClose={onClose}
+          />
+        )}
+      </Modal>
+
+      <Modal open={confirmClose} onClose={() => setConfirmClose(false)} maxWidth="24rem" width="100%">
+        <div className="modal-header"><h2 className="modal-title">{t('common.unsavedChanges')}</h2></div>
+        <div className="modal-content"><p>{t('common.unsavedChangesMessage')}</p></div>
+        <div className="modal-footer">
+          <Button variant="ghost" onClick={() => setConfirmClose(false)}>{t('common.cancel')}</Button>
+          <Button color="danger" onClick={forceClose}>{t('common.discard')}</Button>
+        </div>
+      </Modal>
+    </>
+  );
+}
+
+// ============================================================================
+// Correct-model modal — admin-only cross-family model correction for an asset
+// registered under the wrong model at intake (e.g. iPhone 17 logged as 17e, or
+// 256GB↔512GB). Distinct from CorrectVariantModal (same-model colour only).
+//   fn_inv_asset_model_options → preflight (enable/disable + scope + current)
+//   fn_product_search          → model typeahead, family-scoped by default
+//   v_product_variant_list     → colour/SKU picker for the chosen model
+//   fn_inv_asset_correct_model → commit
+// BE enforces contract-binding / category / IMEI / scope guards (mig 585); the
+// UI mirrors the bound guard via preflight and translates the rest on reject.
+// ============================================================================
+
+interface ModelOptionsResponse {
+  asset_id: number;
+  is_correctable: boolean;
+  block_reason: string | null;
+  scope: { holding_id: number; category_id: number; family_id: number; family_name: string | null };
+  current: {
+    model_id: number;
+    model_name: string;
+    base_model_name: string;
+    variant_id: number;
+    product_display_name: string | null;
+  };
+}
+
+interface ProductSearchVariant {
+  variant_id: number;
+  sku_code: string;
+  name: string;
+  is_active: boolean;
+}
+interface ProductSearchModel {
+  model_id: number;
+  model_code: string;
+  model_name: string;
+  base_model_name: string;
+  brand_name: string;
+  family_name: string;
+  variants: ProductSearchVariant[];
+}
+interface ProductSearchResponse {
+  rows: ProductSearchModel[];
+  total: number;
+  has_more: boolean;
+}
+
+interface ModelVariantRow {
+  variant_id: number;
+  sku_code: string;
+  item_name: string;
+  manufacturer_color: string | null;
+  master_color_hex: string | null;
+  master_color_name_en: string | null;
+  is_active: boolean;
+}
+
+function CorrectModelModal({
+  open, asset, t, onClose, onSuccess,
+}: {
+  open: boolean;
+  asset: Asset;
+  t: ReturnType<typeof useTranslation>['t'];
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [view, setView] = useState<'form' | 'done'>('form');
+  const [modelQuery, setModelQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [scopeAllFamilies, setScopeAllFamilies] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<ProductSearchModel | null>(null);
+  const [selectedVariant, setSelectedVariant] = useState<number | null>(null);
+  const [note, setNote] = useState('');
+  const [error, setError] = useState('');
+  const [confirmClose, setConfirmClose] = useState(false);
+  const [savedName, setSavedName] = useState('');
+
+  useEffect(() => {
+    if (open) {
+      setView('form');
+      setModelQuery('');
+      setDebouncedQuery('');
+      setScopeAllFamilies(false);
+      setSelectedModel(null);
+      setSelectedVariant(null);
+      setNote('');
+      setError('');
+      setConfirmClose(false);
+      setSavedName('');
+    }
+  }, [open]);
+
+  // Debounce the typeahead query.
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(modelQuery.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [modelQuery]);
+
+  // Preflight — enable/disable + scope + current model. Fresh each open.
+  const { data: preflight, isFetching: preflightLoading } = useQuery({
+    queryKey: ['asset-model-options', asset.asset_id],
+    queryFn: () => apiClient.rpc<ModelOptionsResponse>('fn_inv_asset_model_options', {
+      p_asset_id: asset.asset_id,
+    }),
+    enabled: open,
+  });
+
+  const familyId = preflight?.scope.family_id ?? null;
+  const holdingId = preflight?.scope.holding_id ?? null;
+  const familyName = preflight?.scope.family_name ?? null;
+
+  // Model typeahead — default scoped to the asset's family; "Search all" clears it.
+  const { data: search, isFetching: searchLoading } = useQuery({
+    queryKey: ['asset-model-search', holdingId, scopeAllFamilies ? null : familyId, debouncedQuery],
+    queryFn: () => apiClient.rpc<ProductSearchResponse>('fn_product_search', {
+      p_q: debouncedQuery,
+      p_family_id: scopeAllFamilies ? null : familyId,
+      p_holding_id: holdingId,
+      p_is_active: true,
+      p_limit: 20,
+      p_offset: 0,
+    }),
+    enabled: open && !!preflight?.is_correctable && holdingId != null,
+  });
+
+  const modelOptions = useMemo(() => {
+    const rows = search?.rows ?? [];
+    return rows.map(m => ({
+      value: String(m.model_id),
+      label: `${m.model_name}${m.family_name ? ` · ${m.family_name}` : ''}`,
+    }));
+  }, [search]);
+
+  const onPickModel = (modelId: string) => {
+    const m = search?.rows.find(r => String(r.model_id) === modelId) ?? null;
+    setSelectedModel(m);
+    setSelectedVariant(null);
+  };
+
+  // Colour/SKU list for the chosen model.
+  const { data: variants, isFetching: variantsLoading } = useQuery({
+    queryKey: ['asset-model-variant-list', selectedModel?.model_id],
+    queryFn: () => apiClient.get<ModelVariantRow[]>(
+      `/v_product_variant_list?model_id=eq.${selectedModel!.model_id}&is_active=eq.true&order=sku_code`,
+    ),
+    enabled: open && selectedModel != null,
+  });
+
+  const isDirty = selectedModel != null || selectedVariant != null || note.trim() !== '';
+  const forceClose = () => { setConfirmClose(false); onClose(); };
+  const handleClose = () => {
+    if (view === 'done') { forceClose(); return; }
+    if (isDirty) { setConfirmClose(true); return; }
+    forceClose();
+  };
+
+  const mutation = useMutation({
+    mutationFn: () => apiClient.rpc<{ product_display_name: string | null; new: { model_code: string; sku_code: string } }>(
+      'fn_inv_asset_correct_model',
+      {
+        p_asset_id: asset.asset_id,
+        p_new_model_id: selectedModel!.model_id,
+        p_new_variant_id: selectedVariant,
+        p_note: note.trim() || null,
+      },
+    ),
+    onSuccess: (res) => {
+      setSavedName(res?.product_display_name ?? selectedModel?.model_name ?? '');
+      onSuccess();
+      setView('done');
+    },
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        const translated =
+          (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') ||
+          (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setError(translated || err.message);
+      } else {
+        setError(String(err));
+      }
+    },
+  });
+
+  const selectedVariantRow = variants?.find(v => v.variant_id === selectedVariant) ?? null;
+
+  return (
+    <>
+      <Modal open={open} onClose={handleClose} maxWidth="32rem" width="100%">
+        <div className="modal-header">
+          <h2 className="modal-title">
+            {view === 'done'
+              ? t('asset.correctModel.doneTitle', { defaultValue: 'Model corrected' })
+              : t('asset.correctModel.title', { defaultValue: 'Correct model' })}
+          </h2>
+          <button type="button" className="modal-close-btn" onClick={handleClose}>&times;</button>
+        </div>
+
+        {view === 'form' && (
+          <>
+            <div className="modal-content">
+              {/* Target box — asset code + current model. */}
+              <div className="px-3 py-2.5 rounded-md bg-surface border border-line mb-4">
+                <div className="font-medium text-sm">{asset.asset_code}</div>
+                <div className="text-xs text-subtle">
+                  {t('asset.correctModel.current', { defaultValue: 'Current model' })}: {preflight?.current.product_display_name ?? asset.product_display_name ?? asset.variant_name}
+                </div>
+              </div>
+
+              {error && (
+                <div className="alert alert-danger mb-4">
+                  <XCircle size={18} />
+                  <div><div className="alert-description">{error}</div></div>
+                </div>
+              )}
+
+              {preflightLoading && !preflight && (
+                <div className="py-6 text-center text-sm text-subtler">{t('common.loading')}</div>
+              )}
+
+              {preflight && !preflight.is_correctable && (
+                <div className="alert alert-warning">
+                  <AlertTriangle size={18} />
+                  <div>
+                    <div className="alert-title">{t('asset.correctModel.blockedTitle', { defaultValue: 'Cannot change model' })}</div>
+                    <div className="alert-description">
+                      {preflight.block_reason === 'ASSET_BOUND_TO_CONTRACT'
+                        ? t('asset.correctModel.blockedContract', { defaultValue: "This device is bound to a contract — its model can't be changed. Void or re-sign the contract first." })
+                        : (preflight.block_reason ?? t('asset.correctModel.blockedGeneric', { defaultValue: "This device's model cannot be changed." }))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {preflight && preflight.is_correctable && (
+                <>
+                  {/* Step 1 — model typeahead. */}
+                  <div className="flex flex-col gap-1.5 mb-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="form-label mb-0">{t('asset.correctModel.pickModel', { defaultValue: 'Select the correct model' })}</label>
+                      <button
+                        type="button"
+                        onClick={() => { setScopeAllFamilies(s => !s); setSelectedModel(null); setSelectedVariant(null); }}
+                        className="text-xs text-primary-fg hover:underline bg-transparent border-none p-0 cursor-pointer shrink-0"
+                      >
+                        {scopeAllFamilies
+                          ? t('asset.correctModel.backToFamily', { defaultValue: 'Back to {{family}}', family: familyName ?? '' })
+                          : t('asset.correctModel.searchAll', { defaultValue: 'Search all models' })}
+                      </button>
+                    </div>
+                    <Select
+                      options={modelOptions}
+                      value={selectedModel ? String(selectedModel.model_id) : null}
+                      onChange={(val) => onPickModel(val as string)}
+                      onSearchChange={setModelQuery}
+                      filterOptions={false}
+                      loading={searchLoading}
+                      placeholder={t('asset.correctModel.searchPlaceholder', { defaultValue: 'Search models…' })}
+                      searchable
+                      showChevron
+                    />
+                    <div className="text-xs text-subtler">
+                      {scopeAllFamilies
+                        ? t('asset.correctModel.searchingAll', { defaultValue: 'Searching all models in this holding' })
+                        : t('asset.correctModel.scopedToFamily', { defaultValue: 'Showing {{family}} models', family: familyName ?? '' })}
+                    </div>
+                  </div>
+
+                  {/* Step 2 — colour/SKU picker for the chosen model. */}
+                  {selectedModel && (
+                    <div className="flex flex-col gap-1.5 mb-4">
+                      <label className="form-label mb-0">{t('asset.correctModel.pickVariant', { defaultValue: 'Select the colour / SKU' })}</label>
+                      {variantsLoading && !variants && (
+                        <div className="py-3 text-center text-sm text-subtler">{t('asset.correctModel.loadingVariants', { defaultValue: 'Loading colours…' })}</div>
+                      )}
+                      {variants && variants.length === 0 && (
+                        <div className="text-xs text-subtler py-1">{t('asset.correctModel.noVariants', { defaultValue: 'This model has no active colours' })}</div>
+                      )}
+                      {variants && variants.length > 0 && (
+                        <div className="grid grid-cols-1 gap-1.5">
+                          {variants.map(v => {
+                            const active = selectedVariant === v.variant_id;
+                            return (
+                              <button
+                                key={v.variant_id}
+                                type="button"
+                                onClick={() => setSelectedVariant(v.variant_id)}
+                                className={`flex items-center gap-2.5 px-3 py-2 rounded-md border text-left transition-colors ${
+                                  active ? 'border-primary-fg bg-primary-soft' : 'border-line hover:bg-surface-hover cursor-pointer'
+                                }`}
+                              >
+                                <ColorSwatch hex={v.master_color_hex} title={v.master_color_name_en ?? undefined} />
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-sm truncate">{v.master_color_name_en ?? v.manufacturer_color ?? v.item_name}</div>
+                                  <div className="text-xs text-subtler truncate">{v.item_name}</div>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Step 3 — note. */}
+                  <div className="flex flex-col">
+                    <label className="form-label">{t('asset.correctModel.note', { defaultValue: 'Note (optional)' })}</label>
+                    <TextArea value={note} onChange={(e) => setNote(e.target.value)} className="w-full" size="sm" rows={2} />
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="modal-footer">
+              <Button variant="ghost" onClick={handleClose} disabled={mutation.isPending}>{t('common.cancel')}</Button>
+              <Button
+                color="primary"
+                onClick={() => { setError(''); mutation.mutate(); }}
+                disabled={mutation.isPending || !preflight?.is_correctable || selectedModel == null || selectedVariant == null}
+              >
+                {mutation.isPending ? t('common.loading') : t('asset.correctModel.submit', { defaultValue: 'Correct model' })}
+              </Button>
+            </div>
+          </>
+        )}
+
+        {view === 'done' && (
+          <ActionDoneView
+            headline={t('asset.correctModel.doneTitle', { defaultValue: 'Model corrected' })}
+            contractCode={asset.asset_code}
+            detailRows={[
+              { label: t('asset.correctModel.model', { defaultValue: 'Model' }), value: savedName },
+              ...(selectedVariantRow
+                ? [{ label: t('asset.correctModel.colour', { defaultValue: 'Colour' }), value: selectedVariantRow.master_color_name_en ?? selectedVariantRow.manufacturer_color ?? selectedVariantRow.item_name }]
+                : []),
             ]}
             onClose={onClose}
           />
