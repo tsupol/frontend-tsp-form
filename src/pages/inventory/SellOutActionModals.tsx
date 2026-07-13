@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useMutation } from '@tanstack/react-query';
-import { Modal, Button, Select, TextArea, Badge } from 'tsp-form';
-import { XCircle, Plus, Trash2, ArrowRight } from 'lucide-react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { Modal, Button, Select, TextArea, Input, Badge } from 'tsp-form';
+import { XCircle, Plus, Trash2, ArrowRight, ChevronsRight } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { CurrencyInput } from '../../components/CurrencyInput';
 import { BranchPinInput } from '../../components/BranchPinInput';
@@ -12,12 +12,65 @@ import { fmtCurrency } from '../../lib/format';
 import { getBucketLabel, getBucketColor } from './inventoryUtils';
 
 // ============================================================================
-// Sell-out request actions (branch, post-approval):
-//   • Cancel  — withdraw a PENDING_APPROVAL / APPROVED request. Asset → origin.
+// Sell-out request actions (branch):
+//   • Edit    — update a DRAFT's price / note / supplier (fn_..._update).
+//   • Cancel  — withdraw DRAFT / PENDING_APPROVAL / APPROVED. Asset → origin.
 //   • Commit  — Screen D: confirm the sale + collect payment (CASH/TRANSFER),
 //     total must equal the APPROVED price (frozen — no price field), PIN.
-// Spec: UI_SUMMARY/124_ASSET_SELL_OUT_FLOW.md §3.
+//
+// Which buttons show is driven by fn_asset_sell_request_available_actions
+// (see useSellRequestActions), NOT by status checks — per BE reply
+// 2026-07-12. Spec: UI_SUMMARY/124_ASSET_SELL_OUT_FLOW.md §3.
 // ============================================================================
+
+// ── Backend-driven action gating ────────────────────────────────────────────
+// The evaluator returns one row per action with its own is_available +
+// blocking_reason + require_permission, so gating is self-contained: render a
+// button when its action_code is available; never infer from status alone.
+
+export type SellRequestActionCode =
+  | 'EDIT' | 'SUBMIT' | 'UPLOAD_PHOTO'
+  | 'APPROVE' | 'REJECT' | 'COMMIT' | 'CANCEL';
+
+export interface SellRequestAction {
+  action_code: SellRequestActionCode;
+  rpc_name: string;
+  category: string;
+  sort_order: number;
+  require_pin: boolean;
+  require_permission: string | null;
+  is_available: boolean;
+  blocking_reason: string | null;
+}
+
+interface SellRequestActionsData {
+  status: string;
+  request_id: number;
+  actions: SellRequestAction[];
+}
+
+export const sellRequestActionsKey = (requestId: number | null) =>
+  ['sell-request-actions', requestId] as const;
+
+/**
+ * Query the sell-request action evaluator. `can(code)` returns true only when
+ * that action is currently available for this user + request. Drive every
+ * draft/lifecycle button off this — never off status.
+ */
+export function useSellRequestActions(requestId: number | null) {
+  const query = useQuery({
+    queryKey: sellRequestActionsKey(requestId),
+    queryFn: () => apiClient.rpc<SellRequestActionsData>('fn_asset_sell_request_available_actions', {
+      p_request_id: requestId,
+    }),
+    enabled: requestId != null,
+    staleTime: 15 * 1000,
+  });
+  const actions = query.data?.actions ?? [];
+  const can = (code: SellRequestActionCode) =>
+    actions.some((a) => a.action_code === code && a.is_available);
+  return { ...query, actions, can };
+}
 
 function translateErr(err: unknown, t: ReturnType<typeof useTranslation>['t']): string {
   if (err instanceof ApiError) {
@@ -86,6 +139,144 @@ export function SellOutCancelModal({
         </Button>
       </div>
     </Modal>
+  );
+}
+
+// ── Edit DRAFT — update price / note / supplier ─────────────────────────────
+// fn_asset_sell_request_update is a partial update: null = keep, "" = clear
+// (note/supplier only), value = set. Price must be > 0. DRAFT only. BE
+// recomputes price_snapshot. We send the full current form each time (simplest
+// and unambiguous): trimmed strings, "" → clear; price always set.
+
+interface EditDraftInitial {
+  proposed_price: number;
+  note: string | null;
+  supplier_name: string | null;
+  supplier_ref: string | null;
+}
+
+export function SellOutEditDraftModal({
+  open, onClose, requestId, code, branchId, initial, suggestedPrice, onSaved,
+}: {
+  open: boolean;
+  onClose: () => void;
+  requestId: number;
+  code: string;
+  branchId: number;
+  initial: EditDraftInitial | null;
+  /** Cost/catalog suggested price for the ChevronsRight autofill; null hides it. */
+  suggestedPrice: number | null;
+  onSaved: () => void;
+}) {
+  const { t } = useTranslation();
+  const [price, setPrice] = useState('');
+  const [note, setNote] = useState('');
+  const [supplierName, setSupplierName] = useState('');
+  const [supplierRef, setSupplierRef] = useState('');
+  const [error, setError] = useState('');
+  const [confirmClose, setConfirmClose] = useState(false);
+
+  useEffect(() => {
+    if (open && initial) {
+      setPrice(String(initial.proposed_price ?? ''));
+      setNote(initial.note ?? '');
+      setSupplierName(initial.supplier_name ?? '');
+      setSupplierRef(initial.supplier_ref ?? '');
+      setError('');
+      setConfirmClose(false);
+    }
+  }, [open, initial]);
+
+  const save = useMutation({
+    mutationFn: () => apiClient.rpc('fn_asset_sell_request_update', {
+      p_request_id: requestId,
+      p_proposed_price: Number(price),
+      // "" clears; the RPC treats "" as NULL-out for these text fields.
+      p_note: note.trim(),
+      p_supplier_name: supplierName.trim(),
+      p_supplier_ref: supplierRef.trim(),
+      p_branch_id: branchId,
+    }),
+    onSuccess: () => onSaved(),
+    onError: (err) => setError(translateErr(err, t)),
+  });
+
+  const priceNum = Number(price);
+  const canSave = price.trim() !== '' && priceNum > 0 && !save.isPending;
+
+  // Dirty guard — confirm before discarding edits (backdrop / X / Cancel).
+  const isDirty = !!initial && (
+    price !== String(initial.proposed_price ?? '') ||
+    note !== (initial.note ?? '') ||
+    supplierName !== (initial.supplier_name ?? '') ||
+    supplierRef !== (initial.supplier_ref ?? '')
+  );
+  const handleClose = () => {
+    if (save.isPending) return;
+    if (isDirty) { setConfirmClose(true); return; }
+    onClose();
+  };
+
+  return (
+    <>
+    <Modal open={open} onClose={handleClose} maxWidth="32rem" width="100%">
+      <div className="modal-header">
+        <h2 className="modal-title">{t('assetSales.editDraft', { defaultValue: 'Edit draft' })}</h2>
+        <button type="button" className="modal-close-btn" onClick={handleClose} aria-label="Close">&times;</button>
+      </div>
+      <div className="modal-content">
+        {error && (
+          <div className="alert alert-danger mb-4 animate-pop-in"><XCircle size={16} /><span>{error}</span></div>
+        )}
+        <div className="px-3 py-2.5 rounded-md bg-surface border border-line mb-4">
+          <div className="font-medium text-sm">{code}</div>
+        </div>
+        <div className="form-grid gap-4">
+          <div className="flex flex-col">
+            <label className="form-label">{t('sellOut.proposedPrice', { defaultValue: 'Proposed sell price' })} *</label>
+            <CurrencyInput
+              value={price}
+              onChange={setPrice}
+              endIcon={suggestedPrice != null && Number(price) !== suggestedPrice ? <ChevronsRight size={14} /> : undefined}
+              onEndIconClick={suggestedPrice != null ? () => setPrice(String(suggestedPrice)) : undefined}
+              className="w-full"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col">
+              <label className="form-label">{t('sellOut.supplierName', { defaultValue: 'Dealer / buyer name' })}</label>
+              <Input value={supplierName} onChange={(e) => setSupplierName(e.target.value)} className="w-full" />
+            </div>
+            <div className="flex flex-col">
+              <label className="form-label">{t('sellOut.supplierRef', { defaultValue: 'Reference no.' })}</label>
+              <Input value={supplierRef} onChange={(e) => setSupplierRef(e.target.value)} className="w-full" />
+            </div>
+          </div>
+          <div className="flex flex-col">
+            <label className="form-label">{t('sellOut.note', { defaultValue: 'Note (reason)' })}</label>
+            <TextArea value={note} onChange={(e) => setNote(e.target.value)} rows={2} className="w-full" />
+          </div>
+        </div>
+      </div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={handleClose} disabled={save.isPending}>{t('common.cancel')}</Button>
+        <Button color="primary" onClick={() => { setError(''); save.mutate(); }} disabled={!canSave}>
+          {save.isPending ? t('common.loading') : t('common.save', { defaultValue: 'Save' })}
+        </Button>
+      </div>
+    </Modal>
+
+    {/* Unsaved-changes guard — sibling, not nested, to keep the shared modal
+        context in sync. */}
+    <Modal open={confirmClose} onClose={() => setConfirmClose(false)} maxWidth="24rem" width="100%">
+      <div className="modal-header"><h2 className="modal-title">{t('common.unsavedChanges')}</h2></div>
+      <div className="modal-content"><p>{t('common.unsavedChangesMessage')}</p></div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={() => setConfirmClose(false)}>{t('common.cancel')}</Button>
+        <Button color="danger" onClick={() => { setConfirmClose(false); onClose(); }}>{t('common.discard')}</Button>
+      </div>
+    </Modal>
+    </>
   );
 }
 

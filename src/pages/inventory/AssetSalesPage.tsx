@@ -7,12 +7,13 @@ import {
   Badge, Select, Button, useSnackbarContext,
 } from 'tsp-form';
 import { ArrowLeft, ArrowRightFromLine, Package, ExternalLink, ArrowRight, XCircle } from 'lucide-react';
-import { apiClient, ApiError } from '../../lib/api';
+import { apiClient } from '../../lib/api';
+import { translateApiError } from '../../lib/apiErrors';
 import { DateTime } from '../../components/DateTime';
 import { CopyButton } from '../../components/CopyButton';
 import { fmtCurrency } from '../../lib/format';
 import { codeDisplay } from './inventoryUtils';
-import { SellOutCancelModal, SellOutCommitModal } from './SellOutActionModals';
+import { SellOutCancelModal, SellOutCommitModal, SellOutEditDraftModal, useSellRequestActions, sellRequestActionsKey } from './SellOutActionModals';
 import { SellOutConditionPhotos } from './SellOutPhotos';
 
 // ============================================================================
@@ -308,15 +309,28 @@ function AssetSaleDetailPanel({
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [cancelOpen, setCancelOpen] = useState(false);
   const [commitOpen, setCommitOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [submitError, setSubmitError] = useState('');
 
   const isSellOut = row.sale_type === 'SELL_OUT';
-  const isDraft = isSellOut && row.status === 'DRAFT';
-  // Cancel works on any pre-commit state (DRAFT / PENDING_APPROVAL / APPROVED).
-  const canCancel = isSellOut && (row.status === 'DRAFT' || row.status === 'PENDING_APPROVAL' || row.status === 'APPROVED');
-  const canCommit = isSellOut && row.status === 'APPROVED';
+
+  // Backend-driven button gating — which actions this user can take on this
+  // request. Never infer from status; each action carries its own is_available.
+  const { can } = useSellRequestActions(isSellOut ? row.id : null);
+  const canEdit = can('EDIT');
+  const canSubmit = can('SUBMIT');
+  const canCancel = can('CANCEL');
+  const canCommit = can('COMMIT');
+  const canUploadPhoto = can('UPLOAD_PHOTO'); // photos editable while this holds
+
+  // Refresh the ledger AND re-evaluate the action set after any lifecycle change.
+  const refreshAll = () => {
+    onRefresh();
+    queryClient.invalidateQueries({ queryKey: sellRequestActionsKey(row.id) });
+  };
 
   // Submit a resumed DRAFT for approval — locks the asset, freezes photos.
   const submitMutation = useMutation({
@@ -325,20 +339,10 @@ function AssetSaleDetailPanel({
       p_branch_id: row.branch_id,
     }),
     onSuccess: () => {
-      onRefresh();
+      refreshAll();
       addSnackbar({ message: <div className="alert alert-success"><span>{t('assetSales.submittedMsg', { defaultValue: 'Submitted for approval' })}</span></div> });
     },
-    onError: (err) => {
-      if (err instanceof ApiError) {
-        setSubmitError(
-          (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') ||
-          (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '') ||
-          err.message,
-        );
-      } else {
-        setSubmitError(String(err));
-      }
-    },
+    onError: (err) => setSubmitError(translateApiError(err, t)),
   });
 
   return (
@@ -425,7 +429,7 @@ function AssetSaleDetailPanel({
           <SellOutConditionPhotos
             requestId={row.id}
             code={row.code_display}
-            editable={isDraft}
+            editable={canUploadPhoto}
             compact
           />
         </section>
@@ -444,10 +448,10 @@ function AssetSaleDetailPanel({
         </section>
       </div>
 
-      {/* Actions (SELL_OUT only) */}
-      {(canCancel || canCommit || isDraft) && (
+      {/* Actions — driven off the evaluator (can(...)), not status. */}
+      {(canEdit || canSubmit || canCommit || canCancel) && (
         <div className="flex-none border-t border-line px-4 py-3 flex flex-col gap-2">
-          {isDraft && (
+          {canSubmit && (
             <div className="alert alert-info">
               <span>{t('sellOut.draftHint', { defaultValue: 'Attach condition photos, then submit for approval. The device is not locked until you submit.' })}</span>
             </div>
@@ -459,7 +463,7 @@ function AssetSaleDetailPanel({
             </div>
           )}
           <div className="flex items-center gap-2">
-            {isDraft && (
+            {canSubmit && (
               <Button
                 color="primary"
                 size="sm"
@@ -474,14 +478,35 @@ function AssetSaleDetailPanel({
                 {t('assetSales.confirmSale')}
               </Button>
             )}
+            {canEdit && (
+              <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+                {t('assetSales.editDraft', { defaultValue: 'Edit draft' })}
+              </Button>
+            )}
             {canCancel && (
               <Button variant="outline" color="danger" size="sm" onClick={() => setCancelOpen(true)}>
-                {isDraft ? t('sellOut.cancelDraft', { defaultValue: 'Discard draft' }) : t('assetSales.cancelRequest')}
+                {canEdit ? t('sellOut.cancelDraft', { defaultValue: 'Discard draft' }) : t('assetSales.cancelRequest')}
               </Button>
             )}
           </div>
         </div>
       )}
+
+      <SellOutEditDraftModal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        requestId={row.id}
+        code={row.code_display}
+        branchId={row.branch_id}
+        initial={{
+          proposed_price: row.proposed_price,
+          note: row.note,
+          supplier_name: row.supplier_name,
+          supplier_ref: row.supplier_ref,
+        }}
+        suggestedPrice={row.cost_basis ?? row.catalog_cost ?? null}
+        onSaved={() => { setEditOpen(false); refreshAll(); }}
+      />
 
       <SellOutCancelModal
         open={cancelOpen}
@@ -491,7 +516,7 @@ function AssetSaleDetailPanel({
         branchId={row.branch_id}
         onCancelled={() => {
           setCancelOpen(false);
-          onRefresh();
+          refreshAll();
           addSnackbar({ message: <div className="alert alert-success"><span>{t('assetSales.cancelledMsg')}</span></div> });
         }}
       />
@@ -505,7 +530,7 @@ function AssetSaleDetailPanel({
         approvedPrice={row.proposed_price}
         onCommitted={() => {
           setCommitOpen(false);
-          onRefresh();
+          refreshAll();
         }}
       />
     </div>

@@ -116,6 +116,10 @@ export function SellOutRequestModal({
   const [existingRequest, setExistingRequest] = useState<{ id: number; code: string; status: string } | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
   const [result, setResult] = useState<CreateResponse | null>(null);
+  // Form values captured at draft-create time, to detect whether a flush-update
+  // is actually needed before submit (skip an unnecessary — and possibly
+  // unpermitted — update when nothing changed).
+  const [savedForm, setSavedForm] = useState<{ price: string; note: string; supplierName: string; supplierRef: string } | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -128,6 +132,7 @@ export function SellOutRequestModal({
       setExistingRequest(null);
       setConfirmClose(false);
       setResult(null);
+      setSavedForm(null);
     }
   }, [open, asset]);
 
@@ -177,7 +182,12 @@ export function SellOutRequestModal({
       p_supplier_ref: supplierRef.trim() || null,
       p_branch_id: asset!.branch_id,
     }),
-    onSuccess: (data) => setResult(data),
+    onSuccess: (data) => {
+      setResult(data);
+      // Snapshot the values this draft was created with, so submit can tell if
+      // the form was edited afterward and only then flush an update.
+      setSavedForm({ price, note, supplierName, supplierRef });
+    },
     onError: async (err) => {
       setError(translateErr(err, t));
       // On "already open", find that request so the alert can link to it.
@@ -199,8 +209,34 @@ export function SellOutRequestModal({
     return data.request_id;
   };
 
+  // The form differs from what the existing draft was created with → a flush
+  // update is needed before submit. Only true when a draft already exists.
+  const formDiffersFromDraft = !!savedForm && (
+    savedForm.price !== price ||
+    savedForm.note !== note ||
+    savedForm.supplierName !== supplierName ||
+    savedForm.supplierRef !== supplierRef
+  );
+
   const submitMutation = useMutation({
     mutationFn: async () => {
+      // A draft created lazily by the photo step may have had its fields edited
+      // afterward — flush those via update before submitting. Skip when nothing
+      // changed, so an unchanged (and possibly EDIT-unpermitted) draft still
+      // submits.
+      if (result && formDiffersFromDraft) {
+        await apiClient.rpc('fn_asset_sell_request_update', {
+          p_request_id: result.request_id,
+          p_proposed_price: Number(price),
+          p_note: note.trim(),
+          p_supplier_name: supplierName.trim(),
+          p_supplier_ref: supplierRef.trim(),
+          p_branch_id: asset!.branch_id,
+        });
+        // Keep result in sync so the done view shows the submitted price, not
+        // the stale create-time one.
+        setResult((prev) => (prev ? { ...prev, proposed_price: Number(price) } : prev));
+      }
       const requestId = await ensureDraft(); // create-then-submit if no draft yet
       return apiClient.rpc<SubmitResponse>('fn_asset_sell_request_submit', {
         p_request_id: requestId,
@@ -280,37 +316,36 @@ export function SellOutRequestModal({
 
               <div className="form-grid gap-4">
                 {/* Proposed price — locks once a draft exists (no update-price RPC). */}
+                {/* Fields stay editable even after the draft is created — edits
+                    are flushed via fn_asset_sell_request_update on Submit (drafts
+                    are mutable since BE mig 595). */}
                 <div className="flex flex-col">
                   <label className="form-label">{t('sellOut.proposedPrice', { defaultValue: 'Proposed sell price' })} *</label>
                   <CurrencyInput
                     value={price}
                     onChange={setPrice}
-                    disabled={hasDraft}
-                    endIcon={!hasDraft && suggested != null && Number(price) !== suggested ? <ChevronsRight size={14} /> : undefined}
-                    onEndIconClick={!hasDraft && suggested != null ? () => setPrice(String(suggested)) : undefined}
+                    endIcon={suggested != null && Number(price) !== suggested ? <ChevronsRight size={14} /> : undefined}
+                    onEndIconClick={suggested != null ? () => setPrice(String(suggested)) : undefined}
                     className="w-full"
                   />
-                  {hasDraft && (
-                    <span className="text-xs text-subtler mt-1">{t('sellOut.priceLockedHint', { defaultValue: 'Price is locked once photos are added. Discard to change it.' })}</span>
-                  )}
                 </div>
 
                 {/* Supplier (dealer) — optional */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="flex flex-col">
                     <label className="form-label">{t('sellOut.supplierName', { defaultValue: 'Dealer / buyer name' })}</label>
-                    <Input value={supplierName} onChange={(e) => setSupplierName(e.target.value)} disabled={hasDraft} className="w-full" />
+                    <Input value={supplierName} onChange={(e) => setSupplierName(e.target.value)} className="w-full" />
                   </div>
                   <div className="flex flex-col">
                     <label className="form-label">{t('sellOut.supplierRef', { defaultValue: 'Reference no.' })}</label>
-                    <Input value={supplierRef} onChange={(e) => setSupplierRef(e.target.value)} disabled={hasDraft} className="w-full" />
+                    <Input value={supplierRef} onChange={(e) => setSupplierRef(e.target.value)} className="w-full" />
                   </div>
                 </div>
 
                 {/* Note */}
                 <div className="flex flex-col">
                   <label className="form-label">{t('sellOut.note', { defaultValue: 'Note (reason)' })}</label>
-                  <TextArea value={note} onChange={(e) => setNote(e.target.value)} disabled={hasDraft} rows={2} className="w-full" />
+                  <TextArea value={note} onChange={(e) => setNote(e.target.value)} rows={2} className="w-full" />
                 </div>
 
                 {/* Condition photos — first Add/Capture lazily creates the draft
