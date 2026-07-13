@@ -27,6 +27,7 @@
   "TRANSFER_BRANCH": "Transfer to branch",
   "TRANSFER_ACCEPT": "Accept transfer",
   "TRANSFER_CANCEL": "Cancel transfer",
+  "RESCHEDULE_DUE_DAY": "Reschedule due day",
   "UPDATE_DELIVERY": "Update delivery",
   "APPOINTMENT_CREATE": "Create appointment",
   "APPOINTMENT_CANCEL": "Cancel appointment",

@@ -18,9 +18,9 @@
 //       VOIDED            → no actions, void reason inline
 //   - System-voided rows (voided_by=0) show a Bot icon for disambiguation.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, Switch, Tooltip } from 'tsp-form';
 import {
   Bot, CheckCircle2, ChevronDown, ChevronRight, Circle, Eye, FileSignature, Info, PenLine,
@@ -228,6 +228,23 @@ export function SigningTab({
     refetchInterval: () => (hasCollecting(historyQuery.data) ? 5_000 : false),
     refetchIntervalInBackground: false,
   });
+
+  // When the customer signs on the bridge and the snapshot seals, the polls above
+  // pick it up and COLLECTING → none. That transition is exactly when the contract
+  // flips (e.g. PENDING_SIGN → ACTIVE), so refresh the contract detail/lists too —
+  // otherwise the state chip + action footer stay stale until a manual reload.
+  const qc = useQueryClient();
+  const wasCollecting = useRef(false);
+  useEffect(() => {
+    const collecting = hasCollecting(historyQuery.data);
+    if (wasCollecting.current && !collecting) {
+      qc.invalidateQueries({ queryKey: ['contract-detail', contractId] });
+      qc.invalidateQueries({ queryKey: ['contract-actions', contractId] });
+      qc.invalidateQueries({ queryKey: ['contract-search'] });
+      qc.invalidateQueries({ queryKey: ['contract-installments', contractId] });
+    }
+    wasCollecting.current = collecting;
+  }, [historyQuery.data, qc, contractId]);
 
   const partiesBySigning = useMemo(() => {
     const map = new Map<number, SigningPartyRow[]>();

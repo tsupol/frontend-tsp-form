@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, Modal, Input, Select, TextArea, MaskedInput, Badge, Tooltip, PopOver, ImageUploader, useSnackbarContext } from 'tsp-form';
 import type { UploadedImage } from 'tsp-form';
-import { CheckCircle, XCircle, X, Pencil, Plus, Trash2, Loader2, ChevronsRight, ChevronDown, ExternalLink, Wrench, ArrowRight, Info, Receipt, Paperclip, MessageSquare } from 'lucide-react';
+import { CheckCircle, XCircle, X, Pencil, Plus, Trash2, Loader2, ChevronsRight, ChevronDown, ExternalLink, Wrench, ArrowRight, Info, Receipt, Paperclip, MessageSquare, PenLine } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { getRoleLabel } from '../../lib/roleLabel';
 import { fmtCurrency } from '../../lib/format';
@@ -40,6 +40,7 @@ import { TransferBranchModal } from './TransferBranchModal';
 import { ActionDoneView, type ActionDoneDetailRow } from './ActionDoneView';
 import { ContractFeeModal } from './ContractFeeModal';
 import { LateFeeCollectModal } from './LateFeeCollectModal';
+import { RescheduleDueDayModal } from './RescheduleDueDayModal';
 import { useContractInvalidate } from './useContractInvalidate';
 import { useCompanyFeatures } from '../../hooks/useCompanyFeatures';
 
@@ -104,7 +105,8 @@ type ContractAction =
   | 'continue_pay'
   | 'pay_installment'
   | 'service_charge'
-  | 'late_fee_collect';
+  | 'late_fee_collect'
+  | 'reschedule_due_day';
 
 // ── Action config ────────────────────────────────────────────────────────────
 
@@ -425,6 +427,19 @@ const ACTION_CONFIGS: Record<ContractAction, ActionConfig> = {
     needsNewOwner: false,
     successKey: 'lateFee.done',
   },
+  reschedule_due_day: {
+    rpc: '', // handled by RescheduleDueDayModal (options view + fn_contract_reschedule_due_day)
+    color: 'primary',
+    needsPin: false, // PIN is driven by evaluator pin_required, handled inside the modal
+    needsNote: false,
+    needsReason: false,
+    needsBranch: false,
+    needsDevice: false,
+    needsAmount: false,
+    needsCloseReason: false,
+    needsNewOwner: false,
+    successKey: 'reschedule.done',
+  },
   bind_loaner: {
     rpc: '', // handled by BindLoanerModal
     color: 'primary',
@@ -526,6 +541,10 @@ interface BackendContractAction {
   is_available: boolean;
   blocking_reason: string | null;
   require_pin: boolean;
+  // mig 600: per-user permission + per-user PIN requirement. Present on every action.
+  // Legacy actions (no required_permission) always come back is_permitted=true.
+  is_permitted: boolean;
+  pin_required: boolean;
   sort_order: number;
   target_state: string | null;
   creates_bill: boolean;
@@ -574,6 +593,7 @@ const FE_TO_BACKEND_ACTION: Record<ContractAction, string> = {
   pay_installment: 'PAY_INSTALLMENT',
   service_charge: 'SERVICE_CHARGE',
   late_fee_collect: 'LATE_FEE_COLLECT',
+  reschedule_due_day: 'RESCHEDULE_DUE_DAY',
 };
 
 const BACKEND_TO_FE_ACTION: Record<string, ContractAction> = Object.entries(FE_TO_BACKEND_ACTION)
@@ -594,6 +614,7 @@ const FOOTER_ACTION_ALLOWLIST: ReadonlySet<string> = new Set([
   'PAUSE_CONTRACT', 'RESUME_CONTRACT',
   'COMPLETE_CONTRACT', 'TERMINATE_CONTRACT', 'VOID_CONTRACT',
   'TRANSFER_BRANCH', 'TRANSFER_ACCEPT', 'TRANSFER_CANCEL',
+  'RESCHEDULE_DUE_DAY',
   'APPOINTMENT_CREATE', 'APPOINTMENT_CANCEL',
   'HOLDING_REFUND', 'HOLDING_REFUND_VOID',
   'UPDATE_DELIVERY', 'ADD_NOTE',
@@ -717,6 +738,12 @@ function getPrimaryActionCodes(contract: ContractForActions): string[] {
     codes.push('RESUME_CONTRACT');
   }
 
+  // Reschedule due day — only usable in the first 5 days post-activate with zero
+  // payments. Hidden until the backend says available (HIDE_UNTIL_AVAILABLE_PRIMARY),
+  // so it surfaces as a quick action exactly in that window and never as a
+  // perpetually-disabled button on every ACTIVE contract.
+  codes.push('RESCHEDULE_DUE_DAY');
+
   // Always offer PAY_INSTALLMENT — customer can pay any time, even before due date
   codes.push('PAY_INSTALLMENT');
 
@@ -733,7 +760,7 @@ function getPrimaryActionCodes(contract: ContractForActions): string[] {
 // Primaries normally show even when unavailable (disabled + tooltip). These ones
 // hide entirely until available, so they don't clutter the footer with a
 // disabled button that only makes sense in a specific end-state.
-const HIDE_UNTIL_AVAILABLE_PRIMARY: ReadonlySet<string> = new Set(['COMPLETE_CONTRACT']);
+const HIDE_UNTIL_AVAILABLE_PRIMARY: ReadonlySet<string> = new Set(['COMPLETE_CONTRACT', 'RESCHEDULE_DUE_DAY']);
 
 const CATEGORY_LABEL_KEY: Record<string, string> = {
   LIFECYCLE: 'contract.actionCategory.lifecycle',
@@ -777,6 +804,10 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
 
   const isWizardState = WIZARD_STATES.has(contract.state);
   const isPendingPayment = contract.state === 'PENDING_PAYMENT';
+  // Awaiting the customer signature (paid, or paid-and-awaiting). The only action
+  // is to go sign, which lives in the Signing tab — surface a button so the footer
+  // isn't empty here.
+  const isPendingSign = contract.state === 'PENDING_SIGN' || contract.state === 'PENDING_PAYMENT_AND_SIGN';
   const showActionGrid = ACTION_GRID_STATES.has(contract.state);
   const [moreOpen, setMoreOpen] = useState(false);
   const moreTriggerRef = useRef<HTMLButtonElement>(null);
@@ -798,6 +829,12 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   const isTransferBranch = activeAction === 'transfer_branch';
   const isServiceCharge = activeAction === 'service_charge';
   const isLateFeeCollect = activeAction === 'late_fee_collect';
+  const isReschedule = activeAction === 'reschedule_due_day';
+
+  // pin_required is per-user (BM=true, HQ=false) — read it off the evaluator
+  // response for this specific action, never hard-code it.
+  const reschedulePinRequired = (actionsResp?.actions ?? [])
+    .find(a => a.action_code === 'RESCHEDULE_DUE_DAY')?.pin_required ?? true;
 
   const handleSuccess = (msgKey: string, override?: ReactNode) => {
     setActiveAction(null);
@@ -841,10 +878,14 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
     });
   };
 
-  // Filter to curated allowlist, hide permission-denied
+  // Filter to curated allowlist, hide permission-denied. mig 600: also hide any
+  // action the logged-in user isn't permitted to run (is_permitted=false) — legacy
+  // actions with no required_permission always report is_permitted=true, so this
+  // only affects permission-bound actions like RESCHEDULE_DUE_DAY.
   const allowedActions = (actionsResp?.actions ?? [])
     .filter(a => FOOTER_ACTION_ALLOWLIST.has(a.action_code))
     .filter(a => a.blocking_reason !== 'permission_denied')
+    .filter(a => a.is_permitted !== false)
     .slice()
     .sort((a, b) => a.sort_order - b.sort_order);
 
@@ -969,6 +1010,19 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
               onClick={() => setActiveAction('void_bill')}
             >
               {t('contract.action_void_bill')}
+            </Button>
+          </div>
+        )}
+
+        {isPendingSign && (
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              color="primary"
+              startIcon={<PenLine size={14} />}
+              onClick={() => onNavigateTab?.('signing')}
+            >
+              {t('contract.action_go_to_signing')}
             </Button>
           </div>
         )}
@@ -1141,8 +1195,18 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
           queryClient.invalidateQueries({ queryKey: ['contract-actions', contract.id] });
         }}
       />
+      <RescheduleDueDayModal
+        open={isReschedule}
+        contract={contract}
+        pinRequired={reschedulePinRequired}
+        onClose={() => setActiveAction(null)}
+        onSuccess={() => {
+          onRefresh();
+          queryClient.invalidateQueries({ queryKey: ['contract-actions', contract.id] });
+        }}
+      />
       <ContractActionModal
-        open={!!activeAction && !isSavingDeposit && !isCancelSaving && !isEarlyPayoff && !isContinuePay && !isVoidBill && !isPayInstallment && !isComplete && !isTerminate && !isBindLoaner && !isUnbindLoaner && !isRepairRequest && !isAppointmentCreate && !isAppointmentCancel && !isRefundVoid && !isTransferBranch && !isServiceCharge && !isLateFeeCollect}
+        open={!!activeAction && !isSavingDeposit && !isCancelSaving && !isEarlyPayoff && !isContinuePay && !isVoidBill && !isPayInstallment && !isComplete && !isTerminate && !isBindLoaner && !isUnbindLoaner && !isRepairRequest && !isAppointmentCreate && !isAppointmentCancel && !isRefundVoid && !isTransferBranch && !isServiceCharge && !isLateFeeCollect && !isReschedule}
         action={activeAction}
         contract={contract}
         onClose={() => setActiveAction(null)}

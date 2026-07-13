@@ -135,9 +135,18 @@ export function useInvalidateContract() {
   const qc = useQueryClient();
   return useCallback(
     (contractId: number | null) => {
-      if (contractId) {
-        qc.invalidateQueries({ queryKey: contractQueryKey(contractId) });
-      }
+      if (!contractId) return;
+      // The wizard's own copy of the contract.
+      qc.invalidateQueries({ queryKey: contractQueryKey(contractId) });
+      // The lists + detail-panel the user lands on after activating (success
+      // state links to /admin/contracts/search|draft). Without these, those
+      // views keep the pre-activation DRAFT row from cache and show the wrong
+      // state. Mirrors useContractInvalidate.
+      qc.invalidateQueries({ queryKey: ['contract-detail', contractId] });
+      qc.invalidateQueries({ queryKey: ['contract-search'] });
+      qc.invalidateQueries({ queryKey: ['draft-contracts'] });
+      qc.invalidateQueries({ queryKey: ['saving-contracts'] });
+      qc.invalidateQueries({ queryKey: ['contract-actions', contractId] });
     },
     [qc]
   );
