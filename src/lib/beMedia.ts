@@ -196,6 +196,17 @@ export async function beMediaContractPrintAll(contractId: number): Promise<Blob>
   return postContractPdf('/contract/pdf/print-all', { contract_id: contractId });
 }
 
+// ── Repair PDF ────────────────────────────────────────────────────────
+// Server-rendered repair document (INTAKE / CHARGE_NOTICE / RETURN), raw
+// application/pdf. Rendered live from current state (be-media repair.go). INTAKE
+// and RETURN are one-per-order; CHARGE_NOTICE is re-issuable. The signature image
+// is not embedded in the PDF yet (BE PDF v2 pending) — don't rely on it.
+export type BeMediaRepairDoc = 'INTAKE' | 'CHARGE_NOTICE' | 'RETURN';
+
+export async function beMediaRepairPdf(repairOrderId: number, docType: BeMediaRepairDoc): Promise<Blob> {
+  return postContractPdf('/repair/pdf', { repair_order_id: repairOrderId, doc_type: docType });
+}
+
 // Batch delete. Failures (per-key) come back in `failed`; harmless — the
 // sweeper picks them up. Callers should log if non-empty.
 export async function beMediaDelete(keys: string[]): Promise<{ failed: string[] | null }> {
