@@ -1980,7 +1980,20 @@
     "slipCode": "Slip code",
     "submitterRole_PRIMARY": "Primary lessee",
     "submitterRole_CO_LESSEE": "Co-lessee",
-    "cancelledByCustomer": "Cancelled by customer"
+    "cancelledByCustomer": "Cancelled by customer",
+    "bill": "Bill",
+    "voidedShort": "Reversed",
+    "voidedBill": "The whole bill was cancelled — this payment no longer counts.",
+    "voidedPayment": "This payment was reversed — the money no longer counts, even though the bill still shows Paid.",
+    "voidReasonUnspecified": "Reason not specified",
+    "voidReason_DATA_CORRECTION": "Data correction",
+    "voidReason_CONTRACT_CHANGE": "Contract change",
+    "voidReason_CUSTOMER_CANCEL": "Customer cancelled",
+    "voidReason_PAYMENT_RETURNED": "Payment didn't arrive",
+    "billStatus_OPEN": "Open",
+    "billStatus_PARTIAL": "Partial",
+    "billStatus_PAID": "Paid",
+    "billStatus_VOIDED": "Voided"
   },
   "approvals": {
     "title": "Approvals",

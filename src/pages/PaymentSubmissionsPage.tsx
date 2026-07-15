@@ -196,6 +196,11 @@ export function PaymentSubmissionsPage() {
             <Badge size="xs" color={statusColor(row.status)}>
               {t(`paymentSubmissions.status_${row.status}`)}
             </Badge>
+            {/* Money reversed even though the slip reads APPROVED — flag it so the
+                list doesn't imply the payment still stands (doc: is_voided). */}
+            {row.is_voided && (
+              <Badge size="xs" color="danger">{t('paymentSubmissions.voidedShort')}</Badge>
+            )}
           </div>
         </div>
         {/* Line 2 */}

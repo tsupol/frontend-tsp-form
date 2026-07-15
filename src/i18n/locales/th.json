@@ -1979,7 +1979,20 @@
     "slipCode": "รหัสสลิป",
     "submitterRole_PRIMARY": "ผู้เช่าหลัก",
     "submitterRole_CO_LESSEE": "ผู้เช่าร่วม",
-    "cancelledByCustomer": "ลูกค้ายกเลิกสลิปแล้ว"
+    "cancelledByCustomer": "ลูกค้ายกเลิกสลิปแล้ว",
+    "bill": "บิล",
+    "voidedShort": "ถูกยกเลิก",
+    "voidedBill": "บิลถูกยกเลิกทั้งใบ — เงินก้อนนี้ไม่นับเป็นการชำระแล้ว",
+    "voidedPayment": "เงินก้อนนี้ถูกยกเลิก (reverse) — ไม่นับเป็นการชำระ แม้บิลจะยังขึ้นว่าชำระแล้ว",
+    "voidReasonUnspecified": "ไม่ระบุเหตุผล",
+    "voidReason_DATA_CORRECTION": "แก้ข้อมูลผิดพลาด",
+    "voidReason_CONTRACT_CHANGE": "เปลี่ยนเงื่อนไขสัญญา",
+    "voidReason_CUSTOMER_CANCEL": "ลูกค้ายกเลิกรายการ",
+    "voidReason_PAYMENT_RETURNED": "เงินไม่เข้า / โอนไม่สำเร็จ",
+    "billStatus_OPEN": "เปิดอยู่",
+    "billStatus_PARTIAL": "ชำระบางส่วน",
+    "billStatus_PAID": "ชำระแล้ว",
+    "billStatus_VOIDED": "ยกเลิกแล้ว"
   },
   "approvals": {
     "title": "รายการอนุมัติ",

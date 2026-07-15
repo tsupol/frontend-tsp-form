@@ -56,6 +56,18 @@ export interface SubmissionRow {
   code_display: string | null;
   // 'CO_LESSEE' when a co-lessee submitted; null/'PRIMARY' for the primary lessee.
   submitter_role: SubmitterRole | null;
+  // mig 535/620 (2026-07-14): the bill this slip's payment landed in, and whether
+  // that money is still standing. bill_* are nullable (null = no bill yet — pending/
+  // rejected slips, or the rare APPROVED-with-null-payment). The 3 void flags are
+  // never null (false when there's no bill). Decide "is this money void?" off
+  // `is_voided` alone; bill_is_voided / payment_is_voided only explain which kind.
+  bill_id: number | null;
+  bill_code_display: string | null;
+  bill_status: string | null;
+  bill_is_voided: boolean;
+  payment_is_voided: boolean;
+  is_voided: boolean;
+  void_reason_code: string | null;
 }
 
 interface EntityMedia {
@@ -260,6 +272,25 @@ export function SubmissionReviewDrawer({
               </div>
             )}
 
+            {/* Money reversed — an APPROVED slip can still have its payment voided
+                (whole bill cancelled, or just this payment reversed to a CN). The
+                slip status alone reads "approved", so this must be loud. */}
+            {row.is_voided && (
+              <div className="alert alert-danger">
+                <AlertTriangle size={16} />
+                <div>
+                  <div className="alert-description text-xs">
+                    {row.bill_is_voided
+                      ? t('paymentSubmissions.voidedBill')
+                      : t('paymentSubmissions.voidedPayment')}
+                    {row.void_reason_code && (
+                      <> · {t(`paymentSubmissions.voidReason_${row.void_reason_code}`, { defaultValue: t('paymentSubmissions.voidReasonUnspecified') })}</>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div>
               <div className="form-label mb-1">{t('paymentSubmissions.slipImage')}</div>
               {slipsFetching ? (
@@ -320,6 +351,29 @@ export function SubmissionReviewDrawer({
                 {row.transfer_at ? <DateTime value={row.transfer_at} /> : <span>—</span>}
               </DetailRow>
               <DetailRow label={t('paymentSubmissions.transactionRef')} value={row.transaction_ref ?? '—'} />
+              {/* Which bill this slip's payment landed in. bill_id is null for slips
+                  with no payment yet (pending/rejected/cancelled) — render a dash then. */}
+              <DetailRow label={t('paymentSubmissions.bill')}>
+                {row.bill_id != null && row.bill_code_display ? (
+                  <span className="text-right inline-flex items-center gap-1.5 flex-wrap justify-end">
+                    <Link
+                      to={`/admin/accounting/bills/${row.bill_id}`}
+                      className="text-primary-fg inline-flex items-center gap-1 no-underline hover:underline tabular-nums"
+                      onClick={onClose}
+                    >
+                      {row.bill_code_display}
+                      <ExternalLink size={12} />
+                    </Link>
+                    {row.bill_status && (
+                      <Badge size="xs" color={row.is_voided ? 'danger' : 'default'}>
+                        {t(`paymentSubmissions.billStatus_${row.bill_status}`, { defaultValue: row.bill_status })}
+                      </Badge>
+                    )}
+                  </span>
+                ) : (
+                  <span className="text-right">—</span>
+                )}
+              </DetailRow>
               <hr className="border-line my-2" />
               <div className="text-xs uppercase text-subtle tracking-wide mt-2">
                 {t('paymentSubmissions.sender')}
