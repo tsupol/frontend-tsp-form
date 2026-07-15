@@ -5020,6 +5020,8 @@
     "confirm": "Confirm & collect",
     "blockNoBalance": "No outstanding late fee",
     "blockNoCollect": "Enter an amount to collect",
-    "blockWaiveExceeds": "Waive amount cannot exceed the collected amount"
+    "blockWaiveExceeds": "Waive amount cannot exceed the collected amount",
+    "blockWaiveReason": "Enter a reason for the waive",
+    "notePlaceholderWaive": "Reason for the waive (required)"
   }
 }

@@ -88,6 +88,8 @@ export function LateFeeCollectModal({ open, contract, onClose, onSuccess }: {
   if (balance <= 0) blockReasons.push(t('lateFee.blockNoBalance'));
   if (balance > 0 && collect <= 0) blockReasons.push(t('lateFee.blockNoCollect'));
   if (waive > collect) blockReasons.push(t('lateFee.blockWaiveExceeds'));
+  // Waiving part of a fee must be justified (audit trail) — reason mandatory on waive.
+  if (waive > 0 && !note.trim()) blockReasons.push(t('lateFee.blockWaiveReason'));
   const canSubmit = blockReasons.length === 0 && !submitting && !!contract;
 
   const handleConfirm = async () => {
@@ -204,13 +206,16 @@ export function LateFeeCollectModal({ open, contract, onClose, onSuccess }: {
                     </div>
 
                     <div className="flex flex-col">
-                      <label className="form-label">{t('lateFee.note')}</label>
+                      <label className="form-label">
+                        {t('lateFee.note')}
+                        {waive > 0 && <span className="text-danger ml-0.5">*</span>}
+                      </label>
                       <Input
                         size="sm"
                         className="w-full"
                         value={note}
                         onChange={(e) => setNote(e.target.value)}
-                        placeholder={t('lateFee.notePlaceholder')}
+                        placeholder={waive > 0 ? t('lateFee.notePlaceholderWaive') : t('lateFee.notePlaceholder')}
                       />
                     </div>
 
