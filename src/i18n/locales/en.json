@@ -3506,6 +3506,14 @@
     "coLesseeSignature": "Co-lessee signature",
     "needCustomerFirst": "Register customer first",
     "checkCustomer": "Check Customer",
+    "customerMatch": {
+      "idMismatch": "This ID belongs to {{name}} ({{cid}}, {{count}} contract(s)) — not the name entered. Re-check the ID against the physical card.",
+      "noMatch": "No existing customer — a new one will be created.",
+      "contractsCount": "{{count}} contract(s)",
+      "hint_ID_EXACT_MATCH": "Existing customer — ID and name match.",
+      "hint_NAME_EXACT_MATCH": "Same name found (the ID entered may be mistyped) — pick the right person, or register new.",
+      "hint_PARTIAL_MATCH": "Possible duplicates — pick the right person, or register new."
+    },
     "citizenIdLength": "Citizen ID must be 13 digits",
     "citizenIdInvalid": "Invalid citizen ID — checksum does not match",
     "noCustomerFound": "No matching customer found",

@@ -16,6 +16,8 @@ import { IdPhotoUpload } from './IdPhotoUpload';
 import { IdCardScanner, type DetectedIdCardFields } from '../../../components/IdCardScanner';
 import { passesThaiCidChecksum } from '../../../lib/ocr/extractIdCard';
 import type { CustomerRegisterResult, CustomerAddress } from './WorkspaceTypes';
+import { useCustomerMatch, type MatchedCustomer } from './useCustomerMatch';
+import { CustomerMatchResults } from './CustomerMatchResults';
 
 const KNOWN_TH_PREFIXES = new Set(['นาย', 'นาง', 'นางสาว']);
 
@@ -91,8 +93,7 @@ export function PanelCoLessee({ onClose: _onClose }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState('');
   const [result, setResult] = useState<CustomerRegisterResult | null>(null);
-  const [searching, setSearching] = useState(false);
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const { result: matchResult, matching: searching, runMatch, reset: resetMatch, blocked: idNameMismatch } = useCustomerMatch();
   const [hasSearched, setHasSearched] = useState(false);
 
   // Pending scanned ID card image — uploaded to backend once we have a customer_id.
@@ -104,11 +105,18 @@ export function PanelCoLessee({ onClose: _onClose }: Props) {
   }, [idNumber, firstName, lastName, tel, dateOfBirth, prefix, setPanelDirty]);
   useEffect(() => () => setPanelDirty(false), [setPanelDirty]);
 
+  // Editing ID/name after a check invalidates the verdict — clear it so a stale
+  // ID_MATCH_NAME_MISMATCH can't keep the button blocked after a fix.
+  useEffect(() => {
+    if (hasSearched && !selectedCustomer) { resetMatch(); setHasSearched(false); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idNumber, firstName, lastName]);
+
   const resetForm = () => {
     setIdType('CITIZEN_ID'); setIdNumber(''); setPrefix(''); setFirstName('');
     setLastName(''); setDateOfBirth(''); setTel('');
     setSelectedCustomer(null); setResult(null); setApiError('');
-    setSearchResults([]); setHasSearched(false);
+    resetMatch(); setHasSearched(false);
     pendingScanRef.current = null;
   };
 
@@ -157,30 +165,36 @@ export function PanelCoLessee({ onClose: _onClose }: Props) {
     pendingScanRef.current = img;
   };
 
+  // Dedupe check via fn_customer_match (unmasked CID + verdict). The old
+  // id_number.ilike on v_customers always returned 0 rows (masked CID).
   const handleSearch = async () => {
-    setSearching(true); setHasSearched(true);
-    try {
-      const params: string[] = ['is_active=is.true', 'order=full_name', 'limit=10'];
-      const orParts: string[] = [];
-      if (idNumber.trim()) orParts.push(`id_number.ilike.*${encodeURIComponent(idNumber.trim())}*`);
-      if (firstName.trim()) orParts.push(`first_name.ilike.*${encodeURIComponent(firstName.trim())}*`);
-      if (lastName.trim()) orParts.push(`last_name.ilike.*${encodeURIComponent(lastName.trim())}*`);
-      if (orParts.length > 0) params.push(`or=(${orParts.join(',')})`);
-      const results = await apiClient.get<SearchResult[]>(`/v_customers?${params.join('&')}`);
-      setSearchResults(workspace.customerId ? results.filter(c => c.id !== workspace.customerId) : results);
-    } catch { setSearchResults([]); }
-    finally { setSearching(false); }
+    setHasSearched(true);
+    setSelectedCustomer(null);
+    await runMatch({ idNumber, firstName, lastName });
   };
 
-  const handleSelectCustomer = (c: SearchResult) => {
-    setSelectedCustomer(c);
-    setIdType(c.id_type as 'CITIZEN_ID' | 'PASSPORT');
-    setIdNumber(c.id_number);
-    setPrefix(c.prefix ?? '');
-    setFirstName(c.first_name);
-    setLastName(c.last_name);
-    setDateOfBirth(c.date_of_birth ?? '');
-    setTel(c.tel ?? '');
+  // fn_customer_match omits date_of_birth — fetch it by id to complete the form.
+  const handleSelectCustomer = async (m: MatchedCustomer) => {
+    let dob: string | null = null;
+    try {
+      const rows = await apiClient.get<{ date_of_birth: string | null }[]>(
+        `/v_customers?id=eq.${m.id}&select=date_of_birth&limit=1`,
+      );
+      dob = rows[0]?.date_of_birth ?? null;
+    } catch { /* DOB optional */ }
+
+    setSelectedCustomer({
+      id: m.id, id_type: m.id_type, id_number: m.id_number,
+      prefix: m.prefix, first_name: m.first_name, last_name: m.last_name,
+      full_name: m.full_name, tel: m.tel, date_of_birth: dob,
+    });
+    setIdType(m.id_type);
+    setIdNumber(m.id_number);
+    setPrefix(m.prefix ?? '');
+    setFirstName(m.first_name);
+    setLastName(m.last_name);
+    setDateOfBirth(dob ?? '');
+    setTel(m.tel ?? '');
     setApiError(''); setResult(null);
   };
 
@@ -221,6 +235,8 @@ export function PanelCoLessee({ onClose: _onClose }: Props) {
 
   const handleUseOrRegister = async () => {
     setApiError('');
+    // Never register/overwrite when the CID belongs to a different-named customer.
+    if (idNameMismatch) return;
     if (selectedCustomer) {
       await attachCoLessee(selectedCustomer.id);
       return;
@@ -406,29 +422,23 @@ export function PanelCoLessee({ onClose: _onClose }: Props) {
               <Button variant="outline" onClick={handleSearch} disabled={searching || !canSearch} startIcon={searching ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}>
                 {t('workspace.checkCustomer')}
               </Button>
-              <Button color={isExisting ? 'primary' : undefined} variant={isExisting ? undefined : 'outline'} onClick={handleUseOrRegister} disabled={submitting || !idNumber.trim() || !firstName.trim() || !lastName.trim() || !tel.trim() || !dateOfBirth} startIcon={submitting ? <Loader2 size={14} className="animate-spin" /> : undefined}>
+              <Button color={isExisting ? 'primary' : undefined} variant={isExisting ? undefined : 'outline'} onClick={handleUseOrRegister} disabled={submitting || idNameMismatch || !idNumber.trim() || !firstName.trim() || !lastName.trim() || !tel.trim() || !dateOfBirth} startIcon={submitting ? <Loader2 size={14} className="animate-spin" /> : undefined}>
                 {submitting ? t('common.saving') : buttonLabel}
               </Button>
             </div>
 
-            {hasSearched && (
-              <div className="flex flex-col gap-1 mt-3">
-                {searchResults.length > 0 ? (
-                  <div className="border border-line rounded-lg divide-y divide-line overflow-hidden max-h-48 overflow-y-auto better-scroll">
-                    {searchResults.map(c => (
-                      <button key={c.id} className={`w-full text-left px-4 py-2.5 hover:bg-surface-hover transition-colors cursor-pointer flex items-center justify-between ${selectedCustomer?.id === c.id ? 'bg-primary-soft border-l-2 border-l-primary' : ''}`} onClick={() => handleSelectCustomer(c)}>
-                        <div>
-                          <div className="font-medium text-sm">{c.full_name}</div>
-                          <div className="text-xs text-subtle">{c.id_type}: {c.id_number} {c.tel ? `· ${c.tel}` : ''}</div>
-                        </div>
-                        {selectedCustomer?.id === c.id && <CheckCircle size={14} className="text-primary-fg" />}
-                      </button>
-                    ))}
-                  </div>
-                ) : !searching ? (
-                  <div className="text-sm text-subtle text-center py-2">{t('workspace.noCustomerFound')}</div>
-                ) : null}
-              </div>
+            {hasSearched && matchResult && !searching && (
+              <CustomerMatchResults
+                result={{
+                  ...matchResult,
+                  // A co-lessee can't be the primary lessee — drop the primary from the list.
+                  customers: workspace.customerId
+                    ? matchResult.customers.filter(c => c.id !== workspace.customerId)
+                    : matchResult.customers,
+                }}
+                selectedId={selectedCustomer?.id ?? null}
+                onSelect={handleSelectCustomer}
+              />
             )}
           </div>
         )}
