@@ -4382,6 +4382,8 @@
       "payTotal": "ยอดชำระ",
       "confirmPay": "ยืนยันชำระ",
       "voidBill": "ยกเลิกบิล",
+      "voidReasonCode": "หมวดเหตุผล",
+      "voidReasonCodePlaceholder": "เลือกหมวดเหตุผล",
       "voidReason": "เหตุผล",
       "voidReasonPlaceholder": "ระบุเหตุผลที่ยกเลิกบิล",
       "pin": "PIN สาขา",

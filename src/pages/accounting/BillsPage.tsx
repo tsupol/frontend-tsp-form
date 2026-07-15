@@ -23,6 +23,7 @@ import { buildBillActionToast, hasBill, type StandardBillResponse } from '../../
 import { type Branch, type BillRow, type BillDetail, type BillPayment, type BillLineItem, todayISO } from './accountingTypes';
 import { CorrectLineModal } from './CorrectLineModal';
 import { useBillActions, type BillAction, type BillActionCode } from '../../hooks/useBillActions';
+import { useVoidReasons } from '../../hooks/useVoidReasons';
 import { BillReceipt } from '../contracts/workspace/BillReceipt';
 
 /* ── Types ── */
@@ -449,9 +450,11 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
   // Void (cancel whole bill) state
   const [voidOpen, setVoidOpen] = useState(false);
   const [voidReason, setVoidReason] = useState('');
+  const [voidReasonCode, setVoidReasonCode] = useState('');
   const [voidPin, setVoidPin] = useState('');
   const [voiding, setVoiding] = useState(false);
   const [voidError, setVoidError] = useState('');
+  const { options: voidReasonOptions } = useVoidReasons();
 
   // Void-single-payment state — the payment row the BM chose to void
   const [voidPayment, setVoidPayment] = useState<BillPayment | null>(null);
@@ -594,7 +597,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
   };
 
   const handleVoid = async () => {
-    if (!voidReason.trim() || !voidPin) return;
+    if (!voidReasonCode || !voidReason.trim() || !voidPin) return;
     setVoiding(true);
     setVoidError('');
     try {
@@ -603,9 +606,11 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
         p_reason: voidReason.trim(),
         p_pin: voidPin,
         p_branch_id: detail.branch_id,
+        p_reason_code: voidReasonCode || null,
       });
       setVoidOpen(false);
       setVoidReason('');
+      setVoidReasonCode('');
       setVoidPin('');
       queryClient.invalidateQueries({ queryKey: ['accounting', 'bill-detail', billId] });
       queryClient.invalidateQueries({ queryKey: ['bill-actions', billId] });
@@ -972,7 +977,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
       <BillActionBar
         actions={allActions}
         suppressLifecycle={suppressLifecycle}
-        onVoidOrCancel={() => { setVoidOpen(true); setVoidError(''); setVoidReason(''); setVoidPin(''); }}
+        onVoidOrCancel={() => { setVoidOpen(true); setVoidError(''); setVoidReason(''); setVoidReasonCode(''); setVoidPin(''); }}
       />
 
       {/* ── Print render — portaled into body so no panel ancestor becomes the
@@ -998,6 +1003,16 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
               </div>
             )}
             <div className="flex flex-col">
+              <label className="form-label">{t('accounting.bills.voidReasonCode')} *</label>
+              <Select
+                options={voidReasonOptions}
+                value={voidReasonCode || null}
+                onChange={(v) => setVoidReasonCode((v as string) || '')}
+                placeholder={t('accounting.bills.voidReasonCodePlaceholder')}
+                searchable={false}
+              />
+            </div>
+            <div className="flex flex-col">
               <label className="form-label">{t('accounting.bills.voidReason')} *</label>
               <Input
                 value={voidReason}
@@ -1014,7 +1029,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
           <Button
             color="danger"
             onClick={handleVoid}
-            disabled={!voidReason.trim() || !voidPin || voiding}
+            disabled={!voidReasonCode || !voidReason.trim() || !voidPin || voiding}
           >
             {voiding ? t('common.loading') : t('accounting.bills.confirmVoid')}
           </Button>
@@ -1063,19 +1078,22 @@ function VoidPaymentModal({
   const { t } = useTranslation();
   const [view, setView] = useState<'form' | 'done'>('form');
   const [reason, setReason] = useState('');
+  const [reasonCode, setReasonCode] = useState('');
   const [pin, setPin] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [confirmClose, setConfirmClose] = useState(false);
+  const { options: voidReasonOptions } = useVoidReasons();
 
   const open = payment !== null;
-  const dirty = view === 'form' && (reason.trim() !== '' || pin !== '');
+  const dirty = view === 'form' && (reason.trim() !== '' || reasonCode !== '' || pin !== '');
 
   // Reset to a clean form on open.
   useEffect(() => {
     if (open) {
       setView('form');
       setReason('');
+      setReasonCode('');
       setPin('');
       setError('');
       setConfirmClose(false);
@@ -1091,7 +1109,7 @@ function VoidPaymentModal({
   };
 
   const handleVoid = async () => {
-    if (!payment || !reason.trim() || !pin) return;
+    if (!payment || !reasonCode || !reason.trim() || !pin) return;
     setBusy(true);
     setError('');
     try {
@@ -1099,6 +1117,7 @@ function VoidPaymentModal({
         p_payment_id: payment.id,
         p_reason: reason.trim(),
         p_pin: pin,
+        p_reason_code: reasonCode || null,
       });
       onVoided();
       setView('done');
@@ -1147,6 +1166,16 @@ function VoidPaymentModal({
                 )}
                 <p className="text-sm text-subtle">{t('accounting.bills.voidPaymentMessage', { defaultValue: 'A reversal entry will be recorded and the bill will reopen for re-entry.' })}</p>
                 <div className="flex flex-col">
+                  <label className="form-label">{t('accounting.bills.voidReasonCode')} *</label>
+                  <Select
+                    options={voidReasonOptions}
+                    value={reasonCode || null}
+                    onChange={(v) => setReasonCode((v as string) || '')}
+                    placeholder={t('accounting.bills.voidReasonCodePlaceholder')}
+                    searchable={false}
+                  />
+                </div>
+                <div className="flex flex-col">
                   <label className="form-label">{t('accounting.bills.voidReason')} *</label>
                   <Input
                     value={reason}
@@ -1160,7 +1189,7 @@ function VoidPaymentModal({
             </div>
             <div className="modal-footer">
               <Button onClick={handleClose} disabled={busy}>{t('common.cancel')}</Button>
-              <Button color="danger" onClick={handleVoid} disabled={!reason.trim() || !pin || busy}>
+              <Button color="danger" onClick={handleVoid} disabled={!reasonCode || !reason.trim() || !pin || busy}>
                 {busy ? t('common.loading') : t('accounting.bills.confirmVoidPayment', { defaultValue: 'Void payment' })}
               </Button>
             </div>

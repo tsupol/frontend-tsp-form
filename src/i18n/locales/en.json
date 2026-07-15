@@ -4384,6 +4384,8 @@
       "payTotal": "Payment total",
       "confirmPay": "Confirm payment",
       "voidBill": "Void bill",
+      "voidReasonCode": "Category",
+      "voidReasonCodePlaceholder": "Select a category",
       "voidReason": "Reason",
       "voidReasonPlaceholder": "Why is this bill being voided?",
       "pin": "Branch PIN",
