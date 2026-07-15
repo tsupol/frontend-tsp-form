@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Badge, Button, Input, Modal, TextArea, Tooltip, useSnackbarContext, resizeToVariants } from 'tsp-form';
-import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, Download, Pause, Play, Square, Ban, Settings2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, Download, Pause, Play, Square, Ban, Settings2, AlertTriangle, CalendarClock } from 'lucide-react';
 import { GenerateContractPdfModal } from './GenerateContractPdfModal';
 import type { BeMediaContractDoc } from '../../lib/beMedia';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -107,6 +107,35 @@ interface ContractDetail {
   overdue_count: number | null;
   overdue_since_date: string | null;
   overdue_days: number | null;
+  // Payment-situation columns (migs 605-609, 2026-07-14). See UI_SUMMARY/127.
+  // situation_code drives the status pill; the rest fill the arrears / late-fee /
+  // pause / appointment / repo sections. Nullable where "not applicable" (e.g.
+  // grace_days_left is null when not overdue).
+  situation_code: 'CURRENT' | 'DUE_TODAY' | 'IN_GRACE' | 'OVERDUE' | 'PAUSED' | 'COMPLETED' | null;
+  situation_as_of: string | null;
+  situation_is_stale: boolean | null;
+  // next_due_* = the OLDEST unpaid installment (a past date when overdue) — the one
+  // to pay first. next_future_due_* = the genuinely-next future installment (null
+  // when none left). "Next due" in the UI must read next_future_*, not next_due_*.
+  next_future_due_date: string | null;
+  next_future_due_amount: number | null;
+  has_partial_payment: boolean | null;
+  amount_to_clear_arrears: number | null;
+  grace_period_days: number | null;
+  grace_days_left: number | null;
+  late_fee_accruing: boolean | null;
+  late_fee_skip_reason: 'NO_OVERDUE' | 'GRACE_PERIOD' | 'PAUSED' | 'DEVICE_DEPOSITED' | 'HOLIDAY' | 'CAP_REACHED' | null;
+  late_fee_days: number | null;
+  late_fee_cap: number | null;
+  pause_reason_code: 'DEVICE_REPAIR' | 'OTHER' | null;
+  paused_from: string | null;
+  pause_days: number | null;
+  has_appointment: boolean | null;
+  appointment_date: string | null;
+  appointment_note: string | null;
+  should_dun: boolean | null;
+  should_notify: boolean | null;
+  days_to_repo_threshold: number | null;
   staff_confidence_score: number | null;
   commission_owner_id: number | null;
   commission_owner_name: string | null;
@@ -929,39 +958,7 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
       </div>
 
       {/* Payment progress */}
-      {contract.paid_installment_count != null && contract.total_installments != null && (
-        <div className="border border-line rounded-md px-4 py-3">
-          <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-3">{t('contract.paymentProgress')}</h3>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="flex-1 bg-fg/10 rounded-full h-2">
-              <div
-                className="bg-primary rounded-full h-2 transition-all"
-                style={{ width: `${contract.total_installments > 0 ? Math.min(100, (contract.paid_installment_count / contract.total_installments) * 100) : 0}%` }}
-              />
-            </div>
-            <span className="text-sm font-medium tabular-nums shrink-0">
-              {contract.paid_installment_count}/{contract.total_installments}
-            </span>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <InfoCell label={t('contract.nextDueDate')} value={contract.next_due_date ? <DateTime value={contract.next_due_date} showTime={false} /> : '—'} />
-            <InfoCell label={t('contract.nextDueAmount')} value={fmtCurrency(contract.next_due_amount)} />
-            <InfoCell label={t('contract.lastPaymentDate')} value={contract.last_payment_date ? <DateTime value={contract.last_payment_date} showTime={false} /> : '—'} />
-            {contract.overdue_count != null && contract.overdue_count > 0 && (
-              <InfoCell
-                label={t('contract.overdue')}
-                value={`${contract.overdue_count} ${t('contract.installments')} · ${fmtCurrency(contract.overdue_amount)}`}
-                highlight
-              />
-            )}
-          </div>
-          {contract.overdue_days != null && contract.overdue_days > 0 && (
-            <div className="mt-2 text-xs text-danger">
-              {t('contract.overdueSince', { date: contract.overdue_since_date, days: contract.overdue_days })}
-            </div>
-          )}
-        </div>
-      )}
+      <PaymentProgressBlock contract={contract} t={t} />
 
       {/* Appointments / promise */}
       {isActive && <AppointmentsSection contractId={contract.id} />}
@@ -2214,6 +2211,168 @@ function DeliveryModal({ open, contract, onClose, onSuccess }: {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+// Payment-progress / situation block (overview tab). Renders the situation pill,
+// the FIFO arrears breakdown, late-fee state, and pause/appointment/repo strips
+// from the mig 605-609 columns. Doc: UI_SUMMARY/127_CONTRACT_PAYMENT_STATUS.md.
+//
+// Two rules baked in (both cost real money if broken):
+//  - "Next due" reads next_future_due_* (the future installment), NOT next_due_*
+//    (the oldest unpaid one, a past date when overdue).
+//  - arrears / outstanding / late-fee are three separate figures, never summed.
+//    Late fee is waivable; arrears is not. amount_to_clear_arrears stands alone.
+const SITUATION_PILL_COLOR: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'default'> = {
+  CURRENT: 'success',
+  DUE_TODAY: 'warning',
+  IN_GRACE: 'warning',
+  OVERDUE: 'danger',
+  PAUSED: 'info',
+  COMPLETED: 'default',
+};
+
+function PaymentProgressBlock({ contract, t }: { contract: ContractDetail; t: (k: string, o?: Record<string, unknown>) => string }) {
+  if (contract.paid_installment_count == null || contract.total_installments == null) return null;
+
+  const paid = contract.paid_installment_count;
+  const total = contract.total_installments;
+  const pct = total > 0 ? Math.min(100, (paid / total) * 100) : 0;
+
+  const isOverdue = contract.overdue_count != null && contract.overdue_count > 0;
+  const situation = contract.situation_code;
+  const lateFee = contract.late_fee_balance ?? 0;
+
+  // Repo-threshold warning only when meaningfully close (<= 3 days) or past it.
+  const repo = contract.days_to_repo_threshold;
+  const showRepoWarning = isOverdue && repo != null && repo <= 3;
+
+  return (
+    <div className="border border-line rounded-md px-4 py-3">
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider">{t('contract.paymentProgress')}</h3>
+        <div className="flex items-center gap-2">
+          {situation && (
+            <Badge size="sm" color={SITUATION_PILL_COLOR[situation] ?? 'default'}>
+              {t(`situation.${situation}`, { defaultValue: situation })}
+            </Badge>
+          )}
+          {contract.situation_is_stale && contract.situation_as_of && (
+            <span className="text-[11px] text-subtler">
+              {t('contract.situationAsOf', { date: contract.situation_as_of })}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div className="flex items-center gap-3 mb-2">
+        <div className="flex-1 bg-fg/10 rounded-full h-2">
+          <div className="bg-primary rounded-full h-2 transition-all" style={{ width: `${pct}%` }} />
+        </div>
+        <span className="text-sm font-medium tabular-nums shrink-0">{paid}/{total}</span>
+      </div>
+
+      {/* Arrears sub-group — only when overdue. Kept visually distinct from the
+          normal fields below so the three money figures never read as one list. */}
+      {isOverdue && (
+        <div className="mt-3 rounded-md bg-danger-soft px-3 py-2.5 flex flex-col gap-2">
+          <div className="grid grid-cols-2 gap-3">
+            <InfoCell
+              label={t('contract.overdue')}
+              value={`${contract.overdue_count} ${t('contract.installments')} · ${fmtCurrency(contract.overdue_amount)}`}
+              highlight
+            />
+            {contract.overdue_days != null && (
+              <InfoCell label={t('contract.overdueDays')} value={t('contract.daysCount', { days: contract.overdue_days })} highlight />
+            )}
+            <InfoCell
+              label={t('contract.payFirst')}
+              value={contract.next_due_date ? <DateTime value={contract.next_due_date} showTime={false} /> : '—'}
+            />
+            {contract.grace_days_left != null && contract.grace_days_left > 0 && (
+              <InfoCell label={t('contract.graceLeft')} value={t('contract.daysCount', { days: contract.grace_days_left })} />
+            )}
+          </div>
+
+          {/* Late fee — separate, negotiable. Show accruing rate or why it's skipped. */}
+          {(lateFee > 0 || contract.late_fee_accruing || contract.late_fee_skip_reason) && (
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-line">
+              <div className="text-xs text-subtle">{t('contract.lateFee')}</div>
+              <div className="text-sm font-medium tabular-nums text-right">
+                {fmtCurrency(lateFee)}
+                {contract.late_fee_accruing ? (
+                  <span className="ml-1.5 text-[11px] text-danger">● {t('contract.lateFeeAccruing')}</span>
+                ) : contract.late_fee_skip_reason ? (
+                  <span className="ml-1.5 text-[11px] text-subtler">
+                    {t(`feeSkip.${contract.late_fee_skip_reason}`, { defaultValue: '' })}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          )}
+
+          {/* The one number staff quote to clear arrears — stands alone, not summed. */}
+          {contract.amount_to_clear_arrears != null && contract.amount_to_clear_arrears > 0 && (
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-line">
+              <div className="text-xs font-medium">{t('contract.clearArrears')}</div>
+              <div className="text-sm font-semibold tabular-nums">{fmtCurrency(contract.amount_to_clear_arrears)}</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Normal fields — next FUTURE due + last payment. Always shown. */}
+      <div className="grid grid-cols-2 gap-3 mt-3">
+        <InfoCell
+          label={t('contract.nextDueDate')}
+          value={contract.next_future_due_date ? <DateTime value={contract.next_future_due_date} showTime={false} /> : '—'}
+        />
+        <InfoCell label={t('contract.nextDueAmount')} value={fmtCurrency(contract.next_future_due_amount)} />
+        <InfoCell label={t('contract.lastPaymentDate')} value={contract.last_payment_date ? <DateTime value={contract.last_payment_date} showTime={false} /> : '—'} />
+      </div>
+
+      {/* Pause strip — staff must not dun a paused contract. */}
+      {contract.is_paused && (
+        <div className="mt-3 rounded-md bg-info-soft px-3 py-2.5 flex items-start gap-2">
+          <Pause size={15} className="text-info-fg shrink-0 mt-0.5" />
+          <div className="text-xs">
+            <div className="font-medium">
+              {t('contract.pausedStrip')}
+              {contract.pause_reason_code && <> · {t(`pauseReason.${contract.pause_reason_code}`, { defaultValue: '' })}</>}
+              {contract.paused_from && <> · {t('contract.pausedSince', { date: contract.paused_from, days: contract.pause_days ?? 0 })}</>}
+            </div>
+            <div className="text-subtle mt-0.5">{t('contract.pausedNote')}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Appointment strip — customer promised a date; NOT green, they haven't paid. */}
+      {contract.has_appointment && contract.appointment_date && (
+        <div className="mt-3 rounded-md bg-warning-soft px-3 py-2.5 flex items-start gap-2">
+          <CalendarClock size={15} className="text-warning-fg shrink-0 mt-0.5" />
+          <div className="text-xs">
+            <div className="font-medium">
+              {t('contract.appointmentStrip', { date: contract.appointment_date })}
+              {contract.appointment_note ? ` — "${contract.appointment_note}"` : ''}
+            </div>
+            <div className="text-subtle mt-0.5">{t('contract.appointmentNote')}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Near / past the contractual repossession threshold. */}
+      {showRepoWarning && (
+        <div className="mt-3 rounded-md bg-danger-soft px-3 py-2.5 flex items-start gap-2">
+          <AlertTriangle size={15} className="text-danger shrink-0 mt-0.5" />
+          <div className="text-xs font-medium text-danger">
+            {repo! < 0
+              ? t('contract.repoPast', { days: Math.abs(repo!) })
+              : t('contract.repoNear', { days: repo })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function InfoCell({ label, value, highlight }: { label: string; value: React.ReactNode; highlight?: boolean }) {
   return (

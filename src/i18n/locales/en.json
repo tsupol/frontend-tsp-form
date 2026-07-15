@@ -1995,6 +1995,26 @@
     "billStatus_PAID": "Paid",
     "billStatus_VOIDED": "Voided"
   },
+  "situation": {
+    "CURRENT": "Current",
+    "DUE_TODAY": "Due today",
+    "IN_GRACE": "In grace period",
+    "OVERDUE": "Overdue",
+    "PAUSED": "Paused",
+    "COMPLETED": "Completed"
+  },
+  "feeSkip": {
+    "NO_OVERDUE": "not overdue",
+    "GRACE_PERIOD": "grace period",
+    "PAUSED": "paused",
+    "DEVICE_DEPOSITED": "device deposited",
+    "HOLIDAY": "holiday",
+    "CAP_REACHED": "cap reached"
+  },
+  "pauseReason": {
+    "DEVICE_REPAIR": "device repair",
+    "OTHER": "other"
+  },
   "approvals": {
     "title": "Approvals",
     "review": "Review Approval",
@@ -2914,6 +2934,20 @@
     "overdue": "Overdue",
     "installments": "installments",
     "overdueSince": "Overdue since {{date}} ({{days}} days)",
+    "overdueDays": "Overdue for",
+    "daysCount": "{{days}} days",
+    "payFirst": "Pay first",
+    "graceLeft": "Grace left",
+    "lateFeeAccruing": "accruing",
+    "clearArrears": "Pay to clear arrears",
+    "situationAsOf": "As of {{date}}",
+    "pausedStrip": "Payment paused",
+    "pausedSince": "since {{date}} ({{days}}d)",
+    "pausedNote": "No late fee · no dunning · the clock is stopped.",
+    "appointmentStrip": "Payment appointment {{date}}",
+    "appointmentNote": "Dunning held until the appointment · late fee still accrues.",
+    "repoPast": "Past the contractual repossession threshold by {{days}} days.",
+    "repoNear": "{{days}} days to the contractual repossession threshold.",
     "savingProgress": "Saving Progress",
     "savingTransactions": "Transactions",
     "txnType_SAVING": "Saving",

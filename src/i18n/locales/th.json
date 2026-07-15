@@ -1994,6 +1994,26 @@
     "billStatus_PAID": "ชำระแล้ว",
     "billStatus_VOIDED": "ยกเลิกแล้ว"
   },
+  "situation": {
+    "CURRENT": "ปกติ",
+    "DUE_TODAY": "ครบกำหนดวันนี้",
+    "IN_GRACE": "อยู่ในช่วงผ่อนผัน",
+    "OVERDUE": "ค้างชำระ",
+    "PAUSED": "พักชำระ",
+    "COMPLETED": "จบสัญญา"
+  },
+  "feeSkip": {
+    "NO_OVERDUE": "ไม่ค้างชำระ",
+    "GRACE_PERIOD": "อยู่ในช่วงผ่อนผัน",
+    "PAUSED": "พักชำระอยู่",
+    "DEVICE_DEPOSITED": "ฝากเครื่องไว้",
+    "HOLIDAY": "วันหยุด",
+    "CAP_REACHED": "ถึงเพดานค่าปรับ"
+  },
+  "pauseReason": {
+    "DEVICE_REPAIR": "เครื่องซ่อม",
+    "OTHER": "อื่นๆ"
+  },
   "approvals": {
     "title": "รายการอนุมัติ",
     "review": "พิจารณาอนุมัติ",
@@ -2907,11 +2927,25 @@
     "discount": "ส่วนลด",
     "paymentProgress": "ความคืบหน้าการชำระ",
     "nextDueDate": "ครบกำหนดถัดไป",
-    "nextDueAmount": "ค้างชำระ",
+    "nextDueAmount": "ยอดงวดถัดไป",
     "lastPaymentDate": "ชำระล่าสุด",
     "overdue": "ค้างชำระ",
     "installments": "งวด",
     "overdueSince": "ค้างตั้งแต่ {{date}} ({{days}} วัน)",
+    "overdueDays": "ค้างมาแล้ว",
+    "daysCount": "{{days}} วัน",
+    "payFirst": "งวดที่ต้องจ่ายก่อน",
+    "graceLeft": "ผ่อนผันเหลือ",
+    "lateFeeAccruing": "กำลังคิดเพิ่ม",
+    "clearArrears": "จ่ายเพื่อพ้นค้างชำระ",
+    "situationAsOf": "ข้อมูล ณ {{date}}",
+    "pausedStrip": "พักชำระอยู่",
+    "pausedSince": "ตั้งแต่ {{date}} ({{days}} วัน)",
+    "pausedNote": "ไม่คิดค่าปรับ · ไม่ทวง · นาฬิกาหยุดเดิน",
+    "appointmentStrip": "นัดชำระ {{date}}",
+    "appointmentNote": "หยุดการทวงถึงวันนัด · ค่าปรับยังเดินต่อ",
+    "repoPast": "เลยเกณฑ์ยึดเครื่องตามสัญญามาแล้ว {{days}} วัน",
+    "repoNear": "อีก {{days}} วันถึงเกณฑ์ยึดเครื่องตามสัญญา",
     "savingProgress": "ความคืบหน้าการออม",
     "savingTransactions": "รายการเคลื่อนไหว",
     "txnType_SAVING": "ออมเงิน",
