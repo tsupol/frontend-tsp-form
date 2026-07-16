@@ -297,8 +297,10 @@ export function RepairAddPhotoModal({
       const uploaded = await beMediaUpload({
         type: REPAIR_CONDITION_TYPE,
         file: frame,
-        // repair_order_id = DB path param; ts = client leaf token (uniqueness).
-        params: { repair_order_id: repairOrderId, ts: Date.now() },
+        // repair_order_id = DB path param; idx = client leaf token for filename
+        // uniqueness (UnixMilli — matches the be-media leaf `attachment-{idx}.{ext}`,
+        // same convention as the QR bridge, mig 660 shape I `attachment-{slug}`).
+        params: { repair_order_id: repairOrderId, idx: Date.now() },
       });
 
       try {

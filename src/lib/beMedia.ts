@@ -407,12 +407,13 @@ export const UPLOAD_SPECS: Record<string, BeMediaSpec> = {
     path_params: ['request_id', 'idx'],
   },
   repair_attachment_bridge: {
-    // mig 633: repair photo album. required_path_params = ['repair_order_id'] ONLY
-    // (no idx — unlike sell_out). `ts` below is a client-supplied leaf token, not a
-    // DB path param, so it doesn't participate in fn_media_upload_check.
+    // mig 633: repair photo album. DB required_path_params = ['repair_order_id'] ONLY.
+    // `idx` is a client-supplied leaf token (UnixMilli) for filename uniqueness — the
+    // be-media leaf is `attachment-{idx}.{ext}` (same as the QR bridge). It's not a DB
+    // path param, so it doesn't participate in fn_media_upload_check.
     type: 'repair_attachment_bridge', privacy: 'private', resize_mode: 'contain', quality: 0.82,
     sizes: [{ label: 'md', width: 1280 }], max_files: 20,
-    path_params: ['repair_order_id', 'ts'],
+    path_params: ['repair_order_id', 'idx'],
   },
   branch_expense_slip: {
     type: 'branch_expense_slip', privacy: 'private', resize_mode: 'contain', quality: 0.82,
