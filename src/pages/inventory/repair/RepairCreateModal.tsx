@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Modal, Button, Input, MaskedInput, TextArea, Select, Badge, FormErrorMessage } from 'tsp-form';
-import { CheckCircle, XCircle, Search, User, Package, FileText } from 'lucide-react';
+import { Modal, Button, Input, MaskedInput, TextArea, Badge, FormErrorMessage } from 'tsp-form';
+import { XCircle, Search, User, Package, FileText } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { validateiPhoneSerial } from '../../../lib/validators';
 import { ActionDoneView } from '../../contracts/ActionDoneView';
