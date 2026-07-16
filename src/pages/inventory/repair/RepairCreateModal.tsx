@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Modal, Button, Input, MaskedInput, TextArea, Select, Badge } from 'tsp-form';
+import { Modal, Button, Input, MaskedInput, TextArea, Select, Badge, FormErrorMessage } from 'tsp-form';
 import { CheckCircle, XCircle, Search, User, Package, FileText } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
+import { validateiPhoneSerial } from '../../../lib/validators';
 import { ActionDoneView } from '../../contracts/ActionDoneView';
 import { getStateColor } from '../../contracts/contractUtils';
 import type { RepairType } from '../repairTypes';
@@ -26,6 +27,13 @@ interface ContractHit {
   device_serial: string | null;
   customer_name: string | null;
   product_display_name: string | null;
+  // is_my_branch = contract branch matches the caller's JWT branch. The repair
+  // intake RPC requires the device's custody branch = caller branch, so a
+  // cross-branch contract can't be turned into a repair here (would fail
+  // INV.AUTH.BRANCH_CUSTODY_MISMATCH). branchless users (company/holding admin)
+  // get false for everything — correct: they have no branch to intake at.
+  is_my_branch: boolean | null;
+  branch_name: string | null;
 }
 
 interface CreateResult {
@@ -108,12 +116,18 @@ export function RepairCreateModal({
 
   const symptomOk = repairNote.trim().length >= 3;
 
+  // Serial is optional for a walk-in, but when typed it must be a valid Apple
+  // serial (same rule as the register flow — mostly-Apple product). Blank = ok.
+  const serialError = extSerial.trim().length > 0
+    ? validateiPhoneSerial(extSerial).error ?? null
+    : null;
+
   const canSubmit = useMemo(() => {
     if (busy || !symptomOk) return false;
-    if (tab === 'WALK_IN') return extName.trim().length > 0 && extPhone.trim().length > 0;
+    if (tab === 'WALK_IN') return extName.trim().length > 0 && extPhone.trim().length > 0 && !serialError;
     if (tab === 'CUSTOMER_CONTRACT') return pickedContract != null && pickedContract.device_id != null;
     return false; // SHOP_STOCK handled in its own tab body
-  }, [busy, symptomOk, tab, extName, extPhone, pickedContract]);
+  }, [busy, symptomOk, tab, extName, extPhone, pickedContract, serialError]);
 
   const submit = async () => {
     if (!canSubmit) return;
@@ -131,7 +145,8 @@ export function RepairCreateModal({
       params.p_ext_customer_name = extName.trim();
       params.p_ext_customer_phone = extPhone.trim();
       params.p_ext_model = extModel.trim() || null;
-      params.p_ext_serial = extSerial.trim() || null;
+      // Normalize like the register flow: strip spaces, uppercase.
+      params.p_ext_serial = extSerial.replace(/\s/g, '').toUpperCase() || null;
     } else if (tab === 'CUSTOMER_CONTRACT' && pickedContract) {
       params.p_asset_id = pickedContract.device_id;
       params.p_contract_id = pickedContract.id;
@@ -209,7 +224,18 @@ export function RepairCreateModal({
                       {(contractHits ?? []).map(c => {
                         const active = c.state === 'ACTIVE';
                         const hasDevice = c.device_id != null;
-                        const selectable = active && hasDevice;
+                        const myBranch = c.is_my_branch === true;
+                        const selectable = active && hasDevice && myBranch;
+                        // Reason for a non-selectable row — checked in intake order
+                        // (state → device → branch) so the message points at the
+                        // first blocker, mirroring the RPC's own validation order.
+                        const reason = !active
+                          ? t('repair.contractNotActive')
+                          : !hasDevice
+                            ? t('repair.contractNoDevice')
+                            : !myBranch
+                              ? t('repair.contractOtherBranch', { branch: c.branch_name ?? '' })
+                              : '';
                         return (
                           <button
                             key={c.id}
@@ -225,7 +251,7 @@ export function RepairCreateModal({
                             <div className="text-xs text-subtle truncate">
                               {[c.customer_name, c.product_display_name].filter(Boolean).join(' · ')}
                             </div>
-                            {!selectable && <div className="text-xs text-danger">{!active ? t('repair.contractNotActive') : t('repair.contractNoDevice')}</div>}
+                            {reason && <div className="text-xs text-danger">{reason}</div>}
                           </button>
                         );
                       })}
@@ -256,7 +282,13 @@ export function RepairCreateModal({
                   </div>
                   <div className="flex flex-col flex-1">
                     <label className="form-label">{t('repair.deviceSerial')}</label>
-                    <Input value={extSerial} onChange={(e) => setExtSerial(e.target.value)} className="w-full" />
+                    <Input
+                      value={extSerial}
+                      onChange={(e) => setExtSerial(e.target.value)}
+                      className="w-full"
+                      error={!!serialError}
+                    />
+                    <FormErrorMessage error={serialError ? { message: t('repair.serialInvalid') } : undefined} />
                   </div>
                 </div>
               </div>

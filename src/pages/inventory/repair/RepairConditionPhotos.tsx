@@ -18,6 +18,7 @@ import {
 } from '../../../lib/beMedia';
 import { toStoragePath, normalizeKey } from '../../../lib/mediaPath';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
+import { MediaLightbox } from '../../../components/MediaLightbox';
 import { useMobileCaptureSession } from '../../contracts/workspace/useMobileCaptureSession';
 
 // ============================================================================
@@ -98,6 +99,7 @@ export function RepairConditionPhotos({
   const [addOpen, setAddOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<RepairEntityMedia | null>(null);
+  const [lightboxKey, setLightboxKey] = useState<string | null>(null);
   // Adaptive polling clock — reset whenever a QR capture window opens, so the
   // grid self-refreshes as phone uploads land even after the modal closes.
   const [captureSince, setCaptureSince] = useState<number | null>(null);
@@ -165,6 +167,7 @@ export function RepairConditionPhotos({
               media={m}
               editable={editable}
               onRemove={() => setConfirmRemove(m)}
+              onView={(key) => setLightboxKey(key)}
               disabled={remove.isPending}
             />
           ))}
@@ -214,24 +217,46 @@ export function RepairConditionPhotos({
         code={code}
         onUploaded={() => { setCaptureSince(Date.now()); refresh(); }}
       />
+      <MediaLightbox
+        open={lightboxKey != null}
+        onClose={() => setLightboxKey(null)}
+        mediaKey={lightboxKey}
+        alt={t('repair.photos', { defaultValue: 'Condition photos' })}
+      />
     </div>
   );
 }
 
-function PhotoThumb({ media, editable, onRemove, disabled }: {
+// Prefer the largest available variant for the full-screen view; fall back to
+// the original storage_path.
+function pickFullKey(m: RepairEntityMedia): string | null {
+  const v = m.variants_json ?? {};
+  return m.storage_path || v.lg || v.md || v.sm || v.original || null;
+}
+
+function PhotoThumb({ media, editable, onRemove, onView, disabled }: {
   media: RepairEntityMedia;
   editable: boolean;
   onRemove: () => void;
+  onView: (mediaKey: string) => void;
   disabled: boolean;
 }) {
   const { t } = useTranslation();
   const thumbKey = pickThumbKey(media);
   const { url, loading } = useMediaUrl(thumbKey ? normalizeKey(thumbKey) : null);
+  const fullKey = pickFullKey(media);
   const canRemove = editable && !media.is_locked;
   return (
     <div className="relative rounded-md border border-line overflow-hidden bg-surface aspect-[4/3]">
       {url ? (
-        <img src={url} alt="" className="w-full h-full object-contain" />
+        <button
+          type="button"
+          onClick={() => fullKey && onView(normalizeKey(fullKey))}
+          className="w-full h-full cursor-zoom-in bg-transparent border-none p-0"
+          aria-label={t('common.view', { defaultValue: 'View' })}
+        >
+          <img src={url} alt="" className="w-full h-full object-contain" />
+        </button>
       ) : loading ? (
         <div className="w-full h-full flex items-center justify-center text-subtler"><ImageOff size={18} /></div>
       ) : (
