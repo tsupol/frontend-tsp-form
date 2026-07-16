@@ -283,6 +283,10 @@ export const AppSideNav = () => {
       ],
     },
     {
+      key: 'repairs-top', icon: <Wrench size="1rem" />, label: t('nav.repairs'),
+      path: '/admin/inventory/repairs',
+    },
+    {
       key: 'accounting',
       ...iconWithCount(<BookOpen size="1rem" />, unclosedCount),
       label: t('nav.accounting'),
