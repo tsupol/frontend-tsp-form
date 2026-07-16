@@ -104,11 +104,6 @@ export function RepairDetailPanel({
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
           <span className="font-semibold">{order.code_display}</span>
           <CopyButton value={order.code_display} />
-          <Badge size="sm" color={SUB_STATE_COLOR[order.sub_state]}>{t(`repair.subState_${order.sub_state}`)}</Badge>
-          <Badge size="sm" color="default">{t(`repair.type_${order.repair_type}`)}</Badge>
-          {order.result && (
-            <Badge size="sm" color={RESULT_COLOR[order.result]}>{t(`repair.result_${order.result}`)}</Badge>
-          )}
           <div className="ml-auto flex items-center gap-1">
             {order.intake_document_id != null && (
               <Tooltip content={t('repair.printIntake')}>
@@ -143,8 +138,15 @@ export function RepairDetailPanel({
           )}
           {order.master_color_name && <span className="text-subtle font-normal">· {order.master_color_name}</span>}
         </div>
-        <div className="text-[11px] text-subtler font-mono truncate mt-0.5">
+        <div className="text-xs text-subtle font-mono truncate mt-0.5">
           {[order.serial_no, order.imei && `IMEI ${order.imei}`].filter(Boolean).join(' · ') || '—'}
+        </div>
+        <div className="flex items-center flex-wrap gap-1.5 mt-2">
+          <Badge size="sm" color={SUB_STATE_COLOR[order.sub_state]}>{t(`repair.subState_${order.sub_state}`)}</Badge>
+          <Badge size="sm" color="default">{t(`repair.type_${order.repair_type}`)}</Badge>
+          {order.result && (
+            <Badge size="sm" color={RESULT_COLOR[order.result]}>{t(`repair.result_${order.result}`)}</Badge>
+          )}
         </div>
       </div>
 

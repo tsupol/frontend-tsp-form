@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Modal, Button, Select, TextArea, Input, Badge, useSnackbarContext } from 'tsp-form';
-import { CheckCircle, XCircle, Plus } from 'lucide-react';
+import { Modal, Button, Select, TextArea, Input, Badge, MaskedInput, useSnackbarContext } from 'tsp-form';
+import { CheckCircle, XCircle, Plus, Trash2, ChevronsRight } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { CurrencyInput } from '../../../components/CurrencyInput';
 import { BranchPaymentAccountField } from '../../../components/BranchPaymentAccountField';
@@ -442,6 +442,14 @@ export function RepairChargeNoticeModal({
  * ActionDoneView with the created bill (download/print receipt).
  * ──────────────────────────────────────────────────────────────────────────── */
 
+// One tender line in the multi-channel repair payment.
+interface RepairPayLine {
+  method: RepairPayMethod;
+  amount: number;
+  bank_account_id: number | null;
+  reference: string;
+}
+
 export function RepairPayModal({
   open, onClose, order, onDone,
 }: {
@@ -449,59 +457,119 @@ export function RepairPayModal({
 }) {
   const { t } = useTranslation();
   const [view, setView] = useState<'form' | 'done'>('form');
-  const [amount, setAmount] = useState('');
-  const [method, setMethod] = useState<RepairPayMethod>('CASH');
-  const [bankAccountId, setBankAccountId] = useState<number | null>(null);
-  const [reference, setReference] = useState('');
+  const [lines, setLines] = useState<RepairPayLine[]>([{ method: 'CASH', amount: 0, bank_account_id: null, reference: '' }]);
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [errorLine, setErrorLine] = useState<number | null>(null); // 1-based, from error.params.line
   const [billId, setBillId] = useState<number | null>(null);
 
   const hasContract = order.contract_id != null;
 
+  // Wallet balances for the contract (how much the customer has). Same source as
+  // the contract payment flow — the denormalized *_balance columns on v_contracts.
+  // Only fetched when the repair is on a contract (walk-in/shop-stock have none).
+  const { data: walletBalances } = useQuery({
+    queryKey: ['repair-pay-wallets', order.contract_id],
+    queryFn: async () => {
+      const rows = await apiClient.get<{
+        saving_balance: number | null;
+        credit_balance: number | null;
+        insurance_balance: number | null;
+      }[]>(`/v_contracts?id=eq.${order.contract_id}&select=saving_balance,credit_balance,insurance_balance&limit=1`);
+      return rows[0] ?? null;
+    },
+    enabled: open && hasContract,
+  });
+
+  const walletBalanceFor = (m: RepairPayMethod): number | null => {
+    if (m === 'SAVING_WALLET') return walletBalances?.saving_balance ?? 0;
+    if (m === 'CREDIT_WALLET') return walletBalances?.credit_balance ?? 0;
+    if (m === 'INSURANCE_WALLET') return walletBalances?.insurance_balance ?? 0;
+    return null; // CASH / TRANSFER — no wallet cap
+  };
+
   const methodOptions = useMemo(() => {
     const base: RepairPayMethod[] = ['CASH', 'TRANSFER'];
     const wallets: RepairPayMethod[] = ['CREDIT_WALLET', 'INSURANCE_WALLET', 'SAVING_WALLET'];
-    return [...base, ...(hasContract ? wallets : [])].map(m => ({ value: m, label: t(`repair.method_${m}`) }));
-  }, [hasContract, t]);
+    return [
+      ...base.map(m => ({ value: m, label: t(`repair.method_${m}`) })),
+      ...(hasContract ? wallets.map(m => {
+        const bal = walletBalanceFor(m) ?? 0;
+        return {
+          value: m,
+          // "Credit wallet (฿1,200)" — show the balance, disable at zero (matches
+          // the contract payment dropdown). Server still enforces sufficiency.
+          label: `${t(`repair.method_${m}`)} (${fmtCurrency(bal)})`,
+          disabled: bal === 0,
+        };
+      }) : []),
+    ];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasContract, t, walletBalances]);
 
   useEffect(() => {
     if (open) {
       setView('form');
-      setAmount(order.c_charge_balance > 0 ? String(order.c_charge_balance) : '');
-      setMethod('CASH'); setBankAccountId(null); setReference('');
-      setBusy(false); setErrorMessage(''); setBillId(null);
+      // Seed one line pre-filled to the full balance — the common case (pay in full,
+      // one channel). Staff adds lines / adjusts to split.
+      setLines([{ method: 'CASH', amount: order.c_charge_balance > 0 ? order.c_charge_balance : 0, bank_account_id: null, reference: '' }]);
+      setBusy(false); setErrorMessage(''); setErrorLine(null); setBillId(null);
     }
   }, [open, order.c_charge_balance]);
 
-  const amountNum = Number(amount) || 0;
-  const needsBank = method === 'TRANSFER';
-  const canSubmit = !busy && amountNum > 0 && (!needsBank || bankAccountId != null);
+  const updateLine = (idx: number, patch: Partial<RepairPayLine>) =>
+    setLines(prev => prev.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
+  const addLine = () => {
+    const remaining = Math.max(0, order.c_charge_balance - totalPay);
+    setLines(prev => [...prev, { method: 'CASH', amount: remaining, bank_account_id: null, reference: '' }]);
+  };
+  const removeLine = (idx: number) => setLines(prev => prev.filter((_, i) => i !== idx));
+
+  const totalPay = lines.reduce((sum, l) => sum + (l.amount || 0), 0);
+  const remainingAfter = order.c_charge_balance - totalPay;
+
+  // Per-line validity — every line needs a positive amount, TRANSFER needs an
+  // account, and a wallet line can't exceed its balance (BE enforces this too).
+  const lineInvalid = (l: RepairPayLine): boolean => {
+    if (!(l.amount > 0)) return true;
+    if (l.method === 'TRANSFER' && l.bank_account_id == null) return true;
+    const cap = walletBalanceFor(l.method);
+    if (cap != null && l.amount > cap) return true;
+    return false;
+  };
+  const canSubmit = !busy && totalPay > 0 && lines.every(l => !lineInvalid(l));
 
   const submit = async () => {
     if (!canSubmit) return;
-    setBusy(true); setErrorMessage('');
+    setBusy(true); setErrorMessage(''); setErrorLine(null);
     try {
+      // One atomic call — server sums the lines into a single bill (mig 661).
       const res = await apiClient.rpc<{ bill_id?: number }>('fn_bill_repair_pay', {
         p_repair_order_id: order.repair_order_id,
-        p_amount: amountNum,
-        p_method: method,
-        p_bank_account_id: needsBank ? bankAccountId : null,
-        p_reference: reference.trim() || null,
+        p_payments: lines.map(l => ({
+          method: l.method,
+          amount: Number(l.amount),
+          ...(l.method === 'TRANSFER' && l.bank_account_id != null ? { bank_account_id: l.bank_account_id } : {}),
+          ...(l.reference.trim() ? { reference: l.reference.trim() } : {}),
+        })),
+        p_note: null,
       });
       setBillId(res?.bill_id ?? null);
       setView('done');
     } catch (err) {
+      // error params.line = 1-based failing line → highlight it (mig 661 contract).
+      if (err instanceof ApiError) {
+        const line = (err.messageParams as { line?: number } | undefined)?.line;
+        if (typeof line === 'number') setErrorLine(line);
+      }
       setErrorMessage(translateErr(err, t));
     } finally {
       setBusy(false);
     }
   };
 
-  const remainingAfter = Math.max(0, order.c_charge_balance - amountNum);
-
   return (
-    <Modal open={open} onClose={busy ? () => {} : onClose} maxWidth="30rem" width="100%">
+    <Modal open={open} onClose={busy ? () => {} : onClose} maxWidth="32rem" width="100%">
       {view === 'form' ? (
         <>
           <div className="modal-header">
@@ -510,32 +578,98 @@ export function RepairPayModal({
           </div>
           <div className="modal-content">
             <RepairTargetBox order={order} subtitle={`${t('repair.balance')}: ${fmtCurrency(order.c_charge_balance)}`} />
-            <div className="form-grid">
-              <div className="flex flex-col">
-                <label className="form-label">{t('repair.amount')}</label>
-                <CurrencyInput value={amount} onChange={(raw) => setAmount(raw)} placeholder="0.00" className="w-full" />
-                {amountNum > 0 && amountNum < order.c_charge_balance && (
-                  <span className="text-xs text-subtle mt-1">{t('repair.remainingAfter', { amount: fmtCurrency(remainingAfter) })}</span>
-                )}
-              </div>
-              <div className="flex flex-col">
-                <label className="form-label">{t('repair.method')}</label>
-                <Select
-                  options={methodOptions}
-                  value={method}
-                  onChange={(v) => { setMethod((v as RepairPayMethod) || 'CASH'); setBankAccountId(null); }}
-                  searchable={false}
-                  showChevron
-                />
-              </div>
-              {needsBank && (
-                <BranchPaymentAccountField onResolve={setBankAccountId} active={needsBank} />
-              )}
-              <div className="flex flex-col">
-                <label className="form-label">{t('repair.reference')}</label>
-                <Input value={reference} onChange={(e) => setReference(e.target.value)} className="w-full" placeholder={t('repair.referencePlaceholder')} />
-              </div>
+
+            <div className="flex flex-col gap-3">
+              <label className="form-label">{t('repair.paymentMethods')}</label>
+              {lines.map((line, idx) => {
+                const cap = walletBalanceFor(line.method);
+                const over = cap != null && line.amount > cap;
+                const isErrorLine = errorLine === idx + 1;
+                return (
+                  <div
+                    key={idx}
+                    className={`border rounded-lg p-3 flex flex-col gap-3 ${isErrorLine ? 'border-danger' : 'border-line'}`}
+                  >
+                    <div className="flex gap-3 items-end">
+                      <div className="flex flex-col" style={{ width: '11rem' }}>
+                        <label className="form-label text-xs">{t('repair.method')}</label>
+                        <Select
+                          options={methodOptions}
+                          value={line.method}
+                          onChange={(v) => updateLine(idx, { method: (v as RepairPayMethod) || 'CASH', bank_account_id: null })}
+                          size="sm"
+                          searchable={false}
+                          showChevron
+                        />
+                      </div>
+                      <div className="flex flex-col flex-1 min-w-0">
+                        <label className="form-label text-xs">{t('repair.amount')}</label>
+                        <MaskedInput
+                          mask="number"
+                          decimalScale={2}
+                          value={line.amount ? String(line.amount) : ''}
+                          onChange={(raw) => updateLine(idx, { amount: parseFloat(raw) || 0 })}
+                          size="sm"
+                          className="w-full"
+                          endIcon={<ChevronsRight size={14} />}
+                          onEndIconClick={() => {
+                            // Fill this line with the remaining balance, capped to a
+                            // wallet's balance if this is a wallet line.
+                            const others = lines.reduce((s, l, i) => (i === idx ? s : s + (l.amount || 0)), 0);
+                            const remaining = Math.max(0, order.c_charge_balance - others);
+                            const fill = cap != null ? Math.min(cap, remaining) : remaining;
+                            updateLine(idx, { amount: fill });
+                          }}
+                        />
+                      </div>
+                      {lines.length > 1 && (
+                        <Button size="sm" className="shrink-0" startIcon={<Trash2 size={14} />} onClick={() => removeLine(idx)} />
+                      )}
+                    </div>
+                    {over && cap != null && (
+                      <span className="text-xs text-danger">{t('repair.walletInsufficient', { balance: fmtCurrency(cap) })}</span>
+                    )}
+                    {line.method === 'TRANSFER' && (
+                      <div className="flex flex-col gap-3">
+                        <div className="flex flex-col">
+                          <label className="form-label text-xs">{t('repair.bankAccount')}</label>
+                          <BranchPaymentAccountField
+                            active={line.method === 'TRANSFER'}
+                            onResolve={(id) => updateLine(idx, { bank_account_id: id })}
+                          />
+                        </div>
+                        <div className="flex flex-col">
+                          <label className="form-label text-xs">{t('repair.reference')}</label>
+                          <Input
+                            value={line.reference}
+                            onChange={(e) => updateLine(idx, { reference: e.target.value })}
+                            className="w-full"
+                            placeholder={t('repair.referencePlaceholder')}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              <Button size="sm" variant="outline" startIcon={<Plus size={14} />} onClick={addLine} className="self-start">
+                {t('repair.addPayment')}
+              </Button>
             </div>
+
+            {/* Running total vs charge balance */}
+            <div className="flex items-center justify-between mt-4 px-3 py-2 rounded-lg border border-line bg-surface-soft">
+              <span className="text-sm text-subtle">{t('repair.totalPayment')}</span>
+              <span className="text-sm font-medium tabular-nums">{fmtCurrency(totalPay)}</span>
+            </div>
+            {totalPay > 0 && remainingAfter > 0 && (
+              <span className="block text-xs text-subtle mt-1">{t('repair.remainingAfter', { amount: fmtCurrency(remainingAfter) })}</span>
+            )}
+            {remainingAfter < 0 && (
+              <span className="block text-xs text-subtle mt-1">{t('repair.overpayRefund', { amount: fmtCurrency(-remainingAfter) })}</span>
+            )}
+
             {errorMessage && (
               <div className="alert alert-danger mt-4 animate-pop-in"><XCircle size={16} /><span>{errorMessage}</span></div>
             )}
@@ -550,8 +684,9 @@ export function RepairPayModal({
           headline={t('repair.payDone')}
           contractCode={order.code_display}
           detailRows={[
-            { label: t('repair.amount'), value: fmtCurrency(amountNum), emphasis: true },
-            { label: t('repair.method'), value: t(`repair.method_${method}`) },
+            { label: t('repair.totalPayment'), value: fmtCurrency(totalPay), emphasis: true },
+            // One row per tender line — how the payment was split.
+            ...lines.map(l => ({ label: t(`repair.method_${l.method}`), value: fmtCurrency(l.amount) })),
           ]}
           billId={billId}
           onClose={() => { onDone(); onClose(); }}
