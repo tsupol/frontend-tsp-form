@@ -243,7 +243,12 @@ export function beMediaCanPresign(key: string): boolean {
     /^private\/companies\/\d+\/signatory-/.test(k) ||
     /^private\/buyback\/\d+\/condition-/.test(k) ||
     /^private\/asset_check\/\d+\/photo-/.test(k) ||
-    /^private\/sell_out\/\d+\/condition-/.test(k)
+    /^private\/sell_out\/\d+\/condition-/.test(k) ||
+    // repair photo album (mig 633 prefix private/repairs/{repair_order_id}/).
+    // ⚠ The BE read-side fn_media_url_check does NOT yet accept this shape (no
+    // repairs read shape as of 2026-07-16) — this regex is FE-side optimistic;
+    // the presign round-trip still fails until BE adds the shape.
+    /^private\/repairs\/\d+\//.test(k)
   );
 }
 
@@ -324,6 +329,46 @@ export const SELL_OUT_CONDITION_RESIZE: ResizeOptions = {
   maxWidth: 1280, maxHeight: 1280, mode: 'contain', format: 'webp', quality: 0.82,
 };
 
+// ── repair_attachment_bridge — hardcoded spec (single md=1280, PRIVATE) ─
+// Repair photo album (REPAIR_ORDER / ATTACHMENT) — device condition on intake,
+// work-in-progress, and return handover. Both the mobile QR bridge (entity_type
+// REPAIR_ATTACHMENT, auto-attached server-side via inv.fn_repair_attach_media)
+// and this desktop direct-upload use the SAME be-media type. Lands at
+// private/repairs/{repair_order_id}/... (nnf-private).
+//
+// Source of truth (verified 2026-07-16 against D:\dev\nnf):
+//   • DB dispatch — mig 633, core.ref_media_upload_check_dispatch:
+//       type='repair_attachment_bridge', required_path_params=ARRAY['repair_order_id'],
+//       key_prefix_template='private/repairs/{repair_order_id}/'.
+//     NOTE the plural "repairs" folder, and NO {idx} path param (unlike sell_out).
+//   • Upload authz — mig 644 extended api.fn_media_upload_check with a
+//     repair_attachment_bridge branch (staff-only, INVENTORY.REPAIR_REQUEST on the
+//     repair's branch). Live-confirmed passing on 2026-07-16.
+//
+// Because the DB template has NO leaf token, the desktop path supplies its own
+// filename token `ts` (a client timestamp) so be-media can build a unique leaf
+// `attachment-{ts}.{ext}` — mirrors how buyback/asset_check use time.Now() for
+// uniqueness on the bridge side. `ts` is a plain form field, NOT a DB
+// required_path_param, so authz is unaffected.
+//
+// ⚠ TWO BACKEND GAPS (as of 2026-07-16, both BE-owned — the "shipped" claim in
+// mig 633 covers the DB/attach layer only, not the two below):
+//   1. be-media leaf.go had NO template for repair_attachment_bridge → a desktop
+//      upload fails LEAF_BUILD_FAILED. Added the leaf `attachment-{ts}.{ext}` in
+//      be-media source this session (NOT deployed — needs `just deploy` + the
+//      live server's R2_DIRECT_TYPES env to list repair_attachment_bridge).
+//   2. api.fn_media_url_check has NO read shape for private/repairs/… → thumbnail
+//      presign returns CORE.VALIDATION.MEDIA_KEY_INVALID. Live-confirmed. Until BE
+//      adds the shape, uploaded/attached repair photos cannot be VIEWED (the album
+//      shows an "images can't load yet" hint). The album polling + QR attach still
+//      work; only the presigned thumbnail URL is blocked.
+export const REPAIR_CONDITION_TYPE = 'repair_attachment_bridge';
+export const REPAIR_CONDITION_MAX = 20;  // mig 633 default_max_uploads = 20
+
+export const REPAIR_CONDITION_RESIZE: ResizeOptions = {
+  maxWidth: 1280, maxHeight: 1280, mode: 'contain', format: 'webp', quality: 0.82,
+};
+
 // ── Hardcoded upload-spec registry ────────────────────────────────────
 // be-media has no /upload/spec endpoint; these mirror misc-go's
 // pkg/uploadspec/spec.go so getUploadSpec() can serve them client-side
@@ -360,6 +405,14 @@ export const UPLOAD_SPECS: Record<string, BeMediaSpec> = {
     type: 'sell_out_condition_bridge', privacy: 'private', resize_mode: 'contain', quality: 0.82,
     sizes: [{ label: 'md', width: 1280 }], max_files: 10,
     path_params: ['request_id', 'idx'],
+  },
+  repair_attachment_bridge: {
+    // mig 633: repair photo album. required_path_params = ['repair_order_id'] ONLY
+    // (no idx — unlike sell_out). `ts` below is a client-supplied leaf token, not a
+    // DB path param, so it doesn't participate in fn_media_upload_check.
+    type: 'repair_attachment_bridge', privacy: 'private', resize_mode: 'contain', quality: 0.82,
+    sizes: [{ label: 'md', width: 1280 }], max_files: 20,
+    path_params: ['repair_order_id', 'ts'],
   },
   branch_expense_slip: {
     type: 'branch_expense_slip', privacy: 'private', resize_mode: 'contain', quality: 0.82,

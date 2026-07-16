@@ -411,6 +411,7 @@ export const AppSideNav = () => {
         { key: 'company-config', icon: <Building2 size="1rem" />, label: t('nav.companyConfig'), path: '/admin/company/config' },
         ...(['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
           { key: 'owner-config', icon: <Boxes size="1rem" />, label: t('nav.ownerConfig'), path: '/admin/company/owner-config' },
+          { key: 'repair-charge-owner', icon: <Wrench size="1rem" />, label: t('nav.repairChargeOwner'), path: '/admin/company/repair-charge-owner' },
         ] : []),
         { type: 'group', key: 'grp-policy', label: t('nav.groupPolicy') },
         { key: 'holidays', icon: <CalendarDays size="1rem" />, label: t('nav.holidays'), path: '/admin/company/holidays' },

@@ -66,6 +66,7 @@ import { ICloudPoolPage } from './pages/company/ICloudPoolPage';
 import { BranchPinPage } from './pages/company/BranchPinPage';
 import { BranchFinanceModelsPage } from './pages/company/BranchFinanceModelsPage';
 import { OwnerConfigPage } from './pages/company/OwnerConfigPage';
+import { RepairChargeOwnerPage } from './pages/company/RepairChargeOwnerPage';
 import { LessorsPage } from './pages/company/LessorsPage';
 import { BranchSignersPage } from './pages/company/BranchSignersPage';
 import { BranchesPage } from './pages/BranchesPage';
@@ -898,6 +899,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <CompanyLayout><OwnerConfigPage /></CompanyLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/company/repair-charge-owner"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <CompanyLayout><RepairChargeOwnerPage /></CompanyLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

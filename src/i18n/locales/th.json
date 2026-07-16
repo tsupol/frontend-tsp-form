@@ -387,6 +387,7 @@
     "company": "Company",
     "companyConfig": "ตั้งค่า Company",
     "ownerConfig": "เจ้าของสต๊อก",
+    "repairChargeOwner": "ผู้รับรู้รายได้ค่าซ่อม",
     "bankAccounts": "บัญชีธนาคาร",
     "financeModels": "รูปแบบการเงิน",
     "holidays": "วันหยุด",
@@ -489,6 +490,21 @@
     "resetToTemplate": "รีเซ็ตตาม template",
     "saved": "บันทึกแล้ว",
     "resyncDone": "รีเซ็ตสาขาตาม template บริษัทแล้ว"
+  },
+  "owners": {
+    "COMPANY": "บริษัท",
+    "HOLDING": "กองทุนกลาง"
+  },
+  "repairChargeOwner": {
+    "title": "ผู้รับรู้รายได้ค่าซ่อม",
+    "description": "กำหนดว่ารายได้ค่าซ่อมเป็นของใคร — บริษัท หรือกองทุนกลาง",
+    "company": "บริษัท",
+    "defaultOwner": "ผู้รับรู้รายได้ (ค่าเริ่มต้น)",
+    "defaultOwnerHint": "ใช้กับค่าซ่อมทั้งหมด เว้นแต่สาขาจะตั้งค่าเองด้านล่าง",
+    "allowBranchOverride": "ให้สาขาตั้งค่าเองได้",
+    "allowBranchOverrideHint": "อนุญาตให้แต่ละสาขากำหนดผู้รับรู้รายได้ค่าซ่อมของตัวเอง",
+    "noBranches": "ไม่มีสาขาที่ใช้งานอยู่ให้ตั้งค่า",
+    "saved": "บันทึกแล้ว"
   },
   "contractsOpened": {
     "title": "รายงานเปิดสัญญา",
@@ -2035,8 +2051,11 @@
     "allStatuses": "ทุกสถานะ",
     "approve": "อนุมัติ",
     "reject": "ปฏิเสธ",
+    "cancel": "ยกเลิกคำขอ",
+    "cancelConfirm": "ยกเลิกคำขอนี้?",
     "approveSuccess": "อนุมัติเรียบร้อย",
     "rejectSuccess": "ปฏิเสธเรียบร้อย",
+    "cancelSuccess": "ยกเลิกคำขอเรียบร้อย",
     "notePlaceholder": "หมายเหตุ (จำเป็นสำหรับการปฏิเสธ)",
     "type_NEGOTIATION": "ต่อรองราคา",
     "type_BILL_LINE_DISCOUNT": "ส่วนลดบิล",
@@ -2438,7 +2457,17 @@
     "doc_RETURN": "ใบส่งมอบ",
     "chargePendingLineMessage": "คุณพิมพ์รายการค่าซ่อมไว้แต่ยังไม่ได้กดเพิ่ม ต้องการทิ้งหรือไม่?",
     "editCharges": "แก้ไขรายการ",
-    "noChargesYet": "ยังไม่มีรายการค่าซ่อม"
+    "noChargesYet": "ยังไม่มีรายการค่าซ่อม",
+    "photos": "รูปสภาพเครื่อง",
+    "photosOptional": "ไม่บังคับ",
+    "addPhoto": "เพิ่มรูป",
+    "captureFromPhone": "ถ่ายจากมือถือ",
+    "captureScanHint": "สแกน QR ด้วยมือถือเพื่อเปิดกล้องและส่งรูปงานซ่อม",
+    "captureCount": "อัปโหลดแล้ว {{count}} / {{max}}",
+    "confirmRemovePhoto": "ลบรูปนี้หรือไม่?",
+    "photoFile": "รูปภาพ",
+    "errorPickImage": "กรุณาเลือกรูปก่อน",
+    "photoCantLoad": "โหลดไม่ได้"
   },
   "buyback": {
     "cancel": "ยกเลิกการซื้อคืน",

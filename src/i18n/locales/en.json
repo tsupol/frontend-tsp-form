@@ -388,6 +388,7 @@
     "company": "Company",
     "companyConfig": "Company Config",
     "ownerConfig": "Stock Owner",
+    "repairChargeOwner": "Repair Revenue Owner",
     "bankAccounts": "Bank Accounts",
     "financeModels": "Finance Models",
     "holidays": "Holidays",
@@ -490,6 +491,21 @@
     "resetToTemplate": "Reset to template",
     "saved": "Saved",
     "resyncDone": "Branch reset to company template"
+  },
+  "owners": {
+    "COMPANY": "Company",
+    "HOLDING": "Central fund (Holding)"
+  },
+  "repairChargeOwner": {
+    "title": "Repair Revenue Owner",
+    "description": "Set who recognizes repair-payment revenue — the company, or the central fund (Holding).",
+    "company": "Company",
+    "defaultOwner": "Default owner",
+    "defaultOwnerHint": "Applies to all repair payments unless a branch overrides it below.",
+    "allowBranchOverride": "Let branches override",
+    "allowBranchOverrideHint": "Allow each branch to set its own repair revenue owner.",
+    "noBranches": "No active branches to override.",
+    "saved": "Saved"
   },
   "contractsOpened": {
     "title": "Contracts Opened",
@@ -2036,8 +2052,11 @@
     "allStatuses": "All statuses",
     "approve": "Approve",
     "reject": "Reject",
+    "cancel": "Cancel request",
+    "cancelConfirm": "Cancel this request?",
     "approveSuccess": "Approved",
     "rejectSuccess": "Rejected",
+    "cancelSuccess": "Request cancelled",
     "notePlaceholder": "Note (required for reject)",
     "type_NEGOTIATION": "Negotiation",
     "type_BILL_LINE_DISCOUNT": "Bill Discount",
@@ -2440,7 +2459,17 @@
     "doc_RETURN": "Delivery note",
     "chargePendingLineMessage": "You have a charge line typed in but not added. Discard it?",
     "editCharges": "Edit charges",
-    "noChargesYet": "No charges added yet"
+    "noChargesYet": "No charges added yet",
+    "photos": "Condition photos",
+    "photosOptional": "optional",
+    "addPhoto": "Add photo",
+    "captureFromPhone": "Capture from phone",
+    "captureScanHint": "Scan the QR with a phone to open the camera and send repair photos.",
+    "captureCount": "{{count}} / {{max}} uploaded",
+    "confirmRemovePhoto": "Remove this photo?",
+    "photoFile": "Photo",
+    "errorPickImage": "Pick an image first",
+    "photoCantLoad": "Can't load"
   },
   "buyback": {
     "cancel": "Cancel buyback",

@@ -19,6 +19,7 @@ import {
   RepairPayModal, RepairRefundModal, RepairCancelModal, RepairDiscardModal, RepairDraftEditModal,
 } from './RepairActionModals';
 import { RepairDocPreviewModal } from './RepairDocPreviewModal';
+import { RepairConditionPhotos } from './RepairConditionPhotos';
 
 // Icon per action_code for the quick (primary) footer buttons.
 const ACTION_ICON: Partial<Record<RepairActionCode, React.ReactNode>> = {
@@ -68,12 +69,21 @@ export function RepairDetailPanel({
     enabled: order.status !== 'DRAFT',
   });
 
-  // ATTACH_MEDIA has no direct RPC (dead ref) — hidden for now. The rest render.
-  const actions = (caps?.actions ?? []).filter(a => a.action_code !== 'ATTACH_MEDIA');
+  const actions = caps?.actions ?? [];
+
+  // ATTACH_MEDIA is not a footer button — it maps to the self-serve condition-
+  // photo album rendered in-context below (its own Add / Capture buttons, like
+  // SellOut). We drive the album's editable state off this action's capability
+  // when the RPC exposes it, and keep it out of the footer to avoid duplication.
+  const attachMediaAction = actions.find(a => a.action_code === 'ATTACH_MEDIA');
+  const photosEditable = attachMediaAction
+    ? (attachMediaAction.is_permitted && attachMediaAction.blocking_reason === null)
+    : (order.sub_state !== 'CLOSED' && order.sub_state !== 'VOIDED');
 
   // Footer = quick actions inline + everything else in "More". CHARGE_SET is
-  // pulled out entirely — it's rendered in the charge-sheet section instead.
-  const footerActions = actions.filter(a => !INLINE_ACTIONS.has(a.action_code));
+  // pulled out entirely (charge-sheet section); ATTACH_MEDIA is pulled out too
+  // (the photo album owns it).
+  const footerActions = actions.filter(a => !INLINE_ACTIONS.has(a.action_code) && a.action_code !== 'ATTACH_MEDIA');
   const quickActions = footerActions.filter(a => QUICK_ACTIONS.has(a.action_code));
   const moreActions = footerActions.filter(a => !QUICK_ACTIONS.has(a.action_code));
 
@@ -240,6 +250,14 @@ export function RepairDetailPanel({
             )}
           </div>
         )}
+
+        {/* Condition photo album — self-serve add (desktop / QR) + read-only grid
+            once the order closes. Owns the ATTACH_MEDIA affordance. */}
+        <RepairConditionPhotos
+          repairOrderId={order.repair_order_id}
+          code={order.code_display}
+          editable={photosEditable}
+        />
       </div>
 
       {/* Data-driven action footer — quick actions inline + "More" overflow

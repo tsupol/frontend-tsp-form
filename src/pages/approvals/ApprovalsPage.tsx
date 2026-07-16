@@ -300,7 +300,11 @@ export function ApprovalsPage() {
                       setSelected(null);
                       if (isMobile) goBack();
                       refresh();
-                      const key = action === 'approve' ? 'approvals.approveSuccess' : 'approvals.rejectSuccess';
+                      const key = action === 'approve'
+                        ? 'approvals.approveSuccess'
+                        : action === 'cancel'
+                          ? 'approvals.cancelSuccess'
+                          : 'approvals.rejectSuccess';
                       addSnackbar({
                         type: 'success',
                         message: <div className="alert alert-success"><CheckCircle size={16} /><span>{t(key)}</span></div>,
@@ -380,21 +384,27 @@ function SimpleApprovalPanel({
   row, onSuccess,
 }: {
   row: ApprovalRow;
-  onSuccess: (action: 'approve' | 'reject') => void;
+  onSuccess: (action: 'approve' | 'reject' | 'cancel') => void;
 }) {
   const { t } = useTranslation();
   const [reason, setReason] = useState('');
-  const [busy, setBusy] = useState<'approve' | 'reject' | null>(null);
+  const [busy, setBusy] = useState<'approve' | 'reject' | 'cancel' | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => { setReason(''); setErrorMessage(''); }, [row.type, row.id]);
 
   const isPending = row.status === 'PENDING';
+  // Cancel = requester-side withdrawal of a pending request. Only NEGOTIATION
+  // exposes a cancel RPC (fn_negotiation_cancel); the other simple types don't.
+  const canCancel = isPending && row.type === 'NEGOTIATION';
 
-  const buildRpcCall = (action: 'approve' | 'reject'): { rpc: string; params: Record<string, unknown> } => {
+  const buildRpcCall = (action: 'approve' | 'reject' | 'cancel'): { rpc: string; params: Record<string, unknown> } => {
     const trimmed = reason.trim();
     switch (row.type) {
       case 'NEGOTIATION': {
+        if (action === 'cancel') {
+          return { rpc: 'fn_negotiation_cancel', params: { p_request_id: row.id, p_note: trimmed || null } };
+        }
         const rpc = action === 'approve' ? 'fn_negotiation_approve' : 'fn_negotiation_reject';
         const params: Record<string, unknown> = { p_request_id: row.id };
         if (action === 'reject') params.p_reason = trimmed || null;
@@ -429,7 +439,7 @@ function SimpleApprovalPanel({
     }
   };
 
-  const handleAction = async (action: 'approve' | 'reject') => {
+  const handleAction = async (action: 'approve' | 'reject' | 'cancel') => {
     if (action === 'reject' && !reason.trim()) return;
     setBusy(action);
     setErrorMessage('');
@@ -518,6 +528,15 @@ function SimpleApprovalPanel({
                 {busy === 'reject' ? t('common.loading') : t('approvals.reject')}
               </Button>
             </div>
+            {canCancel && (
+              <Button
+                variant="ghost" size="md" className="w-full"
+                disabled={!!busy}
+                onClick={() => handleAction('cancel')}
+              >
+                {busy === 'cancel' ? t('common.loading') : t('approvals.cancel')}
+              </Button>
+            )}
           </div>
         </div>
       )}
