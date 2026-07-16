@@ -5,7 +5,7 @@ import { Input, Select, Badge, Button, MaskedInput, useSnackbarContext } from 't
 import { Search, ScanBarcode, XCircle, X, Calculator, Info, CheckCircle, Package, BookOpen, AlertTriangle, Wand2 } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { fmtCurrency } from '../../../lib/format';
-import { getConditionLabel, getConditionTextColor } from '../../inventory/inventoryUtils';
+import { getConditionLabel, getConditionTextColor, assetSearchOrClause } from '../../inventory/inventoryUtils';
 import { useWorkspace } from './WorkspaceContext';
 import type { Quote } from './WorkspaceTypes';
 import { useBarcodeScanner } from '../../../components/BarcodeScanner';
@@ -226,8 +226,10 @@ export function PanelProductPlan(_props: Props) {
       let url = `/v_assets?current_bucket=eq.ON_HAND_AVAILABLE&is_contractable=is.true&order=asset_code&limit=50${conditionFilterClause}`;
       if (branchId) url += `&branch_id=eq.${branchId}`;
       if (debouncedAssetSearch) {
-        const q = debouncedAssetSearch;
-        url += `&or=(asset_code.ilike.*${q}*,serial_no.ilike.*${q}*,imei.ilike.*${q}*,model_name.ilike.*${q}*,base_model_name.ilike.*${q}*,variant_name.ilike.*${q}*,sku_code.ilike.*${q}*,family_name.ilike.*${q}*,brand_name.ilike.*${q}*,physical_color.ilike.*${q}*,manufacturer_color.ilike.*${q}*)`;
+        url += `&${assetSearchOrClause(debouncedAssetSearch, [
+          'model_name', 'base_model_name', 'variant_name', 'sku_code',
+          'family_name', 'brand_name', 'physical_color', 'manufacturer_color',
+        ])}`;
       }
       return apiClient.get<StockAsset[]>(url);
     },

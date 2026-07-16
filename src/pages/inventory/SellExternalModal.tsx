@@ -8,7 +8,7 @@ import { CurrencyInput } from '../../components/CurrencyInput';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { fmtCurrency } from '../../lib/format';
-import { getBucketLabel, getBucketColor, codeDisplay } from './inventoryUtils';
+import { getBucketLabel, getBucketColor, codeDisplay, assetCodeMatches } from './inventoryUtils';
 
 // ============================================================================
 // Sell External B2B (ขายให้คู่ค้า) — sell ON_HAND_AVAILABLE assets out of stock
@@ -117,6 +117,7 @@ export function SellExternalModal({
   const [error, setError] = useState('');
   const [confirmClose, setConfirmClose] = useState(false);
   const [addPickerOpen, setAddPickerOpen] = useState(false);
+  const [addPickerSearch, setAddPickerSearch] = useState('');
 
   const [result, setResult] = useState<SellResponse | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -141,6 +142,7 @@ export function SellExternalModal({
       setError('');
       setConfirmClose(false);
       setAddPickerOpen(false);
+      setAddPickerSearch('');
       setResult(null);
       setCancelOpen(false);
     }
@@ -195,15 +197,23 @@ export function SellExternalModal({
     enabled: open && addPickerOpen && branchId != null,
     staleTime: 60 * 1000,
   });
-  const addableOptions = useMemo(
-    () => sellable
-      .filter(a => !assetIds.includes(a.asset_id))
-      .map(a => ({
-        value: String(a.asset_id),
-        label: `${codeDisplay(a.asset_code_display, a.asset_code)} — ${a.product_display_name ?? a.variant_name}`,
-      })),
-    [sellable, assetIds],
-  );
+  const addableOptions = useMemo(() => {
+    const available = sellable.filter(a => !assetIds.includes(a.asset_id));
+    const q = addPickerSearch.trim().toLowerCase();
+    // Dash-insensitive: match the typed code against both the dashed display
+    // code and the raw asset_code; fall back to product name / serial / imei.
+    const filtered = q
+      ? available.filter(a =>
+          assetCodeMatches(q, a.asset_code_display, a.asset_code)
+          || `${a.product_display_name ?? ''} ${a.variant_name ?? ''}`.toLowerCase().includes(q)
+          || (a.serial_no ?? '').toLowerCase().includes(q)
+          || (a.imei ?? '').toLowerCase().includes(q))
+      : available;
+    return filtered.map(a => ({
+      value: String(a.asset_id),
+      label: `${codeDisplay(a.asset_code_display, a.asset_code)} — ${a.product_display_name ?? a.variant_name}`,
+    }));
+  }, [sellable, assetIds, addPickerSearch]);
 
   // Effective total from the current (possibly-edited) prices.
   const effectivePrice = useCallback((it: PreviewItem): number => {
@@ -336,9 +346,11 @@ export function SellExternalModal({
                       <Select
                         options={addableOptions}
                         value={null}
-                        onChange={(v) => { if (v) addAsset(Number(v)); }}
+                        onChange={(v) => { if (v) { addAsset(Number(v)); setAddPickerSearch(''); } }}
                         placeholder={t('sellExternal.addDevicePlaceholder', { defaultValue: 'Search ON_HAND devices at this branch' })}
                         searchable
+                        onSearchChange={setAddPickerSearch}
+                        filterOptions={false}
                         showChevron
                         startIcon={<Search size={14} />}
                       />

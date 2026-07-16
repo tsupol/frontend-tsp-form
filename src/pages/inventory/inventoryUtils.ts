@@ -103,3 +103,52 @@ export function fmtNum(n: number | null | undefined): string {
 export const codeDisplay = (display?: string | null, raw?: string | null): string =>
   display ?? raw ?? '';
 
+// ============================================================================
+// Asset search — dash-insensitive matching
+// ============================================================================
+//
+// Asset codes exist in two forms: the raw stored `asset_code` (dash-free, e.g.
+// `AT26040001013`) and the displayed `asset_code_display` (dashed, e.g.
+// `AT-2604-000101-3`). Users read and type the dashed form off the screen, but
+// naive searches only match one form and silently return nothing for the other.
+// These helpers make every asset search accept both forms.
+
+/** Strip dashes from a search term so it can match the dash-free `asset_code`/`imei`. */
+export const stripAssetDashes = (s: string): string => s.replace(/-/g, '');
+
+/**
+ * Build a PostgREST `or=(...)` clause (WITHOUT the leading `&or=` / parens) that
+ * matches an asset by code either way, plus any extra text fields passed in.
+ *
+ * Dashed fields (`asset_code_display`, `serial_no`) match the raw term; dash-free
+ * fields (`asset_code`, `imei`) match the dash-stripped term. Mirrors the
+ * reference implementation in AssetsPage.
+ *
+ * `term` must already be trimmed. `extraFields` are matched against the raw term
+ * with `ilike.*term*` (e.g. `model_name`, `brand_name`).
+ */
+export function assetSearchOrClause(term: string, extraFields: string[] = []): string {
+  const stripped = stripAssetDashes(term);
+  const conds = [
+    `asset_code_display.ilike.*${term}*`,
+    `serial_no.ilike.*${term}*`,
+    `asset_code.ilike.*${stripped}*`,
+    `imei.ilike.*${stripped}*`,
+    ...extraFields.map(f => `${f}.ilike.*${term}*`),
+  ];
+  return `or=(${conds.join(',')})`;
+}
+
+/**
+ * Dash-insensitive client-side asset-code match. Returns true if the (already
+ * lowercased) query matches either the dashed display code or the raw code,
+ * comparing both with dashes removed so `AT26040001013`, `AT-2604-000101-3`,
+ * and `2604000101` all match the same asset.
+ */
+export function assetCodeMatches(lowerQuery: string, display?: string | null, raw?: string | null): boolean {
+  const q = stripAssetDashes(lowerQuery);
+  if (!q) return false;
+  const codes = [display, raw].filter(Boolean).map(c => stripAssetDashes(c!.toLowerCase()));
+  return codes.some(c => c.includes(q));
+}
+

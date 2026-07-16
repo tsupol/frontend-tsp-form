@@ -9,7 +9,7 @@ import { translateApiError } from '../../lib/apiErrors';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { DateTime } from '../../components/DateTime';
 import { CopyButton } from '../../components/CopyButton';
-import { fmtNum } from './inventoryUtils';
+import { fmtNum, assetSearchOrClause } from './inventoryUtils';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { ActionDoneView } from '../contracts/ActionDoneView';
@@ -889,8 +889,7 @@ function AddLineModal({
     queryFn: () => {
       let url = `/v_assets?branch_id=eq.${order.from_branch_id}&current_bucket=eq.ON_HAND_AVAILABLE&order=updated_at.desc&limit=50`;
       if (debounced) {
-        const term = encodeURIComponent(debounced);
-        url += `&or=(asset_code.ilike.*${term}*,serial_no.ilike.*${term}*,imei.ilike.*${term}*,product_display_name.ilike.*${term}*)`;
+        url += `&${assetSearchOrClause(debounced, ['product_display_name'])}`;
       }
       return apiClient.get<AddableAsset[]>(url);
     },

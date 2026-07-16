@@ -6,10 +6,12 @@ import { XCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { ActionDoneView } from './ActionDoneView';
 import { useContractInvalidate } from './useContractInvalidate';
+import { codeDisplay, assetCodeMatches } from '../inventory/inventoryUtils';
 
 interface LoanerAssetOption {
   asset_id: number;
   asset_code: string;
+  asset_code_display: string | null;
   model_name: string;
   variant_name: string;
 }
@@ -51,12 +53,14 @@ export function BindLoanerModal({
   const [loanerAssetId, setLoanerAssetId] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
+  const [assetSearch, setAssetSearch] = useState('');
 
   useEffect(() => {
     if (open) {
       setLoanerAssetId(presetLoanerAssetId ? String(presetLoanerAssetId) : null);
       setNote('');
       setError('');
+      setAssetSearch('');
     }
   }, [open, presetLoanerAssetId]);
 
@@ -64,6 +68,7 @@ export function BindLoanerModal({
     queryKey: ['loaner-assets-available', branchId],
     queryFn: () => {
       const params = new URLSearchParams({
+        select: 'asset_id,asset_code,asset_code_display,model_name,variant_name',
         current_bucket: 'eq.LOANED_OUT',
         branch_id: `eq.${branchId}`,
         order: 'asset_code',
@@ -75,13 +80,19 @@ export function BindLoanerModal({
     enabled: open && !presetLoanerAssetId,
   });
 
-  const options = useMemo(
-    () => assets.map(a => ({
+  const options = useMemo(() => {
+    const q = assetSearch.trim().toLowerCase();
+    // Dash-insensitive: match the typed code either way; fall back to model name.
+    const filtered = q
+      ? assets.filter(a =>
+          assetCodeMatches(q, a.asset_code_display, a.asset_code)
+          || `${a.model_name} ${a.variant_name}`.toLowerCase().includes(q))
+      : assets;
+    return filtered.map(a => ({
       value: String(a.asset_id),
-      label: `${a.asset_code} — ${a.model_name} ${a.variant_name}`,
-    })),
-    [assets],
-  );
+      label: `${codeDisplay(a.asset_code_display, a.asset_code)} — ${a.model_name} ${a.variant_name}`,
+    }));
+  }, [assets, assetSearch]);
 
   const mutation = useMutation({
     mutationFn: () => apiClient.rpc('fn_contract_bind_loaner', {
@@ -121,6 +132,8 @@ export function BindLoanerModal({
                   placeholder={t('contract.bindLoaner_selectLoaner')}
                   showChevron
                   searchable
+                  onSearchChange={setAssetSearch}
+                  filterOptions={false}
                 />
                 <div className="text-xs text-subtle mt-1">{t('contract.bindLoaner_hint')}</div>
               </div>

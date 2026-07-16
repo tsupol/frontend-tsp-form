@@ -1403,6 +1403,11 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
 
     const tokens = q.split(/\s+/).filter(Boolean);
     const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Users type the code either dashed ("AT-2604-000101-3") or dash-free
+    // ("AT26040001013"); strip dashes from both the token and the code so
+    // either input matches.
+    const strip = (s: string) => s.replace(/-/g, '');
+    const qStripped = strip(q);
 
     type Scored = { asset: Asset; tier: number; fuzzy: number; index: number };
     const scored: Scored[] = [];
@@ -1410,8 +1415,10 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
 
     assets.forEach((a, index) => {
       const code = codeOf(a).toLowerCase();
+      const codeStripped = strip(code);
       const hay = [
         code,
+        codeStripped,
         a.family_name ?? '',
         a.model_name,
         a.variant_name,
@@ -1419,11 +1426,11 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
         a.serial_no ?? '',
         a.imei ?? '',
       ].join(' ').toLowerCase();
-      if (!tokens.every(tok => hay.includes(tok))) return;
+      if (!tokens.every(tok => hay.includes(tok) || hay.includes(strip(tok)))) return;
 
       let tier = 3;
-      if (code === q) tier = 0;
-      else if (code.startsWith(q)) tier = 1;
+      if (code === q || codeStripped === qStripped) tier = 0;
+      else if (code.startsWith(q) || codeStripped.startsWith(qStripped)) tier = 1;
       else if (new RegExp(`\\b${escape(q)}\\b`).test(hay)) tier = 2;
       scored.push({ asset: a, tier, fuzzy: 1, index });
       matched.add(index);
