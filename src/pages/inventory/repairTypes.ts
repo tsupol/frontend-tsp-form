@@ -13,7 +13,8 @@ export type RepairStatus = 'DRAFT' | 'IN_REPAIR' | 'CLOSED' | 'VOIDED';
 export type RepairSubState =
   | 'DRAFT'
   | 'AWAITING_ASSESSMENT'   // IN_REPAIR, no charge sheet yet (c_charge_gross = 0)
-  | 'AWAITING_PAYMENT'      // balance > 0
+  | 'IN_PROGRESS'           // priced, tech working (mig 664) — deposit paid still sits here
+  | 'AWAITING_PAYMENT'      // tech marked completed AND balance > 0 (meaning shifted, mig 664)
   | 'REFUND_DUE'            // balance < 0
   | 'READY_FOR_RETURN'      // balance = 0, closable
   | 'CLOSED'
@@ -73,11 +74,25 @@ export interface RepairOrder {
 
   promised_date: string | null;
   intake_at: string | null;
+  // Work axis (mig 664): the tech "marked completed" stamp. NULL = still working.
+  completed_at: string | null;
+  completed_by: number | null;
+  completed_by_name: string | null;
   closed_at: string | null;
   cancelled_at: string | null;
   cancel_reason: string | null;
   created_at: string;
   updated_at: string;
+
+  // Pickup deadline axis (mig 671). pickup_days = the "come collect within N days"
+  // agreed at DRAFT; pickup_deadline = completed_at + pickup_days (NULL until done).
+  pickup_days: number | null;
+  pickup_deadline: string | null;
+
+  // worklist-only extras.
+  aging_days?: number | null;        // days since intake (v_repair_worklist)
+  repair_days?: number | null;       // intake_at → completed_at (NULL if not done)
+  pickup_days_left?: number | null;  // days until pickup_deadline (negative = overdue)
 
   holding_id: number;
   branch_id: number;
@@ -111,12 +126,14 @@ export interface RepairSearchResult {
 // One action row from fn_repair_available_actions. Enabled iff
 // is_permitted === true && blocking_reason === null. POST rpc_name verbatim.
 export type RepairActionCode =
-  | 'DRAFT_UPDATE' | 'DISCARD' | 'INTAKE'
+  | 'DRAFT_UPDATE' | 'DISCARD' | 'INTAKE' | 'PICKUP_SET'
   | 'CHARGE_SET' | 'COST_SET' | 'CHARGE_NOTICE'
+  | 'MARK_COMPLETED' | 'UNCOMPLETE'
   | 'PAY' | 'REFUND' | 'CANCEL' | 'CLOSE' | 'ATTACH_MEDIA';
 
 export type RepairBlockingReason =
-  | 'permission_denied' | 'no_charge_sheet' | 'balance_not_cleared' | 'nothing_to_refund';
+  | 'permission_denied' | 'no_charge_sheet' | 'balance_not_cleared' | 'nothing_to_refund'
+  | 'already_completed' | 'not_completed_yet';
 
 export interface RepairAction {
   action_code: RepairActionCode;
@@ -198,15 +215,37 @@ export interface RefRepairItemType {
 }
 
 // Colors for sub_state badges — the primary status signal on list + detail.
-export const SUB_STATE_COLOR: Record<RepairSubState, 'default' | 'info' | 'warning' | 'success' | 'danger'> = {
+export const SUB_STATE_COLOR: Record<RepairSubState, 'default' | 'info' | 'warning' | 'success' | 'danger' | 'primary'> = {
   DRAFT: 'default',
   AWAITING_ASSESSMENT: 'info',
+  IN_PROGRESS: 'primary',
   AWAITING_PAYMENT: 'warning',
   REFUND_DUE: 'danger',
   READY_FOR_RETURN: 'success',
   CLOSED: 'success',
   VOIDED: 'danger',
 };
+
+// One row from v_repair_timeline. event_code is FE-translated (all codes live in
+// v_ref_repair_events). ALWAYS order by log_id — same-transaction events share
+// event_at exactly. detail is event-specific; *_CHANGED carry {from,to}.
+export type RepairEventCode =
+  | 'CREATED' | 'INTAKE' | 'CHARGE_ADD' | 'CHARGE_VOID' | 'CHARGE_NOTICE'
+  | 'PAYMENT' | 'REFUND' | 'BILL_VOIDED' | 'COST_CHANGED' | 'NOTE_CHANGED'
+  | 'PICKUP_DAYS_CHANGED' | 'NOTE' | 'COMPLETED' | 'UNCOMPLETED' | 'CLOSED' | 'CANCELLED';
+
+export interface RepairTimelineEvent {
+  log_id: number;
+  repair_order_id: number;
+  event_code: RepairEventCode;
+  event_at: string;
+  actor_id: number | null;
+  actor_name: string | null;
+  detail: Record<string, unknown> | null;
+  note: string | null;
+  bill_status: string | null;   // for PAYMENT/REFUND rows → 'VOIDED' shows "(cancelled)"
+  is_backfilled: boolean;
+}
 
 export const RESULT_COLOR: Record<RepairResult, 'success' | 'danger' | 'warning'> = {
   FIXED: 'success',

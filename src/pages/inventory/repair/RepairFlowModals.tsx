@@ -188,11 +188,18 @@ export function RepairCloseModal({
     staleTime: 60 * 60 * 1000,
   });
 
+  // If the technician already marked the repair completed, the result is locked
+  // to their verdict (BE rejects a mismatching close with REPAIR_RESULT_CONFLICT).
+  // Seed the result from the order and disable the field. To change it, staff must
+  // undo completion first.
+  const resultLocked = order.completed_at != null;
+
   useEffect(() => {
     if (open) {
-      setView('form'); setResult(null); setRoute(null); setNote('');
+      setView('form'); setResult(resultLocked ? order.result : null); setRoute(null); setNote('');
       setSignMediaId(null); setQrOpen(false); setBusy(false); setErrorMessage('');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   // Routes allowed for this repair_type (shop-stock cannot RETURN_TO_CUSTOMER).
@@ -248,7 +255,9 @@ export function RepairCloseModal({
                     placeholder={t('repair.selectResult')}
                     showChevron
                     searchable={false}
+                    disabled={resultLocked}
                   />
+                  {resultLocked && <span className="text-xs text-subtle mt-1">{t('repair.resultLocked')}</span>}
                 </div>
                 <div className="flex flex-col">
                   <label className="form-label">{t('repair.routeDecision')}</label>

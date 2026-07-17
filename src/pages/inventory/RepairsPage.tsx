@@ -5,7 +5,7 @@ import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-quer
 import {
   PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Input, DataTable,
 } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, Wrench, Search, Plus } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, Wrench, Search, Plus, CheckCircle2, CalendarClock } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency } from '../../lib/format';
@@ -191,6 +191,33 @@ export function RepairsPage() {
                           </span>
                           <span className="ml-auto shrink-0"><DateTime value={r.created_at} showTime={false} /></span>
                         </div>
+                        {/* Work + pickup cues: who finished it, and the collect-by
+                            deadline for a still-open completed repair. */}
+                        {(r.completed_at || (r.pickup_deadline && r.status !== 'CLOSED' && r.status !== 'VOIDED')) && (
+                          <div className="flex items-center gap-2.5 text-xs min-w-0">
+                            {r.completed_at && (
+                              <span className="inline-flex items-center gap-1 text-success shrink-0">
+                                <CheckCircle2 size={11} />
+                                {r.completed_by_name ?? t('repair.completedAt')}
+                              </span>
+                            )}
+                            {r.pickup_deadline && r.status !== 'CLOSED' && r.status !== 'VOIDED' && (() => {
+                              // pickup_days_left is worklist-only; derive overdue from
+                              // the deadline date when the search RPC didn't supply it.
+                              const isOverdue = r.pickup_days_left != null
+                                ? r.pickup_days_left < 0
+                                : new Date(r.pickup_deadline) < new Date();
+                              return (
+                                <span className={`inline-flex items-center gap-1 shrink-0 ${isOverdue ? 'text-danger' : 'text-subtle'}`}>
+                                  <CalendarClock size={11} />
+                                  {r.pickup_days_left != null && r.pickup_days_left < 0
+                                    ? t('repair.pickupOverdue', { days: -r.pickup_days_left })
+                                    : <DateTime value={r.pickup_deadline} showTime={false} />}
+                                </span>
+                              );
+                            })()}
+                          </div>
+                        )}
                       </button>
                     );
                   }}

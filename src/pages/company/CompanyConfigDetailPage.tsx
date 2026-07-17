@@ -51,6 +51,8 @@ export function CompanyConfigDetailPage() {
     { key: 'buyback_auto_reject_days', label: t('settings.config.buybackAutoRejectDays'), type: 'number', group: 'buyback', min: 1, max: 365 },
     // pay_pending_limit: 0 = pay only what's due, 99 = allow pay-ahead (mig 533). Fill policy.
     { key: 'pay_pending_limit', label: t('settings.config.payPendingLimit'), type: 'number', group: 'policy', min: 0, max: 99 },
+    // repair_pickup_max_days: default pickup window for new repair orders (mig 671).
+    { key: 'repair_pickup_max_days', label: t('settings.config.repairPickupMaxDays'), type: 'number', group: 'repair', min: 1, max: 365 },
   ];
 
   const groups = [
@@ -61,6 +63,7 @@ export function CompanyConfigDetailPage() {
     { key: 'legal', label: t('settings.config.groupLegal') },
     { key: 'buyback', label: t('settings.config.groupBuyback') },
     { key: 'policy', label: t('settings.config.groupPolicy') },
+    { key: 'repair', label: t('settings.config.groupRepair') },
   ];
 
   // Initialize form when config loads

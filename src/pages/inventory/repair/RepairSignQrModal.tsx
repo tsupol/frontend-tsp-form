@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Button } from 'tsp-form';
 import { QRCodeSVG } from 'qrcode.react';
-import { Smartphone, XCircle, Copy, Check, PenLine, CheckCircle } from 'lucide-react';
+import { Smartphone, XCircle, Copy, Check, PenLine, CheckCircle, ExternalLink } from 'lucide-react';
 import { useMobileCaptureSession } from '../../contracts/workspace/useMobileCaptureSession';
 import type { RepairDocType } from '../repairTypes';
 
@@ -116,6 +116,19 @@ export function RepairSignQrModal({
                   <PenLine size={14} />
                   {t('repair.signScanHint')}
                 </p>
+
+                {/* Same page the QR points to — open it right here so staff can
+                    hand this device to the customer to read + sign, then poll
+                    picks up the signed media_id exactly like the QR flow. */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  startIcon={<ExternalLink size={14} />}
+                  onClick={() => window.open(session.qr_payload, '_blank', 'noopener')}
+                >
+                  {t('repair.openSignLink')}
+                </Button>
 
                 <div className="w-full flex items-center gap-2">
                   <input

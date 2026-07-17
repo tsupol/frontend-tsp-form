@@ -18,6 +18,7 @@ export interface CompanyConfig {
   deposit_max_days: number;
   buyback_auto_reject_days: number;
   pay_pending_limit: number;
+  repair_pickup_max_days: number;
   updated_by: number | null;
   updated_at: string;
 }

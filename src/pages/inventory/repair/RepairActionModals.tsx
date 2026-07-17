@@ -9,7 +9,7 @@ import { BranchPaymentAccountField } from '../../../components/BranchPaymentAcco
 import { ActionDoneView } from '../../contracts/ActionDoneView';
 import { fmtCurrency } from '../../../lib/format';
 import type {
-  RepairOrder, RepairItemType, RepairPayMethod, RefRepairItemType, RepairRenderDoc,
+  RepairOrder, RepairItemType, RepairPayMethod, RefRepairItemType, RepairRenderDoc, RepairResult,
 } from '../repairTypes';
 
 function translateErr(err: unknown, t: ReturnType<typeof useTranslation>['t']): string {
@@ -901,6 +901,304 @@ export function RepairDiscardModal({
       <div className="modal-footer">
         <Button variant="ghost" onClick={onClose} disabled={busy}>{t('common.cancel')}</Button>
         <Button color="danger" onClick={submit} disabled={busy}>{busy ? t('common.loading') : t('repair.confirmDiscard')}</Button>
+      </div>
+    </Modal>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Mark completed (MARK_COMPLETED) — the technician's verdict. "Completed" = the
+ * result is decided (an unfixable device is still completed). Result dropdown is
+ * fed from v_ref_repair_results (never hardcoded). Work note optional. Moves the
+ * sub_state IN_PROGRESS → AWAITING_PAYMENT (or READY_FOR_RETURN if already paid).
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+interface RefRepairResult { result: RepairResult; sort_order: number }
+
+export function RepairMarkCompletedModal({
+  open, onClose, order, onDone,
+}: {
+  open: boolean; onClose: () => void; order: RepairOrder; onDone: () => void;
+}) {
+  const { t } = useTranslation();
+  const { addSnackbar } = useSnackbarContext();
+  const [result, setResult] = useState<RepairResult | null>(null);
+  const [workNote, setWorkNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const { data: results } = useQuery({
+    queryKey: ['ref-repair-results'],
+    queryFn: () => apiClient.get<RefRepairResult[]>('/v_ref_repair_results?order=sort_order'),
+    staleTime: 60 * 60 * 1000,
+  });
+
+  useEffect(() => {
+    if (open) { setResult(null); setWorkNote(order.work_note ?? ''); setBusy(false); setErrorMessage(''); }
+  }, [open, order]);
+
+  const canSubmit = !busy && !!result;
+
+  const submit = async () => {
+    if (!canSubmit) return;
+    setBusy(true); setErrorMessage('');
+    try {
+      await apiClient.rpc('fn_inv_repair_mark_completed', {
+        p_repair_order_id: order.repair_order_id,
+        p_result: result,
+        p_work_note: workNote.trim() || null,
+      });
+      onDone(); onClose();
+      addSnackbar({ message: <div className="alert alert-success"><CheckCircle size={16} /><span>{t('repair.markCompletedDone')}</span></div> });
+    } catch (err) {
+      setErrorMessage(translateErr(err, t));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal open={open} onClose={busy ? () => {} : onClose} maxWidth="30rem" width="100%">
+      <div className="modal-header">
+        <h2 className="modal-title">{t('repair.markCompletedTitle')}</h2>
+        <button type="button" className="modal-close-btn" onClick={onClose} aria-label={t('common.close')}>&times;</button>
+      </div>
+      <div className="modal-content">
+        <RepairTargetBox order={order} subtitle={t('repair.markCompletedHint')} />
+        <div className="form-grid">
+          <div className="flex flex-col">
+            <label className="form-label">{t('repair.result')} <span className="text-danger">*</span></label>
+            <Select
+              options={(results ?? []).map(r => ({ value: r.result, label: t(`repair.result_${r.result}`) }))}
+              value={result}
+              onChange={(val) => setResult((val as RepairResult) || null)}
+              placeholder={t('repair.selectResult')}
+              showChevron
+              searchable={false}
+            />
+          </div>
+          <div className="flex flex-col">
+            <label className="form-label">{t('repair.workNote')}</label>
+            <TextArea value={workNote} onChange={(e) => setWorkNote(e.target.value)} rows={2} />
+          </div>
+        </div>
+        {errorMessage && (
+          <div className="alert alert-danger mt-4 animate-pop-in"><XCircle size={16} /><span>{errorMessage}</span></div>
+        )}
+      </div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={onClose} disabled={busy}>{t('common.cancel')}</Button>
+        <Button color="primary" onClick={submit} disabled={!canSubmit}>{busy ? t('common.loading') : t('repair.confirmMarkCompleted')}</Button>
+      </div>
+    </Modal>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Undo completion (UNCOMPLETE) — reopen a completed repair so the result can be
+ * changed (wrong verdict / wrong order). Reason ≥ 3 chars. Not tied to money —
+ * a fully-paid repair can still be reopened. Clears completed_at/result.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+export function RepairUncompleteModal({
+  open, onClose, order, onDone,
+}: {
+  open: boolean; onClose: () => void; order: RepairOrder; onDone: () => void;
+}) {
+  const { t } = useTranslation();
+  const { addSnackbar } = useSnackbarContext();
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  useEffect(() => { if (open) { setReason(''); setBusy(false); setErrorMessage(''); } }, [open]);
+
+  const canSubmit = !busy && reason.trim().length >= 3;
+
+  const submit = async () => {
+    if (!canSubmit) return;
+    setBusy(true); setErrorMessage('');
+    try {
+      await apiClient.rpc('fn_inv_repair_uncomplete', {
+        p_repair_order_id: order.repair_order_id,
+        p_reason: reason.trim(),
+      });
+      onDone(); onClose();
+      addSnackbar({ message: <div className="alert alert-success"><CheckCircle size={16} /><span>{t('repair.uncompleteDone')}</span></div> });
+    } catch (err) {
+      setErrorMessage(translateErr(err, t));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal open={open} onClose={busy ? () => {} : onClose} maxWidth="28rem" width="100%">
+      <div className="modal-header">
+        <h2 className="modal-title">{t('repair.uncompleteTitle')}</h2>
+        <button type="button" className="modal-close-btn" onClick={onClose} aria-label={t('common.close')}>&times;</button>
+      </div>
+      <div className="modal-content">
+        <RepairTargetBox order={order} subtitle={
+          order.result ? `${t('repair.result')}: ${t(`repair.result_${order.result}`)}` : t('repair.uncompleteHint')
+        } />
+        <div className="flex flex-col">
+          <label className="form-label">{t('repair.uncompleteReason')} <span className="text-danger">*</span></label>
+          <TextArea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} placeholder={t('repair.uncompleteReasonPlaceholder')} />
+        </div>
+        {errorMessage && (
+          <div className="alert alert-danger mt-4 animate-pop-in"><XCircle size={16} /><span>{errorMessage}</span></div>
+        )}
+      </div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={onClose} disabled={busy}>{t('common.cancel')}</Button>
+        <Button color="danger" onClick={submit} disabled={!canSubmit}>{busy ? t('common.loading') : t('repair.confirmUncomplete')}</Button>
+      </div>
+    </Modal>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Pickup window (PICKUP_SET) — days the customer has to collect after the repair
+ * is completed. Editable only while DRAFT (the number is printed on the signed
+ * intake doc). 1–365. Prefilled from the order's current pickup_days (default 45).
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+export function RepairPickupSetModal({
+  open, onClose, order, onDone,
+}: {
+  open: boolean; onClose: () => void; order: RepairOrder; onDone: () => void;
+}) {
+  const { t } = useTranslation();
+  const { addSnackbar } = useSnackbarContext();
+  const [days, setDays] = useState('');
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  useEffect(() => {
+    if (open) {
+      setDays(order.pickup_days != null ? String(order.pickup_days) : '');
+      setNote(''); setBusy(false); setErrorMessage('');
+    }
+  }, [open, order]);
+
+  const daysNum = Number(days) || 0;
+  const canSubmit = !busy && daysNum >= 1 && daysNum <= 365;
+
+  const submit = async () => {
+    if (!canSubmit) return;
+    setBusy(true); setErrorMessage('');
+    try {
+      await apiClient.rpc('fn_inv_repair_pickup_set', {
+        p_repair_order_id: order.repair_order_id,
+        p_pickup_days: daysNum,
+        p_note: note.trim() || null,
+      });
+      onDone(); onClose();
+      addSnackbar({ message: <div className="alert alert-success"><CheckCircle size={16} /><span>{t('repair.pickupSetDone')}</span></div> });
+    } catch (err) {
+      setErrorMessage(translateErr(err, t));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal open={open} onClose={busy ? () => {} : onClose} maxWidth="28rem" width="100%">
+      <div className="modal-header">
+        <h2 className="modal-title">{t('repair.pickupSetTitle')}</h2>
+        <button type="button" className="modal-close-btn" onClick={onClose} aria-label={t('common.close')}>&times;</button>
+      </div>
+      <div className="modal-content">
+        <RepairTargetBox order={order} subtitle={t('repair.pickupSetHint')} />
+        <div className="form-grid">
+          <div className="flex flex-col">
+            <label className="form-label">{t('repair.pickupDays')} <span className="text-danger">*</span></label>
+            <div style={{ width: '10rem' }}>
+              <MaskedInput
+                mask="number"
+                decimalScale={0}
+                value={days}
+                onChange={(raw) => setDays(raw)}
+                placeholder="45"
+                className="w-full"
+              />
+            </div>
+          </div>
+          <div className="flex flex-col">
+            <label className="form-label">{t('repair.pickupNote')}</label>
+            <Input value={note} onChange={(e) => setNote(e.target.value)} className="w-full" />
+          </div>
+        </div>
+        {errorMessage && (
+          <div className="alert alert-danger mt-4 animate-pop-in"><XCircle size={16} /><span>{errorMessage}</span></div>
+        )}
+      </div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={onClose} disabled={busy}>{t('common.cancel')}</Button>
+        <Button color="primary" onClick={submit} disabled={!canSubmit}>{busy ? t('common.loading') : t('repair.confirmPickupSet')}</Button>
+      </div>
+    </Modal>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Add note (fn_repair_note_add) — a free note logged to the timeline (e.g.
+ * "called the customer"). No status/money effect. Note ≥ 3 chars.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+export function RepairNoteAddModal({
+  open, onClose, order, onDone,
+}: {
+  open: boolean; onClose: () => void; order: RepairOrder; onDone: () => void;
+}) {
+  const { t } = useTranslation();
+  const { addSnackbar } = useSnackbarContext();
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  useEffect(() => { if (open) { setNote(''); setBusy(false); setErrorMessage(''); } }, [open]);
+
+  const canSubmit = !busy && note.trim().length >= 3;
+
+  const submit = async () => {
+    if (!canSubmit) return;
+    setBusy(true); setErrorMessage('');
+    try {
+      await apiClient.rpc('fn_repair_note_add', {
+        p_repair_order_id: order.repair_order_id,
+        p_note: note.trim(),
+      });
+      onDone(); onClose();
+      addSnackbar({ message: <div className="alert alert-success"><CheckCircle size={16} /><span>{t('repair.noteAddDone')}</span></div> });
+    } catch (err) {
+      setErrorMessage(translateErr(err, t));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal open={open} onClose={busy ? () => {} : onClose} maxWidth="28rem" width="100%">
+      <div className="modal-header">
+        <h2 className="modal-title">{t('repair.noteAddTitle')}</h2>
+        <button type="button" className="modal-close-btn" onClick={onClose} aria-label={t('common.close')}>&times;</button>
+      </div>
+      <div className="modal-content">
+        <RepairTargetBox order={order} subtitle={t('repair.noteAddHint')} />
+        <div className="flex flex-col">
+          <label className="form-label">{t('repair.note')}</label>
+          <TextArea value={note} onChange={(e) => setNote(e.target.value)} rows={3} placeholder={t('repair.noteAddPlaceholder')} />
+        </div>
+        {errorMessage && (
+          <div className="alert alert-danger mt-4 animate-pop-in"><XCircle size={16} /><span>{errorMessage}</span></div>
+        )}
+      </div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={onClose} disabled={busy}>{t('common.cancel')}</Button>
+        <Button color="primary" onClick={submit} disabled={!canSubmit}>{busy ? t('common.loading') : t('repair.confirmNoteAdd')}</Button>
       </div>
     </Modal>
   );

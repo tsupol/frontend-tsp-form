@@ -2,12 +2,12 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Badge, Button, Tooltip, PopOver } from 'tsp-form';
-import { Printer, FileText, FilePlus, User, Package, PackagePlus, PackageCheck, Banknote, ExternalLink, ChevronDown } from 'lucide-react';
+import { Printer, FileText, FilePlus, User, Package, PackagePlus, PackageCheck, Banknote, ExternalLink, ChevronDown, Phone, CheckCircle2, AlertTriangle, CalendarClock, Wrench } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { apiClient } from '../../../lib/api';
 import { DateTime } from '../../../components/DateTime';
 import { CopyButton } from '../../../components/CopyButton';
-import { fmtCurrency } from '../../../lib/format';
+import { fmtCurrency, formatTel } from '../../../lib/format';
 import type {
   RepairOrder, RepairAvailableActions, RepairAction, RepairActionCode, RepairRenderDoc,
 } from '../repairTypes';
@@ -17,16 +17,19 @@ import { RepairIntakeModal, RepairCloseModal } from './RepairFlowModals';
 import {
   RepairChargeModal, RepairCostModal, RepairChargeNoticeModal,
   RepairPayModal, RepairRefundModal, RepairCancelModal, RepairDiscardModal, RepairDraftEditModal,
+  RepairMarkCompletedModal, RepairUncompleteModal, RepairPickupSetModal, RepairNoteAddModal,
 } from './RepairActionModals';
 import { RepairDocPreviewModal } from './RepairDocPreviewModal';
 import { RepairConditionPhotos } from './RepairConditionPhotos';
+import { RepairTimeline } from './RepairTimeline';
 
 // Icon per action_code for the quick (primary) footer buttons.
 const ACTION_ICON: Partial<Record<RepairActionCode, React.ReactNode>> = {
-  INTAKE: <PackagePlus size={16} />,     // receive device in
-  CHARGE_SET: <FileText size={16} />,    // build the charge sheet
-  PAY: <Banknote size={16} />,           // collect payment
-  CLOSE: <PackageCheck size={16} />,     // hand device back / close
+  INTAKE: <PackagePlus size={16} />,          // receive device in
+  CHARGE_SET: <FileText size={16} />,         // build the charge sheet
+  MARK_COMPLETED: <CheckCircle2 size={16} />, // tech marks the work done
+  PAY: <Banknote size={16} />,                // collect payment
+  CLOSE: <PackageCheck size={16} />,          // hand device back / close
 };
 
 // Quick (primary) actions — the forward step for each state, shown inline as
@@ -34,10 +37,12 @@ const ACTION_ICON: Partial<Record<RepairActionCode, React.ReactNode>> = {
 // drops into the "More" overflow so the footer stays a clean one-tap row.
 // Same primary/more split as the AssetsPage footer. CHARGE_SET is deliberately
 // NOT here — it lives inline in the charge-sheet section (in-context editing).
-const QUICK_ACTIONS = new Set<RepairActionCode>(['INTAKE', 'PAY', 'CLOSE']);
-// Actions surfaced in-context (not in the footer at all).
-const INLINE_ACTIONS = new Set<RepairActionCode>(['CHARGE_SET']);
-const DANGER_ACTIONS = new Set<RepairActionCode>(['CANCEL', 'DISCARD']);
+const QUICK_ACTIONS = new Set<RepairActionCode>(['INTAKE', 'MARK_COMPLETED', 'PAY', 'CLOSE']);
+// Actions surfaced in-context (not in the footer at all): CHARGE_SET in the
+// charge-sheet section, PICKUP_SET in the pickup metadata row, COST_SET in the
+// internal cost band.
+const INLINE_ACTIONS = new Set<RepairActionCode>(['CHARGE_SET', 'PICKUP_SET', 'COST_SET']);
+const DANGER_ACTIONS = new Set<RepairActionCode>(['CANCEL', 'DISCARD', 'UNCOMPLETE']);
 
 export function RepairDetailPanel({
   order, isMobile, onRefresh,
@@ -47,9 +52,10 @@ export function RepairDetailPanel({
   onRefresh: () => void;
 }) {
   const { t } = useTranslation();
-  const [activeAction, setActiveAction] = useState<RepairActionCode | null>(null);
+  const [activeAction, setActiveAction] = useState<RepairActionCode | 'NOTE_ADD' | null>(null);
   const [previewDoc, setPreviewDoc] = useState<BeMediaRepairDoc | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [tab, setTab] = useState<'details' | 'history'>('details');
   const moreTriggerRef = useRef<HTMLButtonElement>(null);
 
   // Data-driven action catalog — filtered to status + permissions by the BE.
@@ -91,9 +97,26 @@ export function RepairDetailPanel({
   const chargeAction = actions.find(a => a.action_code === 'CHARGE_SET');
   const chargeActionEnabled = !!chargeAction && chargeAction.is_permitted && chargeAction.blocking_reason === null;
 
-  const pick = (code: RepairActionCode) => { setActiveAction(code); setMoreOpen(false); };
+  // The PICKUP_SET action (surfaced inline in the pickup metadata row — DRAFT only).
+  const pickupAction = actions.find(a => a.action_code === 'PICKUP_SET');
+  const pickupActionEnabled = !!pickupAction && pickupAction.is_permitted && pickupAction.blocking_reason === null;
+
+  // The COST_SET action (internal repair cost — surfaced inline in the cost band,
+  // staff-only, never printed). "Not recorded yet" gets a ⚠ so staff notice.
+  const costAction = actions.find(a => a.action_code === 'COST_SET');
+  const costActionEnabled = !!costAction && costAction.is_permitted && costAction.blocking_reason === null;
+  const costRecorded = order.repair_cost != null;
+
+  const pick = (code: RepairActionCode | 'NOTE_ADD') => { setActiveAction(code); setMoreOpen(false); };
   const close = () => setActiveAction(null);
   const done = () => { onRefresh(); };
+
+  // pickup_days_left is a v_repair_worklist-only field; fn_repair_search (which
+  // feeds this panel) returns v_repair_orders, which has pickup_deadline but not
+  // days_left. Fall back to comparing the deadline date to today.
+  const overdue = order.pickup_days_left != null
+    ? order.pickup_days_left < 0
+    : order.pickup_deadline != null && new Date(order.pickup_deadline) < new Date();
 
   const charges = doc?.charge_items ?? [];
 
@@ -124,76 +147,139 @@ export function RepairDetailPanel({
         </div>
       )}
 
-      {/* Body */}
-      {/* Device — primary identity band */}
-      <div className="flex-none px-4 py-3 border-b border-line">
-        <div className="flex items-center gap-1.5 text-sm font-medium truncate">
-          {order.asset_id != null ? (
-            <Link to={`/admin/inventory/assets/${order.asset_id}`} className="inline-flex items-center gap-1 text-primary-fg hover:underline">
-              {order.product_display_name ?? order.asset_code_display ?? '—'}
-              <ExternalLink size={11} />
-            </Link>
-          ) : (
-            order.product_display_name ?? '—'
-          )}
-          {order.master_color_name && <span className="text-subtle font-normal">· {order.master_color_name}</span>}
-        </div>
-        <div className="text-xs text-subtle font-mono truncate mt-0.5">
-          {[order.serial_no, order.imei && `IMEI ${order.imei}`].filter(Boolean).join(' · ') || '—'}
-        </div>
-        <div className="flex items-center flex-wrap gap-1.5 mt-2">
-          <Badge size="sm" color={SUB_STATE_COLOR[order.sub_state]}>{t(`repair.subState_${order.sub_state}`)}</Badge>
-          <Badge size="sm" color="default">{t(`repair.type_${order.repair_type}`)}</Badge>
-          {order.result && (
-            <Badge size="sm" color={RESULT_COLOR[order.result]}>{t(`repair.result_${order.result}`)}</Badge>
-          )}
-        </div>
+      {/* Details / History tabs — right under the header. All the identity /
+          money / metadata bands live inside Details so nothing's forced on the
+          History view. */}
+      <div className="flex-none flex items-center gap-1 px-3 border-b border-line">
+        {(['details', 'history'] as const).map(tk => (
+          <button
+            key={tk}
+            type="button"
+            className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors cursor-pointer ${
+              tab === tk ? 'border-primary text-fg' : 'border-transparent text-subtle hover:text-fg'
+            }`}
+            onClick={() => setTab(tk)}
+          >
+            {t(`repair.${tk}`)}
+          </button>
+        ))}
       </div>
 
-      {/* Customer + contract cross-link */}
-      <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-2 text-sm">
-        <User size={13} className="text-subtle shrink-0" />
-        <span className="font-medium truncate">{order.customer_name ?? '—'}</span>
-        {order.customer_tel && <span className="text-xs text-subtle shrink-0">{order.customer_tel}</span>}
-        {order.contract_id != null && (
-          <Link to={`/admin/contracts/search/${order.contract_id}`} className="ml-auto inline-flex items-center gap-1 text-xs text-primary-fg hover:underline shrink-0">
-            {order.contract_code_display ?? t('repair.viewContract')}
-            <ExternalLink size={10} />
-          </Link>
-        )}
-      </div>
-
-      {/* Money — prominent stat band (once there's a charge sheet) */}
-      {order.c_charge_gross > 0 && (
-        <div className="flex-none grid grid-cols-3 gap-3 px-4 py-3 border-b border-line bg-surface">
-          <div>
-            <div className="text-xs text-subtle">{t('repair.chargeNet')}</div>
-            <div className="font-semibold text-base tabular-nums">{fmtCurrency(order.c_charge_net)}</div>
-          </div>
-          <div>
-            <div className="text-xs text-subtle">{t('repair.paid')}</div>
-            <div className="font-semibold text-base tabular-nums">{fmtCurrency(order.c_charge_paid)}</div>
-          </div>
-          <div>
-            <div className="text-xs text-subtle">{order.c_charge_balance < 0 ? t('repair.refundDue') : t('repair.balance')}</div>
-            <div className={`font-semibold text-base tabular-nums ${
-              order.c_charge_balance > 0 ? 'text-warning-fg' : order.c_charge_balance < 0 ? 'text-danger' : 'text-success'
-            }`}>{fmtCurrency(Math.abs(order.c_charge_balance))}</div>
-          </div>
-        </div>
-      )}
-
-      {/* Branch + timeline — quiet metadata band */}
-      <div className="flex-none px-4 py-2 border-b border-line flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-subtle">
-        <span><span className="text-subtler">{t('repair.branch')}:</span> {order.branch_name}</span>
-        <span><span className="text-subtler">{t('repair.created')}:</span> <DateTime value={order.created_at} /></span>
-        {order.promised_date && <span><span className="text-subtler">{t('repair.promised')}:</span> <DateTime value={order.promised_date} showTime={false} /></span>}
-        {order.intake_at && <span><span className="text-subtler">{t('repair.intakeAt')}:</span> <DateTime value={order.intake_at} /></span>}
-        {order.closed_at && <span><span className="text-subtler">{t('repair.closedAt')}:</span> <DateTime value={order.closed_at} /></span>}
-      </div>
-
-      {/* Scrollable content — symptom, condition, charge sheet */}
+      {/* Scrollable content — symptom, condition, charge sheet, cost, photos / history */}
       <div className="flex-1 overflow-auto better-scroll px-4 py-3 flex flex-col gap-4">
+       {tab === 'history' ? (
+        <RepairTimeline
+          repairOrderId={order.repair_order_id}
+          updatedAt={order.updated_at}
+          onAddNote={() => pick('NOTE_ADD')}
+        />
+       ) : (
+        <>
+        {/* Device — primary identity band */}
+        <div>
+          <div className="flex items-center gap-1.5 text-sm font-medium truncate">
+            {order.asset_id != null ? (
+              <Link to={`/admin/inventory/assets/${order.asset_id}`} className="inline-flex items-center gap-1 text-primary-fg hover:underline">
+                {order.product_display_name ?? order.asset_code_display ?? '—'}
+                <ExternalLink size={11} />
+              </Link>
+            ) : (
+              order.product_display_name ?? '—'
+            )}
+            {order.master_color_name && <span className="text-subtle font-normal">· {order.master_color_name}</span>}
+          </div>
+          <div className="text-xs text-subtle font-mono truncate mt-0.5">
+            {[order.serial_no, order.imei && `IMEI ${order.imei}`].filter(Boolean).join(' · ') || '—'}
+          </div>
+          <div className="flex items-center flex-wrap gap-1.5 mt-2">
+            <Badge size="sm" color={SUB_STATE_COLOR[order.sub_state]}>{t(`repair.subState_${order.sub_state}`)}</Badge>
+            <Badge size="sm" color="default">{t(`repair.type_${order.repair_type}`)}</Badge>
+            {order.result && (
+              <Badge size="sm" color={RESULT_COLOR[order.result]}>{t(`repair.result_${order.result}`)}</Badge>
+            )}
+          </div>
+        </div>
+
+        {/* Customer + contract cross-link */}
+        <div className="flex items-center gap-2 text-sm">
+          <User size={13} className="text-subtle shrink-0" />
+          <span className="font-medium truncate">{order.customer_name ?? '—'}</span>
+          {order.customer_tel && (
+            <a
+              href={`tel:${order.customer_tel.replace(/\D/g, '')}`}
+              className="inline-flex items-center gap-1 text-xs text-subtle shrink-0 hover:text-fg tabular-nums"
+            >
+              <Phone size={11} className="shrink-0" />
+              {formatTel(order.customer_tel)}
+            </a>
+          )}
+          {order.contract_id != null && (
+            <Link to={`/admin/contracts/search/${order.contract_id}`} className="ml-auto inline-flex items-center gap-1 text-xs text-primary-fg hover:underline shrink-0">
+              {order.contract_code_display ?? t('repair.viewContract')}
+              <ExternalLink size={10} />
+            </Link>
+          )}
+        </div>
+
+        {/* Money — prominent stat band (once there's a charge sheet) */}
+        {order.c_charge_gross > 0 && (
+          <div className="grid grid-cols-3 gap-3 px-3 py-3 rounded-md border border-line bg-surface">
+            <div>
+              <div className="text-xs text-subtle">{t('repair.chargeNet')}</div>
+              <div className="font-semibold text-base tabular-nums">{fmtCurrency(order.c_charge_net)}</div>
+            </div>
+            <div>
+              <div className="text-xs text-subtle">{t('repair.paid')}</div>
+              <div className="font-semibold text-base tabular-nums">{fmtCurrency(order.c_charge_paid)}</div>
+            </div>
+            <div>
+              <div className="text-xs text-subtle">{order.c_charge_balance < 0 ? t('repair.refundDue') : t('repair.balance')}</div>
+              <div className={`font-semibold text-base tabular-nums ${
+                order.c_charge_balance > 0 ? 'text-warning-fg' : order.c_charge_balance < 0 ? 'text-danger' : 'text-success'
+              }`}>{fmtCurrency(Math.abs(order.c_charge_balance))}</div>
+            </div>
+          </div>
+        )}
+
+        {/* Branch + timeline — quiet metadata band. Three axes read from here:
+            work (completed_by/at, repair_days), and delivery (pickup deadline). */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-subtle">
+          <span><span className="text-subtler">{t('repair.branch')}:</span> {order.branch_name}</span>
+          <span><span className="text-subtler">{t('repair.created')}:</span> <DateTime value={order.created_at} /></span>
+          {order.promised_date && <span><span className="text-subtler">{t('repair.promised')}:</span> <DateTime value={order.promised_date} showTime={false} /></span>}
+          {order.intake_at && <span><span className="text-subtler">{t('repair.intakeAt')}:</span> <DateTime value={order.intake_at} /></span>}
+          {order.completed_at && (
+            <span className="inline-flex items-center gap-1 text-success">
+              <CheckCircle2 size={12} className="shrink-0" />
+              <span className="text-subtler">{t('repair.completedAt')}:</span> <DateTime value={order.completed_at} />
+              {order.completed_by_name && <span className="text-subtle">· {order.completed_by_name}</span>}
+            </span>
+          )}
+          {order.repair_days != null && (
+            <span><span className="text-subtler">{t('repair.repairDays')}:</span> {t('repair.repairDaysValue', { days: order.repair_days })}</span>
+          )}
+          {order.pickup_deadline && order.status !== 'CLOSED' && order.status !== 'VOIDED' && (
+            <span className={`inline-flex items-center gap-1 ${overdue ? 'text-danger' : ''}`}>
+              <CalendarClock size={12} className="shrink-0" />
+              <span className="text-subtler">{t('repair.pickupDeadline')}:</span> <DateTime value={order.pickup_deadline} showTime={false} />
+              {order.pickup_days_left != null && (
+                <span>· {overdue ? t('repair.pickupOverdue', { days: -order.pickup_days_left }) : t('repair.pickupDaysLeft', { days: order.pickup_days_left })}</span>
+              )}
+            </span>
+          )}
+          {order.closed_at && <span><span className="text-subtler">{t('repair.closedAt')}:</span> <DateTime value={order.closed_at} /></span>}
+          {/* Pickup window is agreed at DRAFT (printed on the intake doc). Editable
+              only while DRAFT — the action engine drops PICKUP_SET afterwards. */}
+          {pickupAction && (
+            <span className="inline-flex items-center gap-1">
+              <span className="text-subtler">{t('repair.pickupDays')}:</span> {order.pickup_days ?? '—'}
+              <Button variant="ghost" size="sm" className="btn-icon-xs" disabled={!pickupActionEnabled} startIcon={<CalendarClock size={12} />} onClick={() => pick('PICKUP_SET')} />
+            </span>
+          )}
+        </div>
+
+        <hr className="border-line" />
+
         {order.status === 'VOIDED' && order.cancel_reason && (
           <div className="alert alert-danger">
             <span>{t('repair.cancelledReason')}: {order.cancel_reason}</span>
@@ -253,6 +339,38 @@ export function RepairDetailPanel({
           </div>
         )}
 
+        {/* Internal repair cost (staff-only, never on the customer's PDF). A ⚠
+            flags "not recorded yet" so staff know the profit isn't captured. */}
+        {(costAction || costRecorded) && (
+          <div className="rounded-md border border-line px-3 py-2.5">
+            <div className="flex items-center gap-2">
+              <Wrench size={14} className="text-subtle shrink-0" />
+              <span className="text-xs font-semibold text-subtle uppercase tracking-wider">{t('repair.costAxis')}</span>
+              {costRecorded ? (
+                <span className="ml-auto font-semibold tabular-nums text-sm">{fmtCurrency(order.repair_cost ?? 0)}</span>
+              ) : (
+                <span className="ml-auto inline-flex items-center gap-1 text-xs text-warning-fg">
+                  <AlertTriangle size={13} />{t('repair.costNotRecorded')}
+                </span>
+              )}
+              {costAction && (
+                <Button
+                  variant={costRecorded ? 'ghost' : 'outline'}
+                  size="sm"
+                  className={costRecorded ? 'btn-icon-sm' : ''}
+                  startIcon={<Wrench size={14} />}
+                  disabled={!costActionEnabled}
+                  onClick={() => pick('COST_SET')}
+                >
+                  {costRecorded ? undefined : t('repair.setCost')}
+                </Button>
+              )}
+            </div>
+            {order.cost_note && <p className="text-xs text-subtle mt-1.5">{order.cost_note}</p>}
+            {order.work_note && <p className="text-sm mt-1.5 whitespace-pre-wrap">{order.work_note}</p>}
+          </div>
+        )}
+
         {/* Condition photo album — self-serve add (desktop / QR) + read-only grid
             once the order closes. Owns the ATTACH_MEDIA affordance. */}
         <RepairConditionPhotos
@@ -260,6 +378,8 @@ export function RepairDetailPanel({
           code={order.code_display}
           editable={photosEditable}
         />
+        </>
+       )}
       </div>
 
       {/* Data-driven action footer — quick actions inline + "More" overflow
@@ -304,11 +424,15 @@ export function RepairDetailPanel({
       <RepairIntakeModal open={activeAction === 'INTAKE'} onClose={close} order={order} onDone={done} />
       <RepairChargeModal open={activeAction === 'CHARGE_SET'} onClose={close} order={order} onChanged={done} />
       <RepairCostModal open={activeAction === 'COST_SET'} onClose={close} order={order} onDone={done} />
+      <RepairPickupSetModal open={activeAction === 'PICKUP_SET'} onClose={close} order={order} onDone={done} />
       <RepairChargeNoticeModal open={activeAction === 'CHARGE_NOTICE'} onClose={close} order={order} onDone={(issued) => { done(); if (issued) setPreviewDoc('CHARGE_NOTICE'); }} />
+      <RepairMarkCompletedModal open={activeAction === 'MARK_COMPLETED'} onClose={close} order={order} onDone={done} />
+      <RepairUncompleteModal open={activeAction === 'UNCOMPLETE'} onClose={close} order={order} onDone={done} />
       <RepairPayModal open={activeAction === 'PAY'} onClose={close} order={order} onDone={done} />
       <RepairRefundModal open={activeAction === 'REFUND'} onClose={close} order={order} onDone={done} />
       <RepairCancelModal open={activeAction === 'CANCEL'} onClose={close} order={order} onDone={done} />
       <RepairCloseModal open={activeAction === 'CLOSE'} onClose={close} order={order} onDone={done} />
+      <RepairNoteAddModal open={activeAction === 'NOTE_ADD'} onClose={close} order={order} onDone={done} />
 
       <RepairDocPreviewModal
         open={previewDoc != null}
