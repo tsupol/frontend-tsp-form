@@ -8,6 +8,7 @@ import { DateTime } from '../../components/DateTime';
 import { fmtCurrency } from '../../lib/format';
 import { getStateColor, getStateLabel } from './contractUtils';
 import { ContractActionButtons } from './ContractActions';
+import { WalletsTab } from './wallet/WalletsTab';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -59,6 +60,7 @@ interface ContractDetail {
   outstanding_amount: number | null;
   credit_balance: number | null;
   credit_balance_company: number | null;
+  credit_balance_holding: number | null;
   late_fee_balance: number | null;
   total_refunded: number | null;
   saving_balance: number | null;
@@ -117,7 +119,7 @@ interface ContractNote {
 
 // ── Tabs ─────────────────────────────────────────────────────────────────────
 
-type SavingTab = 'overview' | 'notes';
+type SavingTab = 'overview' | 'wallets' | 'notes';
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -177,7 +179,7 @@ export function SavingDetailPanel({ contractId, isMobile }: { contractId: number
 
       {/* Tabs */}
       <div className="flex-none border-b border-line flex px-2">
-        {(['overview', 'notes'] as SavingTab[]).map(tab => (
+        {(['overview', 'wallets', 'notes'] as SavingTab[]).map(tab => (
           <button
             key={tab}
             className={`py-2 px-3 text-sm font-medium transition-colors cursor-pointer border-b-2 whitespace-nowrap ${
@@ -195,6 +197,7 @@ export function SavingDetailPanel({ contractId, isMobile }: { contractId: number
       {/* Tab content */}
       <div className="flex-1 overflow-auto better-scroll">
         {activeTab === 'overview' && <SavingOverviewTab contract={contract} t={t} />}
+        {activeTab === 'wallets' && <WalletsTab contract={contract} />}
         {activeTab === 'notes' && <NotesTab contractId={contractId} t={t} />}
       </div>
 

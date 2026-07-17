@@ -84,6 +84,10 @@ export function useWalletMutation(contractId: number) {
       queryClient.invalidateQueries({ queryKey: ['contract-detail', contractId] });
       queryClient.invalidateQueries({ queryKey: ['wallet-available', contractId] });
       queryClient.invalidateQueries({ queryKey: ['contract-wallet-txns', contractId] });
+      // Saving surfaces that show wallet balances from their own queries.
+      queryClient.invalidateQueries({ queryKey: ['workspace-contract', contractId] });
+      queryClient.invalidateQueries({ queryKey: ['saving-wallet-contract', contractId] });
+      queryClient.invalidateQueries({ queryKey: ['saving-contracts'] });
     },
   });
 }
