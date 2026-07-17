@@ -55,7 +55,7 @@ export function RepairDetailPanel({
   const [activeAction, setActiveAction] = useState<RepairActionCode | 'NOTE_ADD' | null>(null);
   const [previewDoc, setPreviewDoc] = useState<BeMediaRepairDoc | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
-  const [tab, setTab] = useState<'details' | 'history'>('details');
+  const [tab, setTab] = useState<'details' | 'charges' | 'photos' | 'history'>('details');
   const moreTriggerRef = useRef<HTMLButtonElement>(null);
 
   // Data-driven action catalog — filtered to status + permissions by the BE.
@@ -147,11 +147,11 @@ export function RepairDetailPanel({
         </div>
       )}
 
-      {/* Details / History tabs — right under the header. All the identity /
-          money / metadata bands live inside Details so nothing's forced on the
-          History view. */}
+      {/* Tabs — right under the header. Details holds identity/money/meta +
+          symptom; charges = charge sheet + internal cost; photos = album;
+          history = timeline (last). Keeps each view from being a wall of info. */}
       <div className="flex-none flex items-center gap-1 px-3 border-b border-line">
-        {(['details', 'history'] as const).map(tk => (
+        {(['details', 'charges', 'photos', 'history'] as const).map(tk => (
           <button
             key={tk}
             type="button"
@@ -160,7 +160,7 @@ export function RepairDetailPanel({
             }`}
             onClick={() => setTab(tk)}
           >
-            {t(`repair.${tk}`)}
+            {t(`repair.tab_${tk}`)}
           </button>
         ))}
       </div>
@@ -173,6 +173,88 @@ export function RepairDetailPanel({
           updatedAt={order.updated_at}
           onAddNote={() => pick('NOTE_ADD')}
         />
+       ) : tab === 'photos' ? (
+        <RepairConditionPhotos
+          repairOrderId={order.repair_order_id}
+          code={order.code_display}
+          editable={photosEditable}
+        />
+       ) : tab === 'charges' ? (
+        <>
+        {/* Charge sheet — the CHARGE_SET action lives here (in-context), not in
+            the footer. Shown whenever the action is available (even with 0 lines,
+            so an IN_REPAIR order can start its sheet) or once lines exist. */}
+        {(chargeAction || charges.length > 0) ? (
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="text-xs font-semibold text-subtle uppercase tracking-wider">{t('repair.chargeSheet')}</div>
+              {chargeAction && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="ml-auto"
+                  startIcon={<FilePlus size={14} />}
+                  disabled={!chargeActionEnabled}
+                  onClick={() => pick('CHARGE_SET')}
+                >
+                  {charges.length > 0 ? t('repair.editCharges') : t('repairActions.CHARGE_SET')}
+                </Button>
+              )}
+            </div>
+            {charges.length > 0 ? (
+              <div className="rounded-md border border-line overflow-hidden">
+                {charges.map((it, i) => (
+                  <div key={i} className="flex items-center justify-between gap-2 px-3 py-1.5 border-b border-line last:border-b-0 text-sm">
+                    <div className="min-w-0 flex items-center gap-2">
+                      <Badge size="xs" color={it.item_type === 'CHARGE' ? 'default' : it.item_type === 'DISCOUNT' ? 'info' : 'warning'}>
+                        {t(`repair.itemType_${it.item_type}`)}
+                      </Badge>
+                      <span className="truncate">{it.description}</span>
+                    </div>
+                    <span className={`tabular-nums shrink-0 ${it.amount < 0 ? 'text-danger' : ''}`}>{fmtCurrency(it.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-subtler">{t('repair.noChargesYet')}</p>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-subtler">{t('repair.noChargesYet')}</p>
+        )}
+
+        {/* Internal repair cost (staff-only, never on the customer's PDF). A ⚠
+            flags "not recorded yet" so staff know the profit isn't captured. */}
+        {(costAction || costRecorded) && (
+          <div className="rounded-md border border-line px-3 py-2.5">
+            <div className="flex items-center gap-2">
+              <Wrench size={14} className="text-subtle shrink-0" />
+              <span className="text-xs font-semibold text-subtle uppercase tracking-wider">{t('repair.costAxis')}</span>
+              {costRecorded ? (
+                <span className="ml-auto font-semibold tabular-nums text-sm">{fmtCurrency(order.repair_cost ?? 0)}</span>
+              ) : (
+                <span className="ml-auto inline-flex items-center gap-1 text-xs text-warning-fg">
+                  <AlertTriangle size={13} />{t('repair.costNotRecorded')}
+                </span>
+              )}
+              {costAction && (
+                <Button
+                  variant={costRecorded ? 'ghost' : 'outline'}
+                  size="sm"
+                  className={costRecorded ? 'btn-icon-sm' : ''}
+                  startIcon={<Wrench size={14} />}
+                  disabled={!costActionEnabled}
+                  onClick={() => pick('COST_SET')}
+                >
+                  {costRecorded ? undefined : t('repair.setCost')}
+                </Button>
+              )}
+            </div>
+            {order.cost_note && <p className="text-xs text-subtle mt-1.5">{order.cost_note}</p>}
+            {order.work_note && <p className="text-sm mt-1.5 whitespace-pre-wrap">{order.work_note}</p>}
+          </div>
+        )}
+        </>
        ) : (
         <>
         {/* Device — primary identity band */}
@@ -298,86 +380,6 @@ export function RepairDetailPanel({
             <p className="text-sm text-subtle whitespace-pre-wrap">{order.condition_note}</p>
           </div>
         )}
-
-        {/* Charge sheet — the CHARGE_SET action lives here (in-context), not in
-            the footer. Shown whenever the action is available (even with 0 lines,
-            so an IN_REPAIR order can start its sheet) or once lines exist. */}
-        {(chargeAction || charges.length > 0) && (
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <div className="text-xs font-semibold text-subtle uppercase tracking-wider">{t('repair.chargeSheet')}</div>
-              {chargeAction && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="ml-auto"
-                  startIcon={<FilePlus size={14} />}
-                  disabled={!chargeActionEnabled}
-                  onClick={() => pick('CHARGE_SET')}
-                >
-                  {charges.length > 0 ? t('repair.editCharges') : t('repairActions.CHARGE_SET')}
-                </Button>
-              )}
-            </div>
-            {charges.length > 0 ? (
-              <div className="rounded-md border border-line overflow-hidden">
-                {charges.map((it, i) => (
-                  <div key={i} className="flex items-center justify-between gap-2 px-3 py-1.5 border-b border-line last:border-b-0 text-sm">
-                    <div className="min-w-0 flex items-center gap-2">
-                      <Badge size="xs" color={it.item_type === 'CHARGE' ? 'default' : it.item_type === 'DISCOUNT' ? 'info' : 'warning'}>
-                        {t(`repair.itemType_${it.item_type}`)}
-                      </Badge>
-                      <span className="truncate">{it.description}</span>
-                    </div>
-                    <span className={`tabular-nums shrink-0 ${it.amount < 0 ? 'text-danger' : ''}`}>{fmtCurrency(it.amount)}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-subtler">{t('repair.noChargesYet')}</p>
-            )}
-          </div>
-        )}
-
-        {/* Internal repair cost (staff-only, never on the customer's PDF). A ⚠
-            flags "not recorded yet" so staff know the profit isn't captured. */}
-        {(costAction || costRecorded) && (
-          <div className="rounded-md border border-line px-3 py-2.5">
-            <div className="flex items-center gap-2">
-              <Wrench size={14} className="text-subtle shrink-0" />
-              <span className="text-xs font-semibold text-subtle uppercase tracking-wider">{t('repair.costAxis')}</span>
-              {costRecorded ? (
-                <span className="ml-auto font-semibold tabular-nums text-sm">{fmtCurrency(order.repair_cost ?? 0)}</span>
-              ) : (
-                <span className="ml-auto inline-flex items-center gap-1 text-xs text-warning-fg">
-                  <AlertTriangle size={13} />{t('repair.costNotRecorded')}
-                </span>
-              )}
-              {costAction && (
-                <Button
-                  variant={costRecorded ? 'ghost' : 'outline'}
-                  size="sm"
-                  className={costRecorded ? 'btn-icon-sm' : ''}
-                  startIcon={<Wrench size={14} />}
-                  disabled={!costActionEnabled}
-                  onClick={() => pick('COST_SET')}
-                >
-                  {costRecorded ? undefined : t('repair.setCost')}
-                </Button>
-              )}
-            </div>
-            {order.cost_note && <p className="text-xs text-subtle mt-1.5">{order.cost_note}</p>}
-            {order.work_note && <p className="text-sm mt-1.5 whitespace-pre-wrap">{order.work_note}</p>}
-          </div>
-        )}
-
-        {/* Condition photo album — self-serve add (desktop / QR) + read-only grid
-            once the order closes. Owns the ATTACH_MEDIA affordance. */}
-        <RepairConditionPhotos
-          repairOrderId={order.repair_order_id}
-          code={order.code_display}
-          editable={photosEditable}
-        />
         </>
        )}
       </div>

@@ -154,6 +154,8 @@
   "core.validation.pin_required": "Please enter the PIN",
   "CORE.AUTH.INVALID_PIN": "PIN is incorrect — please try again",
   "CORE.STATE.MEDIA_LOCKED": "Media is locked and cannot be modified",
+  "MEDIA.INTERNAL.DETACH_TYPE_NOT_DISPATCHED": "This photo can't be deleted right now.",
+  "media.internal.detach_type_not_dispatched": "This photo can't be deleted right now.",
   "SALE.AUTH.PERMISSION_DENIED": "You do not have permission for this branch",
   "SALE.AUTH.COMPANY_ADMIN_REQUIRED": "Only Company Admin can perform this action",
   "SALE.VALIDATION.CONTRACT_NOT_FOUND": "Contract not found",

@@ -154,6 +154,8 @@
   "core.validation.pin_required": "กรุณากรอก PIN",
   "CORE.AUTH.INVALID_PIN": "PIN ไม่ถูกต้อง — ลองอีกครั้ง",
   "CORE.STATE.MEDIA_LOCKED": "สื่อถูกล็อกไม่สามารถแก้ไขได้",
+  "MEDIA.INTERNAL.DETACH_TYPE_NOT_DISPATCHED": "ตอนนี้ยังลบรูปนี้ไม่ได้",
+  "media.internal.detach_type_not_dispatched": "ตอนนี้ยังลบรูปนี้ไม่ได้",
   "SALE.AUTH.PERMISSION_DENIED": "คุณไม่มีสิทธิ์ในสาขานี้",
   "SALE.AUTH.COMPANY_ADMIN_REQUIRED": "เฉพาะ Company Admin เท่านั้น",
   "SALE.VALIDATION.CONTRACT_NOT_FOUND": "ไม่พบสัญญา",
