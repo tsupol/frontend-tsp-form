@@ -1,15 +1,19 @@
 import { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, Tooltip, PopOver } from 'tsp-form';
-import { Printer, FileText, FilePlus, User, Package, PackagePlus, PackageCheck, Banknote, ExternalLink, ChevronDown, Phone, CheckCircle2, AlertTriangle, CalendarClock, Wrench } from 'lucide-react';
+import { Printer, FileText, FilePlus, User, Package, PackagePlus, PackageCheck, Banknote, ExternalLink, ChevronDown, Phone, CheckCircle2, AlertTriangle, CalendarClock, Coins, Pencil, Download, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { apiClient } from '../../../lib/api';
 import { DateTime } from '../../../components/DateTime';
 import { CopyButton } from '../../../components/CopyButton';
+import { useBillPdfDownload } from '../../../hooks/useBillPdfDownload';
+import { BillReceipt } from '../../contracts/workspace/BillReceipt';
+import { printWithMarker } from '../../../lib/printDoc';
 import { fmtCurrency, formatTel } from '../../../lib/format';
 import type {
-  RepairOrder, RepairAvailableActions, RepairAction, RepairActionCode, RepairRenderDoc,
+  RepairOrder, RepairAvailableActions, RepairAction, RepairActionCode, RepairRenderDoc, RepairTimelineEvent,
 } from '../repairTypes';
 import { SUB_STATE_COLOR, RESULT_COLOR } from '../repairTypes';
 import type { BeMediaRepairDoc } from '../../../lib/beMedia';
@@ -52,6 +56,7 @@ export function RepairDetailPanel({
   onRefresh: () => void;
 }) {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const [activeAction, setActiveAction] = useState<RepairActionCode | 'NOTE_ADD' | null>(null);
   const [previewDoc, setPreviewDoc] = useState<BeMediaRepairDoc | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -74,6 +79,45 @@ export function RepairDetailPanel({
     }),
     enabled: order.status !== 'DRAFT',
   });
+
+  // Bills the system already generated for this repair (fn_bill_repair_pay /
+  // _refund). No dedicated bill view exposes repair_order_id, but the timeline
+  // records each PAYMENT/REFUND with its bill_id + code — enough to list them as
+  // downloadable receipts. Only fetched on the Charges tab.
+  const { data: billEvents = [] } = useQuery({
+    queryKey: ['repair-bills', order.repair_order_id, order.updated_at],
+    queryFn: () => apiClient.get<RepairTimelineEvent[]>(
+      `/v_repair_timeline?repair_order_id=eq.${order.repair_order_id}&event_code=in.(PAYMENT,REFUND)&order=log_id.desc`,
+    ),
+    enabled: tab === 'charges' && order.status !== 'DRAFT',
+  });
+  const { downloadingId, download: downloadBill } = useBillPdfDownload();
+
+  // Per-bill browser print — mount the receipt off-screen for the chosen bill,
+  // warm its queries, then window.print() isolated via the 'bill' marker. Same
+  // portal pattern as BillsPage (Modal can't reach the @page box). One at a time.
+  const [printBillId, setPrintBillId] = useState<number | null>(null);
+  const printBill = async (billId: number | null) => {
+    if (billId == null) return;
+    try {
+      const billRow = await queryClient.fetchQuery({
+        queryKey: ['bill-detail', billId],
+        queryFn: () => apiClient.get<{ branch_id?: number }[]>(`/v_bill_detail?bill_id=eq.${billId}`).then(rows => rows[0] ?? null),
+      });
+      const branchId = billRow?.branch_id;
+      if (branchId != null) {
+        await queryClient.fetchQuery({
+          queryKey: ['branch-info', branchId],
+          queryFn: () => apiClient.get(`/v_branches?id=eq.${branchId}&select=id,name,address`).then((rows: unknown) => (rows as unknown[])[0] ?? null),
+        });
+      }
+    } catch { /* receipt shows its own loading state if warming fails */ }
+    setPrintBillId(billId);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      printWithMarker('bill');
+      setPrintBillId(null);
+    }));
+  };
 
   const actions = caps?.actions ?? [];
 
@@ -183,24 +227,11 @@ export function RepairDetailPanel({
         <>
         {/* Charge sheet — the CHARGE_SET action lives here (in-context), not in
             the footer. Shown whenever the action is available (even with 0 lines,
-            so an IN_REPAIR order can start its sheet) or once lines exist. */}
+            so an IN_REPAIR order can start its sheet) or once lines exist. The
+            edit button sits at the bottom-right, under the lines. */}
         {(chargeAction || charges.length > 0) ? (
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <div className="text-xs font-semibold text-subtle uppercase tracking-wider">{t('repair.chargeSheet')}</div>
-              {chargeAction && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="ml-auto"
-                  startIcon={<FilePlus size={14} />}
-                  disabled={!chargeActionEnabled}
-                  onClick={() => pick('CHARGE_SET')}
-                >
-                  {charges.length > 0 ? t('repair.editCharges') : t('repairActions.CHARGE_SET')}
-                </Button>
-              )}
-            </div>
+            <div className="text-xs font-semibold text-subtle uppercase tracking-wider mb-1">{t('repair.chargeSheet')}</div>
             {charges.length > 0 ? (
               <div className="rounded-md border border-line overflow-hidden">
                 {charges.map((it, i) => (
@@ -218,9 +249,76 @@ export function RepairDetailPanel({
             ) : (
               <p className="text-sm text-subtler">{t('repair.noChargesYet')}</p>
             )}
+            {chargeAction && (
+              <div className="flex justify-end mt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  startIcon={<FilePlus size={14} />}
+                  disabled={!chargeActionEnabled}
+                  onClick={() => pick('CHARGE_SET')}
+                >
+                  {charges.length > 0 ? t('repair.editCharges') : t('repairActions.CHARGE_SET')}
+                </Button>
+              </div>
+            )}
           </div>
         ) : (
           <p className="text-sm text-subtler">{t('repair.noChargesYet')}</p>
+        )}
+
+        {/* Bills — receipts the system already generated (fn_bill_repair_pay /
+            _refund), listed newest-first with a per-bill PDF download. We only
+            display them; the pay/refund modals create them. */}
+        {billEvents.length > 0 && (
+          <div>
+            <div className="text-xs font-semibold text-subtle uppercase tracking-wider mb-1">{t('repair.bills')}</div>
+            <div className="rounded-md border border-line overflow-hidden">
+              {billEvents.map(ev => {
+                const billId = typeof ev.detail?.bill_id === 'number' ? ev.detail.bill_id : null;
+                const billCode = typeof ev.detail?.code_display === 'string' ? ev.detail.code_display : null;
+                const amount = typeof ev.detail?.amount === 'number' ? ev.detail.amount : null;
+                const voided = ev.bill_status === 'VOIDED';
+                return (
+                  <div key={ev.log_id} className="flex items-center gap-2 px-3 py-2 border-b border-line last:border-b-0 text-sm">
+                    <Badge size="xs" color={ev.event_code === 'REFUND' ? 'warning' : 'default'}>
+                      {t(`repair.event_${ev.event_code}`)}
+                    </Badge>
+                    <div className="min-w-0 flex flex-col">
+                      <span className={`font-mono text-xs truncate ${voided ? 'line-through text-subtler' : ''}`}>{billCode ?? '—'}</span>
+                      <span className="text-xs text-subtler"><DateTime value={ev.event_at} /></span>
+                    </div>
+                    {voided && <Badge size="xs" color="danger">{t('repair.billVoided')}</Badge>}
+                    {amount != null && (
+                      <span className={`ml-auto tabular-nums shrink-0 ${voided ? 'line-through text-subtler' : ev.event_code === 'REFUND' ? 'text-danger' : ''}`}>
+                        {fmtCurrency(amount)}
+                      </span>
+                    )}
+                    <Tooltip content={t('repair.printBill')}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="btn-icon-sm shrink-0"
+                        disabled={billId == null}
+                        startIcon={<Printer size={14} />}
+                        onClick={() => printBill(billId)}
+                      />
+                    </Tooltip>
+                    <Tooltip content={t('repair.downloadBill')}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="btn-icon-sm shrink-0"
+                        disabled={billId == null || downloadingId === billId}
+                        startIcon={downloadingId === billId ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                        onClick={() => downloadBill(billId)}
+                      />
+                    </Tooltip>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         )}
 
         {/* Internal repair cost (staff-only, never on the customer's PDF). A ⚠
@@ -228,7 +326,7 @@ export function RepairDetailPanel({
         {(costAction || costRecorded) && (
           <div className="rounded-md border border-line px-3 py-2.5">
             <div className="flex items-center gap-2">
-              <Wrench size={14} className="text-subtle shrink-0" />
+              <Coins size={14} className="text-subtle shrink-0" />
               <span className="text-xs font-semibold text-subtle uppercase tracking-wider">{t('repair.costAxis')}</span>
               {costRecorded ? (
                 <span className="ml-auto font-semibold tabular-nums text-sm">{fmtCurrency(order.repair_cost ?? 0)}</span>
@@ -242,7 +340,7 @@ export function RepairDetailPanel({
                   variant={costRecorded ? 'ghost' : 'outline'}
                   size="sm"
                   className={costRecorded ? 'btn-icon-sm' : ''}
-                  startIcon={<Wrench size={14} />}
+                  startIcon={costRecorded ? <Pencil size={14} /> : undefined}
                   disabled={!costActionEnabled}
                   onClick={() => pick('COST_SET')}
                 >
@@ -323,42 +421,64 @@ export function RepairDetailPanel({
           </div>
         )}
 
-        {/* Branch + timeline — quiet metadata band. Three axes read from here:
-            work (completed_by/at, repair_days), and delivery (pickup deadline). */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-subtle">
-          <span><span className="text-subtler">{t('repair.branch')}:</span> {order.branch_name}</span>
-          <span><span className="text-subtler">{t('repair.created')}:</span> <DateTime value={order.created_at} /></span>
-          {order.promised_date && <span><span className="text-subtler">{t('repair.promised')}:</span> <DateTime value={order.promised_date} showTime={false} /></span>}
-          {order.intake_at && <span><span className="text-subtler">{t('repair.intakeAt')}:</span> <DateTime value={order.intake_at} /></span>}
-          {order.completed_at && (
-            <span className="inline-flex items-center gap-1 text-success">
-              <CheckCircle2 size={12} className="shrink-0" />
-              <span className="text-subtler">{t('repair.completedAt')}:</span> <DateTime value={order.completed_at} />
-              {order.completed_by_name && <span className="text-subtle">· {order.completed_by_name}</span>}
-            </span>
-          )}
-          {order.repair_days != null && (
-            <span><span className="text-subtler">{t('repair.repairDays')}:</span> {t('repair.repairDaysValue', { days: order.repair_days })}</span>
-          )}
-          {order.pickup_deadline && order.status !== 'CLOSED' && order.status !== 'VOIDED' && (
-            <span className={`inline-flex items-center gap-1 ${overdue ? 'text-danger' : ''}`}>
-              <CalendarClock size={12} className="shrink-0" />
-              <span className="text-subtler">{t('repair.pickupDeadline')}:</span> <DateTime value={order.pickup_deadline} showTime={false} />
+        {/* Timeline metadata — a clean label/value list (was a cramped inline
+            wrap that ran labels into their values). Three axes read from here:
+            work (completed_by/at, repair_days) and delivery (pickup deadline). */}
+        <dl className="grid grid-cols-[7.5rem_1fr] gap-x-3 gap-y-1.5 text-xs">
+          <dt className="text-subtler">{t('repair.branch')}</dt>
+          <dd className="text-subtle">{order.branch_name}</dd>
+
+          <dt className="text-subtler">{t('repair.created')}</dt>
+          <dd className="text-subtle"><DateTime value={order.created_at} /></dd>
+
+          {order.promised_date && <>
+            <dt className="text-subtler">{t('repair.promised')}</dt>
+            <dd className="text-subtle"><DateTime value={order.promised_date} showTime={false} /></dd>
+          </>}
+
+          {order.intake_at && <>
+            <dt className="text-subtler">{t('repair.intakeAt')}</dt>
+            <dd className="text-subtle"><DateTime value={order.intake_at} /></dd>
+          </>}
+
+          {order.completed_at && <>
+            <dt className="text-subtler inline-flex items-center gap-1"><CheckCircle2 size={12} className="text-success shrink-0" />{t('repair.completedAt')}</dt>
+            <dd className="text-success">
+              <DateTime value={order.completed_at} />
+              {order.completed_by_name && <div className="text-subtle">{t('repair.completedBy')}: {order.completed_by_name}</div>}
+            </dd>
+          </>}
+
+          {order.repair_days != null && <>
+            <dt className="text-subtler">{t('repair.repairDays')}</dt>
+            <dd className="text-subtle">{t('repair.repairDaysValue', { days: order.repair_days })}</dd>
+          </>}
+
+          {order.pickup_deadline && order.status !== 'CLOSED' && order.status !== 'VOIDED' && <>
+            <dt className="text-subtler inline-flex items-center gap-1"><CalendarClock size={12} className="shrink-0" />{t('repair.pickupDeadline')}</dt>
+            <dd className={overdue ? 'text-danger' : 'text-subtle'}>
+              <DateTime value={order.pickup_deadline} showTime={false} />
               {order.pickup_days_left != null && (
-                <span>· {overdue ? t('repair.pickupOverdue', { days: -order.pickup_days_left }) : t('repair.pickupDaysLeft', { days: order.pickup_days_left })}</span>
+                <span> · {overdue ? t('repair.pickupOverdue', { days: -order.pickup_days_left }) : t('repair.pickupDaysLeft', { days: order.pickup_days_left })}</span>
               )}
-            </span>
-          )}
-          {order.closed_at && <span><span className="text-subtler">{t('repair.closedAt')}:</span> <DateTime value={order.closed_at} /></span>}
+            </dd>
+          </>}
+
+          {order.closed_at && <>
+            <dt className="text-subtler">{t('repair.closedAt')}</dt>
+            <dd className="text-subtle"><DateTime value={order.closed_at} /></dd>
+          </>}
+
           {/* Pickup window is agreed at DRAFT (printed on the intake doc). Editable
               only while DRAFT — the action engine drops PICKUP_SET afterwards. */}
-          {pickupAction && (
-            <span className="inline-flex items-center gap-1">
-              <span className="text-subtler">{t('repair.pickupDays')}:</span> {order.pickup_days ?? '—'}
+          {pickupAction && <>
+            <dt className="text-subtler">{t('repair.pickupDays')}</dt>
+            <dd className="text-subtle inline-flex items-center gap-1">
+              {order.pickup_days ?? '—'}
               <Button variant="ghost" size="sm" className="btn-icon-xs" disabled={!pickupActionEnabled} startIcon={<CalendarClock size={12} />} onClick={() => pick('PICKUP_SET')} />
-            </span>
-          )}
-        </div>
+            </dd>
+          </>}
+        </dl>
 
         <hr className="border-line" />
 
@@ -377,7 +497,7 @@ export function RepairDetailPanel({
         {order.condition_note && (
           <div>
             <div className="text-xs font-semibold text-subtle uppercase tracking-wider mb-1">{t('repair.conditionNote')}</div>
-            <p className="text-sm text-subtle whitespace-pre-wrap">{order.condition_note}</p>
+            <p className="text-sm whitespace-pre-wrap">{order.condition_note}</p>
           </div>
         )}
         </>
@@ -443,6 +563,18 @@ export function RepairDetailPanel({
         repairCode={order.code_display}
         docType={previewDoc ?? 'INTAKE'}
       />
+
+      {/* Off-screen bill receipt — portaled to body so no panel ancestor becomes
+          the positioning context for .bill-receipt (its print rule is
+          position:absolute against the page). Hidden on screen via
+          .print-only-receipt; isolated for window.print() by the 'bill' marker.
+          Mounted only while printing (GOTCHA 5: never a second live copy). */}
+      {printBillId != null && createPortal(
+        <div className="print-only-receipt" aria-hidden>
+          <BillReceipt billId={printBillId} hidePrintButton />
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }
