@@ -2575,7 +2575,8 @@
     "recheck": "ตรวจสอบใหม่",
     "return_blockedOverdue": "คืนไม่ได้ — ค้างค่างวด",
     "return_overdueAmount": "ต้องเก็บยอดค้าง {{amount}} ({{count}} งวด) ก่อนจึงจะรับเครื่องคืนได้",
-    "return_collectPayment": "รับชำระค่างวด"
+    "return_collectPayment": "รับชำระค่างวด",
+    "bandTitle": "ฝากไว้ที่สาขา"
   },
   "buyback": {
     "cancel": "ยกเลิกการซื้อคืน",

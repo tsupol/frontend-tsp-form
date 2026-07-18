@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, Modal, Input, FormErrorMessage, useSnackbarContext } from 'tsp-form';
-import { Smartphone, ExternalLink, Wrench, ArrowDownToLine, ArrowUpFromLine, Link2, Link2Off, Cloud, CloudOff, CheckCircle, Pencil, XCircle, Loader2 } from 'lucide-react';
+import { Smartphone, ExternalLink, Wrench, ArrowDownToLine, ArrowUpFromLine, Link2, Link2Off, Cloud, CloudOff, CheckCircle, Pencil, XCircle, Loader2, Archive } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { getBucketLabel, getBucketColor, codeDisplay } from '../inventory/inventoryUtils';
@@ -27,6 +27,13 @@ interface ContractForDevice {
   model_name: string | null;
   product_display_name: string | null;
   variant_name: string | null;
+  // Deposit state (v_contract_detail +6, mig 674+). All null when not deposited.
+  is_device_deposited?: boolean;
+  deposited_at?: string | null;
+  deposit_max_days?: number | null;
+  deposit_deadline?: string | null;
+  deposit_days_left?: number | null;
+  deposit_sub_state?: 'DEPOSITED' | 'NEAR_DEADLINE' | 'PICKUP_OVERDUE' | null;
 }
 
 interface AssetSummary {
@@ -155,6 +162,19 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
 
   return (
     <div className="p-4 flex flex-col gap-4">
+      {/* Deposit state — shown when the customer has deposited this device at the
+          branch (v_contract_detail +6). sub_state drives the accent: DEPOSITED
+          normal, NEAR_DEADLINE amber, PICKUP_OVERDUE red. The return action lives
+          on the primary card's footer (RETURN_DEPOSIT, driven by the action RPC). */}
+      {contract.is_device_deposited && (
+        <DepositStateBand
+          subState={contract.deposit_sub_state ?? 'DEPOSITED'}
+          depositedAt={contract.deposited_at ?? null}
+          deadline={contract.deposit_deadline ?? null}
+          daysLeft={contract.deposit_days_left ?? null}
+        />
+      )}
+
       {/* Primary device card */}
       <section className="border border-line rounded-md">
         <header className="flex items-center justify-between px-4 py-2.5 border-b border-line">
@@ -608,6 +628,50 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
         </>
       )}
     </div>
+  );
+}
+
+// Deposit state band — the customer has deposited this device at the branch.
+// sub_state (backend-computed, never in the UI) drives the accent + a days-left
+// / overdue line. Deadline is the date the customer signed for; PICKUP_OVERDUE
+// means staff may act (nothing auto-fires).
+function DepositStateBand({
+  subState, depositedAt, deadline, daysLeft,
+}: {
+  subState: 'DEPOSITED' | 'NEAR_DEADLINE' | 'PICKUP_OVERDUE';
+  depositedAt: string | null;
+  deadline: string | null;
+  daysLeft: number | null;
+}) {
+  const { t } = useTranslation();
+  const tone = subState === 'PICKUP_OVERDUE' ? 'danger' : subState === 'NEAR_DEADLINE' ? 'warning' : 'default';
+  const accent = tone === 'danger'
+    ? 'border-danger-border bg-danger-soft'
+    : tone === 'warning'
+      ? 'border-warning-border bg-warning-soft'
+      : 'border-line bg-surface';
+  const overdue = daysLeft != null && daysLeft < 0;
+  return (
+    <section className={`border rounded-md px-4 py-3 ${accent}`}>
+      <div className="flex items-center gap-2">
+        <Archive size={16} className="text-subtle shrink-0" />
+        <h3 className="text-sm font-semibold">{t('deposit.bandTitle')}</h3>
+        <Badge size="xs" color={tone === 'default' ? 'default' : tone}>
+          {t(`deposit.subState_${subState}`)}
+        </Badge>
+      </div>
+      <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-1 text-xs mt-2">
+        <dt className="text-subtler">{t('deposit.depositedSince')}</dt>
+        <dd className="text-subtle"><DateTime value={depositedAt} showTime={false} /></dd>
+        <dt className="text-subtler">{t('deposit.deadline')}</dt>
+        <dd className={overdue ? 'text-danger font-medium' : subState === 'NEAR_DEADLINE' ? 'text-warning-fg' : 'text-subtle'}>
+          <DateTime value={deadline} showTime={false} />
+          {daysLeft != null && (
+            <span> · {overdue ? t('deposit.overdueDays', { days: -daysLeft }) : t('deposit.daysLeft', { days: daysLeft })}</span>
+          )}
+        </dd>
+      </dl>
+    </section>
   );
 }
 
