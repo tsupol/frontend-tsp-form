@@ -33,6 +33,7 @@ const SLIP_SPEC = {
 import { fuzzyScore } from '../../lib/fuzzy';
 import { CompleteContractModal } from './CompleteContractModal';
 import { BindLoanerModal, UnbindLoanerModal } from './LoanerModals';
+import { DepositDeviceModal, ReturnDepositModal } from './DepositModals';
 import { RepairRequestModal } from './RepairRequestModal';
 import { AppointmentCreateModal, AppointmentCancelModal } from './AppointmentModals';
 import { RefundVoidModal } from './RefundVoidModal';
@@ -206,32 +207,9 @@ const ACTION_CONFIGS: Record<ContractAction, ActionConfig> = {
     needsNewOwner: false,
     successKey: 'contract.action_resume_success',
   },
-  deposit_device: {
-    rpc: 'fn_contract_deposit_device',
-    color: undefined,
-    needsPin: false,
-    needsNote: true,
-    needsReason: false,
-    needsBranch: false,
-    needsDevice: false,
-    needsAmount: false,
-    needsCloseReason: false,
-    needsNewOwner: false,
-    successKey: 'contract.action_deposit_device_success',
-  },
-  return_deposit: {
-    rpc: 'fn_contract_return_deposit',
-    color: undefined,
-    needsPin: false,
-    needsNote: true,
-    needsReason: false,
-    needsBranch: false,
-    needsDevice: false,
-    needsAmount: false,
-    needsCloseReason: false,
-    needsNewOwner: false,
-    successKey: 'contract.action_return_deposit_success',
-  },
+  // deposit_device / return_deposit are NOT generic note-modals — they have
+  // dedicated check→confirm→signing modals (DepositModals.tsx). No ACTION_CONFIG
+  // entry, so the generic ContractActionModal never handles them.
   unbind_device: {
     rpc: 'fn_contract_unbind_device',
     color: 'danger',
@@ -830,6 +808,8 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   const isServiceCharge = activeAction === 'service_charge';
   const isLateFeeCollect = activeAction === 'late_fee_collect';
   const isReschedule = activeAction === 'reschedule_due_day';
+  const isDepositDevice = activeAction === 'deposit_device';
+  const isReturnDeposit = activeAction === 'return_deposit';
 
   // pin_required is per-user (BM=true, HQ=false) — read it off the evaluator
   // response for this specific action, never hard-code it.
@@ -1205,8 +1185,23 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
           queryClient.invalidateQueries({ queryKey: ['contract-actions', contract.id] });
         }}
       />
+      <DepositDeviceModal
+        open={isDepositDevice}
+        contract={contract}
+        onClose={() => setActiveAction(null)}
+        onSuccess={handleSuccess}
+        onNavigateSigning={() => onNavigateTab?.('signing')}
+      />
+      <ReturnDepositModal
+        open={isReturnDeposit}
+        contract={contract}
+        onClose={() => setActiveAction(null)}
+        onSuccess={handleSuccess}
+        onNavigateSigning={() => onNavigateTab?.('signing')}
+        onNavigateMoney={() => onNavigateTab?.('money')}
+      />
       <ContractActionModal
-        open={!!activeAction && !isSavingDeposit && !isCancelSaving && !isEarlyPayoff && !isContinuePay && !isVoidBill && !isPayInstallment && !isComplete && !isTerminate && !isBindLoaner && !isUnbindLoaner && !isRepairRequest && !isAppointmentCreate && !isAppointmentCancel && !isRefundVoid && !isTransferBranch && !isServiceCharge && !isLateFeeCollect && !isReschedule}
+        open={!!activeAction && !isSavingDeposit && !isCancelSaving && !isEarlyPayoff && !isContinuePay && !isVoidBill && !isPayInstallment && !isComplete && !isTerminate && !isBindLoaner && !isUnbindLoaner && !isRepairRequest && !isAppointmentCreate && !isAppointmentCancel && !isRefundVoid && !isTransferBranch && !isServiceCharge && !isLateFeeCollect && !isReschedule && !isDepositDevice && !isReturnDeposit}
         action={activeAction}
         contract={contract}
         onClose={() => setActiveAction(null)}
