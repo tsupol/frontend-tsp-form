@@ -125,7 +125,9 @@ interface ActionConfig {
   successKey: string;
 }
 
-const ACTION_CONFIGS: Record<ContractAction, ActionConfig> = {
+// Partial: deposit_device / return_deposit have dedicated modals, not generic
+// config (see DepositModals.tsx). Consumers already guard with `config?.`.
+const ACTION_CONFIGS: Partial<Record<ContractAction, ActionConfig>> = {
   complete: {
     rpc: 'fn_contract_complete',
     color: 'primary',
@@ -1189,14 +1191,12 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
         open={isDepositDevice}
         contract={contract}
         onClose={() => setActiveAction(null)}
-        onSuccess={handleSuccess}
         onNavigateSigning={() => onNavigateTab?.('signing')}
       />
       <ReturnDepositModal
         open={isReturnDeposit}
         contract={contract}
         onClose={() => setActiveAction(null)}
-        onSuccess={handleSuccess}
         onNavigateSigning={() => onNavigateTab?.('signing')}
         onNavigateMoney={() => onNavigateTab?.('money')}
       />

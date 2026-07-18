@@ -110,11 +110,10 @@ function ConfirmParty({ customer, asset }: { customer: CheckCustomer; asset: Che
 // does NOT move buckets here — that happens when the signing is SEALED (§5.1).
 
 export function DepositDeviceModal({
-  open, onClose, onSuccess, contract, onNavigateSigning,
+  open, onClose, contract, onNavigateSigning,
 }: {
   open: boolean;
   onClose: () => void;
-  onSuccess: () => void;
   contract: { id: number; device_id: number | null };
   /** Jump to the Signing tab so staff can collect signatures on the new sheet. */
   onNavigateSigning?: () => void;
@@ -312,11 +311,10 @@ export function DepositDeviceModal({
 // return signing) → done view → Signing tab. Bucket moves on SEAL.
 
 export function ReturnDepositModal({
-  open, onClose, onSuccess, contract, onNavigateSigning, onNavigateMoney,
+  open, onClose, contract, onNavigateSigning, onNavigateMoney,
 }: {
   open: boolean;
   onClose: () => void;
-  onSuccess: () => void;
   contract: { id: number; device_id: number | null };
   onNavigateSigning?: () => void;
   onNavigateMoney?: () => void;
@@ -327,7 +325,6 @@ export function ReturnDepositModal({
 
   const [view, setView] = useState<'form' | 'done'>('form');
   const [check, setCheck] = useState<ReturnCheckResult | null>(null);
-  const [issued, setIssued] = useState<IssueSigningResult | null>(null);
   const [error, setError] = useState('');
 
   const runCheck = useCallback(async () => {
@@ -348,7 +345,6 @@ export function ReturnDepositModal({
     if (open) {
       setView('form');
       setCheck(null);
-      setIssued(null);
       setError('');
       runCheck();
     }
@@ -361,8 +357,7 @@ export function ReturnDepositModal({
       p_contract_id: contract.id,
       p_asset_id: assetId,
     }),
-    onSuccess: (res) => {
-      setIssued(res);
+    onSuccess: () => {
       setView('done');
       // See DepositDeviceModal — keep the done view up (don't call parent onSuccess).
       invalidate();
