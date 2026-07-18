@@ -3059,6 +3059,7 @@
     "allBranches": "All Branches",
     "selectToView": "Select a contract to view details",
     "noCustomer": "No customer",
+    "deposit_chip": "Device deposited",
     "overdueN": "{{count}} overdue",
     "savingBadge": "Saved {{amount}}",
     "saved": "Saved",

@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Badge, Input, Select, Button, DataTableFooter, PopOver } from 'tsp-form';
 import { useAuth } from '../../contexts/AuthContext';
-import { ArrowLeft, ArrowRightFromLine, Search, SlidersHorizontal, Plus } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, Search, SlidersHorizontal, Plus, Archive } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency } from '../../lib/format';
@@ -58,6 +58,7 @@ export interface ContractSearchResult {
   owner_id: number | null;
   owner_name: string | null;
   is_my_branch: boolean;
+  is_device_deposited?: boolean;
   created_at: string;
 }
 
@@ -385,6 +386,12 @@ export function ContractListPane({
                               <Badge size="xs" color={getStateColor(contract.state)}>
                                 {getStateLabel(contract.state, t)}
                               </Badge>
+                              {contract.is_device_deposited && (
+                                <Badge size="xs" color="warning" className="shrink-0 inline-flex items-center gap-1">
+                                  <Archive size={10} />
+                                  {t('contract.deposit_chip', { defaultValue: 'Device deposited' })}
+                                </Badge>
+                              )}
                             </div>
                             <div className="text-xs text-subtle truncate mt-0.5">
                               {contract.customer_name ?? t('contract.noCustomer')}

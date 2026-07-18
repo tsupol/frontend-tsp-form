@@ -3057,6 +3057,7 @@
     "allBranches": "ทุกสาขา",
     "selectToView": "เลือกสัญญาเพื่อดูรายละเอียด",
     "noCustomer": "ไม่มีลูกค้า",
+    "deposit_chip": "มีเครื่องฝาก",
     "overdueN": "ค้าง {{count}} งวด",
     "savingBadge": "ออม {{amount}}",
     "saved": "ออมแล้ว",
