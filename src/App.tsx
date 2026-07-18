@@ -51,6 +51,7 @@ import { ContractSearchPage } from './pages/contracts/ContractSearchPage';
 import { SavingContractsPage } from './pages/contracts/SavingContractsPage';
 import { DraftContractsPage } from './pages/contracts/DraftContractsPage';
 import { PendingPairingPage } from './pages/contracts/PendingPairingPage';
+import { DepositedDevicesPage } from './pages/contracts/DepositedDevicesPage';
 import { PendingPaymentPage } from './pages/contracts/PendingPaymentPage';
 import { ContractWizardPage } from './pages/contracts/ContractWizardPage';
 import { CompanyLayout } from './pages/company/CompanyLayout';
@@ -569,6 +570,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <ContractsLayout><PendingPairingPage /></ContractsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/contracts/deposited/:contractId?"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <ContractsLayout><DepositedDevicesPage /></ContractsLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

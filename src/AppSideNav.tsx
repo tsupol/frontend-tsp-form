@@ -34,7 +34,7 @@ import {
   // Fanout child icons — Company
   MapPin, KeyRound, Landmark, CalendarDays, AlertTriangle, ShieldBan, Cloud,
   // Fanout child icons — Contracts
-  Search, PiggyBank, Link2, FileEdit, FilePlus, CreditCard,
+  Search, PiggyBank, Link2, FileEdit, FilePlus, CreditCard, Archive,
   // Fanout child icons — Commission
   UserCheck, ClipboardCheck,
   // Fanout child icons — Accounting
@@ -175,6 +175,7 @@ export const AppSideNav = () => {
     savingContractsCount,
     draftContractsCount,
     pendingPaymentCount,
+    depositOverdueCount,
     unreadChatCount,
     callCenterMineCount,
     legalCasesQueuedCount,
@@ -224,6 +225,7 @@ export const AppSideNav = () => {
         { key: 'draft-contracts', ...iconWithCount(<FileEdit size="1rem" />, draftContractsCount), label: t('nav.draftContracts'), path: '/admin/contracts/draft' },
         { key: 'pending-payment', ...iconWithCount(<CreditCard size="1rem" />, pendingPaymentCount), label: t('nav.pendingPayment'), path: '/admin/contracts/pending-payment' },
         { key: 'pending-pairing', ...iconWithCount(<Link2 size="1rem" />, pendingPairingCount), label: t('nav.pendingPairing'), path: '/admin/contracts/pending-pairing' },
+        { key: 'deposited-devices', ...iconWithCount(<Archive size="1rem" />, depositOverdueCount), label: t('nav.depositedDevices'), path: '/admin/contracts/deposited' },
         {
           key: 'new-contract',
           icon: <FilePlus size="1rem" className="text-primary-fg" />,

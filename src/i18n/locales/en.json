@@ -421,6 +421,7 @@
     "savingContracts": "Saving",
     "draftContracts": "Draft",
     "pendingPairing": "Pending Pairing",
+    "depositedDevices": "Deposited Devices",
     "pendingPayment": "Pending Pay & Sign",
     "newContract": "Create",
     "newBuyback": "Create Buyback",
@@ -2547,6 +2548,15 @@
     "event_UNCOMPLETED": "Completion undone",
     "event_CLOSED": "Repair closed",
     "event_CANCELLED": "Repair cancelled"
+  },
+  "deposit": {
+    "chip_all": "All",
+    "empty": "No deposited devices.",
+    "subState_DEPOSITED": "Deposited",
+    "subState_NEAR_DEADLINE": "Near deadline",
+    "subState_PICKUP_OVERDUE": "Overdue pickup",
+    "daysLeft": "{{days}} days left",
+    "overdueDays": "{{days}} days overdue"
   },
   "buyback": {
     "cancel": "Cancel buyback",

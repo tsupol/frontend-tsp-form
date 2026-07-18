@@ -112,6 +112,19 @@ export function useNavCounts() {
   });
   const pendingPaymentCount = pendingPaymentCountData?.totalCount ?? 0;
 
+  // Deposited devices past their pickup deadline — the actionable signal (staff
+  // may act; nothing auto-fires). Badge drops to zero once returns are handled.
+  const { data: depositOverdueData } = useQuery({
+    queryKey: ['nav', 'deposit-overdue-count', sk],
+    queryFn: () => apiClient.getPaginated<{ contract_id: number }>(
+      `/v_contracts_deposited?sub_state=eq.PICKUP_OVERDUE&select=contract_id${sq}`,
+      { page: 1, pageSize: 1 },
+    ),
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+  });
+  const depositOverdueCount = depositOverdueData?.totalCount ?? 0;
+
   // Call-center: open tickets assigned to the current user. is_mine + is_takeable
   // are projected columns on v_ops_call_ticket_list. Goes to zero when the user
   // clears their pickups — exactly the daily-actionable signal we want.
@@ -180,6 +193,7 @@ export function useNavCounts() {
     savingContractsCount,
     draftContractsCount,
     pendingPaymentCount,
+    depositOverdueCount,
     unreadChatCount,
     callCenterMineCount,
     legalCasesQueuedCount,

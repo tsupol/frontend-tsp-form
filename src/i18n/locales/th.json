@@ -420,6 +420,7 @@
     "savingContracts": "ออม",
     "draftContracts": "ร่างใหม่",
     "pendingPairing": "รอผูกเครื่อง",
+    "depositedDevices": "เครื่องที่ฝากไว้",
     "pendingPayment": "รอชำระ/เซ็น",
     "newContract": "สร้างใหม่",
     "newBuyback": "สร้างรับซื้อคืน",
@@ -2545,6 +2546,15 @@
     "event_UNCOMPLETED": "ยกเลิกซ่อมเสร็จ",
     "event_CLOSED": "ปิดใบ",
     "event_CANCELLED": "ยกเลิกใบ"
+  },
+  "deposit": {
+    "chip_all": "ทั้งหมด",
+    "empty": "ไม่มีเครื่องที่ฝากไว้",
+    "subState_DEPOSITED": "ฝากอยู่",
+    "subState_NEAR_DEADLINE": "ใกล้ครบกำหนด",
+    "subState_PICKUP_OVERDUE": "เลยกำหนดรับ",
+    "daysLeft": "เหลือ {{days}} วัน",
+    "overdueDays": "เลย {{days}} วัน"
   },
   "buyback": {
     "cancel": "ยกเลิกการซื้อคืน",
