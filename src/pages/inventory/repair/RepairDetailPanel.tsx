@@ -13,7 +13,7 @@ import { BillReceipt } from '../../contracts/workspace/BillReceipt';
 import { printWithMarker } from '../../../lib/printDoc';
 import { fmtCurrency, formatTel } from '../../../lib/format';
 import type {
-  RepairOrder, RepairAvailableActions, RepairAction, RepairActionCode, RepairRenderDoc, RepairTimelineEvent,
+  RepairOrder, RepairAvailableActions, RepairAction, RepairActionCode, RepairRenderDoc,
 } from '../repairTypes';
 import { SUB_STATE_COLOR, RESULT_COLOR } from '../repairTypes';
 import type { BeMediaRepairDoc } from '../../../lib/beMedia';
@@ -48,6 +48,44 @@ const QUICK_ACTIONS = new Set<RepairActionCode>(['INTAKE', 'MARK_COMPLETED', 'PA
 const INLINE_ACTIONS = new Set<RepairActionCode>(['CHARGE_SET', 'PICKUP_SET', 'COST_SET']);
 const DANGER_ACTIONS = new Set<RepairActionCode>(['CANCEL', 'DISCARD', 'UNCOMPLETE']);
 
+// One row of v_bills for a repair order (mig 685 added repair_order_id). Same
+// shape as the contract bill list — INVOICE = charge, CREDIT_NOTE = refund.
+interface RepairBillRow {
+  id: number;
+  code_display: string;
+  bill_type: string;                    // INVOICE | CREDIT_NOTE
+  bill_type_label_short: string | null;
+  bill_purpose: string;
+  bill_purpose_label: string | null;
+  status: string;
+  total_amount: number;
+  paid_amount: number;
+  bill_date: string;
+  is_cancelled: boolean;
+}
+
+// One payment embedded on a bill (v_bill_detail.payments) — same subset the
+// contract bill list renders under each bill.
+interface BillPaymentEmbedded {
+  id: number;
+  method: string | null;
+  amount: number;
+  bank_name: string | null;
+  reference: string | null;
+  is_reversal: boolean;
+}
+
+function getBillStatusColor(status: string, isCancelled: boolean): 'success' | 'warning' | 'danger' | 'default' {
+  if (isCancelled) return 'danger';
+  switch (status) {
+    case 'PAID': return 'success';
+    case 'OPEN':
+    case 'PARTIAL': return 'warning';
+    case 'VOIDED': return 'danger';
+    default: return 'default';
+  }
+}
+
 export function RepairDetailPanel({
   order, isMobile, onRefresh,
 }: {
@@ -60,7 +98,10 @@ export function RepairDetailPanel({
   const [activeAction, setActiveAction] = useState<RepairActionCode | 'NOTE_ADD' | null>(null);
   const [previewDoc, setPreviewDoc] = useState<BeMediaRepairDoc | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
-  const [tab, setTab] = useState<'details' | 'charges' | 'photos' | 'history'>('details');
+  const [tab, setTab] = useState<'details' | 'money' | 'photos' | 'history'>('details');
+  // Money tab holds two sub-tabs — same split as the contract Money tab:
+  // ค่าซ่อม (charge sheet + internal cost) and บิล (the generated bills).
+  const [moneySection, setMoneySection] = useState<'charges' | 'bills'>('charges');
   const moreTriggerRef = useRef<HTMLButtonElement>(null);
 
   // Data-driven action catalog — filtered to status + permissions by the BE.
@@ -80,16 +121,34 @@ export function RepairDetailPanel({
     enabled: order.status !== 'DRAFT',
   });
 
-  // Bills the system already generated for this repair (fn_bill_repair_pay /
-  // _refund). No dedicated bill view exposes repair_order_id, but the timeline
-  // records each PAYMENT/REFUND with its bill_id + code — enough to list them as
-  // downloadable receipts. Only fetched on the Charges tab.
-  const { data: billEvents = [] } = useQuery({
+  // Bills the system generated for this repair (fn_bill_repair_pay / _refund),
+  // straight from v_bills — mig 685 added repair_order_id, so we filter the same
+  // view the contract bill list uses (contract → ?contract_id, repair →
+  // ?repair_order_id). INVOICE = charge, CREDIT_NOTE = refund. Only on the บิล
+  // sub-tab of Money.
+  const { data: bills = [] } = useQuery({
     queryKey: ['repair-bills', order.repair_order_id, order.updated_at],
-    queryFn: () => apiClient.get<RepairTimelineEvent[]>(
-      `/v_repair_timeline?repair_order_id=eq.${order.repair_order_id}&event_code=in.(PAYMENT,REFUND)&order=log_id.desc`,
+    queryFn: () => apiClient.get<RepairBillRow[]>(
+      `/v_bills?repair_order_id=eq.${order.repair_order_id}&order=bill_date.desc,id.desc`,
     ),
-    enabled: tab === 'charges' && order.status !== 'DRAFT',
+    enabled: tab === 'money' && moneySection === 'bills' && order.status !== 'DRAFT',
+  });
+
+  // Payments embedded per bill via v_bill_detail — method / bank / ref / VOID,
+  // shown as a strip under each bill (same as the contract bill list). One
+  // in.(...) round trip for all bills; the print path shares the same key.
+  const billIdsKey = bills.map(b => b.id).join(',');
+  const { data: paymentsByBill } = useQuery<Record<number, BillPaymentEmbedded[]>>({
+    queryKey: ['repair-bill-payments', order.repair_order_id, billIdsKey],
+    enabled: billIdsKey.length > 0,
+    queryFn: async () => {
+      const rows = await apiClient.get<Array<{ bill_id: number; payments: BillPaymentEmbedded[] | null }>>(
+        `/v_bill_detail?bill_id=in.(${billIdsKey})`,
+      );
+      const out: Record<number, BillPaymentEmbedded[]> = {};
+      for (const r of rows) out[r.bill_id] = r.payments ?? [];
+      return out;
+    },
   });
   const { downloadingId, download: downloadBill } = useBillPdfDownload();
 
@@ -191,11 +250,12 @@ export function RepairDetailPanel({
         </div>
       )}
 
-      {/* Tabs — right under the header. Details holds identity/money/meta +
-          symptom; charges = charge sheet + internal cost; photos = album;
-          history = timeline (last). Keeps each view from being a wall of info. */}
+      {/* Tabs — right under the header. Details holds identity/summary/meta +
+          symptom; money = ค่าซ่อม (charge sheet + cost) / บิล (bills) sub-tabs;
+          photos = album; history = timeline. Mirrors the contract panel, which
+          also groups charges + bills under one Money tab. */}
       <div className="flex-none flex items-center gap-1 px-3 border-b border-line">
-        {(['details', 'charges', 'photos', 'history'] as const).map(tk => (
+        {(['details', 'money', 'photos', 'history'] as const).map(tk => (
           <button
             key={tk}
             type="button"
@@ -223,7 +283,26 @@ export function RepairDetailPanel({
           code={order.code_display}
           editable={photosEditable}
         />
-       ) : tab === 'charges' ? (
+       ) : tab === 'money' ? (
+        <>
+        {/* Sub-tabs — ค่าซ่อม (charge sheet + internal cost) / บิล (generated
+            bills). Same money grouping as the contract detail panel. */}
+        <div className="flex-none flex items-center gap-1 border-b border-line -mt-1">
+          {(['charges', 'bills'] as const).map(sec => (
+            <button
+              key={sec}
+              type="button"
+              className={`px-3 py-1.5 text-sm font-medium border-b-2 -mb-px transition-colors cursor-pointer ${
+                moneySection === sec ? 'border-primary text-fg' : 'border-transparent text-subtle hover:text-fg'
+              }`}
+              onClick={() => setMoneySection(sec)}
+            >
+              {t(`repair.moneySection_${sec}`)}
+            </button>
+          ))}
+        </div>
+
+        {moneySection === 'charges' ? (
         <>
         {/* Charge sheet — the CHARGE_SET action lives here (in-context), not in
             the footer. Shown whenever the action is available (even with 0 lines,
@@ -267,60 +346,6 @@ export function RepairDetailPanel({
           <p className="text-sm text-subtler">{t('repair.noChargesYet')}</p>
         )}
 
-        {/* Bills — receipts the system already generated (fn_bill_repair_pay /
-            _refund), listed newest-first with a per-bill PDF download. We only
-            display them; the pay/refund modals create them. */}
-        {billEvents.length > 0 && (
-          <div>
-            <div className="text-xs font-semibold text-subtle uppercase tracking-wider mb-1">{t('repair.bills')}</div>
-            <div className="rounded-md border border-line overflow-hidden">
-              {billEvents.map(ev => {
-                const billId = typeof ev.detail?.bill_id === 'number' ? ev.detail.bill_id : null;
-                const billCode = typeof ev.detail?.code_display === 'string' ? ev.detail.code_display : null;
-                const amount = typeof ev.detail?.amount === 'number' ? ev.detail.amount : null;
-                const voided = ev.bill_status === 'VOIDED';
-                return (
-                  <div key={ev.log_id} className="flex items-center gap-2 px-3 py-2 border-b border-line last:border-b-0 text-sm">
-                    <Badge size="xs" color={ev.event_code === 'REFUND' ? 'warning' : 'default'}>
-                      {t(`repair.event_${ev.event_code}`)}
-                    </Badge>
-                    <div className="min-w-0 flex flex-col">
-                      <span className={`font-mono text-xs truncate ${voided ? 'line-through text-subtler' : ''}`}>{billCode ?? '—'}</span>
-                      <span className="text-xs text-subtler"><DateTime value={ev.event_at} /></span>
-                    </div>
-                    {voided && <Badge size="xs" color="danger">{t('repair.billVoided')}</Badge>}
-                    {amount != null && (
-                      <span className={`ml-auto tabular-nums shrink-0 ${voided ? 'line-through text-subtler' : ev.event_code === 'REFUND' ? 'text-danger' : ''}`}>
-                        {fmtCurrency(amount)}
-                      </span>
-                    )}
-                    <Tooltip content={t('repair.printBill')}>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="btn-icon-sm shrink-0"
-                        disabled={billId == null}
-                        startIcon={<Printer size={14} />}
-                        onClick={() => printBill(billId)}
-                      />
-                    </Tooltip>
-                    <Tooltip content={t('repair.downloadBill')}>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="btn-icon-sm shrink-0"
-                        disabled={billId == null || downloadingId === billId}
-                        startIcon={downloadingId === billId ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-                        onClick={() => downloadBill(billId)}
-                      />
-                    </Tooltip>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
         {/* Internal repair cost (staff-only, never on the customer's PDF). A ⚠
             flags "not recorded yet" so staff know the profit isn't captured. */}
         {(costAction || costRecorded) && (
@@ -351,6 +376,109 @@ export function RepairDetailPanel({
             {order.cost_note && <p className="text-xs text-subtle mt-1.5">{order.cost_note}</p>}
             {order.work_note && <p className="text-sm mt-1.5 whitespace-pre-wrap">{order.work_note}</p>}
           </div>
+        )}
+        </>
+        ) : (
+        <>
+        {/* Bills — the invoices/credit-notes the system generated for this
+            repair (fn_bill_repair_pay / _refund), from v_bills. INVOICE = charge
+            collected, CREDIT_NOTE = refund (negative). Click the code to open the
+            bill, or download / print its receipt. Mirrors the contract bill list. */}
+        {bills.length === 0 ? (
+          <p className="text-sm text-subtler">{order.status === 'DRAFT' ? t('repair.noChargesYet') : t('common.noData')}</p>
+        ) : (
+          <div>
+            <div className="text-xs font-semibold text-subtle uppercase tracking-wider mb-1">{t('repair.bills')}</div>
+            <div className="flex flex-col gap-2">
+              {bills.map(bill => {
+                const isRefund = bill.bill_type === 'CREDIT_NOTE';
+                const signedTotal = isRefund ? -Math.abs(bill.total_amount) : bill.total_amount;
+                const payments = paymentsByBill?.[bill.id] ?? [];
+                return (
+                  <div
+                    key={bill.id}
+                    className={`border border-line rounded-md px-3 py-2.5 ${bill.is_cancelled ? 'opacity-60' : ''}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      {/* Left: code → purpose → badges, one stack */}
+                      <div className="flex flex-col gap-1 min-w-0">
+                        <Link
+                          to={`/admin/accounting/bills/${bill.id}`}
+                          className="font-mono text-xs text-primary-fg inline-flex items-center gap-1 no-underline hover:underline"
+                        >
+                          {bill.code_display}
+                          <ExternalLink size={12} />
+                        </Link>
+                        <div className="text-sm truncate">{bill.bill_purpose_label ?? bill.bill_purpose}</div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <Badge size="xs" color={isRefund ? 'warning' : 'default'}>
+                            {t(`repair.billType_${bill.bill_type}`, { defaultValue: bill.bill_type_label_short ?? bill.bill_type })}
+                          </Badge>
+                          <Badge size="xs" color={getBillStatusColor(bill.status, bill.is_cancelled)}>
+                            {bill.is_cancelled
+                              ? t('contract.billStatus_CANCELLED', { defaultValue: 'Cancelled' })
+                              : t(`contract.billStatus_${bill.status}`, { defaultValue: bill.status })}
+                          </Badge>
+                        </div>
+                      </div>
+                      {/* Right: amount + date top-aligned with the code, actions below */}
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <div className={`text-sm font-medium tabular-nums ${bill.is_cancelled ? 'line-through text-subtler' : isRefund ? 'text-danger' : ''}`}>
+                          {fmtCurrency(signedTotal)}
+                        </div>
+                        <div className="text-xs text-subtle"><DateTime value={bill.bill_date} showTime={false} /></div>
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <Tooltip content={t('repair.printBill')}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="btn-icon-sm"
+                              startIcon={<Printer size={14} />}
+                              onClick={() => printBill(bill.id)}
+                              aria-label={t('repair.printBill')}
+                            />
+                          </Tooltip>
+                          <Tooltip content={t('repair.downloadBill')}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="btn-icon-sm"
+                              disabled={downloadingId === bill.id}
+                              startIcon={downloadingId === bill.id ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                              onClick={() => downloadBill(bill.id)}
+                              aria-label={t('repair.downloadBill')}
+                            />
+                          </Tooltip>
+                        </div>
+                      </div>
+                    </div>
+
+                    {payments.length > 0 && (
+                      <div className="mt-2.5 pt-2.5 border-t border-line flex flex-col gap-1.5">
+                        {payments.map(p => (
+                          <div
+                            key={p.id}
+                            className={`flex items-center justify-between gap-3 text-xs ${p.is_reversal ? 'opacity-50 line-through' : ''}`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-subtle">└</span>
+                              <span>{p.method ? t(`wizard.method_${p.method}`, { defaultValue: p.method }) : '—'}</span>
+                              {p.bank_name && <span className="text-subtle truncate">{p.bank_name}</span>}
+                              {p.reference && <span className="text-subtle font-mono truncate">{p.reference}</span>}
+                              {p.is_reversal && <Badge size="xs" color="danger">VOID</Badge>}
+                            </div>
+                            <span className="tabular-nums shrink-0">{fmtCurrency(p.amount)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        </>
         )}
         </>
        ) : (
