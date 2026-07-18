@@ -739,5 +739,17 @@
   "inv.state.repair_not_in_repair": "Repair is not in progress.",
   "inv.state.repair_sealed": "Repair is closed/voided and can no longer be modified.",
   "inv.state.asset_not_repairable_from_bucket": "This device cannot be sent to repair from its current location.",
-  "inv.auth.repair_cancel_denied": "You do not have permission to cancel a repair."
+  "inv.auth.repair_cancel_denied": "You do not have permission to cancel a repair.",
+  "SALE.VALIDATION.ASSET_NOT_BOUND_TO_CONTRACT": "This is not the device on this contract.",
+  "sale.validation.asset_not_bound_to_contract": "This is not the device on this contract.",
+  "SALE.VALIDATION.ASSET_NOT_THE_DEPOSITED_ONE": "This is not the deposited device.",
+  "sale.validation.asset_not_the_deposited_one": "This is not the deposited device.",
+  "SALE.STATE.RETURN_BLOCKED_OVERDUE": "Collect the overdue installments before returning the device.",
+  "sale.state.return_blocked_overdue": "Collect the overdue installments before returning the device.",
+  "SALE.STATE.ALREADY_DEPOSITED": "This device is already deposited.",
+  "sale.state.already_deposited": "This device is already deposited.",
+  "SALE.STATE.NOT_DEPOSITED": "This device is not deposited.",
+  "sale.state.not_deposited": "This device is not deposited.",
+  "SALE.STATE.ONLY_ACTIVE_CAN_DEPOSIT": "Only an active contract can deposit a device.",
+  "sale.state.only_active_can_deposit": "Only an active contract can deposit a device."
 }

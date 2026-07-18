@@ -739,5 +739,17 @@
   "inv.state.repair_not_in_repair": "งานซ่อมไม่ได้อยู่สถานะกำลังซ่อม",
   "inv.state.repair_sealed": "งานซ่อมปิด/ยกเลิกแล้ว แก้ไขไม่ได้",
   "inv.state.asset_not_repairable_from_bucket": "เครื่องนี้ส่งซ่อมจากตำแหน่งปัจจุบันไม่ได้",
-  "inv.auth.repair_cancel_denied": "คุณไม่มีสิทธิ์ยกเลิกงานซ่อม"
+  "inv.auth.repair_cancel_denied": "คุณไม่มีสิทธิ์ยกเลิกงานซ่อม",
+  "SALE.VALIDATION.ASSET_NOT_BOUND_TO_CONTRACT": "เครื่องนี้ไม่ใช่เครื่องของสัญญานี้",
+  "sale.validation.asset_not_bound_to_contract": "เครื่องนี้ไม่ใช่เครื่องของสัญญานี้",
+  "SALE.VALIDATION.ASSET_NOT_THE_DEPOSITED_ONE": "เครื่องนี้ไม่ใช่เครื่องที่ฝากไว้",
+  "sale.validation.asset_not_the_deposited_one": "เครื่องนี้ไม่ใช่เครื่องที่ฝากไว้",
+  "SALE.STATE.RETURN_BLOCKED_OVERDUE": "ต้องเก็บค่างวดที่ค้างก่อนจึงจะรับเครื่องคืนได้",
+  "sale.state.return_blocked_overdue": "ต้องเก็บค่างวดที่ค้างก่อนจึงจะรับเครื่องคืนได้",
+  "SALE.STATE.ALREADY_DEPOSITED": "เครื่องนี้ฝากอยู่แล้ว",
+  "sale.state.already_deposited": "เครื่องนี้ฝากอยู่แล้ว",
+  "SALE.STATE.NOT_DEPOSITED": "เครื่องนี้ไม่ได้ฝากอยู่",
+  "sale.state.not_deposited": "เครื่องนี้ไม่ได้ฝากอยู่",
+  "SALE.STATE.ONLY_ACTIVE_CAN_DEPOSIT": "สัญญานี้ฝากเครื่องไม่ได้ (ไม่ใช่สถานะใช้งาน)",
+  "sale.state.only_active_can_deposit": "สัญญานี้ฝากเครื่องไม่ได้ (ไม่ใช่สถานะใช้งาน)"
 }

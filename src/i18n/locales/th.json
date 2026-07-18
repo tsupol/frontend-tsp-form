@@ -5142,7 +5142,9 @@
     "change_genericTitle": "การเปลี่ยนแปลง",
     "change_unknownParty": "ไม่สามารถระบุคู่สัญญาที่เกี่ยวข้องได้จากรายการนี้",
     "change_customerId": "รหัสลูกค้า",
-    "change_noNote": "ไม่ได้บันทึกหมายเหตุของการเปลี่ยนแปลง"
+    "change_noNote": "ไม่ได้บันทึกหมายเหตุของการเปลี่ยนแปลง",
+    "reason_DEVICE_DEPOSIT": "ฝากเครื่อง",
+    "reason_DEVICE_RETURN": "รับเครื่องคืน"
   },
   "chat": {
     "title": "แชท",

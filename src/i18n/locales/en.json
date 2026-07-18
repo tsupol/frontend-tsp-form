@@ -5144,7 +5144,9 @@
     "change_genericTitle": "Change",
     "change_unknownParty": "Affected party not identifiable from snapshot.",
     "change_customerId": "Customer ID",
-    "change_noNote": "No change note recorded."
+    "change_noNote": "No change note recorded.",
+    "reason_DEVICE_DEPOSIT": "Device deposit",
+    "reason_DEVICE_RETURN": "Device return"
   },
   "chat": {
     "title": "Chat",
