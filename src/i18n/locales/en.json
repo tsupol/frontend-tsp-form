@@ -2909,12 +2909,28 @@
       "colBranch": "Branch",
       "colBank": "Bank / Account",
       "colPromptpay": "PromptPay",
+      "colQr": "QR",
       "colStatus": "Status",
       "fallbackBadge": "Fallback",
       "isFallback": "Fallback account",
       "setFallback": "Set as fallback",
       "fallbackSet": "Fallback account updated",
-      "fallbackHint": "Only a safety fallback. The store-front / installment account customers see is set in the Channel accounts tab."
+      "fallbackHint": "Only a safety fallback. The store-front / installment account customers see is set in the Channel accounts tab.",
+      "qr": {
+        "label": "Payment QR",
+        "hint": "The QR customers scan to pay into this account. PNG, JPEG, or WebP — upload the original from your bank app, don't crop.",
+        "upload": "Upload QR",
+        "change": "Change QR",
+        "viewLarger": "View larger",
+        "has": "Has payment QR",
+        "none": "No payment QR set",
+        "readOnly": "Payment QR set (view only — you can't change it).",
+        "uploaded": "Payment QR uploaded",
+        "replaced": "Payment QR replaced",
+        "removed": "Payment QR removed",
+        "removeTitle": "Remove payment QR",
+        "removeConfirm": "Remove the payment QR from this account? Customers will no longer be able to scan it to pay."
+      }
     },
     "holidays": {
       "title": "Holidays",

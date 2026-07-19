@@ -59,7 +59,9 @@ async function call<T>(path: string, init: RequestInit): Promise<T> {
   if (!('ok' in body) || !body.ok) {
     const err = (body as ErrEnvelope).error;
     const msg = err?.message ?? `be-media error (HTTP ${res.status})`;
-    throw new Error(msg);
+    // BeMediaError (extends Error, same .message) so callers can translate the
+    // DB i18n `code`; .message-only callers are unaffected.
+    throw new BeMediaError(err?.code ?? '', msg, err?.http ?? res.status);
   }
   return body.data;
 }
@@ -368,6 +370,34 @@ export const REPAIR_CONDITION_MAX = 20;  // mig 633 default_max_uploads = 20
 export const REPAIR_CONDITION_RESIZE: ResizeOptions = {
   maxWidth: 1280, maxHeight: 1280, mode: 'contain', format: 'webp', quality: 0.82,
 };
+
+// ── bank_account_qr — payment QR image on a bank account (PUBLIC) ─────
+// The scannable PromptPay/transfer QR staff show customers. One live QR per
+// account; replacing soft-deletes the old one. Lands at
+// uploads/bank_qr/{account_id}/qr-{idx}.{ext} in the PUBLIC bucket (served via
+// CDN — reads compose the URL with publicMediaUrl, no presign).
+//
+// PNG is accepted for this type (unlike most, which force WebP/JPEG) because a
+// QR is line art — JPEG blurs module edges and can break scanning, and bank-app
+// screenshots are almost always PNG. DO NOT resize/convert before upload; send
+// the original bytes.
+//
+// `idx` is a REQUIRED form field = Date.now() (ms). The bucket is public + CDN,
+// so a stable filename would let the CDN serve a stale QR after a change →
+// customer scans → money to the wrong account. A fresh idx guarantees a new key
+// every time. Omitting idx → CORE.VALIDATION.LEAF_BUILD_FAILED.
+export const BANK_ACCOUNT_QR_TYPE = 'bank_account_qr';
+
+// Upload a QR image for an account (step 1 of 2), then call fn_bank_account_qr_set
+// (step 2) to bind it. Sends the original file unmodified. Returns the be-media
+// key (uploads/bank_qr/{account_id}/qr-{idx}.{ext}).
+export async function uploadBankAccountQr(accountId: number, file: File): Promise<BeMediaUploadResult> {
+  return beMediaUpload({
+    type: BANK_ACCOUNT_QR_TYPE,
+    file,
+    params: { account_id: accountId, idx: Date.now() },
+  });
+}
 
 // ── Hardcoded upload-spec registry ────────────────────────────────────
 // be-media has no /upload/spec endpoint; these mirror misc-go's

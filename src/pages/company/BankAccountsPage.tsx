@@ -10,13 +10,26 @@ import {
 } from 'tsp-form';
 import {
   Plus, MoreHorizontal, Pencil, ShieldCheck, ShieldOff, Star,
-  XCircle, CheckCircle, ArrowRightFromLine,
+  XCircle, CheckCircle, ArrowRightFromLine, QrCode, Upload, Trash2, RefreshCw,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import { BeMediaError, uploadBankAccountQr } from '../../lib/beMedia';
+import { publicMediaUrl } from '../../lib/mediaPath';
 import { useAuth } from '../../contexts/AuthContext';
+import { MediaLightbox } from '../../components/MediaLightbox';
 import { BankChannelConfig } from './BankChannelConfig';
 
 // ── Types ────────────────────────────────────────────────────────────────────
+
+// Payment QR bound to an account (mig 704). `paths.original` is the public-bucket
+// key; compose the URL with publicMediaUrl (no presign). null = no QR yet.
+interface QrMedia {
+  media_id: number;
+  usage_type: string;
+  access_level: string;
+  sort_order: number;
+  paths: { original: string };
+}
 
 interface BankAccount {
   id: number;
@@ -32,6 +45,7 @@ interface BankAccount {
   is_active: boolean;
   is_default: boolean;
   note: string | null;
+  qr_media: QrMedia | null;
 }
 
 interface Branch {
@@ -97,11 +111,12 @@ function RowActions({ account, onEdit, onToggle, onSetDefault }: {
 
 // ── Create / Edit Modal ──────────────────────────────────────────────────────
 
-function AccountModal({ open, onClose, account, branches }: {
+function AccountModal({ open, onClose, account, branches, canManageQr }: {
   open: boolean;
   onClose: () => void;
   account: BankAccount | null;
   branches: Branch[];
+  canManageQr: boolean;
 }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -124,32 +139,120 @@ function AccountModal({ open, onClose, account, branches }: {
     },
   });
 
+  // Reset the form only when the modal opens or switches to a different account
+  // — NOT on every refetch. `account` is re-resolved from the live query on each
+  // refetch (so QR changes show), which would otherwise clobber in-progress edits.
+  const accountRef = useRef(account);
+  accountRef.current = account;
+  const accountId = account?.id ?? null;
   useEffect(() => {
-    if (open) {
-      if (account) {
-        reset({
-          branch_id: String(account.branch_id),
-          bank_name: account.bank_name,
-          account_number: account.account_number,
-          account_name: account.account_name,
-          promptpay_id: account.promptpay_id ?? '',
-          is_default: account.is_default,
-          note: account.note ?? '',
-        });
-      } else {
-        reset({
-          branch_id: '',
-          bank_name: '',
-          account_number: '',
-          account_name: '',
-          promptpay_id: '',
-          is_default: false,
-          note: '',
-        });
-      }
-      setErrorMessage('');
+    if (!open) return;
+    const acc = accountRef.current;
+    if (acc) {
+      reset({
+        branch_id: String(acc.branch_id),
+        bank_name: acc.bank_name,
+        account_number: acc.account_number,
+        account_name: acc.account_name,
+        promptpay_id: acc.promptpay_id ?? '',
+        is_default: acc.is_default,
+        note: acc.note ?? '',
+      });
+    } else {
+      reset({
+        branch_id: '',
+        bank_name: '',
+        account_number: '',
+        account_name: '',
+        promptpay_id: '',
+        is_default: false,
+        note: '',
+      });
     }
-  }, [open, account, reset]);
+    setErrorMessage('');
+    setQrBusy(false);
+    setConfirmRemoveQr(false);
+  }, [open, accountId, reset]);
+
+  // ── Payment QR (edit-only) ─────────────────────────────────────────────
+  const qrFileRef = useRef<HTMLInputElement>(null);
+  const [qrBusy, setQrBusy] = useState(false);
+  const [confirmRemoveQr, setConfirmRemoveQr] = useState(false);
+  const [qrLightbox, setQrLightbox] = useState(false);
+  const qrKey = account?.qr_media?.paths.original ?? null;
+  const qrUrl = qrKey ? publicMediaUrl(qrKey) : null;
+
+  const translateErr = (err: unknown): string => {
+    if (err instanceof ApiError || err instanceof BeMediaError) {
+      const messageKey = err instanceof ApiError ? err.messageKey : undefined;
+      const translated = (messageKey ? t(messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+        || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+      return translated || err.message;
+    }
+    return t('common.error');
+  };
+
+  const handleQrPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-picking the same file
+    if (!file || !account) return;
+    setQrBusy(true);
+    setErrorMessage('');
+    try {
+      // Step 1 — upload the original bytes to be-media (no resize; PNG allowed).
+      const uploaded = await uploadBankAccountQr(account.id, file);
+      // Step 2 — bind the key to the account. Skipping this orphans the file.
+      const res = await apiClient.rpc<{ media_id: number; replaced_media_id: number | null }>(
+        'fn_bank_account_qr_set',
+        {
+          p_account_id: account.id,
+          p_storage_path: uploaded.key,
+          p_mime_type: uploaded.content_type || file.type,
+          p_file_size_bytes: file.size,
+          p_original_filename: file.name,
+        },
+      );
+      addSnackbar({
+        message: (
+          <div className="alert alert-success">
+            <CheckCircle size={16} />
+            <span className="alert-description">
+              {res.replaced_media_id != null
+                ? t('settings.bankAccounts.qr.replaced')
+                : t('settings.bankAccounts.qr.uploaded')}
+            </span>
+          </div>
+        ),
+        type: 'success',
+      });
+      queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
+    } catch (err) {
+      setErrorMessage(translateErr(err));
+      setErrorKey(k => k + 1);
+    } finally {
+      setQrBusy(false);
+    }
+  };
+
+  const handleQrRemove = async () => {
+    if (!account) return;
+    setConfirmRemoveQr(false);
+    setQrBusy(true);
+    setErrorMessage('');
+    try {
+      await apiClient.rpc('fn_bank_account_qr_remove', { p_account_id: account.id });
+      addSnackbar({
+        message: <div className="alert alert-success"><CheckCircle size={16} /><span className="alert-description">{t('settings.bankAccounts.qr.removed')}</span></div>,
+        type: 'success',
+      });
+      queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
+    } catch (err) {
+      setErrorMessage(translateErr(err));
+      setErrorKey(k => k + 1);
+    } finally {
+      setQrBusy(false);
+    }
+  };
 
   const onSubmit = async (data: AccountForm) => {
     if (!user) return;
@@ -261,6 +364,73 @@ function AccountModal({ open, onClose, account, branches }: {
               <label className="form-label">{t('settings.bankAccounts.note')}</label>
               <Input {...register('note')} className="w-full" />
             </div>
+            {isEdit && (
+              <div className="flex flex-col">
+                <label className="form-label">{t('settings.bankAccounts.qr.label')}</label>
+                <div className="flex items-center gap-3 rounded-md border border-line bg-surface p-3">
+                  {qrUrl ? (
+                    <button
+                      type="button"
+                      onClick={() => setQrLightbox(true)}
+                      className="w-20 h-20 shrink-0 rounded-md border border-line bg-surface-soft overflow-hidden cursor-zoom-in hover:opacity-80 transition-opacity"
+                      aria-label={t('settings.bankAccounts.qr.viewLarger')}
+                    >
+                      <img src={qrUrl} alt={t('settings.bankAccounts.qr.label')} className="w-full h-full object-contain" />
+                    </button>
+                  ) : (
+                    <div className="w-20 h-20 shrink-0 rounded-md border border-line bg-surface-soft flex items-center justify-center overflow-hidden">
+                      <QrCode size={28} className="text-subtler" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    {canManageQr ? (
+                      <>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            startIcon={qrUrl ? <RefreshCw size={14} /> : <Upload size={14} />}
+                            disabled={qrBusy}
+                            onClick={() => qrFileRef.current?.click()}
+                          >
+                            {qrBusy
+                              ? t('common.saving')
+                              : qrUrl
+                                ? t('settings.bankAccounts.qr.change')
+                                : t('settings.bankAccounts.qr.upload')}
+                          </Button>
+                          {qrUrl && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              startIcon={<Trash2 size={14} className="text-danger" />}
+                              disabled={qrBusy}
+                              onClick={() => setConfirmRemoveQr(true)}
+                            >
+                              {t('common.remove')}
+                            </Button>
+                          )}
+                        </div>
+                        <p className="text-xs text-subtle mt-1.5">{t('settings.bankAccounts.qr.hint')}</p>
+                      </>
+                    ) : (
+                      <p className="text-xs text-subtle">
+                        {qrUrl ? t('settings.bankAccounts.qr.readOnly') : t('settings.bankAccounts.qr.none')}
+                      </p>
+                    )}
+                  </div>
+                  <input
+                    ref={qrFileRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    onChange={handleQrPick}
+                  />
+                </div>
+              </div>
+            )}
             {!isEdit && (
               <div className="flex flex-col">
                 <label className="form-label">{t('settings.bankAccounts.isFallback')}</label>
@@ -283,6 +453,22 @@ function AccountModal({ open, onClose, account, branches }: {
           </Button>
         </div>
       </form>
+
+      <Modal open={confirmRemoveQr} onClose={() => setConfirmRemoveQr(false)} maxWidth="24rem" width="100%">
+        <div className="modal-header"><h2 className="modal-title">{t('settings.bankAccounts.qr.removeTitle')}</h2></div>
+        <div className="modal-content"><p>{t('settings.bankAccounts.qr.removeConfirm')}</p></div>
+        <div className="modal-footer">
+          <Button variant="ghost" onClick={() => setConfirmRemoveQr(false)}>{t('common.cancel')}</Button>
+          <Button color="danger" onClick={handleQrRemove}>{t('common.remove')}</Button>
+        </div>
+      </Modal>
+
+      <MediaLightbox
+        open={qrLightbox}
+        onClose={() => setQrLightbox(false)}
+        mediaKey={qrKey}
+        alt={t('settings.bankAccounts.qr.label')}
+      />
     </Modal>
   );
 }
@@ -304,6 +490,7 @@ export function BankAccountsPage() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editAccount, setEditAccount] = useState<BankAccount | null>(null);
+  const [qrPreview, setQrPreview] = useState<string | null>(null);
 
   // Channel config (STORE_FRONT / INSTALLMENT slot accounts) is a company-level
   // act — COMPANY_ADMIN / COMPANY_ACCOUNTANT only (PAYMENT_CHANNEL.MANAGE).
@@ -322,6 +509,13 @@ export function BankAccountsPage() {
     queryKey: ['branches-active'],
     queryFn: () => apiClient.get<Branch[]>('/v_branches?is_active=is.true&order=name'),
   });
+
+  // Resolve the edited account from the live query rows (not the frozen state
+  // snapshot) so a QR set/remove — which invalidates ['bank-accounts'] — is
+  // reflected in the open modal.
+  const liveEditAccount = editAccount
+    ? accounts.find(a => a.id === editAccount.id) ?? editAccount
+    : null;
 
   const filtered = search.trim()
     ? accounts.filter(a => {
@@ -428,6 +622,29 @@ export function BankAccountsPage() {
       cell: ({ row }) => row.original.promptpay_id
         ? <span className="tabular-nums text-sm">{row.original.promptpay_id}</span>
         : <span className="opacity-30">—</span>,
+    },
+    {
+      id: 'qr',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('settings.bankAccounts.colQr')} />,
+      cell: ({ row }) => row.original.qr_media
+        ? (
+          <Tooltip content={t('settings.bankAccounts.qr.viewLarger')} placement="top">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setQrPreview(row.original.qr_media!.paths.original); }}
+              className="w-8 h-8 rounded border border-line overflow-hidden bg-surface-soft cursor-zoom-in hover:opacity-80 transition-opacity"
+              aria-label={t('settings.bankAccounts.qr.viewLarger')}
+            >
+              <img
+                src={publicMediaUrl(row.original.qr_media.paths.original)}
+                alt={t('settings.bankAccounts.qr.label')}
+                className="w-full h-full object-contain"
+              />
+            </button>
+          </Tooltip>
+        )
+        : <span className="opacity-30">—</span>,
+      enableSorting: false,
     },
     {
       id: 'status',
@@ -580,6 +797,16 @@ export function BankAccountsPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-sm truncate">{account.bank_name}</span>
+                        {account.qr_media && (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setQrPreview(account.qr_media!.paths.original); }}
+                            className="shrink-0 bg-transparent border-none p-0 cursor-pointer text-subtle"
+                            aria-label={t('settings.bankAccounts.qr.viewLarger')}
+                          >
+                            <QrCode size={14} />
+                          </button>
+                        )}
                         {account.is_default && <Badge color="default" size="sm">{t('settings.bankAccounts.fallbackBadge')}</Badge>}
                         {!account.is_active && <Badge color="default" size="sm">{t('common.inactive')}</Badge>}
                       </div>
@@ -619,12 +846,21 @@ export function BankAccountsPage() {
         onClose={() => setCreateOpen(false)}
         account={null}
         branches={branches}
+        canManageQr={canManageChannels}
       />
       <AccountModal
         open={!!editAccount}
         onClose={() => setEditAccount(null)}
-        account={editAccount}
+        account={liveEditAccount}
         branches={branches}
+        canManageQr={canManageChannels}
+      />
+
+      <MediaLightbox
+        open={!!qrPreview}
+        onClose={() => setQrPreview(null)}
+        mediaKey={qrPreview}
+        alt={t('settings.bankAccounts.qr.label')}
       />
     </>
   );
