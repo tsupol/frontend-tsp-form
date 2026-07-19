@@ -1439,6 +1439,10 @@ function DayCloseOverview({ close, branchId, closeDate }: { close: DayCloseHisto
         <dl className="grid grid-cols-2 @md:grid-cols-3 @lg:grid-cols-4 gap-x-3 gap-y-2">
           <Stat label={t('accounting.dayClose.cashIn')} value={fmtCurrency(row.cash_amount)} />
           <Stat label={t('accounting.dayClose.transferIn')} value={fmtCurrency(row.transfer_amount)} />
+          {/* งบบริษัท (holding refund) — read-only, not from the till; shown only when active */}
+          {row.holding_budget_amount !== 0 && (
+            <Stat label={t('accounting.dayClose.holdingBudget')} value={fmtCurrency(row.holding_budget_amount)} tone="warning" />
+          )}
           <Stat label={t('accounting.dayClose.refundCashOut')} value={fmtCurrency(row.refund_cash_out)} tone={row.refund_cash_out > 0 ? 'warning' : undefined} />
           <Stat label={t('accounting.dayClose.drawerNet')} value={fmtCurrency(row.cash_amount + row.transfer_amount)} />
         </dl>

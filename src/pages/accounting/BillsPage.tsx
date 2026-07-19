@@ -22,6 +22,7 @@ import { useBillPdfDownload } from '../../hooks/useBillPdfDownload';
 import { buildBillActionToast, hasBill, type StandardBillResponse } from '../../lib/billActionToast';
 import { type Branch, type BillRow, type BillDetail, type BillPayment, type BillLineItem, todayISO } from './accountingTypes';
 import { CorrectLineModal } from './CorrectLineModal';
+import { CreditNoteReverseModal } from './CreditNoteReverseModal';
 import { useBillActions, type BillAction, type BillActionCode } from '../../hooks/useBillActions';
 import { useVoidReasons } from '../../hooks/useVoidReasons';
 import { BillReceipt } from '../contracts/workspace/BillReceipt';
@@ -458,6 +459,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
 
   // Void-single-payment state — the payment row the BM chose to void
   const [voidPayment, setVoidPayment] = useState<BillPayment | null>(null);
+  const [reverseCnOpen, setReverseCnOpen] = useState(false);
 
   // Line-amount correction — the line the user chose to fix (opens the modal)
   const [correctLine, setCorrectLine] = useState<BillLineItem | null>(null);
@@ -978,6 +980,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
         actions={allActions}
         suppressLifecycle={suppressLifecycle}
         onVoidOrCancel={() => { setVoidOpen(true); setVoidError(''); setVoidReason(''); setVoidReasonCode(''); setVoidPin(''); }}
+        onReverseCreditNote={() => setReverseCnOpen(true)}
       />
 
       {/* ── Print render — portaled into body so no panel ancestor becomes the
@@ -1054,6 +1057,20 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
         billTotal={detail.total_amount}
         onClose={() => setCorrectLine(null)}
         onCorrected={() => {
+          queryClient.invalidateQueries({ queryKey: ['accounting', 'bill-detail', billId] });
+          queryClient.invalidateQueries({ queryKey: ['bill-actions', billId] });
+          onBillChanged();
+        }}
+      />
+
+      {/* ── กลับรายการคืนเงิน (reverse credit note) ── */}
+      <CreditNoteReverseModal
+        open={reverseCnOpen}
+        onClose={() => setReverseCnOpen(false)}
+        billId={billId}
+        billCode={detail.bill_code_display}
+        billAmount={detail.total_amount}
+        onReversed={() => {
           queryClient.invalidateQueries({ queryKey: ['accounting', 'bill-detail', billId] });
           queryClient.invalidateQueries({ queryKey: ['bill-actions', billId] });
           onBillChanged();
@@ -1268,15 +1285,17 @@ const PRIMARY_BY_STATUS: Record<string, BillActionCode[]> = {
 const WIRED_ACTIONS: ReadonlySet<BillActionCode> = new Set<BillActionCode>([
   'CANCEL_BILL',
   'VOID_BILL',
+  'REVERSE_CREDIT_NOTE',
 ]);
 
 interface BillActionBarProps {
   actions: BillAction[];
   suppressLifecycle: boolean;
   onVoidOrCancel: () => void;
+  onReverseCreditNote: () => void;
 }
 
-function BillActionBar({ actions, suppressLifecycle, onVoidOrCancel }: BillActionBarProps) {
+function BillActionBar({ actions, suppressLifecycle, onVoidOrCancel, onReverseCreditNote }: BillActionBarProps) {
   const { t } = useTranslation();
   const [moreOpen, setMoreOpen] = useState(false);
   const moreTriggerRef = useRef<HTMLButtonElement>(null);
@@ -1332,6 +1351,10 @@ function BillActionBar({ actions, suppressLifecycle, onVoidOrCancel }: BillActio
       onVoidOrCancel();
       return;
     }
+    if (a.action_code === 'REVERSE_CREDIT_NOTE') {
+      onReverseCreditNote();
+      return;
+    }
     // Other actions: not wired yet — buttons are disabled, this never fires.
   };
 
@@ -1361,7 +1384,7 @@ function BillActionBar({ actions, suppressLifecycle, onVoidOrCancel }: BillActio
         </div>
       );
 
-    const isDanger = a.action_code === 'VOID_BILL' || a.action_code === 'CANCEL_BILL' || a.action_code === 'REVERSE_BILL';
+    const isDanger = a.action_code === 'VOID_BILL' || a.action_code === 'CANCEL_BILL' || a.action_code === 'REVERSE_BILL' || a.action_code === 'REVERSE_CREDIT_NOTE';
     const startIcon = isDanger ? <Ban size={14} /> : undefined;
 
     return (

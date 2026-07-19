@@ -14,13 +14,15 @@ export type BillActionCode =
   | 'CANCEL_APPROVAL'
   | 'CANCEL_BILL'
   | 'VOID_BILL'
-  | 'REVERSE_BILL';
+  | 'REVERSE_BILL'
+  | 'REVERSE_CREDIT_NOTE';
 
 export type BillActionCategory = 'PAYMENT' | 'LINE' | 'APPROVAL' | 'LIFECYCLE';
 
 export type BillBlockingReason =
   | 'status_not_allowed'
   | 'bill_purpose_not_match'
+  | 'bill_is_a_reversal'
   | 'pending_approval_blocks'
   | 'not_paid_in_full'
   | 'permission_denied';

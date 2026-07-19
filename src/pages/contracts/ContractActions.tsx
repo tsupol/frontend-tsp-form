@@ -32,11 +32,10 @@ const SLIP_SPEC = {
 } as const;
 import { fuzzyScore } from '../../lib/fuzzy';
 import { CompleteContractModal } from './CompleteContractModal';
-import { BindLoanerModal, UnbindLoanerModal } from './LoanerModals';
+import { LoanAssignModal, LoanReturnModal } from './LoanerModals';
 import { DepositDeviceModal, ReturnDepositModal } from './DepositModals';
 import { RepairRequestModal } from './RepairRequestModal';
 import { AppointmentCreateModal, AppointmentCancelModal } from './AppointmentModals';
-import { RefundVoidModal } from './RefundVoidModal';
 import { TransferBranchModal } from './TransferBranchModal';
 import { ActionDoneView, type ActionDoneDetailRow } from './ActionDoneView';
 import { ContractFeeModal } from './ContractFeeModal';
@@ -89,15 +88,14 @@ type ContractAction =
   | 'return_deposit'
   | 'unbind_device'
   | 'bind_device'
-  | 'bind_loaner'
-  | 'unbind_loaner'
+  | 'loan_assign'
+  | 'loan_return'
   | 'device_repair_request'
   | 'transfer_branch'
   | 'transfer_accept'
   | 'transfer_cancel'
   | 'detach_customer'
   | 'settlement_refund'
-  | 'settlement_refund_void'
   | 'appointment_create'
   | 'appointment_cancel'
   | 'change_draft_owner'
@@ -107,7 +105,8 @@ type ContractAction =
   | 'pay_installment'
   | 'service_charge'
   | 'late_fee_collect'
-  | 'reschedule_due_day';
+  | 'reschedule_due_day'
+  | 'expire_draft';
 
 // ── Action config ────────────────────────────────────────────────────────────
 
@@ -264,8 +263,12 @@ const ACTION_CONFIGS: Partial<Record<ContractAction, ActionConfig>> = {
     needsNewOwner: false,
     successKey: 'contract.action_detach_customer_success',
   },
+  // คืนเงินเจรจา (holding refund). Money comes from the holding budget, not the
+  // branch drawer — the RPC hard-defaults p_channel=HOLDING_BUDGET, so the FE
+  // sends only amount/note/pin (NO channel / bank account). Device must be
+  // unbound first (mig 711); the button's is_available already reflects that.
   settlement_refund: {
-    rpc: 'fn_contract_settlement_refund',
+    rpc: 'fn_bill_holding_refund',
     color: undefined,
     needsPin: true,
     needsNote: true,
@@ -420,8 +423,24 @@ const ACTION_CONFIGS: Partial<Record<ContractAction, ActionConfig>> = {
     needsNewOwner: false,
     successKey: 'reschedule.done',
   },
-  bind_loaner: {
-    rpc: '', // handled by BindLoanerModal
+  // Expire a DRAFT immediately (DRAFT → EXPIRED), so junk drafts drop off the
+  // worklist without waiting for the nightly cron. PIN required (both BM + BS
+  // get pin_required from the evaluator). Note optional — logged to state log.
+  expire_draft: {
+    rpc: 'fn_contract_expire_draft',
+    color: 'danger',
+    needsPin: true,
+    needsNote: true,
+    needsReason: false,
+    needsBranch: false,
+    needsDevice: false,
+    needsAmount: false,
+    needsCloseReason: false,
+    needsNewOwner: false,
+    successKey: 'contract.action_expire_draft_success',
+  },
+  loan_assign: {
+    rpc: '', // handled by LoanAssignModal (check → sign → seal)
     color: 'primary',
     needsPin: false,
     needsNote: false,
@@ -431,11 +450,11 @@ const ACTION_CONFIGS: Partial<Record<ContractAction, ActionConfig>> = {
     needsAmount: false,
     needsCloseReason: false,
     needsNewOwner: false,
-    successKey: 'contract.action_bind_loaner_success',
+    successKey: 'loaner.assign_success',
   },
-  unbind_loaner: {
-    rpc: '', // handled by UnbindLoanerModal
-    color: 'danger',
+  loan_return: {
+    rpc: '', // handled by LoanReturnModal (check → sign → seal)
+    color: 'primary',
     needsPin: false,
     needsNote: false,
     needsReason: false,
@@ -444,7 +463,7 @@ const ACTION_CONFIGS: Partial<Record<ContractAction, ActionConfig>> = {
     needsAmount: false,
     needsCloseReason: false,
     needsNewOwner: false,
-    successKey: 'contract.action_unbind_loaner_success',
+    successKey: 'loaner.return_success',
   },
   device_repair_request: {
     rpc: '', // handled by RepairRequestModal
@@ -484,19 +503,6 @@ const ACTION_CONFIGS: Partial<Record<ContractAction, ActionConfig>> = {
     needsCloseReason: false,
     needsNewOwner: false,
     successKey: 'contract.action_appointment_cancel_success',
-  },
-  settlement_refund_void: {
-    rpc: '', // handled by RefundVoidModal
-    color: 'danger',
-    needsPin: false,
-    needsNote: false,
-    needsReason: false,
-    needsBranch: false,
-    needsDevice: false,
-    needsAmount: false,
-    needsCloseReason: false,
-    needsNewOwner: false,
-    successKey: 'contract.action_settlement_refund_void_success',
   },
 };
 
@@ -557,15 +563,14 @@ const FE_TO_BACKEND_ACTION: Record<ContractAction, string> = {
   return_deposit: 'RETURN_DEPOSIT',
   unbind_device: 'UNBIND_DEVICE',
   bind_device: 'BIND_DEVICE',
-  bind_loaner: 'BIND_LOANER',
-  unbind_loaner: 'UNBIND_LOANER',
+  loan_assign: 'LOAN_ASSIGN',
+  loan_return: 'LOAN_RETURN',
   device_repair_request: 'DEVICE_REPAIR_REQUEST',
   transfer_branch: 'TRANSFER_BRANCH',
   transfer_accept: 'TRANSFER_ACCEPT',
   transfer_cancel: 'TRANSFER_CANCEL',
   detach_customer: 'DETACH_CUSTOMER',
   settlement_refund: 'HOLDING_REFUND',
-  settlement_refund_void: 'HOLDING_REFUND_VOID',
   change_draft_owner: 'CHANGE_DRAFT_OWNER',
   saving_deposit: 'SAVING_DEPOSIT',
   void_bill: '',           // no backend equivalent — keep FE-only behavior
@@ -574,6 +579,7 @@ const FE_TO_BACKEND_ACTION: Record<ContractAction, string> = {
   service_charge: 'SERVICE_CHARGE',
   late_fee_collect: 'LATE_FEE_COLLECT',
   reschedule_due_day: 'RESCHEDULE_DUE_DAY',
+  expire_draft: 'EXPIRE_DRAFT',
 };
 
 const BACKEND_TO_FE_ACTION: Record<string, ContractAction> = Object.entries(FE_TO_BACKEND_ACTION)
@@ -593,10 +599,11 @@ const FOOTER_ACTION_ALLOWLIST: ReadonlySet<string> = new Set([
   // LIFECYCLE
   'PAUSE_CONTRACT', 'RESUME_CONTRACT',
   'COMPLETE_CONTRACT', 'TERMINATE_CONTRACT', 'VOID_CONTRACT',
+  'EXPIRE_DRAFT',
   'TRANSFER_BRANCH', 'TRANSFER_ACCEPT', 'TRANSFER_CANCEL',
   'RESCHEDULE_DUE_DAY',
   'APPOINTMENT_CREATE', 'APPOINTMENT_CANCEL',
-  'HOLDING_REFUND', 'HOLDING_REFUND_VOID',
+  'HOLDING_REFUND',
   'UPDATE_DELIVERY', 'ADD_NOTE',
   // PAYMENT
   'PAY_INSTALLMENT', 'EARLY_PAYOFF',
@@ -611,7 +618,7 @@ const FOOTER_ACTION_ALLOWLIST: ReadonlySet<string> = new Set([
   // DEVICE
   'BIND_DEVICE', 'UNBIND_DEVICE',
   'CUSTOMER_DEPOSIT_DEVICE', 'RETURN_DEPOSIT',
-  'REPOSSESS', 'BIND_LOANER', 'UNBIND_LOANER', 'DEVICE_REPAIR_REQUEST',
+  'REPOSSESS', 'LOAN_ASSIGN', 'LOAN_RETURN', 'DEVICE_REPAIR_REQUEST',
   // CUSTOMER (contract-scoped only)
   'ADD_CO_LESSEE', 'REMOVE_CO_LESSEE',
   'ATTACH_CUSTOMER', 'DETACH_CUSTOMER',
@@ -655,8 +662,8 @@ const ELSEWHERE_TAB: Record<string, 'overview' | 'device' | 'notes' | 'customers
   UNBIND_DEVICE: 'device',
   CUSTOMER_DEPOSIT_DEVICE: 'device',
   RETURN_DEPOSIT: 'device',
-  BIND_LOANER: 'device',
-  UNBIND_LOANER: 'device',
+  LOAN_ASSIGN: 'device',
+  LOAN_RETURN: 'device',
   DEVICE_REPAIR_REQUEST: 'device',
 };
 
@@ -684,8 +691,8 @@ const ACTION_PLACEMENT: Record<string, ActionPlacement> = {
   UNBIND_DEVICE:         { kind: 'elsewhere', where: 'Device tab' },
   CUSTOMER_DEPOSIT_DEVICE: { kind: 'elsewhere', where: 'Device tab' },
   RETURN_DEPOSIT:        { kind: 'elsewhere', where: 'Device tab' },
-  BIND_LOANER:           { kind: 'elsewhere', where: 'Device tab' },
-  UNBIND_LOANER:         { kind: 'elsewhere', where: 'Device tab' },
+  LOAN_ASSIGN:           { kind: 'elsewhere', where: 'Device tab' },
+  LOAN_RETURN:           { kind: 'elsewhere', where: 'Device tab' },
   DEVICE_REPAIR_REQUEST: { kind: 'elsewhere', where: 'Device tab' },
 };
 
@@ -800,12 +807,11 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   const isPayInstallment = activeAction === 'pay_installment';
   const isComplete = activeAction === 'complete';
   const isTerminate = activeAction === 'terminate';
-  const isBindLoaner = activeAction === 'bind_loaner';
-  const isUnbindLoaner = activeAction === 'unbind_loaner';
+  const isLoanAssign = activeAction === 'loan_assign';
+  const isLoanReturn = activeAction === 'loan_return';
   const isRepairRequest = activeAction === 'device_repair_request';
   const isAppointmentCreate = activeAction === 'appointment_create';
   const isAppointmentCancel = activeAction === 'appointment_cancel';
-  const isRefundVoid = activeAction === 'settlement_refund_void';
   const isTransferBranch = activeAction === 'transfer_branch';
   const isServiceCharge = activeAction === 'service_charge';
   const isLateFeeCollect = activeAction === 'late_fee_collect';
@@ -885,6 +891,13 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   // only offer it when the backend says it's available for this contract/user.
   const canServiceChargeSaving = contract.state === 'SAVING'
     && allowedActions.some(a => a.action_code === 'SERVICE_CHARGE' && a.is_available);
+
+  // Expire draft — surfaced in the wizard footer (the action grid is hidden for
+  // wizard states). Backend restricts it to DRAFT; we render it whenever the
+  // evaluator marks it available + permitted for this user.
+  const expireDraftAction = allowedActions.find(
+    a => a.action_code === 'EXPIRE_DRAFT' && a.is_available,
+  );
 
   const groupedSecondary = secondaryActions.reduce<Record<string, BackendContractAction[]>>((acc, a) => {
     const cat = CATEGORY_OVERRIDE[a.action_code] ?? a.category;
@@ -971,6 +984,17 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
                 onClick={() => setActiveAction('service_charge')}
               >
                 {t('SERVICE_CHARGE', { ns: 'contractActions' })}
+              </Button>
+            )}
+            {expireDraftAction && (
+              <Button
+                size="sm"
+                variant="outline"
+                color="danger"
+                startIcon={<Trash2 size={14} />}
+                onClick={() => setActiveAction('expire_draft')}
+              >
+                {t('contract.action_expire_draft')}
               </Button>
             )}
           </div>
@@ -1116,18 +1140,18 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
         onClose={() => setActiveAction(null)}
         onSuccess={handleSuccess}
       />
-      <BindLoanerModal
-        open={isBindLoaner}
-        contractId={contract.id}
+      <LoanAssignModal
+        open={isLoanAssign}
+        contract={contract}
         branchId={contract.branch_id}
         onClose={() => setActiveAction(null)}
-        onSuccess={handleSuccess}
+        onNavigateSigning={() => onNavigateTab?.('signing')}
       />
-      <UnbindLoanerModal
-        open={isUnbindLoaner}
-        contractId={contract.id}
+      <LoanReturnModal
+        open={isLoanReturn}
+        contract={contract}
         onClose={() => setActiveAction(null)}
-        onSuccess={handleSuccess}
+        onNavigateSigning={() => onNavigateTab?.('signing')}
       />
       <RepairRequestModal
         open={isRepairRequest}
@@ -1144,12 +1168,6 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
       />
       <AppointmentCancelModal
         open={isAppointmentCancel}
-        contractId={contract.id}
-        onClose={() => setActiveAction(null)}
-        onSuccess={handleSuccess}
-      />
-      <RefundVoidModal
-        open={isRefundVoid}
         contractId={contract.id}
         onClose={() => setActiveAction(null)}
         onSuccess={handleSuccess}
@@ -1201,7 +1219,7 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
         onNavigateMoney={() => onNavigateTab?.('money')}
       />
       <ContractActionModal
-        open={!!activeAction && !isSavingDeposit && !isCancelSaving && !isEarlyPayoff && !isContinuePay && !isVoidBill && !isPayInstallment && !isComplete && !isTerminate && !isBindLoaner && !isUnbindLoaner && !isRepairRequest && !isAppointmentCreate && !isAppointmentCancel && !isRefundVoid && !isTransferBranch && !isServiceCharge && !isLateFeeCollect && !isReschedule && !isDepositDevice && !isReturnDeposit}
+        open={!!activeAction && !isSavingDeposit && !isCancelSaving && !isEarlyPayoff && !isContinuePay && !isVoidBill && !isPayInstallment && !isComplete && !isTerminate && !isLoanAssign && !isLoanReturn && !isRepairRequest && !isAppointmentCreate && !isAppointmentCancel && !isTransferBranch && !isServiceCharge && !isLateFeeCollect && !isReschedule && !isDepositDevice && !isReturnDeposit}
         action={activeAction}
         contract={contract}
         onClose={() => setActiveAction(null)}
@@ -1297,6 +1315,7 @@ interface VRole {
 const DONE_VIEW_ACTIONS: ReadonlySet<ContractAction> = new Set([
   'cancel',
   'void',
+  'expire_draft',
   'transfer_accept',
   'transfer_cancel',
   'unbind_device',
@@ -1529,6 +1548,8 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
     if (config.needsDevice && !deviceId) return false;
     if (config.needsAmount && (!amount || Number(amount) <= 0)) return false;
     if (config.needsNewOwner && !newOwnerId) return false;
+    // Holding refund is a negotiated payout — the reason must be recorded.
+    if (action === 'settlement_refund' && !note.trim()) return false;
     return true;
   })();
 
@@ -1570,6 +1591,18 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
                       className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer self-start"
                     >
                       {t('contract.goToSigningTabToVoidAddendum', { defaultValue: 'Void the addendum in the Signing tab' })}
+                      <ExternalLink size={12} />
+                    </button>
+                  )}
+                  {/* Holding refund blocked while a device is still bound → point
+                      the user at the Device tab to unbind it first (mig 711). */}
+                  {errorCode === 'SALE.STATE.DEVICE_STILL_BOUND' && onNavigateTab && (
+                    <button
+                      type="button"
+                      onClick={() => { onClose(); onNavigateTab('device'); }}
+                      className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer self-start"
+                    >
+                      {t('contract.goToDeviceTabToUnbind', { defaultValue: 'Unbind the device first' })}
                       <ExternalLink size={12} />
                     </button>
                   )}
@@ -1704,11 +1737,15 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
 
               {config.needsNote && (
                 <div className="flex flex-col">
-                  <label className="form-label">{t('contract.note')}</label>
+                  <label className="form-label">
+                    {t('contract.note')}{action === 'settlement_refund' ? ' *' : ''}
+                  </label>
                   <TextArea
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
-                    placeholder={t('contract.notePlaceholder')}
+                    placeholder={action === 'settlement_refund'
+                      ? t('contract.settlementRefund_notePlaceholder', { defaultValue: t('contract.notePlaceholder') })
+                      : t('contract.notePlaceholder')}
                     rows={3}
                   />
                 </div>
@@ -1781,6 +1818,23 @@ function ContractActionDoneView({
           stateTransition={{ from: contractState, to: String(result.state ?? 'CANCELLED'), toColor: 'warning' }}
           detailRows={[
             { label: t('contract.action_cancel_done_state', { defaultValue: 'State' }), value: String(result.state ?? 'CANCELLED') },
+          ]}
+          onClose={onClose}
+        />
+      );
+    }
+
+    case 'expire_draft': {
+      // fn_contract_expire_draft → { id, state: "EXPIRED" }. DRAFT → EXPIRED;
+      // the draft drops off the DRAFT-filtered worklist.
+      return (
+        <ActionDoneView
+          headline={t('contract.action_expire_draft_done_headline', { defaultValue: 'Draft closed' })}
+          contractCode={contractCode}
+          tone="neutral"
+          stateTransition={{ from: contractState, to: String(result.state ?? 'EXPIRED'), toColor: 'default' }}
+          detailRows={[
+            { label: t('contract.action_expire_draft_done_state', { defaultValue: 'State' }), value: String(result.state ?? 'EXPIRED') },
           ]}
           onClose={onClose}
         />

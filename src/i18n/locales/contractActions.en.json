@@ -32,7 +32,6 @@
   "APPOINTMENT_CREATE": "Create appointment",
   "APPOINTMENT_CANCEL": "Cancel appointment",
   "HOLDING_REFUND": "Holding refund",
-  "HOLDING_REFUND_VOID": "Void holding refund",
   "PAY_OPEN_BILL": "Pay open bill",
   "PAY_INSTALLMENT": "Record Payment",
   "EARLY_PAYOFF": "Early payoff",

@@ -325,9 +325,14 @@ export interface ReconcileItemResult {
 export interface ReconcileChannelSummary {
   net_cash: number;
   net_transfer: number;
+  // mig 714 — holding refund (คืนเงินเจรจา) paid from HOLDING_BUDGET. A real
+  // txn of the day but NOT from the branch till, so it's shown read-only: no
+  // count input, not in shortage/overage, not in `physical`. Usually negative
+  // (a payout). Folded into remit_total server-side.
+  net_holding_budget: number;
   wallet: number;
   physical: number;        // net_cash + net_transfer
-  remit_total: number;     // physical + wallet (= Step 1 total)
+  remit_total: number;     // physical + net_holding_budget + wallet (= Step 1 total)
   counted_cash: number | null;
   counted_transfer: number | null;
   diff_cash: number | null;      // null until counted — the "รอนับ" signal for the range summary
@@ -486,6 +491,10 @@ export interface DayCloseBreakdownRow {
   // Cluster A — revenue / drawer
   cash_amount: number;
   transfer_amount: number;
+  // mig 717 — holding-refund payouts (คืนเงินเจรจา) via HOLDING_BUDGET. NOT from
+  // the branch till; shown read-only alongside cash/transfer, no count/diff.
+  // Usually negative (a payout). LIVE pre-close, SNAPSHOT after close.
+  holding_budget_amount: number;
   wallet_amount: number;
   wallet_saving: number;
   wallet_credit: number;

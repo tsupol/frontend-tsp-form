@@ -6,7 +6,7 @@ import {
   MobileHeader, Select, Badge, InputDateRangePicker, Button,
 } from 'tsp-form';
 import {
-  ArrowRightFromLine, Keyboard, ChevronRight, ChevronDown, Banknote, Landmark, Wallet, FileSpreadsheet, Loader2, Receipt, Image as ImageIcon,
+  ArrowRightFromLine, Keyboard, ChevronRight, ChevronDown, Banknote, Landmark, Building2, Wallet, FileSpreadsheet, Loader2, Receipt, Image as ImageIcon,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -20,7 +20,7 @@ import type { Branch, ReconcileChannelResult, ReconcileChannelPayment } from './
 import { exportReconcileChannel } from './dayCloseExport';
 import { MiniPager } from './MiniPager';
 
-type Channel = 'CASH' | 'TRANSFER' | 'WALLET';
+type Channel = 'CASH' | 'TRANSFER' | 'HOLDING_BUDGET' | 'WALLET';
 
 const SLIPS_PER_PAGE = 10;
 
@@ -115,6 +115,18 @@ export function ReconcileChannelPage() {
     return m;
   }, [shownPayments]);
   const hasSlipPayments = (summary?.slip_payment_count ?? 0) > 0;
+
+  // Holding-budget (คืนเงินเจรจา) net. summary.net_holding_budget is authoritative
+  // but only populated from the persisted day_close snapshot AFTER close — on an
+  // open day it stays 0 even when there are HOLDING_BUDGET payments. So fall back
+  // to summing the live payments so the row shows before close too.
+  const holdingBudgetLive = useMemo(
+    () => (data?.payments ?? []).filter(p => p.method === 'HOLDING_BUDGET').reduce((s, p) => s + p.amount, 0),
+    [data?.payments],
+  );
+  const holdingBudgetNet = (summary?.net_holding_budget ?? 0) !== 0
+    ? summary!.net_holding_budget
+    : holdingBudgetLive;
 
   const toggle = (c: Channel) => setExpanded(prev => {
     const next = new Set(prev);
@@ -299,6 +311,25 @@ export function ReconcileChannelPage() {
                 payments={paymentsByMethod.get('TRANSFER') ?? []}
                 onViewSlip={setSlipImageKey}
               />
+              {/* งบ holding — holding-refund payouts (mig 714). Shown only when
+                  there's activity; read-only (no count, no shortage/overage). */}
+              {holdingBudgetNet !== 0 && (
+                <ChannelRow
+                  icon={<Building2 size={16} className="text-secondary-fg" />}
+                  label={t('accounting.reconcile.holdingBudget')}
+                  note={t('accounting.reconcile.holdingBudgetNote')}
+                  net={holdingBudgetNet}
+                  counted={null}
+                  diff={null}
+                  shortage={0}
+                  overage={0}
+                  readOnly
+                  open={expanded.has('HOLDING_BUDGET')}
+                  onToggle={() => toggle('HOLDING_BUDGET')}
+                  payments={paymentsByMethod.get('HOLDING_BUDGET') ?? []}
+                  onViewSlip={setSlipImageKey}
+                />
+              )}
 
               {/* Transfer breakdown — how net_transfer arrived: front-store (staff-
                   recorded) vs back-office (slip-checked). Both already inside
@@ -405,6 +436,7 @@ export function ReconcileChannelPage() {
 
 function ChannelRow({
   icon, label, net, counted, diff, shortage, overage, open, onToggle, payments, onViewSlip,
+  readOnly = false, note,
 }: {
   icon: ReactNode;
   label: string;
@@ -417,6 +449,10 @@ function ChannelRow({
   onToggle: () => void;
   payments: ReconcileChannelPayment[];
   onViewSlip: (key: string) => void;
+  // readOnly = a shown-not-counted channel (งบ holding): blanks the
+  // counted/diff/short-over columns — no till count, no shortage/overage.
+  readOnly?: boolean;
+  note?: string;
 }) {
   const { t } = useTranslation();
   const hasSlips = payments.length > 0;
@@ -441,28 +477,39 @@ function ChannelRow({
           {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </button>
         {icon}
-        <span className="flex-1 font-medium inline-flex items-center gap-2">
-          {label}
-          {hasSlips && <span className="text-xs text-subtler">({payments.length} {t('accounting.reconcile.slips')})</span>}
+        <span className="flex-1 font-medium inline-flex items-center gap-2 min-w-0">
+          <span className="truncate">{label}</span>
+          {note && <span className="text-xs text-subtler shrink-0">{note}</span>}
+          {hasSlips && <span className="text-xs text-subtler shrink-0">({payments.length} {t('accounting.reconcile.slips')})</span>}
         </span>
         <span className="w-24 text-right tabular-nums font-medium">{fmtCurrency(net)}</span>
-        <span className="w-24 text-right tabular-nums text-subtle">
-          {counted === null ? '—' : fmtCurrency(counted)}
-        </span>
-        <span className={`w-20 text-right tabular-nums ${diff ? (diff < 0 ? 'text-danger' : 'text-warning') : 'text-subtle'}`}>
-          {diff === null ? '—' : fmtCurrency(diff)}
-        </span>
-        <span className="w-24 text-right tabular-nums text-xs">
-          {uncounted ? (
-            <span className="text-subtler">{t('accounting.reconcile.pendingCount')}</span>
-          ) : shortage > 0 ? (
-            <span className="text-danger">−{fmtCurrency(shortage)}</span>
-          ) : overage > 0 ? (
-            <span className="text-warning-fg">+{fmtCurrency(overage)}</span>
-          ) : (
-            <span className="text-success">✓ {t('accounting.reconcile.matched')}</span>
-          )}
-        </span>
+        {readOnly ? (
+          <>
+            <span className="w-24" />
+            <span className="w-20" />
+            <span className="w-24" />
+          </>
+        ) : (
+          <>
+            <span className="w-24 text-right tabular-nums text-subtle">
+              {counted === null ? '—' : fmtCurrency(counted)}
+            </span>
+            <span className={`w-20 text-right tabular-nums ${diff ? (diff < 0 ? 'text-danger' : 'text-warning') : 'text-subtle'}`}>
+              {diff === null ? '—' : fmtCurrency(diff)}
+            </span>
+            <span className="w-24 text-right tabular-nums text-xs">
+              {uncounted ? (
+                <span className="text-subtler">{t('accounting.reconcile.pendingCount')}</span>
+              ) : shortage > 0 ? (
+                <span className="text-danger">−{fmtCurrency(shortage)}</span>
+              ) : overage > 0 ? (
+                <span className="text-warning-fg">+{fmtCurrency(overage)}</span>
+              ) : (
+                <span className="text-success">✓ {t('accounting.reconcile.matched')}</span>
+              )}
+            </span>
+          </>
+        )}
       </div>
 
       {open && hasSlips && (
