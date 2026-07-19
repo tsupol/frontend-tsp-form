@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Badge, Button, Input, Modal, TextArea, Tooltip, useSnackbarContext, resizeToVariants } from 'tsp-form';
-import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, Download, Pause, Play, Square, Ban, Settings2, AlertTriangle, CalendarClock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, Download, Pause, Play, Square, Ban, Settings2, AlertTriangle, CalendarClock, Repeat } from 'lucide-react';
 import { GenerateContractPdfModal } from './GenerateContractPdfModal';
 import type { BeMediaContractDoc } from '../../lib/beMedia';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -29,6 +29,7 @@ import { CommissionOwnerModal } from './CommissionOwnerModal';
 import { BillReceipt } from './workspace/BillReceipt';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { CustomerPickerModal } from './CustomerPickerModal';
+import { SwapPrimaryCustomerModal } from './SwapPrimaryCustomerModal';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { MediaLightbox, MediaThumbButton } from '../../components/MediaLightbox';
 import { CustomerLoginCard, useCustomerLoginInfo, useInvalidateLoginInfo, type CustomerLoginInfo } from '../../components/CustomerLoginCard';
@@ -324,8 +325,8 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
     | 'unbind_device'
     | 'deposit_device'
     | 'return_deposit'
-    | 'bind_loaner'
-    | 'unbind_loaner'
+    | 'loan_assign'
+    | 'loan_return'
     | 'device_repair_request'
     | 'detach_customer'
     | 'pause'
@@ -463,8 +464,11 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
             contractId={contractId}
             customerId={contract.customer_id}
             customerName={contract.customer_name}
+            contractCode={contract.code_display ?? contract.code}
+            contractState={contract.state}
             t={t}
             onRequestDetachCustomer={() => setRequestedAction('detach_customer')}
+            onGoToSigning={() => handleTabChange('signing')}
           />
         )}
         {activeTab === 'notes' && <NotesTab contractId={contractId} t={t} dirtyRef={notesDirtyRef} />}
@@ -1083,12 +1087,13 @@ function MoneyTab({ contractId, contract, t }: {
     staleTime: 30 * 1000,
   });
 
-  // Bills count — INVOICE only (CREDIT_NOTE/JOURNAL aren't customer-facing).
+  // Bills count — INVOICE + CREDIT_NOTE, matching the list below so a refund
+  // credit note (e.g. CN-…) is both counted and shown. JOURNAL stays excluded.
   const { data: billCount } = useQuery({
     queryKey: ['contract-bills-count', contractId],
     queryFn: async () => {
       const res = await apiClient.getPaginated<{ id: number }>(
-        `/v_bills?contract_id=eq.${contractId}&bill_type=eq.INVOICE`,
+        `/v_bills?contract_id=eq.${contractId}&bill_type=in.(INVOICE,CREDIT_NOTE)`,
         { page: 1, pageSize: 1 },
       );
       return res.totalCount;
@@ -1249,24 +1254,31 @@ interface CustomerDetail {
   prefix: string | null;
 }
 
-function CustomersTab({ contractId, customerId, customerName, t, onRequestDetachCustomer }: {
+function CustomersTab({ contractId, customerId, customerName, contractCode, contractState, t, onRequestDetachCustomer, onGoToSigning }: {
   contractId: number;
   customerId: number | null;
   customerName: string | null;
+  contractCode: string;
+  contractState: string;
   t: ReturnType<typeof useTranslation>['t'];
   onRequestDetachCustomer: () => void;
+  onGoToSigning: () => void;
 }) {
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
   const [pickerMode, setPickerMode] = useState<'attach' | 'co_lessee' | null>(null);
   const [removeTarget, setRemoveTarget] = useState<ContractCustomer | null>(null);
+  const [swapOpen, setSwapOpen] = useState(false);
 
-  // v_contract_customers stores ONLY co-lessees today (despite older docs that
-  // suggested it'd also include the primary). The primary customer lives on
-  // contract.customer_id directly — we get it via props.
+  // v_contract_customers returns EVERY contract party — PRIMARY *and* CO_LESSEE
+  // (UI_FEEDBACK/2026-07-19_DISPLAY_RULES). Must filter role=eq.CO_LESSEE or the
+  // primary shows up a second time as a phantom co-lessee. This bit hard after a
+  // PRIMARY_SWAP: the swap deletes+recreates the PRIMARY row, so it's no longer
+  // "the first row" — never infer role from row order, always filter by role.
+  // The primary itself is read from contract.customer_id via props.
   const { data: coLessees, isLoading } = useQuery({
     queryKey: ['contract-customers', contractId],
-    queryFn: () => apiClient.get<ContractCustomer[]>(`/v_contract_customers?contract_id=eq.${contractId}&order=created_at`),
+    queryFn: () => apiClient.get<ContractCustomer[]>(`/v_contract_customers?contract_id=eq.${contractId}&role=eq.CO_LESSEE&order=created_at`),
   });
 
   const successSnack = (msg: string) => {
@@ -1464,7 +1476,7 @@ function CustomersTab({ contractId, customerId, customerName, t, onRequestDetach
           <div className="text-xs font-semibold uppercase tracking-wider text-subtle">
             {t('contract.primaryCustomer', { defaultValue: 'Primary customer' })}
           </div>
-          {customerId == null && (
+          {customerId == null ? (
             <Button
               size="sm"
               variant="outline"
@@ -1472,6 +1484,15 @@ function CustomersTab({ contractId, customerId, customerName, t, onRequestDetach
               onClick={() => setPickerMode('attach')}
             >
               {t('contract.attachCustomer', { defaultValue: 'Attach customer' })}
+            </Button>
+          ) : contractState === 'ACTIVE' && (
+            <Button
+              size="sm"
+              variant="outline"
+              startIcon={<Repeat size={14} />}
+              onClick={() => setSwapOpen(true)}
+            >
+              {t('contract.swapPrimary', { defaultValue: 'Change lessee' })}
             </Button>
           )}
         </div>
@@ -1546,6 +1567,16 @@ function CustomersTab({ contractId, customerId, customerName, t, onRequestDetach
           successSnack(t('contract.removed_co_lessee', { defaultValue: `Removed ${name}`, customer: name }));
         }}
         t={t}
+      />
+
+      <SwapPrimaryCustomerModal
+        open={swapOpen}
+        onClose={() => setSwapOpen(false)}
+        contractId={contractId}
+        contractCode={contractCode}
+        currentCustomerId={customerId}
+        currentCustomerName={customerName}
+        onGoToSigning={onGoToSigning}
       />
     </div>
   );
@@ -1792,11 +1823,11 @@ function BillsTab({ contractId, t }: { contractId: number; t: ReturnType<typeof 
   const queryClient = useQueryClient();
   const { downloadingId, download: downloadPdf } = useBillPdfDownload();
 
-  // Bill list (INVOICE only — CREDIT_NOTE/JOURNAL aren't shown here).
+  // Bill list — INVOICE + CREDIT_NOTE (JOURNAL still excluded).
   const { data: bills, isLoading } = useQuery({
     queryKey: ['contract-bills', contractId],
     queryFn: () => apiClient.get<BillRow[]>(
-      `/v_bills?contract_id=eq.${contractId}&bill_type=eq.INVOICE&order=created_at.desc`,
+      `/v_bills?contract_id=eq.${contractId}&bill_type=in.(INVOICE,CREDIT_NOTE)&order=created_at.desc`,
     ),
   });
 

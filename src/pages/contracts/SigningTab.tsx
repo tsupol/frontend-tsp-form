@@ -39,7 +39,7 @@ import { ContractAttachments } from './ContractAttachments';
 
 type SigningStatus = 'COLLECTING' | 'SEALED' | 'SUPERSEDED' | 'VOIDED';
 type SigningCategory = 'CONTRACT' | 'AMENDMENT' | 'RECEIPT' | null;
-type PartyRole = 'LESSOR' | 'LESSEE' | 'CO_LESSEE' | 'WITNESS';
+type PartyRole = 'LESSOR' | 'LESSEE' | 'OUTGOING_LESSEE' | 'CO_LESSEE' | 'WITNESS';
 
 interface SigningHistoryRow {
   signing_id: number;
@@ -114,13 +114,14 @@ function cardBorderClass(s: SigningStatus): string {
   }
 }
 
-function roleColor(r: PartyRole): 'primary' | 'info' | 'secondary' | 'default' {
+function roleColor(r: PartyRole): 'primary' | 'info' | 'secondary' | 'warning' | 'default' {
   switch (r) {
-    case 'LESSOR':    return 'secondary';  // company/staff side — distinct from the customer
-    case 'LESSEE':    return 'primary';
-    case 'CO_LESSEE': return 'info';
-    case 'WITNESS':   return 'default';
-    default:          return 'default';
+    case 'LESSOR':          return 'secondary';  // company/staff side — distinct from the customer
+    case 'LESSEE':          return 'primary';
+    case 'OUTGOING_LESSEE': return 'warning';    // the party being released — visually distinct from the incoming lessee
+    case 'CO_LESSEE':       return 'info';
+    case 'WITNESS':         return 'default';
+    default:                return 'default';
   }
 }
 

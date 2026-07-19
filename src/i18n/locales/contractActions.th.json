@@ -62,6 +62,7 @@
   "REMOVE_CO_LESSEE": "ลบผู้เช่าร่วม",
   "ATTACH_CUSTOMER": "ผูกลูกค้า",
   "DETACH_CUSTOMER": "ปลดลูกค้า",
+  "SWAP_PRIMARY_CUSTOMER": "เปลี่ยนผู้เช่า",
   "UPLOAD_ID_CARD_FRONT": "อัปโหลดบัตรประชาชน (หน้า)",
   "UPLOAD_ID_CARD_BACK": "อัปโหลดบัตรประชาชน (หลัง)",
   "UPLOAD_SIGNATURE": "อัปโหลดลายเซ็น",

@@ -621,7 +621,7 @@ const FOOTER_ACTION_ALLOWLIST: ReadonlySet<string> = new Set([
   'REPOSSESS', 'LOAN_ASSIGN', 'LOAN_RETURN', 'DEVICE_REPAIR_REQUEST',
   // CUSTOMER (contract-scoped only)
   'ADD_CO_LESSEE', 'REMOVE_CO_LESSEE',
-  'ATTACH_CUSTOMER', 'DETACH_CUSTOMER',
+  'ATTACH_CUSTOMER', 'DETACH_CUSTOMER', 'SWAP_PRIMARY_CUSTOMER',
 ]);
 
 // Per-action placement override.
@@ -656,6 +656,7 @@ const ELSEWHERE_TAB: Record<string, 'overview' | 'device' | 'notes' | 'customers
   ADD_NOTE: 'notes',
   ATTACH_CUSTOMER: 'customers',
   DETACH_CUSTOMER: 'customers',
+  SWAP_PRIMARY_CUSTOMER: 'customers',
   ADD_CO_LESSEE: 'customers',
   REMOVE_CO_LESSEE: 'customers',
   BIND_DEVICE: 'device',
@@ -682,6 +683,7 @@ const ACTION_PLACEMENT: Record<string, ActionPlacement> = {
   // Contract-customer ops live in the Customers tab
   ATTACH_CUSTOMER:   { kind: 'elsewhere', where: 'Customers tab' },
   DETACH_CUSTOMER:   { kind: 'elsewhere', where: 'Customers tab' },
+  SWAP_PRIMARY_CUSTOMER: { kind: 'elsewhere', where: 'Customers tab' },
   ADD_CO_LESSEE:     { kind: 'elsewhere', where: 'Customers tab' },
   REMOVE_CO_LESSEE:  { kind: 'elsewhere', where: 'Customers tab' },
   // Delivery edit lives in the Overview tab → Shipping section

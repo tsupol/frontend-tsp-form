@@ -62,6 +62,7 @@
   "REMOVE_CO_LESSEE": "Remove co-lessee",
   "ATTACH_CUSTOMER": "Attach customer",
   "DETACH_CUSTOMER": "Detach customer",
+  "SWAP_PRIMARY_CUSTOMER": "Change lessee",
   "UPLOAD_ID_CARD_FRONT": "Upload ID card (front)",
   "UPLOAD_ID_CARD_BACK": "Upload ID card (back)",
   "UPLOAD_SIGNATURE": "Upload signature",
