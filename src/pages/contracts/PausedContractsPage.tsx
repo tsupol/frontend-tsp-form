@@ -112,9 +112,20 @@ export function PausedContractsPage() {
       else if (segment === 'awaiting') url += `&has_pending_resume=is.false`;
       // Substring match on code / customer name / phone. Direct-view filter (not
       // fn_contract_search's fuzzy ranking) — fine for the small paused worklist.
+      // `code` has no dashes (CT26040000015), `code_display` has them
+      // (CT-2604-000001-5). Strip the keyword's dashes/spaces and match against
+      // `code`, so a dashed query like "CT-2604-0001" still finds it. Keep the raw
+      // keyword for code_display / name / phone.
       if (debouncedKeyword) {
-        const esc = debouncedKeyword.replace(/[%,()]/g, '');
-        url += `&or=(code_display.ilike.*${esc}*,code.ilike.*${esc}*,customer_name.ilike.*${esc}*,customer_tel.ilike.*${esc}*)`;
+        const raw = debouncedKeyword.replace(/[%,()*]/g, '');
+        const bare = raw.replace(/[\s-]/g, '');
+        const parts = [
+          `code_display.ilike.*${raw}*`,
+          `customer_name.ilike.*${raw}*`,
+          `customer_tel.ilike.*${raw}*`,
+        ];
+        if (bare) parts.push(`code.ilike.*${bare}*`);
+        url += `&or=(${parts.join(',')})`;
       }
       return apiClient.getPaginated<PausedContractRow>(url, { page: pageIndex + 1, pageSize });
     },
