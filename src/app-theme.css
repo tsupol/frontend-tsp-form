@@ -1,7 +1,7 @@
 @import "./index.css";
 
 @theme static {
-    --spacing-side-menu: 200px;
+    --spacing-side-menu: 216px;
     --spacing-panel-header-h: 2.792rem;
     --spacing-info-content-h: 1.708rem;
 

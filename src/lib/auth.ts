@@ -15,6 +15,8 @@ export interface UserProfile {
   date_of_birth: string | null;
   profile_image: Record<string, string> | null;
   images: Record<string, string>[] | null;
+  has_national_id: boolean;
+  national_id_last4: string | null;
   created_at: string;
   updated_at: string;
 }

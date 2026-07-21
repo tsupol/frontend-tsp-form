@@ -185,8 +185,10 @@ function AccountModal({ open, onClose, account, branches, canManageQr }: {
   const translateErr = (err: unknown): string => {
     if (err instanceof ApiError || err instanceof BeMediaError) {
       const messageKey = err instanceof ApiError ? err.messageKey : undefined;
-      const translated = (messageKey ? t(messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-        || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+      const params = err instanceof ApiError ? err.messageParams : undefined;
+      const opts = { ns: 'apiErrors', defaultValue: '', ...params };
+      const translated = (messageKey ? t(messageKey, opts) : '')
+        || (err.code ? t(err.code, opts) : '');
       return translated || err.message;
     }
     return t('common.error');
@@ -265,8 +267,9 @@ function AccountModal({ open, onClose, account, branches, canManageQr }: {
         await apiClient.rpc('fn_bank_account_update', {
           p_account_id: account!.id,
           p_bank_name: data.bank_name,
-          p_account_number: data.account_number,
+          p_account_number: null, // immutable — never sent on update (409 ACCOUNT_NUMBER_IMMUTABLE); null keeps existing
           p_account_name: data.account_name,
+          p_account_number_display: null,
           p_promptpay_id: data.promptpay_id || null,
           p_note: data.note || null,
           p_updated_by: user.user_id,
@@ -294,12 +297,7 @@ function AccountModal({ open, onClose, account, branches, canManageQr }: {
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
       onClose();
     } catch (err) {
-      if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
-        setErrorMessage(translated || err.message);
-      } else {
-        setErrorMessage(t('common.error'));
-      }
+      setErrorMessage(translateErr(err));
       setErrorKey(k => k + 1);
     } finally {
       const elapsed = Date.now() - start;
@@ -348,8 +346,16 @@ function AccountModal({ open, onClose, account, branches, canManageQr }: {
             </div>
             <div className="flex flex-col">
               <label className="form-label">{t('settings.bankAccounts.accountNumber')}</label>
-              <Input {...register('account_number', { required: t('common.required') })} className="w-full" />
-              <FormErrorMessage error={errors.account_number} />
+              <Input
+                {...register('account_number', isEdit ? {} : { required: t('common.required') })}
+                className="w-full"
+                disabled={isEdit}
+              />
+              {isEdit ? (
+                <p className="text-xs text-subtle mt-1.5">{t('settings.bankAccounts.accountNumberImmutable')}</p>
+              ) : (
+                <FormErrorMessage error={errors.account_number} />
+              )}
             </div>
             <div className="flex flex-col">
               <label className="form-label">{t('settings.bankAccounts.accountName')}</label>

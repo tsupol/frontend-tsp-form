@@ -43,6 +43,8 @@ import {
   Tag as TagIcon, BarChart3 as BarChartIcon, BookOpen as BookIcon,
   // Fanout child icons — Collections
   Calendar,
+  // Repo / legal
+  Gavel, ShieldCheck,
   // Chat
   MessageSquare,
   // Dev sandbox
@@ -165,6 +167,10 @@ export const AppSideNav = () => {
   const { user, can } = useAuth();
   const role = user?.role_code ?? '';
   const canApprove = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
+  // Repo/legal access is grant-based at the DB, but nav visibility is by role:
+  // repo staff + admins see the section (DB returns empty rows for anyone without a grant).
+  const isRepoRole = ['COMPANY_REPO', 'HOLDING_REPO', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
+  const isRepoAdmin = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
   const canChat = can('CONTRACT.CHAT');
 
   const {
@@ -287,6 +293,22 @@ export const AppSideNav = () => {
         ] : []),
       ],
     },
+    ...(isRepoRole
+      ? [{
+          key: 'repo',
+          icon: <Gavel size="1rem" />,
+          label: t('nav.repoLegal'),
+          path: '/admin/repo/pool',
+          children: [
+            { type: 'group' as const, key: 'grp-repo-work', label: t('nav.groupRepoWork') },
+            { key: 'repo-pool', icon: <ListChecks size="1rem" />, label: t('nav.repoPool'), path: '/admin/repo/pool' },
+            ...(isRepoAdmin ? [
+              { type: 'group' as const, key: 'grp-repo-admin', label: t('nav.groupRepoAdmin') },
+              { key: 'repo-grants', icon: <ShieldCheck size="1rem" />, label: t('nav.repoGrants'), path: '/admin/repo/grants' },
+            ] : []),
+          ],
+        }]
+      : []),
     {
       key: 'repairs-top', icon: <Wrench size="1rem" />, label: t('nav.repairs'),
       path: '/admin/inventory/repairs',

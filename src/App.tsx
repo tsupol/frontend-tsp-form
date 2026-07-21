@@ -63,6 +63,9 @@ import { BankAccountsPage } from './pages/company/BankAccountsPage';
 import { HolidaysPage } from './pages/company/HolidaysPage';
 import { DunningSystemPage } from './pages/dunning/DunningSystemPage';
 import { CollectionsLayout } from './pages/collections/CollectionsLayout';
+import { RepoLayout } from './pages/repo/RepoLayout';
+import { RepoPoolPage } from './pages/repo/RepoPoolPage';
+import { RepoGrantsPage } from './pages/repo/RepoGrantsPage';
 import { TimelineOverviewPage } from './pages/collections/TimelineOverviewPage';
 import { BlacklistPage } from './pages/company/BlacklistPage';
 import { ICloudPoolPage } from './pages/company/ICloudPoolPage';
@@ -825,6 +828,29 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <CollectionsLayout><DunningSystemPage /></CollectionsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Repo / Legal (ยึดเครื่อง / กฎหมาย) */}
+      <Route path="/admin/repo" element={<Navigate to="/admin/repo/pool" replace />} />
+      <Route
+        path="/admin/repo/pool/:contractId?"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <RepoLayout><RepoPoolPage /></RepoLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/repo/grants"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <RepoLayout><RepoGrantsPage /></RepoLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowRightFromLine, Eye, EyeOff, KeyRound, CheckCircle, XCircle, Camera, Upload, User as UserIcon, RotateCcw, RotateCw, Pencil } from 'lucide-react';
 import { Button, Input, FormErrorMessage, Modal, ImageCropper, Slider, MobileHeader, useSnackbarContext } from 'tsp-form';
 import { EditProfileModal } from './EditProfileModal';
+import { EditNationalIdModal } from './EditNationalIdModal';
 import type { ImageCropperRef } from 'tsp-form';
 import { useAuth } from '../contexts/AuthContext';
 import { DateTime } from '../components/DateTime';
@@ -42,6 +43,7 @@ function ProfileCard() {
   const [cropRotation, setCropRotation] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [editNationalIdOpen, setEditNationalIdOpen] = useState(false);
 
   const { data: meRes, isLoading } = useQuery({
     queryKey: ['me', 'profile'],
@@ -213,6 +215,28 @@ function ProfileCard() {
             <div className="text-sm text-right min-w-0 truncate">{value || '—'}</div>
           </div>
         ))}
+
+        {/* National ID — separate write path (me_national_id_set); never shows the full number */}
+        <div className="flex justify-between items-baseline gap-3">
+          <div className="text-sm text-subtle shrink-0">{t('profile.nationalId')}</div>
+          <div className="flex items-center gap-2 min-w-0">
+            {profile?.has_national_id ? (
+              <span className="text-sm font-mono tracking-wide truncate">
+                {`•••••••••${profile.national_id_last4 ?? ''}`}
+              </span>
+            ) : (
+              <span className="text-sm text-subtler">{t('profile.nationalIdNotSet')}</span>
+            )}
+            <button
+              type="button"
+              className="text-sm text-primary-fg hover:underline shrink-0 bg-transparent border-none p-0 cursor-pointer disabled:opacity-50"
+              onClick={() => setEditNationalIdOpen(true)}
+              disabled={isLoading}
+            >
+              {profile?.has_national_id ? t('common.edit') : t('profile.nationalIdFill')}
+            </button>
+          </div>
+        </div>
       </div>
 
       <hr className="border-line mb-5" />
@@ -332,6 +356,7 @@ function ProfileCard() {
       </Modal>
 
       <EditProfileModal open={editOpen} onClose={() => setEditOpen(false)} profile={profile} />
+      <EditNationalIdModal open={editNationalIdOpen} onClose={() => setEditNationalIdOpen(false)} profile={profile} />
     </div>
   );
 }
