@@ -63,6 +63,9 @@ import { BankAccountsPage } from './pages/company/BankAccountsPage';
 import { HolidaysPage } from './pages/company/HolidaysPage';
 import { DunningSystemPage } from './pages/dunning/DunningSystemPage';
 import { CollectionsLayout } from './pages/collections/CollectionsLayout';
+import { BranchOverviewPage } from './pages/collections/BranchOverviewPage';
+import { TeamLoadPage } from './pages/collections/TeamLoadPage';
+import { UnassignedContractsPage } from './pages/collections/UnassignedContractsPage';
 import { RepoLayout } from './pages/repo/RepoLayout';
 import { RepoPoolPage } from './pages/repo/RepoPoolPage';
 import { RepoGrantsPage } from './pages/repo/RepoGrantsPage';
@@ -798,6 +801,36 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <CollectionsLayout><CallCenterPage /></CollectionsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/collections/branch-overview"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <CollectionsLayout><BranchOverviewPage /></CollectionsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/collections/team-load"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <CollectionsLayout><TeamLoadPage /></CollectionsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/collections/unassigned"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <CollectionsLayout><UnassignedContractsPage /></CollectionsLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

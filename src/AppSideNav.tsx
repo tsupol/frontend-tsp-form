@@ -52,6 +52,7 @@ import {
   // Signatories (v2)
   Stamp,
   Wallet,
+  UserX,
 } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
 import { getRoleLabel } from './lib/roleLabel';
@@ -185,6 +186,7 @@ export const AppSideNav = () => {
     pausedContractsCount,
     unreadChatCount,
     callCenterMineCount,
+    unassignedNoCollectorCount,
     legalCasesQueuedCount,
     unreadNotifCount,
   } = useNavCounts();
@@ -284,6 +286,16 @@ export const AppSideNav = () => {
         { key: 'collections-calls', ...iconWithCount(<Headset size="1rem" />, callCenterMineCount), label: t('nav.callCenter'), path: '/admin/collections/calls' },
         ...(['COMPANY_REPO', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
           { key: 'collections-cases', ...iconWithCount(<Scale size="1rem" />, legalCasesQueuedCount), label: t('nav.legalCases'), path: '/admin/collections/cases' },
+        ] : []),
+        ...((can('OPS.ASSIGN.MANAGE') || can('OPS.ASSIGN.OVERSEE')) ? [
+          { type: 'group' as const, key: 'grp-collections-manage', label: t('nav.groupCollectionsManage') },
+          ...(can('OPS.ASSIGN.OVERSEE') ? [
+            { key: 'collections-branch-overview', icon: <LayoutDashboard size="1rem" />, label: t('nav.branchOverview'), path: '/admin/collections/branch-overview' },
+          ] : []),
+          ...(can('OPS.ASSIGN.MANAGE') ? [
+            { key: 'collections-team-load', icon: <Users size="1rem" />, label: t('nav.teamLoad'), path: '/admin/collections/team-load' },
+            { key: 'collections-unassigned', ...iconWithCount(<UserX size="1rem" />, unassignedNoCollectorCount), label: t('nav.unassigned'), path: '/admin/collections/unassigned' },
+          ] : []),
         ] : []),
         { type: 'group' as const, key: 'grp-collections-reports', label: t('nav.groupCollectionsReports') },
         { key: 'collections-timeline', icon: <Calendar size="1rem" />, label: t('nav.timelineOverview'), path: '/admin/collections/timeline' },

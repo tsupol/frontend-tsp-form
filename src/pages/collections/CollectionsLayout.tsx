@@ -5,7 +5,7 @@
 import { useMemo, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { CalendarDays, Headset, Scale, Calendar as CalendarIcon, Settings } from 'lucide-react';
+import { CalendarDays, Headset, Scale, Calendar as CalendarIcon, Settings, LayoutDashboard, Users, UserX } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavCounts } from '../../hooks/useNavCounts';
@@ -21,24 +21,34 @@ export function CollectionsLayout({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
   const navGuard = useNavGuard();
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   const role = user?.role_code ?? '';
   const isAdmin = ADMIN_ROLES.includes(role);
   const canLegal = LEGAL_ROLES.includes(role);
-  const { callCenterMineCount, legalCasesQueuedCount } = useNavCounts();
+  const canManage = can('OPS.ASSIGN.MANAGE');
+  const canOversee = can('OPS.ASSIGN.OVERSEE');
+  const { callCenterMineCount, legalCasesQueuedCount, unassignedNoCollectorCount } = useNavCounts();
 
   const navItems: NavItem[] = useMemo(() => [
     { type: 'group', labelKey: 'nav.groupCollectionsDaily' },
     { type: 'link', path: '/admin/collections/worklist', labelKey: 'nav.overdueWorklist', icon: CalendarDays },
     { type: 'link', path: '/admin/collections/calls', labelKey: 'nav.callCenter', icon: Headset, count: callCenterMineCount },
     ...(canLegal ? [{ type: 'link' as const, path: '/admin/collections/cases', labelKey: 'nav.legalCases', icon: Scale, count: legalCasesQueuedCount }] : []),
+    ...((canManage || canOversee) ? [
+      { type: 'group' as const, labelKey: 'nav.groupCollectionsManage' },
+      ...(canOversee ? [{ type: 'link' as const, path: '/admin/collections/branch-overview', labelKey: 'nav.branchOverview', icon: LayoutDashboard }] : []),
+      ...(canManage ? [
+        { type: 'link' as const, path: '/admin/collections/team-load', labelKey: 'nav.teamLoad', icon: Users },
+        { type: 'link' as const, path: '/admin/collections/unassigned', labelKey: 'nav.unassigned', icon: UserX, count: unassignedNoCollectorCount },
+      ] : []),
+    ] : []),
     { type: 'group', labelKey: 'nav.groupCollectionsReports' },
     { type: 'link', path: '/admin/collections/timeline', labelKey: 'nav.timelineOverview', icon: CalendarIcon },
     ...(isAdmin ? [
       { type: 'group' as const, labelKey: 'nav.groupCollectionsConfig' },
       { type: 'link' as const, path: '/admin/collections/config', labelKey: 'nav.dunningConfig', icon: Settings },
     ] : []),
-  ], [isAdmin, canLegal, callCenterMineCount, legalCasesQueuedCount]);
+  ], [isAdmin, canLegal, canManage, canOversee, callCenterMineCount, legalCasesQueuedCount, unassignedNoCollectorCount]);
 
   return (
     <div className="flex min-h-full">

@@ -155,6 +155,21 @@ export function useNavCounts() {
   });
   const callCenterMineCount = callsMineData?.totalCount ?? 0;
 
+  // Manager badge: contracts past their assignable date with no collector in the
+  // branch — the actionable half of the unassigned pool (NOT_YET_DUE is normal
+  // and excluded). RLS-scoped; empty (no OPS.ASSIGN.MANAGE) → zero.
+  const { data: unassignedNoColData } = useQuery({
+    queryKey: ['nav', 'unassigned-no-collector', sk],
+    queryFn: () => apiClient.getPaginated<{ contract_id: number }>(
+      `/v_unassigned_contracts?pool_reason=eq.NO_COLLECTOR&select=contract_id`,
+      { page: 1, pageSize: 1 },
+    ),
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+    retry: false,
+  });
+  const unassignedNoCollectorCount = unassignedNoColData?.totalCount ?? 0;
+
   // Legal cases: queued (awaiting pickup). Team-managed, not per-user; small
   // number, drops to zero when triage is done.
   const isLegalRole = ['COMPANY_REPO', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
@@ -212,6 +227,7 @@ export function useNavCounts() {
     pausedContractsCount,
     unreadChatCount,
     callCenterMineCount,
+    unassignedNoCollectorCount,
     legalCasesQueuedCount,
     unreadNotifCount,
   };
