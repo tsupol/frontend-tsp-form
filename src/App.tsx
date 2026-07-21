@@ -19,7 +19,7 @@ import { FamiliesPage } from './pages/products/FamiliesPage';
 import { AttributesPage } from './pages/products/AttributesPage';
 import { ModelsPage } from './pages/products/ModelsPage';
 import { ProductsLayout } from './pages/products/ProductsLayout';
-import { TicketQueuePage } from './pages/call-center/TicketQueuePage';
+import { CallCenterPage } from './pages/call-center/CallCenterPage';
 import { PricingLayout } from './pages/pricing/PricingLayout';
 import { PricebookPage } from './pages/pricing/PricebookPage';
 import { Fin1RatesPage } from './pages/pricing/Fin1RatesPage';
@@ -52,6 +52,8 @@ import { SavingContractsPage } from './pages/contracts/SavingContractsPage';
 import { DraftContractsPage } from './pages/contracts/DraftContractsPage';
 import { PendingPairingPage } from './pages/contracts/PendingPairingPage';
 import { DepositedDevicesPage } from './pages/contracts/DepositedDevicesPage';
+import { LoanersOutPage } from './pages/contracts/LoanersOutPage';
+import { PausedContractsPage } from './pages/contracts/PausedContractsPage';
 import { PendingPaymentPage } from './pages/contracts/PendingPaymentPage';
 import { ContractWizardPage } from './pages/contracts/ContractWizardPage';
 import { CompanyLayout } from './pages/company/CompanyLayout';
@@ -585,6 +587,26 @@ function App() {
         }
       />
       <Route
+        path="/admin/contracts/loaners/:contractId?"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <ContractsLayout><LoanersOutPage /></ContractsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/contracts/paused/:contractId?"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <ContractsLayout><PausedContractsPage /></ContractsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/admin/contracts/pending-payment/:contractId?"
         element={
           <ProtectedRoute>
@@ -772,7 +794,7 @@ function App() {
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <CollectionsLayout><TicketQueuePage /></CollectionsLayout>
+              <CollectionsLayout><CallCenterPage /></CollectionsLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

@@ -789,6 +789,36 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
 
   return (
     <div className="p-4 flex flex-col gap-4">
+      {/* Paused reminder — device in for repair, debt clock frozen. Staff must not
+          chase a paused customer. Days from paused_from (v_contract_detail.pause_days
+          is the overdue-clock deduction, not calendar days — pause/resume guide §0.1). */}
+      {contract.is_paused && contract.paused_from && (
+        <div className="border rounded-md px-4 py-3 border-warning-border bg-warning-soft">
+          <div className="flex items-start gap-2">
+            <Pause size={14} className="text-warning-fg shrink-0 mt-0.5" />
+            <div className="min-w-0">
+              <div className="text-xs font-semibold uppercase tracking-wider text-warning-fg">
+                {(() => {
+                  const reason = t(`pause.reason_${contract.pause_reason_code ?? 'OTHER'}`, { defaultValue: '' });
+                  return reason
+                    ? t('pause.strip_title_reason', { reason })
+                    : t('pause.strip_title');
+                })()}
+              </div>
+              <div className="text-sm text-warning-fg mt-0.5">
+                {t('pause.strip_since')}{' '}
+                <DateTime value={contract.paused_from} showTime={false} />
+                {' · '}
+                {t('pause.strip_days', {
+                  days: Math.max(0, Math.floor((Date.now() - new Date(contract.paused_from).getTime()) / 86_400_000)),
+                })}
+              </div>
+              <div className="text-xs text-warning-fg mt-0.5">{t('pause.strip_effects')}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Documents-need-signing reminder — live COLLECTING signing exists */}
       {liveCollectingCount > 0 && (
         <div className="border rounded-md px-4 py-3 border-warning-border bg-warning-soft">

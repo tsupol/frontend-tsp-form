@@ -34,7 +34,7 @@ import {
   // Fanout child icons — Company
   MapPin, KeyRound, Landmark, CalendarDays, AlertTriangle, ShieldBan, Cloud,
   // Fanout child icons — Contracts
-  Search, PiggyBank, Link2, FileEdit, FilePlus, CreditCard, Archive,
+  Search, PiggyBank, Link2, FileEdit, FilePlus, CreditCard, Archive, Repeat2, PauseCircle,
   // Fanout child icons — Commission
   UserCheck, ClipboardCheck,
   // Fanout child icons — Accounting
@@ -176,6 +176,7 @@ export const AppSideNav = () => {
     draftContractsCount,
     pendingPaymentCount,
     depositOverdueCount,
+    pausedContractsCount,
     unreadChatCount,
     callCenterMineCount,
     legalCasesQueuedCount,
@@ -226,6 +227,8 @@ export const AppSideNav = () => {
         { key: 'pending-payment', ...iconWithCount(<CreditCard size="1rem" />, pendingPaymentCount), label: t('nav.pendingPayment'), path: '/admin/contracts/pending-payment' },
         { key: 'pending-pairing', ...iconWithCount(<Link2 size="1rem" />, pendingPairingCount), label: t('nav.pendingPairing'), path: '/admin/contracts/pending-pairing' },
         { key: 'deposited-devices', ...iconWithCount(<Archive size="1rem" />, depositOverdueCount), label: t('nav.depositedDevices'), path: '/admin/contracts/deposited' },
+        { key: 'loaners-out', icon: <Repeat2 size="1rem" />, label: t('nav.loanersOut'), path: '/admin/contracts/loaners' },
+        { key: 'paused-contracts', ...iconWithCount(<PauseCircle size="1rem" />, pausedContractsCount), label: t('nav.pausedContracts'), path: '/admin/contracts/paused' },
         {
           key: 'new-contract',
           icon: <FilePlus size="1rem" className="text-primary-fg" />,

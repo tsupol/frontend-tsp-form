@@ -2,12 +2,12 @@ import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Badge } from 'tsp-form';
-import { Search, PiggyBank, FilePlus, Link2, FileEdit, CreditCard, Archive } from 'lucide-react';
+import { Search, PiggyBank, FilePlus, Link2, FileEdit, CreditCard, Archive, Repeat2, PauseCircle } from 'lucide-react';
 import { useNavCounts } from '../../hooks/useNavCounts';
 
 export function ContractsLayout({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
-  const { savingContractsCount, draftContractsCount, pendingPairingCount, pendingPaymentCount, depositOverdueCount } = useNavCounts();
+  const { savingContractsCount, draftContractsCount, pendingPairingCount, pendingPaymentCount, depositOverdueCount, pausedContractsCount } = useNavCounts();
 
   const navItems = [
     { path: '/admin/contracts/search', labelKey: 'nav.contractSearch', icon: Search, count: 0 },
@@ -16,6 +16,8 @@ export function ContractsLayout({ children }: { children: ReactNode }) {
     { path: '/admin/contracts/pending-payment', labelKey: 'nav.pendingPayment', icon: CreditCard, count: pendingPaymentCount },
     { path: '/admin/contracts/pending-pairing', labelKey: 'nav.pendingPairing', icon: Link2, count: pendingPairingCount },
     { path: '/admin/contracts/deposited', labelKey: 'nav.depositedDevices', icon: Archive, count: depositOverdueCount },
+    { path: '/admin/contracts/loaners', labelKey: 'nav.loanersOut', icon: Repeat2, count: 0 },
+    { path: '/admin/contracts/paused', labelKey: 'nav.pausedContracts', icon: PauseCircle, count: pausedContractsCount },
     { path: '/admin/contracts/new', labelKey: 'nav.newContract', icon: FilePlus, count: 0, accent: true },
   ];
 

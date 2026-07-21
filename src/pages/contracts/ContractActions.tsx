@@ -41,6 +41,8 @@ import { ActionDoneView, type ActionDoneDetailRow } from './ActionDoneView';
 import { ContractFeeModal } from './ContractFeeModal';
 import { LateFeeCollectModal } from './LateFeeCollectModal';
 import { RescheduleDueDayModal } from './RescheduleDueDayModal';
+import { PauseContractModal } from './PauseContractModal';
+import { ResumeContractModal } from './ResumeContractModal';
 import { useContractInvalidate } from './useContractInvalidate';
 import { useCompanyFeatures } from '../../hooks/useCompanyFeatures';
 
@@ -182,32 +184,11 @@ const ACTION_CONFIGS: Partial<Record<ContractAction, ActionConfig>> = {
     needsNewOwner: false,
     successKey: 'contract.action_void_success',
   },
-  pause: {
-    rpc: 'fn_contract_pause',
-    color: undefined,
-    needsPin: true,
-    needsNote: true,
-    needsReason: false,
-    needsBranch: false,
-    needsDevice: false,
-    needsAmount: false,
-    needsCloseReason: false,
-    needsNewOwner: false,
-    successKey: 'contract.action_pause_success',
-  },
-  resume: {
-    rpc: 'fn_contract_resume',
-    color: 'primary',
-    needsPin: false,
-    needsNote: true,
-    needsReason: false,
-    needsBranch: false,
-    needsDevice: false,
-    needsAmount: false,
-    needsCloseReason: false,
-    needsNewOwner: false,
-    successKey: 'contract.action_resume_success',
-  },
+  // pause / resume are NOT generic note-modals anymore (pause/resume rebuild,
+  // migs 722-738). Pause = check→reason+PIN→fn_contract_pause (PauseContractModal).
+  // Resume = preview→pick date→fn_contract_resume issues a 4-signature schedule
+  // (ResumeContractModal). Neither has an ACTION_CONFIG entry, so the generic
+  // ContractActionModal never handles them — see the isPause/isResume routing below.
   // deposit_device / return_deposit are NOT generic note-modals — they have
   // dedicated check→confirm→signing modals (DepositModals.tsx). No ACTION_CONFIG
   // entry, so the generic ContractActionModal never handles them.
@@ -820,6 +801,8 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   const isReschedule = activeAction === 'reschedule_due_day';
   const isDepositDevice = activeAction === 'deposit_device';
   const isReturnDeposit = activeAction === 'return_deposit';
+  const isPause = activeAction === 'pause';
+  const isResume = activeAction === 'resume';
 
   // pin_required is per-user (BM=true, HQ=false) — read it off the evaluator
   // response for this specific action, never hard-code it.
@@ -1160,7 +1143,11 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
         assetId={contract.device_id ?? 0}
         contractId={contract.id}
         onClose={() => setActiveAction(null)}
-        onSuccess={handleSuccess}
+        onSuccess={() => {
+          onRefresh();
+          queryClient.invalidateQueries({ queryKey: ['contract-actions', contract.id] });
+        }}
+        onNavigateRepair={(repairOrderId) => navigate(`/admin/inventory/repairs/${repairOrderId}`)}
       />
       <AppointmentCreateModal
         open={isAppointmentCreate}
@@ -1207,6 +1194,25 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
           queryClient.invalidateQueries({ queryKey: ['contract-actions', contract.id] });
         }}
       />
+      <PauseContractModal
+        open={isPause}
+        contract={contract}
+        onClose={() => setActiveAction(null)}
+        onSuccess={() => {
+          onRefresh();
+          queryClient.invalidateQueries({ queryKey: ['contract-actions', contract.id] });
+        }}
+      />
+      <ResumeContractModal
+        open={isResume}
+        contract={contract}
+        onClose={() => setActiveAction(null)}
+        onSuccess={() => {
+          onRefresh();
+          queryClient.invalidateQueries({ queryKey: ['contract-actions', contract.id] });
+        }}
+        onNavigateSigning={() => onNavigateTab?.('signing')}
+      />
       <DepositDeviceModal
         open={isDepositDevice}
         contract={contract}
@@ -1221,7 +1227,7 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
         onNavigateMoney={() => onNavigateTab?.('money')}
       />
       <ContractActionModal
-        open={!!activeAction && !isSavingDeposit && !isCancelSaving && !isEarlyPayoff && !isContinuePay && !isVoidBill && !isPayInstallment && !isComplete && !isTerminate && !isLoanAssign && !isLoanReturn && !isRepairRequest && !isAppointmentCreate && !isAppointmentCancel && !isTransferBranch && !isServiceCharge && !isLateFeeCollect && !isReschedule && !isDepositDevice && !isReturnDeposit}
+        open={!!activeAction && !isSavingDeposit && !isCancelSaving && !isEarlyPayoff && !isContinuePay && !isVoidBill && !isPayInstallment && !isComplete && !isTerminate && !isLoanAssign && !isLoanReturn && !isRepairRequest && !isAppointmentCreate && !isAppointmentCancel && !isTransferBranch && !isServiceCharge && !isLateFeeCollect && !isReschedule && !isDepositDevice && !isReturnDeposit && !isPause && !isResume}
         action={activeAction}
         contract={contract}
         onClose={() => setActiveAction(null)}

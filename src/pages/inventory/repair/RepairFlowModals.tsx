@@ -53,7 +53,7 @@ export function RepairIntakeModal({
   onDone: () => void;
 }) {
   const { t } = useTranslation();
-  const [view, setView] = useState<'form' | 'done'>('form');
+  const { addSnackbar } = useSnackbarContext();
   const [signMediaId, setSignMediaId] = useState<number | null>(null);
   const [qrOpen, setQrOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -62,9 +62,11 @@ export function RepairIntakeModal({
   const needsSig = isCustomerDevice(order);
 
   useEffect(() => {
-    if (open) { setView('form'); setSignMediaId(null); setQrOpen(false); setBusy(false); setErrorMessage(''); }
+    if (open) { setSignMediaId(null); setQrOpen(false); setBusy(false); setErrorMessage(''); }
   }, [open]);
 
+  // Intake has no separate success screen — the customer already signed the intake
+  // receipt, so confirming IS the finish. Close on success + snackbar, no extra Done.
   const submit = async () => {
     if (needsSig && signMediaId == null) return;
     setBusy(true);
@@ -74,7 +76,9 @@ export function RepairIntakeModal({
         p_repair_order_id: order.repair_order_id,
         p_signature_media_id: signMediaId,
       });
-      setView('done');
+      onDone();
+      onClose();
+      addSnackbar({ message: <div className="alert alert-success"><CheckCircle size={16} /><span>{t('repair.intakeDone')}</span></div> });
     } catch (err) {
       setErrorMessage(translateErr(err, t));
     } finally {
@@ -87,62 +91,51 @@ export function RepairIntakeModal({
   return (
     <>
       <Modal open={open} onClose={busy ? () => {} : onClose} maxWidth="30rem" width="100%">
-        {view === 'form' ? (
-          <>
-            <div className="modal-header">
-              <h2 className="modal-title">{t('repair.intakeTitle')}</h2>
-              <button type="button" className="modal-close-btn" onClick={onClose} aria-label={t('common.close')}>&times;</button>
-            </div>
-            <div className="modal-content">
-              <RepairTargetBox order={order} subtitle={t(`repair.type_${order.repair_type}`)} />
+        <div className="modal-header">
+          <h2 className="modal-title">{t('repair.intakeTitle')}</h2>
+          <button type="button" className="modal-close-btn" onClick={onClose} aria-label={t('common.close')}>&times;</button>
+        </div>
+        <div className="modal-content">
+          <RepairTargetBox order={order} subtitle={t(`repair.type_${order.repair_type}`)} />
 
-              {order.repair_note && (
-                <div className="mb-3">
-                  <div className="text-xs text-subtle mb-0.5">{t('repair.symptom')}</div>
-                  <div className="text-sm whitespace-pre-wrap">{order.repair_note}</div>
-                </div>
-              )}
-
-              {needsSig ? (
-                signMediaId != null ? (
-                  <div className="alert alert-success">
-                    <CheckCircle size={16} />
-                    <span>{t('repair.signCaptured')}</span>
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-2">
-                    <div className="text-sm text-subtle">{t('repair.intakeSignHint')}</div>
-                    <Button color="primary" startIcon={<PenLine size={16} />} onClick={() => setQrOpen(true)}>
-                      {t('repair.captureSignature')}
-                    </Button>
-                  </div>
-                )
-              ) : (
-                <div className="text-sm text-subtle">{t('repair.intakeNoSignHint')}</div>
-              )}
-
-              {errorMessage && (
-                <div className="alert alert-danger mt-4 animate-pop-in">
-                  <XCircle size={16} />
-                  <span>{errorMessage}</span>
-                </div>
-              )}
+          {order.repair_note && (
+            <div className="mb-3">
+              <div className="text-xs text-subtle mb-0.5">{t('repair.symptom')}</div>
+              <div className="text-sm whitespace-pre-wrap">{order.repair_note}</div>
             </div>
-            <div className="modal-footer">
-              <Button variant="ghost" onClick={onClose} disabled={busy}>{t('common.cancel')}</Button>
-              <Button color="primary" onClick={submit} disabled={!canSubmit}>
-                {busy ? t('common.loading') : t('repair.confirmIntake')}
-              </Button>
+          )}
+
+          {needsSig ? (
+            signMediaId != null ? (
+              <div className="alert alert-success">
+                <CheckCircle size={16} />
+                <span>{t('repair.signCaptured')}</span>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <div className="text-sm text-subtle">{t('repair.intakeSignHint')}</div>
+                <Button color="primary" startIcon={<PenLine size={16} />} onClick={() => setQrOpen(true)}>
+                  {t('repair.captureSignature')}
+                </Button>
+              </div>
+            )
+          ) : (
+            <div className="text-sm text-subtle">{t('repair.intakeNoSignHint')}</div>
+          )}
+
+          {errorMessage && (
+            <div className="alert alert-danger mt-4 animate-pop-in">
+              <XCircle size={16} />
+              <span>{errorMessage}</span>
             </div>
-          </>
-        ) : (
-          <ActionDoneView
-            headline={t('repair.intakeDone')}
-            contractCode={order.code_display}
-            stateTransition={{ from: t('repair.status_DRAFT'), to: t('repair.status_IN_REPAIR'), toColor: 'success' }}
-            onClose={() => { onDone(); onClose(); }}
-          />
-        )}
+          )}
+        </div>
+        <div className="modal-footer">
+          <Button variant="ghost" onClick={onClose} disabled={busy}>{t('common.cancel')}</Button>
+          <Button color="primary" onClick={submit} disabled={!canSubmit}>
+            {busy ? t('common.loading') : t('repair.confirmIntake')}
+          </Button>
+        </div>
       </Modal>
 
       <RepairSignQrModal

@@ -125,13 +125,28 @@ export function useNavCounts() {
   });
   const depositOverdueCount = depositOverdueData?.totalCount ?? 0;
 
-  // Call-center: open tickets assigned to the current user. is_mine + is_takeable
-  // are projected columns on v_ops_call_ticket_list. Goes to zero when the user
-  // clears their pickups — exactly the daily-actionable signal we want.
+  // Paused contracts (device in for repair, debt clock frozen). The whole list is
+  // the worklist — staff track these until the customer collects + the resume
+  // schedule is signed. Badge drops to zero when none are paused.
+  const { data: pausedContractsData } = useQuery({
+    queryKey: ['nav', 'paused-contracts-count', sk],
+    queryFn: () => apiClient.getPaginated<{ id: number }>(
+      `/v_contracts_paused?select=id${sq}`,
+      { page: 1, pageSize: 1 },
+    ),
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+  });
+  const pausedContractsCount = pausedContractsData?.totalCount ?? 0;
+
+  // Collections: contracts in the collector's own book that are actionable today
+  // and not already pulled into focus. RLS-scoped to the caller — the daily "new
+  // work" signal in the owner-per-contract model. Empty (no permission) for
+  // non-collectors, which is fine — badge just reads zero.
   const { data: callsMineData } = useQuery({
     queryKey: ['nav', 'call-center-mine', sk],
-    queryFn: () => apiClient.getPaginated<{ ticket_code: string }>(
-      `/v_ops_call_ticket_list?is_mine=is.true&is_takeable=is.true&select=ticket_code`,
+    queryFn: () => apiClient.getPaginated<{ contract_id: number }>(
+      `/v_my_book?is_actionable=eq.true&on_focus=eq.false&select=contract_id`,
       { page: 1, pageSize: 1 },
     ),
     refetchInterval: 60_000,
@@ -194,6 +209,7 @@ export function useNavCounts() {
     draftContractsCount,
     pendingPaymentCount,
     depositOverdueCount,
+    pausedContractsCount,
     unreadChatCount,
     callCenterMineCount,
     legalCasesQueuedCount,

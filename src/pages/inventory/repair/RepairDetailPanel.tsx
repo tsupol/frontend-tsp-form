@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, Tooltip, PopOver } from 'tsp-form';
-import { Printer, FileText, FilePlus, User, Package, PackagePlus, PackageCheck, Banknote, ExternalLink, ChevronDown, Phone, CheckCircle2, AlertTriangle, CalendarClock, Coins, Pencil, Download, Loader2 } from 'lucide-react';
+import { Printer, FileText, FilePlus, User, Package, PackagePlus, PackageCheck, Banknote, ExternalLink, ChevronDown, Phone, CheckCircle2, AlertTriangle, CalendarClock, Coins, Pencil, Download, Loader2, PauseCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { apiClient } from '../../../lib/api';
 import { DateTime } from '../../../components/DateTime';
@@ -26,6 +26,14 @@ import {
 import { RepairDocPreviewModal } from './RepairDocPreviewModal';
 import { RepairConditionPhotos } from './RepairConditionPhotos';
 import { RepairTimeline } from './RepairTimeline';
+import { PauseContractModal } from '../../contracts/PauseContractModal';
+
+// fn_contract_check_pausable — just the slice the repair-page pause prompt needs.
+interface PausableCheck {
+  allowed: boolean;
+  reason: string | null;
+  contract: { contract_id: number; code_display: string; is_paused: boolean };
+}
 
 // Icon per action_code for the quick (primary) footer buttons.
 const ACTION_ICON: Partial<Record<RepairActionCode, React.ReactNode>> = {
@@ -98,6 +106,7 @@ export function RepairDetailPanel({
   const [activeAction, setActiveAction] = useState<RepairActionCode | 'NOTE_ADD' | null>(null);
   const [previewDoc, setPreviewDoc] = useState<BeMediaRepairDoc | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [pauseOpen, setPauseOpen] = useState(false);
   const [tab, setTab] = useState<'details' | 'money' | 'photos' | 'history'>('details');
   // Money tab holds two sub-tabs — same split as the contract Money tab:
   // ค่าซ่อม (charge sheet + internal cost) and บิล (the generated bills).
@@ -110,6 +119,23 @@ export function RepairDetailPanel({
     queryFn: () => apiClient.rpc<RepairAvailableActions>('fn_repair_available_actions', {
       p_repair_order_id: order.repair_order_id,
     }),
+  });
+
+  // Pause prompt — a contract device sent for repair should have its debt clock
+  // frozen (no late fees / no dunning while the customer has no phone). Only for a
+  // CUSTOMER_CONTRACT repair that's actually IN_REPAIR; the alert renders only when
+  // the check RPC says allowed (self-hides on loaner-bound / already-paused /
+  // pause-disabled). Never for shop-stock / walk-in (no contract to pause).
+  const pauseEligible = order.repair_type === 'CUSTOMER_CONTRACT'
+    && order.contract_id != null
+    && order.status === 'IN_REPAIR';
+  const { data: pausable } = useQuery({
+    queryKey: ['repair-pause-check', order.contract_id],
+    queryFn: () => apiClient.rpc<PausableCheck>('fn_contract_check_pausable', {
+      p_contract_id: order.contract_id,
+    }),
+    enabled: pauseEligible,
+    staleTime: 30 * 1000,
   });
 
   // Charge sheet preview (running lines) for IN_REPAIR+ orders.
@@ -191,8 +217,12 @@ export function RepairDetailPanel({
 
   // Footer = quick actions inline + everything else in "More". CHARGE_SET is
   // pulled out entirely (charge-sheet section); ATTACH_MEDIA is pulled out too
-  // (the photo album owns it).
-  const footerActions = actions.filter(a => !INLINE_ACTIONS.has(a.action_code) && a.action_code !== 'ATTACH_MEDIA');
+  // (the photo album owns it). PAY is hidden once the balance is cleared —
+  // nothing left to collect (the action engine still returns it for overpayment).
+  const footerActions = actions.filter(a =>
+    !INLINE_ACTIONS.has(a.action_code)
+    && a.action_code !== 'ATTACH_MEDIA'
+    && !(a.action_code === 'PAY' && order.c_charge_balance <= 0));
   const quickActions = footerActions.filter(a => QUICK_ACTIONS.has(a.action_code));
   const moreActions = footerActions.filter(a => !QUICK_ACTIONS.has(a.action_code));
 
@@ -310,6 +340,38 @@ export function RepairDetailPanel({
             edit button sits at the bottom-right, under the lines. */}
         {(chargeAction || charges.length > 0) ? (
           <div>
+            {/* Summary — net (what the customer owes), paid, balance. Profit
+                (net − internal cost) only when the cost is recorded. The bottom
+                line up top; the itemized charge sheet below explains it. */}
+            {order.c_charge_gross > 0 && (
+              <div className="mb-3 rounded-md border border-line overflow-hidden text-sm">
+                <div className="flex items-center justify-between px-3 py-1.5 border-b border-line">
+                  <span className="text-subtle">{t('repair.chargeNet')}</span>
+                  <span className="tabular-nums font-medium">{fmtCurrency(order.c_charge_net)}</span>
+                </div>
+                <div className="flex items-center justify-between px-3 py-1.5 border-b border-line">
+                  <span className="text-subtle">{t('repair.paid')}</span>
+                  <span className="tabular-nums">{fmtCurrency(order.c_charge_paid)}</span>
+                </div>
+                <div className="flex items-center justify-between px-3 py-1.5">
+                  <span className="text-subtle">{order.c_charge_balance < 0 ? t('repair.refundDue') : t('repair.balance')}</span>
+                  <span className={`tabular-nums font-semibold ${
+                    order.c_charge_balance > 0 ? 'text-warning-fg' : order.c_charge_balance < 0 ? 'text-danger' : 'text-success'
+                  }`}>{fmtCurrency(Math.abs(order.c_charge_balance))}</span>
+                </div>
+                {costRecorded && (
+                  <div className="flex items-center justify-between px-3 py-1.5 border-t border-line bg-surface">
+                    <span className="text-subtle inline-flex items-center gap-1">
+                      <Coins size={12} className="shrink-0" />{t('repair.grossProfit')}
+                    </span>
+                    <span className={`tabular-nums font-semibold ${
+                      order.c_charge_net - (order.repair_cost ?? 0) < 0 ? 'text-danger' : 'text-success'
+                    }`}>{fmtCurrency(order.c_charge_net - (order.repair_cost ?? 0))}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="text-xs font-semibold text-subtle uppercase tracking-wider mb-1">{t('repair.chargeSheet')}</div>
             {charges.length > 0 ? (
               <div className="rounded-md border border-line overflow-hidden">
@@ -328,6 +390,7 @@ export function RepairDetailPanel({
             ) : (
               <p className="text-sm text-subtler">{t('repair.noChargesYet')}</p>
             )}
+
             {chargeAction && (
               <div className="flex justify-end mt-2">
                 <Button
@@ -529,6 +592,31 @@ export function RepairDetailPanel({
           )}
         </div>
 
+        {/* Pause prompt — only when the contract is genuinely pausable (check RPC
+            allowed). Bridges the repair flow to the contract's pause: staff receive
+            the device here, so nudge them to freeze the debt clock without leaving
+            the page. Already-paused shows a quiet confirmation instead. */}
+        {pauseEligible && pausable?.allowed && (
+          <div className="alert alert-warning">
+            <PauseCircle />
+            <div>
+              <div className="alert-title text-warning-fg">{t('repair.pausePromptTitle')}</div>
+              <div className="alert-description">{t('repair.pausePromptHint')}</div>
+            </div>
+            <Button size="sm" color="primary" className="shrink-0 self-center ml-auto" onClick={() => setPauseOpen(true)}>
+              {t('repair.pausePromptButton')}
+            </Button>
+          </div>
+        )}
+        {pauseEligible && pausable?.contract.is_paused && (
+          <div className="alert alert-info">
+            <PauseCircle />
+            <div>
+              <div className="alert-title text-info-fg">{t('repair.pauseAlreadyPaused')}</div>
+            </div>
+          </div>
+        )}
+
         {/* Money — prominent stat band (once there's a charge sheet) */}
         {order.c_charge_gross > 0 && (
           <div className="grid grid-cols-3 gap-3 px-3 py-3 rounded-md border border-line bg-surface">
@@ -683,6 +771,24 @@ export function RepairDetailPanel({
       <RepairCancelModal open={activeAction === 'CANCEL'} onClose={close} order={order} onDone={done} />
       <RepairCloseModal open={activeAction === 'CLOSE'} onClose={close} order={order} onDone={done} />
       <RepairNoteAddModal open={activeAction === 'NOTE_ADD'} onClose={close} order={order} onDone={done} />
+
+      {/* Pause the linked contract from the repair page (reuses the contract's
+          own pause modal). Re-check ONLY on close — not on success — so the modal
+          keeps its own success→done view intact. Invalidating mid-success would
+          make its internal check_pausable flip to "already paused" while the done
+          view is still showing. So the alert flips only after the user clicks Done. */}
+      <PauseContractModal
+        open={pauseOpen}
+        contract={order.contract_id != null
+          ? { id: order.contract_id, code_display: order.contract_code_display, code: order.contract_code_display ?? '' }
+          : null}
+        onSuccess={() => { /* refresh happens on close, not here — see note above */ }}
+        onClose={() => {
+          setPauseOpen(false);
+          queryClient.invalidateQueries({ queryKey: ['repair-pause-check', order.contract_id] });
+          onRefresh();
+        }}
+      />
 
       <RepairDocPreviewModal
         open={previewDoc != null}
