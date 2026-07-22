@@ -60,6 +60,17 @@ export function RepairSignQrModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status?.uploads?.[0]?.media_id]);
 
+  // Auto-close once the customer has signed — show the ✓ briefly, then dismiss
+  // so staff don't have to close it manually and wonder if it worked. The
+  // media_id was already handed up via onSigned, so the parent can proceed.
+  const signed = (status?.uploads?.[0]?.media_id != null) || uploadCount > 0;
+  useEffect(() => {
+    if (!open || !signed) return;
+    const timer = setTimeout(() => { stop(); onClose(); }, 1200);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, signed]);
+
   const handleClose = () => {
     // Keep the session alive server-side (TTL-expired); only stop local polling.
     stop();

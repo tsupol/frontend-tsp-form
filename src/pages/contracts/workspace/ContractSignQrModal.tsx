@@ -58,6 +58,16 @@ export function ContractSignQrModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
+  // Auto-advance once the ceremony completes — show the ✓ briefly, then hand off
+  // to onCompleted (caller's success step) or, if none, just close. onSigned
+  // already fired above, so the parent has refreshed.
+  useEffect(() => {
+    if (!open || phase !== 'done') return;
+    const timer = setTimeout(() => { stop(); onClose(); }, 1400);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, phase]);
+
   const handleClose = () => {
     // Keep the signing session alive — phone may still be signing; BE expires
     // it on TTL. Only stop local polling.

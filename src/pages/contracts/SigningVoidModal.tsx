@@ -32,7 +32,8 @@ interface Props {
 
 interface VoidResult {
   signing_id: number;
-  state: string;
+  status: string;       // 'VOIDED' — the RPC returns `status`, not `state`
+  prev_status: string;  // status before the void (COLLECTING / SEALED)
 }
 
 function describeApiError(
@@ -145,7 +146,7 @@ export function SigningVoidModal({ open, onClose, contractId, signingId, isSeale
               </div>
             </div>
             <div className="modal-footer">
-              <Button onClick={handleClose}>{t('common.cancel')}</Button>
+              <Button variant="ghost" onClick={handleClose}>{t('common.close')}</Button>
               <Button color="danger" onClick={() => mutation.mutate()} disabled={!canSubmit}>
                 {mutation.isPending ? t('common.loading') : t('signing.voidConfirm')}
               </Button>
@@ -158,7 +159,7 @@ export function SigningVoidModal({ open, onClose, contractId, signingId, isSeale
             headline={t('signing.voidDoneHeadline')}
             contractCode={`SGN-${result.signing_id}`}
             tone="warning"
-            stateTransition={{ from: isSealedAddendum ? 'SEALED' : 'COLLECTING', to: result.state }}
+            stateTransition={{ from: result.prev_status, to: result.status }}
             detailRows={[
               { label: t('signing.voidReason'), value: reason.trim() },
             ]}

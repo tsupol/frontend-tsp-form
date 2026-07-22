@@ -5536,7 +5536,7 @@
     "reason_CUSTOMER_REQUEST": "Customer request",
     "reason_OTHER": "Other",
     "voidTitle": "Void this document",
-    "voidConfirm": "Void",
+    "voidConfirm": "Confirm void",
     "voidReasonPlaceholder": "Why are you voiding this document?",
     "voidHint": "Only this signing document moves to VOIDED state. The contract itself continues normally and a new signing can be issued. Captured signatures stay on the audit trail.",
     "voidAddendumTitle": "Void addendum",
