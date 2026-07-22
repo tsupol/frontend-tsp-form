@@ -14,8 +14,9 @@
 // and summary_edited_before_offer as a plain fact (never labelled "suspicious").
 // Offers never expire; pending_days is informational, not a countdown (§10.5).
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, Modal, Select, Input, useSnackbarContext } from 'tsp-form';
 import {
@@ -25,8 +26,9 @@ import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency } from '../../lib/format';
 import { FlagPair } from './ccBadges';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import {
-  ccKeys, useFlagLevels, tradeTargets, tradeOffer, tradeRespond, tradeCancel,
+  ccKeys, useFlagLevels, overdueColor, tradeTargets, tradeOffer, tradeRespond, tradeCancel,
   type TradeRow, type TradeInboxRow, type FlagLevelRef, type BookRow,
 } from './callCenterApi';
 
@@ -46,16 +48,23 @@ function renderTwoLineOption(opt: { label: string; primary?: string; secondary?:
 }
 
 interface Props {
-  /** Jump to a contract in the detail panel (mobile-aware handled by parent). */
-  onOpenContract: (contractId: number) => void;
+  /** Active box — the tab strip is rendered by the parent (full-width). */
+  box: Box;
+  /** Offer modal open state, controlled by the parent's toolbar button. */
+  offerOpen: boolean;
+  onOfferClose: () => void;
+  /** Report inbox/outbox counts up so the parent's tab badges stay in sync. */
+  onCounts: (c: { inbox: number; outbox: number }) => void;
+  /** Currently-selected trade (for row highlight). */
+  selectedTradeId: number | null;
+  /** Select an offer — the parent renders its detail on the right. */
+  onSelectOffer: (offer: TradeRow | TradeInboxRow) => void;
 }
 
-export function TransferView({ onOpenContract }: Props) {
+export function TransferView({ box, offerOpen, onOfferClose, onCounts, selectedTradeId, onSelectOffer }: Props) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { data: flagLevels } = useFlagLevels();
-  const [box, setBox] = useState<Box>('inbox');
-  const [offerOpen, setOfferOpen] = useState(false);
 
   const inbox = useQuery({
     queryKey: ccKeys.tradeInbox,
@@ -77,45 +86,17 @@ export function TransferView({ onOpenContract }: Props) {
 
   const active = box === 'inbox' ? inbox : outbox;
   const rows = active.data ?? [];
+
+  // Report counts up so the parent's box-tab badges stay in sync.
   const inboxCount = inbox.data?.length ?? 0;
   const outboxCount = outbox.data?.length ?? 0;
+  useEffect(() => {
+    onCounts({ inbox: inboxCount, outbox: outboxCount });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inboxCount, outboxCount]);
 
   return (
     <div className="flex flex-col h-full">
-      {/* Box sub-tabs + offer button. No top border — the parent view-tab
-          strip already draws the divider; a second one here double-lines. */}
-      <div className="flex-none px-4 flex items-center gap-2 border-b border-line">
-        <div className="flex">
-          <button
-            className={`py-2 px-3 text-sm font-medium transition-colors cursor-pointer border-b-2 whitespace-nowrap bg-transparent ${
-              box === 'inbox' ? 'border-primary-fg text-primary-fg' : 'border-transparent text-fg'
-            }`}
-            onClick={() => setBox('inbox')}
-          >
-            <span className="inline-flex items-center gap-1.5">
-              {t('callCenter.transfer.inbox')}
-              {inboxCount > 0 && <Badge size="xs" color="warning">{inboxCount}</Badge>}
-            </span>
-          </button>
-          <button
-            className={`py-2 px-3 text-sm font-medium transition-colors cursor-pointer border-b-2 whitespace-nowrap bg-transparent ${
-              box === 'outbox' ? 'border-primary-fg text-primary-fg' : 'border-transparent text-fg'
-            }`}
-            onClick={() => setBox('outbox')}
-          >
-            <span className="inline-flex items-center gap-1.5">
-              {t('callCenter.transfer.outbox')}
-              {outboxCount > 0 && <Badge size="xs" color="default">{outboxCount}</Badge>}
-            </span>
-          </button>
-        </div>
-        <div className="ml-auto">
-          <Button size="sm" variant="outline" startIcon={<Send size={14} />} onClick={() => setOfferOpen(true)}>
-            {t('callCenter.transfer.offerButton')}
-          </Button>
-        </div>
-      </div>
-
       <div className="flex-1 min-h-0 overflow-auto better-scroll">
         {active.isError ? (
           <div className="p-4">
@@ -126,16 +107,18 @@ export function TransferView({ onOpenContract }: Props) {
             {box === 'inbox' ? t('callCenter.transfer.inboxEmpty') : t('callCenter.transfer.outboxEmpty')}
           </div>
         ) : (
-          <div className="divide-y divide-line">
+          <div className="border-b border-line">
             {rows.map(row => (
-              <TradeCard
+              <button
                 key={row.trade_id}
-                row={row}
-                box={box}
-                levels={flagLevels}
-                onOpenContract={onOpenContract}
-                onChanged={invalidateAll}
-              />
+                type="button"
+                className={`block w-full text-left border-t border-line transition-colors cursor-pointer ${
+                  selectedTradeId === row.trade_id ? 'bg-primary-soft' : 'hover:bg-surface-hover'
+                }`}
+                onClick={() => onSelectOffer(row)}
+              >
+                <TradeCard row={row} box={box} levels={flagLevels} />
+              </button>
             ))}
           </div>
         )}
@@ -143,31 +126,74 @@ export function TransferView({ onOpenContract }: Props) {
 
       <OfferModal
         open={offerOpen}
-        onClose={() => setOfferOpen(false)}
-        onSuccess={() => { setOfferOpen(false); setBox('outbox'); invalidateAll(); }}
+        onClose={onOfferClose}
+        onSuccess={() => { onOfferClose(); invalidateAll(); }}
       />
     </div>
   );
 }
 
-// ── One offer card ────────────────────────────────────────────────────────────
+// ── One offer card (list preview — click to open full detail on the right) ─────
 
-function TradeCard({ row, box, levels, onOpenContract, onChanged }: {
+function TradeCard({ row, box, levels }: {
   row: TradeRow | TradeInboxRow;
   box: Box;
   levels: FlagLevelRef[] | undefined;
-  onOpenContract: (contractId: number) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="px-4 py-3">
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="font-medium text-sm truncate text-primary-fg">{row.contract_code_display}</span>
+            <span className="text-xs text-subtle truncate">{row.customer_name}</span>
+          </div>
+          <div className="text-xs text-subtle mt-0.5">
+            {box === 'inbox' ? t('callCenter.transfer.fromLabel') : t('callCenter.transfer.toLabel')}{' '}
+            <span className="font-medium">{row.counterparty_username ?? `#${row.counterparty_user_id}`}</span>
+          </div>
+        </div>
+        <div className="shrink-0 text-right">
+          {row.overdue_amount > 0 && (
+            <div className="text-sm font-medium tabular-nums">฿{fmtCurrency(row.overdue_amount)}</div>
+          )}
+          <div className="text-[11px] text-subtle inline-flex items-center gap-1 mt-0.5">
+            <Clock size={11} />
+            {t('callCenter.transfer.pendingDays', { count: row.pending_days })}
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 mt-1.5 text-xs">
+        <span className="text-subtle">{t('callCenter.overdueDays', { n: row.overdue_days })}</span>
+        <FlagPair auto={row.auto_flag_level} manual={row.manual_flag_level} divergent={row.flag_divergent} levels={levels} compact />
+        {box === 'inbox' && (row as TradeInboxRow).summary_edited_before_offer && (
+          <Pencil size={12} className="text-warning-fg shrink-0" />
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Offer detail (right panel) — full offer + accept/reject/cancel ─────────────
+
+export function TransferOfferDetail({ offer, box, onChanged }: {
+  offer: TradeRow | TradeInboxRow;
+  box: Box;
   onChanged: () => void;
 }) {
   const { t } = useTranslation();
+  const { data: levels } = useFlagLevels();
   const { addSnackbar } = useSnackbarContext();
   const [busy, setBusy] = useState<'accept' | 'reject' | 'cancel' | null>(null);
+  const [confirm, setConfirm] = useState<'accept' | 'reject' | 'cancel' | null>(null);
   const [error, setError] = useState('');
 
-  const editedBeforeOffer = box === 'inbox' && (row as TradeInboxRow).summary_edited_before_offer;
+  const editedBeforeOffer = box === 'inbox' && (offer as TradeInboxRow).summary_edited_before_offer;
 
   const run = async (kind: 'accept' | 'reject' | 'cancel', fn: () => Promise<unknown>, successKey: string) => {
     setBusy(kind);
+    setConfirm(null);
     setError('');
     try {
       await fn();
@@ -188,121 +214,132 @@ function TradeCard({ row, box, levels, onOpenContract, onChanged }: {
   };
 
   return (
-    <div className="px-4 py-3">
-      {/* Header — contract + counterparty + pending days */}
-      <div className="flex items-start gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="font-medium text-sm truncate bg-transparent border-none p-0 cursor-pointer text-primary-fg hover:underline inline-flex items-center gap-1"
-              onClick={() => onOpenContract(row.contract_id)}
+    <div className="flex flex-col h-full">
+      <div className="flex-1 min-h-0 overflow-auto better-scroll p-4 flex flex-col gap-4">
+        {/* Contract + counterparty */}
+        <div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Link
+              to={`/admin/contracts/search/${offer.contract_id}`}
+              className="text-base font-semibold text-primary-fg hover:underline inline-flex items-center gap-1"
             >
-              {row.contract_code_display}
-              <ExternalLink size={12} className="shrink-0" />
-            </button>
-            <span className="text-xs text-subtle truncate">{row.customer_name}</span>
+              {offer.contract_code_display}
+              <ExternalLink size={14} className="shrink-0" />
+            </Link>
+            <span className="text-sm text-subtle">{offer.customer_name}</span>
           </div>
-          <div className="text-xs text-subtle mt-0.5">
+          <div className="text-sm text-subtle mt-1">
             {box === 'inbox' ? t('callCenter.transfer.fromLabel') : t('callCenter.transfer.toLabel')}{' '}
-            <span className="font-medium">{row.counterparty_username ?? `#${row.counterparty_user_id}`}</span>
+            <span className="font-medium text-fg">{offer.counterparty_username ?? `#${offer.counterparty_user_id}`}</span>
+            {' · '}
+            <span className="inline-flex items-center gap-1"><Clock size={12} />{t('callCenter.transfer.pendingDays', { count: offer.pending_days })}</span>
           </div>
         </div>
-        <div className="shrink-0 text-right">
-          {row.overdue_amount > 0 && (
-            <div className="text-sm font-medium">฿{fmtCurrency(row.overdue_amount)}</div>
-          )}
-          <div className="text-[11px] text-subtle inline-flex items-center gap-1 mt-0.5">
-            <Clock size={11} />
-            {t('callCenter.transfer.pendingDays', { count: row.pending_days })}
+
+        {/* Money */}
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div>
+            <div className="text-xs text-subtle">{t('callCenter.outstanding')}</div>
+            <div className="font-medium tabular-nums">฿{fmtCurrency(offer.outstanding)}</div>
+          </div>
+          <div>
+            <div className="text-xs text-subtle">{t('callCenter.overdueAmount')}</div>
+            <div className="font-medium tabular-nums">
+              ฿{fmtCurrency(offer.overdue_amount)}
+              <span className="text-subtle text-xs ml-1">({t('callCenter.transfer.overdue', { count: offer.overdue_count })})</span>
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-subtle">{t('callCenter.overdueDaysShort', { n: offer.overdue_days })}</div>
+            <div><Badge size="sm" color={overdueColor(offer.overdue_days)}>{t('callCenter.overdueDays', { n: offer.overdue_days })}</Badge></div>
           </div>
         </div>
+
+        {/* Flags — anti-dump: read before accepting */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <FlagPair auto={offer.auto_flag_level} manual={offer.manual_flag_level} divergent={offer.flag_divergent} levels={levels} showLabels />
+          {offer.is_paused && <Badge size="sm" color="warning">{t('callCenter.skipReason.PAUSED')}</Badge>}
+        </div>
+        {offer.flag_divergent && box === 'inbox' && (
+          <div className="alert alert-warning">
+            <AlertTriangle size={16} />
+            <span>{t('callCenter.transfer.divergentWarning')}</span>
+          </div>
+        )}
+
+        {/* Summary + edited-before-offer fact */}
+        {offer.summary ? (
+          <div className="text-sm bg-surface rounded-md border border-line px-3 py-2.5">
+            <div className="text-xs text-subtle mb-1">{t('callCenter.summary')}</div>
+            <div className="whitespace-pre-wrap break-words">{offer.summary}</div>
+            <div className="text-[11px] text-subtle mt-1.5 flex items-center gap-2 flex-wrap">
+              {offer.summary_at && <DateTime value={offer.summary_at} />}
+              {editedBeforeOffer && (
+                <span className="inline-flex items-center gap-1 text-warning-fg">
+                  <Pencil size={11} />{t('callCenter.transfer.summaryEditedBeforeOffer')}
+                </span>
+              )}
+            </div>
+          </div>
+        ) : null}
+
+        {/* Offer note */}
+        {offer.note && (
+          <div className="text-sm text-subtle italic">“{offer.note}”</div>
+        )}
+
+        {error && <div className="alert alert-danger"><XCircle size={16} /><span>{error}</span></div>}
       </div>
 
-      {/* Debt + flag pair — anti-dump: show both flags + divergence */}
-      <div className="flex items-center gap-3 flex-wrap mt-2 text-xs">
-        <span className="text-subtle">
-          {t('callCenter.transfer.overdue', { count: row.overdue_count })} · {t('callCenter.overdueDays', { n: row.overdue_days })}
-        </span>
-        <FlagPair
-          auto={row.auto_flag_level}
-          manual={row.manual_flag_level}
-          divergent={row.flag_divergent}
-          levels={levels}
-        />
-        {row.is_paused && <Badge size="xs" color="warning">{t('callCenter.skipReason.PAUSED')}</Badge>}
-      </div>
-
-      {/* Divergence warning — read the history before accepting */}
-      {row.flag_divergent && box === 'inbox' && (
-        <div className="alert alert-warning mt-2">
-          <AlertTriangle size={16} />
-          <span>{t('callCenter.transfer.divergentWarning')}</span>
-        </div>
-      )}
-
-      {/* Summary — another channel where a bad contract gets hidden */}
-      {row.summary && (
-        <div className="mt-2 text-xs bg-surface rounded px-2 py-1.5">
-          <div className="whitespace-pre-wrap break-words">{row.summary}</div>
-          <div className="text-[11px] text-subtle mt-1 flex items-center gap-2 flex-wrap">
-            {row.summary_at && <DateTime value={row.summary_at} />}
-            {editedBeforeOffer && (
-              <span className="inline-flex items-center gap-1 text-warning-fg">
-                <Pencil size={11} />
-                {t('callCenter.transfer.summaryEditedBeforeOffer')}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Offer note */}
-      {row.note && (
-        <div className="mt-2 text-xs text-subtle italic">“{row.note}”</div>
-      )}
-
-      {error && (
-        <div className="alert alert-danger mt-2"><XCircle size={16} /><span>{error}</span></div>
-      )}
-
-      {/* Actions */}
-      <div className="flex items-center gap-2 mt-3">
+      {/* Action footer — pinned bottom-right. Each opens a confirm first. */}
+      <div className="flex-none border-t border-line p-4 flex justify-end gap-2">
         {box === 'inbox' ? (
           <>
             <Button
-              size="sm"
-              color="primary"
-              disabled={busy !== null}
-              startIcon={busy === 'accept' ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-              onClick={() => run('accept', () => tradeRespond(row.trade_id, true), 'callCenter.transfer.acceptSuccess')}
-            >
-              {t('callCenter.transfer.accept')}
-            </Button>
-            <Button
-              size="sm"
               variant="outline"
               color="danger"
               disabled={busy !== null}
               startIcon={busy === 'reject' ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
-              onClick={() => run('reject', () => tradeRespond(row.trade_id, false), 'callCenter.transfer.rejectSuccess')}
+              onClick={() => setConfirm('reject')}
             >
               {t('callCenter.transfer.reject')}
+            </Button>
+            <Button
+              color="primary"
+              disabled={busy !== null}
+              startIcon={busy === 'accept' ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+              onClick={() => setConfirm('accept')}
+            >
+              {t('callCenter.transfer.accept')}
             </Button>
           </>
         ) : (
           <Button
-            size="sm"
             variant="outline"
             color="danger"
             disabled={busy !== null}
             startIcon={busy === 'cancel' ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
-            onClick={() => run('cancel', () => tradeCancel(row.trade_id), 'callCenter.transfer.cancelSuccess')}
+            onClick={() => setConfirm('cancel')}
           >
             {t('callCenter.transfer.cancel')}
           </Button>
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirm !== null}
+        onClose={() => setConfirm(null)}
+        pending={busy !== null}
+        title={confirm ? t(`callCenter.transfer.confirm.${confirm}Title`) : ''}
+        message={confirm ? t(`callCenter.transfer.confirm.${confirm}Body`, { contract: offer.contract_code_display }) : ''}
+        confirmLabel={confirm ? t(`callCenter.transfer.${confirm}`) : undefined}
+        color={confirm === 'accept' ? 'primary' : 'danger'}
+        onConfirm={() => {
+          if (confirm === 'accept') run('accept', () => tradeRespond(offer.trade_id, true), 'callCenter.transfer.acceptSuccess');
+          else if (confirm === 'reject') run('reject', () => tradeRespond(offer.trade_id, false), 'callCenter.transfer.rejectSuccess');
+          else if (confirm === 'cancel') run('cancel', () => tradeCancel(offer.trade_id), 'callCenter.transfer.cancelSuccess');
+        }}
+      />
     </div>
   );
 }

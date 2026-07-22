@@ -455,7 +455,7 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
               {canEditIdentity && (
                 <button
                   type="button"
-                  className="btn-icon-xs text-subtle hover:text-fg"
+                  className="inline-flex items-center justify-center w-6 h-6 rounded cursor-pointer bg-transparent border-none text-subtle transition-colors hover:text-primary-fg hover:bg-surface-hover"
                   onClick={() => setEditIdentityOpen(true)}
                   title={t('customer.editIdentity.title')}
                   aria-label={t('customer.editIdentity.title')}

@@ -2,21 +2,22 @@
 // (v_my_book), right = 4-tab contract detail. Replaces the deprecated Call Ticket
 // queue (TicketQueuePage). No central queue — the collector works their own book.
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { PageNav, PageNavPanel, MobileHeader, DataTable, Badge, Input, Select, Button, useSnackbarContext } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, XCircle, Star, StarOff } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, XCircle, Star, StarOff, Send } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency } from '../../lib/format';
 import {
-  ccKeys, useFlagLevels, focusAdd, focusRemove, overdueColor, type BookRow, type TradeInboxRow,
+  ccKeys, useFlagLevels, focusAdd, focusRemove, overdueColor,
+  type BookRow, type TradeRow, type TradeInboxRow,
 } from './callCenterApi';
 import { FlagPair, SkipReasonBadge } from './ccBadges';
 import { ContractDunningDetail } from './ContractDunningDetail';
-import { TransferView } from './TransferView';
+import { TransferView, TransferOfferDetail } from './TransferView';
 
 type View = 'focus' | 'book' | 'transfer';
 type SortKey =
@@ -32,6 +33,14 @@ export function CallCenterPage() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [view, setView] = useState<View>('focus');
+  // Transfer sub-state lifted here so its box-tab strip can render in the
+  // full-width toolbar (spanning both list + detail panels), like the view tabs.
+  const [transferBox, setTransferBox] = useState<'inbox' | 'outbox'>('inbox');
+  const [transferOfferOpen, setTransferOfferOpen] = useState(false);
+  const [transferCounts, setTransferCounts] = useState<{ inbox: number; outbox: number }>({ inbox: 0, outbox: 0 });
+  const [selectedOffer, setSelectedOffer] = useState<TradeRow | TradeInboxRow | null>(null);
+  // Switching box or leaving transfer clears the selected offer.
+  useEffect(() => { setSelectedOffer(null); }, [transferBox, view]);
   const [showAllInBook, setShowAllInBook] = useState(false);
   const [sortBy, setSortBy] = useState<SortKey>('work_priority.desc');
   const [redOnly, setRedOnly] = useState(false);
@@ -105,9 +114,12 @@ export function CallCenterPage() {
   const focusCount = focusCountData?.totalCount ?? 0;
 
   // Pending transfer offers addressed to me — drives the Transfer tab badge.
+  // Distinct key from the Transfer view's full inbox fetch: they select
+  // different columns, so sharing a key would let this trade_id-only result
+  // clobber the full rows (undefined fields → raw i18n keys, blank links).
   const { data: tradeInboxData } = useQuery({
-    queryKey: ccKeys.tradeInbox,
-    queryFn: () => apiClient.get<TradeInboxRow[]>('/v_trade_inbox?select=trade_id'),
+    queryKey: [...ccKeys.tradeInbox, 'count'],
+    queryFn: () => apiClient.get<{ trade_id: number }[]>('/v_trade_inbox?select=trade_id'),
     refetchInterval: 60_000,
   });
   const tradeInboxCount = tradeInboxData?.length ?? 0;
@@ -138,7 +150,7 @@ export function CallCenterPage() {
   const selectedRow = selectedId ? rows.find(r => r.contract_id === selectedId) : null;
 
   return (
-    <PageNav panels={['list', 'detail']} defaultPanel={selectedId ? 'detail' : undefined} className="h-dvh">
+    <PageNav panels={['list', 'detail']} defaultPanel={(selectedId || selectedOffer) ? 'detail' : undefined} className="h-dvh">
       {({ isMobile, isRoot, goTo, goBack }) => (
         <>
           {isMobile ? (
@@ -208,6 +220,41 @@ export function CallCenterPage() {
                   </span>
                 </button>
               </div>
+              {/* Transfer box sub-tabs (กล่องเข้า/ที่ส่งไป) + offer button —
+                  full width so it spans both the list and detail panels. */}
+              {view === 'transfer' && (
+                <div className="flex items-center gap-2 px-4 border-b border-line">
+                  <div className="flex">
+                    <button
+                      className={`py-2 px-3 text-sm font-medium transition-colors cursor-pointer border-b-2 whitespace-nowrap bg-transparent ${
+                        transferBox === 'inbox' ? 'border-primary-fg text-primary-fg' : 'border-transparent text-fg'
+                      }`}
+                      onClick={() => setTransferBox('inbox')}
+                    >
+                      <span className="inline-flex items-center gap-1.5">
+                        {t('callCenter.transfer.inbox')}
+                        {transferCounts.inbox > 0 && <Badge size="xs" color="warning">{transferCounts.inbox}</Badge>}
+                      </span>
+                    </button>
+                    <button
+                      className={`py-2 px-3 text-sm font-medium transition-colors cursor-pointer border-b-2 whitespace-nowrap bg-transparent ${
+                        transferBox === 'outbox' ? 'border-primary-fg text-primary-fg' : 'border-transparent text-fg'
+                      }`}
+                      onClick={() => setTransferBox('outbox')}
+                    >
+                      <span className="inline-flex items-center gap-1.5">
+                        {t('callCenter.transfer.outbox')}
+                        {transferCounts.outbox > 0 && <Badge size="xs" color="default">{transferCounts.outbox}</Badge>}
+                      </span>
+                    </button>
+                  </div>
+                  <div className="ml-auto">
+                    <Button size="sm" variant="ghost" startIcon={<Send size={14} />} onClick={() => setTransferOfferOpen(true)}>
+                      {t('callCenter.transfer.offerButton')}
+                    </Button>
+                  </div>
+                </div>
+              )}
               {/* Search + sort + red filter — book/focus only; Transfer has its
                   own sub-tab strip and no sort. */}
               {view !== 'transfer' && (
@@ -252,7 +299,12 @@ export function CallCenterPage() {
             <PageNavPanel id="list" className={isMobile ? 'flex flex-col overflow-hidden' : 'w-1/2 xl:w-5/12 border-r border-line flex flex-col'}>
               {view === 'transfer' ? (
                 <TransferView
-                  onOpenContract={(id) => { selectContract(id); if (isMobile) goTo('detail'); }}
+                  box={transferBox}
+                  offerOpen={transferOfferOpen}
+                  onOfferClose={() => setTransferOfferOpen(false)}
+                  onCounts={setTransferCounts}
+                  selectedTradeId={selectedOffer?.trade_id ?? null}
+                  onSelectOffer={(offer) => { setSelectedOffer(offer); if (isMobile) goTo('detail'); }}
                 />
               ) : isError ? (
                 <div className="flex-none p-4">
@@ -331,7 +383,27 @@ export function CallCenterPage() {
             </PageNavPanel>
 
             <PageNavPanel id="detail" className={isMobile ? '' : 'flex-1 min-w-0 flex flex-col'}>
-              {selectedId ? (
+              {view === 'transfer' ? (
+                selectedOffer ? (
+                  <TransferOfferDetail
+                    key={selectedOffer.trade_id}
+                    offer={selectedOffer}
+                    box={transferBox}
+                    onChanged={() => {
+                      // Offer acted on (accepted/rejected/cancelled) — clear the
+                      // panel and refresh the boxes + book.
+                      setSelectedOffer(null);
+                      queryClient.invalidateQueries({ queryKey: ccKeys.tradeInbox });
+                      queryClient.invalidateQueries({ queryKey: ccKeys.tradeOutbox });
+                      queryClient.invalidateQueries({ queryKey: ['cc', 'book'] });
+                    }}
+                  />
+                ) : (
+                  <div className="flex-1 h-full flex items-center justify-center text-subtler">
+                    {t('callCenter.transfer.selectOffer')}
+                  </div>
+                )
+              ) : selectedId ? (
                 <ContractDunningDetail
                   key={selectedId}
                   contractId={selectedId}

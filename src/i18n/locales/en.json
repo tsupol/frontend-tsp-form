@@ -1226,6 +1226,7 @@
       "inbox": "Inbox",
       "outbox": "Sent",
       "inboxEmpty": "No transfer offers waiting for you",
+      "selectOffer": "Select an offer to review",
       "outboxEmpty": "You haven't sent any transfer offers",
       "fromLabel": "From",
       "toLabel": "To",
@@ -1238,6 +1239,14 @@
       "accept": "Accept",
       "reject": "Reject",
       "cancel": "Cancel offer",
+      "confirm": {
+        "acceptTitle": "Accept this transfer?",
+        "acceptBody": "You'll become the owner of {{contract}} and it moves into your book.",
+        "rejectTitle": "Reject this transfer?",
+        "rejectBody": "The offer for {{contract}} is declined and stays with the sender.",
+        "cancelTitle": "Cancel this offer?",
+        "cancelBody": "Your transfer offer for {{contract}} is withdrawn."
+      },
       "acceptSuccess": "Contract accepted — it's in your book now",
       "rejectSuccess": "Offer rejected",
       "cancelSuccess": "Offer cancelled",

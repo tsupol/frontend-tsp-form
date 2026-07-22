@@ -59,7 +59,7 @@ interface AssetSummary {
 }
 
 interface RepairOrder {
-  id: number;
+  repair_order_id: number;
   repair_no: string;
   status: string;
   result: string | null;
@@ -554,11 +554,11 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
           </header>
           <div className="divide-y divide-line">
             {repairOrders.map(ro => (
-              <div key={ro.id} className="px-4 py-2.5 flex items-start justify-between gap-3">
+              <div key={ro.repair_order_id} className="px-4 py-2.5 flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <Link
-                      to={`/admin/inventory/repairs?repair_id=${ro.id}`}
+                      to={`/admin/inventory/repairs/${ro.repair_order_id}`}
                       className="text-sm font-medium text-primary-fg hover:underline"
                     >
                       {ro.repair_no}

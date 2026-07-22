@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { apiClient } from '../../lib/api';
-import { formatTel, fmtCurrency } from '../../lib/format';
+import { formatTel } from '../../lib/format';
 import {
   fetchContractRepo, fetchRepoActions,
   type RepoAction, type RepoActionCode, type GeoPrecision,
@@ -56,7 +56,7 @@ function GeoPin({ precision }: { precision: GeoPrecision }) {
   return <Tooltip content={t('repo.geo.NONE')} placement="top"><MapPin size={13} className="text-subtler shrink-0" /></Tooltip>;
 }
 
-export function RepoDetailPanel({ contractId, isMobile, onChanged }: {
+export function RepoDetailPanel({ contractId, onChanged }: {
   contractId: number;
   isMobile: boolean;
   onChanged: () => void;
