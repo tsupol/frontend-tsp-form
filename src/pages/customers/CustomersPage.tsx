@@ -16,7 +16,9 @@ import { DatePicker } from '../../components/DatePicker';
 import { PhoneInput } from '../../components/PhoneInput';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { CustomerLoginCard, useInvalidateLoginInfo } from '../../components/CustomerLoginCard';
+import { EditIdentityModal } from '../../components/EditIdentityModal';
 import { ContractDetailPanel } from '../contracts/ContractDetailPanel';
+import { useAuth } from '../../contexts/AuthContext';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -408,6 +410,7 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
   const [addReferenceOpen, setAddReferenceOpen] = useState(false);
   const [editReference, setEditReference] = useState<CustomerReference | null>(null);
   const [contractModalId, setContractModalId] = useState<number | null>(null);
+  const [editIdentityOpen, setEditIdentityOpen] = useState(false);
 
   // Reset modals when customer changes
   useEffect(() => {
@@ -416,9 +419,12 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
     setAddContactOpen(false);
     setAddReferenceOpen(false);
     setEditReference(null);
+    setEditIdentityOpen(false);
   }, [customerId]);
 
   const invalidateLogin = useInvalidateLoginInfo();
+  const { can } = useAuth();
+  const canEditIdentity = can('CUSTOMER.UPDATE');
 
   const refreshAll = () => {
     queryClient.invalidateQueries({ queryKey: ['customers'] });
@@ -446,6 +452,17 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
                 {customer.is_active ? t('customer.active') : t('customer.inactive')}
               </Badge>
               <span className="text-xs text-subtle tabular-nums">{customer.id_type}: {formatCid(customer.id_number)}</span>
+              {canEditIdentity && (
+                <button
+                  type="button"
+                  className="btn-icon-xs text-subtle hover:text-fg"
+                  onClick={() => setEditIdentityOpen(true)}
+                  title={t('customer.editIdentity.title')}
+                  aria-label={t('customer.editIdentity.title')}
+                >
+                  <Pencil size={12} />
+                </button>
+              )}
             </div>
           </div>
           <Button variant="outline" size="sm" startIcon={<Pencil size={14} />} onClick={() => setEditInfoOpen(true)}>
@@ -578,6 +595,15 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
         onClose={() => setEditInfoOpen(false)}
         customer={customer}
         onSuccess={() => { setEditInfoOpen(false); refreshAll(); showSuccess(t('customer.saveSuccess')); }}
+      />
+
+      <EditIdentityModal
+        open={editIdentityOpen}
+        customerId={customer.id}
+        currentIdType={customer.id_type}
+        currentIdNumber={customer.id_number}
+        onClose={() => setEditIdentityOpen(false)}
+        onSuccess={() => { setEditIdentityOpen(false); refreshAll(); showSuccess(t('customer.editIdentity.success')); }}
       />
 
       <EditAddressModal

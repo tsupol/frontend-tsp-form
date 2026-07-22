@@ -9,9 +9,10 @@ import {
 } from 'lucide-react';
 import { apiClient, ApiError } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
-import { formatTel, formatCid, formatSmart } from '../lib/format';
+import { formatSmart } from '../lib/format';
 import { DateTime } from './DateTime';
 import { CustomerActivityModal } from './CustomerActivityModal';
+import { ResetCustomerLoginModal } from './ResetCustomerLoginModal';
 
 export interface CustomerLoginInfo {
   id: number;
@@ -128,11 +129,12 @@ export function CustomerLoginCard({ customer, onChanged, noCard = false }: Props
         </>
       )}
 
-      <ResetPasswordModal
+      <ResetCustomerLoginModal
         open={resetOpen}
-        customer={customer}
+        customerId={customer.id}
+        customerName={customer.full_name}
         onClose={() => setResetOpen(false)}
-        onSuccess={() => { setResetOpen(false); onChanged?.(); }}
+        onDone={() => onChanged?.()}
       />
       <UnlockModal
         open={unlockOpen}
@@ -156,112 +158,6 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
       <span className="text-subtle text-xs shrink-0">{label}</span>
       <span className="text-right text-sm">{children}</span>
     </div>
-  );
-}
-
-// ── Reset Password Modal ────────────────────────────────────────────────────
-
-function ResetPasswordModal({ open, customer, onClose, onSuccess }: {
-  open: boolean;
-  customer: CustomerLoginInfo;
-  onClose: () => void;
-  onSuccess: () => void;
-}) {
-  const { t } = useTranslation();
-  const { addSnackbar } = useSnackbarContext();
-  const [reason, setReason] = useState('');
-  const [error, setError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (open) { setReason(''); setError(''); setSubmitting(false); }
-  }, [open]);
-
-  const handleConfirm = async () => {
-    const trimmed = reason.trim();
-    if (!trimmed) {
-      setError(t('customer.login.reasonRequired'));
-      return;
-    }
-    setSubmitting(true);
-    setError('');
-    try {
-      await apiClient.rpc('staff_reset_customer_login', {
-        p_customer_id: customer.id,
-        p_reason: trimmed,
-      });
-      addSnackbar({
-        message: (
-          <div className="alert alert-success">
-            <CheckCircle size={16} />
-            <span>{t('customer.login.resetSuccess', { name: customer.full_name })}</span>
-          </div>
-        ),
-      });
-      onSuccess();
-    } catch (err) {
-      if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
-        setError(translated || err.message);
-      } else {
-        setError(err instanceof Error ? err.message : String(err));
-      }
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <Modal open={open} onClose={onClose} maxWidth="30rem" width="100%">
-      <div className="modal-header">
-        <h2 className="modal-title">{t('customer.login.resetTitle', { name: customer.full_name })}</h2>
-        <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
-      </div>
-      <div className="modal-content">
-        {error && (
-          <div className="alert alert-danger mb-3">
-            <XCircle size={16} />
-            <span>{error}</span>
-          </div>
-        )}
-        <ul className="text-sm space-y-1.5 mb-4 pl-5 list-disc text-subtle">
-          <li>
-            {t('customer.login.resetConsequenceUsername', {
-              id: formatCid(customer.id_number) || customer.id_number || '—',
-            })}
-          </li>
-          <li>
-            {t('customer.login.resetConsequencePassword', {
-              tel: formatTel(customer.tel) || customer.tel || '—',
-            })}
-          </li>
-          <li>{t('customer.login.resetConsequenceLogout')}</li>
-          <li className="text-warning-fg">{t('customer.login.resetConsequenceNoNotify')}</li>
-        </ul>
-        <div className="form-grid">
-          <div className="flex flex-col">
-            <label className="form-label">{t('customer.login.reason')} *</label>
-            <Input
-              value={reason}
-              onChange={e => setReason(e.target.value)}
-              placeholder={t('customer.login.reasonPlaceholder')}
-              className="w-full"
-            />
-          </div>
-        </div>
-      </div>
-      <div className="modal-footer">
-        <Button variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
-        <Button
-          color="primary"
-          onClick={handleConfirm}
-          disabled={submitting || !reason.trim()}
-          startIcon={submitting ? <Loader2 size={14} className="animate-spin" /> : <KeyRound size={14} />}
-        >
-          {t('customer.login.resetConfirm')}
-        </Button>
-      </div>
-    </Modal>
   );
 }
 

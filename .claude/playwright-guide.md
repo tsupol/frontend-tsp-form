@@ -10,6 +10,8 @@ i # Playwright MCP Usage Guide
 
 The login page (`https://localhost:5173/login`) has **Quick Login buttons** that prefill username + password (`Test123456`).
 
+> **The Quick Login panel is hidden by default.** There's an unlabeled rectangle button at the **bottom-right** of the login page (`ref=e29`, `getByRole('button').filter({ hasText: /^$/ })`) that toggles it open. Click it first, THEN the role buttons (`HOLD_ADMIN`, `CO_ADMIN`, `CO_ACCT`, `CO_INV`, `BR_MGR`, `BR_STAFF`) appear. Do NOT type usernames like `ui_branch_manager` directly — that username is invalid ("Invalid username or password"); only the quick-login buttons carry the correct usernames.
+
 ### Available Quick Login Users
 
 | Button label | Username | Role |
@@ -35,3 +37,19 @@ await page.waitForURL('**/admin');
 ## After Login
 
 Use `browser_snapshot` to get the DOM tree, then interact via `browser_run_code` for multi-step flows or individual `browser_click`/`browser_fill_form` for single actions.
+
+## Dark mode
+
+Theme is the `data-theme` attribute on `<html>` (not a class). Set it AND persist it, and **re-apply after every navigation/reload** — a route change or `page.reload()` can reset it before React re-reads:
+
+```js
+await page.evaluate(() => {
+  document.documentElement.setAttribute('data-theme', 'dark');
+  localStorage.setItem('theme', 'dark');
+});
+```
+
+## Gotchas found in practice
+
+- **Icon-only buttons that share an `aria-label` cause strict-mode violations.** e.g. multiple reset-key buttons on a list page all had `aria-label="Reset password"`, same as the modal's confirm button. Scope to the dialog: `page.getByRole('dialog').getByRole('button', { name: 'X' })`.
+- **Verify i18n plural keys render, not just that the page loads.** A `foo_one`/`foo_other` key only pluralizes when the interpolation var is named **`count`**. Passing `{ n: x }` or `{ days: x }` fails selection → i18next falls back to the base key `foo` (which doesn't exist) → the raw key string renders on screen. Screenshot and read the actual text.

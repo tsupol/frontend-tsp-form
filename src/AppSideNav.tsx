@@ -47,6 +47,8 @@ import {
   Gavel, ShieldCheck,
   // Chat
   MessageSquare,
+  // NNF App console
+  Smartphone,
   // Dev sandbox
   FlaskConical, PenLine, Image as ImageIcon, Bell,
   // Signatories (v2)
@@ -263,6 +265,12 @@ export const AppSideNav = () => {
           path: '/admin/chat',
         }]
       : []),
+    {
+      key: 'nnf-app',
+      icon: <Smartphone size="1rem" />,
+      label: t('nav.nnfApp'),
+      path: '/admin/nnf-app',
+    },
     ...(canApprove
       ? [{
           key: 'approvals',

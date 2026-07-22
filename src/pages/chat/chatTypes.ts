@@ -4,6 +4,23 @@
 export type ChatMessageType = 'TEXT' | 'IMAGE';
 export type ChatSenderType = 'STAFF' | 'CUSTOMER';
 
+// Lessee role of a chat participant (mig 843). Pure codes — UI translates.
+// null for STAFF senders (intentional; don't render a badge for it).
+export type LesseeRole = 'PRIMARY' | 'CO_LESSEE';
+
+// Contract lifecycle state carried on the chat list (mig 839). Codes only —
+// UI translates, and MUST tolerate unknown codes (DB can add states without
+// waiting on the UI). Never hardcode "only these 4 exist".
+export type ContractStateScope = 'OPEN' | 'CLOSED';
+
+// One lessee of a chat's contract — from v_branch_chat_list.customers[].
+export interface ChatListCustomer {
+  customer_id: number;
+  name: string | null;
+  role: LesseeRole | string;
+  tel: string | null;
+}
+
 export type ChatStatus =
   | 'WAITING_REPLY'
   | 'RESOLVED'
@@ -40,6 +57,15 @@ export interface ChatInboxRow {
   pinned_note_by_user_id: number | null;
   pinned_note_by_username: string | null;
   pinned_note_at: string | null;
+
+  // New 2026-07-22 — contract state (mig 839). Codes only; tolerate unknowns.
+  // Use contract_can_receive_payment directly; never derive it from state.
+  contract_state: string | null;
+  contract_state_scope: ContractStateScope | string | null;
+  contract_can_receive_payment: boolean | null;
+
+  // New 2026-07-22 — all lessees on the contract (mig 843), PRIMARY first.
+  customers: ChatListCustomer[] | null;
 }
 
 export interface ChatMessage {
@@ -56,6 +82,9 @@ export interface ChatMessage {
   is_read: boolean;
   read_at: string | null;
   created_at: string;
+
+  // New 2026-07-22 (mig 843) — lessee role of the sender. null for STAFF.
+  sender_role?: LesseeRole | string | null;
 }
 
 export interface ChatThreadStatusLogRow {

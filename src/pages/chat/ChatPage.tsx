@@ -14,7 +14,10 @@ import { formatSmart } from '../../lib/format';
 import { MediaLightbox } from '../../components/MediaLightbox';
 import { ChatThreadPanel } from './ChatThreadPanel';
 import { CHAT_STATUS_VALUES, type ChatInboxRow, type ChatStatus } from './chatTypes';
-import { chatStatusBadgeColor, sortChatRowsByStatusThenRecency } from './chatStatus';
+import {
+  chatStatusBadgeColor, contractStateBadgeColor, contractStateLabel,
+  sortChatRowsByStatusThenRecency,
+} from './chatStatus';
 
 type StatusFilter = ChatStatus | 'NONE' | null;
 
@@ -334,11 +337,20 @@ export function ChatPage() {
                             <div className="text-[11px] text-subtle truncate font-mono min-w-0">
                               {row.contract_code_display}
                             </div>
-                            {row.chat_status && (
-                              <Badge size="xs" color={chatStatusBadgeColor(row.chat_status)}>
-                                {t(`chat.status.${row.chat_status}`)}
-                              </Badge>
-                            )}
+                            <div className="flex items-center gap-1 shrink-0">
+                              {/* Contract-state badge — only when not ACTIVE, so the
+                                  339 normal rooms stay uncluttered (BE §3). */}
+                              {row.contract_state && row.contract_state !== 'ACTIVE' && (
+                                <Badge size="xs" color={contractStateBadgeColor(row.contract_state)}>
+                                  {contractStateLabel(row.contract_state, t)}
+                                </Badge>
+                              )}
+                              {row.chat_status && (
+                                <Badge size="xs" color={chatStatusBadgeColor(row.chat_status)}>
+                                  {t(`chat.status.${row.chat_status}`)}
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                           <div className="text-xs text-subtle truncate mt-0.5">
                             {isImage ? (

@@ -7,6 +7,7 @@ import {
 } from 'tsp-form';
 import {
   ChevronRight, CheckCircle, ExternalLink, FileText, Image as ImageIcon, Send, Smile, XCircle,
+  AlertTriangle,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { wsClient } from '../../lib/api/ws';
@@ -27,6 +28,7 @@ import type { ChatInboxRow, ChatMessage } from './chatTypes';
 import {
   ChatStatusBadge, ChatStatusSetterLine, ChatThreadActionsMenu, ChatPinnedNoteRow,
 } from './ChatStatusHeader';
+import { contractStateBadgeColor, contractStateLabel, lesseeRoleLabel } from './chatStatus';
 import { EmojiPicker } from './EmojiPicker';
 import { pushRecentEmoji } from './emojiData';
 
@@ -322,9 +324,10 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
       {!hideDesktopHeader && (
         <div className="flex-none hidden md:flex items-start justify-between gap-3 px-4 py-3 border-b border-line">
           <div className="min-w-0 flex-1 flex flex-col gap-1">
-            <div className="flex items-center gap-2 min-w-0">
+            <div className="flex items-center gap-2 min-w-0 flex-wrap">
               <span className="text-sm font-medium truncate">{title}</span>
               {inboxRow && <ChatStatusBadge row={inboxRow} />}
+              {inboxRow && <ContractStateBadge row={inboxRow} />}
             </div>
             {inboxRow && <ChatStatusSetterLine row={inboxRow} lang={i18n.language} />}
             {inboxRow && (
@@ -340,6 +343,7 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
                 <span>{t('chat.messageCount', { count: inboxRow.total_messages })}</span>
               </div>
             )}
+            {inboxRow && <ChatCustomerRoster row={inboxRow} />}
           </div>
           {inboxRow && (
             <ChatThreadActionsMenu contractId={contractId} inboxRow={inboxRow} />
@@ -354,9 +358,10 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
         <div className="md:hidden absolute top-0 left-0 right-0 z-10 bg-bg border-b border-line shadow-sm animate-fade-in">
           <div className="px-4 py-3 flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1 flex flex-col gap-1">
-              <div className="flex items-center gap-2 min-w-0">
+              <div className="flex items-center gap-2 min-w-0 flex-wrap">
                 <span className="text-sm font-medium truncate">{inboxRow.customer_name ?? t('chat.title')}</span>
                 <ChatStatusBadge row={inboxRow} />
+                <ContractStateBadge row={inboxRow} />
               </div>
               <ChatStatusSetterLine row={inboxRow} lang={i18n.language} />
               <div className="text-xs text-subtle flex items-center gap-2">
@@ -370,6 +375,7 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
                 <span>·</span>
                 <span>{t('chat.messageCount', { count: inboxRow.total_messages })}</span>
               </div>
+              <ChatCustomerRoster row={inboxRow} />
             </div>
             <ChatThreadActionsMenu contractId={contractId} inboxRow={inboxRow} />
           </div>
@@ -380,6 +386,18 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
           ... menu for edit / clear. */}
       {inboxRow && (
         <ChatPinnedNoteRow contractId={contractId} inboxRow={inboxRow} lang={i18n.language} />
+      )}
+
+      {/* Payment-blocked warning — driven by contract_can_receive_payment,
+          never derived from state code (BE §3). Staff must not tell the
+          customer to transfer money on a contract that can't receive it. */}
+      {inboxRow?.contract_can_receive_payment === false && (
+        <div className="flex-none px-3 py-2 border-b border-line">
+          <div className="alert alert-danger">
+            <AlertTriangle size={16} />
+            <span>{t('chat.cannotReceivePayment')}</span>
+          </div>
+        </div>
       )}
 
       {/* Scrollable timeline (chat + slips merged) */}
@@ -574,10 +592,19 @@ function TimelineRow({ item, showSender, currentUserId, lang, onOpenImage, onOpe
   const timeNode = (
     <span className="text-[10px] text-subtle/60 tabular-nums shrink-0 self-end pb-1">{clock}</span>
   );
+  // Co-lessee tag beside the sender name (mig 843). Only for CO_LESSEE
+  // customers — STAFF sender_role is null, PRIMARY is the default and skipped
+  // to avoid clutter. Unknown roles fall back to the raw code.
+  const showCoLesseeTag = !isStaff && m.sender_role === 'CO_LESSEE';
   return (
     <div className={`flex flex-col ${align} ${showSender && senderLabel ? 'gap-1 mt-1' : 'gap-0.5 -mt-2'}`}>
       {showSender && senderLabel && (
-        <div className="text-[11px] text-subtle px-1">{senderLabel}</div>
+        <div className="text-[11px] text-subtle px-1 flex items-center gap-1">
+          <span>{senderLabel}</span>
+          {showCoLesseeTag && (
+            <Badge size="xs" color="info">{lesseeRoleLabel(m.sender_role, t)}</Badge>
+          )}
+        </div>
       )}
       <div className={`flex items-end gap-1.5 max-w-[80%] ${isStaff ? 'flex-row' : 'flex-row-reverse'}`}>
         {timeNode}
@@ -750,6 +777,40 @@ function ImageWithSkeleton({ src, alt }: { src: string; alt: string }) {
   );
 }
 
+
+// Contract-state badge — shown only when the state is not ACTIVE (an active
+// contract is the norm and needs no badge). Tolerates unknown codes.
+function ContractStateBadge({ row }: { row: ChatInboxRow }) {
+  const { t } = useTranslation();
+  const state = row.contract_state;
+  if (!state || state === 'ACTIVE') return null;
+  return (
+    <Badge size="xs" color={contractStateBadgeColor(state)}>
+      {contractStateLabel(state, t)}
+    </Badge>
+  );
+}
+
+// Roster of every lessee on the contract (PRIMARY first, from the view).
+// Lets staff see who can speak in the room before reading a message.
+function ChatCustomerRoster({ row }: { row: ChatInboxRow }) {
+  const { t } = useTranslation();
+  const people = row.customers ?? [];
+  // With 0–1 customers there's nothing the header doesn't already say.
+  if (people.length <= 1) return null;
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap text-[11px] text-subtle">
+      {people.map(c => (
+        <span key={c.customer_id} className="inline-flex items-center gap-1">
+          <span className="truncate max-w-[10rem]">{c.name ?? '—'}</span>
+          <Badge size="xs" color={c.role === 'PRIMARY' ? 'default' : 'info'}>
+            {lesseeRoleLabel(c.role, t)}
+          </Badge>
+        </span>
+      ))}
+    </div>
+  );
+}
 
 function translateApiError(err: unknown, t: (k: string, opts?: Record<string, unknown>) => string): string {
   if (err instanceof ApiError) {

@@ -157,6 +157,99 @@ export interface ResultRef {
   sort_order: number;
 }
 
+// ── Transfer (การโอนสัญญา) ────────────────────────────────────────────────────
+// Owner-to-peer contract handoff within a branch. Owner changes only on ACCEPT.
+// Doc §10. Both boxes share a base shape; inbox adds summary_edited_before_offer.
+
+/** A valid transfer recipient — fn_trade_targets() (mig 828). Same branch,
+ *  active BRANCH_COLLECTOR, excludes self. Matches what trade_offer accepts. */
+export interface TradeTarget {
+  user_id: number;
+  username: string;
+  full_name: string | null;
+  is_active: boolean;
+}
+
+/** Shared columns of v_trade_inbox / v_trade_outbox. */
+export interface TradeRow {
+  trade_id: number;
+  contract_id: number;
+  contract_code_display: string;
+  customer_name: string | null;
+  branch_id: number;
+  /** The other party — recipient on outbox, sender on inbox. */
+  counterparty_user_id: number;
+  counterparty_username: string | null;
+  note: string | null;
+  offered_at: string;
+  /** Info only — offers never expire, no countdown (§10.5). */
+  pending_days: number;
+  outstanding: number;
+  overdue_amount: number;
+  overdue_count: number;
+  overdue_days: number;
+  first_overdue_due_date: string | null;
+  auto_flag_level: FlagLevel;
+  manual_flag_level: FlagLevel;
+  flag_divergent: boolean;
+  summary: string | null;
+  summary_at: string | null;
+  summary_by: number | null;
+  dunning_skip_reason: DunningSkipReason | null;
+  is_paused: boolean;
+}
+
+/** Inbox rows add whether the summary was edited within 24h of the offer. */
+export interface TradeInboxRow extends TradeRow {
+  summary_edited_before_offer: boolean;
+}
+
+export interface TradeOfferResult {
+  status: 'OFFERED' | string;
+  trade_id: number;
+  contract_id: number;
+  contract_code_display: string;
+  to_user_id: number;
+  to_username: string | null;
+  offered_at: string;
+  outbox_count: number;
+}
+
+export interface TradeRespondResult {
+  status: 'ACCEPTED' | 'REJECTED' | string;
+  trade_id: number;
+  contract_id: number;
+  inbox_count: number;
+}
+
+export interface TradeCancelResult {
+  status: 'CANCELLED' | string;
+  trade_id: number;
+  contract_id: number;
+  outbox_count: number;
+}
+
+export const tradeTargets = () =>
+  apiClient.rpc<TradeTarget[]>('fn_trade_targets', {});
+
+export const tradeOffer = (contractId: number, toUserId: number, note: string | null) =>
+  apiClient.rpc<TradeOfferResult>('ops_contract_trade_offer', {
+    p_contract_id: contractId,
+    p_to_user_id: toUserId,
+    p_note: note,
+  });
+
+export const tradeRespond = (tradeId: number, accept: boolean) =>
+  apiClient.rpc<TradeRespondResult>('ops_contract_trade_respond', {
+    p_trade_id: tradeId,
+    p_accept: accept,
+  });
+
+export const tradeCancel = (tradeId: number) =>
+  apiClient.rpc<TradeCancelResult>('ops_contract_trade_cancel', {
+    p_trade_id: tradeId,
+  });
+
 // RPC response shapes (data already unwrapped by apiClient.rpc).
 export interface FocusResult {
   on_focus: boolean;
@@ -198,6 +291,9 @@ export const ccKeys = {
   flagLevels: ['cc', 'ref', 'flag-levels'] as const,
   eventTypes: ['cc', 'ref', 'event-types'] as const,
   callResults: ['cc', 'ref', 'call-results'] as const,
+  tradeInbox: ['cc', 'trade', 'inbox'] as const,
+  tradeOutbox: ['cc', 'trade', 'outbox'] as const,
+  tradeTargets: ['cc', 'trade', 'targets'] as const,
 };
 
 // ── RPC wrappers ─────────────────────────────────────────────────────────────

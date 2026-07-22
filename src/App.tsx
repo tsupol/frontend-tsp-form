@@ -45,6 +45,7 @@ import { LegalCasesPage } from './pages/legal/LegalCasesPage';
 import { StaffCommissionPage } from './pages/commission/StaffCommissionPage';
 import { ApprovalsPage } from './pages/approvals/ApprovalsPage';
 import { ChatPage } from './pages/chat/ChatPage';
+import { NnfAppPage } from './pages/nnf-app/NnfAppPage';
 import { PaymentSubmissionsPage } from './pages/PaymentSubmissionsPage';
 import { ContractsLayout } from './pages/contracts/ContractsLayout';
 import { ContractSearchPage } from './pages/contracts/ContractSearchPage';
@@ -775,6 +776,18 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <ChatPage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* NNF App — customer app-access console */}
+      <Route
+        path="/admin/nnf-app"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <NnfAppPage />
             </AdminLayout>
           </ProtectedRoute>
         }

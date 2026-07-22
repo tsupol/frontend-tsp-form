@@ -5,6 +5,43 @@ import type { ChatStatus, ChatInboxRow } from './chatTypes';
 
 type BadgeColor = 'default' | 'primary' | 'secondary' | 'success' | 'danger' | 'warning' | 'info';
 
+// Contract-state badge color (mig 839). Tolerates unknown codes → neutral.
+// ACTIVE is deliberately not shown in the list (would clutter 339 normal rooms);
+// callers guard on `state !== 'ACTIVE'` before rendering.
+export function contractStateBadgeColor(state: string | null | undefined): BadgeColor {
+  switch (state) {
+    case 'ACTIVE':      return 'success';
+    case 'COMPLETED':   return 'info';
+    case 'TERMINATED':
+    case 'VOIDED':      return 'danger';
+    default:            return 'default';
+  }
+}
+
+// Label for a contract-state code. Known codes come from i18n; unknown codes
+// fall back to the raw code (DB may add states without waiting on the UI).
+export function contractStateLabel(
+  state: string | null | undefined,
+  t: (key: string, opts?: Record<string, unknown>) => string,
+): string {
+  if (!state) return '';
+  const known = ['ACTIVE', 'COMPLETED', 'TERMINATED', 'VOIDED'];
+  return known.includes(state)
+    ? t(`chat.contractState.${state}`)
+    : state;
+}
+
+// Lessee role label (PRIMARY / CO_LESSEE, mig 843). Unknown → raw code.
+export function lesseeRoleLabel(
+  role: string | null | undefined,
+  t: (key: string, opts?: Record<string, unknown>) => string,
+): string {
+  if (!role) return '';
+  return role === 'PRIMARY' || role === 'CO_LESSEE'
+    ? t(`lesseeRole.${role}`)
+    : role;
+}
+
 export function chatStatusBadgeColor(status: ChatStatus | null | undefined): BadgeColor {
   switch (status) {
     case 'WAITING_REPLY':   return 'danger';

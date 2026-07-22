@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, Modal, Input, FormErrorMessage, useSnackbarContext } from 'tsp-form';
-import { Smartphone, ExternalLink, Wrench, ArrowDownToLine, ArrowUpFromLine, Link2, Link2Off, Cloud, CloudOff, CheckCircle, Pencil, XCircle, Loader2, Archive } from 'lucide-react';
+import { Smartphone, ExternalLink, Wrench, ArrowDownToLine, ArrowUpFromLine, Link2, Link2Off, Cloud, CloudOff, CheckCircle, Pencil, XCircle, Loader2, Archive, Undo2 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import { BranchPinInput } from '../../components/BranchPinInput';
 import { DateTime } from '../../components/DateTime';
 import { getBucketLabel, getBucketColor, codeDisplay } from '../inventory/inventoryUtils';
 import { AssignIcloudModal, ReleaseIcloudModal, IcloudPasswordRow } from './IcloudModals';
@@ -77,8 +78,8 @@ type DeviceAction =
   | 'unbind_device'
   | 'deposit_device'
   | 'return_deposit'
-  | 'bind_loaner'
-  | 'unbind_loaner'
+  | 'loan_assign'
+  | 'loan_return'
   | 'device_repair_request';
 
 interface DeviceTabProps {
@@ -154,6 +155,20 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
   });
   const canDo = (code: string): boolean =>
     actionsResp?.actions?.find(a => a.action_code === code)?.is_available ?? false;
+
+  // Undo-unbind readiness — separate from the action engine (UNBIND_UNDO isn't
+  // an available_action). Only meaningful once the primary device is gone, so
+  // fetch only then. `allowed` gates the button; the RPC still re-checks + needs
+  // PIN. See fn_contract_check_unbind_undo / fn_contract_unbind_undo (mig 748).
+  const [undoUnbindOpen, setUndoUnbindOpen] = useState(false);
+  const { data: undoCheck } = useQuery({
+    queryKey: ['contract-unbind-undo-check', contract.id],
+    queryFn: () => apiClient.rpc<{ allowed: boolean; reason: string | null; device_id: string | null; unbound_at: string | null }>(
+      'fn_contract_check_unbind_undo', { p_contract_id: contract.id },
+    ),
+    enabled: contract.device_id == null,
+    staleTime: 30 * 1000,
+  });
 
   const hasPrimary = contract.device_id != null;
   const hasLoaner = contract.loaner_device_id != null;
@@ -396,20 +411,35 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
               )}
             </div>
           ) : (
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="text-sm text-subtle">{t('contract.device_noPrimary')}</div>
-              {/* Binding does not require ACTIVE — fn_contract_bind_device only
-                  checks permission + that no device is bound, so allow binding
-                  the primary device before signing/activation too. (The inv
-                  issue-to-customer txn still only fires once ACTIVE.) */}
-              <Button
-                size="sm"
-                color="primary"
-                startIcon={<Link2 size={14} />}
-                onClick={() => onRequestAction('bind_device')}
-              >
-                {t('contract.action_bind_device')}
-              </Button>
+              <div className="flex items-center gap-2">
+                {/* Undo an accidental unbind — brings the just-removed device back
+                    through the real inventory path. Only offered while the undo
+                    window is open (backend readiness check). PIN required. */}
+                {undoCheck?.allowed && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    startIcon={<Undo2 size={14} />}
+                    onClick={() => setUndoUnbindOpen(true)}
+                  >
+                    {t('contract.action_unbind_undo')}
+                  </Button>
+                )}
+                {/* Binding does not require ACTIVE — fn_contract_bind_device only
+                    checks permission + that no device is bound, so allow binding
+                    the primary device before signing/activation too. (The inv
+                    issue-to-customer txn still only fires once ACTIVE.) */}
+                <Button
+                  size="sm"
+                  color="primary"
+                  startIcon={<Link2 size={14} />}
+                  onClick={() => onRequestAction('bind_device')}
+                >
+                  {t('contract.action_bind_device')}
+                </Button>
+              </div>
             </div>
           )}
         </div>
@@ -479,16 +509,15 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
                 )}
               </div>
 
-              {canDo('UNBIND_LOANER') && (
+              {canDo('LOAN_RETURN') && (
                 <div className="flex flex-wrap gap-2 pt-2 border-t border-line mt-2">
                   <Button
                     size="sm"
                     variant="outline"
-                    color="danger"
                     startIcon={<Link2Off size={14} />}
-                    onClick={() => onRequestAction('unbind_loaner')}
+                    onClick={() => onRequestAction('loan_return')}
                   >
-                    {t('contract.action_unbind_loaner')}
+                    {t('loaner.action_return')}
                   </Button>
                 </div>
               )}
@@ -496,20 +525,20 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
           ) : (
             <div className="flex items-center justify-between gap-3">
               <div className="text-sm text-subtle">{t('contract.device_noLoaner')}</div>
-              {canDo('BIND_LOANER') && (
+              {canDo('LOAN_ASSIGN') && (
                 <Button
                   size="sm"
                   variant="outline"
                   startIcon={<Link2 size={14} />}
-                  onClick={() => onRequestAction('bind_loaner')}
+                  onClick={() => onRequestAction('loan_assign')}
                 >
-                  {t('contract.action_bind_loaner')}
+                  {t('loaner.action_assign')}
                 </Button>
               )}
             </div>
           )}
 
-          {!hasLoaner && primaryWithCustomer && !canDo('BIND_LOANER') && (
+          {!hasLoaner && primaryWithCustomer && !canDo('LOAN_ASSIGN') && (
             <div className="text-xs text-subtle mt-2">
               {t('contract.device_loanerHint')}
             </div>
@@ -627,7 +656,106 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
           />
         </>
       )}
+
+      <UndoUnbindModal
+        open={undoUnbindOpen}
+        contractId={contract.id}
+        unboundAt={undoCheck?.unbound_at ?? null}
+        onClose={() => setUndoUnbindOpen(false)}
+        onSuccess={() => {
+          setUndoUnbindOpen(false);
+          queryClient.invalidateQueries({ queryKey: ['contract-detail', contract.id] });
+          queryClient.invalidateQueries({ queryKey: ['contract-unbind-undo-check', contract.id] });
+          queryClient.invalidateQueries({ queryKey: ['contract-actions', contract.id] });
+          addSnackbar({
+            message: (
+              <div className="alert alert-success">
+                <CheckCircle size={16} />
+                <span>{t('contract.unbindUndoSuccess')}</span>
+              </div>
+            ),
+            type: 'success',
+          });
+        }}
+      />
     </div>
+  );
+}
+
+// ── Undo-unbind modal — reverse an accidental device removal (PIN) ────────────
+
+function UndoUnbindModal({ open, contractId, unboundAt, onClose, onSuccess }: {
+  open: boolean;
+  contractId: number;
+  unboundAt: string | null;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const { t } = useTranslation();
+  const [pin, setPin] = useState('');
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (open) { setPin(''); setReason(''); setError(''); setSubmitting(false); }
+  }, [open]);
+
+  const handleConfirm = async () => {
+    setSubmitting(true); setError('');
+    try {
+      await apiClient.rpc('fn_contract_unbind_undo', {
+        p_contract_id: contractId,
+        p_reason: reason.trim() || null,
+        p_pin: pin,
+      });
+      onSuccess();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setError(tr || err.code || err.message);
+      } else setError(err instanceof Error ? err.message : String(err));
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
+      <div className="modal-header">
+        <h2 className="modal-title">{t('contract.unbindUndoTitle')}</h2>
+        <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+      </div>
+      <div className="modal-content">
+        {error && (
+          <div className="alert alert-danger mb-3"><XCircle size={16} /><span>{error}</span></div>
+        )}
+        <p className="text-sm text-subtle mb-3">
+          {t('contract.unbindUndoHint')}
+          {unboundAt && (
+            <> (<DateTime value={unboundAt} />)</>
+          )}
+        </p>
+        <div className="form-grid">
+          <div className="flex flex-col">
+            <label className="form-label">{t('contract.reason')}</label>
+            <Input value={reason} onChange={e => setReason(e.target.value)} className="w-full" />
+          </div>
+          <BranchPinInput value={pin} onChange={setPin} required />
+        </div>
+      </div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
+        <Button
+          color="primary"
+          onClick={handleConfirm}
+          disabled={submitting || pin.length !== 6}
+          startIcon={submitting ? <Loader2 size={14} className="animate-spin" /> : <Undo2 size={14} />}
+        >
+          {t('contract.unbindUndoConfirm')}
+        </Button>
+      </div>
+    </Modal>
   );
 }
 
