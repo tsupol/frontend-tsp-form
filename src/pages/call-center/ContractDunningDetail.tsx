@@ -8,7 +8,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, Select, TextArea, useSnackbarContext } from 'tsp-form';
 import {
   ChevronLeft, ChevronRight, Phone, Pencil, CheckCircle, XCircle,
-  Smartphone, Users, ExternalLink, Save,
+  Smartphone, Users, ExternalLink, Save, Clock,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
@@ -163,7 +163,11 @@ function SummaryBlock({ row }: { row: BookRow }) {
         </button>
       )}
       {row.summary_at && !editing && (
-        <div className="text-[11px] text-subtler mt-1"><DateTime value={row.summary_at} /></div>
+        <div className="text-xs text-subtle mt-1.5 flex items-center gap-1">
+          <Clock size={11} className="shrink-0" />
+          <span>{t('callCenter.summaryUpdated')}</span>
+          <DateTime value={row.summary_at} />
+        </div>
       )}
     </div>
   );
@@ -221,44 +225,51 @@ function LogActivity({ row }: { row: BookRow }) {
   const canSave = !!action && (!needsResult || !!result) && !saving;
 
   return (
-    <div className="border border-line rounded-md p-3 flex flex-col gap-2.5">
-      <div className="text-sm font-medium">{t('callCenter.logAction')}</div>
-      <div className="flex flex-wrap gap-2">
-        <div style={{ width: '12rem' }}>
-          <Select
-            options={actionOptions}
-            value={action || null}
-            onChange={(v) => setAction((v as string) ?? 'CALL')}
-            placeholder={t('callCenter.selectAction')}
-            size="sm"
-          />
-        </div>
-        {needsResult && (
-          <div style={{ width: '14rem' }}>
+    <section className="border-t border-line pt-4 flex flex-col gap-3">
+      <h3 className="text-sm font-medium">{t('callCenter.logAction')}</h3>
+      <div className="flex flex-col gap-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="form-label">{t('callCenter.actionLabel')}</label>
             <Select
-              options={resultOptions}
-              value={result || null}
-              onChange={(v) => setResult((v as string) ?? '')}
-              placeholder={t('callCenter.selectResult')}
+              options={actionOptions}
+              value={action || null}
+              onChange={(v) => setAction((v as string) ?? 'CALL')}
+              placeholder={t('callCenter.selectAction')}
               size="sm"
             />
           </div>
-        )}
+          {needsResult && (
+            <div className="flex flex-col gap-1">
+              <label className="form-label">{t('callCenter.resultLabel')}</label>
+              <Select
+                options={resultOptions}
+                value={result || null}
+                onChange={(v) => setResult((v as string) ?? '')}
+                placeholder={t('callCenter.selectResult')}
+                size="sm"
+              />
+            </div>
+          )}
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="form-label">{t('callCenter.noteLabel')}</label>
+          <TextArea
+            className="w-full"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder={t('callCenter.notePlaceholder')}
+            rows={2}
+          />
+        </div>
+        {error && <div className="alert alert-danger"><XCircle size={16} /><span>{error}</span></div>}
+        <div className="flex justify-end">
+          <Button color="primary" size="sm" disabled={!canSave} onClick={save} startIcon={<Phone size={14} />}>
+            {saving ? t('callCenter.logging') : t('callCenter.logButton')}
+          </Button>
+        </div>
       </div>
-      <TextArea
-        className="w-full"
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-        placeholder={t('callCenter.notePlaceholder')}
-        rows={2}
-      />
-      {error && <div className="alert alert-danger"><XCircle size={16} /><span>{error}</span></div>}
-      <div>
-        <Button color="primary" size="sm" disabled={!canSave} onClick={save} startIcon={<Phone size={14} />}>
-          {saving ? t('callCenter.logging') : t('callCenter.logButton')}
-        </Button>
-      </div>
-    </div>
+    </section>
   );
 }
 

@@ -211,7 +211,7 @@ export function CallCenterPage() {
               {/* Search + sort + red filter — book/focus only; Transfer has its
                   own sub-tab strip and no sort. */}
               {view !== 'transfer' && (
-              <div className="px-4 py-2 flex flex-col gap-2">
+              <div className="px-4 py-2 flex flex-col gap-2 border-b border-line">
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="flex-[2] min-w-0 basis-40">
                     <Input className="w-full" placeholder={t('callCenter.search')} value={searchInput} onChange={(e) => handleSearch(e.target.value)} size="sm" />
@@ -266,25 +266,17 @@ export function CallCenterPage() {
                     const c = row.original;
                     return (
                       <div
-                        className="px-4 py-2.5 transition-colors cursor-pointer"
+                        className="px-4 py-3 transition-colors cursor-pointer flex flex-col gap-1.5"
                         onClick={() => { selectContract(c.contract_id); if (isMobile) goTo('detail'); }}
                       >
+                        {/* Row 1 — contract code + due status badge, focus star pinned right */}
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-sm truncate">{c.contract_code_display}</span>
-                          <span className="text-xs text-subtle truncate">{c.customer_name}</span>
-                          {c.overdue_amount > 0 && (
-                            <span className="ml-auto shrink-0 text-sm font-medium">฿{fmtCurrency(c.overdue_amount)}</span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                           {c.is_overdue ? (
                             <Badge size="sm" color={overdueColor(c.overdue_days)}>{t('callCenter.overdueDays', { n: c.overdue_days })}</Badge>
                           ) : c.next_due_date && (
                             <Badge size="sm" color="default"><DateTime value={c.next_due_date} showTime={false} /></Badge>
                           )}
-                          <SkipReasonBadge reason={c.dunning_skip_reason} />
-                          {c.has_loaner && <Badge size="sm" color="info">{t('callCenter.hasLoaner')}</Badge>}
-                          <FlagPair auto={c.auto_flag_level} manual={c.manual_flag_level} divergent={c.flag_divergent} levels={flagLevels} />
                           <button
                             type="button"
                             className="group ml-auto shrink-0 flex items-center justify-center w-6 h-6 rounded bg-transparent border-none cursor-pointer text-subtle hover:text-primary-fg hover:bg-surface-hover"
@@ -301,6 +293,23 @@ export function CallCenterPage() {
                               <Star size={15} />
                             )}
                           </button>
+                        </div>
+
+                        {/* Row 2 — customer name + fact badges, overdue amount pinned right */}
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                            <span className="text-xs text-subtle truncate min-w-0">{c.customer_name}</span>
+                            <SkipReasonBadge reason={c.dunning_skip_reason} />
+                            {c.has_loaner && <Badge size="sm" color="info">{t('callCenter.hasLoaner')}</Badge>}
+                          </div>
+                          {c.overdue_amount > 0 && (
+                            <span className="ml-auto shrink-0 text-sm font-medium tabular-nums">฿{fmtCurrency(c.overdue_amount)}</span>
+                          )}
+                        </div>
+
+                        {/* Row 3 — flags (auto / manual) */}
+                        <div className="flex items-center">
+                          <FlagPair auto={c.auto_flag_level} manual={c.manual_flag_level} divergent={c.flag_divergent} levels={flagLevels} compact />
                         </div>
                       </div>
                     );
