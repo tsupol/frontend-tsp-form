@@ -2373,6 +2373,7 @@
     "type_DEAL_PARTNER": "Deal Partner",
     "type_BUYBACK": "รับซื้อ",
     "type_ASSET_SELL_OUT": "ขายออก",
+    "type_PO": "ใบสั่งซื้อ",
     "sellOut": {
       "proposedPrice": "ราคาเสนอ",
       "cost": "ทุน",

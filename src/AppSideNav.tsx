@@ -189,7 +189,7 @@ export const AppSideNav = () => {
     unreadChatCount,
     callCenterMineCount,
     unassignedNoCollectorCount,
-    legalCasesQueuedCount,
+    legalWaitCount,
     unreadNotifCount,
   } = useNavCounts();
 
@@ -292,9 +292,6 @@ export const AppSideNav = () => {
         { type: 'group', key: 'grp-collections-daily', label: t('nav.groupCollectionsDaily') },
         { key: 'overdue-worklist', icon: <CalendarDays size="1rem" />, label: t('nav.overdueWorklist'), path: '/admin/collections/worklist' },
         { key: 'collections-calls', ...iconWithCount(<Headset size="1rem" />, callCenterMineCount), label: t('nav.callCenter'), path: '/admin/collections/calls' },
-        ...(['COMPANY_REPO', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
-          { key: 'collections-cases', ...iconWithCount(<Scale size="1rem" />, legalCasesQueuedCount), label: t('nav.legalCases'), path: '/admin/collections/cases' },
-        ] : []),
         ...((can('OPS.ASSIGN.MANAGE') || can('OPS.ASSIGN.OVERSEE')) ? [
           { type: 'group' as const, key: 'grp-collections-manage', label: t('nav.groupCollectionsManage') },
           ...(can('OPS.ASSIGN.OVERSEE') ? [
@@ -316,7 +313,7 @@ export const AppSideNav = () => {
     ...(isRepoRole
       ? [{
           key: 'repo',
-          icon: <Gavel size="1rem" />,
+          ...iconWithCount(<Gavel size="1rem" />, legalWaitCount),
           label: t('nav.repoLegal'),
           path: '/admin/repo/pool',
           children: [

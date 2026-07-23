@@ -41,7 +41,6 @@ import { BuybackWizardPage } from './pages/inventory/BuybackWizardPage';
 import { BarcodesPage } from './pages/inventory/BarcodesPage';
 import { PriceCheckPage } from './pages/PriceCheckPage';
 import { DunningTargetsPage } from './pages/legal/DunningTargetsPage';
-import { LegalCasesPage } from './pages/legal/LegalCasesPage';
 import { StaffCommissionPage } from './pages/commission/StaffCommissionPage';
 import { ApprovalsPage } from './pages/approvals/ApprovalsPage';
 import { ChatPage } from './pages/chat/ChatPage';
@@ -793,9 +792,11 @@ function App() {
         }
       />
 
-      {/* Legal (legacy paths — redirect to Collections section) */}
+      {/* Legal (legacy paths — the old legal-case model was dropped BE-side
+          (migs 845/846); legal work now lives in the Repo/Legal section) */}
       <Route path="/admin/legal/dunning" element={<Navigate to="/admin/collections/worklist" replace />} />
-      <Route path="/admin/legal/cases/:caseId?" element={<Navigate to="/admin/collections/cases" replace />} />
+      <Route path="/admin/legal/cases/:caseId?" element={<Navigate to="/admin/repo/pool" replace />} />
+      <Route path="/admin/collections/cases/:caseId?" element={<Navigate to="/admin/repo/pool" replace />} />
 
       {/* Collections — unified section (worklist / calls / cases / timeline / config) */}
       <Route
@@ -844,16 +845,6 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <CollectionsLayout><UnassignedContractsPage /></CollectionsLayout>
-            </AdminLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin/collections/cases/:caseId?"
-        element={
-          <ProtectedRoute>
-            <AdminLayout>
-              <CollectionsLayout><LegalCasesPage /></CollectionsLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

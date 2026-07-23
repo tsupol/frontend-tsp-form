@@ -19,7 +19,7 @@ import { fmtCurrency } from '../../lib/format';
  * TOC projection: list/headline fields only. Detail is fetched per-type.
  * ─────────────────────────────────────────────────────────────────────────── */
 
-type ApprovalType = 'NEGOTIATION' | 'BILL_LINE_DISCOUNT' | 'DEAL_PARTNER' | 'BUYBACK' | 'ASSET_SELL_OUT';
+type ApprovalType = 'NEGOTIATION' | 'BILL_LINE_DISCOUNT' | 'DEAL_PARTNER' | 'BUYBACK' | 'ASSET_SELL_OUT' | 'PO';
 type ApprovalStatus =
   | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'
   | 'EXPIRED' | 'INVALIDATED' | 'COMPLETED';
@@ -67,13 +67,14 @@ const statusColor = (status: ApprovalStatus): 'warning' | 'success' | 'danger' |
   }
 };
 
-const typeColor = (type: ApprovalType): 'info' | 'primary' | 'secondary' | 'warning' | 'success' => {
+const typeColor = (type: ApprovalType): 'info' | 'primary' | 'secondary' | 'warning' | 'success' | 'default' => {
   switch (type) {
     case 'NEGOTIATION': return 'info';
     case 'BILL_LINE_DISCOUNT': return 'warning';
     case 'DEAL_PARTNER': return 'primary';
     case 'BUYBACK': return 'secondary';
     case 'ASSET_SELL_OUT': return 'success';
+    case 'PO': return 'default';
   }
 };
 
@@ -148,6 +149,7 @@ export function ApprovalsPage() {
     { value: 'DEAL_PARTNER', label: t('approvals.type_DEAL_PARTNER') },
     { value: 'BUYBACK', label: t('approvals.type_BUYBACK') },
     { value: 'ASSET_SELL_OUT', label: t('approvals.type_ASSET_SELL_OUT') },
+    { value: 'PO', label: t('approvals.type_PO') },
   ];
 
   return (
@@ -428,6 +430,13 @@ function SimpleApprovalPanel({
         const params: Record<string, unknown> = { p_request_id: row.id };
         if (action === 'reject') params.p_reason = trimmed || null;
         else params.p_note = trimmed || null;
+        return { rpc, params };
+      }
+      case 'PO': {
+        // fn_po_approve → (p_po_id); fn_po_reject → (p_po_id, p_reason).
+        const rpc = action === 'approve' ? 'fn_po_approve' : 'fn_po_reject';
+        const params: Record<string, unknown> = { p_po_id: row.id };
+        if (action === 'reject') params.p_reason = trimmed || null;
         return { rpc, params };
       }
       case 'BUYBACK':

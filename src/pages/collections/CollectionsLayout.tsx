@@ -1,17 +1,16 @@
 // Shared sub-nav for the Collections section (Worklist / Call Center /
-// Legal Cases / Timeline / Dunning Config). Mirrors the CompanyLayout pattern
-// for grouped sidebar items.
+// Timeline / Dunning Config). Mirrors the CompanyLayout pattern for grouped
+// sidebar items. (Legal cases moved to the Repo/Legal section — /admin/repo.)
 
 import { useMemo, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { CalendarDays, Headset, Scale, Calendar as CalendarIcon, Settings, LayoutDashboard, Users, UserX } from 'lucide-react';
+import { CalendarDays, Headset, Calendar as CalendarIcon, Settings, LayoutDashboard, Users, UserX } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavCounts } from '../../hooks/useNavCounts';
 
 const ADMIN_ROLES = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'];
-const LEGAL_ROLES = ['COMPANY_REPO', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'];
 
 type NavItem =
   | { type: 'link'; path: string; labelKey: string; icon: typeof CalendarDays; count?: number }
@@ -24,16 +23,14 @@ export function CollectionsLayout({ children }: { children: ReactNode }) {
   const { user, can } = useAuth();
   const role = user?.role_code ?? '';
   const isAdmin = ADMIN_ROLES.includes(role);
-  const canLegal = LEGAL_ROLES.includes(role);
   const canManage = can('OPS.ASSIGN.MANAGE');
   const canOversee = can('OPS.ASSIGN.OVERSEE');
-  const { callCenterMineCount, legalCasesQueuedCount, unassignedNoCollectorCount } = useNavCounts();
+  const { callCenterMineCount, unassignedNoCollectorCount } = useNavCounts();
 
   const navItems: NavItem[] = useMemo(() => [
     { type: 'group', labelKey: 'nav.groupCollectionsDaily' },
     { type: 'link', path: '/admin/collections/worklist', labelKey: 'nav.overdueWorklist', icon: CalendarDays },
     { type: 'link', path: '/admin/collections/calls', labelKey: 'nav.callCenter', icon: Headset, count: callCenterMineCount },
-    ...(canLegal ? [{ type: 'link' as const, path: '/admin/collections/cases', labelKey: 'nav.legalCases', icon: Scale, count: legalCasesQueuedCount }] : []),
     ...((canManage || canOversee) ? [
       { type: 'group' as const, labelKey: 'nav.groupCollectionsManage' },
       ...(canOversee ? [{ type: 'link' as const, path: '/admin/collections/branch-overview', labelKey: 'nav.branchOverview', icon: LayoutDashboard }] : []),
@@ -48,7 +45,7 @@ export function CollectionsLayout({ children }: { children: ReactNode }) {
       { type: 'group' as const, labelKey: 'nav.groupCollectionsConfig' },
       { type: 'link' as const, path: '/admin/collections/config', labelKey: 'nav.dunningConfig', icon: Settings },
     ] : []),
-  ], [isAdmin, canLegal, canManage, canOversee, callCenterMineCount, legalCasesQueuedCount, unassignedNoCollectorCount]);
+  ], [isAdmin, canManage, canOversee, callCenterMineCount, unassignedNoCollectorCount]);
 
   return (
     <div className="flex min-h-full">

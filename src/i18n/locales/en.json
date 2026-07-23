@@ -2376,6 +2376,7 @@
     "type_DEAL_PARTNER": "Deal Partner",
     "type_BUYBACK": "Buyback",
     "type_ASSET_SELL_OUT": "Sell out",
+    "type_PO": "Purchase Order",
     "sellOut": {
       "proposedPrice": "Proposed",
       "cost": "Cost",

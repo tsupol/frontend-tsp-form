@@ -170,21 +170,23 @@ export function useNavCounts() {
   });
   const unassignedNoCollectorCount = unassignedNoColData?.totalCount ?? 0;
 
-  // Legal cases: queued (awaiting pickup). Team-managed, not per-user; small
-  // number, drops to zero when triage is done.
-  const isLegalRole = ['COMPANY_REPO', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
-  const { data: legalQueuedData } = useQuery({
-    queryKey: ['nav', 'legal-cases-queued', sk],
-    queryFn: () => apiClient.getPaginated<{ case_code: string }>(
-      `/v_legal_case_list?status=eq.QUEUED&select=case_code`,
+  // Legal queue: contracts handed to the legal team (repo gave up). The whole
+  // WAIT_FOR_LEGAL slice of the repo pool is the worklist; drops to zero when
+  // legal finishes them. v_repo_pool is grant-filtered in the DB, so a user with
+  // no can_legal grant sees zero — correct, not an error.
+  const isRepoRole = ['COMPANY_REPO', 'HOLDING_REPO', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
+  const { data: legalWaitData } = useQuery({
+    queryKey: ['nav', 'repo-legal-wait', sk],
+    queryFn: () => apiClient.getPaginated<{ contract_id: number }>(
+      `/v_repo_pool?dunning_status=eq.WAIT_FOR_LEGAL&select=contract_id`,
       { page: 1, pageSize: 1 },
     ),
-    enabled: isLegalRole,
+    enabled: isRepoRole,
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
     retry: false,
   });
-  const legalCasesQueuedCount = legalQueuedData?.totalCount ?? 0;
+  const legalWaitCount = legalWaitData?.totalCount ?? 0;
 
   // Chat unread — sum unread_count from v_branch_chat_list (RLS-scoped to branch).
   // Gated on the CONTRACT.CHAT capability, not role — any branch role with chat
@@ -228,7 +230,7 @@ export function useNavCounts() {
     unreadChatCount,
     callCenterMineCount,
     unassignedNoCollectorCount,
-    legalCasesQueuedCount,
+    legalWaitCount,
     unreadNotifCount,
   };
 }
