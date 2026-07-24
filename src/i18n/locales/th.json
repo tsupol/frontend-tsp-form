@@ -1700,6 +1700,7 @@
       "imei": "IMEI",
       "grade": "เกรด",
       "battery": "แบต",
+      "externalRef": "เลขอ้างอิง",
       "found": "พบ",
       "assetTotal": "รวมสินทรัพย์"
     },

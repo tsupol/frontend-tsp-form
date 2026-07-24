@@ -30,6 +30,8 @@ export interface StockSheetRow {
   imei?: string | null;
   grade?: string | null;
   battery?: number | null;
+  bucketTh?: string | null;    // bucket_name_th
+  externalRef?: string | null;
 }
 
 export interface StockCountSheetProps {
@@ -97,6 +99,8 @@ export function StockCountSheet({ branchName, tab, printedAt, printedBy, rows }:
               <th className="scs-col-serial">{t('branchStock.countSheet.imei')}</th>
               <th className="scs-col-cond">{t('branchStock.countSheet.grade')}</th>
               <th className="scs-col-batt">{t('branchStock.countSheet.battery')}</th>
+              <th className="scs-col-status">{t('branchStock.countSheet.status')}</th>
+              <th className="scs-col-ref">{t('branchStock.countSheet.externalRef')}</th>
               <th className="scs-col-found">{t('branchStock.countSheet.found')}</th>
               <th className="scs-col-note">{t('branchStock.countSheet.note')}</th>
             </tr>
@@ -111,19 +115,21 @@ export function StockCountSheet({ branchName, tab, printedAt, printedBy, rows }:
                 <td className="scs-col-serial">{r.imei ?? '—'}</td>
                 <td className="scs-col-cond">{r.grade ?? '—'}</td>
                 <td className="scs-col-batt">{r.battery != null ? `${r.battery}%` : '—'}</td>
+                <td className="scs-col-status">{r.bucketTh ?? '—'}</td>
+                <td className="scs-col-ref">{r.externalRef ?? '—'}</td>
                 <td className="scs-col-found" />
                 <td className="scs-col-note" />
               </tr>
             ))}
             {rows.length === 0 && (
               <tr>
-                <td className="scs-empty" colSpan={9}>{t('common.noData')}</td>
+                <td className="scs-empty" colSpan={11}>{t('common.noData')}</td>
               </tr>
             )}
           </tbody>
           <tfoot>
             <tr>
-              <td className="scs-total-label" colSpan={7}>{t('branchStock.countSheet.assetTotal')}</td>
+              <td className="scs-total-label" colSpan={9}>{t('branchStock.countSheet.assetTotal')}</td>
               <td className="scs-col-found scs-total-qty">{fmtNum(rows.length)}</td>
               <td className="scs-col-note" />
             </tr>

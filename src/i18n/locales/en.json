@@ -1703,6 +1703,7 @@
       "imei": "IMEI",
       "grade": "Grade",
       "battery": "Battery",
+      "externalRef": "Ref",
       "found": "Found",
       "assetTotal": "Total assets"
     },

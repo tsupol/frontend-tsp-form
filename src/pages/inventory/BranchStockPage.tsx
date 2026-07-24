@@ -313,6 +313,8 @@ export function BranchStockPage() {
         imei: r.imei,
         grade: getConditionLabel(r.condition_grade, t),
         battery: r.battery_health,
+        bucketTh: r.bucket_name_th,
+        externalRef: r.external_ref,
         systemQty: 1,
       }));
     }
@@ -333,10 +335,12 @@ export function BranchStockPage() {
       rows: buildSheetRows(),
     });
     // A4 @page, injected only for this flow so it doesn't fight the 80mm bill
-    // default. Removed after printing.
+    // default. Removed after printing. The itemized tab has many columns, so it
+    // prints landscape; the aggregate tabs stay portrait.
     const styleEl = document.createElement('style');
     styleEl.id = 'stock-count-print-page';
-    styleEl.textContent = '@media print { @page { size: A4; margin: 12mm; } }';
+    const orientation = tab === 'assetDetail' ? 'A4 landscape' : 'A4';
+    styleEl.textContent = `@media print { @page { size: ${orientation}; margin: 12mm; } }`;
     document.head.appendChild(styleEl);
     requestAnimationFrame(() => requestAnimationFrame(() => {
       try {

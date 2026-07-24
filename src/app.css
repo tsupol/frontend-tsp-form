@@ -506,11 +506,12 @@ input[type="number"
 .stock-count-sheet .scs-col-count { width: 24mm; }
 .stock-count-sheet .scs-col-note { width: 34mm; }
 /* Per-asset (itemized) sheet columns */
-.stock-count-sheet .scs-col-code { width: 24mm; }
-.stock-count-sheet .scs-col-serial { width: 24mm; }
+.stock-count-sheet .scs-col-code { width: 26mm; }
+.stock-count-sheet .scs-col-serial { width: 28mm; }
 .stock-count-sheet .scs-col-batt { width: 12mm; text-align: center; }
 .stock-count-sheet td.scs-col-batt { text-align: center; }
-.stock-count-sheet .scs-col-found { width: 14mm; text-align: center; }
+.stock-count-sheet .scs-col-ref { width: 20mm; }
+.stock-count-sheet .scs-col-found { width: 16mm; text-align: center; }
 .stock-count-sheet td.scs-col-found { text-align: center; }
 .stock-count-sheet tbody td.scs-col-count,
 .stock-count-sheet tbody td.scs-col-note,
