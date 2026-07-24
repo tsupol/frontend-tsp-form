@@ -4,11 +4,11 @@ import { useSearchParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { MobileHeader, Badge, Select, Input, Button, PopOver, MenuItem } from 'tsp-form';
-import { Boxes, ScanBarcode, ArrowRightFromLine, ShoppingCart, Smartphone, MoreHorizontal, PackageMinus, Archive, Printer, FileSpreadsheet } from 'lucide-react';
+import { Boxes, ScanBarcode, ArrowRightFromLine, ShoppingCart, Smartphone, MoreHorizontal, PackageMinus, Archive, Printer, FileSpreadsheet, ListChecks } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
-import { fmtNum } from './inventoryUtils';
+import { fmtNum, getConditionLabel } from './inventoryUtils';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { useBarcodeScanner } from '../../components/BarcodeScanner';
 import { RetailWriteOffModal, type RetailWriteOffTarget } from './RetailWriteOffModal';
@@ -85,12 +85,43 @@ interface UnavailableRow {
   updated_at: string;
 }
 
+// Tab 4 — one row per serialized asset the branch holds (v_branch_asset_detail).
+// For walking a physical count device-by-device: serial/IMEI/grade/battery +
+// cost basis vs live catalog cost.
+interface AssetDetailRow {
+  holding_id: number;
+  company_id: number;
+  branch_id: number;
+  branch_name: string;
+  asset_id: number;
+  asset_code: string;
+  variant_id: number;
+  model_id: number;
+  brand_name: string | null;
+  family_name: string | null;
+  model_name: string;
+  variant_name: string;
+  product_display_name: string;
+  serial_no: string | null;
+  imei: string | null;
+  condition_grade: string;
+  condition: 'NEW' | 'USED';
+  battery_health: number | null;
+  cost_basis: number | null;
+  catalog_cost_price: number | null;
+  external_ref: string | null;
+  current_bucket: string;
+  bucket_name_th: string;
+  bucket_scope: 'AT_BRANCH' | 'AT_REPAIR' | 'IN_TRANSIT';
+  updated_at: string;
+}
+
 interface Branch {
   id: number;
   name: string;
 }
 
-type Tab = 'retail' | 'lease' | 'unavailable';
+type Tab = 'retail' | 'lease' | 'unavailable' | 'assetDetail';
 
 export function BranchStockPage() {
   const { t, i18n } = useTranslation();
@@ -101,7 +132,10 @@ export function BranchStockPage() {
   const defaultBranchId = isBranchUser && user?.branch_id ? user.branch_id : null;
 
   const tabParam = searchParams.get('tab');
-  const initialTab: Tab = tabParam === 'lease' ? 'lease' : tabParam === 'unavailable' ? 'unavailable' : 'retail';
+  const initialTab: Tab = tabParam === 'lease' ? 'lease'
+    : tabParam === 'unavailable' ? 'unavailable'
+      : tabParam === 'assetDetail' ? 'assetDetail'
+        : 'retail';
   const initialBranchId = searchParams.get('branch_id')
     ? Number(searchParams.get('branch_id'))
     : defaultBranchId;
@@ -124,7 +158,7 @@ export function BranchStockPage() {
   // browser back, etc.)
   useEffect(() => {
     const tp = searchParams.get('tab');
-    if (tp === 'lease' || tp === 'retail' || tp === 'unavailable') setTab(tp);
+    if (tp === 'lease' || tp === 'retail' || tp === 'unavailable' || tp === 'assetDetail') setTab(tp);
     const b = searchParams.get('branch_id');
     if (b) setFilterBranchId(Number(b));
   }, [searchParams]);
@@ -190,6 +224,28 @@ export function BranchStockPage() {
     staleTime: 30 * 1000,
   });
 
+  const { data: assetDetailRows, isFetching: assetDetailFetching } = useQuery({
+    queryKey: ['branch-stock', 'assetDetail', filterBranchId, debouncedSearch],
+    queryFn: () => {
+      let url = '/v_branch_asset_detail?order=product_display_name,asset_code';
+      if (filterBranchId) url += `&branch_id=eq.${filterBranchId}`;
+      if (debouncedSearch) {
+        const enc = encodeURIComponent(debouncedSearch);
+        const orParts = [
+          `product_display_name.ilike.*${enc}*`,
+          `model_name.ilike.*${enc}*`,
+          `variant_name.ilike.*${enc}*`,
+          `serial_no.ilike.*${enc}*`,
+          `imei.ilike.*${enc}*`,
+          `asset_code.ilike.*${enc}*`,
+        ];
+        url += `&or=(${orParts.join(',')})`;
+      }
+      return apiClient.get<AssetDetailRow[]>(url);
+    },
+    staleTime: 30 * 1000,
+  });
+
   // Pill counts — total qty / asset_count across the visible scope.
   const retailTotal = useMemo(
     () => (retailRows ?? []).reduce((sum, r) => sum + (r.qty ?? 0), 0),
@@ -203,9 +259,14 @@ export function BranchStockPage() {
     () => (unavailableRows ?? []).reduce((sum, r) => sum + (r.asset_count ?? 0), 0),
     [unavailableRows],
   );
+  // Itemized tab is 1 row per asset, so the count is simply the row count.
+  const assetDetailTotal = assetDetailRows?.length ?? 0;
 
   const isMobile = useMediaQuery('(max-width: 767px)');
-  const isFetching = tab === 'retail' ? retailFetching : tab === 'lease' ? leaseFetching : unavailableFetching;
+  const isFetching = tab === 'retail' ? retailFetching
+    : tab === 'lease' ? leaseFetching
+      : tab === 'unavailable' ? unavailableFetching
+        : assetDetailFetching;
 
   const branchName = (id: number) => branches?.find(b => b.id === id)?.name ?? '';
 
@@ -243,13 +304,24 @@ export function BranchStockPage() {
         systemQty: r.asset_count ?? 0,
       }));
     }
+    if (tab === 'assetDetail') {
+      return (assetDetailRows ?? []).map(r => ({
+        productName: r.product_display_name,
+        assetCode: r.asset_code,
+        serialNo: r.serial_no,
+        imei: r.imei,
+        grade: getConditionLabel(r.condition_grade, t),
+        battery: r.battery_health,
+        systemQty: 1,
+      }));
+    }
     return (unavailableRows ?? []).map(r => ({
       productName: r.product_display_name,
       condition: r.condition,
       statusTh: r.bucket_name_th,
       systemQty: r.asset_count ?? 0,
     }));
-  }, [tab, retailRows, leaseRows, unavailableRows]);
+  }, [tab, retailRows, leaseRows, unavailableRows, assetDetailRows, t]);
 
   const handlePrint = useCallback(() => {
     setPrintPayload({
@@ -280,7 +352,8 @@ export function BranchStockPage() {
     const tabTag =
       tab === 'retail' ? t('branchStock.retailTab')
         : tab === 'lease' ? t('branchStock.leaseTab')
-          : t('branchStock.unavailableTab');
+          : tab === 'unavailable' ? t('branchStock.unavailableTab')
+            : t('branchStock.assetDetailTab');
     // Bangkok-local stamp (UTC+7) so the filename time matches the sheet header.
     const bkk = new Date(Date.now() + 7 * 60 * 60 * 1000);
     const fileStamp = bkk.toISOString().slice(0, 16).replace(/[:T]/g, '-');
@@ -307,7 +380,7 @@ export function BranchStockPage() {
         { key: 'updated_at', label: t('branchStock.exportUpdatedAt'), type: 'date', width: 14 },
       ];
       rows = (leaseRows ?? []) as unknown as Record<string, unknown>[];
-    } else {
+    } else if (tab === 'unavailable') {
       columns = [
         { key: 'product_display_name', label: t('branchStock.countSheet.product'), type: 'text', width: 40 },
         { key: 'branch_name', label: t('branchStock.countSheet.branch'), type: 'text', width: 20 },
@@ -318,14 +391,34 @@ export function BranchStockPage() {
         { key: 'updated_at', label: t('branchStock.exportUpdatedAt'), type: 'date', width: 14 },
       ];
       rows = (unavailableRows ?? []) as unknown as Record<string, unknown>[];
+    } else {
+      columns = [
+        { key: 'asset_code', label: t('branchStock.countSheet.assetCode'), type: 'text', width: 18 },
+        { key: 'product_display_name', label: t('branchStock.countSheet.product'), type: 'text', width: 40 },
+        { key: 'branch_name', label: t('branchStock.countSheet.branch'), type: 'text', width: 20 },
+        { key: 'serial_no', label: t('branchStock.countSheet.serial'), type: 'text', width: 18 },
+        { key: 'imei', label: t('branchStock.countSheet.imei'), type: 'text', width: 18 },
+        { key: 'condition_grade_label', label: t('branchStock.countSheet.grade'), type: 'text', width: 12 },
+        { key: 'battery_health', label: t('branchStock.countSheet.battery'), type: 'number', width: 10 },
+        { key: 'cost_basis', label: t('branchStock.costBasis'), type: 'number', width: 12 },
+        { key: 'catalog_cost_price', label: t('branchStock.catalogCost'), type: 'number', width: 14 },
+        { key: 'bucket_name_th', label: t('branchStock.countSheet.status'), type: 'text', width: 16 },
+        { key: 'external_ref', label: t('branchStock.externalRef'), type: 'text', width: 12 },
+        { key: 'updated_at', label: t('branchStock.exportUpdatedAt'), type: 'date', width: 14 },
+      ];
+      rows = (assetDetailRows ?? []).map(r => ({
+        ...r,
+        condition_grade_label: getConditionLabel(r.condition_grade, t),
+      })) as unknown as Record<string, unknown>[];
     }
     downloadXlsx(rows, columns, filename);
-  }, [tab, retailRows, leaseRows, unavailableRows, activeBranchName, i18n.language, t]);
+  }, [tab, retailRows, leaseRows, unavailableRows, assetDetailRows, activeBranchName, i18n.language, t]);
 
   const activeRowCount =
     tab === 'retail' ? (retailRows?.length ?? 0)
       : tab === 'lease' ? (leaseRows?.length ?? 0)
-        : (unavailableRows?.length ?? 0);
+        : tab === 'unavailable' ? (unavailableRows?.length ?? 0)
+          : (assetDetailRows?.length ?? 0);
 
   return (
     <div className="flex flex-col h-dvh">
@@ -401,6 +494,21 @@ export function BranchStockPage() {
             {fmtNum(unavailableTotal)}
           </Badge>
         </button>
+        <button
+          type="button"
+          onClick={() => { setTab('assetDetail'); writeTab('assetDetail'); }}
+          className={`inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-t-md border-b-2 transition-colors cursor-pointer bg-transparent ${
+            tab === 'assetDetail'
+              ? 'border-primary-fg text-primary-fg font-medium'
+              : 'border-transparent text-subtle hover:bg-surface-hover'
+          }`}
+        >
+          <ListChecks size={14} />
+          <span>{t('branchStock.assetDetailTab', { defaultValue: 'Assets (itemized)' })}</span>
+          <Badge size="xs" color={tab === 'assetDetail' ? 'primary' : 'default'}>
+            {fmtNum(assetDetailTotal)}
+          </Badge>
+        </button>
       </div>
 
       {/* Filter bar */}
@@ -418,7 +526,9 @@ export function BranchStockPage() {
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder={t('branchStock.search', { defaultValue: 'Search by name, model, variant' })}
+              placeholder={tab === 'assetDetail'
+                ? t('branchStock.assetSearch', { defaultValue: 'Search by name, serial, IMEI, code' })
+                : t('branchStock.search', { defaultValue: 'Search by name, model, variant' })}
               size="sm"
               className="w-full"
             />
@@ -481,6 +591,14 @@ export function BranchStockPage() {
             rows={unavailableRows ?? []}
             branchName={branchName}
             isFetching={unavailableFetching}
+            t={t}
+          />
+        )}
+        {tab === 'assetDetail' && (
+          <AssetDetailList
+            rows={assetDetailRows ?? []}
+            branchName={branchName}
+            isFetching={assetDetailFetching}
             t={t}
           />
         )}
@@ -763,6 +881,69 @@ function UnavailableList({
           </Link>
         );
       })}
+    </div>
+  );
+}
+
+// "Assets (itemized)" — one row per serialized device the branch holds, for
+// walking a physical count device-by-device. Shows asset code, serial/IMEI,
+// condition grade + battery, and cost basis vs live catalog cost. Not a
+// deep-link: the row carries every inspection field inline (the asset console
+// can't pre-filter to a single serial), so the checker reads it here.
+function AssetDetailList({
+  rows,
+  branchName,
+  isFetching,
+  t,
+}: {
+  rows: AssetDetailRow[];
+  branchName: (id: number) => string;
+  isFetching: boolean;
+  t: (key: string, opts?: Record<string, unknown>) => string;
+}) {
+  if (!isFetching && rows.length === 0) {
+    return (
+      <div className="p-8 text-center text-subtler">
+        {t('common.noData')}
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col pb-8">
+      {rows.map((row) => (
+        <div
+          key={row.asset_id}
+          className="w-full px-4 py-2.5 border-b border-line flex items-center gap-3"
+        >
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="font-medium text-sm truncate">{row.product_display_name}</span>
+              <Badge size="xs" color="default">{getConditionLabel(row.condition_grade, t)}</Badge>
+              {row.bucket_scope !== 'AT_BRANCH' && (
+                <Badge size="xs" color={row.bucket_scope === 'IN_TRANSIT' ? 'info' : 'warning'}>
+                  {row.bucket_name_th}
+                </Badge>
+              )}
+            </div>
+            <div className="text-xs text-subtle truncate">
+              <span className="font-mono">{row.asset_code}</span>
+              {row.serial_no && <> · SN <span className="font-mono">{row.serial_no}</span></>}
+              {row.imei && <> · IMEI <span className="font-mono">{row.imei}</span></>}
+            </div>
+            <div className="text-[11px] text-subtler truncate mt-0.5">
+              {branchName(row.branch_id)}
+              {row.battery_health != null && <> · {t('branchStock.battery')} {row.battery_health}%</>}
+              {row.external_ref && <> · {t('branchStock.externalRef')} {row.external_ref}</>}
+            </div>
+          </div>
+          <div className="text-right shrink-0">
+            <div className="text-sm font-medium tabular-nums">{fmtCurrency(row.cost_basis ?? 0)}</div>
+            <div className="text-[11px] text-subtler tabular-nums">
+              {t('branchStock.catalogCost')} {row.catalog_cost_price != null ? fmtCurrency(row.catalog_cost_price) : '—'}
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

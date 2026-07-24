@@ -1665,7 +1665,9 @@
     "retailTab": "Retail",
     "leaseTab": "Assets (available)",
     "unavailableTab": "Assets (other)",
+    "assetDetailTab": "Assets (itemized)",
     "search": "Search by name, model, variant",
+    "assetSearch": "Search by name, serial, IMEI, code",
     "each": "each",
     "units": "units",
     "inTransit": "In transit",
@@ -1673,6 +1675,12 @@
     "exportExcel": "Excel",
     "exportValue": "Value",
     "exportUpdatedAt": "Updated",
+    "serial": "Serial",
+    "imei": "IMEI",
+    "battery": "Battery",
+    "costBasis": "Cost",
+    "catalogCost": "Catalog",
+    "externalRef": "Ref",
     "countSheet": {
       "title": "Stock Count Sheet",
       "branch": "Branch",
@@ -1689,7 +1697,14 @@
       "systemTotal": "System total",
       "counter": "Counted by",
       "checker": "Checked by",
-      "date": "Date"
+      "date": "Date",
+      "assetCode": "Asset code",
+      "serial": "Serial",
+      "imei": "IMEI",
+      "grade": "Grade",
+      "battery": "Battery",
+      "found": "Found",
+      "assetTotal": "Total assets"
     },
     "writeOff": {
       "action": "Write off",

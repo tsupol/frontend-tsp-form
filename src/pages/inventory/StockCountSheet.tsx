@@ -11,16 +11,25 @@ import { fmtNum } from './inventoryUtils';
 // `.stock-count-sheet`, body class `printing-stock-count`, A4 @page injected
 // dynamically by the print handler (see .claude/in-app-print-pattern.md).
 // One column set per stock tab; the "status" column only appears for the
-// unavailable tab (which carries a bucket).
+// unavailable tab (which carries a bucket). The per-asset tab ('assetDetail')
+// is one-device-per-row instead of aggregate quantities, so it prints a
+// different column set (asset code / serial / IMEI / grade / battery + a
+// "found" tick box instead of a counted quantity) — handled separately below.
 // ============================================================================
 
-export type StockSheetTab = 'retail' | 'lease' | 'unavailable';
+export type StockSheetTab = 'retail' | 'lease' | 'unavailable' | 'assetDetail';
 
 export interface StockSheetRow {
   productName: string;
   condition?: string | null;   // lease / unavailable only
   statusTh?: string | null;    // unavailable only (bucket_name_th)
   systemQty: number;
+  // Per-asset (assetDetail tab) fields:
+  assetCode?: string | null;
+  serialNo?: string | null;
+  imei?: string | null;
+  grade?: string | null;
+  battery?: number | null;
 }
 
 export interface StockCountSheetProps {
@@ -36,26 +45,98 @@ export function StockCountSheet({ branchName, tab, printedAt, printedBy, rows }:
 
   const showCondition = tab === 'lease' || tab === 'unavailable';
   const showStatus = tab === 'unavailable';
+  const isAssetDetail = tab === 'assetDetail';
   const systemTotal = rows.reduce((sum, r) => sum + (r.systemQty ?? 0), 0);
 
   const tabLabel =
     tab === 'retail' ? t('branchStock.retailTab')
       : tab === 'lease' ? t('branchStock.leaseTab')
-        : t('branchStock.unavailableTab');
+        : tab === 'unavailable' ? t('branchStock.unavailableTab')
+          : t('branchStock.assetDetailTab');
+
+  const header = (
+    <div className="scs-header">
+      <div className="scs-title">{t('branchStock.countSheet.title')}</div>
+      <div className="scs-meta">
+        <div><span className="scs-meta-label">{t('branchStock.countSheet.branch')}:</span> {branchName || '—'}</div>
+        <div><span className="scs-meta-label">{t('branchStock.countSheet.category')}:</span> {tabLabel}</div>
+        <div><span className="scs-meta-label">{t('branchStock.countSheet.printedAt')}:</span> {formatDateTime(printedAt, i18n.language, true)}</div>
+        <div><span className="scs-meta-label">{t('branchStock.countSheet.printedBy')}:</span> {printedBy || '—'}</div>
+      </div>
+    </div>
+  );
+
+  const signatures = (
+    <div className="scs-signatures">
+      <div className="scs-sig-block">
+        <div className="scs-sig-line" />
+        <div className="scs-sig-role">{t('branchStock.countSheet.counter')}</div>
+        <div className="scs-sig-date">{t('branchStock.countSheet.date')} ______________</div>
+      </div>
+      <div className="scs-sig-block">
+        <div className="scs-sig-line" />
+        <div className="scs-sig-role">{t('branchStock.countSheet.checker')}</div>
+        <div className="scs-sig-date">{t('branchStock.countSheet.date')} ______________</div>
+      </div>
+    </div>
+  );
+
+  // Per-asset (itemized) sheet — one device per row, tick "found" against the
+  // physical device instead of writing a counted quantity.
+  if (isAssetDetail) {
+    return (
+      <div className="stock-count-sheet">
+        {header}
+        <table className="scs-table">
+          <thead>
+            <tr>
+              <th className="scs-col-no">{t('branchStock.countSheet.no')}</th>
+              <th className="scs-col-code">{t('branchStock.countSheet.assetCode')}</th>
+              <th className="scs-col-name">{t('branchStock.countSheet.product')}</th>
+              <th className="scs-col-serial">{t('branchStock.countSheet.serial')}</th>
+              <th className="scs-col-serial">{t('branchStock.countSheet.imei')}</th>
+              <th className="scs-col-cond">{t('branchStock.countSheet.grade')}</th>
+              <th className="scs-col-batt">{t('branchStock.countSheet.battery')}</th>
+              <th className="scs-col-found">{t('branchStock.countSheet.found')}</th>
+              <th className="scs-col-note">{t('branchStock.countSheet.note')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i}>
+                <td className="scs-col-no">{i + 1}</td>
+                <td className="scs-col-code">{r.assetCode ?? '—'}</td>
+                <td className="scs-col-name">{r.productName}</td>
+                <td className="scs-col-serial">{r.serialNo ?? '—'}</td>
+                <td className="scs-col-serial">{r.imei ?? '—'}</td>
+                <td className="scs-col-cond">{r.grade ?? '—'}</td>
+                <td className="scs-col-batt">{r.battery != null ? `${r.battery}%` : '—'}</td>
+                <td className="scs-col-found" />
+                <td className="scs-col-note" />
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr>
+                <td className="scs-empty" colSpan={9}>{t('common.noData')}</td>
+              </tr>
+            )}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td className="scs-total-label" colSpan={7}>{t('branchStock.countSheet.assetTotal')}</td>
+              <td className="scs-col-found scs-total-qty">{fmtNum(rows.length)}</td>
+              <td className="scs-col-note" />
+            </tr>
+          </tfoot>
+        </table>
+        {signatures}
+      </div>
+    );
+  }
 
   return (
     <div className="stock-count-sheet">
-      {/* Header — repeats on every printed page via CSS position:running or,
-          failing that, simply sits at the top of the flow. */}
-      <div className="scs-header">
-        <div className="scs-title">{t('branchStock.countSheet.title')}</div>
-        <div className="scs-meta">
-          <div><span className="scs-meta-label">{t('branchStock.countSheet.branch')}:</span> {branchName || '—'}</div>
-          <div><span className="scs-meta-label">{t('branchStock.countSheet.category')}:</span> {tabLabel}</div>
-          <div><span className="scs-meta-label">{t('branchStock.countSheet.printedAt')}:</span> {formatDateTime(printedAt, i18n.language, true)}</div>
-          <div><span className="scs-meta-label">{t('branchStock.countSheet.printedBy')}:</span> {printedBy || '—'}</div>
-        </div>
-      </div>
+      {header}
 
       <table className="scs-table">
         <thead>
@@ -101,19 +182,7 @@ export function StockCountSheet({ branchName, tab, printedAt, printedBy, rows }:
         </tfoot>
       </table>
 
-      {/* Signature footer */}
-      <div className="scs-signatures">
-        <div className="scs-sig-block">
-          <div className="scs-sig-line" />
-          <div className="scs-sig-role">{t('branchStock.countSheet.counter')}</div>
-          <div className="scs-sig-date">{t('branchStock.countSheet.date')} ______________</div>
-        </div>
-        <div className="scs-sig-block">
-          <div className="scs-sig-line" />
-          <div className="scs-sig-role">{t('branchStock.countSheet.checker')}</div>
-          <div className="scs-sig-date">{t('branchStock.countSheet.date')} ______________</div>
-        </div>
-      </div>
+      {signatures}
     </div>
   );
 }

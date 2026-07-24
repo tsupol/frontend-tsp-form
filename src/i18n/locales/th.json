@@ -1662,7 +1662,9 @@
     "retailTab": "ขายปลีก",
     "leaseTab": "สินทรัพย์ (พร้อมเช่า)",
     "unavailableTab": "สินทรัพย์ (อื่นๆ)",
+    "assetDetailTab": "สินทรัพย์ (แยกรายการ)",
     "search": "ค้นหาด้วยชื่อ รุ่น หรือรุ่นย่อย",
+    "assetSearch": "ค้นหาด้วยชื่อ ซีเรียล IMEI หรือรหัส",
     "each": "ต่อหน่วย",
     "units": "เครื่อง",
     "inTransit": "กำลังโอน",
@@ -1670,6 +1672,12 @@
     "exportExcel": "Excel",
     "exportValue": "มูลค่า",
     "exportUpdatedAt": "อัปเดต",
+    "serial": "ซีเรียล",
+    "imei": "IMEI",
+    "battery": "แบต",
+    "costBasis": "ทุน",
+    "catalogCost": "ทุน catalog",
+    "externalRef": "อ้างอิง",
     "countSheet": {
       "title": "ใบตรวจนับสต๊อก",
       "branch": "สาขา",
@@ -1686,7 +1694,14 @@
       "systemTotal": "รวมยอดในระบบ",
       "counter": "ผู้นับ",
       "checker": "ผู้ตรวจ",
-      "date": "วันที่"
+      "date": "วันที่",
+      "assetCode": "รหัสสินทรัพย์",
+      "serial": "ซีเรียล",
+      "imei": "IMEI",
+      "grade": "เกรด",
+      "battery": "แบต",
+      "found": "พบ",
+      "assetTotal": "รวมสินทรัพย์"
     },
     "writeOff": {
       "action": "ตัดสูญเสีย",
