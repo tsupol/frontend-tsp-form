@@ -953,6 +953,7 @@ function ReconcileBlock({ close, branchId }: { close: DayCloseHistoryRow; branch
             <MaskedInput
               mask="number"
               decimalScale={2}
+              allowNegative
               value={cash}
               onChange={(raw) => setCash(raw)}
               className="w-full"
@@ -970,6 +971,7 @@ function ReconcileBlock({ close, branchId }: { close: DayCloseHistoryRow; branch
             <MaskedInput
               mask="number"
               decimalScale={2}
+              allowNegative
               value={transfer}
               onChange={(raw) => setTransfer(raw)}
               className="w-full"
@@ -1066,8 +1068,13 @@ function CloseDayModal({
   }, [open]);
 
   const netPhysical = netCashVal + netTransferVal;
-  const cashNum = countedCash === '' ? null : parseFloat(countedCash);
-  const transferNum = countedTransfer === '' ? null : parseFloat(countedTransfer);
+  // parseFloat('-') is NaN — treat a partial/blank entry as "not counted yet".
+  const parseCounted = (s: string) => {
+    const n = parseFloat(s);
+    return Number.isFinite(n) ? n : null;
+  };
+  const cashNum = parseCounted(countedCash);
+  const transferNum = parseCounted(countedTransfer);
   // Per-channel diff = counted − net, only once that channel is counted.
   const diffCash = cashNum === null ? null : cashNum - netCashVal;
   const diffTransfer = transferNum === null ? null : transferNum - netTransferVal;
@@ -1286,6 +1293,7 @@ function CountInputRow({
         <MaskedInput
           mask="number"
           decimalScale={2}
+          allowNegative
           value={value}
           onChange={(raw) => onChange(raw)}
           className="w-full"
