@@ -11,6 +11,7 @@ export function useContractInvalidate(contractId: number) {
     queryClient.invalidateQueries({ queryKey: ['contract-detail', contractId] });
     queryClient.invalidateQueries({ queryKey: ['contract-search'] });
     queryClient.invalidateQueries({ queryKey: ['saving-contracts'] });
+    queryClient.invalidateQueries({ queryKey: ['draft-contracts'] });
     queryClient.invalidateQueries({ queryKey: ['contract-installments', contractId] });
     queryClient.invalidateQueries({ queryKey: ['contract-txns', contractId] });
     queryClient.invalidateQueries({ queryKey: ['contract-payments', contractId] });
