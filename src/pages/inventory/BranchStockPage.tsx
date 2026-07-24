@@ -958,7 +958,13 @@ function AssetDetailList({
               )}
             </div>
             <div className="text-xs text-subtle truncate">
-              <span className="font-mono">{row.asset_code}</span>
+              <button
+                type="button"
+                onClick={() => navigate(`/admin/inventory/assets/${row.asset_id}`)}
+                className="font-mono text-subtle hover:text-primary-fg hover:underline bg-transparent border-none p-0 cursor-pointer"
+              >
+                {row.asset_code}
+              </button>
               {row.serial_no && <> · SN <span className="font-mono">{row.serial_no}</span></>}
               {row.imei && <> · IMEI <span className="font-mono">{row.imei}</span></>}
             </div>
