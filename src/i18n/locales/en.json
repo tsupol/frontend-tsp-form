@@ -2435,7 +2435,15 @@
     "status_CANCELLED": "Cancelled",
     "status_EXPIRED": "Expired",
     "status_INVALIDATED": "Invalidated",
-    "status_COMPLETED": "Completed"
+    "status_COMPLETED": "Completed",
+    "po": {
+      "supplier": "Supplier",
+      "totalQty": "Total Qty",
+      "totalAmount": "Total Amount",
+      "lines": "items",
+      "noLines": "No items in this PO",
+      "type": "PO type"
+    }
   },
   "retail": {
     "walkIn": "Walk-in",

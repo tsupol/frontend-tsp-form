@@ -295,6 +295,20 @@ export function ApprovalsPage() {
                       });
                     }}
                   />
+                ) : selected.type === 'PO' ? (
+                  <PoApprovalPanel
+                    row={selected}
+                    onSuccess={action => {
+                      setSelected(null);
+                      if (isMobile) goBack();
+                      refresh();
+                      const key = action === 'approve' ? 'approvals.approveSuccess' : 'approvals.rejectSuccess';
+                      addSnackbar({
+                        type: 'success',
+                        message: <div className="alert alert-success"><CheckCircle size={16} /><span>{t(key)}</span></div>,
+                      });
+                    }}
+                  />
                 ) : (
                   <SimpleApprovalPanel
                     row={selected}
@@ -432,13 +446,9 @@ function SimpleApprovalPanel({
         else params.p_note = trimmed || null;
         return { rpc, params };
       }
-      case 'PO': {
-        // fn_po_approve → (p_po_id); fn_po_reject → (p_po_id, p_reason).
-        const rpc = action === 'approve' ? 'fn_po_approve' : 'fn_po_reject';
-        const params: Record<string, unknown> = { p_po_id: row.id };
-        if (action === 'reject') params.p_reason = trimmed || null;
-        return { rpc, params };
-      }
+      case 'PO':
+        // PO never routes here (handled by PoApprovalPanel).
+        return { rpc: 'fn_po_approve', params: { p_po_id: row.id } };
       case 'BUYBACK':
         // Buyback never routes here (handled by BuybackApprovalPanel).
         return { rpc: 'fn_inv_buyback_approve', params: { p_po_id: row.id } };
@@ -748,6 +758,201 @@ function SellOutApprovalPhoto({ keyPath }: { keyPath: string | null }) {
         <img src={url} alt="" className="w-full h-full object-contain" />
       ) : (
         <div className="w-full h-full flex items-center justify-center text-subtler"><ImageOff size={18} /></div>
+      )}
+    </div>
+  );
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * PO approval panel — a purchase PO carries no meaningful "product/customer"
+ * headline (v_pending_approvals leaves product_name null), so the generic
+ * SimpleApprovalPanel showed the approver almost nothing to decide on. This
+ * panel fetches v_po_detail (po_id = row.id) and leads with what's actually
+ * being ordered: supplier, per-line items (brand/model/variant · qty · unit
+ * cost · line total), and the roll-up totals. approve/reject reuse
+ * fn_po_approve / fn_po_reject.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+interface PoApprovalLine {
+  line_id: number;
+  brand_name: string | null;
+  family_name: string | null;
+  variant_name: string | null;
+  sku_code: string | null;
+  qty: number;
+  unit_cost: number;
+  line_total: number;
+}
+
+interface PoApprovalDetail {
+  po_id: number;
+  code_display: string | null;
+  po_no: string;
+  po_type: string;
+  ownership: string;
+  supplier_name: string | null;
+  supplier_ref: string | null;
+  notes: string | null;
+  c_total_lines: number;
+  c_total_qty: number;
+  c_total_amount: number;
+  lines: PoApprovalLine[] | null;
+}
+
+const fmtPoNum = (value: number | null | undefined): string =>
+  value == null ? '—' : new Intl.NumberFormat('en-US').format(value);
+
+function PoApprovalPanel({
+  row, onSuccess,
+}: {
+  row: ApprovalRow;
+  onSuccess: (action: 'approve' | 'reject') => void;
+}) {
+  const { t } = useTranslation();
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState<'approve' | 'reject' | null>(null);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  useEffect(() => { setReason(''); setErrorMessage(''); }, [row.id]);
+
+  const { data: detail, isFetching } = useQuery({
+    queryKey: ['po-approval-detail', row.id],
+    queryFn: async () => {
+      const rows = await apiClient.get<PoApprovalDetail[]>(`/v_po_detail?po_id=eq.${row.id}&limit=1`);
+      return rows[0] ?? null;
+    },
+    placeholderData: keepPreviousData,
+  });
+
+  const lines = detail?.lines ?? [];
+  const isPending = row.status === 'PENDING';
+
+  const handleAction = async (action: 'approve' | 'reject') => {
+    if (action === 'reject' && !reason.trim()) return;
+    setBusy(action);
+    setErrorMessage('');
+    try {
+      const rpc = action === 'approve' ? 'fn_po_approve' : 'fn_po_reject';
+      const params: Record<string, unknown> = { p_po_id: row.id };
+      if (action === 'reject') params.p_reason = reason.trim() || null;
+      await apiClient.rpc(rpc, params);
+      onSuccess(action);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setErrorMessage(translated || err.message);
+      } else {
+        setErrorMessage(t('common.error'));
+      }
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="relative flex flex-col h-full min-w-0 overflow-hidden">
+      <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
+        <span className="font-semibold truncate">{detail?.code_display ?? detail?.po_no ?? row.display_label}</span>
+        <Badge size="sm" color={typeColor(row.type)}>{t('approvals.type_PO')}</Badge>
+        <Badge size="sm" color={statusColor(row.status)}>{t(`approvals.status_${row.status}`)}</Badge>
+      </div>
+
+      {/* Summary — supplier · qty/lines · total */}
+      <div className="flex-none grid grid-cols-3 gap-3 px-4 py-3 border-b border-line bg-surface">
+        <div className="min-w-0">
+          <div className="text-xs text-subtle">{t('approvals.po.supplier')}</div>
+          <div className="font-semibold text-sm truncate">{detail?.supplier_name ?? row.customer_name ?? '—'}</div>
+          {detail?.supplier_ref && <div className="text-xs text-subtle truncate">{detail.supplier_ref}</div>}
+        </div>
+        <div className="min-w-0">
+          <div className="text-xs text-subtle">{t('approvals.po.totalQty')}</div>
+          <div className="font-semibold text-sm tabular-nums">{fmtPoNum(detail?.c_total_qty)}</div>
+          <div className="text-xs text-subtle">{fmtPoNum(detail?.c_total_lines)} {t('approvals.po.lines')}</div>
+        </div>
+        <div className="min-w-0">
+          <div className="text-xs text-subtle">{t('approvals.po.totalAmount')}</div>
+          <div className="font-semibold text-sm tabular-nums">{fmtCurrency(detail?.c_total_amount ?? row.amount)}</div>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-auto better-scroll">
+        {/* Meta row */}
+        <div className="px-4 py-2 border-b border-line flex flex-wrap gap-x-6 gap-y-1 text-xs text-subtle">
+          <span>{t('approvals.branch')}: <span className="text-fg">{row.branch_name ?? '—'}</span></span>
+          {detail?.po_type && (
+            <span>{t('approvals.po.type')}: <span className="text-fg">{t(`po.type_${detail.po_type}`, { defaultValue: detail.po_type })}</span></span>
+          )}
+          <span>{t('approvals.requestedAt')}: <span className="text-fg"><DateTime value={row.requested_at} /></span></span>
+          {row.decided_at && (
+            <span>{t('approvals.decidedAt')}: <span className="text-fg"><DateTime value={row.decided_at} /></span></span>
+          )}
+        </div>
+
+        {detail?.notes && (
+          <div className="px-4 py-2 border-b border-line text-xs text-subtle italic">{detail.notes}</div>
+        )}
+
+        {/* Lines — the whole point of this panel */}
+        <div className="px-4 pt-3 pb-1">
+          <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider">
+            {t('approvals.po.lines')} ({lines.length})
+          </h3>
+        </div>
+        {lines.length === 0 && !isFetching && (
+          <div className="p-8 text-center text-subtler">{t('approvals.po.noLines')}</div>
+        )}
+        {lines.map(line => (
+          <div key={line.line_id} className="px-4 py-2.5 border-b border-line flex items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium truncate">
+                {[line.brand_name, line.family_name].filter(Boolean).join(' ') || line.sku_code || '—'}
+              </div>
+              {line.variant_name && (
+                <div className="text-xs text-subtle font-semibold truncate mt-0.5">{line.variant_name}</div>
+              )}
+              {line.sku_code && (
+                <div className="text-[11px] text-subtler font-mono truncate">{line.sku_code}</div>
+              )}
+            </div>
+            <div className="text-right shrink-0">
+              <div className="text-sm font-medium tabular-nums">{fmtPoNum(line.qty)} pcs</div>
+              <div className="text-xs text-subtle tabular-nums">@ {fmtCurrency(line.unit_cost)}</div>
+              <div className="text-xs font-medium tabular-nums">{fmtCurrency(line.line_total)}</div>
+            </div>
+          </div>
+        ))}
+
+        {errorMessage && (
+          <div className="alert alert-danger animate-pop-in m-4">
+            <XCircle size={16} />
+            <div><div className="alert-description text-xs">{errorMessage}</div></div>
+          </div>
+        )}
+      </div>
+
+      {isPending && (
+        <div className="flex-none border-t border-line px-4 py-3 bg-bg">
+          <div className="space-y-2 w-full">
+            <TextArea
+              size="md"
+              className="mb-1 w-full"
+              rows={2}
+              value={reason}
+              onChange={e => setReason(e.target.value)}
+              placeholder={t('approvals.notePlaceholder')}
+              disabled={!!busy}
+            />
+            <div className="flex gap-2 w-full">
+              <Button color="success" size="md" className="flex-1" disabled={!!busy} onClick={() => handleAction('approve')}>
+                {busy === 'approve' ? t('common.loading') : t('approvals.approve')}
+              </Button>
+              <Button color="danger" size="md" className="flex-1" disabled={!!busy || !reason.trim()} onClick={() => handleAction('reject')}>
+                {busy === 'reject' ? t('common.loading') : t('approvals.reject')}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

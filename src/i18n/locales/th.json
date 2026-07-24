@@ -2432,7 +2432,15 @@
     "status_CANCELLED": "ยกเลิก",
     "status_EXPIRED": "หมดอายุ",
     "status_INVALIDATED": "เป็นโมฆะ",
-    "status_COMPLETED": "เสร็จสิ้น"
+    "status_COMPLETED": "เสร็จสิ้น",
+    "po": {
+      "supplier": "ผู้ขาย",
+      "totalQty": "จำนวนรวม",
+      "totalAmount": "ยอดรวม",
+      "lines": "รายการ",
+      "noLines": "ไม่มีรายการในใบสั่งซื้อนี้",
+      "type": "ประเภท PO"
+    }
   },
   "retail": {
     "walkIn": "ลูกค้าทั่วไป",
