@@ -951,19 +951,15 @@ function AssetDetailList({
                 <ExternalLink size={12} className="shrink-0" />
               </button>
               <Badge size="xs" color="default">{getConditionLabel(row.condition_grade, t)}</Badge>
-              {row.bucket_scope !== 'AT_BRANCH' && (
-                <Badge size="xs" color={row.bucket_scope === 'IN_TRANSIT' ? 'info' : 'warning'}>
-                  {row.bucket_name_th}
-                </Badge>
-              )}
             </div>
             <div className="text-xs text-subtle truncate">
               <button
                 type="button"
                 onClick={() => navigate(`/admin/inventory/assets/${row.asset_id}`)}
-                className="font-mono text-subtle hover:text-primary-fg hover:underline bg-transparent border-none p-0 cursor-pointer"
+                className="font-mono text-subtle hover:text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
               >
                 {row.asset_code}
+                <ExternalLink size={11} className="shrink-0" />
               </button>
               {row.serial_no && <> · SN <span className="font-mono">{row.serial_no}</span></>}
               {row.imei && <> · IMEI <span className="font-mono">{row.imei}</span></>}
@@ -971,13 +967,25 @@ function AssetDetailList({
             <div className="text-[11px] text-subtler truncate mt-0.5">
               {branchName(row.branch_id)}
               {row.battery_health != null && <> · {t('branchStock.battery')} {row.battery_health}%</>}
-              {row.external_ref && <> · {t('branchStock.externalRef')} {row.external_ref}</>}
+              <> · {t('branchStock.externalRef')} {row.external_ref || '—'}</>
             </div>
           </div>
-          <div className="text-right shrink-0">
+          <div className="text-right shrink-0 flex flex-col items-end">
             <div className="text-sm font-medium tabular-nums">{fmtCurrency(row.cost_basis ?? 0)}</div>
             <div className="text-[11px] text-subtler tabular-nums">
-              {t('branchStock.catalogCost')} {row.catalog_cost_price != null ? fmtCurrency(row.catalog_cost_price) : '—'}
+              {t('branchStock.catalogCost')}{' '}
+              <span className="text-subtle font-medium">
+                {row.catalog_cost_price != null ? fmtCurrency(row.catalog_cost_price) : '—'}
+              </span>
+            </div>
+            <div
+              className={`text-[11px] ${
+                row.current_bucket === 'ON_HAND_AVAILABLE' ? 'text-subtle'
+                  : row.bucket_scope === 'IN_TRANSIT' ? 'text-info-fg'
+                    : 'text-warning-fg'
+              }`}
+            >
+              {row.bucket_name_th}
             </div>
           </div>
         </div>
