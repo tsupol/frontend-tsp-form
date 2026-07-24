@@ -1,7 +1,3 @@
-# Use bash so recipes resolve npm/node the same way on Windows (Git Bash) and
-# Unix. Default `sh` on Windows mangles the nodejs path and breaks `build`.
-set shell := ["bash", "-cu"]
-
 droplet_ip := "103.208.24.76"
 droplet_user := "nnfsup"
 image_name := "nnf-ui"
