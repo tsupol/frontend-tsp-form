@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, useNavigate, type NavigateFunction } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { MobileHeader, Badge, Select, Input, Button, PopOver, MenuItem } from 'tsp-form';
-import { Boxes, ScanBarcode, ArrowRightFromLine, ShoppingCart, Smartphone, MoreHorizontal, PackageMinus, Archive, Printer, FileSpreadsheet, ListChecks } from 'lucide-react';
+import { Boxes, ScanBarcode, ArrowRightFromLine, ShoppingCart, Smartphone, MoreHorizontal, PackageMinus, Archive, Printer, FileSpreadsheet, ListChecks, ExternalLink } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
@@ -126,6 +126,7 @@ type Tab = 'retail' | 'lease' | 'unavailable' | 'assetDetail';
 export function BranchStockPage() {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const isBranchUser = ['BRANCH_STAFF', 'BRANCH_MANAGER'].includes(user?.role_code ?? '');
@@ -583,6 +584,7 @@ export function BranchStockPage() {
             rows={leaseRows ?? []}
             branchName={branchName}
             isFetching={leaseFetching}
+            navigate={navigate}
             t={t}
           />
         )}
@@ -591,6 +593,7 @@ export function BranchStockPage() {
             rows={unavailableRows ?? []}
             branchName={branchName}
             isFetching={unavailableFetching}
+            navigate={navigate}
             t={t}
           />
         )}
@@ -599,6 +602,7 @@ export function BranchStockPage() {
             rows={assetDetailRows ?? []}
             branchName={branchName}
             isFetching={assetDetailFetching}
+            navigate={navigate}
             t={t}
           />
         )}
@@ -766,11 +770,13 @@ function LeaseList({
   rows,
   branchName,
   isFetching,
+  navigate,
   t,
 }: {
   rows: ContractableRow[];
   branchName: (id: number) => string;
   isFetching: boolean;
+  navigate: NavigateFunction;
   t: (key: string, opts?: Record<string, unknown>) => string;
 }) {
   if (!isFetching && rows.length === 0) {
@@ -789,14 +795,20 @@ function LeaseList({
         params.set('bucket', 'ON_HAND_AVAILABLE');
         params.set('condition', row.condition);
         return (
-          <Link
+          <div
             key={`${row.branch_id}-${row.variant_id}-${row.condition}`}
-            to={`/admin/inventory/assets?${params.toString()}`}
-            className="w-full px-4 py-2.5 border-b border-line flex items-center gap-3 hover:bg-surface-hover transition-colors no-underline text-current"
+            className="w-full px-4 py-2.5 border-b border-line flex items-center gap-3"
           >
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 min-w-0">
-                <span className="font-medium text-sm truncate">{row.product_display_name}</span>
+                <button
+                  type="button"
+                  onClick={() => navigate(`/admin/inventory/assets?${params.toString()}`)}
+                  className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer truncate"
+                >
+                  <span className="truncate">{row.product_display_name}</span>
+                  <ExternalLink size={12} className="shrink-0" />
+                </button>
                 <Badge size="xs" color={row.condition === 'NEW' ? 'success' : 'warning'}>
                   {row.condition}
                 </Badge>
@@ -813,7 +825,7 @@ function LeaseList({
               <div className="text-xs text-subtle tabular-nums">{fmtCurrency(row.total_cost ?? 0)}</div>
               <div className="text-[11px] text-subtler tabular-nums">{fmtCurrency(row.avg_cost ?? 0)} {t('branchStock.each', { defaultValue: 'each' })}</div>
             </div>
-          </Link>
+          </div>
         );
       })}
     </div>
@@ -828,11 +840,13 @@ function UnavailableList({
   rows,
   branchName,
   isFetching,
+  navigate,
   t,
 }: {
   rows: UnavailableRow[];
   branchName: (id: number) => string;
   isFetching: boolean;
+  navigate: NavigateFunction;
   t: (key: string, opts?: Record<string, unknown>) => string;
 }) {
   if (!isFetching && rows.length === 0) {
@@ -851,14 +865,20 @@ function UnavailableList({
         params.set('bucket', row.current_bucket);
         params.set('condition', row.condition);
         return (
-          <Link
+          <div
             key={`${row.branch_id}-${row.variant_id}-${row.current_bucket}-${row.condition}`}
-            to={`/admin/inventory/assets?${params.toString()}`}
-            className="w-full px-4 py-2.5 border-b border-line flex items-center gap-3 hover:bg-surface-hover transition-colors no-underline text-current"
+            className="w-full px-4 py-2.5 border-b border-line flex items-center gap-3"
           >
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 min-w-0">
-                <span className="font-medium text-sm truncate">{row.product_display_name}</span>
+                <button
+                  type="button"
+                  onClick={() => navigate(`/admin/inventory/assets?${params.toString()}`)}
+                  className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer truncate"
+                >
+                  <span className="truncate">{row.product_display_name}</span>
+                  <ExternalLink size={12} className="shrink-0" />
+                </button>
                 <Badge size="xs" color={row.condition === 'NEW' ? 'success' : 'warning'}>
                   {row.condition}
                 </Badge>
@@ -878,7 +898,7 @@ function UnavailableList({
               <div className="text-xs text-subtle tabular-nums">{fmtCurrency(row.total_cost ?? 0)}</div>
               <div className="text-[11px] text-subtler tabular-nums">{fmtCurrency(row.avg_cost ?? 0)} {t('branchStock.each', { defaultValue: 'each' })}</div>
             </div>
-          </Link>
+          </div>
         );
       })}
     </div>
@@ -887,17 +907,19 @@ function UnavailableList({
 
 // "Assets (itemized)" — one row per serialized device the branch holds, for
 // walking a physical count device-by-device. Shows asset code, serial/IMEI,
-// condition grade + battery, and cost basis vs live catalog cost. Each row
-// deep-links to that asset's detail page (/admin/inventory/assets/:assetId).
+// condition grade + battery, and cost basis vs live catalog cost. The product
+// name deep-links to that asset's detail page (/admin/inventory/assets/:assetId).
 function AssetDetailList({
   rows,
   branchName,
   isFetching,
+  navigate,
   t,
 }: {
   rows: AssetDetailRow[];
   branchName: (id: number) => string;
   isFetching: boolean;
+  navigate: NavigateFunction;
   t: (key: string, opts?: Record<string, unknown>) => string;
 }) {
   if (!isFetching && rows.length === 0) {
@@ -910,14 +932,20 @@ function AssetDetailList({
   return (
     <div className="flex flex-col pb-8">
       {rows.map((row) => (
-        <Link
+        <div
           key={row.asset_id}
-          to={`/admin/inventory/assets/${row.asset_id}`}
-          className="w-full px-4 py-2.5 border-b border-line flex items-center gap-3 hover:bg-surface-hover transition-colors no-underline text-current"
+          className="w-full px-4 py-2.5 border-b border-line flex items-center gap-3"
         >
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 min-w-0">
-              <span className="font-medium text-sm truncate">{row.product_display_name}</span>
+              <button
+                type="button"
+                onClick={() => navigate(`/admin/inventory/assets/${row.asset_id}`)}
+                className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer truncate"
+              >
+                <span className="truncate">{row.product_display_name}</span>
+                <ExternalLink size={12} className="shrink-0" />
+              </button>
               <Badge size="xs" color="default">{getConditionLabel(row.condition_grade, t)}</Badge>
               {row.bucket_scope !== 'AT_BRANCH' && (
                 <Badge size="xs" color={row.bucket_scope === 'IN_TRANSIT' ? 'info' : 'warning'}>
@@ -942,7 +970,7 @@ function AssetDetailList({
               {t('branchStock.catalogCost')} {row.catalog_cost_price != null ? fmtCurrency(row.catalog_cost_price) : '—'}
             </div>
           </div>
-        </Link>
+        </div>
       ))}
     </div>
   );
