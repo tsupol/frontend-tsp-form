@@ -887,9 +887,8 @@ function UnavailableList({
 
 // "Assets (itemized)" — one row per serialized device the branch holds, for
 // walking a physical count device-by-device. Shows asset code, serial/IMEI,
-// condition grade + battery, and cost basis vs live catalog cost. Not a
-// deep-link: the row carries every inspection field inline (the asset console
-// can't pre-filter to a single serial), so the checker reads it here.
+// condition grade + battery, and cost basis vs live catalog cost. Each row
+// deep-links to that asset's detail page (/admin/inventory/assets/:assetId).
 function AssetDetailList({
   rows,
   branchName,
@@ -911,9 +910,10 @@ function AssetDetailList({
   return (
     <div className="flex flex-col pb-8">
       {rows.map((row) => (
-        <div
+        <Link
           key={row.asset_id}
-          className="w-full px-4 py-2.5 border-b border-line flex items-center gap-3"
+          to={`/admin/inventory/assets/${row.asset_id}`}
+          className="w-full px-4 py-2.5 border-b border-line flex items-center gap-3 hover:bg-surface-hover transition-colors no-underline text-current"
         >
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 min-w-0">
@@ -942,7 +942,7 @@ function AssetDetailList({
               {t('branchStock.catalogCost')} {row.catalog_cost_price != null ? fmtCurrency(row.catalog_cost_price) : '—'}
             </div>
           </div>
-        </div>
+        </Link>
       ))}
     </div>
   );
