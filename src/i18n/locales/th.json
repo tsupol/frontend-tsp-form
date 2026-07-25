@@ -3679,6 +3679,7 @@
     "icloud_account": "บัญชี iCloud",
     "icloud_pickAccount": "เลือกบัญชีจาก pool",
     "icloud_full": "เต็ม",
+    "icloud_slotsLeft_other": "เหลือ {{count}} เครื่อง",
     "icloud_assignHint": "ล็อกเครื่องนี้กับบัญชี iCloud ที่เลือกจาก pool หากมีบัญชีเก่าจะปลดให้อัตโนมัติ",
     "icloud_reason": "เหตุผล",
     "icloud_assignSuccess": "ผูก iCloud เรียบร้อย",

@@ -129,6 +129,8 @@ export function AssignIcloudModal({
       .filter(a => a.id !== currentAccountId) // hide the currently-bound one
       .map(a => ({
         value: String(a.id),
+        // Flat label — used for the collapsed trigger display and search
+        // matching. The dropdown rows get the richer 2-line renderOption below.
         label: a.is_full
           ? `${a.apple_id} · ${a.c_device_count}/${a.device_cap} · ${t('contract.icloud_full')}`
           : `${a.apple_id} · ${a.c_device_count}/${a.device_cap}`,
@@ -136,6 +138,25 @@ export function AssignIcloudModal({
       })),
     [accounts, currentAccountId, t],
   );
+
+  // Two-line dropdown row: Apple ID on top, capacity + slots-left (or "full")
+  // beneath. Option only carries {value,label}, so look the account back up by id.
+  const renderAccountOption = (opt: { value: string }) => {
+    const a = accounts.find(acc => String(acc.id) === opt.value);
+    if (!a) return null;
+    return (
+      <div className="flex flex-col gap-0.5 min-w-0 py-0.5">
+        <span className="text-sm truncate">{a.apple_id}</span>
+        <span className="text-xs text-subtle inline-flex items-center gap-1.5">
+          <span className="tabular-nums">{a.c_device_count}/{a.device_cap}</span>
+          <span className="text-subtler">·</span>
+          {a.is_full
+            ? <span className="text-danger-fg">{t('contract.icloud_full')}</span>
+            : <span>{t('contract.icloud_slotsLeft', { count: a.remaining_slots })}</span>}
+        </span>
+      </div>
+    );
+  };
 
   const selectedAccount = useMemo(
     () => accounts.find(a => String(a.id) === accountId) ?? null,
@@ -194,6 +215,7 @@ export function AssignIcloudModal({
                 value={accountId}
                 onChange={(v) => setAccountId((v as string) || null)}
                 placeholder={t('contract.icloud_pickAccount')}
+                renderOption={renderAccountOption}
                 showChevron
                 searchable
               />

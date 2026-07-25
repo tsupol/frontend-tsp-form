@@ -3683,6 +3683,8 @@
     "icloud_account": "iCloud account",
     "icloud_pickAccount": "Pick an iCloud account from the pool",
     "icloud_full": "full",
+    "icloud_slotsLeft_one": "{{count}} slot left",
+    "icloud_slotsLeft_other": "{{count}} slots left",
     "icloud_assignHint": "Locks this device to the selected iCloud account in the pool. Auto-releases the previous account if any.",
     "icloud_reason": "Reason",
     "icloud_assignSuccess": "iCloud account assigned",
