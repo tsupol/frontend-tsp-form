@@ -53,6 +53,9 @@ export function CompanyConfigDetailPage() {
     { key: 'pay_pending_limit', label: t('settings.config.payPendingLimit'), type: 'number', group: 'policy', min: 0, max: 99 },
     // repair_pickup_max_days: default pickup window for new repair orders (mig 671).
     { key: 'repair_pickup_max_days', label: t('settings.config.repairPickupMaxDays'), type: 'number', group: 'repair', min: 1, max: 365 },
+    // icloud_device_cap: max devices bindable per Apple ID (Apple ceiling ~20).
+    // BE enforces the same via CHECK; range check below rejects early.
+    { key: 'icloud_device_cap', label: t('settings.config.icloudDeviceCap'), type: 'number', group: 'icloud', min: 1, max: 20 },
   ];
 
   const groups = [
@@ -64,6 +67,7 @@ export function CompanyConfigDetailPage() {
     { key: 'buyback', label: t('settings.config.groupBuyback') },
     { key: 'policy', label: t('settings.config.groupPolicy') },
     { key: 'repair', label: t('settings.config.groupRepair') },
+    { key: 'icloud', label: t('settings.config.groupIcloud') },
   ];
 
   // Initialize form when config loads

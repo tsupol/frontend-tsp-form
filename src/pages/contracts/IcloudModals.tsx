@@ -14,6 +14,12 @@ interface ICloudAccountRow {
   branch_name: string;
   is_active: boolean;
   c_device_count: number;
+  // Per-company cap on devices bindable to one Apple ID (default 20). is_full =
+  // c_device_count >= device_cap → the option must be disabled. RPC enforces the
+  // cap regardless (MDM.VALIDATION.ACCOUNT_FULL); this is UX only.
+  device_cap: number;
+  remaining_slots: number;
+  is_full: boolean;
   // Masked by permission in the view (ICLOUD.ACCOUNT_REVEAL_PASSWORD): the real
   // password for those who may see it, null otherwise. No FE role check needed.
   password: string | null;
@@ -105,10 +111,14 @@ export function AssignIcloudModal({
     }
   }, [open]);
 
-  const { data: accounts = [] } = useQuery({
+  const { data: accounts = [], refetch: refetchAccounts } = useQuery({
     queryKey: ['icloud-accounts-available', branchId],
+    // Emptiest-first + only the top 5: staff use ~2 accounts per session, so the
+    // freest few are all that's needed — don't pull the whole pool. Capacity
+    // (count/cap) shown per option; full accounts render disabled. (IMPLEMENT
+    // 2026-07-24)
     queryFn: () => apiClient.get<ICloudAccountRow[]>(
-      `/v_icloud_accounts?branch_id=eq.${branchId}&is_active=is.true&order=apple_id&select=id,apple_id,registration_email,branch_id,branch_name,is_active,c_device_count,password`,
+      `/v_icloud_accounts?branch_id=eq.${branchId}&is_active=is.true&order=c_device_count.asc&limit=5&select=id,apple_id,registration_email,branch_id,branch_name,is_active,c_device_count,device_cap,remaining_slots,is_full,password`,
     ),
     staleTime: 30 * 1000,
     enabled: open,
@@ -119,9 +129,12 @@ export function AssignIcloudModal({
       .filter(a => a.id !== currentAccountId) // hide the currently-bound one
       .map(a => ({
         value: String(a.id),
-        label: `${a.apple_id} · ${a.c_device_count} devices`,
+        label: a.is_full
+          ? `${a.apple_id} · ${a.c_device_count}/${a.device_cap} · ${t('contract.icloud_full')}`
+          : `${a.apple_id} · ${a.c_device_count}/${a.device_cap}`,
+        disabled: a.is_full,
       })),
-    [accounts, currentAccountId],
+    [accounts, currentAccountId, t],
   );
 
   const selectedAccount = useMemo(
@@ -141,10 +154,22 @@ export function AssignIcloudModal({
       queryClient.invalidateQueries({ queryKey: ['contract-print-asset', assetId] });
       onSuccess();
     },
-    onError: (err) => setApiError(err, t, setError),
+    onError: (err) => {
+      setApiError(err, t, setError);
+      // The RPC is the hard cap. If the account filled up (race) or was
+      // deactivated between fetch and submit, the stale count is disproven —
+      // refetch so the picker shows current capacity + disables the full one.
+      if (err instanceof ApiError && (
+        err.code === 'MDM.VALIDATION.ACCOUNT_FULL'
+        || err.code === 'MDM.VALIDATION.ACCOUNT_NOT_FOUND_OR_INACTIVE'
+      )) {
+        setAccountId(null);
+        refetchAccounts();
+      }
+    },
   });
 
-  const canSubmit = !!accountId && !mutation.isPending;
+  const canSubmit = !!accountId && !selectedAccount?.is_full && !mutation.isPending;
 
   return (
     <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
