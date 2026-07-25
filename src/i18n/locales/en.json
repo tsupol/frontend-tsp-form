@@ -1668,6 +1668,7 @@
     "assetDetailTab": "Assets (itemized)",
     "search": "Search by name, model, variant",
     "assetSearch": "Search by name, serial, IMEI, code",
+    "sortByCondition": "By condition",
     "each": "each",
     "units": "units",
     "inTransit": "In transit",

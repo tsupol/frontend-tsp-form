@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useSearchParams, useNavigate, type NavigateFunction } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { MobileHeader, Badge, Select, Input, Button, PopOver, MenuItem } from 'tsp-form';
+import { MobileHeader, Badge, Select, Input, Button, PopOver, MenuItem, LabeledCheckbox } from 'tsp-form';
 import { Boxes, ScanBarcode, ArrowRightFromLine, ShoppingCart, Smartphone, MoreHorizontal, PackageMinus, Archive, Printer, FileSpreadsheet, ListChecks, ExternalLink } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { fmtCurrency } from '../../lib/format';
@@ -143,6 +143,7 @@ export function BranchStockPage() {
 
   const [tab, setTab] = useState<Tab>(initialTab);
   const [filterBranchId, setFilterBranchId] = useState<number | null>(initialBranchId);
+  const [sortByCondition, setSortByCondition] = useState(false);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [writeOffTarget, setWriteOffTarget] = useState<RetailWriteOffTarget | null>(null);
@@ -226,9 +227,12 @@ export function BranchStockPage() {
   });
 
   const { data: assetDetailRows, isFetching: assetDetailFetching } = useQuery({
-    queryKey: ['branch-stock', 'assetDetail', filterBranchId, debouncedSearch],
+    queryKey: ['branch-stock', 'assetDetail', filterBranchId, debouncedSearch, sortByCondition],
     queryFn: () => {
-      let url = '/v_branch_asset_detail?order=product_display_name,asset_code';
+      const order = sortByCondition
+        ? 'condition,product_display_name,asset_code'
+        : 'product_display_name,asset_code';
+      let url = `/v_branch_asset_detail?order=${order}`;
       if (filterBranchId) url += `&branch_id=eq.${filterBranchId}`;
       if (debouncedSearch) {
         const enc = encodeURIComponent(debouncedSearch);
@@ -550,6 +554,14 @@ export function BranchStockPage() {
             clearable
           />
         </div>
+        {tab === 'assetDetail' && (
+          <LabeledCheckbox
+            label={t('branchStock.sortByCondition', { defaultValue: 'By condition' })}
+            checked={sortByCondition}
+            onChange={(e) => setSortByCondition(e.target.checked)}
+            className="shrink-0 text-sm"
+          />
+        )}
         <div className="flex items-center gap-2 shrink-0 ml-auto">
           <Button
             size="sm"
