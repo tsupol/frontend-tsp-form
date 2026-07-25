@@ -2025,7 +2025,76 @@
     "addToQueue": "Add to print queue",
     "removeFromQueue": "Remove from print queue",
     "tab_overview": "Overview",
+    "tab_mdm": "MDM",
     "tab_security": "Device Lock",
+    "mdm": {
+      "title": "MDM enrollment",
+      "chip": "MDM",
+      "deviceInfo": "Device info",
+      "noStatus": "No MDM status for this device.",
+      "noPermission": "This device is ready to enroll, but you don't have permission to send it. A branch manager or company admin can do this.",
+      "enrolledSince": "In MDM since",
+      "prepareError": "Couldn't send the enrollment. Please try again.",
+      "step": {
+        "serial": "Record Serial/IMEI",
+        "scan": "Scan into ABM",
+        "send": "Send enrollment",
+        "wipe": "Wipe after scanning",
+        "enrolled": "Device enrolls + reports"
+      },
+      "stepWhere": {
+        "system": "in the system",
+        "device": "on the device",
+        "auto": "happens on its own"
+      },
+      "badge": {
+        "NO_SERIAL": {
+          "label": "No Serial/IMEI yet",
+          "sub": "Record the Serial/IMEI first before you can enroll."
+        },
+        "NOT_STARTED": {
+          "label": "Scan the device into ABM, then press this",
+          "sub": "If you haven't scanned it yet, wipe the device and scan it with Configurator first."
+        },
+        "PREPARING": {
+          "label": "Sending to Apple…",
+          "sub": "Usually under a minute."
+        },
+        "PROFILE_READY": {
+          "label": "Wipe the device after scanning now",
+          "sub": "Wipe it, then wait until the Remote Management screen appears."
+        },
+        "PREPARE_FAILED": {
+          "label": "Couldn't send — the device may not be scanned into ABM yet",
+          "sub": "Check in ABM that this device is there. The system will retry on its own within 1 hour."
+        },
+        "IN_MDM_WAITING": {
+          "label": "Device is in the system · waiting for it to report",
+          "sub": "Keep the device on and connected to the internet."
+        },
+        "IN_MDM_INFO": {
+          "label": "Device is in MDM",
+          "sub": "Device is in MDM."
+        }
+      },
+      "button": {
+        "prepare": "Send enrollment",
+        "retry": "Try sending again"
+      },
+      "afterPress": {
+        "title": "Sent — not finished yet",
+        "next": "Next: wipe the device after scanning, then wait until the Remote Management screen appears.",
+        "note": "The status changes on its own once the device enrolls — nothing more to press. (Enrolling in MDM isn't the end of handover — the customer still needs to sign in to iCloud and install the NNF App.)"
+      },
+      "info": {
+        "os": "iOS version",
+        "battery": "Battery",
+        "capacity": "Capacity",
+        "free": "free",
+        "supervised": "Supervised",
+        "reportedAt": "Last reported"
+      }
+    },
     "icloud_appleOnly": "iCloud applies to Apple devices only.",
     "icloud_account": "iCloud account",
     "icloud_password": "Password",

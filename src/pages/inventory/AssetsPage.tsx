@@ -20,6 +20,7 @@ import { AssetScreenTimeSection } from '../../components/AssetScreenTimeSection'
 import { ImeiInput } from '../../components/ImeiInput';
 import { getBucketLabel, getBucketColor, getConditionLabel, getConditionTextColor, CONDITION_VALUES, codeDisplay } from './inventoryUtils';
 import { RegisterAssetModal } from './RegisterAssetModal';
+import { AssetMdmTab } from './AssetMdmTab';
 import { SellExternalModal } from './SellExternalModal';
 import { SellOutRequestModal } from './SellOutRequestModal';
 import { OwnerBadge } from '../../components/OwnerBadge';
@@ -899,6 +900,9 @@ export function AssetsPage() {
                               EXT {asset.external_ref}
                             </span>
                           )}
+                          <span className={`text-[10px] shrink-0 ${getConditionTextColor(asset.condition_grade)}`}>
+                            {getConditionLabel(asset.condition_grade, t)}
+                          </span>
                         </div>
                         <div className="text-xs text-subtle truncate">
                           {asset.product_display_name ?? `${asset.brand_name} ${asset.family_name} · ${asset.variant_name}`}
@@ -907,9 +911,6 @@ export function AssetsPage() {
                           <Badge size="xs" color={getBucketColor(asset.current_bucket)}>
                             {getBucketLabel(asset.current_bucket, t)}
                           </Badge>
-                          <span className={`text-xs ${getConditionTextColor(asset.condition_grade)}`}>
-                            {getConditionLabel(asset.condition_grade, t)}
-                          </span>
                           <OwnerBadge ownerType={asset.owner_type as OwnerType | null} ownerName={asset.owner_name} size="xs" />
                         </div>
                       </div>
@@ -998,8 +999,8 @@ export function AssetsPage() {
 // Detail tabs
 // ============================================================================
 
-type AssetTab = 'overview' | 'security';
-const ASSET_TABS: AssetTab[] = ['overview', 'security'];
+type AssetTab = 'overview' | 'mdm' | 'security';
+const ASSET_TABS: AssetTab[] = ['overview', 'mdm', 'security'];
 
 function ScrollableTabs<T extends string>({ tabs, activeTab, onTabChange, renderLabel }: {
   tabs: readonly T[];
@@ -1165,6 +1166,10 @@ function AssetDetailPanel({
         onTabChange={handleTabChange}
         renderLabel={(tab) => t(`asset.tab_${tab}`)}
       />
+
+      {activeTab === 'mdm' && (
+        <AssetMdmTab assetId={asset.asset_id} onRefresh={onRefresh} />
+      )}
 
       {activeTab === 'security' && (
         <AssetDeviceLockTab asset={asset} t={t} onRefresh={onRefresh} addSnackbar={addSnackbar} />

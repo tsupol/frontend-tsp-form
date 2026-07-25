@@ -114,6 +114,8 @@ interface AssetDetailRow {
   bucket_name_th: string;
   bucket_scope: 'AT_BRANCH' | 'AT_REPAIR' | 'IN_TRANSIT';
   updated_at: string;
+  in_mdm: boolean;
+  mdm_since: string | null;
 }
 
 interface Branch {
@@ -963,6 +965,11 @@ function AssetDetailList({
                 <ExternalLink size={12} className="shrink-0" />
               </button>
               <Badge size="xs" color="default">{getConditionLabel(row.condition_grade, t)}</Badge>
+              {/* MDM chip — shown only when the device is enrolled; absence is
+                  normal, not an error (enrol only happens in-hand). */}
+              {row.in_mdm && (
+                <Badge size="xs" color="success">{t('asset.mdm.chip', { defaultValue: 'MDM' })}</Badge>
+              )}
             </div>
             <div className="text-xs text-subtle truncate">
               <button
