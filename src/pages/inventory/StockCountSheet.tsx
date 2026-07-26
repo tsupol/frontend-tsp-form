@@ -87,16 +87,16 @@ export function StockCountSheet({ branchName, tab, printedAt, printedBy, rows }:
   // physical device instead of writing a counted quantity.
   if (isAssetDetail) {
     return (
-      <div className="stock-count-sheet">
+      <div className="stock-count-sheet stock-count-sheet-landscape">
         {header}
-        <table className="scs-table">
+        <table className="scs-table scs-table-asset">
           <thead>
             <tr>
               <th className="scs-col-no">{t('branchStock.countSheet.no')}</th>
               <th className="scs-col-code">{t('branchStock.countSheet.assetCode')}</th>
               <th className="scs-col-name">{t('branchStock.countSheet.product')}</th>
               <th className="scs-col-serial">{t('branchStock.countSheet.serial')}</th>
-              <th className="scs-col-serial">{t('branchStock.countSheet.imei')}</th>
+              <th className="scs-col-imei">{t('branchStock.countSheet.imei')}</th>
               <th className="scs-col-cond">{t('branchStock.countSheet.grade')}</th>
               <th className="scs-col-batt">{t('branchStock.countSheet.battery')}</th>
               <th className="scs-col-status">{t('branchStock.countSheet.status')}</th>
@@ -112,7 +112,7 @@ export function StockCountSheet({ branchName, tab, printedAt, printedBy, rows }:
                 <td className="scs-col-code">{r.assetCode ?? '—'}</td>
                 <td className="scs-col-name">{r.productName}</td>
                 <td className="scs-col-serial">{r.serialNo ?? '—'}</td>
-                <td className="scs-col-serial">{r.imei ?? '—'}</td>
+                <td className="scs-col-imei">{r.imei ?? '—'}</td>
                 <td className="scs-col-cond">{r.grade ?? '—'}</td>
                 <td className="scs-col-batt">{r.battery != null ? `${r.battery}%` : '—'}</td>
                 <td className="scs-col-status">{r.bucketTh ?? '—'}</td>

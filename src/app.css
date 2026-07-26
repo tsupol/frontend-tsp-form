@@ -459,9 +459,13 @@ input[type="number"
 /* Stock-count sheet layout (shared screen + print — the component only ever
    renders off-screen for printing, so no separate screen styling needed). */
 .stock-count-sheet {
-    width: 186mm;
+    width: 186mm; /* A4 portrait content width (210 − 2×12mm margin) */
     color: #000;
     font-family: 'Sarabun', Tahoma, Arial, sans-serif;
+}
+/* Itemized sheet prints landscape → wider content box (297 − 2×12mm margin). */
+.stock-count-sheet-landscape {
+    width: 273mm;
 }
 .stock-count-sheet .scs-header {
     margin-bottom: 4mm;
@@ -505,13 +509,26 @@ input[type="number"
 .stock-count-sheet td.scs-col-qty { text-align: right; }
 .stock-count-sheet .scs-col-count { width: 24mm; }
 .stock-count-sheet .scs-col-note { width: 34mm; }
-/* Per-asset (itemized) sheet columns */
-.stock-count-sheet .scs-col-code { width: 26mm; }
-.stock-count-sheet .scs-col-serial { width: 28mm; }
-.stock-count-sheet .scs-col-batt { width: 12mm; text-align: center; }
+/* Per-asset (itemized) sheet — fixed layout with % widths so the table
+   stretches to fill landscape A4 (name + note columns absorb the extra width). */
+.stock-count-sheet .scs-table-asset { table-layout: fixed; }
+.stock-count-sheet .scs-table-asset .scs-col-no { width: 4%; }
+.stock-count-sheet .scs-table-asset .scs-col-code { width: 11%; }
+.stock-count-sheet .scs-table-asset .scs-col-name { width: 17%; }
+.stock-count-sheet .scs-table-asset .scs-col-serial { width: 9%; }
+.stock-count-sheet .scs-table-asset .scs-col-imei { width: 12%; }
+.stock-count-sheet .scs-table-asset .scs-col-cond { width: 6%; }
+.stock-count-sheet .scs-table-asset .scs-col-batt { width: 5%; text-align: center; }
+.stock-count-sheet .scs-table-asset .scs-col-status { width: 10%; }
+.stock-count-sheet .scs-table-asset .scs-col-ref { width: 7%; }
+.stock-count-sheet .scs-table-asset .scs-col-found { width: 5%; text-align: center; }
+.stock-count-sheet .scs-table-asset .scs-col-note { width: 14%; }
+.stock-count-sheet .scs-table-asset td { word-break: break-word; }
+/* Codes/serials/IMEI shouldn't split mid-token; the columns are sized to hold them. */
+.stock-count-sheet .scs-table-asset .scs-col-code,
+.stock-count-sheet .scs-table-asset .scs-col-serial,
+.stock-count-sheet .scs-table-asset .scs-col-imei { word-break: normal; overflow-wrap: anywhere; }
 .stock-count-sheet td.scs-col-batt { text-align: center; }
-.stock-count-sheet .scs-col-ref { width: 20mm; }
-.stock-count-sheet .scs-col-found { width: 16mm; text-align: center; }
 .stock-count-sheet td.scs-col-found { text-align: center; }
 .stock-count-sheet tbody td.scs-col-count,
 .stock-count-sheet tbody td.scs-col-note,
