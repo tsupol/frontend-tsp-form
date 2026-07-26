@@ -214,6 +214,7 @@ interface ActionHandlers {
   onIntake: () => void;
   onCancel: () => void;
   onCancelApproved: () => void;
+  onUpdateNote: () => void;
   validateFailingChecks: string[];
 }
 
@@ -229,6 +230,7 @@ function renderBuybackActionButton(a: BuybackAction, h: ActionHandlers): React.R
     BUYBACK_CONFIRM_INTAKE: h.onIntake,
     BUYBACK_CANCEL: h.onCancel,
     BUYBACK_CANCEL_APPROVED: h.onCancelApproved,
+    BUYBACK_UPDATE_NOTE: h.onUpdateNote,
   };
   const handler = onClick[a.action_code];
   // UPDATE_*/VALIDATE are catalog entries the FE doesn't open a modal for.
@@ -575,6 +577,7 @@ export function BuybackDetailPanel({
 }) {
   const [actionModal, setActionModal] = useState<BuybackActionKind | null>(null);
   const [intakeOpen, setIntakeOpen] = useState(false);
+  const [noteEditOpen, setNoteEditOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [lightboxKey, setLightboxKey] = useState<string | null>(null);
   const moreTriggerRef = useRef<HTMLButtonElement>(null);
@@ -844,6 +847,7 @@ export function BuybackDetailPanel({
             onIntake: () => setIntakeOpen(true),
             onCancel: () => setActionModal('cancel'),
             onCancelApproved: () => setActionModal('cancelApproved'),
+            onUpdateNote: () => setNoteEditOpen(true),
             validateFailingChecks: actionsResp?.validate_failing_checks ?? [],
           }))}
 
@@ -888,6 +892,7 @@ export function BuybackDetailPanel({
                                 onIntake: () => setIntakeOpen(true),
                                 onCancel: () => setActionModal('cancel'),
                                 onCancelApproved: () => setActionModal('cancelApproved'),
+                                onUpdateNote: () => setNoteEditOpen(true),
                                 validateFailingChecks: actionsResp?.validate_failing_checks ?? [],
                               })}
                             </div>
@@ -935,6 +940,26 @@ export function BuybackDetailPanel({
         onClose={() => { setIntakeOpen(false); onRefresh(); }}
         detail={detail}
         targetLineId={intakeAction?.target_line_id ?? null}
+      />
+
+      <BuybackNoteEditModal
+        open={noteEditOpen}
+        onClose={() => setNoteEditOpen(false)}
+        detail={detail}
+        totalPrice={totalPrice}
+        t={t}
+        onSuccess={() => {
+          setNoteEditOpen(false);
+          onRefresh();
+          addSnackbar({
+            message: (
+              <div className="alert alert-success">
+                <CheckCircle size={16} />
+                <span>{t('buyback.noteUpdated', { defaultValue: 'Note updated' })}</span>
+              </div>
+            ),
+          });
+        }}
       />
 
       <MediaLightbox
@@ -1361,6 +1386,103 @@ function BuybackActionModal({
             disabled={!canSubmit}
           >
             {mutation.isPending ? t('common.loading') : (action ? titleMap[action] : '')}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ============================================================================
+// Note Edit Modal — approver edits the request note while it awaits decision.
+// PENDING_APPROVAL only; permission surfaced via BUYBACK_UPDATE_NOTE action
+// (mig 885). Backend keeps the old note when a blank is sent, so we require a
+// non-empty, changed value.
+// ============================================================================
+
+function BuybackNoteEditModal({
+  open,
+  onClose,
+  detail,
+  totalPrice,
+  t,
+  onSuccess,
+}: {
+  open: boolean;
+  onClose: () => void;
+  detail: BuybackDetail;
+  totalPrice: number;
+  t: ReturnType<typeof useTranslation>['t'];
+  onSuccess: () => void;
+}) {
+  const [note, setNote] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (open) {
+      setNote(detail.notes ?? '');
+      setError('');
+    }
+  }, [open, detail.notes]);
+
+  const mutation = useMutation({
+    mutationFn: () => apiClient.rpc('fn_inv_buyback_update_note', {
+      p_po_id: detail.po_id,
+      p_note: note.trim(),
+    }),
+    onSuccess,
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setError(translated || err.message);
+      } else {
+        setError(String(err));
+      }
+    },
+  });
+
+  const trimmed = note.trim();
+  const changed = trimmed.length > 0 && trimmed !== (detail.notes ?? '').trim();
+  const canSave = changed && !mutation.isPending;
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
+      <div className="flex flex-col overflow-hidden">
+        <div className="modal-header">
+          <h2 className="modal-title">{t('buyback.editNote', { defaultValue: 'Edit note' })}</h2>
+          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+        </div>
+        <div className="modal-content">
+          {error && (
+            <div className="alert alert-danger mb-4 animate-pop-in">
+              <XCircle size={16} />
+              <span>{error}</span>
+            </div>
+          )}
+          <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
+            <div className="font-medium text-sm">{codeDisplay(detail.code_display, detail.po_no)}</div>
+            <div className="text-xs text-subtle">{detail.supplier_name}</div>
+            <div className="text-xs text-subtle">{detail.c_total_lines} {t('buyback.items')} · {fmtCurrency(totalPrice)}</div>
+          </div>
+
+          <div className="form-grid gap-4">
+            <div className="flex flex-col">
+              <label className="form-label">{t('buyback.note')}</label>
+              <TextArea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder={t('buyback.notePlaceholder')}
+                rows={4}
+                autoFocus
+              />
+            </div>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <Button onClick={onClose} disabled={mutation.isPending}>{t('common.cancel')}</Button>
+          <Button color="primary" onClick={() => mutation.mutate()} disabled={!canSave}>
+            {mutation.isPending ? t('common.loading') : t('common.save', { defaultValue: 'Save' })}
           </Button>
         </div>
       </div>

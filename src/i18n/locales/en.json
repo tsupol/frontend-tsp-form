@@ -124,7 +124,12 @@
       "grandTotal": "Grand total",
       "exportPdf": "PDF",
       "exportExcel": "Excel",
-      "exporting": "Exporting…"
+      "exporting": "Exporting…",
+      "export": "Export",
+      "byCategory": "By category",
+      "flat": "Flat list",
+      "flatPdf": "Flat PDF",
+      "flatExcel": "Flat Excel"
     },
     "errItemRequired": "Pick an item.",
     "errBranchRequired": "Pick a branch.",
@@ -3418,6 +3423,8 @@
     "poNo": "Buyback No.",
     "note": "Note",
     "notePlaceholder": "Optional note...",
+    "editNote": "Edit note",
+    "noteUpdated": "Note updated",
     "created": "Created",
     "submitted": "Submitted",
     "approved": "Approved",
@@ -3502,7 +3509,8 @@
     "BUYBACK_REVERT_DRAFT": "Revert to Draft",
     "BUYBACK_CONFIRM_INTAKE": "Confirm Intake",
     "BUYBACK_CANCEL": "Cancel Buyback",
-    "BUYBACK_CANCEL_APPROVED": "Cancel Approved Buyback"
+    "BUYBACK_CANCEL_APPROVED": "Cancel Approved Buyback",
+    "BUYBACK_UPDATE_NOTE": "Edit Note"
   },
   "buybackWizard": {
     "photosCount": "{{count}} photo(s)",

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
@@ -7,7 +8,7 @@ import {
 } from 'tsp-form';
 import {
   ArrowRightFromLine, Keyboard, Search, X, SlidersHorizontal,
-  CalendarRange, FileSpreadsheet, FileText, Loader2,
+  CalendarRange, FileSpreadsheet, FileText, Loader2, Download, ChevronDown,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -16,7 +17,9 @@ import {
 } from '../../lib/format';
 import type { ExpenseCategory, ExpenseSummaryRow, ExpenseReportRow } from './branchExpenseTypes';
 import {
-  downloadExpenseReportPdf, downloadExpenseReportXlsx, type ExpenseReportMeta,
+  downloadExpenseReportPdf, downloadExpenseReportXlsx,
+  downloadExpenseReportFlatPdf, downloadExpenseReportFlatXlsx,
+  type ExpenseReportMeta,
 } from './expenseReportExport';
 
 interface Branch {
@@ -25,6 +28,8 @@ interface Branch {
   name: string;
   company_id: number;
 }
+
+type ExportKey = 'pdf' | 'xlsx' | 'flatPdf' | 'flatXlsx';
 
 export function ExpenseSummaryPage() {
   const { t, i18n } = useTranslation();
@@ -108,10 +113,13 @@ export function ExpenseSummaryPage() {
     return d;
   };
 
-  // ── Date-range report export (PDF / Excel) ──────────────────────────────
-  // Both pull DETAIL rows from v_branch_expense_report (the on-screen list is a
-  // month rollup) with the same filters, grouped by category with subtotals.
-  const [exporting, setExporting] = useState<null | 'pdf' | 'xlsx'>(null);
+  // ── Date-range report export (PDF / Excel, grouped or flat) ─────────────
+  // All variants pull DETAIL rows from v_branch_expense_report (the on-screen
+  // list is a month rollup) with the same filters. Grouped = by-category bands
+  // + subtotals; flat = plain chronological list + grand total (holding request,
+  // UI_FEEDBACK/2026-07-26_DELIVERY_expense_flat_report.md).
+  const [exporting, setExporting] = useState<null | ExportKey>(null);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
 
   const selectedBranch = branches.find((b) => String(b.id) === branchId);
   const scopeLabel = selectedBranch
@@ -129,18 +137,32 @@ export function ExpenseSummaryPage() {
     return apiClient.get<ExpenseReportRow[]>(`/v_branch_expense_report?${params.join('&')}`);
   };
 
-  const runExport = async (kind: 'pdf' | 'xlsx') => {
+  const runExport = async (key: ExportKey) => {
     if (exporting) return;
-    setExporting(kind);
+    setExportMenuOpen(false);
+    setExporting(key);
     try {
       const reportRows = await fetchReportRows();
       const meta: ExpenseReportMeta = { scopeLabel, fromDate, toDate, lang: i18n.language };
       const branchTag = selectedBranch ? selectedBranch.code : 'all';
-      const filename = `expense-report_${branchTag}_${fromDate}_${toDate}`;
-      if (kind === 'pdf') {
-        await downloadExpenseReportPdf(reportRows, meta, t, filename);
-      } else {
-        await downloadExpenseReportXlsx(reportRows, meta, t, filename);
+      switch (key) {
+        case 'pdf':
+          await downloadExpenseReportPdf(reportRows, meta, t, `expense-report_${branchTag}_${fromDate}_${toDate}`);
+          break;
+        case 'xlsx':
+          await downloadExpenseReportXlsx(reportRows, meta, t, `expense-report_${branchTag}_${fromDate}_${toDate}`);
+          break;
+        case 'flatPdf': {
+          // Flat = same dataset, re-sorted chronologically (view sort is by category).
+          const flat = [...reportRows].sort((a, b) => a.expense_date.localeCompare(b.expense_date) || a.id - b.id);
+          await downloadExpenseReportFlatPdf(flat, meta, t, `expense-report-flat_${branchTag}_${fromDate}_${toDate}`);
+          break;
+        }
+        case 'flatXlsx': {
+          const flat = [...reportRows].sort((a, b) => a.expense_date.localeCompare(b.expense_date) || a.id - b.id);
+          await downloadExpenseReportFlatXlsx(flat, meta, t, `expense-report-flat_${branchTag}_${fromDate}_${toDate}`);
+          break;
+        }
       }
     } finally {
       setExporting(null);
@@ -177,26 +199,38 @@ export function ExpenseSummaryPage() {
       {/* Desktop header — matches ModelsPage / ICloudPoolPage / ExpenseEntriesPage */}
       <div className="flex-none px-4 py-2.5 border-b border-line items-center justify-between gap-4 max-md:hidden flex">
         <h1 className="heading-2">{t('branchExpense.summary')}</h1>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            startIcon={exporting === 'pdf' ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
-            onClick={() => runExport('pdf')}
-            disabled={rows.length === 0 || !!exporting}
-          >
-            {exporting === 'pdf' ? t('branchExpense.report.exporting') : t('branchExpense.report.exportPdf')}
-          </Button>
-          <Button
-            color="primary"
-            size="sm"
-            startIcon={exporting === 'xlsx' ? <Loader2 size={16} className="animate-spin" /> : <FileSpreadsheet size={16} />}
-            onClick={() => runExport('xlsx')}
-            disabled={rows.length === 0 || !!exporting}
-          >
-            {exporting === 'xlsx' ? t('branchExpense.report.exporting') : t('branchExpense.report.exportExcel')}
-          </Button>
-        </div>
+        <PopOver
+          isOpen={exportMenuOpen}
+          onClose={() => setExportMenuOpen(false)}
+          placement="bottom"
+          align="end"
+          maxWidth="260px"
+          trigger={
+            <Button
+              color="primary"
+              size="sm"
+              startIcon={exporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+              endIcon={<ChevronDown size={14} />}
+              onClick={() => setExportMenuOpen((v) => !v)}
+              disabled={rows.length === 0 || !!exporting}
+            >
+              {exporting ? t('branchExpense.report.exporting') : t('branchExpense.report.export')}
+            </Button>
+          }
+        >
+          <div className="flex flex-col py-1 min-w-[13rem]">
+            <div className="px-3 pt-2 pb-1 text-xs font-medium text-subtle uppercase tracking-wide">
+              {t('branchExpense.report.byCategory')}
+            </div>
+            <ExportMenuItem icon={<FileText size={15} />} label={t('branchExpense.report.exportPdf')} onClick={() => runExport('pdf')} />
+            <ExportMenuItem icon={<FileSpreadsheet size={15} />} label={t('branchExpense.report.exportExcel')} onClick={() => runExport('xlsx')} />
+            <div className="px-3 pt-3 pb-1 text-xs font-medium text-subtle uppercase tracking-wide border-t border-line mt-1">
+              {t('branchExpense.report.flat')}
+            </div>
+            <ExportMenuItem icon={<FileText size={15} />} label={t('branchExpense.report.exportPdf')} onClick={() => runExport('flatPdf')} />
+            <ExportMenuItem icon={<FileSpreadsheet size={15} />} label={t('branchExpense.report.exportExcel')} onClick={() => runExport('flatXlsx')} />
+          </div>
+        </PopOver>
       </div>
 
       {/* Filter bar — hand-tuned breakpoints, overflow PopOver, same pattern as ExpenseEntriesPage */}
@@ -391,6 +425,19 @@ export function ExpenseSummaryPage() {
         }
       />
     </div>
+  );
+}
+
+function ExportMenuItem({ icon, label, onClick }: { icon: ReactNode; label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-surface-muted cursor-pointer bg-transparent border-none w-full"
+    >
+      <span className="text-subtle shrink-0">{icon}</span>
+      <span>{label}</span>
+    </button>
   );
 }
 

@@ -245,3 +245,116 @@ export async function downloadExpenseReportXlsx(
 
   await downloadXlsx(out, columns, filename);
 }
+
+// ── FLAT report (no category grouping) — date · item(+note) · amount ──────────
+// holding request: a plain chronological list, no per-category bands/subtotals,
+// just a grand total at the bottom. Same dataset as the grouped export; caller
+// re-sorts by expense_date before handing rows in. See
+// UI_FEEDBACK/2026-07-26_DELIVERY_expense_flat_report.md.
+
+/** "item — note" (note appended when present), else just the item name. */
+function flatItemLabel(r: ExpenseReportRow): string {
+  return r.note ? `${r.item_name_th} — ${r.note}` : r.item_name_th;
+}
+
+export async function downloadExpenseReportFlatPdf(
+  rows: ExpenseReportRow[],
+  meta: ExpenseReportMeta,
+  t: TFunction,
+  filename: string,
+): Promise<void> {
+  const total = grandTotal(rows);
+
+  const content: Record<string, unknown>[] = [];
+
+  content.push({ text: t('branchExpense.report.title'), fontSize: 15, bold: true });
+  content.push({ text: meta.scopeLabel, fontSize: 11, margin: [0, 2, 0, 0] });
+  content.push({
+    text: t('branchExpense.report.dateRange', { from: shortDate(meta.fromDate), to: shortDate(meta.toDate) }),
+    fontSize: 10, color: GREY, margin: [0, 1, 0, 8],
+  });
+
+  const headerCell = (text: string, align: 'left' | 'right' = 'left') => ({
+    text, bold: true, fontSize: 9, alignment: align, color: GREY, margin: [0, 2, 0, 2],
+  });
+
+  const body: Record<string, unknown>[][] = [[
+    headerCell(t('branchExpense.report.date')),
+    headerCell(t('branchExpense.report.item')),
+    headerCell(t('branchExpense.report.amount'), 'right'),
+  ]];
+
+  for (const r of rows) {
+    body.push([
+      { text: shortDate(r.expense_date), fontSize: 9, margin: [0, 1.5, 0, 1.5] },
+      { text: flatItemLabel(r), fontSize: 9, margin: [0, 1.5, 0, 1.5] },
+      { text: fmtCurrency(r.amount), fontSize: 9, alignment: 'right', margin: [0, 1.5, 0, 1.5] },
+    ]);
+  }
+
+  // Grand total row inside the same table.
+  body.push([
+    { text: t('branchExpense.report.grandTotal'), bold: true, fontSize: 10, colSpan: 2, margin: [0, 3, 0, 3] },
+    {},
+    { text: fmtCurrency(total), bold: true, fontSize: 10, alignment: 'right', margin: [0, 3, 0, 3] },
+  ]);
+
+  content.push({
+    table: { headerRows: 1, widths: ['auto', '*', 'auto'], body },
+    layout: {
+      hLineWidth: (i: number, node: { table: { body: unknown[] } }) =>
+        (i === 1 || i === node.table.body.length - 1 || i === node.table.body.length ? 0.7 : 0.3),
+      vLineWidth: () => 0,
+      hLineColor: (i: number, node: { table: { body: unknown[] } }) =>
+        (i === node.table.body.length - 1 || i === node.table.body.length ? LINE : '#cccccc'),
+      paddingLeft: () => 4,
+      paddingRight: () => 4,
+    },
+  });
+
+  const def = {
+    pageSize: 'A4',
+    pageMargins: [32, 32, 32, 40],
+    defaultStyle: { font: 'Sarabun', fontSize: 10, color: '#000000', lineHeight: 1.15 },
+    footer: (currentPage: number, pageCount: number) => ({
+      text: `${currentPage} / ${pageCount}`,
+      fontSize: 8, color: GREY, alignment: 'center', margin: [0, 8, 0, 0],
+    }),
+    content,
+  };
+
+  const pdfMake = await getPdfMake();
+  pdfMake.createPdf(def).download(filename.endsWith('.pdf') ? filename : `${filename}.pdf`);
+}
+
+export async function downloadExpenseReportFlatXlsx(
+  rows: ExpenseReportRow[],
+  _meta: ExpenseReportMeta,
+  t: TFunction,
+  filename: string,
+): Promise<void> {
+  const total = grandTotal(rows);
+
+  // note kept as its own column so it stays filter/sort-able in Excel.
+  const columns: XlsxColumn[] = [
+    { key: 'date', label: t('branchExpense.report.date'), type: 'date', width: 12 },
+    { key: 'item', label: t('branchExpense.report.item'), width: 28 },
+    { key: 'note', label: t('branchExpense.report.note'), width: 28 },
+    { key: 'amount', label: t('branchExpense.report.amount'), type: 'number', width: 14 },
+  ];
+
+  const out: Record<string, unknown>[] = rows.map((r) => ({
+    date: r.expense_date,
+    item: r.item_name_th,
+    note: r.note ?? '',
+    amount: r.amount,
+  }));
+
+  out.push({
+    date: '', item: '',
+    note: t('branchExpense.report.grandTotal'),
+    amount: total,
+  });
+
+  await downloadXlsx(out, columns, filename);
+}

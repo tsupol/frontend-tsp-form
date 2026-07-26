@@ -123,7 +123,12 @@
       "grandTotal": "รวมทั้งสิ้น",
       "exportPdf": "PDF",
       "exportExcel": "Excel",
-      "exporting": "กำลังส่งออก…"
+      "exporting": "กำลังส่งออก…",
+      "export": "ส่งออก",
+      "byCategory": "แยกหมวด",
+      "flat": "แบบแยกรายการ",
+      "flatPdf": "PDF แบบแยกรายการ",
+      "flatExcel": "Excel แบบแยกรายการ"
     },
     "errItemRequired": "ต้องเลือกรายการ",
     "errBranchRequired": "ต้องเลือกสาขา",
@@ -3414,6 +3419,8 @@
     "poNo": "เลขที่รับซื้อคืน",
     "note": "หมายเหตุ",
     "notePlaceholder": "หมายเหตุ (ไม่บังคับ)...",
+    "editNote": "แก้ไขหมายเหตุ",
+    "noteUpdated": "อัปเดตหมายเหตุแล้ว",
     "created": "สร้างเมื่อ",
     "submitted": "ส่งเมื่อ",
     "approved": "อนุมัติเมื่อ",
@@ -3498,7 +3505,8 @@
     "BUYBACK_REVERT_DRAFT": "ย้อนกลับเป็นร่าง",
     "BUYBACK_CONFIRM_INTAKE": "ยืนยันรับเข้า",
     "BUYBACK_CANCEL": "ยกเลิกการซื้อคืน",
-    "BUYBACK_CANCEL_APPROVED": "ยกเลิกการซื้อคืนที่อนุมัติแล้ว"
+    "BUYBACK_CANCEL_APPROVED": "ยกเลิกการซื้อคืนที่อนุมัติแล้ว",
+    "BUYBACK_UPDATE_NOTE": "แก้ไขหมายเหตุ"
   },
   "buybackWizard": {
     "photosCount": "{{count}} รูป",
