@@ -956,7 +956,7 @@ export function AssetsPage() {
               />
             </PageNavPanel>
 
-            <PageNavPanel id="detail" className={isMobile ? '' : 'flex-1 flex flex-col'}>
+            <PageNavPanel id="detail" className={isMobile ? '' : 'flex-1 min-w-0 flex flex-col'}>
               {selectedAsset ? (
                 <AssetDetailPanel
                   asset={selectedAsset}

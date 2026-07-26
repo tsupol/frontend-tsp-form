@@ -2109,7 +2109,11 @@
       "subtab": {
         "enroll": "Enroll device",
         "status": "Status & queue",
-        "dunning": "Dunning"
+        "dunning": "Dunning",
+        "wallpaper": "Wallpaper",
+        "appControl": "App control",
+        "lostMode": "Lost mode & location",
+        "pause": "Pause enforcement"
       },
       "goToEnroll": "This device isn't in MDM yet — enroll it first",
       "ack": {
@@ -2206,6 +2210,67 @@
           "desc": "Enforce needs a default dunning image. Set one in branch wallpaper settings first.",
           "goSettings": "Go to wallpaper settings"
         }
+      },
+      "wallpaper": {
+        "intro": "Send a wallpaper to the device without locking it. For real dunning use the Dunning tab (it also locks).",
+        "send": "Send wallpaper",
+        "confirmTitle": "Send this wallpaper?",
+        "confirmBody": "This changes the device's wallpaper. It won't be locked — the customer can change it back.",
+        "emptyTitle": "This branch has no wallpapers",
+        "emptyDesc": "Add images in branch wallpaper settings first.",
+        "goSettings": "Go to wallpaper settings"
+      },
+      "appControl": {
+        "intro": "Choose an app set the device is allowed to use, preview it, then apply.",
+        "presetLabel": "App set",
+        "presetPlaceholder": "Choose a set",
+        "preview": "Preview",
+        "previewTitle": "Preview",
+        "appCount": "{{count}} apps will be allowed",
+        "baselineNote": "Essential apps (phone, messages, settings, NNF App…) are always included so the device stays usable.",
+        "apply": "Apply to device"
+      },
+      "lost": {
+        "title": "Lost Mode",
+        "on": "On",
+        "off": "Off",
+        "enableHint": "Locks the device and shows your message + phone on the lock screen. Both are required.",
+        "message": "Lock-screen message",
+        "messagePlaceholder": "e.g. This device is managed by NNF. Please call to return it.",
+        "phone": "Contact phone",
+        "phonePlaceholder": "Callable from the lock screen",
+        "enable": "Enable Lost Mode",
+        "disable": "Disable Lost Mode",
+        "playSound": "Play sound"
+      },
+      "location": {
+        "title": "Location",
+        "needLostMode": "Location is only available while Lost Mode is on.",
+        "request": "Request location",
+        "readLatest": "Show latest location",
+        "none": "No location reported yet. Enable Lost Mode, then request a location.",
+        "current": "Current location ·",
+        "asOf": "As of",
+        "googleMaps": "Google Maps",
+        "appleMaps": "Apple Maps"
+      },
+      "pause": {
+        "intro": "Pause enforcement when you shouldn't act on this device yet — the customer is negotiating, promised a pay date, or it's under legal hold.",
+        "reasonLabel": "Reason",
+        "reasonPlaceholder": "Why is enforcement paused?",
+        "durationLabel": "Duration",
+        "auto48": "48 hours (auto-resume)",
+        "auto48Hint": "The safe default — resumes on its own so a device is never dropped silently.",
+        "untilDate": "Until a date",
+        "indefiniteOption": "Indefinite",
+        "indefiniteHint": "Legal hold only. No expiry.",
+        "willResume48": "Enforcement resumes automatically in 48 hours.",
+        "willResumeDate": "Enforcement resumes automatically on the chosen date.",
+        "pauseButton": "Pause enforcement",
+        "activeTitle": "Enforcement is paused",
+        "resume": "Resume now",
+        "resumeElsewhere": "To resume, use the enforcement-pause list.",
+        "indefinite": "Paused indefinitely (legal hold)."
       }
     },
     "icloud_appleOnly": "iCloud applies to Apple devices only.",

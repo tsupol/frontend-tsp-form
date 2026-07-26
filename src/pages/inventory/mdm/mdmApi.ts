@@ -171,6 +171,136 @@ export function fetchBranchWallpapers(branchId: number): Promise<BranchWallpaper
   return apiClient.get<BranchWallpaper[]>(`/v_branch_mdm_wallpaper_config?branch_id=eq.${branchId}`);
 }
 
+// ── Sub-tab 4: wallpaper (single push, no lock; §6) ─────────────────────────
+// No preview (§11.5). No p_actor_id (§11.2). Omit p_wallpaper_asset_id = branch
+// default. Returns the standard async ack.
+export function setWallpaperFromLibrary(params: {
+  p_asset_id: number;
+  p_wallpaper_asset_id?: number | null;
+  p_where?: number | null;
+}): Promise<MdmIntentAck> {
+  return apiClient.rpc<MdmIntentAck>('fn_mdm_set_wallpaper_from_library', params);
+}
+
+// ── Sub-tab 5: app control (§7) ─────────────────────────────────────────────
+export interface MdmWhitelistPreset {
+  preset_key: string;
+  display_name: string;
+  bundle_ids: string[];
+  sort_order: number;
+}
+export function fetchWhitelistPresets(): Promise<MdmWhitelistPreset[]> {
+  return apiClient.get<MdmWhitelistPreset[]>('/v_mdm_whitelist_preset?order=sort_order');
+}
+
+export interface ApplyPresetResult {
+  preview: boolean;
+  asset_id: number;
+  serial: string;
+  preset_key: string;
+  preset_id: number;
+  preset_scope: string;
+  app_count: number;
+  bundle_ids: string[];
+  payload_identifier: string;
+  intent_id?: number; // absent on preview
+}
+// ⚠️ p_preview defaults to TRUE server-side (§7). ALWAYS pass it explicitly;
+// forgetting false = no real command sent, silently (§3.2).
+export function applyAppWhitelist(assetId: number, presetKey: string, preview: boolean): Promise<ApplyPresetResult> {
+  return apiClient.rpc<ApplyPresetResult>('fn_mdm_apply_app_whitelist_by_preset', {
+    p_asset_id: assetId,
+    p_preset_key: presetKey,
+    p_preview: preview,
+  });
+}
+
+// ── Sub-tab 6: lost mode & location (§8) ────────────────────────────────────
+// These take p_actor_id (§11.2). enable requires message + phone (both).
+export function enableLostMode(p: {
+  p_asset_id: number; p_actor_id: number; p_lock_message: string; p_phone_number: string; p_footnote?: string | null;
+}): Promise<MdmIntentAck> {
+  return apiClient.rpc<MdmIntentAck>('fn_mdm_enable_lost_mode', p);
+}
+export function disableLostMode(assetId: number, actorId: number): Promise<MdmIntentAck> {
+  return apiClient.rpc<MdmIntentAck>('fn_mdm_disable_lost_mode', { p_asset_id: assetId, p_actor_id: actorId });
+}
+export function playLostModeSound(assetId: number, actorId: number): Promise<MdmIntentAck> {
+  return apiClient.rpc<MdmIntentAck>('fn_mdm_play_lost_mode_sound', { p_asset_id: assetId, p_actor_id: actorId });
+}
+export function requestLocation(assetId: number, actorId: number): Promise<MdmIntentAck> {
+  return apiClient.rpc<MdmIntentAck>('fn_mdm_request_location', { p_asset_id: assetId, p_actor_id: actorId });
+}
+
+// v_mdm_device_overview — the device-reported lost-mode flag (§3, §6).
+export interface MdmDeviceOverview {
+  asset_id: number;
+  is_mdm_lost_mode_enabled: boolean | null;
+}
+export function fetchDeviceOverview(assetId: number): Promise<MdmDeviceOverview | null> {
+  return apiClient
+    .get<MdmDeviceOverview[]>(`/v_mdm_device_overview?asset_id=eq.${assetId}`)
+    .then((r) => r[0] ?? null);
+}
+
+// fn_mdm_read_locations — uses p_enrollment_id (NOT asset_id), no p_actor_id.
+// Returns the latest location object, or null if the device never reported.
+export interface MdmLocation {
+  lat: number;
+  lon: number;
+  accuracy_m: number | null;
+  reported_at: string;
+  received_at: string | null;
+  is_stale: boolean;
+  staleness_band: string | null;
+  enrollment_id: number;
+}
+export function readLocations(enrollmentId: number): Promise<MdmLocation | null> {
+  return apiClient.rpc<MdmLocation | null>('fn_mdm_read_locations', { p_enrollment_id: enrollmentId });
+}
+
+// ── Sub-tab 7: enforcement pause (§9) — DB-only, no device command ───────────
+// NOTE: v_mdm_enforcement_pauses is keyed on device_id/contract_id and exposes
+// NO asset_id — and v_asset_mdm_status has no device_id — so the FE can't scope
+// the list to an asset. We filter by enrollment_id when present (best available
+// device-side key). Filed as ASK 2026-07-26 (add asset_id to the view). Until
+// then, whether/until a device is paused comes from v_asset_mdm_status; this
+// list only yields the pause_id needed to resume.
+export interface MdmEnforcementPause {
+  pause_id: number;
+  target_type: string;
+  device_id: number | null;
+  contract_id: number | null;
+  intent_id: number | null;
+  pause_reason: string;
+  expires_at: string | null;
+  is_indefinite: boolean;
+  paused_at: string;
+  paused_by: number | null;
+}
+export function fetchEnforcementPauses(enrollmentId: number | null): Promise<MdmEnforcementPause[]> {
+  // No enrollment → nothing to key on; return empty rather than an unfiltered list.
+  if (enrollmentId == null) return Promise.resolve([]);
+  return apiClient.get<MdmEnforcementPause[]>(
+    `/v_mdm_enforcement_pauses?order=paused_at.desc`,
+  );
+}
+export interface PauseResult {
+  pause_id: number;
+  target: 'device' | 'contract';
+  expires_at: string | null;
+  indefinite: boolean;
+}
+// Omit p_until = 48h auto-expire. p_indefinite needs MDM.PAUSE_INDEFINITE.
+export function pauseEnforcement(p: {
+  p_asset_id: number; p_reason: string; p_until?: string | null; p_indefinite?: boolean;
+}): Promise<PauseResult> {
+  return apiClient.rpc<PauseResult>('fn_mdm_pause_enforcement', p);
+}
+export function resumeEnforcement(pauseId: number, reason?: string): Promise<{ pause_id: number; resumed: boolean }> {
+  return apiClient.rpc('fn_mdm_resume_enforcement', { p_pause_id: pauseId, p_reason: reason ?? null });
+}
+
 // ============================================================================
 // Error normalisation (§11.4) — the one place MDM errors get decoded.
 //
