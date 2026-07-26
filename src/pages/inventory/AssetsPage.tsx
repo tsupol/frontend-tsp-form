@@ -21,6 +21,7 @@ import { ImeiInput } from '../../components/ImeiInput';
 import { getBucketLabel, getBucketColor, getConditionLabel, getConditionTextColor, CONDITION_VALUES, codeDisplay } from './inventoryUtils';
 import { RegisterAssetModal } from './RegisterAssetModal';
 import { AssetMdmTab } from './AssetMdmTab';
+import { ScrollableTabs } from './ScrollableTabs';
 import { SellExternalModal } from './SellExternalModal';
 import { SellOutRequestModal } from './SellOutRequestModal';
 import { OwnerBadge } from '../../components/OwnerBadge';
@@ -1002,76 +1003,6 @@ export function AssetsPage() {
 type AssetTab = 'overview' | 'mdm' | 'security';
 const ASSET_TABS: AssetTab[] = ['overview', 'mdm', 'security'];
 
-function ScrollableTabs<T extends string>({ tabs, activeTab, onTabChange, renderLabel }: {
-  tabs: readonly T[];
-  activeTab: T;
-  onTabChange: (tab: T) => void;
-  renderLabel: (tab: T) => React.ReactNode;
-}) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
-
-  const checkScroll = useCallback(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    setCanScrollLeft(el.scrollLeft > 0);
-    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
-  }, []);
-
-  useEffect(() => {
-    checkScroll();
-    const el = scrollRef.current;
-    if (!el) return;
-    el.addEventListener('scroll', checkScroll, { passive: true });
-    const ro = new ResizeObserver(checkScroll);
-    ro.observe(el);
-    return () => { el.removeEventListener('scroll', checkScroll); ro.disconnect(); };
-  }, [checkScroll]);
-
-  const scroll = (dir: 'left' | 'right') => {
-    const el = scrollRef.current;
-    if (!el) return;
-    el.scrollBy({ left: dir === 'left' ? -120 : 120, behavior: 'smooth' });
-  };
-
-  return (
-    <div className="flex-none relative border-b border-line">
-      {canScrollLeft && (
-        <button
-          className="absolute left-0 top-0 bottom-0 z-10 w-7 flex items-center justify-center bg-bg border-r border-line cursor-pointer border-y-0 border-l-0"
-          onClick={() => scroll('left')}
-        >
-          <ChevronLeft size={14} className="text-subtle" />
-        </button>
-      )}
-      <div ref={scrollRef} className="flex px-2 overflow-x-auto hidden-scroll">
-        {tabs.map(tab => (
-          <button
-            key={tab}
-            className={`py-2 px-3 text-sm font-medium transition-colors cursor-pointer border-b-2 whitespace-nowrap ${
-              activeTab === tab
-                ? 'border-primary-fg text-primary-fg'
-                : 'border-transparent text-fg'
-            }`}
-            onClick={() => onTabChange(tab)}
-          >
-            {renderLabel(tab)}
-          </button>
-        ))}
-      </div>
-      {canScrollRight && (
-        <button
-          className="absolute right-0 top-0 bottom-0 z-10 w-7 flex items-center justify-center bg-bg border-l border-line cursor-pointer border-y-0 border-r-0"
-          onClick={() => scroll('right')}
-        >
-          <ChevronRight size={14} className="text-subtle" />
-        </button>
-      )}
-    </div>
-  );
-}
-
 // ============================================================================
 // Detail panel
 // ============================================================================
@@ -1146,16 +1077,20 @@ function AssetDetailPanel({
     <div className="relative flex flex-col h-full">
       {/* Desktop header */}
       {!isMobile && (
-        <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
-          <span className="font-semibold">{codeDisplay(asset.asset_code_display, asset.asset_code)}</span>
-          <CopyButton value={codeDisplay(asset.asset_code_display, asset.asset_code)} />
-          <Badge size="xs" color={getBucketColor(asset.current_bucket)}>
-            {getBucketLabel(asset.current_bucket, t)}
-          </Badge>
-          <OwnerBadge ownerType={asset.owner_type as OwnerType | null} ownerName={asset.owner_name} size="xs" />
-          <span className={`text-xs ${getConditionTextColor(asset.condition_grade)}`}>
-            {getConditionLabel(asset.condition_grade, t)}
-          </span>
+        <div className="flex-none px-4 py-2.5 border-b border-line flex flex-col gap-1.5">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="font-semibold truncate">{codeDisplay(asset.asset_code_display, asset.asset_code)}</span>
+            <CopyButton value={codeDisplay(asset.asset_code_display, asset.asset_code)} />
+          </div>
+          <div className="flex items-center flex-wrap gap-x-2 gap-y-1">
+            <Badge size="xs" color={getBucketColor(asset.current_bucket)}>
+              {getBucketLabel(asset.current_bucket, t)}
+            </Badge>
+            <OwnerBadge ownerType={asset.owner_type as OwnerType | null} ownerName={asset.owner_name} size="xs" />
+            <span className={`text-xs ${getConditionTextColor(asset.condition_grade)}`}>
+              {getConditionLabel(asset.condition_grade, t)}
+            </span>
+          </div>
         </div>
       )}
 

@@ -384,6 +384,8 @@
     "navRetail": "ขายปลีก",
     "navLease": "ปล่อยเช่า",
     "branchStock": "สต๊อกสาขา",
+    "internalUseStock": "สต๊อกใช้ภายใน",
+    "myAssets": "สินทรัพย์ที่ถือไว้",
     "retail": "ขายปลีก",
     "company": "Company",
     "companyConfig": "ตั้งค่า Company",
@@ -1724,6 +1726,14 @@
       "value": "มูลค่า"
     }
   },
+  "internalUse": {
+    "custodian": "ผู้ถือครอง",
+    "custodianUsername": "ชื่อผู้ใช้",
+    "assignedAt": "มอบหมายเมื่อ"
+  },
+  "myAssets": {
+    "subtitle": "เครื่องใช้ภายในที่คุณถือครองอยู่ในขณะนี้"
+  },
   "barcodes": {
     "title": "บาร์โค้ดสินค้า",
     "scanPlaceholder": "สแกนหรือพิมพ์บาร์โค้ด แล้วกด Enter…",
@@ -2011,6 +2021,8 @@
     "registerRetailOverride": "ราคาขาย (กำหนดเอง)",
     "registerSubmit": "ลงทะเบียน",
     "registerDone": "ลงทะเบียนเครื่องแล้ว",
+    "registerViewAsset": "เปิดหน้าเครื่อง",
+    "registerViewExisting": "ดูเครื่องที่มีอยู่",
     "registerNoBranch": "คุณไม่มีสาขาที่ลงทะเบียนเครื่องเข้าสต็อกได้",
     "printSticker": "พิมพ์สติกเกอร์",
     "printQueue": "คิวพิมพ์",
@@ -2090,6 +2102,107 @@
         "free": "ว่าง",
         "supervised": "Supervised",
         "reportedAt": "รายงานล่าสุด"
+      },
+      "subtab": {
+        "enroll": "นำเครื่องเข้าระบบ",
+        "status": "สถานะ & คิวงาน",
+        "dunning": "การทวงถาม"
+      },
+      "goToEnroll": "เครื่องนี้ยังไม่อยู่ในระบบ MDM — นำเครื่องเข้าระบบก่อน",
+      "ack": {
+        "title": "รับทราบแล้ว เดี๋ยวระบบจัดการให้",
+        "desc": "คำสั่งเข้าคิวแล้ว เครื่องจะทำเมื่อเช็คอินเข้ามา ตามผลได้ที่คิวด้านล่าง — ปิดหน้านี้ไปได้เลย"
+      },
+      "pausedBar": {
+        "title": "กำลังพักการบังคับใช้",
+        "generic": "คำสั่งทวงถามจะไม่ถูกส่งขณะที่เครื่องนี้ถูกพัก",
+        "until": "พักถึง",
+        "indefinite": "พักไม่มีกำหนด (ติดคดี)",
+        "manage": "จัดการการพัก"
+      },
+      "status": {
+        "enrollState": "สถานะการเข้าระบบ",
+        "inMdm": "อยู่ใน MDM",
+        "notInMdm": "ยังไม่อยู่ใน MDM",
+        "since": "เข้าระบบเมื่อ",
+        "lastSeen": "เห็นล่าสุด",
+        "serial": "Serial",
+        "pullHint": "ดึงข้อมูลล่าสุดจากเครื่อง",
+        "pullProfiles": "ดึงโปรไฟล์",
+        "pullApps": "ดึงรายการแอป"
+      },
+      "queue": {
+        "title": "คิวคำสั่ง",
+        "empty": "ยังไม่มีคำสั่ง",
+        "viewAll": "ดูทั้งหมด",
+        "staff": "พนักงาน",
+        "system": "ระบบ",
+        "engineer": "ทีมช่าง",
+        "attempt": "ครั้งที่ {{n}}/{{max}}",
+        "status": {
+          "DONE": "สำเร็จ",
+          "IN_PROGRESS": "กำลังดำเนินการ",
+          "FAILED": "ล้มเหลว",
+          "CANCELED": "ยกเลิก"
+        }
+      },
+      "intentType": {
+        "SET_WALLPAPER": "เปลี่ยนภาพพื้นหลัง",
+        "LOCK_WALLPAPER": "ล็อกภาพพื้นหลัง",
+        "UNLOCK_WALLPAPER": "ปลดล็อกภาพพื้นหลัง",
+        "APPLY_APP_WHITELIST": "ใช้ชุดแอป",
+        "APPLY_RESTRICTION_PROFILE": "ใช้ข้อจำกัดการใช้งาน",
+        "REMOVE_RESTRICTION_PROFILE": "ถอนข้อจำกัดการใช้งาน",
+        "ENABLE_LOST_MODE": "เปิดโหมดสูญหาย",
+        "DISABLE_LOST_MODE": "ปิดโหมดสูญหาย",
+        "PLAY_LOST_MODE_SOUND": "เล่นเสียง",
+        "REQUEST_LOCATION": "ขอตำแหน่ง",
+        "QUERY_PROFILES": "ดึงโปรไฟล์",
+        "QUERY_APPS": "ดึงรายการแอป"
+      },
+      "outcome": {
+        "CANCELED_MANUAL_PAUSE": "ถูกพักการบังคับใช้อยู่",
+        "CANCELED_DEVICE_NOT_WITH_CUSTOMER": "เครื่องไม่ได้อยู่กับลูกค้า (อยู่กับเรา/ซ่อม)",
+        "CANCELED_DEVICE_UNRESOLVED": "ยังระบุเครื่องของสัญญานี้ไม่ได้",
+        "CANCELED_PAYMENT_POSTED": "ลูกค้าชำระแล้ว",
+        "CANCELED_CONTRACT_PAUSED": "สัญญาถูกพัก",
+        "CANCELED_APPOINTMENT": "มีนัดหมายอยู่",
+        "CANCELED_LEGAL_HOLD": "อยู่ระหว่างดำเนินคดี",
+        "MDM.DEVICE.ERROR": "เครื่องปฏิเสธคำสั่ง",
+        "MDM.DEVICE.NOT_NOW_EXHAUSTED": "เครื่องบอก \"ยังไม่พร้อม\" หลายครั้งจนเลิกพยายาม",
+        "MDM.SWEEPER.EXPIRED_PAST_DEADLINE": "ส่งไม่ถึงเครื่องในเวลาที่กำหนด"
+      },
+      "dunning": {
+        "intro": "บังคับใช้ = เปลี่ยนภาพพื้นหลังเป็นภาพทวงของสาขาแล้วล็อกไม่ให้ลูกค้าเปลี่ยนกลับ · ปลดการบังคับใช้ = ปลดล็อก (และเปลี่ยนเป็นภาพกลาง)",
+        "deviceLabel": "เครื่อง",
+        "imageToSend": "ภาพที่จะส่ง",
+        "enforce": {
+          "title": "บังคับใช้",
+          "desc": "เปลี่ยนเป็นภาพทวงและล็อกไม่ให้ลูกค้าเปลี่ยนกลับ",
+          "button": "บังคับใช้",
+          "confirmTitle": "บังคับใช้การทวงถาม?",
+          "confirmBody": "จะเปลี่ยนภาพพื้นหลังของลูกค้าและล็อกไว้ ลูกค้าจะเห็นภาพทวงของสาขาและเปลี่ยนกลับเองไม่ได้จนกว่าจะปลด",
+          "confirmButton": "บังคับใช้"
+        },
+        "release": {
+          "title": "ปลดการบังคับใช้",
+          "desc": "ปลดล็อกเครื่องและเปลี่ยนเป็นภาพกลาง",
+          "button": "ปลดการบังคับใช้",
+          "confirmTitle": "ปลดการบังคับใช้?",
+          "confirmBody": "จะปลดล็อกเครื่องและเปลี่ยนเป็นภาพกลาง",
+          "confirmButton": "ปลดการบังคับใช้"
+        },
+        "neutralSkip": {
+          "title": "ปลดล็อกแล้ว — แต่ภาพยังเป็นภาพเดิม",
+          "no_wallpaper_permission": "ปลดล็อกเครื่องแล้ว แต่ยังไม่ได้เปลี่ยนภาพกลับ (คุณไม่มีสิทธิ์ภาพพื้นหลัง)",
+          "no_neutral_configured": "ปลดล็อกเครื่องแล้ว แต่ holding นี้ยังไม่มีภาพกลางที่ตั้งไว้",
+          "unknown": "ปลดล็อกเครื่องแล้ว แต่ยังไม่ได้เปลี่ยนภาพกลับ"
+        },
+        "noDefault": {
+          "title": "สาขานี้ยังไม่มีภาพหลัก",
+          "desc": "การบังคับใช้ต้องมีภาพทวงที่เป็นภาพหลัก ตั้งภาพหลักที่หน้าตั้งค่าภาพพื้นหลังของสาขาก่อน",
+          "goSettings": "ไปหน้าตั้งค่าภาพพื้นหลัง"
+        }
       }
     },
     "icloud_appleOnly": "iCloud ใช้ได้เฉพาะเครื่อง Apple เท่านั้น",
@@ -5044,6 +5157,8 @@
       "flagRefundHigh": "คืนเงิน %",
       "flagGiftCostHigh": "ของแถม",
       "unclosedBadge": "ยังไม่ปิด",
+      "voidedOnlyBadge": "บิลถูกยกเลิก {{count}} ใบ",
+      "voidedOnlyDesc": "บิลทุกใบของวันนี้ถูกยกเลิก · ค้าง {{days}} วัน",
       "unclosedDesc": "{{count}} บิล · ค้าง {{days}} วัน",
       "unclosedTitle": "วันก่อนหน้ายังไม่ปิด",
       "unclosedMessage": "มี {{count}} บิลจากวันนี้ที่ยังไม่ได้ปิดวัน (ค้าง {{days}} วัน) ต้องปิดวันนี้ก่อน",

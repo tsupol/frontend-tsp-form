@@ -385,6 +385,8 @@
     "navRetail": "Retail",
     "navLease": "Lease",
     "branchStock": "Branch Stock",
+    "internalUseStock": "Internal-use Stock",
+    "myAssets": "My Assets",
     "retail": "Retail",
     "company": "Company",
     "companyConfig": "Company Config",
@@ -1727,6 +1729,14 @@
       "value": "Value"
     }
   },
+  "internalUse": {
+    "custodian": "Custodian",
+    "custodianUsername": "Username",
+    "assignedAt": "Assigned"
+  },
+  "myAssets": {
+    "subtitle": "Internal-use devices currently in your custody."
+  },
   "barcodes": {
     "title": "Product Barcodes",
     "scanPlaceholder": "Scan or type barcode, press Enter…",
@@ -2014,6 +2024,8 @@
     "registerRetailOverride": "Retail (override)",
     "registerSubmit": "Register",
     "registerDone": "Asset registered",
+    "registerViewAsset": "Open asset",
+    "registerViewExisting": "View existing asset",
     "registerNoBranch": "You have no branch that can register devices into stock.",
     "printSticker": "Print sticker",
     "printQueue": "Print queue",
@@ -2093,6 +2105,107 @@
         "free": "free",
         "supervised": "Supervised",
         "reportedAt": "Last reported"
+      },
+      "subtab": {
+        "enroll": "Enroll device",
+        "status": "Status & queue",
+        "dunning": "Dunning"
+      },
+      "goToEnroll": "This device isn't in MDM yet — enroll it first",
+      "ack": {
+        "title": "Got it — the system will handle it",
+        "desc": "The command is queued. The device will apply it once it checks in. Track progress in the queue below — you can leave this page."
+      },
+      "pausedBar": {
+        "title": "Enforcement is paused",
+        "generic": "Dunning commands won't be sent while this device is paused.",
+        "until": "Paused until",
+        "indefinite": "Paused indefinitely (legal hold).",
+        "manage": "Manage pause"
+      },
+      "status": {
+        "enrollState": "Enrollment",
+        "inMdm": "In MDM",
+        "notInMdm": "Not in MDM",
+        "since": "In MDM since",
+        "lastSeen": "Last seen",
+        "serial": "Serial",
+        "pullHint": "Refresh what the device reports",
+        "pullProfiles": "Pull profiles",
+        "pullApps": "Pull apps"
+      },
+      "queue": {
+        "title": "Command queue",
+        "empty": "No commands yet.",
+        "viewAll": "View all",
+        "staff": "Staff",
+        "system": "System",
+        "engineer": "Engineer",
+        "attempt": "attempt {{n}}/{{max}}",
+        "status": {
+          "DONE": "Done",
+          "IN_PROGRESS": "In progress",
+          "FAILED": "Failed",
+          "CANCELED": "Canceled"
+        }
+      },
+      "intentType": {
+        "SET_WALLPAPER": "Change wallpaper",
+        "LOCK_WALLPAPER": "Lock wallpaper",
+        "UNLOCK_WALLPAPER": "Unlock wallpaper",
+        "APPLY_APP_WHITELIST": "Apply app set",
+        "APPLY_RESTRICTION_PROFILE": "Apply restrictions",
+        "REMOVE_RESTRICTION_PROFILE": "Remove restrictions",
+        "ENABLE_LOST_MODE": "Enable Lost Mode",
+        "DISABLE_LOST_MODE": "Disable Lost Mode",
+        "PLAY_LOST_MODE_SOUND": "Play sound",
+        "REQUEST_LOCATION": "Request location",
+        "QUERY_PROFILES": "Pull profiles",
+        "QUERY_APPS": "Pull apps"
+      },
+      "outcome": {
+        "CANCELED_MANUAL_PAUSE": "Enforcement was paused.",
+        "CANCELED_DEVICE_NOT_WITH_CUSTOMER": "The device isn't with the customer (it's with us or in repair).",
+        "CANCELED_DEVICE_UNRESOLVED": "Couldn't determine which device this contract points to.",
+        "CANCELED_PAYMENT_POSTED": "The customer has paid.",
+        "CANCELED_CONTRACT_PAUSED": "The contract is paused.",
+        "CANCELED_APPOINTMENT": "There's an appointment on file.",
+        "CANCELED_LEGAL_HOLD": "Under legal proceedings.",
+        "MDM.DEVICE.ERROR": "The device rejected the command.",
+        "MDM.DEVICE.NOT_NOW_EXHAUSTED": "The device kept replying \"not now\" and gave up.",
+        "MDM.SWEEPER.EXPIRED_PAST_DEADLINE": "Couldn't reach the device in time."
+      },
+      "dunning": {
+        "intro": "Enforce puts the branch's dunning image on the device and locks it so the customer can't revert. Release unlocks it (and restores a neutral image).",
+        "deviceLabel": "Device",
+        "imageToSend": "Image that will be sent",
+        "enforce": {
+          "title": "Enforce",
+          "desc": "Set the dunning wallpaper and lock it so the customer can't change it back.",
+          "button": "Enforce",
+          "confirmTitle": "Enforce dunning?",
+          "confirmBody": "This changes the customer's wallpaper and locks it. They will see the branch dunning image and can't revert it until you release.",
+          "confirmButton": "Enforce"
+        },
+        "release": {
+          "title": "Release",
+          "desc": "Unlock the device and restore a neutral wallpaper.",
+          "button": "Release",
+          "confirmTitle": "Release enforcement?",
+          "confirmBody": "This unlocks the device and restores a neutral wallpaper.",
+          "confirmButton": "Release"
+        },
+        "neutralSkip": {
+          "title": "Unlocked — wallpaper unchanged",
+          "no_wallpaper_permission": "The device was unlocked, but the wallpaper wasn't changed back (you don't have wallpaper permission).",
+          "no_neutral_configured": "The device was unlocked, but there's no neutral image configured for this holding yet.",
+          "unknown": "The device was unlocked, but the wallpaper wasn't changed back."
+        },
+        "noDefault": {
+          "title": "This branch has no default wallpaper",
+          "desc": "Enforce needs a default dunning image. Set one in branch wallpaper settings first.",
+          "goSettings": "Go to wallpaper settings"
+        }
       }
     },
     "icloud_appleOnly": "iCloud applies to Apple devices only.",
@@ -5049,6 +5162,8 @@
       "flagRefundHigh": "refund %",
       "flagGiftCostHigh": "gift cost",
       "unclosedBadge": "Unclosed",
+      "voidedOnlyBadge": "{{count}} bill(s) voided",
+      "voidedOnlyDesc": "All bills this day were voided · {{days}} day(s) overdue",
       "unclosedDesc": "{{count}} bill(s) · {{days}} day(s) overdue",
       "unclosedTitle": "Previous day not closed",
       "unclosedMessage": "{{count}} bill(s) from this date have not been closed yet ({{days}} day(s) overdue). Close this day before proceeding.",
