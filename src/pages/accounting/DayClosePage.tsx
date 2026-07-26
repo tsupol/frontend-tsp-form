@@ -236,11 +236,13 @@ export function DayClosePage() {
     enabled: !!effectiveBranchId && isCloseable,
   });
 
+  // Enable purely off the canonical gate fn_day_close_check().allowed — NOT off
+  // bill_count/received_total. A "voided-only day" (every bill of the day voided)
+  // is bill_count=0 with 0 expected, but it still MUST be closed for audit; the
+  // check returns allowed=true. Inferring from bill_count>0 wrongly disabled it.
   const canCloseSelected =
     !!effectiveBranchId &&
     isCloseable &&
-    !!closingSummary &&
-    closingSummary.bill_count > 0 &&
     closeCheck?.allowed === true;
 
   const selectDate = (d: string, goTo?: (panel: string) => void) => {
@@ -379,6 +381,7 @@ export function DayClosePage() {
               {unclosedDays.map(u => {
                 const key = UNCLOSED_PREFIX + u.bill_date;
                 const isSelected = selectedDate === key;
+                const voidedOnly = u.bill_count === 0 && (u.voided_bill_count ?? 0) > 0;
                 return (
                   <button
                     key={key}
@@ -392,9 +395,16 @@ export function DayClosePage() {
                       <div className="font-medium text-sm flex items-center gap-2">
                         <DateTime value={u.bill_date} showTime={false} />
                         <Badge color="warning" size="sm">{t('accounting.dayClose.unclosedBadge')}</Badge>
+                        {voidedOnly && (
+                          <Badge color="default" size="sm">
+                            {t('accounting.dayClose.voidedOnlyBadge', { count: u.voided_bill_count })}
+                          </Badge>
+                        )}
                       </div>
                       <div className="text-xs text-subtle">
-                        {t('accounting.dayClose.unclosedDesc', { count: u.bill_count, days: u.days_overdue })}
+                        {voidedOnly
+                          ? t('accounting.dayClose.voidedOnlyDesc', { days: u.days_overdue })
+                          : t('accounting.dayClose.unclosedDesc', { count: u.bill_count, days: u.days_overdue })}
                       </div>
                     </div>
                     <div className="text-right shrink-0 text-sm tabular-nums">
@@ -490,7 +500,17 @@ export function DayClosePage() {
                   billDate={selectedUnclosed.bill_date}
                   headerIcon={<Clock size={18} className="text-warning-fg shrink-0" />}
                   headerLabel={<DateTime value={selectedUnclosed.bill_date} showTime={false} />}
-                  headerBadge={<Badge color="warning" size="sm">{t('accounting.dayClose.unclosedBadge')}</Badge>}
+                  headerBadge={
+                    <>
+                      <Badge color="warning" size="sm">{t('accounting.dayClose.unclosedBadge')}</Badge>
+                      {(unclosedSummary?.bill_count ?? selectedUnclosed.bill_count) === 0
+                        && (unclosedSummary?.voided_bill_count ?? 0) > 0 && (
+                        <Badge color="default" size="sm">
+                          {t('accounting.dayClose.voidedOnlyBadge', { count: unclosedSummary!.voided_bill_count })}
+                        </Badge>
+                      )}
+                    </>
+                  }
                   summary={unclosedSummary}
                   summaryFetched={unclosedSummaryFetched}
                   fallbackBillCount={selectedUnclosed.bill_count}

@@ -95,6 +95,9 @@ export interface BranchTodaySummaryRow {
   bill_date: string;
   is_today: boolean;
   bill_count: number;
+  // Bills whose every-day was voided (voided-only day). bill_count counts only
+  // money-effect bills, so a voided-only day is bill_count=0 + voided_bill_count>0.
+  voided_bill_count: number;
   contract_bill_count: number;
   retail_bill_count: number;
   received_cash: number;
@@ -624,6 +627,7 @@ export interface UnclosedDayRow {
   branch_name: string;
   bill_date: string;
   bill_count: number;
+  voided_bill_count: number;
   total_amount: number;
   days_overdue: number;
 }
