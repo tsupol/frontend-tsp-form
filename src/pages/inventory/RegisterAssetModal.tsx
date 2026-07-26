@@ -1,12 +1,14 @@
 import { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, keepPreviousData } from '@tanstack/react-query';
 import { Modal, Button, Input, Select, MaskedInput, LabeledCheckbox, InputDatePicker } from 'tsp-form';
-import { XCircle, CheckCircle, Search, Package, Keyboard } from 'lucide-react';
+import { XCircle, CheckCircle, Search, Package, Keyboard, ExternalLink } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import { translateApiError } from '../../lib/apiErrors';
 import { makeDatePickerFormat, toLocalDateStr } from '../../lib/format';
 import { ImeiInput } from '../../components/ImeiInput';
-import { getConditionLabel, CONDITION_VALUES } from './inventoryUtils';
+import { getConditionLabel, getBucketLabel, CONDITION_VALUES } from './inventoryUtils';
 
 // Direct device intake — fn_inv_asset_register. For our own shops (INTERNAL) and
 // company-owned consignment branches (EXTERNAL): the device lands straight in
@@ -63,6 +65,9 @@ export function RegisterAssetModal({
   const [retailOverride, setRetailOverride] = useState('');
   const [externalRef, setExternalRef] = useState('');
   const [error, setError] = useState('');
+  // When the register RPC rejects with INV.CONFLICT.IDENTIFIER_CONFLICT, the BE
+  // sends the existing asset's id/code so we can link straight to it.
+  const [conflictAssetId, setConflictAssetId] = useState<number | null>(null);
 
   // INTERNAL (own shops) + EXTERNAL (company-owned consignment) may register here.
   // DEAL_PARTNER is excluded — they own their devices; self-register would let them
@@ -98,7 +103,7 @@ export function RegisterAssetModal({
       setImei(''); setSerial('');
       setCostOverride(''); setRetailOverride('');
       setExternalRef('');
-      setError('');
+      setError(''); setConflictAssetId(null);
     }
   }, [open]);
 
@@ -168,11 +173,19 @@ export function RegisterAssetModal({
       onRegistered();
     },
     onError: (err) => {
+      setConflictAssetId(null);
       if (err instanceof ApiError) {
-        const translated =
-          (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') ||
-          (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
-        setError(translated || err.message);
+        // Identifier conflict: the BE ships the existing asset's id/code/branch/
+        // bucket as params. Resolve the bucket to its label so the message reads
+        // like the stock screens, and stash the id so we can link to it.
+        const p = err.messageParams;
+        if (p && (err.code === 'INV.CONFLICT.IDENTIFIER_CONFLICT' || err.messageKey === 'inv.conflict.identifier_conflict')) {
+          const bucket = p.existing_bucket as string | undefined;
+          if (bucket) err.messageParams = { ...p, existing_bucket_label: getBucketLabel(bucket, t) };
+          const id = Number(p.existing_asset_id);
+          if (Number.isFinite(id) && id > 0) setConflictAssetId(id);
+        }
+        setError(translateApiError(err, t));
       } else {
         setError(String(err));
       }
@@ -194,7 +207,21 @@ export function RegisterAssetModal({
             <div className="flex flex-col items-center gap-2 py-6">
               <CheckCircle size={40} className="text-success" />
               <p className="text-sm text-subtle">{t('asset.registerDone', { defaultValue: 'Asset registered' })}</p>
-              <p className="text-lg font-semibold font-mono">{result.code_display ?? result.asset_code}</p>
+              <Link
+                to={`/admin/inventory/assets/${result.asset_id}`}
+                className="text-lg font-semibold font-mono text-primary-fg hover:underline"
+                onClick={onClose}
+              >
+                {result.code_display ?? result.asset_code}
+              </Link>
+              <Link
+                to={`/admin/inventory/assets/${result.asset_id}`}
+                className="inline-flex items-center gap-1 text-sm text-primary-fg hover:underline"
+                onClick={onClose}
+              >
+                <ExternalLink size={14} />
+                {t('asset.registerViewAsset', { defaultValue: 'Open asset' })}
+              </Link>
             </div>
           </div>
           <div className="modal-footer">
@@ -216,7 +243,19 @@ export function RegisterAssetModal({
                 {error && (
                   <div className="alert alert-danger mb-4 animate-pop-in">
                     <XCircle size={16} />
-                    <span>{error}</span>
+                    <div className="flex flex-col gap-1 min-w-0">
+                      <span>{error}</span>
+                      {conflictAssetId != null && (
+                        <Link
+                          to={`/admin/inventory/assets/${conflictAssetId}`}
+                          className="inline-flex items-center gap-1 text-primary-fg hover:underline font-medium"
+                          onClick={onClose}
+                        >
+                          <ExternalLink size={13} />
+                          {t('asset.registerViewExisting', { defaultValue: 'View existing asset' })}
+                        </Link>
+                      )}
+                    </div>
                   </div>
                 )}
 
