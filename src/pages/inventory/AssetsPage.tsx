@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useSearchParams, useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, Modal, TextArea, DataTable, PopOver, Tooltip, Switch, MaskedInput, InputDatePicker, LabeledCheckbox, useSnackbarContext } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, Box, Search, SlidersHorizontal, XCircle, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Wrench, Printer, Plus, CheckCircle, Pencil, Cloud, CloudOff, MoreVertical, Package, Keyboard, AlertTriangle, Lock } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, Box, Search, SlidersHorizontal, XCircle, ChevronDown, ExternalLink, Wrench, Printer, Plus, CheckCircle, Pencil, Cloud, CloudOff, MoreVertical, Package, Keyboard, AlertTriangle, Lock } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
