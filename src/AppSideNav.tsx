@@ -305,6 +305,7 @@ export const AppSideNav = () => {
           ...(can('OPS.ASSIGN.MANAGE') ? [
             { key: 'collections-team-load', icon: <Users size="1rem" />, label: t('nav.teamLoad'), path: '/admin/collections/team-load' },
             { key: 'collections-unassigned', ...iconWithCount(<UserX size="1rem" />, unassignedNoCollectorCount), label: t('nav.unassigned'), path: '/admin/collections/unassigned' },
+            { key: 'collections-unassignable', icon: <AlertTriangle size="1rem" />, label: t('nav.unassignable'), path: '/admin/collections/unassignable' },
           ] : []),
         ] : []),
         { type: 'group' as const, key: 'grp-collections-reports', label: t('nav.groupCollectionsReports') },

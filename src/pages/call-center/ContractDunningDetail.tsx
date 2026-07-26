@@ -4,21 +4,28 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, Select, TextArea, useSnackbarContext } from 'tsp-form';
 import {
   ChevronLeft, ChevronRight, Phone, Pencil, CheckCircle, XCircle,
-  Smartphone, Users, ExternalLink, Save, Clock,
+  Smartphone, Users, ExternalLink, Save, Clock, Flag, CalendarClock,
+  MessageSquare, Cloud,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { formatTel, fmtCurrency } from '../../lib/format';
 import {
   ccKeys, useFlagLevels, useActorEventTypes, useActionResults,
+  useActiveAppointment, useContractIcloud,
   focusAdd, focusRemove, logDunningAction, setDunningSummary, overdueColor,
   type BookRow, type InstallmentRow, type ContactBook, type TimelineRow,
 } from './callCenterApi';
-import { FlagPair, SkipReasonBadge, DunningStatusBadge } from './ccBadges';
+import {
+  FlagPair, SkipReasonBadge, DunningStatusBadge,
+  DeviceContextBadges, AppointmentBadge, DeviceLink,
+} from './ccBadges';
+import { FlagChangeModal, PromiseModal, IcloudRevealButton } from './DunningActions';
 
 type DetailTab = 'overview' | 'installments' | 'contacts' | 'history';
 const TABS: DetailTab[] = ['overview', 'installments', 'contacts', 'history'];
@@ -276,12 +283,29 @@ function LogActivity({ row }: { row: BookRow }) {
 function OverviewTab({ row }: { row: BookRow }) {
   const { t } = useTranslation();
   const { data: flagLevels } = useFlagLevels();
+  const queryClient = useQueryClient();
+  const [flagOpen, setFlagOpen] = useState(false);
+  const [promiseOpen, setPromiseOpen] = useState(false);
+
+  const { data: appointment } = useActiveAppointment(row.contract_id);
+  const { data: icloud } = useContractIcloud(row.contract_id);
+
+  const refreshRow = () => {
+    queryClient.invalidateQueries({ queryKey: ccKeys.bookRow(row.contract_id) });
+    queryClient.invalidateQueries({ queryKey: ccKeys.timeline(row.contract_id) });
+    queryClient.invalidateQueries({ queryKey: ccKeys.appointment(row.contract_id) });
+    queryClient.invalidateQueries({ queryKey: ['cc', 'book'] });
+  };
+
+  // open_promise_date is the sortable column; the appointment view carries the
+  // note. Prefer whichever date is present.
+  const promiseDate = appointment?.appointment_date ?? row.open_promise_date;
 
   return (
     <div className="flex flex-col gap-4 p-4">
       <SummaryBlock row={row} />
 
-      {/* Flags + status */}
+      {/* Flags + status. The flag pair carries a "change" button. */}
       <div className="flex items-center gap-3 flex-wrap">
         <FlagPair
           auto={row.auto_flag_level}
@@ -290,9 +314,30 @@ function OverviewTab({ row }: { row: BookRow }) {
           levels={flagLevels}
           showLabels
         />
+        <Button variant="ghost" size="sm" startIcon={<Flag size={14} />} onClick={() => setFlagOpen(true)}>
+          {t('callCenter.changeFlag')}
+        </Button>
         <DunningStatusBadge status={row.dunning_status} />
         <SkipReasonBadge reason={row.dunning_skip_reason} />
-        {row.has_loaner && <Badge size="sm" color="info">{t('callCenter.hasLoaner')}</Badge>}
+      </div>
+
+      {/* Appointment (promise) — badge if one stands, else the "log promise" CTA */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {promiseDate ? (
+          <>
+            <AppointmentBadge date={promiseDate} />
+            {appointment?.appointment_note && (
+              <span className="text-xs text-subtle truncate">{appointment.appointment_note}</span>
+            )}
+            <Button variant="ghost" size="sm" startIcon={<CalendarClock size={14} />} onClick={() => setPromiseOpen(true)}>
+              {t('callCenter.reschedulePromise')}
+            </Button>
+          </>
+        ) : (
+          <Button variant="outline" size="sm" startIcon={<CalendarClock size={14} />} onClick={() => setPromiseOpen(true)}>
+            {t('callCenter.logPromise')}
+          </Button>
+        )}
       </div>
 
       {/* Money */}
@@ -343,17 +388,75 @@ function OverviewTab({ row }: { row: BookRow }) {
         </div>
       )}
 
-      {/* Bound device */}
-      {row.device_code_display && (
-        <div className="flex items-center gap-2 text-sm">
-          <Smartphone size={15} className="text-subtle" />
-          <span className="text-xs text-subtle">{t('callCenter.boundDevice')}</span>
-          <span className="font-medium">{row.device_code_display}</span>
-          {row.device_serial && <span className="text-xs text-subtler">{row.device_serial}</span>}
+      {/* Device — model + code link, context badges, loaner identity */}
+      {(row.device_code_display || row.product_display_name || row.device_in_repair || row.device_deposited || row.has_loaner) && (
+        <div className="flex flex-col gap-2 border border-line rounded-md p-3">
+          <div className="flex items-center gap-2 text-sm min-w-0">
+            <Smartphone size={15} className="text-subtle shrink-0" />
+            <span className="text-xs text-subtle shrink-0">{t('callCenter.boundDevice')}</span>
+            {(row.device_code_display || row.product_display_name) ? (
+              <DeviceLink
+                deviceId={row.device_id}
+                code={row.device_code_display}
+                product={row.product_display_name}
+                className="text-sm"
+              />
+            ) : (
+              <span className="text-subtler text-xs">{t('callCenter.noDevice')}</span>
+            )}
+          </div>
+          {(row.device_in_repair || row.device_deposited || row.has_loaner) && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <DeviceContextBadges
+                inRepair={row.device_in_repair}
+                deposited={row.device_deposited}
+                hasLoaner={row.has_loaner}
+              />
+            </div>
+          )}
+          {row.has_loaner && (row.loaner_code_display || row.loaner_product_display_name) && (
+            <div className="flex items-center gap-2 text-sm min-w-0">
+              <span className="text-xs text-subtle shrink-0">{t('callCenter.loanerDevice')}</span>
+              <DeviceLink
+                deviceId={row.loaner_device_id}
+                code={row.loaner_code_display}
+                product={row.loaner_product_display_name}
+                className="text-sm"
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* iCloud pool account — Apple ID + audited reveal */}
+      {icloud?.device_icloud_account_id && (
+        <div className="flex flex-col gap-2 border border-line rounded-md p-3">
+          <div className="flex items-center gap-2 text-sm">
+            <Cloud size={15} className="text-subtle shrink-0" />
+            <span className="text-xs text-subtle shrink-0">{t('callCenter.icloudAppleId')}</span>
+            <span className="font-medium truncate">
+              {icloud.device_icloud_apple_id || icloud.device_icloud_email || '—'}
+            </span>
+          </div>
+          <IcloudRevealButton accountId={icloud.device_icloud_account_id} />
         </div>
       )}
 
       <LogActivity row={row} />
+
+      <FlagChangeModal
+        open={flagOpen}
+        contractId={row.contract_id}
+        currentManual={row.manual_flag_level}
+        onClose={() => setFlagOpen(false)}
+        onChanged={refreshRow}
+      />
+      <PromiseModal
+        open={promiseOpen}
+        contractId={row.contract_id}
+        onClose={() => setPromiseOpen(false)}
+        onSaved={refreshRow}
+      />
     </div>
   );
 }
@@ -550,6 +653,7 @@ export function ContractDunningDetail({
   onTabChange?: (t: DetailTab) => void;
 }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
   const [activeTab, setActiveTab] = useState<DetailTab>(initialTab ?? 'overview');
@@ -599,7 +703,15 @@ export function ContractDunningDetail({
         <div className="flex-none flex items-center gap-2 h-panel-header-h px-4 border-b border-line">
           <span className="font-semibold truncate">{row.contract_code_display}</span>
           <span className="text-sm text-subtle truncate">{row.customer_name}</span>
-          <div className="ml-auto shrink-0">
+          <div className="ml-auto shrink-0 flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              startIcon={<MessageSquare size={14} />}
+              onClick={() => navigate(`/admin/chat?contract=${contractId}`)}
+            >
+              {t('callCenter.chatCustomer')}
+            </Button>
             <Button
               variant={row.on_focus ? 'outline' : 'solid'}
               color="primary"
@@ -626,7 +738,15 @@ export function ContractDunningDetail({
 
       <div className="flex-1 min-h-0 overflow-y-auto better-scroll">
         {isMobile && (
-          <div className="px-4 pt-3">
+          <div className="px-4 pt-3 flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              startIcon={<MessageSquare size={14} />}
+              onClick={() => navigate(`/admin/chat?contract=${contractId}`)}
+            >
+              {t('callCenter.chatCustomer')}
+            </Button>
             <Button
               variant={row.on_focus ? 'outline' : 'solid'}
               color="primary"

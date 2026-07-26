@@ -35,8 +35,12 @@ export interface RepoPoolRow {
   device_code_display: string | null;
   device_serial: string | null;
   device_identifier: string | null;
+  product_display_name: string | null;
   device_in_repair: boolean;
   device_deposited: boolean;
+  has_loaner: boolean;
+  loaner_code_display: string | null;
+  loaner_product_display_name: string | null;
   is_paused: boolean;
   dunning_skip_reason: string | null;
   target_address_id: number | null;
@@ -86,6 +90,10 @@ export interface ContractRepoDetail {
   customer_tel: string | null;
   device_code_display: string | null;
   device_serial: string | null;
+  product_display_name: string | null;
+  has_loaner: boolean;
+  loaner_code_display: string | null;
+  loaner_product_display_name: string | null;
   address_display: string | null;
   lat: number | null;
   lng: number | null;

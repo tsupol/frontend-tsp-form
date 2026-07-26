@@ -67,6 +67,7 @@ import { CollectionsLayout } from './pages/collections/CollectionsLayout';
 import { BranchOverviewPage } from './pages/collections/BranchOverviewPage';
 import { TeamLoadPage } from './pages/collections/TeamLoadPage';
 import { UnassignedContractsPage } from './pages/collections/UnassignedContractsPage';
+import { UnassignableContractsPage } from './pages/collections/UnassignableContractsPage';
 import { RepoLayout } from './pages/repo/RepoLayout';
 import { RepoPoolPage } from './pages/repo/RepoPoolPage';
 import { RepoGrantsPage } from './pages/repo/RepoGrantsPage';
@@ -878,6 +879,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <CollectionsLayout><UnassignedContractsPage /></CollectionsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/collections/unassignable"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <CollectionsLayout><UnassignableContractsPage /></CollectionsLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

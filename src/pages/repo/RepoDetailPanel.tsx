@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Badge, Tooltip, useSnackbarContext } from 'tsp-form';
 import {
   User, Phone, Smartphone, MapPin, Loader2, ClipboardList, Scale,
-  Star, StarOff, CheckCircle, Clock, AlertTriangle,
+  Star, StarOff, CheckCircle, Clock, AlertTriangle, Repeat,
 } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { apiClient } from '../../lib/api';
@@ -188,8 +188,20 @@ export function RepoDetailPanel({ contractId, onChanged }: {
             <div className="flex items-start gap-2 text-sm">
               <Smartphone size={14} className="text-subtle shrink-0 mt-0.5" />
               <div className="min-w-0">
+                {detail.product_display_name && <div className="text-sm">{detail.product_display_name}</div>}
                 <div className="font-mono text-xs">{detail.device_code_display}</div>
                 {detail.device_serial && <div className="text-xs text-subtle font-mono">{detail.device_serial}</div>}
+              </div>
+            </div>
+          )}
+          {/* Loaner — prominent on the repo screen: the crew must collect it too */}
+          {detail.has_loaner && (
+            <div className="flex items-start gap-2 text-sm rounded-md bg-danger-soft border border-danger-border px-2.5 py-2">
+              <Repeat size={14} className="text-danger-fg shrink-0 mt-0.5" />
+              <div className="min-w-0">
+                <div className="text-xs font-medium text-danger-fg">{t('callCenter.loanerToCollect')}</div>
+                {detail.loaner_product_display_name && <div className="text-sm">{detail.loaner_product_display_name}</div>}
+                {detail.loaner_code_display && <div className="font-mono text-xs">{detail.loaner_code_display}</div>}
               </div>
             </div>
           )}

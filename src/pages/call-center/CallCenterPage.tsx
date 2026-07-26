@@ -10,12 +10,12 @@ import { PageNav, PageNavPanel, MobileHeader, DataTable, Badge, Input, Select, B
 import { ArrowLeft, ArrowRightFromLine, XCircle, Star, StarOff, Send } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
-import { fmtCurrency } from '../../lib/format';
+import { fmtCurrency, formatRelativeAgo } from '../../lib/format';
 import {
   ccKeys, useFlagLevels, focusAdd, focusRemove, overdueColor,
   type BookRow, type TradeRow, type TradeInboxRow,
 } from './callCenterApi';
-import { FlagPair, SkipReasonBadge } from './ccBadges';
+import { FlagPair, SkipReasonBadge, AppointmentBadge, DeviceContextBadges, DeviceLink } from './ccBadges';
 import { ContractDunningDetail } from './ContractDunningDetail';
 import { TransferView, TransferOfferDetail } from './TransferView';
 
@@ -27,7 +27,7 @@ type SortKey =
   | 'last_action_at.asc.nullsfirst';
 
 export function CallCenterPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -44,6 +44,8 @@ export function CallCenterPage() {
   const [showAllInBook, setShowAllInBook] = useState(false);
   const [sortBy, setSortBy] = useState<SortKey>('work_priority.desc');
   const [redOnly, setRedOnly] = useState(false);
+  // last_action_at neglect filter (§8.2). '' = off.
+  const [neglect, setNeglect] = useState<'' | 'never' | 'stale7' | 'today'>('');
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [searchInput, setSearchInput] = useState('');
@@ -87,16 +89,37 @@ export function CallCenterPage() {
       params.push('on_focus=eq.false');
     }
     if (redOnly) params.push('auto_flag_level=eq.RED');
+
+    // Both the neglect "stale7" chip and search compile to a top-level `or`;
+    // PostgREST allows only one, so collect them and nest under a single `and`
+    // when more than one is present.
+    const orClauses: string[] = [];
+    if (neglect === 'never') {
+      params.push('last_action_at=is.null');
+    } else if (neglect === 'stale7') {
+      const cutoff = new Date(Date.now() - 7 * 86_400_000).toISOString();
+      orClauses.push(`or(last_action_at.is.null,last_action_at.lt.${cutoff})`);
+    } else if (neglect === 'today') {
+      const start = new Date(); start.setHours(0, 0, 0, 0);
+      params.push(`last_action_at=gte.${start.toISOString()}`);
+    }
     if (search.trim()) {
       const q = encodeURIComponent(search.trim());
-      params.push(`or=(contract_code_display.ilike.*${q}*,customer_name.ilike.*${q}*)`);
+      orClauses.push(`or(contract_code_display.ilike.*${q}*,customer_name.ilike.*${q}*)`);
     }
+    if (orClauses.length === 1) {
+      // strip the leading `or` → `or=(...)`
+      params.push(`or=${orClauses[0].slice(2)}`);
+    } else if (orClauses.length > 1) {
+      params.push(`and=(${orClauses.join(',')})`);
+    }
+
     params.push(`order=${sortBy}`);
     return `/v_my_book?${params.join('&')}`;
-  }, [view, showAllInBook, redOnly, search, sortBy]);
+  }, [view, showAllInBook, redOnly, neglect, search, sortBy]);
 
   const { data, isError, error, isFetching } = useQuery({
-    queryKey: ['cc', 'book', view, showAllInBook, redOnly, search, sortBy, pageIndex, pageSize],
+    queryKey: ['cc', 'book', view, showAllInBook, redOnly, neglect, search, sortBy, pageIndex, pageSize],
     queryFn: () => apiClient.getPaginated<BookRow>(buildEndpoint(), { page: pageIndex + 1, pageSize }),
     placeholderData: keepPreviousData,
   });
@@ -281,6 +304,30 @@ export function CallCenterPage() {
                     {t('callCenter.filterRedFlag')}
                   </Button>
                 </div>
+                {/* Neglect chips (§8.2) — last_action_at based, mutually exclusive */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {([
+                    ['never', 'callCenter.neglectNever'],
+                    ['stale7', 'callCenter.neglectStale7'],
+                    ['today', 'callCenter.neglectToday'],
+                  ] as const).map(([key, labelKey]) => {
+                    const active = neglect === key;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => { setNeglect(active ? '' : key); setPageIndex(0); }}
+                        className={`px-2.5 py-1 rounded-full text-xs border transition-colors cursor-pointer ${
+                          active
+                            ? 'border-primary-fg bg-primary-soft text-primary-fg'
+                            : 'border-line text-subtle hover:bg-surface-hover'
+                        }`}
+                      >
+                        {t(labelKey)}
+                      </button>
+                    );
+                  })}
+                </div>
                 {/* Book-view "show all" hint */}
                 {view === 'book' && focusCount > 0 && (
                   <div className="flex items-center gap-2 text-xs text-subtle">
@@ -352,16 +399,34 @@ export function CallCenterPage() {
                           <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                             <span className="text-xs text-subtle truncate min-w-0">{c.customer_name}</span>
                             <SkipReasonBadge reason={c.dunning_skip_reason} />
-                            {c.has_loaner && <Badge size="sm" color="info">{t('callCenter.hasLoaner')}</Badge>}
+                            <AppointmentBadge date={c.open_promise_date} />
+                            <DeviceContextBadges inRepair={c.device_in_repair} deposited={c.device_deposited} hasLoaner={c.has_loaner} />
                           </div>
                           {c.overdue_amount > 0 && (
                             <span className="ml-auto shrink-0 text-sm font-medium tabular-nums">฿{fmtCurrency(c.overdue_amount)}</span>
                           )}
                         </div>
 
-                        {/* Row 3 — flags (auto / manual) */}
-                        <div className="flex items-center">
+                        {/* Row 3 — device model (code links to asset) */}
+                        {(c.product_display_name || c.device_code_display) && (
+                          <div onClick={(e) => e.stopPropagation()} className="min-w-0">
+                            <DeviceLink
+                              deviceId={c.device_id}
+                              code={c.device_code_display}
+                              product={c.product_display_name}
+                              className="text-xs text-subtle"
+                            />
+                          </div>
+                        )}
+
+                        {/* Row 4 — flags (auto / manual) + last touched */}
+                        <div className="flex items-center gap-2 flex-wrap">
                           <FlagPair auto={c.auto_flag_level} manual={c.manual_flag_level} divergent={c.flag_divergent} levels={flagLevels} compact />
+                          <span className="ml-auto shrink-0 text-[11px] text-subtler">
+                            {c.last_action_at
+                              ? t('callCenter.lastTouched', { rel: formatRelativeAgo(c.last_action_at, i18n.language).rel })
+                              : t('callCenter.neverTouched')}
+                          </span>
                         </div>
                       </div>
                     );

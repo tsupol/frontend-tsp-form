@@ -3,8 +3,10 @@
 // labels come from FE i18n; unknown codes render raw with a neutral color.
 
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { Badge, Tooltip } from 'tsp-form';
-import { AlertTriangle, Cpu, User } from 'lucide-react';
+import { AlertTriangle, Cpu, User, Wrench, Store, Repeat, CalendarClock, ExternalLink } from 'lucide-react';
+import { DateTime } from '../../components/DateTime';
 import { flagColor, type FlagLevelRef } from './callCenterApi';
 
 function flagLabel(t: (k: string, o?: Record<string, unknown>) => string, code: string): string {
@@ -93,4 +95,84 @@ export function DunningStatusBadge({ status }: { status: string }) {
   const label = t(`callCenter.dunningStatus.${status}`, { defaultValue: status });
   const color = status === 'WAIT_FOR_LEGAL' ? 'danger' : 'info';
   return <Badge size="sm" color={color}>{label}</Badge>;
+}
+
+/** Device-context badges: in-repair / deposited / has-loaner. Each is a distinct
+ *  business signal for the collector — "may not truly be in default" / "we hold
+ *  their device" / "another company asset is out with them". `loanerProminent`
+ *  bumps the loaner chip to a solid danger fill for the repo team. */
+export function DeviceContextBadges({
+  inRepair, deposited, hasLoaner, loanerProminent = false,
+}: {
+  inRepair: boolean;
+  deposited: boolean;
+  hasLoaner: boolean;
+  loanerProminent?: boolean;
+}) {
+  const { t } = useTranslation();
+  if (!inRepair && !deposited && !hasLoaner) return null;
+  return (
+    <>
+      {inRepair && (
+        <Badge size="sm" color="info">
+          <Wrench size={11} className="inline -mt-0.5 mr-0.5" />{t('callCenter.deviceInRepair')}
+        </Badge>
+      )}
+      {deposited && (
+        <Badge size="sm" color="warning">
+          <Store size={11} className="inline -mt-0.5 mr-0.5" />{t('callCenter.deviceDeposited')}
+        </Badge>
+      )}
+      {hasLoaner && (
+        <Badge size="sm" color={loanerProminent ? 'danger' : 'info'}>
+          <Repeat size={11} className="inline -mt-0.5 mr-0.5" />{t('callCenter.hasLoaner')}
+        </Badge>
+      )}
+    </>
+  );
+}
+
+/** "มีนัด <date>" badge — an open promise-to-pay. Dunning is suppressed while
+ *  it stands, so this tells the collector not to call again. */
+export function AppointmentBadge({ date }: { date: string | null }) {
+  const { t } = useTranslation();
+  if (!date) return null;
+  return (
+    <Badge size="sm" color="success">
+      <CalendarClock size={11} className="inline -mt-0.5 mr-0.5" />
+      {t('callCenter.appointmentOn')} <DateTime value={date} showTime={false} />
+    </Badge>
+  );
+}
+
+/** "Product (code)" where the code links to the asset page. Used for both the
+ *  bound device and the loaner (mig 883/885). code is the clickable part. */
+export function DeviceLink({
+  deviceId, code, product, className = '',
+}: {
+  deviceId: number | null;
+  code: string | null;
+  product: string | null;
+  className?: string;
+}) {
+  const navigate = useNavigate();
+  if (!code && !product) return null;
+  return (
+    <span className={`inline-flex items-center gap-1.5 min-w-0 ${className}`}>
+      {product && <span className="truncate">{product}</span>}
+      {code && (
+        deviceId ? (
+          <button
+            type="button"
+            onClick={() => navigate(`/admin/inventory/assets/${deviceId}`)}
+            className="shrink-0 text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer font-mono text-xs"
+          >
+            {code}<ExternalLink size={11} />
+          </button>
+        ) : (
+          <span className="shrink-0 font-mono text-xs text-subtle">{code}</span>
+        )
+      )}
+    </span>
+  );
 }

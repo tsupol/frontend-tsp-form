@@ -5,7 +5,7 @@
 import { useMemo, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { CalendarDays, Headset, Calendar as CalendarIcon, Settings, LayoutDashboard, Users, UserX } from 'lucide-react';
+import { CalendarDays, Headset, Calendar as CalendarIcon, Settings, LayoutDashboard, Users, UserX, AlertTriangle } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavCounts } from '../../hooks/useNavCounts';
@@ -37,6 +37,7 @@ export function CollectionsLayout({ children }: { children: ReactNode }) {
       ...(canManage ? [
         { type: 'link' as const, path: '/admin/collections/team-load', labelKey: 'nav.teamLoad', icon: Users },
         { type: 'link' as const, path: '/admin/collections/unassigned', labelKey: 'nav.unassigned', icon: UserX, count: unassignedNoCollectorCount },
+        { type: 'link' as const, path: '/admin/collections/unassignable', labelKey: 'nav.unassignable', icon: AlertTriangle },
       ] : []),
     ] : []),
     { type: 'group', labelKey: 'nav.groupCollectionsReports' },

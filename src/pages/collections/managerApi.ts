@@ -74,6 +74,20 @@ export interface UnassignedContract {
   collectors_in_branch: number;
 }
 
+/** One row of v_assignment_unassignable (mig 880) — a contract overdue ≥ 2 days
+ *  with no owner AND no visible collector in its branch (nobody, or all at
+ *  capacity 0). Action = add staff / open capacity, not reassign. HQ-wide. */
+export interface UnassignableContract {
+  holding_id: number;
+  company_id: number;
+  branch_id: number;
+  branch_name: string;
+  contract_id: number;
+  contract_code: string;
+  overdue_days: number;
+  outstanding_amount: number;
+}
+
 /** ops_collector_set_capacity response (data, already unwrapped). */
 export interface SetCapacityResult {
   user_id: number;
@@ -99,6 +113,7 @@ export const mgrKeys = {
   branchSummary: ['mgr', 'branch-summary'] as const,
   collectorLoad: ['mgr', 'collector-load'] as const,
   unassigned: (reason: string) => ['mgr', 'unassigned', reason] as const,
+  unassignable: ['mgr', 'unassignable'] as const,
 };
 
 // ── Hooks ────────────────────────────────────────────────────────────────────
@@ -124,6 +139,16 @@ export function useUnassignedContracts(reason: PoolReason) {
     queryFn: () =>
       apiClient.get<UnassignedContract[]>(
         `/v_unassigned_contracts?pool_reason=eq.${reason}&order=days_waiting_for_owner.desc`,
+      ),
+  });
+}
+
+export function useUnassignableContracts() {
+  return useQuery({
+    queryKey: mgrKeys.unassignable,
+    queryFn: () =>
+      apiClient.get<UnassignableContract[]>(
+        '/v_assignment_unassignable?order=overdue_days.desc',
       ),
   });
 }

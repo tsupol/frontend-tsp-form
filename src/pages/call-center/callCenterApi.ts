@@ -64,6 +64,13 @@ export interface BookRow {
   device_id: number | null;
   device_code_display: string | null;
   device_serial: string | null;
+  /** Product name, e.g. "Apple iPhone 17 Air 256GB Space Black" (mig 883).
+   *  NULL = contract has no bound device. */
+  product_display_name: string | null;
+  /** Loaner device identity when has_loaner (mig 885). NULL = none. */
+  loaner_device_id: number | null;
+  loaner_code_display: string | null;
+  loaner_product_display_name: string | null;
   /** Capped late-fee balance in THB — display directly, never per_day × days. */
   late_fee_balance: number;
   late_fee_per_day: number;
@@ -280,6 +287,58 @@ export interface SummaryResult {
   changed: boolean;
 }
 
+// ── Manual flag (mig 882) ──────────────────────────────────────────────────────
+
+/** ops_set_manual_flag response (data, already unwrapped). */
+export interface SetManualFlagResult {
+  contract_id: number;
+  manual_flag_level: FlagLevel;
+  manual_flag_from: FlagLevel;
+  manual_flag_reason: string | null;
+  manual_flag_at: string;
+  auto_flag_level: FlagLevel;
+  flag_divergent: boolean;
+}
+
+// ── Promise to pay (uses the appointment system — mig, no new table) ────────────
+
+/** ops_log_promise_to_pay response (data, already unwrapped). */
+export interface PromiseToPayResult {
+  contract_id: number;
+  promise_date: string;
+  log_id: number;
+  current_stage: string;
+  appointment: { id: number; contract_id: number; promise_date: string };
+  suppresses_dunning: boolean;
+}
+
+/** One row of v_contract_active_appointment (empty = no open appointment). */
+export interface ActiveAppointment {
+  contract_id: number;
+  appointment_id: number;
+  appointment_date: string;
+  appointment_note: string | null;
+}
+
+// ── iCloud (mig 884) ───────────────────────────────────────────────────────────
+
+/** iCloud fields from v_contract_detail (keyed by contract id).
+ *  All NULL = device not bound to a pool account. */
+export interface ContractIcloud {
+  id: number;
+  device_icloud_account_id: number | null;
+  device_icloud_apple_id: string | null;
+  device_icloud_email: string | null;
+}
+
+/** fn_icloud_account_reveal_password response (data, already unwrapped).
+ *  Never cache, never put in a table, never auto-copy — every call is audited. */
+export interface IcloudRevealResult {
+  account_id: number;
+  apple_id: string;
+  password: string;
+}
+
 // ── Query keys ───────────────────────────────────────────────────────────────
 
 export const ccKeys = {
@@ -288,6 +347,8 @@ export const ccKeys = {
   installments: (contractId: number) => ['cc', 'installments', contractId] as const,
   contacts: (contractId: number) => ['cc', 'contacts', contractId] as const,
   timeline: (contractId: number) => ['cc', 'timeline', contractId] as const,
+  appointment: (contractId: number) => ['cc', 'appointment', contractId] as const,
+  icloud: (contractId: number) => ['cc', 'icloud', contractId] as const,
   flagLevels: ['cc', 'ref', 'flag-levels'] as const,
   eventTypes: ['cc', 'ref', 'event-types'] as const,
   callResults: ['cc', 'ref', 'call-results'] as const,
@@ -325,6 +386,40 @@ export const setDunningSummary = (contractId: number, summary: string) =>
     p_summary: summary,
   });
 
+/** Change the manual flag. Raising severity needs no reason; lowering it
+ *  requires a typed reason ≥ 10 chars (anti-whitewash) — pass it in `reason`.
+ *  On a bad lower the BE returns OPS.VALIDATION.FLAG_REASON_REQUIRED. */
+export const setManualFlag = (contractId: number, flagLevel: string, reason: string | null) =>
+  apiClient.rpc<SetManualFlagResult>('ops_set_manual_flag', {
+    p_contract_id: contractId,
+    p_flag_level: flagLevel,
+    p_reason: reason,
+  });
+
+/** Log a promise-to-pay. Wraps 3 effects: creates the appointment, logs
+ *  PROMISE_TO_PAY, moves stage → PROMISED. Never call the appointment RPC
+ *  directly. p_pin may be null; the appointment system surfaces its own error
+ *  if it needs one. */
+export const logPromiseToPay = (params: {
+  contractId: number;
+  promiseDate: string;
+  note: string | null;
+  pin?: string | null;
+}) =>
+  apiClient.rpc<PromiseToPayResult>('ops_log_promise_to_pay', {
+    p_contract_id: params.contractId,
+    p_promise_date: params.promiseDate,
+    p_note: params.note,
+    p_pin: params.pin ?? null,
+  });
+
+/** Reveal an iCloud pool-account password. Audited every call — display
+ *  temporarily, never cache/store/copy. Branch-scoped (other branches → 403). */
+export const revealIcloudPassword = (accountId: number) =>
+  apiClient.rpc<IcloudRevealResult>('fn_icloud_account_reveal_password', {
+    p_account_id: accountId,
+  });
+
 // ── Ref-data hooks (cache long — these rarely change) ────────────────────────
 
 const REF_STALE = 30 * 60 * 1000; // 30 min
@@ -356,6 +451,32 @@ export function useActionResults(actionCode: string | null) {
       ),
     enabled: !!actionCode,
     staleTime: REF_STALE,
+  });
+}
+
+/** Open appointment (promise) for a contract, or null. */
+export function useActiveAppointment(contractId: number) {
+  return useQuery({
+    queryKey: ccKeys.appointment(contractId),
+    queryFn: async () => {
+      const rows = await apiClient.get<ActiveAppointment[]>(
+        `/v_contract_active_appointment?contract_id=eq.${contractId}`,
+      );
+      return rows[0] ?? null;
+    },
+  });
+}
+
+/** iCloud pool-account fields for a contract, or null when unbound. */
+export function useContractIcloud(contractId: number) {
+  return useQuery({
+    queryKey: ccKeys.icloud(contractId),
+    queryFn: async () => {
+      const rows = await apiClient.get<ContractIcloud[]>(
+        `/v_contract_detail?id=eq.${contractId}&select=id,device_icloud_account_id,device_icloud_apple_id,device_icloud_email`,
+      );
+      return rows[0] ?? null;
+    },
   });
 }
 
