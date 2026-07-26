@@ -171,6 +171,25 @@ export function fetchBranchWallpapers(branchId: number): Promise<BranchWallpaper
   return apiClient.get<BranchWallpaper[]>(`/v_branch_mdm_wallpaper_config?branch_id=eq.${branchId}`);
 }
 
+// Branch wallpaper CRUD (§10). Base64 must be RAW (no data: prefix). p_where:
+// 1 lock / 2 home / 3 both. First image auto-becomes default; ≤3 per branch.
+export function createBranchWallpaper(p: {
+  p_branch_id: number; p_label: string; p_image_b64: string; p_thumb_b64?: string | null; p_where?: number | null;
+}): Promise<{ wallpaper_asset_id: number; branch_id: number; is_default: boolean }> {
+  return apiClient.rpc('fn_branch_mdm_wallpaper_create', p);
+}
+export function replaceBranchWallpaperImage(p: {
+  p_wallpaper_asset_id: number; p_image_b64: string; p_thumb_b64?: string | null;
+}): Promise<{ wallpaper_asset_id: number; replaced: boolean }> {
+  return apiClient.rpc('fn_branch_mdm_wallpaper_replace_image', p);
+}
+export function setBranchWallpaperDefault(wallpaperAssetId: number): Promise<{ wallpaper_asset_id: number; is_default: boolean }> {
+  return apiClient.rpc('fn_branch_mdm_wallpaper_set_default', { p_wallpaper_asset_id: wallpaperAssetId });
+}
+export function retireBranchWallpaper(wallpaperAssetId: number, reason?: string): Promise<{ wallpaper_asset_id: number; retired: boolean; promoted_default_id: number | null }> {
+  return apiClient.rpc('fn_branch_mdm_wallpaper_retire', { p_wallpaper_asset_id: wallpaperAssetId, p_reason: reason ?? null });
+}
+
 // ── Sub-tab 4: wallpaper (single push, no lock; §6) ─────────────────────────
 // No preview (§11.5). No p_actor_id (§11.2). Omit p_wallpaper_asset_id = branch
 // default. Returns the standard async ack.

@@ -15,6 +15,7 @@
 
 import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { OverflowTabs } from './mdm/OverflowTabs';
 import { useMdmStatus } from './mdm/useMdmStatus';
@@ -48,6 +49,8 @@ function visibleSubTabs(status: AssetMdmStatus | null): MdmSubTab[] {
 
 export function AssetMdmTab({ assetId, onRefresh }: { assetId: number; onRefresh: () => void }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const goToWallpaperSettings = () => navigate('/admin/settings/branch-wallpaper');
   const { data: status, isLoading, isFetching, refetch } = useMdmStatus(assetId);
 
   const tabs = useMemo(() => visibleSubTabs(status ?? null), [status]);
@@ -112,7 +115,7 @@ export function AssetMdmTab({ assetId, onRefresh }: { assetId: number; onRefresh
             status={status}
             onAck={() => refetch()}
             onNotEnrolled={goToEnroll}
-            onGoToWallpaperSettings={undefined}
+            onGoToWallpaperSettings={goToWallpaperSettings}
           />
         )}
 
@@ -121,7 +124,7 @@ export function AssetMdmTab({ assetId, onRefresh }: { assetId: number; onRefresh
             status={status}
             onAck={() => refetch()}
             onNotEnrolled={goToEnroll}
-            onGoToWallpaperSettings={undefined}
+            onGoToWallpaperSettings={goToWallpaperSettings}
           />
         )}
 

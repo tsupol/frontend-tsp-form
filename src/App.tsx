@@ -87,6 +87,7 @@ import { PrinterSetupPage } from './pages/help/PrinterSetupPage';
 import { NotificationPrefsPage } from './pages/settings/NotificationPrefsPage';
 import { AppearancePage } from './pages/settings/AppearancePage';
 import { MyAssetsPage } from './pages/settings/MyAssetsPage';
+import { BranchWallpaperPage } from './pages/settings/BranchWallpaperPage';
 import { HelpLayout } from './pages/help/HelpLayout';
 import { UserGuidePage } from './pages/help/UserGuidePage';
 import { CustomersPage } from './pages/customers/CustomersPage';
@@ -257,6 +258,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <SettingsLayout><MyAssetsPage /></SettingsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/settings/branch-wallpaper"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <SettingsLayout><BranchWallpaperPage /></SettingsLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
