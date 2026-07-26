@@ -21,7 +21,7 @@ import {
   setBranchWallpaperDefault, retireBranchWallpaper, parseMdmError,
   type BranchWallpaper, type ParsedMdmError,
 } from '../inventory/mdm/mdmApi';
-import { processWallpaper, isAcceptedImage, type ProcessedWallpaper } from '../inventory/mdm/wallpaperImage';
+import { decodeWallpaper, renderWallpaper, isAcceptedImage, type ProcessedWallpaper, type DecodedWallpaper } from '../inventory/mdm/wallpaperImage';
 
 interface BranchRow { id: number; name: string; is_active: boolean }
 
@@ -229,31 +229,31 @@ function WallpaperUploadModal({ open, mode, existingLabel, onClose, onSubmit }: 
   const [phone, setPhone] = useState('');
   const [where, setWhere] = useState('3'); // both by default
   const [processed, setProcessed] = useState<ProcessedWallpaper | null>(null);
-  const [processing, setProcessing] = useState(false);
+  const [decoding, setDecoding] = useState(false); // ONLY while decoding a new file
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [fileName, setFileName] = useState('');
-  const lastFileRef = useRef<File | null>(null);
+  const decodedRef = useRef<DecodedWallpaper | null>(null);
+  const overlayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Reset on open.
   useEffect(() => {
     if (open) {
       setLabel(existingLabel ?? ''); setMessage(''); setPhone(''); setWhere('3');
-      setProcessed(null); setProcessing(false); setSaving(false); setError(''); setFileName('');
-      lastFileRef.current = null;
+      setProcessed(null); setDecoding(false); setSaving(false); setError(''); setFileName('');
+      decodedRef.current = null;
     }
+    return () => { if (overlayTimer.current) clearTimeout(overlayTimer.current); };
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const reprocess = async (file: File, msg: string, ph: string) => {
-    setProcessing(true); setError('');
+  // Re-render the overlay from the already-decoded image. Cheap + synchronous,
+  // so NO spinner — the preview just updates in place.
+  const renderNow = (msg: string, ph: string) => {
+    if (!decodedRef.current) return;
     try {
-      const p = await processWallpaper(file, { message: msg, phone: ph });
-      setProcessed(p);
+      setProcessed(renderWallpaper(decodedRef.current, { message: msg, phone: ph }));
     } catch (e) {
       setError(t(`branchWallpaper.err.${(e as Error).message}`, { defaultValue: t('branchWallpaper.err.generic') }));
-      setProcessed(null);
-    } finally {
-      setProcessing(false);
     }
   };
 
@@ -261,17 +261,27 @@ function WallpaperUploadModal({ open, mode, existingLabel, onClose, onSubmit }: 
     if (!file) return;
     if (!isAcceptedImage(file)) { setError(t('branchWallpaper.err.image_not_png_or_jpeg')); return; }
     setFileName(file.name);
-    lastFileRef.current = file;
-    await reprocess(file, message, phone);
+    setDecoding(true); setError('');
+    try {
+      decodedRef.current = await decodeWallpaper(file); // the only slow step
+      renderNow(message, phone);
+    } catch (e) {
+      setError(t(`branchWallpaper.err.${(e as Error).message}`, { defaultValue: t('branchWallpaper.err.generic') }));
+      setProcessed(null); decodedRef.current = null;
+    } finally {
+      setDecoding(false);
+    }
   };
 
-  // Re-burn overlay when text changes (if a file is loaded).
+  // Debounce the overlay re-render so typing doesn't redraw on every keystroke.
   const onOverlayChange = (nextMsg: string, nextPhone: string) => {
     setMessage(nextMsg); setPhone(nextPhone);
-    if (lastFileRef.current) reprocess(lastFileRef.current, nextMsg, nextPhone);
+    if (!decodedRef.current) return;
+    if (overlayTimer.current) clearTimeout(overlayTimer.current);
+    overlayTimer.current = setTimeout(() => renderNow(nextMsg, nextPhone), 250);
   };
 
-  const canSubmit = !saving && !processing && !!processed && (mode === 'replace' || label.trim().length > 0);
+  const canSubmit = !saving && !decoding && !!processed && (mode === 'replace' || label.trim().length > 0);
 
   const submit = async () => {
     if (!processed) return;
@@ -349,12 +359,17 @@ function WallpaperUploadModal({ open, mode, existingLabel, onClose, onSubmit }: 
           <div className="flex flex-col">
             <label className="form-label">{t('branchWallpaper.preview')}</label>
             <div className="relative aspect-[9/16] rounded-md border border-line bg-surface overflow-hidden flex items-center justify-center">
-              {processing ? (
-                <Loader2 size={20} className="animate-spin text-subtler" />
-              ) : processed ? (
+              {processed ? (
                 <img src={processed.previewUrl} alt="preview" className="w-full h-full object-cover" />
-              ) : (
+              ) : !decoding ? (
                 <div className="text-xs text-subtler text-center px-4">{t('branchWallpaper.previewEmpty')}</div>
+              ) : null}
+              {/* Spinner only while decoding a NEW file — overlays the current
+                  preview instead of replacing it, so text edits never flicker. */}
+              {decoding && (
+                <div className="absolute inset-0 flex items-center justify-center bg-surface/60">
+                  <Loader2 size={20} className="animate-spin text-subtler" />
+                </div>
               )}
             </div>
           </div>

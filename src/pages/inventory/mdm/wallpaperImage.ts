@@ -106,24 +106,42 @@ function canvasToRawB64(canvas: HTMLCanvasElement, mime: string): { raw: string;
   return { raw, dataUrl };
 }
 
-/** Full pipeline: decode → resize (full + thumb) → optional overlay → base64. */
-export async function processWallpaper(file: File, overlay: WallpaperOverlay = {}): Promise<ProcessedWallpaper> {
+/** A decoded source image + its mime — decode ONCE, then re-render the overlay
+ *  cheaply on every text change without touching the file again. */
+export interface DecodedWallpaper {
+  img: HTMLImageElement;
+  mime: string;
+}
+
+/** Step 1: decode the file (the only slow/async part). Validate type first. */
+export async function decodeWallpaper(file: File): Promise<DecodedWallpaper> {
   if (!isAcceptedImage(file)) throw new Error('image_not_png_or_jpeg');
   const img = await loadImage(file);
   const mime = file.type === 'image/jpeg' ? 'image/jpeg' : 'image/png';
+  return { img, mime };
+}
 
-  const render = (maxEdge: number, withOverlay: boolean) => {
+/** Step 2: render full + thumb with the current overlay. Synchronous + cheap —
+ *  safe to call on every (debounced) keystroke. */
+export function renderWallpaper(decoded: DecodedWallpaper, overlay: WallpaperOverlay = {}): ProcessedWallpaper {
+  const { img, mime } = decoded;
+  const render = (maxEdge: number) => {
     const { w, h } = fitDimensions(img.naturalWidth, img.naturalHeight, maxEdge);
     const canvas = document.createElement('canvas');
     canvas.width = w; canvas.height = h;
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('canvas_unavailable');
     ctx.drawImage(img, 0, 0, w, h);
-    if (withOverlay) drawOverlay(ctx, w, h, overlay);
+    drawOverlay(ctx, w, h, overlay);
     return canvasToRawB64(canvas, mime);
   };
-
-  const full = render(FULL_MAX, true);
-  const thumb = render(THUMB_MAX, true);
+  const full = render(FULL_MAX);
+  const thumb = render(THUMB_MAX);
   return { imageB64: full.raw, thumbB64: thumb.raw, previewUrl: full.dataUrl };
+}
+
+/** Full pipeline in one call (decode + render). Kept for callers that don't
+ *  need incremental overlay editing. */
+export async function processWallpaper(file: File, overlay: WallpaperOverlay = {}): Promise<ProcessedWallpaper> {
+  return renderWallpaper(await decodeWallpaper(file), overlay);
 }
