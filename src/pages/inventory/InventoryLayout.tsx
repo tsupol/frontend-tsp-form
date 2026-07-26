@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { BarChart3, Box, Boxes, ClipboardList, PackagePlus, ArrowLeftRight, Wrench, RotateCcw, HandCoins, ShoppingCart, Barcode, Receipt } from 'lucide-react';
+import { BarChart3, Box, Boxes, ClipboardList, PackagePlus, ArrowLeftRight, Wrench, RotateCcw, HandCoins, ShoppingCart, Barcode, Receipt, UserCog } from 'lucide-react';
 
 type NavItem =
   | { type: 'link'; path: string; labelKey: string; icon: typeof BarChart3; iconClassName?: string }
@@ -14,6 +14,7 @@ const navItems: NavItem[] = [
   { type: 'link', path: '/admin/inventory/lots', labelKey: 'nav.lots', icon: Boxes },
   { type: 'link', path: '/admin/inventory/assets', labelKey: 'nav.assets', icon: Box },
   { type: 'highlight', path: '/admin/inventory/branch-stock', labelKey: 'nav.branchStock', icon: ShoppingCart },
+  { type: 'link', path: '/admin/inventory/internal-use', labelKey: 'nav.internalUseStock', icon: UserCog },
   { type: 'group', labelKey: 'nav.groupProcurement' },
   { type: 'link', path: '/admin/inventory/po', labelKey: 'nav.purchaseOrders', icon: ClipboardList },
   { type: 'link', path: '/admin/inventory/receiving', labelKey: 'nav.receiving', icon: PackagePlus },

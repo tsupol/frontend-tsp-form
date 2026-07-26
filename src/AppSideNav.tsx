@@ -28,7 +28,7 @@ import {
   // Fanout child icons — Pricing
   TrendingUp, Percent, Handshake,
   // Fanout child icons — Inventory
-  BarChart3, Boxes, ClipboardList, PackagePlus, ArrowLeftRight, Wrench, RotateCcw, HandCoins, ShoppingCart, Barcode,
+  BarChart3, Boxes, ClipboardList, PackagePlus, ArrowLeftRight, Wrench, RotateCcw, HandCoins, ShoppingCart, Barcode, UserCog,
   // Retail
   Store,
   // Fanout child icons — Company
@@ -119,6 +119,11 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
           icon={<Settings size={14} />}
           label={t('settings.title')}
           onClick={() => { navigate('/admin/settings/profile'); setOpen(false); }}
+        />
+        <MenuItem
+          icon={<Smartphone size={14} />}
+          label={t('nav.myAssets')}
+          onClick={() => { navigate('/admin/settings/my-assets'); setOpen(false); }}
         />
         <MenuSeparator />
         <SubMenu icon={<Settings size={14} />} label={t('theme.title')}>
@@ -377,6 +382,7 @@ export const AppSideNav = () => {
           label: <span className="text-primary-fg font-medium">{t('nav.branchStock')}</span>,
           path: '/admin/inventory/branch-stock',
         },
+        { key: 'internal-use-stock', icon: <UserCog size="1rem" />, label: t('nav.internalUseStock'), path: '/admin/inventory/internal-use' },
         { type: 'group', key: 'grp-procurement', label: t('nav.groupProcurement') },
         { key: 'po', icon: <ClipboardList size="1rem" />, label: t('nav.purchaseOrders'), path: '/admin/inventory/po' },
         { key: 'receiving', icon: <PackagePlus size="1rem" />, label: t('nav.receiving'), path: '/admin/inventory/receiving' },

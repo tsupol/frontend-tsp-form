@@ -29,6 +29,7 @@ import { DealPartnerRatesPage } from './pages/pricing/DealPartnerRatesPage';
 import { InventoryLayout } from './pages/inventory/InventoryLayout';
 import { StockDashboardPage } from './pages/inventory/StockDashboardPage';
 import { BranchStockPage } from './pages/inventory/BranchStockPage';
+import { InternalUseStockPage } from './pages/inventory/InternalUseStockPage';
 import { ReceivingPage } from './pages/inventory/ReceivingPage';
 import { LotsPage } from './pages/inventory/LotsPage';
 import { AssetsPage } from './pages/inventory/AssetsPage';
@@ -85,6 +86,7 @@ import { CompaniesPage } from './pages/settings/CompaniesPage';
 import { PrinterSetupPage } from './pages/help/PrinterSetupPage';
 import { NotificationPrefsPage } from './pages/settings/NotificationPrefsPage';
 import { AppearancePage } from './pages/settings/AppearancePage';
+import { MyAssetsPage } from './pages/settings/MyAssetsPage';
 import { HelpLayout } from './pages/help/HelpLayout';
 import { UserGuidePage } from './pages/help/UserGuidePage';
 import { CustomersPage } from './pages/customers/CustomersPage';
@@ -245,6 +247,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <SettingsLayout><AppearancePage /></SettingsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/settings/my-assets"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <SettingsLayout><MyAssetsPage /></SettingsLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
@@ -419,6 +431,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <InventoryLayout><BranchStockPage /></InventoryLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/inventory/internal-use"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <InventoryLayout><InternalUseStockPage /></InventoryLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
