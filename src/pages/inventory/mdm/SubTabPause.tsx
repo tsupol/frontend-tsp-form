@@ -13,7 +13,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, TextArea, InputDatePicker } from 'tsp-form';
+import { Button, TextArea, InputDatePicker, RadioGroup } from 'tsp-form';
 import { PauseCircle, PlayCircle, Keyboard, Clock } from 'lucide-react';
 import { DateTime } from '../../../components/DateTime';
 import { makeDatePickerFormat, toLocalDateStr } from '../../../lib/format';
@@ -144,8 +144,19 @@ export function SubTabPause({
 
           <div className="flex flex-col gap-1.5">
             <label className="form-label">{t('asset.mdm.pause.durationLabel')}</label>
-            <Radio checked={mode === 'auto48'} onChange={() => setMode('auto48')} label={t('asset.mdm.pause.auto48')} hint={t('asset.mdm.pause.auto48Hint')} />
-            <Radio checked={mode === 'until'} onChange={() => setMode('until')} label={t('asset.mdm.pause.untilDate')} />
+            <RadioGroup
+              name="pause-duration"
+              value={mode}
+              onChange={(v) => setMode(v as 'auto48' | 'until' | 'indefinite')}
+              className="flex flex-col gap-2"
+              options={[
+                { value: 'auto48', label: <RadioLabel title={t('asset.mdm.pause.auto48')} hint={t('asset.mdm.pause.auto48Hint')} /> },
+                { value: 'until', label: <RadioLabel title={t('asset.mdm.pause.untilDate')} /> },
+                ...(canIndefinite
+                  ? [{ value: 'indefinite' as const, label: <RadioLabel title={t('asset.mdm.pause.indefiniteOption')} hint={t('asset.mdm.pause.indefiniteHint')} /> }]
+                  : []),
+              ]}
+            />
             {mode === 'until' && (
               <div className="pl-6 pt-1" style={{ maxWidth: '16rem' }}>
                 <InputDatePicker
@@ -175,9 +186,6 @@ export function SubTabPause({
                 />
               </div>
             )}
-            {canIndefinite && (
-              <Radio checked={mode === 'indefinite'} onChange={() => setMode('indefinite')} label={t('asset.mdm.pause.indefiniteOption')} hint={t('asset.mdm.pause.indefiniteHint')} />
-            )}
           </div>
 
           {/* Reflect the auto-resume promise so nobody thinks it's permanent. */}
@@ -206,14 +214,12 @@ function dedupeByPauseId(rows: MdmEnforcementPause[]): MdmEnforcementPause[] {
   return rows.filter((r) => (seen.has(r.pause_id) ? false : (seen.add(r.pause_id), true)));
 }
 
-function Radio({ checked, onChange, label, hint }: { checked: boolean; onChange: () => void; label: string; hint?: string }) {
+/** Title + optional hint packed into a RadioGroup option's label node. */
+function RadioLabel({ title, hint }: { title: string; hint?: string }) {
   return (
-    <label className="flex items-start gap-2 cursor-pointer">
-      <input type="radio" checked={checked} onChange={onChange} className="mt-0.5" />
-      <span className="min-w-0">
-        <span className="text-sm">{label}</span>
-        {hint && <span className="block text-xs text-subtler">{hint}</span>}
-      </span>
-    </label>
+    <span className="min-w-0">
+      <span className="text-sm">{title}</span>
+      {hint && <span className="block text-xs text-subtler">{hint}</span>}
+    </span>
   );
 }
