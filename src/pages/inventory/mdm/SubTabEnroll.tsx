@@ -46,13 +46,14 @@ interface PrepareResponse {
 
 type BadgeTone = 'neutral' | 'info' | 'warning' | 'danger' | 'successSoft' | 'success';
 
-const TONE_CLASS: Record<BadgeTone, string> = {
-  neutral: 'bg-surface border-line text-subtle',
-  info: 'bg-info-soft border-info-border text-info-fg',
-  warning: 'bg-warning-soft border-warning-border text-warning-fg',
-  danger: 'bg-danger-soft border-danger-border text-danger-fg',
-  successSoft: 'bg-success-soft border-success-border text-success-fg',
-  success: 'bg-success-soft border-success-border text-success-fg',
+// tsp-form .alert only has info/success/warning/danger — map our badge tones onto it.
+const ALERT_TONE: Record<BadgeTone, string> = {
+  neutral: 'alert alert-info',
+  info: 'alert alert-info',
+  warning: 'alert alert-warning',
+  danger: 'alert alert-danger',
+  successSoft: 'alert alert-success',
+  success: 'alert alert-success',
 };
 
 const TONE_ICON: Record<BadgeTone, typeof CheckCircle> = {
@@ -264,41 +265,47 @@ export function SubTabEnroll({
       </div>
 
       {/* ⭐ Readiness summary — the one-glance answer (§6.5). */}
-      <div className={`flex items-start gap-3 px-4 py-3 rounded-md border ${
-        readyToHandOver
-          ? 'bg-success-soft border-success-border text-success-fg'
-          : 'bg-warning-soft border-warning-border text-warning-fg'
-      }`}>
-        {readyToHandOver ? <PackageCheck size={20} className="shrink-0 mt-0.5" /> : <PackageOpen size={20} className="shrink-0 mt-0.5" />}
+      <div className={readyToHandOver ? 'alert alert-success' : 'alert alert-warning'}>
+        {readyToHandOver ? <PackageCheck size={20} className="shrink-0" /> : <PackageOpen size={20} className="shrink-0" />}
         <div className="min-w-0">
-          <div className="text-sm font-semibold">
+          <div className="alert-title">
             {readyToHandOver ? t('asset.mdm.readiness.ready') : t('asset.mdm.readiness.notReady')}
           </div>
           {!readyToHandOver && (
-            <div className="text-xs mt-0.5 opacity-90">
+            <div className="alert-description">
               {t('asset.mdm.readiness.remaining', { steps: remainingStepLabels(t, { enrollComplete, step6Complete, step7Done }) })}
             </div>
           )}
         </div>
       </div>
 
-      {/* Prepare status badge (steps 1–5 detail). */}
-      <div className={`flex items-start gap-3 px-4 py-3 rounded-md border ${TONE_CLASS[presentation.tone]}`}>
-        <ToneIcon size={20} className={`shrink-0 mt-0.5 ${presentation.spin ? 'animate-spin' : ''}`} />
+      {/* Prepare status badge (steps 1–5 detail). The sub line is dropped when it
+          would just repeat the title (e.g. IN_MDM_INFO). */}
+      <div className={ALERT_TONE[presentation.tone]}>
+        <ToneIcon size={20} className={`shrink-0 ${presentation.spin ? 'animate-spin' : ''}`} />
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold">{t(`asset.mdm.badge.${presentation.key}.label`)}</div>
-          <div className="text-xs mt-0.5 opacity-90">{t(`asset.mdm.badge.${presentation.key}.sub`)}</div>
+          <div className="alert-title">{t(`asset.mdm.badge.${presentation.key}.label`)}</div>
+          {(() => {
+            const label = t(`asset.mdm.badge.${presentation.key}.label`);
+            const sub = t(`asset.mdm.badge.${presentation.key}.sub`);
+            // Drop a sub that only restates the label (ignoring trailing period).
+            const same = sub.replace(/[.。]\s*$/, '') === label.replace(/[.。]\s*$/, '');
+            return same ? null : <div className="alert-description">{sub}</div>;
+          })()}
           {status.mdm_status === 'PREPARE_FAILED' && status.prepare_blocked_reason && (
-            <div className="text-xs mt-1.5 font-mono opacity-80 break-words">{status.prepare_blocked_reason}</div>
+            <div className="alert-description font-mono break-words mt-1">{status.prepare_blocked_reason}</div>
           )}
         </div>
       </div>
 
       {justPrepared && (status.mdm_status === 'PREPARING' || status.mdm_status === 'PROFILE_READY') && (
-        <div className="px-4 py-3 rounded-md border border-info-border bg-info-soft text-info-fg">
-          <div className="text-sm font-semibold">{t('asset.mdm.afterPress.title')}</div>
-          <div className="text-xs mt-1">{t('asset.mdm.afterPress.next')}</div>
-          <div className="text-xs mt-1 opacity-80">{t('asset.mdm.afterPress.note')}</div>
+        <div className="alert alert-info">
+          <Loader2 size={20} className="shrink-0 animate-spin" />
+          <div className="min-w-0">
+            <div className="alert-title">{t('asset.mdm.afterPress.title')}</div>
+            <div className="alert-description">{t('asset.mdm.afterPress.next')}</div>
+            <div className="alert-description">{t('asset.mdm.afterPress.note')}</div>
+          </div>
         </div>
       )}
 
