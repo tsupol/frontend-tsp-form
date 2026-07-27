@@ -2212,10 +2212,28 @@
         "notInMdm": "ยังไม่อยู่ใน MDM",
         "since": "เข้าระบบเมื่อ",
         "lastSeen": "เห็นล่าสุด",
+        "lastSeenStale": "เครื่องไม่ได้ติดต่อเข้ามานาน คำสั่งจะค้างในคิวจนกว่าเครื่องจะออนไลน์",
         "serial": "Serial",
-        "pullHint": "ดึงข้อมูลล่าสุดจากเครื่อง",
-        "pullProfiles": "ดึงโปรไฟล์",
-        "pullApps": "ดึงรายการแอป"
+        "battery": "แบตเตอรี่",
+        "capacity": "ความจุ",
+        "capacityFree": "ว่าง {{free}} GB จาก {{total}} GB",
+        "capacityTotal": "{{total}} GB",
+        "os": "iOS",
+        "supervised": "โหมดควบคุม",
+        "notSupervised": "ไม่ได้อยู่ในโหมดควบคุม — คำสั่งจำกัดบางอย่างจะไม่ทำงาน",
+        "noBasicInfo": "ยังไม่ได้ดึงข้อมูลเครื่อง กดปุ่มดึงด้านล่างเพื่อดึงข้อมูล"
+      },
+      "devInfo": {
+        "profiles": "โปรไฟล์บนเครื่อง",
+        "apps": "แอปที่ติดตั้ง",
+        "pull": "ดึงใหม่",
+        "observedAt": "ข้อมูลเมื่อ",
+        "neverPulled": "ยังไม่เคยดึง",
+        "noProfiles": "ไม่มีโปรไฟล์",
+        "noApps": "ไม่มีแอป",
+        "lockedProfile": "ล็อกไม่ให้ลบ",
+        "encrypted": "เข้ารหัส",
+        "managed": "จัดการโดยองค์กร"
       },
       "queue": {
         "title": "คิวคำสั่ง",

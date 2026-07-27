@@ -1,9 +1,42 @@
 // Small shared presentational pieces used across MDM sub-tabs.
 
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PauseCircle, XCircle, ArrowRight } from 'lucide-react';
+import { PauseCircle, XCircle, ArrowRight, AppWindow } from 'lucide-react';
 import { DateTime } from '../../../components/DateTime';
 import type { AssetMdmStatus, ParsedMdmError } from './mdmApi';
+
+// §7.1 — app icon from be-media (302 → Apple CDN, 404 = not an App Store app →
+// placeholder). No token, aggressively cached; safe to fire per-row. App NAME
+// always comes from the view (app_name), never Apple.
+const APP_ICON_BASE = 'https://be-media.czynet.dev/api/v1/mdm/app-icon?bundle_id=';
+
+export function AppIcon({ bundleId, size = 32 }: { bundleId: string; size?: number }) {
+  const [failed, setFailed] = useState(false);
+  if (failed || !bundleId) {
+    return (
+      <span
+        className="inline-flex items-center justify-center rounded-md bg-surface-hover text-subtler shrink-0"
+        style={{ width: size, height: size }}
+        aria-hidden
+      >
+        <AppWindow size={Math.round(size * 0.55)} />
+      </span>
+    );
+  }
+  return (
+    <img
+      src={`${APP_ICON_BASE}${encodeURIComponent(bundleId)}`}
+      width={size}
+      height={size}
+      loading="lazy"
+      alt=""
+      className="rounded-md shrink-0"
+      style={{ width: size, height: size }}
+      onError={() => setFailed(true)}
+    />
+  );
+}
 
 /** Warning bar shown at the top of the MDM tab when enforcement is paused (§3). */
 export function EnforcementPausedBar({ status, onGoToPause }: {

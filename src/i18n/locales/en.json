@@ -2215,10 +2215,28 @@
         "notInMdm": "Not in MDM",
         "since": "In MDM since",
         "lastSeen": "Last seen",
+        "lastSeenStale": "The device hasn't checked in for a while — commands will stay queued until it comes back online.",
         "serial": "Serial",
-        "pullHint": "Refresh what the device reports",
-        "pullProfiles": "Pull profiles",
-        "pullApps": "Pull apps"
+        "battery": "Battery",
+        "capacity": "Storage",
+        "capacityFree": "{{free}} GB free of {{total}} GB",
+        "capacityTotal": "{{total}} GB",
+        "os": "iOS",
+        "supervised": "Supervised",
+        "notSupervised": "Not supervised — some restrictions won't apply",
+        "noBasicInfo": "Device info hasn't been pulled yet. Use the pull buttons below to fetch it."
+      },
+      "devInfo": {
+        "profiles": "Configuration profiles",
+        "apps": "Installed apps",
+        "pull": "Pull",
+        "observedAt": "as of",
+        "neverPulled": "never pulled",
+        "noProfiles": "No profiles reported.",
+        "noApps": "No apps reported.",
+        "lockedProfile": "Removal locked",
+        "encrypted": "Encrypted",
+        "managed": "Managed by organization"
       },
       "queue": {
         "title": "Command queue",

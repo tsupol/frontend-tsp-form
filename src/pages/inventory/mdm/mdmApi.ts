@@ -83,7 +83,7 @@ export interface AssetMdmStatus {
   // is levels 1–3.
   enforcement_level: number;
   enforcement_level_max: number;
-  enforcement_level_expected: number;
+  enforcement_level_commanded: number; // "last commanded", NOT "what it should be" (§3.0; renamed mig 914)
   enforcement_origin_code: MdmEnforcementOrigin;
   enforcement_wallpaper_on: boolean;
   enforcement_wallpaper_purpose: MdmWallpaperPurpose | null;
@@ -94,7 +94,10 @@ export interface AssetMdmStatus {
   // Why / next step — all nullable, and null is a real answer (device not under
   // a live contract). null → hide the line, never render "0 days".
   overdue_days_effective: number | null;
-  overdue_days_raw: number | null;
+  // Documented in 131 §3.0 but NOT present in the live view (verified 2026-07-27,
+  // asset 3091). Optional so the raw-vs-effective line stays hidden until BE adds
+  // it, rather than asserting a column that isn't there.
+  overdue_days_raw?: number | null;
   next_level: number | null;
   next_level_at_overdue_days: number | null;
   days_until_next_level: number | null;
@@ -113,6 +116,7 @@ export interface AssetMdmStatus {
 
   // §6/§3.4 helper flags (also on this row).
   app_whitelist_active: boolean | null; // sub-tab 5 remove button gate
+  app_whitelist_checked_at: string | null; // staleness of app_whitelist_active (§7.0)
   nnf_app_installed: boolean | null;     // sub-tab 1 step 6 checklist
   nnf_app_checked_at: string | null;
 
@@ -218,6 +222,44 @@ export function queryProfiles(assetId: number, actorId: number): Promise<MdmInte
 }
 export function queryApps(assetId: number, actorId: number): Promise<MdmIntentAck> {
   return apiClient.rpc<MdmIntentAck>('fn_mdm_query_apps', { p_asset_id: assetId, p_actor_id: actorId });
+}
+
+// ── §3.4 device-reported profiles & apps (accordion render target) ───────────
+// These are what the "pull profiles/apps" commands populate. The pull is async
+// (§0.3) — after firing, observed_at only moves once the device answers, so the
+// UI polls these until observed_at advances. Profiles key on device_id (= asset
+// id in these MDM tables; the §4 pause doc confirmed device_id IS inv.assets.id).
+
+export interface MdmDeviceProfile {
+  id: number;
+  device_id: number;
+  payload_display_name: string | null;
+  payload_organization: string | null;
+  payload_identifier: string | null;
+  is_managed: boolean | null;
+  is_encrypted: boolean | null;
+  removal_disallowed: boolean | null;
+  observed_at: string | null;
+}
+export function fetchDeviceProfiles(assetId: number): Promise<MdmDeviceProfile[]> {
+  return apiClient.get<MdmDeviceProfile[]>(
+    `/v_mdm_device_profiles_current?device_id=eq.${assetId}&order=payload_display_name.asc`,
+  );
+}
+
+export interface MdmDeviceApp {
+  asset_id: number;
+  bundle_id: string;
+  app_name: string | null;
+  version: string | null;
+  short_version: string | null;
+  is_managed: boolean | null;
+  last_observed_at: string | null;
+}
+export function fetchDeviceApps(assetId: number): Promise<MdmDeviceApp[]> {
+  return apiClient.get<MdmDeviceApp[]>(
+    `/v_mdm_device_apps_current?asset_id=eq.${assetId}&order=app_name.asc`,
+  );
 }
 
 // ── Branch wallpaper config (read only, for the dunning confirm preview) ─────
