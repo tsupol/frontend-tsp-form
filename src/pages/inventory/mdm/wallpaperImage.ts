@@ -3,15 +3,34 @@
 // resize or draw; the FE ships the finished bytes).
 //
 //   - accept PNG/JPEG only (HEIC/WebP rejected by BE → check here first)
-//   - produce TWO sizes: full (phone-resolution) + thumb (list) as base64
-//   - base64 is RAW (no "data:image/png;base64," prefix, no whitespace) — the
-//     BE rejects a data: URL (IMAGE_B64_INVALID_FORMAT)
+//   - crop to the phone aspect 19.5:9 and render at 1170×2532 (§10.1) — the
+//     crop is done by tsp-form's <ImageCropper>; this file takes the already-
+//     cropped image and finishes it (overlay + encode)
+//   - always encode JPEG at ~q0.75, stepping quality down until ≤500 KB (§5.3):
+//     the image lives in the DB and rides every push command, so bytes cost twice
+//   - produce TWO sizes: full (1170×2532) + thumb (list) as RAW base64 (no
+//     "data:...;base64," prefix, no whitespace — BE rejects a data: URL)
 //   - optionally burn the dunning message + phone onto the image (BE won't)
 // ============================================================================
 
 export const ACCEPTED_TYPES = ['image/png', 'image/jpeg'];
-export const FULL_MAX = 1290;  // ~iPhone portrait long edge; keeps bytes sane
-export const THUMB_MAX = 320;
+
+// §10.1 — iPhone 13/14/15 portrait resolution; 19.5:9. Bigger doesn't look
+// better on-device, only bloats bytes.
+export const TARGET_W = 1170;
+export const TARGET_H = 2532;
+export const WALLPAPER_ASPECT = TARGET_W / TARGET_H; // width/height ≈ 0.462 (portrait)
+
+export const THUMB_W = 320;
+export const THUMB_H = Math.round(THUMB_W / WALLPAPER_ASPECT);
+
+// §5.3 — target ≤500 KB for the full image; the hard BE ceiling is 2 MB. Step
+// JPEG quality down from START until under the cap (or we hit the floor).
+const FULL_MAX_BYTES = 500 * 1024;
+const JPEG_QUALITY_START = 0.8;
+const JPEG_QUALITY_FLOOR = 0.4;
+const JPEG_QUALITY_STEP = 0.1;
+const THUMB_QUALITY = 0.7;
 
 export interface WallpaperOverlay {
   message?: string | null;
@@ -19,9 +38,10 @@ export interface WallpaperOverlay {
 }
 
 export interface ProcessedWallpaper {
-  imageB64: string;  // full, raw base64 (no data: prefix)
-  thumbB64: string;  // thumbnail, raw base64
+  imageB64: string;   // full 1170×2532 JPEG, raw base64
+  thumbB64: string;   // thumbnail JPEG, raw base64
   previewUrl: string; // data: URL for on-screen preview only
+  bytes: number;      // full image size, so the UI can show it / warn
 }
 
 /** True if the File is a type the backend accepts. */
@@ -29,22 +49,14 @@ export function isAcceptedImage(file: File): boolean {
   return ACCEPTED_TYPES.includes(file.type);
 }
 
-function loadImage(file: File): Promise<HTMLImageElement> {
+export function loadImageFromBlob(blob: Blob): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
+    const url = URL.createObjectURL(blob);
     const img = new Image();
     img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('image_decode_failed')); };
     img.src = url;
   });
-}
-
-/** Scale (contain) to fit maxEdge, preserving aspect. Never upscales. */
-function fitDimensions(w: number, h: number, maxEdge: number): { w: number; h: number } {
-  const longest = Math.max(w, h);
-  if (longest <= maxEdge) return { w, h };
-  const s = maxEdge / longest;
-  return { w: Math.round(w * s), h: Math.round(h * s) };
 }
 
 /** Draw the message + phone as a legible band near the bottom of the canvas. */
@@ -58,7 +70,6 @@ function drawOverlay(ctx: CanvasRenderingContext2D, cw: number, ch: number, over
   const phoneSize = Math.round(cw * 0.07);
   const lineGap = Math.round(msgSize * 0.35);
 
-  // Word-wrap the message to the canvas width.
   ctx.font = `600 ${msgSize}px system-ui, sans-serif`;
   const maxTextW = cw - pad * 2;
   const words = msg.split(/\s+/).filter(Boolean);
@@ -76,7 +87,6 @@ function drawOverlay(ctx: CanvasRenderingContext2D, cw: number, ch: number, over
   const bandH = msgBlockH + phoneBlockH + pad * 1.5;
   const bandTop = ch - bandH;
 
-  // Scrim so text stays legible over any wallpaper.
   const grad = ctx.createLinearGradient(0, bandTop - pad, 0, ch);
   grad.addColorStop(0, 'rgba(0,0,0,0)');
   grad.addColorStop(1, 'rgba(0,0,0,0.72)');
@@ -100,48 +110,54 @@ function drawOverlay(ctx: CanvasRenderingContext2D, cw: number, ch: number, over
   }
 }
 
-function canvasToRawB64(canvas: HTMLCanvasElement, mime: string): { raw: string; dataUrl: string } {
-  const dataUrl = canvas.toDataURL(mime, 0.9);
+/** Cover-draw a source image into a w×h canvas (fills, centre-crops overflow). */
+function drawCover(ctx: CanvasRenderingContext2D, img: HTMLImageElement, w: number, h: number) {
+  const scale = Math.max(w / img.naturalWidth, h / img.naturalHeight);
+  const dw = img.naturalWidth * scale;
+  const dh = img.naturalHeight * scale;
+  ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+}
+
+function encodeCanvas(canvas: HTMLCanvasElement, quality: number): { raw: string; dataUrl: string; bytes: number } {
+  const dataUrl = canvas.toDataURL('image/jpeg', quality);
   const raw = dataUrl.replace(/^data:[^,]+,/, '');
-  return { raw, dataUrl };
+  // base64 → bytes: 4 chars encode 3 bytes, minus padding.
+  const bytes = Math.floor(raw.length * 3 / 4) - (raw.endsWith('==') ? 2 : raw.endsWith('=') ? 1 : 0);
+  return { raw, dataUrl, bytes };
 }
 
-/** A decoded source image + its mime — decode ONCE, then re-render the overlay
- *  cheaply on every text change without touching the file again. */
-export interface DecodedWallpaper {
-  img: HTMLImageElement;
-  mime: string;
+/** Render the full image at 1170×2532, stepping JPEG quality down until ≤500 KB. */
+function encodeFull(canvas: HTMLCanvasElement): { raw: string; dataUrl: string; bytes: number } {
+  let out = encodeCanvas(canvas, JPEG_QUALITY_START);
+  let q = JPEG_QUALITY_START;
+  while (out.bytes > FULL_MAX_BYTES && q > JPEG_QUALITY_FLOOR) {
+    q = Math.round((q - JPEG_QUALITY_STEP) * 100) / 100;
+    out = encodeCanvas(canvas, q);
+  }
+  return out;
 }
 
-/** Step 1: decode the file (the only slow/async part). Validate type first. */
-export async function decodeWallpaper(file: File): Promise<DecodedWallpaper> {
-  if (!isAcceptedImage(file)) throw new Error('image_not_png_or_jpeg');
-  const img = await loadImage(file);
-  const mime = file.type === 'image/jpeg' ? 'image/jpeg' : 'image/png';
-  return { img, mime };
-}
+/**
+ * Take an already-cropped image (from <ImageCropper>, aspect 19.5:9) and finish
+ * it: draw at 1170×2532 with the overlay, encode a size-capped full + a thumb.
+ * Synchronous + cheap — safe to re-run on every (debounced) overlay keystroke.
+ */
+export function renderCroppedWallpaper(cropped: HTMLImageElement, overlay: WallpaperOverlay = {}): ProcessedWallpaper {
+  const full = document.createElement('canvas');
+  full.width = TARGET_W; full.height = TARGET_H;
+  const fctx = full.getContext('2d');
+  if (!fctx) throw new Error('canvas_unavailable');
+  drawCover(fctx, cropped, TARGET_W, TARGET_H);
+  drawOverlay(fctx, TARGET_W, TARGET_H, overlay);
+  const fullOut = encodeFull(full);
 
-/** Step 2: render full + thumb with the current overlay. Synchronous + cheap —
- *  safe to call on every (debounced) keystroke. */
-export function renderWallpaper(decoded: DecodedWallpaper, overlay: WallpaperOverlay = {}): ProcessedWallpaper {
-  const { img, mime } = decoded;
-  const render = (maxEdge: number) => {
-    const { w, h } = fitDimensions(img.naturalWidth, img.naturalHeight, maxEdge);
-    const canvas = document.createElement('canvas');
-    canvas.width = w; canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('canvas_unavailable');
-    ctx.drawImage(img, 0, 0, w, h);
-    drawOverlay(ctx, w, h, overlay);
-    return canvasToRawB64(canvas, mime);
-  };
-  const full = render(FULL_MAX);
-  const thumb = render(THUMB_MAX);
-  return { imageB64: full.raw, thumbB64: thumb.raw, previewUrl: full.dataUrl };
-}
+  const thumb = document.createElement('canvas');
+  thumb.width = THUMB_W; thumb.height = THUMB_H;
+  const tctx = thumb.getContext('2d');
+  if (!tctx) throw new Error('canvas_unavailable');
+  drawCover(tctx, cropped, THUMB_W, THUMB_H);
+  drawOverlay(tctx, THUMB_W, THUMB_H, overlay);
+  const thumbOut = encodeCanvas(thumb, THUMB_QUALITY);
 
-/** Full pipeline in one call (decode + render). Kept for callers that don't
- *  need incremental overlay editing. */
-export async function processWallpaper(file: File, overlay: WallpaperOverlay = {}): Promise<ProcessedWallpaper> {
-  return renderWallpaper(await decodeWallpaper(file), overlay);
+  return { imageB64: fullOut.raw, thumbB64: thumbOut.raw, previewUrl: fullOut.dataUrl, bytes: fullOut.bytes };
 }

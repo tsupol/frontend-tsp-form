@@ -10,7 +10,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Select, Modal, Input, TextArea } from 'tsp-form';
+import { Button, Select, Modal, Input, TextArea, Slider, ImageCropper, type ImageCropperRef } from 'tsp-form';
 import {
   Image as ImageIcon, Star, Trash2, RefreshCw, Plus, Upload, XCircle, Loader2, Info,
 } from 'lucide-react';
@@ -21,7 +21,10 @@ import {
   setBranchWallpaperDefault, retireBranchWallpaper, parseMdmError,
   type BranchWallpaper, type ParsedMdmError,
 } from '../inventory/mdm/mdmApi';
-import { decodeWallpaper, renderWallpaper, isAcceptedImage, type ProcessedWallpaper, type DecodedWallpaper } from '../inventory/mdm/wallpaperImage';
+import {
+  isAcceptedImage, renderCroppedWallpaper, loadImageFromBlob,
+  WALLPAPER_ASPECT, TARGET_W, type ProcessedWallpaper,
+} from '../inventory/mdm/wallpaperImage';
 
 interface BranchRow { id: number; name: string; is_active: boolean }
 
@@ -216,6 +219,8 @@ function WallpaperCard({ wallpaper, busy, onSetDefault, onReplace, onRetire }: {
   );
 }
 
+const CROP_VIEWPORT_W = 220; // px on-screen; keeps the 19.5:9 frame a sane height
+
 function WallpaperUploadModal({ open, mode, existingLabel, onClose, onSubmit }: {
   open: boolean;
   mode: 'create' | 'replace';
@@ -224,81 +229,55 @@ function WallpaperUploadModal({ open, mode, existingLabel, onClose, onSubmit }: 
   onSubmit: (v: { label: string; where: number; processed: ProcessedWallpaper }) => Promise<void>;
 }) {
   const { t } = useTranslation();
+  const cropperRef = useRef<ImageCropperRef>(null);
   const [label, setLabel] = useState('');
   const [message, setMessage] = useState('');
   const [phone, setPhone] = useState('');
-  const [where, setWhere] = useState('3'); // both by default
-  const [processed, setProcessed] = useState<ProcessedWallpaper | null>(null);
-  const [decoding, setDecoding] = useState(false); // ONLY while decoding a new file
+  const [where, setWhere] = useState('3'); // both by default (§10.1)
+  const [file, setFile] = useState<File | null>(null);
+  const [fileName, setFileName] = useState('');
+  const [zoom, setZoom] = useState(1);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [fileName, setFileName] = useState('');
-  const decodedRef = useRef<DecodedWallpaper | null>(null);
-  const overlayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Reset on open.
   useEffect(() => {
     if (open) {
       setLabel(existingLabel ?? ''); setMessage(''); setPhone(''); setWhere('3');
-      setProcessed(null); setDecoding(false); setSaving(false); setError(''); setFileName('');
-      decodedRef.current = null;
+      setFile(null); setFileName(''); setZoom(1); setSaving(false); setError('');
     }
-    return () => { if (overlayTimer.current) clearTimeout(overlayTimer.current); };
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Re-render the overlay from the already-decoded image. Cheap + synchronous,
-  // so NO spinner — the preview just updates in place.
-  const renderNow = (msg: string, ph: string) => {
-    if (!decodedRef.current) return;
-    try {
-      setProcessed(renderWallpaper(decodedRef.current, { message: msg, phone: ph }));
-    } catch (e) {
-      setError(t(`branchWallpaper.err.${(e as Error).message}`, { defaultValue: t('branchWallpaper.err.generic') }));
-    }
+  const onFile = (f: File | undefined) => {
+    if (!f) return;
+    if (!isAcceptedImage(f)) { setError(t('branchWallpaper.err.image_not_png_or_jpeg')); return; }
+    setError('');
+    setFileName(f.name);
+    setFile(f);
   };
 
-  const onFile = async (file: File | undefined) => {
-    if (!file) return;
-    if (!isAcceptedImage(file)) { setError(t('branchWallpaper.err.image_not_png_or_jpeg')); return; }
-    setFileName(file.name);
-    setDecoding(true); setError('');
-    try {
-      decodedRef.current = await decodeWallpaper(file); // the only slow step
-      renderNow(message, phone);
-    } catch (e) {
-      setError(t(`branchWallpaper.err.${(e as Error).message}`, { defaultValue: t('branchWallpaper.err.generic') }));
-      setProcessed(null); decodedRef.current = null;
-    } finally {
-      setDecoding(false);
-    }
-  };
+  const minZoomPct = Math.round((cropperRef.current?.minZoom ?? 1) * 100);
+  const maxZoomPct = Math.round((cropperRef.current?.maxZoom ?? 4) * 100);
 
-  // Debounce the overlay re-render so typing doesn't redraw on every keystroke.
-  const onOverlayChange = (nextMsg: string, nextPhone: string) => {
-    setMessage(nextMsg); setPhone(nextPhone);
-    if (!decodedRef.current) return;
-    if (overlayTimer.current) clearTimeout(overlayTimer.current);
-    overlayTimer.current = setTimeout(() => renderNow(nextMsg, nextPhone), 250);
-  };
+  const canSubmit = !saving && !!file && (mode === 'replace' || label.trim().length > 0);
 
-  const canSubmit = !saving && !decoding && !!processed && (mode === 'replace' || label.trim().length > 0);
-
-  const submit = async () => {
-    if (!processed) return;
+  // Crop → decode the cropped JPEG → burn overlay + size-cap → submit (§5.3/§10.1).
+  const submit = () => {
+    if (!file || !cropperRef.current) return;
     setSaving(true); setError('');
-    try {
-      await onSubmit({ label: label.trim(), where: Number(where), processed });
-      onClose();
-    } catch (e) {
-      if (e instanceof ApiError) {
-        const mdm = parseMdmError(e, t);
-        setError(mdm.message);
-      } else {
-        setError(t('common.error'));
+    cropperRef.current.crop(async (blob) => {
+      try {
+        const cropped = await loadImageFromBlob(blob);
+        const processed = renderCroppedWallpaper(cropped, { message, phone });
+        await onSubmit({ label: label.trim(), where: Number(where), processed });
+        onClose();
+      } catch (e) {
+        if (e instanceof ApiError) setError(parseMdmError(e, t).message);
+        else setError(t(`branchWallpaper.err.${(e as Error).message}`, { defaultValue: t('branchWallpaper.err.generic') }));
+      } finally {
+        setSaving(false);
       }
-    } finally {
-      setSaving(false);
-    }
+    });
   };
 
   return (
@@ -331,11 +310,11 @@ function WallpaperUploadModal({ open, mode, existingLabel, onClose, onSubmit }: 
             </div>
             <div className="flex flex-col">
               <label className="form-label">{t('branchWallpaper.overlayMessage')}</label>
-              <TextArea value={message} onChange={(e) => onOverlayChange(e.target.value, phone)} rows={2} className="w-full" placeholder={t('branchWallpaper.overlayMessagePlaceholder')} />
+              <TextArea value={message} onChange={(e) => setMessage(e.target.value)} rows={2} className="w-full" placeholder={t('branchWallpaper.overlayMessagePlaceholder')} />
             </div>
             <div className="flex flex-col">
               <label className="form-label">{t('branchWallpaper.overlayPhone')}</label>
-              <Input value={phone} onChange={(e) => onOverlayChange(message, e.target.value)} size="sm" className="w-full" placeholder={t('branchWallpaper.overlayPhonePlaceholder')} />
+              <Input value={phone} onChange={(e) => setPhone(e.target.value)} size="sm" className="w-full" placeholder={t('branchWallpaper.overlayPhonePlaceholder')} />
             </div>
             {mode === 'create' && (
               <div className="flex flex-col">
@@ -355,23 +334,49 @@ function WallpaperUploadModal({ open, mode, existingLabel, onClose, onSubmit }: 
             )}
           </div>
 
-          {/* Right: live preview */}
-          <div className="flex flex-col">
-            <label className="form-label">{t('branchWallpaper.preview')}</label>
-            <div className="relative aspect-[9/16] rounded-md border border-line bg-surface overflow-hidden flex items-center justify-center">
-              {processed ? (
-                <img src={processed.previewUrl} alt="preview" className="w-full h-full object-cover" />
-              ) : !decoding ? (
-                <div className="text-xs text-subtler text-center px-4">{t('branchWallpaper.previewEmpty')}</div>
-              ) : null}
-              {/* Spinner only while decoding a NEW file — overlays the current
-                  preview instead of replacing it, so text edits never flicker. */}
-              {decoding && (
-                <div className="absolute inset-0 flex items-center justify-center bg-surface/60">
-                  <Loader2 size={20} className="animate-spin text-subtler" />
+          {/* Right: 19.5:9 crop frame + phone-mock text overlay. The overlay text
+              previews as an HTML layer here; it's burned into the pixels on save. */}
+          <div className="flex flex-col items-center">
+            <label className="form-label self-start">{t('branchWallpaper.crop')}</label>
+            {file ? (
+              <>
+                <div className="relative" style={{ width: CROP_VIEWPORT_W }}>
+                  <ImageCropper
+                    ref={cropperRef}
+                    src={file}
+                    aspectRatio={WALLPAPER_ASPECT}
+                    outputType="image/jpeg"
+                    outputWidth={TARGET_W}
+                    viewportWidth={CROP_VIEWPORT_W}
+                    onZoomChange={(z) => setZoom(z)}
+                  />
+                  {/* Text preview overlay (mock, not the burned pixels). */}
+                  {(message.trim() || phone.trim()) && (
+                    <div className="absolute inset-x-0 bottom-0 pointer-events-none p-2 text-center"
+                      style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.72), rgba(0,0,0,0))' }}>
+                      {message.trim() && <div className="text-white text-[11px] leading-snug font-medium break-words">{message}</div>}
+                      {phone.trim() && <div className="text-white text-xs font-bold mt-0.5">{phone}</div>}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+                <div className="flex items-center gap-2 w-full mt-2" style={{ maxWidth: CROP_VIEWPORT_W }}>
+                  <span className="text-xs text-subtle">{t('branchWallpaper.zoom')}</span>
+                  <Slider
+                    min={minZoomPct}
+                    max={maxZoomPct}
+                    step={1}
+                    value={Math.round(zoom * 100)}
+                    onChange={(v) => cropperRef.current?.setZoom(v / 100)}
+                  />
+                </div>
+                <span className="text-xs text-subtler mt-1 text-center">{t('branchWallpaper.cropHint')}</span>
+              </>
+            ) : (
+              <div className="rounded-md border border-line bg-surface flex items-center justify-center text-xs text-subtler text-center px-4"
+                style={{ width: CROP_VIEWPORT_W, aspectRatio: `${WALLPAPER_ASPECT}` }}>
+                {t('branchWallpaper.previewEmpty')}
+              </div>
+            )}
           </div>
         </div>
       </div>

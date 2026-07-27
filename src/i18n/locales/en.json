@@ -994,7 +994,10 @@
     "whereHome": "Home screen",
     "whereBoth": "Both screens",
     "preview": "Preview",
-    "previewEmpty": "Choose an image to preview.",
+    "previewEmpty": "Choose an image to crop.",
+    "crop": "Crop (phone screen)",
+    "cropHint": "Drag and zoom to frame the image. It's cropped to 1170×2532 and saved as JPEG.",
+    "zoom": "Zoom",
     "save": "Add wallpaper",
     "replaceSave": "Replace image",
     "err": {
