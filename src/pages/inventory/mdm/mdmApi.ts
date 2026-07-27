@@ -23,6 +23,21 @@ export type MdmStatusCode =
   | 'NO_SERIAL' | 'NOT_STARTED' | 'PREPARING'
   | 'PROFILE_READY' | 'PREPARE_FAILED' | 'IN_MDM';
 
+// §3.0 status-box code columns (DONE 2026-07-27).
+export type MdmActivityCode =
+  | 'NOT_ENROLLED' | 'ENFORCEMENT_PAUSED' | 'LEFT_FLEET'
+  | 'COMMAND_IN_FLIGHT' | 'ENFORCED' | 'DEVICE_UNREACHABLE' | 'NORMAL';
+export type MdmEnforcementOrigin = 'NONE' | 'AUTOMATION' | 'MANUAL' | 'LAGGING';
+export type MdmWallpaperPurpose = 'DUNNING' | 'NEUTRAL' | 'UNKNOWN';
+export type MdmVerifyState = 'VERIFIED' | 'PENDING' | 'DRIFT';
+export type MdmPauseMode = 'GRACE' | 'FREEZE';
+// Single source for the "how does this unlock" line — never composed from
+// enforcement_origin_code (they contradicted on real hardware). null ≠ "no
+// restrictions": the baseline light lock has no release condition (§3.0).
+export type MdmReleaseCondition = 'CUSTOMER_PAYS' | 'STAFF_MUST_RELEASE' | 'AUTOMATION_WILL_REVERT';
+export type MdmCommandState = 'EXECUTED' | 'FAILED' | 'EXPIRED' | 'CANCELED';
+export type MdmActorKind = 'SYSTEM' | 'STAFF';
+
 export interface AssetMdmStatus {
   asset_id: number;
   holding_id: number;
@@ -56,7 +71,58 @@ export interface AssetMdmStatus {
   may_location: boolean;         // sub-tab 6 (request / history)
   may_pause: boolean;            // sub-tab 7
   may_pause_indefinite: boolean; // sub-tab 7 indefinite option
-  may_profile: boolean;          // spare — future standalone profile button
+  may_profile: boolean;          // sub-tab 1 step 7 (apply device policy)
+
+  // ── §3.0 status box: "what's happening now" (DONE 2026-07-27) ──────────────
+  // All on the same row — no extra query. activity_code is the single header
+  // driver (icon/colour/sentence); the rest fill in the detail lines.
+  activity_code: MdmActivityCode;
+
+  // Enforcement ladder. LEVEL 0 = the baseline `light` lock (the floor, applied
+  // at handover, stays for the whole contract) — NOT "no restriction". Dunning
+  // is levels 1–3.
+  enforcement_level: number;
+  enforcement_level_max: number;
+  enforcement_level_expected: number;
+  enforcement_origin_code: MdmEnforcementOrigin;
+  enforcement_wallpaper_on: boolean;
+  enforcement_wallpaper_purpose: MdmWallpaperPurpose | null;
+  enforcement_verify_state: MdmVerifyState | null;
+  enforcement_pause_mode: MdmPauseMode | null;
+  automation_enabled: boolean;
+
+  // Why / next step — all nullable, and null is a real answer (device not under
+  // a live contract). null → hide the line, never render "0 days".
+  overdue_days_effective: number | null;
+  overdue_days_raw: number | null;
+  next_level: number | null;
+  next_level_at_overdue_days: number | null;
+  days_until_next_level: number | null;
+
+  // How it unlocks — the ONE source for the release line (§3.0).
+  release_condition_code: MdmReleaseCondition | null;
+
+  // What the system is doing / just did.
+  pending_command_count: number;
+  pending_command_type: string | null;
+  last_command_type: string | null;
+  last_command_state: MdmCommandState | null;
+  last_command_outcome_code: string | null;
+  last_command_at: string | null;
+  last_command_actor_kind: MdmActorKind | null;
+
+  // §6/§3.4 helper flags (also on this row).
+  app_whitelist_active: boolean | null; // sub-tab 5 remove button gate
+  nnf_app_installed: boolean | null;     // sub-tab 1 step 6 checklist
+  nnf_app_checked_at: string | null;
+
+  // Device info (§3.1) — battery is 0–1, multiply by 100.
+  battery_level: number | null;
+  capacity_gb: number | null;
+  available_capacity_gb: number | null;
+  os_version: string | null;
+  build_version: string | null;
+  is_supervised: boolean | null;
 }
 
 export function fetchMdmStatus(assetId: number): Promise<AssetMdmStatus | null> {

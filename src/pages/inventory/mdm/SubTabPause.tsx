@@ -21,6 +21,7 @@ import {
   fetchEnforcementPauses, pauseEnforcement, resumeEnforcement,
   parseMdmError, type AssetMdmStatus, type ParsedMdmError,
 } from './mdmApi';
+import { MDM_NO_CACHE } from './useMdmStatus';
 import { MdmErrorAlert } from './MdmSharedBits';
 
 export function SubTabPause({
@@ -38,6 +39,7 @@ export function SubTabPause({
   const { data: pauses = [], refetch } = useQuery({
     queryKey: ['mdm-enforcement-pauses', status.enrollment_id],
     queryFn: () => fetchEnforcementPauses(status.enrollment_id),
+    ...MDM_NO_CACHE,
   });
   // Whether/until it's paused is authoritative on the status row. The pauses
   // view isn't asset-scoped (no asset_id/device_id join key — see ASK), so we

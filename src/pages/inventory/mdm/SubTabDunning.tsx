@@ -23,6 +23,7 @@ import {
   type AssetMdmStatus,
 } from './mdmApi';
 import { useMdmCommand } from './useMdmCommand';
+import { MDM_NO_CACHE } from './useMdmStatus';
 import { MdmErrorAlert, CommandAckNote } from './MdmSharedBits';
 
 export function SubTabDunning({
@@ -46,6 +47,7 @@ export function SubTabDunning({
   const { data: wallpapers = [], isLoading: wpLoading } = useQuery({
     queryKey: ['branch-mdm-wallpapers', status.branch_id],
     queryFn: () => fetchBranchWallpapers(status.branch_id),
+    ...MDM_NO_CACHE,
   });
   const defaultWp = wallpapers.find((w) => w.is_default) ?? null;
   const hasDefault = !!defaultWp;

@@ -18,6 +18,7 @@ import {
   fetchRecentIntents, hasInFlightIntent,
   type MdmRecentIntent, type MdmIntentDisplayStatus, type MdmIntentSourceLayer,
 } from './mdmApi';
+import { MDM_NO_CACHE } from './useMdmStatus';
 
 const STATUS_META: Record<MdmIntentDisplayStatus, { color: 'success' | 'info' | 'danger' | 'default'; icon: typeof CheckCircle; spin?: boolean }> = {
   DONE: { color: 'success', icon: CheckCircle },
@@ -58,6 +59,7 @@ export function RecentIntentsPanel({
   const { data: intents = [], isFetching, refetch } = useQuery({
     queryKey: ['mdm-recent-intents', assetId, limit],
     queryFn: () => fetchRecentIntents(assetId, limit),
+    ...MDM_NO_CACHE,
     // Poll while anything is in flight — the device reports back async (§0.3).
     refetchInterval: (q) => (hasInFlightIntent(q.state.data ?? []) ? 3000 : false),
     refetchIntervalInBackground: false,

@@ -12,6 +12,7 @@ import { Button, Modal } from 'tsp-form';
 import { Image as ImageIcon, ImageOff, ArrowRight, Send } from 'lucide-react';
 import { setWallpaperFromLibrary, fetchBranchWallpapers, type AssetMdmStatus } from './mdmApi';
 import { useMdmCommand } from './useMdmCommand';
+import { MDM_NO_CACHE } from './useMdmStatus';
 import { MdmErrorAlert, CommandAckNote } from './MdmSharedBits';
 
 export function SubTabWallpaper({
@@ -33,6 +34,7 @@ export function SubTabWallpaper({
   const { data: wallpapers = [], isLoading } = useQuery({
     queryKey: ['branch-mdm-wallpapers', status.branch_id],
     queryFn: () => fetchBranchWallpapers(status.branch_id),
+    ...MDM_NO_CACHE,
   });
 
   const chosen = wallpapers.find((w) => w.id === selected)

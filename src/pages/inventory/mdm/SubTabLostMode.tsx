@@ -27,6 +27,7 @@ import {
   fetchDeviceOverview, parseMdmError, type AssetMdmStatus, type MdmLocation, type ParsedMdmError,
 } from './mdmApi';
 import { useMdmCommand } from './useMdmCommand';
+import { MDM_NO_CACHE } from './useMdmStatus';
 import { MdmErrorAlert, CommandAckNote } from './MdmSharedBits';
 
 export function SubTabLostMode({
@@ -53,6 +54,7 @@ export function SubTabLostMode({
   const { data: overview } = useQuery({
     queryKey: ['mdm-device-overview', status.asset_id],
     queryFn: () => fetchDeviceOverview(status.asset_id),
+    ...MDM_NO_CACHE,
   });
   const lostOn = overview?.is_mdm_lost_mode_enabled === true;
 

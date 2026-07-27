@@ -16,7 +16,9 @@
 import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { Loader2, RefreshCw } from 'lucide-react';
+import { Button } from 'tsp-form';
 import { OverflowTabs } from './mdm/OverflowTabs';
 import { useMdmStatus } from './mdm/useMdmStatus';
 import { EnforcementPausedBar } from './mdm/MdmSharedBits';
@@ -50,8 +52,23 @@ function visibleSubTabs(status: AssetMdmStatus | null): MdmSubTab[] {
 export function AssetMdmTab({ assetId, onRefresh }: { assetId: number; onRefresh: () => void }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const goToWallpaperSettings = () => navigate('/admin/settings/branch-wallpaper');
   const { data: status, isLoading, isFetching, refetch } = useMdmStatus(assetId);
+
+  // Manual refresh (§0.25 — every tab must offer one). Refetch the shared status
+  // row and drop every other MDM query for this asset so the active sub-tab
+  // reloads its own data too.
+  const refreshAll = () => {
+    refetch();
+    queryClient.invalidateQueries({
+      predicate: (q) => {
+        const k = q.queryKey;
+        return Array.isArray(k) && typeof k[0] === 'string'
+          && (k[0].startsWith('mdm-') || k[0].startsWith('branch-mdm') || k[0] === 'asset-mdm-status');
+      },
+    });
+  };
 
   const tabs = useMemo(() => visibleSubTabs(status ?? null), [status]);
 
@@ -91,7 +108,19 @@ export function AssetMdmTab({ assetId, onRefresh }: { assetId: number; onRefresh
         />
       )}
 
-      <div className="flex-1 min-h-0 overflow-auto better-scroll p-4 flex flex-col gap-4">
+      <div className="flex-1 min-h-0 overflow-auto better-scroll p-4 flex flex-col gap-3">
+        {/* Manual refresh — this data goes stale silently (§0.25). */}
+        <div className="flex-none flex items-center justify-end -mb-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="btn-icon-sm"
+            startIcon={<RefreshCw size={14} className={isFetching ? 'animate-spin' : ''} />}
+            onClick={refreshAll}
+            aria-label={t('common.refresh')}
+          />
+        </div>
+
         {/* Pause bar — visible on every action sub-tab (not on enroll/pause). */}
         {effectiveActive !== 'enroll' && effectiveActive !== 'pause' && (
           <EnforcementPausedBar status={status} onGoToPause={() => setActive('pause')} />
