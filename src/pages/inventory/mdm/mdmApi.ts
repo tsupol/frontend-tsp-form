@@ -94,10 +94,7 @@ export interface AssetMdmStatus {
   // Why / next step — all nullable, and null is a real answer (device not under
   // a live contract). null → hide the line, never render "0 days".
   overdue_days_effective: number | null;
-  // Documented in 131 §3.0 but NOT present in the live view (verified 2026-07-27,
-  // asset 3091). Optional so the raw-vs-effective line stays hidden until BE adds
-  // it, rather than asserting a column that isn't there.
-  overdue_days_raw?: number | null;
+  overdue_days_raw: number | null; // added mig 921 (was accidentally dropped); null = not under a live contract
   next_level: number | null;
   next_level_at_overdue_days: number | null;
   days_until_next_level: number | null;
