@@ -200,17 +200,22 @@ function RemoveRestrictionSection({
       <MdmErrorAlert error={cmd.error} onGoToEnroll={onNotEnrolled} />
       <CommandAckNote show={cmd.acked && !cmd.error} />
 
-      <div>
-        <Button
-          variant="outline"
-          size="sm"
-          startIcon={<Unlock size={15} />}
-          disabled={!canRemove || cmd.pending}
-          onClick={openConfirm}
-        >
-          {t('asset.mdm.appControl.remove.button')}
-        </Button>
-      </div>
+      {/* Only offer the button when there's something to remove (or unknown).
+          When nothing is active, the status line above already says so — a
+          disabled "Remove restriction" would just repeat it. */}
+      {canRemove && (
+        <div>
+          <Button
+            variant="outline"
+            size="sm"
+            startIcon={<Unlock size={15} />}
+            disabled={cmd.pending}
+            onClick={openConfirm}
+          >
+            {t('asset.mdm.appControl.remove.button')}
+          </Button>
+        </div>
+      )}
 
       <Modal open={confirmOpen} onClose={() => !busy && setConfirmOpen(false)} maxWidth="26rem" width="100%">
         <div className="modal-header">

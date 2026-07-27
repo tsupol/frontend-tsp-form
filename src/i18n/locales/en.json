@@ -2410,7 +2410,7 @@
         "baselineNote": "Essential apps (phone, messages, settings, NNF App…) are always included so the device stays usable.",
         "apply": "Apply to device",
         "remove": {
-          "title": "Remove app restriction",
+          "title": "App restriction",
           "active": "The device is currently restricted to an allowed-apps list.",
           "none": "No app restriction is active on this device.",
           "unknown": "App-restriction status unknown — pull the profile list on the status tab first.",
