@@ -14,6 +14,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { queryProfiles, queryApps, type AssetMdmStatus } from './mdmApi';
 import { useMdmCommand } from './useMdmCommand';
 import { RecentIntentsPanel } from './RecentIntentsPanel';
+import { MdmActivityCard } from './MdmActivityCard';
 import { MdmErrorAlert, CommandAckNote } from './MdmSharedBits';
 
 export function SubTabStatus({
@@ -43,6 +44,9 @@ export function SubTabStatus({
 
   return (
     <div className="flex flex-col gap-4">
+      {/* "What's happening now" — the first thing a staffer on a call needs. */}
+      <MdmActivityCard status={status} />
+
       {/* Status glance */}
       <div className="border border-line rounded-md p-4">
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5">

@@ -24,6 +24,7 @@ import {
 } from './mdmApi';
 import { useMdmCommand } from './useMdmCommand';
 import { MDM_NO_CACHE } from './useMdmStatus';
+import { MdmActivityLine } from './MdmActivityCard';
 import { MdmErrorAlert, CommandAckNote } from './MdmSharedBits';
 
 export function SubTabDunning({
@@ -82,6 +83,9 @@ export function SubTabDunning({
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Current state — so staff don't re-press what's already in effect. */}
+      <MdmActivityLine status={status} />
+
       <p className="text-sm text-subtle">{t('asset.mdm.dunning.intro')}</p>
 
       <MdmErrorAlert error={cmd.error} onGoToEnroll={onNotEnrolled} />

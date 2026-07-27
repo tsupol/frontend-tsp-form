@@ -1371,9 +1371,12 @@
     "icloudAuditNote": "การดูรหัสถูกบันทึกทุกครั้ง (ใคร / เมื่อไหร่ / บัญชีไหน)",
     "lastTouched": "แตะล่าสุด: {{rel}}",
     "neverTouched": "ยังไม่เคยแตะ",
+    "copyCode": "คัดลอกรหัสสัญญา",
+    "codeCopied": "คัดลอกแล้ว",
+    "pendingTransferTo": "รอโอน → {{name}}",
     "neglectNever": "ยังไม่เคยแตะ",
     "neglectStale7": "ไม่ได้แตะเกิน 7 วัน",
-    "neglectToday": "แตะแล้ววันนี้",
+    "neglectNotToday": "วันนี้ยังไม่ได้แตะ",
     "logAction": "บันทึกการทำงาน",
     "action": "กิจกรรม",
     "result": "ผลลัพธ์",
@@ -2229,6 +2232,43 @@
           "CANCELED": "ยกเลิก"
         }
       },
+      "activity": {
+        "code": {
+          "NOT_ENROLLED": "ยังไม่อยู่ใน MDM",
+          "ENFORCEMENT_PAUSED": "พักการบังคับใช้อยู่",
+          "LEFT_FLEET": "ไม่ได้อยู่ในความดูแลแล้ว",
+          "COMMAND_IN_FLIGHT": "กำลังส่งคำสั่ง…",
+          "ENFORCED": "ถูกจำกัดการใช้งานอยู่",
+          "DEVICE_UNREACHABLE": "ติดต่อเครื่องไม่ได้",
+          "NORMAL": "ปกติ"
+        },
+        "levelOf": "ขั้นที่ {{level}} จาก {{max}}",
+        "whyLabel": "เพราะ",
+        "overdue": "ค้างชำระ {{count}} วัน",
+        "overdueRaw": "ตามบิล {{raw}} วัน (นับให้น้อยลงเพราะอยู่ในช่วงผ่อนผัน)",
+        "nextLabel": "ขั้นถัดไป",
+        "nextIn": "อีก {{count}} วัน",
+        "releaseLabel": "ปลดเมื่อ",
+        "release": {
+          "CUSTOMER_PAYS": "เมื่อลูกค้าชำระ — ระบบปลดให้เองภายใน ~1 นาที ไม่ต้องกดอะไร",
+          "STAFF_MUST_RELEASE": "ต้องมีพนักงานกดปลดเอง — ระบบจะไม่ปลดให้อัตโนมัติ",
+          "AUTOMATION_WILL_REVERT": "ระบบจะดึงกลับให้เองในรอบถัดไป — ไม่ต้องทำอะไร"
+        },
+        "byLabel": "สั่งโดย",
+        "origin": {
+          "AUTOMATION": "ระบบทวงถามอัตโนมัติ",
+          "MANUAL": "พนักงานตั้งไว้เอง — ระบบจะไม่ปลดให้อัตโนมัติ",
+          "LAGGING": "กำลังปรับไปที่ขั้นที่ต้องการ"
+        },
+        "lastLabel": "ล่าสุด",
+        "cmdState": {
+          "EXECUTED": "สำเร็จ",
+          "FAILED": "ล้มเหลว",
+          "EXPIRED": "หมดอายุ",
+          "CANCELED": "ยกเลิก"
+        },
+        "sending": "กำลังส่ง {{count}} คำสั่ง"
+      },
       "intentType": {
         "SET_WALLPAPER": "เปลี่ยนภาพพื้นหลัง",
         "LOCK_WALLPAPER": "ล็อกภาพพื้นหลัง",
@@ -2241,7 +2281,9 @@
         "PLAY_LOST_MODE_SOUND": "เล่นเสียง",
         "REQUEST_LOCATION": "ขอตำแหน่ง",
         "QUERY_PROFILES": "ดึงโปรไฟล์",
-        "QUERY_APPS": "ดึงรายการแอป"
+        "QUERY_APPS": "ดึงรายการแอป",
+        "DEVICE_PROFILES_QUERY": "ดึงโปรไฟล์",
+        "DEVICE_APPS_QUERY": "ดึงรายการแอป"
       },
       "outcome": {
         "CANCELED_MANUAL_PAUSE": "ถูกพักการบังคับใช้อยู่",

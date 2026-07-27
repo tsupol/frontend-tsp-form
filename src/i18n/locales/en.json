@@ -1374,9 +1374,12 @@
     "icloudAuditNote": "Every reveal is logged (who / when / which account).",
     "lastTouched": "Last touched: {{rel}}",
     "neverTouched": "Never touched",
+    "copyCode": "Copy contract code",
+    "codeCopied": "Copied",
+    "pendingTransferTo": "Pending transfer → {{name}}",
     "neglectNever": "Never touched",
     "neglectStale7": "Untouched 7+ days",
-    "neglectToday": "Touched today",
+    "neglectNotToday": "Not touched today",
     "logAction": "Log activity",
     "action": "Activity",
     "result": "Result",
@@ -2232,6 +2235,43 @@
           "CANCELED": "Canceled"
         }
       },
+      "activity": {
+        "code": {
+          "NOT_ENROLLED": "Not in MDM",
+          "ENFORCEMENT_PAUSED": "Enforcement paused",
+          "LEFT_FLEET": "No longer managed",
+          "COMMAND_IN_FLIGHT": "Sending a command…",
+          "ENFORCED": "Restricted",
+          "DEVICE_UNREACHABLE": "Device unreachable",
+          "NORMAL": "Normal"
+        },
+        "levelOf": "step {{level}} of {{max}}",
+        "whyLabel": "Why",
+        "overdue": "{{count}} day(s) overdue",
+        "overdueRaw": "{{raw}} by the bill, adjusted for grace",
+        "nextLabel": "Next step",
+        "nextIn": "in {{count}} day(s)",
+        "releaseLabel": "Unlocks",
+        "release": {
+          "CUSTOMER_PAYS": "When the customer pays — the system unlocks it on its own within ~1 min, nothing to press.",
+          "STAFF_MUST_RELEASE": "A staff member must release it — the system won't unlock it automatically.",
+          "AUTOMATION_WILL_REVERT": "The system will pull it back on its own next cycle — nothing to do."
+        },
+        "byLabel": "By",
+        "origin": {
+          "AUTOMATION": "Automated dunning",
+          "MANUAL": "Set manually — the system won't release it automatically",
+          "LAGGING": "Adjusting to the target level"
+        },
+        "lastLabel": "Last",
+        "cmdState": {
+          "EXECUTED": "done",
+          "FAILED": "failed",
+          "EXPIRED": "expired",
+          "CANCELED": "canceled"
+        },
+        "sending": "sending {{count}} command(s)"
+      },
       "intentType": {
         "SET_WALLPAPER": "Change wallpaper",
         "LOCK_WALLPAPER": "Lock wallpaper",
@@ -2244,7 +2284,9 @@
         "PLAY_LOST_MODE_SOUND": "Play sound",
         "REQUEST_LOCATION": "Request location",
         "QUERY_PROFILES": "Pull profiles",
-        "QUERY_APPS": "Pull apps"
+        "QUERY_APPS": "Pull apps",
+        "DEVICE_PROFILES_QUERY": "Pull profiles",
+        "DEVICE_APPS_QUERY": "Pull apps"
       },
       "outcome": {
         "CANCELED_MANUAL_PAUSE": "Enforcement was paused.",
