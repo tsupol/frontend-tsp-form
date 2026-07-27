@@ -12,10 +12,14 @@ export function RelativeDateTime({
   value,
   staleAfterDays = 7,
   className,
+  relClassName = 'text-subtler',
 }: {
   value: string | null | undefined;
   staleAfterDays?: number;
   className?: string;
+  /** Class for the "(N ago)" part. Default text-subtler; pass a stronger token
+   *  when the surrounding text is on a coloured background (e.g. inside .alert). */
+  relClassName?: string;
 }) {
   const { i18n } = useTranslation();
   if (!value) return <span className={className}>—</span>;
@@ -27,7 +31,7 @@ export function RelativeDateTime({
 
   return (
     <span className={`${className ?? ''} ${stale ? 'text-warning-fg' : ''}`}>
-      {abs} <span className="text-subtler">({rel})</span>
+      {abs} <span className={relClassName}>({rel})</span>
     </span>
   );
 }

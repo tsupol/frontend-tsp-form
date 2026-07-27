@@ -26,22 +26,30 @@ import {
 import { RelativeDateTime } from './RelativeDateTime';
 import type { AssetMdmStatus, MdmActivityCode } from './mdmApi';
 
-type Tone = 'neutral' | 'warning' | 'info' | 'danger' | 'success';
+// tsp-form .alert only has info/success/warning/danger — neutral maps to info.
+type Tone = 'info' | 'warning' | 'danger' | 'success';
 
 const ACTIVITY: Record<MdmActivityCode, { icon: typeof ShieldAlert; tone: Tone; spin?: boolean }> = {
-  NOT_ENROLLED:       { icon: ShieldOff,    tone: 'neutral' },
+  NOT_ENROLLED:       { icon: ShieldOff,    tone: 'info' },
   ENFORCEMENT_PAUSED: { icon: PauseCircle,  tone: 'warning' },
-  LEFT_FLEET:         { icon: LogOut,       tone: 'neutral' },
+  LEFT_FLEET:         { icon: LogOut,       tone: 'info' },
   COMMAND_IN_FLIGHT:  { icon: Loader2,      tone: 'info', spin: true },
   ENFORCED:           { icon: ShieldAlert,  tone: 'danger' },
   DEVICE_UNREACHABLE: { icon: WifiOff,      tone: 'warning' },
   NORMAL:             { icon: CheckCircle2, tone: 'success' },
 };
 
-const TONE_BOX: Record<Tone, string> = {
-  neutral: 'bg-surface border-line text-subtle',
-  warning: 'bg-warning-soft border-warning-border text-warning-fg',
+const ALERT_CLASS: Record<Tone, string> = {
+  info: 'alert alert-info',
+  warning: 'alert alert-warning',
+  danger: 'alert alert-danger',
+  success: 'alert alert-success',
+};
+
+// Compact pill tint for MdmActivityLine (an .alert would be too heavy there).
+const PILL_CLASS: Record<Tone, string> = {
   info: 'bg-info-soft border-info-border text-info-fg',
+  warning: 'bg-warning-soft border-warning-border text-warning-fg',
   danger: 'bg-danger-soft border-danger-border text-danger-fg',
   success: 'bg-success-soft border-success-border text-success-fg',
 };
@@ -82,72 +90,73 @@ export function MdmActivityCard({ status }: { status: AssetMdmStatus }) {
     : '';
 
   return (
-    <div className={`rounded-md border px-4 py-3 ${TONE_BOX[a.tone]}`}>
-      {/* Header: what + level */}
-      <div className="flex items-center gap-2">
-        <Icon size={18} className={`shrink-0 ${a.spin ? 'animate-spin' : ''}`} />
-        <span className="text-sm font-semibold">
-          {t(`asset.mdm.activity.code.${status.activity_code}`)}
-        </span>
-        {showLevel && (
-          <span className="text-xs opacity-90 inline-flex items-center">
-            {t('asset.mdm.activity.levelOf', { level: status.enforcement_level, max: status.enforcement_level_max })}
-            <LevelDots level={status.enforcement_level} max={status.enforcement_level_max} />
-          </span>
-        )}
-      </div>
+    <div className={ALERT_CLASS[a.tone]}>
+      <Icon size={20} className={`shrink-0 ${a.spin ? 'animate-spin' : ''}`} />
+      <div className="min-w-0 flex-1">
+        {/* Headline: what + level */}
+        <div className="alert-title flex items-center gap-2 flex-wrap">
+          <span>{t(`asset.mdm.activity.code.${status.activity_code}`)}</span>
+          {showLevel && (
+            <span className="text-sm font-normal inline-flex items-center">
+              {t('asset.mdm.activity.levelOf', { level: status.enforcement_level, max: status.enforcement_level_max })}
+              <LevelDots level={status.enforcement_level} max={status.enforcement_level_max} />
+            </span>
+          )}
+        </div>
 
-      {/* Detail lines */}
-      <div className="mt-1.5 flex flex-col gap-1 text-xs opacity-90">
-        {showWhy && (
-          <div>
-            <span className="opacity-70">{t('asset.mdm.activity.whyLabel')}: </span>
-            {t('asset.mdm.activity.overdue', { count: status.overdue_days_effective! })}
-            {showRaw && (
-              <span className="opacity-70"> · {t('asset.mdm.activity.overdueRaw', { raw: status.overdue_days_raw! })}</span>
-            )}
-          </div>
-        )}
+        {/* Detail lines — full-size, labels not dimmed. */}
+        <div className="alert-description flex flex-col gap-1 mt-1">
+          {showWhy && (
+            <div>
+              <span className="text-subtle">{t('asset.mdm.activity.whyLabel')}: </span>
+              {t('asset.mdm.activity.overdue', { count: status.overdue_days_effective! })}
+              {showRaw && (
+                <span className="text-subtle"> · {t('asset.mdm.activity.overdueRaw', { raw: status.overdue_days_raw! })}</span>
+              )}
+            </div>
+          )}
 
-        {showNext && (
-          <div>
-            <span className="opacity-70">{t('asset.mdm.activity.nextLabel')}: </span>
-            {t('asset.mdm.activity.nextIn', { count: status.days_until_next_level! })}
-          </div>
-        )}
+          {showNext && (
+            <div>
+              <span className="text-subtle">{t('asset.mdm.activity.nextLabel')}: </span>
+              {t('asset.mdm.activity.nextIn', { count: status.days_until_next_level! })}
+            </div>
+          )}
 
-        {showRelease && (
-          <div>
-            <span className="opacity-70">{t('asset.mdm.activity.releaseLabel')}: </span>
-            {t(`asset.mdm.activity.release.${status.release_condition_code}`)}
-          </div>
-        )}
+          {showRelease && (
+            <div>
+              <span className="text-subtle">{t('asset.mdm.activity.releaseLabel')}: </span>
+              {t(`asset.mdm.activity.release.${status.release_condition_code}`)}
+            </div>
+          )}
 
-        {originText && (
-          <div>
-            <span className="opacity-70">{t('asset.mdm.activity.byLabel')}: </span>{originText}
-          </div>
-        )}
+          {originText && (
+            <div>
+              <span className="text-subtle">{t('asset.mdm.activity.byLabel')}: </span>{originText}
+            </div>
+          )}
 
-        {/* What the system last did — always show the outcome, never bare "failed". */}
-        {status.last_command_type && (
-          <div className="opacity-70">
-            {t('asset.mdm.activity.lastLabel')}: {t(`asset.mdm.intentType.${status.last_command_type}`, { defaultValue: status.last_command_type })}
-            {status.last_command_state && <> · {t(`asset.mdm.activity.cmdState.${status.last_command_state}`)}</>}
-            {status.last_command_state && status.last_command_state !== 'EXECUTED' && status.last_command_outcome_code && (
-              <> · {t(`asset.mdm.outcome.${status.last_command_outcome_code}`, { defaultValue: status.last_command_outcome_code })}</>
-            )}
-            {status.last_command_at && <> · <RelativeDateTime value={status.last_command_at} /></>}
-          </div>
-        )}
+          {/* What the system last did — always show the outcome, never bare "failed". */}
+          {status.last_command_type && (
+            <div>
+              <span className="text-subtle">{t('asset.mdm.activity.lastLabel')}: </span>
+              {t(`asset.mdm.intentType.${status.last_command_type}`, { defaultValue: status.last_command_type })}
+              {status.last_command_state && <> · {t(`asset.mdm.activity.cmdState.${status.last_command_state}`)}</>}
+              {status.last_command_state && status.last_command_state !== 'EXECUTED' && status.last_command_outcome_code && (
+                <> · {t(`asset.mdm.outcome.${status.last_command_outcome_code}`, { defaultValue: status.last_command_outcome_code })}</>
+              )}
+              {status.last_command_at && <> · <RelativeDateTime value={status.last_command_at} relClassName="text-subtle" /></>}
+            </div>
+          )}
 
-        {/* In-flight commands. */}
-        {status.pending_command_count > 0 && (
-          <div className="inline-flex items-center gap-1">
-            <Loader2 size={12} className="animate-spin" />
-            {t('asset.mdm.activity.sending', { count: status.pending_command_count })}
-          </div>
-        )}
+          {/* In-flight commands. */}
+          {status.pending_command_count > 0 && (
+            <div className="inline-flex items-center gap-1">
+              <Loader2 size={14} className="animate-spin" />
+              {t('asset.mdm.activity.sending', { count: status.pending_command_count })}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -161,11 +170,11 @@ export function MdmActivityLine({ status }: { status: AssetMdmStatus }) {
   const Icon = a.icon;
   const showLevel = status.enforcement_level >= 1 && status.enforcement_level_max > 0;
   return (
-    <div className={`rounded-md border px-3 py-2 text-xs inline-flex items-center gap-2 ${TONE_BOX[a.tone]}`}>
-      <Icon size={14} className={`shrink-0 ${a.spin ? 'animate-spin' : ''}`} />
+    <div className={`rounded-md border px-3 py-2 text-sm inline-flex items-center gap-2 ${PILL_CLASS[a.tone]}`}>
+      <Icon size={15} className={`shrink-0 ${a.spin ? 'animate-spin' : ''}`} />
       <span className="font-medium">{t(`asset.mdm.activity.code.${status.activity_code}`)}</span>
       {showLevel && (
-        <span className="opacity-90 inline-flex items-center">
+        <span className="inline-flex items-center">
           {t('asset.mdm.activity.levelOf', { level: status.enforcement_level, max: status.enforcement_level_max })}
           <LevelDots level={status.enforcement_level} max={status.enforcement_level_max} />
         </span>
