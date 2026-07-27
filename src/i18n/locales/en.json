@@ -2405,7 +2405,18 @@
         "previewTitle": "Preview",
         "appCount": "{{count}} apps will be allowed",
         "baselineNote": "Essential apps (phone, messages, settings, NNF App…) are always included so the device stays usable.",
-        "apply": "Apply to device"
+        "apply": "Apply to device",
+        "remove": {
+          "title": "Remove app restriction",
+          "active": "The device is currently restricted to an allowed-apps list.",
+          "none": "No app restriction is active on this device.",
+          "unknown": "App-restriction status unknown — pull the profile list on the status tab first.",
+          "button": "Remove restriction",
+          "confirmTitle": "Remove app restriction?",
+          "confirmBody": "This removes the allowed-apps profile so the customer can use all apps again.",
+          "confirmButton": "Remove",
+          "noOpWarn": "The device doesn't appear to have this restriction right now. Removing it may come back as \"failed\" even though nothing is wrong."
+        }
       },
       "lost": {
         "title": "Lost Mode",

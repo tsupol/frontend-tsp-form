@@ -369,6 +369,26 @@ export function applyAppWhitelist(assetId: number, presetKey: string, preview: b
   });
 }
 
+// §7.0 — remove the app-restriction profile (the missing counterpart to apply).
+// Same permission as apply (MDM.APP_CONTROL) by design. Gate the button on
+// app_whitelist_active from the status row; warn when will_be_a_no_op (removing
+// a profile the device doesn't have → Apple errors 12075, reads as "failed").
+export interface RemoveWhitelistResult {
+  preview: boolean;
+  asset_id: number;
+  observed_at: string | null;
+  will_be_a_no_op: boolean;
+  whitelist_active: boolean | null;
+  payload_identifier: string;
+  intent_id?: number; // absent on preview
+}
+export function removeAppWhitelist(assetId: number, preview: boolean): Promise<RemoveWhitelistResult> {
+  return apiClient.rpc<RemoveWhitelistResult>('fn_mdm_remove_app_whitelist', {
+    p_asset_id: assetId,
+    p_preview: preview,
+  });
+}
+
 // ── Sub-tab 6: lost mode & location (§8) ────────────────────────────────────
 // These take p_actor_id (§11.2). enable requires message + phone (both).
 export function enableLostMode(p: {
