@@ -215,6 +215,33 @@ export function releaseDunning(params: {
   return apiClient.rpc<ReleaseDunningResult>('fn_mdm_release_dunning', params);
 }
 
+// ── Sub-tab 1 step 7: apply baseline device policy (§6) ─────────────────────
+// preview → confirm (like app whitelist). Requires MDM.PROFILE (may_profile).
+// p_preset_key omitted = 'light' (the baseline lock). The preview's `reminders`
+// drive the step-6 checklist the UI must tick before enabling the real apply.
+export interface ApplyDevicePolicyResult {
+  serial: string;
+  preview: boolean;
+  asset_id: number;
+  reminders: string[]; // e.g. CONFIRM_ICLOUD_SIGNED_IN, CONFIRM_NNF_APP_INSTALLED
+  preset_key: string;
+  preset_level: number;
+  preset_scope: string;
+  template_key: string;
+  current_level: number;
+  locks_profile: boolean;
+  nnf_app_installed: boolean | null;
+  restriction_flags: Record<string, boolean>;
+  intent_id?: number; // absent on preview
+}
+// ⚠️ p_preview defaults to TRUE server-side (§6). ALWAYS pass it explicitly.
+export function applyDevicePolicy(assetId: number, preview: boolean): Promise<ApplyDevicePolicyResult> {
+  return apiClient.rpc<ApplyDevicePolicyResult>('fn_mdm_apply_device_policy', {
+    p_asset_id: assetId,
+    p_preview: preview,
+  });
+}
+
 // ── Sub-tab 2: pull-from-device (async; needs p_actor_id per §11.2) ──────────
 
 export function queryProfiles(assetId: number, actorId: number): Promise<MdmIntentAck> {

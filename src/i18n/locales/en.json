@@ -2141,6 +2141,44 @@
         "device": "on the device",
         "auto": "happens on its own"
       },
+      "readiness": {
+        "ready": "Ready to hand over to the customer",
+        "notReady": "Not ready to hand over yet",
+        "remaining": "Still to do: {{steps}}",
+        "stepEnroll": "finish enrollment (steps 1–5)",
+        "step6": "step 6 (iCloud + NNF app)",
+        "step7": "step 7 (baseline lock)"
+      },
+      "step6": {
+        "title": "Customer signs into iCloud + installs the NNF app",
+        "icloud": "Customer has signed into iCloud on this device (can't be changed after the next step)",
+        "nnfApp": "The NNF app is installed on this device",
+        "nnfFound": "app detected",
+        "nnfMissing": "NNF app not found yet",
+        "nnfUnknown": "not checked yet — pull the app list on the status tab"
+      },
+      "step7": {
+        "title": "Apply baseline lock",
+        "desc": "Locks the device to the baseline profile so the customer can't sign out of iCloud or wipe it. Stays on for the whole contract.",
+        "button": "Apply baseline lock",
+        "needStep6": "Tick both step 6 confirmations first — after this the customer can no longer sign into iCloud.",
+        "noPermission": "You don't have permission to lock this device.",
+        "done": "Baseline lock applied",
+        "verifyPending": "waiting for the device to confirm",
+        "applied": "Sent — waiting for the device to confirm",
+        "confirmTitle": "Apply baseline lock?",
+        "confirmBody": "This sends the baseline restriction profile to the device. It stays on until the contract ends.",
+        "confirmButton": "Apply lock",
+        "irreversibleNote": "After this, the customer can no longer sign into iCloud on this device. Make sure step 6 is truly done.",
+        "flag": {
+          "allowAccountModification": "Can't add or change accounts (incl. iCloud)",
+          "allowModifyFindMy": "Can't turn off Find My",
+          "allowHostPairing": "Can't pair with a computer",
+          "allowProfileInstallation": "Can't install other profiles",
+          "allowEraseContentAndSettings": "Can't erase all content and settings",
+          "allowSystemAppRemoval": "Can't remove system apps"
+        }
+      },
       "badge": {
         "NO_SERIAL": {
           "label": "No Serial/IMEI yet",
