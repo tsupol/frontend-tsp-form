@@ -58,7 +58,7 @@ const PILL_CLASS: Record<Tone, string> = {
 function LevelDots({ level, max }: { level: number; max: number }) {
   if (max <= 0) return null;
   return (
-    <span className="inline-flex items-center gap-0.5 ml-1" aria-hidden>
+    <span className="inline-flex items-center gap-0.5 ml-2" aria-hidden>
       {Array.from({ length: max }, (_, i) => (
         <span key={i} className={`w-1.5 h-1.5 rounded-full ${i < level ? 'bg-current' : 'bg-current opacity-30'}`} />
       ))}
