@@ -19,7 +19,7 @@ import { DateTime } from '../../../components/DateTime';
 import { makeDatePickerFormat, toLocalDateStr } from '../../../lib/format';
 import {
   fetchEnforcementPauses, pauseEnforcement, resumeEnforcement,
-  parseMdmError, type AssetMdmStatus, type ParsedMdmError,
+  parseMdmError, type AssetMdmStatus, type ParsedMdmError, type MdmEnforcementPause,
 } from './mdmApi';
 import { MDM_NO_CACHE } from './useMdmStatus';
 import { MdmErrorAlert } from './MdmSharedBits';
@@ -37,18 +37,18 @@ export function SubTabPause({
   const queryClient = useQueryClient();
 
   const { data: pauses = [], refetch } = useQuery({
-    queryKey: ['mdm-enforcement-pauses', status.enrollment_id],
-    queryFn: () => fetchEnforcementPauses(status.enrollment_id),
+    queryKey: ['mdm-enforcement-pauses', status.asset_id],
+    queryFn: () => fetchEnforcementPauses(status.asset_id),
     ...MDM_NO_CACHE,
   });
-  // Whether/until it's paused is authoritative on the status row. The pauses
-  // view isn't asset-scoped (no asset_id/device_id join key — see ASK), so we
-  // can only surface a pause_id to resume when exactly one active pause exists
-  // in this holding/branch scope; otherwise resume routes through the reason
-  // shown on the status row and we hide the resume button to avoid guessing.
+  // Now asset-scoped (mig 220). Dedupe by pause_id — a contract pause covering a
+  // loaner returns 2 rows (§9.1). Whether/until it's paused stays authoritative
+  // on the status row; the list gives us the pause_id + mode to show and resume.
   const hasActive = status.is_enforcement_paused;
-  const activePauses = pauses.filter((p) => !p.expires_at || new Date(p.expires_at) > new Date());
-  const active = activePauses.length === 1 ? activePauses[0] : null;
+  const activePauses = dedupeByPauseId(
+    pauses.filter((p) => !p.expires_at || new Date(p.expires_at) > new Date()),
+  );
+  const active = activePauses[0] ?? null;
 
   const [reason, setReason] = useState('');
   const [mode, setMode] = useState<'auto48' | 'until' | 'indefinite'>('auto48');
@@ -117,6 +117,13 @@ export function SubTabPause({
                 ? <>{t('asset.mdm.pausedBar.until')} <DateTime value={status.pause_until} showTime /></>
                 : t('asset.mdm.pausedBar.generic')}
           </div>
+          {/* mode is a different MEANING, not a severity (§9.1) — spell it out. */}
+          {active?.mode && (
+            <div className="text-xs">
+              <span className="font-medium">{t(`asset.mdm.pause.mode.${active.mode}.label`)}</span>
+              <span className="text-subtle"> — {t(`asset.mdm.pause.mode.${active.mode}.desc`)}</span>
+            </div>
+          )}
           {active?.pause_reason && <div className="text-xs text-subtle">{t('asset.mdm.pause.reasonLabel')}: {active.pause_reason}</div>}
           {active ? (
             <div>
@@ -190,6 +197,13 @@ export function SubTabPause({
       )}
     </div>
   );
+}
+
+/** A contract pause covering a loaner yields one row per device — collapse to
+ *  one entry per pause_id (§9.1). */
+function dedupeByPauseId(rows: MdmEnforcementPause[]): MdmEnforcementPause[] {
+  const seen = new Set<number>();
+  return rows.filter((r) => (seen.has(r.pause_id) ? false : (seen.add(r.pause_id), true)));
 }
 
 function Radio({ checked, onChange, label, hint }: { checked: boolean; onChange: () => void; label: string; hint?: string }) {

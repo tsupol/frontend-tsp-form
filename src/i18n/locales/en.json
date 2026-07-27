@@ -2432,7 +2432,12 @@
         "phonePlaceholder": "Callable from the lock screen",
         "enable": "Enable Lost Mode",
         "disable": "Disable Lost Mode",
-        "playSound": "Play sound"
+        "playSound": "Play sound",
+        "modeTemplate": "Standard message",
+        "modeCustom": "Custom message",
+        "template": "Message template",
+        "templatePlaceholder": "Choose a message",
+        "noAnswer": "The device hasn't answered yet — the command is still queued. It'll update when the device comes online."
       },
       "location": {
         "title": "Location",
@@ -2443,7 +2448,14 @@
         "current": "Current location ·",
         "asOf": "As of",
         "googleMaps": "Google Maps",
-        "appleMaps": "Apple Maps"
+        "appleMaps": "Apple Maps",
+        "startLoop": "Track continuously",
+        "stopLoop": "Stop tracking",
+        "loopHint": "Repeatedly asks the device for its location for about an hour.",
+        "loopRunning": "Tracking location",
+        "loopAttempts": "{{made}} of {{max}} checks",
+        "loopEnds": "ends",
+        "loopLast": "last fix"
       },
       "pause": {
         "intro": "Pause enforcement when you shouldn't act on this device yet — the customer is negotiating, promised a pay date, or it's under legal hold.",
@@ -2461,7 +2473,17 @@
         "activeTitle": "Enforcement is paused",
         "resume": "Resume now",
         "resumeElsewhere": "To resume, use the enforcement-pause list.",
-        "indefinite": "Paused indefinitely (legal hold)."
+        "indefinite": "Paused indefinitely (legal hold).",
+        "mode": {
+          "GRACE": {
+            "label": "Grace",
+            "desc": "treated as not overdue for now — the system steps the device down on its own"
+          },
+          "FREEZE": {
+            "label": "Freeze",
+            "desc": "the system won't make it worse, but paying always still unlocks"
+          }
+        }
       }
     },
     "icloud_appleOnly": "iCloud applies to Apple devices only.",

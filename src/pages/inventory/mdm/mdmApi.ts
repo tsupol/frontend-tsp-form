@@ -406,6 +406,60 @@ export function requestLocation(assetId: number, actorId: number): Promise<MdmIn
   return apiClient.rpc<MdmIntentAck>('fn_mdm_request_location', { p_asset_id: assetId, p_actor_id: actorId });
 }
 
+// §8.4 — one-click lost mode from a standard template (recommended primary
+// button; free-typing is the fallback). p_locale defaults to 'th' server-side.
+export function enableLostModeFromTemplate(p: {
+  p_asset_id: number; p_actor_id: number; p_template_key: string; p_phone_number: string; p_locale?: string;
+}): Promise<MdmIntentAck> {
+  return apiClient.rpc<MdmIntentAck>('fn_mdm_enable_lost_mode_from_template', p);
+}
+
+// §8 — continuous location loop. p_window_duration_sec 300–3600 (default 1800);
+// pass 3600 for the 60-min window ops uses (§8.4).
+export function signalLocationLoop(assetId: number, actorId: number, windowSec = 1800): Promise<MdmIntentAck> {
+  return apiClient.rpc<MdmIntentAck>('fn_mdm_signal_location_loop', {
+    p_asset_id: assetId, p_actor_id: actorId, p_window_duration_sec: windowSec,
+  });
+}
+export function stopLocationLoop(assetId: number, actorId: number): Promise<MdmIntentAck> {
+  return apiClient.rpc<MdmIntentAck>('fn_mdm_stop_location_loop', { p_asset_id: assetId, p_actor_id: actorId });
+}
+
+// v_mdm_lock_message_templates — standard lock-screen wordings, keyed by
+// template_key + locale. Filter to the UI language; the RPC re-resolves anyway.
+export interface MdmLockTemplate {
+  template_key: string;
+  locale: string;
+  message_template: string;
+  footnote_template: string | null;
+  is_active: boolean;
+}
+export function fetchLockTemplates(locale: string): Promise<MdmLockTemplate[]> {
+  return apiClient.get<MdmLockTemplate[]>(
+    `/v_mdm_lock_message_templates?is_active=is.true&locale=eq.${locale}&order=template_key`,
+  );
+}
+
+// §8.1 — active location loop for a device (device_id === asset_id). No row =
+// no loop; a row = looping. Poll by next_poll_at (§8.2), NOT a fixed interval.
+export interface MdmActiveLoop {
+  device_id: number;
+  progress: number | null;
+  attempts_made: number | null;
+  max_attempts: number | null;
+  seconds_to_timeout: number | null;
+  ends_at: string | null;
+  next_poll_at: string | null;
+  last_location_at: string | null;
+  pending_intent_count: number | null;
+  health_status: string | null;
+}
+export function fetchActiveLoop(assetId: number): Promise<MdmActiveLoop | null> {
+  return apiClient
+    .get<MdmActiveLoop[]>(`/v_mdm_active_loops?device_id=eq.${assetId}`)
+    .then((r) => r[0] ?? null);
+}
+
 // v_mdm_device_overview — the device-reported lost-mode flag (§3, §6).
 export interface MdmDeviceOverview {
   asset_id: number;
@@ -434,14 +488,18 @@ export function readLocations(enrollmentId: number): Promise<MdmLocation | null>
 }
 
 // ── Sub-tab 7: enforcement pause (§9) — DB-only, no device command ───────────
-// NOTE: v_mdm_enforcement_pauses is keyed on device_id/contract_id and exposes
-// NO asset_id — and v_asset_mdm_status has no device_id — so the FE can't scope
-// the list to an asset. We filter by enrollment_id when present (best available
-// device-side key). Filed as ASK 2026-07-26 (add asset_id to the view). Until
-// then, whether/until a device is paused comes from v_asset_mdm_status; this
-// list only yields the pause_id needed to resume.
+// mig 220 (2026-07-27) added asset_id + mode to the view (answered our ASK), so
+// the list is now asset-scoped directly: ?asset_id=eq.<id>. asset_id resolves
+// all three pause scopes (device / contract / single-command); scoping by
+// device_id alone would miss contract-bound pauses (device_id NULL there).
+// ⚠️ pause_id is no longer unique in the view — a contract pause covering a
+// loaner shows as 2 rows (one per device). Dedupe by pause_id before display;
+// one resume clears both (§9.1).
+export type MdmPauseModeCode = 'GRACE' | 'FREEZE';
 export interface MdmEnforcementPause {
   pause_id: number;
+  asset_id: number | null;
+  mode: MdmPauseModeCode | null;
   target_type: string;
   device_id: number | null;
   contract_id: number | null;
@@ -452,11 +510,9 @@ export interface MdmEnforcementPause {
   paused_at: string;
   paused_by: number | null;
 }
-export function fetchEnforcementPauses(enrollmentId: number | null): Promise<MdmEnforcementPause[]> {
-  // No enrollment → nothing to key on; return empty rather than an unfiltered list.
-  if (enrollmentId == null) return Promise.resolve([]);
+export function fetchEnforcementPauses(assetId: number): Promise<MdmEnforcementPause[]> {
   return apiClient.get<MdmEnforcementPause[]>(
-    `/v_mdm_enforcement_pauses?order=paused_at.desc`,
+    `/v_mdm_enforcement_pauses?asset_id=eq.${assetId}&order=paused_at.desc`,
   );
 }
 export interface PauseResult {
