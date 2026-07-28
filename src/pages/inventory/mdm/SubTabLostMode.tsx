@@ -119,7 +119,13 @@ export function SubTabLostMode({
   const canEnableCustom = !cmd.pending && actorId != null && message.trim().length > 0 && phone.trim().length > 0;
 
   const loopActive = loop != null;
-  const loopBusy = (loop?.pending_intent_count ?? 0) > 0 || loopBackoff.active;
+  // START is blocked while a loop intent is still queued (don't stack loops) or
+  // while we're waiting for a just-fired start to land. STOP must NOT be blocked
+  // by the loop's own pending location requests — a running loop always has one,
+  // which used to lock the Stop button forever (Ohm's report). Stop is only busy
+  // while a stop command itself is in flight.
+  const startBusy = (loop?.pending_intent_count ?? 0) > 0 || loopBackoff.active;
+  const stopBusy = cmd.pending || loopBackoff.active;
 
   return (
     <div className="flex flex-col gap-4">
@@ -256,7 +262,7 @@ export function SubTabLostMode({
                 <LoopStatus loop={loop!} />
                 <div>
                   <Button variant="outline" size="sm" startIcon={<Square size={14} />}
-                    disabled={cmd.pending || actorId == null || loopBusy}
+                    disabled={actorId == null || stopBusy}
                     onClick={() => actorId != null && run(() => stopLocationLoop(status.asset_id, actorId), () => loopBackoff.start())}>
                     {t('asset.mdm.location.stopLoop')}
                   </Button>
@@ -265,7 +271,7 @@ export function SubTabLostMode({
             ) : (
               <div>
                 <Button variant="outline" size="sm" startIcon={<Repeat size={14} />}
-                  disabled={cmd.pending || actorId == null || !lostOn || loopBusy}
+                  disabled={cmd.pending || actorId == null || !lostOn || startBusy}
                   onClick={() => actorId != null && run(() => signalLocationLoop(status.asset_id, actorId, LOOP_WINDOW_SEC), () => loopBackoff.start())}>
                   {t('asset.mdm.location.startLoop')}
                 </Button>
