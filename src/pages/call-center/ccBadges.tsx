@@ -14,8 +14,13 @@ function flagLabel(t: (k: string, o?: Record<string, unknown>) => string, code: 
   return translated || code;
 }
 
+function flagRank(levels: FlagLevelRef[] | undefined, code: string): number | null {
+  return levels?.find(l => l.code === code)?.severity_rank ?? null;
+}
+
 /** A single flag: source icon tinted with the level color + the level label.
- *  No dot — the icon's color IS the level; its shape (cpu/user) is the source. */
+ *  No dot — the icon's color IS the level; its shape (cpu/user) is the source.
+ *  Detail-panel style (labels visible). List rows use FlagDot instead. */
 export function FlagChip({
   code,
   levels,
@@ -43,14 +48,48 @@ export function FlagChip({
   );
 }
 
+/** A single flag as a colored circle with its severity_rank number inside.
+ *  Colour-blind safe: the number distinguishes levels when hue can't (green/red).
+ *  title + aria-label carry the full "Auto: Orange (3)" text for screen readers.
+ *  `emphasize` thickens the ring (used on the Auto dot when flags diverge). */
+function FlagDot({
+  code, levels, source, emphasize = false,
+}: {
+  code: string;
+  levels: FlagLevelRef[] | undefined;
+  source: 'auto' | 'manual';
+  emphasize?: boolean;
+}) {
+  const { t } = useTranslation();
+  const color = flagColor(levels, code);
+  const rank = flagRank(levels, code);
+  const sourceWord = t(source === 'auto' ? 'callCenter.flagAuto' : 'callCenter.flagManual');
+  const full = `${sourceWord}: ${flagLabel(t, code)}${rank != null ? ` (${rank})` : ''}`;
+  // WHITE (rank 0) needs dark text; the rest read on white.
+  const textOnDot = code === 'WHITE' ? '#374151' : '#ffffff';
+  return (
+    <span
+      title={full}
+      aria-label={full}
+      role="img"
+      className={`inline-flex items-center justify-center w-4 h-4 rounded-full shrink-0 text-[9px] font-semibold leading-none tabular-nums ${
+        emphasize ? 'ring-2 ring-offset-1 ring-warning-fg' : ''
+      }`}
+      style={{ backgroundColor: color, color: textOnDot }}
+    >
+      {rank ?? ''}
+    </span>
+  );
+}
+
 /**
- * Auto + manual flag pair, shown side by side (never merged). Each flag is a
- * source icon (cpu=auto / user=manual) tinted with the level color + the level
- * label — no dots. When they diverge, a warning marker prompts reading the
- * history first.
+ * Auto + manual flag pair, shown side by side (never merged).
  *
- * `compact` (dense list rows): icon + level label only.
- * `showLabels` (detail panel): also prefix each with the source word.
+ * `compact` (dense list rows): two colored circles with the severity_rank
+ *   number inside + short "Auto:"/"Manual:" prefixes — no level text. When the
+ *   flags diverge the Auto circle gets a warning ring (no words).
+ * `showLabels` (detail panel): source icon + full level label per flag, plus a
+ *   warning marker on divergence.
  */
 export function FlagPair({
   auto,
@@ -68,8 +107,24 @@ export function FlagPair({
   compact?: boolean;
 }) {
   const { t } = useTranslation();
+
+  if (compact) {
+    return (
+      <span className="inline-flex items-center gap-2 text-[11px] text-subtle">
+        <span className="inline-flex items-center gap-1">
+          {t('callCenter.flagAuto')}:
+          <FlagDot code={auto} levels={levels} source="auto" emphasize={divergent} />
+        </span>
+        <span className="inline-flex items-center gap-1">
+          {t('callCenter.flagManual')}:
+          <FlagDot code={manual} levels={levels} source="manual" />
+        </span>
+      </span>
+    );
+  }
+
   return (
-    <span className={`inline-flex items-center ${compact ? 'gap-2' : 'gap-3'}`}>
+    <span className="inline-flex items-center gap-3">
       <FlagChip code={auto} levels={levels} source="auto" showSourceLabel={showLabels} />
       <FlagChip code={manual} levels={levels} source="manual" showSourceLabel={showLabels} />
       {divergent && (

@@ -6,8 +6,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { PageNav, PageNavPanel, MobileHeader, DataTable, Badge, Input, Select, Button, useSnackbarContext } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, XCircle, Star, StarOff, Send } from 'lucide-react';
+import { PageNav, PageNavPanel, MobileHeader, DataTable, Badge, Input, Select, Button, Tooltip, useSnackbarContext } from 'tsp-form';
+import { ArrowLeft, ArrowRightFromLine, XCircle, CheckCircle, Star, StarOff, Send, Copy, ArrowRightLeft } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency, formatRelativeAgo } from '../../lib/format';
@@ -16,6 +16,7 @@ import {
   type BookRow, type TradeRow, type TradeInboxRow,
 } from './callCenterApi';
 import { FlagPair, SkipReasonBadge, AppointmentBadge, DeviceContextBadges, DeviceLink } from './ccBadges';
+import { RowTransferModal } from './DunningActions';
 import { ContractDunningDetail } from './ContractDunningDetail';
 import { TransferView, TransferOfferDetail } from './TransferView';
 
@@ -44,8 +45,8 @@ export function CallCenterPage() {
   const [showAllInBook, setShowAllInBook] = useState(false);
   const [sortBy, setSortBy] = useState<SortKey>('work_priority.desc');
   const [redOnly, setRedOnly] = useState(false);
-  // last_action_at neglect filter (§8.2). '' = off.
-  const [neglect, setNeglect] = useState<'' | 'never' | 'stale7' | 'today'>('');
+  // last_action_at neglect filter (§8.2, chip 3 revised round 3). '' = off.
+  const [neglect, setNeglect] = useState<'' | 'never' | 'stale7' | 'notToday'>('');
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [searchInput, setSearchInput] = useState('');
@@ -99,9 +100,10 @@ export function CallCenterPage() {
     } else if (neglect === 'stale7') {
       const cutoff = new Date(Date.now() - 7 * 86_400_000).toISOString();
       orClauses.push(`or(last_action_at.is.null,last_action_at.lt.${cutoff})`);
-    } else if (neglect === 'today') {
+    } else if (neglect === 'notToday') {
+      // "Not touched today" = never touched OR last touched before today 00:00.
       const start = new Date(); start.setHours(0, 0, 0, 0);
-      params.push(`last_action_at=gte.${start.toISOString()}`);
+      orClauses.push(`or(last_action_at.is.null,last_action_at.lt.${start.toISOString()})`);
     }
     if (search.trim()) {
       const q = encodeURIComponent(search.trim());
@@ -146,6 +148,37 @@ export function CallCenterPage() {
     refetchInterval: 60_000,
   });
   const tradeInboxCount = tradeInboxData?.length ?? 0;
+
+  // My open outgoing offers — drives the per-row "pending transfer → {name}"
+  // badge and hides the transfer action while an offer stands. Keyed on
+  // contract_id. Distinct from the Transfer view's fetch (different columns).
+  const { data: outboxData } = useQuery({
+    queryKey: [...ccKeys.tradeOutbox, 'row-badge'],
+    queryFn: () => apiClient.get<{ contract_id: number; counterparty_username: string | null }[]>(
+      '/v_trade_outbox?select=contract_id,counterparty_username'),
+    refetchInterval: 60_000,
+  });
+  const pendingTradeByContract = new Map(
+    (outboxData ?? []).map(o => [o.contract_id, o.counterparty_username]));
+
+  // Row action modal state — transfer from the row (contract already known).
+  const [transferRow, setTransferRow] = useState<BookRow | null>(null);
+
+  const copyCode = async (code: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(code);
+      addSnackbar({
+        message: <div className="alert alert-success"><CheckCircle size={18} /><span>{t('callCenter.codeCopied')}</span></div>,
+        type: 'success', duration: 1800,
+      });
+    } catch {
+      addSnackbar({
+        message: <div className="alert alert-danger"><XCircle size={18} /><span>{t('common.error')}</span></div>,
+        type: 'error', duration: 2000,
+      });
+    }
+  };
 
   const toggleFocus = async (row: BookRow, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -309,7 +342,7 @@ export function CallCenterPage() {
                   {([
                     ['never', 'callCenter.neglectNever'],
                     ['stale7', 'callCenter.neglectStale7'],
-                    ['today', 'callCenter.neglectToday'],
+                    ['notToday', 'callCenter.neglectNotToday'],
                   ] as const).map(([key, labelKey]) => {
                     const active = neglect === key;
                     return (
@@ -368,36 +401,66 @@ export function CallCenterPage() {
                         className="px-4 py-3 transition-colors cursor-pointer flex flex-col gap-1.5"
                         onClick={() => { selectContract(c.contract_id); if (isMobile) goTo('detail'); }}
                       >
-                        {/* Row 1 — contract code + due status badge, focus star pinned right */}
-                        <div className="flex items-center gap-2">
+                        {/* Row 1 — contract code + copy, due badge, transfer + focus star pinned right */}
+                        <div className="flex items-center gap-1.5">
                           <span className="font-medium text-sm truncate">{c.contract_code_display}</span>
+                          <Tooltip content={t('callCenter.copyCode')}>
+                            <button
+                              type="button"
+                              className="shrink-0 flex items-center justify-center w-6 h-6 rounded bg-transparent border-none cursor-pointer text-subtler hover:text-primary-fg hover:bg-surface-hover"
+                              aria-label={t('callCenter.copyCode')}
+                              onClick={(e) => copyCode(c.contract_code_display, e)}
+                            >
+                              <Copy size={13} />
+                            </button>
+                          </Tooltip>
                           {c.is_overdue ? (
                             <Badge size="sm" color={overdueColor(c.overdue_days)}>{t('callCenter.overdueDays', { n: c.overdue_days })}</Badge>
                           ) : c.next_due_date && (
                             <Badge size="sm" color="default"><DateTime value={c.next_due_date} showTime={false} /></Badge>
                           )}
-                          <button
-                            type="button"
-                            className="group ml-auto shrink-0 flex items-center justify-center w-6 h-6 rounded bg-transparent border-none cursor-pointer text-subtle hover:text-primary-fg hover:bg-surface-hover"
-                            title={c.on_focus ? t('callCenter.removeFromFocus') : t('callCenter.addToFocus')}
-                            onClick={(e) => toggleFocus(c, e)}
-                          >
-                            {c.on_focus ? (
-                              <>
-                                {/* Focused: filled star normally, StarOff on hover to signal removal */}
-                                <Star size={15} className="text-primary-fg fill-current group-hover:hidden" />
-                                <StarOff size={15} className="hidden group-hover:block" />
-                              </>
-                            ) : (
-                              <Star size={15} />
+                          <div className="ml-auto shrink-0 flex items-center gap-0.5">
+                            {/* Transfer to a peer — hidden while an offer is already open */}
+                            {!pendingTradeByContract.has(c.contract_id) && (
+                              <Tooltip content={t('callCenter.transfer.offerButton')}>
+                                <button
+                                  type="button"
+                                  className="flex items-center justify-center w-6 h-6 rounded bg-transparent border-none cursor-pointer text-subtle hover:text-primary-fg hover:bg-surface-hover"
+                                  aria-label={t('callCenter.transfer.offerButton')}
+                                  onClick={(e) => { e.stopPropagation(); setTransferRow(c); }}
+                                >
+                                  <ArrowRightLeft size={14} />
+                                </button>
+                              </Tooltip>
                             )}
-                          </button>
+                            <button
+                              type="button"
+                              className="group flex items-center justify-center w-6 h-6 rounded bg-transparent border-none cursor-pointer text-subtle hover:text-primary-fg hover:bg-surface-hover"
+                              title={c.on_focus ? t('callCenter.removeFromFocus') : t('callCenter.addToFocus')}
+                              onClick={(e) => toggleFocus(c, e)}
+                            >
+                              {c.on_focus ? (
+                                <>
+                                  {/* Focused: filled star normally, StarOff on hover to signal removal */}
+                                  <Star size={15} className="text-primary-fg fill-current group-hover:hidden" />
+                                  <StarOff size={15} className="hidden group-hover:block" />
+                                </>
+                              ) : (
+                                <Star size={15} />
+                              )}
+                            </button>
+                          </div>
                         </div>
 
                         {/* Row 2 — customer name + fact badges, overdue amount pinned right */}
                         <div className="flex items-center gap-1.5 min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                             <span className="text-xs text-subtle truncate min-w-0">{c.customer_name}</span>
+                            {pendingTradeByContract.has(c.contract_id) && (
+                              <Badge size="sm" color="info">
+                                {t('callCenter.pendingTransferTo', { name: pendingTradeByContract.get(c.contract_id) || '—' })}
+                              </Badge>
+                            )}
                             <SkipReasonBadge reason={c.dunning_skip_reason} />
                             <AppointmentBadge date={c.open_promise_date} />
                             <DeviceContextBadges inRepair={c.device_in_repair} deposited={c.device_deposited} hasLoaner={c.has_loaner} />
@@ -483,6 +546,21 @@ export function CallCenterPage() {
               )}
             </PageNavPanel>
           </div>
+
+          <RowTransferModal
+            open={!!transferRow}
+            contractId={transferRow?.contract_id ?? 0}
+            contractCode={transferRow?.contract_code_display ?? ''}
+            onClose={() => setTransferRow(null)}
+            onOffered={() => {
+              queryClient.invalidateQueries({ queryKey: ccKeys.tradeOutbox });
+              queryClient.invalidateQueries({ queryKey: ['cc', 'book'] });
+              addSnackbar({
+                message: <div className="alert alert-success"><CheckCircle size={18} /><span>{t('callCenter.transfer.offerSuccess')}</span></div>,
+                type: 'success', duration: 2500,
+              });
+            }}
+          />
         </>
       )}
     </PageNav>

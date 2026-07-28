@@ -5,13 +5,15 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, Button, TextArea, Badge, InputDatePicker, useSnackbarContext } from 'tsp-form';
-import { Flag, XCircle, CheckCircle, Eye, EyeOff, ShieldAlert, Calendar, Keyboard } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Modal, Button, TextArea, Badge, Select, InputDatePicker, useSnackbarContext } from 'tsp-form';
+import { Flag, XCircle, CheckCircle, Eye, EyeOff, ShieldAlert, Calendar, Keyboard, Send } from 'lucide-react';
 import { ApiError } from '../../lib/api';
 import { makeDatePickerFormat } from '../../lib/format';
 import {
-  useFlagLevels, setManualFlag, logPromiseToPay, revealIcloudPassword,
-  flagColor, type FlagLevelRef, type IcloudRevealResult,
+  ccKeys, useFlagLevels, setManualFlag, logPromiseToPay, revealIcloudPassword,
+  tradeTargets, tradeOffer, flagColor,
+  type FlagLevelRef, type IcloudRevealResult,
 } from './callCenterApi';
 
 function toLocalDateStr(d: Date | null): string {
@@ -319,5 +321,112 @@ export function IcloudRevealButton({ accountId }: { accountId: number }) {
       </div>
       {error && <div className="alert alert-danger"><XCircle size={16} /><span>{error}</span></div>}
     </div>
+  );
+}
+
+// ── Transfer a contract to a peer (from the row) ────────────────────────────────
+
+/** Offer this contract to another collector (trade), scoped to one contract so
+ *  it can be launched straight from the book row — no contract picker. The
+ *  contract stays with us until the recipient accepts. */
+export function RowTransferModal({
+  open, contractId, contractCode, onClose, onOffered,
+}: {
+  open: boolean;
+  contractId: number;
+  contractCode: string;
+  onClose: () => void;
+  onOffered: () => void;
+}) {
+  const { t } = useTranslation();
+  const [toUserId, setToUserId] = useState('');
+  const [note, setNote] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const targets = useQuery({
+    queryKey: ccKeys.tradeTargets,
+    queryFn: tradeTargets,
+    enabled: open,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  useEffect(() => {
+    if (open) { setToUserId(''); setNote(''); setError(''); setSubmitting(false); }
+  }, [open]);
+
+  const targetOptions = (targets.data ?? [])
+    .filter(tt => tt.is_active)
+    .map(tt => {
+      const name = tt.full_name?.trim();
+      return { value: String(tt.user_id), label: name ? `${name} · ${tt.username}` : tt.username };
+    });
+
+  const submit = async () => {
+    if (!toUserId) { setError(t('callCenter.transfer.offerMissing')); return; }
+    setSubmitting(true);
+    setError('');
+    try {
+      await tradeOffer(contractId, parseInt(toUserId, 10), note.trim() || null);
+      onOffered();
+      onClose();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const key = err.messageKey || err.code || '';
+        const translated = key ? t(key, { ns: 'apiErrors', defaultValue: '' }) : '';
+        setError(translated || err.message || t('common.error'));
+      } else {
+        setError(t('common.error'));
+      }
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
+      <div className="modal-header">
+        <h2 className="modal-title inline-flex items-center gap-2"><Send size={16} />{t('callCenter.transfer.offerTitle')}</h2>
+        <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">×</button>
+      </div>
+      <div className="modal-content">
+        <div className="px-3 py-2.5 rounded-md bg-surface border border-line mb-4">
+          <div className="font-medium text-sm">{contractCode}</div>
+        </div>
+        {targets.data && targetOptions.length === 0 && (
+          <div className="alert alert-warning mb-3"><XCircle size={16} /><span>{t('callCenter.transfer.noTargets')}</span></div>
+        )}
+        <div className="form-grid gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="form-label">{t('callCenter.transfer.recipientLabel')} *</label>
+            <Select
+              options={targetOptions}
+              value={toUserId || null}
+              onChange={v => setToUserId((v as string) || '')}
+              placeholder={t('callCenter.transfer.recipientPlaceholder')}
+              searchable
+              showChevron
+              disabled={targets.isLoading || targetOptions.length === 0}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="form-label">{t('callCenter.transfer.noteLabel')}</label>
+            <TextArea
+              className="w-full"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder={t('callCenter.transfer.notePlaceholder')}
+              rows={2}
+            />
+          </div>
+          {error && <div className="alert alert-danger"><XCircle size={16} /><span>{error}</span></div>}
+        </div>
+      </div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={onClose} disabled={submitting}>{t('common.cancel')}</Button>
+        <Button color="primary" onClick={submit} disabled={submitting || !toUserId}>
+          {t('callCenter.transfer.offerConfirm')}
+        </Button>
+      </div>
+    </Modal>
   );
 }
