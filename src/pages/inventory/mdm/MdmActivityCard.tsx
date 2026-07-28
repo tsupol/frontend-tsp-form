@@ -149,11 +149,20 @@ export function MdmActivityCard({ status }: { status: AssetMdmStatus }) {
             </div>
           )}
 
-          {/* In-flight commands. */}
+          {/* In-flight commands — name what's queued and say we're WAITING on the
+              device (not "sending", which implies active progress). §0.3: tell a
+              human story, never a bare perpetual spinner. */}
           {status.pending_command_count > 0 && (
-            <div className="inline-flex items-center gap-1">
-              <Loader2 size={14} className="animate-spin" />
-              {t('asset.mdm.activity.sending', { count: status.pending_command_count })}
+            <div className="inline-flex items-center gap-1.5">
+              <Loader2 size={14} className="animate-spin shrink-0" />
+              <span>
+                {status.pending_command_type
+                  ? t('asset.mdm.activity.waitingFor', {
+                      cmd: t(`asset.mdm.intentType.${status.pending_command_type}`, { defaultValue: status.pending_command_type }),
+                    })
+                  : t('asset.mdm.activity.waiting')}
+                {status.pending_command_count > 1 && <> · {t('asset.mdm.activity.sending', { count: status.pending_command_count })}</>}
+              </span>
             </div>
           )}
         </div>

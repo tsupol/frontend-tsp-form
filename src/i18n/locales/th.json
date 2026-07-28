@@ -2340,7 +2340,9 @@
           "EXPIRED": "หมดอายุ",
           "CANCELED": "ยกเลิก"
         },
-        "sending": "กำลังส่ง {{count}} คำสั่ง"
+        "sending": "กำลังส่ง {{count}} คำสั่ง",
+        "waiting": "รอเครื่องตอบกลับ",
+        "waitingFor": "รอเครื่องตอบกลับ: {{cmd}}"
       },
       "intentType": {
         "SET_WALLPAPER": "เปลี่ยนภาพพื้นหลัง",

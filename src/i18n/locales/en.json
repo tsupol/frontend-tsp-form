@@ -2343,7 +2343,9 @@
           "EXPIRED": "expired",
           "CANCELED": "canceled"
         },
-        "sending": "sending {{count}} command(s)"
+        "sending": "sending {{count}} command(s)",
+        "waiting": "Waiting for the device to respond",
+        "waitingFor": "Waiting for the device: {{cmd}}"
       },
       "intentType": {
         "SET_WALLPAPER": "Change wallpaper",
