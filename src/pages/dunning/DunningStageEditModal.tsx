@@ -7,7 +7,7 @@
 //   - day_from, day_to (integer day window; day_to may be NULL = open-ended)
 //   - priority (small int — disambiguates overlapping windows)
 //   - active (boolean)
-//   - extra (per-module: reason_code / intent_type / action_code) — text
+//   - extra (per-module: reason_code / action_code) — text
 //
 // Notif has no editable extra (event_type is fixed by stage_template).
 //

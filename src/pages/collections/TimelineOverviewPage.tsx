@@ -1,47 +1,48 @@
-// Cross-module dunning timeline — read-only fan-out view across the 4
-// dunning modules. Reads all 4 module lists in parallel via useDunningStages,
-// merges by day, and renders 4 horizontal lanes over a shared day axis.
+// Cross-module dunning timeline — read-only fan-out view across the 3
+// dunning modules. Reads all 3 module lists in parallel via useDunningStages,
+// merges by day, and renders 3 horizontal lanes over a shared day axis.
+// (The former `ops`/call-center lane was removed 2026-07-28 — obsolete
+// call-ticket ladder.)
 //
 // Open-ended stages (day_to == null) are drawn with a trailing arrow off the
 // right edge to signal "continues indefinitely."
 
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { MobileHeader, Tooltip, Badge } from 'tsp-form';
-import { ArrowRightFromLine, Bell, ShieldBan, Phone, Scale } from 'lucide-react';
+import { MobileHeader } from 'tsp-form';
+import { ArrowRightFromLine, Bell, ShieldBan, Scale } from 'lucide-react';
 import { useDunningStages } from '../dunning/useDunningStages';
 import type { DunningModule, DunningStageRow } from '../dunning/dunningTypes';
 
 const LANES: { module: DunningModule; icon: React.ReactNode; labelKey: string; color: string }[] = [
   { module: 'notif',     icon: <Bell size={14} />,     labelKey: 'dunningSystem.tab_notif',     color: 'var(--color-info-fg, #3b82f6)' },
-  { module: 'ops',       icon: <Phone size={14} />,    labelKey: 'dunningSystem.tab_ops',       color: 'var(--color-warning-fg, #f59e0b)' },
   { module: 'blacklist', icon: <ShieldBan size={14} />, labelKey: 'dunningSystem.tab_blacklist', color: 'var(--color-danger, #ef4444)' },
   { module: 'legal',     icon: <Scale size={14} />,    labelKey: 'dunningSystem.tab_legal',     color: 'var(--color-danger, #ef4444)' },
 ];
 
 // Axis bounds — explicit so all lanes share the same scale.
-const AXIS_MIN = -7;
-const AXIS_MAX = 80;
-const AXIS_TICKS = [-7, 0, 7, 14, 30, 45, 60, 80];
+// Spec: UI_SUMMARY/112 §7.2 — range −2…+70 (covers all module ranges),
+// tick labels −2 / 0 / +1 / +3 / +7 / +15 / +21 / +30 / +45 / +60.
+const AXIS_MIN = -2;
+const AXIS_MAX = 70;
+const AXIS_TICKS = [-2, 0, 1, 3, 7, 15, 21, 30, 45, 60];
 
 export function TimelineOverviewPage() {
   const { t } = useTranslation();
 
-  // Pull all 4 module lists. Each hook fires its own query; they run in
+  // Pull all 3 module lists. Each hook fires its own query; they run in
   // parallel naturally via React Query.
   const notif     = useDunningStages('notif');
-  const ops       = useDunningStages('ops');
   const blacklist = useDunningStages('blacklist');
   const legal     = useDunningStages('legal');
 
-  const isLoading = notif.isLoading || ops.isLoading || blacklist.isLoading || legal.isLoading;
+  const isLoading = notif.isLoading || blacklist.isLoading || legal.isLoading;
 
   const rowsByModule = useMemo(() => ({
     notif:     notif.rows,
-    ops:       ops.rows,
     blacklist: blacklist.rows,
     legal:     legal.rows,
-  }), [notif.rows, ops.rows, blacklist.rows, legal.rows]);
+  }), [notif.rows, blacklist.rows, legal.rows]);
 
   return (
     <>
@@ -71,17 +72,23 @@ export function TimelineOverviewPage() {
         ) : (
           <div className="border border-line rounded-md p-4 overflow-x-auto">
             <div className="min-w-[40rem]">
-              {/* Axis (top) */}
-              <div className="flex items-end pl-32 mb-2 relative h-6 border-b border-line">
-                {AXIS_TICKS.map(tick => (
-                  <span
-                    key={tick}
-                    className="absolute text-[10px] text-subtle tabular-nums"
-                    style={{ left: `calc(8rem + ${positionPct(tick)}%)`, transform: 'translateX(-50%)' }}
-                  >
-                    {tick > 0 ? `+${tick}` : tick}
-                  </span>
-                ))}
+              {/* Axis (top) — mirror the lane structure (w-32 label spacer +
+                  flex-1 track) so tick % and dot % share one coordinate origin.
+                  Positioning ticks by a full-container % + 8rem (as before)
+                  put them ~30px right of where the track maps the same day. */}
+              <div className="flex items-end mb-2 h-6 border-b border-line">
+                <div className="w-32 shrink-0" />
+                <div className="flex-1 relative h-full">
+                  {AXIS_TICKS.map(tick => (
+                    <span
+                      key={tick}
+                      className="absolute bottom-0 text-[10px] text-subtle tabular-nums"
+                      style={{ left: `${positionPct(tick)}%`, transform: 'translateX(-50%)' }}
+                    >
+                      {tick > 0 ? `+${tick}` : tick}
+                    </span>
+                  ))}
+                </div>
               </div>
 
               {/* Lanes */}
@@ -137,64 +144,57 @@ function StageDot({ row, laneColor }: { row: DunningStageRow; laneColor: string 
   // If the stage spans a window, draw a pill from day_from to day_to. If it's
   // a point (from===to) or open-ended, draw a dot at day_from with an
   // optional trailing line for open-ended.
-  return (
-    <Tooltip content={<StageTooltip row={row} />} placement="top">
-      {isPointStage || isOpenEnded ? (
+  //
+  // Native `title` tooltip (not tsp-form's) per request — the marker is a bare
+  // element so the browser shows the plain-text summary on hover.
+  const title = stageTitle(row);
+  return isPointStage || isOpenEnded ? (
+    <span
+      className="absolute top-1/2 -translate-y-1/2 inline-flex items-center"
+      style={{ left: `${left}%` }}
+      title={title}
+    >
+      <span
+        className="inline-block w-2 h-2 rounded-full ring-2 ring-bg"
+        style={{ background: laneColor }}
+      />
+      {isOpenEnded && (
         <span
-          className="absolute top-1/2 -translate-y-1/2 inline-flex items-center"
-          style={{ left: `${left}%` }}
-        >
-          <span
-            className="inline-block w-3 h-3 rounded-full ring-2 ring-bg"
-            style={{ background: laneColor }}
-          />
-          {isOpenEnded && (
-            <span
-              className="ml-0.5 inline-block h-0.5"
-              style={{ background: laneColor, width: `calc(${100 - left}% - 0.75rem)` }}
-            />
-          )}
-        </span>
-      ) : (
-        <span
-          className="absolute top-1/2 -translate-y-1/2 h-2 rounded-full ring-2 ring-bg"
-          style={{
-            left: `${left}%`,
-            width: `calc(${positionPct(eff.day_to!) - left}%)`,
-            background: laneColor,
-            minWidth: '0.5rem',
-          }}
+          className="ml-0.5 inline-block h-0.5"
+          style={{ background: laneColor, width: `calc(${100 - left}% - 0.5rem)` }}
         />
       )}
-    </Tooltip>
+    </span>
+  ) : (
+    <span
+      className="absolute top-1/2 -translate-y-1/2 h-2 rounded-full ring-2 ring-bg"
+      style={{
+        left: `${left}%`,
+        width: `calc(${positionPct(eff.day_to!) - left}%)`,
+        background: laneColor,
+        minWidth: '0.5rem',
+      }}
+      title={title}
+    />
   );
 }
 
-function StageTooltip({ row }: { row: DunningStageRow }) {
-  const { t } = useTranslation();
-  // No holding override → the template is what applies (and it's not "custom").
+// Plain-text summary for the native `title` tooltip: "stage · days · extra · custom".
+function stageTitle(row: DunningStageRow): string {
   const eff = row.effective ?? row.template;
   const dayLabel = eff.day_to == null
     ? `${formatDay(eff.day_from)}…`
     : eff.day_to === eff.day_from
       ? formatDay(eff.day_from)
       : `${formatDay(eff.day_from)} → ${formatDay(eff.day_to)}`;
-  const extra = row.event_type
-    ?? eff.reason_code
-    ?? eff.intent_type
-    ?? eff.action_code
-    ?? null;
-  return (
-    <div className="text-xs leading-tight">
-      <div className="font-mono font-semibold mb-0.5">{row.stage}</div>
-      <div>{row.description}</div>
-      <div className="mt-1 flex gap-2 items-center">
-        <span className="tabular-nums">{dayLabel}</span>
-        {extra && <span className="font-mono text-[10px] text-subtle">{extra}</span>}
-        {row.effective?.is_custom && <Badge size="xs" color="info">{t('dunningSystem.custom')}</Badge>}
-      </div>
-    </div>
-  );
+  const extra = row.event_type ?? eff.reason_code ?? eff.action_code ?? null;
+  return [
+    row.stage,
+    row.description,
+    dayLabel,
+    extra,
+    row.effective?.is_custom ? 'custom' : null,
+  ].filter(Boolean).join(' · ');
 }
 
 function positionPct(day: number): number {

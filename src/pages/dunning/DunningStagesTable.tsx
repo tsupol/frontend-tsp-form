@@ -83,7 +83,7 @@ export function DunningStagesTable({ module }: Props) {
 
 function StageRow({ row, extraField, onEdit, onReset }: {
   row: DunningStageRow;
-  extraField: 'reason_code' | 'intent_type' | 'action_code' | undefined;
+  extraField: 'reason_code' | 'action_code' | undefined;
   onEdit: () => void;
   onReset: () => void;
 }) {

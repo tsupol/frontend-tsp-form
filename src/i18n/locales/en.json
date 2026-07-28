@@ -6063,12 +6063,11 @@
     "done": "Done"
   },
   "dunningSystem": {
-    "description": "Per-module dunning ladders — notification, blacklist, call-center and legal — replacing the legacy single ladder.",
+    "description": "Per-module dunning ladders — notification, blacklist and legal — replacing the legacy single ladder.",
     "tab_notif": "App notifications",
     "tab_blacklist": "Blacklist",
-    "tab_ops": "Call Center",
     "tab_legal": "Legal",
-    "timelineDescription": "Cross-module dunning schedule, day-by-day across notification, blacklist, call-center and legal lanes.",
+    "timelineDescription": "Cross-module dunning schedule, day-by-day across notification, blacklist and legal lanes.",
     "timelineStubBody": "Cross-module fan-out timeline will render here once all four modules are live.",
     "empty": "No stages configured for this module.",
     "custom": "Custom",
@@ -6093,7 +6092,6 @@
     "field_event_type": "Event type",
     "fieldEventTypeHint": "Read-only — set by the system stage template.",
     "field_reason_code": "Reason code",
-    "field_intent_type": "Call intent",
     "field_action_code": "Action code",
     "resetTitle": "Reset to default",
     "resetBody": "Reset stage {{stage}} to the system default? Your holding override will be removed.",

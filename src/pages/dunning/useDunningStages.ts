@@ -48,7 +48,7 @@ export function useDunningStages(module: DunningModule) {
     day_to?: number | null;
     priority?: number;
     active?: boolean;
-    /** Module-specific extra (reason_code / intent_type / action_code) */
+    /** Module-specific extra (reason_code / action_code) */
     extra?: string;
   }
 

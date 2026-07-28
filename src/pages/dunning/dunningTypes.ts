@@ -1,5 +1,5 @@
-// Shared types + module config for the 4 Dunning Config tabs (notif, blacklist,
-// ops, legal). The 4 modules expose the same RPC shape via different names
+// Shared types + module config for the 3 Dunning Config tabs (notif, blacklist,
+// legal). Each module exposes the same RPC shape via different names
 // (`api.fn_admin_<module>_dunning_stage_list / _set / _reset`). Each list row
 // has the same generic envelope:
 //
@@ -8,13 +8,16 @@
 // where the per-module extra field is:
 //   - notif     : event_type   (fixed by stage, NOT editable via _set)
 //   - blacklist : reason_code  (editable)
-//   - ops       : intent_type  (editable)
 //   - legal     : action_code  (editable)
 //
 // Notif's event_type comes back at the top level of the row; the others come
 // inside template/effective. We normalize that in the hook.
+//
+// The former `ops` (call-center) ladder was removed 2026-07-28 — the automatic
+// call-ticket system it configured is obsolete (nothing read the ladder). See
+// UI_FEEDBACK/2026-07-27_REMOVE_ops_call_ticket_dunning_obsolete.md.
 
-export type DunningModule = 'notif' | 'blacklist' | 'ops' | 'legal';
+export type DunningModule = 'notif' | 'blacklist' | 'legal';
 
 export type StageKind = 'pre_due' | 'overdue' | string;
 
@@ -27,7 +30,6 @@ export interface DunningStageTemplate {
   // Per-module extra. Present only for non-notif modules — but kept optional
   // on the union so a single type covers all 4.
   reason_code?: string;
-  intent_type?: string;
   action_code?: string;
 }
 
@@ -60,7 +62,7 @@ export interface DunningStagesResponse {
 export interface DunningModuleConfig {
   module: DunningModule;
   /** Extra column key for non-notif modules. Notif has none (it's a fixed event_type label). */
-  extraField?: 'reason_code' | 'intent_type' | 'action_code';
+  extraField?: 'reason_code' | 'action_code';
   /** i18n key under `dunningSystem.tab_*` for tab label */
   labelKey: string;
   /** RPC function names — derived but spelled out for clarity */
@@ -89,16 +91,6 @@ export const MODULE_CONFIG: Record<DunningModule, DunningModuleConfig> = {
       list:  'fn_admin_blacklist_dunning_stage_list',
       set:   'fn_admin_blacklist_dunning_stage_set',
       reset: 'fn_admin_blacklist_dunning_stage_reset',
-    },
-  },
-  ops: {
-    module: 'ops',
-    extraField: 'intent_type',
-    labelKey: 'dunningSystem.tab_ops',
-    rpc: {
-      list:  'fn_admin_ops_dunning_stage_list',
-      set:   'fn_admin_ops_dunning_stage_set',
-      reset: 'fn_admin_ops_dunning_stage_reset',
     },
   },
   legal: {

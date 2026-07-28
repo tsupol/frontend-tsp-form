@@ -1,11 +1,14 @@
-// Dunning Config admin page — 4 modules (notif / blacklist / ops / legal),
+// Dunning Config admin page — 3 modules (notif / blacklist / legal),
 // each surfaced as a tab. The Timeline overview is its own page at
 // /admin/collections/timeline so non-admin viewers can read the schedule
 // without entering this config screen.
 //
 // Each tab body is the same DunningStagesTable component parameterised by
 // module — the per-module differences (extra editable column: reason_code /
-// intent_type / action_code) are encoded in MODULE_CONFIG in dunningTypes.ts.
+// action_code) are encoded in MODULE_CONFIG in dunningTypes.ts.
+//
+// The former `ops` (call-center) tab was removed 2026-07-28 — obsolete
+// call-ticket config. See UI_FEEDBACK/2026-07-27_REMOVE_ops_call_ticket_dunning_obsolete.md.
 //
 // Replaces the legacy single-ladder /admin/company/dunning page per
 // UI_SUMMARY/110_DUNNING_SYSTEM_MIGRATION_GUIDE.md. Old paths redirect.
@@ -13,7 +16,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MobileHeader } from 'tsp-form';
-import { ArrowRightFromLine, Bell, ShieldBan, Phone, Scale } from 'lucide-react';
+import { ArrowRightFromLine, Bell, ShieldBan, Scale } from 'lucide-react';
 import { DunningStagesTable } from './DunningStagesTable';
 import type { DunningModule } from './dunningTypes';
 
@@ -22,7 +25,6 @@ type DunningTab = DunningModule;
 const TABS: { key: DunningTab; icon: React.ReactNode }[] = [
   { key: 'notif',     icon: <Bell size={14} /> },
   { key: 'blacklist', icon: <ShieldBan size={14} /> },
-  { key: 'ops',       icon: <Phone size={14} /> },
   { key: 'legal',     icon: <Scale size={14} /> },
 ];
 
