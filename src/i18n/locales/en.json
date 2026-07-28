@@ -2267,6 +2267,20 @@
         "notSupervised": "Not supervised — some restrictions won't apply",
         "noBasicInfo": "Device info hasn't been pulled yet. Use the pull buttons below to fetch it."
       },
+      "cellular": {
+        "title": "IMEI & SIM",
+        "neverPulled": "Device info hasn't been pulled yet.",
+        "dualImeiNote": "Dual-SIM devices have two IMEIs — this is normal.",
+        "kind": { "PHYSICAL": "Physical SIM", "ESIM": "eSIM" },
+        "phone": "Phone",
+        "carrier": "Carrier",
+        "iccid": "SIM (ICCID)",
+        "noSim": "No active SIM",
+        "voice": "Voice",
+        "data": "Data",
+        "copyImei": "Copy IMEI",
+        "copyIccid": "Copy ICCID"
+      },
       "devInfo": {
         "profiles": "Configuration profiles",
         "apps": "Installed apps",

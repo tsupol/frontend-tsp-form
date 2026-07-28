@@ -2,25 +2,40 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PauseCircle, XCircle, ArrowRight, AppWindow } from 'lucide-react';
+import { PauseCircle, XCircle, ArrowRight } from 'lucide-react';
 import { DateTime } from '../../../components/DateTime';
 import type { AssetMdmStatus, ParsedMdmError } from './mdmApi';
 
-// §7.1 — app icon from be-media (302 → Apple CDN, 404 = not an App Store app →
-// placeholder). No token, aggressively cached; safe to fire per-row. App NAME
-// always comes from the view (app_name), never Apple.
+// §7.1 — app icon from be-media (302 → Apple CDN, 404 = no fetchable icon). No
+// token, aggressively cached; safe to fire per-row. On 404 (App Store and any
+// future icon-less app) draw a MONOGRAM of the app name, not a broken tile — per
+// BE 2026-07-28: don't chase the icon, there isn't one. App NAME always comes
+// from the view (app_name), never Apple.
 const APP_ICON_BASE = 'https://be-media.czynet.dev/api/v1/mdm/app-icon?bundle_id=';
 
-export function AppIcon({ bundleId, size = 32 }: { bundleId: string; size?: number }) {
+// Deterministic tint per app so the monograms aren't a wall of identical tiles.
+const MONO_TINTS = [
+  'bg-info-soft text-info-fg', 'bg-success-soft text-success-fg',
+  'bg-warning-soft text-warning-fg', 'bg-danger-soft text-danger-fg',
+  'bg-surface-hover text-subtle',
+];
+function monoTint(seed: string): string {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
+  return MONO_TINTS[Math.abs(h) % MONO_TINTS.length];
+}
+
+export function AppIcon({ bundleId, appName, size = 32 }: { bundleId: string; appName?: string | null; size?: number }) {
   const [failed, setFailed] = useState(false);
   if (failed || !bundleId) {
+    const letter = (appName || bundleId || '?').trim().charAt(0).toUpperCase() || '?';
     return (
       <span
-        className="inline-flex items-center justify-center rounded-md bg-surface-hover text-subtler shrink-0"
-        style={{ width: size, height: size }}
+        className={`inline-flex items-center justify-center rounded-md shrink-0 font-semibold ${monoTint(appName || bundleId || '')}`}
+        style={{ width: size, height: size, fontSize: Math.round(size * 0.5) }}
         aria-hidden
       >
-        <AppWindow size={Math.round(size * 0.55)} />
+        {letter}
       </span>
     );
   }

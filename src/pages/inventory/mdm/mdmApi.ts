@@ -278,12 +278,45 @@ export interface MdmDeviceApp {
   version: string | null;
   short_version: string | null;
   is_managed: boolean | null;
+  is_user_app: boolean | null; // false = OS pseudo-app (poster/proxy) — filtered out (mig 905)
   last_observed_at: string | null;
 }
+// Filter to real, launchable apps (is_user_app) — drops the OS poster/proxy
+// pseudo-apps a person never opens (BE 2026-07-28). App Store stays (it's a real
+// app; it just has no fetchable icon → monogram).
 export function fetchDeviceApps(assetId: number): Promise<MdmDeviceApp[]> {
   return apiClient.get<MdmDeviceApp[]>(
-    `/v_mdm_device_apps_current?asset_id=eq.${assetId}&order=app_name.asc`,
+    `/v_mdm_device_apps_current?asset_id=eq.${assetId}&is_user_app=is.true&order=app_name.asc`,
   );
+}
+
+// §3.4 — IMEI & SIM. ONE ROW PER SIM SLOT, not per device: dual-SIM iPhones
+// report a PHYSICAL slot + an ESIM slot, each with its OWN IMEI (both correct).
+// phone_number/carrier_network are null when no active SIM — a real answer, show
+// "no active SIM", never blank. Pulled by fn_mdm_query_device_info (same command
+// that refreshes device info).
+export type SimKind = 'PHYSICAL' | 'ESIM';
+export interface MdmAssetCellular {
+  asset_id: number;
+  slot: string;
+  sim_kind: SimKind;
+  imei: string;          // no spaces — for copy/search
+  imei_display: string;  // device-formatted (spaced) — for reading
+  phone_number: string | null;
+  carrier_network: string | null;
+  iccid: string | null;
+  eid: string | null;
+  is_data_preferred: boolean | null;
+  is_voice_preferred: boolean | null;
+  observed_at: string | null;
+}
+export function fetchAssetCellular(assetId: number): Promise<MdmAssetCellular[]> {
+  return apiClient.get<MdmAssetCellular[]>(
+    `/v_asset_cellular?asset_id=eq.${assetId}&order=sim_kind`,
+  );
+}
+export function queryDeviceInfo(assetId: number, actorId: number): Promise<MdmIntentAck> {
+  return apiClient.rpc<MdmIntentAck>('fn_mdm_query_device_info', { p_asset_id: assetId, p_actor_id: actorId });
 }
 
 // ── Branch wallpaper config (read only, for the dunning confirm preview) ─────
