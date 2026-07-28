@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  MobileHeader, InputDateRangePicker, Button, LabeledCheckbox,
+  MobileHeader, InputDateRangePicker, Button, LabeledCheckbox, DataTableFooter,
 } from 'tsp-form';
 import {
   ArrowRightFromLine, Keyboard, RefreshCw, ExternalLink, CheckCircle2,
@@ -321,11 +321,11 @@ export function FinancierFormFeedPage() {
             <FeedSection
               key={section.category}
               category={section.category}
+              rows={section.rows}
               pending={section.pending}
               defaultOpen={section.category === currentCategory}
               onExport={() => exportCsv(section.category, section.rows, t, i18n.language)}
-            >
-              {section.rows.map((row) => (
+              renderRow={(row) => (
                 <FeedRowItem
                   key={row.id}
                   row={row}
@@ -337,8 +337,8 @@ export function FinancierFormFeedPage() {
                   onToggleSend={(willSend) => handleToggleSend(row, willSend)}
                   onDismissNudge={() => clearNudge(row.id)}
                 />
-              ))}
-            </FeedSection>
+              )}
+            />
           ))}
         </div>
       </div>
@@ -357,16 +357,24 @@ export function FinancierFormFeedPage() {
 /* ── Section (hand-rolled collapsible) ─────────────────────────────────────── */
 
 function FeedSection({
-  category, pending, defaultOpen, onExport, children,
+  category, rows, pending, defaultOpen, onExport, renderRow,
 }: {
   category: Category;
+  rows: FeedRow[];
   pending: number;
   defaultOpen: boolean;
   onExport: () => void;
-  children: ReactNode;
+  renderRow: (row: FeedRow) => ReactNode;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(defaultOpen);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageSize, setPageSize] = useState(15);
+
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  // Clamp the page if the row set shrinks (rows leave as they're sent/skipped).
+  const safePage = Math.min(pageIndex, totalPages - 1);
+  const pageRows = rows.slice(safePage * pageSize, safePage * pageSize + pageSize);
 
   return (
     <div className="border border-line rounded-md overflow-hidden">
@@ -396,7 +404,27 @@ function FeedSection({
           {t('financierForm.exportExcel')}
         </button>
       </div>
-      {open && <div className="px-3 pb-1 flex flex-col divide-y divide-line border-t border-line">{children}</div>}
+      {open && (
+        <div className="border-t border-line">
+          <div className="px-3 flex flex-col divide-y divide-line">
+            {pageRows.map(renderRow)}
+          </div>
+          {rows.length > pageSize && (
+            <div className="padded-datatable px-1">
+              <DataTableFooter
+                currentPage={safePage}
+                totalPages={totalPages}
+                onPageChange={setPageIndex}
+                pageSize={pageSize}
+                pageSizeOptions={[15, 25, 50, 100]}
+                onPageSizeChange={(size) => { setPageSize(size); setPageIndex(0); }}
+                totalRows={rows.length}
+                controlSize="sm"
+              />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
