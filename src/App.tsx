@@ -104,6 +104,7 @@ import { InstallmentCheckPage } from './pages/accounting/InstallmentCheckPage';
 import { AuditFlagsPage } from './pages/accounting/AuditFlagsPage';
 import { ReportsPage } from './pages/accounting/ReportsPage';
 import { ContractsOpenedReportPage } from './pages/accounting/ContractsOpenedReportPage';
+import { FinancierFormFeedPage } from './pages/accounting/FinancierFormFeedPage';
 import { BranchExpenseLayout } from './pages/branch-expense/BranchExpenseLayout';
 import { ExpenseEntriesPage } from './pages/branch-expense/ExpenseEntriesPage';
 import { CategoriesPage as BranchExpenseCategoriesPage } from './pages/branch-expense/CategoriesPage';
@@ -1138,6 +1139,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <AccountingLayout><ContractsOpenedReportPage /></AccountingLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/accounting/financier-form"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <AccountingLayout><FinancierFormFeedPage /></AccountingLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

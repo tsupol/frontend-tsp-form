@@ -44,6 +44,7 @@ export function AccountingLayout({ children }: { children: ReactNode }) {
     ...(canSeeReports ? [
       { type: 'link' as const, path: '/admin/accounting/contracts-opened', labelKey: 'nav.contractsOpened', icon: TrendingUp },
       { type: 'link' as const, path: '/admin/accounting/reports', labelKey: 'nav.dailyReports', icon: FileSpreadsheet },
+      { type: 'link' as const, path: '/admin/accounting/financier-form', labelKey: 'nav.financierForm', icon: ClipboardList },
     ] : []),
     ...(canSeeAudit ? [
       { type: 'group' as const, labelKey: 'nav.groupAudit' },
