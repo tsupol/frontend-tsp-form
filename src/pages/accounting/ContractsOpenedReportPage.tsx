@@ -1,18 +1,15 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import {
-  MobileHeader, Select, PopOver,
-} from 'tsp-form';
-import {
-  ArrowRightFromLine, TrendingUp, ChevronLeft, ChevronRight,
-} from 'lucide-react';
+import { MobileHeader, Select } from 'tsp-form';
+import { ArrowRightFromLine, TrendingUp } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from 'recharts';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { fmtCurrency } from '../../lib/format';
+import { MonthPicker } from '../../components/MonthPicker';
 
 /* ───────────────────────────────────────────────────────────────────────────
  * รายงานเปิดสัญญา — monthly "opened & still active" bar chart.
@@ -31,9 +28,11 @@ interface MonthlyRow {
   branch_id: number;
   branch_code: string;
   branch_name: string;
-  active_contracts: number;
+  opened_contracts: number;
   agreed_total: number;
   down_total: number;
+  financed_total: number;
+  down_pct: number | null;
 }
 
 interface Branch { id: number; name: string; company_id: number }
@@ -95,19 +94,20 @@ export function ContractsOpenedReportPage() {
       const existing = byDay.get(r.day);
       const agreed = Number(r.agreed_total) || 0;
       const down = Number(r.down_total) || 0;
+      const financed = Number(r.financed_total) || 0;
       if (existing) {
-        existing.contracts += r.active_contracts;
+        existing.contracts += r.opened_contracts;
         existing.agreed += agreed;
         existing.down += down;
-        existing.financed += agreed - down;
+        existing.financed += financed;
       } else {
         byDay.set(r.day, {
           day: r.day,
           dayNum: Number(r.day.slice(8, 10)),
-          contracts: r.active_contracts,
+          contracts: r.opened_contracts,
           agreed,
           down,
-          financed: agreed - down,
+          financed,
         });
       }
     }
@@ -243,105 +243,6 @@ export function ContractsOpenedReportPage() {
           </div>
         )}
       </div>
-    </div>
-  );
-}
-
-/* ── MonthPicker ────────────────────────────────────────────────────────────
-   Purpose-built month selector — no day concept (the RPC only cares about the
-   month, so a full day-calendar is confusing). Displays "กรกฎาคม 2026" with
-   prev/next arrows; the label opens a year-stepper + 12-month grid popover. */
-function MonthPicker({ value, onChange, lang }: {
-  value: Date;
-  onChange: (d: Date) => void;
-  lang: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const [viewYear, setViewYear] = useState(value.getFullYear());
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const locale = lang === 'th' ? 'th-TH' : 'en-GB';
-
-  const monthLabel = value.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
-  const monthNames = useMemo(
-    () => Array.from({ length: 12 }, (_, m) =>
-      new Date(2000, m, 1).toLocaleDateString(locale, { month: 'short' })),
-    [locale],
-  );
-
-  const step = (delta: number) => onChange(new Date(value.getFullYear(), value.getMonth() + delta, 1));
-  const pick = (m: number) => { onChange(new Date(viewYear, m, 1)); setOpen(false); };
-
-  return (
-    <div className="input-group h-8">
-      <button
-        type="button"
-        className="flex items-center justify-center px-1.5 text-subtle hover:text-fg cursor-pointer bg-transparent border-none"
-        aria-label="Previous month"
-        onClick={() => step(-1)}
-      >
-        <ChevronLeft size={16} />
-      </button>
-      <div className="input-group-divider" />
-      <button
-        ref={triggerRef}
-        type="button"
-        className="flex-1 flex items-center justify-center px-2 text-sm cursor-pointer bg-transparent border-none whitespace-nowrap"
-        onClick={() => { setViewYear(value.getFullYear()); setOpen(v => !v); }}
-      >
-        <span className="font-medium">{monthLabel}</span>
-      </button>
-      <div className="input-group-divider" />
-      <button
-        type="button"
-        className="flex items-center justify-center px-1.5 text-subtle hover:text-fg cursor-pointer bg-transparent border-none"
-        aria-label="Next month"
-        onClick={() => step(1)}
-      >
-        <ChevronRight size={16} />
-      </button>
-
-      <PopOver isOpen={open} onClose={() => setOpen(false)} triggerRef={triggerRef} placement="bottom" align="center" maxWidth="18rem">
-        <div className="p-2 w-64">
-          <div className="flex items-center justify-between mb-2">
-            <button
-              type="button"
-              className="btn-icon-sm cursor-pointer text-subtle hover:text-fg bg-transparent border-none"
-              aria-label="Previous year"
-              onClick={() => setViewYear(y => y - 1)}
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <span className="font-semibold text-sm tabular-nums">{viewYear}</span>
-            <button
-              type="button"
-              className="btn-icon-sm cursor-pointer text-subtle hover:text-fg bg-transparent border-none"
-              aria-label="Next year"
-              onClick={() => setViewYear(y => y + 1)}
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-          <div className="grid grid-cols-3 gap-1">
-            {monthNames.map((name, m) => {
-              const selected = viewYear === value.getFullYear() && m === value.getMonth();
-              return (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => pick(m)}
-                  className={`py-1.5 rounded-md text-sm cursor-pointer border-none transition-colors ${
-                    selected
-                      ? 'bg-item-active-bg text-item-active-fg font-medium'
-                      : 'bg-transparent text-fg hover:bg-item-hover-bg'
-                  }`}
-                >
-                  {name}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </PopOver>
     </div>
   );
 }

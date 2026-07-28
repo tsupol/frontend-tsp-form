@@ -31,6 +31,7 @@
     "categoriesDescription": "ดูแลหมวดหมู่ค่าใช้จ่ายที่สาขาเลือกได้",
     "summary": "สรุปยอด",
     "summaryDescription": "ยอดรวมรายเดือนแยกตามสาขาและหมวด",
+    "byCategory": "สัดส่วนค่าใช้จ่าย",
     "groupRecord": "บันทึก",
     "groupReports": "รายงาน",
     "groupConfig": "ตั้งค่า",
@@ -473,8 +474,9 @@
     "installmentCheck": "ตรวจชำระค่างวด",
     "bills": "บิล",
     "auditFlags": "ธงตรวจสอบ",
-    "dailyReports": "รายงานประจำวัน",
-    "contractsOpened": "รายงานเปิดสัญญา",
+    "dailyReports": "ประจำวัน",
+    "contractsOpened": "เปิดสัญญา",
+    "openedByModel": "เปิดสัญญาตามรุ่น",
     "financierForm": "กรอกฟอร์ม RICH",
     "notifications": "การแจ้งเตือน",
     "branchExpense": "ค่าใช้จ่ายสาขา"
@@ -541,6 +543,32 @@
     "tipDay": "วันที่",
     "tipContracts": "จำนวนสัญญา",
     "noData": "ไม่มีสัญญาที่เปิดในเดือนนี้"
+  },
+  "openedByModel": {
+    "title": "รายงานเปิดสัญญาตามรุ่น",
+    "allCompanies": "ทุกบริษัท",
+    "allBranches": "ทุกสาขา",
+    "byCount": "อันดับตามจำนวนสัญญา",
+    "byFinanced": "อันดับตามยอดจัด",
+    "financed": "ยอดจัด",
+    "down": "เงินดาวน์",
+    "sumContracts": "จำนวนสัญญา",
+    "sumFinanced": "ยอดจัดรวม",
+    "sumDown": "เงินดาวน์รวม",
+    "sumAgreed": "ราคาตกลงรวม",
+    "contractsN": "{{count}} สัญญา",
+    "downPct": "ดาวน์ {{pct}}%",
+    "noModel": "ไม่ระบุรุ่น",
+    "others": "อื่น ๆ ({{count}} รุ่น)",
+    "noData": "ไม่มีสัญญาที่เปิดในช่วงนี้"
+  },
+  "expenseByCategory": {
+    "title": "สัดส่วนค่าใช้จ่าย",
+    "allCompanies": "ทุกบริษัท",
+    "allBranches": "ทุกสาขา",
+    "total": "รวมทั้งหมด",
+    "entriesN": "{{count}} รายการ",
+    "noData": "ไม่มีค่าใช้จ่ายในเดือนนี้"
   },
   "financierForm": {
     "title": "กรอกฟอร์ม RICH",

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import {
   MobileHeader, Select, InputDateRangePicker, Button,
-  Input, Badge,
+  Input, Badge, DataTableFooter,
 } from 'tsp-form';
 import {
   ArrowRightFromLine, Keyboard, Search, X, FileSpreadsheet, ArrowRight, Loader2,
@@ -77,11 +77,18 @@ export function ReportsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [isTypingRange, setIsTypingRange] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
     return () => clearTimeout(timer);
   }, [search]);
+
+  // Any filter/date/search/report change resets to the first page.
+  useEffect(() => {
+    setPageIndex(0);
+  }, [reportKey, dateCol, fromDate, toDate, enumFilters, boolFilters, scopeFilters, debouncedSearch]);
 
   const { data: catalog = [] } = useQuery({
     queryKey: ['report-catalog'],
@@ -139,8 +146,10 @@ export function ReportsPage() {
     },
   });
 
-  // Build the PostgREST query shared by the on-screen table and the export.
-  const buildParams = (withLimit: boolean): string => {
+  // Build the PostgREST query (filters + sort) shared by the on-screen table and
+  // the export. Row window is applied separately: the table paginates via Range
+  // headers (getPaginated), the export pulls the full filtered set.
+  const buildParams = (): string => {
     if (!report) return '';
     const params: string[] = [];
     if (fromDate) params.push(`${dateCol}=gte.${fromDate}`);
@@ -154,16 +163,20 @@ export function ReportsPage() {
       params.push(`or=(${or})`);
     }
     params.push(`order=${report.date_primary}.desc`);
-    if (withLimit) params.push('limit=1000');
     return params.join('&');
   };
 
-  const tableParams = buildParams(true);
-  const { data: rows = [], isFetching } = useQuery({
-    queryKey: ['report-data', report?.api_view, tableParams],
+  const tableParams = buildParams();
+  const { data: page, isFetching } = useQuery({
+    queryKey: ['report-data', report?.api_view, tableParams, pageIndex, pageSize],
     enabled: !!report,
-    queryFn: () => apiClient.get<Record<string, unknown>[]>(`/${report!.api_view}?${tableParams}`),
+    queryFn: () => apiClient.getPaginated<Record<string, unknown>>(
+      `/${report!.api_view}?${tableParams}`,
+      { page: pageIndex + 1, pageSize },
+    ),
   });
+  const rows = page?.data ?? [];
+  const totalCount = page?.totalCount ?? 0;
 
   // Column order = view order (already the intended Excel layout). Derive from
   // the first row's keys — views return columns in DDL order.
@@ -183,7 +196,7 @@ export function ReportsPage() {
     const started = Date.now();
     try {
       // Export the full filtered set (not just the visible page) — doc §4.5.
-      const all = await apiClient.get<Record<string, unknown>[]>(`/${report.api_view}?${buildParams(false)}`);
+      const all = await apiClient.get<Record<string, unknown>[]>(`/${report.api_view}?${buildParams()}`);
       await downloadXlsx(all, exportColumns(), exportFilename());
     } finally {
       // Keep the spinner up for a minimum 0.5s so a near-instant export doesn't flicker.
@@ -410,8 +423,7 @@ export function ReportsPage() {
 
       {/* Result count */}
       <div className="flex-none flex items-center gap-2 border-b border-line px-4 py-1.5 text-xs text-subtle">
-        <span>{t('reports.rowCount', { count: rows.length })}</span>
-        {rows.length >= 1000 && <Badge color="warning" size="xs">{t('reports.cappedAt1000')}</Badge>}
+        <span>{t('reports.rowCount', { count: totalCount })}</span>
       </div>
 
       {/* Readable rows — each report renders its own entity shape. */}
@@ -428,6 +440,22 @@ export function ReportsPage() {
           </div>
         )}
       </div>
+
+      {/* Pagination — server-side via Content-Range. */}
+      {totalCount > 0 && (
+        <div className="flex-none border-t border-line px-2 py-2">
+          <DataTableFooter
+            currentPage={pageIndex}
+            totalPages={Math.max(1, Math.ceil(totalCount / pageSize))}
+            onPageChange={setPageIndex}
+            pageSize={pageSize}
+            pageSizeOptions={[25, 50, 100]}
+            onPageSizeChange={(size) => { setPageSize(size); setPageIndex(0); }}
+            totalRows={totalCount}
+            controlSize="sm"
+          />
+        </div>
+      )}
     </div>
   );
 }

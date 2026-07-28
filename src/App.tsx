@@ -104,11 +104,13 @@ import { InstallmentCheckPage } from './pages/accounting/InstallmentCheckPage';
 import { AuditFlagsPage } from './pages/accounting/AuditFlagsPage';
 import { ReportsPage } from './pages/accounting/ReportsPage';
 import { ContractsOpenedReportPage } from './pages/accounting/ContractsOpenedReportPage';
+import { OpenedByModelReportPage } from './pages/accounting/OpenedByModelReportPage';
 import { FinancierFormFeedPage } from './pages/accounting/FinancierFormFeedPage';
 import { BranchExpenseLayout } from './pages/branch-expense/BranchExpenseLayout';
 import { ExpenseEntriesPage } from './pages/branch-expense/ExpenseEntriesPage';
 import { CategoriesPage as BranchExpenseCategoriesPage } from './pages/branch-expense/CategoriesPage';
 import { ExpenseSummaryPage } from './pages/branch-expense/ExpenseSummaryPage';
+import { ExpenseByCategoryPage } from './pages/branch-expense/ExpenseByCategoryPage';
 import { RetailBillsPage } from './pages/retail/RetailBillsPage';
 import { DevLayout } from './pages/dev/DevLayout';
 import { DevSignaturePage } from './pages/dev/DevSignaturePage';
@@ -1144,6 +1146,16 @@ function App() {
         }
       />
       <Route
+        path="/admin/accounting/opened-by-model"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <AccountingLayout><OpenedByModelReportPage /></AccountingLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/admin/accounting/financier-form"
         element={
           <ProtectedRoute>
@@ -1245,6 +1257,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <BranchExpenseLayout><ExpenseSummaryPage /></BranchExpenseLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/branch-expense/by-category"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <BranchExpenseLayout><ExpenseByCategoryPage /></BranchExpenseLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

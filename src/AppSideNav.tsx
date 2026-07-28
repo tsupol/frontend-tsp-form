@@ -40,7 +40,7 @@ import {
   // Fanout child icons — Accounting
   CalendarCheck, Receipt, ShieldAlert, Banknote, FileSpreadsheet, Coins, ArrowUpRight, ListChecks,
   // Fanout child icons — Branch expense
-  Tag as TagIcon, BarChart3 as BarChartIcon, BookOpen as BookIcon,
+  Tag as TagIcon, BarChart3 as BarChartIcon, BookOpen as BookIcon, PieChart as PieChartIcon,
   // Fanout child icons — Collections
   Calendar,
   // Repo / legal
@@ -361,6 +361,7 @@ export const AppSideNav = () => {
         { key: 'branch-balance', icon: <Scale size="1rem" />, label: t('nav.branchBalance'), path: '/admin/accounting/balance' },
         ...(['BRANCH_MANAGER', 'COMPANY_ADMIN', 'COMPANY_ACCOUNTANT', 'COMPANY_INVENTORY', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
           { key: 'contracts-opened', icon: <TrendingUp size="1rem" />, label: t('nav.contractsOpened'), path: '/admin/accounting/contracts-opened' },
+          { key: 'opened-by-model', icon: <Package size="1rem" />, label: t('nav.openedByModel'), path: '/admin/accounting/opened-by-model' },
           { key: 'daily-reports', icon: <FileSpreadsheet size="1rem" />, label: t('nav.dailyReports'), path: '/admin/accounting/reports' },
           { key: 'financier-form', icon: <ClipboardList size="1rem" />, label: t('nav.financierForm'), path: '/admin/accounting/financier-form' },
         ] : []),
@@ -417,6 +418,7 @@ export const AppSideNav = () => {
         ...(['COMPANY_ADMIN', 'COMPANY_ACCOUNTANT', 'HOLDING_ADMIN', 'SYSTEM_DEV', 'BRANCH_MANAGER', 'BRANCH_STAFF'].includes(role) ? [
           { type: 'group' as const, key: 'grp-bxp-reports', label: t('branchExpense.groupReports') },
           { key: 'bxp-summary', icon: <BarChartIcon size="1rem" />, label: t('branchExpense.summary'), path: '/admin/branch-expense/summary' },
+          { key: 'bxp-by-category', icon: <PieChartIcon size="1rem" />, label: t('branchExpense.byCategory'), path: '/admin/branch-expense/by-category' },
         ] : []),
         ...(['COMPANY_ADMIN', 'COMPANY_ACCOUNTANT', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
           { type: 'group' as const, key: 'grp-bxp-config', label: t('branchExpense.groupConfig') },

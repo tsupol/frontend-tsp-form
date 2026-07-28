@@ -31,6 +31,7 @@
     "categoriesDescription": "Manage expense categories used by branches",
     "summary": "Summary",
     "summaryDescription": "Monthly rollup by branch and category",
+    "byCategory": "Expense share",
     "groupRecord": "Record",
     "groupReports": "Reports",
     "groupConfig": "Setup",
@@ -474,8 +475,9 @@
     "installmentCheck": "Installment Check",
     "bills": "Bills",
     "auditFlags": "Audit Flags",
-    "dailyReports": "Daily Reports",
-    "contractsOpened": "Contracts Opened",
+    "dailyReports": "Daily",
+    "contractsOpened": "Opened",
+    "openedByModel": "Opened by Model",
     "financierForm": "Financier Form (RICH)",
     "notifications": "Notifications",
     "branchExpense": "Branch Expense"
@@ -542,6 +544,32 @@
     "tipDay": "Day",
     "tipContracts": "Contracts",
     "noData": "No contracts opened this month"
+  },
+  "openedByModel": {
+    "title": "Contracts Opened by Model",
+    "allCompanies": "All companies",
+    "allBranches": "All branches",
+    "byCount": "Rank by count",
+    "byFinanced": "Rank by financed",
+    "financed": "Financed",
+    "down": "Down payment",
+    "sumContracts": "Contracts",
+    "sumFinanced": "Financed total",
+    "sumDown": "Down total",
+    "sumAgreed": "Agreed total",
+    "contractsN": "{{count}} contracts",
+    "downPct": "down {{pct}}%",
+    "noModel": "No model",
+    "others": "Others ({{count}} models)",
+    "noData": "No contracts opened in this range"
+  },
+  "expenseByCategory": {
+    "title": "Expense by Category",
+    "allCompanies": "All companies",
+    "allBranches": "All branches",
+    "total": "Total",
+    "entriesN": "{{count}} entries",
+    "noData": "No expenses this month"
   },
   "financierForm": {
     "title": "Financier Form (RICH)",

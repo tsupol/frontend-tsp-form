@@ -1,7 +1,7 @@
 import { useMemo, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { BookOpen, Tag, BarChart3 } from 'lucide-react';
+import { BookOpen, Tag, BarChart3, PieChart } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -26,6 +26,7 @@ export function BranchExpenseLayout({ children }: { children: ReactNode }) {
     ...(canSeeSummary ? [
       { type: 'group' as const, labelKey: 'branchExpense.groupReports' },
       { type: 'link' as const, path: '/admin/branch-expense/summary', labelKey: 'branchExpense.summary', icon: BarChart3 },
+      { type: 'link' as const, path: '/admin/branch-expense/by-category', labelKey: 'branchExpense.byCategory', icon: PieChart },
     ] : []),
     ...(canManageCategory ? [
       { type: 'group' as const, labelKey: 'branchExpense.groupConfig' },
