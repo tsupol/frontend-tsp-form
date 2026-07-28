@@ -477,6 +477,7 @@
     "dailyReports": "ประจำวัน",
     "contractsOpened": "เปิดสัญญา",
     "openedByModel": "เปิดสัญญาตามรุ่น",
+    "collectionMonthly": "เรียกเก็บ vs เก็บได้",
     "financierForm": "กรอกฟอร์ม RICH",
     "notifications": "การแจ้งเตือน",
     "branchExpense": "ค่าใช้จ่ายสาขา"
@@ -561,6 +562,23 @@
     "noModel": "ไม่ระบุรุ่น",
     "others": "อื่น ๆ ({{count}} รุ่น)",
     "noData": "ไม่มีสัญญาที่เปิดในช่วงนี้"
+  },
+  "collectionMonthly": {
+    "title": "รายงานเรียกเก็บ vs เก็บได้จริง",
+    "allCompanies": "ทุกบริษัท",
+    "allBranches": "ทุกสาขา",
+    "onTime": "เก็บตรงงวด",
+    "late": "เก็บช้า",
+    "outstanding": "ยังค้าง",
+    "sumExpected": "ยอดเรียกเก็บ",
+    "sumCollected": "เก็บได้จริง",
+    "sumLate": "เก็บช้า",
+    "lateHint": "ผลงานทีมเร่งรัดหนี้",
+    "sumOutstanding": "ยังค้าง",
+    "overallPct": "เก็บได้รวม",
+    "collectionPct": "อัตราเก็บได้",
+    "installments": "งวด (จ่าย/ครบกำหนด)",
+    "noData": "ไม่มีค่างวดที่ครบกำหนดในช่วงนี้"
   },
   "expenseByCategory": {
     "title": "สัดส่วนค่าใช้จ่าย",

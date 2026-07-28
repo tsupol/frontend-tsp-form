@@ -478,6 +478,7 @@
     "dailyReports": "Daily",
     "contractsOpened": "Opened",
     "openedByModel": "Opened by Model",
+    "collectionMonthly": "Billed vs Collected",
     "financierForm": "Financier Form (RICH)",
     "notifications": "Notifications",
     "branchExpense": "Branch Expense"
@@ -562,6 +563,23 @@
     "noModel": "No model",
     "others": "Others ({{count}} models)",
     "noData": "No contracts opened in this range"
+  },
+  "collectionMonthly": {
+    "title": "Billed vs Collected",
+    "allCompanies": "All companies",
+    "allBranches": "All branches",
+    "onTime": "On time",
+    "late": "Late",
+    "outstanding": "Outstanding",
+    "sumExpected": "Billed",
+    "sumCollected": "Collected",
+    "sumLate": "Late",
+    "lateHint": "Dunning team recovery",
+    "sumOutstanding": "Outstanding",
+    "overallPct": "Collection rate",
+    "collectionPct": "Collection rate",
+    "installments": "Installments (paid/due)",
+    "noData": "No installments due in this range"
   },
   "expenseByCategory": {
     "title": "Expense by Category",

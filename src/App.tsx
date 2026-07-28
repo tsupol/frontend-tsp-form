@@ -105,6 +105,7 @@ import { AuditFlagsPage } from './pages/accounting/AuditFlagsPage';
 import { ReportsPage } from './pages/accounting/ReportsPage';
 import { ContractsOpenedReportPage } from './pages/accounting/ContractsOpenedReportPage';
 import { OpenedByModelReportPage } from './pages/accounting/OpenedByModelReportPage';
+import { CollectionMonthlyReportPage } from './pages/accounting/CollectionMonthlyReportPage';
 import { FinancierFormFeedPage } from './pages/accounting/FinancierFormFeedPage';
 import { BranchExpenseLayout } from './pages/branch-expense/BranchExpenseLayout';
 import { ExpenseEntriesPage } from './pages/branch-expense/ExpenseEntriesPage';
@@ -1151,6 +1152,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <AccountingLayout><OpenedByModelReportPage /></AccountingLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/accounting/collection-monthly"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <AccountingLayout><CollectionMonthlyReportPage /></AccountingLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
