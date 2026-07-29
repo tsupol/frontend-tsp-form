@@ -18,6 +18,7 @@ import {
   XCircle,
   Smartphone,
   PenLine,
+  QrCode,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../lib/api';
 import { fmtCurrency } from '../lib/format';
@@ -25,6 +26,7 @@ import { DateTime } from '../components/DateTime';
 import { useAuth } from '../contexts/AuthContext';
 import { DashboardScopePicker } from '../components/DashboardScopePicker';
 import { PushSubscribeBanner } from '../components/PushSubscribeBanner';
+import { MediaLightbox } from '../components/MediaLightbox';
 import { useBranchPaymentAccounts, type BranchPaymentAccount } from '../components/BranchPaymentAccountField';
 import {
   defaultScopeFor,
@@ -666,6 +668,8 @@ function ReceivingAccount({
   noAccount: boolean;
   t: (k: string, opts?: Record<string, unknown>) => string;
 }) {
+  const [qrKey, setQrKey] = useState<string | null>(null);
+
   if (!show) return null;
 
   if (accounts.length > 0) {
@@ -673,30 +677,54 @@ function ReceivingAccount({
     const order: Record<string, number> = { STORE_FRONT: 0, INSTALLMENT: 1 };
     const sorted = [...accounts].sort((a, b) => (order[a.channel] ?? 9) - (order[b.channel] ?? 9));
     return (
-      <div className="rounded-lg border border-line bg-surface px-4 py-3 max-w-full">
-        <div className="text-xs text-subtle mb-2">{t('dashboard.receivingAccount')}</div>
-        <div className="flex divide-x divide-line">
-          {sorted.map((account) => (
-            <div key={account.channel} className="min-w-0 flex-1 px-3 first:pl-0 last:pr-0">
-              {/* line 1 — channel label + override badge */}
-              <div className="text-xs text-subtle mb-1 flex items-center gap-1.5">
-                <span className="truncate">{t(`bankChannel.channel_${account.channel}`, { defaultValue: account.channel })}</span>
-                {account.source === 'OVERRIDE' && (
-                  <Badge color="warning" size="sm">{t('dashboard.receivingAccountOverride')}</Badge>
-                )}
-              </div>
-              {/* line 2 — account number */}
-              <div className="text-fg tabular-nums tracking-widest font-semibold truncate">
-                {account.account_number_display ?? account.account_number}
-              </div>
-              {/* line 3 — bank */}
-              <div className="text-subtle text-xs truncate mt-0.5">{account.bank_name}</div>
-              {/* line 4 — account name */}
-              <div className="text-subtle text-xs truncate">{account.account_name}</div>
-            </div>
-          ))}
+      <>
+        <div className="rounded-lg border border-line bg-surface px-4 py-3 max-w-full">
+          <div className="text-xs text-subtle mb-2">{t('dashboard.receivingAccount')}</div>
+          <div className="flex divide-x divide-line">
+            {sorted.map((account) => {
+              return (
+                <div key={account.channel} className="min-w-0 flex-1 px-3 first:pl-0 last:pr-0">
+                  {/* line 1 — channel label + override badge */}
+                  <div className="text-xs text-subtle mb-1 flex items-center gap-1.5">
+                    <span className="truncate">{t(`bankChannel.channel_${account.channel}`, { defaultValue: account.channel })}</span>
+                    {account.source === 'OVERRIDE' && (
+                      <Badge color="warning" size="sm">{t('dashboard.receivingAccountOverride')}</Badge>
+                    )}
+                  </div>
+                  {/* line 2 — account/promptpay number (omitted for QR-only accounts) */}
+                  {(() => {
+                    const num = account.account_number_display ?? account.account_number ?? account.promptpay_id;
+                    return num ? (
+                      <div className="text-fg tabular-nums tracking-widest font-semibold truncate">{num}</div>
+                    ) : null;
+                  })()}
+                  {/* line 3 — bank */}
+                  <div className="text-subtle text-xs truncate mt-0.5">{account.bank_name}</div>
+                  {/* line 4 — account name */}
+                  <div className="text-subtle text-xs truncate">{account.account_name}</div>
+                  {/* line 5 — show QR button (only when a QR image exists) */}
+                  {account.qr_media && (
+                    <button
+                      type="button"
+                      onClick={() => setQrKey(account.qr_media!.paths.original)}
+                      className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-line bg-transparent px-2 py-1 text-xs text-fg cursor-pointer hover:bg-surface-hover transition-colors"
+                    >
+                      <QrCode size={14} />
+                      <span>{t('dashboard.showQr')}</span>
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
+        <MediaLightbox
+          open={!!qrKey}
+          onClose={() => setQrKey(null)}
+          mediaKey={qrKey}
+          alt={t('dashboard.receivingAccount')}
+        />
+      </>
     );
   }
 

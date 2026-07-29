@@ -234,6 +234,7 @@
     "pushBannerEnabled": "เปิดการแจ้งเตือนเรียบร้อย",
     "receivingAccount": "บัญชีรับเงินวันนี้:",
     "receivingAccountOverride": "ชั่วคราว",
+    "showQr": "QR",
     "noReceivingAccount": "สาขาของคุณยังไม่ได้ตั้งบัญชีรับโอน กรุณาตั้งบัญชีหลักก่อนรับชำระแบบโอน",
     "actionRequired": "ต้องดำเนินการ",
     "pendingTasks": "งานรอทำ",

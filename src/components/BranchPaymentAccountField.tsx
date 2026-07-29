@@ -7,6 +7,16 @@ import { apiClient } from '../lib/api';
 
 export type PaymentChannel = 'STORE_FRONT' | 'INSTALLMENT';
 
+/** Payment QR image bound to the account (public-bucket key at paths.original).
+ *  Compose the URL with publicMediaUrl (no presign). null = no QR uploaded. */
+export interface PaymentQrMedia {
+  media_id: number;
+  usage_type: string;
+  access_level: string;
+  sort_order: number;
+  paths: { original: string };
+}
+
 /** v_branch_payment_account — both channel slots for the logged-in staff's own
  *  branch (JWT-scoped). 2 rows: STORE_FRONT + INSTALLMENT. */
 export interface BranchPaymentAccount {
@@ -18,6 +28,9 @@ export interface BranchPaymentAccount {
   source: 'OVERRIDE' | 'PRIMARY';
   channel: PaymentChannel;
   channel_name_th: string;
+  is_promptpay: boolean;
+  promptpay_id: string | null;
+  qr_media: PaymentQrMedia | null;
 }
 
 export function useBranchPaymentAccounts(enabled = true) {

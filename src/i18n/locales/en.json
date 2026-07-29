@@ -235,6 +235,7 @@
     "pushBannerEnabled": "Push notifications enabled.",
     "receivingAccount": "Today's receiving account:",
     "receivingAccountOverride": "Temporary",
+    "showQr": "QR",
     "noReceivingAccount": "No receiving account is set for your branch. Set a default bank account before taking transfers.",
     "actionRequired": "Action required",
     "pendingTasks": "Pending tasks",
