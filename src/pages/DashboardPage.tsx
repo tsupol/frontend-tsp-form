@@ -678,7 +678,7 @@ function ReceivingAccount({
     const sorted = [...accounts].sort((a, b) => (order[a.channel] ?? 9) - (order[b.channel] ?? 9));
     return (
       <>
-        <div className="rounded-lg border border-line bg-surface px-4 py-3 max-w-full">
+        <div className="rounded-lg bg-surface px-4 py-3 max-w-full">
           <div className="text-xs text-subtle mb-2">{t('dashboard.receivingAccount')}</div>
           <div className="flex divide-x divide-line">
             {sorted.map((account) => {
