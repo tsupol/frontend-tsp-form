@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Modal, Button, Input, Select } from 'tsp-form';
-import { XCircle, Link2, CheckCircle2, Link as LinkIcon } from 'lucide-react';
+import { XCircle, Link2, CheckCircle2, Link as LinkIcon, Search } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { parseLocalDate } from '../../lib/format';
@@ -64,6 +64,7 @@ export function SetFormUrlModal({
   const [saving, setSaving] = useState(false);
   const [savedMonth, setSavedMonth] = useState<string | null>(null); // inline success flag
   const [confirmClose, setConfirmClose] = useState(false);
+  const [filter, setFilter] = useState(''); // registered-forms search (month / company)
 
   const formsQuery = useQuery({
     queryKey: ['financier-forms'],
@@ -88,6 +89,19 @@ export function SetFormUrlModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [forms, i18n.language]);
 
+  // Filter the registered list by month label or company name (case-insensitive).
+  // Holding admins see every company × month, so this keeps a long list navigable.
+  const filteredForms = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    if (!q) return forms;
+    return forms.filter(f =>
+      monthLabel(f.form_month).toLowerCase().includes(q)
+      || f.company_name.toLowerCase().includes(q)
+      || f.form_month.includes(q),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forms, filter, i18n.language]);
+
   // Seed the form on open: preselected month if given, else this month.
   useEffect(() => {
     if (open) {
@@ -97,6 +111,7 @@ export function SetFormUrlModal({
       setSaving(false);
       setSavedMonth(null);
       setConfirmClose(false);
+      setFilter('');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, preselectMonth]);
@@ -136,14 +151,33 @@ export function SetFormUrlModal({
         <div className="modal-content">
           {/* Registered forms — one row per month, newest first. */}
           <div className="mb-5">
-            <div className="text-xs font-medium text-subtle mb-2">{t('financierForm.registeredForms')}</div>
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <div className="text-xs font-medium text-subtle">{t('financierForm.registeredForms')}</div>
+              {/* Filter — only worth showing once the list is long enough to hunt in. */}
+              {forms.length > 4 && (
+                <div className="w-48">
+                  <Input
+                    className="w-full"
+                    size="sm"
+                    value={filter}
+                    onChange={(e) => setFilter(e.target.value)}
+                    placeholder={t('financierForm.filterForms')}
+                    startIcon={<Search size={14} />}
+                  />
+                </div>
+              )}
+            </div>
             {formsQuery.isLoading ? (
               <div className="text-sm text-subtle py-3">{t('common.loading')}</div>
             ) : forms.length === 0 ? (
               <div className="text-sm text-subtler py-3">{t('financierForm.noFormsYet')}</div>
+            ) : filteredForms.length === 0 ? (
+              <div className="text-sm text-subtler py-3">{t('financierForm.noFormsMatch')}</div>
             ) : (
-              <div className="border border-line rounded-md divide-y divide-line">
-                {forms.map(f => (
+              // Capped height + own scroll so a long list never pushes the month
+              // picker / URL field out of reach.
+              <div className="border border-line rounded-md divide-y divide-line max-h-64 overflow-y-auto better-scroll">
+                {filteredForms.map(f => (
                   <div key={`${f.company_id}-${f.form_month}`} className="flex items-center gap-3 px-3 py-2">
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium">{monthLabel(f.form_month)}</div>

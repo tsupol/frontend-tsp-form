@@ -661,7 +661,9 @@
     "unverifiedHint": "A \"not checked\" form still works — if a field comes up blank after opening, let an admin know.",
     "changeUrl": "Change URL",
     "month": "Month",
-    "setUrlSavedFor": "Form URL saved for {{month}}."
+    "setUrlSavedFor": "Form URL saved for {{month}}.",
+    "filterForms": "Search month / company",
+    "noFormsMatch": "No forms match your search."
   },
   "reports": {
     "title": "Daily Reports",

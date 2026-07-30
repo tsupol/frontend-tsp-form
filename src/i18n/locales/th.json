@@ -660,7 +660,9 @@
     "unverifiedHint": "ฟอร์ม \"ยังไม่ตรวจ\" ใช้งานได้ตามปกติ — ถ้าเปิดแล้วมีช่องว่าง แจ้ง admin",
     "changeUrl": "เปลี่ยน URL",
     "month": "เดือน",
-    "setUrlSavedFor": "บันทึก URL ฟอร์มของ {{month}} แล้ว"
+    "setUrlSavedFor": "บันทึก URL ฟอร์มของ {{month}} แล้ว",
+    "filterForms": "ค้นหาเดือน / บริษัท",
+    "noFormsMatch": "ไม่พบฟอร์มที่ตรงกับการค้นหา"
   },
   "reports": {
     "title": "รายงานประจำวัน",
