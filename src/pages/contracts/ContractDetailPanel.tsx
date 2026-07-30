@@ -24,6 +24,7 @@ import { ContractActionButtons } from './ContractActions';
 import { WalletsTab } from './wallet/WalletsTab';
 import { DeviceTab } from './DeviceTab';
 import { SigningTab } from './SigningTab';
+import { ContractNotifyTab } from './ContractNotifyTab';
 import { AppointmentsSection } from './AppointmentsSection';
 import { CommissionOwnerModal } from './CommissionOwnerModal';
 import { BillReceipt } from './workspace/BillReceipt';
@@ -221,9 +222,9 @@ interface EntityMedia {
 
 // ── Tabs ─────────────────────────────────────────────────────────────────────
 
-type DetailTab = 'overview' | 'money' | 'device' | 'customers' | 'signing' | 'notes';
+type DetailTab = 'overview' | 'money' | 'device' | 'customers' | 'signing' | 'notify' | 'notes';
 
-const TABS: DetailTab[] = ['overview', 'money', 'device', 'customers', 'signing', 'notes'];
+const TABS: DetailTab[] = ['overview', 'money', 'device', 'customers', 'signing', 'notify', 'notes'];
 
 type MoneySection = 'installments' | 'txns' | 'wallets' | 'bills';
 
@@ -471,6 +472,7 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
             onGoToSigning={() => handleTabChange('signing')}
           />
         )}
+        {activeTab === 'notify' && <ContractNotifyTab contractId={contractId} />}
         {activeTab === 'notes' && <NotesTab contractId={contractId} t={t} dirtyRef={notesDirtyRef} />}
         {activeTab === 'device' && (
           <DeviceTab contract={contract} onRequestAction={setRequestedAction} />
