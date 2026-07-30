@@ -47,8 +47,8 @@ import {
   Gavel, ShieldCheck,
   // Chat
   MessageSquare,
-  // NNF App console
-  Smartphone,
+  // NNF Extra (NNF App console + NNF MDM)
+  Smartphone, Sparkles, MonitorSmartphone,
   // Dev sandbox
   FlaskConical, PenLine, Image as ImageIcon, Bell,
   // Signatories (v2)
@@ -270,11 +270,18 @@ export const AppSideNav = () => {
           path: '/admin/chat',
         }]
       : []),
+    // NNF Extra — labels are NNF brand names, intentionally English in every
+    // language (owner: the name signals "NNF designed this"). Content inside
+    // the screens is Thai as normal. Visible wherever NNF App was visible.
     {
-      key: 'nnf-app',
-      icon: <Smartphone size="1rem" />,
-      label: t('nav.nnfApp'),
+      key: 'nnf-extra',
+      icon: <Sparkles size="1rem" />,
+      label: t('nav.nnfExtra'),
       path: '/admin/nnf-app',
+      children: [
+        { key: 'nnf-app', icon: <Smartphone size="1rem" />, label: t('nav.nnfApp'), path: '/admin/nnf-app' },
+        { key: 'nnf-mdm', icon: <MonitorSmartphone size="1rem" />, label: t('nav.nnfMdm'), path: '/admin/nnf-mdm' },
+      ],
     },
     ...(canApprove
       ? [{

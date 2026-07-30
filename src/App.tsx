@@ -46,6 +46,7 @@ import { StaffCommissionPage } from './pages/commission/StaffCommissionPage';
 import { ApprovalsPage } from './pages/approvals/ApprovalsPage';
 import { ChatPage } from './pages/chat/ChatPage';
 import { NnfAppPage } from './pages/nnf-app/NnfAppPage';
+import { NnfMdmPage } from './pages/nnf-mdm/NnfMdmPage';
 import { PaymentSubmissionsPage } from './pages/PaymentSubmissionsPage';
 import { ContractsLayout } from './pages/contracts/ContractsLayout';
 import { ContractSearchPage } from './pages/contracts/ContractSearchPage';
@@ -818,13 +819,25 @@ function App() {
         }
       />
 
-      {/* NNF App — customer app-access console */}
+      {/* NNF Extra > NNF App — customer app-access console */}
       <Route
         path="/admin/nnf-app"
         element={
           <ProtectedRoute>
             <AdminLayout>
               <NnfAppPage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* NNF Extra > NNF MDM — MDM device anomaly report */}
+      <Route
+        path="/admin/nnf-mdm"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <NnfMdmPage />
             </AdminLayout>
           </ProtectedRoute>
         }
