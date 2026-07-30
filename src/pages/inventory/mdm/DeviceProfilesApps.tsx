@@ -18,7 +18,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from 'tsp-form';
 import {
   ChevronRight, RefreshCw, Lock, ShieldCheck, KeyRound, Loader2, FileText,
-  Smartphone, Signal, Copy, Check,
+  Smartphone, Signal, Copy, Check, CardSim as SimCardIcon,
 } from 'lucide-react';
 import { RelativeDateTime } from './RelativeDateTime';
 import { AppIcon, MdmErrorAlert } from './MdmSharedBits';
@@ -38,6 +38,19 @@ function newestObserved(rows: { observed_at?: string | null; last_observed_at?: 
   let max: string | null = null;
   for (const r of rows) {
     const v = r.observed_at ?? r.last_observed_at ?? null;
+    if (v && (max === null || v > max)) max = v;
+  }
+  return max;
+}
+
+/** newest last_confirmed_at across the cellular rows (ISO string), or null.
+ *  This is the freshness clock — it advances every day the device reports, so
+ *  it drives both the "data as of …" line and the pull-poll. Falls back to
+ *  observed_at only for legacy rows the backfill missed. */
+function newestConfirmed(rows: MdmAssetCellular[]): string | null {
+  let max: string | null = null;
+  for (const r of rows) {
+    const v = r.last_confirmed_at ?? r.observed_at ?? null;
     if (v && (max === null || v > max)) max = v;
   }
   return max;
@@ -138,7 +151,10 @@ function CellularSection({ assetId, actorId, onNotEnrolled }: {
     ...MDM_NO_CACHE,
   });
 
-  const observedAt = q.data ? newestObserved(q.data) : null;
+  // Freshness = last_confirmed_at (moves on every device report), NOT observed_at
+  // (moves only when the SIM set changes). A device on the same SIM for 6 months
+  // would otherwise read "data from 6 months ago" while it reported this morning.
+  const observedAt = q.data ? newestConfirmed(q.data) : null;
   const cmd = useMdmCommand({ onNotEnrolled });
   const pulling = usePullPoll({ enabled: open, observedAt, refetch: () => qc.invalidateQueries({ queryKey }) });
 
@@ -189,6 +205,10 @@ function SimCard({ sim }: { sim: MdmAssetCellular }) {
   const { t } = useTranslation();
   const Icon = sim.sim_kind === 'ESIM' ? Signal : Smartphone;
   const hasSim = sim.phone_number != null || sim.carrier_network != null;
+  // SIM removed: the DB keeps the last-known number so the collections team still
+  // has a contact — we surface it as before, just flagged as no longer current.
+  // Never suppress the number (BE 2026-07-29).
+  const removed = sim.sim_removed === true && hasSim;
   return (
     <div className="border border-line rounded-md p-3 flex flex-col gap-1.5">
       <div className="flex items-center gap-1.5 text-sm font-medium">
@@ -212,6 +232,26 @@ function SimCard({ sim }: { sim: MdmAssetCellular }) {
           <span className="font-mono text-xs truncate" title={sim.iccid}>{sim.iccid}</span>
           <CopyButton value={sim.iccid} label={t('asset.mdm.cellular.copyIccid')} />
         </Row>
+      )}
+
+      {/* "using this SIM since" — observed_at is stable, so it tells us whether the
+          customer just swapped SIM/number. Only meaningful when a SIM is present. */}
+      {hasSim && sim.observed_at && (
+        <div className="text-[11px] text-subtler">
+          {t('asset.mdm.cellular.simSince')} <RelativeDateTime value={sim.observed_at} />
+        </div>
+      )}
+
+      {/* SIM removed — the number above is the last one seen before removal. */}
+      {removed && (
+        <div className="flex items-start gap-1.5 text-xs text-warning-fg bg-warning-soft border border-warning-border rounded-md px-2 py-1.5">
+          <SimCardIcon size={13} className="mt-px shrink-0" />
+          <span>
+            {sim.sim_removed_at
+              ? <>{t('asset.mdm.cellular.simRemovedSince')} <RelativeDateTime value={sim.sim_removed_at} /></>
+              : t('asset.mdm.cellular.simRemoved')}
+          </span>
+        </div>
       )}
     </div>
   );

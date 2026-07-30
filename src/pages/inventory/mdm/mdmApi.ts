@@ -295,6 +295,17 @@ export function fetchDeviceApps(assetId: number): Promise<MdmDeviceApp[]> {
 // phone_number/carrier_network are null when no active SIM — a real answer, show
 // "no active SIM", never blank. Pulled by fn_mdm_query_device_info (same command
 // that refreshes device info).
+//
+// Two DIFFERENT timestamps — never swap them (BE 2026-07-29):
+//   observed_at       = when THIS sim/number set was first seen. Stays put until
+//                       the customer actually changes SIM. "using this SIM since…"
+//   last_confirmed_at = when the device last re-confirmed this data. Advances every
+//                       day the device reports, even when nothing changed. This is
+//                       the freshness signal — the "data as of …" line uses it, and
+//                       the pull-poll watches it (it moves on every device report).
+// SIM removal keeps the last number/iccid/carrier (mig 926) and flags it instead:
+//   sim_removed=true → the shown number is the LAST one before removal. NEVER hide
+//   it — it's the contact number the collections team calls. sim_removed_at = when.
 export type SimKind = 'PHYSICAL' | 'ESIM';
 export interface MdmAssetCellular {
   asset_id: number;
@@ -308,7 +319,10 @@ export interface MdmAssetCellular {
   eid: string | null;
   is_data_preferred: boolean | null;
   is_voice_preferred: boolean | null;
-  observed_at: string | null;
+  observed_at: string | null;         // this SIM set first seen (stable)
+  last_confirmed_at: string | null;   // device last re-confirmed this data (fresh)
+  sim_removed: boolean | null;        // SIM physically removed; number kept as last-known
+  sim_removed_at: string | null;      // when removal was first observed
 }
 export function fetchAssetCellular(assetId: number): Promise<MdmAssetCellular[]> {
   return apiClient.get<MdmAssetCellular[]>(
