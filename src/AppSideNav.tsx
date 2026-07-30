@@ -277,10 +277,10 @@ export const AppSideNav = () => {
       key: 'nnf-extra',
       icon: <Sparkles size="1rem" />,
       label: t('nav.nnfExtra'),
-      path: '/admin/nnf-app',
+      path: '/admin/nnf-extra/app',
       children: [
-        { key: 'nnf-app', icon: <Smartphone size="1rem" />, label: t('nav.nnfApp'), path: '/admin/nnf-app' },
-        { key: 'nnf-mdm', icon: <MonitorSmartphone size="1rem" />, label: t('nav.nnfMdm'), path: '/admin/nnf-mdm' },
+        { key: 'nnf-app', icon: <Smartphone size="1rem" />, label: t('nav.nnfApp'), path: '/admin/nnf-extra/app' },
+        { key: 'nnf-mdm', icon: <MonitorSmartphone size="1rem" />, label: t('nav.nnfMdm'), path: '/admin/nnf-extra/mdm' },
       ],
     },
     ...(canApprove

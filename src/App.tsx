@@ -47,6 +47,7 @@ import { ApprovalsPage } from './pages/approvals/ApprovalsPage';
 import { ChatPage } from './pages/chat/ChatPage';
 import { NnfAppPage } from './pages/nnf-app/NnfAppPage';
 import { NnfMdmPage } from './pages/nnf-mdm/NnfMdmPage';
+import { NnfExtraLayout } from './pages/nnf-extra/NnfExtraLayout';
 import { PaymentSubmissionsPage } from './pages/PaymentSubmissionsPage';
 import { ContractsLayout } from './pages/contracts/ContractsLayout';
 import { ContractSearchPage } from './pages/contracts/ContractSearchPage';
@@ -819,29 +820,30 @@ function App() {
         }
       />
 
-      {/* NNF Extra > NNF App — customer app-access console */}
+      {/* NNF Extra — NNF App (customer app-access console) + NNF MDM (device
+          anomaly report) */}
       <Route
-        path="/admin/nnf-app"
+        path="/admin/nnf-extra/app"
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <NnfAppPage />
+              <NnfExtraLayout><NnfAppPage /></NnfExtraLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
       />
-
-      {/* NNF Extra > NNF MDM — MDM device anomaly report */}
       <Route
-        path="/admin/nnf-mdm"
+        path="/admin/nnf-extra/mdm"
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <NnfMdmPage />
+              <NnfExtraLayout><NnfMdmPage /></NnfExtraLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
       />
+      {/* Legacy path — NNF App lived at /admin/nnf-app before the NNF Extra group */}
+      <Route path="/admin/nnf-app" element={<Navigate to="/admin/nnf-extra/app" replace />} />
 
       {/* Legal (legacy paths — the old legal-case model was dropped BE-side
           (migs 845/846); legal work now lives in the Repo/Legal section) */}
