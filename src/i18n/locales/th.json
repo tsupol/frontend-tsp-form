@@ -431,7 +431,9 @@
     "approvals": "อนุมัติ",
     "paymentSubmissions": "ตรวจสลิป",
     "chat": "แชท",
-    "nnfApp": "แอป NNF",
+    "nnfExtra": "NNF Extra",
+    "nnfApp": "NNF App",
+    "nnfMdm": "NNF MDM",
     "legal": "กฎหมาย",
     "dunningTargets": "ทวงถาม",
     "legalCases": "คดี",
@@ -648,7 +650,17 @@
       "charger_qty": "หัวชาร์จ",
       "cable_qty": "สายชาร์จ",
       "total_price": "รวม"
-    }
+    },
+    "manageTitle": "จัดการฟอร์มนายทุน",
+    "manageButton": "จัดการฟอร์ม",
+    "registeredForms": "ฟอร์มที่ลงทะเบียนแล้ว",
+    "noFormsYet": "ยังไม่มีฟอร์มที่ลงทะเบียน",
+    "verified": "ตรวจแล้ว",
+    "unverified": "ยังไม่ตรวจ",
+    "unverifiedHint": "ฟอร์ม \"ยังไม่ตรวจ\" ใช้งานได้ตามปกติ — ถ้าเปิดแล้วมีช่องว่าง แจ้ง admin",
+    "changeUrl": "เปลี่ยน URL",
+    "month": "เดือน",
+    "setUrlSavedFor": "บันทึก URL ฟอร์มของ {{month}} แล้ว"
   },
   "reports": {
     "title": "รายงานประจำวัน",
@@ -2377,7 +2389,10 @@
         "title": "IMEI และซิมการ์ด",
         "neverPulled": "ยังไม่เคยดึงข้อมูลจากเครื่อง",
         "dualImeiNote": "เครื่องที่รองรับ 2 ซิมจะมี IMEI 2 เลข ถือว่าปกติ",
-        "kind": { "PHYSICAL": "ซิมจริง", "ESIM": "eSIM" },
+        "kind": {
+          "PHYSICAL": "ซิมจริง",
+          "ESIM": "eSIM"
+        },
         "phone": "เบอร์โทร",
         "carrier": "ค่าย",
         "iccid": "เลขซิม (ICCID)",
@@ -2385,7 +2400,10 @@
         "voice": "ใช้โทร",
         "data": "ใช้เน็ต",
         "copyImei": "คัดลอก IMEI",
-        "copyIccid": "คัดลอก ICCID"
+        "copyIccid": "คัดลอก ICCID",
+        "simSince": "ใช้ซิมนี้ตั้งแต่",
+        "simRemoved": "ซิมถูกถอดออก — เก็บเบอร์ล่าสุดไว้",
+        "simRemovedSince": "ซิมถูกถอดออกตั้งแต่"
       },
       "devInfo": {
         "profiles": "โปรไฟล์บนเครื่อง",
@@ -4596,7 +4614,8 @@
     "attachSlip_needSlip": "กรุณาอัปโหลดรูปสลิป",
     "attachSlip_needAmount": "กรุณาระบุยอดเงิน",
     "attachSlip_submissionId": "หมายเลขรายการ",
-    "attachSlip_viewQueue": "ไปที่คิวตรวจสลิป"
+    "attachSlip_viewQueue": "ไปที่คิวตรวจสลิป",
+    "tab_notify": "แจ้งเตือน"
   },
   "wizard": {
     "barcodeNotFound": "ไม่พบบาร์โค้ด {{barcode}} ในระบบ",
@@ -6320,6 +6339,31 @@
       "telDirtyWarning": "เบอร์ในระบบ ({{tel}}) ไม่สะอาด — ควรไปแก้ให้ถูกต้องเพื่อไม่ให้เกิดซ้ำ"
     }
   },
+  "nnfMdm": {
+    "title": "NNF MDM",
+    "noNotifyNote": "หน้านี้ไม่ส่งการแจ้งเตือน — ระบบให้ข้อเท็จจริง การตัดสินเป็นของคนอ่าน",
+    "loadedAt": "ข้อมูล ณ",
+    "refresh": "รีเฟรช",
+    "tabAnomaly": "ผิดปกติ",
+    "tabSilent": "เครื่องในมือเราที่เงียบ",
+    "silentTabHint": "ข้อมูลประกอบ — เครื่องซ่อม/สต๊อกเงียบเป็นเรื่องปกติ ไม่ใช่ความผิดปกติ",
+    "code": {
+      "SIM_REMOVED": "ซิมถูกถอด",
+      "SILENT": "เงียบ",
+      "NO_SIM_EVER": "ไม่เคยมีซิมใช้งาน"
+    },
+    "codeSilentDays": "เงียบ {{n}} วัน",
+    "overdueDays": "ค้าง {{n}} วัน",
+    "notOverdue": "ไม่ค้าง",
+    "lastPhone": "เบอร์ล่าสุด",
+    "removedAt": "ถอดเมื่อ",
+    "lastSeen": "เห็นล่าสุด",
+    "silentFor": "เงียบมา {{n}} วัน",
+    "anomalyEmpty": "ไม่มีเครื่องผิดปกติ",
+    "anomalyEmptyHint": "เครื่องทุกตัวติดต่อเข้ามาและมีซิมใช้งานตามปกติ",
+    "silentEmpty": "ไม่มีเครื่องในมือเราที่เงียบ",
+    "silentEmptyHint": "เครื่องในสต๊อก/ซ่อมทุกตัวติดต่อเข้ามาตามปกติ"
+  },
   "chat": {
     "title": "แชท",
     "searchPlaceholder": "ค้นหาลูกค้า / เลขสัญญา",
@@ -6505,5 +6549,29 @@
     "nothing_to_refund": "ไม่มียอดต้องคืน",
     "already_completed": "กดซ่อมเสร็จไปแล้ว",
     "not_completed_yet": "ยังไม่ได้กดซ่อมเสร็จ"
+  },
+  "notify": {
+    "empty": "ยังไม่มีการแจ้งเตือนสำหรับสัญญานี้",
+    "showMessage": "ดูข้อความที่ส่ง",
+    "cycle": "งวด {{date}}",
+    "dueSoon": "ก่อนครบกำหนด {{count}} วัน",
+    "overdue": "ค้าง {{count}} วัน",
+    "status": {
+      "ACKED_PAY": "ลูกค้ากดจะชำระ",
+      "ACKED": "ลูกค้ากดรับทราบ",
+      "OPENED": "ลูกค้าแตะเข้ามาดู",
+      "READ": "ลูกค้าเปิดอ่านแล้ว",
+      "ACCEPTED": "ส่งเข้าแอปแล้ว",
+      "NO_APP": "ลูกค้าไม่มีแอป — ไม่ได้ส่ง",
+      "FAILED": "ส่งไม่สำเร็จ",
+      "UNKNOWN": "ไม่ทราบผล"
+    },
+    "event": {
+      "payment_due_soon_customer": "ใกล้ถึงกำหนดชำระ",
+      "payment_overdue_customer": "เลยกำหนดชำระ",
+      "promise_today": "นัดชำระวันนี้",
+      "promise_tomorrow_customer": "นัดชำระพรุ่งนี้",
+      "promise_missed_customer": "ผิดนัดชำระ"
+    }
   }
 }

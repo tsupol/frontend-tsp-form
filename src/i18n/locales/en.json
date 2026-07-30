@@ -432,7 +432,9 @@
     "approvals": "Approvals",
     "paymentSubmissions": "Slips to Review",
     "chat": "Chat",
+    "nnfExtra": "NNF Extra",
     "nnfApp": "NNF App",
+    "nnfMdm": "NNF MDM",
     "legal": "Legal",
     "dunningTargets": "Dunning Targets",
     "legalCases": "Cases",
@@ -649,7 +651,17 @@
       "charger_qty": "Chargers",
       "cable_qty": "Cables",
       "total_price": "Total"
-    }
+    },
+    "manageTitle": "Manage financier forms",
+    "manageButton": "Manage forms",
+    "registeredForms": "Registered forms",
+    "noFormsYet": "No forms registered yet.",
+    "verified": "Verified",
+    "unverified": "Not checked",
+    "unverifiedHint": "A \"not checked\" form still works — if a field comes up blank after opening, let an admin know.",
+    "changeUrl": "Change URL",
+    "month": "Month",
+    "setUrlSavedFor": "Form URL saved for {{month}}."
   },
   "reports": {
     "title": "Daily Reports",
@@ -2380,7 +2392,10 @@
         "title": "IMEI & SIM",
         "neverPulled": "Device info hasn't been pulled yet.",
         "dualImeiNote": "Dual-SIM devices have two IMEIs — this is normal.",
-        "kind": { "PHYSICAL": "Physical SIM", "ESIM": "eSIM" },
+        "kind": {
+          "PHYSICAL": "Physical SIM",
+          "ESIM": "eSIM"
+        },
         "phone": "Phone",
         "carrier": "Carrier",
         "iccid": "SIM (ICCID)",
@@ -2388,7 +2403,10 @@
         "voice": "Voice",
         "data": "Data",
         "copyImei": "Copy IMEI",
-        "copyIccid": "Copy ICCID"
+        "copyIccid": "Copy ICCID",
+        "simSince": "Using this SIM since",
+        "simRemoved": "SIM removed — last number kept",
+        "simRemovedSince": "SIM removed since"
       },
       "devInfo": {
         "profiles": "Configuration profiles",
@@ -4601,7 +4619,8 @@
     "attachSlip_needSlip": "Please upload a slip image",
     "attachSlip_needAmount": "Please enter the amount",
     "attachSlip_submissionId": "Submission #",
-    "attachSlip_viewQueue": "Open review queue"
+    "attachSlip_viewQueue": "Open review queue",
+    "tab_notify": "Notifications"
   },
   "wizard": {
     "barcodeNotFound": "Barcode {{barcode}} not registered",
@@ -6327,6 +6346,31 @@
       "telDirtyWarning": "The phone number on file ({{tel}}) isn't clean — fix it so this doesn't recur."
     }
   },
+  "nnfMdm": {
+    "title": "NNF MDM",
+    "noNotifyNote": "This page sends no notifications — the system gives you the facts; the judgment is yours.",
+    "loadedAt": "Data as of",
+    "refresh": "Refresh",
+    "tabAnomaly": "Anomalies",
+    "tabSilent": "Silent devices in our custody",
+    "silentTabHint": "Context data — devices in stock or repair being silent is normal, not an anomaly.",
+    "code": {
+      "SIM_REMOVED": "SIM removed",
+      "SILENT": "Silent",
+      "NO_SIM_EVER": "No active SIM ever"
+    },
+    "codeSilentDays": "Silent {{n}} days",
+    "overdueDays": "Overdue {{n}} days",
+    "notOverdue": "Not overdue",
+    "lastPhone": "Last phone",
+    "removedAt": "removed",
+    "lastSeen": "Last seen",
+    "silentFor": "Silent for {{n}} days",
+    "anomalyEmpty": "No anomalous devices",
+    "anomalyEmptyHint": "Every device is reporting in and has an active SIM.",
+    "silentEmpty": "No silent devices in our custody",
+    "silentEmptyHint": "Every device in stock or repair is reporting in normally."
+  },
   "chat": {
     "title": "Chat",
     "searchPlaceholder": "Search customer or contract",
@@ -6512,5 +6556,31 @@
     "nothing_to_refund": "There is nothing to refund.",
     "already_completed": "Already marked completed.",
     "not_completed_yet": "Not marked completed yet."
+  },
+  "notify": {
+    "empty": "No notifications have been sent for this contract yet.",
+    "showMessage": "Show sent message",
+    "cycle": "Cycle {{date}}",
+    "dueSoon": "{{count}} day before due",
+    "dueSoon_other": "{{count}} days before due",
+    "overdue": "{{count}} day overdue",
+    "overdue_other": "{{count}} days overdue",
+    "status": {
+      "ACKED_PAY": "Customer tapped will-pay",
+      "ACKED": "Customer acknowledged",
+      "OPENED": "Customer tapped in",
+      "READ": "Customer read it",
+      "ACCEPTED": "Sent to the app",
+      "NO_APP": "Customer has no app — not sent",
+      "FAILED": "Failed to send",
+      "UNKNOWN": "Result unknown"
+    },
+    "event": {
+      "payment_due_soon_customer": "Payment due soon",
+      "payment_overdue_customer": "Payment overdue",
+      "promise_today": "Promise to pay today",
+      "promise_tomorrow_customer": "Promise to pay tomorrow",
+      "promise_missed_customer": "Promise missed"
+    }
   }
 }
