@@ -2629,7 +2629,8 @@
             "desc": "the system won't make it worse, but paying always still unlocks"
           }
         }
-      }
+      },
+      "refreshAll": "Refresh all"
     },
     "icloud_appleOnly": "iCloud applies to Apple devices only.",
     "icloud_account": "iCloud account",

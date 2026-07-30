@@ -109,16 +109,18 @@ export function AssetMdmTab({ assetId, onRefresh }: { assetId: number; onRefresh
       )}
 
       <div className="flex-1 min-h-0 overflow-auto better-scroll p-4 flex flex-col gap-3">
-        {/* Manual refresh — this data goes stale silently (§0.25). */}
+        {/* Manual refresh — this data goes stale silently (§0.25). Labelled
+            "all" so it reads distinctly from the per-section [pull] buttons,
+            which fetch fresh data from the device rather than reloading. */}
         <div className="flex-none flex items-center justify-end -mb-1">
           <Button
             variant="ghost"
             size="sm"
-            className="btn-icon-sm"
             startIcon={<RefreshCw size={14} className={isFetching ? 'animate-spin' : ''} />}
             onClick={refreshAll}
-            aria-label={t('common.refresh')}
-          />
+          >
+            {t('asset.mdm.refreshAll')}
+          </Button>
         </div>
 
         {/* Pause bar — visible on every action sub-tab (not on enroll/pause). */}
