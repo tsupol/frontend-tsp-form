@@ -6,7 +6,7 @@ import {
 } from 'tsp-form';
 import {
   ArrowRightFromLine, Keyboard, RefreshCw, ExternalLink, CheckCircle2,
-  FileSpreadsheet, Clock, AlertTriangle, Inbox, Loader2, ChevronRight,
+  FileSpreadsheet, Clock, AlertTriangle, Inbox, Loader2, ChevronRight, Settings,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { ApiError } from '../../lib/api';
@@ -87,8 +87,15 @@ export function FinancierFormFeedPage() {
   const [busyRowId, setBusyRowId] = useState<number | null>(null);
   // Rows whose Google tab was opened then closed — show an inline "sent?" nudge.
   const [nudgeRowIds, setNudgeRowIds] = useState<Set<number>>(new Set());
-  const [setUrlMonth, setSetUrlMonth] = useState<string | null>(null);
+  // Manage-forms modal: open flag + optional month to preselect (banner / missing-form).
+  const [manageOpen, setManageOpen] = useState(false);
+  const [preselectMonth, setPreselectMonth] = useState<string | null>(null);
   const didAutoGen = useRef(false);
+
+  const openManage = useCallback((month?: string) => {
+    setPreselectMonth(month ? monthStart(month) : null);
+    setManageOpen(true);
+  }, []);
 
   const feedQueryKey = ['financier-feed', fromDate, toDate];
 
@@ -188,12 +195,12 @@ export function FinancierFormFeedPage() {
         }
       }, 800);
     } catch (err) {
-      // FORM_URL_MISSING → push the user toward registering the month's form.
+      // FORM_URL_MISSING → open the manage modal, preselecting the row's month.
       if (err instanceof ApiError && err.code === 'ETL.FINANCIER.FORM_URL_MISSING') {
-        setSetUrlMonth(row.form_month);
+        openManage(row.form_month);
       }
     }
-  }, [runRowRpc]);
+  }, [runRowRpc, openManage]);
 
   const clearNudge = (id: number) => setNudgeRowIds(prev => {
     const next = new Set(prev);
@@ -256,6 +263,19 @@ export function FinancierFormFeedPage() {
     </Button>
   );
 
+  // Permanent management entry — always available (wrong link / financier swaps
+  // mid-month / register next month ahead), not just when a form is missing.
+  const manageBtn = (
+    <Button
+      variant="outline"
+      size="sm"
+      startIcon={<Settings size={16} />}
+      onClick={() => openManage()}
+    >
+      {t('financierForm.manageButton')}
+    </Button>
+  );
+
   const branchTitle = user?.branch_name
     ? t('financierForm.titleBranch', { branch: user.branch_name })
     : t('financierForm.title');
@@ -281,12 +301,14 @@ export function FinancierFormFeedPage() {
         <h1 className="heading-2 whitespace-nowrap">{branchTitle}</h1>
         <div style={{ width: '19rem' }}>{dateRangePicker}</div>
         {fetchBtn}
+        <div className="ml-auto">{manageBtn}</div>
       </div>
 
       {/* Mobile controls */}
       <div className="flex-none p-2 border-b border-line flex items-center gap-2 md:hidden">
         <div className="flex-1 min-w-0">{dateRangePicker}</div>
         {fetchBtn}
+        {manageBtn}
       </div>
 
       <div className={`flex-1 min-h-0 overflow-auto better-scroll ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
@@ -304,7 +326,7 @@ export function FinancierFormFeedPage() {
               <span className="flex-1">
                 {t('financierForm.noFormBanner', { month: monthLabel(unregisteredMonth) })}
               </span>
-              <Button size="sm" variant="outline" onClick={() => setSetUrlMonth(unregisteredMonth)}>
+              <Button size="sm" variant="outline" onClick={() => openManage(unregisteredMonth)}>
                 {t('financierForm.setUrlButton')}
               </Button>
             </div>
@@ -344,10 +366,9 @@ export function FinancierFormFeedPage() {
       </div>
 
       <SetFormUrlModal
-        open={setUrlMonth !== null}
-        month={setUrlMonth ? monthStart(setUrlMonth) : todayIso()}
-        monthLabel={setUrlMonth ? monthLabel(setUrlMonth) : ''}
-        onClose={() => setSetUrlMonth(null)}
+        open={manageOpen}
+        preselectMonth={preselectMonth}
+        onClose={() => setManageOpen(false)}
         onSaved={() => { refetch(); }}
       />
     </div>
