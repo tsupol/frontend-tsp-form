@@ -8,6 +8,7 @@ import {
 import {
   ArrowRightFromLine, Keyboard, RefreshCw, ExternalLink, CheckCircle2,
   FileSpreadsheet, Clock, AlertTriangle, Inbox, Loader2, ChevronRight, Settings,
+  ChevronsDownUp, ChevronsUpDown,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { ApiError } from '../../lib/api';
@@ -102,7 +103,13 @@ export function FinancierFormFeedPage() {
   // Per §3.6 this is a single-branch, once-per-session choice — the picker only
   // shows when exactly one branch is on screen with >1 form to choose from.
   const [chosenForm, setChosenForm] = useState('');
+  // Per-section open state, keyed `${branch_id}:${category}`. Unset = fall back to
+  // the default (only the current working category open). "Expand/collapse all"
+  // writes an explicit value for every visible section.
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const didAutoGen = useRef(false);
+
+  const sectionKey = (branchId: number, category: Category) => `${branchId}:${category}`;
 
   const openManage = useCallback((branchId?: number) => {
     setPreselectBranch(branchId ?? null);
@@ -183,6 +190,35 @@ export function FinancierFormFeedPage() {
   }, [rows]);
 
   const multiBranch = branchGroups.length > 1;
+
+  // Resolve a section's open state: explicit override wins, else default (only the
+  // branch's current working category is open).
+  const isSectionOpen = useCallback((branchId: number, category: Category, defaultOpen: boolean) => {
+    const v = openSections[sectionKey(branchId, category)];
+    return v ?? defaultOpen;
+  }, [openSections]);
+
+  const toggleSection = useCallback((branchId: number, category: Category, defaultOpen: boolean) => {
+    const key = sectionKey(branchId, category);
+    setOpenSections(prev => ({ ...prev, [key]: !(prev[key] ?? defaultOpen) }));
+  }, []);
+
+  // Are all visible sections currently open? Drives the "expand vs collapse all" label.
+  const allSectionsOpen = useMemo(() =>
+    branchGroups.every(g =>
+      g.sections.every(s => isSectionOpen(g.branch_id, s.category, s.category === g.currentCategory))),
+    [branchGroups, isSectionOpen]);
+
+  const setAllSections = useCallback((open: boolean) => {
+    setOpenSections(() => {
+      const next: Record<string, boolean> = {};
+      for (const g of branchGroups)
+        for (const s of g.sections) next[sectionKey(g.branch_id, s.category)] = open;
+      return next;
+    });
+  }, [branchGroups]);
+
+  const hasSections = branchGroups.some(g => g.sections.length > 0);
 
   const runRowRpc = useCallback(async (id: number, fn: string, extra?: Record<string, unknown>) => {
     setRowError('');
@@ -303,7 +339,7 @@ export function FinancierFormFeedPage() {
     // Single-panel PageNav: bounds height to the viewport and owns the scroll,
     // so the toolbar stays fixed and ONLY the list panel scrolls (no page-level
     // scroll dragging the side nav).
-    <PageNav panels={['list']} className="h-dvh">
+    <PageNav panels={['list']} className="h-dvh overflow-hidden">
       {({ isMobile }) => (
         <>
           {isMobile && (
@@ -344,7 +380,7 @@ export function FinancierFormFeedPage() {
           <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
             <PageNavPanel
               id="list"
-              className={`flex-1 min-w-0 overflow-auto better-scroll ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
+              className={`flex-1 min-w-0 min-h-0 overflow-auto better-scroll ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
             >
               <div className="max-w-4xl mx-auto p-4 flex flex-col gap-3">
           {genError && (
@@ -370,6 +406,20 @@ export function FinancierFormFeedPage() {
               value={chosenForm}
               onChange={setChosenForm}
             />
+          )}
+
+          {/* Expand / collapse every section at once. */}
+          {hasSections && (
+            <div className="flex justify-end -mb-1">
+              <Button
+                size="sm"
+                variant="outline"
+                startIcon={allSectionsOpen ? <ChevronsDownUp size={14} /> : <ChevronsUpDown size={14} />}
+                onClick={() => setAllSections(!allSectionsOpen)}
+              >
+                {allSectionsOpen ? t('financierForm.collapseAll') : t('financierForm.expandAll')}
+              </Button>
+            </div>
           )}
 
           {branchGroups.map((group) => {
@@ -408,7 +458,8 @@ export function FinancierFormFeedPage() {
                     category={section.category}
                     rows={section.rows}
                     pending={section.pending}
-                    defaultOpen={section.category === group.currentCategory}
+                    open={isSectionOpen(group.branch_id, section.category, section.category === group.currentCategory)}
+                    onToggle={() => toggleSection(group.branch_id, section.category, section.category === group.currentCategory)}
                     onExport={() => exportCsv(section.category, section.rows, t, i18n.language)}
                     renderRow={(row) => (
                       <FeedRowItem
@@ -502,17 +553,17 @@ function FormChoicePicker({
 /* ── Section (hand-rolled collapsible) ─────────────────────────────────────── */
 
 function FeedSection({
-  category, rows, pending, defaultOpen, onExport, renderRow,
+  category, rows, pending, open, onToggle, onExport, renderRow,
 }: {
   category: Category;
   rows: FeedRow[];
   pending: number;
-  defaultOpen: boolean;
+  open: boolean;
+  onToggle: () => void;
   onExport: () => void;
   renderRow: (row: FeedRow) => ReactNode;
 }) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(defaultOpen);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
 
@@ -530,7 +581,7 @@ function FeedSection({
         <button
           type="button"
           className="flex items-center gap-2 flex-1 min-w-0 bg-transparent border-none cursor-pointer p-0 text-left"
-          onClick={() => setOpen(v => !v)}
+          onClick={onToggle}
           aria-expanded={open}
         >
           <ChevronRight size={16} className={`text-subtle transition-transform ${open ? 'rotate-90' : ''}`} />

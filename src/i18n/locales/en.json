@@ -599,6 +599,8 @@
     "noRows": "No rows for this date range",
     "remaining": "{{count}} left",
     "done": "Done",
+    "expandAll": "Expand all",
+    "collapseAll": "Collapse all",
     "exportExcel": "Export Excel",
     "openForm": "Open form",
     "markSent": "Mark sent",

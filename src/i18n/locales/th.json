@@ -598,6 +598,8 @@
     "noRows": "ไม่มีรายการในช่วงวันนี้",
     "remaining": "เหลือ {{count}}",
     "done": "เกลี้ยง",
+    "expandAll": "กางทั้งหมด",
+    "collapseAll": "พับทั้งหมด",
     "exportExcel": "Export Excel",
     "openForm": "เปิดฟอร์ม",
     "markSent": "ส่งแล้ว",

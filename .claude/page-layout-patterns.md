@@ -88,10 +88,55 @@ selected item. On mobile the two collapse into a stack (rail → detail via `goT
 Used frequently in this project — it's a core layout, not an edge case. Reference
 implementations: **BuybackPage**, **BillsPage**, **ContractsPage**.
 
+### ⛔ PageNav MUST be `className="h-dvh overflow-hidden"` — not just `h-dvh`
+
+**Always include `overflow-hidden` on the `<PageNav>` root.** Omitting it produces a
+**double scrollbar**: one on the inner scroll panel (correct) AND a phantom one on
+the outer app container that spans the whole height, past the fixed toolbar,
+dragging the global side nav.
+
+Why: `AdminLayout`'s content cell carries `.better-scroll`, which is
+`overflow-y: auto`. A `PageNavPanel` is its own scroll container, but its inner
+`scrollHeight` **leaks up to that `overflow:auto` ancestor** — so the ancestor
+offers a scrollbar even though the PageNav is visually clamped to `h-dvh`.
+`overflow-hidden` on the PageNav root seals the leak so only the panel scrolls.
+
+- The bug only shows once panel content exceeds the viewport, so a page with little
+  data (or a tightly-paginated DataTable) hides it — don't judge by a short list.
+- This is the fix, NOT bounding heights up in `AdminLayout`/`AccountingLayout`.
+  Those layers are shared; leave them alone. The seal belongs on the PageNav.
+- Same rule for a **single-panel** PageNav (below).
+
+### Single-panel PageNav (fixed toolbar + one contained scroll)
+
+`PageNav` works with **one** panel — use it for a plain full-height page that needs a
+fixed toolbar and a single scrolling body (not a table, not two panels). Reference:
+**FinancierFormFeedPage**. `panels={['list']}`, `isRoot` is always true, no `goTo`.
+
+```tsx
+<PageNav panels={['list']} className="h-dvh overflow-hidden">
+  {({ isMobile }) => (
+    <>
+      {isMobile && <MobileHeader className="mobile-header-bordered">…</MobileHeader>}
+      {!isMobile && <div className="flex-none px-4 py-2.5 border-b border-line flex …">{/* toolbar */}</div>}
+      <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
+        <PageNavPanel id="list" className="flex-1 min-w-0 min-h-0 overflow-auto better-scroll">
+          <div className="max-w-4xl mx-auto p-4 flex flex-col gap-3">{/* body */}</div>
+        </PageNavPanel>
+      </div>
+    </>
+  )}
+</PageNav>
+```
+
+Do NOT hand-roll this as `<div className="flex flex-col h-dvh">` + a `flex-1
+overflow-auto` body. That looks equivalent but re-introduces the double-scroll —
+the PageNav's `overflow-hidden` + `.pagenav` height management is what prevents it.
+
 ### Shell
 
 ```tsx
-<PageNav panels={['list', 'detail']} className="h-dvh">
+<PageNav panels={['list', 'detail']} className="h-dvh overflow-hidden">
   {({ isMobile, isRoot, goTo, goBack }) => (
     <>
       {isMobile && <MobileHeader className="mobile-header-bordered">…</MobileHeader>}
