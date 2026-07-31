@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  MobileHeader, InputDateRangePicker, Button, LabeledCheckbox, DataTableFooter,
+  MobileHeader, InputDateRangePicker, Button, LabeledCheckbox, DataTableFooter, Select,
 } from 'tsp-form';
 import {
   ArrowRightFromLine, Keyboard, RefreshCw, ExternalLink, CheckCircle2,
@@ -27,10 +27,17 @@ import { SetFormUrlModal } from './SetFormUrlModal';
  * Google → come back and tick "sent". A helper, not a cop: any row can be
  * unticked (skipped) or exported to CSV for manual copy-paste.
  *
+ * ⭐ Forms are PER BRANCH, not per company/month (mig 47, UPDATE 2026-07-31).
+ * Each branch has its own financier form URL; the feed row carries the branch's
+ * own prefill_url. A form has an effective_from date and stays in force until a
+ * newer one is placed — there is NO monthly cycle, no "register every month".
+ * The financier may swap the form any day; the branch pastes the new URL then.
+ * A company/holding user sees many branches at once, so rows group by branch.
+ *
  * Order is DB-driven by category_rank (1=ขาย 2=ซื้อ 3=ผ่อน 4=อุปกรณ์). We never
  * sort categories client-side. Every successful RPC re-fetches the view — state
  * lives in the DB and two people in one branch can work the queue at once.
- * Spec: UI_SUMMARY/130_FINANCIER_FORM_FEED.md · DELIVERY 2026-07-27.
+ * Spec: UI_SUMMARY/130_FINANCIER_FORM_FEED.md · UPDATE 2026-07-31.
  * ─────────────────────────────────────────────────────────────────────────── */
 
 type Category = 'ขาย' | 'ซื้อ' | 'ผ่อน' | 'อุปกรณ์';
@@ -43,9 +50,12 @@ interface FeedRow {
   status: FeedStatus;
   payload: Record<string, string | null>;
   prefill_url: string | null;
-  form_month: string;         // yyyy-mm-01
-  form_registered: boolean;
+  // Per-branch form fields (mig 47 — no more form_month).
+  form_effective_from: string | null;  // form in force for this row, or null if none
+  form_label: string | null;
+  form_registered: boolean;             // does THIS branch have a form for this row's date
   form_verified: boolean;
+  form_choice_count: number;            // # of forms this branch has to choose from
   opened_at: string | null;
   sent_at: string | null;
   branch_id: number;
@@ -68,11 +78,6 @@ function todayIso(): string {
   return toLocalDateStr(new Date());
 }
 
-/** yyyy-mm-dd → yyyy-mm-01 */
-function monthStart(iso: string): string {
-  return `${iso.slice(0, 7)}-01`;
-}
-
 export function FinancierFormFeedPage() {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
@@ -87,13 +92,17 @@ export function FinancierFormFeedPage() {
   const [busyRowId, setBusyRowId] = useState<number | null>(null);
   // Rows whose Google tab was opened then closed — show an inline "sent?" nudge.
   const [nudgeRowIds, setNudgeRowIds] = useState<Set<number>>(new Set());
-  // Manage-forms modal: open flag + optional month to preselect (banner / missing-form).
+  // Manage-forms modal: open flag + optional branch to preselect (banner / missing-form).
   const [manageOpen, setManageOpen] = useState(false);
-  const [preselectMonth, setPreselectMonth] = useState<string | null>(null);
+  const [preselectBranch, setPreselectBranch] = useState<number | null>(null);
+  // Per-branch chosen form (effective_from). Key = branch_id; value = chosen
+  // form's effective_from or '' for "auto (by row date)". Only used when a
+  // branch has >1 form to choose from (§3.6).
+  const [chosenForm, setChosenForm] = useState<Record<number, string>>({});
   const didAutoGen = useRef(false);
 
-  const openManage = useCallback((month?: string) => {
-    setPreselectMonth(month ? monthStart(month) : null);
+  const openManage = useCallback((branchId?: number) => {
+    setPreselectBranch(branchId ?? null);
     setManageOpen(true);
   }, []);
 
@@ -103,7 +112,7 @@ export function FinancierFormFeedPage() {
     queryKey: feedQueryKey,
     queryFn: () => apiClient.get<FeedRow[]>(
       `/v_financier_feed?feed_date=gte.${fromDate}&feed_date=lte.${toDate}`
-      + `&order=category_rank,feed_date,id`,
+      + `&order=branch_id,category_rank,feed_date,id`,
     ),
     // Wait for the initial auto-generate before the first fetch, so we don't
     // flash "no rows" then pop them in.
@@ -133,42 +142,46 @@ export function FinancierFormFeedPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Group into sections by category, preserving the DB's category_rank order.
-  const sections = useMemo(() => {
-    const byCat = new Map<Category, FeedRow[]>();
+  // Group into branches (in DB order), each with category sections. A BM sees a
+  // single branch; a company/holding user sees several. Voided rows are dropped.
+  const branchGroups = useMemo(() => {
+    const byBranch = new Map<number, { branch_id: number; branch_name: string; rows: FeedRow[] }>();
     for (const r of rows) {
-      // Never surface voided rows — the DB cuts them; we just hide them.
       if (r.status === 'voided') continue;
-      const list = byCat.get(r.category) ?? [];
-      list.push(r);
-      byCat.set(r.category, list);
+      let g = byBranch.get(r.branch_id);
+      if (!g) { g = { branch_id: r.branch_id, branch_name: r.branch_name, rows: [] }; byBranch.set(r.branch_id, g); }
+      g.rows.push(r);
     }
-    return CATEGORY_ORDER
-      .filter(cat => byCat.has(cat))
-      .map(cat => {
-        const list = byCat.get(cat)!;
-        const pending = list.filter(r => r.status === 'pending').length;
-        return { category: cat, rows: list, pending };
-      });
+    return Array.from(byBranch.values()).map(g => {
+      const byCat = new Map<Category, FeedRow[]>();
+      for (const r of g.rows) {
+        const list = byCat.get(r.category) ?? [];
+        list.push(r);
+        byCat.set(r.category, list);
+      }
+      const sections = CATEGORY_ORDER
+        .filter(cat => byCat.has(cat))
+        .map(cat => {
+          const list = byCat.get(cat)!;
+          const pending = list.filter(r => r.status === 'pending').length;
+          return { category: cat, rows: list, pending };
+        });
+      const currentCategory = sections.find(s => s.pending > 0)?.category ?? null;
+      // Branch has no form for at least one visible row → prompt to paste URL.
+      const unregistered = g.rows.some(r => !r.form_registered);
+      // Choices this branch offers (from any row — same for all rows of a branch).
+      const choiceCount = g.rows[0]?.form_choice_count ?? 0;
+      return { ...g, sections, currentCategory, unregistered, choiceCount };
+    });
   }, [rows]);
 
-  // Current section = first with pending rows (expanded); later ones collapse.
-  const currentCategory = useMemo(
-    () => sections.find(s => s.pending > 0)?.category ?? null,
-    [sections],
-  );
+  const multiBranch = branchGroups.length > 1;
 
-  // A month is unregistered if any visible row in it lacks a form.
-  const unregisteredMonth = useMemo(() => {
-    const row = rows.find(r => !r.form_registered && r.status !== 'voided');
-    return row ? row.form_month : null;
-  }, [rows]);
-
-  const runRowRpc = useCallback(async (id: number, fn: string) => {
+  const runRowRpc = useCallback(async (id: number, fn: string, extra?: Record<string, unknown>) => {
     setRowError('');
     setBusyRowId(id);
     try {
-      const res = await apiClient.rpc<{ prefill_url?: string }>(fn, { p_id: id });
+      const res = await apiClient.rpc<{ prefill_url?: string }>(fn, { p_id: id, ...extra });
       await refetch();
       return res;
     } catch (err) {
@@ -181,7 +194,13 @@ export function FinancierFormFeedPage() {
 
   const handleOpen = useCallback(async (row: FeedRow) => {
     try {
-      const res = await runRowRpc(row.id, 'fn_financier_feed_open');
+      // Pass the branch's chosen form so the opened URL matches the shown list (§3.6).
+      const chosen = chosenForm[row.branch_id];
+      const res = await runRowRpc(
+        row.id,
+        'fn_financier_feed_open',
+        chosen ? { p_form_effective_from: chosen } : undefined,
+      );
       const url = res?.prefill_url ?? row.prefill_url;
       if (!url) return;
       // New tab only — never iframe. Google login won't run inside a frame.
@@ -195,12 +214,12 @@ export function FinancierFormFeedPage() {
         }
       }, 800);
     } catch (err) {
-      // FORM_URL_MISSING → open the manage modal, preselecting the row's month.
+      // FORM_URL_MISSING → open the manage modal, preselecting this row's branch.
       if (err instanceof ApiError && err.code === 'ETL.FINANCIER.FORM_URL_MISSING') {
-        openManage(row.form_month);
+        openManage(row.branch_id);
       }
     }
-  }, [runRowRpc, openManage]);
+  }, [runRowRpc, openManage, chosenForm]);
 
   const clearNudge = (id: number) => setNudgeRowIds(prev => {
     const next = new Set(prev);
@@ -221,12 +240,6 @@ export function FinancierFormFeedPage() {
   const handleUnmarkSent = useCallback(async (row: FeedRow) => {
     await runRowRpc(row.id, 'fn_financier_feed_unmark').catch(() => {});
   }, [runRowRpc]);
-
-  const monthLabel = useCallback((iso: string) => {
-    const d = parseLocalDate(iso);
-    if (!d) return iso;
-    return d.toLocaleDateString(i18n.language === 'th' ? 'th-TH' : 'en-GB', { month: 'long', year: 'numeric' });
-  }, [i18n.language]);
 
   const dateRangePicker = (
     <InputDateRangePicker
@@ -264,7 +277,7 @@ export function FinancierFormFeedPage() {
   );
 
   // Permanent management entry — always available (wrong link / financier swaps
-  // mid-month / register next month ahead), not just when a form is missing.
+  // the form / register a new branch), not just when a form is missing.
   const manageBtn = (
     <Button
       variant="outline"
@@ -320,57 +333,144 @@ export function FinancierFormFeedPage() {
             <div className="alert alert-danger"><AlertTriangle size={16} /><span>{rowError}</span></div>
           )}
 
-          {unregisteredMonth && (
-            <div className="alert alert-warning items-center">
-              <AlertTriangle size={16} />
-              <span className="flex-1">
-                {t('financierForm.noFormBanner', { month: monthLabel(unregisteredMonth) })}
-              </span>
-              <Button size="sm" variant="outline" onClick={() => openManage(unregisteredMonth)}>
-                {t('financierForm.setUrlButton')}
-              </Button>
-            </div>
-          )}
-
-          {!isFetching && !generating && sections.length === 0 && (
+          {!isFetching && !generating && branchGroups.length === 0 && (
             <div className="flex flex-col items-center justify-center gap-2 text-subtler py-16">
               <Inbox size={32} strokeWidth={1.5} />
               <span className="text-sm">{t('financierForm.noRows')}</span>
             </div>
           )}
 
-          {sections.map((section) => (
-            <FeedSection
-              key={section.category}
-              category={section.category}
-              rows={section.rows}
-              pending={section.pending}
-              defaultOpen={section.category === currentCategory}
-              onExport={() => exportCsv(section.category, section.rows, t, i18n.language)}
-              renderRow={(row) => (
-                <FeedRowItem
-                  key={row.id}
-                  row={row}
-                  busy={busyRowId === row.id}
-                  nudge={nudgeRowIds.has(row.id)}
-                  onOpen={() => handleOpen(row)}
-                  onMarkSent={() => handleMarkSent(row)}
-                  onUnmarkSent={() => handleUnmarkSent(row)}
-                  onToggleSend={(willSend) => handleToggleSend(row, willSend)}
-                  onDismissNudge={() => clearNudge(row.id)}
-                />
-              )}
-            />
-          ))}
+          {branchGroups.map((group) => {
+            const chosen = chosenForm[group.branch_id] ?? '';
+            return (
+              <div key={group.branch_id} className="flex flex-col gap-3">
+                {/* Branch header — only when several branches are on screen. */}
+                {multiBranch && (
+                  <div className="flex items-center gap-2 pt-1">
+                    <h2 className="text-sm font-semibold">{group.branch_name}</h2>
+                    <div className="h-px flex-1 bg-line" />
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      startIcon={<Settings size={14} />}
+                      onClick={() => openManage(group.branch_id)}
+                    >
+                      {t('financierForm.manageButton')}
+                    </Button>
+                  </div>
+                )}
+
+                {/* No form for this branch — shortcut to paste the URL. */}
+                {group.unregistered && (
+                  <div className="alert alert-warning items-center">
+                    <AlertTriangle size={16} />
+                    <span className="flex-1">{t('financierForm.noFormBanner')}</span>
+                    <Button size="sm" variant="outline" onClick={() => openManage(group.branch_id)}>
+                      {t('financierForm.setUrlButton')}
+                    </Button>
+                  </div>
+                )}
+
+                {/* Form picker — only when the branch has more than one form to
+                    choose from (§3.6). Choose once; every row uses that form. */}
+                {group.choiceCount > 1 && (
+                  <FormChoicePicker
+                    branchId={group.branch_id}
+                    value={chosen}
+                    onChange={(v) => setChosenForm(prev => ({ ...prev, [group.branch_id]: v }))}
+                  />
+                )}
+
+                {group.sections.map((section) => (
+                  <FeedSection
+                    key={section.category}
+                    category={section.category}
+                    rows={section.rows}
+                    pending={section.pending}
+                    defaultOpen={section.category === group.currentCategory}
+                    onExport={() => exportCsv(section.category, section.rows, t, i18n.language)}
+                    renderRow={(row) => (
+                      <FeedRowItem
+                        key={row.id}
+                        row={row}
+                        busy={busyRowId === row.id}
+                        nudge={nudgeRowIds.has(row.id)}
+                        onOpen={() => handleOpen(row)}
+                        onMarkSent={() => handleMarkSent(row)}
+                        onUnmarkSent={() => handleUnmarkSent(row)}
+                        onToggleSend={(willSend) => handleToggleSend(row, willSend)}
+                        onDismissNudge={() => clearNudge(row.id)}
+                      />
+                    )}
+                  />
+                ))}
+              </div>
+            );
+          })}
         </div>
       </div>
 
       <SetFormUrlModal
         open={manageOpen}
-        preselectMonth={preselectMonth}
+        preselectBranch={preselectBranch}
         onClose={() => setManageOpen(false)}
         onSaved={() => { refetch(); }}
       />
+    </div>
+  );
+}
+
+/* ── Form-choice picker (§3.6) ─────────────────────────────────────────────── */
+
+interface FeedFormChoice {
+  effective_from: string;
+  form_label: string | null;
+  verified: boolean;
+}
+
+/** Header dropdown to pick which form file to fill this session. Shows only when
+ *  a branch has >1 form. "Auto" (empty value) = the form matching each row's date. */
+function FormChoicePicker({
+  branchId, value, onChange,
+}: {
+  branchId: number;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const { t, i18n } = useTranslation();
+  const { data } = useQuery({
+    queryKey: ['financier-feed-forms', branchId],
+    queryFn: () => apiClient.rpc<{ branch_id: number; forms: FeedFormChoice[] }>(
+      'fn_financier_feed_forms', { p_branch_id: branchId },
+    ),
+  });
+  const forms = data?.forms ?? [];
+
+  const fmt = (iso: string) => {
+    const d = parseLocalDate(iso);
+    return d ? d.toLocaleDateString(i18n.language === 'th' ? 'th-TH' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : iso;
+  };
+
+  const options = [
+    { value: '', label: t('financierForm.formChoiceAuto') },
+    ...forms.map(f => ({
+      value: f.effective_from,
+      label: `${f.form_label || t('financierForm.formUnlabeled')} · ${t('financierForm.effectiveFrom', { date: fmt(f.effective_from) })}`,
+    })),
+  ];
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-xs text-subtle whitespace-nowrap">{t('financierForm.formChoiceLabel')}</span>
+      <div className="flex-1 min-w-0 max-w-md">
+        <Select
+          options={options}
+          value={value}
+          onChange={(v) => onChange((v as string) ?? '')}
+          size="sm"
+          searchable={false}
+        />
+      </div>
     </div>
   );
 }
@@ -396,6 +496,9 @@ function FeedSection({
   // Clamp the page if the row set shrinks (rows leave as they're sent/skipped).
   const safePage = Math.min(pageIndex, totalPages - 1);
   const pageRows = rows.slice(safePage * pageSize, safePage * pageSize + pageSize);
+
+  // Light hint when the current form isn't verified yet (§3.5) — never a blocker.
+  const hasUnverified = rows.some(r => r.form_registered && !r.form_verified);
 
   return (
     <div className="border border-line rounded-md overflow-hidden">
@@ -427,6 +530,12 @@ function FeedSection({
       </div>
       {open && (
         <div className="border-t border-line">
+          {hasUnverified && (
+            <div className="flex items-start gap-2 px-3 py-2 bg-warning-soft border-b border-warning-border text-xs text-warning-fg">
+              <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+              <span>{t('financierForm.unverifiedRowHint')}</span>
+            </div>
+          )}
           <div className="px-3 flex flex-col divide-y divide-line">
             {pageRows.map(renderRow)}
           </div>
