@@ -278,6 +278,7 @@
   "SALE.STATE.CANNOT_VOID_AFTER_DAY_CLOSE": "วันของบิลต้นทางปิดแล้ว — ให้ผู้ดูแลระบบจัดการ",
   "SALE.STATE.PREVIOUS_DAY_NOT_CLOSED": "ยังไม่ได้ปิดวันก่อนหน้า",
   "SALE.STATE.DAY_ALREADY_CLOSED": "ปิดวันแล้ว",
+  "SALE.STATE.DAY_NOT_CLOSED": "วันนี้ยังไม่ได้ปิด — เปิดวันคืนได้เฉพาะภายในวันเดียวกับที่ปิดเท่านั้น",
   "SALE.VALIDATION.LINE_NOT_EDITABLE": "รายการนี้แก้ยอดที่นี่ไม่ได้",
   "SALE.VALIDATION.PAYMENT_METHOD_NOT_ADJUSTABLE": "เลือกช่องเงินสดหรือโอน — wallet ปรับไม่ได้",
   "SALE.VALIDATION.PAYMENT_INVALID": "รายการชำระนี้ใช้กับบิลนี้ไม่ได้",

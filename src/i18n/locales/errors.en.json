@@ -278,6 +278,7 @@
   "SALE.STATE.CANNOT_VOID_AFTER_DAY_CLOSE": "The original bill's day is closed — ask a system admin to handle it",
   "SALE.STATE.PREVIOUS_DAY_NOT_CLOSED": "Previous day has not been closed yet",
   "SALE.STATE.DAY_ALREADY_CLOSED": "Day is already closed",
+  "SALE.STATE.DAY_NOT_CLOSED": "This day isn't closed — a day can only be reopened on the same day it was closed",
   "SALE.VALIDATION.LINE_NOT_EDITABLE": "This line's amount can't be corrected here",
   "SALE.VALIDATION.PAYMENT_METHOD_NOT_ADJUSTABLE": "Pick a cash or transfer payment — wallet payments can't be adjusted",
   "SALE.VALIDATION.PAYMENT_INVALID": "That payment isn't valid for this bill",

@@ -7,7 +7,7 @@ import {
 } from 'tsp-form';
 import {
   ArrowRightFromLine, ArrowLeft, CalendarCheck, AlertTriangle, CheckCircle2, Lock, Sparkles, Keyboard, XCircle, Clock, ChevronsRight,
-  Coins, Banknote, FileSpreadsheet, Loader2,
+  Coins, Banknote, FileSpreadsheet, Loader2, CalendarClock,
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { apiClient, ApiError } from '../../lib/api';
@@ -737,10 +737,16 @@ function ReconcileBody({
 function ClosedSnapshot({ close, branchId }: { close: DayCloseHistoryRow; branchId: string }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { can } = useAuth();
+  const queryClient = useQueryClient();
   // Overview first — the "what happened this day" glance; drill into remittance
   // buckets or the bill list from there.
   const [tab, setTab] = useState<'overview' | 'breakdown' | 'reconcile'>('overview');
   const [exporting, setExporting] = useState(false);
+  const [reopenOpen, setReopenOpen] = useState(false);
+  // Reopen is same-day only (BE: close_date must = sale._today(), Asia/Bangkok)
+  // and requires DAY_CLOSE.REOPEN (COMPANY_ADMIN / SYSTEM_DEV). Hide otherwise.
+  const canReopen = close.close_date === todayISO() && can('DAY_CLOSE.REOPEN');
   const remittanceLink = `/admin/accounting/reconcile-channel?branch_id=${branchId}&from=${close.close_date}&to=${close.close_date}`;
   const paymentsLink = `/admin/accounting/payments?branch_id=${branchId}&from=${close.close_date}&to=${close.close_date}`;
 
@@ -761,6 +767,7 @@ function ClosedSnapshot({ close, branchId }: { close: DayCloseHistoryRow; branch
     }
   };
   return (
+    <>
     <div className="@container flex flex-col h-full min-h-0">
       {/* Header: date + closed badge + who/when, drill icons */}
       <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
@@ -779,6 +786,16 @@ function ClosedSnapshot({ close, branchId }: { close: DayCloseHistoryRow; branch
           )}
         </div>
         <div className="ml-auto flex items-center gap-1.5 shrink-0">
+          {canReopen && (
+            <Button
+              size="sm"
+              variant="outline"
+              startIcon={<CalendarClock size={14} />}
+              onClick={() => setReopenOpen(true)}
+            >
+              {t('accounting.dayClose.reopenDay')}
+            </Button>
+          )}
           <Tooltip content={t('accounting.reconcile.export')} placement="bottom">
             <Button
               size="sm"
@@ -837,6 +854,93 @@ function ClosedSnapshot({ close, branchId }: { close: DayCloseHistoryRow; branch
         )}
       </div>
     </div>
+
+    <ReopenDayModal
+      open={reopenOpen}
+      onClose={() => setReopenOpen(false)}
+      branchId={close.branch_id}
+      closeDate={close.close_date}
+      onSuccess={() => {
+        // Day flips back to open → the detail panel re-renders as today's
+        // reconcile view. Invalidate the whole accounting cache to refresh
+        // the history list, unclosed-day picker, and nav badge together.
+        queryClient.invalidateQueries({ queryKey: ['accounting'] });
+        queryClient.invalidateQueries({ queryKey: ['nav'] });
+      }}
+    />
+    </>
+  );
+}
+
+/* ── Reopen-day modal ──────────────────────────────────────────────────────
+   Same-day-only reopen of a mistakenly-closed day (mig 907). Deletes today's
+   day_close row + unlocks any slips it locked, so the branch can keep booking
+   and re-close. Requires DAY_CLOSE.REOPEN (button hidden otherwise); the RPC
+   is the backstop for permission + the past-midnight cutoff. */
+
+function ReopenDayModal({
+  open, onClose, branchId, closeDate, onSuccess,
+}: {
+  open: boolean;
+  onClose: () => void;
+  branchId: number;
+  closeDate: string;
+  onSuccess: () => void;
+}) {
+  const { t } = useTranslation();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (open) { setBusy(false); setError(''); }
+  }, [open]);
+
+  const doReopen = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      await apiClient.rpc('fn_day_close_reopen', { p_branch_id: branchId });
+      onSuccess();
+      onClose();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
+          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        setError(translated || err.message);
+      } else {
+        setError(t('common.error'));
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal open={open} onClose={() => { if (!busy) onClose(); }} maxWidth="28rem" width="100%">
+      <div className="modal-header">
+        <h2 className="modal-title">{t('accounting.dayClose.reopenTitle')}</h2>
+      </div>
+      <div className="modal-content">
+        {error && (
+          <div className="alert alert-danger mb-4 animate-pop-in">
+            <XCircle size={18} />
+            <div><div className="alert-description">{error}</div></div>
+          </div>
+        )}
+        <div className="px-3 py-2.5 rounded-md bg-surface border border-line mb-3">
+          <div className="font-medium text-sm">
+            <DateTime value={closeDate} showTime={false} />
+          </div>
+        </div>
+        <p className="text-sm text-subtle">{t('accounting.dayClose.reopenConfirm')}</p>
+      </div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={onClose} disabled={busy}>{t('common.cancel')}</Button>
+        <Button color="primary" startIcon={<CalendarClock size={14} />} onClick={doReopen} disabled={busy}>
+          {busy ? t('common.loading') : t('accounting.dayClose.reopenDay')}
+        </Button>
+      </div>
+    </Modal>
   );
 }
 
