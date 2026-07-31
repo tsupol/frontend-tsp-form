@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   MobileHeader, InputDateRangePicker, Button, LabeledCheckbox, DataTableFooter, Select,
+  PageNav, PageNavPanel,
 } from 'tsp-form';
 import {
   ArrowRightFromLine, Keyboard, RefreshCw, ExternalLink, CheckCircle2,
@@ -95,10 +96,12 @@ export function FinancierFormFeedPage() {
   // Manage-forms modal: open flag + optional branch to preselect (banner / missing-form).
   const [manageOpen, setManageOpen] = useState(false);
   const [preselectBranch, setPreselectBranch] = useState<number | null>(null);
-  // Per-branch chosen form (effective_from). Key = branch_id; value = chosen
-  // form's effective_from or '' for "auto (by row date)". Only used when a
-  // branch has >1 form to choose from (§3.6).
-  const [chosenForm, setChosenForm] = useState<Record<number, string>>({});
+  // Chosen form for this session (effective_from), or '' for "auto = branch's
+  // latest form". The whole list reloads against it (v_financier_feed_for), so
+  // every row's preview + prefill_url reflects the pick, not just the open URL.
+  // Per §3.6 this is a single-branch, once-per-session choice — the picker only
+  // shows when exactly one branch is on screen with >1 form to choose from.
+  const [chosenForm, setChosenForm] = useState('');
   const didAutoGen = useRef(false);
 
   const openManage = useCallback((branchId?: number) => {
@@ -106,13 +109,17 @@ export function FinancierFormFeedPage() {
     setManageOpen(true);
   }, []);
 
-  const feedQueryKey = ['financier-feed', fromDate, toDate];
+  const feedQueryKey = ['financier-feed', fromDate, toDate, chosenForm];
 
   const { data: rows = [], isFetching, refetch } = useQuery({
     queryKey: feedQueryKey,
-    queryFn: () => apiClient.get<FeedRow[]>(
-      `/v_financier_feed?feed_date=gte.${fromDate}&feed_date=lte.${toDate}`
-      + `&order=branch_id,category_rank,feed_date,id`,
+    // v_financier_feed_for is an RPC (SETOF) — the chosen form goes in the body,
+    // date filters in the query string. Empty pick = null body = latest form,
+    // identical to the plain v_financier_feed view. Ordering is done client-side
+    // (RPC output can't be ordered by the returned columns via PostgREST).
+    queryFn: () => apiClient.post<FeedRow[]>(
+      `/rpc/v_financier_feed_for?feed_date=gte.${fromDate}&feed_date=lte.${toDate}`,
+      { p_form_effective_from: chosenForm || null },
     ),
     // Wait for the initial auto-generate before the first fetch, so we don't
     // flash "no rows" then pop them in.
@@ -152,7 +159,7 @@ export function FinancierFormFeedPage() {
       if (!g) { g = { branch_id: r.branch_id, branch_name: r.branch_name, rows: [] }; byBranch.set(r.branch_id, g); }
       g.rows.push(r);
     }
-    return Array.from(byBranch.values()).map(g => {
+    return Array.from(byBranch.values()).sort((a, b) => a.branch_id - b.branch_id).map(g => {
       const byCat = new Map<Category, FeedRow[]>();
       for (const r of g.rows) {
         const list = byCat.get(r.category) ?? [];
@@ -194,12 +201,11 @@ export function FinancierFormFeedPage() {
 
   const handleOpen = useCallback(async (row: FeedRow) => {
     try {
-      // Pass the branch's chosen form so the opened URL matches the shown list (§3.6).
-      const chosen = chosenForm[row.branch_id];
+      // Pass the session's chosen form so the opened URL matches the shown list (§3.6).
       const res = await runRowRpc(
         row.id,
         'fn_financier_feed_open',
-        chosen ? { p_form_effective_from: chosen } : undefined,
+        chosenForm ? { p_form_effective_from: chosenForm } : undefined,
       );
       const url = res?.prefill_url ?? row.prefill_url;
       if (!url) return;
@@ -294,38 +300,53 @@ export function FinancierFormFeedPage() {
     : t('financierForm.title');
 
   return (
-    <div className="flex flex-col h-dvh">
-      <MobileHeader className="mobile-header-bordered md:hidden">
-        <div className="mobile-header-start">
-          <button
-            className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
-            aria-label="Open menu"
-            onClick={() => window.dispatchEvent(new CustomEvent('sidemenu:open'))}
-          >
-            <ArrowRightFromLine size={18} />
-          </button>
-        </div>
-        <div className="mobile-header-title mobile-header-title-truncate">{t('financierForm.title')}</div>
-        <div className="mobile-header-end w-nav" />
-      </MobileHeader>
+    // Single-panel PageNav: bounds height to the viewport and owns the scroll,
+    // so the toolbar stays fixed and ONLY the list panel scrolls (no page-level
+    // scroll dragging the side nav).
+    <PageNav panels={['list']} className="h-dvh">
+      {({ isMobile }) => (
+        <>
+          {isMobile && (
+            <MobileHeader className="mobile-header-bordered">
+              <div className="mobile-header-start">
+                <button
+                  className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
+                  aria-label="Open menu"
+                  onClick={() => window.dispatchEvent(new CustomEvent('sidemenu:open'))}
+                >
+                  <ArrowRightFromLine size={18} />
+                </button>
+              </div>
+              <div className="mobile-header-title mobile-header-title-truncate">{t('financierForm.title')}</div>
+              <div className="mobile-header-end w-nav" />
+            </MobileHeader>
+          )}
 
-      {/* Desktop header */}
-      <div className="flex-none px-4 py-2.5 border-b border-line items-center gap-3 max-md:hidden flex flex-wrap">
-        <h1 className="heading-2 whitespace-nowrap">{branchTitle}</h1>
-        <div style={{ width: '19rem' }}>{dateRangePicker}</div>
-        {fetchBtn}
-        <div className="ml-auto">{manageBtn}</div>
-      </div>
+          {/* Desktop toolbar — fixed */}
+          {!isMobile && (
+            <div className="flex-none px-4 py-2.5 border-b border-line items-center gap-3 flex flex-wrap">
+              <h1 className="heading-2 whitespace-nowrap">{branchTitle}</h1>
+              <div style={{ width: '19rem' }}>{dateRangePicker}</div>
+              {fetchBtn}
+              <div className="ml-auto">{manageBtn}</div>
+            </div>
+          )}
 
-      {/* Mobile controls */}
-      <div className="flex-none p-2 border-b border-line flex items-center gap-2 md:hidden">
-        <div className="flex-1 min-w-0">{dateRangePicker}</div>
-        {fetchBtn}
-        {manageBtn}
-      </div>
+          {/* Mobile toolbar controls — fixed */}
+          {isMobile && (
+            <div className="flex-none p-2 border-b border-line flex items-center gap-2">
+              <div className="flex-1 min-w-0">{dateRangePicker}</div>
+              {fetchBtn}
+              {manageBtn}
+            </div>
+          )}
 
-      <div className={`flex-1 min-h-0 overflow-auto better-scroll ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
-        <div className="max-w-4xl mx-auto p-4 flex flex-col gap-3">
+          <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
+            <PageNavPanel
+              id="list"
+              className={`flex-1 min-w-0 overflow-auto better-scroll ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
+            >
+              <div className="max-w-4xl mx-auto p-4 flex flex-col gap-3">
           {genError && (
             <div className="alert alert-danger"><AlertTriangle size={16} /><span>{genError}</span></div>
           )}
@@ -340,8 +361,18 @@ export function FinancierFormFeedPage() {
             </div>
           )}
 
+          {/* Form picker — session-wide, single-branch only. Picking reloads the
+              whole list against that form (§3.6). A multi-branch (company) view
+              can't express one form-per-branch in a single call, so no picker. */}
+          {!multiBranch && branchGroups[0]?.choiceCount > 1 && (
+            <FormChoicePicker
+              branchId={branchGroups[0].branch_id}
+              value={chosenForm}
+              onChange={setChosenForm}
+            />
+          )}
+
           {branchGroups.map((group) => {
-            const chosen = chosenForm[group.branch_id] ?? '';
             return (
               <div key={group.branch_id} className="flex flex-col gap-3">
                 {/* Branch header — only when several branches are on screen. */}
@@ -371,16 +402,6 @@ export function FinancierFormFeedPage() {
                   </div>
                 )}
 
-                {/* Form picker — only when the branch has more than one form to
-                    choose from (§3.6). Choose once; every row uses that form. */}
-                {group.choiceCount > 1 && (
-                  <FormChoicePicker
-                    branchId={group.branch_id}
-                    value={chosen}
-                    onChange={(v) => setChosenForm(prev => ({ ...prev, [group.branch_id]: v }))}
-                  />
-                )}
-
                 {group.sections.map((section) => (
                   <FeedSection
                     key={section.category}
@@ -407,16 +428,19 @@ export function FinancierFormFeedPage() {
               </div>
             );
           })}
-        </div>
-      </div>
+              </div>
+            </PageNavPanel>
+          </div>
 
-      <SetFormUrlModal
-        open={manageOpen}
-        preselectBranch={preselectBranch}
-        onClose={() => setManageOpen(false)}
-        onSaved={() => { refetch(); }}
-      />
-    </div>
+          <SetFormUrlModal
+            open={manageOpen}
+            preselectBranch={preselectBranch}
+            onClose={() => setManageOpen(false)}
+            onSaved={() => { refetch(); }}
+          />
+        </>
+      )}
+    </PageNav>
   );
 }
 

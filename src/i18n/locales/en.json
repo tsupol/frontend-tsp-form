@@ -1094,6 +1094,7 @@
     "COMPANY_COLLECTOR": "Company Collector",
     "COMPANY_REPO": "Company Repossession",
     "HOLDING_ADMIN": "Holding Admin",
+    "HOLDING_VIEWER": "Holding Viewer",
     "SYSTEM_DEV": "System Developer"
   },
   "branchWallpaper": {

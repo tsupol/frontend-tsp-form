@@ -1093,6 +1093,7 @@
     "COMPANY_COLLECTOR": "ฝ่ายเรียกเก็บ",
     "COMPANY_REPO": "ฝ่ายยึดคืน",
     "HOLDING_ADMIN": "ผู้ดูแลโฮลดิ้ง",
+    "HOLDING_VIEWER": "ผู้ชมโฮลดิ้ง",
     "SYSTEM_DEV": "ผู้ดูแลระบบ"
   },
   "branchWallpaper": {

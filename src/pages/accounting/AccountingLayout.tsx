@@ -26,6 +26,12 @@ export function AccountingLayout({ children }: { children: ReactNode }) {
     'BRANCH_MANAGER', 'COMPANY_ADMIN', 'COMPANY_ACCOUNTANT', 'COMPANY_INVENTORY',
     'HOLDING_ADMIN', 'SYSTEM_DEV',
   ].includes(user?.role_code ?? '');
+  // Financier form filling is a branch/company chore — hide from holding-scope
+  // users (HOLDING_ADMIN / HOLDING_VIEWER), who never fill a branch's form.
+  const canSeeFinancier = [
+    'BRANCH_MANAGER', 'COMPANY_ADMIN', 'COMPANY_ACCOUNTANT', 'COMPANY_INVENTORY',
+    'SYSTEM_DEV',
+  ].includes(user?.role_code ?? '');
   const { unclosedCount } = useNavCounts();
 
   const navItems: NavItem[] = useMemo(() => [
@@ -46,13 +52,15 @@ export function AccountingLayout({ children }: { children: ReactNode }) {
       { type: 'link' as const, path: '/admin/accounting/opened-by-model', labelKey: 'nav.openedByModel', icon: Package },
       { type: 'link' as const, path: '/admin/accounting/collection-monthly', labelKey: 'nav.collectionMonthly', icon: Wallet },
       { type: 'link' as const, path: '/admin/accounting/reports', labelKey: 'nav.dailyReports', icon: FileSpreadsheet },
+    ] : []),
+    ...(canSeeFinancier ? [
       { type: 'link' as const, path: '/admin/accounting/financier-form', labelKey: 'nav.financierForm', icon: ClipboardList },
     ] : []),
     ...(canSeeAudit ? [
       { type: 'group' as const, labelKey: 'nav.groupAudit' },
       { type: 'link' as const, path: '/admin/accounting/audit-flags', labelKey: 'nav.auditFlags', icon: ShieldAlert },
     ] : []),
-  ], [canSeeAudit, canSeeReports, unclosedCount]);
+  ], [canSeeAudit, canSeeReports, canSeeFinancier, unclosedCount]);
 
   return (
     <div className="flex min-h-full">
