@@ -3,10 +3,10 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, keepPreviousData } from '@tanstack/react-query';
 import { Modal, Button, Input, Select, MaskedInput, LabeledCheckbox, InputDatePicker } from 'tsp-form';
-import { XCircle, CheckCircle, Search, Package, Keyboard, ExternalLink } from 'lucide-react';
+import { XCircle, CheckCircle, Search, Package, Keyboard, ExternalLink, RotateCcw } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
-import { makeDatePickerFormat, toLocalDateStr } from '../../lib/format';
+import { makeDatePickerFormat, toLocalDateStr, fmtCurrency } from '../../lib/format';
 import { ImeiInput } from '../../components/ImeiInput';
 import { getConditionLabel, getBucketLabel, CONDITION_VALUES } from './inventoryUtils';
 
@@ -33,6 +33,14 @@ interface RegisterResult {
   asset_id: number;
   asset_code: string;
   code_display?: string | null;
+  // Set true when the scanned device was OWNERSHIP_TRANSFERRED and the register
+  // RPC pulled the existing row back into stock instead of creating a new one
+  // (mig 890). from_branch_id = the branch that once released it; final_cost =
+  // the cost the staff entered. The user pressed "register a new device" but the
+  // system re-registered an existing one, so the done view says so explicitly.
+  re_registered?: boolean;
+  from_branch_id?: number | null;
+  final_cost?: number | null;
 }
 
 export function RegisterAssetModal({
@@ -194,6 +202,14 @@ export function RegisterAssetModal({
 
   const noEligible = eligibleBranches.length === 0;
 
+  // Name of the branch that once released a re-registered device. Falls back to
+  // its id if the branch isn't in the active list (e.g. deactivated since).
+  const fromBranchName = useMemo(() => {
+    if (!result?.from_branch_id) return null;
+    const b = branches.find(x => x.id === result.from_branch_id);
+    return b?.name ?? `#${result.from_branch_id}`;
+  }, [result?.from_branch_id, branches]);
+
   return (
     <Modal open={open} onClose={onClose} maxWidth="34rem" width="100%">
       <div className="modal-header">
@@ -205,8 +221,16 @@ export function RegisterAssetModal({
         <>
           <div className="modal-content">
             <div className="flex flex-col items-center gap-2 py-6">
-              <CheckCircle size={40} className="text-success" />
-              <p className="text-sm text-subtle">{t('asset.registerDone', { defaultValue: 'Asset registered' })}</p>
+              {result.re_registered ? (
+                <RotateCcw size={40} className="text-success" />
+              ) : (
+                <CheckCircle size={40} className="text-success" />
+              )}
+              <p className="text-sm text-subtle text-center">
+                {result.re_registered
+                  ? t('asset.reRegisterDone', { defaultValue: 'Device returned to stock' })
+                  : t('asset.registerDone', { defaultValue: 'Asset registered' })}
+              </p>
               <Link
                 to={`/admin/inventory/assets/${result.asset_id}`}
                 className="text-lg font-semibold font-mono text-primary-fg hover:underline"
@@ -214,6 +238,21 @@ export function RegisterAssetModal({
               >
                 {result.code_display ?? result.asset_code}
               </Link>
+              {result.re_registered && (
+                <p className="text-xs text-subtle text-center max-w-xs">
+                  {fromBranchName
+                    ? t('asset.reRegisterFromBranch', {
+                        branch: fromBranchName,
+                        defaultValue: 'This device was previously transferred out of {{branch}}. It is now in this branch’s stock.',
+                      })
+                    : t('asset.reRegisterGeneric', {
+                        defaultValue: 'This device had been transferred out. It is now back in this branch’s stock.',
+                      })}
+                  {result.final_cost != null && (
+                    <> {' · '}{t('asset.reRegisterCost', { cost: fmtCurrency(result.final_cost), defaultValue: 'Cost {{cost}}' })}</>
+                  )}
+                </p>
+              )}
               <Link
                 to={`/admin/inventory/assets/${result.asset_id}`}
                 className="inline-flex items-center gap-1 text-sm text-primary-fg hover:underline"
