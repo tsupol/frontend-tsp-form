@@ -30,9 +30,8 @@ import {
   ArrowRightFromLine, Lock, Send, Loader2, CheckCircle, XCircle, AlertTriangle,
   ExternalLink,
 } from 'lucide-react';
-import { apiClient, ApiError } from '../../lib/api';
+import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
-import { DateTime } from '../../components/DateTime';
 import { ColorSwatch } from '../../components/ColorAutocomplete';
 import {
   prepareAsset, applyLightLock,
@@ -380,7 +379,7 @@ function EnrollDialog({
 // ── Lock confirm dialog (preview → apply; RPC self-enforces MDM.PROFILE) ───────
 
 function LockDialog({
-  row, actorId, onClose, onDone, onError,
+  row, actorId, onClose, onDone,
 }: {
   row: MdmDeviceListRow | null;
   actorId: number | null;
