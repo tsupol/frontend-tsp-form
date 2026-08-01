@@ -24,7 +24,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { MobileHeader, Badge, Button, DataTableFooter } from 'tsp-form';
-import { ArrowRightFromLine, RefreshCw, CheckCircle2, ExternalLink } from 'lucide-react';
+import { ArrowRightFromLine, RefreshCw, CheckCircle2, ExternalLink, Copy, Check } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { DateTime } from '../../components/DateTime';
@@ -238,54 +238,48 @@ function AnomalyCard({ row, showBranch }: { row: MdmAnomalyRow; showBranch: bool
   const simRemoved = row.anomaly_codes.includes('SIM_REMOVED');
 
   return (
-    <div
-      className="rounded-md border border-line bg-surface px-3 py-2.5 cursor-pointer hover:bg-surface-hover transition-colors"
-      onClick={() => navigate(`/admin/inventory/assets/${row.asset_id}`)}
-    >
-      {/* Badges + overdue. Prominence rules: badge count sorts rows already;
-          the only extra emphasis allowed is bold on overdue days. */}
+    <div className="rounded-lg border border-line bg-surface p-3.5">
+      {/* Header: device identity (title link) · overdue on the right. */}
       <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-1 flex-wrap min-w-0">
-          {row.anomaly_codes.map(code => (
-            <Badge key={code} size="xs" color="default">
-              {code === 'SILENT' && row.silent_days != null
-                ? t('nnfMdm.codeSilentDays', { n: row.silent_days })
-                : t(`nnfMdm.code.${code}`, { defaultValue: code })}
-            </Badge>
-          ))}
-        </div>
-        <div className="shrink-0 text-sm">
+        <DeviceIdentity serial={row.serial_number} assetCode={row.asset_code} assetId={row.asset_id} />
+        <div className="shrink-0 text-right">
           {row.overdue_days != null && row.overdue_days > 0
             ? <span className="font-bold tabular-nums">{t('nnfMdm.overdueDays', { n: row.overdue_days })}</span>
             : <span className="text-subtler text-xs">{t('nnfMdm.notOverdue')}</span>}
         </div>
       </div>
 
-      {/* Device */}
-      <div className="mt-1.5 text-sm font-medium tabular-nums">
-        {row.serial_number}
-        {row.asset_code && <span className="text-subtle font-normal"> · {row.asset_code}</span>}
+      {/* Anomaly badges. Prominence = badge count (rows already sorted by it);
+          no self-invented severity colors. */}
+      <div className="mt-2 flex items-center gap-1 flex-wrap">
+        {row.anomaly_codes.map(code => (
+          <Badge key={code} size="xs" color="default">
+            {code === 'SILENT' && row.silent_days != null
+              ? t('nnfMdm.codeSilentDays', { n: row.silent_days })
+              : t(`nnfMdm.code.${code}`, { defaultValue: code })}
+          </Badge>
+        ))}
       </div>
 
       {/* SIM_REMOVED: last known phone/carrier — the number collections will
           call. Always shown, never hidden. */}
       {simRemoved && (
-        <div className="mt-1 text-sm">
-          {t('nnfMdm.lastPhone')}{' '}
+        <div className="mt-2 rounded-md bg-surface-shallow px-2.5 py-1.5 text-sm">
+          <span className="text-subtle">{t('nnfMdm.lastPhone')}</span>{' '}
           <span className="font-medium tabular-nums">{formatTel(row.sim_last_phone)}</span>
-          {row.sim_last_carrier && <span> ({row.sim_last_carrier})</span>}
+          {row.sim_last_carrier && <span className="text-subtle"> ({row.sim_last_carrier})</span>}
           {row.sim_removed_at && (
             <span className="text-subtle"> · {t('nnfMdm.removedAt')} <DateTime value={row.sim_removed_at} showTime={false} /></span>
           )}
         </div>
       )}
 
-      {/* Contract + context */}
-      <div className="mt-1 flex items-center gap-x-2 gap-y-1 flex-wrap text-xs text-subtle">
+      {/* Context footer — divider separates identity/signal from metadata. */}
+      <div className="mt-2.5 pt-2.5 border-t border-line-subtle flex items-center gap-x-2.5 gap-y-1 flex-wrap text-xs text-subtle">
         {row.contract_id && row.contract_code && (
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); navigate(`/admin/contracts/search/${row.contract_id}`); }}
+            onClick={() => navigate(`/admin/contracts/search/${row.contract_id}`)}
             className="text-xs font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer tabular-nums"
           >
             {row.contract_code}
@@ -339,21 +333,14 @@ function SilentTab({ rows, totalCount, loading, error, fetching, showBranch, pag
 
 function SilentCard({ row, showBranch }: { row: MdmSilentRow; showBranch: boolean }) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
 
   return (
-    <div
-      className="rounded-md border border-line bg-surface px-3 py-2.5 cursor-pointer hover:bg-surface-hover transition-colors"
-      onClick={() => navigate(`/admin/inventory/assets/${row.asset_id}`)}
-    >
+    <div className="rounded-lg border border-line bg-surface p-3.5">
       <div className="flex items-start justify-between gap-3">
-        <div className="text-sm font-medium tabular-nums min-w-0">
-          {row.serial_number}
-          {row.asset_code && <span className="text-subtle font-normal"> · {row.asset_code}</span>}
-        </div>
+        <DeviceIdentity serial={row.serial_number} assetCode={row.asset_code} assetId={row.asset_id} />
         <span className="shrink-0 text-sm tabular-nums">{t('nnfMdm.silentFor', { n: row.silent_days })}</span>
       </div>
-      <div className="mt-1 flex items-center gap-x-2 gap-y-1 flex-wrap text-xs text-subtle">
+      <div className="mt-2.5 pt-2.5 border-t border-line-subtle flex items-center gap-x-2.5 gap-y-1 flex-wrap text-xs text-subtle">
         <Badge size="xs" color={getBucketColor(row.current_bucket)}>
           {getBucketLabel(row.current_bucket, t)}
         </Badge>
@@ -365,6 +352,67 @@ function SilentCard({ row, showBranch }: { row: MdmSilentRow; showBranch: boolea
 }
 
 // ── Shared bits ───────────────────────────────────────────────────────────────
+
+// Device identity block = the card's title. The asset code is the ONLY nav to
+// the device page (the card itself is no longer clickable), so it reads as the
+// primary link — keyed on asset_id (doc 132 §2). The serial sits under it as a
+// dim sub-line with a copy button (§3) — the value staff paste into ABM, not a
+// key for any page, so no link. When there's no asset code the serial is
+// promoted to the title so identity is never buried.
+function DeviceIdentity({ serial, assetCode, assetId }: {
+  serial: string;
+  assetCode: string | null;
+  assetId: number;
+}) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const [copied, setCopied] = useState(false);
+
+  const copySerial = () => {
+    navigator.clipboard?.writeText(serial).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
+
+  const copyBtn = (
+    <button
+      type="button"
+      onClick={copySerial}
+      aria-label={t('common.copy')}
+      className="shrink-0 inline-flex items-center justify-center text-subtler hover:text-fg bg-transparent border-none p-0 cursor-pointer"
+    >
+      {copied ? <Check size={13} className="text-success-fg" /> : <Copy size={13} />}
+    </button>
+  );
+
+  return (
+    <div className="min-w-0">
+      {assetCode ? (
+        <>
+          <button
+            type="button"
+            onClick={() => navigate(`/admin/inventory/assets/${assetId}`)}
+            className="max-w-full text-[0.95rem] font-semibold text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer tabular-nums"
+          >
+            <span className="truncate">{assetCode}</span>
+            <ExternalLink size={13} className="shrink-0" />
+          </button>
+          <div className="mt-0.5 flex items-center gap-1.5 text-xs text-subtle tabular-nums">
+            <span className="truncate">{serial}</span>
+            {copyBtn}
+          </div>
+        </>
+      ) : (
+        // No asset code — promote the serial to the title (still not a link).
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-[0.95rem] font-semibold tabular-nums truncate">{serial}</span>
+          {copyBtn}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // 0 rows is the goal state of this page — render it as good news, not an error.
 function PositiveEmpty({ headline, hint }: { headline: string; hint: string }) {
