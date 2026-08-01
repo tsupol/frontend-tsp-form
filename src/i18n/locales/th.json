@@ -5599,6 +5599,8 @@
       "overage": "เกิน",
       "totalCash": "เงินสด",
       "totalTransfer": "โอน",
+      "transferFront": "หน้าร้าน",
+      "transferSlip": "หลังร้าน (ส่งสลิปตรวจ)",
       "billCount": "บิล",
       "closedAt": "ปิดเมื่อ",
       "closedBy": "ปิดโดย",

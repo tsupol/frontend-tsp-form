@@ -17,7 +17,7 @@ import { DateTime } from '../../components/DateTime';
 import { toLocalDateStr, parseLocalDate, makeDatePickerFormat, fmtCurrency } from '../../lib/format';
 import {
   type Branch, type BranchTodaySummaryRow, type DayCloseHistoryRow, type DayCloseAuditRow,
-  type UnclosedDayRow, type DayCloseBreakdownRow,
+  type UnclosedDayRow, type DayCloseBreakdownRow, type ReconcileChannelResult,
   todayISO, netCash, netTransfer, netTotal,
 } from './accountingTypes';
 import { BillReconcilePanel } from './BillReconcilePanel';
@@ -216,6 +216,9 @@ export function DayClosePage() {
   // Selected day is closeable (today or an unclosed previous day)
   const closingDate = selectedUnclosedDate ?? today;
   const closingSummary = selectedUnclosedDate ? unclosedSummary : summary;
+  // Transfer front/slip split for the day being closed — feeds the close modal's
+  // read-only sub-lines under the transfer row (same source as the ② page).
+  const closingSplit = useTransferSplit(effectiveBranchId, closingDate);
   // For today, also block close if there are previous unclosed days
   const blockTodayClose = selectedIsToday && unclosedDays.length > 0;
 
@@ -585,6 +588,8 @@ export function DayClosePage() {
       closingDate={closingDate}
       netCash={closingSummary ? netCash(closingSummary) : 0}
       netTransfer={closingSummary ? netTransfer(closingSummary) : 0}
+      transferFront={closingSplit?.front ?? null}
+      transferSlip={closingSplit?.slip ?? null}
       onSuccess={() => {
         queryClient.invalidateQueries({ queryKey: ['accounting'] });
       }}
@@ -594,6 +599,25 @@ export function DayClosePage() {
 }
 
 /* ── Detail body: header + summary stats + reconcile + sticky footer ── */
+
+// Pre-close transfer front/slip split from fn_reconcile_by_channel (the ② source).
+// v_branch_today_summary has only the combined net_transfer; this gives the split
+// reversal-aware. company_id resolves from the branch server-side (pass null).
+function useTransferSplit(branchId: string, billDate: string) {
+  const { data } = useQuery({
+    queryKey: ['accounting', 'reconcile-channel', 'split', branchId, billDate],
+    queryFn: () => apiClient.rpc<ReconcileChannelResult>('fn_reconcile_by_channel', {
+      p_company_id: null,
+      p_branch_id: Number(branchId),
+      p_date_from: billDate,
+      p_date_to: billDate,
+    }),
+    enabled: !!branchId && !!billDate,
+  });
+  const s = data?.summary;
+  if (!s) return null;
+  return { front: s.transfer_front_total, slip: s.slip_payment_total };
+}
 
 function ReconcileBody({
   branchId, billDate, headerIcon, headerLabel, headerBadge,
@@ -623,6 +647,11 @@ function ReconcileBody({
   // Default to the reconcile list — it's the primary work area before closing.
   const [tab, setTab] = useState<'reconcile' | 'breakdown'>('reconcile');
 
+  // Transfer front/slip split for the pre-close day. v_branch_today_summary carries
+  // only the combined net_transfer, so pull the split from fn_reconcile_by_channel
+  // (same source the ② page uses; front + slip = net_transfer, reversal-aware).
+  const transferSplit = useTransferSplit(branchId, billDate);
+
   return (
     <div className="@container flex flex-col h-full min-h-0">
       {/* Header strip */}
@@ -638,7 +667,13 @@ function ReconcileBody({
           <dl className="grid grid-cols-2 @md:grid-cols-3 @lg:grid-cols-4 gap-x-3 gap-y-2">
             <Stat label={t('accounting.dayClose.expected')} value={fmtCurrency(netTotal(summary))} />
             <Stat label={t('accounting.dayClose.totalCash')} value={fmtCurrency(netCash(summary))} />
-            <Stat label={t('accounting.dayClose.totalTransfer')} value={fmtCurrency(netTransfer(summary))} />
+            <Stat
+              label={t('accounting.dayClose.totalTransfer')}
+              value={fmtCurrency(netTransfer(summary))}
+              sub={transferSplit && (transferSplit.front !== 0 || transferSplit.slip !== 0) ? (
+                <TransferSplitInline front={transferSplit.front} slip={transferSplit.slip} />
+              ) : undefined}
+            />
             <Stat label={t('accounting.dayClose.billCount')} value={String(summary.bill_count)} />
           </dl>
         </div>
@@ -1042,6 +1077,7 @@ function ReconcileBlock({ close, branchId }: { close: DayCloseHistoryRow; branch
                 counted={close.counted_transfer}
                 diff={close.diff_transfer}
               />
+              <TransferSplitRows front={close.net_transfer_front} slip={close.net_transfer_slip} />
               <CountRow
                 label={t('accounting.dayClose.physicalTotal')}
                 net={netTotalVal}
@@ -1152,10 +1188,42 @@ function CountRow({
   );
 }
 
+/* Read-only sub-lines under the transfer row: front (โอนหน้าร้าน) vs slip
+   (โอนหลังร้าน/ส่งสลิปตรวจ). front + slip = net_transfer. Staff still counts a
+   single transfer figure — this is just what the system knows about the split,
+   so there's no counted/diff column. Hidden when there's no transfer at all. */
+function TransferSplitRows({ front, slip }: { front: number; slip: number }) {
+  const { t } = useTranslation();
+  if (front === 0 && slip === 0) return null;
+  return (
+    <>
+      <tr className="text-xs text-subtle">
+        <td className="py-0.5 pl-6">
+          <span className="text-subtler mr-1">├</span>
+          {t('accounting.dayClose.transferFront')}
+        </td>
+        <td className="py-0.5 text-right tabular-nums">{fmtCurrency(front)}</td>
+        <td className="py-0.5" />
+        <td className="py-0.5" />
+      </tr>
+      <tr className="text-xs text-subtle">
+        <td className="py-0.5 pl-6">
+          <span className="text-subtler mr-1">└</span>
+          {t('accounting.dayClose.transferSlip')}
+        </td>
+        <td className="py-0.5 text-right tabular-nums">{fmtCurrency(slip)}</td>
+        <td className="py-0.5" />
+        <td className="py-0.5" />
+      </tr>
+    </>
+  );
+}
+
 /* ── Close-day modal ── */
 
 function CloseDayModal({
-  open, onClose, branchId, closingDate, netCash: netCashVal, netTransfer: netTransferVal, onSuccess,
+  open, onClose, branchId, closingDate, netCash: netCashVal, netTransfer: netTransferVal,
+  transferFront, transferSlip, onSuccess,
 }: {
   open: boolean;
   onClose: () => void;
@@ -1163,6 +1231,8 @@ function CloseDayModal({
   closingDate: string;
   netCash: number;
   netTransfer: number;
+  transferFront: number | null;
+  transferSlip: number | null;
   onSuccess: () => void;
 }) {
   const { t } = useTranslation();
@@ -1327,6 +1397,9 @@ function CloseDayModal({
                   onChange={setCountedTransfer}
                   diff={fmtDiff(diffTransfer)}
                 />
+                {transferFront != null && transferSlip != null && (
+                  <TransferSplitRows front={transferFront} slip={transferSlip} />
+                )}
                 <tr className="border-t-2 border-line font-semibold">
                   <td className="py-1.5">{t('accounting.dayClose.physicalTotal')}</td>
                   <td className="py-1.5 text-right">{fmtCurrency(netPhysical)}</td>
@@ -1457,7 +1530,7 @@ function DetailTabs<K extends string>({
   );
 }
 
-function Stat({ label, value, tone, small }: { label: React.ReactNode; value: React.ReactNode; tone?: 'danger' | 'warning' | 'info' | 'success'; small?: boolean }) {
+function Stat({ label, value, tone, small, sub }: { label: React.ReactNode; value: React.ReactNode; tone?: 'danger' | 'warning' | 'info' | 'success'; small?: boolean; sub?: React.ReactNode }) {
   const toneClass = tone === 'danger' ? 'text-danger'
     : tone === 'warning' ? 'text-warning-fg'
     : tone === 'info' ? 'text-info-fg'
@@ -1467,6 +1540,25 @@ function Stat({ label, value, tone, small }: { label: React.ReactNode; value: Re
     <div>
       <dt className="text-xs text-subtle">{label}</dt>
       <dd className={`${small ? 'text-xs font-medium' : 'text-base font-semibold'} tabular-nums ${toneClass}`}>{value}</dd>
+      {sub}
+    </div>
+  );
+}
+
+/* Tree-style front/slip split shown under the transfer stat. Read-only — the
+   split is what the system knows, not something staff counts. */
+function TransferSplitInline({ front, slip }: { front: number; slip: number }) {
+  const { t } = useTranslation();
+  return (
+    <div className="mt-0.5 text-[11px] text-subtle leading-tight">
+      <div className="flex justify-between gap-2">
+        <span><span className="text-subtler mr-0.5">├</span>{t('accounting.dayClose.transferFront')}</span>
+        <span className="tabular-nums">{fmtCurrency(front)}</span>
+      </div>
+      <div className="flex justify-between gap-2">
+        <span><span className="text-subtler mr-0.5">└</span>{t('accounting.dayClose.transferSlip')}</span>
+        <span className="tabular-nums">{fmtCurrency(slip)}</span>
+      </div>
     </div>
   );
 }

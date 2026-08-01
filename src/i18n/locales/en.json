@@ -5604,6 +5604,8 @@
       "overage": "Overage",
       "totalCash": "Cash",
       "totalTransfer": "Transfer",
+      "transferFront": "In-store",
+      "transferSlip": "Slip submission",
       "billCount": "Bills",
       "closedAt": "Closed at",
       "closedBy": "Closed by",

@@ -51,6 +51,11 @@ export interface DayCloseHistoryRow {
   // diff = counted − net (null until counted). Counting is a separate, editable-after-close step.
   net_cash: number;
   net_transfer: number;
+  // mig 936 — net_transfer split by how the money arrived: front = ลูกค้าโอนหน้าร้าน
+  // (no slip), slip = ลูกค้าส่งสลิปให้ตรวจ (หลังร้าน). Read-only sub-lines under
+  // transfer; staff still counts a single transfer figure. front + slip = net_transfer.
+  net_transfer_front: number;
+  net_transfer_slip: number;
   counted_cash: number | null;
   counted_transfer: number | null;
   diff_cash: number | null;
