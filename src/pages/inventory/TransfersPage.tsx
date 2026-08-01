@@ -198,9 +198,12 @@ export function TransfersPage() {
 
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
   const [filterFromBranch, setFilterFromBranch] = useState<number | null>(null);
-  // Default the destination to the user's own branch — a branch lands on its
-  // inbound/receive queue (where order 14 etc. live), not its outbound list.
-  const [filterToBranch, setFilterToBranch] = useState<number | null>(ownBranchId);
+  const [filterToBranch, setFilterToBranch] = useState<number | null>(null);
+  // Default scope = "my branch" (from OR to), so a branch user sees both what
+  // it's sending out AND what's coming in — not just its inbound queue. A plain
+  // to=my-branch default hid the branch's own unsent drafts. Only meaningful for
+  // branch users (others have no own branch → always 'all').
+  const [filterScope, setFilterScope] = useState<'mine' | 'all'>(ownBranchId ? 'mine' : 'all');
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
   const [search, setSearch] = useState('');
@@ -208,7 +211,14 @@ export function TransfersPage() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
 
-  const extraFilterCount = (filterStatus ? 1 : 0) + (filterFromBranch !== null ? 1 : 0) + (filterToBranch !== null ? 1 : 0);
+  // "my branch" scope only bites when no explicit from/to is set — an explicit
+  // branch filter takes over. Count it as active only when it's actually applied.
+  const scopeApplied = filterScope === 'mine' && !!ownBranchId && filterFromBranch === null && filterToBranch === null;
+  const extraFilterCount =
+    (filterStatus ? 1 : 0) +
+    (filterFromBranch !== null ? 1 : 0) +
+    (filterToBranch !== null ? 1 : 0) +
+    (scopeApplied ? 1 : 0);
 
   useEffect(() => {
     const tm = setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -226,12 +236,14 @@ export function TransfersPage() {
   }, [branches]);
 
   const { data: listData, isFetching } = useQuery({
-    queryKey: ['transfer-orders', filterStatus, filterFromBranch, filterToBranch, debouncedSearch, pageIndex, pageSize],
+    queryKey: ['transfer-orders', filterStatus, filterFromBranch, filterToBranch, scopeApplied, ownBranchId, debouncedSearch, pageIndex, pageSize],
     queryFn: () => {
       let url = '/v_transfer_orders?order=created_at.desc';
       if (filterStatus) url += `&status=eq.${filterStatus}`;
       if (filterFromBranch) url += `&from_branch_id=eq.${filterFromBranch}`;
       if (filterToBranch) url += `&to_branch_id=eq.${filterToBranch}`;
+      // "my branch" scope: orders this branch is sending OR receiving.
+      if (scopeApplied) url += `&or=(from_branch_id.eq.${ownBranchId},to_branch_id.eq.${ownBranchId})`;
       if (debouncedSearch) {
         // transfer_no is dash-free (TF26060000036); the user sees/types the
         // dashed code_display (TF-2606-000003-6). Strip dashes so the search
@@ -262,7 +274,7 @@ export function TransfersPage() {
     placeholderData: keepPreviousData,
   });
 
-  useEffect(() => { setPageIndex(0); }, [filterStatus, filterFromBranch, filterToBranch, debouncedSearch]);
+  useEffect(() => { setPageIndex(0); }, [filterStatus, filterFromBranch, filterToBranch, filterScope, debouncedSearch]);
 
   // Fallback fetch so direct deep-links (id not on current page) still resolve.
   const { data: detailFallback } = useQuery({
@@ -362,6 +374,32 @@ export function TransfersPage() {
                     >
                       <div className="flex flex-col gap-3 p-3">
                         <div className="text-xs font-medium text-subtle uppercase tracking-wide">{t('common.filters')}</div>
+                        {ownBranchId && (
+                          <div className="flex flex-col gap-1.5">
+                            <label className="form-label">{t('transfer.scope', { defaultValue: 'Scope' })}</label>
+                            <div className="flex rounded-md border border-line overflow-hidden text-xs">
+                              <button
+                                type="button"
+                                onClick={() => setFilterScope('mine')}
+                                className={`flex-1 px-2 py-1.5 transition-colors cursor-pointer ${filterScope === 'mine' ? 'bg-primary text-primary-contrast font-medium' : 'bg-transparent text-subtle hover:bg-surface-hover'}`}
+                              >
+                                {t('transfer.scopeMine', { defaultValue: 'My branch' })}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setFilterScope('all')}
+                                className={`flex-1 px-2 py-1.5 transition-colors cursor-pointer border-l border-line ${filterScope === 'all' ? 'bg-primary text-primary-contrast font-medium' : 'bg-transparent text-subtle hover:bg-surface-hover'}`}
+                              >
+                                {t('transfer.scopeAll', { defaultValue: 'All branches' })}
+                              </button>
+                            </div>
+                            <p className="text-[11px] text-subtle">
+                              {filterScope === 'mine'
+                                ? t('transfer.scopeMineHint', { defaultValue: 'Transfers this branch is sending or receiving.' })
+                                : t('transfer.scopeAllHint', { defaultValue: 'Every transfer in the holding.' })}
+                            </p>
+                          </div>
+                        )}
                         <Select
                           options={TRANSFER_STATUS_VALUES.map((v) => ({ value: v, label: t(`transfer.status_${v}`) }))}
                           value={filterStatus}
