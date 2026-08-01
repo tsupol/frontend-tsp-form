@@ -5,12 +5,13 @@
 import { type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Smartphone, MonitorSmartphone } from 'lucide-react';
+import { Smartphone, MonitorSmartphone, ListChecks } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 
 const NAV_ITEMS = [
-  { path: '/admin/nnf-extra/app', labelKey: 'nav.nnfApp', icon: Smartphone },
-  { path: '/admin/nnf-extra/mdm', labelKey: 'nav.nnfMdm', icon: MonitorSmartphone },
+  { path: '/admin/nnf-extra/mdm-devices', labelKey: 'nav.mdmDevices', icon: ListChecks },
+  { path: '/admin/nnf-extra/mdm', labelKey: 'nav.mdmDetection', icon: MonitorSmartphone },
+  { path: '/admin/nnf-extra/app', labelKey: 'nav.appDetection', icon: Smartphone },
 ];
 
 export function NnfExtraLayout({ children }: { children: ReactNode }) {
@@ -23,7 +24,9 @@ export function NnfExtraLayout({ children }: { children: ReactNode }) {
       <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-50 border-r border-line p-4 pt-7.5 sticky top-0 h-dvh">
         <span className="subnav-group-label mb-1">{t('nav.nnfExtra')}</span>
         {NAV_ITEMS.map(({ path, labelKey, icon: Icon }) => {
-          const isActive = pathname.startsWith(path);
+          // exact match — '/admin/nnf-extra/mdm' is a prefix of '…/mdm-devices',
+          // so startsWith would light up both.
+          const isActive = pathname === path;
           return (
             <a
               key={path}

@@ -433,8 +433,9 @@
     "paymentSubmissions": "Slips to Review",
     "chat": "Chat",
     "nnfExtra": "NNF Extra",
-    "nnfApp": "NNF App",
-    "nnfMdm": "NNF MDM",
+    "mdmDevices": "MDM Devices",
+    "mdmDetection": "MDM Detection",
+    "appDetection": "App Detection",
     "legal": "Legal",
     "dunningTargets": "Dunning Targets",
     "legalCases": "Cases",
@@ -6391,6 +6392,45 @@
       "passwordLabel": "Password",
       "telDirtyWarning": "The phone number on file ({{tel}}) isn't clean — fix it so this doesn't recur."
     }
+  },
+  "mdmDevices": {
+    "title": "MDM Devices",
+    "searchPlaceholder": "Scan or type — asset code, contract, serial, IMEI, name",
+    "allBranches": "All branches",
+    "noResults": "No devices",
+    "inMdm": "In MDM",
+    "notInMdm": "Not in MDM",
+    "enrollButton": "Enroll",
+    "lockButton": "Baseline lock",
+    "filter": {
+      "notEnrolled": "Not in MDM",
+      "enrolled": "In MDM",
+      "all": "All"
+    },
+    "lock": {
+      "APPLYING": "Sending command…",
+      "NONE": "Not locked",
+      "LIGHT": "Baseline lock",
+      "ENFORCED": "Locked"
+    },
+    "prepare": {
+      "PENDING": "Sending to Apple…",
+      "READY": "Profile ready — erase the device",
+      "NOT_ON_SERVER": "Not scanned into ABM yet",
+      "ERROR": "Failed"
+    },
+    "enrollQueued": "Enrollment queued",
+    "enrollConfirmTitle": "Scanned into ABM?",
+    "enrollConfirmBody": "Scan the device into Apple Business Manager first, then press this.",
+    "enrollConfirmButton": "Scanned — proceed",
+    "lockQueued": "Baseline lock queued",
+    "lockConfirmTitle": "Apply baseline lock?",
+    "lockConfirmBody": "This sends the baseline restriction profile to the device. It stays on until the contract ends.",
+    "lockConfirmButton": "Apply lock",
+    "lockReminderTitle": "Before you lock, confirm that:",
+    "lockReminderIcloud": "iCloud is signed in",
+    "lockReminderFindMy": "Find My iPhone is on",
+    "lockReminderNnfApp": "The NNF app is installed"
   },
   "nnfMdm": {
     "title": "NNF MDM",

@@ -432,8 +432,9 @@
     "paymentSubmissions": "ตรวจสลิป",
     "chat": "แชท",
     "nnfExtra": "NNF Extra",
-    "nnfApp": "NNF App",
-    "nnfMdm": "NNF MDM",
+    "mdmDevices": "MDM Devices",
+    "mdmDetection": "MDM Detection",
+    "appDetection": "App Detection",
     "legal": "กฎหมาย",
     "dunningTargets": "ทวงถาม",
     "legalCases": "คดี",
@@ -6384,6 +6385,45 @@
       "passwordLabel": "รหัสผ่าน",
       "telDirtyWarning": "เบอร์ในระบบ ({{tel}}) ไม่สะอาด — ควรไปแก้ให้ถูกต้องเพื่อไม่ให้เกิดซ้ำ"
     }
+  },
+  "mdmDevices": {
+    "title": "MDM Devices",
+    "searchPlaceholder": "สแกนหรือพิมพ์ — รหัสสินทรัพย์ สัญญา ซีเรียล IMEI ชื่อ",
+    "allBranches": "ทุกสาขา",
+    "noResults": "ไม่พบเครื่อง",
+    "inMdm": "อยู่ใน MDM",
+    "notInMdm": "ยังไม่เข้า MDM",
+    "enrollButton": "เตรียมเครื่อง",
+    "lockButton": "ล็อกขั้นพื้นฐาน",
+    "filter": {
+      "notEnrolled": "ยังไม่เข้า MDM",
+      "enrolled": "อยู่ใน MDM",
+      "all": "ทั้งหมด"
+    },
+    "lock": {
+      "APPLYING": "กำลังส่งคำสั่ง…",
+      "NONE": "ยังไม่ได้ล็อค",
+      "LIGHT": "ล็อคขั้นพื้นฐาน",
+      "ENFORCED": "ล็อคแล้ว"
+    },
+    "prepare": {
+      "PENDING": "กำลังส่งให้ Apple…",
+      "READY": "โปรไฟล์พร้อม — ล้างเครื่องได้",
+      "NOT_ON_SERVER": "ยังไม่ได้สแกนเข้า ABM",
+      "ERROR": "ไม่สำเร็จ"
+    },
+    "enrollQueued": "ส่งคำขอเตรียมเครื่องแล้ว",
+    "enrollConfirmTitle": "สแกนเครื่องเข้า ABM แล้วใช่ไหม?",
+    "enrollConfirmBody": "ต้องสแกนเครื่องเข้า Apple Business Manager ให้เรียบร้อยก่อน แล้วจึงกดปุ่มนี้",
+    "enrollConfirmButton": "สแกนแล้ว — ดำเนินการ",
+    "lockQueued": "ส่งคำสั่งล็อกขั้นพื้นฐานแล้ว",
+    "lockConfirmTitle": "ล็อกขั้นพื้นฐาน?",
+    "lockConfirmBody": "จะส่งโปรไฟล์ข้อจำกัดขั้นพื้นฐานไปยังเครื่อง และจะติดอยู่จนกว่าสัญญาจะจบ",
+    "lockConfirmButton": "ล็อกเลย",
+    "lockReminderTitle": "ก่อนกด กรุณาตรวจสอบว่า:",
+    "lockReminderIcloud": "ติดตั้ง iCloud เรียบร้อยแล้ว",
+    "lockReminderFindMy": "เปิด Find My iPhone แล้ว",
+    "lockReminderNnfApp": "ติดตั้งแอป NNF แล้ว"
   },
   "nnfMdm": {
     "title": "NNF MDM",

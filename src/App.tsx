@@ -47,6 +47,7 @@ import { ApprovalsPage } from './pages/approvals/ApprovalsPage';
 import { ChatPage } from './pages/chat/ChatPage';
 import { NnfAppPage } from './pages/nnf-app/NnfAppPage';
 import { NnfMdmPage } from './pages/nnf-mdm/NnfMdmPage';
+import { MdmDevicesPage } from './pages/nnf-extra/MdmDevicesPage';
 import { NnfExtraLayout } from './pages/nnf-extra/NnfExtraLayout';
 import { PaymentSubmissionsPage } from './pages/PaymentSubmissionsPage';
 import { ContractsLayout } from './pages/contracts/ContractsLayout';
@@ -838,6 +839,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <NnfExtraLayout><NnfMdmPage /></NnfExtraLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/nnf-extra/mdm-devices"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <NnfExtraLayout><MdmDevicesPage /></NnfExtraLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

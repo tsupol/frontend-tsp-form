@@ -279,6 +279,56 @@ export function applyLightLock(
   });
 }
 
+// ── MDM Devices list screen (v_mdm_device_list, mig 940; doc IMPLEMENT 2026-08-01) ──
+// A branch-wide "which device needs action?" list — the shortcut counterpart to the
+// per-device tab-1 panel. 27 columns, RLS-scoped by role, no permission columns
+// (the two RPCs — fn_mdm_prepare_asset / fn_mdm_apply_template — self-enforce).
+// enforcement_badge here is COARSER than tab-1 (ENFORCED lumps MEDIUM/HARD/…).
+
+export type MdmDeviceListBadge = 'NOT_IN_MDM' | 'APPLYING' | 'NONE' | 'LIGHT' | 'ENFORCED';
+export type MdmPrepareStatus = 'PENDING' | 'READY' | 'NOT_ON_SERVER' | 'ERROR' | null;
+
+export interface MdmDeviceListRow {
+  asset_id: number;
+  asset_code_display: string;
+  asset_code: string;
+  serial_number: string | null;
+  imei: string | null;
+  product_name: string;
+  color_name: string | null;
+  color_hex: string | null;
+  contract_id: number | null;
+  contract_code: string | null;
+  contract_state: string | null;
+  customer_id: number | null;
+  customer_name: string | null;
+  in_mdm: boolean;
+  in_mdm_since: string | null;
+  prepare_status: MdmPrepareStatus;
+  prepare_detail: string | null;
+  prepare_requested_at: string | null;
+  enforcement_level: string | null; // ⚠️ raw device value — do NOT decide lock state from this
+  nnf_app_installed: boolean | null; // null = never checked (≠ false)
+  enforcement_badge: MdmDeviceListBadge;
+  holding_id: number;
+  company_id: number;
+  branch_id: number;
+  branch_name: string;
+  has_contract: boolean;
+  search_key: string; // lowercased; toLowerCase() the term before matching
+}
+
+// enroll button — no p_actor_id, no preview; RPC dedupes + self-enforces.
+export function prepareAsset(assetId: number): Promise<PrepareAssetResult> {
+  return apiClient.rpc<PrepareAssetResult>('fn_mdm_prepare_asset', { p_asset_id: assetId });
+}
+export interface PrepareAssetResult {
+  request_id: number;
+  serial: string;
+  status: string;
+  deduped?: boolean;
+}
+
 // ── Sub-tab 2: pull-from-device (async; needs p_actor_id per §11.2) ──────────
 
 export function queryProfiles(assetId: number, actorId: number): Promise<MdmIntentAck> {
