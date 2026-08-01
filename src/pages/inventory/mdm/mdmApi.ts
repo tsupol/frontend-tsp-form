@@ -38,6 +38,16 @@ export type MdmReleaseCondition = 'CUSTOMER_PAYS' | 'STAFF_MUST_RELEASE' | 'AUTO
 export type MdmCommandState = 'EXECUTED' | 'FAILED' | 'EXPIRED' | 'CANCELED';
 export type MdmActorKind = 'SYSTEM' | 'STAFF';
 
+// Baseline-lock badge (mig 935) — the single answer to "ล็อคไปหรือยัง".
+// NONE / WALLPAPER_ONLY are NOT locked (button shows); LIGHT/MEDIUM/HARD are.
+export type MdmEnforcementBadge =
+  | 'NOT_IN_MDM' | 'APPLYING' | 'NONE' | 'WALLPAPER_ONLY'
+  | 'LIGHT' | 'MEDIUM' | 'HARD' | 'PAUSED';
+// Why the baseline-lock button is disabled (null = pressable).
+export type MdmApplyLightBlockedReason =
+  | 'NOT_IN_MDM' | 'NO_PERMISSION' | 'COMMAND_IN_FLIGHT'
+  | 'ENFORCEMENT_PAUSED' | 'ALREADY_ENFORCED' | 'HIGHER_LEVEL_ACTIVE';
+
 export interface AssetMdmStatus {
   asset_id: number;
   holding_id: number;
@@ -114,8 +124,27 @@ export interface AssetMdmStatus {
   // §6/§3.4 helper flags (also on this row).
   app_whitelist_active: boolean | null; // sub-tab 5 remove button gate
   app_whitelist_checked_at: string | null; // staleness of app_whitelist_active (§7.0)
-  nnf_app_installed: boolean | null;     // sub-tab 1 step 6 checklist
+  nnf_app_installed: boolean | null;     // sub-tab 1 step 6 — auto-detected app scan (com.nnf.customer)
   nnf_app_checked_at: string | null;
+
+  // Escrow key window (mig 933) — Apple lets us pull the Activation-Lock bypass
+  // code only within 15 days of enroll; miss it and the device is permanently
+  // unrecoverable. Surfaced as sub-tab 1 step 6's "กุญแจปลดล็อก" badge.
+  // window_status null = not enrolled (check FIRST); has_code never null (false
+  // when not enrolled), so window_status is the "is it enrolled" signal.
+  escrow_window_status: 'OK' | 'EXPIRED' | null;
+  escrow_has_code: boolean;
+  escrow_days_remaining: number | null;
+  escrow_window_ends_at: string | null;
+
+  // Baseline-lock decision columns (mig 935, UI_SUMMARY 134). The DB decides
+  // "is it locked?" and "can this user lock it?" so the FE never re-derives them.
+  // ⛔ Do NOT use enforcement_level to answer "is it locked" — wallpaper bumps
+  //    level to 1 with no real restriction. enforcement_badge splits those out.
+  // ⛔ Do NOT hand-roll the button condition — may_apply_light is the ONE gate.
+  enforcement_badge: MdmEnforcementBadge;
+  may_apply_light: boolean;
+  apply_light_blocked_reason: MdmApplyLightBlockedReason | null; // null = pressable
 
   // Device info (§3.1) — battery is 0–1, multiply by 100.
   battery_level: number | null;
@@ -212,29 +241,40 @@ export function releaseDunning(params: {
   return apiClient.rpc<ReleaseDunningResult>('fn_mdm_release_dunning', params);
 }
 
-// ── Sub-tab 1 step 7: apply baseline device policy (§6) ─────────────────────
-// preview → confirm (like app whitelist). Requires MDM.PROFILE (may_profile).
-// p_preset_key omitted = 'light' (the baseline lock). The preview's `reminders`
-// drive the step-6 checklist the UI must tick before enabling the real apply.
-export interface ApplyDevicePolicyResult {
+// ── Sub-tab 1 step 7: apply baseline lock (UI_SUMMARY 134 §2.3) ─────────────
+// fn_mdm_apply_template with template_key 'ENFORCEMENT_LIGHT' (the baseline lock).
+// preview:true → dialog restriction list, sends nothing to the device.
+// preview:false → queues the real APPLY intent (⛔ MUST pass false, default is
+// true → silent no-op). Needs p_actor_id (the acting user's id).
+export const ENFORCEMENT_LIGHT = 'ENFORCEMENT_LIGHT';
+
+export interface ApplyTemplateRestriction {
+  key: string;      // e.g. allowAccountModification
+  allowed: boolean; // always false for the lock restrictions
+}
+export interface ApplyTemplateResult {
+  count: number;
   serial: string;
   preview: boolean;
-  asset_id: number;
-  reminders: string[]; // e.g. CONFIRM_ICLOUD_SIGNED_IN, CONFIRM_NNF_APP_INSTALLED
-  preset_key: string;
-  preset_level: number;
-  preset_scope: string;
+  display_name: string;
   template_key: string;
-  current_level: number;
-  locks_profile: boolean;
-  nnf_app_installed: boolean | null;
-  restriction_flags: Record<string, boolean>;
-  intent_id?: number; // absent on preview
+  removal_disallowed: boolean;
+  restrictions: ApplyTemplateRestriction[];
+  allow_listed_bundle_ids?: string[];
+  // present on the real apply (preview:false)
+  intent_id?: number;
+  payload_identifier?: string;
 }
-// ⚠️ p_preview defaults to TRUE server-side (§6). ALWAYS pass it explicitly.
-export function applyDevicePolicy(assetId: number, preview: boolean): Promise<ApplyDevicePolicyResult> {
-  return apiClient.rpc<ApplyDevicePolicyResult>('fn_mdm_apply_device_policy', {
-    p_asset_id: assetId,
+// ⚠️ p_preview defaults to TRUE server-side. ALWAYS pass it explicitly.
+export function applyLightLock(
+  assetId: number,
+  actorId: number,
+  preview: boolean,
+): Promise<ApplyTemplateResult> {
+  return apiClient.rpc<ApplyTemplateResult>('fn_mdm_apply_template', {
+    p_device_id: assetId,
+    p_actor_id: actorId,
+    p_template_key: ENFORCEMENT_LIGHT,
     p_preview: preview,
   });
 }

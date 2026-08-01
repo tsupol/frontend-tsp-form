@@ -2281,22 +2281,26 @@
         "notReady": "ยังไม่พร้อมส่งมอบ",
         "remaining": "เหลือ: {{steps}}",
         "stepEnroll": "ทำการเข้าระบบให้ครบ (ขั้น 1–5)",
-        "step6": "ขั้น 6 (iCloud + แอป NNF)",
         "step7": "ขั้น 7 (ล็อกขั้นพื้นฐาน)"
       },
       "step6": {
-        "title": "ลูกค้า login iCloud + ติดตั้งแอป NNF",
-        "icloud": "ลูกค้า login iCloud บนเครื่องนี้เรียบร้อยแล้ว (หลังกดขั้นต่อไปจะแก้ไม่ได้อีก)",
-        "nnfApp": "ติดตั้งแอป NNF บนเครื่องแล้ว",
-        "nnfFound": "พบแอปแล้ว",
-        "nnfMissing": "ยังไม่พบแอป NNF",
-        "nnfUnknown": "ยังไม่ได้ตรวจ — กดดึงรายการแอปที่แท็บสถานะ"
+        "title": "สถานะเครื่อง (ระบบตรวจให้เอง)",
+        "nnfAppLabel": "แอป NNF",
+        "nnfInstalled": "ติดตั้งแล้ว",
+        "nnfNotInstalled": "ยังไม่ได้ติดตั้ง",
+        "nnfUnknown": "ยังไม่เคยตรวจ",
+        "escrowLabel": "กุญแจปลดล็อก",
+        "escrowNotEnrolled": "ยังไม่ได้ลงทะเบียน",
+        "escrowHasKey": "มีกุญแจแล้ว",
+        "escrowRacing": "ยังไม่มีกุญแจ · เหลือ {{days}} วัน",
+        "escrowMissed": "ไม่มีกุญแจ (หมดเวลาแล้ว)"
       },
       "step7": {
         "title": "ล็อกขั้นพื้นฐาน",
         "desc": "ล็อกเครื่องด้วยโปรไฟล์ขั้นพื้นฐาน เพื่อไม่ให้ลูกค้าออกจาก iCloud หรือล้างเครื่อง จะติดอยู่ตลอดอายุสัญญา",
         "button": "ล็อกขั้นพื้นฐาน",
-        "needStep6": "ติ๊กยืนยันขั้น 6 ให้ครบทั้ง 2 ข้อก่อน — หลังจากนี้ลูกค้าจะ login iCloud ไม่ได้อีก",
+        "lockLabel": "การล็อค",
+        "wallpaperOnlyWarn": "มีแต่ภาพพื้นหลังทวงหนี้ — ยังไม่มีข้อจำกัดบนเครื่อง",
         "noPermission": "คุณไม่มีสิทธิ์ล็อกเครื่องนี้",
         "done": "ล็อกขั้นพื้นฐานแล้ว",
         "verifyPending": "รอเครื่องยืนยัน",
@@ -2304,15 +2308,39 @@
         "confirmTitle": "ล็อกขั้นพื้นฐาน?",
         "confirmBody": "จะส่งโปรไฟล์ข้อจำกัดขั้นพื้นฐานไปยังเครื่อง และจะติดอยู่จนกว่าสัญญาจะจบ",
         "confirmButton": "ล็อกเลย",
-        "irreversibleNote": "หลังจากนี้ลูกค้าจะ login iCloud บนเครื่องนี้ไม่ได้อีก ตรวจให้แน่ใจว่าทำขั้น 6 เสร็จจริง",
+        "reminderTitle": "ก่อนกด กรุณาตรวจสอบว่า:",
+        "reminderIcloud": "ติดตั้ง iCloud เรียบร้อยแล้ว",
+        "reminderFindMy": "เปิด Find My iPhone แล้ว",
+        "reminderNnfApp": "ติดตั้งแอป NNF แล้ว",
+        "blocked": {
+          "NOT_IN_MDM": "เครื่องยังไม่เข้าระบบ",
+          "NO_PERMISSION": "คุณไม่มีสิทธิ์ล็อกเครื่องนี้",
+          "COMMAND_IN_FLIGHT": "มีคำสั่งล็อก/ปลดล็อกกำลังส่งอยู่ — รอสักครู่",
+          "ENFORCEMENT_PAUSED": "เครื่องถูกพักการบังคับใช้อยู่",
+          "ALREADY_ENFORCED": "ล็อกอยู่แล้ว",
+          "HIGHER_LEVEL_ACTIVE": "มีการล็อกระดับสูงกว่าอยู่"
+        },
         "flag": {
           "allowAccountModification": "เพิ่ม/เปลี่ยนบัญชีไม่ได้ (รวม iCloud)",
           "allowModifyFindMy": "ปิด Find My ไม่ได้",
           "allowHostPairing": "จับคู่กับคอมพิวเตอร์ไม่ได้",
           "allowProfileInstallation": "ติดตั้งโปรไฟล์อื่นไม่ได้",
           "allowEraseContentAndSettings": "ล้างเนื้อหาและการตั้งค่าทั้งหมดไม่ได้",
-          "allowSystemAppRemoval": "ลบแอประบบไม่ได้"
+          "allowSystemAppRemoval": "ลบแอประบบไม่ได้",
+          "allowAppRemoval": "ลบแอปไม่ได้",
+          "allowCloudPrivateRelay": "ปิด iCloud Private Relay",
+          "allowESIMOutgoingTransfers": "โอน eSIM ออกไม่ได้"
         }
+      },
+      "lock": {
+        "NOT_IN_MDM": "ยังไม่ได้ลงทะเบียน",
+        "APPLYING": "กำลังส่งคำสั่ง…",
+        "NONE": "ยังไม่ได้ล็อค",
+        "WALLPAPER_ONLY": "มีแต่ภาพพื้นหลังทวงหนี้",
+        "LIGHT": "ล็อคขั้นพื้นฐาน",
+        "MEDIUM": "ล็อคระดับกลาง",
+        "HARD": "ล็อคเข้ม",
+        "PAUSED": "พักการบังคับใช้"
       },
       "badge": {
         "NO_SERIAL": {

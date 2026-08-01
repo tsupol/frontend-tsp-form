@@ -1,37 +1,47 @@
 // ============================================================================
-// Sub-tab 1 — เตรียมเครื่อง (enroll → readiness). §6 reframes the old 5-step
-// enroll strip as a 7-step READINESS CHECKLIST answering one question at the top:
-// "is this device ready to hand to a customer?"
+// Sub-tab 1 — เตรียมเครื่อง (enroll → readiness). A 7-step READINESS CHECKLIST
+// answering one question at the top: "is this device ready to hand to a customer?"
 //
 //   1–5  enrollment (unchanged, derived from mdm_status): serial, ABM scan,
 //        send-enrollment [button], wipe, device reports in.
-//   6    customer signs into iCloud + installs the NNF app. Apple can't report
-//        iCloud state, so the system NEVER blocks — the staffer TICKS two
-//        confirmations (§6.3). nnf_app_installed helps pre-tick the app one.
+//   6    two AUTO-DETECTED status badges (rewritten 2026-08-01 per
+//        UI_FEEDBACK/2026-08-01_IMPLEMENT_mdm_tab1_status_badges.md): the NNF-app
+//        scan result and the escrow (Activation-Lock bypass) key window. These
+//        used to be two checkboxes, which mis-read as a staff checklist — but the
+//        values are system-detected, the user never sets them, and the iCloud one
+//        had NO backing column at all. So: NO checkboxes, just badges.
 //   7    baseline lock — fn_mdm_apply_device_policy (preview→confirm), MDM.PROFILE.
 //
-// ⛔ Step 6 MUST precede step 7 (§6.1): the light profile sets
-//    allowAccountModification:false, so once step 7 fires the customer can no
-//    longer sign into iCloud. So step 7 stays disabled until both step-6 boxes
-//    are ticked.
+// Step 7 has NO app/iCloud precondition — the DB never gated on it (may_profile
+// checks only the MDM.PROFILE permission). The button is always pressable; a
+// confirm dialog reminds staff to verify iCloud/Find-My/NNF-app first, but does
+// not force a tick. The only real protection is the restriction profile itself,
+// so delaying the lock just leaves the device unprotected longer.
 //
-// Readiness summary = steps 1–5 done  +  both step-6 ticks  +  enforcement_level>=1
-// (step-7 done-ness is read from enforcement_level, NOT preset_level — §6.4).
+// Escrow badge (why it matters): Apple lets us pull the Activation-Lock bypass
+// code only within 15 days of enroll — miss it and recovery is impossible
+// forever. This badge surfaces that deadline before it silently passes.
+//
+// "Is it locked?" and "can I lock it?" come from the DB, NOT from enforcement_level
+// (UI_SUMMARY 134): enforcement_badge answers the first (LIGHT/MEDIUM/HARD = yes;
+// NONE/WALLPAPER_ONLY = no, even at level 1), may_apply_light answers the second.
+// Readiness summary = steps 1–5 done + a real baseline lock present (badge).
 // ============================================================================
 
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button, Modal } from 'tsp-form';
+import { Button, Modal, Badge } from 'tsp-form';
 import {
   ShieldCheck, RefreshCw, Send, CheckCircle, AlertTriangle, Loader2,
   Fingerprint, ScanLine, RotateCcw, Smartphone, XCircle, Lock, Cloud, CircleDashed,
-  PackageCheck, PackageOpen,
+  PackageCheck, PackageOpen, KeyRound, HelpCircle, LockOpen, PauseCircle,
 } from 'lucide-react';
+import { useAuth } from '../../../contexts/AuthContext';
 import { apiClient, ApiError } from '../../../lib/api';
 import { DateTime } from '../../../components/DateTime';
 import { RelativeDateTime } from './RelativeDateTime';
-import { applyDevicePolicy, type AssetMdmStatus, type MdmStatusCode, type ApplyDevicePolicyResult } from './mdmApi';
+import { applyLightLock, type AssetMdmStatus, type MdmStatusCode, type ApplyTemplateResult, type MdmEnforcementBadge } from './mdmApi';
 import { parseMdmError } from './mdmApi';
 
 interface PrepareResponse {
@@ -96,6 +106,10 @@ const STEPS_1_5 = [
   { key: 'enrolled', icon: Smartphone, where: 'auto' },
 ] as const;
 
+// enforcement_badge values that mean a real restriction profile is on the device.
+// NONE / WALLPAPER_ONLY / APPLYING / PAUSED / NOT_IN_MDM are NOT "locked".
+const LOCKED_BADGES = new Set<MdmEnforcementBadge>(['LIGHT', 'MEDIUM', 'HARD']);
+
 /** How many of steps 1–5 are done, from mdm_status. */
 function enrollDoneCount(s: { mdm_status: MdmStatusCode }): number {
   switch (s.mdm_status) {
@@ -125,12 +139,12 @@ function StepRow({
   return (
     <div className="flex gap-3">
       <div className="flex flex-col items-center shrink-0">
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${
+        <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 ${
           state === 'current' ? 'bg-primary border-primary text-primary-contrast'
             : state === 'done' ? 'bg-success border-success text-success-contrast'
               : 'bg-surface border-line text-subtle'
         }`}>
-          {state === 'done' ? <CheckCircle size={17} /> : <Icon size={16} />}
+          {state === 'done' ? <CheckCircle size={13} /> : <Icon size={12} />}
         </div>
         {!last && <div className={`w-0.5 flex-1 min-h-[0.75rem] my-0.5 ${state === 'done' ? 'bg-success' : 'bg-line'}`} />}
       </div>
@@ -159,18 +173,11 @@ export function SubTabEnroll({
   onRefresh: () => void;
 }) {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const actorId = user?.user_id ?? null;
   const queryClient = useQueryClient();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [justPrepared, setJustPrepared] = useState(false);
-
-  // Step-6 self-confirmations (§6.3). NNF-app box pre-ticks when the device
-  // actually reports the app installed; the iCloud box is always manual.
-  const [icloudOk, setIcloudOk] = useState(false);
-  const [nnfAppOk, setNnfAppOk] = useState(false);
-  useEffect(() => {
-    // Pre-tick the app box only on a firm `true` — null (never pulled) ≠ false.
-    if (status.nnf_app_installed === true) setNnfAppOk(true);
-  }, [status.nnf_app_installed]);
 
   useEffect(() => {
     if (status.mdm_status !== 'PREPARING' && status.mdm_status !== 'PROFILE_READY') setJustPrepared(false);
@@ -204,13 +211,15 @@ export function SubTabEnroll({
   // Step readiness.
   const doneEnroll = enrollDoneCount(status);
   const enrollComplete = doneEnroll >= 5;               // steps 1–5
-  const step6Complete = icloudOk && nnfAppOk;           // both ticks
-  const step7Done = status.enforcement_level >= 1;      // baseline lock present (§6.4)
-  const readyToHandOver = enrollComplete && step6Complete && step7Done;
+  // "Locked?" comes from the badge, not enforcement_level (wallpaper fakes level 1).
+  const isLocked = LOCKED_BADGES.has(status.enforcement_badge);
+  const isApplying = status.enforcement_badge === 'APPLYING';
+  const step7Done = isLocked;
+  const readyToHandOver = enrollComplete && step7Done;  // step 6 is informational, not a gate
 
-  // Step-7 apply flow (preview→confirm).
+  // Step-7 apply flow (preview→confirm). The button gate is may_apply_light ALONE.
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [preview, setPreview] = useState<ApplyDevicePolicyResult | null>(null);
+  const [preview, setPreview] = useState<ApplyTemplateResult | null>(null);
   const [policyBusy, setPolicyBusy] = useState(false);
   const [policyErr, setPolicyErr] = useState<string | null>(null);
   const [applied, setApplied] = useState(false);
@@ -221,7 +230,8 @@ export function SubTabEnroll({
     setConfirmOpen(true);
     setPolicyBusy(true);
     try {
-      setPreview(await applyDevicePolicy(status.asset_id, true));
+      if (actorId == null) throw new Error('no actor');
+      setPreview(await applyLightLock(status.asset_id, actorId, true));
     } catch (err) {
       setPolicyErr(parseMdmError(err, t).message);
     } finally {
@@ -233,7 +243,8 @@ export function SubTabEnroll({
     setPolicyBusy(true);
     setPolicyErr(null);
     try {
-      await applyDevicePolicy(status.asset_id, false);
+      if (actorId == null) throw new Error('no actor');
+      await applyLightLock(status.asset_id, actorId, false); // ⛔ false = real apply
       setApplied(true);
       setConfirmOpen(false);
       queryClient.invalidateQueries({ queryKey: ['asset-mdm-status', status.asset_id] });
@@ -245,9 +256,12 @@ export function SubTabEnroll({
     }
   };
 
-  // Step 7 state for the strip.
-  const step7State: StepStatus = step7Done ? 'done' : (enrollComplete && step6Complete ? 'current' : 'todo');
-  const step6State: StepStatus = step6Complete ? 'done' : (enrollComplete ? 'current' : 'todo');
+  // Step 7 state for the strip. Step 6 no longer gates it — once 1–5 are done and
+  // the lock isn't applied yet, step 7 is the current action.
+  const step7State: StepStatus = step7Done ? 'done' : (enrollComplete ? 'current' : 'todo');
+  // Step 6 is a status readout, not a checklist item — mark it done once enrolled
+  // (its badges then carry the real state), current while enrolling.
+  const step6State: StepStatus = enrollComplete ? 'done' : 'current';
 
   return (
     <div className="flex flex-col gap-4">
@@ -273,7 +287,7 @@ export function SubTabEnroll({
           </div>
           {!readyToHandOver && (
             <div className="alert-description">
-              {t('asset.mdm.readiness.remaining', { steps: remainingStepLabels(t, { enrollComplete, step6Complete, step7Done }) })}
+              {t('asset.mdm.readiness.remaining', { steps: remainingStepLabels(t, { enrollComplete, step7Done }) })}
             </div>
           )}
         </div>
@@ -350,7 +364,8 @@ export function SubTabEnroll({
             );
           })}
 
-          {/* Step 6 — customer iCloud + NNF app (staffer-confirmed). */}
+          {/* Step 6 — two AUTO-DETECTED status badges (NNF app + escrow key).
+              Not checkboxes: the system computes these, staff never sets them. */}
           <StepRow
             n={6}
             icon={Cloud}
@@ -358,33 +373,17 @@ export function SubTabEnroll({
             state={step6State}
           >
             <div className="flex flex-col gap-2">
-              <label className={`flex items-start gap-2 text-sm ${enrollComplete ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}>
-                <input
-                  type="checkbox"
-                  className="mt-0.5"
-                  checked={icloudOk}
-                  disabled={!enrollComplete || step7Done}
-                  onChange={(e) => setIcloudOk(e.target.checked)}
-                />
-                <span>{t('asset.mdm.step6.icloud')}</span>
-              </label>
-              <label className={`flex items-start gap-2 text-sm ${enrollComplete ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}>
-                <input
-                  type="checkbox"
-                  className="mt-0.5"
-                  checked={nnfAppOk}
-                  disabled={!enrollComplete || step7Done}
-                  onChange={(e) => setNnfAppOk(e.target.checked)}
-                />
-                <span>
-                  {t('asset.mdm.step6.nnfApp')}
-                  <NnfAppHint status={status} />
-                </span>
-              </label>
+              <StatusLine label={t('asset.mdm.step6.nnfAppLabel')}>
+                <NnfAppBadge status={status} />
+              </StatusLine>
+              <StatusLine label={t('asset.mdm.step6.escrowLabel')}>
+                <EscrowBadge status={status} />
+              </StatusLine>
             </div>
           </StepRow>
 
-          {/* Step 7 — baseline lock. */}
+          {/* Step 7 — baseline lock. The "การล็อค" badge answers "locked yet?" from
+              enforcement_badge; the button shows/hides on may_apply_light alone. */}
           <StepRow
             n={7}
             icon={Lock}
@@ -392,42 +391,55 @@ export function SubTabEnroll({
             state={step7State}
             last
           >
-            {step7Done ? (
-              <div className="text-xs text-success-fg inline-flex items-center gap-1">
-                <CheckCircle size={13} />
-                {t('asset.mdm.step7.done')}
-                {status.enforcement_verify_state === 'PENDING' && <span className="text-warning-fg ml-1">· {t('asset.mdm.step7.verifyPending')}</span>}
-              </div>
-            ) : (
-              <div className="flex flex-col gap-1.5">
-                <p className="text-xs text-subtle">{t('asset.mdm.step7.desc')}</p>
-                {status.may_profile ? (
-                  <div>
-                    <Button
-                      color="primary"
-                      size="sm"
-                      startIcon={<Lock size={15} />}
-                      disabled={!enrollComplete || !step6Complete}
-                      onClick={openStep7}
-                    >
-                      {t('asset.mdm.step7.button')}
-                    </Button>
-                    {enrollComplete && !step6Complete && (
-                      <div className="text-xs text-warning-fg mt-1 inline-flex items-center gap-1">
-                        <AlertTriangle size={12} />{t('asset.mdm.step7.needStep6')}
-                      </div>
-                    )}
+            <div className="flex flex-col gap-2">
+              <StatusLine label={t('asset.mdm.step7.lockLabel')}>
+                <EnforcementBadge badge={status.enforcement_badge} />
+              </StatusLine>
+
+              {/* WALLPAPER_ONLY looks locked but has NO real restriction — warn. */}
+              {status.enforcement_badge === 'WALLPAPER_ONLY' && (
+                <div className="text-xs text-warning-fg inline-flex items-center gap-1">
+                  <AlertTriangle size={12} className="shrink-0" />{t('asset.mdm.step7.wallpaperOnlyWarn')}
+                </div>
+              )}
+
+              {isLocked ? (
+                status.enforcement_verify_state === 'PENDING' && (
+                  <div className="text-xs text-warning-fg inline-flex items-center gap-1">
+                    <CircleDashed size={13} className="animate-spin" />{t('asset.mdm.step7.verifyPending')}
                   </div>
-                ) : (
-                  <div className="text-xs text-subtler">{t('asset.mdm.step7.noPermission')}</div>
-                )}
-                {applied && (
-                  <div className="text-xs text-info-fg inline-flex items-center gap-1">
-                    <CircleDashed size={13} className="animate-spin" />{t('asset.mdm.step7.applied')}
-                  </div>
-                )}
-              </div>
-            )}
+                )
+              ) : isApplying ? (
+                <div className="text-xs text-info-fg inline-flex items-center gap-1">
+                  <CircleDashed size={13} className="animate-spin" />{t('asset.mdm.step7.applied')}
+                </div>
+              ) : (
+                <div className="flex flex-col gap-1.5">
+                  <p className="text-xs text-subtle">{t('asset.mdm.step7.desc')}</p>
+                  {status.may_apply_light ? (
+                    <div>
+                      <Button
+                        color="primary"
+                        size="sm"
+                        startIcon={<Lock size={15} />}
+                        onClick={openStep7}
+                      >
+                        {t('asset.mdm.step7.button')}
+                      </Button>
+                    </div>
+                  ) : status.apply_light_blocked_reason ? (
+                    <div className="text-xs text-subtler">
+                      {t(`asset.mdm.step7.blocked.${status.apply_light_blocked_reason}`)}
+                    </div>
+                  ) : null}
+                  {applied && (
+                    <div className="text-xs text-info-fg inline-flex items-center gap-1">
+                      <CircleDashed size={13} className="animate-spin" />{t('asset.mdm.step7.applied')}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </StepRow>
         </div>
       </div>
@@ -462,14 +474,21 @@ export function SubTabEnroll({
                 </p>
               )}
               <div className="alert alert-warning mt-3">
-                <AlertTriangle size={16} />
-                <div className="alert-description">{t('asset.mdm.step7.irreversibleNote')}</div>
+                <AlertTriangle size={16} className="shrink-0" />
+                <div className="min-w-0">
+                  <div className="alert-title">{t('asset.mdm.step7.reminderTitle')}</div>
+                  <ul className="alert-description mt-1 flex flex-col gap-0.5 list-disc pl-4">
+                    <li>{t('asset.mdm.step7.reminderIcloud')}</li>
+                    <li>{t('asset.mdm.step7.reminderFindMy')}</li>
+                    <li>{t('asset.mdm.step7.reminderNnfApp')}</li>
+                  </ul>
+                </div>
               </div>
               <ul className="text-xs text-subtle mt-3 flex flex-col gap-1">
-                {Object.keys(preview.restriction_flags).map((flag) => (
-                  <li key={flag} className="inline-flex items-center gap-1.5">
+                {preview.restrictions.map((r) => (
+                  <li key={r.key} className="inline-flex items-center gap-1.5">
                     <Lock size={11} className="shrink-0" />
-                    {t(`asset.mdm.step7.flag.${flag}`, { defaultValue: flag })}
+                    {t(`asset.mdm.step7.flag.${r.key}`, { defaultValue: r.key })}
                   </li>
                 ))}
               </ul>
@@ -487,22 +506,87 @@ export function SubTabEnroll({
   );
 }
 
-/** Inline helper under the NNF-app checkbox: distinguishes false (pulled, absent)
- *  from null (never pulled) per §6.3 — null must NOT read as "not installed". */
-function NnfAppHint({ status }: { status: EnrollStatus }) {
+/** A step-6 status readout row: label on the left, an auto-detected badge on
+ *  the right. These replaced the old checkboxes — the values are system-computed. */
+function StatusLine({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-2 flex-wrap text-sm">
+      <span className="text-subtle">{label}</span>
+      {children}
+    </div>
+  );
+}
+
+/** "การล็อค" badge — the single answer to "locked yet?" (enforcement_badge).
+ *  NONE / WALLPAPER_ONLY are deliberately NOT green: no real restriction on the
+ *  device. NOT_IN_MDM renders nothing (step 7 is unreachable until enrolled). */
+const ENFORCEMENT_BADGE_STYLE: Record<
+  MdmEnforcementBadge,
+  { color: 'default' | 'success' | 'warning' | 'danger' | 'info'; icon: typeof Lock } | null
+> = {
+  NOT_IN_MDM: null,
+  APPLYING: { color: 'info', icon: CircleDashed },
+  NONE: { color: 'default', icon: LockOpen },
+  WALLPAPER_ONLY: { color: 'warning', icon: LockOpen },
+  LIGHT: { color: 'success', icon: Lock },
+  MEDIUM: { color: 'success', icon: Lock },
+  HARD: { color: 'success', icon: Lock },
+  PAUSED: { color: 'warning', icon: PauseCircle },
+};
+function EnforcementBadge({ badge }: { badge: MdmEnforcementBadge }) {
   const { t } = useTranslation();
-  if (status.nnf_app_installed === true) {
-    return <span className="text-xs text-success-fg ml-1">· {t('asset.mdm.step6.nnfFound')}</span>;
+  const style = ENFORCEMENT_BADGE_STYLE[badge];
+  if (!style) return <span className="text-xs text-subtler">{t(`asset.mdm.lock.${badge}`)}</span>;
+  const Icon = style.icon;
+  return (
+    <Badge color={style.color} startIcon={<Icon size={12} className={badge === 'APPLYING' ? 'animate-spin' : ''} />}>
+      {t(`asset.mdm.lock.${badge}`)}
+    </Badge>
+  );
+}
+
+/** NNF-app scan result. Three distinct states — null (never scanned) must NOT
+ *  read as "not installed", or it accuses the customer before we've even checked. */
+function NnfAppBadge({ status }: { status: EnrollStatus }) {
+  const { t } = useTranslation();
+  if (status.nnf_app_installed == null) {
+    return <Badge color="default" startIcon={<HelpCircle size={12} />}>{t('asset.mdm.step6.nnfUnknown')}</Badge>;
   }
-  if (status.nnf_app_installed === false) {
+  if (status.nnf_app_installed) {
     return (
-      <span className="text-xs text-warning-fg ml-1">
-        · {t('asset.mdm.step6.nnfMissing')}
-        {status.nnf_app_checked_at && <> (<RelativeDateTime value={status.nnf_app_checked_at} />)</>}
-      </span>
+      <>
+        <Badge color="success" startIcon={<CheckCircle size={12} />}>{t('asset.mdm.step6.nnfInstalled')}</Badge>
+        {status.nnf_app_checked_at && <span className="text-xs text-subtler"><RelativeDateTime value={status.nnf_app_checked_at} /></span>}
+      </>
     );
   }
-  return <span className="text-xs text-subtler ml-1">· {t('asset.mdm.step6.nnfUnknown')}</span>;
+  return (
+    <>
+      <Badge color="warning" startIcon={<XCircle size={12} />}>{t('asset.mdm.step6.nnfNotInstalled')}</Badge>
+      {status.nnf_app_checked_at && <span className="text-xs text-subtler"><RelativeDateTime value={status.nnf_app_checked_at} /></span>}
+    </>
+  );
+}
+
+/** Escrow (Activation-Lock bypass) key window. Order matters: check
+ *  window_status==null FIRST (not enrolled), else has_code, else OK vs EXPIRED.
+ *  has_code alone means nothing — an unenrolled device has has_code=false too. */
+function EscrowBadge({ status }: { status: EnrollStatus }) {
+  const { t } = useTranslation();
+  if (status.escrow_window_status == null) {
+    return <Badge color="default" startIcon={<HelpCircle size={12} />}>{t('asset.mdm.step6.escrowNotEnrolled')}</Badge>;
+  }
+  if (status.escrow_has_code) {
+    return <Badge color="success" startIcon={<KeyRound size={12} />}>{t('asset.mdm.step6.escrowHasKey')}</Badge>;
+  }
+  if (status.escrow_window_status === 'OK') {
+    return (
+      <Badge color="warning" startIcon={<AlertTriangle size={12} />}>
+        {t('asset.mdm.step6.escrowRacing', { days: status.escrow_days_remaining ?? 0 })}
+      </Badge>
+    );
+  }
+  return <Badge color="danger" startIcon={<XCircle size={12} />}>{t('asset.mdm.step6.escrowMissed')}</Badge>;
 }
 
 function DeviceInfo({ status }: { status: EnrollStatus }) {
@@ -529,14 +613,14 @@ function DeviceInfo({ status }: { status: EnrollStatus }) {
   );
 }
 
-/** Comma-joined labels of the still-incomplete groups, for the summary line. */
+/** Comma-joined labels of the still-incomplete groups, for the summary line.
+ *  Step 6 is informational (auto-detected badges) and never blocks handover. */
 function remainingStepLabels(
   t: (k: string) => string,
-  { enrollComplete, step6Complete, step7Done }: { enrollComplete: boolean; step6Complete: boolean; step7Done: boolean },
+  { enrollComplete, step7Done }: { enrollComplete: boolean; step7Done: boolean },
 ): string {
   const parts: string[] = [];
   if (!enrollComplete) parts.push(t('asset.mdm.readiness.stepEnroll'));
-  if (!step6Complete) parts.push(t('asset.mdm.readiness.step6'));
   if (!step7Done) parts.push(t('asset.mdm.readiness.step7'));
   return parts.join(', ');
 }

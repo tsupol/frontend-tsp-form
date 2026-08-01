@@ -2284,22 +2284,26 @@
         "notReady": "Not ready to hand over yet",
         "remaining": "Still to do: {{steps}}",
         "stepEnroll": "finish enrollment (steps 1–5)",
-        "step6": "step 6 (iCloud + NNF app)",
         "step7": "step 7 (baseline lock)"
       },
       "step6": {
-        "title": "Customer signs into iCloud + installs the NNF app",
-        "icloud": "Customer has signed into iCloud on this device (can't be changed after the next step)",
-        "nnfApp": "The NNF app is installed on this device",
-        "nnfFound": "app detected",
-        "nnfMissing": "NNF app not found yet",
-        "nnfUnknown": "not checked yet — pull the app list on the status tab"
+        "title": "Device status (auto-detected)",
+        "nnfAppLabel": "NNF app",
+        "nnfInstalled": "Installed",
+        "nnfNotInstalled": "Not installed",
+        "nnfUnknown": "Not checked yet",
+        "escrowLabel": "Unlock key",
+        "escrowNotEnrolled": "Not enrolled yet",
+        "escrowHasKey": "Key secured",
+        "escrowRacing": "No key yet · {{days}} days left",
+        "escrowMissed": "No key (window expired)"
       },
       "step7": {
         "title": "Apply baseline lock",
         "desc": "Locks the device to the baseline profile so the customer can't sign out of iCloud or wipe it. Stays on for the whole contract.",
         "button": "Apply baseline lock",
-        "needStep6": "Tick both step 6 confirmations first — after this the customer can no longer sign into iCloud.",
+        "lockLabel": "Lock",
+        "wallpaperOnlyWarn": "Dunning wallpaper only — no real restriction on the device.",
         "noPermission": "You don't have permission to lock this device.",
         "done": "Baseline lock applied",
         "verifyPending": "waiting for the device to confirm",
@@ -2307,15 +2311,39 @@
         "confirmTitle": "Apply baseline lock?",
         "confirmBody": "This sends the baseline restriction profile to the device. It stays on until the contract ends.",
         "confirmButton": "Apply lock",
-        "irreversibleNote": "After this, the customer can no longer sign into iCloud on this device. Make sure step 6 is truly done.",
+        "reminderTitle": "Before you lock, confirm that:",
+        "reminderIcloud": "iCloud is signed in",
+        "reminderFindMy": "Find My iPhone is on",
+        "reminderNnfApp": "The NNF app is installed",
+        "blocked": {
+          "NOT_IN_MDM": "Device isn't enrolled yet",
+          "NO_PERMISSION": "You don't have permission to lock this device.",
+          "COMMAND_IN_FLIGHT": "A lock/unlock command is in flight — hold on",
+          "ENFORCEMENT_PAUSED": "Enforcement is paused on this device",
+          "ALREADY_ENFORCED": "Already locked",
+          "HIGHER_LEVEL_ACTIVE": "A higher lock level is active"
+        },
         "flag": {
           "allowAccountModification": "Can't add or change accounts (incl. iCloud)",
           "allowModifyFindMy": "Can't turn off Find My",
           "allowHostPairing": "Can't pair with a computer",
           "allowProfileInstallation": "Can't install other profiles",
           "allowEraseContentAndSettings": "Can't erase all content and settings",
-          "allowSystemAppRemoval": "Can't remove system apps"
+          "allowSystemAppRemoval": "Can't remove system apps",
+          "allowAppRemoval": "Can't remove apps",
+          "allowCloudPrivateRelay": "iCloud Private Relay off",
+          "allowESIMOutgoingTransfers": "Can't transfer eSIM out"
         }
+      },
+      "lock": {
+        "NOT_IN_MDM": "Not enrolled yet",
+        "APPLYING": "Sending command…",
+        "NONE": "Not locked",
+        "WALLPAPER_ONLY": "Dunning wallpaper only",
+        "LIGHT": "Baseline lock",
+        "MEDIUM": "Medium lock",
+        "HARD": "Hard lock",
+        "PAUSED": "Enforcement paused"
       },
       "badge": {
         "NO_SERIAL": {
