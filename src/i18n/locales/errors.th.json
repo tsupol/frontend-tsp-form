@@ -336,7 +336,7 @@
   "CONTRACT.VALIDATION.BRANCH_INACTIVE": "สาขาไม่ได้เปิดใช้งาน",
   "CONTRACT.VALIDATION.CUSTOMER_REQUIRED": "ต้องระบุลูกค้า",
   "CONTRACT.VALIDATION.AGREED_PRICE_REQUIRED": "ต้องระบุราคาที่ตกลง",
-  "CONTRACT.VALIDATION.CO_LESSEE_REQUIRED_FOR_MINOR": "ต้องมีผู้เช่าร่วม (ลูกค้าอายุต่ำกว่า 18 ปี)",
+  "CONTRACT.VALIDATION.CO_LESSEE_REQUIRED_FOR_MINOR": "ลูกค้าอายุต่ำกว่า 20 ปี — แนะนำให้เพิ่มผู้เช่าร่วมที่เป็นผู้ใหญ่ (ไม่บังคับ)",
   "CONTRACT.VALIDATION.REFERENCE_REQUIRED": "ต้องมีบุคคลอ้างอิงอย่างน้อย 1 ราย",
   "CONTRACT.VALIDATION.MODEL_REQUIRED": "ต้องเลือกรุ่นสินค้า",
   "CONTRACT.VALIDATION.ASSET_CROSS_HOLDING": "เครื่องนี้เป็นของอีก holding ผูกกับสัญญานี้ไม่ได้",

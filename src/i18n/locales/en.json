@@ -4906,7 +4906,7 @@
     "noCoLessee": "No co-lessee selected",
     "coLesseeSkipped": "Co-lessee skipped",
     "coLesseeNotNeeded": "Not needed (customer is 20+)",
-    "coLesseeRequired": "Required (customer is under 20)",
+    "coLesseeRequired": "Recommended (customer is under 20)",
     "coLesseeSigOptionalNote": "Signing now is optional. The co-lessee can sign together with the customer from the Documents step, or by hand on the printed contract.",
     "coLesseeSignature": "Co-lessee signature",
     "needCustomerFirst": "Register customer first",

@@ -336,7 +336,7 @@
   "CONTRACT.VALIDATION.BRANCH_INACTIVE": "Branch is inactive",
   "CONTRACT.VALIDATION.CUSTOMER_REQUIRED": "Customer is required",
   "CONTRACT.VALIDATION.AGREED_PRICE_REQUIRED": "Agreed price is required",
-  "CONTRACT.VALIDATION.CO_LESSEE_REQUIRED_FOR_MINOR": "Co-lessee is required (customer is under 18)",
+  "CONTRACT.VALIDATION.CO_LESSEE_REQUIRED_FOR_MINOR": "Customer is under 20 — an adult co-lessee is recommended, not required.",
   "CONTRACT.VALIDATION.REFERENCE_REQUIRED": "At least one reference is required",
   "CONTRACT.VALIDATION.MODEL_REQUIRED": "Product model is required",
   "CONTRACT.VALIDATION.ASSET_CROSS_HOLDING": "That device belongs to another holding and can't be bound to this contract",
