@@ -629,7 +629,7 @@ export function BranchStockPage() {
       <RetailWriteOffModal
         target={writeOffTarget}
         onClose={() => setWriteOffTarget(null)}
-        onDone={() => setWriteOffTarget(null)}
+        onDone={() => { /* modal shows its done view; it invalidates the list itself. Do NOT close here. */ }}
       />
 
       {/* Off-screen print portal — mounted only during the print flow. */}
