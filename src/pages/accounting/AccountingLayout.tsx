@@ -29,8 +29,8 @@ export function AccountingLayout({ children }: { children: ReactNode }) {
   // Financier form filling is a branch/company chore — hide from holding-scope
   // users (HOLDING_ADMIN / HOLDING_VIEWER), who never fill a branch's form.
   const canSeeFinancier = [
-    'BRANCH_MANAGER', 'COMPANY_ADMIN', 'COMPANY_ACCOUNTANT', 'COMPANY_INVENTORY',
-    'SYSTEM_DEV',
+    'BRANCH_MANAGER', 'BRANCH_COLLECTOR', 'COMPANY_ADMIN', 'COMPANY_ACCOUNTANT',
+    'COMPANY_INVENTORY', 'SYSTEM_DEV',
   ].includes(user?.role_code ?? '');
   const { unclosedCount } = useNavCounts();
 

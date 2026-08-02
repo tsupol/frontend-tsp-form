@@ -375,7 +375,7 @@ export const AppSideNav = () => {
         ] : []),
         // Financier form filling is a branch/company chore — holding-scope users
         // (HOLDING_ADMIN / HOLDING_VIEWER) never do it, so hide it from them.
-        ...(['BRANCH_MANAGER', 'COMPANY_ADMIN', 'COMPANY_ACCOUNTANT', 'COMPANY_INVENTORY', 'SYSTEM_DEV'].includes(role) ? [
+        ...(['BRANCH_MANAGER', 'BRANCH_COLLECTOR', 'COMPANY_ADMIN', 'COMPANY_ACCOUNTANT', 'COMPANY_INVENTORY', 'SYSTEM_DEV'].includes(role) ? [
           { key: 'financier-form', icon: <ClipboardList size="1rem" />, label: t('nav.financierForm'), path: '/admin/accounting/financier-form' },
         ] : []),
         ...(['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
