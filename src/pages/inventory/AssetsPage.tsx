@@ -582,7 +582,7 @@ export function AssetsPage() {
   };
 
   return (
-    <PageNav panels={['list', 'detail']} className="h-dvh">
+    <PageNav panels={['list', 'detail']} defaultPanel={selectedId ? 'detail' : 'list'} className="h-dvh">
       {({ isMobile, isRoot, goTo, goBack }) => (
         <>
           {isMobile && (
