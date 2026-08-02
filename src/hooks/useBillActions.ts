@@ -14,6 +14,7 @@ export type BillActionCode =
   | 'CANCEL_APPROVAL'
   | 'CANCEL_BILL'
   | 'VOID_BILL'
+  | 'CANCEL_CLOSED_DAY'
   | 'REVERSE_BILL'
   | 'REVERSE_CREDIT_NOTE';
 
@@ -25,7 +26,13 @@ export type BillBlockingReason =
   | 'bill_is_a_reversal'
   | 'pending_approval_blocks'
   | 'not_paid_in_full'
-  | 'permission_denied';
+  | 'permission_denied'
+  // CANCEL_CLOSED_DAY day-close guards (mig 953+954). The three lifecycle verbs
+  // are mutually exclusive: a bill's day is either closed (only CANCEL_CLOSED_DAY)
+  // or not (only CANCEL_BILL/VOID_BILL), and a reversed bill blocks all of them.
+  | 'day_closed'
+  | 'day_not_closed'
+  | 'bill_already_reversed';
 
 export interface BillAction {
   action_code: BillActionCode;

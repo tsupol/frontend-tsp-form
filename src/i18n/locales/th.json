@@ -690,6 +690,9 @@
       "installment": "ผ่อน (จ่ายค่างวด)",
       "accessory": "อุปกรณ์ (ยอดรายวัน)"
     },
+    "incomplete_MISSING_EXTERNAL_REF": "ต้องกรอกรหัสลูกค้าของนายทุนก่อน",
+    "incomplete_generic": "แถวนี้ข้อมูลยังไม่ครบ",
+    "incompleteHint": "ไปกรอกรหัสอ้างอิงนายทุนที่หน้าเครื่อง แล้วกลับมากด \"ดึงข้อมูล\"",
     "status": {
       "pending": "รอส่ง",
       "sent": "ส่งแล้ว",
@@ -3114,7 +3117,33 @@
     "billStatus_OPEN": "เปิดอยู่",
     "billStatus_PARTIAL": "ชำระบางส่วน",
     "billStatus_PAID": "ชำระแล้ว",
-    "billStatus_VOIDED": "ยกเลิกแล้ว"
+    "billStatus_VOIDED": "ยกเลิกแล้ว",
+    "ocrReading": "กำลังอ่านสลิป…",
+    "ocrMatch": "ตรงกับสลิป",
+    "ocrNonSlip": "รูปนี้อาจไม่ใช่สลิปธนาคาร — ตรวจก่อนอนุมัติ",
+    "ocrNonSlipShort": "อาจไม่ใช่สลิป",
+    "ocrAmountMismatch": "ยอดไม่ตรงสลิป: สลิป {{amount}}",
+    "ocrDateMismatch": "วันโอนบนสลิป:",
+    "ocrReviewNeeded": "OCR อ่านไม่ชัด ดูรูปประกอบ",
+    "dupSeenBefore": "สลิปนี้เคยส่งแล้ว ({{count}} ครั้ง)",
+    "dupCrossCustomer": "⚠ สลิปนี้ถูกใช้กับลูกค้าคนละราย",
+    "dupVia_HASH": "รูปเดียวกัน",
+    "dupVia_TXREF": "เลขอ้างอิงตรงกัน",
+    "dupVia_HASH+TXREF": "รูป+เลขอ้างอิงตรงกัน",
+    "dupFirstSeen": "รายการแรกสุด",
+    "dupShort": "สลิปซ้ำ"
+  },
+  "slipDup": {
+    "title": "สลิปนี้อาจซ้ำ",
+    "crossCustomer": "สลิปใบนี้เคยถูกใช้กับลูกค้าคนละราย การส่งซ้ำอาจทำให้ยอดเข้าซ้ำ",
+    "priorApproved": "สลิปนี้ถูกใช้ชำระไปแล้วเมื่อ",
+    "priorPending": "สลิปนี้อยู่ระหว่างรอตรวจอยู่แล้ว การส่งซ้ำไม่ทำให้เร็วขึ้น",
+    "priorRejected": "สลิปนี้เคยส่งและถูกปฏิเสธ — ส่งใหม่ได้",
+    "generic": "สลิปนี้เคยส่งแล้ว ({{count}} ครั้ง)",
+    "firstSeen": "รายการแรกสุด:",
+    "otherCount": "และพบในรายการของลูกค้าอื่นอีก {{count}} รายการ",
+    "proceed": "ส่งต่อ",
+    "cancel": "ยกเลิก"
   },
   "situation": {
     "CURRENT": "ปกติ",
@@ -6009,10 +6038,25 @@
         "CANCEL_APPROVAL": "ยกเลิกการขออนุมัติ",
         "CANCEL_BILL": "ยกเลิกบิล",
         "VOID_BILL": "Void บิล (PAID)",
+        "CANCEL_CLOSED_DAY": "ยกเลิกบิล (วันปิดแล้ว)",
         "REVERSE_BILL": "ทำใบลดหนี้ (Reverse)",
         "REVERSE_CREDIT_NOTE": "กลับรายการคืนเงิน",
         "PRINT": "พิมพ์ใบเสร็จ",
         "DOWNLOAD_PDF": "ดาวน์โหลด PDF"
+      },
+      "cancelClosedDay": {
+        "title": "ยกเลิกบิล (วันปิดยอดไปแล้ว)",
+        "warning": "วันของบิลนี้ปิดยอดไปแล้ว การยกเลิกจะทำให้ยอดปิดวันนั้นถูกคำนวณใหม่ (สร้าง version ใหม่)",
+        "reasonPlaceholder": "เหตุผลที่ยกเลิกบิลนี้ (เช่น สลิปซ้ำ)",
+        "confirm": "ยกเลิกบิล",
+        "doneHeadline": "ยกเลิกบิลแล้ว",
+        "cancelledBill": "บิลที่ยกเลิก",
+        "creditNoteDate": "วันที่ใบลดหนี้",
+        "installmentsReversed": "งวดที่กลับมาค้างจ่าย",
+        "installmentNo": "งวด {{no}}",
+        "paymentsReversed": "ยอดที่กลับรายการ",
+        "dayCloseAdjusted": "ปิดวันคำนวณใหม่",
+        "viewContract": "เปิดสัญญา"
       },
       "reverseCn": {
         "title": "กลับรายการคืนเงิน",

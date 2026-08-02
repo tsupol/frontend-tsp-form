@@ -63,6 +63,10 @@ interface FeedRow {
   branch_id: number;
   branch_name: string;
   category_rank: number;
+  // mig 025/58 — non-null means the row is missing data and can't be opened/sent
+  // (currently only 'MISSING_EXTERNAL_REF'). Visible in the list, but open/send is
+  // disabled; skip stays allowed. Fix by filling the ref on the asset, then re-fetch.
+  incomplete_reason: string | null;
 }
 
 /** Column order per §7 — must match the field order in the Google Form so a
@@ -653,6 +657,8 @@ function FeedRowItem({
   const isSkipped = row.status === 'skipped';
   const isPending = row.status === 'pending';
   const opened = !!row.opened_at;
+  // Row is missing required data (e.g. external_ref) — visible but not sendable.
+  const isIncomplete = !!row.incomplete_reason;
 
   return (
     <div className={`flex items-start gap-3 py-2.5 ${isSkipped ? 'opacity-55' : ''}`}>
@@ -674,7 +680,17 @@ function FeedRowItem({
         </div>
         <div className="text-sm mt-0.5 break-words">{rowPreview(row)}</div>
 
-        {nudge && isPending && (
+        {isIncomplete && (
+          <div className="mt-2 flex items-start gap-2 text-xs bg-warning-soft border border-warning-border rounded-md px-2.5 py-1.5">
+            <AlertTriangle size={14} className="text-warning-fg shrink-0 mt-0.5" />
+            <div className="text-warning-fg">
+              <div>{t(`financierForm.incomplete_${row.incomplete_reason}`, { defaultValue: t('financierForm.incomplete_generic') })}</div>
+              <div className="text-subtle mt-0.5">{t('financierForm.incompleteHint')}</div>
+            </div>
+          </div>
+        )}
+
+        {nudge && isPending && !isIncomplete && (
           <div className="mt-2 flex items-center gap-2 text-xs bg-warning-soft border border-warning-border rounded-md px-2.5 py-1.5">
             <span className="text-warning-fg flex-1">{t('financierForm.sentPrompt')}</span>
             <button type="button" className="text-primary-fg hover:underline bg-transparent border-none cursor-pointer p-0 font-medium" onClick={onMarkSent}>
@@ -698,7 +714,7 @@ function FeedRowItem({
             <Button
               size="sm"
               variant="outline"
-              disabled={busy || !row.prefill_url}
+              disabled={busy || !row.prefill_url || isIncomplete}
               startIcon={<ExternalLink size={14} />}
               onClick={onOpen}
             >
@@ -707,7 +723,7 @@ function FeedRowItem({
             <Button
               size="sm"
               variant={opened ? 'primary' : 'outline'}
-              disabled={busy}
+              disabled={busy || isIncomplete}
               onClick={onMarkSent}
             >
               {t('financierForm.markSent')}

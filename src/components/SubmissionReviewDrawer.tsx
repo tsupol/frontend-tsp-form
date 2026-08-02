@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   Badge, Select, Button, Drawer, TextArea,
 } from 'tsp-form';
-import { XCircle, AlertTriangle, ImageOff, ExternalLink } from 'lucide-react';
+import { XCircle, AlertTriangle, ImageOff, ExternalLink, CheckCircle, Loader2, Copy } from 'lucide-react';
 import { apiClient, ApiError } from '../lib/api';
 import { wsClient } from '../lib/api/ws';
 import { DateTime } from './DateTime';
@@ -68,6 +68,26 @@ export interface SubmissionRow {
   payment_is_voided: boolean;
   is_voided: boolean;
   void_reason_code: string | null;
+  // OCR advisory (mig 958) — the system reads the slip after submit and compares
+  // it to what was entered. ALL advisory: never bind approve/reject to these.
+  // match fields are 3-state — null = "not known yet", never render as mismatch.
+  ocr_status: 'DONE' | 'PENDING' | 'ERROR' | 'NON_SLIP' | null;
+  ocr_amount: number | null;
+  ocr_amount_match: boolean | null;
+  ocr_transfer_at: string | null;
+  ocr_date_match: boolean | null;
+  ocr_review_needed: boolean | null;
+  // Duplicate-slip advisory (doc 64 §5.1) — same slip file/txref seen on another
+  // submission in this holding. Advisory only; the common case is a re-send after
+  // REJECT (dup_first_status='REJECTED' — nothing alarming).
+  is_duplicate_slip: boolean;
+  dup_count: number | null;
+  dup_match_via: 'HASH' | 'TXREF' | 'HASH+TXREF' | null;
+  dup_first_submission_id: number | null;
+  dup_first_code_display: string | null;
+  dup_first_status: SubmissionStatus | null;
+  dup_first_submitted_at: string | null;
+  dup_cross_customer: boolean | null;
 }
 
 interface EntityMedia {
@@ -271,6 +291,11 @@ export function SubmissionReviewDrawer({
                 <div><div className="alert-description text-xs">{t('paymentSubmissions.cancelledByCustomer')}</div></div>
               </div>
             )}
+
+            {/* Advisory signals — duplicate slip + OCR read-back. Both are hints for
+                the reviewer, never blockers (approve/reject stay driven by allowed_actions). */}
+            <DuplicateAdvisory row={row} />
+            <OcrAdvisory row={row} />
 
             {/* Money reversed — an APPROVED slip can still have its payment voided
                 (whole bill cancelled, or just this payment reversed to a CN). The
@@ -504,6 +529,115 @@ export function SubmissionReviewDrawer({
         alt="slip"
       />
     </>
+  );
+}
+
+// OCR advisory — reads slip vs. entered values. Advisory only; the reviewer still
+// decides. 3-state matches: only render a mismatch on IS FALSE, never on null.
+function OcrAdvisory({ row }: { row: SubmissionRow }) {
+  const { t } = useTranslation();
+  const s = row.ocr_status;
+  // NULL (pre-OCR rows) / ERROR (unreadable — retrying) → show nothing. "Can't read"
+  // is not "customer is wrong". PENDING shows a faint "reading…" note only.
+  if (s == null || s === 'ERROR') return null;
+
+  if (s === 'PENDING') {
+    return (
+      <div className="flex items-center gap-1.5 text-xs text-subtle">
+        <Loader2 size={13} className="animate-spin" />
+        <span>{t('paymentSubmissions.ocrReading')}</span>
+      </div>
+    );
+  }
+
+  if (s === 'NON_SLIP') {
+    return (
+      <div className="alert alert-danger">
+        <AlertTriangle size={16} />
+        <div><div className="alert-description text-xs">{t('paymentSubmissions.ocrNonSlip')}</div></div>
+      </div>
+    );
+  }
+
+  // s === 'DONE'
+  const amountMismatch = row.ocr_amount_match === false;
+  const dateMismatch = row.ocr_date_match === false;
+  const reviewNeeded = row.ocr_review_needed === true;
+  const allClear = !amountMismatch && !dateMismatch && !reviewNeeded;
+
+  if (allClear) {
+    return (
+      <div className="flex items-center gap-1.5 text-xs text-success-fg">
+        <CheckCircle size={13} />
+        <span>{t('paymentSubmissions.ocrMatch')}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1.5">
+      {amountMismatch && (
+        <div className="alert alert-warning">
+          <AlertTriangle size={14} />
+          <div className="alert-description text-xs">
+            {t('paymentSubmissions.ocrAmountMismatch', {
+              amount: row.ocr_amount != null ? fmtCurrency(row.ocr_amount) : '—',
+            })}
+          </div>
+        </div>
+      )}
+      {dateMismatch && (
+        <div className="alert alert-warning">
+          <AlertTriangle size={14} />
+          <div className="alert-description text-xs inline-flex flex-wrap items-center gap-1">
+            <span>{t('paymentSubmissions.ocrDateMismatch')}</span>
+            {row.ocr_transfer_at && <DateTime value={row.ocr_transfer_at} />}
+          </div>
+        </div>
+      )}
+      {reviewNeeded && (
+        <div className="flex items-center gap-1.5 text-xs text-subtle">
+          <AlertTriangle size={13} />
+          <span>{t('paymentSubmissions.ocrReviewNeeded')}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Duplicate-slip advisory — same slip file/txref already on another submission.
+// Advisory only. Staff see the first duplicate's code + a cross-customer flag.
+function DuplicateAdvisory({ row }: { row: SubmissionRow }) {
+  const { t } = useTranslation();
+  if (!row.is_duplicate_slip) return null;
+
+  const cross = row.dup_cross_customer === true;
+  const via = row.dup_match_via;
+  return (
+    <div className={`alert ${cross ? 'alert-danger' : 'alert-warning'}`}>
+      <Copy size={16} />
+      <div className="min-w-0">
+        <div className="alert-description text-xs space-y-1">
+          <div>
+            {cross
+              ? t('paymentSubmissions.dupCrossCustomer')
+              : t('paymentSubmissions.dupSeenBefore', { count: row.dup_count ?? 1 })}
+            {via && <> · {t(`paymentSubmissions.dupVia_${via}`, { defaultValue: via })}</>}
+          </div>
+          {row.dup_first_code_display && (
+            <div className="inline-flex items-center gap-1.5 flex-wrap">
+              <span className="text-subtle">{t('paymentSubmissions.dupFirstSeen')}</span>
+              <span className="font-medium tabular-nums">{row.dup_first_code_display}</span>
+              {row.dup_first_status && (
+                <Badge size="xs" color={submissionStatusColor(row.dup_first_status)}>
+                  {t(`paymentSubmissions.status_${row.dup_first_status}`)}
+                </Badge>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 

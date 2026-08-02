@@ -691,6 +691,9 @@
       "installment": "Installments (payments)",
       "accessory": "Accessories (daily totals)"
     },
+    "incomplete_MISSING_EXTERNAL_REF": "Enter the financier customer ref first",
+    "incomplete_generic": "This row is missing required data",
+    "incompleteHint": "Fill the financier ref on the device page, then press Fetch again.",
     "status": {
       "pending": "Pending",
       "sent": "Sent",
@@ -3117,7 +3120,33 @@
     "billStatus_OPEN": "Open",
     "billStatus_PARTIAL": "Partial",
     "billStatus_PAID": "Paid",
-    "billStatus_VOIDED": "Voided"
+    "billStatus_VOIDED": "Voided",
+    "ocrReading": "Reading slip…",
+    "ocrMatch": "Matches the slip",
+    "ocrNonSlip": "This image may not be a bank slip — check before approving.",
+    "ocrNonSlipShort": "Not a slip?",
+    "ocrAmountMismatch": "Amount doesn't match the slip: slip reads {{amount}}",
+    "ocrDateMismatch": "Transfer date on slip:",
+    "ocrReviewNeeded": "OCR reading unclear — check the image.",
+    "dupSeenBefore": "This slip was already submitted ({{count}} times).",
+    "dupCrossCustomer": "⚠ This slip was used for a different customer.",
+    "dupVia_HASH": "same image",
+    "dupVia_TXREF": "same transaction ref",
+    "dupVia_HASH+TXREF": "same image & ref",
+    "dupFirstSeen": "First seen on",
+    "dupShort": "Duplicate"
+  },
+  "slipDup": {
+    "title": "This slip may be a duplicate",
+    "crossCustomer": "This exact slip was already used for a different customer. Sending it again may double-count the payment.",
+    "priorApproved": "This slip was already used to pay on",
+    "priorPending": "This slip is already waiting for review. Sending it again won't make it faster.",
+    "priorRejected": "This slip was submitted before and rejected — you can send it again.",
+    "generic": "This slip was already submitted ({{count}} times).",
+    "firstSeen": "First submission:",
+    "otherCount": "Also seen on {{count}} other customer's records.",
+    "proceed": "Send anyway",
+    "cancel": "Cancel"
   },
   "situation": {
     "CURRENT": "Current",
@@ -6014,10 +6043,25 @@
         "CANCEL_APPROVAL": "Cancel approval",
         "CANCEL_BILL": "Cancel bill",
         "VOID_BILL": "Void bill",
+        "CANCEL_CLOSED_DAY": "Cancel bill (day closed)",
         "REVERSE_BILL": "Reverse (credit note)",
         "REVERSE_CREDIT_NOTE": "Reverse refund",
         "PRINT": "Print",
         "DOWNLOAD_PDF": "Download PDF"
+      },
+      "cancelClosedDay": {
+        "title": "Cancel bill (day already closed)",
+        "warning": "This bill's day has already been closed. Cancelling it recomputes that day's closing total as a new version.",
+        "reasonPlaceholder": "Why is this bill being cancelled? (e.g. duplicate slip)",
+        "confirm": "Cancel bill",
+        "doneHeadline": "Bill cancelled",
+        "cancelledBill": "Cancelled bill",
+        "creditNoteDate": "Credit note date",
+        "installmentsReversed": "Installments back to unpaid",
+        "installmentNo": "Installment {{no}}",
+        "paymentsReversed": "Payments reversed",
+        "dayCloseAdjusted": "Day close recomputed",
+        "viewContract": "Open contract"
       },
       "reverseCn": {
         "title": "Reverse refund",

@@ -23,6 +23,7 @@ import { buildBillActionToast, hasBill, type StandardBillResponse } from '../../
 import { type Branch, type BillRow, type BillDetail, type BillPayment, type BillLineItem, todayISO } from './accountingTypes';
 import { CorrectLineModal } from './CorrectLineModal';
 import { CreditNoteReverseModal } from './CreditNoteReverseModal';
+import { CancelClosedDayModal } from './CancelClosedDayModal';
 import { useBillActions, type BillAction, type BillActionCode } from '../../hooks/useBillActions';
 import { useVoidReasons } from '../../hooks/useVoidReasons';
 import { BillReceipt } from '../contracts/workspace/BillReceipt';
@@ -460,6 +461,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
   // Void-single-payment state — the payment row the BM chose to void
   const [voidPayment, setVoidPayment] = useState<BillPayment | null>(null);
   const [reverseCnOpen, setReverseCnOpen] = useState(false);
+  const [cancelClosedDayOpen, setCancelClosedDayOpen] = useState(false);
 
   // Line-amount correction — the line the user chose to fix (opens the modal)
   const [correctLine, setCorrectLine] = useState<BillLineItem | null>(null);
@@ -980,6 +982,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
         actions={allActions}
         suppressLifecycle={suppressLifecycle}
         onVoidOrCancel={() => { setVoidOpen(true); setVoidError(''); setVoidReason(''); setVoidReasonCode(''); setVoidPin(''); }}
+        onCancelClosedDay={() => setCancelClosedDayOpen(true)}
         onReverseCreditNote={() => setReverseCnOpen(true)}
       />
 
@@ -1073,6 +1076,22 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
         onReversed={() => {
           queryClient.invalidateQueries({ queryKey: ['accounting', 'bill-detail', billId] });
           queryClient.invalidateQueries({ queryKey: ['bill-actions', billId] });
+          onBillChanged();
+        }}
+      />
+
+      {/* ── ยกเลิกบิลวันปิดแล้ว (CANCEL_CLOSED_DAY) ── */}
+      <CancelClosedDayModal
+        open={cancelClosedDayOpen}
+        onClose={() => setCancelClosedDayOpen(false)}
+        billId={billId}
+        billCode={detail.bill_code_display}
+        billAmount={detail.total_amount}
+        onCancelled={() => {
+          queryClient.invalidateQueries({ queryKey: ['accounting', 'bill-detail', billId] });
+          queryClient.invalidateQueries({ queryKey: ['bill-actions', billId] });
+          // The day-close was recomputed to a new version — refresh those views too.
+          queryClient.invalidateQueries({ queryKey: ['day-close'] });
           onBillChanged();
         }}
       />
@@ -1276,7 +1295,11 @@ const FOOTER_CATEGORIES: ReadonlySet<string> = new Set(['LIFECYCLE']);
 const PRIMARY_BY_STATUS: Record<string, BillActionCode[]> = {
   OPEN: ['CANCEL_BILL'],
   PARTIAL: ['CANCEL_BILL'],
-  PAID: ['VOID_BILL'],
+  // On a PAID bill whose day is still open, VOID_BILL is the primary verb; once the
+  // day is closed VOID_BILL is blocked and CANCEL_CLOSED_DAY takes its place. Both
+  // are primary — only one is ever is_available, so only one shows.
+  PAID: ['VOID_BILL', 'CANCEL_CLOSED_DAY'],
+  PAID_CLOSED: ['CANCEL_CLOSED_DAY'],
   VOIDED: [],
 };
 
@@ -1285,6 +1308,7 @@ const PRIMARY_BY_STATUS: Record<string, BillActionCode[]> = {
 const WIRED_ACTIONS: ReadonlySet<BillActionCode> = new Set<BillActionCode>([
   'CANCEL_BILL',
   'VOID_BILL',
+  'CANCEL_CLOSED_DAY',
   'REVERSE_CREDIT_NOTE',
 ]);
 
@@ -1292,10 +1316,11 @@ interface BillActionBarProps {
   actions: BillAction[];
   suppressLifecycle: boolean;
   onVoidOrCancel: () => void;
+  onCancelClosedDay: () => void;
   onReverseCreditNote: () => void;
 }
 
-function BillActionBar({ actions, suppressLifecycle, onVoidOrCancel, onReverseCreditNote }: BillActionBarProps) {
+function BillActionBar({ actions, suppressLifecycle, onVoidOrCancel, onCancelClosedDay, onReverseCreditNote }: BillActionBarProps) {
   const { t } = useTranslation();
   const [moreOpen, setMoreOpen] = useState(false);
   const moreTriggerRef = useRef<HTMLButtonElement>(null);
@@ -1326,6 +1351,8 @@ function BillActionBar({ actions, suppressLifecycle, onVoidOrCancel, onReverseCr
   const inferredStatus =
     actions.find(a => a.action_code === 'CONFIRM_PAYMENT' && a.is_available) ? 'PARTIAL'
     : actions.find(a => a.action_code === 'VOID_BILL' && a.is_available) ? 'PAID'
+    // Day-closed PAID bill: VOID_BILL is blocked, CANCEL_CLOSED_DAY is the live verb.
+    : actions.find(a => a.action_code === 'CANCEL_CLOSED_DAY' && a.is_available) ? 'PAID_CLOSED'
     : actions.find(a => a.action_code === 'CANCEL_BILL' && a.is_available) ? 'OPEN'
     : 'VOIDED';
 
@@ -1349,6 +1376,10 @@ function BillActionBar({ actions, suppressLifecycle, onVoidOrCancel, onReverseCr
     setMoreOpen(false);
     if (a.action_code === 'VOID_BILL' || a.action_code === 'CANCEL_BILL') {
       onVoidOrCancel();
+      return;
+    }
+    if (a.action_code === 'CANCEL_CLOSED_DAY') {
+      onCancelClosedDay();
       return;
     }
     if (a.action_code === 'REVERSE_CREDIT_NOTE') {
@@ -1384,7 +1415,7 @@ function BillActionBar({ actions, suppressLifecycle, onVoidOrCancel, onReverseCr
         </div>
       );
 
-    const isDanger = a.action_code === 'VOID_BILL' || a.action_code === 'CANCEL_BILL' || a.action_code === 'REVERSE_BILL' || a.action_code === 'REVERSE_CREDIT_NOTE';
+    const isDanger = a.action_code === 'VOID_BILL' || a.action_code === 'CANCEL_BILL' || a.action_code === 'CANCEL_CLOSED_DAY' || a.action_code === 'REVERSE_BILL' || a.action_code === 'REVERSE_CREDIT_NOTE';
     const startIcon = isDanger ? <Ban size={14} /> : undefined;
 
     return (

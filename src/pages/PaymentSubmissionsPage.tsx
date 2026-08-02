@@ -201,6 +201,16 @@ export function PaymentSubmissionsPage() {
             {row.is_voided && (
               <Badge size="xs" color="danger">{t('paymentSubmissions.voidedShort')}</Badge>
             )}
+            {/* Strongest advisory signals surfaced in the list so reviewers catch
+                them without opening each drawer (full detail lives in the drawer). */}
+            {row.ocr_status === 'NON_SLIP' && (
+              <Badge size="xs" color="danger">{t('paymentSubmissions.ocrNonSlipShort')}</Badge>
+            )}
+            {row.is_duplicate_slip && (
+              <Badge size="xs" color={row.dup_cross_customer === true ? 'danger' : 'warning'}>
+                {t('paymentSubmissions.dupShort')}
+              </Badge>
+            )}
           </div>
         </div>
         {/* Line 2 */}

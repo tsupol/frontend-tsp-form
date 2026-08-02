@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, Modal, Input, Select, TextArea, MaskedInput, Badge, Tooltip, PopOver, ImageUploader, useSnackbarContext } from 'tsp-form';
 import type { UploadedImage } from 'tsp-form';
-import { CheckCircle, XCircle, X, Pencil, Plus, Trash2, Loader2, ChevronsRight, ChevronDown, ExternalLink, Wrench, ArrowRight, Info, Receipt, Paperclip, MessageSquare, PenLine } from 'lucide-react';
+import { CheckCircle, XCircle, X, Pencil, Plus, Trash2, Loader2, ChevronsRight, ChevronDown, ExternalLink, Wrench, ArrowRight, Info, Receipt, Paperclip, MessageSquare, PenLine, AlertTriangle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { getRoleLabel } from '../../lib/roleLabel';
 import { fmtCurrency } from '../../lib/format';
@@ -2689,6 +2689,32 @@ interface PayInstallmentResult {
   days_early: number | null;
 }
 
+// fn_payment_slip_precheck response (staff view). Null fields are dropped by the
+// backend, so everything past is_duplicate/dup_count is optional.
+interface SlipPrecheck {
+  is_duplicate: boolean;
+  dup_count?: number;
+  match_via?: 'HASH' | 'TXREF' | 'HASH+TXREF';
+  own_prior_submission_id?: number;
+  own_prior_status?: 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+  own_prior_submitted_at?: string;
+  other_count?: number;
+  dup_first_submission_id?: number;
+  dup_first_code_display?: string;
+  dup_first_status?: 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+  dup_first_submitted_at?: string;
+  dup_cross_customer?: boolean;
+}
+
+const dupStatusColor = (s: 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | 'CANCELLED'): 'warning' | 'success' | 'danger' | 'default' => {
+  switch (s) {
+    case 'PENDING_REVIEW': return 'warning';
+    case 'APPROVED': return 'success';
+    case 'REJECTED': return 'danger';
+    case 'CANCELLED': return 'default';
+  }
+};
+
 interface ContractAfterPay {
   id: number;
   outstanding_amount: number | null;
@@ -2758,6 +2784,11 @@ function PayInstallmentModal({ open, contract, onClose }: {
     paidCount: number;
     totalInstallments: number;
   } | null>(null);
+  // Duplicate-slip precheck (doc: slip_duplicate_warn_before_submit). When the
+  // just-attached slip matches a prior submission, hold the media_id + precheck
+  // result here and show an advisory dialog. Advisory only — the user can always
+  // proceed. null = no pending warning.
+  const [dupPrecheck, setDupPrecheck] = useState<{ mediaId: number; info: SlipPrecheck } | null>(null);
 
   // Reset ONLY on the closed→open transition. Keying this on nextDue/outstanding
   // too made it re-run after a successful payment: onSuccess invalidates the
@@ -2783,6 +2814,7 @@ function PayInstallmentModal({ open, contract, onClose }: {
       setSlipFile(null);
       setSlipPreviewUrl(null);
       setSlipUploading(false);
+      setDupPrecheck(null);
     }
     wasOpen.current = open;
   }, [open, nextDue, outstanding]);
@@ -2964,6 +2996,37 @@ function PayInstallmentModal({ open, contract, onClose }: {
   // submission (staff-on-behalf, submit_channel='WEB'). No money moves here —
   // a reviewer approves the queued submission, which fires the real payment.
   // Mirrors the former standalone AttachSlipModal (per UI_SUMMARY/64 §6).
+  //
+  // Duplicate precheck: after fn_media_attach we ask fn_payment_slip_precheck
+  // whether this exact slip was already submitted. If so we STOP and show an
+  // advisory dialog (proceed / cancel). Advisory only — never blocks. If the
+  // precheck errors or times out, we skip the warning and create as normal
+  // (per doc: precheck must never become a failure point in the payment flow).
+
+  // Create step only — takes an already-attached media_id. Shared by the
+  // straight-through path and the "proceed anyway" button on the dup dialog.
+  const createSubmission = async (mediaId: number) =>
+    apiClient.rpc<{ submission_id: number }>(
+      'fn_payment_submission_create',
+      {
+        p_contract_id: contract.id,
+        p_amount: parsedAmount,
+        p_media_id: mediaId,
+        p_note: note.trim() || null,
+        p_submit_channel: 'WEB',
+        // PostgREST RPC overload: send all keys; null for unused fields.
+        p_transfer_at: null,
+        p_sender_account_name: null,
+        p_sender_bank: null,
+        p_sender_account_no: null,
+        p_receiver_account_name: null,
+        p_receiver_bank: null,
+        p_receiver_account_no: null,
+        p_transaction_ref: null,
+        p_ocr_source: 'MANUAL',
+      },
+    );
+
   const slipMutation = useMutation({
     mutationFn: async () => {
       if (!slipKey) {
@@ -2993,51 +3056,67 @@ function PayInstallmentModal({ open, contract, onClose }: {
           p_caption: t('contract.payInstallment_slipCaption', { defaultValue: 'Slip' }),
         },
       );
-      const submission = await apiClient.rpc<{ submission_id: number }>(
-        'fn_payment_submission_create',
-        {
-          p_contract_id: contract.id,
-          p_amount: parsedAmount,
+      // Advisory precheck — never let it break the flow.
+      let precheck: SlipPrecheck | null = null;
+      try {
+        precheck = await apiClient.rpc<SlipPrecheck>('fn_payment_slip_precheck', {
           p_media_id: mediaRes.media_id,
-          p_note: note.trim() || null,
-          p_submit_channel: 'WEB',
-          // PostgREST RPC overload: send all keys; null for unused fields.
-          p_transfer_at: null,
-          p_sender_account_name: null,
-          p_sender_bank: null,
-          p_sender_account_no: null,
-          p_receiver_account_name: null,
-          p_receiver_bank: null,
-          p_receiver_account_no: null,
-          p_transaction_ref: null,
-          p_ocr_source: 'MANUAL',
-        },
-      );
+          p_contract_id: contract.id,
+        });
+      } catch {
+        precheck = null;
+      }
+      if (precheck?.is_duplicate) {
+        // Hold here — the dialog decides. Return a sentinel so onSuccess doesn't
+        // treat this as a completed submission.
+        setDupPrecheck({ mediaId: mediaRes.media_id, info: precheck });
+        return { submission_id: null, held: true as const };
+      }
+      const submission = await createSubmission(mediaRes.media_id);
       return submission;
     },
     onSuccess: (res) => {
-      // Stash preview + amount for the done view; the media row now owns the R2
-      // object, so clear the working slip copies (handleClose won't delete it).
-      setSubmissionResult({
-        submissionId: res.submission_id ?? null,
-        amount: parsedAmount,
-        previewUrl: slipPreviewUrl,
-      });
-      setSlipKey(null);
-      setSlipFile(null);
-      setSlipPreviewUrl(null);
-      queryClient.invalidateQueries({ queryKey: ['entity-media', 'CONTRACT', contract.id, 'PAYMENT_SLIP'] });
-      queryClient.invalidateQueries({ queryKey: ['entity-media-count', 'CONTRACT', contract.id, 'PAYMENT_SLIP'] });
-      queryClient.invalidateQueries({ queryKey: ['contract-media', contract.id] });
-      queryClient.invalidateQueries({ queryKey: ['payment-submissions'] });
-      queryClient.invalidateQueries({ queryKey: ['payment-submissions-pending-count'] });
-      queryClient.invalidateQueries({ queryKey: ['nav', 'pending-submissions-summary'] });
-      setView('done');
+      if ((res as { held?: boolean }).held) return; // waiting on the dup dialog
+      onSubmissionCreated(res.submission_id ?? null);
     },
     onError: setApiError,
   });
 
-  const isSubmitting = mutation.isPending || slipMutation.isPending;
+  // Shared success handler for both the straight-through slip path and the
+  // "proceed anyway" button on the duplicate dialog.
+  const onSubmissionCreated = (submissionId: number | null) => {
+    // Stash preview + amount for the done view; the media row now owns the R2
+    // object, so clear the working slip copies (handleClose won't delete it).
+    setSubmissionResult({
+      submissionId,
+      amount: parsedAmount,
+      previewUrl: slipPreviewUrl,
+    });
+    setDupPrecheck(null);
+    setSlipKey(null);
+    setSlipFile(null);
+    setSlipPreviewUrl(null);
+    queryClient.invalidateQueries({ queryKey: ['entity-media', 'CONTRACT', contract.id, 'PAYMENT_SLIP'] });
+    queryClient.invalidateQueries({ queryKey: ['entity-media-count', 'CONTRACT', contract.id, 'PAYMENT_SLIP'] });
+    queryClient.invalidateQueries({ queryKey: ['contract-media', contract.id] });
+    queryClient.invalidateQueries({ queryKey: ['payment-submissions'] });
+    queryClient.invalidateQueries({ queryKey: ['payment-submissions-pending-count'] });
+    queryClient.invalidateQueries({ queryKey: ['nav', 'pending-submissions-summary'] });
+    setView('done');
+  };
+
+  // "Proceed anyway" from the duplicate dialog — the media is already attached,
+  // so we only run the create step with the held media_id.
+  const proceedMutation = useMutation({
+    mutationFn: () => {
+      if (!dupPrecheck) throw new Error('No pending slip');
+      return createSubmission(dupPrecheck.mediaId);
+    },
+    onSuccess: (res) => onSubmissionCreated(res.submission_id ?? null),
+    onError: setApiError,
+  });
+
+  const isSubmitting = mutation.isPending || slipMutation.isPending || proceedMutation.isPending;
   const submitMode = () => (mode === 'payNow' ? mutation.mutate() : slipMutation.mutate());
 
   const canSubmit = (() => {
@@ -3406,6 +3485,86 @@ function PayInstallmentModal({ open, contract, onClose }: {
               </Button>
             </div>
           )}
+        </div>
+      </Modal>
+
+      {/* Duplicate-slip advisory — shown after precheck flags a match, before the
+          submission is created. Advisory only: "Send anyway" always available.
+          Always mounted; visibility via open. */}
+      <Modal
+        open={!!dupPrecheck}
+        onClose={() => { if (!proceedMutation.isPending) setDupPrecheck(null); }}
+        maxWidth="26rem"
+        width="100%"
+      >
+        <div className="modal-header">
+          <h2 className="modal-title">{t('slipDup.title')}</h2>
+        </div>
+        <div className="modal-content">
+          {dupPrecheck && (() => {
+            const info = dupPrecheck.info;
+            const cross = info.dup_cross_customer === true;
+            const prior = info.own_prior_status;
+            // Severity: cross-customer is the loudest; APPROVED/PENDING own-prior next.
+            const variant = cross || prior === 'APPROVED' ? 'danger' : 'warning';
+            return (
+              <div className="space-y-3">
+                <div className={`alert alert-${variant}`}>
+                  <AlertTriangle size={16} />
+                  <div className="alert-description text-sm">
+                    {cross ? (
+                      t('slipDup.crossCustomer')
+                    ) : prior === 'APPROVED' ? (
+                      <span className="inline-flex flex-wrap items-center gap-1">
+                        <span>{t('slipDup.priorApproved')}</span>
+                        {info.own_prior_submitted_at && <DateTime value={info.own_prior_submitted_at} showTime={false} />}
+                      </span>
+                    ) : prior === 'PENDING_REVIEW' ? (
+                      t('slipDup.priorPending')
+                    ) : prior === 'REJECTED' || prior === 'CANCELLED' ? (
+                      t('slipDup.priorRejected')
+                    ) : (
+                      t('slipDup.generic', { count: info.dup_count ?? 1 })
+                    )}
+                  </div>
+                </div>
+
+                {/* First duplicate (staff detail) */}
+                {info.dup_first_code_display && (
+                  <div className="text-sm flex items-center gap-1.5 flex-wrap">
+                    <span className="text-subtle">{t('slipDup.firstSeen')}</span>
+                    <span className="font-medium tabular-nums">{info.dup_first_code_display}</span>
+                    {info.dup_first_status && (
+                      <Badge size="xs" color={dupStatusColor(info.dup_first_status)}>
+                        {t(`paymentSubmissions.status_${info.dup_first_status}`)}
+                      </Badge>
+                    )}
+                    {info.match_via && (
+                      <span className="text-xs text-subtle">· {t(`paymentSubmissions.dupVia_${info.match_via}`, { defaultValue: info.match_via })}</span>
+                    )}
+                  </div>
+                )}
+                {info.other_count != null && info.other_count > 0 && (
+                  <div className="text-xs text-subtle">{t('slipDup.otherCount', { count: info.other_count })}</div>
+                )}
+              </div>
+            );
+          })()}
+        </div>
+        <div className="modal-footer">
+          <Button
+            onClick={() => setDupPrecheck(null)}
+            disabled={proceedMutation.isPending}
+          >
+            {t('slipDup.cancel')}
+          </Button>
+          <Button
+            color="warning"
+            onClick={() => proceedMutation.mutate()}
+            disabled={proceedMutation.isPending}
+          >
+            {proceedMutation.isPending ? t('common.loading') : t('slipDup.proceed')}
+          </Button>
         </div>
       </Modal>
     </>
