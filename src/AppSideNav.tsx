@@ -38,7 +38,7 @@ import {
   // Fanout child icons — Commission
   UserCheck, ClipboardCheck,
   // Fanout child icons — Accounting
-  CalendarCheck, Receipt, ShieldAlert, Banknote, FileSpreadsheet, Coins, ArrowUpRight, ListChecks,
+  CalendarCheck, Receipt, ShieldAlert, Banknote, FileSpreadsheet, Coins, ArrowUpRight, ListChecks, ShoppingBag,
   // Fanout child icons — Branch expense
   Tag as TagIcon, BarChart3 as BarChartIcon, BookOpen as BookIcon, PieChart as PieChartIcon,
   // Fanout child icons — Collections
@@ -370,6 +370,8 @@ export const AppSideNav = () => {
         ...(['BRANCH_MANAGER', 'COMPANY_ADMIN', 'COMPANY_ACCOUNTANT', 'COMPANY_INVENTORY', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
           { key: 'contracts-opened', icon: <TrendingUp size="1rem" />, label: t('nav.contractsOpened'), path: '/admin/accounting/contracts-opened' },
           { key: 'opened-by-model', icon: <Package size="1rem" />, label: t('nav.openedByModel'), path: '/admin/accounting/opened-by-model' },
+          { key: 'retail-sales', icon: <ShoppingBag size="1rem" />, label: t('nav.retailSales'), path: '/admin/accounting/retail-sales' },
+          { key: 'retail-sales-by-type', icon: <PieChartIcon size="1rem" />, label: t('nav.retailSalesByType'), path: '/admin/accounting/retail-sales-by-type' },
           { key: 'collection-monthly', icon: <Wallet size="1rem" />, label: t('nav.collectionMonthly'), path: '/admin/accounting/collection-monthly' },
           { key: 'daily-reports', icon: <FileSpreadsheet size="1rem" />, label: t('nav.dailyReports'), path: '/admin/accounting/reports' },
         ] : []),

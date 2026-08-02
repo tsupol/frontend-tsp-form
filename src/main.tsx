@@ -15,6 +15,7 @@ import './app-theme.css';
 import './styles/typography.css';
 import './styles/layout.css';
 import './app.css';
+import './chart-theme.css';
 
 installRemoteLog();
 

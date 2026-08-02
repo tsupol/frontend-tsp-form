@@ -1,0 +1,57 @@
+/* ============================================================================
+ * Chart color set — a reusable, theme-aware categorical palette for report
+ * charts (retail-sales bars, by-type stacks, and any future multi-series
+ * chart). SOLID colors, one validated step per theme — never a
+ * `color-mix(… var(--color-bg))` blend (that darkens toward black in dark mode
+ * and made segments near-invisible).
+ *
+ * Six categorical slots (--chart-1 … --chart-6) in a fixed, CVD-safe order,
+ * plus semantic aliases so charts read by role (--chart-sold / --chart-gift)
+ * not by slot number. Assign slots in order; never cycle a 7th.
+ *
+ * Palette + per-mode steps are the dataviz skill's validated default set
+ * (first six of its eight hues). Validated with scripts/validate_palette.js
+ * against THIS project's chart surfaces (light bg #f3f3f6 / dark bg #111113):
+ *   light — all hard gates PASS (contrast WARN on low-L hues → relief via the
+ *           direct numeric labels each bar row already carries)
+ *   dark  — all hard gates PASS incl. ≥3:1 contrast on all six
+ * The stacked sold+gift pair (blue↔amber) is deliberately two hues: CVD ΔE ≈
+ * 27–31, normal-vision ΔE ≈ 30–37 — unmistakable in both themes and under CVD.
+ *
+ * Dark values are declared under BOTH a prefers-color-scheme media query (OS
+ * setting) and the [data-theme="dark"] scope (the app's theme toggle, which
+ * must win either way). Light is the :root default.
+ * ========================================================================== */
+
+:root {
+  --chart-1: #2a78d6; /* blue    */
+  --chart-2: #008300; /* green   */
+  --chart-3: #e87ba4; /* magenta */
+  --chart-4: #eda100; /* amber   */
+  --chart-5: #1baf7a; /* aqua    */
+  --chart-6: #eb6834; /* orange  */
+
+  /* Semantic aliases — reference these in chart code, not the slot numbers. */
+  --chart-sold: var(--chart-1); /* retail sold  */
+  --chart-gift: var(--chart-4); /* gift / promo */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --chart-1: #3987e5;
+    --chart-2: #008300;
+    --chart-3: #d55181;
+    --chart-4: #c98500;
+    --chart-5: #199e70;
+    --chart-6: #d95926;
+  }
+}
+
+:root[data-theme="dark"] {
+  --chart-1: #3987e5;
+  --chart-2: #008300;
+  --chart-3: #d55181;
+  --chart-4: #c98500;
+  --chart-5: #199e70;
+  --chart-6: #d95926;
+}

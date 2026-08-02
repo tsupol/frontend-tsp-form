@@ -168,6 +168,7 @@
   },
   "common": {
     "loading": "กำลังโหลด...",
+    "print": "พิมพ์",
     "previous": "ก่อนหน้า",
     "next": "ถัดไป",
     "createdAt": "สร้างเมื่อ",
@@ -481,6 +482,8 @@
     "dailyReports": "ประจำวัน",
     "contractsOpened": "เปิดสัญญา",
     "openedByModel": "เปิดสัญญาตามรุ่น",
+    "retailSales": "รายงานขายปลีก",
+    "retailSalesByType": "รายงานขายปลีกตามประเภท",
     "collectionMonthly": "เรียกเก็บ vs เก็บได้",
     "financierForm": "กรอกฟอร์ม RICH",
     "notifications": "การแจ้งเตือน",
@@ -566,6 +569,56 @@
     "noModel": "ไม่ระบุรุ่น",
     "others": "อื่น ๆ ({{count}} รุ่น)",
     "noData": "ไม่มีสัญญาที่เปิดในช่วงนี้"
+  },
+  "retailSales": {
+    "title": "รายงานขายปลีก",
+    "allBranches": "ทุกสาขา",
+    "exportCsv": "ส่งออก CSV",
+    "sumSaleQty": "ชิ้นที่ขาย",
+    "sumSaleAmount": "ยอดขาย",
+    "sumReturnAmount": "รับคืน",
+    "sumNetAmount": "สุทธิ",
+    "sumGiftQty": "ของแถม (ชิ้น)",
+    "legendSale": "ยอดขาย",
+    "legendNet": "สุทธิ",
+    "tipGift": "ของแถม",
+    "total": "รวม",
+    "noData": "ไม่มีการขายปลีกในเดือนนี้",
+    "accType": {
+      "case": "เคส",
+      "film": "ฟิล์ม",
+      "lens": "เลนส์",
+      "charger": "หัวชาร์จ",
+      "cable": "สายชาร์จ",
+      "other": "อื่น ๆ"
+    },
+    "col": {
+      "day": "วันที่",
+      "branchCode": "รหัสสาขา",
+      "branchName": "ชื่อสาขา",
+      "saleQty": "จำนวนขาย (ชิ้น)",
+      "saleAmount": "ยอดขาย (฿)",
+      "returnQty": "รับคืน (ชิ้น)",
+      "returnAmount": "ยอดคืน (฿)",
+      "netAmount": "สุทธิ (฿)",
+      "giftQty": "ของแถม (ชิ้น)",
+      "giftValue": "มูลค่าของแถม (฿)"
+    }
+  },
+  "retailSalesByType": {
+    "title": "รายงานขายปลีกตามประเภท",
+    "allCompanies": "ทุกบริษัท",
+    "legendRetail": "ขายปลีก",
+    "legendGift": "ของแถม",
+    "piecesN": "{{count}} ชิ้น",
+    "drillFor": "สินค้า — {{type}}",
+    "products": "สินค้า",
+    "selectHint": "เลือกประเภทเพื่อดูสินค้า",
+    "col": {
+      "type": "ประเภท",
+      "product": "สินค้า",
+      "salePct": "% ของยอดขาย"
+    }
   },
   "collectionMonthly": {
     "title": "รายงานเรียกเก็บ vs เก็บได้จริง",

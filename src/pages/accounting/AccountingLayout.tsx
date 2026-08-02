@@ -5,6 +5,7 @@ import { Badge } from 'tsp-form';
 import {
   CalendarCheck, Scale, Receipt, ShieldAlert, Banknote, FileSpreadsheet,
   ClipboardList, Coins, ArrowUpRight, TrendingUp, ListChecks, Package, Wallet,
+  ShoppingBag, PieChart,
 } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -50,6 +51,8 @@ export function AccountingLayout({ children }: { children: ReactNode }) {
     ...(canSeeReports ? [
       { type: 'link' as const, path: '/admin/accounting/contracts-opened', labelKey: 'nav.contractsOpened', icon: TrendingUp },
       { type: 'link' as const, path: '/admin/accounting/opened-by-model', labelKey: 'nav.openedByModel', icon: Package },
+      { type: 'link' as const, path: '/admin/accounting/retail-sales', labelKey: 'nav.retailSales', icon: ShoppingBag },
+      { type: 'link' as const, path: '/admin/accounting/retail-sales-by-type', labelKey: 'nav.retailSalesByType', icon: PieChart },
       { type: 'link' as const, path: '/admin/accounting/collection-monthly', labelKey: 'nav.collectionMonthly', icon: Wallet },
       { type: 'link' as const, path: '/admin/accounting/reports', labelKey: 'nav.dailyReports', icon: FileSpreadsheet },
     ] : []),
@@ -74,7 +77,9 @@ export function AccountingLayout({ children }: { children: ReactNode }) {
             );
           }
           const { path, labelKey, icon: Icon, badge } = item;
-          const isActive = pathname.startsWith(path);
+          // Exact match, or a real sub-path (path + '/…') — NOT a bare prefix,
+          // else '/retail-sales' would also light up on '/retail-sales-by-type'.
+          const isActive = pathname === path || pathname.startsWith(`${path}/`);
           const badgeLabel = badge && badge > 0 ? (badge > 99 ? '99+' : String(badge)) : null;
           return (
             <a

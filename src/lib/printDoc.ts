@@ -17,7 +17,7 @@
 // `body.printing-*` rules in src/app.css.
 // ============================================================================
 
-export type PrintMarker = 'bill' | 'barcode-sticker' | 'asset-sticker' | 'signing-detail' | 'stock-count';
+export type PrintMarker = 'bill' | 'barcode-sticker' | 'asset-sticker' | 'signing-detail' | 'stock-count' | 'retail-report';
 
 const bodyClass = (marker: PrintMarker) => `printing-${marker}`;
 

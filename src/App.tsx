@@ -108,6 +108,8 @@ import { AuditFlagsPage } from './pages/accounting/AuditFlagsPage';
 import { ReportsPage } from './pages/accounting/ReportsPage';
 import { ContractsOpenedReportPage } from './pages/accounting/ContractsOpenedReportPage';
 import { OpenedByModelReportPage } from './pages/accounting/OpenedByModelReportPage';
+import { RetailSalesMonthlyReportPage } from './pages/accounting/RetailSalesMonthlyReportPage';
+import { RetailSalesByTypeReportPage } from './pages/accounting/RetailSalesByTypeReportPage';
 import { CollectionMonthlyReportPage } from './pages/accounting/CollectionMonthlyReportPage';
 import { FinancierFormFeedPage } from './pages/accounting/FinancierFormFeedPage';
 import { BranchExpenseLayout } from './pages/branch-expense/BranchExpenseLayout';
@@ -1178,6 +1180,26 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <AccountingLayout><OpenedByModelReportPage /></AccountingLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/accounting/retail-sales"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <AccountingLayout><RetailSalesMonthlyReportPage /></AccountingLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/accounting/retail-sales-by-type"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <AccountingLayout><RetailSalesByTypeReportPage /></AccountingLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

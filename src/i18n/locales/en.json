@@ -169,6 +169,7 @@
   },
   "common": {
     "loading": "Loading...",
+    "print": "Print",
     "previous": "Previous",
     "next": "Next",
     "createdAt": "Created",
@@ -482,6 +483,8 @@
     "dailyReports": "Daily",
     "contractsOpened": "Opened",
     "openedByModel": "Opened by Model",
+    "retailSales": "Retail Sales",
+    "retailSalesByType": "Retail Sales by Type",
     "collectionMonthly": "Billed vs Collected",
     "financierForm": "Financier Form (RICH)",
     "notifications": "Notifications",
@@ -567,6 +570,56 @@
     "noModel": "No model",
     "others": "Others ({{count}} models)",
     "noData": "No contracts opened in this range"
+  },
+  "retailSales": {
+    "title": "Retail Sales",
+    "allBranches": "All branches",
+    "exportCsv": "Export CSV",
+    "sumSaleQty": "Pieces sold",
+    "sumSaleAmount": "Sales",
+    "sumReturnAmount": "Returns",
+    "sumNetAmount": "Net",
+    "sumGiftQty": "Gift pieces",
+    "legendSale": "Sales",
+    "legendNet": "Net",
+    "tipGift": "Gift",
+    "total": "Total",
+    "noData": "No retail sales this month",
+    "accType": {
+      "case": "Case",
+      "film": "Film",
+      "lens": "Lens",
+      "charger": "Charger",
+      "cable": "Cable",
+      "other": "Other"
+    },
+    "col": {
+      "day": "Day",
+      "branchCode": "Branch code",
+      "branchName": "Branch name",
+      "saleQty": "Pieces sold",
+      "saleAmount": "Sales (฿)",
+      "returnQty": "Returned pieces",
+      "returnAmount": "Returns (฿)",
+      "netAmount": "Net (฿)",
+      "giftQty": "Gift pieces",
+      "giftValue": "Gift value (฿)"
+    }
+  },
+  "retailSalesByType": {
+    "title": "Retail Sales by Type",
+    "allCompanies": "All companies",
+    "legendRetail": "Retail (sold)",
+    "legendGift": "Gift",
+    "piecesN": "{{count}} pcs",
+    "drillFor": "Products — {{type}}",
+    "products": "Products",
+    "selectHint": "Select a category to see its products",
+    "col": {
+      "type": "Type",
+      "product": "Product",
+      "salePct": "% of sales"
+    }
   },
   "collectionMonthly": {
     "title": "Billed vs Collected",
