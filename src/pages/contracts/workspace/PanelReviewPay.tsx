@@ -42,6 +42,7 @@ const BASE_PAYMENT_METHOD_VALUES = ['CASH', 'TRANSFER'] as const;
 interface ReadinessResult {
   ready: boolean;
   errors: Array<{ code: string; detail?: Record<string, unknown> }>;
+  warnings?: Array<{ code: string; severity?: string; detail?: Record<string, unknown> }>;
 }
 
 export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
@@ -67,6 +68,9 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
   // we treat the result as "unknown" so the alert doesn't show stale blockers
   // and Confirm doesn't reactivate prematurely.
   const readinessErrors = !readiness || readinessFetching || readiness.ready ? [] : readiness.errors;
+  // Non-blocking advisories (e.g. minor primary lessee). Shown regardless of
+  // ready — they never gate Confirm.
+  const readinessWarnings = !readiness || readinessFetching ? [] : (readiness.warnings ?? []);
   const readinessKnown = !!readiness && !readinessFetching;
   const readinessReady = readinessKnown && readiness.ready;
 
@@ -535,6 +539,34 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
                         key={i}
                         type="button"
                         className="text-left bg-transparent border-none p-0 text-danger hover:underline cursor-pointer text-sm"
+                        onClick={() => setOpenModal(targetModal)}
+                      >
+                        {label}
+                      </button>
+                    ) : (
+                      <span key={i} className="text-sm">{label}</span>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+            <div className="border-t border-line" />
+          </>
+        )}
+        {readinessWarnings.length > 0 && (
+          <>
+            <div className="px-4 py-2">
+              <div className="alert alert-warning">
+                <AlertTriangle size={16} />
+                <div className="flex flex-col gap-1 min-w-0 flex-1">
+                  {readinessWarnings.map((warn, i) => {
+                    const targetModal = ERROR_TO_MODAL[warn.code];
+                    const label = t(warn.code, { ns: 'apiErrors', defaultValue: warn.code });
+                    return targetModal ? (
+                      <button
+                        key={i}
+                        type="button"
+                        className="text-left bg-transparent border-none p-0 text-warning-fg hover:underline cursor-pointer text-sm"
                         onClick={() => setOpenModal(targetModal)}
                       >
                         {label}

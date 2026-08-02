@@ -200,9 +200,19 @@ export interface ReadinessError {
   detail?: unknown;
 }
 
+// Non-blocking advisories from fn_contract_validate_ready → warnings[].
+// `ready` gates on errors[] only; warnings never block signing (e.g. minor
+// primary lessee without an adult co-lessee — CO_LESSEE_REQUIRED_FOR_MINOR).
+export interface ReadinessWarning {
+  code: string;
+  severity?: string;
+  detail?: unknown;
+}
+
 export interface ReadinessResult {
   ready: boolean;
   errors: ReadinessError[];
+  warnings?: ReadinessWarning[];
 }
 
 // Map readiness error codes to which modal can fix them

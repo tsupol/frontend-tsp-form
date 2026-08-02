@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from 'tsp-form';
-import { CheckCircle, XCircle, Loader2, AlertCircle } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, AlertCircle, AlertTriangle } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { useWorkspace } from './WorkspaceContext';
 import type { ReadinessResult } from './WorkspaceTypes';
@@ -96,6 +96,29 @@ export function CardReadiness() {
                     >
                       <XCircle size={14} className="shrink-0" />
                       <span>{t(err.code, { ns: 'apiErrors', defaultValue: err.code })}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Non-blocking warnings (e.g. minor primary lessee). Shown even when
+                ready — they never gate the Create bill button. */}
+            {readiness.warnings && readiness.warnings.length > 0 && (
+              <div className="flex flex-col gap-1.5">
+                {readiness.warnings.map((warn, i) => {
+                  const targetModal = ERROR_TO_MODAL[warn.code];
+                  return (
+                    <button
+                      key={i}
+                      className={`flex items-center gap-2 text-sm text-left w-full text-warning-fg ${
+                        targetModal ? 'hover:underline cursor-pointer' : 'cursor-default'
+                      }`}
+                      onClick={targetModal ? () => setOpenModal(targetModal) : undefined}
+                      disabled={!targetModal}
+                    >
+                      <AlertTriangle size={14} className="shrink-0" />
+                      <span>{t(warn.code, { ns: 'apiErrors', defaultValue: warn.code })}</span>
                     </button>
                   );
                 })}
