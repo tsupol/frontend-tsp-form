@@ -6413,6 +6413,8 @@
     "notInMdm": "Not in MDM",
     "enrollButton": "Enroll",
     "lockButton": "Baseline lock",
+    "serial": "SN",
+    "imei": "IMEI",
     "filter": {
       "notEnrolled": "Not in MDM",
       "enrolled": "In MDM",

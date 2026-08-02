@@ -301,12 +301,26 @@ function DeviceRow({
           <EnforcementBadge badge={row.enforcement_badge} />
         </div>
         <div className="text-sm text-subtle truncate">{row.product_name}</div>
+        <div className="text-xs truncate flex flex-wrap gap-x-3 gap-y-0.5">
+          {row.serial_number && (
+            <span>
+              <span className="text-subtler">{t('mdmDevices.serial')}: </span>
+              <span className="font-mono text-fg">{row.serial_number}</span>
+            </span>
+          )}
+          {row.imei && (
+            <span>
+              <span className="text-subtler">{t('mdmDevices.imei')}: </span>
+              <span className="font-mono text-fg">{row.imei}</span>
+            </span>
+          )}
+          {!row.serial_number && !row.imei && <span className="text-subtler">—</span>}
+        </div>
         <div className="text-xs text-subtler truncate">
-          {row.serial_number || row.imei || '—'}
-          {row.customer_name && <> · {row.customer_name}</>}
+          {row.customer_name}
           {row.contract_code && (
             <>
-              {' · '}
+              {row.customer_name && ' · '}
               <button type="button" onClick={onOpenContract} className="text-primary-fg hover:underline inline-flex items-center gap-0.5 bg-transparent border-none p-0 cursor-pointer">
                 {row.contract_code}<ExternalLink size={11} className="opacity-60" />
               </button>

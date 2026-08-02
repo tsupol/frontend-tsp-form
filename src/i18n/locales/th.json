@@ -6406,6 +6406,8 @@
     "notInMdm": "ยังไม่เข้า MDM",
     "enrollButton": "เตรียมเครื่อง",
     "lockButton": "ล็อกขั้นพื้นฐาน",
+    "serial": "SN",
+    "imei": "IMEI",
     "filter": {
       "notEnrolled": "ยังไม่เข้า MDM",
       "enrolled": "อยู่ใน MDM",
