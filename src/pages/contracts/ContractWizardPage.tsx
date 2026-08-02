@@ -338,9 +338,16 @@ function WorkspaceContent() {
         // on desktop (split-pane) or on mobile when the edit panel is showing
         const isCardActive = (id: ModalId) => openModal === id && !(isMobile && isRoot);
 
-        // Review & Pay card: always visible once draft exists, but disabled until all cards complete
+        // Review & Pay card: always visible once draft exists, but disabled until all cards complete.
+        // co_lessee is exempt: an adult co-lessee for a minor lessee is OPTIONAL (BE mig 937 — it's a
+        // WARNING, not a blocker), so its 'warning' status must NOT hold Review & Pay disabled. The
+        // amber advisory still shows on the co-lessee card itself.
         const requiredCards = ['productPlan', 'customer', 'contactRef', 'co_lessee', 'signatory', 'documents'] as const;
-        const allCardsComplete = data.contractId != null && requiredCards.every(id => getCardStatus(id) === 'complete');
+        const isCardSatisfied = (id: (typeof requiredCards)[number]) => {
+          const s = getCardStatus(id);
+          return s === 'complete' || (id === 'co_lessee' && s === 'warning');
+        };
+        const allCardsComplete = data.contractId != null && requiredCards.every(isCardSatisfied);
         const reviewPayReady = allCardsComplete || !!data.billId;
 
         return (
