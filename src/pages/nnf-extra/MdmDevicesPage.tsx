@@ -115,13 +115,20 @@ export function MdmDevicesPage() {
   const rows = data?.data ?? [];
   const totalCount = data?.totalCount ?? 0;
 
-  // Branch dropdown is built from the rows themselves (branch_id + branch_name on
-  // every row). A branch-scoped user only ever sees their own → dropdown hides.
-  const branchOptions = useMemo(() => {
-    const seen = new Map<number, string>();
-    rows.forEach((r) => { if (!seen.has(r.branch_id)) seen.set(r.branch_id, r.branch_name); });
-    return Array.from(seen, ([value, label]) => ({ value: String(value), label }));
-  }, [rows]);
+  // Branch dropdown comes from v_branches (RLS-scoped to what the user can see),
+  // NOT from the device rows. Deriving it from rows only listed branches that
+  // already had an MDM-known device — and only those on the current page — so a
+  // company user saw an incomplete branch list (2026-08-02 report).
+  const { data: branches } = useQuery({
+    queryKey: ['mdm-branches'],
+    queryFn: () => apiClient.get<{ id: number; name: string }[]>('/v_branches?is_active=is.true&order=name&select=id,name'),
+    staleTime: 5 * 60 * 1000,
+  });
+  const branchOptions = useMemo(
+    () => (branches ?? []).map((b) => ({ value: String(b.id), label: b.name })),
+    [branches],
+  );
+  // A branch-scoped user only sees their own branch → dropdown hides.
   const showBranchDropdown = branchOptions.length > 1 || branchId != null;
 
   const handleSearch = (value: string) => {
