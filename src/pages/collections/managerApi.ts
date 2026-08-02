@@ -74,9 +74,14 @@ export interface UnassignedContract {
   collectors_in_branch: number;
 }
 
-/** One row of v_assignment_unassignable (mig 880) — a contract overdue ≥ 2 days
- *  with no owner AND no visible collector in its branch (nobody, or all at
- *  capacity 0). Action = add staff / open capacity, not reassign. HQ-wide. */
+/** Why a contract can't be assigned (mig 960 added `reason`).
+ *  POOL_NO_MEMBER — the branch's pool has no member to receive work.
+ *  BRANCH_NO_POOL — a (new) branch isn't bound to any pool yet. */
+export type UnassignableReason = 'POOL_NO_MEMBER' | 'BRANCH_NO_POOL' | string;
+
+/** One row of v_assignment_unassignable (mig 880, +reason mig 960) — a contract
+ *  overdue ≥ 2 days with no owner AND no member can receive it. The fix is
+ *  "add a member / move the branch into a pool with members" — see `reason`. */
 export interface UnassignableContract {
   holding_id: number;
   company_id: number;
@@ -86,6 +91,7 @@ export interface UnassignableContract {
   contract_code: string;
   overdue_days: number;
   outstanding_amount: number;
+  reason: UnassignableReason;
 }
 
 /** ops_collector_set_capacity response (data, already unwrapped). */

@@ -5,7 +5,7 @@
 import { useMemo, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { CalendarDays, Headset, Calendar as CalendarIcon, Settings, LayoutDashboard, Users, UserX, AlertTriangle } from 'lucide-react';
+import { CalendarDays, Headset, Calendar as CalendarIcon, Settings, LayoutDashboard, Users, UserX, AlertTriangle, Users2 } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavCounts } from '../../hooks/useNavCounts';
@@ -33,7 +33,10 @@ export function CollectionsLayout({ children }: { children: ReactNode }) {
     { type: 'link', path: '/admin/collections/calls', labelKey: 'nav.callCenter', icon: Headset, count: callCenterMineCount },
     ...((canManage || canOversee) ? [
       { type: 'group' as const, labelKey: 'nav.groupCollectionsManage' },
-      ...(canOversee ? [{ type: 'link' as const, path: '/admin/collections/branch-overview', labelKey: 'nav.branchOverview', icon: LayoutDashboard }] : []),
+      ...(canOversee ? [
+        { type: 'link' as const, path: '/admin/collections/branch-overview', labelKey: 'nav.branchOverview', icon: LayoutDashboard },
+        { type: 'link' as const, path: '/admin/collections/pools', labelKey: 'nav.collectionPools', icon: Users2 },
+      ] : []),
       ...(canManage ? [
         { type: 'link' as const, path: '/admin/collections/team-load', labelKey: 'nav.teamLoad', icon: Users },
         { type: 'link' as const, path: '/admin/collections/unassigned', labelKey: 'nav.unassigned', icon: UserX, count: unassignedNoCollectorCount },

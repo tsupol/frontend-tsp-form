@@ -42,7 +42,7 @@ import {
   // Fanout child icons — Branch expense
   Tag as TagIcon, BarChart3 as BarChartIcon, BookOpen as BookIcon, PieChart as PieChartIcon,
   // Fanout child icons — Collections
-  Calendar,
+  Calendar, Users2,
   // Repo / legal
   Gavel, ShieldCheck,
   // Chat
@@ -309,6 +309,7 @@ export const AppSideNav = () => {
           { type: 'group' as const, key: 'grp-collections-manage', label: t('nav.groupCollectionsManage') },
           ...(can('OPS.ASSIGN.OVERSEE') ? [
             { key: 'collections-branch-overview', icon: <LayoutDashboard size="1rem" />, label: t('nav.branchOverview'), path: '/admin/collections/branch-overview' },
+            { key: 'collections-pools', icon: <Users2 size="1rem" />, label: t('nav.collectionPools'), path: '/admin/collections/pools' },
           ] : []),
           ...(can('OPS.ASSIGN.MANAGE') ? [
             { key: 'collections-team-load', icon: <Users size="1rem" />, label: t('nav.teamLoad'), path: '/admin/collections/team-load' },
