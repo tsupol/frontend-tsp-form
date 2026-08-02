@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { User, Building2, Store, Bell, Palette, Smartphone, ImageIcon } from 'lucide-react';
+import { User, Building2, Store, Bell, Palette, Smartphone, ImageIcon, MessageSquareReply } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -12,6 +12,10 @@ export function SettingsLayout({ children }: { children: ReactNode }) {
   const { user, can } = useAuth();
   const role = user?.role_code ?? '';
   const canManageOrg = ['HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
+  // Slip auto-reply config is a COMPANY_ADMIN feature (RPC resolves company from
+  // JWT). Show the nav item for those roles only — the page itself hides on
+  // PERMISSION_DENIED, so this just avoids a dead entry for everyone else.
+  const canManageAutoReply = ['COMPANY_ADMIN', 'SYSTEM_DEV'].includes(role);
 
   const navItems = [
     { path: '/admin/settings/profile', labelKey: 'nav.profile', icon: User },
@@ -21,6 +25,9 @@ export function SettingsLayout({ children }: { children: ReactNode }) {
     ] : []),
     { path: '/admin/settings/appearance', labelKey: 'appearance.title', icon: Palette },
     { path: '/admin/settings/notifications', labelKey: 'notifPrefs.title', icon: Bell },
+    ...(canManageAutoReply ? [
+      { path: '/admin/settings/slip-autoreply', labelKey: 'slipAutoReply.navLabel', icon: MessageSquareReply },
+    ] : []),
     ...(canManageOrg ? [
       { path: '/admin/settings/holdings', labelKey: 'settings.holdings', icon: Building2 },
       { path: '/admin/settings/companies', labelKey: 'settings.companies', icon: Store },

@@ -91,6 +91,7 @@ import { CompaniesPage } from './pages/settings/CompaniesPage';
 import { PrinterSetupPage } from './pages/help/PrinterSetupPage';
 import { NotificationPrefsPage } from './pages/settings/NotificationPrefsPage';
 import { AppearancePage } from './pages/settings/AppearancePage';
+import { SlipAutoReplyPage } from './pages/settings/SlipAutoReplyPage';
 import { MyAssetsPage } from './pages/settings/MyAssetsPage';
 import { BranchWallpaperPage } from './pages/settings/BranchWallpaperPage';
 import { HelpLayout } from './pages/help/HelpLayout';
@@ -259,6 +260,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <SettingsLayout><AppearancePage /></SettingsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/settings/slip-autoreply"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <SettingsLayout><SlipAutoReplyPage /></SettingsLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
