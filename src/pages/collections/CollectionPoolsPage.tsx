@@ -37,8 +37,6 @@ import {
   type CollectionPool, type PoolDetailRow,
 } from './collectionPoolApi';
 
-const ADMIN_MANAGE_ROLES = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'];
-
 export function CollectionPoolsPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
