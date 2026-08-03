@@ -65,6 +65,13 @@ export interface AssetMdmStatus {
   can_prepare: boolean;
   may_prepare: boolean;
   prepare_blocked_reason: string | null;
+  // Re-enroll (mig 968) — a device already IN_MDM can be prepared again (branch
+  // wiped it and wants it back). prepare_is_reenroll picks the button wording;
+  // prepare_status/detail carry the post-press "erase the device" signal, since
+  // mdm_status STAYS 'IN_MDM' (the view checks the binding before the request).
+  prepare_is_reenroll: boolean;
+  prepare_status: 'PENDING' | 'READY' | 'ERROR' | null;
+  prepare_detail: string | null;
 
   // §3 — enforcement pause. is_enforcement_paused → warning bar + disable
   // dunning buttons (else a queued dunning command gets CANCELED_MANUAL_PAUSE).

@@ -179,9 +179,14 @@ export function SubTabEnroll({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [justPrepared, setJustPrepared] = useState(false);
 
+  // A re-enroll leaves mdm_status at IN_MDM (the view checks the binding first),
+  // so the READY signal lives in prepare_status/detail, not mdm_status.
+  const reenrollReady = status.prepare_is_reenroll && status.prepare_status === 'READY';
+
   useEffect(() => {
-    if (status.mdm_status !== 'PREPARING' && status.mdm_status !== 'PROFILE_READY') setJustPrepared(false);
-  }, [status.mdm_status]);
+    const inFlight = status.mdm_status === 'PREPARING' || status.mdm_status === 'PROFILE_READY';
+    if (!inFlight && !reenrollReady) setJustPrepared(false);
+  }, [status.mdm_status, reenrollReady]);
 
   const prepare = useMutation({
     mutationFn: () => apiClient.rpc<PrepareResponse>('fn_mdm_prepare_asset', { p_asset_id: status.asset_id }),
@@ -323,6 +328,21 @@ export function SubTabEnroll({
         </div>
       )}
 
+      {/* Re-enroll READY — the profile is pushed but mdm_status stays IN_MDM, so
+          this box (not the PROFILE_READY one above) tells staff to wipe. The
+          wording names WHOSE device gets erased: pressing this on a customer's
+          device by mistake and then wiping it loses their data (§งานจอ #3). */}
+      {reenrollReady && (
+        <div className="alert alert-warning">
+          <RotateCcw size={20} className="shrink-0" />
+          <div className="min-w-0">
+            <div className="alert-title">{t('asset.mdm.reenrollReady.title')}</div>
+            <div className="alert-description">{t('asset.mdm.reenrollReady.warn')}</div>
+            <div className="alert-description">{t('asset.mdm.reenrollReady.next')}</div>
+          </div>
+        </div>
+      )}
+
       {errorMsg && (
         <div className="alert alert-danger">
           <XCircle size={16} />
@@ -345,17 +365,30 @@ export function SubTabEnroll({
                 where={t(`asset.mdm.stepWhere.${step.where}`)}
                 state={state}
               >
-                {/* Step 3 owns the send-enrollment button. */}
+                {/* Step 3 owns the send-enrollment button. Re-enroll (device
+                    already IN_MDM, branch wiped it) reuses the same RPC — only
+                    the wording changes (mig 968). */}
                 {isSendStep && showPrepareButton && (
-                  <Button
-                    color="primary"
-                    size="sm"
-                    startIcon={isRetry ? <RotateCcw size={15} /> : <Send size={15} />}
-                    onClick={() => prepare.mutate()}
-                    disabled={prepare.isPending}
-                  >
-                    {isRetry ? t('asset.mdm.button.retry') : t('asset.mdm.button.prepare')}
-                  </Button>
+                  <div className="flex flex-col gap-1.5">
+                    <div>
+                      <Button
+                        color="primary"
+                        size="sm"
+                        startIcon={isRetry ? <RotateCcw size={15} /> : status.prepare_is_reenroll ? <RotateCcw size={15} /> : <Send size={15} />}
+                        onClick={() => prepare.mutate()}
+                        disabled={prepare.isPending}
+                      >
+                        {isRetry
+                          ? t('asset.mdm.button.retry')
+                          : status.prepare_is_reenroll
+                            ? t('asset.mdm.button.reenroll')
+                            : t('asset.mdm.button.prepare')}
+                      </Button>
+                    </div>
+                    {status.prepare_is_reenroll && !isRetry && (
+                      <p className="text-xs text-subtle">{t('asset.mdm.button.reenrollHint')}</p>
+                    )}
+                  </div>
                 )}
                 {isSendStep && status.can_prepare && !status.may_prepare && (
                   <div className="text-xs text-subtler">{t('asset.mdm.noPermission')}</div>

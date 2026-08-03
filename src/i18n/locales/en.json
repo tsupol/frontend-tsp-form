@@ -2501,12 +2501,19 @@
       },
       "button": {
         "prepare": "Send enrollment",
-        "retry": "Try sending again"
+        "retry": "Try sending again",
+        "reenroll": "Re-enroll device",
+        "reenrollHint": "The device must be wiped after you press this."
       },
       "afterPress": {
         "title": "Sent — not finished yet",
         "next": "Next: wipe the device after scanning, then wait until the Remote Management screen appears.",
         "note": "The status changes on its own once the device enrolls — nothing more to press. (Enrolling in MDM isn't the end of handover — the customer still needs to sign in to iCloud and install the NNF App.)"
+      },
+      "reenrollReady": {
+        "title": "Enrollment profile is ready — now wipe this device",
+        "warn": "This will erase everything on the device you're holding. Make sure it's the company device you meant to re-enroll, not a customer's — wiping the wrong one loses their data.",
+        "next": "On the device: Settings → General → Transfer or Reset → Erase All Content and Settings. It re-enrolls on its own after the wipe."
       },
       "info": {
         "os": "iOS version",
