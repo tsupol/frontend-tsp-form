@@ -162,6 +162,11 @@ export function ChatPage() {
   const selectedRow = rows.find(r => r.contract_id === selectedContractId);
   const headerTitle = selectedRow?.customer_name ?? t('chat.title');
 
+  // Multi-branch users (company / holding) have no branch_id — they see chats
+  // across every สาขา in scope, so tag each row with its branch. A branch user
+  // only ever sees their own branch, so the badge would be noise; hide it.
+  const showBranch = !user?.branch_id;
+
   return (
     <PageNav
       panels={['list', 'thread']}
@@ -333,24 +338,28 @@ export function ChatPage() {
                               )}
                             </div>
                           </div>
-                          <div className="flex items-center justify-between gap-2 mt-0.5">
-                            <div className="text-[11px] text-subtle truncate font-mono min-w-0">
+                          {/* One flex-wrap cluster: code + all badges flow to a
+                              second line when the rail is too narrow to fit them
+                              on one row, instead of overlapping. */}
+                          <div className="flex items-center flex-wrap gap-x-2 gap-y-1 mt-0.5">
+                            <div className="text-[11px] text-subtle truncate font-mono min-w-0 max-w-full">
                               {row.contract_code_display}
                             </div>
-                            <div className="flex items-center gap-1 shrink-0">
-                              {/* Contract-state badge — only when not ACTIVE, so the
-                                  339 normal rooms stay uncluttered (BE §3). */}
-                              {row.contract_state && row.contract_state !== 'ACTIVE' && (
-                                <Badge size="xs" color={contractStateBadgeColor(row.contract_state)}>
-                                  {contractStateLabel(row.contract_state, t)}
-                                </Badge>
-                              )}
-                              {row.chat_status && (
-                                <Badge size="xs" color={chatStatusBadgeColor(row.chat_status)}>
-                                  {t(`chat.status.${row.chat_status}`)}
-                                </Badge>
-                              )}
-                            </div>
+                            {showBranch && row.branch_name && (
+                              <Badge size="xs" color="secondary">{row.branch_name}</Badge>
+                            )}
+                            {/* Contract-state badge — only when not ACTIVE, so the
+                                339 normal rooms stay uncluttered (BE §3). */}
+                            {row.contract_state && row.contract_state !== 'ACTIVE' && (
+                              <Badge size="xs" color={contractStateBadgeColor(row.contract_state)}>
+                                {contractStateLabel(row.contract_state, t)}
+                              </Badge>
+                            )}
+                            {row.chat_status && (
+                              <Badge size="xs" color={chatStatusBadgeColor(row.chat_status)}>
+                                {t(`chat.status.${row.chat_status}`)}
+                              </Badge>
+                            )}
                           </div>
                           <div className="text-xs text-subtle truncate mt-0.5">
                             {isImage ? (

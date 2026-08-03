@@ -48,6 +48,11 @@ export interface ChatInboxRow {
 
   // New 2026-06-09 — v_branch_chat_list extended
   branch_id: number;
+  // New 2026-08-03 (mig 973) — branch code + name of the contract's branch.
+  // Rendered only for multi-branch users (company/holding) so they can tell
+  // which สาขา a chat belongs to; branch users see one branch, so it's hidden.
+  branch_code: string | null;
+  branch_name: string | null;
   chat_status: ChatStatus | null;
   chat_status_set_by_user_id: number | null;
   chat_status_set_by_username: string | null;
@@ -85,6 +90,12 @@ export interface ChatMessage {
 
   // New 2026-07-22 (mig 843) — lessee role of the sender. null for STAFF.
   sender_role?: LesseeRole | string | null;
+
+  // New 2026-08-03 (mig 973) — branch of the contract this chat rides on.
+  // Same value on every row of a contract; used for the thread-header สาขา line.
+  branch_id?: number | null;
+  branch_code?: string | null;
+  branch_name?: string | null;
 }
 
 export interface ChatThreadStatusLogRow {

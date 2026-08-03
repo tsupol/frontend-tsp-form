@@ -319,6 +319,11 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
 
   const title = inboxRow?.customer_name ?? t('chat.title');
 
+  // Multi-branch users (company / holding, no branch_id) see chats from every
+  // สาขา — surface which branch this thread belongs to. Branch users see one
+  // branch only, so the label is redundant and hidden.
+  const showBranch = !user?.branch_id;
+
   return (
     <div className="flex-1 min-h-0 flex flex-col h-full relative">
       {!hideDesktopHeader && (
@@ -341,6 +346,12 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
                 </Link>
                 <span>·</span>
                 <span>{t('chat.messageCount', { count: inboxRow.total_messages })}</span>
+                {showBranch && inboxRow.branch_name && (
+                  <>
+                    <span>·</span>
+                    <Badge size="xs" color="secondary">{inboxRow.branch_name}</Badge>
+                  </>
+                )}
               </div>
             )}
             {inboxRow && <ChatCustomerRoster row={inboxRow} />}
@@ -374,6 +385,12 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
                 </Link>
                 <span>·</span>
                 <span>{t('chat.messageCount', { count: inboxRow.total_messages })}</span>
+                {showBranch && inboxRow.branch_name && (
+                  <>
+                    <span>·</span>
+                    <Badge size="xs" color="secondary">{inboxRow.branch_name}</Badge>
+                  </>
+                )}
               </div>
               <ChatCustomerRoster row={inboxRow} />
             </div>
