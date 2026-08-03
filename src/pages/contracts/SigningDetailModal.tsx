@@ -23,7 +23,7 @@ import { DateTime } from '../../components/DateTime';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
 import { formatCid, formatTel } from '../../lib/format';
 import { printWithMarker } from '../../lib/printDoc';
-import { SnapshotOverviewDiff } from './SnapshotOverviewDiff';
+import { SnapshotDetailSummary } from './SnapshotDetailSummary';
 import { SigningDetailPrint, type SigningDetailPrintData, type PrintParty } from './SigningDetailPrint';
 
 // ─── Types ─────────────────────────────────────────────────────────────
@@ -89,12 +89,6 @@ interface PdfPartyRow {
   signed_at: string | null;
 }
 
-interface SiblingRow {
-  signing_id: number;
-  version: number;
-  status: string;
-}
-
 // ─── Props ─────────────────────────────────────────────────────────────
 
 interface Props {
@@ -128,41 +122,6 @@ export function SigningDetailModal({ open, onClose, signingId, contractId, signi
   const error = pdfInputQuery.error;
 
   const isSystemVoided = data?.status === 'VOIDED' && (data as unknown as { voided_by?: number }).voided_by === 0;
-
-  // ─── Set-diff fallback ────────────────────────────────────────────────
-  // Legacy FULL payloads carry cumulative state, not a delta. To identify
-  // "which co-lessee was added" on a FULL row, we set-diff against the
-  // previous non-VOIDED snapshot. For DELTA payloads (mig 227+) the change
-  // is read directly off the payload and this query is unused.
-  // VOIDED rows are skipped entirely upstream — they never committed.
-  const siblingsQuery = useQuery({
-    queryKey: ['contract-signing-siblings', contractId],
-    queryFn: () => apiClient.get<SiblingRow[]>(
-      `/v_contract_signing_history?contract_id=eq.${contractId}&order=version.desc&select=signing_id,version,status`,
-    ),
-    enabled: open && data?.status !== 'VOIDED' && data != null,
-    staleTime: 30_000,
-  });
-
-  const prevSiblingId: number | null = (() => {
-    if (!data || !siblingsQuery.data) return null;
-    const siblings = siblingsQuery.data;
-    const self = siblings.find(s => s.signing_id === data.signing_id);
-    if (!self) return null;
-    const prev = siblings
-      .filter(s => s.version < self.version && s.status !== 'VOIDED')
-      .sort((a, b) => b.version - a.version)[0];
-    return prev?.signing_id ?? null;
-  })();
-
-  const prevSnapshotQuery = useQuery({
-    queryKey: ['signing-pdf-input', prevSiblingId],
-    queryFn: () => apiClient.rpc<PdfInput>('fn_staff_get_signing_pdf_input', {
-      p_signing_id: prevSiblingId,
-    }),
-    enabled: open && prevSiblingId != null,
-    staleTime: 60_000,
-  });
 
   // ─── Print (browser-print pattern; see .claude/in-app-print-pattern.md) ──
   // Customer-facing copy: identity + the change only. No signatures, no
@@ -254,25 +213,16 @@ export function SigningDetailModal({ open, onClose, signingId, contractId, signi
               )}
             </section>
 
-            {/* Differences from the previous non-VOIDED snapshot. This
-                tells the truth about state movement — a row here may not
-                trace 1:1 to this signing's change_reason (contract fields
-                can drift between SEALs), but that's correct. The reason
-                label at the top frames what THIS signing was about.
-                Skipped for VOIDED (never committed) and when no prior
-                non-VOIDED snapshot exists (CONTRACT_OPEN baseline). */}
-            {data.status !== 'VOIDED' && prevSnapshotQuery.data?.snapshot_payload && payload && (
-              <SnapshotOverviewDiff
-                changeReason={changeReason}
-                stateBefore={prevSnapshotQuery.data.snapshot_payload}
-                stateAfter={payload}
-              />
-            )}
-            {data.status !== 'VOIDED' && !prevSiblingId && payload && (
-              <SnapshotOverviewDiff
-                changeReason={changeReason}
-                stateBefore={null}
-                stateAfter={payload}
+            {/* What this signing was about — read straight from THIS
+                snapshot's payload, keyed on change_reason. NOT a diff: an
+                amendment payload is a DELTA (only the changed field), so
+                comparing it against the prior FULL snapshot would strike
+                through the unchanged lessee + terms and read as "removed".
+                Skipped for VOIDED (never committed). */}
+            {data.status !== 'VOIDED' && payload && (
+              <SnapshotDetailSummary
+                changeReason={changeReason ?? data.change_reason}
+                payload={payload}
               />
             )}
 
