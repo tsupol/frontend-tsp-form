@@ -105,6 +105,7 @@ interface Props {
 export function SigningDetailModal({ open, onClose, signingId, contractId, signingType, changeReason }: Props) {
   const { t } = useTranslation();
   void signingType; // currently unused — kept on the prop for caller stability
+  void contractId;  // currently unused — kept on the prop for caller stability
 
   const pdfInputQuery = useQuery({
     queryKey: ['signing-pdf-input', signingId],
