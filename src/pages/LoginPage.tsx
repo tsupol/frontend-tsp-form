@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button, Input, FormErrorMessage } from 'tsp-form';
-import { Eye, EyeOff, AlertTriangle } from 'lucide-react';
+import { Eye, EyeOff, AlertTriangle, CheckCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { ApiError } from '../lib/api';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
@@ -38,6 +38,25 @@ export function LoginPage() {
   const reasonRef = useRef(searchParams.get('reason'));
   const errorCodeRef = useRef(searchParams.get('error_code'));
   const errorMsgRef = useRef(searchParams.get('error_msg'));
+
+  // Turn the raw redirect params into a human sentence. The backend hands us an
+  // uppercase code (e.g. AUTH.AUTH.SESSION_TAKEN_OVER); the apiErrors catalog keys
+  // some codes lowercase, so try the code as-is, then lowercased, before falling
+  // back. Never render the bare "[CODE] English message" — that leaked to users.
+  const sessionEndedCode = reasonRef.current === 'session_expired' ? errorCodeRef.current : null;
+  const isTakenOver = sessionEndedCode === 'AUTH.AUTH.SESSION_TAKEN_OVER';
+  const sessionEndedReason = (() => {
+    if (!sessionEndedCode) return '';
+    const translated =
+      t(sessionEndedCode, { ns: 'apiErrors', defaultValue: '' }) ||
+      t(sessionEndedCode.toLowerCase(), { ns: 'apiErrors', defaultValue: '' });
+    if (translated) return translated;
+    // Taken-over has its own dedicated hint below — don't fall back to raw English.
+    if (isTakenOver) return '';
+    // Last resort for an untranslated code: the backend's own message beats a bare
+    // title, but never the "[CODE] English" dump we used to show.
+    return errorMsgRef.current ?? '';
+  })();
 
   useEffect(() => {
     if (reasonRef.current) {
@@ -100,14 +119,26 @@ export function LoginPage() {
             <LanguageSwitcher />
           </div>
 
+        {reasonRef.current === 'password_changed' && (
+          <div className="alert alert-success mb-8">
+            <CheckCircle size={18} />
+            <div>
+              <div className="alert-title">{t('auth.passwordChangedTitle')}</div>
+              <div className="alert-description mt-0.5">{t('auth.passwordChangedHint')}</div>
+            </div>
+          </div>
+        )}
+
         {reasonRef.current === 'session_expired' && (
           <div className="alert alert-warning mb-8">
             <AlertTriangle size={18} />
             <div>
-              <div className="alert-description">{t('auth.sessionExpired')}</div>
-              {errorCodeRef.current && (
-                <div className="mt-1 text-xs opacity-75">
-                  [{errorCodeRef.current}] {errorMsgRef.current}
+              <div className="alert-title">
+                {isTakenOver ? t('auth.sessionTakenOverTitle') : t('auth.sessionExpired')}
+              </div>
+              {(sessionEndedReason || (isTakenOver && t('auth.sessionTakenOverHint'))) && (
+                <div className="alert-description mt-0.5">
+                  {sessionEndedReason || t('auth.sessionTakenOverHint')}
                 </div>
               )}
             </div>

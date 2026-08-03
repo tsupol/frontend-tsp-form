@@ -12,6 +12,7 @@ export class ApiError extends Error {
   public messageParams?: Record<string, unknown>;
   public isAuthError: boolean;
   public httpStatus?: number;
+  public fieldErrors?: FieldError[] | null;
 
   constructor(opts: {
     code: string;
@@ -20,6 +21,7 @@ export class ApiError extends Error {
     messageParams?: Record<string, unknown>;
     isAuthError: boolean;
     httpStatus?: number;
+    fieldErrors?: FieldError[] | null;
   }) {
     super(opts.message);
     this.name = 'ApiError';
@@ -28,6 +30,7 @@ export class ApiError extends Error {
     this.messageParams = opts.messageParams;
     this.isAuthError = opts.isAuthError;
     this.httpStatus = opts.httpStatus;
+    this.fieldErrors = opts.fieldErrors;
   }
 }
 
@@ -55,8 +58,11 @@ interface V2Error {
     params?: Record<string, unknown>;
     trace_id?: string;
     http_status?: number;
+    field_errors?: Array<{ field: string; message: string }> | null;
   };
 }
+
+export type FieldError = { field: string; message: string };
 
 function isV2Success<T>(data: unknown): data is V2Success<T> {
   return (
@@ -88,6 +94,12 @@ const AUTH_ERROR_CODES = [
   'PGRST302', // JWT invalid
   'PGRST303', // JWT expired
   'PGRST116', // JWT required
+  // Genuine session-death codes (401) raised by auth.refresh — these DO mean the
+  // session is gone and the user must re-login. Kept distinct from business 401s
+  // like USER.AUTH.INVALID_CURRENT_PASSWORD, which must surface on the calling screen.
+  'AUTH.AUTH.SESSION_TAKEN_OVER',
+  'AUTH.AUTH.REFRESH_FAILED',
+  'AUTH.CUSTOMER.REFRESH_FAILED',
 ];
 
 const AUTH_ERROR_MESSAGES = [
@@ -147,7 +159,13 @@ async function tryRefreshToken(): Promise<boolean> {
 
 function makeV2ApiError(err: V2Error['error'], httpStatus?: number): ApiError {
   const status = httpStatus ?? err.http_status;
-  const auth = isAuthError(err.code, err.message) || status === 401;
+  // A v2 envelope carries a real business code, so trust the code — NOT the bare
+  // 401 status. The backend uses 401 for business failures too (e.g.
+  // USER.AUTH.INVALID_CURRENT_PASSWORD when the typed current password is wrong).
+  // Treating every 401 as a dead session bounced the user to /login before the
+  // calling screen could show the real error — production users then believed their
+  // password had changed and got locked out. Only genuine session/token codes redirect.
+  const auth = isAuthError(err.code, err.message);
 
   return new ApiError({
     code: err.code,
@@ -156,6 +174,7 @@ function makeV2ApiError(err: V2Error['error'], httpStatus?: number): ApiError {
     messageParams: err.params,
     isAuthError: auth,
     httpStatus: status,
+    fieldErrors: err.field_errors ?? null,
   });
 }
 

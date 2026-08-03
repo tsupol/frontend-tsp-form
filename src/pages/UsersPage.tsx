@@ -2,8 +2,8 @@ import { useState, useEffect, useRef, useCallback, useMemo, type MouseEvent } fr
 import { useTranslation } from 'react-i18next';
 import { useForm, Controller } from 'react-hook-form';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { DataTable, DataTableColumnHeader, DataTableFooter, Button, Input, Select, PopOver, MenuItem, MenuSeparator, Badge, Modal, Switch, createSelectColumn, useSnackbarContext, MobileHeader, type ColumnDef, type RowSelectionState, type SortingState } from 'tsp-form';
-import { Plus, MoreHorizontal, Pencil, ShieldCheck, ShieldOff, KeyRound, Trash2, Ban, XCircle, CheckCircle, Eye, EyeOff, Copy, SlidersHorizontal, ArrowRightFromLine } from 'lucide-react';
+import { DataTable, DataTableColumnHeader, DataTableFooter, Button, Input, Select, PopOver, MenuItem, MenuSeparator, Badge, Modal, Switch, LabeledCheckbox, createSelectColumn, useSnackbarContext, MobileHeader, type ColumnDef, type RowSelectionState, type SortingState } from 'tsp-form';
+import { Plus, MoreHorizontal, Pencil, ShieldCheck, ShieldOff, KeyRound, Trash2, Ban, XCircle, CheckCircle, Eye, EyeOff, Copy, SlidersHorizontal, ArrowRightFromLine, AlertTriangle } from 'lucide-react';
 import { apiClient, ApiError } from '../lib/api';
 import { FormErrorMessage } from 'tsp-form';
 import { getRoleLabel } from '../lib/roleLabel';
@@ -860,6 +860,23 @@ interface SetPasswordFormData {
   confirmPassword: string;
 }
 
+// Admin pastes the password from chat/notes — a stray leading/trailing space or a
+// newline silently becomes part of the password, and the staff member is then
+// locked out with no way to see why. Strip edge whitespace + control chars before
+// sending. Inner spaces are legal (backend policy allows them) so keep those.
+function sanitizePassword(raw: string): string {
+  // eslint-disable-next-line no-control-regex
+  return raw.replace(/[\u0000-\u001f\u007f-\u009f]/g, '').trim();
+}
+
+// Matches auth.require_password_ok: >= 8 chars, at least one letter and one digit.
+function passwordRuleError(t: (k: string) => string, v: string): string | true {
+  if (v.length < 8) return t('users.passwordRules');
+  if (!/[A-Za-z]/.test(v)) return t('users.passwordRules');
+  if (!/[0-9]/.test(v)) return t('users.passwordRules');
+  return true;
+}
+
 function PasswordModal({ user, open, onClose }: { user: VUser | null; open: boolean; onClose: () => void }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -870,6 +887,7 @@ function PasswordModal({ user, open, onClose }: { user: VUser | null; open: bool
   const [errorKey, setErrorKey] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [forceChange, setForceChange] = useState(true);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
 
   const {
@@ -888,10 +906,12 @@ function PasswordModal({ user, open, onClose }: { user: VUser | null; open: bool
     setErrorMessage('');
     setShowPassword(false);
     setShowConfirm(false);
+    setForceChange(true);
   };
 
   const handleClose = () => {
     setMode('set');
+    setForceChange(true);
     resetForm();
     setErrorMessage('');
     setShowPassword(false);
@@ -905,19 +925,25 @@ function PasswordModal({ user, open, onClose }: { user: VUser | null; open: bool
     setIsPending(true);
     const start = Date.now();
     try {
+      // Send the sanitized value — the same string we validated, never the raw
+      // paste with a trailing newline the admin can't see.
       await apiClient.rpc('user_set_password', {
         p_user_id: user.id,
-        p_new_password: data.password,
+        p_new_password: sanitizePassword(data.password),
+        p_force_change: forceChange,
       });
       addSnackbar({
         message: (
           <div className="alert alert-success">
             <CheckCircle size={18} />
-            <div><div className="alert-title">{t('users.setPasswordSuccess', { username: user.username })}</div></div>
+            <div>
+              <div className="alert-title">{t('users.setPasswordSuccess', { username: user.username })}</div>
+              <div className="alert-description mt-0.5">{t('users.setPasswordSignedOutNote')}</div>
+            </div>
           </div>
         ),
         type: 'success',
-        duration: 3000,
+        duration: 5000,
       });
       queryClient.invalidateQueries({ queryKey: ['users'] });
       handleClose();
@@ -1002,15 +1028,26 @@ function PasswordModal({ user, open, onClose }: { user: VUser | null; open: bool
             </div>
             <div className="flex flex-col">
               <label className="form-label">{t('users.tempPasswordLabel')}</label>
-              <div className="flex gap-2">
-                <Input value={tempPassword} readOnly className="flex-1 font-mono" />
-                <Button type="button" variant="outline" startIcon={<Copy size={16} />} onClick={copyTempPassword} />
+              {/* Big + monospace + copyable — this string is shown ONCE and is the
+                  only way anyone learns the new password. */}
+              <div className="flex gap-2 items-stretch">
+                <div className="flex-1 min-w-0 flex items-center px-3 py-2 rounded-md bg-surface-shallow border border-line font-mono text-lg tracking-wide select-all break-all">
+                  {tempPassword}
+                </div>
+                <Button type="button" variant="outline" startIcon={<Copy size={16} />} onClick={copyTempPassword} aria-label={t('users.copyTempPassword')} />
+              </div>
+              <div className="alert alert-warning mt-3">
+                <AlertTriangle size={16} />
+                <div>
+                  <div className="alert-description">{t('users.tempPasswordSeenOnce')}</div>
+                  <div className="alert-description mt-1">{t('users.tempPasswordFirstLogin')}</div>
+                </div>
               </div>
             </div>
           </div>
           <div className="modal-footer">
-            <Button type="button" variant="ghost" onClick={handleClose}>
-              {t('common.cancel')}
+            <Button type="button" color="primary" onClick={handleClose}>
+              {t('common.done')}
             </Button>
           </div>
         </div>
@@ -1064,10 +1101,14 @@ function PasswordModal({ user, open, onClose }: { user: VUser | null; open: bool
                     onEndIconClick={() => setShowPassword(!showPassword)}
                     {...register('password', {
                       required: t('users.passwordRequired'),
-                      minLength: { value: 6, message: t('users.passwordMinLength') },
+                      validate: (v) => passwordRuleError(t, sanitizePassword(v)),
                     })}
                   />
-                  <FormErrorMessage error={errors.password} />
+                  {errors.password ? (
+                    <FormErrorMessage error={errors.password} />
+                  ) : (
+                    <p className="text-xs text-subtle mt-1">{t('users.passwordRules')}</p>
+                  )}
                 </div>
                 <div className="flex flex-col">
                   <label className="form-label" htmlFor="pm-confirm">{t('users.confirmPassword')}</label>
@@ -1080,11 +1121,18 @@ function PasswordModal({ user, open, onClose }: { user: VUser | null; open: bool
                     onEndIconClick={() => setShowConfirm(!showConfirm)}
                     {...register('confirmPassword', {
                       required: t('users.passwordRequired'),
-                      validate: (v) => v === watch('password') || t('users.passwordMismatch'),
+                      // Compare sanitized-vs-sanitized so a stray edge space in one
+                      // field but not the other doesn't cause a confusing mismatch.
+                      validate: (v) => sanitizePassword(v) === sanitizePassword(watch('password')) || t('users.passwordMismatch'),
                     })}
                   />
                   <FormErrorMessage error={errors.confirmPassword} />
                 </div>
+                <LabeledCheckbox
+                  label={t('users.forceChangeOnFirstLogin')}
+                  checked={forceChange}
+                  onChange={(e) => setForceChange(e.target.checked)}
+                />
               </div>
             </form>
           ) : (

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -369,19 +369,45 @@ interface ChangePasswordFormData {
   confirmPassword: string;
 }
 
+// Map a backend field name (from field_errors[].field) to our form field.
+function mapPasswordField(field: string): keyof ChangePasswordFormData | null {
+  if (field === 'current_password') return 'currentPassword';
+  if (field === 'new_password') return 'newPassword';
+  return null;
+}
+
 function ChangePasswordForm() {
   const { t } = useTranslation();
-  const { addSnackbar } = useSnackbarContext();
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  // On success the backend revokes ALL of this user's sessions (including this
+  // one). We must tell the user and send them to /login ourselves — otherwise the
+  // next request 401s and they read it as "the system kicked me / it's broken".
+  const [succeeded, setSucceeded] = useState(false);
+  const [countdown, setCountdown] = useState(5);
+
+  const redirectToLogin = useCallback(() => {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    window.location.href = '/login?reason=password_changed';
+  }, []);
+
+  // Once succeeded, tick a visible countdown and redirect at 0. The user can also
+  // hit the button to go now — never trap them waiting on a fixed timer.
+  useEffect(() => {
+    if (!succeeded) return;
+    if (countdown <= 0) { redirectToLogin(); return; }
+    const id = setTimeout(() => setCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(id);
+  }, [succeeded, countdown, redirectToLogin]);
 
   const {
     register,
     handleSubmit,
-    reset,
     watch,
+    setError,
     formState: { errors, isSubmitting },
   } = useForm<ChangePasswordFormData>({
     defaultValues: { currentPassword: '', newPassword: '', confirmPassword: '' },
@@ -396,30 +422,58 @@ function ChangePasswordForm() {
         p_current_password: data.currentPassword,
         p_new_password: data.newPassword,
       });
-      addSnackbar({
-        message: (
-          <div className="alert alert-success">
-            <CheckCircle size={18} />
-            <div><div className="alert-title">{t('profile.passwordChanged')}</div></div>
-          </div>
-        ),
-        type: 'success',
-        duration: 3000,
-      });
-      reset();
-      setShowCurrent(false);
-      setShowNew(false);
-      setShowConfirm(false);
+      // Success — session is now dead. Show the done state; the countdown effect
+      // then walks the user to /login (or they can go now via the button).
+      setSucceeded(true);
     } catch (err) {
       if (err instanceof ApiError) {
         const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
-        setApiError(translated || err.message);
+          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '')
+          || err.message;
+        // Pin the message to the field the backend blamed, so the user sees WHICH
+        // input is wrong (esp. "current password is incorrect" — the reported case).
+        const fieldErrs = err.fieldErrors ?? [];
+        let pinned = false;
+        for (const fe of fieldErrs) {
+          const target = mapPasswordField(fe.field);
+          if (target) {
+            setError(target, { type: 'server', message: translated });
+            pinned = true;
+          }
+        }
+        // Also keep a top-of-form alert so it's impossible to miss.
+        setApiError(translated);
+        if (!pinned && !translated) setApiError(t('common.error'));
       } else {
         setApiError(t('common.error'));
       }
     }
   };
+
+  if (succeeded) {
+    return (
+      <div className="border border-line bg-surface p-6 rounded-lg">
+        <div className="flex items-center gap-2 mb-4">
+          <KeyRound size={20} />
+          <h2 className="text-lg font-semibold">{t('profile.changePassword')}</h2>
+        </div>
+        <div className="alert alert-success mb-4">
+          <CheckCircle size={18} />
+          <div>
+            <div className="alert-title">{t('profile.passwordChanged')}</div>
+            <div className="alert-description mt-0.5">
+              {t('profile.passwordChangedRelogin', { count: countdown })}
+            </div>
+          </div>
+        </div>
+        <div className="flex justify-end">
+          <Button color="primary" onClick={redirectToLogin}>
+            {t('profile.goToLoginNow')}
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="border border-line bg-surface p-6 rounded-lg">
@@ -465,10 +519,19 @@ function ChangePasswordForm() {
               onEndIconClick={() => setShowNew(!showNew)}
               {...register('newPassword', {
                 required: t('profile.newPasswordRequired'),
-                minLength: { value: 6, message: t('profile.passwordMinLength') },
+                minLength: { value: 8, message: t('profile.passwordRules') },
+                validate: (v) => {
+                  if (!/[A-Za-z]/.test(v)) return t('profile.passwordRules');
+                  if (!/[0-9]/.test(v)) return t('profile.passwordRules');
+                  return true;
+                },
               })}
             />
-            <FormErrorMessage error={errors.newPassword} />
+            {errors.newPassword ? (
+              <FormErrorMessage error={errors.newPassword} />
+            ) : (
+              <p className="text-xs text-subtle mt-1">{t('profile.passwordRules')}</p>
+            )}
           </div>
 
           <div className="flex flex-col">
