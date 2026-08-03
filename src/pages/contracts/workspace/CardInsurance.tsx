@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Shield, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Shield, CheckCircle } from 'lucide-react';
 import { fmtCurrency } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
 import { SummaryCard } from './SummaryCard';
@@ -12,16 +12,14 @@ export function CardInsurance({ onEdit, active, shake }: { onEdit?: () => void; 
   const hasCustomer = !!contract?.customer_id;
   const amount = contract?.insurance_deposit ?? 0;
   const hasAmount = amount > 0;
-  const downPayment = contract?.down_payment ?? 0;
 
-  // FIN2 with no down payment collects ONLY the insurance fund at contract open.
-  // Without it the bill total is 0 and the contract can't activate — so here
-  // insurance is required, not optional. Flag the card as such.
-  const insuranceRequired = isFin2 && hasCustomer && downPayment === 0 && !hasAmount;
-
+  // Insurance is OPTIONAL for FIN2 — including when there is no down payment.
+  // A FIN2 contract with down 0 and no insurance is a valid no-charge open
+  // (BE mig 971): the 0-baht CONTRACT_OPEN bill is born PAID and the contract
+  // goes straight to signing. So an empty insurance field is never a blocker,
+  // and this card never shows a "required" warning.
   const status = !isFin2 ? 'complete' as const
     : !hasCustomer ? 'locked' as const
-    : insuranceRequired ? 'warning' as const
     : 'empty' as const;
 
   return (
@@ -30,7 +28,6 @@ export function CardInsurance({ onEdit, active, shake }: { onEdit?: () => void; 
       status={status}
       icon={
         !isFin2 ? undefined
-        : insuranceRequired ? <AlertTriangle size={16} className="text-warning-fg shrink-0" />
         : <Shield size={16} className={hasAmount ? 'text-info shrink-0' : 'text-fg/30 shrink-0'} />
       }
       onEdit={onEdit}
@@ -48,8 +45,6 @@ export function CardInsurance({ onEdit, active, shake }: { onEdit?: () => void; 
         <div className="text-subtle text-xs">{t('workspace.insuranceNeedCustomer')}</div>
       ) : hasAmount ? (
         <span className="font-semibold tabular-nums text-info">{fmtCurrency(amount)}</span>
-      ) : insuranceRequired ? (
-        <div className="text-warning-fg text-xs">{t('workspace.insuranceRequiredZeroDown')}</div>
       ) : (
         <div className="text-subtle">{t('workspace.insuranceEmpty')}</div>
       )}

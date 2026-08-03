@@ -69,12 +69,10 @@ export function PanelInsurance({ onClose: _onClose }: Props) {
   }, []);
 
   const disabled = isReadOnly || isFinancialLocked || !data.contractId;
-  const downPayment = contract?.down_payment ?? 0;
-  // FIN2 with no down payment collects ONLY the insurance fund at open — without
-  // it the bill total is 0 and the contract can't activate. So here insurance is
-  // required, not optional: show a single required alert instead of the generic
-  // "optional" hint + "recommended" note (which contradict each other).
-  const insuranceRequired = isFin2 && downPayment === 0 && current <= 0;
+  // Insurance is OPTIONAL for FIN2, always — including when there's no down
+  // payment. A FIN2 contract with down 0 and no insurance is a valid no-charge
+  // open (BE mig 971): the 0-baht bill opens PAID and goes straight to signing.
+  // So there is no "required" state here — just the generic optional hint.
 
   return (
     <div className="p-4 flex flex-col gap-3">
@@ -88,21 +86,12 @@ export function PanelInsurance({ onClose: _onClose }: Props) {
         </div>
       </div>
 
-      {insuranceRequired ? (
-        <div className="alert alert-warning">
-          <Info size={16} />
-          <div>
-            <div className="alert-description">{t('workspace.insuranceRequiredNote')}</div>
-          </div>
+      <div className="alert alert-info">
+        <Info size={16} />
+        <div>
+          <div className="alert-description">{t('workspace.insuranceHint')}</div>
         </div>
-      ) : (
-        <div className="alert alert-info">
-          <Info size={16} />
-          <div>
-            <div className="alert-description">{t('workspace.insuranceHint')}</div>
-          </div>
-        </div>
-      )}
+      </div>
 
       {!isFin2 ? (
         <div className="alert alert-info">

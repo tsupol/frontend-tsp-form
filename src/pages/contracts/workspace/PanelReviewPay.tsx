@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Select, MaskedInput } from 'tsp-form';
+import { Button, Select, MaskedInput, Modal } from 'tsp-form';
 import {
   Plus, Trash2, XCircle, Loader2, CheckCircle,
   ChevronsRight, Link2, FileText, Printer, PenLine, AlertTriangle, CreditCard,
@@ -89,13 +89,14 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
   const cartChargeTotal = cartLines.reduce((sum, l) => sum + (l.as_gift ? 0 : l.amount), 0);
   const totalAmount = downPayment + insuranceDeposit + cartChargeTotal;
 
-  // FIN2 with no down payment collects only the insurance fund at contract open.
-  // If it's left at 0 the whole bill is 0 — nothing to charge, so activation
-  // can't proceed. Surface this as a clear blocker pointing at the Insurance
-  // step. (Reacts to FIN2/insurance changes via the contract query: editing the
-  // insurance deposit invalidates the contract and recomputes totalAmount here.)
-  const isFin2 = contract?.commercial_model === 'FIN2';
-  const needsInsuranceFund = isFin2 && totalAmount <= 0;
+  // Zero-open (BE mig 971): down 0 + no insurance deposit + empty cart = a
+  // contract that collects nothing today. fn_bill_contract_open now opens a
+  // 0-baht bill that is born PAID and drops the contract straight to
+  // PENDING_SIGN (skipping payment). This is a deliberate, supported config —
+  // NOT an unset-insurance error. So there is no payment to record and no
+  // balance to check; the whole payment section is hidden and Confirm goes via
+  // a 2-step "no amount to collect" dialog straight to signing.
+  const isNoCharge = totalAmount <= 0;
 
   // ── Payment rows ─────────────────────────────────────────────────────
   const paymentMethodOptions = useMemo(() => {
@@ -236,14 +237,28 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
   // fail on the existing bill). Instead we show a recovery view pointing at the
   // bill. billId is already stored in workspace data at step 1.
   const [billOpenFailed, setBillOpenFailed] = useState(false);
+  // Task #4: 2-step confirm before opening a no-charge contract (down 0 + no
+  // insurance). Guards against a staff member opening a contract that collects
+  // no money without meaning to. Only shown when isNoCharge.
+  const [confirmNoCharge, setConfirmNoCharge] = useState(false);
 
+  // A no-charge open needs readiness only — there is nothing to balance. The
+  // normal path additionally requires a balanced, non-zero payment.
   const canConfirm = readinessReady
-    && isBalanced
-    && totalAmount > 0
     && !!data.contractId
-    && !loading;
+    && !loading
+    && (isNoCharge || (isBalanced && totalAmount > 0));
 
-  const handleConfirm = async () => {
+  // Confirm button: for a no-charge contract, first open the 2-step dialog;
+  // otherwise run the open sequence directly.
+  const onConfirmClick = () => {
+    if (!canConfirm) return;
+    if (isNoCharge) { setConfirmNoCharge(true); return; }
+    void runOpenSequence();
+  };
+
+  const runOpenSequence = async () => {
+    setConfirmNoCharge(false);
     if (!canConfirm || !data.contractId) return;
     setLoading(true);
     setError('');
@@ -311,23 +326,34 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
         );
       }
 
-      // 4. Record payments.
-      for (const payment of payments) {
-        await apiClient.rpc('fn_bill_payment_add', {
+      // 4 + 5 — payment. A no-charge open (BE mig 971) has a 0-baht bill that is
+      // already PAID and the contract is already at PENDING_SIGN, so there is
+      // nothing to add or confirm. Route by the state the open RPC returned
+      // instead of assuming payment-then-sign (doc task #2). For a real bill we
+      // record the payments and confirm as before.
+      const noChargeBill = bill.total_amount != null
+        ? bill.total_amount <= 0
+        : isNoCharge;
+
+      if (!noChargeBill) {
+        // 4. Record payments.
+        for (const payment of payments) {
+          await apiClient.rpc('fn_bill_payment_add', {
+            p_bill_id: bill.bill_id,
+            p_method: payment.method,
+            p_amount: payment.amount,
+            p_bank_account_id: payment.method === 'TRANSFER' ? payment.bank_account_id : null,
+          });
+        }
+
+        // 5. Confirm payment. Contract moves to PENDING_SIGN (paid, awaiting the
+        //    customer signature on the bridge) — it activates only after the
+        //    snapshot seals once the customer has signed.
+        await apiClient.rpc('fn_bill_payment_confirm', {
           p_bill_id: bill.bill_id,
-          p_method: payment.method,
-          p_amount: payment.amount,
-          p_bank_account_id: payment.method === 'TRANSFER' ? payment.bank_account_id : null,
+          p_contract_id: data.contractId,
         });
       }
-
-      // 5. Confirm payment. Contract moves to PENDING_SIGN (paid, awaiting the
-      //    customer signature on the bridge) — it activates only after the
-      //    snapshot seals once the customer has signed.
-      await apiClient.rpc('fn_bill_payment_confirm', {
-        p_bill_id: bill.bill_id,
-        p_contract_id: data.contractId,
-      });
 
       updateData({ billConfirmed: true });
       invalidateContract();
@@ -359,11 +385,15 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
   // ContractDetailPanel so the 80mm @page resolves cleanly.
   if (data.billConfirmed && data.billId) {
     const needsBindDevice = contract != null && contract.device_id == null;
+    const noChargeBill = data.billData?.total_amount != null
+      ? data.billData.total_amount <= 0
+      : isNoCharge;
     return (
       <PostConfirmView
         billId={data.billId}
         contractId={data.contractId ?? null}
         needsBindDevice={needsBindDevice}
+        noCharge={noChargeBill}
         onNavigate={navigate}
         t={t}
       />
@@ -411,6 +441,18 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
         </div>
 
         {/* ── Section 2: Payment Methods ───────────────────────── */}
+        {/* Zero-open: nothing to collect, so there is no payment UI at all —
+            just a clear note. The Confirm button (via a 2-step dialog) opens
+            the 0-baht bill and routes straight to signing. */}
+        {isNoCharge ? (
+          <div className="alert alert-info">
+            <CheckCircle size={16} />
+            <div>
+              <div className="alert-title">{t('wizard.noChargeTitle')}</div>
+              <div className="alert-description">{t('wizard.noChargeBody')}</div>
+            </div>
+          </div>
+        ) : (
         <div>
           <label className="form-label">{t('wizard.paymentMethods')}</label>
           <div className="flex flex-col gap-3">
@@ -491,6 +533,7 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
             </span>
           </div>
         </div>
+        )}
 
         {/* Confidence score moved to the Documents step (it's a readiness
             prerequisite, surfaced there with the other missing-field items). */}
@@ -506,25 +549,6 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
 
       {/* ── Footer ───────────────────────────────────────────── */}
       <div className="shrink-0 border-t border-line bg-bg flex flex-col">
-        {needsInsuranceFund && (
-          <>
-            <div className="px-4 py-2">
-              <div className="alert alert-danger">
-                <XCircle size={16} />
-                <div className="flex flex-col gap-1 min-w-0 flex-1">
-                  <button
-                    type="button"
-                    className="text-left bg-transparent border-none p-0 text-danger hover:underline cursor-pointer text-sm"
-                    onClick={() => setOpenModal('insurance')}
-                  >
-                    {t('wizard.fin2NeedsInsuranceFund')}
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div className="border-t border-line" />
-          </>
-        )}
         {readinessErrors.length > 0 && (
           <>
             <div className="px-4 py-2">
@@ -584,14 +608,42 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
         <div className="px-4 py-3 flex justify-end gap-2">
           <Button
             color="primary"
-            onClick={handleConfirm}
+            onClick={onConfirmClick}
             disabled={!canConfirm}
             startIcon={loading ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
           >
-            {loading ? t('common.loading') : t('wizard.confirmPayment')}
+            {loading
+              ? t('common.loading')
+              : isNoCharge
+                ? t('wizard.confirmOpenNoCharge')
+                : t('wizard.confirmPayment')}
           </Button>
         </div>
       </div>
+
+      {/* Task #4 — 2-step confirm before opening a no-charge contract. Always
+          mounted; visibility via `open`. */}
+      <Modal open={confirmNoCharge} onClose={() => setConfirmNoCharge(false)} maxWidth="26rem" width="100%">
+        <div className="modal-header">
+          <h2 className="modal-title">{t('wizard.noChargeConfirmTitle')}</h2>
+        </div>
+        <div className="modal-content">
+          <div className="alert alert-warning">
+            <AlertTriangle size={16} />
+            <div><div className="alert-description">{t('wizard.noChargeConfirmBody')}</div></div>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <Button variant="ghost" onClick={() => setConfirmNoCharge(false)}>{t('common.cancel')}</Button>
+          <Button
+            color="primary"
+            onClick={() => void runOpenSequence()}
+            startIcon={<CheckCircle size={16} />}
+          >
+            {t('wizard.noChargeConfirmCta')}
+          </Button>
+        </div>
+      </Modal>
 
       {/* Unofficial invoice print — same off-screen body portal + isolation
           as BillsPage. Exactly one .bill-receipt node, only at print time. */}
@@ -609,11 +661,13 @@ interface PostConfirmViewProps {
   billId: number;
   contractId: number | null;
   needsBindDevice: boolean;
+  /** No-charge open (0-baht bill): nothing was collected — adapt the copy. */
+  noCharge: boolean;
   onNavigate: (to: string) => void;
   t: ReturnType<typeof useTranslation>['t'];
 }
 
-function PostConfirmView({ billId, contractId, needsBindDevice, onNavigate, t }: PostConfirmViewProps) {
+function PostConfirmView({ billId, contractId, needsBindDevice, noCharge, onNavigate, t }: PostConfirmViewProps) {
   const queryClient = useQueryClient();
   const [printReady, setPrintReady] = useState(false);
 
@@ -645,9 +699,15 @@ function PostConfirmView({ billId, contractId, needsBindDevice, onNavigate, t }:
       <div className="flex-1 overflow-y-auto better-scroll p-6 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3 text-center max-w-sm">
           <CheckCircle size={56} className="text-success" />
-          <div className="text-lg font-semibold">{t('wizard.bill_confirmed_title', { defaultValue: 'Payment confirmed' })}</div>
+          <div className="text-lg font-semibold">
+            {noCharge
+              ? t('wizard.bill_opened_no_charge_title', { defaultValue: 'Contract opened' })
+              : t('wizard.bill_confirmed_title', { defaultValue: 'Payment confirmed' })}
+          </div>
           <div className="text-sm text-subtle">
-            {t('wizard.bill_confirmed_body_signing', { defaultValue: 'The bill has been recorded. Next, have the customer sign on the Signing tab.' })}
+            {noCharge
+              ? t('wizard.bill_opened_no_charge_body', { defaultValue: 'No amount was collected. Next, have the customer sign on the Signing tab.' })
+              : t('wizard.bill_confirmed_body_signing', { defaultValue: 'The bill has been recorded. Next, have the customer sign on the Signing tab.' })}
           </div>
         </div>
       </div>
