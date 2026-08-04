@@ -1,5 +1,6 @@
 import type { TFunction } from 'i18next';
 import { ApiError } from './api';
+import { getBucketLabel } from '../pages/inventory/inventoryUtils';
 
 // Try every reasonable translation key for an API error before falling back
 // to the raw English message. Backend codes look like `PRODUCT.CONFLICT.X`
@@ -21,13 +22,13 @@ export function translateApiError(err: unknown, t: TranslateFn): string {
   // it via `asset.idType.<CODE>` before injecting — otherwise the message reads
   // "SERIAL_NO GJ76..." instead of "ซีเรียล GJ76...".
   const params: Record<string, unknown> = { ...err.messageParams };
-  // The same error code is raised by several RPCs that name the same facts
-  // differently (asset_register sends {type, value}, identifier_correct sends
-  // {identifier_type, new_value}). Normalise to the names the catalog uses.
-  if (params.type == null && params.identifier_type != null) params.type = params.identifier_type;
-  if (params.value == null && params.new_value != null) params.value = params.new_value;
   if (typeof params.type === 'string') {
     params.type = t(`asset.idType.${params.type}`, { defaultValue: params.type });
+  }
+  // `existing_bucket` arrives as a code (ON_HAND_AVAILABLE); the backend never
+  // ships translated labels. Resolve it the same way every inventory screen does.
+  if (typeof params.existing_bucket === 'string') {
+    params.existing_bucket = getBucketLabel(params.existing_bucket, t as (k: string) => string);
   }
   const tryKey = (key: string | undefined): string => {
     if (!key) return '';
@@ -43,9 +44,11 @@ export function translateApiError(err: unknown, t: TranslateFn): string {
   // would short-circuit better candidates below.
   const messageKey = err.messageKey && err.messageKey !== 'unexpected' ? err.messageKey : undefined;
   const codeLower = err.code ? err.code.toLowerCase() : undefined;
-  // `<key>_basic` is an optional leaner phrasing for codes whose main string
-  // names facts only some callers send. Tried after the full one, so a caller
-  // that does send them still gets the detailed message.
+  // `<key>_basic` is an optional leaner phrasing used when the full string's
+  // facts are missing. Backend now always ships them, EXCEPT when the conflicting
+  // row vanishes mid-request (race) and only {type, value} arrive — this keeps
+  // that rare case a proper sentence instead of the English fallback.
+  // Tried after the full one, so the detailed message still wins when possible.
   return (
     tryKey(messageKey)
     || tryKey(err.code)
