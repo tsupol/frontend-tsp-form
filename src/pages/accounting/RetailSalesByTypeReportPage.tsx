@@ -1,6 +1,7 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   PageNav, PageNavPanel, MobileHeader, DataTable, Select, Button, InputDateRangePicker,
@@ -62,8 +63,16 @@ interface VariantRow {
 interface Branch { id: number; name: string; company_id: number }
 interface Company { id: number; name: string }
 
+/** Full filter set for the drill RPC — must mirror the parent list's scope. */
+interface VariantParams {
+  p_date_from: string | null;
+  p_date_to: string | null;
+  p_branch_id: number | null;
+  p_company_id: number | null;
+  p_acc_type: string;
+}
+
 const COLOR_RETAIL = 'var(--chart-sold)';
-const COLOR_GIFT = 'var(--chart-gift)';
 
 function monthStartIso(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
@@ -88,12 +97,56 @@ export function RetailSalesByTypeReportPage() {
   const isHoldingScope = !user?.company_id && !user?.branch_id;
   const isCompanyScope = !!user?.company_id && !user?.branch_id;
 
+  // Filters live in the query string so a report view is deep-linkable and
+  // survives a reload — ?from=&to=&branch_id=&company_id=. All four are
+  // optional; absent ones fall back to "this month, whole JWT scope".
+  const [searchParams, setSearchParams] = useSearchParams();
   const now = new Date();
-  const [fromDate, setFromDate] = useState(monthStartIso(now));
-  const [toDate, setToDate] = useState(toLocalDateStr(now));
-  const [companyId, setCompanyId] = useState<string>('');
-  const [branchId, setBranchId] = useState<string>('');
+  const fromDate = searchParams.get('from') ?? monthStartIso(now);
+  const toDate = searchParams.get('to') ?? toLocalDateStr(now);
+  const companyId = searchParams.get('company_id') ?? '';
+  const branchId = searchParams.get('branch_id') ?? '';
   const [isTypingRange, setIsTypingRange] = useState(false);
+
+  // Writes one or more filter params; '' removes the param so a cleared picker
+  // leaves a clean URL rather than an empty `branch_id=`.
+  const setParams = useCallback((patch: Record<string, string>) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      for (const [key, value] of Object.entries(patch)) {
+        if (value) next.set(key, value);
+        else next.delete(key);
+      }
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  // The range picker fires onFromDateChange + onToDateChange in the SAME tick
+  // (both on typing-commit, and on the calendar's second click). Two separate
+  // setSearchParams updaters both read the pre-update params, so the second
+  // write drops the first and the range never fully applies. Merge them through
+  // a ref that holds the latest intent, then write both keys at once.
+  const pendingRange = useRef({ from: fromDate, to: toDate });
+  pendingRange.current = { from: fromDate, to: toDate };
+
+  const setRange = useCallback((patch: { from?: string; to?: string }) => {
+    const next = { ...pendingRange.current, ...patch };
+    pendingRange.current = next;
+    setParams({ from: next.from, to: next.to });
+  }, [setParams]);
+
+  // A null date is the calendar's intermediate state while picking a new range
+  // (it clears `to` on the first click) — keep the current value rather than
+  // writing the epoch-ish string toLocalDateStr(null) would produce.
+  const setFromDate = useCallback((d: Date | null) => {
+    if (d) setRange({ from: toLocalDateStr(d) });
+  }, [setRange]);
+  const setToDate = useCallback((d: Date | null) => {
+    if (d) setRange({ to: toLocalDateStr(d) });
+  }, [setRange]);
+  const setBranchId = useCallback((v: string) => setParams({ branch_id: v }), [setParams]);
+  // Switching company invalidates the branch choice (branch list is company-scoped).
+  const setCompanyId = useCallback((v: string) => setParams({ company_id: v, branch_id: '' }), [setParams]);
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [printing, setPrinting] = useState(false);
   const [printPayload, setPrintPayload] = useState<{ groups: TypeSheetRow[]; drills: TypeDrillGroup[] } | null>(null);
@@ -126,14 +179,25 @@ export function RetailSalesByTypeReportPage() {
     queryFn: () => apiClient.rpc<TypeRow[]>('fn_retail_sales_by_type', typeParams),
   });
 
-  // Max pieces-out across groups drives bar length (retail + gift = pieces out).
-  const maxPieces = rows.reduce((m, r) => Math.max(m, r.sale_qty + r.gift_qty), 0) || 1;
+  // Bar length is scaled by SALES AMOUNT (฿), matching the ฿/% on the same row.
+  // It used to scale by pieces while the label showed a baht percentage — two
+  // units on one row, so a high-count/low-price group (film: 626 pcs, ฿93,650)
+  // drew a bar ~4.6× a low-count/high-price one (charger: 136 pcs, ฿88,240)
+  // whose sales were in fact nearly equal. Piece counts still show as text.
+  const maxAmount = rows.reduce((m, r) => Math.max(m, r.sale_amount), 0) || 1;
 
+  // The drill MUST carry the same scope as the parent list. Omitting branch/
+  // company made a company-level user's drill show whole-company totals under a
+  // branch heading (บางใหญ่ ก.ค. charger: 51 ชิ้น instead of 25) — numbers that
+  // feed commission. Branch users never saw it; the DB clamps their scope.
+  // Ref: UI_FEEDBACK/2026-08-04_BUG_retail_variant_drill_missing_branch_filter.md
   const variantParamsFor = useCallback((accType: string) => ({
     p_date_from: fromDate || null,
     p_date_to: toDate || null,
+    p_branch_id: branchId ? Number(branchId) : null,
+    p_company_id: companyId ? Number(companyId) : null,
     p_acc_type: accType,
-  }), [fromDate, toDate]);
+  }), [fromDate, toDate, branchId, companyId]);
 
   const selectedBranch = branches.find((b) => String(b.id) === branchId);
   const selectedCompany = companies.find((c) => String(c.id) === companyId);
@@ -181,9 +245,12 @@ export function RetailSalesByTypeReportPage() {
     try {
       const drills: TypeDrillGroup[] = [];
       if (selectedType) {
+        // Same key + same params as the on-screen drill, so print shows exactly
+        // the scoped numbers the user is looking at (not a whole-company total).
+        const printParams = variantParamsFor(selectedType);
         const variants = await queryClient.fetchQuery({
-          queryKey: ['retail-sales-by-variant', selectedType, fromDate, toDate],
-          queryFn: () => apiClient.rpc<VariantRow[]>('fn_retail_sales_by_variant', variantParamsFor(selectedType)),
+          queryKey: ['retail-sales-by-variant', printParams],
+          queryFn: () => apiClient.rpc<VariantRow[]>('fn_retail_sales_by_variant', printParams),
         });
         drills.push({
           acc_type: selectedType,
@@ -236,8 +303,8 @@ export function RetailSalesByTypeReportPage() {
     <InputDateRangePicker
       fromDate={parseLocalDate(fromDate)}
       toDate={parseLocalDate(toDate)}
-      onFromDateChange={(d) => setFromDate(toLocalDateStr(d))}
-      onToDateChange={(d) => setToDate(toLocalDateStr(d))}
+      onFromDateChange={setFromDate}
+      onToDateChange={setToDate}
       dateFormat={makeDateRangePickerFormat(i18n.language)}
       size="sm"
       locale={i18n.language}
@@ -259,7 +326,7 @@ export function RetailSalesByTypeReportPage() {
     <Select
       options={companyOptions}
       value={companyId || null}
-      onChange={(v) => { setCompanyId((v as string) ?? ''); setBranchId(''); }}
+      onChange={(v) => setCompanyId((v as string) ?? '')}
       placeholder={t('retailSalesByType.allCompanies')}
       size="sm"
       clearable
@@ -369,15 +436,12 @@ export function RetailSalesByTypeReportPage() {
                 </div>
               )}
 
-              {/* Legend */}
+              {/* Legend — one series; names the unit the bar encodes (฿ sales),
+                  since the row also prints a piece count that it does NOT scale by. */}
               <div className="flex-none flex items-center gap-4 px-4 py-2 border-b border-line text-xs text-subtle">
                 <span className="inline-flex items-center gap-1.5">
                   <span className="w-3 h-3 rounded-sm" style={{ background: COLOR_RETAIL }} />
-                  {t('retailSalesByType.legendRetail')}
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded-sm" style={{ background: COLOR_GIFT }} />
-                  {t('retailSalesByType.legendGift')}
+                  {t('retailSalesByType.legendSaleAmount')}
                 </span>
               </div>
 
@@ -395,7 +459,7 @@ export function RetailSalesByTypeReportPage() {
                       if (isMobile) goTo('detail');
                     }}
                   >
-                    <CategoryBar row={row.original} maxPieces={maxPieces} t={t} />
+                    <CategoryBar row={row.original} maxAmount={maxAmount} t={t} />
                   </button>
                 )}
                 className={`flex-1 min-h-0 panel-datatable ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
@@ -443,14 +507,17 @@ export function RetailSalesByTypeReportPage() {
   );
 }
 
-/** One category row in the rail: label · stacked pieces bar · N pcs · ฿ · %. */
-function CategoryBar({ row, maxPieces, t }: {
+/** One category row in the rail: label · sales-amount bar · N pcs · ฿ · %. */
+function CategoryBar({ row, maxAmount, t }: {
   row: TypeRow;
-  maxPieces: number;
+  maxAmount: number;
   t: (k: string, o?: Record<string, unknown>) => string;
 }) {
-  const pieces = row.sale_qty + row.gift_qty;
-  const pctOfMax = (pieces / maxPieces) * 100;
+  // Bar = sales amount (฿), the same figure the row's ฿ and % report. Gift is a
+  // giveaway (฿0 of sales), so it is NOT stacked into a sales bar — it would
+  // inflate the bar past the amount printed beside it. Gift pieces stay in the
+  // text below when there are any.
+  const pctOfMax = (Math.max(row.sale_amount, 0) / maxAmount) * 100;
   const typeLabel = t(`retailSales.accType.${row.acc_type}`, { defaultValue: row.acc_type });
 
   return (
@@ -458,18 +525,22 @@ function CategoryBar({ row, maxPieces, t }: {
       <div className="flex items-baseline justify-between gap-3 min-w-0">
         <span className="text-sm font-medium text-fg truncate">{typeLabel}</span>
         <span className="shrink-0 text-xs tabular-nums text-subtle whitespace-nowrap">
-          {t('retailSalesByType.piecesN', { count: pieces })}
+          {t('retailSalesByType.soldN', { count: row.sale_qty })}
+          {row.gift_qty > 0 && (
+            <span className="text-subtler">
+              {' + '}{t('retailSalesByType.giftN', { count: row.gift_qty })}
+            </span>
+          )}
           {' · '}฿{fmtCurrency(row.sale_amount)}
           <span className="text-subtler"> ({row.sale_pct}%)</span>
         </span>
       </div>
-      {/* Bar track — stacked by PIECES: retail (sold) + gift. A zero-pieces
-          group draws no track at all (an empty box reads as broken); its row
-          still shows the "0 pcs" label above so the group isn't hidden. */}
-      {pieces > 0 && (
-        <div className="h-4 rounded bg-surface-soft overflow-hidden flex" style={{ width: `${pctOfMax}%`, minWidth: '2px' }}>
-          <div style={{ width: `${(row.sale_qty / pieces) * 100}%`, background: COLOR_RETAIL }} />
-          <div style={{ width: `${(row.gift_qty / pieces) * 100}%`, background: COLOR_GIFT }} />
+      {/* Bar track — a zero-sales group draws no track at all (an empty box
+          reads as broken); its row still shows the "0 sold" label above so the
+          group isn't hidden. */}
+      {row.sale_amount > 0 && (
+        <div className="h-4 rounded overflow-hidden flex" style={{ width: `${pctOfMax}%`, minWidth: '2px' }}>
+          <div className="w-full" style={{ background: COLOR_RETAIL }} />
         </div>
       )}
     </div>
@@ -479,13 +550,15 @@ function CategoryBar({ row, maxPieces, t }: {
 /** Right panel: product-level drill for one category. */
 function TypeDrillPanel({ row, variantParams }: {
   row: TypeRow;
-  variantParams: { p_date_from: string | null; p_date_to: string | null; p_acc_type: string };
+  variantParams: VariantParams;
 }) {
   const { t } = useTranslation();
   const typeLabel = t(`retailSales.accType.${row.acc_type}`, { defaultValue: row.acc_type });
 
+  // Key on the whole param set — branch/company are part of the identity of the
+  // result, so a cached drill can't leak across a branch switch.
   const { data: variants = [], isFetching } = useQuery({
-    queryKey: ['retail-sales-by-variant', row.acc_type, variantParams.p_date_from, variantParams.p_date_to],
+    queryKey: ['retail-sales-by-variant', variantParams],
     queryFn: () => apiClient.rpc<VariantRow[]>('fn_retail_sales_by_variant', variantParams),
   });
 
@@ -495,7 +568,7 @@ function TypeDrillPanel({ row, variantParams }: {
       <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-3">
         <h2 className="text-base font-semibold truncate">{typeLabel}</h2>
         <span className="ml-auto shrink-0 text-xs tabular-nums text-subtle whitespace-nowrap">
-          {t('retailSalesByType.piecesN', { count: row.sale_qty })}
+          {t('retailSalesByType.soldN', { count: row.sale_qty })}
           {' · '}฿{fmtCurrency(row.sale_amount)}
           <span className="text-subtler"> ({row.sale_pct}%)</span>
         </span>
@@ -518,7 +591,7 @@ function TypeDrillPanel({ row, variantParams }: {
               <div key={v.variant_id} className="flex items-baseline justify-between gap-3 min-w-0 py-2">
                 <span className="text-sm text-fg truncate min-w-0">{v.product_name}</span>
                 <span className="shrink-0 text-xs tabular-nums text-subtle whitespace-nowrap">
-                  {t('retailSalesByType.piecesN', { count: v.sale_qty })}
+                  {t('retailSalesByType.soldN', { count: v.sale_qty })}
                   {' · '}฿{fmtCurrency(v.sale_amount)}
                   <span className="text-subtler"> ({v.sale_pct}%)</span>
                 </span>
