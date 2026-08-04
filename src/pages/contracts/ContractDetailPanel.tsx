@@ -28,6 +28,7 @@ import { ContractNotifyTab } from './ContractNotifyTab';
 import { AppointmentsSection } from './AppointmentsSection';
 import { CommissionOwnerModal } from './CommissionOwnerModal';
 import { BillReceipt } from './workspace/BillReceipt';
+import { ContractAddonModal } from './ContractAddonModal';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { CustomerPickerModal } from './CustomerPickerModal';
 import { SwapPrimaryCustomerModal } from './SwapPrimaryCustomerModal';
@@ -313,6 +314,10 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
     ? (tabParam as DetailTab)
     : 'overview';
   const [activeTab, setActiveTab] = useState<DetailTab>(initialTab);
+  // Set when a footer action routes into a specific Money sub-section (e.g.
+  // ADD_ADDON → Bills). Consumed once by MoneyTab, then cleared so the user's
+  // own sub-tab clicks aren't overridden on later visits.
+  const [requestedMoneySection, setRequestedMoneySection] = useState<MoneySection | null>(null);
 
   useEffect(() => {
     if (!tabParam) return;
@@ -459,7 +464,15 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
             setDeliveryModalOpen={setDeliveryModalOpen}
           />
         )}
-        {activeTab === 'money' && <MoneyTab contractId={contractId} contract={contract} t={t} />}
+        {activeTab === 'money' && (
+          <MoneyTab
+            contractId={contractId}
+            contract={contract}
+            t={t}
+            requestedSection={requestedMoneySection}
+            onSectionConsumed={() => setRequestedMoneySection(null)}
+          />
+        )}
         {activeTab === 'customers' && (
           <CustomersTab
             contractId={contractId}
@@ -491,7 +504,12 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
         contract={contract}
         requestedAction={requestedAction}
         onRequestedActionConsumed={() => setRequestedAction(null)}
-        onNavigateTab={(tab) => handleTabChange(tab)}
+        onNavigateTab={(tab, moneySection) => {
+          // A money-tab action can name the sub-section it lives in (e.g.
+          // ADD_ADDON → Bills); without it MoneyTab would open on Installments.
+          if (moneySection) setRequestedMoneySection(moneySection);
+          handleTabChange(tab);
+        }}
         onRefresh={() => {
           queryClient.invalidateQueries({ queryKey: ['contract-detail', contractId] });
           queryClient.invalidateQueries({ queryKey: ['contract-search'] });
@@ -1086,12 +1104,22 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
 
 // ── Money Tab (wraps Installments / Txns / Payments / Wallets) ───────────────
 
-function MoneyTab({ contractId, contract, t }: {
+function MoneyTab({ contractId, contract, t, requestedSection, onSectionConsumed }: {
   contractId: number;
   contract: ContractDetail;
   t: ReturnType<typeof useTranslation>['t'];
+  /** Sub-section a footer action asked for; applied once then cleared. */
+  requestedSection?: MoneySection | null;
+  onSectionConsumed?: () => void;
 }) {
-  const [section, setSection] = useState<MoneySection>('installments');
+  const [section, setSection] = useState<MoneySection>(requestedSection ?? 'installments');
+
+  // Apply a late-arriving request (tab already mounted when the action fired).
+  useEffect(() => {
+    if (!requestedSection) return;
+    setSection(requestedSection);
+    onSectionConsumed?.();
+  }, [requestedSection, onSectionConsumed]);
 
   // Counts for sub-tab badges. Use HEAD (count=exact) so we don't pull rows
   // we won't render.
@@ -1171,7 +1199,7 @@ function MoneyTab({ contractId, contract, t }: {
         {section === 'installments' && <InstallmentsTab contractId={contractId} t={t} />}
         {section === 'txns' && <TxnsTab contractId={contractId} t={t} />}
         {section === 'wallets' && <WalletsTab contract={contract} />}
-        {section === 'bills' && <BillsTab contractId={contractId} t={t} />}
+        {section === 'bills' && <BillsTab contractId={contractId} contract={contract} t={t} />}
       </div>
     </div>
   );
@@ -1851,9 +1879,19 @@ interface BillPaymentEmbedded {
   created_by_name: string | null;
 }
 
-function BillsTab({ contractId, t }: { contractId: number; t: ReturnType<typeof useTranslation>['t'] }) {
+function BillsTab({ contractId, contract, t }: {
+  contractId: number;
+  contract: ContractDetail;
+  t: ReturnType<typeof useTranslation>['t'];
+}) {
   const queryClient = useQueryClient();
   const { downloadingId, download: downloadPdf } = useBillPdfDownload();
+
+  // Add-on (CONTRACT_ADDON) — sell or gift an accessory on an ACTIVE contract.
+  // Restricted to ACTIVE because ref_bill_purposes.allowed_states={ACTIVE}; the
+  // server rejects any other state, so we don't offer the button at all.
+  const [addonOpen, setAddonOpen] = useState(false);
+  const canAddAddon = contract.state === 'ACTIVE';
 
   // Bill list — INVOICE + CREDIT_NOTE (JOURNAL still excluded).
   const { data: bills, isLoading } = useQuery({
@@ -1920,8 +1958,44 @@ function BillsTab({ contractId, t }: { contractId: number; t: ReturnType<typeof 
     }));
   }, [queryClient]);
 
+  // The add-on button is part of the tab chrome, not the list — it must stay
+  // reachable when the contract has no bills yet (a first add-on is a normal
+  // reason to be here), so it renders above the loading/empty branches.
+  const addonModal = (
+    <ContractAddonModal
+      open={addonOpen}
+      contract={contract}
+      onClose={() => setAddonOpen(false)}
+      onSuccess={() => {
+        queryClient.invalidateQueries({ queryKey: ['contract-bills', contractId] });
+        queryClient.invalidateQueries({ queryKey: ['contract-bills-count', contractId] });
+      }}
+    />
+  );
+
+  const addonButton = canAddAddon ? (
+    <Button
+      size="sm"
+      color="primary"
+      startIcon={<Plus size={14} />}
+      onClick={() => setAddonOpen(true)}
+      className="self-start"
+    >
+      {t('contractAddon.addLine')}
+    </Button>
+  ) : null;
+
   if (isLoading) return <div className="p-8 text-center text-subtler">{t('common.loading')}</div>;
-  if (!bills || bills.length === 0) return <div className="p-8 text-center text-subtler">{t('common.noData')}</div>;
+
+  if (!bills || bills.length === 0) {
+    return (
+      <div className="p-4 flex flex-col gap-4">
+        <div className="py-8 text-center text-subtler">{t('common.noData')}</div>
+        {addonButton && <div className="flex justify-center">{addonButton}</div>}
+        {addonModal}
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 flex flex-col gap-4">
@@ -1930,6 +2004,8 @@ function BillsTab({ contractId, t }: { contractId: number; t: ReturnType<typeof 
           <MediaRow label={t('contract.paymentSlips')} media={paymentSlips} />
         </div>
       )}
+
+      {addonButton}
 
       <div className="flex flex-col gap-2">
         {bills.map(bill => {
@@ -2027,6 +2103,8 @@ function BillsTab({ contractId, t }: { contractId: number; t: ReturnType<typeof 
         </div>,
         document.body,
       )}
+
+      {addonModal}
     </div>
   );
 }

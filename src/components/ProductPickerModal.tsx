@@ -35,7 +35,7 @@ interface Props {
 
 /**
  * Product picker for "+ product / + accessory / + gift" cart actions.
- * Queries `v_branch_sellable_stock_priced` (qty > 0) at the given branch with
+ * Queries `v_branch_sellable_stock_priced` (qty > 0, ON_HAND_AVAILABLE) with
  * debounced ilike + barcode search. Flags items already in the cart and
  * switches to "Update" so re-picking the same variant updates its line.
  * Used by the retail New Bill modal and the contract Review & Pay cart.
@@ -71,7 +71,13 @@ export function ProductPickerModal({
   const { data: variants = [], isFetching } = useQuery({
     queryKey: ['sellable-variants', branchId, debounced],
     queryFn: () => {
-      let url = `/v_branch_sellable_stock_priced?branch_id=eq.${branchId}&qty=gt.0&order=brand_name,model_name&limit=50`;
+      // bucket=ON_HAND_AVAILABLE is REQUIRED, not a nicety. The view returns one
+      // row PER BUCKET, so a variant that also has IN_TRANSIT_OUTBOUND stock came
+      // back twice — duplicate React keys, and because the picker indexes its
+      // stepper state by variant_id, editing one row's qty moved the other's.
+      // Only ON_HAND_AVAILABLE is sellable anyway (inv.ref_asset_actions gates
+      // every sell action on that bucket), so the other rows were never pickable.
+      let url = `/v_branch_sellable_stock_priced?branch_id=eq.${branchId}&qty=gt.0&bucket=eq.ON_HAND_AVAILABLE&order=brand_name,model_name&limit=50`;
       if (debounced) {
         const term = debounced.replace(/\s+/g, '*');
         const enc = encodeURIComponent(term);

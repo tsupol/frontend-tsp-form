@@ -6817,6 +6817,27 @@
     "blockNoBank": "Select a receiving account for the transfer",
     "blockWalletInsufficient": "{{method}} balance is not enough"
   },
+  "contractAddon": {
+    "title": "Add add-on",
+    "done": "Add-on bill created",
+    "linesLabel": "Items",
+    "emptyCart": "No items yet — add a sale or a gift below",
+    "addLine": "Add add-on",
+    "addSale": "Sell accessory",
+    "addGift": "Give as gift",
+    "editPrice": "Adjust price",
+    "giftHint": "Free to customer · retail value {{value}}",
+    "giftValue": "Gift value",
+    "giftOnlyNotice": "Gifts only — nothing to collect from the customer.",
+    "paymentsLabel": "Payment",
+    "paid": "Paid",
+    "total": "Total",
+    "confirm": "Confirm & pay",
+    "blockNoBank": "Select a bank account for the transfer",
+    "editLine": "Edit item",
+    "editQty": "Edit quantity",
+    "catalogHint": "Catalog price: {{value}}"
+  },
   "lateFee": {
     "title": "Collect late fee",
     "done": "Late fee collected",

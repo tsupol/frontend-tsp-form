@@ -626,6 +626,7 @@ const CATEGORY_OVERRIDE: Record<string, string> = {
 // Maps `elsewhere` actions to the tab they live in, so a footer click can navigate there
 const ELSEWHERE_TAB: Record<string, 'overview' | 'device' | 'notes' | 'customers' | 'money'> = {
   UPDATE_DELIVERY: 'overview',
+  ADD_ADDON: 'money',
   SAVING_DEPOSIT: 'money',
   SAVING_CASHOUT: 'money',
   SAVING_DEDUCT: 'money',
@@ -649,6 +650,22 @@ const ELSEWHERE_TAB: Record<string, 'overview' | 'device' | 'notes' | 'customers
   DEVICE_REPAIR_REQUEST: 'device',
 };
 
+// Money-tab actions that live in a specific sub-section. Without this the Money
+// tab opens on Installments and the user has to find the right sub-tab. Wallet
+// actions are omitted deliberately — WalletsTab is the Money tab's own landing
+// concern and already handled by the `where` label.
+const ELSEWHERE_MONEY_SECTION: Record<string, 'installments' | 'txns' | 'wallets' | 'bills'> = {
+  ADD_ADDON: 'bills',
+  SAVING_DEPOSIT: 'wallets',
+  SAVING_CASHOUT: 'wallets',
+  SAVING_DEDUCT: 'wallets',
+  CREDIT_CASHOUT: 'wallets',
+  INSURANCE_TOPUP: 'wallets',
+  INSURANCE_DEDUCT: 'wallets',
+  INSURANCE_CASHOUT: 'wallets',
+  APPLY_INSURANCE: 'wallets',
+};
+
 const ACTION_PLACEMENT: Record<string, ActionPlacement> = {
   // Wallet ops live in the Wallets tab
   SAVING_DEPOSIT:    { kind: 'elsewhere', where: 'Wallets tab → Saving' },
@@ -659,6 +676,9 @@ const ACTION_PLACEMENT: Record<string, ActionPlacement> = {
   INSURANCE_DEDUCT:  { kind: 'elsewhere', where: 'Wallets tab → Insurance' },
   INSURANCE_CASHOUT: { kind: 'elsewhere', where: 'Wallets tab → Insurance' },
   APPLY_INSURANCE:   { kind: 'elsewhere', where: 'Wallets tab → Insurance' },
+  // Add-on cart lives in the Money tab → Bills (it creates a bill, so it sits
+  // with the bill list it produces)
+  ADD_ADDON:         { kind: 'elsewhere', where: 'Money tab → Bills' },
   // Note composer lives in the Notes tab
   ADD_NOTE:          { kind: 'elsewhere', where: 'Notes tab' },
   // Contract-customer ops live in the Customers tab
@@ -749,7 +769,11 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   onRefresh: () => void;
   requestedAction?: ContractAction | null;
   onRequestedActionConsumed?: () => void;
-  onNavigateTab?: (tab: 'overview' | 'device' | 'notes' | 'customers' | 'money' | 'signing') => void;
+  onNavigateTab?: (
+    tab: 'overview' | 'device' | 'notes' | 'customers' | 'money' | 'signing',
+    /** Money sub-section to open, for actions that live in one (e.g. ADD_ADDON → bills). */
+    moneySection?: 'installments' | 'txns' | 'wallets' | 'bills',
+  ) => void;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -829,7 +853,7 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
     if (placement?.kind === 'elsewhere') {
       const target = ELSEWHERE_TAB[action.action_code];
       if (target) {
-        onNavigateTab?.(target);
+        onNavigateTab?.(target, ELSEWHERE_MONEY_SECTION[action.action_code]);
         return;
       }
     }
@@ -1336,7 +1360,11 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
   contract: ContractForActions;
   onClose: () => void;
   onSuccess: (msgKey: string) => void;
-  onNavigateTab?: (tab: 'overview' | 'device' | 'notes' | 'customers' | 'money' | 'signing') => void;
+  onNavigateTab?: (
+    tab: 'overview' | 'device' | 'notes' | 'customers' | 'money' | 'signing',
+    /** Money sub-section to open, for actions that live in one (e.g. ADD_ADDON → bills). */
+    moneySection?: 'installments' | 'txns' | 'wallets' | 'bills',
+  ) => void;
 }) {
   const { t } = useTranslation();
   const invalidate = useContractInvalidate(contract.id);

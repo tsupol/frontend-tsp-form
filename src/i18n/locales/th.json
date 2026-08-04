@@ -6810,6 +6810,27 @@
     "blockNoBank": "เลือกบัญชีรับเงินสำหรับการโอน",
     "blockWalletInsufficient": "ยอด {{method}} ไม่เพียงพอ"
   },
+  "contractAddon": {
+    "title": "เพิ่ม Add-on",
+    "done": "เปิดบิล Add-on แล้ว",
+    "linesLabel": "รายการ",
+    "emptyCart": "ยังไม่มีรายการ — เพิ่มรายการขายหรือของแถมด้านล่าง",
+    "addLine": "เพิ่ม Add-on",
+    "addSale": "ขายอุปกรณ์เพิ่ม",
+    "addGift": "แถมให้ลูกค้า",
+    "editPrice": "แก้ไขราคา",
+    "giftHint": "ลูกค้าไม่ต้องจ่าย · มูลค่า {{value}}",
+    "giftValue": "มูลค่าของแถม",
+    "giftOnlyNotice": "มีเฉพาะของแถม — ไม่ต้องเก็บเงินจากลูกค้า",
+    "paymentsLabel": "การชำระเงิน",
+    "paid": "ชำระแล้ว",
+    "total": "ยอดรวม",
+    "confirm": "ยืนยันและชำระเงิน",
+    "blockNoBank": "เลือกบัญชีธนาคารสำหรับการโอน",
+    "editLine": "แก้ไขรายการ",
+    "editQty": "แก้ไขจำนวน",
+    "catalogHint": "ราคาตามแคตตาล็อก: {{value}}"
+  },
   "lateFee": {
     "title": "เก็บค่าปรับ",
     "done": "เก็บค่าปรับแล้ว",
