@@ -2508,6 +2508,12 @@
         "reenroll": "Re-enroll device",
         "reenrollHint": "The device must be wiped after you press this."
       },
+      "serialCheck": {
+        "label": "Serial",
+        "zoom": "Enlarge the serial",
+        "title": "Check the serial against the device",
+        "hint": "Compare this with the serial on the device — Settings → General → About."
+      },
       "afterPress": {
         "title": "Sent — not finished yet",
         "next": "Next: wipe the device after scanning, then wait until the Remote Management screen appears.",

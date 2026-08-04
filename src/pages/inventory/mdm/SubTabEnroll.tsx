@@ -35,7 +35,7 @@ import { Button, Modal, Badge } from 'tsp-form';
 import {
   ShieldCheck, RefreshCw, Send, CheckCircle, AlertTriangle, Loader2,
   Fingerprint, ScanLine, RotateCcw, Smartphone, XCircle, Lock, Cloud, CircleDashed,
-  PackageCheck, PackageOpen, KeyRound, HelpCircle, LockOpen, PauseCircle,
+  PackageCheck, PackageOpen, KeyRound, HelpCircle, LockOpen, PauseCircle, Search,
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { apiClient, ApiError } from '../../../lib/api';
@@ -43,6 +43,7 @@ import { DateTime } from '../../../components/DateTime';
 import { RelativeDateTime } from './RelativeDateTime';
 import { applyLightLock, type AssetMdmStatus, type MdmStatusCode, type ApplyTemplateResult, type MdmEnforcementBadge } from './mdmApi';
 import { parseMdmError } from './mdmApi';
+import { translateApiError } from '../../../lib/apiErrors';
 
 interface PrepareResponse {
   request_id: number;
@@ -178,6 +179,9 @@ export function SubTabEnroll({
   const queryClient = useQueryClient();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [justPrepared, setJustPrepared] = useState(false);
+  // Step-3 serial zoom — staff eyeball the serial against the physical device
+  // before sending the enrollment, so it renders BIG and letter-spaced.
+  const [serialZoomOpen, setSerialZoomOpen] = useState(false);
 
   // A re-enroll leaves mdm_status at IN_MDM (the view checks the binding first),
   // so the READY signal lives in prepare_status/detail, not mdm_status.
@@ -198,8 +202,7 @@ export function SubTabEnroll({
     },
     onError: (err) => {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setErrorMsg(translated || err.message);
       } else {
         setErrorMsg(t('asset.mdm.prepareError'));
@@ -365,6 +368,24 @@ export function SubTabEnroll({
                 where={t(`asset.mdm.stepWhere.${step.where}`)}
                 state={state}
               >
+                {/* Step 3 shows the serial being enrolled + a magnifier that
+                    blows it up full-screen, so staff can check it against the
+                    physical device before sending. */}
+                {isSendStep && status.serial_number && (
+                  <div className="flex items-center gap-2 flex-wrap mb-2">
+                    <span className="text-xs text-subtle">{t('asset.mdm.serialCheck.label')}</span>
+                    <span className="font-mono text-sm tracking-widest break-all">{status.serial_number}</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="btn-icon-sm"
+                      startIcon={<Search size={14} />}
+                      onClick={() => setSerialZoomOpen(true)}
+                      aria-label={t('asset.mdm.serialCheck.zoom')}
+                    />
+                  </div>
+                )}
+
                 {/* Step 3 owns the send-enrollment button. Re-enroll (device
                     already IN_MDM, branch wiped it) reuses the same RPC — only
                     the wording changes (mig 968). */}
@@ -484,6 +505,46 @@ export function SubTabEnroll({
           <DeviceInfo status={status} />
         </div>
       )}
+
+      {/* Serial zoom — the whole point is legibility at arm's length while the
+          device is in the other hand, so: as wide as the viewport allows, the
+          characters spaced apart (Ohm: "A B C D E"), and a plain unspaced copy
+          underneath for reading it back normally. Always mounted (§Modal rule). */}
+      <Modal
+        open={serialZoomOpen}
+        onClose={() => setSerialZoomOpen(false)}
+        maxWidth="min(64rem, 96vw)"
+        width="100%"
+      >
+        <div className="modal-header">
+          <h2 className="modal-title">{t('asset.mdm.serialCheck.title')}</h2>
+          <button type="button" className="modal-close-btn" onClick={() => setSerialZoomOpen(false)}>&times;</button>
+        </div>
+        <div className="modal-content min-w-0">
+          <div className="flex flex-col items-center gap-4 py-4 min-w-0 w-full">
+            {/* MUST stay on one line — a wrapped serial defeats the whole check.
+                Mono glyphs are 0.6em wide and each carries the letter-spacing,
+                so N chars ≈ N × 0.82em: size off the length, not a fixed clamp. */}
+            <div
+              className="font-mono font-bold text-center leading-tight whitespace-nowrap w-full select-all"
+              style={{
+                fontSize: `min(9vw, ${(90 / Math.max((status.serial_number?.length ?? 1) * 0.82, 1)).toFixed(2)}vw, 4rem)`,
+                letterSpacing: '0.22em',
+                textIndent: '0.22em', // trailing letter-space would push it off-centre
+              }}
+            >
+              {status.serial_number}
+            </div>
+            <div className="font-mono text-base text-subtle break-all text-center select-all">
+              {status.serial_number}
+            </div>
+            <p className="text-xs text-subtle text-center">{t('asset.mdm.serialCheck.hint')}</p>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <Button variant="ghost" onClick={() => setSerialZoomOpen(false)}>{t('common.close')}</Button>
+        </div>
+      </Modal>
 
       {/* Step-7 confirm modal (preview→apply). Always mounted (§Modal rule). */}
       <Modal open={confirmOpen} onClose={() => !policyBusy && setConfirmOpen(false)} maxWidth="28rem" width="100%">

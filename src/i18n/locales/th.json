@@ -2505,6 +2505,12 @@
         "reenroll": "ลงทะเบียนใหม่",
         "reenrollHint": "ต้องล้างเครื่องหลังกด"
       },
+      "serialCheck": {
+        "label": "Serial",
+        "zoom": "ขยาย Serial",
+        "title": "ตรวจ Serial กับตัวเครื่อง",
+        "hint": "เทียบกับ Serial ที่ตัวเครื่อง — Settings → General → About"
+      },
       "afterPress": {
         "title": "ส่งข้อมูลแล้ว — ยังไม่เสร็จ",
         "next": "ขั้นต่อไป: ล้างเครื่องหลังสแกน แล้วรอจนขึ้นหน้า Remote Management",
