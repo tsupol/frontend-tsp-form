@@ -357,7 +357,6 @@
   "CONTRACT.VALIDATION.CUSTOMER_ID_CARD_REQUIRED": "Customer ID card photo is required",
   "CONTRACT.VALIDATION.CO_LESSEE_ID_CARD_REQUIRED": "Co-lessee ID card photo is required",
   "CONTRACT.VALIDATION.CO_LESSEE_AGE_BELOW_THRESHOLD": "Co-lessee is under the required age",
-  "CONTRACT.VALIDATION.CO_LESSEE_DOB_REQUIRED": "Co-lessee date of birth is required",
   "CONTRACT.VALIDATION.CONTRACT_REQUIRED": "Contract is required",
   "CONTRACT.VALIDATION.ASSET_TYPE_MISMATCH": "The selected device does not match the contract's product",
   "CONTRACT.VALIDATION.INSTALLMENT_AMOUNT_REQUIRED": "Installment amount is required",
