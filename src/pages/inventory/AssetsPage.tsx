@@ -25,6 +25,7 @@ import { ScrollableTabs } from './ScrollableTabs';
 import { SellExternalModal } from './SellExternalModal';
 import { SellOutRequestModal } from './SellOutRequestModal';
 import { OwnerBadge } from '../../components/OwnerBadge';
+import { ApiErrorAlert } from '../../components/ApiErrorAlert';
 import type { OwnerType } from '../../lib/ownerTypes';
 import { translateApiError } from '../../lib/apiErrors';
 
@@ -2883,7 +2884,9 @@ function AssetActionModal({
   const [reason, setReason] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [extra, setExtra] = useState<Record<string, string>>({});
-  const [error, setError] = useState('');
+  // Holds the caught error itself, so ApiErrorAlert can offer a link to the
+  // conflicting asset when the backend names one.
+  const [error, setError] = useState<unknown>(null);
   // Per-field date-picker typing-mode toggle, keyed by field name.
   const [typingDate, setTypingDate] = useState<Record<string, boolean>>({});
 
@@ -2935,7 +2938,7 @@ function AssetActionModal({
     if (open) {
       setReason(null);
       setNote('');
-      setError('');
+      setError(null);
       setTypingDate({});
       const initial: Record<string, string> = {};
       config?.extraFields?.forEach(f => {
@@ -3026,14 +3029,9 @@ function AssetActionModal({
       return apiClient.rpc<Partial<StandardBillResponse>>(config.rpc, params);
     },
     onSuccess: (data) => onSuccess(config!.successKey, data),
-    onError: (err) => {
-      if (err instanceof ApiError) {
-        const translated = translateApiError(err, t);
-        setError(translated || err.message);
-      } else {
-        setError(String(err));
-      }
-    },
+    // Keep the error object, not just its message: ApiErrorAlert reads
+    // `existing_asset_id` off an identifier conflict to link to that asset.
+    onError: (err) => setError(err),
   });
 
   const reasonValid = !config?.hasReason?.required || !!reason;
@@ -3055,12 +3053,7 @@ function AssetActionModal({
           <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
         </div>
         <div className="modal-content">
-          {error && (
-            <div className="alert alert-danger mb-4 animate-pop-in">
-              <XCircle size={16} />
-              <span>{error}</span>
-            </div>
-          )}
+          <ApiErrorAlert error={error} />
           <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
             <div className="font-medium text-sm">{codeDisplay(asset.asset_code_display, asset.asset_code)}</div>
             <div className="text-xs text-subtle">

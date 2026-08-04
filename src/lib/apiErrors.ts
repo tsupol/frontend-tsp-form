@@ -12,34 +12,53 @@ import { getBucketLabel } from '../pages/inventory/inventoryUtils';
  *  `(key, opts) => string` alias some modules declare in their props. */
 type TranslateFn = TFunction | ((k: string, opts?: Record<string, unknown>) => string);
 
+/**
+ * Prepare backend error `params` for i18next interpolation.
+ *
+ * Backend ships enum *codes*, never translated labels (adding a language must
+ * not mean migrating the DB), so codes are resolved to labels here:
+ *   - `type` — IMEI / SERIAL_NO / CHASSIS_NO → `asset.idType.<CODE>`
+ *   - `existing_bucket` — ON_HAND_AVAILABLE → the shared inventory bucket map
+ *
+ * Exported because the same params also arrive on non-`ApiError` paths (the
+ * lot-convert validate RPC answers `ok: true` and hides errors per row).
+ */
+export function prepareErrorParams(
+  raw: Record<string, unknown> | undefined,
+  t: TranslateFn,
+): Record<string, unknown> {
+  const params: Record<string, unknown> = { ...(raw ?? {}) };
+  if (typeof params.type === 'string') {
+    params.type = t(`asset.idType.${params.type}`, { defaultValue: params.type });
+  }
+  if (typeof params.existing_bucket === 'string') {
+    params.existing_bucket = getBucketLabel(params.existing_bucket, t as (k: string) => string);
+  }
+  return params;
+}
+
+/**
+ * Translate `code` with `params`, or return '' if the result still carries an
+ * unresolved `{{placeholder}}` — a catalog string may name facts this caller
+ * didn't send, and a raw placeholder must never reach a user.
+ */
+export function translateErrorCode(
+  code: string | undefined,
+  params: Record<string, unknown>,
+  t: TranslateFn,
+): string {
+  if (!code) return '';
+  const value = t(code, { ns: 'apiErrors', defaultValue: '', ...params });
+  if (typeof value !== 'string') return '';
+  return value.includes('{{') ? '' : value;
+}
+
 export function translateApiError(err: unknown, t: TranslateFn): string {
   if (!(err instanceof ApiError)) {
     return t('common.error');
   }
-  // Pass the backend's error params through as interpolation values, so catalog
-  // strings like "...to {{branch_code}} {{branch_name}}..." fill in the facts.
-  // `type` is itself an enum code (IMEI / SERIAL_NO / CHASSIS_NO), so translate
-  // it via `asset.idType.<CODE>` before injecting — otherwise the message reads
-  // "SERIAL_NO GJ76..." instead of "ซีเรียล GJ76...".
-  const params: Record<string, unknown> = { ...err.messageParams };
-  if (typeof params.type === 'string') {
-    params.type = t(`asset.idType.${params.type}`, { defaultValue: params.type });
-  }
-  // `existing_bucket` arrives as a code (ON_HAND_AVAILABLE); the backend never
-  // ships translated labels. Resolve it the same way every inventory screen does.
-  if (typeof params.existing_bucket === 'string') {
-    params.existing_bucket = getBucketLabel(params.existing_bucket, t as (k: string) => string);
-  }
-  const tryKey = (key: string | undefined): string => {
-    if (!key) return '';
-    const value = t(key, { ns: 'apiErrors', defaultValue: '', ...params });
-    if (typeof value !== 'string') return '';
-    // A catalog string may reference facts this particular RPC didn't send
-    // (e.g. identifier_correct omits existing_asset_code). i18next leaves those
-    // as literal "{{placeholder}}" — never show that to a user; fall through to
-    // the next candidate key, and ultimately to the backend's own message.
-    return value.includes('{{') ? '' : value;
-  };
+  const params = prepareErrorParams(err.messageParams, t);
+  const tryKey = (key: string | undefined): string => translateErrorCode(key, params, t);
   // Skip the "unexpected" sentinel — it has no useful translation and
   // would short-circuit better candidates below.
   const messageKey = err.messageKey && err.messageKey !== 'unexpected' ? err.messageKey : undefined;

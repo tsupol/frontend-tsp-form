@@ -21,7 +21,7 @@ import { ColorAutocomplete, ColorMatchBadge } from '../../components/ColorAutoco
 import { ImeiInput } from '../../components/ImeiInput';
 import { OwnerBadge } from '../../components/OwnerBadge';
 import type { OwnerType } from '../../lib/ownerTypes';
-import { translateApiError } from '../../lib/apiErrors';
+import { translateApiError, prepareErrorParams, translateErrorCode } from '../../lib/apiErrors';
 
 // ============================================================================
 // Types — verified against live API 2026-05-08
@@ -1042,19 +1042,23 @@ interface BatchRowError {
 }
 
 /** Translate a per-row / blocking error with its backend-shipped params.
- *  Backend `params` keys differ per code (e.g. `{type, value}` for IDENTIFIER_CONFLICT,
- *  `{imei}` for BUYBACK_IMEI_CHECKSUM_FAIL, `{requested, available}` for
- *  BATCH_DEVICES_EXCEED_LOT_QTY) — we forward them as i18next interpolation
- *  values. The `type` field is itself an enum code (`IMEI/SERIAL_NO/CHASSIS_NO`)
- *  so we translate it via `asset.idType.<CODE>` before injection. */
+ *  This RPC answers `ok: true` even when rows fail, so errors arrive as plain
+ *  `{code, params}` objects rather than as an `ApiError` — but the params are
+ *  the same shape, so they go through the same preparation (enum codes → labels)
+ *  and the same unresolved-`{{placeholder}}` guard as every other API error.
+ *  Falls back to `<code>_basic`, then to the raw code. */
 function useTranslateBatchError() {
   const { t } = useTranslation();
   return (err: BatchRowError): string => {
-    const params: Record<string, unknown> = { ...(err.params ?? {}) };
-    if (typeof params.type === 'string') {
-      params.type = t(`asset.idType.${params.type}`, { defaultValue: params.type });
-    }
-    return t(err.code, { ns: 'apiErrors', defaultValue: err.code, ...params });
+    const params = prepareErrorParams(err.params, t);
+    const codeLower = err.code.toLowerCase();
+    return (
+      translateErrorCode(err.code, params, t)
+      || translateErrorCode(codeLower, params, t)
+      || translateErrorCode(`${err.code}_basic`, params, t)
+      || translateErrorCode(`${codeLower}_basic`, params, t)
+      || err.code
+    );
   };
 }
 

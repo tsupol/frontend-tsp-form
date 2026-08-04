@@ -2121,6 +2121,7 @@
   },
   "inventory": {
     "title": "ภาพรวมสต็อก",
+    "viewConflictingAsset": "เปิดดูเครื่อง {{code}}",
     "available": "พร้อมขาย",
     "quarantine": "กักกัน",
     "inRepair": "ซ่อม",

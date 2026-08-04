@@ -2124,6 +2124,7 @@
   },
   "inventory": {
     "title": "Stock Dashboard",
+    "viewConflictingAsset": "Open asset {{code}}",
     "available": "Available",
     "quarantine": "Quarantine",
     "inRepair": "In Repair",
