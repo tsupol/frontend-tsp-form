@@ -856,5 +856,7 @@
   "SALE.STATE.NOT_DEPOSITED": "เครื่องนี้ไม่ได้ฝากอยู่",
   "sale.state.not_deposited": "เครื่องนี้ไม่ได้ฝากอยู่",
   "SALE.STATE.ONLY_ACTIVE_CAN_DEPOSIT": "สัญญานี้ฝากเครื่องไม่ได้ (ไม่ใช่สถานะใช้งาน)",
-  "sale.state.only_active_can_deposit": "สัญญานี้ฝากเครื่องไม่ได้ (ไม่ใช่สถานะใช้งาน)"
+  "sale.state.only_active_can_deposit": "สัญญานี้ฝากเครื่องไม่ได้ (ไม่ใช่สถานะใช้งาน)",
+  "sale.validation.branch_required": "กรุณาเลือกอย่างน้อย 1 สาขา",
+  "SALE.VALIDATION.BRANCH_REQUIRED": "กรุณาเลือกอย่างน้อย 1 สาขา"
 }

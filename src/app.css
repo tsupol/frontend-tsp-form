@@ -883,3 +883,8 @@ input[type="number"
         pointer-events: none;
     }
 }
+/* ①ยอดนำส่ง / ②ตรวจเงิน branch picker: the "ทุกสาขา" chip has no remove button —
+   clearing it can only snap back to ทุกสาขา, so an × there reads as broken. */
+.branch-scope-select-all .selected-chip-close {
+    display: none;
+}

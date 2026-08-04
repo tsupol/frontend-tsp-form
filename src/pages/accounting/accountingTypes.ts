@@ -309,10 +309,15 @@ export interface ReconcileItemBranch {
   company_total: number;
 }
 
+// mig 986 — BRANCH_SET is the multi-branch mode: p_branch_ids: [a, b, …] scopes
+// every figure (groups/summary/by_branch) to just those branches. branch_ids
+// reflects the set actually used (deduped); it's null in the other two modes.
+// Note company_id comes back null in BRANCH_SET — don't read scope for it.
 export interface ReconcileScope {
-  mode: 'BRANCH' | 'COMPANY_ALL';
+  mode: 'BRANCH' | 'COMPANY_ALL' | 'BRANCH_SET';
   company_id: number | null;
   branch_id: number | null;
+  branch_ids: number[] | null;
   date_from: string;
   date_to: string;
 }

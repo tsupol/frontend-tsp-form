@@ -3,10 +3,10 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import {
-  MobileHeader, Select, Badge, InputDateRangePicker, Button,
+  MobileHeader, Badge, InputDateRangePicker, Button,
 } from 'tsp-form';
 import {
-  ArrowRightFromLine, Keyboard, ChevronRight, ChevronDown, ExternalLink, Truck, Building2, FileSpreadsheet, Loader2,
+  ArrowRightFromLine, Keyboard, ChevronRight, ChevronDown, ExternalLink, Truck, Building2, FileSpreadsheet, Loader2, XCircle,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -18,6 +18,10 @@ import {
 import type { Branch, ReconcileItemResult, ReconcileItemGroup, ReconcileItemRow } from './accountingTypes';
 import { exportReconcileItems } from './dayCloseExport';
 import { MiniPager } from './MiniPager';
+import { useReconcileBranchScope, useReconcileDateRange, branchRpcParams, type BranchScope } from './useReconcileBranchScope';
+import { BranchScopeSelect } from './BranchScopeSelect';
+import { BranchBreakdownStrip } from './BranchBreakdownStrip';
+import { translateApiError } from '../../lib/apiErrors';
 
 type OwnerType = 'HOLDING' | 'COMPANY';
 
@@ -47,19 +51,22 @@ export function ReconcileItemPage() {
   const userBranchId = isBranchUser && user?.branch_id ? String(user.branch_id) : '';
 
   const initial = defaultRange();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const branchId = searchParams.get('branch_id') ?? userBranchId;
-  const fromParam = searchParams.get('from');
-  const toParam = searchParams.get('to');
-  const fromDate = fromParam === null ? initial.from : fromParam;
-  const toDate = toParam === null ? initial.to : toParam;
+  const [, setSearchParams] = useSearchParams();
+  // Branch user is pinned to their own branch; company-level users start on "ทุกสาขา".
+  const fallbackScope: BranchScope = userBranchId
+    ? { mode: 'SET', branchIds: [Number(userBranchId)] }
+    : { mode: 'ALL' };
+  const { scope, setScope } = useReconcileBranchScope(fallbackScope);
+  // Date range is shared with ② too — same branches over different dates would
+  // make the two pages' totals incomparable.
+  const { from: fromDate, to: toDate } = useReconcileDateRange(initial);
 
   const [isTypingRange, setIsTypingRange] = useState(false);
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
 
   const pendingPatchRef = useRef<Record<string, string> | null>(null);
-  const updateFilters = useCallback((patch: Partial<{ branch_id: string; from: string; to: string }>) => {
+  const updateFilters = useCallback((patch: Partial<{ from: string; to: string }>) => {
     if (pendingPatchRef.current) {
       Object.assign(pendingPatchRef.current, patch);
       return;
@@ -85,21 +92,35 @@ export function ReconcileItemPage() {
     queryFn: () => apiClient.get<Branch[]>('/v_branches?is_active=is.true&order=name'),
   });
 
-  const selectedBranch = branches.find(b => String(b.id) === branchId);
-  const companyId = selectedBranch?.company_id ?? null;
-  const allBranches = branchId === '__ALL__';
+  // Company comes from the JWT; the picked branches only narrow the scope within
+  // it. Falling back to a selected branch's company keeps holding-level users
+  // (no company in JWT) working.
+  const scopedBranches = scope.mode === 'SET'
+    ? branches.filter(b => scope.branchIds.includes(b.id))
+    : branches;
+  const companyId = user?.company_id ?? scopedBranches[0]?.company_id ?? null;
 
-  const { data, isFetching } = useQuery({
-    queryKey: ['accounting', 'reconcile-item', branchId, companyId, fromDate, toDate],
+  const branchParams = branchRpcParams(scope);
+  const { data, isFetching, error } = useQuery({
+    queryKey: ['accounting', 'reconcile-item', branchParams.p_branch_ids?.join(',') ?? 'all', companyId, fromDate, toDate],
     queryFn: () => apiClient.rpc<ReconcileItemResult>('fn_reconcile_by_item', {
       p_company_id: companyId,
-      p_branch_id: allBranches ? null : (branchId ? Number(branchId) : null),
+      ...branchParams,
       p_date_from: fromDate,
       p_date_to: toDate,
     }),
-    enabled: !!branchId && (allBranches ? !!companyId : !!selectedBranch),
+    enabled: !!companyId,
     placeholderData: keepPreviousData,
   });
+  const errorMessage = error ? translateApiError(error, t) : null;
+
+  // by_branch[] is the DB's own per-branch split — shown whenever more than one
+  // branch is in scope so the total's composition is visible.
+  const branchBreakdown = (data?.by_branch ?? []).map(b => ({
+    branchId: b.branch_id,
+    name: b.branch_name,
+    amount: b.total,
+  }));
 
   const groups = data?.groups ?? [];
   // rows already ordered (owner → subgroup → time) by the RPC; bucket by
@@ -123,12 +144,15 @@ export function ReconcileItemPage() {
     if (!data || groups.length === 0) return;
     setExporting(true);
     try {
-      const branchLabel = selectedBranch?.name ?? (allBranches ? 'all' : branchId);
+      const branchLabel = scope.mode === 'ALL'
+        ? 'all'
+        : scopedBranches.map(b => b.name).join('-') || scope.branchIds.join('-');
       await exportReconcileItems(
         data.groups,
         data.rows,
         t,
         `remit_${branchLabel}_${fromDate}_${toDate}`,
+        (data.by_branch?.length ?? 0) > 1,
       );
     } finally {
       setExporting(false);
@@ -172,22 +196,15 @@ export function ReconcileItemPage() {
     />
   );
   const branchNode: ReactNode = (
-    <Select
-      value={branchId || null}
-      onChange={(v) => updateFilters({ branch_id: (v as string) ?? '' })}
-      placeholder={t('accounting.reconcile.pickBranch')}
-      options={[
-        ...(isBranchUser ? [] : [{ label: t('accounting.reconcile.allBranches'), value: '__ALL__' }]),
-        ...branches.map(b => ({ label: b.name, value: String(b.id) })),
-      ]}
-      size="sm"
-      showChevron
-      clearable={false}
+    <BranchScopeSelect
+      branches={branches}
+      scope={scope}
+      onChange={setScope}
       disabled={isBranchUser}
     />
   );
   const filterItems: FilterBarItem[] = [
-    { key: 'branch', width: 200, node: branchNode, priority: 10 },
+    { key: 'branch', width: 240, node: branchNode, priority: 10 },
   ];
 
   return (
@@ -242,7 +259,7 @@ export function ReconcileItemPage() {
         />
 
         {/* Scope totals — remit total + holding/company split */}
-        {branchId && (groups.length > 0) && (
+        {groups.length > 0 && (
           <div className="flex-none px-4 py-3 border-b border-line flex flex-wrap items-baseline gap-x-5 gap-y-1">
             <span className="text-sm">
               <span className="text-subtle">{t('accounting.reconcile.totalRemit')}: </span>
@@ -259,14 +276,23 @@ export function ReconcileItemPage() {
           </div>
         )}
 
+        {/* Per-branch split (by_branch[]) — only when the scope spans >1 branch */}
+        <BranchBreakdownStrip
+          entries={branchBreakdown}
+          label={t('accounting.reconcile.totalRemit')}
+        />
+
         <div className={`flex-1 min-h-0 overflow-auto better-scroll ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
-          {!branchId && (
-            <div className="p-8 text-center text-subtler">{t('accounting.reconcile.pickBranch')}</div>
+          {errorMessage && (
+            <div className="m-4 alert alert-danger">
+              <XCircle size={16} />
+              <span>{errorMessage}</span>
+            </div>
           )}
-          {branchId && groups.length === 0 && (
+          {!errorMessage && groups.length === 0 && (
             <div className="p-8 text-center text-subtler">{t('accounting.reconcile.noData')}</div>
           )}
-          {branchId && groups.length > 0 && (
+          {groups.length > 0 && (
             <div className="max-w-3xl mx-auto">
               {/* Sub-group header row (columns) — mirrors GroupRow exactly */}
               <div className="flex items-center pr-4 py-2 text-[11px] font-semibold text-subtle uppercase tracking-wider border-b border-line">

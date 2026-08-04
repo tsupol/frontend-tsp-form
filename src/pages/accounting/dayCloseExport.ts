@@ -17,6 +17,7 @@ import type {
 // sheet reads like the screen (subtotal = groups[].total).
 interface ItemExportRow {
   subgroup: string;
+  branch_name: string;
   bill_date: string;
   bill_code: string | null;
   contract_code: string | null;
@@ -32,6 +33,9 @@ export async function exportReconcileItems(
   rows: ReconcileItemRow[],
   t: TFunction,
   filename: string,
+  // Multi-branch scope (COMPANY_ALL / BRANCH_SET) → add the branch column, since
+  // a line's branch is no longer implied by the sheet as a whole.
+  showBranchColumn = false,
 ): Promise<void> {
   // HOLDING_INSTALLMENT arrives as two groups (front/back) sharing a subgroup but
   // differing on from_slip; key on subgroup + from_slip so each side's rows stay
@@ -55,6 +59,7 @@ export async function exportReconcileItems(
     for (const r of rowsBySubgroup.get(key(g.subgroup, g.from_slip)) ?? []) {
       out.push({
         subgroup: groupLabel,
+        branch_name: r.branch_name ?? '',
         bill_date: r.bill_date,
         bill_code: r.bill_code,
         contract_code: r.contract_code,
@@ -68,6 +73,7 @@ export async function exportReconcileItems(
     // Subtotal marker row (= groups[].total, matching the screen).
     out.push({
       subgroup: groupLabel,
+      branch_name: '',
       bill_date: '',
       bill_code: null,
       contract_code: null,
@@ -81,6 +87,9 @@ export async function exportReconcileItems(
 
   const columns: XlsxColumn[] = [
     { key: 'subgroup', label: t('accounting.reconcile.group'), width: 20 },
+    ...(showBranchColumn
+      ? [{ key: 'branch_name', label: t('accounting.reconcile.branch'), width: 18 } as XlsxColumn]
+      : []),
     { key: 'bill_date', label: t('accounting.dayClose.billDate'), type: 'date', width: 12 },
     { key: 'bill_code', label: t('accounting.reconcile.billCode'), type: 'text', width: 18 },
     { key: 'contract_code', label: t('accounting.reconcile.contractCode'), type: 'text', width: 18 },

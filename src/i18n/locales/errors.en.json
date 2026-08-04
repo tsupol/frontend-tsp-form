@@ -856,5 +856,7 @@
   "SALE.STATE.NOT_DEPOSITED": "This device is not deposited.",
   "sale.state.not_deposited": "This device is not deposited.",
   "SALE.STATE.ONLY_ACTIVE_CAN_DEPOSIT": "Only an active contract can deposit a device.",
-  "sale.state.only_active_can_deposit": "Only an active contract can deposit a device."
+  "sale.state.only_active_can_deposit": "Only an active contract can deposit a device.",
+  "sale.validation.branch_required": "Select at least one branch.",
+  "SALE.VALIDATION.BRANCH_REQUIRED": "Select at least one branch."
 }

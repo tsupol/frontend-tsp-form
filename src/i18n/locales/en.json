@@ -6373,7 +6373,9 @@
       "amount": "Amount",
       "bank": "Bank",
       "account": "Account no.",
-      "payer": "Payer"
+      "payer": "Payer",
+      "branch": "Branch",
+      "branchCount": "{{count}} branches"
     }
   },
   "billToast": {

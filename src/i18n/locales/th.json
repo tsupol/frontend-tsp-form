@@ -6368,7 +6368,9 @@
       "amount": "จำนวนเงิน",
       "bank": "ธนาคาร",
       "account": "เลขบัญชี",
-      "payer": "ผู้ชำระ"
+      "payer": "ผู้ชำระ",
+      "branch": "สาขา",
+      "branchCount": "{{count}} สาขา"
     }
   },
   "billToast": {
