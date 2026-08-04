@@ -6375,7 +6375,9 @@
       "account": "Account no.",
       "payer": "Payer",
       "branch": "Branch",
-      "branchCount": "{{count}} branches"
+      "branchCount": "{{count}} branches",
+      "branchesNeedAttention": "{{count}} need attention",
+      "viewAllBranches": "View all {{count}}"
     }
   },
   "billToast": {

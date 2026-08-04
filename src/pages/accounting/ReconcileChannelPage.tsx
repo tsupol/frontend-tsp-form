@@ -114,10 +114,17 @@ export function ReconcileChannelPage() {
     () => new Map(branches.map(b => [b.id, b.name])),
     [branches],
   );
+  // Carry the per-branch problem signals too — a closer scanning 30 branches
+  // needs to see which ones are short/over or owe a wallet settlement, not just
+  // who has the biggest till.
   const branchBreakdown = (data?.by_branch ?? []).map(b => ({
     branchId: b.branch_id,
     name: branchNameById.get(b.branch_id) ?? String(b.branch_id),
     amount: b.physical,
+    shortage: b.shortage,
+    overage: b.overage,
+    walletAction: b.wallet_action,
+    walletActionAmount: b.wallet_action_amount,
   }));
 
   const summary = data?.summary;
@@ -289,6 +296,7 @@ export function ReconcileChannelPage() {
         <BranchBreakdownStrip
           entries={branchBreakdown}
           label={t('accounting.reconcile.mustCount')}
+          total={summary?.physical}
         />
 
         <div className={`flex-1 min-h-0 overflow-auto better-scroll ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>

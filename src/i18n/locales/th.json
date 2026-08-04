@@ -6370,7 +6370,9 @@
       "account": "เลขบัญชี",
       "payer": "ผู้ชำระ",
       "branch": "สาขา",
-      "branchCount": "{{count}} สาขา"
+      "branchCount": "{{count}} สาขา",
+      "branchesNeedAttention": "ต้องตรวจ {{count}} สาขา",
+      "viewAllBranches": "ดูทั้งหมด {{count}} สาขา"
     }
   },
   "billToast": {

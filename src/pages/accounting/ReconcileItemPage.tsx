@@ -203,7 +203,11 @@ export function ReconcileItemPage() {
       disabled={isBranchUser}
     />
   );
+  // Date sits in `items` (fixed width), not the `leading` slot — leading takes all
+  // remaining space, which stretched the range picker across the whole bar. Same
+  // config as ②ตรวจเงิน so the two filter rows line up.
   const filterItems: FilterBarItem[] = [
+    { key: 'date', width: 260, node: dateFilter, priority: 20 },
     { key: 'branch', width: 240, node: branchNode, priority: 10 },
   ];
 
@@ -252,8 +256,6 @@ export function ReconcileItemPage() {
 
         <FilterBar
           className="flex-none p-2 border-b border-line"
-          leading={dateFilter}
-          leadingMinWidth={224}
           items={filterItems}
           activeCount={0}
         />
@@ -280,6 +282,7 @@ export function ReconcileItemPage() {
         <BranchBreakdownStrip
           entries={branchBreakdown}
           label={t('accounting.reconcile.totalRemit')}
+          total={data?.total_amount}
         />
 
         <div className={`flex-1 min-h-0 overflow-auto better-scroll ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
