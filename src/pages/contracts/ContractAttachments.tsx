@@ -35,6 +35,7 @@ import {
   CONTRACT_EVIDENCE_MAX,
 } from '../../lib/beMedia';
 import { useMobileCaptureSession } from './workspace/useMobileCaptureSession';
+import { translateApiError } from '../../lib/apiErrors';
 
 const ENTITY_TYPE = 'CONTRACT';
 const USAGE_TYPE = 'ATTACHMENT';
@@ -504,8 +505,7 @@ function ManageThumb({
 
 function formatApiError(err: unknown, t: ReturnType<typeof useTranslation>['t']): string {
   if (err instanceof ApiError) {
-    const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-      || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+    const translated = translateApiError(err, t);
     return translated || err.message;
   }
   return err instanceof Error ? err.message : String(err);

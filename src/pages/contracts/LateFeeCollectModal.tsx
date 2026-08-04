@@ -6,6 +6,7 @@ import { apiClient, ApiError } from '../../lib/api';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { ActionDoneView, type ActionDoneDetailRow } from './ActionDoneView';
+import { translateApiError } from '../../lib/apiErrors';
 
 /* ─────────────────────────────────────────────────────────────────────────────
    Late Fee Collect (LATE_FEE_COLLECT) — เก็บค่าปรับ on a contract with accrued
@@ -110,8 +111,7 @@ export function LateFeeCollectModal({ open, contract, onClose, onSuccess }: {
       onSuccess();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(err instanceof Error ? err.message : String(err));

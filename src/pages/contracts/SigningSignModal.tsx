@@ -30,6 +30,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { SignatureCapture } from './workspace/SignatureCapture';
 import { ActionDoneView } from './ActionDoneView';
 import { SnapshotOverviewDiff } from './SnapshotOverviewDiff';
+import { translateApiError } from '../../lib/apiErrors';
 
 interface PendingParty {
   signing_id: number;
@@ -75,8 +76,7 @@ function describeApiError(
   t: (k: string, opts?: Record<string, unknown>) => string,
 ): string {
   if (err instanceof ApiError) {
-    const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-      || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+    const translated = translateApiError(err, t);
     return translated || err.message;
   }
   if (err instanceof Error) return err.message;

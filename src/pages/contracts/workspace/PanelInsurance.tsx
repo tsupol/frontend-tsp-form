@@ -4,6 +4,7 @@ import { MaskedInput } from 'tsp-form';
 import { Shield, Loader2, Check, XCircle, Info } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { useWorkspace } from './WorkspaceContext';
+import { translateApiError } from '../../../lib/apiErrors';
 
 interface Props { onClose: () => void }
 
@@ -46,8 +47,7 @@ export function PanelInsurance({ onClose: _onClose }: Props) {
       savedTimer.current = setTimeout(() => setSaved(false), 2000);
     } catch (err) {
       if (err instanceof ApiError) {
-        const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const tr = translateApiError(err, t);
         setError(tr || err.message);
       } else {
         setError(err instanceof Error ? err.message : String(err));

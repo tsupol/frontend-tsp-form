@@ -5,6 +5,7 @@ import { XCircle, Loader2, MapPin, CheckCircle2, AlertTriangle } from 'lucide-re
 import { apiClient, ApiError } from '../../lib/api';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { REPO_RESULT_CODES, type RepoResultCode } from './repoApi';
+import { translateApiError } from '../../lib/apiErrors';
 
 /* บันทึกผลลงพื้นที่ (ops_repo_log_attempt) — the heart of the field flow.
    4 result codes only. SUCCESS = ยึดได้ → REPO_COMPLETED (terminal): a confirm
@@ -14,8 +15,7 @@ import { REPO_RESULT_CODES, type RepoResultCode } from './repoApi';
 
 function apiErr(err: unknown, t: ReturnType<typeof useTranslation>['t']): string {
   if (err instanceof ApiError) {
-    return (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-      || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '')
+    return translateApiError(err, t)
       || err.message;
   }
   return err instanceof Error ? err.message : String(err);

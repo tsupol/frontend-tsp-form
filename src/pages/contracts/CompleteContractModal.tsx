@@ -13,6 +13,7 @@ import type { WalletType, WalletAction } from './wallet/types';
 import { ActionDoneView, type ActionDoneDetailRow } from './ActionDoneView';
 import { ContractFeeModal } from './ContractFeeModal';
 import { useContractInvalidate } from './useContractInvalidate';
+import { translateApiError } from '../../lib/apiErrors';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -221,8 +222,7 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
   const setApiError = (err: unknown) => {
     if (err instanceof ApiError) {
       const translated =
-        (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') ||
-        (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        translateApiError(err, t);
       setError(translated || err.message);
     } else {
       setError(err instanceof Error ? err.message : String(err));

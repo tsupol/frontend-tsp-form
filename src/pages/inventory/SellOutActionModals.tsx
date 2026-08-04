@@ -10,6 +10,7 @@ import { BranchPaymentAccountField } from '../../components/BranchPaymentAccount
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { fmtCurrency } from '../../lib/format';
 import { getBucketLabel, getBucketColor } from './inventoryUtils';
+import { translateApiError } from '../../lib/apiErrors';
 
 // ============================================================================
 // Sell-out request actions (branch):
@@ -75,8 +76,7 @@ export function useSellRequestActions(requestId: number | null) {
 function translateErr(err: unknown, t: ReturnType<typeof useTranslation>['t']): string {
   if (err instanceof ApiError) {
     return (
-      (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') ||
-      (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '') ||
+      translateApiError(err, t) ||
       err.message
     );
   }

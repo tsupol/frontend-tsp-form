@@ -16,6 +16,7 @@ import { publicMediaUrl } from '../lib/mediaPath';
 import { useUploadSpec } from '../hooks/useMediaUrl';
 import { formatTel } from '../lib/format';
 import { getRoleLabel } from '../lib/roleLabel';
+import { translateApiError } from '../lib/apiErrors';
 
 function profileImageUrl(profileImage: Record<string, string> | null | undefined): string | null {
   if (!profileImage) return null;
@@ -117,7 +118,7 @@ function ProfileCard() {
         });
       } catch (err) {
         const msg = err instanceof ApiError
-          ? (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') || err.message
+          ? (translateApiError(err, t)) || err.message
           : err instanceof Error ? err.message : t('profile.uploadFailed');
 
         addSnackbar({
@@ -427,8 +428,7 @@ function ChangePasswordForm() {
       setSucceeded(true);
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '')
+        const translated = translateApiError(err, t)
           || err.message;
         // Pin the message to the field the backend blamed, so the user sees WHICH
         // input is wrong (esp. "current password is incorrect" — the reported case).

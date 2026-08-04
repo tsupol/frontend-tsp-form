@@ -14,6 +14,7 @@ import { fmtCurrency } from '../../lib/format';
 import { BranchPaymentAccountField } from '../../components/BranchPaymentAccountField';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { ProductPickerModal, type SellableVariant } from '../../components/ProductPickerModal';
+import { translateApiError } from '../../lib/apiErrors';
 
 /* ───────────────────────────────────────────────────────────────────────────
  * Types — match fn_bill_retail_preview / fn_bill_retail_submit (doc 38 §0)
@@ -194,8 +195,7 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
       setPreview(res);
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setPreviewError(translated || err.message);
       } else {
         setPreviewError(String(err));
@@ -340,8 +340,7 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
     },
     onError: (err) => {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         addSnackbar({
           type: 'error',
           message: (

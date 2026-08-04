@@ -11,6 +11,7 @@ import { ActionDoneView } from '../contracts/ActionDoneView';
 import { fmtCurrency } from '../../lib/format';
 import { codeDisplay } from './inventoryUtils';
 import { SellOutConditionPhotos } from './SellOutPhotos';
+import { translateApiError } from '../../lib/apiErrors';
 
 // ============================================================================
 // Sell-Out (ขายออก) — open a fraud-controlled outright-sale request for one
@@ -80,8 +81,7 @@ type ViewState = 'form' | 'done';
 function translateErr(err: unknown, t: ReturnType<typeof useTranslation>['t']): string {
   if (err instanceof ApiError) {
     return (
-      (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') ||
-      (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '') ||
+      translateApiError(err, t) ||
       err.message
     );
   }

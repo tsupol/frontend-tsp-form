@@ -7,6 +7,7 @@ import { apiClient, ApiError } from '../../lib/api';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { DateTime } from '../../components/DateTime';
 import { ActionDoneView, type ActionDoneDetailRow } from './ActionDoneView';
+import { translateApiError } from '../../lib/apiErrors';
 
 /* ─────────────────────────────────────────────────────────────────────────────
    Reschedule due day (RESCHEDULE_DUE_DAY) — เลื่อนวันครบกำหนดชำระ +1..+5 วัน
@@ -132,8 +133,7 @@ export function RescheduleDueDayModal({ open, contract, pinRequired, onClose, on
       onSuccess();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(err instanceof Error ? err.message : String(err));

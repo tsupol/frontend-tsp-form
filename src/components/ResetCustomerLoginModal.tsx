@@ -17,6 +17,7 @@ import { Button, Modal, Input } from 'tsp-form';
 import { KeyRound, XCircle, Loader2, Copy, Check, AlertTriangle, CheckCircle } from 'lucide-react';
 import { ApiError } from '../lib/api';
 import { resetCustomerLogin, type ResetLoginResult } from '../pages/nnf-app/nnfAppApi';
+import { translateApiError } from '../lib/apiErrors';
 
 interface Props {
   open: boolean;
@@ -54,8 +55,7 @@ export function ResetCustomerLoginModal({ open, customerId, customerName, onClos
       onDone?.();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(err instanceof Error ? err.message : String(err));

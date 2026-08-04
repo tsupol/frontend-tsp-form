@@ -10,6 +10,7 @@ import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import type { CompanyConfig, EditableField } from './companyConfigTypes';
 import type { CompanyFeatureCode } from '../../hooks/useCompanyFeatures';
+import { translateApiError } from '../../lib/apiErrors';
 
 // ── Detail Page ──────────────────────────────────────────────────────────────
 
@@ -149,7 +150,7 @@ export function CompanyConfigDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['company-config-list'] });
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setErrorMessage(translated || err.message);
       }
     } finally {
@@ -322,7 +323,7 @@ function WalletFeaturesSection({ companyId }: { companyId: number }) {
       });
     } catch (err) {
       if (err instanceof ApiError) {
-        setError((err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '') || err.message);
+        setError(translateApiError(err, t) || err.message);
       }
     } finally {
       setPending(null);
@@ -398,7 +399,7 @@ function ChargeOwnerSection({ companyId }: { companyId: number }) {
       });
     } catch (err) {
       if (err instanceof ApiError) {
-        setError((err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '') || err.message);
+        setError(translateApiError(err, t) || err.message);
       }
     } finally {
       setSaving(false);

@@ -11,6 +11,7 @@ import type { Quote } from './WorkspaceTypes';
 import { useBarcodeScanner } from '../../../components/BarcodeScanner';
 import { ColorSwatch } from '../../../components/ColorAutocomplete';
 import { lookupBarcode } from '../../../lib/barcodeLookup';
+import { translateApiError } from '../../../lib/apiErrors';
 
 // ── Types ───────────────────────────────────────────────────────────────
 
@@ -769,8 +770,7 @@ export function PanelProductPlan(_props: Props) {
       });
     } catch (err) {
       if (err instanceof ApiError) {
-        const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const tr = translateApiError(err, t);
         setSaveError(tr || err.code || err.message);
       } else {
         setSaveError(String(err));

@@ -7,6 +7,7 @@ import { Plus, MoreHorizontal, Pencil, ShieldCheck, ShieldOff, KeyRound, Trash2,
 import { apiClient, ApiError } from '../lib/api';
 import { FormErrorMessage } from 'tsp-form';
 import { getRoleLabel } from '../lib/roleLabel';
+import { translateApiError } from '../lib/apiErrors';
 
 interface VUser {
   id: number;
@@ -183,7 +184,7 @@ function ToggleActiveModal({ user, open, onClose }: { user: VUser | null; open: 
       onClose();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        const translated = translateApiError(err, t);
         setErrorMessage(translated || err.message);
       } else {
         setErrorMessage(t('common.error'));
@@ -322,7 +323,7 @@ function BulkActionModal({ action, users, open, onClose }: { action: 'deactivate
       onClose();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        const translated = translateApiError(err, t);
         setErrorMessage(translated || err.message);
       } else {
         setErrorMessage(t('common.error'));
@@ -454,7 +455,7 @@ function CreateUserModal({ open, onClose }: { open: boolean; onClose: () => void
       onClose();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        const translated = translateApiError(err, t);
         setErrorMessage(translated || err.message);
       } else {
         setErrorMessage(t('common.error'));
@@ -708,7 +709,7 @@ function EditUserModal({ user, open, onClose }: { user: VUser | null; open: bool
       onClose();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        const translated = translateApiError(err, t);
         setErrorMessage(translated || err.message);
       } else {
         setErrorMessage(t('common.error'));
@@ -949,7 +950,7 @@ function PasswordModal({ user, open, onClose }: { user: VUser | null; open: bool
       handleClose();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        const translated = translateApiError(err, t);
         setErrorMessage(translated || err.message);
       } else {
         setErrorMessage(t('common.error'));
@@ -984,7 +985,7 @@ function PasswordModal({ user, open, onClose }: { user: VUser | null; open: bool
       queryClient.invalidateQueries({ queryKey: ['users'] });
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        const translated = translateApiError(err, t);
         setErrorMessage(translated || err.message);
       } else {
         setErrorMessage(t('common.error'));
@@ -1224,7 +1225,7 @@ function ChangeRoleModal({ user, open, onClose }: { user: VUser | null; open: bo
       onClose();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        const translated = translateApiError(err, t);
         setErrorMessage(translated || err.message);
       } else {
         setErrorMessage(t('common.error'));

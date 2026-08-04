@@ -14,6 +14,7 @@ import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { fmtNum, codeDisplay } from './inventoryUtils';
 import { ActionDoneView } from '../contracts/ActionDoneView';
+import { translateApiError } from '../../lib/apiErrors';
 
 // ============================================================================
 // Types (verified against live API 2026-03-25)
@@ -741,7 +742,7 @@ function ConfirmReceiptModal({
     },
     onError: (err) => {
       if (err instanceof ApiError) {
-        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(String(err));
@@ -949,7 +950,7 @@ function CancelReceiptModal({
     onSuccess,
     onError: (err) => {
       if (err instanceof ApiError) {
-        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(String(err));
@@ -1119,8 +1120,7 @@ function CreateReceiptModal({
     onError: (err) => {
       if (err instanceof ApiError) {
         const translated =
-          (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') ||
-          (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+          translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(String(err));
@@ -1378,8 +1378,7 @@ function AddReceiptLineModal({
     onError: (err) => {
       if (err instanceof ApiError) {
         const translated =
-          (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') ||
-          (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+          translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(String(err));

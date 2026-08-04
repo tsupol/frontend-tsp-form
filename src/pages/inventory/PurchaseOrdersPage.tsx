@@ -22,6 +22,7 @@ import { useBarcodeScanner } from '../../components/BarcodeScanner';
 import { lookupBarcode } from '../../lib/barcodeLookup';
 import { OwnerBadge } from '../../components/OwnerBadge';
 import type { OwnerType } from '../../lib/ownerTypes';
+import { translateApiError } from '../../lib/apiErrors';
 
 // ============================================================================
 // Types — verified against live API 2026-05-02
@@ -1001,7 +1002,7 @@ function PoActionModal({
     },
     onError: (err) => {
       if (err instanceof ApiError) {
-        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        const translated = translateApiError(err, t);
         setError(translated || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '') || err.message);
       } else {
         setError(String(err));
@@ -1170,7 +1171,7 @@ function CreatePoModal({
     },
     onError: (err) => {
       if (err instanceof ApiError) {
-        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        const translated = translateApiError(err, t);
         setError(translated || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '') || err.message);
       } else {
         setError(String(err));
@@ -1350,7 +1351,7 @@ function AddLineModal({
     onSuccess: onAdded,
     onError: (err) => {
       if (err instanceof ApiError) {
-        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        const translated = translateApiError(err, t);
         setError(translated || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '') || err.message);
       } else {
         setError(String(err));
@@ -1676,8 +1677,7 @@ function CreateReceiptModal({
     onError: (err) => {
       if (err instanceof ApiError) {
         const translated =
-          (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') ||
-          (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+          translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(String(err));

@@ -16,6 +16,7 @@ import { SignatoryEditor } from './SignatoryEditor';
 import { ConfidenceScoreEditor } from './ConfidenceScoreEditor';
 import { useContractCoLessees } from './useContractCoLessees';
 import type { ContractMin } from '../../../lib/contractPdf/contractMin';
+import { translateApiError } from '../../../lib/apiErrors';
 
 interface CustomerDocument {
   id: number;
@@ -178,8 +179,7 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
   // ── Generic upload helpers (parameterised by target customer) ───────
   const handleErr = (err: unknown) => {
     if (err instanceof ApiError) {
-      const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-        || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+      const tr = translateApiError(err, t);
       setError(tr || err.code || err.message);
     } else {
       setError(err instanceof Error ? err.message : String(err));

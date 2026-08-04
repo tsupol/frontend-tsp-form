@@ -10,6 +10,7 @@ import {
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import type { ExpenseCategory, ExpenseItem } from './branchExpenseTypes';
+import { translateApiError } from '../../lib/apiErrors';
 
 export function CategoriesPage() {
   const { t } = useTranslation();
@@ -250,8 +251,7 @@ function CategoryFormModal({
       onClose();
     } catch (e) {
       if (e instanceof ApiError) {
-        const translated = (e.messageKey ? t(e.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (e.code ? t(e.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(e, t);
         setError(translated || e.message);
       } else if (e instanceof Error) {
         setError(e.message);
@@ -390,8 +390,7 @@ function ItemFormModal({
       onClose();
     } catch (e) {
       if (e instanceof ApiError) {
-        const translated = (e.messageKey ? t(e.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (e.code ? t(e.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(e, t);
         setError(translated || e.message);
       } else if (e instanceof Error) {
         setError(e.message);

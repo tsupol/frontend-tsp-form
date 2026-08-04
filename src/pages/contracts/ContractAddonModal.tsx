@@ -9,6 +9,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { BranchPaymentAccountField } from '../../components/BranchPaymentAccountField';
 import { ProductPickerModal, type SellableVariant } from '../../components/ProductPickerModal';
 import { ActionDoneView, type ActionDoneDetailRow } from './ActionDoneView';
+import { translateApiError } from '../../lib/apiErrors';
 
 /* ─────────────────────────────────────────────────────────────────────────────
    Contract Add-on (CONTRACT_ADDON) — ขาย/แถมของภายหลัง on an ACTIVE contract.
@@ -333,8 +334,7 @@ export function ContractAddonModal({ open, contract, onClose, onSuccess }: {
       onSuccess();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(err instanceof Error ? err.message : String(err));

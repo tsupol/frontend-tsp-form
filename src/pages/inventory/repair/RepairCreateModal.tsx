@@ -8,6 +8,7 @@ import { validateiPhoneSerial } from '../../../lib/validators';
 import { ActionDoneView } from '../../contracts/ActionDoneView';
 import { getStateColor } from '../../contracts/contractUtils';
 import type { RepairType } from '../repairTypes';
+import { translateApiError } from '../../../lib/apiErrors';
 
 // Thai phone mask (mirrors the project convention in tsp-form-guide-here).
 const thaiPhoneMask = (digits: string) => {
@@ -44,8 +45,7 @@ interface CreateResult {
 
 function translateErr(err: unknown, t: ReturnType<typeof useTranslation>['t']): string {
   if (err instanceof ApiError) {
-    const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-      || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+    const translated = translateApiError(err, t);
     return translated || err.message;
   }
   return t('common.error');

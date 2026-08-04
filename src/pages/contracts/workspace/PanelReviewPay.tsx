@@ -18,6 +18,7 @@ import { BranchPaymentAccountField, useBranchPaymentAccount } from '../../../com
 import { BillReceipt, type BillDetail } from './BillReceipt';
 import { BillCart, type DraftCartLine } from './BillCart';
 import { signContractOpenParties } from './signContractOpenParties';
+import { translateApiError } from '../../../lib/apiErrors';
 
 /* ─────────────────────────────────────────────────────────────────────────────
    ⚠️  ONE-GO ACTIVATION — DO NOT FIRE BILL/ACTIVATE RPCs ON MOUNT.
@@ -359,8 +360,7 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
       invalidateContract();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(err instanceof Error ? err.message : String(err));

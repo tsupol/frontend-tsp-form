@@ -25,6 +25,7 @@ import { DayCloseBuckets } from './DayCloseBuckets';
 import { exportReconcileItems } from './dayCloseExport';
 import type { ReconcileItemResult } from './accountingTypes';
 import { ActionDoneView, type ActionDoneDetailRow } from '../contracts/ActionDoneView';
+import { translateApiError } from '../../lib/apiErrors';
 
 const UNCLOSED_PREFIX = '__unclosed__';
 const TODAY_KEY = '__today__';
@@ -939,8 +940,7 @@ function ReopenDayModal({
       onClose();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(t('common.error'));
@@ -1029,8 +1029,7 @@ function ReconcileBlock({ close, branchId }: { close: DayCloseHistoryRow; branch
       setEditing(false);
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(t('common.error'));
@@ -1311,8 +1310,7 @@ function CloseDayModal({
       setView('done');
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(t('common.error'));

@@ -70,8 +70,7 @@ export function PanelCoLessee({ onClose: _onClose }: Props) {
       if (expandedCoLessee === customerId) setExpandedCoLessee(null);
     } catch (err) {
       if (err instanceof ApiError) {
-        const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const tr = translateApiError(err, t);
         setRemoveError(tr || err.code || err.message);
       } else setRemoveError(String(err));
     } finally {
@@ -226,8 +225,7 @@ export function PanelCoLessee({ onClose: _onClose }: Props) {
       setExpandedCoLessee(custId);
     } catch (err) {
       if (err instanceof ApiError) {
-        const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const tr = translateApiError(err, t);
         setApiError(tr || err.code || err.message);
       }
     }
@@ -260,8 +258,7 @@ export function PanelCoLessee({ onClose: _onClose }: Props) {
       await attachCoLessee(res.customer_id);
     } catch (err) {
       if (err instanceof ApiError) {
-        const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const tr = translateApiError(err, t);
         setApiError(tr || err.code || err.message);
       } else setApiError(String(err));
     } finally { setSubmitting(false); }

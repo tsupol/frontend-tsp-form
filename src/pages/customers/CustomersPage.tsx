@@ -792,8 +792,7 @@ function EditInfoModal({ open, onClose, customer, onSuccess }: {
       onSuccess();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else setError(String(err));
     } finally { setSaving(false); }
@@ -946,8 +945,7 @@ function EditAddressModal({ open, onClose, customerId, addressType, existing, on
       onSuccess();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setApiError(translated || err.message);
       } else setApiError(String(err));
     } finally { setSaving(false); }
@@ -1066,8 +1064,7 @@ function AddContactModal({ open, onClose, customerId, onSuccess }: {
       onSuccess();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else setError(String(err));
     } finally { setSaving(false); }
@@ -1149,8 +1146,7 @@ function AddReferenceModal({ open, onClose, customerId, onSuccess }: {
       onSuccess();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else setError(String(err));
     } finally { setSaving(false); }
@@ -1287,8 +1283,7 @@ function EditReferenceModal({ open, reference, onClose, onSuccess }: {
       onSuccess();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else setError(String(err));
     } finally { setSaving(false); }

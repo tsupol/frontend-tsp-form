@@ -13,6 +13,7 @@ import { fmtCurrency } from '../lib/format';
 import { useAuth } from '../contexts/AuthContext';
 import { MediaLightbox, MediaThumbButton } from './MediaLightbox';
 import { normalizeKey } from '../lib/mediaPath';
+import { translateApiError } from '../lib/apiErrors';
 
 export type SubmissionStatus = 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
 
@@ -248,8 +249,7 @@ export function SubmissionReviewDrawer({
       onSuccess(action);
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setErrorMessage(translated || err.message);
       } else {
         setErrorMessage(t('common.error'));

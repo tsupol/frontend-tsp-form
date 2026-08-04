@@ -18,6 +18,7 @@ import {
 } from './workspace/useContractSignatories';
 import { SignatureThumb } from './workspace/SignatureThumb';
 import { useState } from 'react';
+import { translateApiError } from '../../lib/apiErrors';
 
 interface ContractMin {
   id: number;
@@ -313,8 +314,7 @@ function surfaceError(err: unknown, t: (k: string, opts?: Record<string, unknown
   if (err instanceof BeMediaError) {
     msg = t(err.code, { ns: 'apiErrors', defaultValue: err.message });
   } else if (err instanceof ApiError) {
-    msg = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-      || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '')
+    msg = translateApiError(err, t)
       || err.message;
   } else {
     msg = err instanceof Error ? err.message : String(err);

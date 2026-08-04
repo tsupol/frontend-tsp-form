@@ -45,6 +45,7 @@ import { PauseContractModal } from './PauseContractModal';
 import { ResumeContractModal } from './ResumeContractModal';
 import { useContractInvalidate } from './useContractInvalidate';
 import { useCompanyFeatures } from '../../hooks/useCompanyFeatures';
+import { translateApiError } from '../../lib/apiErrors';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -1563,8 +1564,7 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
     },
     onError: (err) => {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
         setErrorCode(err.code ?? err.messageKey ?? null);
       } else {
@@ -2092,8 +2092,7 @@ function SavingDepositModal({ open, contract, onClose, onSuccess }: {
 
   const setApiError = (err: unknown) => {
     if (err instanceof ApiError) {
-      const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-        || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+      const translated = translateApiError(err, t);
       setError(translated || err.code || err.message);
     } else {
       setError(err instanceof Error ? err.message : String(err));
@@ -2237,8 +2236,7 @@ function CancelSavingModal({ open, contract, onClose, onSuccess }: {
 
   const setApiError = (err: unknown) => {
     if (err instanceof ApiError) {
-      const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-        || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+      const translated = translateApiError(err, t);
       setError(translated || err.message);
     } else {
       setError(String(err));
@@ -2436,8 +2434,7 @@ function VoidBillModal({ open, contract, onClose, onSuccess }: {
     onSuccess: () => onSuccess('contract.action_void_bill_success'),
     onError: (err) => {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(String(err));
@@ -2575,8 +2572,7 @@ function PendingPaymentModal({ open, contract, onClose, onSuccess }: {
       onSuccess('contract.action_continue_pay_success');
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(String(err));
@@ -2856,8 +2852,7 @@ function PayInstallmentModal({ open, contract, onClose }: {
         setErrorKey(k => k + 1);
         return;
       }
-      const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-        || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+      const translated = translateApiError(err, t);
       setError(translated || err.message);
     } else {
       setError(err instanceof Error ? err.message : String(err));

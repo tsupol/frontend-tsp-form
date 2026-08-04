@@ -9,6 +9,7 @@ import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useFormSnapshot } from '../../hooks/useFormSnapshot';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { ModelName } from '../../components/ModelName';
+import { translateApiError } from '../../lib/apiErrors';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -283,7 +284,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
 
   const handleError = (err: unknown) => {
     if (err instanceof ApiError) {
-      const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+      const translated = translateApiError(err, t);
       setErrorMessage(translated || err.message);
     } else {
       setErrorMessage(t('common.error'));

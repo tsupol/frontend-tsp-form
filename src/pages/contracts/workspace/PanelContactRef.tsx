@@ -172,7 +172,7 @@ function ReferenceRow({ reference, onDeleted, onEdited }: { reference: CustomerR
       setEditing(false);
       onEdited();
     } catch (err) {
-      if (err instanceof ApiError) { const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : ''); setError(tr || err.code || err.message); } else setError(String(err));
+      if (err instanceof ApiError) { const tr = translateApiError(err, t); setError(tr || err.code || err.message); } else setError(String(err));
     } finally { setSaving(false); }
   };
 
@@ -273,7 +273,7 @@ function ContactAddForm({ customerId, onSuccess }: { customerId: number; onSucce
       await apiClient.rpc('fn_customer_contact_upsert', { p_customer_id: customerId, p_contact_type: contactType, p_value: value.trim(), p_label: null, p_is_primary: isPrimary, p_note: null });
       setValue(''); setIsPrimary(false); onSuccess();
     } catch (err) {
-      if (err instanceof ApiError) { const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : ''); setError(tr || err.code || err.message); } else setError(String(err));
+      if (err instanceof ApiError) { const tr = translateApiError(err, t); setError(tr || err.code || err.message); } else setError(String(err));
     } finally { setSaving(false); }
   };
   return (
@@ -320,7 +320,7 @@ function ReferenceAddForm({ customerId, onSuccess }: { customerId: number; onSuc
       await apiClient.rpc('fn_customer_reference_add', { p_customer_id: customerId, p_name: name.trim(), p_last_name: lastName.trim() || null, p_tel: tel.trim(), p_relation: relation.trim(), p_facebook: null, p_line_id: null });
       setName(''); setLastName(''); setTel(''); setRelation(''); onSuccess();
     } catch (err) {
-      if (err instanceof ApiError) { const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : ''); setError(tr || err.code || err.message); } else setError(String(err));
+      if (err instanceof ApiError) { const tr = translateApiError(err, t); setError(tr || err.code || err.message); } else setError(String(err));
     } finally { setSaving(false); }
   };
 

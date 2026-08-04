@@ -37,6 +37,7 @@ import { MediaLightbox, MediaThumbButton } from '../../components/MediaLightbox'
 import { CustomerLoginCard, useCustomerLoginInfo, useInvalidateLoginInfo, type CustomerLoginInfo } from '../../components/CustomerLoginCard';
 import { OwnerBadge } from '../../components/OwnerBadge';
 import type { OwnerType } from '../../lib/ownerTypes';
+import { translateApiError } from '../../lib/apiErrors';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -1673,8 +1674,7 @@ function RemoveCoLesseeModal({ target, contractId, onClose, onSuccess, t }: {
       onSuccess(target.customer_name);
     } catch (err) {
       if (err instanceof ApiError) {
-        const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const tr = translateApiError(err, t);
         setError(tr || err.code || err.message);
       } else {
         setError(err instanceof Error ? err.message : String(err));
@@ -1771,7 +1771,7 @@ function NotesTab({ contractId, t, dirtyRef }: {
     },
     onError: (err) => {
       if (err instanceof ApiError) {
-        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(String(err));
@@ -2161,8 +2161,7 @@ function DeliveryModal({ open, contract, onClose, onSuccess }: {
       refetchPhotos();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(String(err));
@@ -2187,8 +2186,7 @@ function DeliveryModal({ open, contract, onClose, onSuccess }: {
     },
     onError: (err) => {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else setError(String(err));
     },

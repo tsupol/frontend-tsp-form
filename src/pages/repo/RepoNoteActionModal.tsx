@@ -4,6 +4,7 @@ import { Modal, Button, TextArea } from 'tsp-form';
 import { XCircle, Loader2 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { ActionDoneView, type ActionDoneStateTransition } from '../contracts/ActionDoneView';
+import { translateApiError } from '../../lib/apiErrors';
 
 /* Reusable note-driven repo action. Covers the actions whose only input is a note:
    REPO_ADD_NOTE, LEGAL_FINISH, LEGAL_RETURN_TO_REPO, REPO_REVERT_ACTIVE.
@@ -23,8 +24,7 @@ const MIN_NOTE_LEN = 10;
 
 function apiErr(err: unknown, t: ReturnType<typeof useTranslation>['t']): string {
   if (err instanceof ApiError) {
-    return (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-      || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '')
+    return translateApiError(err, t)
       || err.message;
   }
   return err instanceof Error ? err.message : String(err);

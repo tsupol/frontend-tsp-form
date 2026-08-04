@@ -7,6 +7,7 @@ import { fmtCurrency } from '../../lib/format';
 import { DateTime } from '../../components/DateTime';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { ActionDoneView } from '../contracts/ActionDoneView';
+import { translateApiError } from '../../lib/apiErrors';
 
 // กลับรายการคืนเงิน (REVERSE_CREDIT_NOTE) — reverse a credit note that was
 // mis-keyed (wrong amount / wrong contract / duplicate) BEFORE the money left
@@ -86,8 +87,7 @@ export function CreditNoteReverseModal({
       setView('done');
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(err instanceof Error ? err.message : String(err));

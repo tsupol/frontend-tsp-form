@@ -20,6 +20,7 @@ import { Button, Select } from 'tsp-form';
 import { Check } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useBranchWitnesses } from './workspace/useContractSignatories';
+import { translateApiError } from '../../lib/apiErrors';
 
 interface WitnessSlotRow {
   signing_id: number;
@@ -98,8 +99,7 @@ export function WitnessSlotPicker({
       onAssigned();
     } catch (err) {
       const msg = err instanceof ApiError
-        ? (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '')
+        ? translateApiError(err, t)
           || err.message
         : String(err);
       setError(msg);

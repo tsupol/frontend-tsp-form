@@ -9,6 +9,7 @@ import { formatTel } from '../../lib/format';
 import { ActionDoneView } from './ActionDoneView';
 import { useContractInvalidate } from './useContractInvalidate';
 import { codeDisplay, assetCodeMatches } from '../inventory/inventoryUtils';
+import { translateApiError } from '../../lib/apiErrors';
 
 // Two-line loaner option: asset code (bold) over the product name, with a color
 // swatch. `label` stays a single line for the collapsed display; renderOption
@@ -115,8 +116,7 @@ interface LoanerAssetDetail {
 
 function apiErr(err: unknown, t: ReturnType<typeof useTranslation>['t']): string {
   if (err instanceof ApiError) {
-    return (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-      || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '')
+    return translateApiError(err, t)
       || err.message;
   }
   return err instanceof Error ? err.message : String(err);

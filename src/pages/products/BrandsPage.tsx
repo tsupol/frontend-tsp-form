@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { translateApiError } from '../../lib/apiErrors';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -118,7 +119,7 @@ function CreateBrandModal({ open, onClose, holdingId }: { open: boolean; onClose
       onClose();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        const translated = translateApiError(err, t);
         setErrorMessage(translated || err.message);
       } else {
         setErrorMessage(t('common.error'));
@@ -256,7 +257,7 @@ function EditBrandModal({ brand, open, onClose }: { brand: Brand | null; open: b
       onClose();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        const translated = translateApiError(err, t);
         setErrorMessage(translated || err.message);
       } else {
         setErrorMessage(t('common.error'));
@@ -420,7 +421,7 @@ export function BrandsPage() {
       queryClient.invalidateQueries({ queryKey: ['brands'] });
     } catch (err) {
       const msg = err instanceof ApiError
-        ? (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') || err.message
+        ? (translateApiError(err, t)) || err.message
         : t('common.error');
       addSnackbar({
         message: (

@@ -10,6 +10,7 @@ import {
 import { ArrowRightFromLine, CheckCircle, XCircle, SlidersHorizontal } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
+import { translateApiError } from '../../lib/apiErrors';
 
 // ── Lookup types ─────────────────────────────────────────────────────────────
 
@@ -127,7 +128,7 @@ function ReviewDrawer({ request, open, onClose, companyMap, branchMap }: {
       onClose();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        const translated = translateApiError(err, t);
         setErrorMessage(translated || err.message);
       } else {
         setErrorMessage(t('common.error'));

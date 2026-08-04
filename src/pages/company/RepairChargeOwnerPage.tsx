@@ -17,6 +17,7 @@ import { Select, Switch, MobileHeader, useSnackbarContext } from 'tsp-form';
 import { ArrowRightFromLine, CheckCircle, XCircle, Info } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { translateApiError } from '../../lib/apiErrors';
 
 const ADMIN_ROLES = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'];
 const CHARGE_TYPE = 'REPAIR_PAYMENT';
@@ -102,8 +103,7 @@ export function RepairChargeOwnerPage() {
 
   const translateErr = (err: unknown): string => {
     if (err instanceof ApiError) {
-      const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-        || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+      const translated = translateApiError(err, t);
       return translated || err.message;
     }
     return t('common.error');

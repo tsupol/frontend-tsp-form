@@ -13,6 +13,7 @@ import { formatSmart } from '../lib/format';
 import { DateTime } from './DateTime';
 import { CustomerActivityModal } from './CustomerActivityModal';
 import { ResetCustomerLoginModal } from './ResetCustomerLoginModal';
+import { translateApiError } from '../lib/apiErrors';
 
 export interface CustomerLoginInfo {
   id: number;
@@ -198,8 +199,7 @@ function UnlockModal({ open, customer, onClose, onSuccess }: {
       onSuccess();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(err instanceof Error ? err.message : String(err));

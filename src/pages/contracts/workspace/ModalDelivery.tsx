@@ -4,6 +4,7 @@ import { Modal, Input, Select, Button } from 'tsp-form';
 import { XCircle, Loader2 } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { useWorkspace } from './WorkspaceContext';
+import { translateApiError } from '../../../lib/apiErrors';
 
 const SHIPPING_VALUES = ['PICKUP', 'DELIVERY', 'COURIER'] as const;
 
@@ -44,8 +45,7 @@ export function ModalDelivery({ open, onClose }: Props) {
       onClose();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(err instanceof Error ? err.message : String(err));

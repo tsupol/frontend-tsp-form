@@ -19,6 +19,7 @@ import {
 import { toStoragePath, normalizeKey } from '../../lib/mediaPath';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { useMobileCaptureSession } from '../contracts/workspace/useMobileCaptureSession';
+import { translateApiError } from '../../lib/apiErrors';
 
 // ============================================================================
 // Sell-out condition photos — shared album component for the ASSET_SELL_REQUEST
@@ -51,8 +52,7 @@ export const sellOutPhotosKey = (requestId: number) => ['sell-out-photos', reque
 function translateErr(err: unknown, t: ReturnType<typeof useTranslation>['t']): string {
   if (err instanceof ApiError) {
     return (
-      (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') ||
-      (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '') ||
+      translateApiError(err, t) ||
       err.message
     );
   }

@@ -9,6 +9,7 @@ import { BranchPinInput } from '../../components/BranchPinInput';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { fmtCurrency } from '../../lib/format';
 import { getBucketLabel, getBucketColor, codeDisplay, assetCodeMatches } from './inventoryUtils';
+import { translateApiError } from '../../lib/apiErrors';
 
 // ============================================================================
 // Sell External B2B (ขายให้คู่ค้า) — sell ON_HAND_AVAILABLE assets out of stock
@@ -85,8 +86,7 @@ type ViewState = 'form' | 'done';
 function translateErr(err: unknown, t: ReturnType<typeof useTranslation>['t']): string {
   if (err instanceof ApiError) {
     return (
-      (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') ||
-      (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '') ||
+      translateApiError(err, t) ||
       err.message
     );
   }

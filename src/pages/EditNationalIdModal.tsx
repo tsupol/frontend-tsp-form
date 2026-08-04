@@ -7,6 +7,7 @@ import { apiClient, ApiError } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import type { UserProfile } from '../lib/auth';
 import { ActionDoneView } from './contracts/ActionDoneView';
+import { translateApiError } from '../lib/apiErrors';
 
 interface Props {
   open: boolean;
@@ -68,8 +69,7 @@ export function EditNationalIdModal({ open, onClose, profile }: Props) {
       setView('done');
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setApiError(translated || err.message);
       } else {
         setApiError(t('common.error'));

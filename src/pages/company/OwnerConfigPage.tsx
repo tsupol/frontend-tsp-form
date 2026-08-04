@@ -17,6 +17,7 @@ import { Select, Switch, Button, MobileHeader, useSnackbarContext } from 'tsp-fo
 import { ArrowRightFromLine, CheckCircle, XCircle, RotateCcw, Info } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { translateApiError } from '../../lib/apiErrors';
 import {
   INTAKE_CHANNELS, BRANCH_TYPES, type OwnerType, type IntakeChannel, type BranchType,
 } from '../../lib/ownerTypes';
@@ -112,8 +113,7 @@ export function OwnerConfigPage() {
 
   const translateErr = (err: unknown): string => {
     if (err instanceof ApiError) {
-      const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-        || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+      const translated = translateApiError(err, t);
       return translated || err.message;
     }
     return t('common.error');

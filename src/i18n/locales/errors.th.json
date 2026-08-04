@@ -507,6 +507,8 @@
   "inv.conflict.buyback_identifier_reserved": "Serial/IMEI นี้ติดอยู่กับรายการรับซื้อคืนอื่นที่กำลังดำเนินการ (รออนุมัติหรืออนุมัติแล้ว)",
   "INV.CONFLICT.IDENTIFIER_CONFLICT": "{{type}} {{value}} ซ้ำกับเครื่อง {{existing_asset_code}} ที่มีอยู่แล้วในระบบ — สาขา{{existing_branch_name}} ({{existing_bucket_label}})",
   "inv.conflict.identifier_conflict": "{{type}} {{value}} ซ้ำกับเครื่อง {{existing_asset_code}} ที่มีอยู่แล้วในระบบ — สาขา{{existing_branch_name}} ({{existing_bucket_label}})",
+  "INV.CONFLICT.IDENTIFIER_CONFLICT_basic": "{{type}} {{value}} ซ้ำกับเครื่องอื่นที่มีอยู่แล้วในระบบ",
+  "inv.conflict.identifier_conflict_basic": "{{type}} {{value}} ซ้ำกับเครื่องอื่นที่มีอยู่แล้วในระบบ",
   "INV.CONFLICT.REPAIR_LOANER_CONFLICT": "มอบเครื่องสำรองให้สัญญานี้ไม่ได้ เพราะมีเครื่องที่ผูกอยู่แล้ว อนุญาตหนึ่งเครื่องต่อสัญญา",
   "inv.conflict.repair_loaner_conflict": "มอบเครื่องสำรองให้สัญญานี้ไม่ได้ เพราะมีเครื่องที่ผูกอยู่แล้ว อนุญาตหนึ่งเครื่องต่อสัญญา",
   "INV.NOT_FOUND.ASSET": "ไม่พบสินทรัพย์",

@@ -16,6 +16,7 @@ import {
 } from './useWallet';
 import { WALLET_ACTION_CODE } from './types';
 import type { WalletType, WalletAction, WalletChannel } from './types';
+import { translateApiError } from '../../../lib/apiErrors';
 
 interface BankAccount {
   id: number;
@@ -136,8 +137,7 @@ export function WalletActionForm({
   const setApiError = (err: unknown) => {
     if (err instanceof ApiError) {
       const translated =
-        (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') ||
-        (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        translateApiError(err, t);
       setError(translated || err.message);
     } else {
       setError(err instanceof Error ? err.message : String(err));

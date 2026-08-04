@@ -8,6 +8,7 @@ import { fmtCurrency } from '../../lib/format';
 import { DateTime } from '../../components/DateTime';
 import { useVoidReasons } from '../../hooks/useVoidReasons';
 import { ActionDoneView } from '../contracts/ActionDoneView';
+import { translateApiError } from '../../lib/apiErrors';
 
 // ยกเลิกบิลที่วันปิดยอดไปแล้ว (CANCEL_CLOSED_DAY) — cancel a PAID contract-payment
 // bill whose day has already been closed. The normal Cancel/Void verbs are blocked
@@ -106,8 +107,7 @@ export function CancelClosedDayModal({
       setView('done');
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(err instanceof Error ? err.message : String(err));

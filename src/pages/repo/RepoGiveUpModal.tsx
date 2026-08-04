@@ -4,6 +4,7 @@ import { Modal, Button, TextArea } from 'tsp-form';
 import { XCircle, Loader2, Scale, ArrowRight } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { ActionDoneView } from '../contracts/ActionDoneView';
+import { translateApiError } from '../../lib/apiErrors';
 
 /* ยอมแพ้ → ส่งต่อทีมกฎหมาย (ops_repo_give_up). WAIT_FOR_REPO → WAIT_FOR_LEGAL.
    p_note is MANDATORY (OPS.VALIDATION.NOTE_REQUIRED) — free text, no dropdown,
@@ -13,8 +14,7 @@ const MIN_NOTE_LEN = 10;
 
 function apiErr(err: unknown, t: ReturnType<typeof useTranslation>['t']): string {
   if (err instanceof ApiError) {
-    return (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-      || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '')
+    return translateApiError(err, t)
       || err.message;
   }
   return err instanceof Error ? err.message : String(err);

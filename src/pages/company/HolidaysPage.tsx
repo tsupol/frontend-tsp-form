@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { translateApiError } from '../../lib/apiErrors';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -137,7 +138,7 @@ function HolidayFormModal({ open, onClose, companies, holiday }: {
       onClose();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setErrorMessage(translated || err.message);
       } else {
         setErrorMessage(t('common.error'));
@@ -252,7 +253,7 @@ function ConfirmRemoveModal({ open, onClose, holiday }: {
       onClose();
     } catch (err) {
       const msg = err instanceof ApiError
-        ? (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '') || err.message
+        ? translateApiError(err, t) || err.message
         : t('common.error');
       addSnackbar({
         message: <div className="alert alert-danger"><XCircle size={16} /><span className="alert-description">{msg}</span></div>,

@@ -27,6 +27,7 @@ import { CancelClosedDayModal } from './CancelClosedDayModal';
 import { useBillActions, type BillAction, type BillActionCode } from '../../hooks/useBillActions';
 import { useVoidReasons } from '../../hooks/useVoidReasons';
 import { BillReceipt } from '../contracts/workspace/BillReceipt';
+import { translateApiError } from '../../lib/apiErrors';
 
 /* ── Types ── */
 
@@ -589,8 +590,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
       onBillChanged();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setPayError(translated || err.message);
       } else {
         setPayError(err instanceof Error ? err.message : String(err));
@@ -625,8 +625,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
       onBillChanged(enriched);
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setVoidError(translated || err.message);
       } else {
         setVoidError(err instanceof Error ? err.message : String(err));
@@ -1159,8 +1158,7 @@ function VoidPaymentModal({
       setView('done');
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(err instanceof Error ? err.message : String(err));

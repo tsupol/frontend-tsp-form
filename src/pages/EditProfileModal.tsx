@@ -10,6 +10,7 @@ import { useFormSnapshot } from '../hooks/useFormSnapshot';
 import { makeDatePickerFormat, parseLocalDate, toLocalDateStr } from '../lib/format';
 import type { UserProfile } from '../lib/auth';
 import { ActionDoneView } from './contracts/ActionDoneView';
+import { translateApiError } from '../lib/apiErrors';
 
 // Self-editable profile fields (allow-list mirrors api.me_profile_update —
 // see UI_FEEDBACK/2026-07-05_DELIVERY_me_profile_update_self_service.md).
@@ -104,8 +105,7 @@ export function EditProfileModal({ open, onClose, profile }: Props) {
       setView('done');
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setApiError(translated || err.message);
       } else {
         setApiError(t('common.error'));

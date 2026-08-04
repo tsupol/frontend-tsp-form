@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { translateApiError } from '../../lib/apiErrors';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -205,7 +206,7 @@ function CreateAttributeModal({ open, onClose, holdingId }: { open: boolean; onC
       onClose();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        const translated = translateApiError(err, t);
         setErrorMessage(translated || err.message);
       } else {
         setErrorMessage(t('common.error'));
@@ -381,7 +382,7 @@ function EditAttributeModal({ attribute, open, onClose }: { attribute: ProductAt
       onClose();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        const translated = translateApiError(err, t);
         setErrorMessage(translated || err.message);
       } else {
         setErrorMessage(t('common.error'));
@@ -554,7 +555,7 @@ function CreateOptionModal({ open, onClose, holdingId, attributeId }: {
       onClose();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        const translated = translateApiError(err, t);
         setErrorMessage(translated || err.message);
       } else {
         setErrorMessage(t('common.error'));
@@ -727,7 +728,7 @@ function EditOptionModal({ option, open, onClose }: { option: AttributeOption | 
       onClose();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        const translated = translateApiError(err, t);
         setErrorMessage(translated || err.message);
       } else {
         setErrorMessage(t('common.error'));
@@ -920,7 +921,7 @@ function ManageOptionsModal({ attribute, open, onClose, holdingId }: {
       queryClient.invalidateQueries({ queryKey: ['product-attribute-options'] });
     } catch (err) {
       const msg = err instanceof ApiError
-        ? (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') || err.message
+        ? (translateApiError(err, t)) || err.message
         : t('common.error');
       addSnackbar({
         message: (
@@ -1137,7 +1138,7 @@ export function AttributesPage() {
       queryClient.invalidateQueries({ queryKey: ['product-attributes'] });
     } catch (err) {
       const msg = err instanceof ApiError
-        ? (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') || err.message
+        ? (translateApiError(err, t)) || err.message
         : t('common.error');
       addSnackbar({
         message: (

@@ -18,6 +18,7 @@ import { MediaLightbox } from '../../components/MediaLightbox';
 import { ImeiInput } from '../../components/ImeiInput';
 import { OwnerBadge } from '../../components/OwnerBadge';
 import type { OwnerType } from '../../lib/ownerTypes';
+import { translateApiError } from '../../lib/apiErrors';
 
 // ============================================================================
 // Types — uses dedicated v_buyback_list / v_buyback_detail views
@@ -1064,8 +1065,7 @@ function BuybackIntakeModal({
     },
     onError: (err) => {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(String(err));
@@ -1273,8 +1273,7 @@ function BuybackActionModal({
     onSuccess,
     onError: (err) => {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(String(err));
@@ -1433,8 +1432,7 @@ function BuybackNoteEditModal({
     onSuccess,
     onError: (err) => {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(String(err));

@@ -6,6 +6,7 @@ import { XCircle, Loader2, CheckCircle, User } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { useWorkspace } from './WorkspaceContext';
 import { BranchPinInput } from '../../../components/BranchPinInput';
+import { translateApiError } from '../../../lib/apiErrors';
 
 interface BranchStaffUser {
   id: number;
@@ -78,8 +79,7 @@ export function PanelCommissionOwner({ onClose }: { onClose: () => void }) {
       });
     } catch (err) {
       if (err instanceof ApiError) {
-        const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const tr = translateApiError(err, t);
         setError(tr || err.message);
       } else {
         setError(String(err));

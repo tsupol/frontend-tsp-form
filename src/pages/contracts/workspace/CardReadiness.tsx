@@ -7,6 +7,7 @@ import { apiClient, ApiError } from '../../../lib/api';
 import { useWorkspace } from './WorkspaceContext';
 import type { ReadinessResult } from './WorkspaceTypes';
 import { ERROR_TO_MODAL } from './WorkspaceTypes';
+import { translateApiError } from '../../../lib/apiErrors';
 
 export function CardReadiness() {
   const { t } = useTranslation();
@@ -46,8 +47,7 @@ export function CardReadiness() {
       });
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setBillError(translated || err.message);
       } else {
         setBillError(String(err));

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { translateApiError } from '../../lib/apiErrors';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -263,7 +264,7 @@ function CreateFamilyModal({ open, onClose, brands }: {
       onClose();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        const translated = translateApiError(err, t);
         setErrorMessage(translated || err.message);
       } else {
         setErrorMessage(t('common.error'));
@@ -433,7 +434,7 @@ function EditFamilyModal({ family, open, onClose, brands }: {
       onClose();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        const translated = translateApiError(err, t);
         setErrorMessage(translated || err.message);
       } else {
         setErrorMessage(t('common.error'));
@@ -671,7 +672,7 @@ function CreateFamilyAttrModal({ open, onClose, holdingId, familyId, attributes 
       onClose();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        const translated = translateApiError(err, t);
         setErrorMessage(translated || err.message);
       } else {
         setErrorMessage(t('common.error'));
@@ -919,7 +920,7 @@ function EditFamilyAttrModal({ rule, attrName, open, onClose }: {
       onClose();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        const translated = translateApiError(err, t);
         setErrorMessage(translated || err.message);
       } else {
         setErrorMessage(t('common.error'));
@@ -1151,7 +1152,7 @@ function ManageFamilyAttributesModal({ family, open, onClose, holdingId }: {
       queryClient.invalidateQueries({ queryKey: ['family-variant-attributes'] });
     } catch (err) {
       const msg = err instanceof ApiError
-        ? (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') || err.message
+        ? (translateApiError(err, t)) || err.message
         : t('common.error');
       addSnackbar({
         message: (
@@ -1382,7 +1383,7 @@ export function FamiliesPage() {
       queryClient.invalidateQueries({ queryKey: ['families'] });
     } catch (err) {
       const msg = err instanceof ApiError
-        ? (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') || err.message
+        ? (translateApiError(err, t)) || err.message
         : t('common.error');
       addSnackbar({
         message: (

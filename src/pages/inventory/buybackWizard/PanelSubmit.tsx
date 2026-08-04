@@ -8,6 +8,7 @@ import { validateIMEI, validateiPhoneSerial } from '../../../lib/validators';
 import { ImeiInput } from '../../../components/ImeiInput';
 import { getLine } from './useBuyback';
 import type { BuybackDraft } from './types';
+import { translateApiError } from '../../../lib/apiErrors';
 
 // fn_inv_buyback_validate is codes-only now (no Thai label) — each check is
 // { code, passed, reason, params }. UI translates code → label, reason → detail.
@@ -75,8 +76,7 @@ export function PanelSubmit({
     onSuccess: () => { setError(''); onSubmitted(); },
     onError: (err) => {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(String(err));

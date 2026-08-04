@@ -26,6 +26,7 @@ import { formatSmart } from '../../lib/format';
 import { CHAT_STATUS_VALUES, type ChatInboxRow, type ChatStatus } from './chatTypes';
 import { chatStatusBadgeColor } from './chatStatus';
 import { ChatStatusLogModal } from './ChatStatusLogModal';
+import { translateApiError } from '../../lib/apiErrors';
 
 const STATUS_ICONS: Record<ChatStatus, React.ReactNode> = {
   WAITING_REPLY:   <MessageSquareWarning size={14} />,
@@ -479,8 +480,7 @@ function describeApiError(
   fallbackKey: string,
 ): string {
   if (err instanceof ApiError) {
-    const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-      || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+    const translated = translateApiError(err, t);
     return translated || err.message || t(fallbackKey);
   }
   if (err instanceof Error) return err.message;

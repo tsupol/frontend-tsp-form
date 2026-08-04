@@ -174,8 +174,7 @@ export function CustomerPickerModal({ open, title, excludeCustomerIds = [], onCl
       onClose();
     } catch (err) {
       if (err instanceof ApiError) {
-        const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const tr = translateApiError(err, t);
         setError(tr || err.code || err.message);
       } else {
         setError(err instanceof Error ? err.message : String(err));
@@ -223,8 +222,7 @@ export function CustomerPickerModal({ open, title, excludeCustomerIds = [], onCl
       await submitWithCustomer(res.customer_id, res.full_name);
     } catch (err) {
       if (err instanceof ApiError) {
-        const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const tr = translateApiError(err, t);
         setError(tr || err.code || err.message);
       } else {
         setError(err instanceof Error ? err.message : String(err));

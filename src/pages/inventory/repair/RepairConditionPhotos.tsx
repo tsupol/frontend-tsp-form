@@ -20,6 +20,7 @@ import { toStoragePath, normalizeKey } from '../../../lib/mediaPath';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
 import { MediaLightbox } from '../../../components/MediaLightbox';
 import { useMobileCaptureSession } from '../../contracts/workspace/useMobileCaptureSession';
+import { translateApiError } from '../../../lib/apiErrors';
 
 // ============================================================================
 // Repair condition photos — album for the REPAIR_ORDER / ATTACHMENT media,
@@ -57,8 +58,7 @@ export const repairPhotosKey = (repairOrderId: number) => ['repair-photos', repa
 function translateErr(err: unknown, t: ReturnType<typeof useTranslation>['t']): string {
   if (err instanceof ApiError) {
     return (
-      (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') ||
-      (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '') ||
+      translateApiError(err, t) ||
       err.message
     );
   }

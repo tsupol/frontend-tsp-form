@@ -8,6 +8,7 @@ import { ActionDoneView } from '../../contracts/ActionDoneView';
 import { RepairSignQrModal } from './RepairSignQrModal';
 import type { RepairOrder, RepairResult, RepairRoute, RefRepairRoute } from '../repairTypes';
 import { RESULT_COLOR } from '../repairTypes';
+import { translateApiError } from '../../../lib/apiErrors';
 
 const RESULT_VALUES: RepairResult[] = ['FIXED', 'UNFIXABLE', 'NOT_REPAIRED'];
 
@@ -19,8 +20,7 @@ function isCustomerDevice(o: RepairOrder): boolean {
 
 function translateErr(err: unknown, t: ReturnType<typeof useTranslation>['t']): string {
   if (err instanceof ApiError) {
-    const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-      || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+    const translated = translateApiError(err, t);
     return translated || err.message;
   }
   return t('common.error');

@@ -13,6 +13,7 @@ import { BuybackDetailPanel, type BuybackDetail } from '../inventory/BuybackPage
 import { useMediaUrl } from '../../hooks/useMediaUrl';
 import { normalizeKey } from '../../lib/mediaPath';
 import { fmtCurrency } from '../../lib/format';
+import { translateApiError } from '../../lib/apiErrors';
 
 /* ───────────────────────────────────────────────────────────────────────────
  * Types — match api.v_approvals_all_statuses (doc 59 / 92)
@@ -469,8 +470,7 @@ function SimpleApprovalPanel({
       onSuccess(action);
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setErrorMessage(translated || err.message);
       } else {
         setErrorMessage(t('common.error'));
@@ -637,8 +637,7 @@ function SellOutApprovalPanel({
       onSuccess(action);
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setErrorMessage(translated || err.message);
       } else {
         setErrorMessage(t('common.error'));
@@ -839,8 +838,7 @@ function PoApprovalPanel({
       onSuccess(action);
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setErrorMessage(translated || err.message);
       } else {
         setErrorMessage(t('common.error'));

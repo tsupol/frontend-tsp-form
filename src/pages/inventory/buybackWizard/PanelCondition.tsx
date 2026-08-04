@@ -12,6 +12,7 @@ import {
   ITEM_CONDITION_OPTIONS, resolveOptions,
 } from './types';
 import type { BuybackDraft } from './types';
+import { translateApiError } from '../../../lib/apiErrors';
 
 export function PanelCondition({
   draft,
@@ -88,8 +89,7 @@ export function PanelCondition({
     },
     onError: (err) => {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(String(err));

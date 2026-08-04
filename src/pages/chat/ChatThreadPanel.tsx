@@ -9,7 +9,7 @@ import {
   ChevronRight, CheckCircle, ExternalLink, FileText, Image as ImageIcon, Send, Smile, XCircle,
   AlertTriangle,
 } from 'lucide-react';
-import { apiClient, ApiError } from '../../lib/api';
+import { apiClient } from '../../lib/api';
 import { wsClient } from '../../lib/api/ws';
 import { useAuth } from '../../contexts/AuthContext';
 import { fmtCurrency, formatSmart } from '../../lib/format';
@@ -31,6 +31,7 @@ import {
 import { contractStateBadgeColor, contractStateLabel, lesseeRoleLabel } from './chatStatus';
 import { EmojiPicker } from './EmojiPicker';
 import { pushRecentEmoji } from './emojiData';
+import { translateApiError } from '../../lib/apiErrors';
 
 const MAX_TEXTAREA_LINES = 6;
 const TEXTAREA_LINE_HEIGHT_PX = 20;
@@ -829,12 +830,3 @@ function ChatCustomerRoster({ row }: { row: ChatInboxRow }) {
   );
 }
 
-function translateApiError(err: unknown, t: (k: string, opts?: Record<string, unknown>) => string): string {
-  if (err instanceof ApiError) {
-    const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-      || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
-    return translated || err.message;
-  }
-  if (err instanceof Error) return err.message;
-  return t('chat.sendFailed');
-}

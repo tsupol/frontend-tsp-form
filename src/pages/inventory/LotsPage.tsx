@@ -21,6 +21,7 @@ import { ColorAutocomplete, ColorMatchBadge } from '../../components/ColorAutoco
 import { ImeiInput } from '../../components/ImeiInput';
 import { OwnerBadge } from '../../components/OwnerBadge';
 import type { OwnerType } from '../../lib/ownerTypes';
+import { translateApiError } from '../../lib/apiErrors';
 
 // ============================================================================
 // Types — verified against live API 2026-05-08
@@ -1291,8 +1292,7 @@ function LotActionModal({
       setValidation(null);
       if (err instanceof ApiError) {
         const translated =
-          (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') ||
-          (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+          translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(String(err));
@@ -1379,8 +1379,7 @@ function LotActionModal({
           }
         }
         const translated =
-          (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') ||
-          (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+          translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(String(err));

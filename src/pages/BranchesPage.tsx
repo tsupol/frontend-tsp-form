@@ -10,6 +10,7 @@ import { ArrowRightFromLine, ExternalLink, Plus, Pencil, Power, Search, SlidersH
 import { apiClient, ApiError } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { PhoneInput } from '../components/PhoneInput';
+import { translateApiError } from '../lib/apiErrors';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -243,8 +244,7 @@ export function BranchesPage() {
       closeModal();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setModalError(translated || err.message);
       } else setModalError(String(err));
     } finally { setModalSaving(false); }
@@ -260,8 +260,7 @@ export function BranchesPage() {
       closeModal();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setModalError(translated || err.message);
       } else setModalError(String(err));
     } finally { setModalSaving(false); }

@@ -6,6 +6,7 @@ import { ArrowRightFromLine, User, ShieldCheck, AlertTriangle, CheckCircle, XCir
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { fetchRepoGrants, type RepoAgentGrant } from './repoApi';
+import { translateApiError } from '../../lib/apiErrors';
 
 /* ตั้งสิทธิ์ทีมยึด — admin toggles can_repo / can_legal per user (ops_repo_grant_set).
    Reads current state from v_repo_agent_grant (mig 823): lists every repo-eligible
@@ -14,8 +15,7 @@ import { fetchRepoGrants, type RepoAgentGrant } from './repoApi';
 
 function apiErr(err: unknown, t: ReturnType<typeof useTranslation>['t']): string {
   if (err instanceof ApiError) {
-    return (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-      || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '')
+    return translateApiError(err, t)
       || err.message;
   }
   return t('common.error');

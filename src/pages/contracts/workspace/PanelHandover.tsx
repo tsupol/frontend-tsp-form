@@ -6,6 +6,7 @@ import { CheckCircle, XCircle, Loader2, Package, PackageX, AlertTriangle } from 
 import { apiClient, ApiError } from '../../../lib/api';
 import { useWorkspace } from './WorkspaceContext';
 import { useContractHandover, useInvalidateHandover } from './useContractHandover';
+import { translateApiError } from '../../../lib/apiErrors';
 
 interface Props { onClose: () => void }
 
@@ -77,8 +78,7 @@ export function PanelHandover({ onClose: _onClose }: Props) {
       setTimeout(() => setSavedFlash(false), 1500);
     } catch (err) {
       if (err instanceof ApiError) {
-        const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const tr = translateApiError(err, t);
         setError(tr || err.message);
       } else {
         setError(err instanceof Error ? err.message : String(err));

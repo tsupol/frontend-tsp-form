@@ -9,6 +9,7 @@ import { toLocalDateStr, parseLocalDate } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
 import { AddressFormPostal } from './AddressFormPostal';
 import type { CustomerRegisterResult, CustomerAddress } from './WorkspaceTypes';
+import { translateApiError } from '../../../lib/apiErrors';
 
 const ID_TYPE_VALUES = ['CITIZEN_ID', 'PASSPORT'] as const;
 
@@ -102,8 +103,7 @@ export function ModalCoLessee({ open, onClose }: Props) {
       }
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setApiError(translated || err.message);
       } else {
         setApiError(String(err));

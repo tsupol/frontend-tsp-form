@@ -5,6 +5,7 @@ import { Button, Modal, Select, Badge, useSnackbarContext } from 'tsp-form';
 import { Pencil, Landmark, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
+import { translateApiError } from '../../lib/apiErrors';
 
 // One row per (branch × channel) in the caller's company — v_bank_account_channel_config.
 interface ChannelConfigRow {
@@ -176,8 +177,7 @@ function SetChannelAccountModal({
       onSaved();
     } catch (err) {
       if (err instanceof ApiError) {
-        const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const tr = translateApiError(err, t);
         setError(tr || err.message);
       } else {
         setError(String(err));

@@ -12,6 +12,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Switch, MobileHeader, useSnackbarContext } from 'tsp-form';
 import { ArrowRightFromLine, Wallet, CheckCircle, XCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import { translateApiError } from '../../lib/apiErrors';
 
 interface BranchModelRow {
   branch_id: number;
@@ -86,8 +87,7 @@ export function BranchFinanceModelsPage() {
     } catch (err) {
       let msg = t('common.error');
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         msg = translated || err.message;
       }
       addSnackbar({

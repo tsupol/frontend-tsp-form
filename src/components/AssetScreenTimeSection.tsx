@@ -18,6 +18,7 @@ import { ShieldCheck, Pencil, XCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../lib/api';
 import { CopyButton } from './CopyButton';
 import { useAuth } from '../contexts/AuthContext';
+import { translateApiError } from '../lib/apiErrors';
 
 interface ScreenTimeRow {
   asset_id: number;
@@ -72,8 +73,7 @@ export function AssetScreenTimeSection({
     onError: (err) => {
       if (err instanceof ApiError) {
         const translated =
-          (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') ||
-          (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+          translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(String(err));

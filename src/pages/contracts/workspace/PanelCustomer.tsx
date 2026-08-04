@@ -302,8 +302,7 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
       }
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setApiError(translated || err.code || err.message);
       } else setApiError(String(err));
     } finally { setSubmitting(false); }
@@ -408,8 +407,7 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
       }
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setApiError(translated || err.code || err.message);
       } else setApiError(String(err));
     } finally {

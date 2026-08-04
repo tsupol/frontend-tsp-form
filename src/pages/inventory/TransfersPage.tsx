@@ -971,8 +971,7 @@ function AddLineModal({
     onSuccess: onAdded,
     onError: (err) => {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(String(err));
@@ -1123,7 +1122,7 @@ function ApproveTransferModal({
     onSuccess,
     onError: (err) => {
       if (err instanceof ApiError) {
-        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(String(err));
@@ -1227,7 +1226,7 @@ function ReceiveLineModal({
     },
     onError: (err) => {
       if (err instanceof ApiError) {
-        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(String(err));
@@ -1544,8 +1543,7 @@ function CancelTransferModal({
     onError: (err) => {
       if (err instanceof ApiError) {
         const translated =
-          (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') ||
-          (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+          translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(String(err));

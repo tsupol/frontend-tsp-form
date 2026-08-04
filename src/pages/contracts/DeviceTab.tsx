@@ -13,6 +13,7 @@ import { AssetScreenTimeSection } from '../../components/AssetScreenTimeSection'
 import { ColorSwatch } from '../../components/ColorAutocomplete';
 import { ImeiInput } from '../../components/ImeiInput';
 import { validateIMEI, validateiPhoneSerial } from '../../lib/validators';
+import { translateApiError } from '../../lib/apiErrors';
 
 type IdentifierType = 'IMEI' | 'SERIAL_NO';
 
@@ -712,8 +713,7 @@ function UndoUnbindModal({ open, contractId, unboundAt, onClose, onSuccess }: {
       onSuccess();
     } catch (err) {
       if (err instanceof ApiError) {
-        const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const tr = translateApiError(err, t);
         setError(tr || err.code || err.message);
       } else setError(err instanceof Error ? err.message : String(err));
       setSubmitting(false);
@@ -829,8 +829,7 @@ function ExternalRefBadge({
     onError: (err) => {
       if (err instanceof ApiError) {
         setError(
-          (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '')
+          translateApiError(err, t)
           || err.message,
         );
       } else {
@@ -973,8 +972,7 @@ function CorrectIdentifierModal({
       onSuccess();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(err instanceof Error ? err.message : String(err));

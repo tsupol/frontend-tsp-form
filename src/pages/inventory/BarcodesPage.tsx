@@ -17,6 +17,7 @@ import { printWithMarker } from '../../lib/printDoc';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { DateTime } from '../../components/DateTime';
 import { useBarcodeScanner } from '../../components/BarcodeScanner';
+import { translateApiError } from '../../lib/apiErrors';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 // v_barcode_list columns (verified against the view DDL):
@@ -176,7 +177,7 @@ export function BarcodesPage() {
   // ── Row actions ────────────────────────────────────────────────────────────
   const showErr = (err: unknown) => {
     const msg = err instanceof ApiError
-      ? (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') || err.message
+      ? (translateApiError(err, t)) || err.message
       : t('common.error');
     addSnackbar({
       message: (
@@ -571,8 +572,7 @@ function RegisterBarcodeModal({ open, onClose, initialBarcode, onSuccess }: Regi
       onClose();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setErrorMessage(translated || err.message);
       } else {
         setErrorMessage(t('common.error'));

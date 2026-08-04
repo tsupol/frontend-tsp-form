@@ -18,6 +18,7 @@ import type {
   ExpenseEntry, DetailsUpdateResponse, VoidResponse, ExpensePaymentMethod,
 } from './branchExpenseTypes';
 import { EXPENSE_PAYMENT_METHODS } from './branchExpenseTypes';
+import { translateApiError } from '../../lib/apiErrors';
 
 interface Props {
   entryId: number;
@@ -308,8 +309,7 @@ function EditEntryModal({
       });
     } catch (e) {
       if (e instanceof ApiError) {
-        const translated = (e.messageKey ? t(e.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (e.code ? t(e.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(e, t);
         setError(translated || e.message);
       } else if (e instanceof Error) setError(e.message);
     } finally {
@@ -485,8 +485,7 @@ function VoidModal({
       });
     } catch (e) {
       if (e instanceof ApiError) {
-        const translated = (e.messageKey ? t(e.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (e.code ? t(e.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(e, t);
         setError(translated || e.message);
       } else if (e instanceof Error) setError(e.message);
     } finally {

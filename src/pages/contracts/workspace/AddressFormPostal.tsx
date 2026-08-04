@@ -5,6 +5,7 @@ import { Input, Select, Button, FormErrorMessage, useSnackbarContext } from 'tsp
 import { XCircle, CheckCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import type { PostalLookup, CustomerAddress } from './WorkspaceTypes';
+import { translateApiError } from '../../../lib/apiErrors';
 
 interface Props {
   customerId: number;
@@ -128,8 +129,7 @@ export function AddressFormPostal({ customerId, addressType, existing, onSuccess
       onSuccess();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setApiError(translated || err.message);
       } else setApiError(String(err));
     } finally {

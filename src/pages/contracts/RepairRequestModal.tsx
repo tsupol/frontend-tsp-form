@@ -6,6 +6,7 @@ import { XCircle, Wrench, ExternalLink } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { ActionDoneView } from './ActionDoneView';
 import { useContractInvalidate } from './useContractInvalidate';
+import { translateApiError } from '../../lib/apiErrors';
 
 // Send a contract device to repair. The repair flow is now DRAFT-based (repair
 // flow v5, UI_SUMMARY/128_REPAIR_FLOW.md): this modal only CREATES the draft
@@ -83,8 +84,7 @@ export function RepairRequestModal({
     },
     onError: (err) => {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(err instanceof Error ? err.message : String(err));

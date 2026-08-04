@@ -23,6 +23,7 @@ import { buildBillActionToast, hasBill, type StandardBillResponse } from '../../
 import { CreateRetailBillModal } from './CreateRetailBillModal';
 import { useBillActions, type BillAction, type BillBlockingReason } from '../../hooks/useBillActions';
 import { BranchPaymentAccountField } from '../../components/BranchPaymentAccountField';
+import { translateApiError } from '../../lib/apiErrors';
 
 interface Branch {
   id: number;
@@ -596,8 +597,7 @@ function TakePaymentModal({
     },
     onError: (err) => {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setErrorMessage(translated || err.message);
       } else {
         setErrorMessage(String(err));
@@ -734,8 +734,7 @@ function VoidBillModal({
     },
     onError: (err) => {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setErrorMessage(translated || err.message);
       } else {
         setErrorMessage(String(err));

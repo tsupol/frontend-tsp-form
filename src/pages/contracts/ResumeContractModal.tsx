@@ -7,6 +7,7 @@ import { DateTime } from '../../components/DateTime';
 import { fmtCurrency } from '../../lib/format';
 import { ActionDoneView } from './ActionDoneView';
 import { useContractInvalidate } from './useContractInvalidate';
+import { translateApiError } from '../../lib/apiErrors';
 
 /* ─────────────────────────────────────────────────────────────────────────────
    Resume contract (ปลดพัก + ออกตารางใหม่ · RESUME_CONTRACT) — FLOW B of the
@@ -96,8 +97,7 @@ interface ResumeResult {
 
 function apiErr(err: unknown, t: ReturnType<typeof useTranslation>['t']): string {
   if (err instanceof ApiError) {
-    return (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-      || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '')
+    return translateApiError(err, t)
       || err.message;
   }
   return err instanceof Error ? err.message : String(err);

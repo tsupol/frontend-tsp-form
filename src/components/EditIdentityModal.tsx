@@ -13,6 +13,7 @@ import { KeyRound, XCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { apiClient, ApiError } from '../lib/api';
 import { BranchPinInput } from './BranchPinInput';
 import { passesThaiCidChecksum } from '../lib/ocr/extractIdCard';
+import { translateApiError } from '../lib/apiErrors';
 
 type IdType = 'CITIZEN_ID' | 'PASSPORT';
 
@@ -62,8 +63,7 @@ export function EditIdentityModal({
       onSuccess();
     } catch (err) {
       if (err instanceof ApiError) {
-        const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const tr = translateApiError(err, t);
         setError(tr || err.code || err.message);
       } else setError(err instanceof Error ? err.message : String(err));
       setSubmitting(false);

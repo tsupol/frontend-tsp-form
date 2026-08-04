@@ -6,6 +6,7 @@ import { apiClient, ApiError } from '../../lib/api';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { fmtCurrency } from '../../lib/format';
 import type { BillLineItem, BillPayment } from './accountingTypes';
+import { translateApiError } from '../../lib/apiErrors';
 
 // แก้ยอด — correct a manual line's amount on a PAID bill (before day-close).
 // Backend: api.fn_bill_correct_manual_line (adjusts the line + one CASH/TRANSFER
@@ -114,8 +115,7 @@ export function CorrectLineModal({ line, payments, billTotal, onClose, onCorrect
       setView('done');
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(err instanceof Error ? err.message : String(err));

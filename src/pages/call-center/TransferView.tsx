@@ -27,6 +27,7 @@ import { DateTime } from '../../components/DateTime';
 import { fmtCurrency } from '../../lib/format';
 import { FlagPair } from './ccBadges';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { translateApiError } from '../../lib/apiErrors';
 import {
   ccKeys, useFlagLevels, overdueColor, tradeTargets, tradeOffer, tradeRespond, tradeCancel,
   type TradeRow, type TradeInboxRow, type FlagLevelRef, type BookRow,
@@ -204,8 +205,7 @@ export function TransferOfferDetail({ offer, box, onChanged }: {
       onChanged();
     } catch (err) {
       const msg = err instanceof ApiError
-        ? ((err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-            || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '')
+        ? (translateApiError(err, t)
             || err.message)
         : String(err);
       setError(msg);
@@ -425,8 +425,7 @@ function OfferModal({ open, onClose, onSuccess }: {
       onSuccess();
     } catch (err) {
       const msg = err instanceof ApiError
-        ? ((err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-            || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '')
+        ? (translateApiError(err, t)
             || err.message)
         : String(err);
       setError(msg);

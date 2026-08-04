@@ -8,6 +8,7 @@ import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { BranchPaymentAccountField } from '../../components/BranchPaymentAccountField';
 import { ActionDoneView, type ActionDoneDetailRow } from './ActionDoneView';
+import { translateApiError } from '../../lib/apiErrors';
 
 /* ─────────────────────────────────────────────────────────────────────────────
    Contract Fee (CONTRACT_FEE) — เปิดบิลค่าปรับ/บริการ on an ACTIVE contract.
@@ -291,8 +292,7 @@ export function ContractFeeModal({ open, contract, onClose, onSuccess }: {
       onSuccess();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(err instanceof Error ? err.message : String(err));

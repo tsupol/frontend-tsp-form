@@ -10,6 +10,7 @@ import { ArrowRightFromLine, PencilLine, CheckCircle, XCircle } from 'lucide-rea
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { DateTime } from '../../components/DateTime';
+import { translateApiError } from '../../lib/apiErrors';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -603,8 +604,7 @@ function AdjustModal({ open, onClose, userOptions, renderUserOption, currentUser
     onSuccess: () => { resetForm(); onSuccess(); },
     onError: (err) => {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else setError(String(err));
       setErrorKey(k => k + 1);

@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { ApiError } from '../lib/api';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
 import { QuickLogin } from '../components/QuickLogin';
+import { translateApiError } from '../lib/apiErrors';
 
 interface LoginFormData {
   username: string;
@@ -87,7 +88,7 @@ export function LoginPage() {
       // If holding selection is needed, the modal in App handles it
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        const translated = translateApiError(err, t);
         if (translated) {
           setErrorMessage(translated);
         } else if (err.code === '28000' || err.message === 'invalid_login') {

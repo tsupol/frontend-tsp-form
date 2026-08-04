@@ -10,6 +10,7 @@ import {
 } from 'tsp-form';
 import { ArrowRightFromLine, Plus, XCircle, CheckCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import { translateApiError } from '../../lib/apiErrors';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -103,7 +104,7 @@ function Fin1Modal({ open, onClose, categories, onSuccess }: {
       onClose();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
+        const translated = translateApiError(err, t);
         setErrorMessage(translated || err.message);
       } else {
         setErrorMessage(t('common.error'));

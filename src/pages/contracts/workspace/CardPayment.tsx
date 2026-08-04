@@ -7,6 +7,7 @@ import { fmtCurrency } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
 import { BranchPaymentAccountField } from '../../../components/BranchPaymentAccountField';
 import type { PaymentMethod, PaymentLine, BillOpenResult } from './WorkspaceTypes';
+import { translateApiError } from '../../../lib/apiErrors';
 
 const BASE_PAYMENT_METHOD_VALUES = ['CASH', 'TRANSFER'] as const;
 
@@ -105,8 +106,7 @@ export function CardPayment() {
       invalidateContract();
     } catch (err) {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(err instanceof Error ? err.message : String(err));

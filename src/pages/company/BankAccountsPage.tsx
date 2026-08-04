@@ -18,6 +18,7 @@ import { publicMediaUrl } from '../../lib/mediaPath';
 import { useAuth } from '../../contexts/AuthContext';
 import { MediaLightbox } from '../../components/MediaLightbox';
 import { BankChannelConfig } from './BankChannelConfig';
+import { translateApiError } from '../../lib/apiErrors';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -567,7 +568,7 @@ export function BankAccountsPage() {
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
     } catch (err) {
       const msg = err instanceof ApiError
-        ? (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '') || err.message
+        ? translateApiError(err, t) || err.message
         : t('common.error');
       addSnackbar({
         message: <div className="alert alert-danger"><XCircle size={16} /><span className="alert-description">{msg}</span></div>,
@@ -596,7 +597,7 @@ export function BankAccountsPage() {
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
     } catch (err) {
       const msg = err instanceof ApiError
-        ? (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '') || err.message
+        ? translateApiError(err, t) || err.message
         : t('common.error');
       addSnackbar({
         message: <div className="alert alert-danger"><XCircle size={16} /><span className="alert-description">{msg}</span></div>,

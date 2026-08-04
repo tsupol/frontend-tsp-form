@@ -19,6 +19,7 @@ import { XCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { ActionDoneView } from './ActionDoneView';
+import { translateApiError } from '../../lib/apiErrors';
 
 interface Props {
   open: boolean;
@@ -41,8 +42,7 @@ function describeApiError(
   t: (k: string, opts?: Record<string, unknown>) => string,
 ): string {
   if (err instanceof ApiError) {
-    const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-      || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+    const translated = translateApiError(err, t);
     return translated || err.message;
   }
   if (err instanceof Error) return err.message;

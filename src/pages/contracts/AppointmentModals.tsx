@@ -9,6 +9,7 @@ import { DateTime } from '../../components/DateTime';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { ActionDoneView } from './ActionDoneView';
 import { useContractInvalidate } from './useContractInvalidate';
+import { translateApiError } from '../../lib/apiErrors';
 
 // Backend RPCs (mig 173 — PIN required on both):
 //   fn_contract_appointment_create(p_contract_id, p_promise_date, p_installment_id?, p_note?, p_pin)
@@ -31,8 +32,7 @@ function toLocalDateStr(d: Date | null): string {
 
 function setApiError(err: unknown, t: ReturnType<typeof useTranslation>['t'], setError: (v: string) => void) {
   if (err instanceof ApiError) {
-    const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-      || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+    const translated = translateApiError(err, t);
     setError(translated || err.message);
   } else {
     setError(err instanceof Error ? err.message : String(err));

@@ -9,6 +9,7 @@ import { getLine } from './useBuyback';
 import type { BuybackDraft } from './types';
 import { useBarcodeScanner } from '../../../components/BarcodeScanner';
 import { lookupBarcode } from '../../../lib/barcodeLookup';
+import { translateApiError } from '../../../lib/apiErrors';
 
 interface ProductSearchVariant { variant_id: number; sku_code: string; name: string; is_active: boolean }
 interface ProductSearchModel {
@@ -161,8 +162,7 @@ export function PanelSetup({
     },
     onError: (err) => {
       if (err instanceof ApiError) {
-        const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else {
         setError(String(err));

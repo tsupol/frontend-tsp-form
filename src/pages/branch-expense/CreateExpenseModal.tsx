@@ -18,6 +18,7 @@ import {
 } from '../../lib/beMedia';
 import { PaymentMethodChips } from './PaymentMethodChips';
 import type { ExpenseItem, ExpenseEntry, AttachResponse, ExpensePaymentMethod } from './branchExpenseTypes';
+import { translateApiError } from '../../lib/apiErrors';
 
 interface BranchOption { id: number; code: string; name: string }
 
@@ -169,8 +170,7 @@ export function CreateExpenseModal({ open, onClose, onSaved, items, branches, fi
     } catch (e) {
       setPhase('form');
       if (e instanceof ApiError) {
-        const translated = (e.messageKey ? t(e.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (e.code ? t(e.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const translated = translateApiError(e, t);
         setError(translated || e.message);
       } else if (e instanceof Error) {
         setError(e.message);

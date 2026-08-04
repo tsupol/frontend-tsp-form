@@ -5,6 +5,7 @@ import { Button, Modal, Select, TextArea } from 'tsp-form';
 import { XCircle, Eye, EyeOff, Copy, Check } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { BranchPinInput } from '../../components/BranchPinInput';
+import { translateApiError } from '../../lib/apiErrors';
 
 interface ICloudAccountRow {
   id: number;
@@ -31,8 +32,7 @@ function setApiError(
   setError: (s: string) => void,
 ) {
   if (err instanceof ApiError) {
-    const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-      || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+    const translated = translateApiError(err, t);
     setError(translated || err.message);
   } else {
     setError(err instanceof Error ? err.message : String(err));

@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { TFunction } from 'i18next';
 import { useForm, Controller } from 'react-hook-form';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
@@ -13,10 +12,11 @@ import {
   ArrowRightFromLine, ArrowLeft, SlidersHorizontal, Pencil,
   ShieldCheck, ShieldOff, History, KeyRound,
 } from 'lucide-react';
-import { apiClient, ApiError } from '../../lib/api';
+import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { DateTime } from '../../components/DateTime';
 import { IcloudPasswordRow } from '../contracts/IcloudModals';
+import { translateApiError } from '../../lib/apiErrors';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -75,15 +75,6 @@ interface EditForm {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-function translateApiError(err: unknown, t: TFunction): string {
-  if (err instanceof ApiError) {
-    const fromKey = err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '';
-    const fromCode = err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '';
-    return fromKey || fromCode || err.message;
-  }
-  return t('common.error');
-}
 
 function statusFilterToParam(filter: 'active' | 'inactive' | null): string | null {
   if (filter === 'active') return 'is_active=is.true';

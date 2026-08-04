@@ -23,6 +23,7 @@ import { useMobileCaptureSession } from '../../contracts/workspace/useMobileCapt
 import { getLine } from './useBuyback';
 import { codeDisplay } from '../inventoryUtils';
 import type { BuybackDraft } from './types';
+import { translateApiError } from '../../../lib/apiErrors';
 
 interface EntityMedia {
   entity_media_id: number;
@@ -622,8 +623,7 @@ function EditCaptionModal({
 
 function formatApiError(err: unknown, t: ReturnType<typeof useTranslation>['t']): string {
   if (err instanceof ApiError) {
-    const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-      || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+    const translated = translateApiError(err, t);
     return translated || err.message;
   }
   return err instanceof Error ? err.message : String(err);

@@ -7,6 +7,7 @@ import { apiClient, ApiError } from '../../lib/api';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { ActionDoneView } from './ActionDoneView';
 import { useContractInvalidate } from './useContractInvalidate';
+import { translateApiError } from '../../lib/apiErrors';
 
 interface ContractForTransfer {
   id: number;
@@ -93,8 +94,7 @@ export function TransferBranchModal({ open, contract, onClose }: Props) {
   const setApiError = (err: unknown) => {
     if (err instanceof ApiError) {
       const translated =
-        (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '') ||
-        (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        translateApiError(err, t);
       setError(translated || err.message);
     } else {
       setError(err instanceof Error ? err.message : String(err));

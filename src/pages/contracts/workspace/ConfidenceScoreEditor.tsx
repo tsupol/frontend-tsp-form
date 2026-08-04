@@ -10,6 +10,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Star, Loader2, XCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { useWorkspace } from './WorkspaceContext';
+import { translateApiError } from '../../../lib/apiErrors';
 
 const SCORE_TOOLTIPS: Record<number, string> = {
   1: 'workspace.score1',
@@ -51,8 +52,7 @@ export function ConfidenceScoreEditor() {
     } catch (err) {
       setPendingScore(null);
       if (err instanceof ApiError) {
-        const tr = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-          || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+        const tr = translateApiError(err, t);
         setScoreError(tr || err.message);
       } else {
         setScoreError(String(err));

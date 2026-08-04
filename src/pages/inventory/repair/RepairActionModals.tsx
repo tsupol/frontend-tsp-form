@@ -8,14 +8,14 @@ import { CurrencyInput } from '../../../components/CurrencyInput';
 import { BranchPaymentAccountField } from '../../../components/BranchPaymentAccountField';
 import { ActionDoneView } from '../../contracts/ActionDoneView';
 import { fmtCurrency } from '../../../lib/format';
+import { translateApiError } from '../../../lib/apiErrors';
 import type {
   RepairOrder, RepairItemType, RepairPayMethod, RefRepairItemType, RepairRenderDoc, RepairResult,
 } from '../repairTypes';
 
 function translateErr(err: unknown, t: ReturnType<typeof useTranslation>['t']): string {
   if (err instanceof ApiError) {
-    const translated = (err.messageKey ? t(err.messageKey, { ns: 'apiErrors', defaultValue: '' }) : '')
-      || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '');
+    const translated = translateApiError(err, t);
     return translated || err.message;
   }
   return t('common.error');
