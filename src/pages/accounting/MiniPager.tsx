@@ -1,9 +1,10 @@
-import { useTranslation } from 'react-i18next';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Pagination } from 'tsp-form';
 
 /**
- * Minimal inline paginator (‹ 1 / N ›) for nested expandable lists.
- * Hidden entirely when there is a single page. Fixed page size, no size selector.
+ * Right-aligned paginator for the nested expandable lists on ①ยอดนำส่ง /
+ * ②ตรวจเงิน. Thin wrapper over tsp-form's `Pagination` — it only adds the
+ * "hide when there's a single page" rule and the row alignment; the control
+ * itself (buttons, sizing, ellipsis, keyboard) is the library's.
  */
 export function MiniPager({
   page, totalPages, onPage,
@@ -12,29 +13,15 @@ export function MiniPager({
   totalPages: number;
   onPage: (p: number) => void;
 }) {
-  const { t } = useTranslation();
   if (totalPages <= 1) return null;
   return (
-    <div className="flex items-center justify-end gap-1 py-1.5 pr-4 text-xs text-subtle">
-      <button
-        type="button"
-        onClick={() => onPage(page - 1)}
-        disabled={page <= 1}
-        aria-label={t('common.previous', { defaultValue: 'Previous' })}
-        className="btn-icon-xs disabled:opacity-40 disabled:cursor-default cursor-pointer"
-      >
-        <ChevronLeft size={14} />
-      </button>
-      <span className="tabular-nums px-1">{page} / {totalPages}</span>
-      <button
-        type="button"
-        onClick={() => onPage(page + 1)}
-        disabled={page >= totalPages}
-        aria-label={t('common.next', { defaultValue: 'Next' })}
-        className="btn-icon-xs disabled:opacity-40 disabled:cursor-default cursor-pointer"
-      >
-        <ChevronRight size={14} />
-      </button>
+    <div className="flex items-center justify-end py-1.5 pr-4">
+      <Pagination
+        currentPage={page}
+        totalPages={totalPages}
+        onPageChange={onPage}
+        size="xs"
+      />
     </div>
   );
 }
