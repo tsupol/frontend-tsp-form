@@ -608,7 +608,8 @@
       "returnAmount": "Returns (฿)",
       "netAmount": "Net (฿)",
       "giftQty": "Gift pieces",
-      "giftValue": "Gift value (฿)"
+      "giftValue": "Gift value (฿)",
+      "netQty": "Net pieces"
     }
   },
   "retailSalesByType": {
@@ -627,7 +628,9 @@
       "type": "Type",
       "product": "Product",
       "salePct": "% of sales"
-    }
+    },
+    "qtyBreakdown": "sold {{sale}}, returned {{ret}}",
+    "netN": "{{count}} net"
   },
   "collectionMonthly": {
     "title": "Billed vs Collected",
@@ -6626,6 +6629,8 @@
     "lockButton": "Baseline lock",
     "serial": "SN",
     "imei": "IMEI",
+    "lastSeen": "Last seen",
+    "sim": "SIM",
     "filter": {
       "notEnrolled": "Not in MDM",
       "enrolled": "In MDM",
@@ -6801,6 +6806,10 @@
       "already": "Already unread",
       "noMessages": "No customer messages to mark",
       "failed": "Couldn't mark as unread"
+    },
+    "readReceipt": {
+      "noRecord": "No record of it being opened yet",
+      "openedHint": "The customer's app opened this chat — not proof they read the message"
     }
   },
   "contractFee": {

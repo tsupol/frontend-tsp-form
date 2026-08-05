@@ -607,7 +607,8 @@
       "returnAmount": "ยอดคืน (฿)",
       "netAmount": "สุทธิ (฿)",
       "giftQty": "ของแถม (ชิ้น)",
-      "giftValue": "มูลค่าของแถม (฿)"
+      "giftValue": "มูลค่าของแถม (฿)",
+      "netQty": "สุทธิ (ชิ้น)"
     }
   },
   "retailSalesByType": {
@@ -626,7 +627,9 @@
       "type": "ประเภท",
       "product": "สินค้า",
       "salePct": "% ของยอดขาย"
-    }
+    },
+    "qtyBreakdown": "ขาย {{sale}} · คืน {{ret}}",
+    "netN": "สุทธิ {{count}} ชิ้น"
   },
   "collectionMonthly": {
     "title": "รายงานเรียกเก็บ vs เก็บได้จริง",
@@ -6619,6 +6622,8 @@
     "lockButton": "ล็อกขั้นพื้นฐาน",
     "serial": "SN",
     "imei": "IMEI",
+    "lastSeen": "ติดต่อล่าสุด",
+    "sim": "ซิม",
     "filter": {
       "notEnrolled": "ยังไม่เข้า MDM",
       "enrolled": "อยู่ใน MDM",
@@ -6794,6 +6799,10 @@
       "already": "ยังไม่อ่านอยู่แล้ว",
       "noMessages": "ไม่มีข้อความลูกค้าให้ทำเป็นยังไม่อ่าน",
       "failed": "ทำเป็นยังไม่อ่านไม่สำเร็จ"
+    },
+    "readReceipt": {
+      "noRecord": "ยังไม่มีบันทึกว่าเปิดอ่าน",
+      "openedHint": "แอปลูกค้าเปิดห้องแชทนี้แล้ว — ไม่ได้แปลว่าลูกค้ารับรู้เนื้อหาแล้ว"
     }
   },
   "contractFee": {
