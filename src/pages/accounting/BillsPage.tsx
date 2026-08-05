@@ -967,6 +967,16 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
               onClick={handlePay}
               disabled={!isPayBalanced || paying || !isActionAvailable('ADD_PAYMENT')}
               startIcon={<CheckCircle size={16} />}
+              // Same probe contract as the BE-driven footer below, so a driver
+              // sees the whole bill's action surface in one query. This button
+              // has THREE independent blockers, so name which one is live.
+              data-action="ADD_PAYMENT"
+              data-blocked-reason={
+                !isActionAvailable('ADD_PAYMENT') ? 'unavailable'
+                  : !isPayBalanced ? 'amount_unbalanced'
+                    : paying ? 'in_flight'
+                      : undefined
+              }
             >
               {paying ? t('common.loading') : t('accounting.bills.confirmPay')}
             </Button>
@@ -1426,6 +1436,17 @@ function BillActionBar({ actions, suppressLifecycle, onVoidOrCancel, onCancelClo
           startIcon={startIcon}
           endIcon={endIcon}
           onClick={() => handleClick(a)}
+          // Machine-readable state for automated UI checks. The label is
+          // translated and the blocking reason lives in a hover-only portal
+          // tooltip, so neither is reachable from the DOM — a driver that can't
+          // see WHY a button is dead ends up clicking it and waiting out a
+          // timeout. See .claude/playwright-affordances.md.
+          data-action={a.action_code}
+          data-blocked-reason={
+            !a.is_available ? (a.blocking_reason ?? 'unavailable')
+              : !wired ? 'not_wired'
+                : undefined
+          }
         >
           {label}
         </Button>

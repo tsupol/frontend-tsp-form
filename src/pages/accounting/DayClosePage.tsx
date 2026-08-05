@@ -760,6 +760,11 @@ function ReconcileBody({
           startIcon={<CalendarCheck size={14} />}
           onClick={onOpenClose}
           disabled={!canClose}
+          // The label is translated and the reason is prose in an alert above,
+          // so neither is a stable target. blockMessage.reason is already the
+          // backend's machine code (HAS_OPEN_BILLS, …) — surface it.
+          data-action="OPEN_DAY_CLOSE"
+          data-blocked-reason={!canClose ? (blockMessage?.reason ?? 'unavailable') : undefined}
         >
           {t('accounting.dayClose.openCloseModal')}
         </Button>
@@ -809,7 +814,10 @@ function ClosedSnapshot({ close, branchId }: { close: DayCloseHistoryRow; branch
       <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
         <Lock size={18} className="text-success shrink-0" />
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
+          {/* items-baseline, not items-center: the date (21px line) and the
+              badge (18px) center-align to the same midpoint but their TEXT
+              still sits ~1.5px apart, which reads as misaligned. */}
+          <div className="flex items-baseline gap-2">
             <span className="font-semibold">
               <DateTime value={close.close_date} showTime={false} />
             </span>
@@ -1437,8 +1445,18 @@ function CloseDayModal({
             </div>
           </div>
           <div className="modal-footer">
-            <Button onClick={handleCloseAttempt} disabled={closing}>{t('common.cancel')}</Button>
-            <Button color="primary" onClick={doClose} disabled={!canSubmit}>
+            <Button onClick={handleCloseAttempt} disabled={closing} data-action="DISMISS">{t('common.cancel')}</Button>
+            <Button
+              color="primary"
+              onClick={doClose}
+              disabled={!canSubmit}
+              data-action="CONFIRM_DAY_CLOSE"
+              data-blocked-reason={
+                closing ? 'in_flight'
+                  : noteRequired && note.trim().length === 0 ? 'note_required'
+                    : undefined
+              }
+            >
               {closing ? t('common.loading') : t('accounting.dayClose.closeDay')}
             </Button>
           </div>

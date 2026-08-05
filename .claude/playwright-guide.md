@@ -53,3 +53,4 @@ await page.evaluate(() => {
 
 - **Icon-only buttons that share an `aria-label` cause strict-mode violations.** e.g. multiple reset-key buttons on a list page all had `aria-label="Reset password"`, same as the modal's confirm button. Scope to the dialog: `page.getByRole('dialog').getByRole('button', { name: 'X' })`.
 - **Verify i18n plural keys render, not just that the page loads.** A `foo_one`/`foo_other` key only pluralizes when the interpolation var is named **`count`**. Passing `{ n: x }` or `{ days: x }` fails selection → i18next falls back to the base key `foo` (which doesn't exist) → the raw key string renders on screen. Screenshot and read the actual text.
+- **Never click a disabled button — it burns a 30s actionability timeout.** Check `disabled` first. On backend-driven action footers the reason is on the button as `data-blocked-reason` (the visible reason is a hover-only portal tooltip, unreadable from the DOM). See `.claude/playwright-affordances.md`.
