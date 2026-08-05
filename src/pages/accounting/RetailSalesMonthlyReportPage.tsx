@@ -277,18 +277,22 @@ export function RetailSalesMonthlyReportPage() {
         </div>
       </MobileHeader>
 
-      {/* Desktop header — title + pickers + actions */}
-      <div className="flex-none px-4 py-2.5 border-b border-line items-center gap-3 max-md:hidden flex flex-wrap">
+      {/* Desktop header — title on its own row, filters + actions below it.
+          One combined row wrapped unpredictably once a long branch name or a
+          third picker appeared, shoving the buttons under the title anyway. */}
+      <div className="flex-none px-4 py-2.5 border-b border-line flex flex-col gap-2 max-md:hidden">
         <h1 className="heading-2 whitespace-nowrap">{t('retailSales.title')}</h1>
-        <div style={{ width: '13rem' }}>{monthPicker}</div>
-        {branchPicker && <div style={{ width: '14rem' }}>{branchPicker}</div>}
-        <div className="ml-auto flex items-center gap-2">
-          <Button variant="outline" size="sm" startIcon={<Download size={16} />} onClick={handleExportCsv} disabled={!hasData}>
-            {t('retailSales.exportCsv')}
-          </Button>
-          <Button variant="outline" size="sm" startIcon={<Printer size={16} />} onClick={handlePrint} disabled={!hasData}>
-            {t('common.print')}
-          </Button>
+        <div className="flex items-center gap-3 flex-wrap">
+          <div style={{ width: '13rem' }}>{monthPicker}</div>
+          {branchPicker && <div style={{ width: '14rem' }}>{branchPicker}</div>}
+          <div className="ml-auto flex items-center gap-2">
+            <Button variant="outline" size="sm" startIcon={<Download size={16} />} onClick={handleExportCsv} disabled={!hasData}>
+              {t('retailSales.exportCsv')}
+            </Button>
+            <Button variant="outline" size="sm" startIcon={<Printer size={16} />} onClick={handlePrint} disabled={!hasData}>
+              {t('common.print')}
+            </Button>
+          </div>
         </div>
       </div>
 

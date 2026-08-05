@@ -7,10 +7,15 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
  * prev/next arrows; the label opens a year-stepper + 12-month grid popover.
  * Used by month-scoped reports whose RPCs only care about the month.
  * ─────────────────────────────────────────────────────────────────────────── */
-export function MonthPicker({ value, onChange, lang }: {
+/** Heights match tsp-form's form-control sizes, so a MonthPicker sitting next
+ *  to a `size="sm"` Select lines up instead of standing 4px taller. */
+const SIZE_H = { sm: 'h-7', md: 'h-8', lg: 'h-10' } as const;
+
+export function MonthPicker({ value, onChange, lang, size = 'sm' }: {
   value: Date;
   onChange: (d: Date) => void;
   lang: string;
+  size?: 'sm' | 'md' | 'lg';
 }) {
   const [open, setOpen] = useState(false);
   const [viewYear, setViewYear] = useState(value.getFullYear());
@@ -28,7 +33,7 @@ export function MonthPicker({ value, onChange, lang }: {
   const pick = (m: number) => { onChange(new Date(viewYear, m, 1)); setOpen(false); };
 
   return (
-    <div className="input-group h-8">
+    <div className={`input-group ${SIZE_H[size]}`}>
       <button
         type="button"
         className="flex items-center justify-center px-1.5 text-subtle hover:text-fg cursor-pointer bg-transparent border-none"

@@ -135,11 +135,13 @@ export function ExpenseByCategoryPage() {
       </MobileHeader>
 
       {/* Desktop header */}
-      <div className="flex-none px-4 py-2.5 border-b border-line items-center gap-3 max-md:hidden flex flex-wrap">
+      <div className="flex-none px-4 py-2.5 border-b border-line flex flex-col gap-2 max-md:hidden">
         <h1 className="heading-2 whitespace-nowrap">{t('expenseByCategory.title')}</h1>
-        <div style={{ width: '13rem' }}>{monthPicker}</div>
-        {companyPicker && <div style={{ width: '12rem' }}>{companyPicker}</div>}
-        {branchPicker && <div style={{ width: '12rem' }}>{branchPicker}</div>}
+        <div className="flex items-center gap-3 flex-wrap">
+          <div style={{ width: '13rem' }}>{monthPicker}</div>
+          {companyPicker && <div style={{ width: '12rem' }}>{companyPicker}</div>}
+          {branchPicker && <div style={{ width: '12rem' }}>{branchPicker}</div>}
+        </div>
       </div>
 
       {/* Mobile pickers */}

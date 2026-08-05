@@ -5,6 +5,7 @@ import {
   MobileHeader, Select, InputDateRangePicker, Button,
   Input, Badge, DataTableFooter,
 } from 'tsp-form';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowRightFromLine, Keyboard, Search, X, FileSpreadsheet, ArrowRight, Loader2,
 } from 'lucide-react';
@@ -338,11 +339,13 @@ export function ReportsPage() {
         </div>
       </MobileHeader>
 
-      {/* Desktop header — report picker + export actions */}
+      {/* Desktop header — this page keeps title + report picker + export on ONE
+          row (the other report pages split them). The picker IS the page's
+          subject, not a filter of it, so it belongs beside the title. */}
       <div className="flex-none px-4 py-2.5 border-b border-line items-center justify-between gap-4 max-md:hidden flex">
         <div className="flex items-center gap-3 min-w-0">
           <h1 className="heading-2 whitespace-nowrap">{t('reports.title')}</h1>
-          <div style={{ width: '18rem' }}>
+          <div style={{ width: '13rem' }}>
             <Select
               options={reportOptions}
               value={reportKey || null}
@@ -470,6 +473,76 @@ type Row = Record<string, unknown>;
 const str = (v: unknown) => (v == null || v === '' ? null : String(v));
 const num = (v: unknown) => (v == null || v === '' ? null : Number(v));
 
+/** Asset code → the asset detail page. R2/R3/R4 carry `asset_id` alongside the
+ *  code, so the label itself becomes the link (no extra action column). */
+function AssetCodeLink({ row }: { row: Row }) {
+  const code = str(row.asset_code);
+  const id = num(row.asset_id);
+  if (!code) return null;
+  if (id == null) return <span className="font-mono">{code}</span>;
+  return (
+    <Link
+      to={`/admin/inventory/assets/${id}`}
+      className="font-mono text-primary-fg hover:underline"
+    >
+      {code}
+    </Link>
+  );
+}
+
+/** Bill / contract code → its detail page.
+ *
+ *  v_report_daily_bill_lines carries only the CODES (no bill_id/contract_id),
+ *  while both routes take numeric ids — so we resolve code → id on click via
+ *  the entity's own view, then navigate. One request, only when the staffer
+ *  actually clicks. If the code resolves to nothing we leave the label as
+ *  plain text rather than navigating somewhere wrong.
+ *  (If BE ever adds the ids to the report view, drop the lookup and link
+ *  straight off row.bill_id / row.contract_id like AssetCodeLink does.) */
+function CodeLink({ code, kind, className = '' }: {
+  code: string | null;
+  kind: 'bill' | 'contract';
+  className?: string;
+}) {
+  const navigate = useNavigate();
+  const [busy, setBusy] = useState(false);
+
+  if (!code) return null;
+
+  const go = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const view = kind === 'bill' ? 'v_bills' : 'v_contracts';
+      const hits = await apiClient.get<{ id: number }[]>(
+        `/${view}?select=id&code_display=eq.${encodeURIComponent(code)}&limit=1`,
+      );
+      const id = hits[0]?.id;
+      if (id != null) {
+        navigate(kind === 'bill'
+          ? `/admin/accounting/bills/${id}`
+          : `/admin/contracts/search/${id}`);
+      }
+    } catch {
+      // Non-fatal: the report row still shows the code.
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={go}
+      disabled={busy}
+      className={`font-mono text-primary-fg hover:underline inline-flex items-center gap-0.5 bg-transparent border-none p-0 cursor-pointer ${className}`}
+    >
+      {code}
+      {busy && <Loader2 size={11} className="animate-spin" />}
+    </button>
+  );
+}
+
 /** Small mono chip for a secondary identifier (EXT ref, IMEI, …). */
 function Chip({ label, value }: { label: string; value: string | null }) {
   if (!value) return null;
@@ -499,10 +572,8 @@ function BillLineRow({ row }: { row: Row }) {
     <div className="flex items-start gap-3 px-4 py-3 hover:bg-surface-hover transition-colors">
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-2 min-w-0 flex-wrap">
-          <span className="font-mono text-sm font-semibold">{str(row.bill_code)}</span>
-          {str(row.contract_code) && (
-            <span className="font-mono text-xs text-primary-fg">{str(row.contract_code)}</span>
-          )}
+          <CodeLink code={str(row.bill_code)} kind="bill" className="text-sm font-semibold" />
+          <CodeLink code={str(row.contract_code)} kind="contract" className="text-xs" />
           {str(row.bill_status) && (
             <Badge size="xs" color={row.bill_status === 'PAID' ? 'success' : 'warning'}>{String(row.bill_status)}</Badge>
           )}
@@ -542,7 +613,7 @@ function DeviceRow({ row, buyback }: { row: Row; buyback: boolean }) {
           <Chip label="EXT" value={str(row.external_ref)} />
         </div>
         <div className="flex items-center gap-2 flex-wrap mt-0.5 text-xs text-subtle">
-          {str(row.asset_code) && <span className="font-mono">{str(row.asset_code)}</span>}
+          <AssetCodeLink row={row} />
           <Chip label="SN" value={str(row.serial_no)} />
           <Chip label="IMEI" value={str(row.imei)} />
         </div>
@@ -579,7 +650,7 @@ function TransferRow({ row }: { row: Row }) {
           <Chip label="EXT" value={str(row.external_ref)} />
         </div>
         <div className="flex items-center gap-2 flex-wrap mt-0.5 text-xs text-subtle">
-          {str(row.asset_code) && <span className="font-mono">{str(row.asset_code)}</span>}
+          <AssetCodeLink row={row} />
           <Chip label="SN" value={str(row.serial_no)} />
           <Chip label="IMEI" value={str(row.imei)} />
         </div>

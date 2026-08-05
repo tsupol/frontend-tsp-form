@@ -6,17 +6,19 @@
  * and made segments near-invisible).
  *
  * Six categorical slots (--chart-1 … --chart-6) in a fixed, CVD-safe order,
- * plus semantic aliases so charts read by role (--chart-sold / --chart-gift)
- * not by slot number. Assign slots in order; never cycle a 7th.
+ * plus --chart-neutral for "no result yet" segments, plus semantic aliases so
+ * charts read by role (--chart-sold / --chart-gift) not by slot number. Assign
+ * slots in order; never cycle a 7th.
  *
- * Palette + per-mode steps are the dataviz skill's validated default set
- * (first six of its eight hues). Validated with scripts/validate_palette.js
- * against THIS project's chart surfaces (light bg #f3f3f6 / dark bg #111113):
- *   light — all hard gates PASS (contrast WARN on low-L hues → relief via the
- *           direct numeric labels each bar row already carries)
- *   dark  — all hard gates PASS incl. ≥3:1 contrast on all six
- * The stacked sold+gift pair (blue↔amber) is deliberately two hues: CVD ΔE ≈
- * 27–31, normal-vision ΔE ≈ 30–37 — unmistakable in both themes and under CVD.
+ * Slot 1 tracks --color-primary so the leading series matches the brand blue
+ * used everywhere else in the UI — same value in both themes, by design.
+ * Slots 2-6 are the dataviz skill's validated hues (light bg #f3f3f6 / dark bg
+ * #111113). The stacked sold+gift pair (blue↔amber) is deliberately two hues:
+ * CVD ΔE ≈ 27–31, normal-vision ΔE ≈ 30–37 — unmistakable under CVD.
+ *
+ * --chart-neutral is NOT a categorical slot: it is the "no result yet" fill
+ * (outstanding, unfilled remainder) and must read as absence, not as a
+ * seventh category.
  *
  * Dark values are declared under BOTH a prefers-color-scheme media query (OS
  * setting) and the [data-theme="dark"] scope (the app's theme toggle, which
@@ -24,34 +26,44 @@
  * ========================================================================== */
 
 :root {
-  --chart-1: #2a78d6; /* blue    */
+  /* Slot 1 IS the brand primary, same value in both themes — the leading
+     series must read as the exact colour the rest of the UI calls "primary".
+     Referencing the token rather than copying a hex keeps it correct if the
+     brand colour is ever re-themed. */
+  --chart-1: var(--color-primary); /* brand blue */
   --chart-2: #008300; /* green   */
   --chart-3: #e87ba4; /* magenta */
   --chart-4: #eda100; /* amber   */
   --chart-5: #1baf7a; /* aqua    */
   --chart-6: #eb6834; /* orange  */
 
+  /* Neutral — for "no result yet" segments (outstanding, unfilled remainder).
+     Deliberately NOT a categorical slot: it must read as absence, not as a
+     sixth category competing with the real ones. */
+  --chart-neutral: #b8bac2;
+
   /* Semantic aliases — reference these in chart code, not the slot numbers. */
   --chart-sold: var(--chart-1); /* retail sold  */
   --chart-gift: var(--chart-4); /* gift / promo */
 }
 
+/* Dark values — the original per-theme steps for slots 2-6. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --chart-1: #3987e5;
     --chart-2: #008300;
     --chart-3: #d55181;
     --chart-4: #c98500;
     --chart-5: #199e70;
     --chart-6: #d95926;
+    --chart-neutral: #63666f;
   }
 }
 
 :root[data-theme="dark"] {
-  --chart-1: #3987e5;
   --chart-2: #008300;
   --chart-3: #d55181;
   --chart-4: #c98500;
   --chart-5: #199e70;
   --chart-6: #d95926;
+  --chart-neutral: #63666f;
 }

@@ -23,6 +23,11 @@ import { MonthPicker } from '../../components/MonthPicker';
  * Spec: UI_FEEDBACK/2026-07-05_IMPLEMENT_report_contracts_opened.md
  * ─────────────────────────────────────────────────────────────────────────── */
 
+// Chart palette from src/chart-theme.css — same slots the other report charts
+// use, so a stack reads the same way on every report page.
+const COLOR_DOWN = 'var(--chart-1)';
+const COLOR_FINANCED = 'var(--chart-4)';
+
 interface MonthlyRow {
   day: string;
   branch_id: number;
@@ -164,10 +169,12 @@ export function ContractsOpenedReportPage() {
       </MobileHeader>
 
       {/* Desktop header — title + pickers */}
-      <div className="flex-none px-4 py-2.5 border-b border-line items-center gap-4 max-md:hidden flex">
+      <div className="flex-none px-4 py-2.5 border-b border-line flex flex-col gap-2 max-md:hidden">
         <h1 className="heading-2 whitespace-nowrap">{t('contractsOpened.title')}</h1>
-        <div style={{ width: '13rem' }}>{monthPicker}</div>
-        {branchPicker && <div style={{ width: '14rem' }}>{branchPicker}</div>}
+        <div className="flex items-center gap-3 flex-wrap">
+          <div style={{ width: '13rem' }}>{monthPicker}</div>
+          {branchPicker && <div style={{ width: '14rem' }}>{branchPicker}</div>}
+        </div>
       </div>
 
       {/* Mobile pickers */}
@@ -229,12 +236,15 @@ export function ContractsOpenedReportPage() {
                       financed: t('contractsOpened.legendFinanced'),
                     }} lang={i18n.language} />}
                   />
-                  {/* Stacked: down (bottom, dark) + financed (top, light). */}
-                  <Bar dataKey="down" stackId="a" fill="var(--color-primary)" radius={[0, 0, 2, 2]} />
-                  <Bar dataKey="financed" stackId="a" fill="color-mix(in srgb, var(--color-primary) 55%, var(--color-bg))" radius={[2, 2, 0, 0]}>
+                  {/* Stacked: down (bottom) + financed (top). Two distinct hues
+                      from the chart palette — the old pair was one primary blue
+                      and a color-mix of the same blue, which read as a single
+                      colour and made the split invisible. */}
+                  <Bar dataKey="down" stackId="a" fill={COLOR_DOWN} radius={[0, 0, 2, 2]} />
+                  <Bar dataKey="financed" stackId="a" fill={COLOR_FINANCED} radius={[2, 2, 0, 0]}>
                     {points.map((p, i) => (
                       // Flat top when a bar is down-only, so single-segment bars still round nicely.
-                      <Cell key={i} fill={p.financed > 0 ? 'color-mix(in srgb, var(--color-primary) 55%, var(--color-bg))' : 'var(--color-primary)'} />
+                      <Cell key={i} fill={p.financed > 0 ? COLOR_FINANCED : COLOR_DOWN} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -261,11 +271,11 @@ function ChartLegend({ downLabel, financedLabel }: { downLabel: string; financed
   return (
     <div className="flex items-center gap-4 mb-2 text-xs text-subtle">
       <span className="inline-flex items-center gap-1.5">
-        <span className="w-3 h-3 rounded-sm" style={{ background: 'var(--color-primary)' }} />
+        <span className="w-3 h-3 rounded-sm" style={{ background: COLOR_DOWN }} />
         {downLabel}
       </span>
       <span className="inline-flex items-center gap-1.5">
-        <span className="w-3 h-3 rounded-sm" style={{ background: 'color-mix(in srgb, var(--color-primary) 55%, var(--color-bg))' }} />
+        <span className="w-3 h-3 rounded-sm" style={{ background: COLOR_FINANCED }} />
         {financedLabel}
       </span>
     </div>
@@ -290,8 +300,8 @@ function ChartTooltip({ active, payload, labels, lang }: {
       <div className="font-semibold mb-1">{dateLabel}</div>
       <Line label={labels.contracts} value={String(p.contracts)} />
       <Line label={labels.agreed} value={`฿${fmtCurrency(p.agreed)}`} strong />
-      <Line label={labels.down} value={`฿${fmtCurrency(p.down)}`} dot="var(--color-primary)" />
-      <Line label={labels.financed} value={`฿${fmtCurrency(p.financed)}`} dot="color-mix(in srgb, var(--color-primary) 55%, var(--color-bg))" />
+      <Line label={labels.down} value={`฿${fmtCurrency(p.down)}`} dot={COLOR_DOWN} />
+      <Line label={labels.financed} value={`฿${fmtCurrency(p.financed)}`} dot={COLOR_FINANCED} />
     </div>
   );
 }

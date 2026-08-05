@@ -364,11 +364,13 @@ export function FinancierFormFeedPage() {
 
           {/* Desktop toolbar — fixed */}
           {!isMobile && (
-            <div className="flex-none px-4 py-2.5 border-b border-line items-center gap-3 flex flex-wrap">
+            <div className="flex-none px-4 py-2.5 border-b border-line flex flex-col gap-2">
               <h1 className="heading-2 whitespace-nowrap">{branchTitle}</h1>
-              <div style={{ width: '19rem' }}>{dateRangePicker}</div>
-              {fetchBtn}
-              <div className="ml-auto">{manageBtn}</div>
+              <div className="flex items-center gap-3 flex-wrap">
+                <div style={{ width: '19rem' }}>{dateRangePicker}</div>
+                {fetchBtn}
+                <div className="ml-auto">{manageBtn}</div>
+              </div>
             </div>
           )}
 

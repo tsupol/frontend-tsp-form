@@ -24,9 +24,12 @@ import { MonthPicker } from '../../components/MonthPicker';
  * Spec: UI_FEEDBACK/2026-07-29_IMPLEMENT_report_collection_monthly.md
  * ─────────────────────────────────────────────────────────────────────────── */
 
-const COLOR_ON_TIME = 'var(--color-primary)';
-const COLOR_LATE = 'var(--color-warning)';
-const COLOR_OUTSTANDING = 'color-mix(in srgb, var(--color-subtle) 35%, var(--color-bg))';
+// Chart palette from src/chart-theme.css. Outstanding stays a neutral grey
+// (it's "not collected", the absence of a result) rather than taking a
+// categorical hue that would compete with the two real outcomes.
+const COLOR_ON_TIME = 'var(--chart-1)';
+const COLOR_LATE = 'var(--chart-4)';
+const COLOR_OUTSTANDING = 'var(--chart-neutral)';
 const MAX_MONTHS = 12;
 
 interface CollectionRow {
@@ -228,15 +231,17 @@ export function CollectionMonthlyReportPage() {
       </MobileHeader>
 
       {/* Desktop header — title + month range + scope pickers */}
-      <div className="flex-none px-4 py-2.5 border-b border-line items-center gap-3 max-md:hidden flex flex-wrap">
+      <div className="flex-none px-4 py-2.5 border-b border-line flex flex-col gap-2 max-md:hidden">
         <h1 className="heading-2 whitespace-nowrap">{t('collectionMonthly.title')}</h1>
-        <div className="flex items-center gap-1.5">
-          <div style={{ width: '11rem' }}>{fromPicker}</div>
-          <span className="text-subtle">–</span>
-          <div style={{ width: '11rem' }}>{toPicker}</div>
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <div style={{ width: '11rem' }}>{fromPicker}</div>
+            <span className="text-subtle">–</span>
+            <div style={{ width: '11rem' }}>{toPicker}</div>
+          </div>
+          {companyPicker && <div style={{ width: '12rem' }}>{companyPicker}</div>}
+          {branchPicker && <div style={{ width: '12rem' }}>{branchPicker}</div>}
         </div>
-        {companyPicker && <div style={{ width: '12rem' }}>{companyPicker}</div>}
-        {branchPicker && <div style={{ width: '12rem' }}>{branchPicker}</div>}
       </div>
 
       {/* Mobile pickers */}

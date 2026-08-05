@@ -20,8 +20,11 @@ import { HBarReport, HBarLegend, type HBarRow } from '../../components/HBarRepor
  * Spec: UI_FEEDBACK/2026-07-28_IMPLEMENT_report_opened_by_model_chart.md
  * ─────────────────────────────────────────────────────────────────────────── */
 
-const COLOR_FINANCED = 'var(--color-primary)';
-const COLOR_DOWN = 'color-mix(in srgb, var(--color-primary) 40%, var(--color-bg))';
+// Chart palette lives in src/chart-theme.css — use its slots, never a
+// color-mix toward --color-bg (that blend darkens to near-invisible in dark
+// mode, which is why the theme file exists).
+const COLOR_FINANCED = 'var(--chart-1)';
+const COLOR_DOWN = 'var(--chart-4)';
 const TOP_N = 15;
 
 interface ModelRow {
@@ -208,14 +211,16 @@ export function OpenedByModelReportPage() {
     />
   );
 
+  // h-7 = tsp-form's form-control-sm height, matching the date range and branch
+  // pickers sitting beside it in the header row.
   const orderToggle = (
-    <div className="input-group h-8">
+    <div className="input-group h-7">
       {(['opened', 'financed'] as OrderBy[]).map((key, i) => (
         <button
           key={key}
           type="button"
           onClick={() => setOrderBy(key)}
-          className={`px-3 text-sm cursor-pointer border-none whitespace-nowrap transition-colors ${
+          className={`px-3 text-xs cursor-pointer border-none whitespace-nowrap transition-colors ${
             orderBy === key ? 'bg-item-active-bg text-item-active-fg font-medium' : 'bg-transparent text-subtle hover:text-fg'
           } ${i > 0 ? 'border-l border-line' : ''}`}
         >
@@ -244,12 +249,20 @@ export function OpenedByModelReportPage() {
       </MobileHeader>
 
       {/* Desktop header — title + pickers + order toggle */}
-      <div className="flex-none px-4 py-2.5 border-b border-line items-center gap-3 max-md:hidden flex flex-wrap">
+      <div className="flex-none px-4 py-2.5 border-b border-line flex flex-col gap-2 max-md:hidden">
         <h1 className="heading-2 whitespace-nowrap">{t('openedByModel.title')}</h1>
-        <div style={{ width: '17rem' }}>{dateRangePicker}</div>
-        {companyPicker && <div style={{ width: '12rem' }}>{companyPicker}</div>}
-        {branchPicker && <div style={{ width: '12rem' }}>{branchPicker}</div>}
-        <div className="ml-auto">{orderToggle}</div>
+        {/* Two sides: filters (left, elastic) + order toggle (right, fixed).
+            The filters share the leftover width via flex-1 with a max cap, so
+            they take up the slack instead of leaving a gap in the middle; the
+            toggle keeps its intrinsic width and stays pinned right. */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className="flex-[2] min-w-0">{dateRangePicker}</div>
+            {companyPicker && <div className="flex-1 min-w-0">{companyPicker}</div>}
+            {branchPicker && <div className="flex-1 min-w-0">{branchPicker}</div>}
+          </div>
+          <div className="shrink-0">{orderToggle}</div>
+        </div>
       </div>
 
       {/* Mobile pickers */}

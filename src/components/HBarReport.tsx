@@ -69,8 +69,10 @@ export function HBarReport({
                 {row.endLabel}
               </div>
             </div>
-            {/* Bar track */}
-            <div className="h-4 rounded bg-surface-soft overflow-hidden flex" style={{ width: `${pctOfMax}%`, minWidth: row.value > 0 ? '2px' : 0 }}>
+            {/* Bar track — deliberately slim. A ranked list is read down the
+                labels; a tall bar turns each row into a block and the page
+                stops scanning as a list. */}
+            <div className="h-2.5 rounded bg-surface-soft overflow-hidden flex" style={{ width: `${pctOfMax}%`, minWidth: row.value > 0 ? '2px' : 0 }}>
               {row.segments && row.segments.length > 0 ? (
                 row.segments.map((seg, i) => (
                   <div
