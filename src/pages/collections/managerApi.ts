@@ -77,7 +77,12 @@ export interface UnassignedContract {
 /** Why a contract can't be assigned (mig 960 added `reason`).
  *  POOL_NO_MEMBER — the branch's pool has no member to receive work.
  *  BRANCH_NO_POOL — a (new) branch isn't bound to any pool yet. */
-export type UnassignableReason = 'POOL_NO_MEMBER' | 'BRANCH_NO_POOL' | string;
+export type UnassignableReason =
+  | 'POOL_NO_MEMBER'
+  /** mig 1006: pool has members but all are paused (capacity 0). */
+  | 'POOL_NO_USABLE_MEMBER'
+  | 'BRANCH_NO_POOL'
+  | string;
 
 /** One row of v_assignment_unassignable (mig 880, +reason mig 960) — a contract
  *  overdue ≥ 2 days with no owner AND no member can receive it. The fix is

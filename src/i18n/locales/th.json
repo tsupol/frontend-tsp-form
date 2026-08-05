@@ -1755,8 +1755,10 @@
     "fixMoveBranch": "ย้ายสาขาเข้าทีม",
     "unassignableReason": {
       "POOL_NO_MEMBER": "ทีมไม่มีคนรับงาน",
-      "BRANCH_NO_POOL": "สาขายังไม่สังกัดทีม"
-    }
+      "BRANCH_NO_POOL": "สาขายังไม่สังกัดทีม",
+      "POOL_NO_USABLE_MEMBER": "ทีมมีคน แต่ทุกคนถูกพักรับงาน"
+    },
+    "fixResumeMember": "เปิดรับงานให้สมาชิก"
   },
   "collectionPools": {
     "title": "ทีมทวง",
@@ -1799,7 +1801,17 @@
     "deactivateHint": "ทีมว่างแล้ว — ปิดทีมได้",
     "deactivateBlockedHint": "ย้ายสาขาและถอดคนออกให้หมดก่อนจึงจะปิดทีมได้",
     "deactivateConfirm": "ปิดทีมนี้หรือไม่ ทีมต้องไม่มีสาขาและไม่มีคนเหลืออยู่",
-    "teamDeactivatedTitle": "ปิดทีมแล้ว"
+    "teamDeactivatedTitle": "ปิดทีมแล้ว",
+    "acceptingWork": "รับงาน",
+    "pauseHint": "กำลังรับงาน — กดเพื่อพัก",
+    "resumeHint": "พักรับงานอยู่ — กดเพื่อเปิด",
+    "pauseMember": "พักรับงาน",
+    "pausedTitle": "พักรับงานแล้ว",
+    "pauseMemberConfirm": "จะไม่ได้รับงานใหม่ตั้งแต่รอบตี 3:30 ถัดไป งานที่แจกไปแล้วยังอยู่กับคนเดิม",
+    "pauseReason": "เหตุผล",
+    "pauseReasonPlaceholder": "เช่น ลาป่วยยาว",
+    "resumed": "{{name}} กลับมารับงานแล้ว",
+    "capacityOpened": "{{name}} เข้าทีมและเปิดรับงานแล้ว — เริ่มได้งานรอบตี 3:30"
   },
   "pricing": {
     "title": "ตารางราคา",

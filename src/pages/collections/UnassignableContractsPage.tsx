@@ -2,8 +2,12 @@
 // no member can receive the work. Reads v_assignment_unassignable (mig 880,
 // +reason mig 960). HQ-wide, grouped by branch. Each branch carries a `reason`
 // badge + a shortcut to the fix:
-//   POOL_NO_MEMBER — the branch's pool has no member → jump to that pool (add a member)
-//   BRANCH_NO_POOL — the branch isn't in any pool → jump to the pool list (move it in)
+//   POOL_NO_MEMBER        — the pool has no member → jump to that pool (add one)
+//   POOL_NO_USABLE_MEMBER — (mig 1006) the pool HAS members but every one of
+//     them is paused → jump to that pool and resume someone. Distinct from
+//     NO_MEMBER for a reason: admins kept adding more people to a pool that
+//     already had six, because the screen said "no member".
+//   BRANCH_NO_POOL        — the branch isn't in any pool → jump to the pool list
 // Requires OPS.ASSIGN.MANAGE / OVERSEE.
 
 import { useMemo } from 'react';
@@ -17,8 +21,12 @@ import { useBranchPoolMap } from './collectionPoolApi';
 
 const REASON_BADGE_COLOR: Record<string, 'danger' | 'warning'> = {
   POOL_NO_MEMBER: 'danger',
+  POOL_NO_USABLE_MEMBER: 'danger',
   BRANCH_NO_POOL: 'warning',
 };
+
+/** Reasons whose fix lives inside the branch's own pool. */
+const POOL_SCOPED_REASONS = new Set(['POOL_NO_MEMBER', 'POOL_NO_USABLE_MEMBER']);
 
 export function UnassignableContractsPage() {
   const { t } = useTranslation();
@@ -37,10 +45,11 @@ export function UnassignableContractsPage() {
     return [...map.values()];
   }, [data]);
 
-  // The shortcut differs by reason: POOL_NO_MEMBER → the branch's own pool (add
-  // a member there); BRANCH_NO_POOL → the pool list (move the branch into one).
+  // The shortcut differs by reason: both POOL_* reasons are fixed inside the
+  // branch's own pool (add a member / resume a paused one); BRANCH_NO_POOL →
+  // the pool list, to move the branch into one.
   const goToFix = (branchId: number, reason: UnassignableReason) => {
-    if (reason === 'POOL_NO_MEMBER') {
+    if (POOL_SCOPED_REASONS.has(reason)) {
       const poolId = branchPoolMap?.[branchId];
       navigate(poolId ? `/admin/collections/pools/${poolId}` : '/admin/collections/pools');
     } else {
@@ -74,7 +83,14 @@ export function UnassignableContractsPage() {
         )}
 
         {byBranch.map(group => {
-          const isPoolNoMember = group.reason === 'POOL_NO_MEMBER';
+          const isPoolScoped = POOL_SCOPED_REASONS.has(group.reason);
+          // "Everyone is paused" needs a different instruction from "nobody is
+          // in the team" — telling an admin to add staff to a pool that already
+          // has six is exactly the loop this reason was added to break.
+          const fixKey = group.reason === 'POOL_NO_USABLE_MEMBER'
+            ? 'collectionsManager.fixResumeMember'
+            : isPoolScoped ? 'collectionsManager.fixAddMember'
+              : 'collectionsManager.fixMoveBranch';
           return (
             <div key={group.id} className="flex flex-col gap-2">
               <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -91,8 +107,8 @@ export function UnassignableContractsPage() {
                   onClick={() => goToFix(group.id, group.reason)}
                   className="text-xs text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
                 >
-                  {isPoolNoMember ? <Users size={13} /> : <ArrowRightLeft size={13} />}
-                  {t(isPoolNoMember ? 'collectionsManager.fixAddMember' : 'collectionsManager.fixMoveBranch')}
+                  {isPoolScoped ? <Users size={13} /> : <ArrowRightLeft size={13} />}
+                  {t(fixKey)}
                 </button>
               </div>
               <div className="divide-y divide-line border border-line rounded-md">

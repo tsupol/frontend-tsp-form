@@ -110,9 +110,33 @@ data-blocked-reason={
 }
 ```
 
+### ⚠️ Switch / Checkbox — put the attribute on a WRAPPER, not the control
+
+`Switch` (and `Checkbox`) render a hidden `<input>` inside a `<label>` that
+covers it. Spreading `data-action` onto the control puts it on an element
+Playwright refuses to click:
+
+```
+<label class="switch"> intercepts pointer events   ← 30s timeout
+```
+
+Wrap it and mark the wrapper instead — that is the clickable surface:
+
+```tsx
+<span data-action={paused ? 'RESUME_MEMBER' : 'PAUSE_MEMBER'}>
+  <Switch checked={!paused} onChange={…} aria-label={…} />
+</span>
+```
+
+The action name should reflect **what the click will do**, not the current
+state — so a driver reading `RESUME_MEMBER` knows clicking resumes.
+
 **Done:**
 - bill action footer + the Add-payment button (`BillsPage.tsx`) —
   `ADD_PAYMENT` reports `unavailable` / `amount_unbalanced` / `in_flight`
+- collection pool member switch (`CollectionPoolsPage.tsx`) —
+  `PAUSE_MEMBER` / `RESUME_MEMBER` on the wrapper, `CONFIRM_PAUSE_MEMBER`
+  reports `reason_required`
 - day close (`DayClosePage.tsx`) — `OPEN_DAY_CLOSE` surfaces the backend's own
   block code (`HAS_OPEN_BILLS`, …); `CONFIRM_DAY_CLOSE` reports `note_required`
 

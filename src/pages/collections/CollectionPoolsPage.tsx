@@ -21,7 +21,7 @@ import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   PageNav, PageNavPanel, MobileHeader, DataTable, Select, Badge, Button, Input,
-  Modal, useSnackbarContext,
+  Modal, Switch, Tooltip, useSnackbarContext,
 } from 'tsp-form';
 import {
   ArrowRightFromLine, ArrowLeft, Plus, AlertTriangle, Users, Building2,
@@ -36,6 +36,7 @@ import {
   useMemberPoolMap, createPool, deactivatePool, setPoolBranch, setPoolMember, poolKeys,
   type CollectionPool, type PoolDetailRow,
 } from './collectionPoolApi';
+import { setCollectorCapacity } from './managerApi';
 
 export function CollectionPoolsPage() {
   const { t } = useTranslation();
@@ -45,6 +46,10 @@ export function CollectionPoolsPage() {
   const { user, can } = useAuth();
 
   const canManage = can('OPS.POOL.MANAGE');
+  // Pausing/resuming a member is a DIFFERENT permission from managing team
+  // membership — HOLDING_ADMIN has OPS.POOL.MANAGE but explicitly NOT this one
+  // (mig 1007), so the two must not be collapsed into one flag.
+  const canSetCapacity = can('OPS.ASSIGN.MANAGE');
   const isHoldingAdmin = user?.role_code === 'HOLDING_ADMIN';
 
   // HOLDING_ADMIN filters by company; everyone else is server-scoped already.
@@ -202,6 +207,7 @@ export function CollectionPoolsPage() {
                 <PoolDetailPanel
                   poolId={selectedPoolId}
                   canManage={canManage}
+                  canSetCapacity={canSetCapacity}
                   onChanged={invalidatePools}
                   addSnackbar={addSnackbar}
                 />
@@ -227,10 +233,11 @@ export function CollectionPoolsPage() {
 /* ── Detail panel ─────────────────────────────────────────────────────────── */
 
 function PoolDetailPanel({
-  poolId, canManage, onChanged, addSnackbar,
+  poolId, canManage, canSetCapacity, onChanged, addSnackbar,
 }: {
   poolId: number;
   canManage: boolean;
+  canSetCapacity: boolean;
   onChanged: () => void;
   addSnackbar: ReturnType<typeof useSnackbarContext>['addSnackbar'];
 }) {
@@ -243,6 +250,9 @@ function PoolDetailPanel({
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [removeMember, setRemoveMember] = useState<PoolDetailRow | null>(null);
   const [deactivateOpen, setDeactivateOpen] = useState(false);
+  // Pausing a member asks for a reason; resuming does not (mig 1007).
+  const [pauseTarget, setPauseTarget] = useState<PoolDetailRow | null>(null);
+  const [resumingId, setResumingId] = useState<number | null>(null);
 
   const branches = useMemo(() => (rows ?? []).filter(r => r.entity_type === 'BRANCH'), [rows]);
   const members = useMemo(() => (rows ?? []).filter(r => r.entity_type === 'MEMBER'), [rows]);
@@ -259,6 +269,27 @@ function PoolDetailPanel({
       message: <div className="alert alert-success"><CheckCircle size={18} /><span>{message}</span></div>,
       type: 'success', duration: 3000,
     });
+
+  const errToast = (message: string) =>
+    addSnackbar({
+      message: <div className="alert alert-danger"><AlertTriangle size={18} /><span>{message}</span></div>,
+      type: 'error', duration: 5000,
+    });
+
+  // Resume needs no reason, so it fires straight off the switch. Pausing opens
+  // a dialog for the reason (it goes into the audit trail).
+  const handleResume = async (m: PoolDetailRow) => {
+    setResumingId(m.entity_id);
+    try {
+      await setCollectorCapacity(m.entity_id, 100, '');
+      toast(t('collectionPools.resumed', { name: m.entity_name }));
+      refresh();
+    } catch (err) {
+      errToast(translateApiError(err, t));
+    } finally {
+      setResumingId(null);
+    }
+  };
 
   if (poolLoading || rowsLoading) return <div className="p-6 text-sm text-subtler">{t('common.loading')}</div>;
   if (!pool) return <div className="p-6 text-sm text-subtler">—</div>;
@@ -341,8 +372,38 @@ function PoolDetailPanel({
                       {t('collectionPools.memberLoad', { n: m.active_contract_count ?? 0 })}
                     </div>
                   </div>
-                  {m.capacity_pct === 0 && (
-                    <Badge color="default" size="xs">{t('collectionPools.paused')}</Badge>
+                  {/* Accepting-work switch. Without the permission this stays a
+                      read-only badge — the RPC would reject the write anyway,
+                      and a dead switch invites clicking. */}
+                  {canSetCapacity ? (
+                    <Tooltip content={m.capacity_pct === 0 ? t('collectionPools.resumeHint') : t('collectionPools.pauseHint')}>
+                      {/* data-action goes on the WRAPPER, not the Switch: the
+                          component's <label> covers its hidden <input>, so an
+                          attribute on the input marks an element that cannot be
+                          clicked (Playwright reports "label intercepts pointer
+                          events" and times out). The wrapper is the clickable
+                          surface. */}
+                      <span
+                        className="shrink-0 inline-flex items-center"
+                        data-action={m.capacity_pct === 0 ? 'RESUME_MEMBER' : 'PAUSE_MEMBER'}
+                        data-blocked-reason={resumingId === m.entity_id ? 'in_flight' : undefined}
+                      >
+                        <Switch
+                          size="sm"
+                          checked={m.capacity_pct !== 0}
+                          disabled={resumingId === m.entity_id}
+                          onChange={(e) => {
+                            if (e.target.checked) handleResume(m);
+                            else setPauseTarget(m);
+                          }}
+                          aria-label={t('collectionPools.acceptingWork')}
+                        />
+                      </span>
+                    </Tooltip>
+                  ) : (
+                    m.capacity_pct === 0 && (
+                      <Badge color="default" size="xs">{t('collectionPools.paused')}</Badge>
+                    )
                   )}
                   {canManage && (
                     <Button
@@ -400,6 +461,11 @@ function PoolDetailPanel({
         member={removeMember}
         onClose={() => setRemoveMember(null)}
         onRemoved={refresh}
+      />
+      <PauseMemberModal
+        member={pauseTarget}
+        onClose={() => setPauseTarget(null)}
+        onPaused={refresh}
       />
       <DeactivatePoolModal
         open={deactivateOpen}
@@ -755,6 +821,8 @@ function AddMemberModal({
   const [error, setError] = useState('');
   const [confirmClose, setConfirmClose] = useState(false);
   const [addedName, setAddedName] = useState('');
+  // mig 1006 returns capacity_opened when the add also un-paused the person.
+  const [capacityOpened, setCapacityOpened] = useState(false);
 
   const existing = useMemo(() => new Set(existingMemberIds), [existingMemberIds]);
   const options = users.filter(u => !existing.has(u.id));
@@ -764,7 +832,7 @@ function AddMemberModal({
   useEffect(() => {
     if (open) {
       setView('form'); setUserId(null); setConfirms([]); setBusy(false);
-      setError(''); setConfirmClose(false); setAddedName('');
+      setError(''); setConfirmClose(false); setAddedName(''); setCapacityOpened(false);
     }
   }, [open]);
 
@@ -812,8 +880,9 @@ function AddMemberModal({
     setBusy(true);
     setError('');
     try {
-      await setPoolMember(picked.id, poolId);
+      const res = await setPoolMember(picked.id, poolId);
       setAddedName(picked.username);
+      setCapacityOpened(res?.capacity_opened === true);
       onAdded();
       setView('done');
     } catch (err) {
@@ -893,6 +962,16 @@ function AddMemberModal({
           <ActionDoneView
             headline={t('collectionPools.memberAddedTitle')}
             contractCode={addedName}
+            extras={capacityOpened ? (
+              <div className="alert alert-success mt-3">
+                <CheckCircle size={16} className="shrink-0" />
+                <div className="min-w-0">
+                  <div className="alert-description">
+                    {t('collectionPools.capacityOpened', { name: addedName })}
+                  </div>
+                </div>
+              </div>
+            ) : undefined}
             onClose={forceClose}
           />
         )}
@@ -989,5 +1068,122 @@ function RemoveMemberModal({
         />
       )}
     </Modal>
+  );
+}
+
+/* ── Pause member (capacity → 0) ───────────────────────────────────────────── */
+// Resuming is a one-click switch; pausing asks for a reason because it lands in
+// the audit trail and answers "why is this person not getting work" later.
+function PauseMemberModal({
+  member, onClose, onPaused,
+}: {
+  member: PoolDetailRow | null;
+  onClose: () => void;
+  onPaused: () => void;
+}) {
+  const { t } = useTranslation();
+  const open = member !== null;
+  const [view, setView] = useState<'form' | 'done'>('form');
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [confirmClose, setConfirmClose] = useState(false);
+
+  useEffect(() => {
+    if (open) { setView('form'); setReason(''); setBusy(false); setError(''); setConfirmClose(false); }
+  }, [open]);
+
+  const forceClose = () => { setConfirmClose(false); onClose(); };
+  const handleClose = () => {
+    if (busy) return;
+    if (view === 'done' || reason.trim() === '') { forceClose(); return; }
+    setConfirmClose(true);
+  };
+
+  const handlePause = async () => {
+    if (!member || !reason.trim()) return;
+    setBusy(true);
+    setError('');
+    try {
+      await setCollectorCapacity(member.entity_id, 0, reason.trim());
+      onPaused();
+      setView('done');
+    } catch (err) {
+      setError(translateApiError(err, t));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+    <Modal open={open} onClose={handleClose} maxWidth="24rem" width="100%">
+      <div className="modal-header">
+        <h2 className="modal-title">
+          {view === 'done' ? t('collectionPools.pausedTitle') : t('collectionPools.pauseMember')}
+        </h2>
+        <button type="button" className="modal-close-btn" onClick={handleClose}>×</button>
+      </div>
+
+      {view === 'form' && (
+        <>
+          <div className="modal-content">
+            <div className="form-grid">
+              {error && (
+                <div className="alert alert-danger">
+                  <AlertTriangle size={18} />
+                  <div><div className="alert-description">{error}</div></div>
+                </div>
+              )}
+              <div className="px-3 py-2.5 rounded-md bg-surface border border-line">
+                <div className="font-medium text-sm">{member?.entity_name}</div>
+              </div>
+              <p className="text-sm text-subtle">{t('collectionPools.pauseMemberConfirm')}</p>
+              <div className="flex flex-col">
+                <label className="form-label">{t('collectionPools.pauseReason')}</label>
+                <Input
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder={t('collectionPools.pauseReasonPlaceholder')}
+                  className="w-full"
+                  autoFocus
+                />
+              </div>
+            </div>
+          </div>
+          <div className="modal-footer">
+            <Button variant="ghost" onClick={handleClose} disabled={busy}>{t('common.cancel')}</Button>
+            <Button
+              color="danger"
+              onClick={handlePause}
+              disabled={busy || !reason.trim()}
+              data-action="CONFIRM_PAUSE_MEMBER"
+              data-blocked-reason={busy ? 'in_flight' : !reason.trim() ? 'reason_required' : undefined}
+            >
+              {busy ? t('common.loading') : t('collectionPools.pauseMember')}
+            </Button>
+          </div>
+        </>
+      )}
+
+      {view === 'done' && (
+        <ActionDoneView
+          headline={t('collectionPools.pausedTitle')}
+          contractCode={member?.entity_name ?? ''}
+          tone="warning"
+          onClose={onClose}
+        />
+      )}
+    </Modal>
+
+    <Modal open={confirmClose} onClose={() => setConfirmClose(false)} maxWidth="24rem" width="100%">
+      <div className="modal-header"><h2 className="modal-title">{t('common.unsavedChanges')}</h2></div>
+      <div className="modal-content"><p>{t('common.unsavedChangesMessage')}</p></div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={() => setConfirmClose(false)}>{t('common.cancel')}</Button>
+        <Button color="danger" onClick={forceClose}>{t('common.discard')}</Button>
+      </div>
+    </Modal>
+    </>
   );
 }

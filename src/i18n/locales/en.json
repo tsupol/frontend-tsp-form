@@ -1758,8 +1758,10 @@
     "fixMoveBranch": "Move branch into a team",
     "unassignableReason": {
       "POOL_NO_MEMBER": "Team has no member",
-      "BRANCH_NO_POOL": "Branch not in a team"
-    }
+      "BRANCH_NO_POOL": "Branch not in a team",
+      "POOL_NO_USABLE_MEMBER": "Everyone on the team is paused"
+    },
+    "fixResumeMember": "Resume a member"
   },
   "collectionPools": {
     "title": "Collection Teams",
@@ -1802,7 +1804,17 @@
     "deactivateHint": "Team is empty — it can be deactivated.",
     "deactivateBlockedHint": "Move branches and remove members before deactivating.",
     "deactivateConfirm": "Deactivate this team? It must have no branches and no members.",
-    "teamDeactivatedTitle": "Team deactivated"
+    "teamDeactivatedTitle": "Team deactivated",
+    "acceptingWork": "Accepting work",
+    "pauseHint": "Taking work — click to pause",
+    "resumeHint": "Paused — click to resume",
+    "pauseMember": "Pause member",
+    "pausedTitle": "Member paused",
+    "pauseMemberConfirm": "They stop receiving new work from the next 03:30 run. Work already assigned to them stays.",
+    "pauseReason": "Reason",
+    "pauseReasonPlaceholder": "e.g. on long sick leave",
+    "resumed": "{{name}} is taking work again",
+    "capacityOpened": "{{name}} joined the team and is set to take work — first assignment at the 03:30 run."
   },
   "pricing": {
     "title": "Pricebook",

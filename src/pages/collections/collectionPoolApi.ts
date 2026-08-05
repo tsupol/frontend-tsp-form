@@ -92,6 +92,12 @@ export interface PoolSetMemberResult {
   user_id: number;
   pool_id: number | null;
   previous_pool_id: number | null;
+  /** mig 1006: adding a member auto-opens them for work. Was previously a
+   *  hidden second switch — six people were added and got nothing for days
+   *  because capacity stayed 0 with no toggle anywhere to open it. */
+  capacity_pct?: number;
+  /** true when this call flipped them from paused (0) to open (100). */
+  capacity_opened?: boolean;
 }
 
 // ── Query keys ───────────────────────────────────────────────────────────────
