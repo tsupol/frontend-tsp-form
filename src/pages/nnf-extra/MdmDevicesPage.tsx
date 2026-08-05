@@ -17,6 +17,13 @@
 //  - A row leaves the "not enrolled" filter ONLY when in_mdm flips true — never on
 //    the intermediate PENDING/READY, or the staffer loses the row mid-task.
 //  - Decide lock state from enforcement_badge, never enforcement_level (raw/unreliable).
+//  - Do NOT render prepare_status on this list (owner, 2026-08-05): READY sticks
+//    forever after a successful enroll (105 of ~140 rows), so "profile ready —
+//    erase the device" showed on nearly every row and meant nothing. That advice
+//    only belongs on the per-device screen, and only while in_mdm = false.
+//  - last_seen_at / sim_info (mig 1004): null = not in MDM, render "—" not an
+//    error. sim_info is what the DEVICE reported, not the contract's tel — the
+//    two can differ and that difference is the useful part when chasing a customer.
 
 import { useState, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -31,6 +38,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
+import { formatRelativeAgo } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { ColorSwatch } from '../../components/ColorAutocomplete';
 import {
@@ -58,20 +66,15 @@ function EnforcementBadge({ badge }: { badge: MdmDeviceListBadge }) {
   return <Badge size="sm" color={BADGE_STYLE[badge].color}>{t(`mdmDevices.lock.${badge}`)}</Badge>;
 }
 
-// prepare_status → short status text under the asset code (only when acting).
-function PrepareStatusHint({ status, detail }: { status: MdmDeviceListRow['prepare_status']; detail: string | null }) {
-  const { t } = useTranslation();
-  if (!status) return null;
-  const tone =
-    status === 'READY' ? 'text-warning-fg'
-      : status === 'PENDING' ? 'text-info-fg'
-        : status === 'NOT_ON_SERVER' || status === 'ERROR' ? 'text-danger-fg'
-          : 'text-subtle';
+// Last contact with MDM. null = not enrolled, so "—" is the honest render.
+function LastSeen({ value }: { value: string | null }) {
+  const { t, i18n } = useTranslation();
+  if (!value) return <span className="text-subtler">—</span>;
+  const { rel } = formatRelativeAgo(value, i18n.language);
   return (
-    <span className={`text-xs ${tone} inline-flex items-center gap-1`}>
-      {status === 'PENDING' && <Loader2 size={11} className="animate-spin" />}
-      {t(`mdmDevices.prepare.${status}`)}
-      {(status === 'ERROR') && detail && <span className="text-subtler">· {detail}</span>}
+    <span>
+      <span className="text-subtler">{t('mdmDevices.lastSeen')}: </span>
+      <span className="text-fg">{rel}</span>
     </span>
   );
 }
@@ -316,6 +319,16 @@ function DeviceRow({
           )}
           {!row.serial_number && !row.imei && <span className="text-subtler">—</span>}
         </div>
+        {/* mig 1004 — device heartbeat + the SIM the DEVICE reported. */}
+        <div className="text-xs flex flex-wrap gap-x-3 gap-y-0.5">
+          <LastSeen value={row.last_seen_at} />
+          <span className="min-w-0">
+            <span className="text-subtler">{t('mdmDevices.sim')}: </span>
+            {row.sim_info
+              ? <span className="text-fg">{row.sim_info}</span>
+              : <span className="text-subtler">—</span>}
+          </span>
+        </div>
         <div className="text-xs text-subtler truncate">
           {row.customer_name}
           {row.contract_code && (
@@ -327,7 +340,6 @@ function DeviceRow({
             </>
           )}
         </div>
-        <div className="mt-0.5"><PrepareStatusHint status={row.prepare_status} detail={row.prepare_detail} /></div>
       </div>
       <div className="shrink-0 flex flex-col items-end gap-1.5">
         {!row.in_mdm && (

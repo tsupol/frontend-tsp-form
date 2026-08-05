@@ -323,6 +323,13 @@ export interface MdmDeviceListRow {
   branch_name: string;
   has_contract: boolean;
   search_key: string; // lowercased; toLowerCase() the term before matching
+  // mig 1004. Both null = device is not in MDM (this view covers every asset,
+  // ~1400 rows, but only ~78 are enrolled) — render "—", never an error.
+  last_seen_at: string | null;
+  /** Carrier + number as the DEVICE reported it — NOT the customer's registered
+   *  tel. Already assembled by the DB (multi-SIM joined with `·`, a removed SIM
+   *  tagged "(ถอดแล้ว)") — never join or compose it ourselves. */
+  sim_info: string | null;
 }
 
 // enroll button — no p_actor_id, no preview; RPC dedupes + self-enforces.
