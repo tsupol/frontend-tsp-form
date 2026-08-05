@@ -22,6 +22,7 @@ export interface TypeSheetRow {
   return_qty: number;
   return_amount: number;
   net_amount: number;
+  net_qty: number;
 }
 
 export interface VariantSheetRow {
@@ -32,6 +33,7 @@ export interface VariantSheetRow {
   return_qty: number;
   return_amount: number;
   net_amount: number;
+  net_qty: number;
 }
 
 export interface TypeDrillGroup {
@@ -61,9 +63,10 @@ export function RetailSalesByTypeSheet({ title, subtitle, groups, drills }: Reta
       acc.return_qty += g.return_qty;
       acc.return_amount += g.return_amount;
       acc.net_amount += g.net_amount;
+      acc.net_qty += g.net_qty;
       return acc;
     },
-    { sale_qty: 0, sale_amount: 0, gift_qty: 0, gift_value: 0, return_qty: 0, return_amount: 0, net_amount: 0 },
+    { sale_qty: 0, sale_amount: 0, gift_qty: 0, gift_value: 0, return_qty: 0, return_amount: 0, net_amount: 0, net_qty: 0 },
   );
 
   return (
@@ -83,6 +86,7 @@ export function RetailSalesByTypeSheet({ title, subtitle, groups, drills }: Reta
             <th>{t('retailSales.col.returnQty')}</th>
             <th>{t('retailSales.col.returnAmount')}</th>
             <th>{t('retailSales.col.netAmount')}</th>
+            <th>{t('retailSales.col.netQty')}</th>
           </tr>
         </thead>
         <tbody>
@@ -97,6 +101,7 @@ export function RetailSalesByTypeSheet({ title, subtitle, groups, drills }: Reta
               <td>{g.return_qty}</td>
               <td>{fmtCurrency(g.return_amount)}</td>
               <td>{fmtCurrency(g.net_amount)}</td>
+              <td className="rr-strong">{g.net_qty}</td>
             </tr>
           ))}
         </tbody>
@@ -111,6 +116,7 @@ export function RetailSalesByTypeSheet({ title, subtitle, groups, drills }: Reta
             <td>{totals.return_qty}</td>
             <td>{fmtCurrency(totals.return_amount)}</td>
             <td>{fmtCurrency(totals.net_amount)}</td>
+            <td>{totals.net_qty}</td>
           </tr>
         </tfoot>
       </table>
@@ -130,6 +136,7 @@ export function RetailSalesByTypeSheet({ title, subtitle, groups, drills }: Reta
                 <th>{t('retailSales.col.returnQty')}</th>
                 <th>{t('retailSales.col.returnAmount')}</th>
                 <th>{t('retailSales.col.netAmount')}</th>
+                <th>{t('retailSales.col.netQty')}</th>
               </tr>
             </thead>
             <tbody>
@@ -142,11 +149,12 @@ export function RetailSalesByTypeSheet({ title, subtitle, groups, drills }: Reta
                   <td>{r.return_qty}</td>
                   <td>{fmtCurrency(r.return_amount)}</td>
                   <td>{fmtCurrency(r.net_amount)}</td>
+                  <td className="rr-strong">{r.net_qty}</td>
                 </tr>
               ))}
               {d.rows.length === 0 && (
                 <tr>
-                  <td className="rr-empty" colSpan={7}>{t('retailSales.noData')}</td>
+                  <td className="rr-empty" colSpan={8}>{t('retailSales.noData')}</td>
                 </tr>
               )}
             </tbody>

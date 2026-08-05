@@ -44,6 +44,11 @@ interface TypeRow {
   return_qty: number;
   return_amount: number;
   net_amount: number;
+  /** Pieces net of returns (sale_qty − return_qty), DB-computed (mig 1005).
+   *  This is the headline piece count — sale_qty alone counts items the
+   *  customer later brought back, so it can't reconcile against the day-close
+   *  RETAIL bucket or stock. Never compute it here. */
+  net_qty: number;
 }
 
 interface VariantRow {
@@ -58,6 +63,7 @@ interface VariantRow {
   return_qty: number;
   return_amount: number;
   net_amount: number;
+  net_qty: number;
 }
 
 interface Branch { id: number; name: string; company_id: number }
@@ -222,6 +228,7 @@ export function RetailSalesByTypeReportPage() {
       return_qty: r.return_qty,
       return_amount: r.return_amount,
       net_amount: r.net_amount,
+      net_qty: r.net_qty,
     }));
     const columns = [
       { key: 'acc_type', label: t('retailSalesByType.col.type') },
@@ -233,6 +240,7 @@ export function RetailSalesByTypeReportPage() {
       { key: 'return_qty', label: t('retailSales.col.returnQty') },
       { key: 'return_amount', label: t('retailSales.col.returnAmount') },
       { key: 'net_amount', label: t('retailSales.col.netAmount') },
+      { key: 'net_qty', label: t('retailSales.col.netQty') },
     ];
     downloadCsv(csvRows, columns, `retail-sales-by-type_${fromDate}_${toDate}.csv`);
   }, [rows, fromDate, toDate, t]);
@@ -262,6 +270,7 @@ export function RetailSalesByTypeReportPage() {
             return_qty: v.return_qty,
             return_amount: v.return_amount,
             net_amount: v.net_amount,
+            net_qty: v.net_qty,
           })),
         });
       }
@@ -275,6 +284,7 @@ export function RetailSalesByTypeReportPage() {
         return_qty: r.return_qty,
         return_amount: r.return_amount,
         net_amount: r.net_amount,
+        net_qty: r.net_qty,
       }));
       setPrintPayload({ groups, drills });
 
@@ -412,12 +422,14 @@ export function RetailSalesByTypeReportPage() {
 
           {/* Desktop header — title + pickers + actions */}
           {!isMobile && (
-            <div className="flex-none px-4 py-2.5 border-b border-line items-center gap-3 flex flex-wrap">
+            <div className="flex-none px-4 py-2.5 border-b border-line flex flex-col gap-2">
               <h1 className="heading-2 whitespace-nowrap">{t('retailSalesByType.title')}</h1>
-              <div style={{ width: '17rem' }}>{dateRangePicker}</div>
-              {companyPicker && <div style={{ width: '12rem' }}>{companyPicker}</div>}
-              {branchPicker && <div style={{ width: '12rem' }}>{branchPicker}</div>}
-              <div className="ml-auto flex items-center gap-2">{actions}</div>
+              <div className="flex items-center gap-3 flex-wrap">
+                <div style={{ width: '17rem' }}>{dateRangePicker}</div>
+                {companyPicker && <div style={{ width: '12rem' }}>{companyPicker}</div>}
+                {branchPicker && <div style={{ width: '12rem' }}>{branchPicker}</div>}
+                <div className="ml-auto flex items-center gap-2">{actions}</div>
+              </div>
             </div>
           )}
 
@@ -507,6 +519,29 @@ export function RetailSalesByTypeReportPage() {
   );
 }
 
+/** The piece count, told the same way as the day-close screen: sold / returned
+ *  / net. The headline number is ALWAYS net_qty — it's the one that reconciles
+ *  with the RETAIL bucket and with stock. When nothing came back, net equals
+ *  sold, so we print the single number rather than "56 − 0 = 56" clutter. */
+function QtyCell({ saleQty, returnQty, netQty, t }: {
+  saleQty: number;
+  returnQty: number;
+  netQty: number;
+  t: (k: string, o?: Record<string, unknown>) => string;
+}) {
+  // No returns → "sold N" is both true and the net figure; saying "net N"
+  // there would imply a deduction that never happened.
+  if (returnQty <= 0) return <>{t('retailSalesByType.soldN', { count: netQty })}</>;
+  return (
+    <>
+      {t('retailSalesByType.netN', { count: netQty })}
+      <span className="text-subtler">
+        {' ('}{t('retailSalesByType.qtyBreakdown', { sale: saleQty, ret: returnQty })}{')'}
+      </span>
+    </>
+  );
+}
+
 /** One category row in the rail: label · sales-amount bar · N pcs · ฿ · %. */
 function CategoryBar({ row, maxAmount, t }: {
   row: TypeRow;
@@ -525,7 +560,7 @@ function CategoryBar({ row, maxAmount, t }: {
       <div className="flex items-baseline justify-between gap-3 min-w-0">
         <span className="text-sm font-medium text-fg truncate">{typeLabel}</span>
         <span className="shrink-0 text-xs tabular-nums text-subtle whitespace-nowrap">
-          {t('retailSalesByType.soldN', { count: row.sale_qty })}
+          <QtyCell saleQty={row.sale_qty} returnQty={row.return_qty} netQty={row.net_qty} t={t} />
           {row.gift_qty > 0 && (
             <span className="text-subtler">
               {' + '}{t('retailSalesByType.giftN', { count: row.gift_qty })}
@@ -535,11 +570,12 @@ function CategoryBar({ row, maxAmount, t }: {
           <span className="text-subtler"> ({row.sale_pct}%)</span>
         </span>
       </div>
-      {/* Bar track — a zero-sales group draws no track at all (an empty box
-          reads as broken); its row still shows the "0 sold" label above so the
-          group isn't hidden. */}
+      {/* Bar track — slim, matching HBarReport on the other report pages. A
+          zero-sales group draws no track at all (an empty box reads as broken);
+          its row still shows the "0 sold" label above so the group isn't
+          hidden. */}
       {row.sale_amount > 0 && (
-        <div className="h-4 rounded overflow-hidden flex" style={{ width: `${pctOfMax}%`, minWidth: '2px' }}>
+        <div className="h-2.5 rounded overflow-hidden flex" style={{ width: `${pctOfMax}%`, minWidth: '2px' }}>
           <div className="w-full" style={{ background: COLOR_RETAIL }} />
         </div>
       )}
@@ -568,7 +604,7 @@ function TypeDrillPanel({ row, variantParams }: {
       <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-3">
         <h2 className="text-base font-semibold truncate">{typeLabel}</h2>
         <span className="ml-auto shrink-0 text-xs tabular-nums text-subtle whitespace-nowrap">
-          {t('retailSalesByType.soldN', { count: row.sale_qty })}
+          <QtyCell saleQty={row.sale_qty} returnQty={row.return_qty} netQty={row.net_qty} t={t} />
           {' · '}฿{fmtCurrency(row.sale_amount)}
           <span className="text-subtler"> ({row.sale_pct}%)</span>
         </span>
@@ -591,7 +627,7 @@ function TypeDrillPanel({ row, variantParams }: {
               <div key={v.variant_id} className="flex items-baseline justify-between gap-3 min-w-0 py-2">
                 <span className="text-sm text-fg truncate min-w-0">{v.product_name}</span>
                 <span className="shrink-0 text-xs tabular-nums text-subtle whitespace-nowrap">
-                  {t('retailSalesByType.soldN', { count: v.sale_qty })}
+                  <QtyCell saleQty={v.sale_qty} returnQty={v.return_qty} netQty={v.net_qty} t={t} />
                   {' · '}฿{fmtCurrency(v.sale_amount)}
                   <span className="text-subtler"> ({v.sale_pct}%)</span>
                 </span>

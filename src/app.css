@@ -656,6 +656,11 @@ input[type="number"
     padding: 6mm;
     color: #555;
 }
+/* Net pieces — the figure that reconciles with the day-close RETAIL bucket,
+   so it reads as the answer column rather than one number among nine. */
+.retail-report-sheet .rr-table td.rr-strong {
+    font-weight: 700;
+}
 
 /* Barcode sticker — XP-420B 76×26mm thermal label.
    Same dimensions and grid as .asset-sticker so both labels share printer
