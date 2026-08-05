@@ -9,11 +9,12 @@
 // branch column; branch users don't.
 
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { MobileHeader, Badge, Button, Tooltip } from 'tsp-form';
 import {
-  ArrowRightFromLine, Phone, KeyRound, BellOff, EyeOff,
+  ArrowRightFromLine, Phone, KeyRound, BellOff, EyeOff, ExternalLink,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -181,7 +182,7 @@ function AccessCard({ row, showBranch, canReset, onReset }: {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-medium text-sm tabular-nums">{row.contract_code}</span>
+            <ContractLink id={row.contract_id} code={row.contract_code} />
             {showBranch && row.branch_name && (
               <span className="text-xs text-subtle">{row.branch_name}</span>
             )}
@@ -268,7 +269,7 @@ function AnomalyTab({ rows, loading, error, showBranch }: {
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-medium text-sm tabular-nums">{row.contract_code}</span>
+                <ContractLink id={row.contract_id} code={row.contract_code} />
                 {showBranch && row.branch_name && (
                   <span className="text-xs text-subtle">{row.branch_name}</span>
                 )}
@@ -333,6 +334,21 @@ function ActivationAge({ activatedOn, days }: { activatedOn: string | null; days
       {' · '}
       <DateTime value={activatedOn} showTime={false} />
     </div>
+  );
+}
+
+/** Contract code → the contract screen. Every row on this page is a contract,
+ *  and the staffer's next move is almost always to open it. */
+function ContractLink({ id, code }: { id: number; code: string }) {
+  const navigate = useNavigate();
+  return (
+    <button
+      type="button"
+      onClick={() => navigate(`/admin/contracts/search/${id}`)}
+      className="font-medium text-sm tabular-nums text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
+    >
+      {code}<ExternalLink size={12} className="opacity-60" />
+    </button>
   );
 }
 

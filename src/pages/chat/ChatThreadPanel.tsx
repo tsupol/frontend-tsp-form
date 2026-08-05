@@ -3,11 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Badge, Button, PopOver, Skeleton, useSnackbarContext, resizeToVariants,
+  Badge, Button, PopOver, Skeleton, Tooltip, useSnackbarContext, resizeToVariants,
 } from 'tsp-form';
 import {
   ChevronRight, CheckCircle, ExternalLink, FileText, Image as ImageIcon, Send, Smile, XCircle,
-  AlertTriangle,
+  AlertTriangle, Check, CheckCheck,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { wsClient } from '../../lib/api/ws';
@@ -607,8 +607,20 @@ function TimelineRow({ item, showSender, currentUserId, lang, onOpenImage, onOpe
     lang === 'th' ? 'th-TH-u-ca-gregory' : 'en-GB',
     { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok', hour12: false },
   );
+  // Read receipt — STAFF bubbles only. `is_read` always means "the OTHER side
+  // read it", so on a CUSTOMER bubble it would say "staff read it", which is
+  // noise to the staffer reading the screen. LINE-style: ✓ grey = no record
+  // yet, ✓✓ blue + time = the customer's app opened the room.
+  // chat_mark_read marks the WHOLE room at once, so read_at is when they opened
+  // the room, not when they read this line — hence "เปิดอ่าน", never "read this
+  // message at". And never write "customer hasn't read it": the app can
+  // auto-mark a room left open, and a lock-screen banner leaves no record at
+  // all, so both directions produce false readings.
   const timeNode = (
-    <span className="text-[10px] text-subtle/60 tabular-nums shrink-0 self-end pb-1">{clock}</span>
+    <span className="flex flex-col items-end gap-0.5 shrink-0 self-end pb-1">
+      <span className="text-[10px] text-subtle tabular-nums">{clock}</span>
+      {isStaff && <ReadReceipt isRead={m.is_read} readAt={m.read_at} lang={lang} />}
+    </span>
   );
   // Co-lessee tag beside the sender name (mig 843). Only for CO_LESSEE
   // customers — STAFF sender_role is null, PRIMARY is the default and skipped
@@ -629,6 +641,43 @@ function TimelineRow({ item, showSender, currentUserId, lang, onOpenImage, onOpe
         <Bubble message={m} isStaff={isStaff} onOpenImage={onOpenImage} />
       </div>
     </div>
+  );
+}
+
+// ✓ / ✓✓ beside a STAFF bubble. Never rendered on a customer bubble — see the
+// note at the call site.
+function ReadReceipt({ isRead, readAt, lang }: {
+  isRead: boolean;
+  readAt: string | null;
+  lang: string;
+}) {
+  const { t } = useTranslation();
+
+  if (!isRead) {
+    // "no record of it being opened" — NOT "the customer hasn't read it".
+    return (
+      <Tooltip content={t('chat.readReceipt.noRecord')}>
+        <span className="inline-flex items-center text-subtler">
+          <Check size={12} />
+        </span>
+      </Tooltip>
+    );
+  }
+
+  const clock = readAt
+    ? new Date(readAt).toLocaleTimeString(
+      lang === 'th' ? 'th-TH-u-ca-gregory' : 'en-GB',
+      { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok', hour12: false },
+    )
+    : null;
+
+  return (
+    <Tooltip content={t('chat.readReceipt.openedHint')}>
+      <span className="inline-flex items-center gap-0.5 text-info-fg">
+        <CheckCheck size={12} />
+        {clock && <span className="text-[10px] tabular-nums">{clock}</span>}
+      </span>
+    </Tooltip>
   );
 }
 
