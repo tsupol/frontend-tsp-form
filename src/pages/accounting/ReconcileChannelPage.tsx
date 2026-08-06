@@ -370,10 +370,23 @@ export function ReconcileChannelPage() {
                   net_transfer above; this only shows the split so the closer knows
                   which side each baht came from (migs 537/543). */}
               <div className="pl-9 pr-2 pb-1 flex flex-col gap-1 text-xs">
-                <div className="flex items-center gap-3 py-1">
-                  <span className="flex-1 text-subtle">{t('accounting.reconcile.transferFront')}</span>
-                  <span className="w-24 text-right tabular-nums text-fg">{fmtCurrency(summary.transfer_front_total)}</span>
-                  <span className="w-24" /><span className="w-20" /><span className="w-24" />
+                <div className="flex flex-col py-1">
+                  <div className="flex items-center gap-3">
+                    <span className="flex-1 text-subtle">{t('accounting.reconcile.transferFront')}</span>
+                    <span className="w-24 text-right tabular-nums text-fg">{fmtCurrency(summary.transfer_front_total)}</span>
+                    <span className="w-24" /><span className="w-20" /><span className="w-24" />
+                  </div>
+                  {/* mig 1014 — the net figure hides money that came in and went back
+                      out the same channel. Show the gross split only on days that
+                      actually had a refund; a normal day stays a single clean line. */}
+                  {summary.transfer_front_refund !== 0 && (
+                    <span className="text-subtler mt-0.5">
+                      {t('accounting.reconcile.transferFrontDetail', {
+                        received: fmtCurrency(summary.transfer_front_in),
+                        refunded: fmtCurrency(summary.transfer_front_refund),
+                      })}
+                    </span>
+                  )}
                 </div>
                 <div className="flex flex-col py-1">
                   <div className="flex items-center gap-3">
