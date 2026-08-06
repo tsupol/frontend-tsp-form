@@ -529,7 +529,8 @@ function AssetSaleDetailPanel({
         branchId={row.branch_id}
         approvedPrice={row.proposed_price}
         onCommitted={() => {
-          setCommitOpen(false);
+          // Refresh the ledger behind the modal only — the modal stays open on
+          // its success step (bill code + Download/Print) until the user closes it.
           refreshAll();
         }}
       />

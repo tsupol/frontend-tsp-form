@@ -317,6 +317,7 @@ export function SellOutCommitModal({
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [result, setResult] = useState<CommitResponse | null>(null);
+  const [confirmClose, setConfirmClose] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -326,6 +327,7 @@ export function SellOutCommitModal({
       setPin('');
       setError('');
       setResult(null);
+      setConfirmClose(false);
     }
   }, [open, approvedPrice]);
 
@@ -370,20 +372,36 @@ export function SellOutCommitModal({
 
   const canSubmit = balanced && !transferMissingBank && pin.length === 6 && !commitMutation.isPending;
 
+  // Dirty guard — the seeded CASH row is untouched state, so only a changed
+  // split / entered PIN counts as dirty. Once committed (`done`) nothing is at
+  // risk, so close freely.
+  const isDirty = view === 'form' && (
+    pin !== '' ||
+    payments.length > 1 ||
+    payments[0]?.method !== 'CASH' ||
+    payments[0]?.amount !== String(approvedPrice)
+  );
+  const handleClose = () => {
+    if (commitMutation.isPending) return;
+    if (isDirty) { setConfirmClose(true); return; }
+    onClose();
+  };
+
   const methodOptions = [
     { value: 'CASH', label: t('assetSales.methodCASH', { defaultValue: 'Cash' }) },
     { value: 'TRANSFER', label: t('assetSales.methodTRANSFER', { defaultValue: 'Transfer' }) },
   ];
 
   return (
-    <Modal open={open} onClose={onClose} maxWidth="34rem" width="100%">
+    <>
+    <Modal open={open} onClose={handleClose} maxWidth="34rem" width="100%">
       <div className="modal-header">
         <h2 className="modal-title">
           {view === 'done'
             ? t('assetSales.commitDoneTitle', { defaultValue: 'Sold' })
             : t('assetSales.commitTitle', { defaultValue: 'Confirm sale & collect' })}
         </h2>
-        <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+        <button type="button" className="modal-close-btn" onClick={handleClose} aria-label="Close">&times;</button>
       </div>
 
       {view === 'form' && (
@@ -419,7 +437,7 @@ export function SellOutCommitModal({
                         options={methodOptions}
                         value={p.method}
                         onChange={(v) => updatePayment(idx, { method: v as PayMethod, bank_account_id: null })}
-                        size="sm"
+                        size="md"
                         searchable={false}
                       />
                     </div>
@@ -462,7 +480,7 @@ export function SellOutCommitModal({
             </div>
           </div>
           <div className="modal-footer">
-            <Button variant="ghost" onClick={onClose} disabled={commitMutation.isPending}>{t('common.cancel')}</Button>
+            <Button variant="ghost" onClick={handleClose} disabled={commitMutation.isPending}>{t('common.cancel')}</Button>
             <Button color="primary" onClick={() => { setError(''); commitMutation.mutate(); }} disabled={!canSubmit}>
               {commitMutation.isPending ? t('common.loading') : t('assetSales.confirmSale', { defaultValue: 'Confirm sale' })}
             </Button>
@@ -489,5 +507,17 @@ export function SellOutCommitModal({
         />
       )}
     </Modal>
+
+    {/* Unsaved-changes guard — sibling, not nested, to keep the shared modal
+        context in sync. */}
+    <Modal open={confirmClose} onClose={() => setConfirmClose(false)} maxWidth="24rem" width="100%">
+      <div className="modal-header"><h2 className="modal-title">{t('common.unsavedChanges')}</h2></div>
+      <div className="modal-content"><p>{t('common.unsavedChangesMessage')}</p></div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={() => setConfirmClose(false)}>{t('common.cancel')}</Button>
+        <Button color="danger" onClick={() => { setConfirmClose(false); onClose(); }}>{t('common.discard')}</Button>
+      </div>
+    </Modal>
+    </>
   );
 }
