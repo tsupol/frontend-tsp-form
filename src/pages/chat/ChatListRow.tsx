@@ -38,7 +38,10 @@ export function ChatListRow({ row, selected, onSelect, showBranch, lang, t, comp
         <div className="text-sm font-medium truncate min-w-0">
           {row.customer_name ?? '—'}
         </div>
-        <div className="flex flex-col items-end gap-1 shrink-0">
+        {/* Timestamp and unread count sit on ONE line — stacking them cost the
+            row an extra line, so unread threads were taller than read ones and
+            the list jumped as counts cleared. */}
+        <div className="flex items-center gap-1.5 shrink-0">
           <span className="text-[11px] text-subtle tabular-nums">
             {formatSmart(row.last_message_at, lang)}
           </span>

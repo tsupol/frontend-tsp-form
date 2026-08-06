@@ -14,6 +14,7 @@ import {
 import { apiClient } from '../../lib/api';
 import { wsClient } from '../../lib/api/ws';
 import { useAuth } from '../../contexts/AuthContext';
+import { useChatDock } from '../../contexts/ChatDockContext';
 import { fmtCurrency, formatSmart } from '../../lib/format';
 import { DateTime } from '../../components/DateTime';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
@@ -50,13 +51,27 @@ interface Props {
   hideDesktopHeader?: boolean;
   /** Whether the mobile-only details strip (contract code + link) is open. */
   mobileDetailsOpen?: boolean;
+  /** Set when this panel IS the floating dock. Suppresses the "carry this
+   *  thread into the dock" behaviour on the contract link — the thread is
+   *  already there, and re-opening would be a no-op that hides the list. */
+  inDock?: boolean;
 }
 
-export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mobileDetailsOpen }: Props) {
+export function ChatThreadPanel({
+  contractId, onOpenImage, hideDesktopHeader, mobileDetailsOpen, inDock,
+}: Props) {
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { addSnackbar } = useSnackbarContext();
+  const { openChat } = useChatDock();
+
+  // Leaving the chat page for the contract shouldn't drop the conversation:
+  // carry it into the floating dock so it's still open when you land there.
+  // No-op when this panel already IS the dock.
+  const handleContractLinkClick = () => {
+    if (!inDock && contractId !== null) openChat(contractId);
+  };
 
   const [composer, setComposer] = useState('');
   const [sendError, setSendError] = useState('');
@@ -459,6 +474,7 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
               <div className="text-xs text-subtle flex items-center gap-2">
                 <Link
                   to={`/admin/contracts/search/${contractId}`}
+                  onClick={handleContractLinkClick}
                   className="inline-flex items-center gap-1 text-primary-fg hover:underline tabular-nums"
                 >
                   {inboxRow.contract_code_display}
@@ -498,6 +514,7 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
               <div className="text-xs text-subtle flex items-center gap-2">
                 <Link
                   to={`/admin/contracts/search/${contractId}`}
+                  onClick={handleContractLinkClick}
                   className="inline-flex items-center gap-1 text-primary-fg hover:underline tabular-nums"
                 >
                   {inboxRow.contract_code_display}

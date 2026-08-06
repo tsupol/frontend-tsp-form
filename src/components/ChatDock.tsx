@@ -42,7 +42,11 @@ export function ChatDock() {
   // setPointerCapture redirects every later pointer event to the capturing
   // element, so a button that captures swallows its own click, and controls
   // nested inside a capturing handle never receive theirs.
-  const dragIntent = useRef<{ startX: number; startY: number; moved: boolean } | null>(null);
+  const dragIntent = useRef<{
+    startX: number; startY: number;
+    originRight: number; originBottom: number;
+    moved: boolean;
+  } | null>(null);
 
   // Thread meta for the panel header — same row shape the chat page uses.
   const { data: inboxRow } = useQuery({
@@ -70,13 +74,27 @@ export function ChatDock() {
     // drag surface itself is currentTarget, so exclude it from the search.
     const hit = (e.target as HTMLElement).closest('button,[role="button"],a,input,textarea');
     if (hit && hit !== e.currentTarget) return;
-    dragIntent.current = { startX: e.clientX, startY: e.clientY, moved: false };
+    // Record where the gesture began AND where the dock was at that moment.
+    // Everything below measures from this fixed origin.
+    dragIntent.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      originRight: positionRef.current.right,
+      originBottom: positionRef.current.bottom,
+      moved: false,
+    };
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   }, []);
 
   const onPointerMove = useCallback((e: React.PointerEvent) => {
     const intent = dragIntent.current;
     if (!intent) return;
+    // Total travel since the press — NOT the step since the last event. An
+    // incremental delta applied to positionRef drifts behind the cursor: two
+    // pointer events can fire before React re-renders, so both read the same
+    // stale position and the first step is silently lost. Measuring from a
+    // fixed origin makes every frame self-correcting, so the dock tracks the
+    // pointer exactly however fast it moves.
     const dx = e.clientX - intent.startX;
     const dy = e.clientY - intent.startY;
     if (!intent.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
@@ -88,11 +106,9 @@ export function ChatDock() {
     // Anchored to right/bottom, so movement is inverted. setPosition clamps
     // against whichever state is rendered.
     setPosition({
-      right: positionRef.current.right - dx,
-      bottom: positionRef.current.bottom - dy,
+      right: intent.originRight - dx,
+      bottom: intent.originBottom - dy,
     });
-    intent.startX = e.clientX;
-    intent.startY = e.clientY;
   }, [setPosition]);
 
   const onPointerUp = useCallback((e: React.PointerEvent) => {
@@ -212,6 +228,7 @@ export function ChatDock() {
                   contractId={contractId}
                   onOpenImage={setLightboxKey}
                   hideDesktopHeader
+                  inDock
                 />
               )}
             </div>
