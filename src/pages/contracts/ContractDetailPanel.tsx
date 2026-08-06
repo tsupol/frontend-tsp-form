@@ -745,6 +745,7 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
   deliveryModalOpen: boolean;
   setDeliveryModalOpen: (open: boolean) => void;
 }) {
+  const { user } = useAuth();
   const isFin2 = contract.commercial_model === 'FIN2';
   const isActive = contract.state === 'ACTIVE' || contract.state === 'COMPLETED' || contract.state === 'TERMINATED';
   // Device can be bound before activation too — fn_contract_bind_device only
@@ -775,10 +776,13 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
     staleTime: 30 * 1000,
   });
 
-  // Commission owner editable only while the contract is in DRAFT or SAVING
-  // (sale._is_editable). Server enforces the rest as a race-condition net.
+  // Commission owner is editable in EVERY state (BE 2026-08-06, migs 1015/1016) —
+  // branches routinely discover the wrong name after activation and need to move
+  // the credit. The only rule is who: branch staff of the contract's own branch
+  // (permission CONTRACT.CHANGE_OWNER); HQ roles don't hold it. Server re-checks.
   const commissionEditable =
-    contract.state === 'DRAFT' || contract.state === 'SAVING';
+    (user?.role_code === 'BRANCH_MANAGER' || user?.role_code === 'BRANCH_STAFF') &&
+    user?.branch_id === contract.branch_id;
 
   // Live signing-needed signal: any COLLECTING signing that hasn't been
   // superseded by a newer COLLECTING of the same change_reason (a contract can
@@ -1095,6 +1099,7 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
         open={commissionModalOpen}
         onClose={() => setCommissionModalOpen(false)}
         contractId={contract.id}
+        contractCode={contract.code_display ?? contract.code}
         currentOwnerId={contract.commission_owner_id}
         currentOwnerName={contract.commission_owner_name}
       />
