@@ -1,4 +1,8 @@
-i # Playwright MCP Usage Guide
+# Playwright MCP Usage Guide
+
+> **Start every session with `await page.emulateMedia({ colorScheme: 'dark' });`**
+> — the user reviews in dark mode. See "Dark mode" below for why setting
+> `data-theme` by hand does not work.
 
 ## Performance Rules
 
@@ -38,15 +42,37 @@ await page.waitForURL('**/admin');
 
 Use `browser_snapshot` to get the DOM tree, then interact via `browser_run_code` for multi-step flows or individual `browser_click`/`browser_fill_form` for single actions.
 
-## Dark mode
+## Dark mode — ALWAYS use it. Do this first, before any screenshot.
 
-Theme is the `data-theme` attribute on `<html>` (not a class). Set it AND persist it, and **re-apply after every navigation/reload** — a route change or `page.reload()` can reset it before React re-reads:
+**The user reviews this app in dark mode. A light-mode screenshot is a wasted
+screenshot.** Run this once per session, right after the first `page.goto`:
 
 ```js
-await page.evaluate(() => {
-  document.documentElement.setAttribute('data-theme', 'dark');
-  localStorage.setItem('theme', 'dark');
-});
+await page.emulateMedia({ colorScheme: 'dark' });
+```
+
+That's the whole fix. It is **sticky for the browser context** — it survives
+navigation, `reload()`, and login redirects, so there is nothing to re-apply.
+
+### Why the old `setAttribute` recipe kept failing
+
+`ThemeContext` defaults to `theme = 'system'` (nothing in `localStorage` on a
+fresh profile) and resolves it from `prefers-color-scheme`, which Playwright
+reports as **light** by default. It then writes `data-theme` on `<html>` from a
+`useEffect`. So hand-setting the attribute only wins until React's next theme
+effect overwrites it — which is exactly why dark kept "randomly" reverting after
+a navigation. Emulating the media query fixes the *input* React reads, so the
+app itself chooses dark and keeps choosing it.
+
+Verified 2026-08-06: before → `data-theme="light"`, `localStorage.theme = null`;
+after `emulateMedia` + reload → `data-theme="dark"`.
+
+Forcing the explicit (non-`system`) setting instead — only if you're
+specifically testing the theme toggle — means seeding storage *before* the app
+boots, not after:
+
+```js
+await page.addInitScript(() => localStorage.setItem('theme', 'dark'));
 ```
 
 ## Gotchas found in practice
