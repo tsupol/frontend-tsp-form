@@ -180,6 +180,8 @@
   "sale.validation.charge_owner_override_not_allowed": "This company doesn't allow branch override for repair revenue.",
   "SALE.VALIDATION.CHARGE_OWNER_OVERRIDE_NOT_ALLOWED": "This company doesn't allow branch override for repair revenue.",
   "SALE.VALIDATION.CONFIG_OUT_OF_RANGE": "{{key}} must be between {{min}} and {{max}}.",
+  "sale.validation.term_months_exceeds_max": "Term is over {{max}} months — check whether the installment amount and the number of months were entered in the wrong boxes.",
+  "SALE.VALIDATION.TERM_MONTHS_EXCEEDS_MAX": "Term is over {{max}} months — check whether the installment amount and the number of months were entered in the wrong boxes.",
   "MDM.VALIDATION.ACCOUNT_FULL": "This iCloud account is full — pick another one.",
   "MDM.VALIDATION.ACCOUNT_NOT_IN_BRANCH": "That iCloud account belongs to a different branch.",
   "MDM.VALIDATION.ACCOUNT_NOT_FOUND_OR_INACTIVE": "That iCloud account is no longer available.",

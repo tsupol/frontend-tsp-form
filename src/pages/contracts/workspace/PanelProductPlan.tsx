@@ -13,6 +13,9 @@ import { ColorSwatch } from '../../../components/ColorAutocomplete';
 import { lookupBarcode } from '../../../lib/barcodeLookup';
 import { translateApiError } from '../../../lib/apiErrors';
 
+/** Hard cap on installment term, mirroring the backend guard (mig 1030). */
+const TERM_MONTHS_MAX = 60;
+
 // ── Types ───────────────────────────────────────────────────────────────
 
 interface SearchVariant {
@@ -1164,6 +1167,10 @@ function Fin2Calculator({ fin2Rows, fin2Terms, t, onUse }: {
   const [installmentInput, setInstallmentInput] = useState('');
 
   const termMonths = parseInt(termInput) || 0;
+  // Backend hard-caps term at 60 (mig 1030) — it exists to catch the field swap
+  // where the installment amount lands in the term box ("12 baht × 2400 months").
+  // Mirror it here so the mistake is visible before the save round-trip.
+  const termOverMax = termMonths > TERM_MONTHS_MAX;
   const downAmount = parseFloat(downInput) || 0;
   const installmentAmount = parseFloat(installmentInput) || 0;
 
@@ -1193,7 +1200,7 @@ function Fin2Calculator({ fin2Rows, fin2Terms, t, onUse }: {
   // Result is ready when we have a profit-rate row + both term and installment typed.
   const result = useMemo(() => {
     if (!resolved) return null;
-    if (termMonths < 1 || installmentAmount <= 0) return null;
+    if (termMonths < 1 || termMonths > TERM_MONTHS_MAX || installmentAmount <= 0) return null;
 
     // x1 = total = cost + profit (FIN2 has no interest markup)
     // x2 = down + term × installment
@@ -1234,6 +1241,8 @@ function Fin2Calculator({ fin2Rows, fin2Terms, t, onUse }: {
             size="sm"
             type="number"
             min={1}
+            max={TERM_MONTHS_MAX}
+            error={termOverMax}
             placeholder={fin2Terms.join(', ')}
             value={termInput}
             onChange={(e) => setTermInput(e.target.value)}
@@ -1241,6 +1250,11 @@ function Fin2Calculator({ fin2Rows, fin2Terms, t, onUse }: {
             onEndIconClick={installmentAmount > 0 && financed > 0 ? fillTerm : undefined}
             className="w-full"
           />
+          {termOverMax && (
+            <span className="text-xs text-danger-fg">
+              {t('priceCheck.termOverMax', { max: TERM_MONTHS_MAX })}
+            </span>
+          )}
         </div>
         <div className="flex flex-col gap-1 flex-1">
           <label className="form-label">{t('priceCheck.downPayment')}</label>

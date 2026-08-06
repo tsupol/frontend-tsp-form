@@ -180,6 +180,8 @@
   "sale.validation.charge_owner_override_not_allowed": "บริษัทนี้ไม่อนุญาตให้สาขาตั้งค่าผู้รับรู้รายได้ค่าซ่อมเอง",
   "SALE.VALIDATION.CHARGE_OWNER_OVERRIDE_NOT_ALLOWED": "บริษัทนี้ไม่อนุญาตให้สาขาตั้งค่าผู้รับรู้รายได้ค่าซ่อมเอง",
   "SALE.VALIDATION.CONFIG_OUT_OF_RANGE": "{{key}} ตั้งได้ระหว่าง {{min}} ถึง {{max}} เท่านั้น",
+  "sale.validation.term_months_exceeds_max": "จำนวนงวดเกิน {{max}} งวด — ตรวจสอบว่ากรอกสลับช่องค่างวดกับจำนวนงวดหรือไม่",
+  "SALE.VALIDATION.TERM_MONTHS_EXCEEDS_MAX": "จำนวนงวดเกิน {{max}} งวด — ตรวจสอบว่ากรอกสลับช่องค่างวดกับจำนวนงวดหรือไม่",
   "MDM.VALIDATION.ACCOUNT_FULL": "บัญชี iCloud นี้เต็มแล้ว เลือกบัญชีอื่น",
   "MDM.VALIDATION.ACCOUNT_NOT_IN_BRANCH": "บัญชี iCloud นี้เป็นของสาขาอื่น",
   "MDM.VALIDATION.ACCOUNT_NOT_FOUND_OR_INACTIVE": "บัญชี iCloud นี้ไม่พร้อมใช้งานแล้ว",
