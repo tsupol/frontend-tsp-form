@@ -1,7 +1,9 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  useQuery, useInfiniteQuery, useMutation, useQueryClient, type InfiniteData,
+} from '@tanstack/react-query';
 import {
   Badge, Button, PopOver, Skeleton, Tooltip, useSnackbarContext, resizeToVariants,
 } from 'tsp-form';
@@ -35,6 +37,10 @@ import { translateApiError } from '../../lib/apiErrors';
 
 const MAX_TEXTAREA_LINES = 6;
 const TEXTAREA_LINE_HEIGHT_PX = 20;
+/** Messages per keyset page (doc 66 §④ specifies 50). */
+const MESSAGE_PAGE_SIZE = 50;
+/** Distance from the top that triggers loading the previous page. */
+const LOAD_OLDER_THRESHOLD_PX = 120;
 
 interface Props {
   contractId: number | null;
@@ -75,14 +81,45 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
     enabled,
   });
 
-  const { data: messages = [], isLoading } = useQuery({
+  // Messages are keyset-paged, newest page first (doc 66 §4 / IMPLEMENT §④).
+  // Offset paging is wrong for chat: the set grows at the head, so OFFSET n
+  // shifts under us and page 2 repeats or skips a row. The cursor is the
+  // oldest created_at we already hold, which no insert can disturb.
+  //
+  // We fetch DESC (there is no way to ask for "the newest 50" ascending) and
+  // reverse per page at the flatten step so the timeline stays oldest-first.
+  const {
+    data: messagePages,
+    isLoading,
+    fetchNextPage: fetchOlderMessages,
+    hasNextPage: hasOlderMessages,
+    isFetchingNextPage: isFetchingOlderMessages,
+  } = useInfiniteQuery({
     queryKey: ['chat-messages', contractId],
-    queryFn: () => apiClient.get<ChatMessage[]>(
-      `/v_branch_chat_messages?contract_id=eq.${contractId}&order=created_at.asc`,
+    initialPageParam: null as string | null,
+    queryFn: ({ pageParam }) => apiClient.get<ChatMessage[]>(
+      `/v_branch_chat_messages?contract_id=eq.${contractId}`
+      + `&order=created_at.desc,id.desc&limit=${MESSAGE_PAGE_SIZE}`
+      + (pageParam ? `&created_at=lt.${encodeURIComponent(pageParam)}` : ''),
+    ),
+    // A short page means we reached the start of the thread.
+    getNextPageParam: (lastPage) => (
+      lastPage.length < MESSAGE_PAGE_SIZE
+        ? undefined
+        : lastPage[lastPage.length - 1]?.created_at ?? undefined
     ),
     enabled,
-    refetchInterval: 15_000,
+    // No refetchInterval: the WS subscription below appends live. Polling the
+    // whole thread every 15s was the thing this page-size change is meant to
+    // stop paying for.
   });
+
+  // Pages arrive newest-first, each page internally DESC. Reverse both levels
+  // to get one flat oldest-first list for the timeline builder.
+  const messages = useMemo(
+    () => (messagePages?.pages ?? []).slice().reverse().flatMap(page => page.slice().reverse()),
+    [messagePages],
+  );
 
   // Slips for the same contract — merged into the timeline alongside messages.
   // See UI_FEEDBACK/2026-06-02_RECOMMEND_chat_slip_interleaved_timeline_pattern.md
@@ -94,6 +131,44 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
     enabled,
     refetchInterval: 30_000,
   });
+
+  // Refresh ONLY the newest page and merge it over the cache. Used by both the
+  // WS event and our own send — neither may invalidate ['chat-messages'],
+  // because invalidating an infinite query refetches EVERY loaded page (ten
+  // pages back = whole thread re-downloaded per message, the exact cost keyset
+  // paging exists to avoid).
+  //
+  // Refetching page 0 rather than only fetching rows newer than the newest
+  // cached one costs the same single request but also catches mutations to
+  // rows already on screen — is_read flipping when the customer reads our
+  // message. A newer-than cursor structurally cannot see those.
+  const refreshNewestMessages = useCallback(async () => {
+    if (contractId === null) return;
+    const key = ['chat-messages', contractId];
+
+    // Nothing cached yet — let the normal query populate page 0.
+    if (!queryClient.getQueryData<InfiniteData<ChatMessage[]>>(key)) {
+      queryClient.invalidateQueries({ queryKey: key });
+      return;
+    }
+
+    const newestPage = await apiClient.get<ChatMessage[]>(
+      `/v_branch_chat_messages?contract_id=eq.${contractId}`
+      + `&order=created_at.desc,id.desc&limit=${MESSAGE_PAGE_SIZE}`,
+    );
+
+    queryClient.setQueryData<InfiniteData<ChatMessage[]>>(key, (prev) => {
+      if (!prev) return prev;
+      const [, ...older] = prev.pages;
+      // Older pages may already hold rows that the refreshed page 0 now also
+      // covers (page 0 always starts at the head, so a quiet thread re-reads
+      // the same rows). Drop those from page 0 — keeping the older page's copy
+      // preserves the cursor chain, which is derived from page boundaries.
+      const inOlderPages = new Set(older.flat().map(m => m.id));
+      const head = newestPage.filter(m => !inOlderPages.has(m.id));
+      return { ...prev, pages: [head, ...older] };
+    });
+  }, [contractId, queryClient]);
 
   // Reset composer state when switching threads
   useEffect(() => {
@@ -125,18 +200,26 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
   // flip from another tab updates the open thread's header instantly.
   useEffect(() => {
     if (!enabled || contractId === null) return;
-    const reload = () => {
-      queryClient.invalidateQueries({ queryKey: ['chat-messages', contractId] });
+
+    // Sidecar queries are cheap single rows — plain invalidate is fine.
+    const reloadSidecars = () => {
       queryClient.invalidateQueries({ queryKey: ['chat-thread-submissions', contractId] });
       queryClient.invalidateQueries({ queryKey: ['chat-inbox'] });
       queryClient.invalidateQueries({ queryKey: ['chat-thread-meta', contractId] });
       queryClient.invalidateQueries({ queryKey: ['chat-thread-status-log', contractId] });
       queryClient.invalidateQueries({ queryKey: ['nav', 'chat-unread'] });
     };
-    const unsubChat = wsClient.subscribe(`chat:contract:${contractId}`, reload);
-    const unsubSlip = wsClient.subscribe(`slip:contract:${contractId}`, reload);
+
+    // Messages refresh page 0 rather than invalidate — see refreshNewestMessages.
+    const onChatEvent = () => {
+      refreshNewestMessages().catch(err => console.warn('[chat] refresh failed', err));
+      reloadSidecars();
+    };
+
+    const unsubChat = wsClient.subscribe(`chat:contract:${contractId}`, onChatEvent);
+    const unsubSlip = wsClient.subscribe(`slip:contract:${contractId}`, reloadSidecars);
     return () => { unsubChat(); unsubSlip(); };
-  }, [contractId, enabled, queryClient]);
+  }, [contractId, enabled, queryClient, refreshNewestMessages]);
 
   // Snapshot the first unread CUSTOMER message ID on initial load — this
   // pins the "unread below" divider so it stays put as the user reads, just
@@ -160,8 +243,33 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
   const lastSeenCount = useRef(0);
   const lastSeenContract = useRef<number | null>(null);
   const itemCount = messages.length + submissions.length;
+
+  // Prepending older messages grows the content ABOVE the viewport. The browser
+  // holds scrollTop fixed, so the view appears to jump backwards. Capture the
+  // height before the page lands and restore the delta after, which pins the
+  // row the user was reading. (CSS overflow-anchor does this natively but
+  // Safari doesn't implement it, so the manual restore stays.)
+  const pendingPrependHeight = useRef<number | null>(null);
+  const loadOlderMessages = () => {
+    if (!hasOlderMessages || isFetchingOlderMessages || !scrollRef.current) return;
+    pendingPrependHeight.current = scrollRef.current.scrollHeight;
+    fetchOlderMessages();
+  };
+
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el || pendingPrependHeight.current === null) return;
+    const delta = el.scrollHeight - pendingPrependHeight.current;
+    pendingPrependHeight.current = null;
+    if (delta > 0) el.scrollTop += delta;
+    // Keep the bottom-scroll effect from reading this growth as new messages.
+    lastSeenCount.current = itemCount;
+  }, [itemCount]);
+
   useLayoutEffect(() => {
     if (!scrollRef.current) return;
+    // A prepend is settling — the effect above owns scroll position this pass.
+    if (pendingPrependHeight.current !== null) return;
     const contractChanged = lastSeenContract.current !== contractId;
     const newItems = itemCount > lastSeenCount.current;
     if (contractChanged || newItems) {
@@ -207,11 +315,19 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
     onSuccess: () => {
       setComposer('');
       setSendError('');
-      queryClient.invalidateQueries({ queryKey: ['chat-messages', contractId] });
+      // Pull our own message in too — the WS echo may not come back to the
+      // sender, and invalidating would refetch every loaded page.
+      refreshNewestMessages().catch(err => console.warn('[chat] refresh failed', err));
       queryClient.invalidateQueries({ queryKey: ['chat-inbox'] });
     },
     onError: (err) => {
       setSendError(translateApiError(err, t));
+    },
+    // The textarea is disabled while the send is in flight, which drops focus to
+    // <body>. Re-focus once it is interactive again so the caret never leaves
+    // the composer — typing the next message must not need a click.
+    onSettled: () => {
+      requestAnimationFrame(() => textareaRef.current?.focus());
     },
   });
 
@@ -302,6 +418,9 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
       setSendError(translateApiError(err, t));
     } finally {
       setUploading(false);
+      // Same reason as the send mutation: uploading disables the composer, so
+      // put the caret back once it is usable again.
+      requestAnimationFrame(() => textareaRef.current?.focus());
     }
   };
 
@@ -419,13 +538,22 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
       )}
 
       {/* Scrollable timeline (chat + slips merged) */}
-      <div ref={scrollRef} className="flex-1 min-h-0 overflow-auto better-scroll px-3 py-3 md:px-8">
+      <div
+        ref={scrollRef}
+        onScroll={e => {
+          if (e.currentTarget.scrollTop <= LOAD_OLDER_THRESHOLD_PX) loadOlderMessages();
+        }}
+        className="flex-1 min-h-0 overflow-auto better-scroll px-3 py-3 md:px-8"
+      >
         {isLoading ? (
           <div className="text-center text-subtle p-8">{t('common.loading')}</div>
         ) : timeline.length === 0 ? (
           <div className="text-center text-subtle p-8">{t('chat.emptyThread')}</div>
         ) : (
           <div className="flex flex-col gap-3">
+            {isFetchingOlderMessages && (
+              <div className="text-center text-xs text-subtle py-2">{t('chat.loadingOlder')}</div>
+            )}
             {timeline.map((item, i) => {
               // Suppress the sender label when this message continues a run
               // from the same sender within 5 minutes — LINE/iMessage style.
@@ -483,6 +611,7 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
                 size="sm"
                 className="btn-icon-sm"
                 startIcon={<ImageIcon size={18} />}
+                onMouseDown={e => e.preventDefault()}
                 onClick={() => fileInputRef.current?.click()}
                 disabled={sendMutation.isPending || uploading}
                 aria-label={t('chat.attachImage')}
@@ -520,6 +649,10 @@ export function ChatThreadPanel({ contractId, onOpenImage, hideDesktopHeader, mo
                 className="btn-icon-sm"
                 startIcon={<Send size={16} />}
                 disabled={!composer.trim() || sendMutation.isPending || uploading}
+                // Keep the caret in the composer: without this the button takes
+                // focus, then goes disabled as the text clears, stranding focus
+                // on <body>.
+                onMouseDown={e => e.preventDefault()}
                 onClick={handleSend}
                 aria-label={t('chat.send')}
               />

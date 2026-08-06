@@ -6726,6 +6726,7 @@
     "unreadOnly": "Unread only",
     "empty": "No conversations",
     "emptyThread": "No messages yet",
+    "loadingOlder": "Loading earlier messages…",
     "unreadBelow": "Unread messages below",
     "unknownStaff": "Staff",
     "unknownCustomer": "Customer",

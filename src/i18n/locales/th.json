@@ -6719,6 +6719,7 @@
     "unreadOnly": "เฉพาะที่ยังไม่อ่าน",
     "empty": "ไม่มีการสนทนา",
     "emptyThread": "ยังไม่มีข้อความ",
+    "loadingOlder": "กำลังโหลดข้อความก่อนหน้า…",
     "unreadBelow": "ข้อความที่ยังไม่ได้อ่าน",
     "unknownStaff": "พนักงาน",
     "unknownCustomer": "ลูกค้า",
