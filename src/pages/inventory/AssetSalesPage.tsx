@@ -39,6 +39,7 @@ export interface AssetSaleRow {
   needs_approval: boolean;
   asset_id: number;
   asset_code: string;
+  asset_code_display: string | null;
   external_ref: string | null;
   serial_no: string | null;
   condition_grade: string;
@@ -372,7 +373,7 @@ function AssetSaleDetailPanel({
             onClick={() => navigate(`/admin/inventory/assets/${row.asset_id}`)}
             className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
           >
-            {codeDisplay(null, row.asset_code)}
+            {codeDisplay(row.asset_code_display, row.asset_code)}
             <ExternalLink size={12} />
           </button>
           <div className="text-sm mt-0.5">{row.product_name}</div>
