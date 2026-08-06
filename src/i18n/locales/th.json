@@ -277,6 +277,8 @@
     },
     "branchRanking": "อันดับสาขาวันนี้",
     "branchRankingHint": "ทุกสาขา เรียงตามยอดรับรวมวันนี้",
+    "contractsOpenedBadge_one": "เปิด {{count}} สัญญา",
+    "contractsOpenedBadge_other": "เปิด {{count}} สัญญา",
     "rankPageOf": "หน้า {{page}} / {{total}}",
     "flag": {
       "voidHigh": "Void เยอะ",
@@ -490,6 +492,8 @@
     "retailSales": "รายงานขายปลีก",
     "retailSalesByType": "รายงานขายปลีกตามประเภท",
     "collectionMonthly": "เรียกเก็บ vs เก็บได้",
+    "commissionSales": "ยอดเซลล์",
+    "commissionStaff": "ยอดพนักงาน",
     "financierForm": "กรอกฟอร์ม RICH",
     "notifications": "การแจ้งเตือน",
     "branchExpense": "ค่าใช้จ่ายสาขา"
@@ -556,6 +560,18 @@
     "tipDay": "วันที่",
     "tipContracts": "จำนวนสัญญา",
     "noData": "ไม่มีสัญญาที่เปิดในเดือนนี้"
+  },
+  "commissionReport": {
+    "titleSales": "รายงานยอดเซลล์",
+    "titleStaff": "รายงานยอดพนักงาน",
+    "allBranches": "ทุกสาขา",
+    "contractsN_one": "{{count}} สัญญา",
+    "contractsN_other": "{{count}} สัญญา",
+    "sumContracts": "จำนวนสัญญา",
+    "sumFinanced": "ยอดจัดรวม",
+    "sumPeople": "จำนวนคน",
+    "rankHint": "อันดับเทียบทั้งบริษัท",
+    "noData": "เดือนนี้ยังไม่มียอด"
   },
   "openedByModel": {
     "title": "รายงานเปิดสัญญาตามรุ่น",
@@ -4611,7 +4627,11 @@
     "commissionOwner_newAssignee": "ผู้รับคนใหม่",
     "commissionOwner_pickPlaceholder": "เลือกพนักงานในสาขา",
     "commissionOwner_sameWarning": "เลือกพนักงานคนอื่นเพื่อเปลี่ยนผู้รับ",
-    "commissionOwner_hint": "การเปลี่ยนผู้รับคอมมิชชั่นต้องใส่ PIN ของสาขา และทำได้เฉพาะสัญญาที่ยังอยู่ในสถานะ DRAFT หรือ SAVING",
+    "commissionOwner_hint": "การเปลี่ยนผู้รับคอมมิชชั่นต้องใส่ PIN ของสาขา และเลือกได้เฉพาะพนักงานในสาขาที่จัดทำสัญญา",
+    "commissionOwner_changedTitle": "เปลี่ยนผู้รับคอมมิชชั่นแล้ว",
+    "commissionOwner_previous": "ผู้รับเดิม",
+    "commissionOwner_new": "ผู้รับคนใหม่",
+    "commissionOwner_alreadyGrantedWarning": "สัญญานี้ออกค่าคอมให้ผู้รับเดิมไปแล้ว — เงินที่จ่ายไปไม่ย้ายตาม การเปลี่ยนนี้มีผลกับการแสดงผลและรายงานนับจากนี้เท่านั้น",
     "commissionOwner_save": "บันทึก",
     "handover_title": "รายการอุปกรณ์ที่มอบให้ลูกค้า",
     "handover_hint": "ติ๊กเฉพาะของที่ส่งมอบจริง ของไหนขาดให้เอาออก รายการนี้จะเก็บใน audit",
@@ -6329,6 +6349,7 @@
       "slipImageAlt": "สลิปการชำระ",
       "slipNote": "มี {{count}} รายการ · ฿{{total}} มาจากการโอนหลังร้าน",
       "transferFront": "โอนหน้าร้าน",
+      "transferFrontDetail": "รับ {{received}} − คืน {{refunded}}",
       "transferBack": "โอนหลังร้าน (ส่งสลิปตรวจ)",
       "transferBackDetail": "ตรวจแล้ว {{count}} สลิป · กลับรายการ {{reversed}} · สุทธิ {{net}}",
       "channelFrontSuffix": "(หน้าร้าน)",

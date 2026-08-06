@@ -38,7 +38,7 @@ import {
 } from '../lib/scope';
 import {
   todayISO,
-  type BranchTodaySummaryRow,
+  type BranchDashboardTodayRow,
   type DayCloseHistoryRow,
   type Branch,
 } from './accounting/accountingTypes';
@@ -282,11 +282,14 @@ export function DashboardPage() {
   const rankCols = useRankCols();
   const RANK_PAGE_SIZE = RANK_ROWS * rankCols;
 
+  // v_branch_dashboard_today (mig 1019) carries the same money columns as
+  // v_branch_today_summary plus contracts_opened, so the ranking card gets the
+  // contract count without a second round-trip.
   const leaderboardQuery = useQuery({
     queryKey: ['dashboard', 'leaderboard', sk, today],
     queryFn: () =>
-      apiClient.get<BranchTodaySummaryRow[]>(
-        `/v_branch_today_summary?bill_date=eq.${today}${sq}&order=received_total.desc`,
+      apiClient.get<BranchDashboardTodayRow[]>(
+        `/v_branch_dashboard_today?bill_date=eq.${today}${sq}&order=received_total.desc`,
       ),
     enabled: showLeaderboard,
   });
@@ -299,7 +302,7 @@ export function DashboardPage() {
 
   // Full ranked list: every in-scope branch, joined to today's summary (or ฿0).
   const rankedBranches = useMemo(() => {
-    const summaryByBranch = new Map<number, BranchTodaySummaryRow>();
+    const summaryByBranch = new Map<number, BranchDashboardTodayRow>();
     (leaderboardQuery.data ?? []).forEach((r) => summaryByBranch.set(r.branch_id, r));
 
     // Restrict the branch universe to the current scope. Company scope → that
@@ -318,6 +321,7 @@ export function DashboardPage() {
           received_cash: s?.received_cash ?? 0,
           received_transfer: s?.received_transfer ?? 0,
           received_wallet: s?.received_wallet ?? 0,
+          contracts_opened: s?.contracts_opened ?? 0,
         };
       })
       .sort((a, b) => (b.received_total - a.received_total) || a.name.localeCompare(b.name));
@@ -596,6 +600,14 @@ export function DashboardPage() {
                             <span className="truncate flex items-center gap-2 min-w-0">
                               <span className="text-subtle tabular-nums w-6 shrink-0">{rank}.</span>
                               <span className="truncate">{b.name}</span>
+                              {/* Contracts opened today — a count, not baht, so it
+                                  sits beside the name rather than on the money line
+                                  below. Hidden at 0 to keep quiet branches clean. */}
+                              {b.contracts_opened > 0 && (
+                                <Badge size="xs" color="info" className="shrink-0">
+                                  {t('dashboard.contractsOpenedBadge', { count: b.contracts_opened })}
+                                </Badge>
+                              )}
                             </span>
                             <span className="font-medium whitespace-nowrap tabular-nums">
                               {fmtCurrency(b.received_total)}

@@ -278,6 +278,8 @@
     },
     "branchRanking": "Branch ranking today",
     "branchRankingHint": "All branches ranked by today's received total",
+    "contractsOpenedBadge_one": "{{count}} contract",
+    "contractsOpenedBadge_other": "{{count}} contracts",
     "rankPageOf": "Page {{page}} / {{total}}",
     "flag": {
       "voidHigh": "Void count high",
@@ -491,6 +493,8 @@
     "retailSales": "Retail Sales",
     "retailSalesByType": "Retail Sales by Type",
     "collectionMonthly": "Billed vs Collected",
+    "commissionSales": "Sales Performance",
+    "commissionStaff": "Staff Performance",
     "financierForm": "Financier Form (RICH)",
     "notifications": "Notifications",
     "branchExpense": "Branch Expense"
@@ -557,6 +561,18 @@
     "tipDay": "Day",
     "tipContracts": "Contracts",
     "noData": "No contracts opened this month"
+  },
+  "commissionReport": {
+    "titleSales": "Sales Performance",
+    "titleStaff": "Staff Performance",
+    "allBranches": "All branches",
+    "contractsN_one": "{{count}} contract",
+    "contractsN_other": "{{count}} contracts",
+    "sumContracts": "Contracts",
+    "sumFinanced": "Financed total",
+    "sumPeople": "People",
+    "rankHint": "company-wide rank",
+    "noData": "No results for this month yet"
   },
   "openedByModel": {
     "title": "Contracts Opened by Model",
@@ -4616,7 +4632,11 @@
     "commissionOwner_newAssignee": "New assignee",
     "commissionOwner_pickPlaceholder": "Pick a staff member from this branch",
     "commissionOwner_sameWarning": "Pick a different staff member to change the assignee.",
-    "commissionOwner_hint": "Reassigning the commission owner requires the branch PIN. Editable only while the contract is in DRAFT or SAVING.",
+    "commissionOwner_hint": "Reassigning the commission owner requires the branch PIN. Only staff at the contract's own branch can be chosen.",
+    "commissionOwner_changedTitle": "Commission owner changed",
+    "commissionOwner_previous": "Previous owner",
+    "commissionOwner_new": "New owner",
+    "commissionOwner_alreadyGrantedWarning": "Commission for this contract was already paid to the previous owner. That payout does not move — this change affects the displayed owner and reports from here on only.",
     "commissionOwner_save": "Save",
     "handover_title": "Handover checklist",
     "handover_hint": "Tick the items you handed to the customer. Untick if missing — this goes into the contract audit trail.",
@@ -6334,6 +6354,7 @@
       "slipImageAlt": "Payment slip",
       "slipNote": "{{count}} payment(s) · ฿{{total}} came from back-office transfers",
       "transferFront": "Transfer (front-store)",
+      "transferFrontDetail": "received {{received}} − refunded {{refunded}}",
       "transferBack": "Transfer (back-office · slip-checked)",
       "transferBackDetail": "{{count}} slip(s) checked · reversed {{reversed}} · net {{net}}",
       "channelFrontSuffix": "(front-store)",

@@ -129,6 +129,35 @@ export interface BranchTodaySummaryRow {
   pending_amount: number;
 }
 
+/**
+ * Today-only branch row for the dashboard ranking (`v_branch_dashboard_today`).
+ *
+ * Same money columns as `v_branch_today_summary` plus `contracts_opened`
+ * (mig 1019) — contracts activated today and not voided, live, `0` (never null)
+ * for a branch with none. `received_wallet` here spans all three wallets
+ * (SAVING + CREDIT + INSURANCE), so `received_total` includes them.
+ */
+export interface BranchDashboardTodayRow {
+  holding_id: number;
+  company_id: number;
+  branch_id: number;
+  branch_code: string;
+  branch_name: string;
+  bill_date: string;
+  is_day_closed: boolean;
+  has_activity: boolean;
+  bill_count: number;
+  received_cash: number;
+  received_transfer: number;
+  received_wallet: number;
+  received_total: number;
+  remit_total: number;
+  refund_total: number;
+  pending_bill_count: number;
+  pending_amount: number;
+  contracts_opened: number;
+}
+
 export interface BranchBalanceRow {
   holding_id: number;
   company_id: number;
@@ -374,6 +403,13 @@ export interface ReconcileChannelSummary {
   // transfer_front_total + slip_payment_total = net_transfer.
   transfer_front_count: number;
   transfer_front_total: number;
+  // mig 1014 — where transfer_front_total came from, before refunds were netted
+  // out. transfer_front_refund is the amount paid back out through the front-store
+  // transfer channel (from CREDIT_NOTE bills) and is POSITIVE. Invariant:
+  // transfer_front_in − transfer_front_refund = transfer_front_total.
+  // Summary only — by_branch[] does not carry these two.
+  transfer_front_in: number;
+  transfer_front_refund: number;
   slip_payment_count: number;
   slip_payment_total: number;
   slip_reversed_total: number;
