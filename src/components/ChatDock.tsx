@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Badge, Button } from 'tsp-form';
 import { MessageSquare, Minus, X, ExternalLink, ArrowLeft } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { apiClient } from '../lib/api';
 import { useChatDock } from '../contexts/ChatDockContext';
 import {
@@ -157,10 +157,17 @@ export function ChatDock() {
                 <div className="text-sm font-medium truncate">
                   {listView ? t('chat.title') : title}
                 </div>
-                {!listView && inboxRow?.contract_code_display && (
-                  <div className="text-xs text-subtle truncate tabular-nums">
-                    {inboxRow.contract_code_display}
-                  </div>
+                {!listView && inboxRow?.contract_code_display && contractId !== null && (
+                  // Jump to the contract this thread belongs to. Sits inside the
+                  // drag handle, so onPointerDown's control check keeps a click
+                  // here from being read as the start of a drag.
+                  <Link
+                    to={`/admin/contracts/search/${contractId}`}
+                    className="text-xs text-primary-fg hover:underline truncate tabular-nums inline-flex items-center gap-1 max-w-full"
+                  >
+                    <span className="truncate">{inboxRow.contract_code_display}</span>
+                    <ExternalLink size={11} className="shrink-0" />
+                  </Link>
                 )}
               </div>
               {!listView && contractId !== null && (
