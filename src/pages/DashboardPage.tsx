@@ -19,12 +19,24 @@ import {
   Smartphone,
   PenLine,
   QrCode,
+  CalendarRange,
+  Trophy,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../lib/api';
 import { fmtCurrency } from '../lib/format';
 import { DateTime } from '../components/DateTime';
 import { useAuth } from '../contexts/AuthContext';
 import { DashboardScopePicker } from '../components/DashboardScopePicker';
+import { MonthPicker } from '../components/MonthPicker';
+import {
+  ContractsOpenedChart,
+  ChartLegend,
+  monthStartIso,
+  useDayPoints,
+  useMonthTotals,
+  type MonthlyRow,
+  type DayPoint,
+} from '../components/ContractsOpenedChart';
 import { PushSubscribeBanner } from '../components/PushSubscribeBanner';
 import { MediaLightbox } from '../components/MediaLightbox';
 import { useBranchPaymentAccounts, type BranchPaymentAccount } from '../components/BranchPaymentAccountField';
@@ -116,7 +128,7 @@ interface TodayRollup {
 }
 
 export function DashboardPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const canApprove = !!user?.role_code && APPROVER_ROLES.has(user.role_code);
   const isBranchUser = !!user?.branch_id;
@@ -334,6 +346,27 @@ export function DashboardPage() {
   // Reset to page 1 when scope changes (branch set shifts) or the column count
   // changes (page size changes, current page may no longer exist).
   useEffect(() => { setRankPage(0); }, [sk, rankCols]);
+
+  // ── Ranking card: flip to the month's opened-contracts report ──────────
+  // Same RPC the รายงานเปิดสัญญา page uses; scope is JWT-bound server-side, so
+  // no permission filter travels with it. Only fetched once the user flips.
+  const [rankView, setRankView] = useState<'today' | 'month'>('today');
+  const [rankMonth, setRankMonth] = useState<Date>(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
+  const rankMonthIso = monthStartIso(rankMonth);
+  const monthlyQuery = useQuery({
+    queryKey: ['dashboard', 'contracts-opened-monthly', rankMonthIso],
+    queryFn: () => apiClient.rpc<MonthlyRow[]>('fn_contracts_opened_monthly', {
+      p_month: rankMonthIso,
+      p_branch_id: null,
+    }),
+    enabled: showLeaderboard && rankView === 'month',
+  });
+  const monthPoints = useDayPoints(monthlyQuery.data ?? []);
+  const monthTotals = useMonthTotals(monthPoints);
+  const monthHasData = monthTotals.agreed > 0 || monthTotals.contracts > 0;
 
   return (
     <>
@@ -580,9 +613,49 @@ export function DashboardPage() {
         {showLeaderboard && (
           <section>
             <div className="border border-line bg-surface rounded-lg p-4">
-              <h3 className="text-sm font-semibold mb-1">{t('dashboard.branchRanking')}</h3>
-              <div className="text-xs text-subtle mb-3">{t('dashboard.branchRankingHint')}</div>
-              {leaderboardQuery.isLoading || branchesQuery.isLoading ? (
+              {/* Header — title/hint on the left, view toggle on the right. The
+                  toggle flips the same card between today's branch ranking and
+                  the month's opened-contracts chart (both are "who opened what"). */}
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-semibold mb-1">
+                    {rankView === 'today' ? t('dashboard.branchRanking') : t('dashboard.rankMonthTitle')}
+                  </h3>
+                  <div className="text-xs text-subtle">
+                    {rankView === 'today' ? t('dashboard.branchRankingHint') : t('dashboard.rankMonthHint')}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {rankView === 'month' && (
+                    <div className="max-sm:hidden" style={{ width: '11rem' }}>
+                      <MonthPicker value={rankMonth} onChange={setRankMonth} lang={i18n.language} />
+                    </div>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    startIcon={rankView === 'today' ? <CalendarRange size={16} /> : <Trophy size={16} />}
+                    onClick={() => setRankView((v) => (v === 'today' ? 'month' : 'today'))}
+                  >
+                    {rankView === 'today' ? t('dashboard.rankFlipToMonth') : t('dashboard.rankFlipToToday')}
+                  </Button>
+                </div>
+              </div>
+              {rankView === 'month' && (
+                <div className="sm:hidden mb-3">
+                  <MonthPicker value={rankMonth} onChange={setRankMonth} lang={i18n.language} />
+                </div>
+              )}
+              {rankView === 'month' ? (
+                <MonthOpenedView
+                  loading={monthlyQuery.isLoading}
+                  fetching={monthlyQuery.isFetching}
+                  hasData={monthHasData}
+                  points={monthPoints}
+                  totals={monthTotals}
+                  t={t}
+                />
+              ) : leaderboardQuery.isLoading || branchesQuery.isLoading ? (
                 <div className="text-sm text-subtle py-6 text-center">—</div>
               ) : rankedBranches.length === 0 ? (
                 <div className="text-sm text-subtle py-6 text-center">
@@ -665,6 +738,55 @@ export function DashboardPage() {
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────
+
+// Month view of the branch-ranking card — the same bars as the รายงานเปิดสัญญา
+// page, over a compact totals strip. Shorter chart than the full report page
+// (this sits in a card among other sections, not on its own screen).
+function MonthOpenedView({ loading, fetching, hasData, points, totals, t }: {
+  loading: boolean;
+  fetching: boolean;
+  hasData: boolean;
+  points: DayPoint[];
+  totals: { contracts: number; agreed: number; down: number };
+  t: (key: string, opts?: Record<string, unknown>) => string;
+}) {
+  if (loading) {
+    return <div className="text-sm text-subtle py-6 text-center">—</div>;
+  }
+  if (!hasData) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-2 py-10 text-subtler">
+        <TrendingUp size={28} strokeWidth={1.5} />
+        <span className="text-sm">{t('contractsOpened.noData')}</span>
+      </div>
+    );
+  }
+  return (
+    <div className={fetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
+      <div className="flex items-stretch divide-x divide-line border border-line rounded-md mb-3">
+        <MonthTotalCell label={t('contractsOpened.sumContracts')} value={String(totals.contracts)} />
+        <MonthTotalCell label={t('contractsOpened.sumAgreed')} value={`฿${fmtCurrency(totals.agreed)}`} />
+        <MonthTotalCell label={t('contractsOpened.sumDown')} value={`฿${fmtCurrency(totals.down)}`} />
+      </div>
+      <ChartLegend
+        downLabel={t('contractsOpened.legendDown')}
+        financedLabel={t('contractsOpened.legendFinanced')}
+      />
+      <div className="h-[260px]">
+        <ContractsOpenedChart points={points} />
+      </div>
+    </div>
+  );
+}
+
+function MonthTotalCell({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex-1 px-3 py-2 min-w-0">
+      <div className="text-xs text-subtle truncate">{label}</div>
+      <div className="text-base font-semibold tabular-nums truncate">{value}</div>
+    </div>
+  );
+}
 
 // Today's receiving account — branch-level users only. Compact, right-aligned
 // in the desktop header so it doesn't push the title down. Account number

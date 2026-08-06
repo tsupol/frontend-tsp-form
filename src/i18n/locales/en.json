@@ -281,6 +281,10 @@
     "contractsOpenedBadge_one": "{{count}} contract",
     "contractsOpenedBadge_other": "{{count}} contracts",
     "rankPageOf": "Page {{page}} / {{total}}",
+    "rankMonthTitle": "Contracts opened this month",
+    "rankMonthHint": "Agreed value per day — down payment and financed portion",
+    "rankFlipToMonth": "This month",
+    "rankFlipToToday": "Ranking",
     "flag": {
       "voidHigh": "Void count high",
       "voidAmountHigh": "Void amount high",
@@ -558,7 +562,6 @@
     "downHint": "Cash collected",
     "legendDown": "Down payment",
     "legendFinanced": "Installment (financed)",
-    "tipDay": "Day",
     "tipContracts": "Contracts",
     "noData": "No contracts opened this month"
   },
@@ -5441,6 +5444,7 @@
     "thb": "THB",
     "fin2Calc": "Custom Calculator",
     "fin2UsingRate": "Using profit rate from",
+    "termOverMax": "Max {{max}} months — did the installment and the term get swapped?",
     "useThisPlan": "Use This Plan",
     "autoFill": "Auto-fill",
     "discount": "Discount",

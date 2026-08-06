@@ -280,6 +280,10 @@
     "contractsOpenedBadge_one": "เปิด {{count}} สัญญา",
     "contractsOpenedBadge_other": "เปิด {{count}} สัญญา",
     "rankPageOf": "หน้า {{page}} / {{total}}",
+    "rankMonthTitle": "เปิดสัญญาเดือนนี้",
+    "rankMonthHint": "ยอดจัดรายวัน — แยกเงินดาวน์กับยอดผ่อน",
+    "rankFlipToMonth": "เดือนนี้",
+    "rankFlipToToday": "อันดับสาขา",
     "flag": {
       "voidHigh": "Void เยอะ",
       "voidAmountHigh": "ยอด void สูง",
@@ -557,7 +561,6 @@
     "downHint": "เงินสดที่เก็บได้",
     "legendDown": "เงินดาวน์",
     "legendFinanced": "ยอดผ่อน",
-    "tipDay": "วันที่",
     "tipContracts": "จำนวนสัญญา",
     "noData": "ไม่มีสัญญาที่เปิดในเดือนนี้"
   },
@@ -5436,6 +5439,7 @@
     "thb": "บาท",
     "fin2Calc": "คำนวณเอง",
     "fin2UsingRate": "ใช้อัตรากำไรของ",
+    "termOverMax": "ไม่เกิน {{max}} งวด — กรอกสลับช่องค่างวดกับจำนวนงวดหรือเปล่า?",
     "useThisPlan": "ใช้แผนนี้",
     "autoFill": "เติมอัตโนมัติ",
     "discount": "ส่วนลด",
