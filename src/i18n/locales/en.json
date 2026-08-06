@@ -6733,6 +6733,7 @@
       "collapse": "Minimise",
       "close": "Close chat",
       "openFullPage": "Open in chat page",
+      "backToList": "All conversations",
       "noThread": "No conversation open yet. Open one from the chat page or a contract.",
       "openChat": "Chat with customer"
     },

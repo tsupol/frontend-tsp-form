@@ -2,13 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Badge, Button } from 'tsp-form';
-import { MessageSquare, Minus, X, ExternalLink } from 'lucide-react';
+import { MessageSquare, Minus, X, ExternalLink, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../lib/api';
+import { useChatDock } from '../contexts/ChatDockContext';
 import {
-  useChatDock, CHAT_BUBBLE_SIZE, CHAT_PANEL_WIDTH, CHAT_PANEL_HEIGHT,
-} from '../contexts/ChatDockContext';
+  CHAT_BUBBLE_SIZE, CHAT_PANEL_WIDTH, CHAT_PANEL_HEIGHT,
+} from '../contexts/chatDockGeometry';
 import { ChatThreadPanel } from '../pages/chat/ChatThreadPanel';
+import { ChatDockList } from './ChatDockList';
 import { MediaLightbox } from './MediaLightbox';
 import type { ChatInboxRow } from '../pages/chat/chatTypes';
 
@@ -27,8 +29,8 @@ export function ChatDock() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const {
-    visible, expanded, contractId, position,
-    setExpanded, closeDock, setPosition,
+    visible, expanded, contractId, position, listView,
+    setExpanded, closeDock, setPosition, openChat, showList,
   } = useChatDock();
 
   const [lightboxKey, setLightboxKey] = useState<string | null>(null);
@@ -138,16 +140,30 @@ export function ChatDock() {
                 dragging ? 'cursor-grabbing' : 'cursor-grab'
               }`}
             >
-              <MessageSquare size={16} className="shrink-0 text-subtle" />
+              {listView ? (
+                <MessageSquare size={16} className="shrink-0 text-subtle" />
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="btn-icon-sm shrink-0"
+                  startIcon={<ArrowLeft size={14} />}
+                  onClick={showList}
+                  aria-label={t('chat.dock.backToList')}
+                  title={t('chat.dock.backToList')}
+                />
+              )}
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium truncate">{title}</div>
-                {inboxRow?.contract_code_display && (
+                <div className="text-sm font-medium truncate">
+                  {listView ? t('chat.title') : title}
+                </div>
+                {!listView && inboxRow?.contract_code_display && (
                   <div className="text-xs text-subtle truncate tabular-nums">
                     {inboxRow.contract_code_display}
                   </div>
                 )}
               </div>
-              {contractId !== null && (
+              {!listView && contractId !== null && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -179,10 +195,11 @@ export function ChatDock() {
             </div>
 
             <div className="flex-1 min-h-0 flex flex-col">
-              {contractId === null ? (
-                <div className="flex-1 flex items-center justify-center text-center text-subtler text-sm p-6">
-                  {t('chat.dock.noThread')}
-                </div>
+              {listView || contractId === null ? (
+                <ChatDockList
+                  selectedContractId={contractId}
+                  onSelect={openChat}
+                />
               ) : (
                 <ChatThreadPanel
                   contractId={contractId}

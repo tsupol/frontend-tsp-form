@@ -1,6 +1,9 @@
 import {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode,
 } from 'react';
+import {
+  clampPosition, dockSizeFor, DEFAULT_DOCK_POSITION, type DockPosition,
+} from './chatDockGeometry';
 
 /**
  * Floating chat dock — a chat-head bubble that expands into the thread panel,
@@ -14,31 +17,9 @@ import {
 
 /** Persisted so the dock comes back where the user parked it. */
 const STORAGE_KEY = 'chatDock';
-/** Bubble diameter (px) — mirrors the w-14/h-14 on the button. */
-export const CHAT_BUBBLE_SIZE = 56;
-/** Keep at least this much of the bubble on screen when clamping. */
-const EDGE_MARGIN = 8;
 
-/**
- * Bubble position is stored as a distance from the RIGHT/BOTTOM edges rather
- * than absolute x/y: the dock lives bottom-right, so anchoring to those edges
- * keeps it visually put when the window resizes. Absolute coords would drift
- * off-screen the moment the viewport shrinks.
- */
-export interface DockPosition {
-  right: number;
-  bottom: number;
-}
-
-const DEFAULT_POSITION: DockPosition = { right: 24, bottom: 24 };
-
-/** Expanded panel size — must match the ChatDock render. */
-export const CHAT_PANEL_WIDTH = 380;
-export const CHAT_PANEL_HEIGHT = 560;
-
-const sizeFor = (expanded: boolean) => (expanded
-  ? { width: CHAT_PANEL_WIDTH, height: CHAT_PANEL_HEIGHT }
-  : { width: CHAT_BUBBLE_SIZE, height: CHAT_BUBBLE_SIZE });
+const DEFAULT_POSITION = DEFAULT_DOCK_POSITION;
+const sizeFor = dockSizeFor;
 
 interface PersistedState {
   contractId: number | null;
@@ -61,28 +42,6 @@ function readPersisted(): PersistedState {
   }
 }
 
-/**
- * Keep the dock on screen. Without this, a position saved on a wide monitor
- * puts it off-screen on a laptop with no way to drag it back.
- *
- * The bounds depend on which state is rendered: the dock is anchored to the
- * right/bottom edges, so a `bottom` that is fine for a 56px bubble can push a
- * 560px panel's top off the viewport. Clamping against the CURRENT size keeps
- * both states reachable — clamping only against the bubble let the expanded
- * panel escape upward (and, once collapsed, stranded the bubble below the fold).
- */
-export function clampPosition(
-  pos: DockPosition,
-  size: { width: number; height: number } = { width: CHAT_BUBBLE_SIZE, height: CHAT_BUBBLE_SIZE },
-): DockPosition {
-  const maxRight = Math.max(EDGE_MARGIN, window.innerWidth - size.width - EDGE_MARGIN);
-  const maxBottom = Math.max(EDGE_MARGIN, window.innerHeight - size.height - EDGE_MARGIN);
-  return {
-    right: Math.min(Math.max(pos.right, EDGE_MARGIN), maxRight),
-    bottom: Math.min(Math.max(pos.bottom, EDGE_MARGIN), maxBottom),
-  };
-}
-
 interface ChatDockValue {
   /** Dock present on screen at all (bubble or panel). Off = nothing rendered. */
   visible: boolean;
@@ -94,6 +53,10 @@ interface ChatDockValue {
 
   /** Show the dock on a specific thread and expand it. */
   openChat: (contractId: number) => void;
+  /** Back to the conversation list (keeps the thread selected for highlight). */
+  showList: () => void;
+  /** True when the dock is showing the list instead of a thread. */
+  listView: boolean;
   /** Nav toggle: show/hide the whole dock. */
   toggleDock: () => void;
   /** Collapse to bubble / expand to panel. */
@@ -111,6 +74,9 @@ export function ChatDockProvider({ children }: { children: ReactNode }) {
   const [expanded, setExpandedState] = useState(true);
   const [contractId, setContractId] = useState<number | null>(initial.contractId);
   const [position, setPositionState] = useState<DockPosition>(initial.position);
+  // Start on the list when there's no thread to resume; otherwise straight into
+  // the last conversation, which is what "resume what I was doing" means.
+  const [listView, setListView] = useState(initial.contractId === null);
 
   // Persist the thread + position, not `visible` — the dock starts hidden every
   // session. Restoring it open would put a panel over the page on every login.
@@ -129,21 +95,26 @@ export function ChatDockProvider({ children }: { children: ReactNode }) {
 
   const openChat = useCallback((id: number) => {
     setContractId(id);
+    setListView(false);
     setVisible(true);
     setExpandedState(true);
     setPositionState(prev => clampPosition(prev, sizeFor(true)));
   }, []);
 
+  const showList = useCallback(() => setListView(true), []);
+
   const toggleDock = useCallback(() => {
     setVisible(prev => {
-      // Opening from the nav lands on the last thread, expanded.
+      // Opening from the nav lands on the last thread, expanded — or on the
+      // list when there is no thread to resume.
       if (!prev) {
         setExpandedState(true);
+        setListView(current => (contractId === null ? true : current));
         setPositionState(p => clampPosition(p, sizeFor(true)));
       }
       return !prev;
     });
-  }, []);
+  }, [contractId]);
 
   const closeDock = useCallback(() => setVisible(false), []);
 
@@ -165,9 +136,12 @@ export function ChatDockProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo<ChatDockValue>(() => ({
-    visible, expanded, contractId, position,
-    openChat, toggleDock, setExpanded, closeDock, setPosition,
-  }), [visible, expanded, contractId, position, openChat, toggleDock, setExpanded, closeDock, setPosition]);
+    visible, expanded, contractId, position, listView,
+    openChat, showList, toggleDock, setExpanded, closeDock, setPosition,
+  }), [
+    visible, expanded, contractId, position, listView,
+    openChat, showList, toggleDock, setExpanded, closeDock, setPosition,
+  ]);
 
   return <ChatDockContext.Provider value={value}>{children}</ChatDockContext.Provider>;
 }

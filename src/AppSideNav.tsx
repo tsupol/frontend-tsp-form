@@ -279,7 +279,6 @@ export const AppSideNav = () => {
             // a full page). stopPropagation so it never triggers navigation.
             badge: (
               <span key="chat-nav-actions" className="inline-flex items-center gap-1">
-                {base.badge}
                 {!menuCollapsed && !isMobile && (
                   <span
                     role="button"
@@ -299,6 +298,7 @@ export const AppSideNav = () => {
                     <PictureInPicture2 size={13} />
                   </span>
                 )}
+                {base.badge}
               </span>
             ),
           };

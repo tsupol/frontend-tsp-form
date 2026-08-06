@@ -4,20 +4,17 @@ import { useSearchParams } from 'react-router-dom';
 import { useQuery, keepPreviousData, useQueryClient } from '@tanstack/react-query';
 import {
   PageNav, PageNavPanel, MobileHeader, DataTableFooter,
-  Badge, Button, Input, PopOver, Select, Tooltip,
+  Button, Input, PopOver, Select,
 } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, ChevronDown, CheckCircle2, Circle, Image as ImageIcon, Pin, SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, ChevronDown, CheckCircle2, Circle, SlidersHorizontal } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { wsClient } from '../../lib/api/ws';
 import { useAuth } from '../../contexts/AuthContext';
-import { formatSmart } from '../../lib/format';
 import { MediaLightbox } from '../../components/MediaLightbox';
 import { ChatThreadPanel } from './ChatThreadPanel';
+import { ChatListRow } from './ChatListRow';
 import { CHAT_STATUS_VALUES, type ChatInboxRow, type ChatStatus } from './chatTypes';
-import {
-  chatStatusBadgeColor, contractStateBadgeColor, contractStateLabel,
-  sortChatRowsByStatusThenRecency,
-} from './chatStatus';
+import { sortChatRowsByStatusThenRecency } from './chatStatus';
 
 type StatusFilter = ChatStatus | 'NONE' | null;
 
@@ -313,74 +310,17 @@ export function ChatPage() {
                   <div className="p-8 text-center text-subtle text-sm">{t('chat.empty')}</div>
                 ) : (
                   <div className="flex flex-col">
-                    {rows.map(row => {
-                      const isSelected = selectedContractId === row.contract_id;
-                      const isImage = row.last_message_type === 'IMAGE';
-                      return (
-                        <button
-                          key={row.contract_id}
-                          type="button"
-                          className={`text-left px-3 py-2.5 border-b border-line cursor-pointer transition-colors ${
-                            isSelected ? 'bg-primary-soft' : 'hover:bg-surface-hover'
-                          }`}
-                          onClick={() => selectThread(row.contract_id, isMobile ? goTo : undefined)}
-                        >
-                          <div className="flex items-start justify-between gap-2 min-w-0">
-                            <div className="text-sm font-medium truncate min-w-0">
-                              {row.customer_name ?? '—'}
-                            </div>
-                            <div className="flex flex-col items-end gap-1 shrink-0">
-                              <span className="text-[11px] text-subtle tabular-nums">
-                                {formatSmart(row.last_message_at, i18n.language)}
-                              </span>
-                              {row.unread_count > 0 && (
-                                <Badge size="sm" color="primary">{row.unread_count}</Badge>
-                              )}
-                            </div>
-                          </div>
-                          {/* One flex-wrap cluster: code + all badges flow to a
-                              second line when the rail is too narrow to fit them
-                              on one row, instead of overlapping. */}
-                          <div className="flex items-center flex-wrap gap-x-2 gap-y-1 mt-0.5">
-                            <div className="text-[11px] text-subtle truncate font-mono min-w-0 max-w-full">
-                              {row.contract_code_display}
-                            </div>
-                            {showBranch && row.branch_name && (
-                              <Badge size="xs" color="secondary">{row.branch_name}</Badge>
-                            )}
-                            {/* Contract-state badge — only when not ACTIVE, so the
-                                339 normal rooms stay uncluttered (BE §3). */}
-                            {row.contract_state && row.contract_state !== 'ACTIVE' && (
-                              <Badge size="xs" color={contractStateBadgeColor(row.contract_state)}>
-                                {contractStateLabel(row.contract_state, t)}
-                              </Badge>
-                            )}
-                            {row.chat_status && (
-                              <Badge size="xs" color={chatStatusBadgeColor(row.chat_status)}>
-                                {t(`chat.status.${row.chat_status}`)}
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="text-xs text-subtle truncate mt-0.5">
-                            {isImage ? (
-                              <span className="inline-flex items-center gap-1">
-                                <ImageIcon size={12} /> {t('chat.imageMessage')}
-                              </span>
-                            ) : (
-                              row.last_message_text ?? ''
-                            )}
-                          </div>
-                          {row.pinned_note && (
-                            <Tooltip content={row.pinned_note} placement="bottom">
-                              <div className="flex items-center gap-1 text-[11px] text-subtle mt-1 min-w-0">
-                                <Pin size={11} className="shrink-0 text-warning" />
-                                <span className="truncate">{row.pinned_note}</span>
-                              </div>
-                            </Tooltip>
-                          )}
-                        </button>
-                      );
-                    })}
+                    {rows.map(row => (
+                      <ChatListRow
+                        key={row.contract_id}
+                        row={row}
+                        selected={selectedContractId === row.contract_id}
+                        onSelect={() => selectThread(row.contract_id, isMobile ? goTo : undefined)}
+                        showBranch={showBranch}
+                        lang={i18n.language}
+                        t={t}
+                      />
+                    ))}
                   </div>
                 )}
               </div>
