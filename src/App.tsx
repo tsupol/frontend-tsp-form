@@ -13,6 +13,8 @@ import { DashboardPage } from './pages/DashboardPage';
 import { UserPage } from './pages/UserPage';
 import { EnrollRedirectPage } from './pages/EnrollRedirectPage';
 import { HoldingSelectModal } from './components/HoldingSelectModal';
+import { ChatDockProvider } from './contexts/ChatDockContext';
+import { ChatDock } from './components/ChatDock';
 import { UsersPage } from './pages/UsersPage';
 import { BrandsPage } from './pages/products/BrandsPage';
 import { FamiliesPage } from './pages/products/FamiliesPage';
@@ -147,6 +149,9 @@ function AdminLayout({ children }: { children: ReactNode }) {
       <div className="flex-grow w-full better-scroll">
         {children}
       </div>
+      {/* Floating chat — fixed-position, so it sits outside the scroll pane and
+          renders on every admin route without affecting page layout. */}
+      <ChatDock />
     </div>
   );
 }
@@ -192,7 +197,7 @@ function App() {
   }
 
   return (
-    <>
+    <ChatDockProvider>
     <RealtimeBridge />
     <HoldingSelectModal open={isAuthenticated && needsHoldingSelect} />
     <Routes>
@@ -1377,7 +1382,7 @@ function App() {
       {/* Catch-all redirect */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
-    </>
+    </ChatDockProvider>
   );
 }
 

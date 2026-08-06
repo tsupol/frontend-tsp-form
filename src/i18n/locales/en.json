@@ -6727,6 +6727,15 @@
     "empty": "No conversations",
     "emptyThread": "No messages yet",
     "loadingOlder": "Loading earlier messages…",
+    "dock": {
+      "toggle": "Floating chat",
+      "expand": "Open chat",
+      "collapse": "Minimise",
+      "close": "Close chat",
+      "openFullPage": "Open in chat page",
+      "noThread": "No conversation open yet. Open one from the chat page or a contract.",
+      "openChat": "Chat with customer"
+    },
     "unreadBelow": "Unread messages below",
     "unknownStaff": "Staff",
     "unknownCustomer": "Customer",

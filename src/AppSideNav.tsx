@@ -48,6 +48,7 @@ import {
   Gavel, ShieldCheck,
   // Chat
   MessageSquare,
+  PictureInPicture2,
   // NNF Extra (NNF App console + NNF MDM)
   Smartphone, Sparkles, MonitorSmartphone,
   // Dev sandbox
@@ -63,6 +64,7 @@ import { useTheme } from './contexts/ThemeContext';
 import { useNavGuard } from './contexts/NavGuardContext';
 import { isLocalDev } from './lib/devEnv';
 import { useNavCounts } from './hooks/useNavCounts';
+import { useChatDock } from './contexts/ChatDockContext';
 import { NotificationMenuItem } from './components/NotificationMenu';
 
 const lgQuery = window.matchMedia('(min-width: 1024px)');
@@ -181,6 +183,7 @@ export const AppSideNav = () => {
   const isRepoRole = ['COMPANY_REPO', 'HOLDING_REPO', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
   const isRepoAdmin = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
   const canChat = can('CONTRACT.CHAT');
+  const { visible: dockVisible, toggleDock } = useChatDock();
 
   const {
     pendingApprovals,
@@ -264,12 +267,42 @@ export const AppSideNav = () => {
       path: '/admin/payment-submissions',
     },
     ...(canChat
-      ? [{
-          key: 'chat',
-          ...iconWithCount(<MessageSquare size="1rem" />, unreadChatCount),
-          label: t('nav.chat'),
-          path: '/admin/chat',
-        }]
+      ? [(() => {
+          const base = iconWithCount(<MessageSquare size="1rem" />, unreadChatCount);
+          return {
+            key: 'chat',
+            ...base,
+            label: t('nav.chat'),
+            path: '/admin/chat',
+            // Toggle for the floating dock, alongside the unread count. Hidden
+            // when collapsed (no room) and on mobile (no dock there — chat is
+            // a full page). stopPropagation so it never triggers navigation.
+            badge: (
+              <span key="chat-nav-actions" className="inline-flex items-center gap-1">
+                {base.badge}
+                {!menuCollapsed && !isMobile && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    aria-label={t('chat.dock.toggle')}
+                    title={t('chat.dock.toggle')}
+                    onClick={(e) => { e.stopPropagation(); e.preventDefault(); toggleDock(); }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.stopPropagation(); e.preventDefault(); toggleDock();
+                      }
+                    }}
+                    className={`inline-flex items-center justify-center w-5 h-5 rounded transition-colors cursor-pointer hover:bg-surface-hover ${
+                      dockVisible ? 'text-primary-fg' : 'text-subtle'
+                    }`}
+                  >
+                    <PictureInPicture2 size={13} />
+                  </span>
+                )}
+              </span>
+            ),
+          };
+        })()]
       : []),
     // NNF Extra — labels are NNF brand names, intentionally English in every
     // language (owner: the name signals "NNF designed this"). Content inside

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Badge, Button, Input, Modal, TextArea, Tooltip, useSnackbarContext, resizeToVariants } from 'tsp-form';
-import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, Download, Pause, Play, Square, Ban, Settings2, AlertTriangle, CalendarClock, Repeat } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, Download, Pause, Play, Square, Ban, Settings2, AlertTriangle, CalendarClock, Repeat, MessageSquare } from 'lucide-react';
 import { GenerateContractPdfModal } from './GenerateContractPdfModal';
 import type { BeMediaContractDoc } from '../../lib/beMedia';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -15,6 +15,7 @@ import { useBillPdfDownload } from '../../hooks/useBillPdfDownload';
 import { beMediaUploadFromImage, beMediaDelete } from '../../lib/beMedia';
 import { toStoragePath, normalizeKey } from '../../lib/mediaPath';
 import { useAuth } from '../../contexts/AuthContext';
+import { useChatDock } from '../../contexts/ChatDockContext';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { ColorSwatch } from '../../components/ColorAutocomplete';
@@ -309,6 +310,7 @@ function ScrollableTabs<T extends string>({ tabs, activeTab, onTabChange, render
 export function ContractDetailPanel({ contractId, isMobile }: { contractId: number; isMobile: boolean }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const { openChat } = useChatDock();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
   const initialTab: DetailTab = (TABS as readonly string[]).includes(tabParam ?? '')
@@ -440,6 +442,20 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
           {contract.commercial_model && (
             <span className="text-xs text-subtle">{contract.commercial_model}</span>
           )}
+          {/* Chat with the customer without leaving the contract — opens the
+              floating dock on this contract's thread (doc 66 §④). Contracts
+              with no chat yet open an empty room; the first message starts it. */}
+          <div className="ml-auto">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="btn-icon-sm"
+              startIcon={<MessageSquare size={16} />}
+              onClick={() => openChat(contract.id)}
+              aria-label={t('chat.dock.openChat')}
+              title={t('chat.dock.openChat')}
+            />
+          </div>
         </div>
       )}
 
