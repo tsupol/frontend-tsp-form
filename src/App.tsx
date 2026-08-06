@@ -113,6 +113,7 @@ import { OpenedByModelReportPage } from './pages/accounting/OpenedByModelReportP
 import { RetailSalesMonthlyReportPage } from './pages/accounting/RetailSalesMonthlyReportPage';
 import { RetailSalesByTypeReportPage } from './pages/accounting/RetailSalesByTypeReportPage';
 import { CollectionMonthlyReportPage } from './pages/accounting/CollectionMonthlyReportPage';
+import { CommissionMonthlyReportPage } from './pages/accounting/CommissionMonthlyReportPage';
 import { FinancierFormFeedPage } from './pages/accounting/FinancierFormFeedPage';
 import { BranchExpenseLayout } from './pages/branch-expense/BranchExpenseLayout';
 import { ExpenseEntriesPage } from './pages/branch-expense/ExpenseEntriesPage';
@@ -1232,6 +1233,26 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <AccountingLayout><CollectionMonthlyReportPage /></AccountingLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/accounting/commission-sales"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <AccountingLayout><CommissionMonthlyReportPage kind="sales" /></AccountingLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/accounting/commission-staff"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <AccountingLayout><CommissionMonthlyReportPage kind="staff" /></AccountingLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

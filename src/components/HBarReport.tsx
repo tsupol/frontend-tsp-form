@@ -49,12 +49,12 @@ export function HBarReport({
   const max = rows.reduce((m, r) => Math.max(m, r.value), 0) || 1;
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2">
       {rows.map((row) => {
         const pctOfMax = (row.value / max) * 100;
         const muted = isMuted?.(row) ?? false;
         return (
-          <div key={row.key} className="flex flex-col gap-1">
+          <div key={row.key} className="flex flex-col gap-0.5">
             {/* Label row: name left, end label right */}
             <div className="flex items-baseline justify-between gap-3 min-w-0">
               <div className="min-w-0">
@@ -72,7 +72,7 @@ export function HBarReport({
             {/* Bar track — deliberately slim. A ranked list is read down the
                 labels; a tall bar turns each row into a block and the page
                 stops scanning as a list. */}
-            <div className="h-2.5 rounded bg-surface-soft overflow-hidden flex" style={{ width: `${pctOfMax}%`, minWidth: row.value > 0 ? '2px' : 0 }}>
+            <div className="h-1.5 rounded bg-surface-soft overflow-hidden flex" style={{ width: `${pctOfMax}%`, minWidth: row.value > 0 ? '2px' : 0 }}>
               {row.segments && row.segments.length > 0 ? (
                 row.segments.map((seg, i) => (
                   <div

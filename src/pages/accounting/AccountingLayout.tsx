@@ -5,7 +5,7 @@ import { Badge } from 'tsp-form';
 import {
   CalendarCheck, Scale, Receipt, ShieldAlert, Banknote, FileSpreadsheet,
   ClipboardList, Coins, ArrowUpRight, TrendingUp, ListChecks, Package, Wallet,
-  ShoppingBag, PieChart,
+  ShoppingBag, PieChart, Trophy, Users,
 } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -56,6 +56,9 @@ export function AccountingLayout({ children }: { children: ReactNode }) {
       { type: 'link' as const, path: '/admin/accounting/collection-monthly', labelKey: 'nav.collectionMonthly', icon: Wallet },
       { type: 'link' as const, path: '/admin/accounting/reports', labelKey: 'nav.dailyReports', icon: FileSpreadsheet },
     ] : []),
+    // Open to every role — a branch caller sees their own row + real rank.
+    { type: 'link', path: '/admin/accounting/commission-sales', labelKey: 'nav.commissionSales', icon: Trophy },
+    { type: 'link', path: '/admin/accounting/commission-staff', labelKey: 'nav.commissionStaff', icon: Users },
     ...(canSeeFinancier ? [
       { type: 'link' as const, path: '/admin/accounting/financier-form', labelKey: 'nav.financierForm', icon: ClipboardList },
     ] : []),
