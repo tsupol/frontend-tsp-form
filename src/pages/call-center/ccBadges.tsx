@@ -48,10 +48,11 @@ export function FlagChip({
   );
 }
 
-/** A single flag as a colored circle with its severity_rank number inside.
- *  Colour-blind safe: the number distinguishes levels when hue can't (green/red).
- *  title + aria-label carry the full "Auto: Orange (3)" text for screen readers.
- *  `emphasize` thickens the ring (used on the Auto dot when flags diverge). */
+/** A single flag as a filled pill carrying the level NAME, tinted with the
+ *  level colour from the DB. The word is what's read — the colour only
+ *  reinforces it, so the flag stays legible under CVD and at a glance.
+ *  (It was a bare rank number in a dot before: "กำหนดเอง: ⓿" told the user
+ *  nothing without hovering.) `emphasize` rings the Auto pill on divergence. */
 function FlagDot({
   code, levels, source, emphasize = false,
 }: {
@@ -65,19 +66,18 @@ function FlagDot({
   const rank = flagRank(levels, code);
   const sourceWord = t(source === 'auto' ? 'callCenter.flagAuto' : 'callCenter.flagManual');
   const full = `${sourceWord}: ${flagLabel(t, code)}${rank != null ? ` (${rank})` : ''}`;
-  // WHITE (rank 0) needs dark text; the rest read on white.
-  const textOnDot = code === 'WHITE' ? '#374151' : '#ffffff';
+  // WHITE (rank 0) is a pale swatch — its label needs dark ink to read.
+  const ink = code === 'WHITE' ? '#374151' : '#ffffff';
   return (
     <span
       title={full}
       aria-label={full}
-      role="img"
-      className={`inline-flex items-center justify-center w-4 h-4 rounded-full shrink-0 text-[9px] font-semibold leading-none tabular-nums ${
+      className={`inline-flex items-center rounded-full shrink-0 px-1.5 py-0.5 text-[10px] font-medium leading-none ${
         emphasize ? 'ring-2 ring-offset-1 ring-warning-fg' : ''
       }`}
-      style={{ backgroundColor: color, color: textOnDot }}
+      style={{ backgroundColor: color, color: ink }}
     >
-      {rank ?? ''}
+      {flagLabel(t, code)}
     </span>
   );
 }
@@ -109,14 +109,17 @@ export function FlagPair({
   const { t } = useTranslation();
 
   if (compact) {
+    // Source is the icon (cpu = auto, user = manual), level is the pill's word.
+    // Spelling out "Auto:"/"Manual:" as well doubled the row's text for no
+    // extra information, and pushed the actual level off the end on mobile.
     return (
-      <span className="inline-flex items-center gap-2 text-[11px] text-subtle">
+      <span className="inline-flex items-center gap-2">
         <span className="inline-flex items-center gap-1">
-          {t('callCenter.flagAuto')}:
+          <Cpu size={12} className="shrink-0 text-subtle" />
           <FlagDot code={auto} levels={levels} source="auto" emphasize={divergent} />
         </span>
         <span className="inline-flex items-center gap-1">
-          {t('callCenter.flagManual')}:
+          <User size={12} className="shrink-0 text-subtle" />
           <FlagDot code={manual} levels={levels} source="manual" />
         </span>
       </span>
