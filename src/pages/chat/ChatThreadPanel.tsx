@@ -42,6 +42,9 @@ const TEXTAREA_LINE_HEIGHT_PX = 20;
 const MESSAGE_PAGE_SIZE = 50;
 /** Distance from the top that triggers loading the previous page. */
 const LOAD_OLDER_THRESHOLD_PX = 120;
+/** Within this distance of the bottom, incoming messages keep the view pinned
+ *  there. Past it the user is reading history and must not be yanked. */
+const FOLLOW_BOTTOM_THRESHOLD_PX = 120;
 
 interface Props {
   contractId: number | null;
@@ -78,6 +81,8 @@ export function ChatThreadPanel({
   const [uploading, setUploading] = useState(false);
   const [selectedSlip, setSelectedSlip] = useState<SubmissionRow | null>(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
+  /** Bumped on send so the scroll effect re-runs immediately, not on the next poll. */
+  const [sendTick, setSendTick] = useState(0);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -190,6 +195,9 @@ export function ChatThreadPanel({
     setComposer('');
     setSendError('');
     setEmojiOpen(false);
+    // A freshly opened thread starts pinned to its newest message.
+    stickToBottom.current = true;
+    wasAtBottom.current = 0;
   }, [contractId]);
 
   const markedRef = useRef<number | null>(null);
@@ -265,8 +273,23 @@ export function ChatThreadPanel({
   // row the user was reading. (CSS overflow-anchor does this natively but
   // Safari doesn't implement it, so the manual restore stays.)
   const pendingPrependHeight = useRef<number | null>(null);
+  // Set when the user sends: their own message must always land at the bottom,
+  // even if they had scrolled up to read history. Incoming messages don't get
+  // this — yanking someone away from what they're reading is worse than a
+  // missed scroll, and the count comparison already handles the common case
+  // where they're sitting at the bottom.
+  const forceScrollBottom = useRef(false);
+  // How far from the bottom the user was BEFORE this render. Measured on the
+  // scroll event, because by the time a layout effect runs the new message has
+  // already grown the content and the distance no longer reflects intent.
+  const wasAtBottom = useRef(0);
+  // While true, any content growth re-pins the view to the bottom. Set when we
+  // scroll there; cleared as soon as the user scrolls up.
+  const stickToBottom = useRef(true);
   const loadOlderMessages = () => {
     if (!hasOlderMessages || isFetchingOlderMessages || !scrollRef.current) return;
+    // Reading history — the prepend must not be yanked back to the bottom.
+    stickToBottom.current = false;
     pendingPrependHeight.current = scrollRef.current.scrollHeight;
     fetchOlderMessages();
   };
@@ -282,31 +305,89 @@ export function ChatThreadPanel({
   }, [itemCount]);
 
   useLayoutEffect(() => {
-    if (!scrollRef.current) return;
+    const el = scrollRef.current;
+    if (!el) return;
     // A prepend is settling — the effect above owns scroll position this pass.
     if (pendingPrependHeight.current !== null) return;
     const contractChanged = lastSeenContract.current !== contractId;
     const newItems = itemCount > lastSeenCount.current;
-    if (contractChanged || newItems) {
-      // On contract change, prefer the unread divider as the landing position
-      // (Slack / Line behavior) so the user sees context above + new below.
-      // Falls through to bottom-scroll when no divider is present or new items
-      // arrived without a contract switch.
-      let scrolled = false;
-      if (contractChanged) {
-        const divider = scrollRef.current.querySelector<HTMLElement>('[data-chat-unread-divider]');
-        if (divider) {
-          divider.scrollIntoView({ block: 'center' });
-          scrolled = true;
-        }
-      }
-      if (!scrolled) {
-        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-      }
+    const forced = forceScrollBottom.current;
+    if (!contractChanged && !newItems && !forced) return;
+    // Only clear the force flag once the sent message has actually landed.
+    // setQueryData resolves a tick or two after onSuccess, so clearing it on
+    // the first render after send would consume it before the new row exists —
+    // the scroll then waited for the next poll (~5s late).
+    if (forced && newItems) forceScrollBottom.current = false;
+
+    // An incoming message only pulls the view down if the user was already at
+    // the bottom. Someone who scrolled up to read history keeps their place —
+    // being yanked away mid-sentence is worse than having to scroll down. Our
+    // OWN sends bypass this (forced), as does opening a thread.
+    //
+    // wasAtBottom is captured on the scroll event, i.e. BEFORE this render grew
+    // the content. Measuring here instead would include the new message's own
+    // height and read as "scrolled up" every time.
+    if (newItems && !contractChanged && !forced
+        && wasAtBottom.current > FOLLOW_BOTTOM_THRESHOLD_PX) {
       lastSeenCount.current = itemCount;
-      lastSeenContract.current = contractId;
+      return;
     }
-  }, [contractId, itemCount, unreadAnchorId]);
+
+    // On contract change, prefer the unread divider as the landing position
+    // (Slack / Line behavior) so the user sees context above + new below.
+    // Falls through to bottom-scroll when no divider is present or new items
+    // arrived without a contract switch.
+    let scrolled = false;
+    if (contractChanged && !forced) {
+      const divider = el.querySelector<HTMLElement>('[data-chat-unread-divider]');
+      if (divider) {
+        divider.scrollIntoView({ block: 'center' });
+        scrolled = true;
+        // Landed mid-thread on purpose — don't let the pin drag it down.
+        stickToBottom.current = false;
+      }
+    }
+    if (!scrolled) {
+      const pin = () => {
+        el.scrollTop = el.scrollHeight;
+        // Keep the follow-check honest: a programmatic scroll may not fire a
+        // scroll event before the next message arrives, and a stale distance
+        // would read as "user scrolled up" and stop following.
+        wasAtBottom.current = 0;
+      };
+      pin();
+
+      // The content keeps growing AFTER this effect runs: the optimistic
+      // bubble is replaced by the server row, images resolve their intrinsic
+      // size, text rewraps. Measured on a real send — the effect pinned
+      // correctly at t=198ms, then the list grew 33px at t=243ms and the view
+      // was left short. Watch for those late changes and re-pin.
+      stickToBottom.current = true;
+    }
+    lastSeenCount.current = itemCount;
+    lastSeenContract.current = contractId;
+  }, [contractId, itemCount, unreadAnchorId, sendTick]);
+
+  // Hold the view at the bottom while `stickToBottom` is set, re-pinning on
+  // every size change until the user scrolls away.
+  //
+  // Chasing the settle with a timer did not work: content grows in several
+  // late bursts (optimistic bubble -> server row -> image/text reflow) and a
+  // fixed window sometimes closed first, leaving the newest message 40-80px
+  // below the fold on roughly half of sends. A standing observer has no such
+  // race — it simply re-pins whenever the content moves.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const target = el.firstElementChild ?? el;
+    const observer = new ResizeObserver(() => {
+      if (!stickToBottom.current) return;
+      el.scrollTop = el.scrollHeight;
+      wasAtBottom.current = 0;
+    });
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [contractId, itemCount]);
 
   // Auto-resize the textarea between 1 and MAX_TEXTAREA_LINES.
   useLayoutEffect(() => {
@@ -330,6 +411,12 @@ export function ChatThreadPanel({
     onSuccess: () => {
       setComposer('');
       setSendError('');
+      // Our own message always lands at the bottom, wherever the user was.
+      // The bump re-runs the scroll effect, whose deps would otherwise not
+      // change until the new row arrives from setQueryData.
+      forceScrollBottom.current = true;
+      stickToBottom.current = true;
+      setSendTick(n => n + 1);
       // Pull our own message in too — the WS echo may not come back to the
       // sender, and invalidating would refetch every loaded page.
       refreshNewestMessages().catch(err => console.warn('[chat] refresh failed', err));
@@ -558,7 +645,12 @@ export function ChatThreadPanel({
       <div
         ref={scrollRef}
         onScroll={e => {
-          if (e.currentTarget.scrollTop <= LOAD_OLDER_THRESHOLD_PX) loadOlderMessages();
+          const el = e.currentTarget;
+          const fromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+          wasAtBottom.current = fromBottom;
+          // Scrolling away releases the pin; scrolling back re-arms it.
+          stickToBottom.current = fromBottom <= FOLLOW_BOTTOM_THRESHOLD_PX;
+          if (el.scrollTop <= LOAD_OLDER_THRESHOLD_PX) loadOlderMessages();
         }}
         className="flex-1 min-h-0 overflow-auto better-scroll px-3 py-3 md:px-8"
       >
