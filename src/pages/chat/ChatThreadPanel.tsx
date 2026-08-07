@@ -50,6 +50,8 @@ const LOAD_OLDER_THRESHOLD_PX = 120;
  * lenient in the short dock.
  */
 const FOLLOW_BOTTOM_FRACTION = 0.5;
+/** Distance from the bottom past which the scroll-to-bottom button appears. */
+const SHOW_JUMP_BUTTON_PX = 200;
 
 interface Props {
   contractId: number | null;
@@ -93,6 +95,13 @@ export function ChatThreadPanel({
    * jump-to-bottom bar. Null when the view is following the bottom normally.
    */
   const [pendingBelow, setPendingBelow] = useState<ChatMessage | null>(null);
+  /**
+   * True while the view is scrolled away from the bottom, driving the
+   * scroll-to-bottom affordance. Mirrors what `stickToBottom` tracks in a ref —
+   * the ref is read inside effects where a re-render would be wrong, this is
+   * for rendering.
+   */
+  const [awayFromBottom, setAwayFromBottom] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -574,6 +583,7 @@ export function ChatThreadPanel({
     stickToBottom.current = true;
     wasAtBottom.current = 0;
     setPendingBelow(null);
+    setAwayFromBottom(false);
   };
 
   const timeline = useMemo(
@@ -706,6 +716,10 @@ export function ChatThreadPanel({
           stickToBottom.current = nearBottom;
           // Back in the live zone — the bar has nothing left to announce.
           if (nearBottom && pendingBelow) setPendingBelow(null);
+          // The button appears on any real scroll-away, well before the
+          // half-screen point where following stops — otherwise there is a dead
+          // zone where the view is off the bottom with no way back.
+          setAwayFromBottom(fromBottom > SHOW_JUMP_BUTTON_PX);
           if (el.scrollTop <= LOAD_OLDER_THRESHOLD_PX) loadOlderMessages();
         }}
         className="flex-1 min-h-0 overflow-auto better-scroll px-3 py-3 md:px-8"
@@ -748,6 +762,21 @@ export function ChatThreadPanel({
           </div>
         )}
       </div>
+
+      {/* Scroll-to-bottom button — any time the view is off the bottom, with or
+          without a new message. Sits above the preview bar when both show, so
+          the two never overlap. */}
+      {awayFromBottom && !pendingBelow && (
+        <button
+          type="button"
+          onClick={jumpToNewest}
+          aria-label={t('chat.scrollToBottom')}
+          title={t('chat.scrollToBottom')}
+          className="absolute right-3 bottom-1.5 md:right-8 z-10 flex items-center justify-center w-9 h-9 rounded-full border border-line bg-surface-elevated/95 backdrop-blur shadow-lg cursor-pointer hover:bg-surface-hover transition-colors animate-pop-in"
+        >
+          <ChevronDown size={18} className="text-subtle" />
+        </button>
+      )}
 
       {/* Jump-to-bottom bar — appears only when a message arrived while the
           user was reading back. One line, truncated, click to catch up. */}

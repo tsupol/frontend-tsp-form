@@ -6732,6 +6732,7 @@
     "emptyThread": "No messages yet",
     "loadingOlder": "Loading earlier messages…",
     "newMessage": "New message",
+    "scrollToBottom": "Jump to latest",
     "dock": {
       "toggle": "Floating chat",
       "expand": "Open chat",

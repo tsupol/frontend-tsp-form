@@ -6725,6 +6725,7 @@
     "emptyThread": "ยังไม่มีข้อความ",
     "loadingOlder": "กำลังโหลดข้อความก่อนหน้า…",
     "newMessage": "ข้อความใหม่",
+    "scrollToBottom": "ไปข้อความล่าสุด",
     "dock": {
       "toggle": "แชทลอย",
       "expand": "เปิดแชท",
