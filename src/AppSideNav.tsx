@@ -57,6 +57,7 @@ import {
   Stamp,
   Wallet,
   UserX,
+  Hourglass,
 } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
 import { getRoleLabel } from './lib/roleLabel';
@@ -352,6 +353,7 @@ export const AppSideNav = () => {
           ] : []),
         ] : []),
         { type: 'group' as const, key: 'grp-collections-reports', label: t('nav.groupCollectionsReports') },
+        { key: 'collections-overdue-aging', icon: <Hourglass size="1rem" />, label: t('nav.overdueAging'), path: '/admin/collections/overdue-aging' },
         { key: 'collections-timeline', icon: <Calendar size="1rem" />, label: t('nav.timelineOverview'), path: '/admin/collections/timeline' },
         ...(['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
           { type: 'group' as const, key: 'grp-collections-config', label: t('nav.groupCollectionsConfig') },

@@ -5,7 +5,7 @@
 import { useMemo, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { CalendarDays, Headset, Calendar as CalendarIcon, Settings, LayoutDashboard, Users, UserX, AlertTriangle, Users2 } from 'lucide-react';
+import { CalendarDays, Headset, Calendar as CalendarIcon, Settings, LayoutDashboard, Users, UserX, AlertTriangle, Users2, Hourglass } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavCounts } from '../../hooks/useNavCounts';
@@ -44,6 +44,7 @@ export function CollectionsLayout({ children }: { children: ReactNode }) {
       ] : []),
     ] : []),
     { type: 'group', labelKey: 'nav.groupCollectionsReports' },
+    { type: 'link', path: '/admin/collections/overdue-aging', labelKey: 'nav.overdueAging', icon: Hourglass },
     { type: 'link', path: '/admin/collections/timeline', labelKey: 'nav.timelineOverview', icon: CalendarIcon },
     ...(isAdmin ? [
       { type: 'group' as const, labelKey: 'nav.groupCollectionsConfig' },

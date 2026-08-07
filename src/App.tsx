@@ -78,6 +78,7 @@ import { RepoLayout } from './pages/repo/RepoLayout';
 import { RepoPoolPage } from './pages/repo/RepoPoolPage';
 import { RepoGrantsPage } from './pages/repo/RepoGrantsPage';
 import { TimelineOverviewPage } from './pages/collections/TimelineOverviewPage';
+import { OverdueAgingReportPage } from './pages/collections/OverdueAgingReportPage';
 import { BlacklistPage } from './pages/company/BlacklistPage';
 import { ICloudPoolPage } from './pages/company/ICloudPoolPage';
 import { BranchPinPage } from './pages/company/BranchPinPage';
@@ -959,6 +960,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <CollectionsLayout><TimelineOverviewPage /></CollectionsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/collections/overdue-aging"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <CollectionsLayout><OverdueAgingReportPage /></CollectionsLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

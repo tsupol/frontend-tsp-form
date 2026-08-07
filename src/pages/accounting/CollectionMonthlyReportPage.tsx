@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { MobileHeader, Select } from 'tsp-form';
-import { ArrowRightFromLine, Wallet } from 'lucide-react';
+import { ArrowRightFromLine, Wallet, Info } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList,
 } from 'recharts';
@@ -10,6 +10,8 @@ import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { fmtCurrency } from '../../lib/format';
 import { MonthPicker } from '../../components/MonthPicker';
+import { useCollectionContext } from '../collections/useCollectionContext';
+import { CollectionViewTabs } from '../collections/CollectionViewTabs';
 
 /* ───────────────────────────────────────────────────────────────────────────
  * รายงานเรียกเก็บ vs เก็บได้จริง — monthly billed-vs-collected stacked bar.
@@ -17,11 +19,22 @@ import { MonthPicker } from '../../components/MonthPicker';
  *   bottom (dark)  = collected_on_time  (เก็บตรงงวด)
  *   middle (mid)   = collected_late     (เก็บช้า — dunning team's recovery)
  *   top (faint)    = outstanding_total  (ยังค้าง)
- * Bar-top label = collection_pct (collected / expected). Data: POST /rpc/
- * fn_installments_collection_monthly — DENSE, one row per branch per month.
- * Company/holding view sums branches per month. Scope is JWT-bound; the
- * company/branch dropdowns only narrow inside the JWT's scope.
+ * Bar-top label = collection_pct (collected / expected).
+ *
+ * Three views over the SAME question, same chart, different data source:
+ *   branch  → fn_installments_collection_monthly  (dense, row per branch/month)
+ *   pool    → fn_installments_collection_pool     (dense, row per month)
+ *   my book → fn_installments_collection_my_book  (dense, row per month)
+ * The view is whichever tab the user pressed — never derived from role.
+ *
+ * ⛔ "สมุด" = contracts held RIGHT NOW. A contract changing hands moves its
+ * whole history to the new holder, so pool/my-book totals will NOT reconcile
+ * against the branch view (member books cross branches, and unassigned work
+ * isn't in either book view). By design — the screen answers "how collectable
+ * is the work in front of me", not "who performed how well last quarter".
+ *
  * Spec: UI_FEEDBACK/2026-07-29_IMPLEMENT_report_collection_monthly.md
+ *     + UI_FEEDBACK/2026-08-07_IMPLEMENT_report_collection_book_views.md
  * ─────────────────────────────────────────────────────────────────────────── */
 
 // Chart palette from src/chart-theme.css. Outstanding stays a neutral grey
@@ -32,11 +45,10 @@ const COLOR_LATE = 'var(--chart-4)';
 const COLOR_OUTSTANDING = 'var(--chart-neutral)';
 const MAX_MONTHS = 12;
 
+/** Shared shape of all three RPCs; the branch/pool identity columns only
+ *  appear in their own view and are never read by the chart. */
 interface CollectionRow {
   month: string;
-  branch_id: number;
-  branch_code: string;
-  branch_name: string;
   expected_total: number;
   collected_on_time: number;
   collected_late: number;
@@ -49,6 +61,7 @@ interface CollectionRow {
 
 interface Branch { id: number; name: string; company_id: number }
 interface Company { id: number; name: string }
+interface Pool { pool_id: number; pool_name: string }
 
 interface MonthPoint {
   month: string;
@@ -99,6 +112,10 @@ export function CollectionMonthlyReportPage() {
   });
   const [companyId, setCompanyId] = useState<string>('');
   const [branchId, setBranchId] = useState<string>('');
+  const [poolId, setPoolId] = useState<string>('');
+
+  const { context, view, setView, availableViews } = useCollectionContext();
+  const canPickScope = isHoldingScope || isCompanyScope;
 
   // Keep the range within MAX_MONTHS and ordered; the RPC clamps too, but a tidy
   // picker beats a silent clamp.
@@ -130,16 +147,42 @@ export function CollectionMonthlyReportPage() {
     enabled: isHoldingScope || isCompanyScope,
   });
 
+  // Pool picker only matters above branch scope — a BRANCH caller is clamped
+  // to their own pool by the RPC and p_pool_id is ignored.
+  const { data: pools = [] } = useQuery({
+    queryKey: ['collection-pools-active'],
+    queryFn: () => apiClient.get<Pool[]>('/v_collection_pools?select=pool_id,pool_name&is_active=is.true&order=pool_name'),
+    enabled: canPickScope && view === 'pool',
+  });
+
   const fromIso = monthStartIso(fromMonth);
   const toIso = monthStartIso(toMonth);
+
+  // One query per view — the three RPCs share a response shape, so the chart
+  // downstream never branches on which view produced the rows.
   const { data: rows = [], isFetching } = useQuery({
-    queryKey: ['collection-monthly', fromIso, toIso, companyId, branchId],
-    queryFn: () => apiClient.rpc<CollectionRow[]>('fn_installments_collection_monthly', {
-      p_month_from: fromIso,
-      p_month_to: toIso,
-      p_branch_id: branchId ? Number(branchId) : null,
-      p_company_id: companyId ? Number(companyId) : null,
-    }),
+    queryKey: ['collection-monthly', view, fromIso, toIso, companyId, branchId, poolId],
+    queryFn: () => {
+      if (view === 'pool') {
+        return apiClient.rpc<CollectionRow[]>('fn_installments_collection_pool', {
+          p_month_from: fromIso,
+          p_month_to: toIso,
+          p_pool_id: poolId ? Number(poolId) : null,
+        });
+      }
+      if (view === 'my_book') {
+        return apiClient.rpc<CollectionRow[]>('fn_installments_collection_my_book', {
+          p_month_from: fromIso,
+          p_month_to: toIso,
+        });
+      }
+      return apiClient.rpc<CollectionRow[]>('fn_installments_collection_monthly', {
+        p_month_from: fromIso,
+        p_month_to: toIso,
+        p_branch_id: branchId ? Number(branchId) : null,
+        p_company_id: companyId ? Number(companyId) : null,
+      });
+    },
   });
 
   // Collapse per-branch rows into one point per month (sum across branches).
@@ -184,11 +227,33 @@ export function CollectionMonthlyReportPage() {
 
   const companyOptions = companies.map((c) => ({ value: String(c.id), label: c.name }));
   const branchOptions = branches.map((b) => ({ value: String(b.id), label: b.name }));
+  const poolOptions = pools.map((p) => ({ value: String(p.pool_id), label: p.pool_name }));
 
   const fromPicker = <MonthPicker value={fromMonth} onChange={setFrom} lang={i18n.language} />;
   const toPicker = <MonthPicker value={toMonth} onChange={setTo} lang={i18n.language} />;
 
-  const companyPicker = isHoldingScope && (
+  const tabs = (
+    <CollectionViewTabs
+      views={availableViews}
+      value={view}
+      onChange={setView}
+      poolName={context?.member_pool_name ?? null}
+    />
+  );
+
+  const poolPicker = canPickScope && view === 'pool' && (
+    <Select
+      options={poolOptions}
+      value={poolId || null}
+      onChange={(v) => setPoolId((v as string) ?? '')}
+      placeholder={t('collectionMonthly.myPool')}
+      size="sm"
+      clearable
+      showChevron
+    />
+  );
+
+  const companyPicker = isHoldingScope && view === 'branch' && (
     <Select
       options={companyOptions}
       value={companyId || null}
@@ -200,7 +265,7 @@ export function CollectionMonthlyReportPage() {
     />
   );
 
-  const branchPicker = (isHoldingScope || isCompanyScope) && (
+  const branchPicker = canPickScope && view === 'branch' && (
     <Select
       options={branchOptions}
       value={branchId || null}
@@ -234,6 +299,7 @@ export function CollectionMonthlyReportPage() {
       <div className="flex-none px-4 py-2.5 border-b border-line flex flex-col gap-2 max-md:hidden">
         <h1 className="heading-2 whitespace-nowrap">{t('collectionMonthly.title')}</h1>
         <div className="flex items-center gap-3 flex-wrap">
+          {tabs}
           <div className="flex items-center gap-1.5">
             <div style={{ width: '11rem' }}>{fromPicker}</div>
             <span className="text-subtle">–</span>
@@ -241,11 +307,13 @@ export function CollectionMonthlyReportPage() {
           </div>
           {companyPicker && <div style={{ width: '12rem' }}>{companyPicker}</div>}
           {branchPicker && <div style={{ width: '12rem' }}>{branchPicker}</div>}
+          {poolPicker && <div style={{ width: '14rem' }}>{poolPicker}</div>}
         </div>
       </div>
 
       {/* Mobile pickers */}
       <div className="flex-none p-2 border-b border-line flex flex-col gap-2 md:hidden">
+        {tabs && <div className="overflow-x-auto hidden-scroll">{tabs}</div>}
         <div className="flex items-center gap-1.5">
           <div className="flex-1 min-w-0">{fromPicker}</div>
           <span className="text-subtle">–</span>
@@ -254,6 +322,7 @@ export function CollectionMonthlyReportPage() {
         <div className="flex items-center gap-2">
           {companyPicker && <div className="flex-1 min-w-0">{companyPicker}</div>}
           {branchPicker && <div className="flex-1 min-w-0">{branchPicker}</div>}
+          {poolPicker && <div className="flex-1 min-w-0">{poolPicker}</div>}
         </div>
       </div>
 
@@ -275,6 +344,12 @@ export function CollectionMonthlyReportPage() {
           </div>
         ) : (
           <div className="max-w-4xl mx-auto">
+            {view !== 'branch' && (
+              <p className="text-xs text-subtle flex items-start gap-1.5 mb-3">
+                <Info size={13} className="shrink-0 mt-0.5" />
+                <span>{t('collectionMonthly.bookNote')}</span>
+              </p>
+            )}
             <ChartLegend
               onTimeLabel={t('collectionMonthly.onTime')}
               lateLabel={t('collectionMonthly.late')}

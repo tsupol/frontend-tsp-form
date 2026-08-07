@@ -501,7 +501,8 @@
     "commissionStaff": "Staff Performance",
     "financierForm": "Financier Form (RICH)",
     "notifications": "Notifications",
-    "branchExpense": "Branch Expense"
+    "branchExpense": "Branch Expense",
+    "overdueAging": "Overdue Aging"
   },
   "ownerType": {
     "HOLDING": "Holding",
@@ -666,7 +667,9 @@
     "overallPct": "Collection rate",
     "collectionPct": "Collection rate",
     "installments": "Installments (paid/due)",
-    "noData": "No installments due in this range"
+    "noData": "No installments due in this range",
+    "myPool": "My pool",
+    "bookNote": "\"Book\" = the contracts held right now. A contract changing hands takes its whole history to the new holder, so these totals will not match the branch view."
   },
   "expenseByCategory": {
     "title": "Expense by Category",
@@ -1500,7 +1503,7 @@
     "variantsHint": "Variants share the same model price but track separately as SKUs (e.g. by color). Cannot be added later."
   },
   "callCenter": {
-    "title": "Collections",
+    "title": "Debt Collection",
     "myFocus": "My Focus",
     "myBook": "My Book",
     "transfer": {
@@ -6768,7 +6771,6 @@
     "imageTooLarge": "Image is too large",
     "selectToView": "Select a conversation",
     "detailsToggle": "Toggle details",
-    "newMessage": "New message",
     "newImage": "Sent a photo",
     "openThread": "Open",
     "today": "Today",
@@ -6974,5 +6976,36 @@
       "promise_tomorrow_customer": "Promise to pay tomorrow",
       "promise_missed_customer": "Promise missed"
     }
+  },
+  "overdueAging": {
+    "title": "Overdue Aging",
+    "allCompanies": "All companies",
+    "allBranches": "All branches",
+    "myPool": "My pool",
+    "sumContracts": "Overdue contracts",
+    "sumAmount": "Overdue amount",
+    "sumSlips": "Slips pending",
+    "slipHint": "Money may already be in",
+    "sumUnassigned": "Unassigned",
+    "unassignedPile": "Not yet assigned",
+    "groupEmpty": "Nothing overdue",
+    "contractsN": "{{count}} contracts",
+    "slipsN": "{{count}} awaiting slip",
+    "noData": "Nothing overdue right now",
+    "freshnessNote": "Days overdue are recalculated nightly (~03:00); amounts are live. Counts differ between tabs on purpose — they count different books and must not be reconciled.",
+    "bucket": {
+      "W_LT1": "< 1 week",
+      "W_1_2": "1–2 weeks",
+      "W_2_3": "2–3 weeks",
+      "W_3_4": "3–4 weeks",
+      "W_4_6": "4–6 weeks",
+      "W_6_8": "6–8 weeks",
+      "W_8_PLUS": "8+ weeks"
+    }
+  },
+  "collectionView": {
+    "branch": "By branch",
+    "pool": "Pool",
+    "my_book": "My book"
   }
 }

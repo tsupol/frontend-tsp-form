@@ -500,7 +500,8 @@
     "commissionStaff": "ยอดพนักงาน",
     "financierForm": "กรอกฟอร์ม RICH",
     "notifications": "การแจ้งเตือน",
-    "branchExpense": "ค่าใช้จ่ายสาขา"
+    "branchExpense": "ค่าใช้จ่ายสาขา",
+    "overdueAging": "รายงานยอดค้างชำระ"
   },
   "ownerType": {
     "HOLDING": "Holding",
@@ -665,7 +666,9 @@
     "overallPct": "เก็บได้รวม",
     "collectionPct": "อัตราเก็บได้",
     "installments": "งวด (จ่าย/ครบกำหนด)",
-    "noData": "ไม่มีค่างวดที่ครบกำหนดในช่วงนี้"
+    "noData": "ไม่มีค่างวดที่ครบกำหนดในช่วงนี้",
+    "myPool": "ทีมของฉัน",
+    "bookNote": "\"สมุด\" = ใบที่ถืออยู่ ณ ตอนนี้ — ใบย้ายมือ เลขเดือนเก่าย้ายตามมือทันที เลขจึงไม่ตรงกับมุมสาขา และห้ามเอามา reconcile กัน"
   },
   "expenseByCategory": {
     "title": "สัดส่วนค่าใช้จ่าย",
@@ -1499,7 +1502,7 @@
     "variantsHint": "Variant ใช้ราคารุ่นเดียวกันแต่แยก SKU ติดตามต่างกัน (เช่น สี) — เพิ่มภายหลังไม่ได้"
   },
   "callCenter": {
-    "title": "ติดตามหนี้",
+    "title": "ติดตามทวงหนี้",
     "myFocus": "โฟกัสของฉัน",
     "myBook": "สัญญาของฉัน",
     "transfer": {
@@ -6761,7 +6764,6 @@
     "imageTooLarge": "ไฟล์รูปภาพใหญ่เกินไป",
     "selectToView": "เลือกการสนทนา",
     "detailsToggle": "แสดง/ซ่อนรายละเอียด",
-    "newMessage": "ข้อความใหม่",
     "newImage": "ส่งรูปภาพ",
     "openThread": "เปิด",
     "today": "วันนี้",
@@ -6965,5 +6967,36 @@
       "promise_tomorrow_customer": "นัดชำระพรุ่งนี้",
       "promise_missed_customer": "ผิดนัดชำระ"
     }
+  },
+  "overdueAging": {
+    "title": "รายงานยอดค้างชำระ",
+    "allCompanies": "ทุกบริษัท",
+    "allBranches": "ทุกสาขา",
+    "myPool": "ทีมของฉัน",
+    "sumContracts": "สัญญาค้าง",
+    "sumAmount": "ยอดค้าง",
+    "sumSlips": "สลิปรอตรวจ",
+    "slipHint": "เงินอาจมาแล้ว",
+    "sumUnassigned": "ยังไม่แจก",
+    "unassignedPile": "ยังไม่แจก",
+    "groupEmpty": "ไม่มียอดค้าง",
+    "contractsN": "{{count}} สัญญา",
+    "slipsN": "รอสลิป {{count}}",
+    "noData": "ตอนนี้ไม่มียอดค้าง",
+    "freshnessNote": "จำนวนวันค้างอัปเดตทุกคืน ~03:00 ส่วนยอดเงินสดตามจริง · เลขแต่ละแท็บนับคนละชุด ไม่ต้องเท่ากัน และห้ามเอามา reconcile กัน",
+    "bucket": {
+      "W_LT1": "น้อยกว่า 1 สัปดาห์",
+      "W_1_2": "1–2 สัปดาห์",
+      "W_2_3": "2–3 สัปดาห์",
+      "W_3_4": "3–4 สัปดาห์",
+      "W_4_6": "4–6 สัปดาห์",
+      "W_6_8": "6–8 สัปดาห์",
+      "W_8_PLUS": "8 สัปดาห์ขึ้นไป"
+    }
+  },
+  "collectionView": {
+    "branch": "ภาพรวมสาขา",
+    "pool": "ทีม",
+    "my_book": "สมุดของฉัน"
   }
 }
