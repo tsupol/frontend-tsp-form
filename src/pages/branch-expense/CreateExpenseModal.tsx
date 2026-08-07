@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Modal, Button, Input, Select, InputDatePicker, MaskedInput,
+  Modal, Button, Input, Select, InputDatePicker, MaskedInput, ImageUploader,
   useSnackbarContext,
   type SelectItem,
 } from 'tsp-form';
@@ -14,6 +14,7 @@ import {
 import {
   uploadBranchExpenseSlipFromFile, beMediaDelete,
   BRANCH_EXPENSE_SLIP_MAX,
+  isImageFile, isHeicFile, convertHeicToJpeg,
   type BranchExpenseImage,
 } from '../../lib/beMedia';
 import { PaymentMethodChips } from './PaymentMethodChips';
@@ -50,7 +51,7 @@ export function CreateExpenseModal({ open, onClose, onSaved, items, branches, fi
   const [expenseDate, setExpenseDate] = useState(() => toLocalDateStr(new Date()));
   const [isTyping, setIsTyping] = useState(false);
   const [pendingPhotos, setPendingPhotos] = useState<File[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [converting, setConverting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
@@ -74,6 +75,7 @@ export function CreateExpenseModal({ open, onClose, onSaved, items, branches, fi
       setError(null);
       setBusy(false);
       setSavedEntry(null);
+      setConverting(false);
     }
   }, [open, fixedBranchId]);
 
@@ -96,6 +98,41 @@ export function CreateExpenseModal({ open, onClose, onSaved, items, branches, fi
 
   const isDirty = itemId !== '' || amount !== '' || vendor !== '' || payeeName !== ''
     || receiptNo !== '' || note !== '' || pendingPhotos.length > 0;
+
+  const isFull = pendingPhotos.length >= BRANCH_EXPENSE_SLIP_MAX;
+
+  // Single entry point for every way a photo arrives: picker, drop, or paste.
+  // Non-images are dropped silently-but-visibly (we tell the user) rather than
+  // queued as a tile that would fail at upload. HEIC is converted first —
+  // iPhone originals copied to a desktop browser arrive as .heic, which
+  // Chrome/Firefox cannot decode, so the tile would preview blank.
+  const addFiles = async (incoming: File[]) => {
+    if (incoming.length === 0) return;
+    const images = incoming.filter(isImageFile);
+    const rejected = incoming.length - images.length;
+    if (rejected > 0) setError(t('branchExpense.photoNotAnImage', { count: rejected }));
+    else setError(null);
+    if (images.length === 0) return;
+
+    const room = BRANCH_EXPENSE_SLIP_MAX - pendingPhotos.length;
+    const accepted = images.slice(0, Math.max(0, room));
+    if (images.length > room) setError(t('branchExpense.photoMaxReached', { max: BRANCH_EXPENSE_SLIP_MAX }));
+    if (accepted.length === 0) return;
+
+    if (accepted.some(isHeicFile)) {
+      setConverting(true);
+      try {
+        const converted = await Promise.all(accepted.map(convertHeicToJpeg));
+        setPendingPhotos(prev => [...prev, ...converted].slice(0, BRANCH_EXPENSE_SLIP_MAX));
+      } catch {
+        setError(t('branchExpense.photoHeicFailed'));
+      } finally {
+        setConverting(false);
+      }
+      return;
+    }
+    setPendingPhotos(prev => [...prev, ...accepted].slice(0, BRANCH_EXPENSE_SLIP_MAX));
+  };
 
   const handleClose = () => {
     if (phase === 'done') { onClose(); return; }
@@ -354,20 +391,13 @@ export function CreateExpenseModal({ open, onClose, onSaved, items, branches, fi
                   {/* Hidden multi-file input (computer + iPad photo library).
                       No `capture`: it would force one rear-camera shot and kill
                       multi-select. iPad's picker still offers "Take Photo". */}
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={(e) => {
-                      const files = Array.from(e.target.files ?? []);
-                      e.target.value = '';
-                      if (files.length === 0) return;
-                      setPendingPhotos(prev => [...prev, ...files].slice(0, BRANCH_EXPENSE_SLIP_MAX));
-                    }}
-                  />
-                  <div className="flex flex-wrap gap-2">
+                  {/* tsp-form's ImageUploader owns click + drag-and-drop (and the
+                      drag highlight) — same component the repair/sell-out photo
+                      modals use. Do NOT hand-roll a drop zone here; see
+                      .claude/image-upload-pattern.md. We keep our own thumbnail
+                      strip because this modal stages up to 5 photos inline and
+                      uploads them only after the entry row exists. */}
+                  <div className="flex flex-wrap gap-2 mb-2">
                     {pendingPhotos.map((file, i) => (
                       <SlipThumb
                         key={i}
@@ -376,19 +406,32 @@ export function CreateExpenseModal({ open, onClose, onSaved, items, branches, fi
                         onRemove={() => setPendingPhotos(prev => prev.filter((_, j) => j !== i))}
                       />
                     ))}
-                    {pendingPhotos.length < BRANCH_EXPENSE_SLIP_MAX && (
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={busy}
-                        className="w-20 h-20 shrink-0 rounded-md border-2 border-dashed border-line flex flex-col items-center justify-center gap-1 text-subtle hover:border-primary hover:text-primary hover:bg-surface-hover transition-colors cursor-pointer bg-transparent disabled:opacity-50"
-                      >
-                        {phase === 'attach'
-                          ? <Loader2 size={18} className="animate-spin" />
-                          : <><Camera size={18} /><span className="text-[10px] font-medium">{t('branchExpense.addPhoto')}</span></>}
-                      </button>
-                    )}
                   </div>
+                  {!isFull && (
+                    <ImageUploader
+                      multiple
+                      maxFiles={BRANCH_EXPENSE_SLIP_MAX - pendingPhotos.length}
+                      accept="image/*,.heic,.heif"
+                      disabled={busy || converting}
+                      // `sizes`/`resizeOptions` are deliberately omitted: the
+                      // save path re-resizes via uploadBranchExpenseSlipFromFile,
+                      // so we take originalFile and let that stay the one place
+                      // the slip resize spec is applied.
+                      onUpload={(imgs) => void addFiles(imgs.map(im => im.originalFile))}
+                      placeholder={
+                        <div className="image-uploader-content">
+                          {phase === 'attach' || converting
+                            ? <><Loader2 size={18} className="animate-spin" /><span>{t('branchExpense.photoConverting')}</span></>
+                            : <><Camera size={18} /><span>{t('branchExpense.photoDropHint')}</span></>}
+                        </div>
+                      }
+                    />
+                  )}
+                  {isFull && (
+                    <div className="text-xs text-subtle">
+                      {t('branchExpense.photoMaxReached', { max: BRANCH_EXPENSE_SLIP_MAX })}
+                    </div>
+                  )}
                 </div>
 
                 {error && (

@@ -433,7 +433,7 @@ export function ExpenseEntriesPage() {
                   return (
                     <button
                       key={r.id}
-                      className="w-full text-left px-4 py-3 flex items-center gap-3 transition-colors cursor-pointer"
+                      className="w-full text-left px-4 py-3 flex items-start gap-3 transition-colors cursor-pointer"
                       onClick={() => selectEntry(r.id, isMobile ? goTo : undefined)}
                     >
                       {thumbUrl ? (
@@ -443,43 +443,41 @@ export function ExpenseEntriesPage() {
                           <ImageIcon size={16} />
                         </div>
                       )}
+                      {/* Three short lines instead of one crowded meta row: the
+                          rail is ~430px, and code + date + payee + vendor + count
+                          on a single line truncated every field to unreadability.
+                          Line 1 title+amount, line 2 category+code+date (all
+                          fixed-width), line 3 the free-text names that actually
+                          need the room. */}
                       <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                        <div className="flex items-center gap-2 min-w-0">
+                        <div className="flex items-baseline gap-2 min-w-0">
                           <span className={`text-sm font-medium truncate ${r.is_voided ? 'line-through text-subtle' : ''}`}>
                             {r.item_name_th}
                           </span>
-                          <span className="text-xs text-subtler shrink-0 truncate">{r.category_name_th}</span>
+                          <span className={`text-sm font-semibold tabular-nums shrink-0 ml-auto ${r.is_voided ? 'line-through text-subtle' : ''}`}>
+                            ฿{fmtCurrency(r.amount)}
+                          </span>
                         </div>
                         <div className="text-xs text-subtle flex items-center gap-1.5 min-w-0">
-                          {r.code_display && (
-                            <>
-                              <span className="font-mono text-subtler shrink-0">{r.code_display}</span>
-                              <span>·</span>
-                            </>
-                          )}
+                          <span className="text-subtler truncate">{r.category_name_th}</span>
+                          <span className="shrink-0">·</span>
                           <DateTime value={r.expense_date} showTime={false} />
-                          {r.payee_name && (
-                            <>
-                              <span>·</span>
-                              <span className="truncate">{r.payee_name}</span>
-                            </>
-                          )}
-                          {r.vendor && (
-                            <>
-                              <span>·</span>
-                              <span className="truncate">{r.vendor}</span>
-                            </>
-                          )}
                           {!r.is_voided && r.image_count > 0 && (
-                            <>
-                              <span>·</span>
-                              <span className="inline-flex items-center gap-1"><ImageIcon size={10} />{r.image_count}</span>
-                            </>
+                            <span className="inline-flex items-center gap-1 shrink-0 ml-auto">
+                              <ImageIcon size={10} />{r.image_count}
+                            </span>
                           )}
                         </div>
-                      </div>
-                      <div className={`text-sm font-semibold tabular-nums shrink-0 ${r.is_voided ? 'line-through text-subtle' : ''}`}>
-                        ฿{fmtCurrency(r.amount)}
+                        {(r.payee_name || r.vendor || r.code_display) && (
+                          <div className="text-xs text-subtler flex items-center gap-1.5 min-w-0">
+                            {r.payee_name && <span className="truncate">{r.payee_name}</span>}
+                            {r.payee_name && r.vendor && <span className="shrink-0">·</span>}
+                            {r.vendor && <span className="truncate">{r.vendor}</span>}
+                            {r.code_display && (
+                              <span className="font-mono shrink-0 ml-auto">{r.code_display}</span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </button>
                   );

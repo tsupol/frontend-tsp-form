@@ -47,9 +47,40 @@ const variants = await resizeToVariants(
 
 ### ImageUploader (drag-drop UI)
 
+> ### ⛔ NEVER hand-roll a drop zone
+>
+> `ImageUploader` from `tsp-form` **already does click + drag-and-drop in one
+> element**, including the drag highlight (`.image-uploader-dragging`). If you
+> find yourself writing `onDrop` / `onDragOver` / `dataTransfer` / a
+> `dragDepth` counter, stop — you are rebuilding this component. There is no
+> `onDrop` handler anywhere in `src/`, and that is deliberate.
+>
+> This has been reinvented before: a custom drop zone shipped in the branch
+> expense modal that was **drop-only and could not be clicked**, because the
+> hand-rolled version forgot the click path the component gives free.
+>
+> **Multi-image is supported** — `multiple` + `maxFiles={n}`. Don't conclude
+> "there's no multi-image pattern" from the fact that most callers upload one
+> photo per modal (repair / sell-out / buyback all do). Set the two props.
+
 - `sizes` prop (multi-size): emits `UploadedImage.variants[label]`. Top-level `file` is undefined in this mode.
 - `resizeOptions` prop (single-size): emits top-level `UploadedImage.file`.
 - `onUpload(images: UploadedImage[])`. `originalFile` is the untouched source.
+- `placeholder` prop replaces the default "Click or drag image" body — use it to
+  restyle the zone rather than building your own container around a hidden input.
+- Staging several files before an id exists (the entry/row must be created first):
+  keep your own thumbnail strip + `File[]` state, feed it from
+  `onUpload(imgs => imgs.map(i => i.originalFile))`, and render `<ImageUploader>`
+  underneath. `CreateExpenseModal.tsx` is the reference for this shape.
+
+### HEIC input
+
+`isHeicFile` / `isImageFile` / `convertHeicToJpeg` live in `src/lib/beMedia.ts`.
+Conversion is canvas-based and works only where the browser decodes HEIC
+natively (**Safari/iOS** — where these files originate). Chrome/Firefox reject
+the decode and the caller shows a "convert to JPEG first" message. Covering
+desktop Chrome needs a WASM decoder (`heic2any` / `libheif-js`, ~1.5 MB) — not
+installed; ask before adding it.
 
 ## Stage 2 — transport (`src/lib/beMedia.ts`)
 

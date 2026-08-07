@@ -254,6 +254,56 @@ export function beMediaCanPresign(key: string): boolean {
   );
 }
 
+// ── Image file intake (picker / drag-drop / paste) ────────────────────
+// Shared by any upload surface that accepts files from more than one route.
+
+/** HEIC/HEIF from iPhone originals. Some browsers report an empty `type` for
+ *  these, so the extension is checked too. */
+export function isHeicFile(file: File): boolean {
+  const n = file.name.toLowerCase();
+  return file.type === 'image/heic' || file.type === 'image/heif'
+    || n.endsWith('.heic') || n.endsWith('.heif');
+}
+
+/** True for anything we can queue as a photo. HEIC counts — it is converted
+ *  before upload. A `type` of '' falls back to the extension (drag-drop from
+ *  some file managers omits the MIME type). */
+export function isImageFile(file: File): boolean {
+  if (file.type.startsWith('image/')) return true;
+  if (file.type === '') return /\.(jpe?g|png|gif|webp|bmp|heic|heif)$/i.test(file.name);
+  return false;
+}
+
+/**
+ * Convert a HEIC/HEIF File to JPEG using only browser APIs.
+ *
+ * Works where the browser can natively decode HEIC — Safari/iOS, which is
+ * where these files come from in practice. Chrome/Firefox cannot decode HEIC
+ * and `createImageBitmap` rejects, which surfaces to the user as a "convert
+ * this photo to JPEG first" message rather than a blank tile at upload time.
+ * Adding a WASM decoder (heic2any / libheif-js) would cover desktop Chrome at
+ * the cost of a ~1.5MB lazy chunk.
+ *
+ * Non-HEIC input is returned untouched.
+ */
+export async function convertHeicToJpeg(file: File): Promise<File> {
+  if (!isHeicFile(file)) return file;
+  const bitmap = await createImageBitmap(file);
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('canvas 2d context unavailable');
+    ctx.drawImage(bitmap, 0, 0);
+    const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/jpeg', 0.92));
+    if (!blob) throw new Error('HEIC conversion produced no output');
+    return new File([blob], file.name.replace(/\.hei[cf]$/i, '.jpg'), { type: 'image/jpeg' });
+  } finally {
+    bitmap.close();
+  }
+}
+
 // ── branch_expense_slip — hardcoded spec ──────────────────────────────
 // be-media is service-only soon; the spec discovery RPC (GET /upload/spec)
 // is misc-go-only and not reachable from FE through be-media. Hardcode the
