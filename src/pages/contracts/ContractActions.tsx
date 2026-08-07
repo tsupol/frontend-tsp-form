@@ -13,6 +13,7 @@ import { BranchPaymentAccountField } from '../../components/BranchPaymentAccount
 import { ColorSwatch } from '../../components/ColorAutocomplete';
 import { DateTime } from '../../components/DateTime';
 import { useAuth } from '../../contexts/AuthContext';
+import { useChatDock } from '../../contexts/ChatDockContext';
 import { mimeFromKey } from '../../lib/upload';
 import {
   beMediaUploadFromImage,
@@ -779,6 +780,7 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { openChat } = useChatDock();
   const [activeAction, setActiveAction] = useState<ContractAction | null>(null);
   const { addSnackbar } = useSnackbarContext();
 
@@ -1051,7 +1053,13 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
               color="primary"
               size="sm"
               startIcon={<MessageSquare size={14} />}
-              onClick={() => navigate(`/admin/chat?contract=${contract.id}`)}
+              // Desktop opens the floating dock so the contract stays on screen
+              // while replying; mobile has no dock, so it navigates. The query
+              // matches the dock's own `hidden md:block`.
+              onClick={() => {
+                if (window.matchMedia('(min-width: 768px)').matches) openChat(contract.id);
+                else navigate(`/admin/chat?contract=${contract.id}`);
+              }}
             >
               {t('nav.chat')}
             </Button>

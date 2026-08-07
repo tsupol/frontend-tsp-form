@@ -13,6 +13,7 @@ import {
   MessageSquare, Cloud,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import { useChatDock } from '../../contexts/ChatDockContext';
 import { DateTime } from '../../components/DateTime';
 import { formatTel, fmtCurrency } from '../../lib/format';
 import {
@@ -656,8 +657,16 @@ export function ContractDunningDetail({
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
+  const { openChat } = useChatDock();
   const [activeTab, setActiveTab] = useState<DetailTab>(initialTab ?? 'overview');
   const [focusPending, setFocusPending] = useState(false);
+
+  // Desktop opens the floating dock so the collector keeps the dunning detail
+  // on screen while replying. Mobile has no dock — chat is a full page there.
+  const handleChatCustomer = () => {
+    if (isMobile) navigate(`/admin/chat?contract=${contractId}`);
+    else openChat(contractId);
+  };
 
   useEffect(() => { if (initialTab) setActiveTab(initialTab); }, [initialTab]);
 
@@ -708,7 +717,7 @@ export function ContractDunningDetail({
               variant="outline"
               size="sm"
               startIcon={<MessageSquare size={14} />}
-              onClick={() => navigate(`/admin/chat?contract=${contractId}`)}
+              onClick={handleChatCustomer}
             >
               {t('callCenter.chatCustomer')}
             </Button>
@@ -743,7 +752,7 @@ export function ContractDunningDetail({
               variant="outline"
               size="sm"
               startIcon={<MessageSquare size={14} />}
-              onClick={() => navigate(`/admin/chat?contract=${contractId}`)}
+              onClick={handleChatCustomer}
             >
               {t('callCenter.chatCustomer')}
             </Button>

@@ -60,6 +60,24 @@ export function ChatDock() {
     enabled: visible && contractId !== null,
   });
 
+  // v_branch_chat_list only has a row once a contract has been chatted, so a
+  // room opened from a contract that never has one leaves the header with no
+  // name and no code — exactly the "open an empty room" case doc 66 §④ calls
+  // for. Fall back to the contract itself to fill those two lines.
+  const { data: contractFallback } = useQuery({
+    queryKey: ['chat-dock-contract-fallback', contractId],
+    queryFn: async () => {
+      const rows = await apiClient.get<{ code_display: string | null; customer_name: string | null }[]>(
+        `/v_contracts?id=eq.${contractId}&select=code_display,customer_name&limit=1`,
+      );
+      return rows[0] ?? null;
+    },
+    enabled: visible && contractId !== null && inboxRow === null,
+  });
+
+  const threadName = inboxRow?.customer_name ?? contractFallback?.customer_name ?? null;
+  const threadCode = inboxRow?.contract_code_display ?? contractFallback?.code_display ?? null;
+
   // Live position for the move handler. Reading `position` from props/state
   // inside the handler would make it a new function on every drag frame; the
   // element then re-renders mid-gesture and loses its pointer capture, so the
@@ -132,7 +150,7 @@ export function ChatDock() {
 
   if (!visible) return null;
 
-  const title = inboxRow?.customer_name ?? t('chat.title');
+  const title = threadName ?? t('chat.title');
 
   return (
     <>
@@ -173,7 +191,7 @@ export function ChatDock() {
                 <div className="text-sm font-medium truncate">
                   {listView ? t('chat.title') : title}
                 </div>
-                {!listView && inboxRow?.contract_code_display && contractId !== null && (
+                {!listView && threadCode && contractId !== null && (
                   // Jump to the contract this thread belongs to. Sits inside the
                   // drag handle, so onPointerDown's control check keeps a click
                   // here from being read as the start of a drag.
@@ -181,7 +199,7 @@ export function ChatDock() {
                     to={`/admin/contracts/search/${contractId}`}
                     className="text-xs text-primary-fg hover:underline truncate tabular-nums inline-flex items-center gap-1 max-w-full"
                   >
-                    <span className="truncate">{inboxRow.contract_code_display}</span>
+                    <span className="truncate">{threadCode}</span>
                     <ExternalLink size={11} className="shrink-0" />
                   </Link>
                 )}
