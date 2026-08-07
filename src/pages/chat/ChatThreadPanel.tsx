@@ -8,8 +8,8 @@ import {
   Badge, Button, PopOver, Skeleton, Tooltip, useSnackbarContext, resizeToVariants,
 } from 'tsp-form';
 import {
-  ChevronRight, CheckCircle, ExternalLink, FileText, Image as ImageIcon, Send, Smile, XCircle,
-  AlertTriangle, Check, CheckCheck,
+  ChevronRight, ChevronDown, CheckCircle, ExternalLink, FileText, Image as ImageIcon, Send, Smile,
+  XCircle, AlertTriangle, Check, CheckCheck,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { wsClient } from '../../lib/api/ws';
@@ -42,9 +42,14 @@ const TEXTAREA_LINE_HEIGHT_PX = 20;
 const MESSAGE_PAGE_SIZE = 50;
 /** Distance from the top that triggers loading the previous page. */
 const LOAD_OLDER_THRESHOLD_PX = 120;
-/** Within this distance of the bottom, incoming messages keep the view pinned
- *  there. Past it the user is reading history and must not be yanked. */
-const FOLLOW_BOTTOM_THRESHOLD_PX = 120;
+/**
+ * How far up the user can be before incoming messages stop following. Expressed
+ * as a fraction of the visible height rather than a fixed pixel count: scrolling
+ * up by half a screen is a deliberate "I'm reading back" gesture at any panel
+ * size, whereas a fixed threshold is trigger-happy in the tall chat page and
+ * lenient in the short dock.
+ */
+const FOLLOW_BOTTOM_FRACTION = 0.5;
 
 interface Props {
   contractId: number | null;
@@ -83,6 +88,11 @@ export function ChatThreadPanel({
   const [emojiOpen, setEmojiOpen] = useState(false);
   /** Bumped on send so the scroll effect re-runs immediately, not on the next poll. */
   const [sendTick, setSendTick] = useState(0);
+  /**
+   * Newest message that arrived while the user was reading back, shown in the
+   * jump-to-bottom bar. Null when the view is following the bottom normally.
+   */
+  const [pendingBelow, setPendingBelow] = useState<ChatMessage | null>(null);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -140,6 +150,9 @@ export function ChatThreadPanel({
     () => (messagePages?.pages ?? []).slice().reverse().flatMap(page => page.slice().reverse()),
     [messagePages],
   );
+  /** Latest messages, for effects that must not re-run when they change. */
+  const messagesRef = useRef<ChatMessage[]>([]);
+  messagesRef.current = messages;
 
   // Slips for the same contract — merged into the timeline alongside messages.
   // See UI_FEEDBACK/2026-06-02_RECOMMEND_chat_slip_interleaved_timeline_pattern.md
@@ -198,6 +211,9 @@ export function ChatThreadPanel({
     // A freshly opened thread starts pinned to its newest message.
     stickToBottom.current = true;
     wasAtBottom.current = 0;
+    setPendingBelow(null);
+    // Re-baseline: the next thread's newest message is not "new".
+    lastAnnounced.current = null;
   }, [contractId]);
 
   const markedRef = useRef<number | null>(null);
@@ -286,6 +302,8 @@ export function ChatThreadPanel({
   // While true, any content growth re-pins the view to the bottom. Set when we
   // scroll there; cleared as soon as the user scrolls up.
   const stickToBottom = useRef(true);
+  /** Last message id surfaced in the jump-to-bottom bar, so it isn't re-announced. */
+  const lastAnnounced = useRef<number | null>(null);
   const loadOlderMessages = () => {
     if (!hasOlderMessages || isFetchingOlderMessages || !scrollRef.current) return;
     // Reading history — the prepend must not be yanked back to the bottom.
@@ -293,6 +311,27 @@ export function ChatThreadPanel({
     pendingPrependHeight.current = scrollRef.current.scrollHeight;
     fetchOlderMessages();
   };
+
+  // Announce a message that landed while the user was reading back.
+  //
+  // Keyed on the newest message ID, NOT on itemCount: the two scroll effects
+  // below both write lastSeenCount, and whichever runs first leaves the other
+  // seeing "no new items". Tracking the ID sidesteps that bookkeeping entirely
+  // and is also correct when a prepend and an arrival land in the same pass.
+  const newestMessageId = messages.length ? messages[messages.length - 1].id : null;
+  useEffect(() => {
+    if (newestMessageId === null) return;
+    // First render of a thread establishes the baseline; nothing is "new" yet.
+    if (lastAnnounced.current === null) {
+      lastAnnounced.current = newestMessageId;
+      return;
+    }
+    if (newestMessageId === lastAnnounced.current) return;
+    lastAnnounced.current = newestMessageId;
+    // Following the bottom — the message is about to be visible anyway.
+    if (stickToBottom.current) return;
+    setPendingBelow(messagesRef.current[messagesRef.current.length - 1] ?? null);
+  }, [newestMessageId]);
 
   useLayoutEffect(() => {
     const el = scrollRef.current;
@@ -307,8 +346,6 @@ export function ChatThreadPanel({
   useLayoutEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    // A prepend is settling — the effect above owns scroll position this pass.
-    if (pendingPrependHeight.current !== null) return;
     const contractChanged = lastSeenContract.current !== contractId;
     const newItems = itemCount > lastSeenCount.current;
     const forced = forceScrollBottom.current;
@@ -328,7 +365,8 @@ export function ChatThreadPanel({
     // the content. Measuring here instead would include the new message's own
     // height and read as "scrolled up" every time.
     if (newItems && !contractChanged && !forced
-        && wasAtBottom.current > FOLLOW_BOTTOM_THRESHOLD_PX) {
+        && wasAtBottom.current > el.clientHeight * FOLLOW_BOTTOM_FRACTION) {
+      // The bar itself is driven by the newest-message-ID effect above.
       lastSeenCount.current = itemCount;
       return;
     }
@@ -416,6 +454,8 @@ export function ChatThreadPanel({
       // change until the new row arrives from setQueryData.
       forceScrollBottom.current = true;
       stickToBottom.current = true;
+      // Sending jumps us to the bottom, so nothing is left unseen below.
+      setPendingBelow(null);
       setSendTick(n => n + 1);
       // Pull our own message in too — the WS echo may not come back to the
       // sender, and invalidating would refetch every loaded page.
@@ -524,6 +564,16 @@ export function ChatThreadPanel({
       // put the caret back once it is usable again.
       requestAnimationFrame(() => textareaRef.current?.focus());
     }
+  };
+
+  /** Catch up to the newest message and resume following it. */
+  const jumpToNewest = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+    stickToBottom.current = true;
+    wasAtBottom.current = 0;
+    setPendingBelow(null);
   };
 
   const timeline = useMemo(
@@ -641,7 +691,10 @@ export function ChatThreadPanel({
         </div>
       )}
 
-      {/* Scrollable timeline (chat + slips merged) */}
+      {/* Scrollable timeline (chat + slips merged). The relative wrapper anchors
+          the jump-to-bottom bar over the timeline's lower edge without letting
+          it scroll away with the content. */}
+      <div className="flex-1 min-h-0 relative flex flex-col">
       <div
         ref={scrollRef}
         onScroll={e => {
@@ -649,7 +702,10 @@ export function ChatThreadPanel({
           const fromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
           wasAtBottom.current = fromBottom;
           // Scrolling away releases the pin; scrolling back re-arms it.
-          stickToBottom.current = fromBottom <= FOLLOW_BOTTOM_THRESHOLD_PX;
+          const nearBottom = fromBottom <= el.clientHeight * FOLLOW_BOTTOM_FRACTION;
+          stickToBottom.current = nearBottom;
+          // Back in the live zone — the bar has nothing left to announce.
+          if (nearBottom && pendingBelow) setPendingBelow(null);
           if (el.scrollTop <= LOAD_OLDER_THRESHOLD_PX) loadOlderMessages();
         }}
         className="flex-1 min-h-0 overflow-auto better-scroll px-3 py-3 md:px-8"
@@ -691,6 +747,29 @@ export function ChatThreadPanel({
             })}
           </div>
         )}
+      </div>
+
+      {/* Jump-to-bottom bar — appears only when a message arrived while the
+          user was reading back. One line, truncated, click to catch up. */}
+      {pendingBelow && (
+        <button
+          type="button"
+          onClick={jumpToNewest}
+          className="absolute left-3 right-3 bottom-3 md:left-8 md:right-8 z-10 flex items-center gap-2 min-w-0 px-3 py-2 rounded-full border border-line bg-surface-elevated/95 backdrop-blur shadow-lg text-left cursor-pointer hover:bg-surface-hover transition-colors animate-pop-in"
+        >
+          <span className="shrink-0 text-xs font-medium text-primary-fg">
+            {pendingBelow.sender_type === 'CUSTOMER'
+              ? (pendingBelow.sender_name ?? t('chat.newMessage'))
+              : t('chat.newMessage')}
+          </span>
+          <span className="min-w-0 flex-1 truncate text-xs text-subtle">
+            {pendingBelow.message_type === 'IMAGE'
+              ? t('chat.imageMessage')
+              : (pendingBelow.message_text ?? '')}
+          </span>
+          <ChevronDown size={14} className="shrink-0 text-subtle" />
+        </button>
+      )}
       </div>
 
       {/* Composer pinned at panel bottom */}

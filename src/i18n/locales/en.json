@@ -6731,6 +6731,7 @@
     "empty": "No conversations",
     "emptyThread": "No messages yet",
     "loadingOlder": "Loading earlier messages…",
+    "newMessage": "New message",
     "dock": {
       "toggle": "Floating chat",
       "expand": "Open chat",
