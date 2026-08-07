@@ -82,6 +82,11 @@
     "photoView": "ดูรูป",
     "uploadPhotosHint": "แตะเพื่อแนบรูปใบเสร็จ (ไม่เกิน 5 รูป)",
     "uploadingPhotos": "กำลังอัปโหลดรูป…",
+    "photoDropHint": "ลากรูปมาวางที่นี่ วางจากคลิปบอร์ด หรือแตะเพื่อเลือกไฟล์",
+    "photoConverting": "กำลังแปลงไฟล์รูป…",
+    "photoMaxReached": "แนบรูปได้ไม่เกิน {{max}} รูป",
+    "photoNotAnImage_other": "ข้าม {{count}} ไฟล์ — แนบได้เฉพาะรูปภาพ",
+    "photoHeicFailed": "อ่านไฟล์ HEIC นี้ไม่ได้ กรุณาแปลงเป็น JPEG แล้วลองใหม่",
     "status": "สถานะ",
     "voided": "ยกเลิกแล้ว",
     "void": "ยกเลิก",
@@ -6934,6 +6939,7 @@
     "REFUND": "คืนเงิน",
     "CANCEL": "ยกเลิก",
     "CLOSE": "ปิดงาน & คืนเครื่อง",
+    "REPOSSESS": "ยึดเครื่อง",
     "ATTACH_MEDIA": "รูปภาพ"
   },
   "repairBlock": {

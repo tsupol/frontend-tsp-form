@@ -82,6 +82,12 @@
     "photoView": "Photo",
     "uploadPhotosHint": "Tap to add receipt photos (max 5)",
     "uploadingPhotos": "Uploading photos…",
+    "photoDropHint": "Drag photos here, paste, or tap to choose",
+    "photoConverting": "Converting photo…",
+    "photoMaxReached": "Maximum {{max}} photos",
+    "photoNotAnImage_one": "{{count}} file skipped — images only",
+    "photoNotAnImage_other": "{{count}} files skipped — images only",
+    "photoHeicFailed": "Could not read this HEIC photo. Please convert it to JPEG and try again.",
     "status": "Status",
     "voided": "Voided",
     "void": "Void",
@@ -6941,6 +6947,7 @@
     "REFUND": "Refund",
     "CANCEL": "Cancel",
     "CLOSE": "Close & return",
+    "REPOSSESS": "Repossess device",
     "ATTACH_MEDIA": "Photos"
   },
   "repairBlock": {
