@@ -55,6 +55,8 @@ interface ChatDockValue {
   openChat: (contractId: number) => void;
   /** Back to the conversation list (keeps the thread selected for highlight). */
   showList: () => void;
+  /** Open the dock on its conversation list, whether or not it was visible. */
+  showDockList: () => void;
   /** True when the dock is showing the list instead of a thread. */
   listView: boolean;
   /** Nav toggle: show/hide the whole dock. */
@@ -103,6 +105,14 @@ export function ChatDockProvider({ children }: { children: ReactNode }) {
 
   const showList = useCallback(() => setListView(true), []);
 
+  /** Show the dock on its conversation list, opening it if it was hidden. */
+  const showDockList = useCallback(() => {
+    setListView(true);
+    setVisible(true);
+    setExpandedState(true);
+    setPositionState(prev => clampPosition(prev, sizeFor(true)));
+  }, []);
+
   const toggleDock = useCallback(() => {
     setVisible(prev => {
       // Opening from the nav lands on the last thread, expanded — or on the
@@ -137,10 +147,10 @@ export function ChatDockProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<ChatDockValue>(() => ({
     visible, expanded, contractId, position, listView,
-    openChat, showList, toggleDock, setExpanded, closeDock, setPosition,
+    openChat, showList, showDockList, toggleDock, setExpanded, closeDock, setPosition,
   }), [
     visible, expanded, contractId, position, listView,
-    openChat, showList, toggleDock, setExpanded, closeDock, setPosition,
+    openChat, showList, showDockList, toggleDock, setExpanded, closeDock, setPosition,
   ]);
 
   return <ChatDockContext.Provider value={value}>{children}</ChatDockContext.Provider>;

@@ -6,13 +6,14 @@ import {
   PageNav, PageNavPanel, MobileHeader, DataTableFooter,
   Button, Input, PopOver, Select,
 } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, ChevronDown, CheckCircle2, Circle, SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, ChevronDown, CheckCircle2, Circle, PictureInPicture2, SlidersHorizontal } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { wsClient } from '../../lib/api/ws';
 import { useAuth } from '../../contexts/AuthContext';
 import { MediaLightbox } from '../../components/MediaLightbox';
 import { ChatThreadPanel } from './ChatThreadPanel';
 import { ChatListRow } from './ChatListRow';
+import { useChatDock } from '../../contexts/ChatDockContext';
 import { CHAT_STATUS_VALUES, type ChatInboxRow, type ChatStatus } from './chatTypes';
 import { sortChatRowsByStatusThenRecency } from './chatStatus';
 
@@ -22,6 +23,7 @@ export function ChatPage() {
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { openChat, showDockList } = useChatDock();
   const [searchParams, setSearchParams] = useSearchParams();
   const contractParam = searchParams.get('contract');
   const selectedContractId = contractParam ? parseInt(contractParam, 10) : null;
@@ -218,6 +220,24 @@ export function ChatPage() {
           {!isMobile && (
             <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
               <h1 className="heading-2 shrink-0">{t('chat.title')}</h1>
+              {/* Pop the open thread out into the floating dock, so the user can
+                  navigate away and keep the conversation. Falls back to opening
+                  the dock on its list when no thread is selected. */}
+              <div className="ml-auto shrink-0">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  startIcon={<PictureInPicture2 size={14} />}
+                  onClick={() => {
+                    if (selectedContractId !== null) openChat(selectedContractId);
+                    // Nothing selected here means "show me the conversations",
+                    // not "resume whatever the dock had last".
+                    else showDockList();
+                  }}
+                >
+                  {t('chat.dock.popOut')}
+                </Button>
+              </div>
             </div>
           )}
 
