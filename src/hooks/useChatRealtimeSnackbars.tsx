@@ -6,6 +6,7 @@ import { useSnackbarContext } from 'tsp-form';
 import { apiClient } from '../lib/api';
 import { wsClient } from '../lib/api/ws';
 import { useAuth } from '../contexts/AuthContext';
+import { useChatDock } from '../contexts/ChatDockContext';
 import { ChatSnackbar } from '../components/ChatSnackbar';
 import type { ChatInboxRow } from '../pages/chat/chatTypes';
 
@@ -41,6 +42,9 @@ export function useChatRealtimeSnackbars() {
   const navigate = useNavigate();
   const navigateRef = useRef(navigate);
   navigateRef.current = navigate;
+  const { openChat } = useChatDock();
+  const openChatRef = useRef(openChat);
+  openChatRef.current = openChat;
 
   // Latest values without re-binding WS handlers.
   const locationRef = useRef(location);
@@ -108,7 +112,15 @@ export function useChatRealtimeSnackbars() {
               sender={sender}
               body={body}
               isImage={isImage}
-              onOpen={() => navigateRef.current(`/admin/chat?contract=${contractId}`)}
+              onOpen={() => {
+                // Desktop pops the floating dock so the user keeps whatever
+                // page they were on; mobile has no dock, so it navigates.
+                if (window.matchMedia('(min-width: 768px)').matches) {
+                  openChatRef.current(contractId);
+                } else {
+                  navigateRef.current(`/admin/chat?contract=${contractId}`);
+                }
+              }}
             />
           ),
         });

@@ -755,12 +755,13 @@ export function ChatThreadPanel({
         <button
           type="button"
           onClick={jumpToNewest}
-          className="absolute left-3 right-3 bottom-3 md:left-8 md:right-8 z-10 flex items-center gap-2 min-w-0 px-3 py-2 rounded-full border border-line bg-surface-elevated/95 backdrop-blur shadow-lg text-left cursor-pointer hover:bg-surface-hover transition-colors animate-pop-in"
+          className="absolute left-3 right-3 bottom-1.5 md:left-8 md:right-8 z-10 flex items-center gap-2 min-w-0 px-3 py-2 rounded-full border border-line bg-surface-elevated/95 backdrop-blur shadow-lg text-left cursor-pointer hover:bg-surface-hover transition-colors animate-pop-in"
         >
-          <span className="shrink-0 text-xs font-medium text-primary-fg">
-            {pendingBelow.sender_type === 'CUSTOMER'
-              ? (pendingBelow.sender_name ?? t('chat.newMessage'))
-              : t('chat.newMessage')}
+          {/* Who it's from, capped so a long name can't crowd out the preview.
+              min-w-0 + max-w (not shrink-0) so `truncate` has a bounded box. */}
+          <span className="min-w-0 max-w-[8rem] truncate text-xs font-medium text-primary-fg">
+            {pendingBelow.sender_name?.trim()
+              || (pendingBelow.sender_type === 'CUSTOMER' ? t('chat.customer') : t('chat.staff'))}
           </span>
           <span className="min-w-0 flex-1 truncate text-xs text-subtle">
             {pendingBelow.message_type === 'IMAGE'

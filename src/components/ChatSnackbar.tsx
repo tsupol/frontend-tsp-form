@@ -22,7 +22,10 @@ export function ChatSnackbar({ sender, body, isImage, onOpen }: Props) {
       }}
     >
       {isImage ? <ImageIcon size={14} /> : <MessageSquare size={14} />}
-      <div className="min-w-0 flex-1 leading-tight">
+      {/* max-w bounds the flex item so `truncate` has something to clip
+          against — without it a long message stretches the snackbar instead
+          of ellipsing. */}
+      <div className="min-w-0 flex-1 max-w-[16rem] leading-tight">
         <div className="text-xs font-semibold truncate">{sender}</div>
         <div className="text-[11px] text-subtle truncate">{body}</div>
       </div>
