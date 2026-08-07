@@ -698,15 +698,18 @@ export function PanelProductPlan(_props: Props) {
             ...(localQuote.finance_model === 'FIN1' ? { p_down_percent: localQuote.down_percent } : {}),
           });
 
-          // Apply negotiation if custom term/down
+          // FIN2's real down comes from negotiation, not set_rate (set_rate always
+          // snapshots down = 0 as a reference ceiling). 0 is a legal negotiated
+          // down, so always send it — never treat 0 as "unset" or the rate-card
+          // down silently wins. Per UI_FEEDBACK/2026-08-03_IMPLEMENT_contract_open_down_zero.
           const hasCustomTerm = localQuote.base_term_months != null && localQuote.term_months !== localQuote.base_term_months;
-          const hasCustomDown = localQuote.finance_model === 'FIN2' && localQuote.down_amount > 0;
-          if (hasCustomTerm || hasCustomDown) {
+          const isFin2 = localQuote.finance_model === 'FIN2';
+          if (hasCustomTerm || isFin2) {
             await apiClient.rpc('fn_contract_apply_negotiation', {
               p_contract_id: contractId,
               p_installment_amount: localQuote.installment_amount,
               ...(hasCustomTerm ? { p_value_month: localQuote.term_months } : {}),
-              ...(hasCustomDown ? { p_down_payment: localQuote.down_amount } : {}),
+              ...(isFin2 ? { p_down_payment: localQuote.down_amount } : {}),
             });
           }
         }
@@ -747,14 +750,16 @@ export function PanelProductPlan(_props: Props) {
             ...(localQuote.finance_model === 'FIN1' ? { p_down_percent: localQuote.down_percent } : {}),
           });
 
+          // Same rule as the USED path above: FIN2 always sends the negotiated
+          // down (0 included) — treating 0 as "unset" lets the rate-card down win.
           const hasCustomTerm = localQuote.base_term_months != null && localQuote.term_months !== localQuote.base_term_months;
-          const hasCustomDown = localQuote.finance_model === 'FIN2' && localQuote.down_amount > 0;
-          if (hasCustomTerm || hasCustomDown) {
+          const isFin2 = localQuote.finance_model === 'FIN2';
+          if (hasCustomTerm || isFin2) {
             await apiClient.rpc('fn_contract_apply_negotiation', {
               p_contract_id: contractId,
               p_installment_amount: localQuote.installment_amount,
               ...(hasCustomTerm ? { p_value_month: localQuote.term_months } : {}),
-              ...(hasCustomDown ? { p_down_payment: localQuote.down_amount } : {}),
+              ...(isFin2 ? { p_down_payment: localQuote.down_amount } : {}),
             });
           }
         }
