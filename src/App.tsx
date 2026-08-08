@@ -81,6 +81,7 @@ import { TimelineOverviewPage } from './pages/collections/TimelineOverviewPage';
 import { OverdueAgingReportPage } from './pages/collections/OverdueAgingReportPage';
 import { BlacklistPage } from './pages/company/BlacklistPage';
 import { ICloudPoolPage } from './pages/company/ICloudPoolPage';
+import { AbmOtpPage } from './pages/company/AbmOtpPage';
 import { BranchPinPage } from './pages/company/BranchPinPage';
 import { BranchFinanceModelsPage } from './pages/company/BranchFinanceModelsPage';
 import { OwnerConfigPage } from './pages/company/OwnerConfigPage';
@@ -1070,6 +1071,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <CompanyLayout><ICloudPoolPage /></CompanyLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/company/abm-otp"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <CompanyLayout><AbmOtpPage /></CompanyLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

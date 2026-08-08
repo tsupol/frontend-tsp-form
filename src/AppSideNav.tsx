@@ -532,6 +532,9 @@ export const AppSideNav = () => {
         { key: 'holidays', icon: <CalendarDays size="1rem" />, label: t('nav.holidays'), path: '/admin/company/holidays' },
         { key: 'blacklist', icon: <ShieldBan size="1rem" />, label: t('nav.blacklist'), path: '/admin/company/blacklist' },
         { key: 'icloud', icon: <Cloud size="1rem" />, label: t('nav.icloud'), path: '/admin/company/icloud' },
+        // No role restriction: View OTP is open to branch staff too, and the
+        // views return 0 rows to anyone out of scope.
+        { key: 'abm-otp', icon: <Smartphone size="1rem" />, label: t('nav.abmOtp'), path: '/admin/company/abm-otp' },
         { type: 'group', key: 'grp-staff', label: t('nav.groupStaff') },
         { key: 'staff-commission', icon: <UserCheck size="1rem" />, label: t('nav.staffCommission'), path: '/admin/company/staff-commission' },
       ],

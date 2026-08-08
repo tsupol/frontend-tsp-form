@@ -1,7 +1,7 @@
 import { useMemo, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { MapPin, Building2, Landmark, CalendarDays, ShieldBan, Cloud, KeyRound, UserCheck, PenLine, Stamp, Wallet, Boxes, Wrench } from 'lucide-react';
+import { MapPin, Building2, Landmark, CalendarDays, ShieldBan, Cloud, KeyRound, UserCheck, PenLine, Stamp, Wallet, Boxes, Wrench, Smartphone } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -35,6 +35,8 @@ export function CompanyLayout({ children }: { children: ReactNode }) {
     { type: 'link', path: '/admin/company/holidays', labelKey: 'nav.holidays', icon: CalendarDays },
     { type: 'link', path: '/admin/company/blacklist', labelKey: 'nav.blacklist', icon: ShieldBan },
     { type: 'link', path: '/admin/company/icloud', labelKey: 'nav.icloud', icon: Cloud },
+    // Open to branch staff as well (View OTP tab) — the views scope themselves.
+    { type: 'link', path: '/admin/company/abm-otp', labelKey: 'nav.abmOtp', icon: Smartphone },
     { type: 'group', labelKey: 'nav.groupStaff' },
     { type: 'link', path: '/admin/company/staff-commission', labelKey: 'nav.staffCommission', icon: UserCheck },
   ], [isAdmin]);
