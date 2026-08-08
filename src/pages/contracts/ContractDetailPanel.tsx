@@ -33,6 +33,7 @@ import { ContractAddonModal } from './ContractAddonModal';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { CustomerPickerModal } from './CustomerPickerModal';
 import { SwapPrimaryCustomerModal } from './SwapPrimaryCustomerModal';
+import { ContractPhoneSyncPanel } from './ContractPhoneSyncPanel';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { MediaLightbox, MediaThumbButton } from '../../components/MediaLightbox';
 import { CustomerLoginCard, useCustomerLoginInfo, useInvalidateLoginInfo, type CustomerLoginInfo } from '../../components/CustomerLoginCard';
@@ -1611,6 +1612,10 @@ function CustomersTab({ contractId, customerId, customerName, contractCode, cont
           coLesseeList.map(c => renderCoLesseeRow(c))
         )}
       </div>
+
+      {/* Frozen-phone diff + per-party sync (mig 1034). Lives here rather than in
+          the action footer — it edits data, it is not a state transition. */}
+      <ContractPhoneSyncPanel contractId={contractId} contractCode={contractCode} />
 
       <CustomerPickerModal
         open={pickerMode !== null}
