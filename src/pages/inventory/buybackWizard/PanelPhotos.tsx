@@ -17,7 +17,7 @@ import {
   BUYBACK_CONDITION_MAX,
 } from '../../../lib/beMedia';
 import { toStoragePath, normalizeKey } from '../../../lib/mediaPath';
-import { MediaLightbox } from '../../../components/MediaLightbox';
+import { MediaLightboxKeyGallery } from '../../../components/MediaLightbox';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
 import { useMobileCaptureSession } from '../../contracts/workspace/useMobileCaptureSession';
 import { getLine } from './useBuyback';
@@ -75,7 +75,8 @@ export function PanelPhotos({
   const lineId = line?.po_line_id ?? null;
 
   const [error, setError] = useState('');
-  const [lightboxKey, setLightboxKey] = useState<string | null>(null);
+  // Index into `photos` (not a key) so the lightbox can page through the album.
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
   const [editCaptionFor, setEditCaptionFor] = useState<EntityMedia | null>(null);
@@ -97,6 +98,11 @@ export function PanelPhotos({
 
   const maxFiles = BUYBACK_CONDITION_MAX;
   const remaining = Math.max(0, maxFiles - photos.length);
+  // Same array the grid maps, so a tile's index addresses the right photo.
+  const photoKeys = photos.map(m => {
+    const k = pickFullKey(m);
+    return k ? normalizeKey(k) : '';
+  });
   const editable = draft.status === 'DRAFT';
 
   const refresh = useCallback(() => {
@@ -141,15 +147,12 @@ export function PanelPhotos({
 
           {photos.length > 0 && (
             <div className="grid grid-cols-2 gap-3">
-              {photos.map((m) => (
+              {photos.map((m, i) => (
                 <PhotoRow
                   key={m.entity_media_id}
                   media={m}
                   editable={editable && !m.is_locked && !remove.isPending}
-                  onPreview={() => {
-                    const full = pickFullKey(m);
-                    if (full) setLightboxKey(normalizeKey(full));
-                  }}
+                  onPreview={() => setLightboxIndex(i)}
                   onRemove={() => setConfirmRemove(m)}
                   onEditCaption={() => setEditCaptionFor(m)}
                 />
@@ -190,10 +193,12 @@ export function PanelPhotos({
         <Button onClick={onClose}>{t('common.close', { defaultValue: 'Close' })}</Button>
       </div>
 
-      <MediaLightbox
-        open={lightboxKey != null}
-        onClose={() => setLightboxKey(null)}
-        mediaKey={lightboxKey}
+      <MediaLightboxKeyGallery
+        open={lightboxIndex != null}
+        onClose={() => setLightboxIndex(null)}
+        mediaKeys={photoKeys}
+        index={lightboxIndex ?? 0}
+        onIndexChange={setLightboxIndex}
         alt="Condition photo"
       />
 

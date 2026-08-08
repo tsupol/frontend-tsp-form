@@ -25,7 +25,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
 import { mimeFromKey } from '../../lib/upload';
 import { toStoragePath, normalizeKey } from '../../lib/mediaPath';
-import { MediaLightbox } from '../../components/MediaLightbox';
+import { MediaLightboxKeyGallery } from '../../components/MediaLightbox';
 import {
   beMediaUpload,
   beMediaDelete,
@@ -81,7 +81,8 @@ export function ContractAttachments({
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [manageOpen, setManageOpen] = useState(false);
-  const [lightboxKey, setLightboxKey] = useState<string | null>(null);
+  // Index into `photos` — the viewer pages through the album.
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   // Keep polling the album while a mobile-capture session is live, even after
   // the Manage-photos modal closes — the phone may keep uploading until the
   // backend session TTL. Holds the session's expiry; polling stops once past.
@@ -106,6 +107,14 @@ export function ContractAttachments({
 
   const strip = photos.slice(0, STRIP_LIMIT);
   const overflow = photos.length - strip.length;
+  // Keys for ALL photos, not just the visible strip — the viewer pages through
+  // the whole album, so a strip index (strip is a prefix of photos) still lines
+  // up and the hidden overflow photos are reachable by arrowing past the last
+  // visible tile.
+  const photoKeys = photos.map(m => {
+    const k = pickFullKey(m);
+    return k ? normalizeKey(k) : '';
+  });
 
   return (
     <div className={`border border-line rounded-md px-4 py-3 ${className ?? ''}`}>
@@ -137,8 +146,8 @@ export function ContractAttachments({
         </button>
       ) : (
         <div className="flex items-center gap-2">
-          {strip.map((m) => (
-            <StripThumb key={m.entity_media_id} media={m} onPreview={setLightboxKey} />
+          {strip.map((m, i) => (
+            <StripThumb key={m.entity_media_id} media={m} onPreview={() => setLightboxIndex(i)} />
           ))}
           {overflow > 0 && (
             <button
@@ -152,10 +161,12 @@ export function ContractAttachments({
         </div>
       )}
 
-      <MediaLightbox
-        open={lightboxKey != null}
-        onClose={() => setLightboxKey(null)}
-        mediaKey={lightboxKey}
+      <MediaLightboxKeyGallery
+        open={lightboxIndex != null}
+        onClose={() => setLightboxIndex(null)}
+        mediaKeys={photoKeys}
+        index={lightboxIndex ?? 0}
+        onIndexChange={setLightboxIndex}
         alt={t('contract.attachments', { defaultValue: 'Photos' })}
       />
 
@@ -177,15 +188,14 @@ function StripThumb({
   onPreview,
 }: {
   media: ContractAttachment;
-  onPreview: (fullKey: string) => void;
+  onPreview: () => void;
 }) {
   const thumbKey = pickThumbKey(media);
   const { url } = useMediaUrl(thumbKey ? normalizeKey(thumbKey) : null);
-  const fullKey = pickFullKey(media);
   return (
     <button
       type="button"
-      onClick={() => fullKey && onPreview(normalizeKey(fullKey))}
+      onClick={onPreview}
       className="w-14 h-14 shrink-0 rounded-md border border-line overflow-hidden bg-surface flex items-center justify-center cursor-zoom-in p-0"
       aria-label="Preview photo"
     >
@@ -223,7 +233,11 @@ function ManageModal({
   const { user } = useAuth();
   const { addSnackbar } = useSnackbarContext();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [lightboxKey, setLightboxKey] = useState<string | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const photoKeys = photos.map(m => {
+    const k = pickFullKey(m);
+    return k ? normalizeKey(k) : '';
+  });
   const [removingId, setRemovingId] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
@@ -386,12 +400,12 @@ function ManageModal({
 
         {/* Live photo list — small thumbs that wrap to fit + an add tile. */}
         <div className="flex flex-wrap gap-2 mb-5">
-          {photos.map((m) => (
+          {photos.map((m, i) => (
             <ManageThumb
               key={m.entity_media_id}
               media={m}
               removing={removingId === m.entity_media_id}
-              onPreview={setLightboxKey}
+              onPreview={() => setLightboxIndex(i)}
               onRemove={() => handleRemove(m)}
             />
           ))}
@@ -450,10 +464,12 @@ function ManageModal({
         <Button onClick={onClose}>{t('common.close', { defaultValue: 'Close' })}</Button>
       </div>
 
-      <MediaLightbox
-        open={lightboxKey != null}
-        onClose={() => setLightboxKey(null)}
-        mediaKey={lightboxKey}
+      <MediaLightboxKeyGallery
+        open={lightboxIndex != null}
+        onClose={() => setLightboxIndex(null)}
+        mediaKeys={photoKeys}
+        index={lightboxIndex ?? 0}
+        onIndexChange={setLightboxIndex}
         alt={t('contract.attachments', { defaultValue: 'Photos' })}
       />
     </Modal>
@@ -468,17 +484,16 @@ function ManageThumb({
 }: {
   media: ContractAttachment;
   removing: boolean;
-  onPreview: (fullKey: string) => void;
+  onPreview: () => void;
   onRemove: () => void;
 }) {
   const thumbKey = pickThumbKey(media);
   const { url } = useMediaUrl(thumbKey ? normalizeKey(thumbKey) : null);
-  const fullKey = pickFullKey(media);
   return (
     <div className="relative group w-20 h-20 shrink-0">
       <button
         type="button"
-        onClick={() => fullKey && onPreview(normalizeKey(fullKey))}
+        onClick={onPreview}
         className="block w-full h-full rounded-md border border-line overflow-hidden bg-surface cursor-zoom-in p-0"
         aria-label="Preview photo"
       >
