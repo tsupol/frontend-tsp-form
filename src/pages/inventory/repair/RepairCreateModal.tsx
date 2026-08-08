@@ -205,7 +205,12 @@ export function RepairCreateModal({
                   onChange={(e) => setKeyword(e.target.value)}
                   placeholder={t('repair.searchContractPlaceholder')}
                   startIcon={<Search size={16} />}
-                  className="w-full"
+                  endIcon={isBelowSearchMin(keyword)
+                    ? <span className="text-[11px] whitespace-nowrap">
+                        {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
+                      </span>
+                    : undefined}
+                  className="w-full search-min-hint"
                 />
                 {pickedContract ? (
                   <div className="mt-2 flex items-center justify-between gap-2 px-3 py-2 rounded-md border border-line bg-surface">
@@ -220,10 +225,6 @@ export function RepairCreateModal({
                     </div>
                     <Button variant="ghost" size="sm" onClick={() => setPickedContract(null)}>{t('common.change')}</Button>
                   </div>
-                ) : isBelowSearchMin(keyword) ? (
-                  <p className="mt-2 text-xs text-subtle">
-                    {t('common.searchMinChars', { n: SEARCH_MIN_CHARS })}
-                  </p>
                 ) : (
                   isSearchable(debounced) && (
                     <div className="mt-2 max-h-52 overflow-auto better-scroll rounded-md border border-line divide-y divide-line">

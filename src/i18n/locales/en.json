@@ -180,7 +180,7 @@
   },
   "common": {
     "loading": "Loading...",
-    "searchMinChars": "Type at least {{n}} characters to search",
+    "searchMinCharsShort": "at least {{n}} chars",
     "print": "Print",
     "previous": "Previous",
     "next": "Next",

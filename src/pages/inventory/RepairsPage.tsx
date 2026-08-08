@@ -138,13 +138,13 @@ export function RepairsPage() {
                     placeholder={t('repair.searchPlaceholder')}
                     size="sm"
                     startIcon={<Search size={16} />}
-                    className="w-full"
+                    endIcon={isBelowSearchMin(keyword)
+                      ? <span className="text-[11px] whitespace-nowrap">
+                          {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
+                        </span>
+                      : undefined}
+                    className="w-full search-min-hint"
                   />
-                  {isBelowSearchMin(keyword) && (
-                    <p className="text-xs text-subtle">
-                      {t('common.searchMinChars', { n: SEARCH_MIN_CHARS })}
-                    </p>
-                  )}
                   <div className="flex items-center gap-2">
                     <div className="flex-1 min-w-0">
                       <Select

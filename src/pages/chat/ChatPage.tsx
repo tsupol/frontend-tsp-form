@@ -368,16 +368,16 @@ export function ChatPage() {
               <div className="flex-1 min-w-0 max-w-xs">
                 <Input
                   size="sm"
-                  className="w-full"
+                  className="w-full search-min-hint"
                   placeholder={t('chat.searchPlaceholder')}
                   value={searchInput}
                   onChange={e => handleSearch(e.target.value)}
+                  endIcon={isBelowSearchMin(searchInput)
+                    ? <span className="text-[11px] whitespace-nowrap">
+                        {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
+                      </span>
+                    : undefined}
                 />
-                {isBelowSearchMin(searchInput) && (
-                  <p className="text-[11px] text-subtle mt-1">
-                    {t('common.searchMinChars', { n: SEARCH_MIN_CHARS })}
-                  </p>
-                )}
               </div>
               <Button
                 size="sm"

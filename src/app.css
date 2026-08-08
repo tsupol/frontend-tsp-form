@@ -49,6 +49,18 @@
         padding-block: 0.5rem;
         border-top: 1px solid var(--color-line);
     }
+
+    /* Search boxes that show the "at least N characters" hint inside the field
+       (right-aligned) instead of on a line below, so the list underneath never
+       shifts as the user types. The end slot's default padding is sized for an
+       icon, which clips a short string. */
+    .search-min-hint .form-control.input-has-end-icon,
+    .search-min-hint input.form-control.input-has-end-icon,
+    .search-min-hint.form-control-sm .form-control.input-has-end-icon,
+    .search-min-hint.form-control-sm input.form-control.input-has-end-icon,
+    .search-min-hint .form-control.form-control-sm.input-has-end-icon {
+        padding-right: 7.5rem;
+    }
 }
 
 /* Hide number input spinners */

@@ -314,13 +314,15 @@ export function ContractListPane({
                       placeholder={t('contract.searchPlaceholder')}
                       size="sm"
                       startIcon={<Search size={16} />}
-                      className="w-full"
+                      // Hint rides inside the field, right-aligned, so it can't
+                      // shift the rows below it as the user types.
+                      endIcon={isBelowSearchMin(keyword)
+                        ? <span className="text-[11px] whitespace-nowrap">
+                            {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
+                          </span>
+                        : undefined}
+                      className="w-full search-min-hint"
                     />
-                    {isBelowSearchMin(keyword) && (
-                      <p className="text-xs text-subtle mt-1">
-                        {t('common.searchMinChars', { n: SEARCH_MIN_CHARS })}
-                      </p>
-                    )}
                   </div>
                   <div className="shrink-0">
                     <PopOver

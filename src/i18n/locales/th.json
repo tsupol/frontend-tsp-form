@@ -178,7 +178,7 @@
   },
   "common": {
     "loading": "กำลังโหลด...",
-    "searchMinChars": "พิมพ์อย่างน้อย {{n}} ตัวอักษรเพื่อค้นหา",
+    "searchMinCharsShort": "อย่างน้อย {{n}} ตัว",
     "print": "พิมพ์",
     "previous": "ก่อนหน้า",
     "next": "ถัดไป",
