@@ -18,6 +18,7 @@ import {
 } from '../../lib/beMedia';
 import { toStoragePath, normalizeKey } from '../../lib/mediaPath';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { MediaLightboxKeyGallery } from '../../components/MediaLightbox';
 import { useMobileCaptureSession } from '../contracts/workspace/useMobileCaptureSession';
 import { translateApiError } from '../../lib/apiErrors';
 
@@ -63,6 +64,11 @@ function pickThumbKey(m: SellOutEntityMedia): string | null {
   const v = m.variants_json ?? {};
   return v.md || v.lg || v.sm || v.original || m.storage_path || null;
 }
+/** Largest available variant — what the lightbox should show. */
+function pickFullKey(m: SellOutEntityMedia): string | null {
+  const v = m.variants_json ?? {};
+  return v.original || v.lg || v.md || v.sm || m.storage_path || null;
+}
 function collectMediaKeys(m: SellOutEntityMedia): string[] {
   const keys: string[] = [];
   if (m.storage_path) keys.push(m.storage_path);
@@ -107,6 +113,10 @@ export function SellOutConditionPhotos({
   const [addOpen, setAddOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<SellOutEntityMedia | null>(null);
+  // Index into `photos`, so the lightbox can page through the whole album.
+  // photoKeys is built from the SAME array the grid maps, so an index always
+  // addresses the photo that was clicked.
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   // When Add/Capture is clicked before a draft exists, remember which one so we
   // can open it automatically once the parent's lazy create yields a requestId
   // — one click instead of two (create, then open).
@@ -139,6 +149,10 @@ export function SellOutConditionPhotos({
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: sellOutPhotosKey(requestId ?? 0) });
   const remaining = Math.max(0, SELL_OUT_CONDITION_MAX - photos.length);
+  const photoKeys = photos.map(m => {
+    const k = pickFullKey(m);
+    return k ? normalizeKey(k) : '';
+  });
   // No draft yet → Add/Capture create it first (via onRequestDraft). With a
   // draft → open the internal add/QR modals directly.
   const noDraft = requestId == null;
@@ -197,12 +211,13 @@ export function SellOutConditionPhotos({
 
       {photos.length > 0 && (
         <div className="grid grid-cols-3 gap-2">
-          {photos.map((m) => (
+          {photos.map((m, i) => (
             <PhotoThumb
               key={m.entity_media_id}
               media={m}
               editable={editable}
               onRemove={() => setConfirmRemove(m)}
+              onView={() => setLightboxIndex(i)}
               disabled={remove.isPending}
             />
           ))}
@@ -254,6 +269,15 @@ export function SellOutConditionPhotos({
         code={code}
         onUploaded={() => { setCaptureSince(Date.now()); refresh(); }}
       />
+
+      <MediaLightboxKeyGallery
+        open={lightboxIndex !== null}
+        onClose={() => setLightboxIndex(null)}
+        mediaKeys={photoKeys}
+        index={lightboxIndex ?? 0}
+        onIndexChange={setLightboxIndex}
+        alt={t('sellOut.photos', { defaultValue: 'Condition photos' })}
+      />
     </div>
   );
 }
@@ -277,6 +301,7 @@ export function SellOutPhotoGrid({
   const queryClient = useQueryClient();
   const [error, setError] = useState('');
   const [confirmRemove, setConfirmRemove] = useState<SellOutEntityMedia | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   const { data: photos = [] } = useQuery({
     queryKey: sellOutPhotosKey(requestId),
@@ -287,6 +312,10 @@ export function SellOutPhotoGrid({
   });
 
   const remaining = Math.max(0, SELL_OUT_CONDITION_MAX - photos.length);
+  const photoKeys = photos.map(m => {
+    const k = pickFullKey(m);
+    return k ? normalizeKey(k) : '';
+  });
   const remove = useMutation({
     mutationFn: async (m: SellOutEntityMedia) => {
       await apiClient.rpc('fn_media_detach', { p_entity_media_id: m.entity_media_id });
@@ -309,8 +338,8 @@ export function SellOutPhotoGrid({
       )}
       {photos.length > 0 && (
         <div className="grid grid-cols-3 gap-2">
-          {photos.map((m) => (
-            <PhotoThumb key={m.entity_media_id} media={m} editable onRemove={() => setConfirmRemove(m)} disabled={remove.isPending} />
+          {photos.map((m, i) => (
+            <PhotoThumb key={m.entity_media_id} media={m} editable onRemove={() => setConfirmRemove(m)} onView={() => setLightboxIndex(i)} disabled={remove.isPending} />
           ))}
         </div>
       )}
@@ -333,14 +362,24 @@ export function SellOutPhotoGrid({
         confirmLabel={t('common.remove', { defaultValue: 'Remove' })}
         pending={remove.isPending}
       />
+
+      <MediaLightboxKeyGallery
+        open={lightboxIndex !== null}
+        onClose={() => setLightboxIndex(null)}
+        mediaKeys={photoKeys}
+        index={lightboxIndex ?? 0}
+        onIndexChange={setLightboxIndex}
+        alt={t('sellOut.photos', { defaultValue: 'Condition photos' })}
+      />
     </div>
   );
 }
 
-function PhotoThumb({ media, editable, onRemove, disabled }: {
+function PhotoThumb({ media, editable, onRemove, onView, disabled }: {
   media: SellOutEntityMedia;
   editable: boolean;
   onRemove: () => void;
+  onView?: () => void;
   disabled: boolean;
 }) {
   const thumbKey = pickThumbKey(media);
@@ -349,7 +388,14 @@ function PhotoThumb({ media, editable, onRemove, disabled }: {
   return (
     <div className="relative rounded-md border border-line overflow-hidden bg-surface aspect-[4/3]">
       {url ? (
-        <img src={url} alt="" className="w-full h-full object-contain" />
+        <button
+          type="button"
+          onClick={onView}
+          className="w-full h-full cursor-zoom-in bg-transparent border-none p-0"
+          aria-label="View photo"
+        >
+          <img src={url} alt="" className="w-full h-full object-contain" />
+        </button>
       ) : (
         <div className="w-full h-full flex items-center justify-center text-subtler"><ImageOff size={18} /></div>
       )}
