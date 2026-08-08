@@ -57,7 +57,11 @@ const variants = await resizeToVariants(
 | Need | Use |
 |---|---|
 | **Several images** (strip of thumbs, max N) | `<MultiImageUploader>` — `src/components/MultiImageUploader.tsx` |
-| **One image** | `<ImageUploader>` from `tsp-form` directly |
+| **One image** (slip, signature, ID card) | `<SingleImageUploader>` — `src/components/SingleImageUploader.tsx` |
+| Neither fits | `<ImageUploader>` from `tsp-form` directly — but say why in a comment |
+
+Both project components share the same dashed zone so an upload field looks the
+same wherever it appears, and both open the zoomable viewer on click.
 
 #### MultiImageUploader (the multi-image pattern)
 
@@ -91,15 +95,37 @@ drag + paste intake, HEIC conversion, non-image rejection, the max-N cap, the
 - `onError(message)` hands back an already-translated string (non-image
   rejected, over max, HEIC decode failed) — render it in `<ModalErrorBand>`.
 
-#### ImageUploader (single image, from tsp-form)
+#### SingleImageUploader (the one-image pattern)
 
-Already does click + drag in one element with a `.image-uploader-dragging`
-highlight. Repair / sell-out / buyback add-photo modals are the reference.
+Empty → the same dashed drop zone (click + drag). Filled → the image, zoomable
+on click, with a Remove button. `ContractActions.tsx` (payment slip) is the
+reference.
 
-- `sizes` prop (multi-size): emits `UploadedImage.variants[label]`. Top-level `file` is undefined in this mode.
-- `resizeOptions` prop (single-size): emits top-level `UploadedImage.file`.
+```tsx
+<SingleImageUploader
+  previewUrl={slipKey ? slipPreviewUrl : null}   // null → empty zone
+  onUpload={handleSlipUpload}                    // caller uploads, sets previewUrl
+  onRemove={handleSlipClear}                     // caller deletes the orphan
+  resizeOptions={slipSpec.resize}
+  sizes={slipSpec.sizes}
+  disabled={uploading || mutation.isPending}
+  busy={uploading}
+  placeholder={<><Receipt size={20} /><span className="text-xs">…</span></>}
+/>
+```
+
+**UI-only by design.** Uploading, R2 keys, and orphan cleanup stay with the
+caller — those differ per upload type (contract slip vs signature vs ID card),
+and the caller already owns delete-on-cancel. The component only turns "an
+image arrived" into `onUpload`.
+
+Underneath it is tsp-form's `ImageUploader`, whose props pass through:
+
+- `sizes` (multi-size): emits `UploadedImage.variants[label]`. Top-level `file` is undefined in this mode.
+- `resizeOptions` (single-size): emits top-level `UploadedImage.file`.
 - `onUpload(images: UploadedImage[])`. `originalFile` is the untouched source.
-- `placeholder` prop replaces the default "Click or drag image" body.
+- ⚠️ `ImageUploader` takes **no `style` prop** — it is silently dropped. Style it
+  with `className` utilities.
 
 ### Viewing images — always navigable
 

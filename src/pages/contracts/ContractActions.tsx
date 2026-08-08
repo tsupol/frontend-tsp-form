@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button, Modal, Input, Select, TextArea, MaskedInput, Badge, Tooltip, PopOver, ImageUploader, useSnackbarContext } from 'tsp-form';
+import { Button, Modal, Input, Select, TextArea, MaskedInput, Badge, Tooltip, PopOver, useSnackbarContext } from 'tsp-form';
 import type { UploadedImage } from 'tsp-form';
 import { CheckCircle, XCircle, X, Pencil, Plus, Trash2, Loader2, ChevronsRight, ChevronDown, ExternalLink, Wrench, ArrowRight, Info, Receipt, Paperclip, MessageSquare, PenLine, AlertTriangle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
@@ -12,6 +12,7 @@ import { BranchPinInput } from '../../components/BranchPinInput';
 import { BranchPaymentAccountField } from '../../components/BranchPaymentAccountField';
 import { ColorSwatch } from '../../components/ColorAutocomplete';
 import { DateTime } from '../../components/DateTime';
+import { SingleImageUploader } from '../../components/SingleImageUploader';
 import { useAuth } from '../../contexts/AuthContext';
 import { useChatDock } from '../../contexts/ChatDockContext';
 import { mimeFromKey } from '../../lib/upload';
@@ -3393,42 +3394,24 @@ function PayInstallmentModal({ open, contract, onClose }: {
                   <label className="form-label">
                     {t('contract.payInstallment_slip', { defaultValue: 'Payment slip' })} *
                   </label>
-                  {slipKey && slipPreviewUrl ? (
-                    <div className="h-24 rounded-md border border-line overflow-hidden bg-surface flex items-center justify-center gap-2 p-2">
-                      <img
-                        src={slipPreviewUrl}
-                        alt={t('contract.payInstallment_slip', { defaultValue: 'Payment slip' })}
-                        className="max-h-full w-auto object-contain block rounded"
-                      />
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        startIcon={<X size={14} />}
-                        onClick={handleSlipClear}
-                        disabled={slipUploading || mutation.isPending}
-                      >
-                        {t('common.remove')}
-                      </Button>
-                    </div>
-                  ) : (
-                    <ImageUploader
-                      resizeOptions={slipSpec.resize}
-                      sizes={slipSpec.sizes}
-                      onUpload={handleSlipUpload}
-                      disabled={slipUploading || mutation.isPending || !slipSpec.spec}
-                      className="!min-h-24 !border !border-solid !border-line !rounded-md"
-                      placeholder={
-                        <div className="flex flex-col items-center justify-center gap-1 text-subtle">
-                          <Receipt size={20} className="opacity-60" />
-                          <span className="text-xs">
-                            {slipUploading
-                              ? t('common.loading')
-                              : t('contract.payInstallment_slipPlaceholder', { defaultValue: 'Upload payment slip image' })}
-                          </span>
-                        </div>
-                      }
-                    />
-                  )}
+                  <SingleImageUploader
+                    previewUrl={slipKey ? slipPreviewUrl : null}
+                    onUpload={handleSlipUpload}
+                    onRemove={handleSlipClear}
+                    resizeOptions={slipSpec.resize}
+                    sizes={slipSpec.sizes}
+                    disabled={slipUploading || mutation.isPending || !slipSpec.spec}
+                    busy={slipUploading}
+                    alt={t('contract.payInstallment_slip', { defaultValue: 'Payment slip' })}
+                    placeholder={
+                      <>
+                        <Receipt size={20} className="opacity-60" />
+                        <span className="text-xs">
+                          {t('contract.payInstallment_slipPlaceholder', { defaultValue: 'Upload payment slip image' })}
+                        </span>
+                      </>
+                    }
+                  />
                 </div>
                 )}
               </div>

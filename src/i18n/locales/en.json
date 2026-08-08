@@ -170,6 +170,7 @@
   "imageUploader": {
     "add": "Add",
     "dropHint": "Drag photos here, paste, or tap to choose",
+    "dropHintSingle": "Drag an image here or tap to choose",
     "converting": "Converting photo…",
     "maxReached": "Maximum {{max}} photos",
     "notAnImage_one": "{{count}} file skipped — images only",
