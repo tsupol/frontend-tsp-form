@@ -9,6 +9,7 @@ import { ArrowLeft, ArrowRightFromLine, Search, SlidersHorizontal, Plus, Archive
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency } from '../../lib/format';
+import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
 import { getStateColor, getStateLabel, stateOptions } from './contractUtils';
 import { ContractDetailPanel } from './ContractDetailPanel';
 import { ContractDetailSlot } from './ContractDetailSlot';
@@ -131,9 +132,13 @@ export function ContractListPane({
     else navigate(routePrefix, { replace: true });
   };
 
-  // Debounce keyword
+  // Debounce keyword. Anything under SEARCH_MIN_CHARS never reaches the RPC —
+  // it would come back as "recent contracts" dressed up as search results.
+  // Checked before the debounce so a short keyword doesn't fire and get thrown
+  // away. Clearing the box drops back to the unfiltered list, as before.
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedKeyword(keyword.trim()), 300);
+    const next = isSearchable(keyword) ? keyword.trim() : '';
+    const timer = setTimeout(() => setDebouncedKeyword(next), 300);
     return () => clearTimeout(timer);
   }, [keyword]);
 
@@ -311,6 +316,11 @@ export function ContractListPane({
                       startIcon={<Search size={16} />}
                       className="w-full"
                     />
+                    {isBelowSearchMin(keyword) && (
+                      <p className="text-xs text-subtle mt-1">
+                        {t('common.searchMinChars', { n: SEARCH_MIN_CHARS })}
+                      </p>
+                    )}
                   </div>
                   <div className="shrink-0">
                     <PopOver

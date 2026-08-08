@@ -9,6 +9,7 @@ import { ArrowLeft, ArrowRightFromLine, Wrench, Search, Plus, CheckCircle2, Cale
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency } from '../../lib/format';
+import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
 import type { RepairOrder, RepairSearchResult, RepairStatus, RepairType } from './repairTypes';
 import { SUB_STATE_COLOR } from './repairTypes';
 import { RepairDetailPanel } from './repair/RepairDetailPanel';
@@ -42,8 +43,11 @@ export function RepairsPage() {
   const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
 
+  // Short keywords never reach fn_repair_search — under SEARCH_MIN_CHARS the
+  // RPC has no trigram to match on and silently degrades to a browse listing.
   useEffect(() => {
-    const tm = setTimeout(() => setDebounced(keyword.trim()), 300);
+    const next = isSearchable(keyword) ? keyword.trim() : '';
+    const tm = setTimeout(() => setDebounced(next), 300);
     return () => clearTimeout(tm);
   }, [keyword]);
 
@@ -52,7 +56,7 @@ export function RepairsPage() {
   const { data, isFetching } = useQuery({
     queryKey: ['repair-search', statusFilter, typeFilter, debounced, page],
     queryFn: () => apiClient.rpc<RepairSearchResult>('fn_repair_search', {
-      p_keyword: debounced.length >= 2 ? debounced : null,
+      p_keyword: debounced || null,
       p_statuses: statusFilter ? [statusFilter] : null,
       p_repair_types: typeFilter ? [typeFilter] : null,
       p_page: page,
@@ -136,6 +140,11 @@ export function RepairsPage() {
                     startIcon={<Search size={16} />}
                     className="w-full"
                   />
+                  {isBelowSearchMin(keyword) && (
+                    <p className="text-xs text-subtle">
+                      {t('common.searchMinChars', { n: SEARCH_MIN_CHARS })}
+                    </p>
+                  )}
                   <div className="flex items-center gap-2">
                     <div className="flex-1 min-w-0">
                       <Select

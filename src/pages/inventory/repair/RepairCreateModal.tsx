@@ -5,6 +5,7 @@ import { Modal, Button, Input, MaskedInput, TextArea, Badge, FormErrorMessage } 
 import { XCircle, Search, User, Package, FileText } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { validateiPhoneSerial } from '../../../lib/validators';
+import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../../lib/searchKeyword';
 import { ActionDoneView } from '../../contracts/ActionDoneView';
 import { getStateColor } from '../../contracts/contractUtils';
 import type { RepairType } from '../repairTypes';
@@ -100,8 +101,11 @@ export function RepairCreateModal({
     }
   }, [open]);
 
+  // Short keywords never reach fn_contract_search — it ignores them and returns
+  // recent contracts instead, which would look like picker results.
   useEffect(() => {
-    const tm = setTimeout(() => setDebounced(keyword.trim()), 300);
+    const next = isSearchable(keyword) ? keyword.trim() : '';
+    const tm = setTimeout(() => setDebounced(next), 300);
     return () => clearTimeout(tm);
   }, [keyword]);
 
@@ -111,7 +115,7 @@ export function RepairCreateModal({
     queryFn: () => apiClient.rpc<{ contracts: ContractHit[] }>('fn_contract_search', {
       p_keyword: debounced, p_page: 1, p_per_page: 15,
     }).then(r => r.contracts),
-    enabled: open && tab === 'CUSTOMER_CONTRACT' && debounced.length >= 2,
+    enabled: open && tab === 'CUSTOMER_CONTRACT' && isSearchable(debounced),
   });
 
   const symptomOk = repairNote.trim().length >= 3;
@@ -216,8 +220,12 @@ export function RepairCreateModal({
                     </div>
                     <Button variant="ghost" size="sm" onClick={() => setPickedContract(null)}>{t('common.change')}</Button>
                   </div>
+                ) : isBelowSearchMin(keyword) ? (
+                  <p className="mt-2 text-xs text-subtle">
+                    {t('common.searchMinChars', { n: SEARCH_MIN_CHARS })}
+                  </p>
                 ) : (
-                  debounced.length >= 2 && (
+                  isSearchable(debounced) && (
                     <div className="mt-2 max-h-52 overflow-auto better-scroll rounded-md border border-line divide-y divide-line">
                       {searching && <div className="p-3 text-sm text-subtle">{t('common.loading')}</div>}
                       {!searching && (contractHits ?? []).length === 0 && <div className="p-3 text-sm text-subtler">{t('repair.noContractFound')}</div>}

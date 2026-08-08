@@ -11,6 +11,7 @@ import { ArrowRightFromLine, ArrowLeft, Search, Users, CheckCircle, XCircle, Tra
 import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { toLocalDateStr, parseLocalDate, formatTel, formatCid } from '../../lib/format';
+import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
 import { DateTime } from '../../components/DateTime';
 import { DatePicker } from '../../components/DatePicker';
 import { PhoneInput } from '../../components/PhoneInput';
@@ -196,8 +197,12 @@ export function CustomersPage() {
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
 
+  // Below SEARCH_MIN_CHARS we never reach the RPC — its trigram index doesn't
+  // exist for shorter strings, so results are either wrong or slow. Filtered
+  // before the debounce so nothing fires and gets discarded.
   useEffect(() => {
-    const timer = setTimeout(() => { setDebouncedSearch(search.trim()); setPageIndex(0); }, 300);
+    const next = isSearchable(search) ? search.trim() : '';
+    const timer = setTimeout(() => { setDebouncedSearch(next); setPageIndex(0); }, 300);
     return () => clearTimeout(timer);
   }, [search]);
 
@@ -206,7 +211,7 @@ export function CustomersPage() {
   // fn_customer_search (trigram-fuzzy on names, LIKE on id/tel). The RPC masks
   // id_number in results; the detail panel re-fetches the full row by id from
   // v_customers, so the unmasked value is never lost.
-  const isSearching = debouncedSearch.length >= 2;
+  const isSearching = isSearchable(debouncedSearch);
   const { data: customersData, isFetching } = useQuery({
     queryKey: ['customers', debouncedSearch, pageIndex, pageSize],
     queryFn: async (): Promise<{ data: CustomerListRow[]; totalCount: number }> => {
@@ -300,6 +305,11 @@ export function CustomersPage() {
                     startIcon={<Search size={16} />}
                     className="w-full"
                   />
+                  {isBelowSearchMin(search) && (
+                    <p className="text-xs text-subtle mt-1">
+                      {t('common.searchMinChars', { n: SEARCH_MIN_CHARS })}
+                    </p>
+                  )}
                 </div>
                 <div className={`data-table-content better-scroll ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
                   {customers.length === 0 ? (
