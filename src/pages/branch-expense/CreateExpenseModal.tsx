@@ -1,11 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Modal, Button, Input, Select, InputDatePicker, MaskedInput, ImageUploader,
+  Modal, Button, Input, Select, InputDatePicker, MaskedInput,
   useSnackbarContext,
   type SelectItem,
 } from 'tsp-form';
-import { Calendar, Keyboard, CheckCircle, XCircle, Camera, Loader2, Trash2 } from 'lucide-react';
+import { Calendar, Keyboard, CheckCircle } from 'lucide-react';
+import { MultiImageUploader } from '../../components/MultiImageUploader';
+import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { fmtCurrency } from '../../lib/format';
 import { apiClient, ApiError } from '../../lib/api';
 import {
@@ -14,7 +16,6 @@ import {
 import {
   uploadBranchExpenseSlipFromFile, beMediaDelete,
   BRANCH_EXPENSE_SLIP_MAX,
-  isImageFile, isHeicFile, convertHeicToJpeg,
   type BranchExpenseImage,
 } from '../../lib/beMedia';
 import { PaymentMethodChips } from './PaymentMethodChips';
@@ -51,7 +52,6 @@ export function CreateExpenseModal({ open, onClose, onSaved, items, branches, fi
   const [expenseDate, setExpenseDate] = useState(() => toLocalDateStr(new Date()));
   const [isTyping, setIsTyping] = useState(false);
   const [pendingPhotos, setPendingPhotos] = useState<File[]>([]);
-  const [converting, setConverting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
@@ -75,7 +75,6 @@ export function CreateExpenseModal({ open, onClose, onSaved, items, branches, fi
       setError(null);
       setBusy(false);
       setSavedEntry(null);
-      setConverting(false);
     }
   }, [open, fixedBranchId]);
 
@@ -98,41 +97,6 @@ export function CreateExpenseModal({ open, onClose, onSaved, items, branches, fi
 
   const isDirty = itemId !== '' || amount !== '' || vendor !== '' || payeeName !== ''
     || receiptNo !== '' || note !== '' || pendingPhotos.length > 0;
-
-  const isFull = pendingPhotos.length >= BRANCH_EXPENSE_SLIP_MAX;
-
-  // Single entry point for every way a photo arrives: picker, drop, or paste.
-  // Non-images are dropped silently-but-visibly (we tell the user) rather than
-  // queued as a tile that would fail at upload. HEIC is converted first —
-  // iPhone originals copied to a desktop browser arrive as .heic, which
-  // Chrome/Firefox cannot decode, so the tile would preview blank.
-  const addFiles = async (incoming: File[]) => {
-    if (incoming.length === 0) return;
-    const images = incoming.filter(isImageFile);
-    const rejected = incoming.length - images.length;
-    if (rejected > 0) setError(t('branchExpense.photoNotAnImage', { count: rejected }));
-    else setError(null);
-    if (images.length === 0) return;
-
-    const room = BRANCH_EXPENSE_SLIP_MAX - pendingPhotos.length;
-    const accepted = images.slice(0, Math.max(0, room));
-    if (images.length > room) setError(t('branchExpense.photoMaxReached', { max: BRANCH_EXPENSE_SLIP_MAX }));
-    if (accepted.length === 0) return;
-
-    if (accepted.some(isHeicFile)) {
-      setConverting(true);
-      try {
-        const converted = await Promise.all(accepted.map(convertHeicToJpeg));
-        setPendingPhotos(prev => [...prev, ...converted].slice(0, BRANCH_EXPENSE_SLIP_MAX));
-      } catch {
-        setError(t('branchExpense.photoHeicFailed'));
-      } finally {
-        setConverting(false);
-      }
-      return;
-    }
-    setPendingPhotos(prev => [...prev, ...accepted].slice(0, BRANCH_EXPENSE_SLIP_MAX));
-  };
 
   const handleClose = () => {
     if (phase === 'done') { onClose(); return; }
@@ -310,7 +274,7 @@ export function CreateExpenseModal({ open, onClose, onSaved, items, branches, fi
 
                 <div className="flex flex-col">
                   <label className="form-label">{t('branchExpense.paymentMethod')}</label>
-                  <PaymentMethodChips value={paymentMethod} onChange={setPaymentMethod} />
+                  <PaymentMethodChips value={paymentMethod} onChange={setPaymentMethod} disabled={busy} />
                 </div>
 
                 <div className="flex flex-col">
@@ -388,60 +352,28 @@ export function CreateExpenseModal({ open, onClose, onSaved, items, branches, fi
                       ({pendingPhotos.length}/{BRANCH_EXPENSE_SLIP_MAX})
                     </span>
                   </label>
-                  {/* Hidden multi-file input (computer + iPad photo library).
-                      No `capture`: it would force one rear-camera shot and kill
-                      multi-select. iPad's picker still offers "Take Photo". */}
-                  {/* tsp-form's ImageUploader owns click + drag-and-drop (and the
-                      drag highlight) — same component the repair/sell-out photo
-                      modals use. Do NOT hand-roll a drop zone here; see
-                      .claude/image-upload-pattern.md. We keep our own thumbnail
-                      strip because this modal stages up to 5 photos inline and
-                      uploads them only after the entry row exists. */}
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {pendingPhotos.map((file, i) => (
-                      <SlipThumb
-                        key={i}
-                        file={file}
-                        disabled={busy}
-                        onRemove={() => setPendingPhotos(prev => prev.filter((_, j) => j !== i))}
-                      />
-                    ))}
-                  </div>
-                  {!isFull && (
-                    <ImageUploader
-                      multiple
-                      maxFiles={BRANCH_EXPENSE_SLIP_MAX - pendingPhotos.length}
-                      accept="image/*,.heic,.heif"
-                      disabled={busy || converting}
-                      // `sizes`/`resizeOptions` are deliberately omitted: the
-                      // save path re-resizes via uploadBranchExpenseSlipFromFile,
-                      // so we take originalFile and let that stay the one place
-                      // the slip resize spec is applied.
-                      onUpload={(imgs) => void addFiles(imgs.map(im => im.originalFile))}
-                      placeholder={
-                        <div className="image-uploader-content">
-                          {phase === 'attach' || converting
-                            ? <><Loader2 size={18} className="animate-spin" /><span>{t('branchExpense.photoConverting')}</span></>
-                            : <><Camera size={18} /><span>{t('branchExpense.photoDropHint')}</span></>}
-                        </div>
-                      }
-                    />
-                  )}
-                  {isFull && (
-                    <div className="text-xs text-subtle">
-                      {t('branchExpense.photoMaxReached', { max: BRANCH_EXPENSE_SLIP_MAX })}
-                    </div>
-                  )}
+                  {/* Photos are staged locally and uploaded only after the entry
+                      row exists (be-media keys embed the expense id), so every
+                      item here is `staged` and removal is immediate. */}
+                  <MultiImageUploader
+                    items={pendingPhotos.map((file, i) => ({
+                      kind: 'staged' as const,
+                      id: String(i),
+                      file,
+                    }))}
+                    onAdd={(files) => setPendingPhotos(prev =>
+                      [...prev, ...files].slice(0, BRANCH_EXPENSE_SLIP_MAX))}
+                    onRemove={(item) => setPendingPhotos(prev =>
+                      prev.filter((_, i) => String(i) !== item.id))}
+                    max={BRANCH_EXPENSE_SLIP_MAX}
+                    disabled={busy}
+                    busyLabel={phase === 'attach' ? t('branchExpense.uploadingPhotos') : undefined}
+                    onError={setError}
+                  />
                 </div>
-
-                {error && (
-                  <div className="alert alert-danger">
-                    <XCircle size={16} />
-                    <span>{error}</span>
-                  </div>
-                )}
               </div>
             </div>
+            <ModalErrorBand message={error} onDismiss={() => setError(null)} />
             <div className="modal-footer">
               <Button variant="ghost" onClick={handleClose} disabled={busy}>
                 {t('common.cancel')}
@@ -463,40 +395,5 @@ export function CreateExpenseModal({ open, onClose, onSaved, items, branches, fi
         </div>
       </Modal>
     </>
-  );
-}
-
-// ── Slip thumbnail (local file preview + remove) ─────────────────────────────
-// Matches the contract "Manage photos" tile style: w-20 square, object-cover,
-// floating round trash button.
-function SlipThumb({ file, disabled, onRemove }: {
-  file: File;
-  disabled: boolean;
-  onRemove: () => void;
-}) {
-  // Create + revoke the object URL in one effect so StrictMode's
-  // mount→unmount→remount doesn't revoke a URL the <img> is still using
-  // (revoking the memoized URL on the first unmount was causing ERR_FILE_NOT_FOUND).
-  const [url, setUrl] = useState<string>('');
-  useEffect(() => {
-    const u = URL.createObjectURL(file);
-    setUrl(u);
-    return () => URL.revokeObjectURL(u);
-  }, [file]);
-  return (
-    <div className="relative group w-20 h-20 shrink-0">
-      <div className="block w-full h-full rounded-md border border-line overflow-hidden bg-surface">
-        {url && <img src={url} alt="" className="w-full h-full object-cover" />}
-      </div>
-      <button
-        type="button"
-        onClick={onRemove}
-        disabled={disabled}
-        aria-label="Remove"
-        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-danger text-white flex items-center justify-center shadow-sm hover:bg-danger-soft disabled:opacity-50 border-none p-0 cursor-pointer"
-      >
-        <Trash2 size={11} />
-      </button>
-    </div>
   );
 }
