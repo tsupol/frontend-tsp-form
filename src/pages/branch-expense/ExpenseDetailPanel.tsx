@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -12,7 +12,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency, toLocalDateStr, parseLocalDate, makeDatePickerFormat } from '../../lib/format';
 import { normalizeKey } from '../../lib/mediaPath';
-import { MediaLightbox, MediaThumbButton } from '../../components/MediaLightbox';
+import { MediaLightboxKeyGallery, MediaThumbButton } from '../../components/MediaLightbox';
 import { PaymentMethodChips } from './PaymentMethodChips';
 import type {
   ExpenseEntry, DetailsUpdateResponse, VoidResponse, ExpensePaymentMethod,
@@ -36,7 +36,8 @@ export function ExpenseDetailPanel({ entryId, onClosed }: Props) {
 
   const [editOpen, setEditOpen] = useState(false);
   const [voidOpen, setVoidOpen] = useState(false);
-  const [lightboxKey, setLightboxKey] = useState<string | null>(null);
+  // Index into the photo strip, not a key — the lightbox pages through them.
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   const { data: entry, isLoading } = useQuery({
     queryKey: ['branch-expense', 'entry', entryId],
@@ -47,6 +48,16 @@ export function ExpenseDetailPanel({ entryId, onClosed }: Props) {
       return rows[0] ?? null;
     },
   });
+
+  // One filtered list drives both the thumbnails and the lightbox, so the
+  // index the strip hands over always addresses the same photo.
+  const photoStrip = useMemo(() => (entry?.images ?? []).flatMap((img) => {
+    const thumb = img.thumb || img.lg;
+    const full = img.lg || img.thumb;
+    return thumb && full
+      ? [{ thumb: normalizeKey(thumb), full: normalizeKey(full) }]
+      : [];
+  }), [entry?.images]);
 
   const canManage = entry != null && !entry.is_voided && (
     COMPANY_MANAGE_ROLES.includes(role)
@@ -147,20 +158,15 @@ export function ExpenseDetailPanel({ entryId, onClosed }: Props) {
                 {t('branchExpense.photos')}
               </div>
               <div className="flex flex-wrap gap-2">
-                {entry.images.map((img, i) => {
-                  const thumbKey = img.thumb || img.lg;
-                  const lgKey = img.lg || img.thumb;
-                  if (!thumbKey || !lgKey) return null;
-                  return (
-                    <MediaThumbButton
-                      key={i}
-                      mediaKey={normalizeKey(thumbKey)}
-                      alt={`${entry.item_name_th} receipt ${i + 1}`}
-                      className="w-24 h-24 rounded-md overflow-hidden border border-line cursor-zoom-in hover:opacity-80 transition-opacity bg-surface-muted"
-                      onClick={() => setLightboxKey(normalizeKey(lgKey))}
-                    />
-                  );
-                })}
+                {photoStrip.map((p, i) => (
+                  <MediaThumbButton
+                    key={i}
+                    mediaKey={p.thumb}
+                    alt={`${entry.item_name_th} receipt ${i + 1}`}
+                    className="w-24 h-24 rounded-md overflow-hidden border border-line cursor-zoom-in hover:opacity-80 transition-opacity bg-surface-muted"
+                    onClick={() => setLightboxIndex(i)}
+                  />
+                ))}
               </div>
             </div>
           )}
@@ -204,10 +210,12 @@ export function ExpenseDetailPanel({ entryId, onClosed }: Props) {
         onSaved={() => { setVoidOpen(false); refresh(); }}
       />
 
-      <MediaLightbox
-        open={lightboxKey !== null}
-        onClose={() => setLightboxKey(null)}
-        mediaKey={lightboxKey}
+      <MediaLightboxKeyGallery
+        open={lightboxIndex !== null}
+        onClose={() => setLightboxIndex(null)}
+        mediaKeys={photoStrip.map(p => p.full)}
+        index={lightboxIndex ?? 0}
+        onIndexChange={setLightboxIndex}
         alt={t('branchExpense.photoView')}
       />
     </>

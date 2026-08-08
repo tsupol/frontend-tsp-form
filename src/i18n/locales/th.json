@@ -82,11 +82,6 @@
     "photoView": "ดูรูป",
     "uploadPhotosHint": "แตะเพื่อแนบรูปใบเสร็จ (ไม่เกิน 5 รูป)",
     "uploadingPhotos": "กำลังอัปโหลดรูป…",
-    "photoDropHint": "ลากรูปมาวางที่นี่ วางจากคลิปบอร์ด หรือแตะเพื่อเลือกไฟล์",
-    "photoConverting": "กำลังแปลงไฟล์รูป…",
-    "photoMaxReached": "แนบรูปได้ไม่เกิน {{max}} รูป",
-    "photoNotAnImage_other": "ข้าม {{count}} ไฟล์ — แนบได้เฉพาะรูปภาพ",
-    "photoHeicFailed": "อ่านไฟล์ HEIC นี้ไม่ได้ กรุณาแปลงเป็น JPEG แล้วลองใหม่",
     "status": "สถานะ",
     "voided": "ยกเลิกแล้ว",
     "void": "ยกเลิก",
@@ -171,6 +166,15 @@
     "accountPlaceholder": "เลือกบัญชี",
     "saved": "อัปเดตบัญชีช่องทางแล้ว"
   },
+  "imageUploader": {
+    "add": "เพิ่ม",
+    "dropHint": "ลากรูปมาวางที่นี่ วางจากคลิปบอร์ด หรือแตะเพื่อเลือกไฟล์",
+    "converting": "กำลังแปลงไฟล์รูป…",
+    "maxReached": "แนบรูปได้ไม่เกิน {{max}} รูป",
+    "notAnImage_other": "ข้าม {{count}} ไฟล์ — แนบได้เฉพาะรูปภาพ",
+    "heicFailed": "อ่านไฟล์ HEIC นี้ไม่ได้ กรุณาแปลงเป็น JPEG แล้วลองใหม่",
+    "locked": "รูปนี้ลบไม่ได้"
+  },
   "common": {
     "loading": "กำลังโหลด...",
     "print": "พิมพ์",
@@ -192,6 +196,7 @@
     "clear": "ล้าง",
     "delete": "ลบ",
     "remove": "ลบ",
+    "dismiss": "ปิด",
     "view": "ดู",
     "edit": "แก้ไข",
     "create": "สร้าง",
