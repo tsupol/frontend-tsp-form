@@ -24,6 +24,30 @@ interface SimpleMsg {
 
 type ServerMsg = ChannelEvent | SimpleMsg;
 
+/**
+ * Role from the JWT we connected with, for `acl_denied` diagnostics only.
+ *
+ * `acl_denied` is a normal protocol reply, not an error — a channel the server
+ * doesn't recognise is refused silently and the feature quietly falls back to
+ * polling. Two channels (`slip:company:*`, `chat:branch:*`) stayed dead that way
+ * for ~2 months because nothing logged the refusal. BE asked us to always warn
+ * with channel + role so the next dead channel surfaces on day one.
+ * (UI_FEEDBACK/2026-08-07_IMPLEMENT_ws_channels_restored.md §6.)
+ */
+function currentRoleFromToken(): string {
+  try {
+    const jwt = localStorage.getItem('access_token');
+    if (!jwt) return 'unknown';
+    const payload = jwt.split('.')[1];
+    if (!payload) return 'unknown';
+    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+    const claims = JSON.parse(json) as { role_code?: string; role?: string };
+    return claims.role_code ?? claims.role ?? 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
+
 class WsClient {
   private ws: WebSocket | null = null;
   private subscribers = new Map<string, Set<WsEventHandler>>();
@@ -102,7 +126,14 @@ class WsClient {
           this.armPongTimer();
           break;
         case 'acl_denied':
-          console.warn('[ws] ACL denied', msg);
+          // Never swallow this — see currentRoleFromToken() above. If a channel
+          // you expect to work shows up here, tell BE rather than routing around
+          // it; a workaround hides the symptom, not the dead channel.
+          console.warn(
+            `[ws] acl_denied channel=${String(msg.channel ?? '?')} ` +
+            `role=${currentRoleFromToken()} reason=${String(msg.reason ?? '?')}`,
+            msg,
+          );
           break;
         case 'auth_error':
           console.warn('[ws] auth_error', msg);
