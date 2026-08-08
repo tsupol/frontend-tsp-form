@@ -4,6 +4,8 @@ import { Button } from 'tsp-form';
 const STORAGE_KEY_ROLE = 'quick_login_last_role';
 const STORAGE_KEY_BRANCH = 'quick_login_last_branch';
 
+const DEFAULT_PASSWORD = 'Test123456';
+
 type RoleColor = 'danger' | 'warning' | 'info' | 'success';
 
 interface RoleDef {
@@ -14,6 +16,8 @@ interface RoleDef {
   username?: string;
   // Username template for branch roles, suffix appended (e.g. 'ui_branch_manager' -> 'ui_branch_manager_a1')
   usernameTemplate?: string;
+  // Overrides DEFAULT_PASSWORD for accounts outside the shared ui_* set
+  password?: string;
 }
 
 const ROLES: RoleDef[] = [
@@ -23,6 +27,8 @@ const ROLES: RoleDef[] = [
   { key: 'CO_INV', label: 'CO_INV', color: 'info', username: 'ui_company_inventory_a' },
   { key: 'BR_MGR', label: 'BR_MGR', color: 'success', usernameTemplate: 'ui_branch_manager' },
   { key: 'BR_STAFF', label: 'BR_STAFF', color: 'success', usernameTemplate: 'ui_branch_staff' },
+  // Fixed to DEV BRANCH A1 — no ui_* equivalent, so it carries its own password
+  { key: 'BR_COLL', label: 'BR_COLL', color: 'danger', username: 'dev.collector1', password: 'DevCollect!2026' },
 ];
 
 const BRANCHES = [
@@ -66,7 +72,7 @@ export function QuickLogin({ onSelect }: QuickLoginProps) {
       const branch = isBranchRole && !availableBranches.some((b) => b.key === activeBranch)
         ? availableBranches[0].key
         : activeBranch;
-      onSelect(buildUsername(role, branch), 'Test123456');
+      onSelect(buildUsername(role, branch), role.password || DEFAULT_PASSWORD);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -86,14 +92,14 @@ export function QuickLogin({ onSelect }: QuickLoginProps) {
       setActiveBranch(branch);
       localStorage.setItem(STORAGE_KEY_BRANCH, branch);
     }
-    onSelect(buildUsername(next, branch), 'Test123456');
+    onSelect(buildUsername(next, branch), next.password || DEFAULT_PASSWORD);
   };
 
   const handleBranchClick = (branchKey: string) => {
     setActiveBranch(branchKey);
     localStorage.setItem(STORAGE_KEY_BRANCH, branchKey);
     if (role && isBranchRole) {
-      onSelect(buildUsername(role, branchKey), 'Test123456');
+      onSelect(buildUsername(role, branchKey), role.password || DEFAULT_PASSWORD);
     }
   };
 
