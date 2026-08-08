@@ -16,8 +16,61 @@ import { ChatListRow } from './ChatListRow';
 import { useChatDock } from '../../contexts/ChatDockContext';
 import { CHAT_STATUS_VALUES, type ChatInboxRow, type ChatStatus } from './chatTypes';
 import { sortChatRowsByStatusThenRecency } from './chatStatus';
+import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
 
 type StatusFilter = ChatStatus | 'NONE' | null;
+
+// Search results page in memory, so this caps how many matches are reachable.
+// fn_contract_search ranks by relevance, so the tail is the least likely to be
+// wanted; a collector who doesn't see their contract types more characters.
+const SEARCH_FETCH_LIMIT = 100;
+
+/** The subset of fn_contract_search's contract shape this page needs. */
+interface ContractSearchHit {
+  id: number;
+  code: string;
+  code_display: string;
+  customer_id: number | null;
+  customer_name: string | null;
+  branch_id: number;
+  branch_name: string | null;
+  state: string | null;
+}
+
+/** A search hit with no chat row yet → a placeholder row that renders in the
+ *  same component as a real one. Everything chat-related is empty because
+ *  nothing has been said; the row exists so the room can be opened. */
+function toStubRow(hit: ContractSearchHit): ChatInboxRow {
+  return {
+    contract_id: hit.id,
+    contract_code: hit.code,
+    contract_code_display: hit.code_display,
+    customer_id: hit.customer_id ?? 0,
+    customer_name: hit.customer_name,
+    last_message_text: null,
+    last_message_type: null,
+    last_message_at: null,
+    unread_count: 0,
+    total_messages: 0,
+    branch_id: hit.branch_id,
+    branch_code: null,
+    branch_name: hit.branch_name,
+    chat_status: null,
+    chat_status_set_by_user_id: null,
+    chat_status_set_by_username: null,
+    chat_status_set_at: null,
+    chat_status_note: null,
+    pinned_note: null,
+    pinned_note_by_user_id: null,
+    pinned_note_by_username: null,
+    pinned_note_at: null,
+    contract_state: hit.state,
+    contract_state_scope: null,
+    contract_can_receive_payment: null,
+    customers: null,
+    is_stub: true,
+  };
+}
 
 export function ChatPage() {
   const { t, i18n } = useTranslation();
@@ -81,12 +134,21 @@ export function ChatPage() {
   useEffect(() => { setMobileDetailsOpen(false); }, [selectedContractId]);
   useEffect(() => () => { if (searchTimer.current) clearTimeout(searchTimer.current); }, []);
 
+  // Only fire once the keyword can actually be searched — a 1-char keyword makes
+  // fn_contract_search return recent contracts instead of matches, which would
+  // render here as a perfectly normal-looking (and completely wrong) chat list.
   const handleSearch = (value: string) => {
     setSearchInput(value);
     clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => setSearch(value), 300);
+    const next = isSearchable(value) ? value.trim() : '';
+    searchTimer.current = setTimeout(() => setSearch(next), 300);
   };
 
+  const isSearchMode = isSearchable(search);
+
+  // ── Inbox mode (no keyword) ────────────────────────────────────────────────
+  // Filtering the view directly is correct HERE and only here: no keyword means
+  // no text matching, so the view's own columns + indexes do the work.
   const queryUrl = useMemo(() => {
     const params: string[] = ['order=last_message_at.desc.nullslast'];
     if (unreadOnly) params.push('unread_count=gt.0');
@@ -95,30 +157,87 @@ export function ChatPage() {
     } else if (statusFilter) {
       params.push(`chat_status=eq.${statusFilter}`);
     }
-    if (search.trim()) {
-      const q = encodeURIComponent(search.trim());
-      params.push(`or=(customer_name.ilike.*${q}*,contract_code.ilike.*${q}*)`);
-    }
     return `/v_branch_chat_list?${params.join('&')}`;
-  }, [search, unreadOnly, statusFilter]);
+  }, [unreadOnly, statusFilter]);
 
-  const { data, isFetching } = useQuery({
-    queryKey: ['chat-inbox', search, unreadOnly, statusFilter, pageIndex, pageSize],
+  const inbox = useQuery({
+    queryKey: ['chat-inbox', unreadOnly, statusFilter, pageIndex, pageSize],
     queryFn: () => apiClient.getPaginated<ChatInboxRow>(
       queryUrl,
       { page: pageIndex + 1, pageSize },
     ),
+    enabled: !isSearchMode,
     refetchInterval: 60_000,
     placeholderData: keepPreviousData,
   });
 
-  // Re-sort fetched rows so attention-needing flags float to the top regardless
-  // of last_message_at ordering on the server.
-  const rows = useMemo(
-    () => sortChatRowsByStatusThenRecency(data?.data ?? []),
-    [data?.data],
-  );
-  const totalCount = data?.totalCount ?? 0;
+  // ── Search mode ────────────────────────────────────────────────────────────
+  // Two steps, and the indirection is the point (NOTICE 2026-08-07):
+  //   ① fn_contract_search — the ONLY path that searches IMEI, serial, asset
+  //      code, phone and citizen ID, and the only one that tolerates typos.
+  //      v_branch_chat_list simply has no columns for most of that, so filtering
+  //      it with ilike silently drops the searches collectors use most. The
+  //      failure looks like "no such contract", not like a bug, so nobody
+  //      reports it.
+  //   ② v_branch_chat_list?contract_id=in.(…) — hydrate the matches into real
+  //      chat rows so every list affordance (unread, status, pinned note)
+  //      carries over untouched.
+  // A contract that matched but has never been chatted has no row in the view;
+  // it becomes a stub so the collector can open an empty room and send the first
+  // message. That case is the whole reason collectors search at all.
+  const searchQuery = useQuery({
+    queryKey: ['chat-search', search],
+    queryFn: async (): Promise<ChatInboxRow[]> => {
+      const res = await apiClient.rpc<{ contracts: ContractSearchHit[] }>('fn_contract_search', {
+        p_keyword: search,
+        p_page: 1,
+        p_per_page: SEARCH_FETCH_LIMIT,
+      });
+      const hits = res.contracts ?? [];
+      if (hits.length === 0) return [];
+
+      const ids = hits.map(c => c.id);
+      const existing = await apiClient.get<ChatInboxRow[]>(
+        `/v_branch_chat_list?contract_id=in.(${ids.join(',')})&order=last_message_at.desc.nullslast`,
+      );
+
+      // Keep the RPC's relevance order; chatted rows first, stubs after.
+      const byId = new Map(existing.map(r => [r.contract_id, r]));
+      const found = hits.filter(h => byId.has(h.id)).map(h => byId.get(h.id)!);
+      const stubs = hits.filter(h => !byId.has(h.id)).map(toStubRow);
+      return [...found, ...stubs];
+    },
+    enabled: isSearchMode,
+    placeholderData: keepPreviousData,
+  });
+
+  const isFetching = isSearchMode ? searchQuery.isFetching : inbox.isFetching;
+
+  // Search results are a fixed set the RPC already ranked, so they page in
+  // memory. Inbox rows are server-paged and only re-sorted within the page.
+  const allSearchRows = useMemo(() => {
+    const found = searchQuery.data ?? [];
+    if (!unreadOnly && !statusFilter) return found;
+    // The filter chips still apply on top of a search.
+    return found.filter(r => {
+      if (unreadOnly && r.unread_count <= 0) return false;
+      if (statusFilter === 'NONE') return r.chat_status === null;
+      if (statusFilter) return r.chat_status === statusFilter;
+      return true;
+    });
+  }, [searchQuery.data, unreadOnly, statusFilter]);
+
+  const rows = useMemo(() => {
+    if (isSearchMode) {
+      const start = pageIndex * pageSize;
+      return allSearchRows.slice(start, start + pageSize);
+    }
+    // Re-sort fetched rows so attention-needing flags float to the top
+    // regardless of last_message_at ordering on the server.
+    return sortChatRowsByStatusThenRecency(inbox.data?.data ?? []);
+  }, [isSearchMode, allSearchRows, pageIndex, pageSize, inbox.data?.data]);
+
+  const totalCount = isSearchMode ? allSearchRows.length : (inbox.data?.totalCount ?? 0);
 
   // New chat messages fire on `chat:contract:<id>` only — `chat:branch:<id>`
   // carries status / pinned-note events, not message events (see doc 66 §2).
@@ -254,6 +373,11 @@ export function ChatPage() {
                   value={searchInput}
                   onChange={e => handleSearch(e.target.value)}
                 />
+                {isBelowSearchMin(searchInput) && (
+                  <p className="text-[11px] text-subtle mt-1">
+                    {t('common.searchMinChars', { n: SEARCH_MIN_CHARS })}
+                  </p>
+                )}
               </div>
               <Button
                 size="sm"
@@ -327,7 +451,9 @@ export function ChatPage() {
             >
               <div className={`flex-1 min-h-0 overflow-auto better-scroll ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
                 {rows.length === 0 ? (
-                  <div className="p-8 text-center text-subtle text-sm">{t('chat.empty')}</div>
+                  <div className="p-8 text-center text-subtle text-sm">
+                    {isSearchMode ? t('chat.searchEmpty') : t('chat.empty')}
+                  </div>
                 ) : (
                   <div className="flex flex-col">
                     {rows.map(row => (

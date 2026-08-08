@@ -71,6 +71,12 @@ export interface ChatInboxRow {
 
   // New 2026-07-22 — all lessees on the contract (mig 843), PRIMARY first.
   customers: ChatListCustomer[] | null;
+
+  /** FE-only, never from the view. True for a search hit that has no chat row
+   *  yet — the contract exists but nobody has ever messaged about it. Opening
+   *  one gives an empty room to send the first message, which is exactly what
+   *  collectors search for. See UI_FEEDBACK/2026-08-07_NOTICE_chat_search_use_rpc_not_view_filter.md */
+  is_stub?: boolean;
 }
 
 export interface ChatMessage {

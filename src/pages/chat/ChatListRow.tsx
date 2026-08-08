@@ -72,10 +72,17 @@ export function ChatListRow({ row, selected, onSelect, showBranch, lang, t, comp
             {t(`chat.status.${row.chat_status}`)}
           </Badge>
         )}
+        {/* Search hit that has never been chatted. Says so plainly so the row
+            doesn't read as an empty conversation. */}
+        {row.is_stub && (
+          <Badge size="xs" color="default">{t('chat.noChatYet')}</Badge>
+        )}
       </div>
 
       <div className="text-xs text-subtle truncate mt-0.5">
-        {isImage ? (
+        {row.is_stub ? (
+          <span className="text-subtler">{t('chat.startConversation')}</span>
+        ) : isImage ? (
           <span className="inline-flex items-center gap-1">
             <ImageIcon size={12} /> {t('chat.imageMessage')}
           </span>
