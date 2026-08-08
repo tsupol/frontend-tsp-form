@@ -1057,6 +1057,12 @@ export function Fin2RatesPage() {
                     getRowProps={(row) => ({
                       'data-state': row.original.id === selectedModelId ? 'selected' : undefined,
                     })}
+                    // "manual" — handleRowSelect runs the unsaved-editor guard,
+                    // so arrowing in follow mode would prompt on every keypress.
+                    // Arrows move the cursor; Enter commits the selection.
+                    enableKeyboardNav={!isMobile}
+                    keyboardActivateMode="manual"
+                    onRowActivate={(row) => handleRowSelect(row.original.id)}
                     renderRow={(row) => {
                       const model = row.original;
                       const rateSummary = rateSummaryMap.get(model.id);

@@ -394,6 +394,11 @@ export function CallCenterPage() {
                 <DataTable<BookRow>
                   data={rows}
                   getRowProps={(row) => ({ 'data-state': selectedId === row.original.contract_id ? 'selected' : undefined })}
+                  // Click the rail, then Arrow keys walk the book and the detail
+                  // panel follows. Desktop only — on mobile the row handler calls
+                  // goTo('detail'), so arrowing would navigate every keypress.
+                  enableKeyboardNav={!isMobile}
+                  onRowActivate={(row) => selectContract(row.original.contract_id)}
                   renderRow={(row) => {
                     const c = row.original;
                     return (

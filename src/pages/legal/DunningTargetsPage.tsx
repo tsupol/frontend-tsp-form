@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import {
-  PageNav, PageNavPanel, MobileHeader, DataTableFooter, Input, Select, Badge, Button,
+  PageNav, PageNavPanel, MobileHeader, DataTable, Input, Select, Badge, Button,
   PopOver, InputDatePicker,
 } from 'tsp-form';
 import { ArrowRightFromLine, ArrowLeft, Search, SlidersHorizontal, Calendar, ExternalLink, ChevronsUpDown } from 'lucide-react';
@@ -365,60 +365,62 @@ export function DunningTargetsPage() {
             <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
               {/* ── List Panel ── */}
               <PageNavPanel id="list" className={isMobile ? '' : 'w-5/12 xl:w-4/12 border-r border-line flex flex-col'}>
-                <div className={`data-table-content better-scroll ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
-                  {list.length === 0 ? (
-                    <div className="p-8 text-center text-subtler">{t('common.noData')}</div>
-                  ) : (
-                    <div className="flex flex-col divide-y divide-line">
-                      {list.map((item) => (
-                        <button
-                          key={item.contract_id}
-                          className={`w-full text-left px-4 py-2.5 transition-colors cursor-pointer ${
-                            item.contract_id === selectedId ? 'bg-primary-soft' : 'hover:bg-surface-hover'
-                          }`}
-                          onClick={() => handleSelect(item)}
-                        >
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="font-medium text-sm truncate">{item.contract_code_display ?? item.contract_code}</span>
-                            <Badge size="xs" color={getBucketColor(item.bucket_code)}>
-                              {getBucketLabel(item.bucket_code, t)}
-                            </Badge>
-                          </div>
-                          <div className="flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-1.5 min-w-0">
-                              <span className="text-subtle truncate">
-                                {item.customer_name ?? '—'} · {item.branch_name}
-                              </span>
-                            </div>
-                            <span className={`tabular-nums font-medium shrink-0 ml-2 ${item.overdue_amount > 0 ? 'text-danger' : 'text-subtle'}`}>
-                              {fmt(item.overdue_amount)}
+                {/* DataTable owns row dividers, selected state, pagination and
+                    (desktop) arrow-key navigation. */}
+                <DataTable<DunningTarget>
+                  data={list}
+                  getRowProps={(row) => ({
+                    'data-state': row.original.contract_id === selectedId ? 'selected' : undefined,
+                  })}
+                  // Click the rail, then Arrow keys walk the worklist and the
+                  // detail panel follows. Desktop only — on mobile handleSelect
+                  // calls goTo('detail'), so arrowing would navigate every press.
+                  enableKeyboardNav={!isMobile}
+                  onRowActivate={(row) => setSelectedId(row.original.contract_id)}
+                  renderRow={(row) => {
+                    const item = row.original;
+                    return (
+                      <button
+                        className="w-full text-left px-4 py-2.5 transition-colors cursor-pointer"
+                        onClick={() => handleSelect(item)}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-medium text-sm truncate">{item.contract_code_display ?? item.contract_code}</span>
+                          <Badge size="xs" color={getBucketColor(item.bucket_code)}>
+                            {getBucketLabel(item.bucket_code, t)}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="text-subtle truncate">
+                              {item.customer_name ?? '—'} · {item.branch_name}
                             </span>
                           </div>
-                          <div className="flex items-center justify-between text-[11px] text-subtler mt-0.5">
-                            <span>{item.overdue_installment_count} {t('legal.installments')}</span>
-                            {item.overdue_days > 0 && (
-                              <span className="tabular-nums">{overdueDaysLabel(item.overdue_days)}</span>
-                            )}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {totalCount > 0 && (
-                  <div className="flex-none border-t border-line p-2">
-                    <DataTableFooter
-                      currentPage={pageIndex + 1}
-                      totalPages={Math.ceil(totalCount / pageSize) || 1}
-                      onPageChange={(p) => setPageIndex(p - 1)}
-                      pageSize={pageSize}
-                      pageSizeOptions={[15, 25, 50]}
-                      onPageSizeChange={(ps) => { setPageSize(ps); setPageIndex(0); }}
-                      totalRows={totalCount}
-                    />
-                  </div>
-                )}
+                          <span className={`tabular-nums font-medium shrink-0 ml-2 ${item.overdue_amount > 0 ? 'text-danger' : 'text-subtle'}`}>
+                            {fmt(item.overdue_amount)}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] text-subtler mt-0.5">
+                          <span>{item.overdue_installment_count} {t('legal.installments')}</span>
+                          {item.overdue_days > 0 && (
+                            <span className="tabular-nums">{overdueDaysLabel(item.overdue_days)}</span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  }}
+                  enablePagination
+                  pageIndex={pageIndex}
+                  pageSize={pageSize}
+                  pageSizeOptions={[15, 25, 50]}
+                  rowCount={totalCount}
+                  onPageChange={({ pageIndex: pi, pageSize: ps }) => {
+                    if (ps !== pageSize) { setPageSize(ps); setPageIndex(0); }
+                    else setPageIndex(pi);
+                  }}
+                  className={`flex-1 min-h-0 panel-datatable ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
+                  noResults={<div className="p-8 text-center text-subtler">{t('common.noData')}</div>}
+                />
               </PageNavPanel>
 
               {/* ── Detail Panel ── */}

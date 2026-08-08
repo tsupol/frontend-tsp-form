@@ -1967,6 +1967,11 @@ export function ModelsPage() {
                     getRowProps={(row) => ({
                       'data-state': row.original.model_id === selectedModelId ? 'selected' : undefined,
                     })}
+                    // Click the rail, then Arrow keys walk the models and the
+                    // detail panel follows. Desktop only — on mobile each
+                    // keypress would fire goTo('detail').
+                    enableKeyboardNav={!isMobile}
+                    onRowActivate={(row) => setSelectedModelId(row.original.model_id)}
                     renderRow={(row) => {
                       const model = row.original;
                       return (

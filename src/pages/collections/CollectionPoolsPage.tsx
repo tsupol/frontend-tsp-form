@@ -154,6 +154,11 @@ export function CollectionPoolsPage() {
                 getRowProps={(row) => ({
                   'data-state': selectedPoolId === row.original.pool_id ? 'selected' : undefined,
                 })}
+                // Click the rail, then Arrow keys walk the pools and the detail
+                // panel follows. Desktop only — on mobile selectPool receives
+                // goTo, so arrowing would navigate every keypress.
+                enableKeyboardNav={!isMobile}
+                onRowActivate={(row) => selectPool(row.original.pool_id)}
                 renderRow={(row) => {
                   const p = row.original;
                   const noMemberWarning = p.member_count === 0 && p.branch_count > 0;

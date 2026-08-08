@@ -1129,6 +1129,12 @@ export function PricebookPage() {
                       'data-active': row.original.id === selectedModelId ? 'true' : undefined,
                       onClick: () => handleRowSelect(row.original.id),
                     })}
+                    // "manual" — handleRowSelect runs the unsaved-editor guard,
+                    // so arrowing in follow mode would prompt on every keypress.
+                    // Arrows move the cursor; Enter commits the selection.
+                    enableKeyboardNav={!isMobile}
+                    keyboardActivateMode="manual"
+                    onRowActivate={(row) => handleRowSelect(row.original.id)}
                     renderRow={(row) => {
                       const model = row.original;
                       const pricing = pricingMap.get(model.id);

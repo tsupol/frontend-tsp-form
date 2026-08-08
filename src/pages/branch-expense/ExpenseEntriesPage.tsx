@@ -426,6 +426,11 @@ export function ExpenseEntriesPage() {
                 getRowProps={(row) => ({
                   'data-state': row.original.id === selectedId ? 'selected' : undefined,
                 })}
+                // Click into the rail, then Arrow keys walk the entries and the
+                // detail panel follows. Desktop only — on mobile arrowing would
+                // fire goTo('detail') on every keypress.
+                enableKeyboardNav={!isMobile}
+                onRowActivate={(row) => selectEntry(row.original.id)}
                 renderRow={(row) => {
                   const r = row.original;
                   const thumbKey = r.is_voided ? null : (r.images?.[0]?.thumb || r.images?.[0]?.lg);

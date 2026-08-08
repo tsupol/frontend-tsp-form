@@ -166,6 +166,8 @@ dividers (including the last row), selected-row highlight, and pagination.
 <DataTable<Row>
   data={rows}
   getRowProps={row => ({ 'data-state': row.original.id === selectedId ? 'selected' : undefined })}
+  enableKeyboardNav={!isMobile}
+  onRowActivate={row => select(row.original)}
   renderRow={row => (
     <button
       key={row.original.id}
@@ -193,6 +195,46 @@ Non-negotiables:
 - `getRowProps`/`renderRow` receive the row object — read `row.original`.
 - Pagination is **built into the DataTable** (`enablePagination` + `rowCount` + `onPageChange`). Do not add a separate `DataTableFooter`.
 - Narrow rail: rows stack vertically (column DataTable headers don't fit). That's what `renderRow` is for.
+- **Arrow-key navigation** via `enableKeyboardNav` + `onRowActivate` — see below.
+
+### Rail keyboard navigation (`enableKeyboardNav`)
+
+Every rail should be arrow-navigable. It's two props on the `DataTable` you
+already have — there is **no wrapper component to reach for**, and writing one
+would just rename `DataTable`'s own API.
+
+```tsx
+enableKeyboardNav={!isMobile}
+onRowActivate={row => select(row.original)}
+```
+
+The user clicks the rail once, then ArrowUp/ArrowDown walk the rows with the
+detail panel following; Home/End jump to the first/last row on the page.
+Requires **tsp-form ≥ 0.8.7**.
+
+- **Always `{!isMobile}`, never bare `enableKeyboardNav`.** On mobile the row
+  handler calls `goTo('detail')`, so arrowing would navigate on every keypress.
+- **`onRowActivate` should do the same thing the row's `onClick` does, minus the
+  mobile `goTo`.** Usually just the `setSelectedId(...)` half.
+- Selection styling still comes from `getRowProps` → `data-state="selected"`.
+  The keyboard cursor is a separate, dimmer state DataTable draws itself.
+- The cursor is keyed on DataTable's internal row id, which is the row's
+  **index** in `data`, not your entity id. Fine within a page; if the rail
+  re-sorts or refetches underneath, the cursor stays at that position rather
+  than following the row.
+- Arrows stop at the top/bottom of the current page — they don't roll over into
+  the next pagination page.
+- **Watch the fetch-per-keypress case:** with the default `follow` mode
+  `onRowActivate` fires on every arrow press. If the detail panel fetches per
+  selection, holding an arrow key fires a burst. Pass
+  `keyboardActivateMode="manual"` to move the cursor on arrows and commit only
+  on Enter/Space.
+
+If a rail is *not* on `DataTable` + `renderRow`, the props don't exist and arrow
+keys just scroll the container — that's the symptom of a hand-rolled list. Fix
+it by converting the rail (see the non-negotiables above), not by bolting a
+keydown handler onto the custom markup. `ContractListPane` was exactly this
+case.
 
 ### Detail panel
 

@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, Badge, Input, Select, Button, DataTableFooter, PopOver } from 'tsp-form';
+import { PageNav, PageNavPanel, MobileHeader, Badge, Input, Select, Button, DataTable, PopOver } from 'tsp-form';
 import { useAuth } from '../../contexts/AuthContext';
 import { ArrowLeft, ArrowRightFromLine, Search, SlidersHorizontal, Plus, Archive } from 'lucide-react';
 import { apiClient } from '../../lib/api';
@@ -217,7 +217,6 @@ export function ContractListPane({
 
   const contracts = searchData?.contracts ?? [];
   const totalCount = searchData?.count ?? 0;
-  const totalPages = Math.ceil(totalCount / pageSize);
 
   useEffect(() => {
     onContractsChange?.(contracts);
@@ -364,77 +363,77 @@ export function ContractListPane({
                 </div>
               </div>
 
-              {/* Contract list */}
-              <div className={`data-table-content better-scroll ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
-                {contracts.length === 0 ? (
+              {/* Contract list — DataTable owns row dividers, selected state,
+                  pagination and (desktop) arrow-key navigation. `page` here is
+                  1-based for the RPC; DataTable's pageIndex is 0-based. */}
+              <DataTable<ContractSearchResult>
+                data={contracts}
+                getRowProps={(row) => ({
+                  'data-state': row.original.id === selectedId ? 'selected' : undefined,
+                })}
+                // Click the rail, then Arrow keys walk the contracts and the
+                // detail panel follows. Desktop only — on mobile each keypress
+                // would fire goTo('detail').
+                enableKeyboardNav={!isMobile}
+                onRowActivate={(row) => setSelectedId(row.original.id)}
+                renderRow={(row) => {
+                  const contract = row.original;
+                  return (
+                    <button
+                      className="w-full text-left px-4 py-2.5 flex items-center gap-3 transition-colors cursor-pointer"
+                      onClick={() => { setSelectedId(contract.id); if (isMobile) goTo('detail'); }}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="font-medium text-sm truncate">{contract.code_display ?? contract.code}</span>
+                          <Badge size="xs" color={getStateColor(contract.state)}>
+                            {getStateLabel(contract.state, t)}
+                          </Badge>
+                          {contract.is_device_deposited && (
+                            <Badge size="xs" color="warning" className="shrink-0 inline-flex items-center gap-1">
+                              <Archive size={10} />
+                              {t('contract.deposit_chip', { defaultValue: 'Device deposited' })}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-xs text-subtle truncate mt-0.5">
+                          {contract.customer_name ?? t('contract.noCustomer')}
+                          {(() => {
+                            const product = contract.product_display_name ?? contract.variant_name ?? contract.model_name;
+                            return product ? ` · ${product}` : '';
+                          })()}
+                        </div>
+                        <div className="flex items-center gap-3 mt-1 text-xs text-subtle">
+                          <span>{contract.branch_name}</span>
+                          <OwnerBadge size="xs" ownerType={contract.owner_type as OwnerType | null} ownerName={contract.owner_name} />
+                          {contract.overdue_count != null && contract.overdue_count > 0 && (
+                            <span className="text-danger font-medium">
+                              {t('contract.overdueN', { count: contract.overdue_count })}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        {rowRight(contract)}
+                        <div className="text-xs text-subtle"><DateTime value={contract.created_at} showTime={false} /></div>
+                      </div>
+                    </button>
+                  );
+                }}
+                enablePagination
+                pageIndex={page - 1}
+                pageSize={pageSize}
+                pageSizeOptions={[15, 25, 50]}
+                rowCount={totalCount}
+                onPageChange={({ pageIndex, pageSize: ps }) => {
+                  if (ps !== pageSize) { setPageSize(ps); setPage(1); }
+                  else setPage(pageIndex + 1);
+                }}
+                className={`flex-1 min-h-0 panel-datatable ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
+                noResults={
                   <div className="p-8 text-center text-subtler">{emptyMessage ?? t('common.noData')}</div>
-                ) : (
-                  <div className="flex flex-col">
-                    {contracts.map(contract => {
-                      const isSelected = contract.id === selectedId;
-                      return (
-                        <button
-                          key={contract.id}
-                          className={`w-full text-left px-4 py-2.5 border-b border-line flex items-center gap-3 transition-colors cursor-pointer ${
-                            isSelected ? 'bg-primary-soft' : 'hover:bg-surface-hover'
-                          }`}
-                          onClick={() => { setSelectedId(contract.id); if (isMobile) goTo('detail'); }}
-                        >
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="font-medium text-sm truncate">{contract.code_display ?? contract.code}</span>
-                              <Badge size="xs" color={getStateColor(contract.state)}>
-                                {getStateLabel(contract.state, t)}
-                              </Badge>
-                              {contract.is_device_deposited && (
-                                <Badge size="xs" color="warning" className="shrink-0 inline-flex items-center gap-1">
-                                  <Archive size={10} />
-                                  {t('contract.deposit_chip', { defaultValue: 'Device deposited' })}
-                                </Badge>
-                              )}
-                            </div>
-                            <div className="text-xs text-subtle truncate mt-0.5">
-                              {contract.customer_name ?? t('contract.noCustomer')}
-                              {(() => {
-                                const product = contract.product_display_name ?? contract.variant_name ?? contract.model_name;
-                                return product ? ` · ${product}` : '';
-                              })()}
-                            </div>
-                            <div className="flex items-center gap-3 mt-1 text-xs text-subtle">
-                              <span>{contract.branch_name}</span>
-                              <OwnerBadge size="xs" ownerType={contract.owner_type as OwnerType | null} ownerName={contract.owner_name} />
-                              {contract.overdue_count != null && contract.overdue_count > 0 && (
-                                <span className="text-danger font-medium">
-                                  {t('contract.overdueN', { count: contract.overdue_count })}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <div className="text-right shrink-0">
-                            {rowRight(contract)}
-                            <div className="text-xs text-subtle"><DateTime value={contract.created_at} showTime={false} /></div>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Pagination */}
-              {totalCount > 0 && (
-                <div className="flex-none border-t border-line px-2 py-2">
-                  <DataTableFooter
-                    currentPage={page}
-                    totalPages={totalPages || 1}
-                    onPageChange={setPage}
-                    pageSize={pageSize}
-                    pageSizeOptions={[15, 25, 50]}
-                    onPageSizeChange={(ps) => { setPageSize(ps); setPage(1); }}
-                    totalRows={totalCount}
-                  />
-                </div>
-              )}
+                }
+              />
             </PageNavPanel>
 
             <ContractDetailSlot isMobile={isMobile} hasSelection={selectedId != null}>
