@@ -45,42 +45,111 @@ const variants = await resizeToVariants(
 - **`ImageUploader` (the UI component) uses this internally.** Use the component for drag-drop zones; call `resizeToVariants` directly for everything else.
 - **Do NOT re-implement canvas resize.** There is no longer an `encodeCanvas`/`renameForExt` in `src/lib/upload.ts` — they were deleted once every path routed through `resizeToVariants`.
 
-### ImageUploader (drag-drop UI)
+### Picking the upload UI
 
 > ### ⛔ NEVER hand-roll a drop zone
 >
-> `ImageUploader` from `tsp-form` **already does click + drag-and-drop in one
-> element**, including the drag highlight (`.image-uploader-dragging`). If you
-> find yourself writing `onDrop` / `onDragOver` / `dataTransfer` / a
-> `dragDepth` counter, stop — you are rebuilding this component. There is no
-> `onDrop` handler anywhere in `src/`, and that is deliberate.
->
-> This has been reinvented before: a custom drop zone shipped in the branch
-> expense modal that was **drop-only and could not be clicked**, because the
-> hand-rolled version forgot the click path the component gives free.
->
-> **Multi-image is supported** — `multiple` + `maxFiles={n}`. Don't conclude
-> "there's no multi-image pattern" from the fact that most callers upload one
-> photo per modal (repair / sell-out / buyback all do). Set the two props.
+> If you are typing `onDrop` / `onDragOver` / `dataTransfer` / a `dragDepth`
+> counter in a page or modal, stop — you are rebuilding a component that
+> exists. A custom zone shipped here once that was **drop-only and could not be
+> clicked**, because the hand-rolled version forgot the click path.
+
+| Need | Use |
+|---|---|
+| **Several images** (strip of thumbs, max N) | `<MultiImageUploader>` — `src/components/MultiImageUploader.tsx` |
+| **One image** | `<ImageUploader>` from `tsp-form` directly |
+
+#### MultiImageUploader (the multi-image pattern)
+
+Owns everything the four hand-rolled copies used to each re-derive: click +
+drag + paste intake, HEIC conversion, non-image rejection, the max-N cap, the
+80px tile grid, remove buttons, and a zoomable viewer.
+
+```tsx
+<MultiImageUploader
+  items={files.map((file, i) => ({ kind: 'staged', id: String(i), file }))}
+  onAdd={(files) => setFiles(prev => [...prev, ...files].slice(0, MAX))}
+  onRemove={(item) => setFiles(prev => prev.filter((_, i) => String(i) !== item.id))}
+  max={MAX}
+  disabled={busy}
+  onError={setError}
+/>
+```
+
+- **Two item kinds, one grid.** `staged` = a local `File` not yet uploaded;
+  removing costs nothing so the component drops it immediately. `persisted` =
+  already on the server; the component only *reports* the intent via
+  `onRemove` so the caller can run its confirm dialog + delete RPC. Set
+  `locked: true` on a persisted item to hide its trash button entirely.
+- **Tile size is measured, not hardcoded.** A `ResizeObserver` picks the column
+  count: how many 80px tiles fit, then one more if it still clears a 64px
+  floor. A fixed 80px stranded ~44px on a 375px phone — 3 tiles where 4 fit.
+  Don't replace this with a plain `auto-fill` grid; CSS alone can shrink-to-fit
+  **or** cap at 80px, not both (a roomy container silently rendered 65px tiles).
+- **Zone geometry**: dashed border, `min-height` = one tile + padding (104px),
+  so it doesn't jump between empty and filled.
+- `onError(message)` hands back an already-translated string (non-image
+  rejected, over max, HEIC decode failed) — render it in `<ModalErrorBand>`.
+
+#### ImageUploader (single image, from tsp-form)
+
+Already does click + drag in one element with a `.image-uploader-dragging`
+highlight. Repair / sell-out / buyback add-photo modals are the reference.
 
 - `sizes` prop (multi-size): emits `UploadedImage.variants[label]`. Top-level `file` is undefined in this mode.
 - `resizeOptions` prop (single-size): emits top-level `UploadedImage.file`.
 - `onUpload(images: UploadedImage[])`. `originalFile` is the untouched source.
-- `placeholder` prop replaces the default "Click or drag image" body — use it to
-  restyle the zone rather than building your own container around a hidden input.
-- Staging several files before an id exists (the entry/row must be created first):
-  keep your own thumbnail strip + `File[]` state, feed it from
-  `onUpload(imgs => imgs.map(i => i.originalFile))`, and render `<ImageUploader>`
-  underneath. `CreateExpenseModal.tsx` is the reference for this shape.
+- `placeholder` prop replaces the default "Click or drag image" body.
+
+### Viewing images — always navigable
+
+**Never wire a thumbnail strip to a single-image lightbox.** If the user can see
+N thumbnails, the viewer must page through all N — opening photo 2 and being
+unable to reach photo 3 is the bug this replaced.
+
+`src/components/MediaLightbox.tsx` exports three, all wrapping tsp-form's
+`ImageZoomPan` (pinch/wheel zoom, pan, rubber-band) in the same dark chrome:
+
+| Component | Takes | Use for |
+|---|---|---|
+| `MediaLightboxGallery` | `urls: string[]` | staged local files (`blob:` URLs) — what `MultiImageUploader` uses internally |
+| `MediaLightboxKeyGallery` | `mediaKeys: string[]` | stored media; presigns the **current** key via `useMediaUrl`, so callers holding keys don't presign by hand |
+| `MediaLightbox` | one `mediaKey` | genuinely single-image callers only (bank slip, chat image) |
+
+Both galleries wrap around, bind ← →, show `n / total`, hide the arrows for a
+single image, and remount the viewer per image so zoom/pan resets.
+
+Callers own the index, not the key:
+
+```tsx
+const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+// …thumb onClick={() => setLightboxIndex(i)}
+<MediaLightboxKeyGallery
+  open={lightboxIndex !== null}
+  onClose={() => setLightboxIndex(null)}
+  mediaKeys={photoStrip.map(p => p.full)}
+  index={lightboxIndex ?? 0}
+  onIndexChange={setLightboxIndex}
+/>
+```
+
+⚠️ **Build the thumbnails and the key list from ONE filtered array.** If the
+strip skips entries with a missing key but the viewer doesn't (or vice versa),
+the index addresses a different photo than the one clicked.
+`ExpenseDetailPanel.tsx` (`photoStrip`) is the reference.
+
+**Still on the single-image lightbox** (each loses navigation once open, migrate
+on touch): repair condition photos, buyback wizard photos, contract attachments
+(two strips).
 
 ### HEIC input
 
-`isHeicFile` / `isImageFile` / `convertHeicToJpeg` live in `src/lib/beMedia.ts`.
-Conversion is canvas-based and works only where the browser decodes HEIC
-natively (**Safari/iOS** — where these files originate). Chrome/Firefox reject
-the decode and the caller shows a "convert to JPEG first" message. Covering
-desktop Chrome needs a WASM decoder (`heic2any` / `libheif-js`, ~1.5 MB) — not
-installed; ask before adding it.
+`isHeicFile` / `isImageFile` / `convertHeicToJpeg` live in `src/lib/beMedia.ts`
+(`MultiImageUploader` calls them for you). Conversion is canvas-based and works
+only where the browser decodes HEIC natively (**Safari/iOS** — where these files
+originate). Chrome/Firefox reject the decode and the caller shows a "convert to
+JPEG first" message. Covering desktop Chrome needs a WASM decoder (`heic2any` /
+`libheif-js`, ~1.5 MB) — not installed; ask before adding it.
 
 ## Stage 2 — transport (`src/lib/beMedia.ts`)
 

@@ -53,3 +53,52 @@ PAID via a ledger drain (no cash step), e.g. `fn_bill_late_fee_collect`.
 
 `ContractFeeModal.tsx` (cart, `billId`), `LateFeeCollectModal.tsx` (single RPC,
 `billId` + waive rows). Copy either.
+
+---
+
+# ModalErrorBand — where a submit error goes
+
+`src/components/ModalErrorBand.tsx`. The failure-side counterpart to
+`ActionDoneView`: the one place a write-modal renders its submit error.
+
+## The rule
+
+Render it **between** `.modal-content` and `.modal-footer` — as a sibling, never
+a child of `modal-content`:
+
+```tsx
+<div className="modal-content">…fields…</div>
+<ModalErrorBand message={error} />
+<div className="modal-footer">…buttons…</div>
+```
+
+## Why not inside modal-content
+
+`.modal-content` is the scrolling element (`overflow-y:auto; flex:1`) between a
+static header and footer. An alert placed inside it scrolls with the form, so on
+any modal taller than the viewport the error renders below the fold — and the
+modal does not scroll to it. The user presses Save and sees **nothing happen**.
+
+Measured on CreateExpenseModal at 390×844 before the fix: error at y=966, content
+viewport ending at 740, `scrollTop: 0`. After: y=694, flush above the footer,
+still visible at every scroll position.
+
+Putting it at the *top* of `modal-content` is not a fix either — it scrolls away
+just as fast once the user has scrolled down, and it sits far from the button
+that produced it.
+
+## Props
+
+| prop | type | purpose |
+|---|---|---|
+| `message` | string｜null | falsy renders nothing (no wasted space) |
+| `variant` | `'danger'｜'warning'` | default `danger`; `warning` for known backend gaps |
+| `onDismiss` | () => void | shows an × that clears the parent's error state. Omit for a non-dismissable band. Pass `() => setError(null)`. |
+
+Translate the message before passing it — use `translateApiError(err, t)` for
+`ApiError`, per the API error handling rules in `.claude/CLAUDE.md`.
+
+## Migration
+
+~157 files still render `alert alert-danger` inline. Migrate a modal to the band
+when you touch it for another reason; no bulk sweep.
