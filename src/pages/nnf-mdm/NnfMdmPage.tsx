@@ -4,9 +4,14 @@
 //   ① ผิดปกติ (default)            — devices under contract we must chase
 //                                    (custody CARE), multi-badge per row via
 //                                    anomaly_codes (same pattern as NNF App)
-//   ② เครื่องในมือเราที่เงียบ        — context data: silent devices in stock /
-//                                    repair (silence there is normal, but it
-//                                    must always be viewable)
+//   ② เครื่องเงียบ (ในมือลูกค้า)     — devices out with customers (or on loan)
+//                                    that stopped reporting in. Silence HERE is
+//                                    the risk signal. Filter is `in.(...)`, not
+//                                    `not.in.(...)` — the original spec had the
+//                                    direction backwards and the tab showed
+//                                    stock/repair devices, where silence is
+//                                    normal, so the at-risk group never
+//                                    appeared. (FIX 2026-08-08.)
 //
 // Hard rules (UI_SUMMARY/132_ANOMALY_REPORT.md "Common Mistakes"):
 // - No self-invented severity colors / red dots. Prominence = badge count per
@@ -98,7 +103,7 @@ export function NnfMdmPage() {
   const silent = useQuery({
     queryKey: ['nnf-mdm', 'silent', silentPage],
     queryFn: () => apiClient.getPaginated<MdmSilentRow>(
-      '/v_mdm_device_silent?current_bucket=not.in.(WITH_CUSTOMER_ACTIVE,LOANED_OUT)&order=silent_days.desc,asset_id.asc',
+      '/v_mdm_device_silent?current_bucket=in.(WITH_CUSTOMER_ACTIVE,LOANED_OUT)&order=silent_days.desc,asset_id.asc',
       { page: silentPage + 1, pageSize: PAGE_SIZE },
     ),
     placeholderData: keepPreviousData,
