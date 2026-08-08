@@ -35,7 +35,7 @@ import {
 } from 'tsp-form';
 import {
   ArrowRightFromLine, Lock, Send, Loader2, CheckCircle, XCircle, AlertTriangle,
-  ExternalLink,
+  ExternalLink, KeyRound,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { formatRelativeAgo } from '../../lib/format';
@@ -46,6 +46,15 @@ import {
   type MdmDeviceListRow, type MdmDeviceListBadge, type ApplyTemplateResult,
 } from '../inventory/mdm/mdmApi';
 import { parseMdmError } from '../inventory/mdm/mdmApi';
+import { ActivationLockRevealModal } from './ActivationLockRevealModal';
+
+// Activation Lock codes can unlock a repossessed device for resale, so the
+// owner restricted reveal to company level on purpose — a branch must ask a
+// company admin. This is the anti-fraud control, not an inconvenience.
+// The RPC enforces it too; hiding the button just avoids a guaranteed 403.
+// (IMPLEMENT 2026-08-07 — this is the one place role_code IS the right check:
+// it's UI visibility of an action, not data scoping.)
+const MAY_REVEAL_ACTIVATION_LOCK = new Set(['COMPANY_ADMIN', 'SYSTEM_DEV']);
 
 type MdmFilter = 'not_enrolled' | 'enrolled' | 'all';
 const POLL_MS = 20_000;
@@ -96,6 +105,8 @@ export function MdmDevicesPage() {
 
   const [enrollTarget, setEnrollTarget] = useState<MdmDeviceListRow | null>(null);
   const [lockTarget, setLockTarget] = useState<MdmDeviceListRow | null>(null);
+  const [revealTarget, setRevealTarget] = useState<MdmDeviceListRow | null>(null);
+  const mayRevealLock = MAY_REVEAL_ACTIVATION_LOCK.has(user?.role_code ?? '');
 
   const buildEndpoint = useCallback(() => {
     const params: string[] = ['order=in_mdm.asc,asset_id.asc'];
@@ -242,6 +253,7 @@ export function MdmDevicesPage() {
                       onOpenContract={() => row.contract_id && navigate(`/admin/contracts/search/${row.contract_id}`)}
                       onEnroll={() => setEnrollTarget(row)}
                       onLock={() => setLockTarget(row)}
+                      onRevealLock={mayRevealLock ? () => setRevealTarget(row) : null}
                     />
                   ))}
                 </div>
@@ -273,6 +285,11 @@ export function MdmDevicesPage() {
         onDone={(msg) => { okSnack(msg); refetch(); }}
         onError={errSnack}
       />
+      {/* Read-only reveal — nothing to refetch afterwards. */}
+      <ActivationLockRevealModal
+        target={revealTarget}
+        onClose={() => setRevealTarget(null)}
+      />
     </>
   );
 }
@@ -280,13 +297,15 @@ export function MdmDevicesPage() {
 // ── One device row ───────────────────────────────────────────────────────────
 
 function DeviceRow({
-  row, onOpenAsset, onOpenContract, onEnroll, onLock,
+  row, onOpenAsset, onOpenContract, onEnroll, onLock, onRevealLock,
 }: {
   row: MdmDeviceListRow;
   onOpenAsset: () => void;
   onOpenContract: () => void;
   onEnroll: () => void;
   onLock: () => void;
+  /** Null hides the action entirely — see MAY_REVEAL_ACTIVATION_LOCK. */
+  onRevealLock: (() => void) | null;
 }) {
   const { t } = useTranslation();
   const applying = row.enforcement_badge === 'APPLYING';
@@ -356,6 +375,11 @@ function DeviceRow({
           <span className="text-xs text-info-fg inline-flex items-center gap-1">
             <Loader2 size={12} className="animate-spin" />{t('mdmDevices.lock.APPLYING')}
           </span>
+        )}
+        {onRevealLock && row.in_mdm && (
+          <Button size="sm" variant="outline" startIcon={<KeyRound size={14} />} onClick={onRevealLock}>
+            {t('mdmDevices.activationLock.rowButton')}
+          </Button>
         )}
       </div>
     </div>

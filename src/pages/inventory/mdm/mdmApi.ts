@@ -286,6 +286,55 @@ export function applyLightLock(
   });
 }
 
+// ── Activation Lock reveal (migs 1038+1039; IMPLEMENT 2026-08-07) ────────────
+// Shows the bypass codes that unlock a device stuck on Activation Lock (e.g. a
+// customer erased it). COMPANY_ADMIN / SYSTEM_DEV only — the owner made the
+// company-level bottleneck deliberate anti-fraud control, since these codes can
+// unlock a repossessed device for resale. Hide the button for every other role;
+// the RPC would reject anyway, and a dead button invites a support call.
+//
+// Every reveal is written to mdm.device_escrow_access_log server-side. The UI
+// does nothing extra for auditing, but p_reason should be filled in — it lands
+// in that log.
+
+export type MdmEscrowType = 'ACTIVATION_LOCK_SERVER' | 'ACTIVATION_LOCK_BYPASS' | string;
+
+export interface MdmActivationLockKey {
+  escrow_id: number;
+  /** ⚠️ Both types are 27-char codes that look identical but unlock DIFFERENT
+   *  locks. NEVER render a code without its type label — staff will try the
+   *  wrong one and conclude "the code doesn't work" on a recoverable device.
+   *  SERVER = our org's lock (the common case, never expires).
+   *  BYPASS = the customer's own Apple ID lock (expires at window_ends_at). */
+  escrow_type: MdmEscrowType;
+  code: string;
+  applied_at: string | null;
+  never_expires: boolean;
+  window_ends_at: string | null;
+}
+
+export interface MdmActivationLockReveal {
+  asset_id: number;
+  asset_code: string;
+  serial_number: string | null;
+  model: string | null;
+  key_count: number;
+  revealed_at: string;
+  /** Already ordered by the DB with the org key first. Do not re-sort or filter:
+   *  the RPC only returns keys that are still usable (status ACTIVE). */
+  keys: MdmActivationLockKey[];
+}
+
+export function revealActivationLock(
+  assetId: number,
+  reason: string,
+): Promise<MdmActivationLockReveal> {
+  return apiClient.rpc<MdmActivationLockReveal>('fn_mdm_activation_lock_reveal', {
+    p_asset_id: assetId,
+    p_reason: reason.trim() || null,
+  });
+}
+
 // ── MDM Devices list screen (v_mdm_device_list, mig 940; doc IMPLEMENT 2026-08-01) ──
 // A branch-wide "which device needs action?" list — the shortcut counterpart to the
 // per-device tab-1 panel. 27 columns, RLS-scoped by role, no permission columns
