@@ -170,12 +170,27 @@ on touch): repair condition photos, buyback wizard photos, contract attachments
 
 ### HEIC input
 
-`isHeicFile` / `isImageFile` / `convertHeicToJpeg` live in `src/lib/beMedia.ts`
-(`MultiImageUploader` calls them for you). Conversion is canvas-based and works
-only where the browser decodes HEIC natively (**Safari/iOS** — where these files
-originate). Chrome/Firefox reject the decode and the caller shows a "convert to
-JPEG first" message. Covering desktop Chrome needs a WASM decoder (`heic2any` /
-`libheif-js`, ~1.5 MB) — not installed; ask before adding it.
+`isHeicFile` / `isImageFile` / `convertHeicToJpeg` live in `src/lib/beMedia.ts`.
+**Both project uploaders handle HEIC for you** — you only call these directly
+when building something neither covers.
+
+`convertHeicToJpeg` tries two decoders in order:
+
+1. **Native canvas** — Safari/iOS decodes HEIC itself. Free, no download, and
+   it is where these files actually originate.
+2. **`heic2any` (WASM)** — everywhere else. `import()`ed dynamically so it
+   builds as its own ~1.35 MB chunk (`assets/heic2any-*.js`) and is fetched
+   **only when a `.heic` is actually dropped**. Never import it statically.
+
+If both fail the caller gets `imageUploader.heicFailed` via `onError`.
+
+⚠️ **tsp-form's `ImageUploader` cannot be handed a HEIC.** It calls
+`loadImageFromFile` up-front and skips any file whose type isn't `image/*` —
+and many HEICs report an empty type, so they vanish with no error.
+`SingleImageUploader` therefore intercepts the drop/pick in a capture-phase
+handler, converts, then feeds the JPEG back into the library's own `<input>`
+via a `DataTransfer` so its resize pipeline is unchanged. Don't "simplify" this
+by converting inside `onUpload` — by then the file is already gone.
 
 ## Stage 2 — transport (`src/lib/beMedia.ts`)
 

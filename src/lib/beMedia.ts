@@ -274,20 +274,11 @@ export function isImageFile(file: File): boolean {
   return false;
 }
 
-/**
- * Convert a HEIC/HEIF File to JPEG using only browser APIs.
- *
- * Works where the browser can natively decode HEIC — Safari/iOS, which is
- * where these files come from in practice. Chrome/Firefox cannot decode HEIC
- * and `createImageBitmap` rejects, which surfaces to the user as a "convert
- * this photo to JPEG first" message rather than a blank tile at upload time.
- * Adding a WASM decoder (heic2any / libheif-js) would cover desktop Chrome at
- * the cost of a ~1.5MB lazy chunk.
- *
- * Non-HEIC input is returned untouched.
- */
-export async function convertHeicToJpeg(file: File): Promise<File> {
-  if (!isHeicFile(file)) return file;
+const heicName = (name: string) =>
+  /\.hei[cf]$/i.test(name) ? name.replace(/\.hei[cf]$/i, '.jpg') : `${name}.jpg`;
+
+/** Native path — Safari/iOS decodes HEIC itself, so no WASM is needed there. */
+async function heicViaCanvas(file: File): Promise<File> {
   const bitmap = await createImageBitmap(file);
   try {
     const canvas = document.createElement('canvas');
@@ -298,9 +289,40 @@ export async function convertHeicToJpeg(file: File): Promise<File> {
     ctx.drawImage(bitmap, 0, 0);
     const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/jpeg', 0.92));
     if (!blob) throw new Error('HEIC conversion produced no output');
-    return new File([blob], file.name.replace(/\.hei[cf]$/i, '.jpg'), { type: 'image/jpeg' });
+    return new File([blob], heicName(file.name), { type: 'image/jpeg' });
   } finally {
     bitmap.close();
+  }
+}
+
+/** WASM fallback for browsers that cannot decode HEIC (Chrome, Firefox). */
+async function heicViaWasm(file: File): Promise<File> {
+  // Dynamic import so the ~1.5MB decoder is only fetched when someone actually
+  // drops a .heic — it must never land in the main bundle.
+  const { default: heic2any } = await import('heic2any');
+  const out = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 });
+  // heic2any returns Blob[] for multi-image HEICs (burst/live photos).
+  const blob = Array.isArray(out) ? out[0] : out;
+  if (!blob) throw new Error('HEIC conversion produced no output');
+  return new File([blob], heicName(file.name), { type: 'image/jpeg' });
+}
+
+/**
+ * Convert a HEIC/HEIF File to JPEG so every browser can preview and upload it.
+ *
+ * Native canvas decode first (Safari/iOS, where these files originate — free
+ * and fast), falling back to a lazily-imported WASM decoder everywhere else.
+ * Both paths are needed: without the fallback Chrome/Firefox users get nothing,
+ * and without the native path every iPad upload would pull 1.5MB of WASM.
+ *
+ * Non-HEIC input is returned untouched.
+ */
+export async function convertHeicToJpeg(file: File): Promise<File> {
+  if (!isHeicFile(file)) return file;
+  try {
+    return await heicViaCanvas(file);
+  } catch {
+    return await heicViaWasm(file);
   }
 }
 

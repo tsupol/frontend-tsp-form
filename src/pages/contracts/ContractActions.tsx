@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, Modal, Input, Select, TextArea, MaskedInput, Badge, Tooltip, PopOver, useSnackbarContext } from 'tsp-form';
 import type { UploadedImage } from 'tsp-form';
-import { CheckCircle, XCircle, X, Pencil, Plus, Trash2, Loader2, ChevronsRight, ChevronDown, ExternalLink, Wrench, ArrowRight, Info, Receipt, Paperclip, MessageSquare, PenLine, AlertTriangle } from 'lucide-react';
+import { CheckCircle, XCircle, Pencil, Plus, Trash2, Loader2, ChevronsRight, ChevronDown, ExternalLink, Wrench, ArrowRight, Info, Receipt, Paperclip, MessageSquare, PenLine, AlertTriangle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { getRoleLabel } from '../../lib/roleLabel';
 import { fmtCurrency } from '../../lib/format';
@@ -3402,6 +3402,7 @@ function PayInstallmentModal({ open, contract, onClose }: {
                     sizes={slipSpec.sizes}
                     disabled={slipUploading || mutation.isPending || !slipSpec.spec}
                     busy={slipUploading}
+                    onError={setError}
                     alt={t('contract.payInstallment_slip', { defaultValue: 'Payment slip' })}
                     placeholder={
                       <>
