@@ -1274,12 +1274,18 @@ function App() {
           </ProtectedRoute>
         }
       />
+      {/* The per-person staff ranking was replaced by the branch ranking
+          (2026-08-09) — keep the old path pointing at the new screen. */}
       <Route
         path="/admin/accounting/commission-staff"
+        element={<Navigate to="/admin/accounting/commission-branch" replace />}
+      />
+      <Route
+        path="/admin/accounting/commission-branch"
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <AccountingLayout><CommissionMonthlyReportPage kind="staff" /></AccountingLayout>
+              <AccountingLayout><CommissionMonthlyReportPage kind="branch" /></AccountingLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

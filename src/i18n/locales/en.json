@@ -512,11 +512,11 @@
     "retailSalesByType": "Retail Sales by Type",
     "collectionMonthly": "Billed vs Collected",
     "commissionSales": "Sales Performance",
-    "commissionStaff": "Staff Performance",
     "financierForm": "Financier Form (RICH)",
     "notifications": "Notifications",
     "branchExpense": "Branch Expense",
-    "overdueAging": "Overdue Aging"
+    "overdueAging": "Overdue Aging",
+    "commissionBranch": "Branch Performance"
   },
   "ownerType": {
     "HOLDING": "Holding",
@@ -582,7 +582,6 @@
   },
   "commissionReport": {
     "titleSales": "Sales Performance",
-    "titleStaff": "Staff Performance",
     "allBranches": "All branches",
     "contractsN_one": "{{count}} contract",
     "contractsN_other": "{{count}} contracts",
@@ -590,7 +589,12 @@
     "sumFinanced": "Financed total",
     "sumPeople": "People",
     "rankHint": "company-wide rank",
-    "noData": "No results for this month yet"
+    "noData": "No results for this month yet",
+    "titleBranch": "Branch Performance",
+    "sumBranches": "Branches",
+    "staffN_one": "{{count}} person",
+    "staffN_other": "{{count}} people",
+    "rankHintBranch": "company-wide branch rank"
   },
   "openedByModel": {
     "title": "Contracts Opened by Model",

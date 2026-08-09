@@ -416,7 +416,7 @@ export const AppSideNav = () => {
         // a branch caller gets their own row back (with their true company-wide
         // rank), which is the whole point of the screen for sales staff.
         { key: 'commission-sales', icon: <Trophy size="1rem" />, label: t('nav.commissionSales'), path: '/admin/accounting/commission-sales' },
-        { key: 'commission-staff', icon: <Users size="1rem" />, label: t('nav.commissionStaff'), path: '/admin/accounting/commission-staff' },
+        { key: 'commission-branch', icon: <Store size="1rem" />, label: t('nav.commissionBranch'), path: '/admin/accounting/commission-branch' },
         // Financier form filling is a branch/company chore — holding-scope users
         // (HOLDING_ADMIN / HOLDING_VIEWER) never do it, so hide it from them.
         ...(['BRANCH_MANAGER', 'BRANCH_COLLECTOR', 'COMPANY_ADMIN', 'COMPANY_ACCOUNTANT', 'COMPANY_INVENTORY', 'SYSTEM_DEV'].includes(role) ? [

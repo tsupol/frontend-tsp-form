@@ -510,11 +510,11 @@
     "retailSalesByType": "รายงานขายปลีกตามประเภท",
     "collectionMonthly": "เรียกเก็บ vs เก็บได้",
     "commissionSales": "ยอดเซลล์",
-    "commissionStaff": "ยอดพนักงาน",
     "financierForm": "กรอกฟอร์ม RICH",
     "notifications": "การแจ้งเตือน",
     "branchExpense": "ค่าใช้จ่ายสาขา",
-    "overdueAging": "รายงานยอดค้างชำระ"
+    "overdueAging": "รายงานยอดค้างชำระ",
+    "commissionBranch": "ยอดสาขา"
   },
   "ownerType": {
     "HOLDING": "Holding",
@@ -580,7 +580,6 @@
   },
   "commissionReport": {
     "titleSales": "รายงานยอดเซลล์",
-    "titleStaff": "รายงานยอดพนักงาน",
     "allBranches": "ทุกสาขา",
     "contractsN_one": "{{count}} สัญญา",
     "contractsN_other": "{{count}} สัญญา",
@@ -588,7 +587,12 @@
     "sumFinanced": "ยอดจัดรวม",
     "sumPeople": "จำนวนคน",
     "rankHint": "อันดับเทียบทั้งบริษัท",
-    "noData": "เดือนนี้ยังไม่มียอด"
+    "noData": "เดือนนี้ยังไม่มียอด",
+    "titleBranch": "รายงานยอดสาขา",
+    "sumBranches": "จำนวนสาขา",
+    "staffN_one": "พนักงาน {{count}} คน",
+    "staffN_other": "พนักงาน {{count}} คน",
+    "rankHintBranch": "อันดับสาขาเทียบทั้งบริษัท"
   },
   "openedByModel": {
     "title": "รายงานเปิดสัญญาตามรุ่น",

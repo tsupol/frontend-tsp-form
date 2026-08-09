@@ -10,30 +10,38 @@ import { MonthPicker } from '../../components/MonthPicker';
 import { HBarReport, type HBarRow } from '../../components/HBarReport';
 
 /* ───────────────────────────────────────────────────────────────────────────
- * รายงานยอดเซลล์ / รายงานยอดพนักงาน — "who booked how much last month".
+ * รายงานยอดเซลล์ / รายงานยอดสาขา — "who booked how much last month".
  *
  * Two screens, one component: the only difference is which RPC is called.
- *   sales → fn_commission_sales_monthly  (commission owners whose role is
- *           BRANCH_SALES; credited when the contract ACTIVATES)
- *   staff → fn_commission_staff_monthly  (every other role; credited when the
- *           first installment is paid in full)
+ *   sales  → fn_commission_sales_monthly   (rows = people. Commission owners
+ *            whose role is BRANCH_SALES; credited when the contract ACTIVATES)
+ *   branch → fn_commission_branch_monthly  (rows = branches. Every other role's
+ *            contracts grouped by the staff member's branch; credited when the
+ *            first installment is paid in full)
+ *
+ * The per-person staff ranking (fn_commission_staff_monthly) was dropped by the
+ * owner on 2026-08-09 — the real question is the branch's take, not who inside
+ * it. The RPC still exists in the DB but no menu points at it.
  *
  * The DB decides everything — ranking order, who is visible, which contracts
  * count (VOIDED/TERMINATED drop out of every month retroactively, COMPLETED
  * stays). So: never sort here, never filter here, never gate by role here.
  *
- * A BRANCH caller gets exactly one row back — their own — but with the true
- * company-wide `rank`. We detect that and render a personal "my result" card
- * instead of a one-bar ranking, which would read as "I am #1 of 1".
+ * A BRANCH caller gets exactly one row back — their own person (sales) or their
+ * own branch (branch) — but with the true company-wide `rank`. We detect that
+ * and render a personal "my result" card instead of a one-bar ranking, which
+ * would read as "I am #1 of 1".
  *
  * Spec: UI_FEEDBACK/2026-08-06_IMPLEMENT_report_commission_monthly.md
+ *     + UI_FEEDBACK/2026-08-09_IMPLEMENT_report_commission_branch.md
  * ─────────────────────────────────────────────────────────────────────────── */
 
 const COLOR_BAR = 'var(--chart-1)';
 
-export type CommissionReportKind = 'sales' | 'staff';
+export type CommissionReportKind = 'sales' | 'branch';
 
-interface CommissionRow {
+/** Row of fn_commission_sales_monthly — one per person. */
+interface SalesRow {
   rank: number;
   user_id: number;
   display_name: string;
@@ -45,12 +53,30 @@ interface CommissionRow {
   pct_of_total: number | null;
 }
 
+/** Row of fn_commission_branch_monthly — one per branch. */
+interface BranchRow {
+  rank: number;
+  branch_id: number;
+  branch_name: string;
+  /** People inside the branch who booked anything this month. */
+  staff_count: number;
+  contract_count: number;
+  financed_total: number;
+  pct_of_total: number | null;
+}
+
+type CommissionRow = SalesRow | BranchRow;
+
 interface Branch { id: number; name: string; company_id: number }
 
 const RPC_BY_KIND: Record<CommissionReportKind, string> = {
   sales: 'fn_commission_sales_monthly',
-  staff: 'fn_commission_staff_monthly',
+  branch: 'fn_commission_branch_monthly',
 };
+
+function isBranchRow(r: CommissionRow): r is BranchRow {
+  return 'staff_count' in r;
+}
 
 /** Default month = last month — the owner opens this on the 6th to see July. */
 function defaultMonth(): Date {
@@ -99,10 +125,14 @@ export function CommissionMonthlyReportPage({ kind }: { kind: CommissionReportKi
 
   // Bar length = contract count (one unit, one colour). Money rides in the end
   // label — mixing baht into a count bar would make the lengths meaningless.
+  // Sales rows are named after the person (branch as sublabel); branch rows are
+  // named after the branch, with the headcount behind the numbers as sublabel.
   const barRows = useMemo<HBarRow[]>(() => rows.map((r) => ({
-    key: r.user_id,
-    label: `${r.rank}. ${r.display_name}`,
-    sublabel: r.branch_name,
+    key: isBranchRow(r) ? `b${r.branch_id}` : `u${r.user_id}`,
+    label: `${r.rank}. ${isBranchRow(r) ? r.branch_name : r.display_name}`,
+    sublabel: isBranchRow(r)
+      ? t('commissionReport.staffN', { count: r.staff_count })
+      : r.branch_name,
     value: r.contract_count,
     endLabel: (
       <span>
@@ -113,11 +143,19 @@ export function CommissionMonthlyReportPage({ kind }: { kind: CommissionReportKi
     ),
   })), [rows, t]);
 
-  // Single row that is the caller = branch-scoped view of themselves.
-  const myRow = rows.length === 1 && rows[0].user_id === user?.user_id ? rows[0] : null;
+  // A single row that IS the caller's own scope = branch-clamped view. For the
+  // sales screen that's their own person row; for the branch screen it's their
+  // own branch. Either way the ranking chart would read "#1 of 1", so we show
+  // the personal card instead.
+  const only = rows.length === 1 ? rows[0] : null;
+  const myRow = only && (isBranchRow(only)
+    ? only.branch_id === user?.branch_id
+    : only.user_id === user?.user_id)
+    ? only
+    : null;
   const hasData = rows.length > 0;
 
-  const titleKey = kind === 'sales' ? 'commissionReport.titleSales' : 'commissionReport.titleStaff';
+  const titleKey = kind === 'sales' ? 'commissionReport.titleSales' : 'commissionReport.titleBranch';
 
   const monthPicker = <MonthPicker value={month} onChange={setMonth} lang={i18n.language} />;
 
@@ -170,7 +208,12 @@ export function CommissionMonthlyReportPage({ kind }: { kind: CommissionReportKi
       <div className="flex-none flex items-stretch divide-x divide-line border-b border-line">
         <SummaryCell label={t('commissionReport.sumContracts')} value={String(totals.contracts)} />
         <SummaryCell label={t('commissionReport.sumFinanced')} value={`฿${fmtCurrency(totals.financed)}`} />
-        {!myRow && <SummaryCell label={t('commissionReport.sumPeople')} value={String(rows.length)} />}
+        {!myRow && (
+          <SummaryCell
+            label={t(kind === 'branch' ? 'commissionReport.sumBranches' : 'commissionReport.sumPeople')}
+            value={String(rows.length)}
+          />
+        )}
       </div>
 
       <div className={`flex-1 min-h-0 overflow-auto better-scroll p-4 ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
@@ -192,22 +235,36 @@ export function CommissionMonthlyReportPage({ kind }: { kind: CommissionReportKi
 }
 
 /**
- * Branch caller's own result. `rank` is still the real company-wide standing,
- * so we show it prominently — the point is "where do I sit", without exposing
- * anyone else's numbers.
+ * Branch caller's own result — their person row (sales) or their branch row
+ * (branch). `rank` is still the real company-wide standing, so we show it
+ * prominently: the point is "where do I sit", without exposing anyone else's
+ * numbers.
  */
 function MyResultCard({ row, t }: { row: CommissionRow; t: ReturnType<typeof useTranslation>['t'] }) {
   return (
     <div className="max-w-md mx-auto mt-4 border border-line bg-surface rounded-lg p-5">
       <div className="flex items-center gap-2 mb-4">
-        <span className="text-sm font-medium">{row.display_name}</span>
-        <Badge size="xs" color="default">{t(`role.${row.role_code}`, { defaultValue: row.role_code })}</Badge>
-        <span className="text-xs text-subtle ml-auto">{row.branch_name}</span>
+        {isBranchRow(row) ? (
+          <>
+            <span className="text-sm font-medium">{row.branch_name}</span>
+            <span className="text-xs text-subtle ml-auto">
+              {t('commissionReport.staffN', { count: row.staff_count })}
+            </span>
+          </>
+        ) : (
+          <>
+            <span className="text-sm font-medium">{row.display_name}</span>
+            <Badge size="xs" color="default">{t(`role.${row.role_code}`, { defaultValue: row.role_code })}</Badge>
+            <span className="text-xs text-subtle ml-auto">{row.branch_name}</span>
+          </>
+        )}
       </div>
       <div className="flex items-baseline gap-2 mb-4">
         <Trophy size={20} className="text-warning-fg" />
         <span className="text-3xl font-semibold tabular-nums">#{row.rank}</span>
-        <span className="text-xs text-subtle">{t('commissionReport.rankHint')}</span>
+        <span className="text-xs text-subtle">
+          {t(isBranchRow(row) ? 'commissionReport.rankHintBranch' : 'commissionReport.rankHint')}
+        </span>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
