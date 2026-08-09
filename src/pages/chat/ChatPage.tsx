@@ -6,7 +6,7 @@ import {
   PageNav, PageNavPanel, MobileHeader, DataTableFooter,
   Button, Input, PopOver, Select,
 } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, ChevronDown, CheckCircle2, Circle, PictureInPicture2, SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, ChevronDown, CheckCircle2, Circle, PictureInPicture2, Search, SlidersHorizontal } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { wsClient } from '../../lib/api/ws';
 import { useAuth } from '../../contexts/AuthContext';
@@ -366,12 +366,19 @@ export function ChatPage() {
           {(isRoot || !isMobile) && (
             <div className="flex-none p-2 border-b border-line flex items-center gap-2">
               <div className="flex-1 min-w-0 max-w-xs">
+                {/* The start icon is load-bearing, not decoration. Input renders a
+                    bare <input> when it has no icons and a wrapped one when it has
+                    any, so a field whose only icon is the conditional min-chars hint
+                    swaps DOM nodes on the 1st and 3rd keystroke. On iOS that drops
+                    focus and folds the keyboard away mid-word. A permanent icon keeps
+                    the same input node mounted throughout. */}
                 <Input
                   size="sm"
                   className="w-full search-min-hint"
                   placeholder={t('chat.searchPlaceholder')}
                   value={searchInput}
                   onChange={e => handleSearch(e.target.value)}
+                  startIcon={<Search size={16} />}
                   endIcon={isBelowSearchMin(searchInput)
                     ? <span className="text-[11px] whitespace-nowrap">
                         {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
