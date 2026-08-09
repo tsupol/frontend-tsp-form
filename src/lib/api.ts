@@ -13,6 +13,14 @@ export class ApiError extends Error {
   public isAuthError: boolean;
   public httpStatus?: number;
   public fieldErrors?: FieldError[] | null;
+  /** Backend's `error.ctx` — a sibling of `params`, not part of it. Carries
+   *  the *variant* of an otherwise generic code, so a screen can say something
+   *  more useful than the catalog string (e.g. one
+   *  MDM.AUTH.PERMISSION_DENIED means "this email already has a live key —
+   *  rotating it is reserved for company admins", ctx.reason =
+   *  `active_key_exists_rotation_reserved`). Never translated by code; read
+   *  the specific key you care about. */
+  public ctx?: Record<string, unknown>;
 
   constructor(opts: {
     code: string;
@@ -22,6 +30,7 @@ export class ApiError extends Error {
     isAuthError: boolean;
     httpStatus?: number;
     fieldErrors?: FieldError[] | null;
+    ctx?: Record<string, unknown>;
   }) {
     super(opts.message);
     this.name = 'ApiError';
@@ -31,6 +40,7 @@ export class ApiError extends Error {
     this.isAuthError = opts.isAuthError;
     this.httpStatus = opts.httpStatus;
     this.fieldErrors = opts.fieldErrors;
+    this.ctx = opts.ctx;
   }
 }
 
@@ -56,6 +66,8 @@ interface V2Error {
     message: string;
     message_key?: string;
     params?: Record<string, unknown>;
+    /** Sibling of `params` — see ApiError.ctx. */
+    ctx?: Record<string, unknown>;
     trace_id?: string;
     http_status?: number;
     field_errors?: Array<{ field: string; message: string }> | null;
@@ -175,6 +187,7 @@ function makeV2ApiError(err: V2Error['error'], httpStatus?: number): ApiError {
     isAuthError: auth,
     httpStatus: status,
     fieldErrors: err.field_errors ?? null,
+    ctx: err.ctx,
   });
 }
 

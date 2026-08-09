@@ -21,15 +21,16 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Badge, Button, Switch, MobileHeader } from 'tsp-form';
+import { Badge, Button, Select, Switch, MobileHeader } from 'tsp-form';
 import {
-  ArrowRightFromLine, RefreshCw, Plus, Mail, AlertTriangle, Inbox,
+  ArrowRightFromLine, RefreshCw, Plus, Mail, AlertTriangle, Inbox, Smartphone,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { DateTime } from '../../components/DateTime';
 import { CopyButton } from '../../components/CopyButton';
 import { AbmOtpSourceCreateModal } from './AbmOtpSourceCreateModal';
+import { AbmOtpSetupModal } from './AbmOtpSetupModal';
 import type { AbmOtpSource, AbmOtpMessage } from './abmOtpTypes';
 
 type Tab = 'view' | 'manage';
@@ -39,15 +40,25 @@ type Tab = 'view' | 'manage';
 // this only decides whether the tab is worth showing.
 const MAY_MANAGE = new Set(['COMPANY_ADMIN', 'BRANCH_MANAGER', 'HOLDING_ADMIN', 'SYSTEM_DEV']);
 
+// Reading or replacing a key needs MDM.ABM_OTP_TOKEN_REVEAL, which is a
+// STRICTLY narrower set than MAY_MANAGE — a branch manager sees these rows and
+// can toggle them, but both key RPCs answer 403. So the two buttons hide by
+// role, not by whether the row is visible (mig 1043).
+const MAY_REVEAL_KEY = new Set(['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV']);
+
 export function AbmOtpPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const companyId = user?.company_id ?? null;
   const mayManage = MAY_MANAGE.has(user?.role_code ?? '');
+  const mayRevealKey = MAY_REVEAL_KEY.has(user?.role_code ?? '');
 
   const [tab, setTab] = useState<Tab>('view');
   const [createOpen, setCreateOpen] = useState(false);
+  const [setupSource, setSetupSource] = useState<AbmOtpSource | null>(null);
+  // Empty = every account, the project's clearable-filter convention.
+  const [filterEmail, setFilterEmail] = useState<string>('');
 
   // No realtime push for OTP yet — a manual refresh button is the contract.
   // Codes are short-lived, so never serve a cached list.
@@ -75,6 +86,31 @@ export function AbmOtpPage() {
     queryClient.invalidateQueries({ queryKey: ['abm-otp'] });
   };
   const refreshing = messages.isFetching || sources.isFetching;
+  // A spinning icon is the only feedback a fast refetch gives, and it's over
+  // before the eye lands on it — you press the button and can't tell whether
+  // anything happened. So the button isn't the feedback: the timestamp says
+  // what you're looking at, and the list dims while it's being replaced.
+  const loadedAt = tab === 'view' ? messages.dataUpdatedAt : sources.dataUpdatedAt;
+
+  // Narrowing to one ABM account is the real defence against the mistake this
+  // screen exists to prevent: several people logging into different accounts at
+  // once, and someone grabbing a code that isn't theirs. Reading carefully is
+  // the fallback; filtering to the email you just typed makes it structural.
+  //
+  // Client-side on purpose. The view already caps at 10 messages PER ACCOUNT
+  // server-side, so everything that could match is already in hand — a refetch
+  // per filter change would be slower for identical rows. (This is the narrow
+  // exception to the server-side-pagination rule, which exists to stop the FE
+  // pulling an unbounded table; there isn't one here.)
+  const allMessages = messages.data ?? [];
+  // Built from the messages themselves, so the Select can never offer an
+  // account with nothing to show behind it.
+  const emailOptions = Array.from(new Set(allMessages.map(m => m.login_email)))
+    .sort((a, b) => a.localeCompare(b))
+    .map(email => ({ value: email, label: email }));
+  const visibleMessages = filterEmail
+    ? allMessages.filter(m => m.login_email === filterEmail)
+    : allMessages;
 
   return (
     <>
@@ -91,13 +127,21 @@ export function AbmOtpPage() {
         <div className="mobile-header-end w-nav" />
       </MobileHeader>
 
-      <div className="page-content flex flex-col gap-4 p-4">
-        <div className="flex items-start justify-between gap-3 flex-wrap">
+      {/* Clamped to the viewport so the title, refresh and tabs stay put and
+          only the rows scroll — on the View tab the list grows without bound
+          and used to push the tabs off the top of the screen. */}
+      <div className="page-content responsive-dvh-mobile-header flex flex-col gap-4 p-4">
+        <div className="flex-none flex items-start justify-between gap-3 flex-wrap">
           <div className="min-w-0">
             <h1 className="heading-2 hidden lg:block">{t('abmOtp.title')}</h1>
             <p className="text-xs text-subtle mt-1">{t('abmOtp.subtitle')}</p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            {loadedAt > 0 && (
+              <span className="text-xs text-subtle">
+                {t('abmOtp.loadedAt')} <DateTime value={new Date(loadedAt).toISOString()} showTime />
+              </span>
+            )}
             <Button
               size="sm"
               variant="outline"
@@ -122,9 +166,45 @@ export function AbmOtpPage() {
           </div>
         )}
 
-        {tab === 'view'
-          ? <OtpList rows={messages.data ?? []} loading={messages.isLoading} />
-          : <SourceList rows={sources.data ?? []} loading={sources.isLoading} onChanged={refresh} />}
+        {/* Only worth showing once there's an ambiguity to resolve — with a
+            single account the filter is a control that can only ever be a
+            no-op. Select needs a fixed-width container in a flex row. */}
+        {tab === 'view' && emailOptions.length > 1 && (
+          <div className="flex-none" style={{ width: '20rem', maxWidth: '100%' }}>
+            <Select
+              options={emailOptions}
+              value={filterEmail || null}
+              onChange={(val) => setFilterEmail((val as string) ?? '')}
+              placeholder={t('abmOtp.filterAllAccounts')}
+              size="sm"
+              showChevron
+              clearable
+            />
+          </div>
+        )}
+
+        {/* The only scroll pane on the page. Dims while fetching, so the whole
+            content reacts to a refresh rather than just a 14px icon. */}
+        <div className={`flex-1 min-h-0 overflow-auto better-scroll pb-8 ${refreshing ? 'opacity-60' : ''} transition-opacity`}>
+          {tab === 'view'
+            ? (
+              <OtpList
+                rows={visibleMessages}
+                loading={messages.isLoading}
+                filtered={filterEmail !== ''}
+                onClearFilter={() => setFilterEmail('')}
+              />
+            )
+            : (
+              <SourceList
+                rows={sources.data ?? []}
+                loading={sources.isLoading}
+                onChanged={refresh}
+                mayRevealKey={mayRevealKey}
+                onOpenSetup={setSetupSource}
+              />
+            )}
+        </div>
       </div>
 
       <AbmOtpSourceCreateModal
@@ -132,6 +212,14 @@ export function AbmOtpPage() {
         companyId={companyId}
         onClose={() => setCreateOpen(false)}
         onCreated={refresh}
+      />
+
+      <AbmOtpSetupModal
+        open={setupSource !== null}
+        sourceId={setupSource?.id ?? null}
+        loginEmail={setupSource?.login_email ?? null}
+        onClose={() => setSetupSource(null)}
+        onRotated={refresh}
       />
     </>
   );
@@ -155,17 +243,34 @@ function TabButton({ active, onClick, label }: { active: boolean; onClick: () =>
 // The view already caps at 10 messages per ABM account, so a chatty account
 // can't push a quiet one off the list. No client-side limit needed.
 
-function OtpList({ rows, loading }: { rows: AbmOtpMessage[]; loading: boolean }) {
+function OtpList({ rows, loading, filtered, onClearFilter }: {
+  rows: AbmOtpMessage[];
+  loading: boolean;
+  /** A filter is narrowing the list — changes what an empty result means. */
+  filtered: boolean;
+  onClearFilter: () => void;
+}) {
   const { t } = useTranslation();
   if (loading) return <p className="text-sm text-subtle">{t('common.loading')}</p>;
   if (rows.length === 0) {
     // 0 rows is a normal 200 response (no accounts yet, or none in scope) —
-    // never an error state.
+    // never an error state. But "this account has no codes" and "nothing has
+    // arrived at all" are different facts, and someone waiting on a code needs
+    // to know which one they're looking at — otherwise a stale filter reads as
+    // a broken phone.
     return (
       <div className="flex flex-col items-center gap-2 py-12 text-center">
         <Inbox size={28} className="text-subtler" />
-        <p className="text-sm text-subtle">{t('abmOtp.noMessages')}</p>
-        <p className="text-xs text-subtler">{t('abmOtp.noMessagesHint')}</p>
+        <p className="text-sm text-subtle">
+          {filtered ? t('abmOtp.noMessagesForAccount') : t('abmOtp.noMessages')}
+        </p>
+        {filtered ? (
+          <Button size="sm" variant="ghost" onClick={onClearFilter}>
+            {t('abmOtp.showAllAccounts')}
+          </Button>
+        ) : (
+          <p className="text-xs text-subtler">{t('abmOtp.noMessagesHint')}</p>
+        )}
       </div>
     );
   }
@@ -215,10 +320,13 @@ function OtpList({ rows, loading }: { rows: AbmOtpMessage[]; loading: boolean })
 
 // ── Tab: Manage ──────────────────────────────────────────────────────────────
 
-function SourceList({ rows, loading, onChanged }: {
+function SourceList({ rows, loading, onChanged, mayRevealKey, onOpenSetup }: {
   rows: AbmOtpSource[];
   loading: boolean;
   onChanged: () => void;
+  /** COMPANY_ADMIN and above only — see MAY_REVEAL_KEY. */
+  mayRevealKey: boolean;
+  onOpenSetup: (row: AbmOtpSource) => void;
 }) {
   const { t } = useTranslation();
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -283,7 +391,21 @@ function SourceList({ rows, loading, onChanged }: {
                 </span>
               )}
             </div>
-            <div className="shrink-0 pt-0.5">
+            <div className="shrink-0 pt-0.5 flex items-center gap-2">
+              {/* Opens the key + the phone recipe. Rotate lives inside that
+                  modal rather than as a second row button — it's destructive
+                  and should be reached only after seeing which account and
+                  which key you're about to kill. */}
+              {mayRevealKey && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  startIcon={<Smartphone size={14} />}
+                  onClick={() => onOpenSetup(row)}
+                >
+                  {t('abmOtp.setup.openButton')}
+                </Button>
+              )}
               <Switch
                 size="sm"
                 checked={row.is_active}

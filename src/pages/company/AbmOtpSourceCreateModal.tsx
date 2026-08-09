@@ -1,13 +1,18 @@
 // Add an ABM account (Company → ABM account OTP → Manage).
 //
-// This modal is unusual in one way that drives its whole shape: the response
-// contains a `token` that is shown EXACTLY ONCE. The DB keeps only a hash and
-// there is no endpoint to read it back. If the user closes without copying it,
-// the only recovery is creating another account with the same email — which
-// immediately kills the old key and means re-doing the iOS Shortcut on the
-// phone. So the success step is deliberately loud, is not an ActionDoneView
-// (which would render a secret as just another receipt row), and its close
-// button is worded as an acknowledgement.
+// The success step shows a `token` the user must carry to a second device (the
+// iPhone holding the SIM). It is no longer a show-once secret — since mig 1042
+// a company admin can re-read it from the row's "Phone setup" button — so the
+// copy points there instead of warning about permanent loss. It still isn't an
+// ActionDoneView: a 48-character key someone is retyping into a phone needs to
+// be the loudest thing on screen, not one row of a receipt list.
+//
+// One non-obvious rejection: creating an account for an email that ALREADY has
+// a live key is a key rotation wearing a create's clothes (the old key dies the
+// moment the new row lands), so the backend reserves it for company admins. A
+// branch manager gets a plain MDM.AUTH.PERMISSION_DENIED whose catalog string
+// says nothing about why creating an account was refused — `ctx.reason` is what
+// distinguishes it, so we read that and say the actual thing.
 
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -86,7 +91,13 @@ export function AbmOtpSourceCreateModal({ open, companyId, onClose, onCreated }:
       setView('done');
       onCreated();
     } catch (err) {
-      setError(err instanceof ApiError ? translateApiError(err, t) : t('common.error'));
+      // The generic permission string would leave a branch manager staring at
+      // a valid-looking form with no idea the email is the problem.
+      if (err instanceof ApiError && err.ctx?.reason === 'active_key_exists_rotation_reserved') {
+        setError(t('abmOtp.create.emailHasActiveKey'));
+      } else {
+        setError(err instanceof ApiError ? translateApiError(err, t) : t('common.error'));
+      }
     } finally {
       setBusy(false);
     }
@@ -159,13 +170,13 @@ export function AbmOtpSourceCreateModal({ open, companyId, onClose, onCreated }:
                 <span className="text-sm font-medium">{result?.login_email}</span>
               </div>
 
-              {/* The one-time secret. Warning goes ABOVE it — after copying,
-                  people stop reading. */}
-              <div className="alert alert-warning">
+              {/* Instruction goes ABOVE the key — once people have copied it
+                  they stop reading. */}
+              <div className="alert alert-info">
                 <AlertTriangle size={16} className="shrink-0" />
                 <div>
-                  <div className="alert-title">{t('abmOtp.create.tokenOnceTitle')}</div>
-                  <div className="alert-description">{t('abmOtp.create.tokenOnceBody')}</div>
+                  <div className="alert-title">{t('abmOtp.create.tokenNextTitle')}</div>
+                  <div className="alert-description">{t('abmOtp.create.tokenNextBody')}</div>
                 </div>
               </div>
 
