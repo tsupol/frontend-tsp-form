@@ -2,13 +2,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
-  DataTableFooter, MobileHeader,
+  MobileHeader,
   Badge, Select, Input, Button, PopOver,
   useSnackbarContext,
 } from 'tsp-form';
-import { ArrowRightFromLine, CheckCircle, Search, SlidersHorizontal } from 'lucide-react';
+import {
+  ArrowRightFromLine, CheckCircle, ChevronLeft, ChevronRight, Search, SlidersHorizontal,
+} from 'lucide-react';
 import { apiClient } from '../lib/api';
 import { fmtCurrency, formatRelativeAgo } from '../lib/format';
+import { SEARCH_MIN_CHARS, isBelowSearchMin, isSearchable } from '../lib/searchKeyword';
 import { useAuth } from '../contexts/AuthContext';
 import { wsClient } from '../lib/api/ws';
 import {
@@ -22,6 +25,17 @@ const COMPANY_TIER_ROLES = new Set([
   'COMPANY_ADMIN', 'COMPANY_ACCOUNTANT', 'COMPANY_COLLECTOR',
   'COMPANY_INVENTORY', 'COMPANY_REPO',
 ]);
+
+// fn_payment_submission_search (mig 1045). Rows carry the same columns as
+// v_payment_submissions, so SubmissionRow is reused as-is.
+type SearchResponse = {
+  page: number;
+  per_page: number;
+  count: number;
+  has_more: boolean;
+  pending_count: number;
+  submissions: SubmissionRow[];
+};
 
 // ── Page ───────────────────────────────────────────────────────────────────
 
@@ -72,67 +86,39 @@ export function PaymentSubmissionsPage() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const queryUrl = useMemo(() => {
-    const params: string[] = [];
-    if (statusFilter) params.push(`status=eq.${statusFilter}`);
-    const effectiveBranch = lockedBranchId ?? branchFilter;
-    if (effectiveBranch != null) {
-      params.push(`branch_id=eq.${effectiveBranch}`);
-    } else if (lockedCompanyId != null) {
-      params.push(`company_id=eq.${lockedCompanyId}`);
-    }
-    const term = debouncedSearch;
-    if (term.length >= 2) {
-      // Phone digits stripped of separators so "081-234-5678" matches stored "0812345678".
-      const digits = term.replace(/\D/g, '');
-      const enc = encodeURIComponent(term);
-      const ors = [
-        `contract_code.ilike.*${enc}*`,
-        `contract_code_display.ilike.*${enc}*`,
-        `customer_name.ilike.*${enc}*`,
-      ];
-      if (digits.length >= 3) ors.push(`customer_tel.ilike.*${digits}*`);
-      params.push(`or=(${ors.join(',')})`);
-    }
-    params.push('order=submitted_at.desc');
-    return `/v_payment_submissions?${params.join('&')}`;
-  }, [statusFilter, branchFilter, lockedBranchId, lockedCompanyId, debouncedSearch]);
+  // The list runs through fn_payment_submission_search (mig 1045), not the view.
+  // The view evaluates RLS per row (~80% of its cost) and gets slower as APPROVED
+  // slips accumulate; the RPC resolves branch scope once and stays flat. Single-slip
+  // reads (drawer, contract money tab) still use the view.
+  const searchParams = useMemo(() => {
+    // Branch scope is server-enforced: a branch user is restricted to their own
+    // branch + collection pool regardless of what we send, so only pass the
+    // picker's value. p_company_id keeps company-tier users off other companies.
+    const branch = lockedBranchId ?? branchFilter;
+    return {
+      p_keyword: isSearchable(debouncedSearch) ? debouncedSearch : null,
+      p_statuses: statusFilter ? [statusFilter] : null,
+      p_date_from: null,
+      p_date_to: null,
+      p_page: pageIndex + 1,
+      p_per_page: pageSize,
+      p_branch_id: branch,
+      p_company_id: branch == null ? lockedCompanyId : null,
+    };
+  }, [statusFilter, branchFilter, lockedBranchId, lockedCompanyId, debouncedSearch, pageIndex, pageSize]);
 
   const { data, isFetching } = useQuery({
-    queryKey: ['payment-submissions', statusFilter, branchFilter, lockedBranchId, debouncedSearch, pageIndex, pageSize],
-    queryFn: () => apiClient.getPaginated<SubmissionRow>(
-      queryUrl,
-      { page: pageIndex + 1, pageSize },
-    ),
+    queryKey: ['payment-submissions', searchParams],
+    queryFn: () => apiClient.rpc<SearchResponse>('fn_payment_submission_search', searchParams),
     placeholderData: keepPreviousData,
   });
-  const rows = data?.data ?? [];
-  const totalCount = data?.totalCount ?? 0;
-
-  // Pending-count pill badge — scoped to the same filters as the list,
-  // so the badge reflects "what you'd see if you switched to Pending Review".
-  const effectiveBranchForCount = lockedBranchId ?? branchFilter;
-  const { data: pendingCountData } = useQuery({
-    queryKey: ['payment-submissions-pending-count', effectiveBranchForCount, lockedCompanyId],
-    queryFn: () => {
-      const params: string[] = ['status=eq.PENDING_REVIEW', 'select=id'];
-      if (effectiveBranchForCount != null) {
-        params.push(`branch_id=eq.${effectiveBranchForCount}`);
-      } else if (lockedCompanyId != null) {
-        params.push(`company_id=eq.${lockedCompanyId}`);
-      }
-      return apiClient.getPaginated<{ id: number }>(
-        `/v_payment_submissions?${params.join('&')}`,
-        { page: 1, pageSize: 1 },
-      );
-    },
-    staleTime: 30 * 1000,
-  });
-  const pendingCount = pendingCountData?.totalCount ?? 0;
+  const rows = data?.submissions ?? [];
+  const hasMore = data?.has_more ?? false;
+  // The RPC returns no total count by design — pagination is next/previous only.
+  const pendingCount = data?.pending_count ?? 0;
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['payment-submissions'] });
-    queryClient.invalidateQueries({ queryKey: ['payment-submissions-pending-count'] });
     queryClient.invalidateQueries({ queryKey: ['nav', 'pending-approvals-count'] });
     queryClient.invalidateQueries({ queryKey: ['nav', 'pending-submissions-summary'] });
     queryClient.invalidateQueries({ queryKey: ['dashboard'] });
@@ -153,7 +139,6 @@ export function PaymentSubmissionsPage() {
     if (!channel) return;
     const unsub = wsClient.subscribe(channel, () => {
       queryClient.invalidateQueries({ queryKey: ['payment-submissions'] });
-      queryClient.invalidateQueries({ queryKey: ['payment-submissions-pending-count'] });
       queryClient.invalidateQueries({ queryKey: ['nav', 'pending-submissions-summary'] });
     });
     return unsub;
@@ -236,6 +221,45 @@ export function PaymentSubmissionsPage() {
     );
   };
 
+  // The search RPC returns has_more instead of a total, so the footer is a
+  // next/previous pair — there's no last page to jump to and no "of N" to show.
+  const renderPager = () => (
+    <div className="flex-none flex items-center justify-between gap-2 border-t border-line px-2 py-2">
+      <div className="text-xs text-subtle">
+        {t('common.pageN', { n: pageIndex + 1 })}
+      </div>
+      <div className="flex items-center gap-2">
+        <div style={{ width: '5.5rem' }}>
+          <Select
+            options={[15, 25, 50].map(n => ({ value: String(n), label: String(n) }))}
+            value={String(pageSize)}
+            onChange={val => { setPageSize(Number(val as string)); setPageIndex(0); }}
+            size="sm"
+            searchable={false}
+          />
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          startIcon={<ChevronLeft size={16} />}
+          disabled={pageIndex === 0 || isFetching}
+          onClick={() => setPageIndex(p => Math.max(0, p - 1))}
+        >
+          {t('common.previous')}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          endIcon={<ChevronRight size={16} />}
+          disabled={!hasMore || isFetching}
+          onClick={() => setPageIndex(p => p + 1)}
+        >
+          {t('common.next')}
+        </Button>
+      </div>
+    </div>
+  );
+
   // Status pills replace the status Select — quick shortcut + pending count visibility.
   // Pending first (most actionable), then Approved, then Rejected.
   const statusPills: { value: SubmissionStatus; label: string; showCount?: boolean }[] = [
@@ -317,7 +341,14 @@ export function PaymentSubmissionsPage() {
                   placeholder={t('paymentSubmissions.searchPlaceholder')}
                   size="sm"
                   startIcon={<Search size={16} />}
-                  className="w-full"
+                  // Hint rides inside the field, right-aligned, so it can't
+                  // shift the rows below it as the user types.
+                  endIcon={isBelowSearchMin(search)
+                    ? <span className="text-[11px] whitespace-nowrap">
+                        {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
+                      </span>
+                    : undefined}
+                  className="w-full search-min-hint"
                 />
               </div>
               {/* Status pills — inline ≥md */}
@@ -380,17 +411,7 @@ export function PaymentSubmissionsPage() {
               </div>
             )}
           </div>
-          {totalCount > 0 && (
-            <DataTableFooter
-              currentPage={pageIndex + 1}
-              totalPages={Math.ceil(totalCount / pageSize)}
-              onPageChange={p => setPageIndex(p - 1)}
-              pageSize={pageSize}
-              pageSizeOptions={[15, 25, 50]}
-              onPageSizeChange={ps => { setPageSize(ps); setPageIndex(0); }}
-              totalRows={totalCount}
-            />
-          )}
+          {(rows.length > 0 || pageIndex > 0) && renderPager()}
         </div>
 
         {/* Mobile cards */}
@@ -404,17 +425,7 @@ export function PaymentSubmissionsPage() {
               </div>
             )}
           </div>
-          {totalCount > 0 && (
-            <DataTableFooter
-              currentPage={pageIndex + 1}
-              totalPages={Math.ceil(totalCount / pageSize)}
-              onPageChange={p => setPageIndex(p - 1)}
-              pageSize={pageSize}
-              pageSizeOptions={[15, 25, 50]}
-              onPageSizeChange={ps => { setPageSize(ps); setPageIndex(0); }}
-              totalRows={totalCount}
-            />
-          )}
+          {(rows.length > 0 || pageIndex > 0) && renderPager()}
         </div>
       </div>
 
