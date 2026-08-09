@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Badge, PopOver, Tooltip } from 'tsp-form';
 import {
   Bell, MessageSquare, FileText, CreditCard, AlertTriangle, CheckCheck,
-  ExternalLink, ClipboardCheck,
+  ExternalLink, ClipboardCheck, Info,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { apiClient } from '../lib/api';
@@ -40,6 +40,10 @@ type NotificationRow = {
     po_code?: string;
     branch_name?: string;
     requested_by_name?: string;
+    // ABM enrollment OTP relay (UI_SUMMARY/137). otp_code is empty when the
+    // SMS couldn't be parsed — the title must still render.
+    otp_code?: string;
+    login_email?: string;
   } | null;
   contract_ids: number[] | null;
   created_at: string;
@@ -85,6 +89,9 @@ function iconForCategory(category: string) {
     case 'chat':     return <MessageSquare size={14} />;
     case 'payment': return <CreditCard size={14} />;
     case 'approval': return <ClipboardCheck size={14} />;
+    // Informational system events (e.g. ABM OTP) — a warning triangle would
+    // overstate them, so only genuinely unknown rows keep it.
+    case 'system':   return <Info size={14} />;
     default:         return <AlertTriangle size={14} />;
   }
 }
@@ -107,6 +114,9 @@ function deeplinkFor(row: NotificationRow): string | null {
   if (evt === 'buyback_approval_required_staff' || row.payload?.po_type === 'BUYBACK') {
     return '/admin/approvals';
   }
+  // ABM enrollment OTP — not contract-related; the full SMS lives on the
+  // ABM account OTP screen (UI_SUMMARY/137).
+  if (evt === 'abm_otp_received') return '/admin/company/abm-otp';
   const cid = row.payload?.contract_id ?? row.contract_ids?.[0];
   if (!cid) return null;
   if (evt.startsWith('chat_')) return `/admin/chat?contract=${cid}`;
@@ -115,17 +125,61 @@ function deeplinkFor(row: NotificationRow): string | null {
   return `/admin/contracts/search/${cid}`;
 }
 
+// Events that are not about a contract, so the "customer · contract code"
+// subtitle never applies to them even though the FE does have a title template.
+const NON_CONTRACT_EVENTS = new Set(['abm_otp_received']);
+
+// True when the contract-shaped subtitle (customer · contract code) applies.
+// Events with no FE template at all, and events known not to concern a
+// contract, render the feed's server-side body instead — see
+// subtitleFallbackOf. Without this, they show two empty [placeholders].
+function usesContractSubtitle(row: NotificationRow, t: ReturnType<typeof useTranslation>['t']): boolean {
+  const evt = row.event_type;
+  if (NON_CONTRACT_EVENTS.has(evt)) return false;
+  if (row.event_variant && t(`notifCenter.event.${evt}.${row.event_variant}`, { defaultValue: '' })) {
+    return true;
+  }
+  return !!t(`notifCenter.event.${evt}`, { defaultValue: '' });
+}
+
 // Title resolution. Prefers top-level row.event_variant (mig 27); falls back
 // to event_type alone. Until Phase A2 wires producers, event_variant is NULL
 // for every row and the title falls back to the per-event default.
+//
+// Last resort is the feed's own `title`, which the server renders in the
+// recipient's language for EVERY event — only if that is missing too do we
+// show the raw event_type. Without this, any event the FE doesn't know about
+// (e.g. abm_otp_received) renders its internal name to the user.
 function titleFor(row: NotificationRow, t: ReturnType<typeof useTranslation>['t']): string {
   const evt = row.event_type;
+  // ABM OTP: the code is only meaningful next to the account it belongs to —
+  // several people can be enrolling at once (UI_SUMMARY/137 §4). A missing
+  // code still renders; the user reads the full SMS on the OTP screen.
+  if (evt === 'abm_otp_received') {
+    const code = row.payload?.otp_code?.trim();
+    return code
+      ? t('notifCenter.event.abm_otp_received', { code })
+      : t('notifCenter.event.abm_otp_received_nocode');
+  }
   if (row.event_variant) {
     const k = `notifCenter.event.${evt}.${row.event_variant}`;
     const hit = t(k, { defaultValue: '' });
     if (hit) return hit;
   }
-  return t(`notifCenter.event.${evt}`, { defaultValue: evt });
+  return t(`notifCenter.event.${evt}`, { defaultValue: '' }) || row.title || evt;
+}
+
+// Subtitle for events with no FE template. The contract-shaped subtitle
+// (customer · contract code) is meaningless for events that aren't about a
+// contract — it renders as two empty [placeholders]. The feed's `body` is
+// server-rendered per event and per language, so it always says something true.
+function subtitleFallbackOf(row: NotificationRow): string | null {
+  // ABM OTP: the account the code belongs to. Prefer the payload field over
+  // the feed body so the pairing holds even if the body wording changes.
+  if (row.event_type === 'abm_otp_received') {
+    return row.payload?.login_email?.trim() || row.body?.trim() || null;
+  }
+  return row.body?.trim() || null;
 }
 
 // Visible placeholder for a missing payload field. Renders "[field_name]" with
@@ -359,6 +413,8 @@ export function NotificationMenuItem({ collapsed, isMobile, unreadCount }: Props
               const customer = customerNameOf(row);
               const cat = resolveCategory(row.event_type, row.category);
               const title = titleFor(row, t);
+              const templated = usesContractSubtitle(row, t);
+              const subtitleFallback = subtitleFallbackOf(row);
 
               // Event-specific extras (composed FE-side from payload fields).
               const extras: React.ReactNode[] = [];
@@ -403,6 +459,14 @@ export function NotificationMenuItem({ collapsed, isMobile, unreadCount }: Props
                             <><span className="text-subtle">·</span><span className="text-subtle tabular-nums shrink-0">฿{fmtCurrency(Number(row.payload.amount))}</span></>
                           )}
                         </div>
+                      ) : !templated ? (
+                        // No FE template — the contract-shaped subtitle doesn't
+                        // apply, so show the server-rendered body (or nothing).
+                        subtitleFallback && (
+                          <div className="text-xs leading-snug truncate mt-0.5 text-subtle min-w-0">
+                            {subtitleFallback}
+                          </div>
+                        )
                       ) : (
                         <div className="text-xs leading-snug truncate mt-0.5 inline-flex items-center gap-1.5 min-w-0 flex-wrap">
                           {customer ? <span className="text-subtle truncate">{customer}</span> : <MissingField field="customer_full_name" />}

@@ -184,6 +184,7 @@
     "print": "Print",
     "previous": "Previous",
     "next": "Next",
+    "pageN": "Page {{n}}",
     "createdAt": "Created",
     "default": "Default",
     "done": "Done",
@@ -881,6 +882,8 @@
     "missingFieldTooltip": "Backend not sending {{field}} yet",
     "actorBy": "by {{name}}",
     "event": {
+      "abm_otp_received": "ABM code {{code}}",
+      "abm_otp_received_nocode": "ABM code received",
       "chat_to_staff": "Chat [waiting reply]",
       "chat_status_attention": "Chat [needs attention]",
       "chat_status_attention.pending_reply": "Chat [waiting reply]",

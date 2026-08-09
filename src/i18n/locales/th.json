@@ -182,6 +182,7 @@
     "print": "พิมพ์",
     "previous": "ก่อนหน้า",
     "next": "ถัดไป",
+    "pageN": "หน้า {{n}}",
     "createdAt": "สร้างเมื่อ",
     "default": "ค่าเริ่มต้น",
     "done": "เสร็จสิ้น",
@@ -879,6 +880,8 @@
     "missingFieldTooltip": "Backend ยังไม่ส่ง {{field}}",
     "actorBy": "โดย {{name}}",
     "event": {
+      "abm_otp_received": "รหัส ABM {{code}}",
+      "abm_otp_received_nocode": "ได้รับรหัส ABM",
       "chat_to_staff": "แชท [รอตอบ]",
       "chat_status_attention": "แชท [ต้องการความสนใจ]",
       "chat_status_attention.pending_reply": "แชท [รอตอบ]",
