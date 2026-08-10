@@ -3332,6 +3332,7 @@
       "total": "รวม",
       "change": "เงินทอน",
       "remaining": "คงเหลือ",
+      "overpaid": "เกินไป",
       "paymentsLabel": "การชำระเงิน",
       "addPayment": "เพิ่มการชำระ",
       "checkout": "ชำระเงิน",

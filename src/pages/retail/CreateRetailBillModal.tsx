@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import {
-  Modal, Button, Select, Badge, Input, MaskedInput, TextArea, useSnackbarContext,
+  Modal, Button, Select, Badge, Input, MaskedInput, TextArea,
 } from 'tsp-form';
 import {
   Plus, Trash2, ShoppingCart, Truck, Percent, ChevronsRight,
@@ -13,6 +13,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { fmtCurrency } from '../../lib/format';
 import { BranchPaymentAccountField } from '../../components/BranchPaymentAccountField';
 import { ActionDoneView } from '../contracts/ActionDoneView';
+import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { ProductPickerModal, type SellableVariant } from '../../components/ProductPickerModal';
 import { translateApiError } from '../../lib/apiErrors';
 
@@ -86,7 +87,12 @@ interface PreviewResponse {
     lines_requiring_approval: number[];
   };
   guards?: {
-    custom_guards?: Array<{ code: string; ok: boolean; message_th?: string | null }>;
+    custom_guards?: Array<{
+      code: string;
+      ok: boolean;
+      message_th?: string | null;
+      message_en?: string | null;
+    }>;
   };
   blockers?: Blocker[];
 }
@@ -102,9 +108,8 @@ interface CreateRetailBillModalProps {
  * ─────────────────────────────────────────────────────────────────────────── */
 
 export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetailBillModalProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
-  const { addSnackbar } = useSnackbarContext();
 
   const [branchId, setBranchId] = useState<number | null>(user?.branch_id ?? null);
   const [lines, setLines] = useState<CartLine[]>([]);
@@ -114,6 +119,9 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [previewing, setPreviewing] = useState(false);
   const [previewError, setPreviewError] = useState<string>('');
+  // Submit rejection — rendered in the band above the footer, not a snackbar,
+  // so the reason sits next to the button that produced it.
+  const [submitError, setSubmitError] = useState<string>('');
 
   // Success state — replaces auto-close + snackbar (write-modal checklist §1/§2).
   const [view, setView] = useState<'form' | 'done'>('form');
@@ -123,7 +131,11 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
     change: number;
     total: number;
     billId: number;
+    /** Echoed by the server — what was actually recorded, per method. */
+    paymentBreakdown: Array<{ method: string; amount: number }>;
   } | null>(null);
+
+  const [confirmClose, setConfirmClose] = useState(false);
 
   const [productPickerOpen, setProductPickerOpen] = useState(false);
   const [shippingOpen, setShippingOpen] = useState(false);
@@ -137,10 +149,12 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
       setPayments([{ method: 'CASH', amount: 0, bank_account_id: null }]);
       setPreview(null);
       setPreviewError('');
+      setSubmitError('');
       setProductPickerOpen(false);
       setShippingOpen(false);
       setDiscountForLineIdx(null);
       setPriceEditIdx(null);
+      setConfirmClose(false);
       setView('form');
       setDone(null);
     }
@@ -167,9 +181,10 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
     }
   }, [open, branches, branchId, ownBranchId]);
 
-  // Preview validates stock + discount policy; the real payment is recorded via
-  // the cart (fn_bill_payment_add) at submit. Pass the bill total as a nominal
-  // single CASH payment so preview's balance/stock checks pass.
+  // Preview validates stock + discount policy + branch guards, and issues the
+  // token that fn_bill_retail_submit consumes as its idempotency key. The real
+  // payment split rides on submit's p_payments, so preview is told the nominal
+  // total as one CASH row — enough for its balance check, nothing more.
   const previewParams = useMemo(() => ({
     p_branch_id: branchId,
     p_customer_id: null,
@@ -182,17 +197,20 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
     p_bank_account_id: null,
   }), [branchId, lines]);
 
-  const runPreview = useCallback(async () => {
+  // Returns the fresh preview so a PREVIEW_STALE retry can chain straight off
+  // it instead of racing the `preview` state update.
+  const runPreview = useCallback(async (): Promise<PreviewResponse | null> => {
     if (!open || !branchId || lines.length === 0) {
       setPreview(null);
       setPreviewError('');
-      return;
+      return null;
     }
     setPreviewing(true);
     setPreviewError('');
     try {
       const res = await apiClient.rpc<PreviewResponse>('fn_bill_retail_preview', previewParams);
       setPreview(res);
+      return res;
     } catch (err) {
       if (err instanceof ApiError) {
         const translated = translateApiError(err, t);
@@ -201,6 +219,7 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
         setPreviewError(String(err));
       }
       setPreview(null);
+      return null;
     } finally {
       setPreviewing(false);
     }
@@ -215,50 +234,96 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
 
   /**
    * Submission strategy:
-   *  - No discount needing approval → cart pattern (fn_bill_create → payment_add
-   *    ×N → confirm), so payment can be split across CASH + TRANSFER.
+   *  - No discount needing approval → ONE atomic call, fn_bill_retail_submit
+   *    with p_payments[] (mig 1056, 2026-08-10). Nothing is written to the DB
+   *    until it succeeds, so cancelling mid-checkout leaves no bill to void,
+   *    and p_preview_token makes a retry after a dropped connection return the
+   *    same bill instead of a duplicate.
    *  - Discount needs approval → 3-step flow per doc 25:
    *      fn_bill_create (REVENUE lines)
    *      → fn_bill_line_item_add (each DISCOUNT line)
    *      → fn_bill_line_item_submit_approval (each DISCOUNT line)
    *    Bill ends up OPEN with discount line PENDING. Payment is collected
    *    later (after approver review) via fn_bill_payment_add/_confirm.
+   *    Kept on the cart path because retail_submit's discount path creates the
+   *    bill without the per-line target linkage this screen collects.
    */
   const submitMutation = useMutation({
-    mutationFn: async (): Promise<{ code: string; mode: 'atomic' | 'approval'; change: number; billId: number }> => {
+    mutationFn: async (): Promise<{
+      code: string;
+      mode: 'atomic' | 'approval';
+      change: number;
+      billId: number;
+      paymentBreakdown: Array<{ method: string; amount: number }>;
+    }> => {
       if (!preview?.approvals?.any_required) {
-        // Split-payment cart: create the bill (revenue lines), record each
-        // payment row, then confirm (stock deducts on confirm). CASH + TRANSFER
-        // only; amounts must sum to the bill total (no overpay — change is
-        // handled at the counter, not sent to the server).
-        const created = await apiClient.rpc<{ bill_id: number; code_display: string }>('fn_bill_create', {
+        // Amounts must sum to the bill total exactly — the server records no
+        // change (DELIVERY §2), so we send only what enters the drawer and the
+        // cashier hands back the difference at the counter.
+        const buildPayload = (token: string | undefined) => ({
           p_branch_id: branchId,
           p_customer_id: null,
-          p_contract_id: null,
-          p_bill_purpose: 'RETAIL',
-          p_line_items: lines.map(l => ({
-            line_type: l.charge_type === 'RETAIL_DISCOUNT' ? 'DISCOUNT' : 'REVENUE',
-            charge_type: l.charge_type,
-            description: l.description ?? null,
-            amount: l.amount,
-            quantity: l.qty ?? 1,
-            variant_id: l.variant_id ?? null,
-          })),
+          p_line_items: lines,
+          p_payments: payments
+            .filter(p => p.amount > 0)
+            .map(p => ({
+              method: p.method,
+              amount: p.amount,
+              ...(p.method === 'TRANSFER' ? { bank_account_id: p.bank_account_id } : {}),
+            })),
+          p_preview_token: token ?? null,
         });
-        const billId = created.bill_id;
 
-        for (const p of payments) {
-          if (p.amount <= 0) continue;
-          await apiClient.rpc('fn_bill_payment_add', {
-            p_bill_id: billId,
-            p_method: p.method,
-            p_amount: p.amount,
-            p_bank_account_id: p.method === 'TRANSFER' ? p.bank_account_id : null,
-          });
+        type SubmitResponse = {
+          bill_id?: number;
+          code?: string;
+          code_display?: string;
+          change_amount?: number;
+          payments?: Array<{ method: string; amount: number }>;
+          /** Refusal shape — see the `valid === false` guard below. */
+          valid?: boolean;
+          blockers?: Blocker[] | null;
+        };
+
+        let res: SubmitResponse;
+        try {
+          res = await apiClient.rpc<SubmitResponse>(
+            'fn_bill_retail_submit',
+            buildPayload(preview?.preview_token),
+          );
+        } catch (err) {
+          // The token expires after 60 min and dies if the cart moved under it.
+          // Re-preview once for a fresh token and resubmit; a second failure is
+          // a real error and surfaces to the user.
+          if (!(err instanceof ApiError) || err.code !== 'SALE.STATE.PREVIEW_STALE') throw err;
+          const fresh = await runPreview();
+          if (!fresh?.preview_token) throw err;
+          res = await apiClient.rpc<SubmitResponse>(
+            'fn_bill_retail_submit',
+            buildPayload(fresh.preview_token),
+          );
         }
 
-        await apiClient.rpc('fn_bill_payment_confirm', { p_bill_id: billId });
-        return { code: created.code_display, mode: 'atomic', change: 0, billId };
+        // A refused submit still answers `ok: true` — the envelope carries
+        // `{valid: false, preview: false, blockers}` and no bill_id rather than an
+        // error code (verified 2026-08-10 against a day-closed branch, where
+        // `blockers` came back null, so there is not always a reason to show).
+        // Without this it would read as a completed sale and show a receipt for
+        // a bill that was never created.
+        if (res.valid === false || res.bill_id == null) {
+          const reason = res.blockers?.map(pickMessage).filter(Boolean).join(' · ');
+          // Re-preview so the guard that refused surfaces in the inline list.
+          await runPreview();
+          throw new Error(reason || t('retail.create.blockInvalid'));
+        }
+
+        return {
+          code: res.code ?? res.code_display ?? '',
+          mode: 'atomic',
+          change: res.change_amount ?? 0,
+          billId: res.bill_id,
+          paymentBreakdown: (res.payments ?? []).map(p => ({ method: p.method, amount: p.amount })),
+        };
       }
 
       // 3-step approval flow
@@ -329,28 +394,23 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
         });
       }
 
-      return { code: created.code_display, mode: 'approval', change: 0, billId };
+      // Payment is collected after approval, so there's nothing to break down yet.
+      return { code: created.code_display, mode: 'approval', change: 0, billId, paymentBreakdown: [] };
     },
-    onSuccess: ({ code, mode, change, billId }) => {
+    onSuccess: ({ code, mode, change, billId, paymentBreakdown }) => {
       // Refresh the list behind the modal, then show the in-modal success view.
       // The user prints/closes themselves (checklist §1/§2) — no snackbar, no auto-close.
       onSuccess();
-      setDone({ code, mode, change, total, billId });
+      setDone({ code, mode, change, total, billId, paymentBreakdown });
       setView('done');
     },
     onError: (err) => {
       if (err instanceof ApiError) {
-        const translated = translateApiError(err, t);
-        addSnackbar({
-          type: 'error',
-          message: (
-            <div className="alert alert-danger">
-              <XCircle size={16} />
-              <span className="alert-description">{translated || err.message}</span>
-            </div>
-          ),
-        });
+        setSubmitError(translateApiError(err, t) || err.message);
+        return;
       }
+      // Refusal thrown above already carries a user-facing reason.
+      setSubmitError(err instanceof Error && err.message ? err.message : t('common.error'));
     },
   });
 
@@ -450,7 +510,10 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
   }, [lines]);
   const totalPaid = payments.reduce((s, p) => s + (p.amount || 0), 0);
   const remaining = Math.max(0, total - totalPaid);
-  const change = totalPaid > total ? totalPaid - total : 0;
+  // The server records no change (DELIVERY §2) and rejects any overpay, so an
+  // over-entry here is a number to correct — not change to hand back. Cash given
+  // over the total is settled at the counter and never typed into these rows.
+  const overpaid = totalPaid > total ? totalPaid - total : 0;
 
   const updatePayment = (idx: number, patch: Partial<PaymentRow>) =>
     setPayments(prev => prev.map((p, i) => (i === idx ? { ...p, ...patch } : p)));
@@ -461,51 +524,66 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
 
   const needsApproval = !!preview?.approvals?.any_required;
 
-  const blockReasons: string[] = [];
-  if (!branchId) blockReasons.push(t('retail.create.blockNoBranch'));
-  if (lines.length === 0) blockReasons.push(t('retail.create.blockEmptyCart'));
+  // Guards and blockers ship both languages (mig 1057) — read the one the user
+  // is looking at, fall back to the other, then to the bare code.
+  const pickMessage = useCallback(
+    (m: { message_th?: string | null; message_en?: string | null; code: string }) => {
+      const th = m.message_th ?? '';
+      const en = m.message_en ?? '';
+      return (i18n.language.startsWith('th') ? th || en : en || th) || m.code;
+    },
+    [i18n.language],
+  );
+
+  // Server-side stops — shown inline, above the footer, before the user clicks.
+  // A guard row's message is null when ok: true, so read only the failing ones.
+  const serverBlocks: string[] = [];
+  preview?.guards?.custom_guards?.forEach(g => {
+    if (g.ok === false) serverBlocks.push(pickMessage(g));
+  });
+  preview?.blockers?.forEach(b => serverBlocks.push(pickMessage(b)));
+
+  // Form-side gaps — the submit button being disabled is the message here; each
+  // field carries its own hint, so these never become an alert on an untouched
+  // form. They only exist to decide `canSubmit`.
+  const formGaps: string[] = [];
+  if (!branchId) formGaps.push(t('retail.create.blockNoBranch'));
+  if (lines.length === 0) formGaps.push(t('retail.create.blockEmptyCart'));
   // Payment-side checks only apply to the pay-now flow. Approval flow defers payment.
   if (!needsApproval && lines.length > 0) {
     if (payments.some(p => p.method === 'TRANSFER' && p.amount > 0 && !p.bank_account_id)) {
-      blockReasons.push(t('retail.create.blockNoBank'));
+      formGaps.push(t('retail.create.blockNoBank'));
     }
     // Must pay the exact bill total (no overpay — change is a counter matter).
-    if (Math.abs(totalPaid - total) >= 0.01) blockReasons.push(t('retail.create.blockInsufficient'));
+    if (Math.abs(totalPaid - total) >= 0.01) formGaps.push(t('retail.create.blockInsufficient'));
   }
-  preview?.guards?.custom_guards?.forEach(g => {
-    if (g.ok === false && g.message_th) blockReasons.push(g.message_th);
-  });
-  preview?.blockers?.forEach(b => {
-    if (b.message_th || b.message_en) blockReasons.push(b.message_th || b.message_en || b.code);
-  });
   // For atomic path, preview must be valid. For approval path, preview returns
   // valid: false only because of the approval requirement — that's expected.
   const previewOk = needsApproval ? !!preview : !!preview?.valid;
-  if (preview && !previewOk && blockReasons.length === 0) {
-    blockReasons.push(t('retail.create.blockInvalid'));
+  // Preview said no but named no reason — surface something rather than a
+  // silently dead button.
+  if (preview && !previewOk && serverBlocks.length === 0) {
+    serverBlocks.push(t('retail.create.blockInvalid'));
   }
-  const canSubmit = blockReasons.length === 0 && previewOk && !submitMutation.isPending;
+  const canSubmit =
+    formGaps.length === 0 && serverBlocks.length === 0 && previewOk && !submitMutation.isPending;
 
   const handleSubmitClick = () => {
-    if (submitMutation.isPending || previewing) return;
-    if (!canSubmit) {
-      addSnackbar({
-        type: 'warning',
-        message: (
-          <div className="alert alert-warning">
-            <AlertCircle size={16} />
-            <div className="alert-description">
-              <div className="font-medium mb-1">{t('retail.create.cannotSubmit')}</div>
-              <ul className="list-disc pl-4 text-sm space-y-0.5">
-                {blockReasons.map((r, i) => <li key={i}>{r}</li>)}
-              </ul>
-            </div>
-          </div>
-        ),
-      });
-      return;
-    }
+    if (!canSubmit || previewing) return;
+    setSubmitError('');
     submitMutation.mutate();
+  };
+
+  // Nothing is written until submit succeeds, so an abandoned cart costs no
+  // cleanup — but it is still typed work, so confirm before dropping it.
+  const isDirty = lines.length > 0 || totalPaid > 0;
+  const forceClose = () => {
+    setConfirmClose(false);
+    onClose();
+  };
+  const handleClose = () => {
+    if (view === 'done' || !isDirty) { forceClose(); return; }
+    setConfirmClose(true);
   };
 
   const saleLines = lines
@@ -521,11 +599,11 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
     .sort((a, b) => displayOrder(a.line.charge_type) - displayOrder(b.line.charge_type));
 
   return (
-    <Modal open={open} onClose={onClose} maxWidth="42rem" width="100%" ariaLabel="Create Retail Bill">
+    <Modal open={open} onClose={handleClose} maxWidth="42rem" width="100%" ariaLabel="Create Retail Bill">
       <div className="flex flex-col overflow-hidden" style={{ maxHeight: '90dvh' }}>
         <div className="modal-header">
           <h2 className="modal-title">{t('retail.create.title')}</h2>
-          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">×</button>
+          <button type="button" className="modal-close-btn" onClick={handleClose} aria-label="Close">×</button>
         </div>
 
         {view === 'done' && done ? (
@@ -538,6 +616,12 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
             detailRows={done.mode === 'atomic'
               ? [
                   { label: t('retail.create.doneRowTotal'), value: fmtCurrency(done.total), emphasis: true },
+                  // One row per method taken, so a split sale's receipt shows how
+                  // the money actually arrived rather than a single lump.
+                  ...done.paymentBreakdown.map(p => ({
+                    label: t(`paymentMethod.${p.method}`, { defaultValue: p.method }),
+                    value: fmtCurrency(p.amount),
+                  })),
                   ...(done.change > 0
                     ? [{ label: t('retail.create.doneRowChange'), value: fmtCurrency(done.change) }]
                     : []),
@@ -678,13 +762,14 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
             </Button>
           </div>
 
-          {/* Blockers / preview error */}
-          {(preview?.blockers && preview.blockers.length > 0) && (
+          {/* Server-side stops — guards + blockers, shown before the click so the
+              reason is on screen rather than in a snackbar after a dead press. */}
+          {serverBlocks.length > 0 && (
             <div className="space-y-1">
-              {preview.blockers.map((b, i) => (
+              {serverBlocks.map((msg, i) => (
                 <div key={i} className="alert alert-danger">
                   <XCircle size={16} />
-                  <div className="alert-description">{b.message_th || b.message_en || b.code}</div>
+                  <div className="alert-description">{msg}</div>
                 </div>
               ))}
             </div>
@@ -778,21 +863,22 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
                 <span className="font-medium tabular-nums text-warning-fg">{fmtCurrency(remaining)}</span>
               </div>
             )}
-            {change > 0 && (
+            {overpaid > 0 && (
               <div className="flex items-baseline gap-3 text-sm mt-1">
-                <span className="text-subtle">{t('retail.create.change')}</span>
-                <span className="font-medium tabular-nums text-success">{fmtCurrency(change)}</span>
+                <span className="text-subtle">{t('retail.create.overpaid')}</span>
+                <span className="font-medium tabular-nums text-danger-fg">{fmtCurrency(overpaid)}</span>
               </div>
             )}
           </div>
         </div>
 
+        <ModalErrorBand message={submitError} onDismiss={() => setSubmitError('')} />
+
         <div className="modal-footer">
-          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button onClick={handleClose}>{t('common.cancel')}</Button>
           <Button
             color="primary"
-            variant={canSubmit ? 'solid' : 'outline'}
-            disabled={submitMutation.isPending || previewing}
+            disabled={!canSubmit || previewing}
             onClick={handleSubmitClick}
           >
             {needsApproval ? t('retail.create.submitForApproval') : t('retail.create.checkout')}
@@ -827,6 +913,25 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
         onClose={() => setPriceEditIdx(null)}
         onSave={savePrice}
       />
+
+      <Modal
+        open={confirmClose}
+        onClose={() => setConfirmClose(false)}
+        maxWidth="24rem"
+        width="100%"
+        ariaLabel="Discard sale"
+      >
+        <div className="modal-header">
+          <h2 className="modal-title">{t('common.unsavedChanges')}</h2>
+        </div>
+        <div className="modal-content">
+          <p>{t('common.unsavedChangesMessage')}</p>
+        </div>
+        <div className="modal-footer">
+          <Button variant="ghost" onClick={() => setConfirmClose(false)}>{t('common.cancel')}</Button>
+          <Button color="danger" onClick={forceClose}>{t('common.discard')}</Button>
+        </div>
+      </Modal>
     </Modal>
   );
 }

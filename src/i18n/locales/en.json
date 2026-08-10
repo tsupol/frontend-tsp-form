@@ -3336,6 +3336,7 @@
       "total": "Total",
       "change": "Change",
       "remaining": "Remaining",
+      "overpaid": "Over by",
       "paymentsLabel": "Payment",
       "addPayment": "Add payment",
       "checkout": "Checkout",
