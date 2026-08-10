@@ -25,6 +25,7 @@ import { DayCloseBuckets } from './DayCloseBuckets';
 import { exportReconcileItems } from './dayCloseExport';
 import type { ReconcileItemResult } from './accountingTypes';
 import { ActionDoneView, type ActionDoneDetailRow } from '../contracts/ActionDoneView';
+import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { translateApiError } from '../../lib/apiErrors';
 
 const UNCLOSED_PREFIX = '__unclosed__';
@@ -1250,6 +1251,7 @@ function CloseDayModal({
   const [countedTransfer, setCountedTransfer] = useState<string>('');
   const [note, setNote] = useState<string>('');
   const [confirmClose, setConfirmClose] = useState(false);
+  const [finalConfirm, setFinalConfirm] = useState(false);
   const [closing, setClosing] = useState(false);
   const [error, setError] = useState('');
   // Snapshot at submit time so the done view reflects what was actually closed.
@@ -1263,6 +1265,7 @@ function CloseDayModal({
       setCountedTransfer('');
       setNote('');
       setConfirmClose(false);
+      setFinalConfirm(false);
       setError('');
       setClosed(null);
     }
@@ -1293,6 +1296,26 @@ function CloseDayModal({
     if (view === 'done' || !isDirty) { onClose(); return; }
     setConfirmClose(true);
   };
+
+  // Relative age of the day being closed — the load-bearing fact of the final
+  // confirm (closing a backlog day cannot be reopened; only close_date=today can).
+  const daysAgo = Math.round(
+    (parseLocalDate(today)!.getTime() - parseLocalDate(closingDate)!.getTime()) / 86_400_000,
+  );
+  const relativeLabel = daysAgo <= 0
+    ? t('accounting.dayClose.closingToday')
+    : daysAgo === 1
+      ? t('accounting.dayClose.closingYesterday')
+      : t('accounting.dayClose.closingDaysAgo', { count: daysAgo });
+  const closingDateBox = (
+    <div className="px-3 py-2.5 rounded-md bg-surface border border-line flex items-center justify-between gap-2">
+      <div>
+        <div className="text-xs text-subtle">{t('accounting.dayClose.closingDateLabel')}</div>
+        <div className="font-medium text-sm"><DateTime value={closingDate} showTime={false} /></div>
+      </div>
+      <Badge color={daysAgo <= 0 ? 'info' : 'warning'} size="sm">{relativeLabel}</Badge>
+    </div>
+  );
 
   const doClose = async () => {
     setClosing(true);
@@ -1361,20 +1384,8 @@ function CloseDayModal({
       {view === 'form' && (
         <>
           <div className="modal-content">
-            {error && (
-              <div className="alert alert-danger mb-4 animate-pop-in">
-                <XCircle size={18} />
-                <div><div className="alert-description">{error}</div></div>
-              </div>
-            )}
-            <p className="text-sm text-subtle">{t('accounting.dayClose.confirmMessage')}</p>
-
-            {closingDate !== today && (
-              <div className="mt-3 text-sm">
-                <span className="text-subtle">{t('accounting.dayClose.closeForDate')}:</span>{' '}
-                <span className="font-semibold"><DateTime value={closingDate} showTime={false} /></span>
-              </div>
-            )}
+            {closingDateBox}
+            <p className="text-sm text-subtle mt-3">{t('accounting.dayClose.confirmMessage')}</p>
 
             {/* Two-channel count table: system net vs staff counted vs diff */}
             <table className="w-full text-sm tabular-nums mt-4">
@@ -1444,11 +1455,12 @@ function CloseDayModal({
               <p className="text-xs text-subtler">{t('accounting.dayClose.countLaterHint')}</p>
             </div>
           </div>
+          <ModalErrorBand message={error} onDismiss={() => setError('')} />
           <div className="modal-footer">
             <Button onClick={handleCloseAttempt} disabled={closing} data-action="DISMISS">{t('common.cancel')}</Button>
             <Button
               color="primary"
-              onClick={doClose}
+              onClick={() => setFinalConfirm(true)}
               disabled={!canSubmit}
               data-action="CONFIRM_DAY_CLOSE"
               data-blocked-reason={
@@ -1479,6 +1491,28 @@ function CloseDayModal({
       <div className="modal-footer">
         <Button variant="ghost" onClick={() => setConfirmClose(false)}>{t('common.cancel')}</Button>
         <Button color="danger" onClick={() => { setConfirmClose(false); onClose(); }}>{t('common.discard')}</Button>
+      </div>
+    </Modal>
+
+    {/* Final are-you-sure before the day actually closes — restates WHICH day
+        (today / yesterday / N days ago), since closing a backlog day is the
+        mistake this guards against (only close_date = today can be reopened). */}
+    <Modal open={finalConfirm} onClose={() => { if (!closing) setFinalConfirm(false); }} maxWidth="24rem" width="100%">
+      <div className="modal-header"><h2 className="modal-title">{t('accounting.dayClose.finalConfirmTitle')}</h2></div>
+      <div className="modal-content">
+        {closingDateBox}
+        <p className="text-sm text-subtle mt-3">{t('accounting.dayClose.finalConfirmMessage')}</p>
+      </div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={() => setFinalConfirm(false)} disabled={closing}>{t('common.cancel')}</Button>
+        <Button
+          color="primary"
+          onClick={() => { setFinalConfirm(false); doClose(); }}
+          disabled={closing}
+          data-action="CONFIRM_DAY_CLOSE_FINAL"
+        >
+          {t('accounting.dayClose.closeDay')}
+        </Button>
       </div>
     </Modal>
     </>
