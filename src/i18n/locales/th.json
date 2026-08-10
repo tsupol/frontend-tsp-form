@@ -1690,7 +1690,8 @@
       "PAUSED": "พักชำระอยู่",
       "DEVICE_IN_REPAIR": "เครื่องอยู่ร้านซ่อม",
       "DEVICE_DEPOSITED": "ฝากเครื่องไว้",
-      "HAS_APPOINTMENT": "มีนัดชำระ"
+      "HAS_APPOINTMENT": "มีนัดชำระ",
+      "HOLIDAY": "วันหยุดบริษัท"
     },
     "dunningStatus": {
       "ACTIVE": "กำลังติดตาม",
@@ -4298,7 +4299,7 @@
     },
     "holidays": {
       "title": "วันหยุด",
-      "description": "วันหยุด Company ที่มีผลต่อวันครบกำหนดและค่าปรับ",
+      "description": "วันหยุด Company ที่มีผลต่อวันครบกำหนดและค่าปรับ และไม่ส่ง notif ทวงชำระไปยังลูกค้าในวันดังกล่าว",
       "addHoliday": "เพิ่มวันหยุด",
       "editHoliday": "แก้ไขวันหยุด",
       "company": "Company",

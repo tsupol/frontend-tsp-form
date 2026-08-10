@@ -1694,7 +1694,8 @@
       "PAUSED": "Payment paused",
       "DEVICE_IN_REPAIR": "Device in repair",
       "DEVICE_DEPOSITED": "Device deposited",
-      "HAS_APPOINTMENT": "Has appointment"
+      "HAS_APPOINTMENT": "Has appointment",
+      "HOLIDAY": "Company holiday"
     },
     "dunningStatus": {
       "ACTIVE": "Active",
@@ -4303,7 +4304,7 @@
     },
     "holidays": {
       "title": "Holidays",
-      "description": "Company holidays that affect due date and late fee calculations.",
+      "description": "Company holidays that affect due date and late fee calculations. Payment reminders and overdue notifications are not sent to customers on these days.",
       "addHoliday": "Add Holiday",
       "editHoliday": "Edit Holiday",
       "company": "Company",

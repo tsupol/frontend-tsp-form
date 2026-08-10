@@ -9,12 +9,14 @@ import {
   type ColumnDef, type SortingState,
 } from 'tsp-form';
 import {
-  Plus, MoreHorizontal, Trash2, Pencil, Calendar,
+  Plus, MoreHorizontal, Trash2, Pencil, Keyboard,
   XCircle, CheckCircle, ArrowRightFromLine, SlidersHorizontal,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { translateApiError } from '../../lib/apiErrors';
+import { toLocalDateStr, parseLocalDate, makeDatePickerFormat } from '../../lib/format';
+import { DateTime } from '../../components/DateTime';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -38,6 +40,21 @@ interface HolidayForm {
   company_id: string;
   holiday_date: Date | null;
   description: string;
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/** DD/MM/YYYY typed input → Date. Accepts Buddhist Era years. */
+function parseTypedDate(raw: string): Date | null {
+  if (raw.length !== 8) return null;
+  const day = parseInt(raw.slice(0, 2), 10);
+  const month = parseInt(raw.slice(2, 4), 10);
+  let year = parseInt(raw.slice(4, 8), 10);
+  if (year > 2400) year -= 543;
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const d = new Date(year, month - 1, day);
+  if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+  return d;
 }
 
 // ── Row Actions ──────────────────────────────────────────────────────────────
@@ -84,13 +101,14 @@ function HolidayFormModal({ open, onClose, companies, holiday }: {
   companies: Company[];
   holiday?: Holiday | null;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { addSnackbar } = useSnackbarContext();
   const [errorMessage, setErrorMessage] = useState('');
   const [errorKey, setErrorKey] = useState(0);
   const [isPending, setIsPending] = useState(false);
+  const [dateTyping, setDateTyping] = useState(false);
   const isEdit = !!holiday;
 
   const { register, handleSubmit, reset, control, formState: { errors } } = useForm<HolidayForm>({
@@ -106,7 +124,7 @@ function HolidayFormModal({ open, onClose, companies, holiday }: {
     if (holiday) {
       reset({
         company_id: String(holiday.company_id),
-        holiday_date: new Date(holiday.holiday_date + 'T00:00:00'),
+        holiday_date: parseLocalDate(holiday.holiday_date),
         description: holiday.description,
       });
     } else {
@@ -126,7 +144,7 @@ function HolidayFormModal({ open, onClose, companies, holiday }: {
       await apiClient.rpc('fn_holiday_manage', {
         p_company_id: Number(data.company_id),
         p_action: 'ADD',
-        p_holiday_date: data.holiday_date ? data.holiday_date.toISOString().split('T')[0] : '',
+        p_holiday_date: toLocalDateStr(data.holiday_date),
         p_description: data.description,
         p_managed_by: user.user_id,
       });
@@ -194,7 +212,16 @@ function HolidayFormModal({ open, onClose, companies, holiday }: {
                     value={field.value}
                     onChange={(date) => field.onChange(date)}
                     placeholder={t('settings.holidays.holidayDate')}
-                    endIcon={<Calendar size={18} />}
+                    dateFormat={makeDatePickerFormat(i18n.language)}
+                    locale={i18n.language}
+                    calendar="gregorian"
+                    endIcon={<Keyboard size={16} />}
+                    onEndIconClick={() => setDateTyping(v => !v)}
+                    typingMode={dateTyping}
+                    onTypingModeChange={setDateTyping}
+                    typingMask="##/##/####"
+                    typingPlaceholder="DD/MM/YYYY"
+                    parseTypedDate={parseTypedDate}
                     disabled={isEdit}
                   />
                 )}
@@ -276,7 +303,7 @@ function ConfirmRemoveModal({ open, onClose, holiday }: {
         <p className="text-sm">{t('settings.holidays.confirmRemoveMessage')}</p>
         {holiday && (
           <div className="mt-2 text-sm text-subtle">
-            <div>{holiday.company_name} — {formatDate(holiday.holiday_date)}</div>
+            <div>{holiday.company_name} — <DateTime value={holiday.holiday_date} showTime={false} /></div>
             <div>{holiday.description}</div>
           </div>
         )}
@@ -290,15 +317,6 @@ function ConfirmRemoveModal({ open, onClose, holiday }: {
     </Modal>
   );
 }
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatDate(dateStr: string) {
-  const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-}
-
-// ── Main Page ────────────────────────────────────────────────────────────────
 
 // ── Sort helpers ─────────────────────────────────────────────────────────────
 
@@ -378,7 +396,7 @@ export function HolidaysPage() {
     {
       accessorKey: 'holiday_date',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('settings.holidays.colDate')} />,
-      cell: ({ row }) => <span className="font-medium tabular-nums">{formatDate(row.original.holiday_date)}</span>,
+      cell: ({ row }) => <DateTime value={row.original.holiday_date} showTime={false} className="font-medium tabular-nums" />,
     },
     {
       accessorKey: 'description',
@@ -549,9 +567,9 @@ export function HolidaysPage() {
                     className="flex items-center gap-3 px-4 py-3"
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm truncate">{formatDate(holiday.holiday_date)}</div>
+                      <DateTime value={holiday.holiday_date} showTime={false} className="font-medium text-sm truncate block" />
                       <div className="text-xs text-subtle mt-0.5">{holiday.description}</div>
-                      <div className="text-xs text-fg/40 mt-0.5">{holiday.company_name}</div>
+                      <div className="text-xs text-subtler mt-0.5">{holiday.company_name}</div>
                     </div>
                     <RowActions
                       holiday={holiday}

@@ -14,7 +14,7 @@ import { apiClient } from '../../lib/api';
 
 export type FlagLevel = 'WHITE' | 'GREEN' | 'YELLOW' | 'ORANGE' | 'RED' | string;
 export type DunningStatus = 'ACTIVE' | 'WAIT_FOR_REPO' | 'WAIT_FOR_LEGAL' | string;
-export type DunningSkipReason = 'PAUSED' | 'DEVICE_IN_REPAIR' | 'DEVICE_DEPOSITED' | 'HAS_APPOINTMENT' | string;
+export type DunningSkipReason = 'PAUSED' | 'DEVICE_IN_REPAIR' | 'DEVICE_DEPOSITED' | 'HAS_APPOINTMENT' | 'HOLIDAY' | string;
 export type CurrentStage = 'NEW' | 'WORKING' | 'PROMISED' | 'BROKEN_PROMISE' | 'HOPELESS' | null;
 
 /** One row of the collector's book — v_my_book. */
