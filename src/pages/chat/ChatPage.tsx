@@ -491,8 +491,11 @@ export function ChatPage() {
                 )}
               </div>
 
+              {/* padded-datatable supplies the footer's inline/block padding +
+                  top border, matching the DataTable rails (ContractListPane et
+                  al). Without it the controls sit flush against the panel edge. */}
               {totalCount > pageSize && (
-                <div className="flex-none border-t border-line">
+                <div className="flex-none padded-datatable">
                   <DataTableFooter
                     currentPage={pageIndex + 1}
                     totalPages={Math.ceil(totalCount / pageSize)}
