@@ -181,6 +181,15 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
     }
   }, [open, branches, branchId, ownBranchId]);
 
+  // `catalog_price` and `target_line_index` are this screen's own bookkeeping
+  // (strike-through original price / which line a discount targets). Neither is
+  // part of the line-item contract, so strip them rather than posting unknown
+  // fields the server has to ignore.
+  const toLineItems = useCallback(
+    (rows: CartLine[]) => rows.map(({ catalog_price: _c, target_line_index: _t, ...line }) => line),
+    [],
+  );
+
   // Preview validates stock + discount policy + branch guards, and issues the
   // token that fn_bill_retail_submit consumes as its idempotency key. The real
   // payment split rides on submit's p_payments, so preview is told the nominal
@@ -188,14 +197,14 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
   const previewParams = useMemo(() => ({
     p_branch_id: branchId,
     p_customer_id: null,
-    p_line_items: lines,
+    p_line_items: toLineItems(lines),
     p_payment_method: 'CASH' as PaymentMethod,
     p_payment_amount: lines.reduce((s, l) => {
       const sign = l.charge_type === 'RETAIL_DISCOUNT' ? -1 : 1;
       return s + sign * l.amount * (l.qty ?? 1);
     }, 0),
     p_bank_account_id: null,
-  }), [branchId, lines]);
+  }), [branchId, lines, toLineItems]);
 
   // Returns the fresh preview so a PREVIEW_STALE retry can chain straight off
   // it instead of racing the `preview` state update.
@@ -263,7 +272,7 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
         const buildPayload = (token: string | undefined) => ({
           p_branch_id: branchId,
           p_customer_id: null,
-          p_line_items: lines,
+          p_line_items: toLineItems(lines),
           p_payments: payments
             .filter(p => p.amount > 0)
             .map(p => ({
@@ -318,7 +327,9 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
         }
 
         return {
-          code: res.code ?? res.code_display ?? '',
+          // code_display is the formatted one the rest of the app shows
+          // (BL-2608-000621-1); `code` is the raw BL26080006211.
+          code: res.code_display ?? res.code ?? '',
           mode: 'atomic',
           change: res.change_amount ?? 0,
           billId: res.bill_id,
