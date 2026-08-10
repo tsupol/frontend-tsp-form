@@ -10,6 +10,11 @@ import { defaultScopeFor, scopeQuery, scopeQueryRollup, scopeKey } from '../lib/
 // Side-menu badges always use the user's default scope (independent of any
 // dashboard scope picker). Backend RLS leaks on these views — must send the
 // explicit scope filter, see UI_FEEDBACK/2026-05-06_dashboard_endpoints.md.
+
+// Badges render "99+" past this (AppSideNav.iconWithCount), so counts only need
+// to be exact below it. Keep in sync with that threshold.
+export const NAV_COUNT_CAP = 99;
+
 export function useNavCounts() {
   const { user, can } = useAuth();
   const role = user?.role_code ?? '';
@@ -191,10 +196,13 @@ export function useNavCounts() {
   // Chat unread — sum unread_count from v_branch_chat_list (RLS-scoped to branch).
   // Gated on the CONTRACT.CHAT capability, not role — any branch role with chat
   // access (incl. BRANCH_COLLECTOR); the view returns empty for others.
+  // Unbounded before: every unread row came back just to be summed. The badge
+  // renders "99+" past NAV_COUNT_CAP, so stop once enough rows to exceed it are
+  // in hand — the sum only has to be *correct* below the cap.
   const { data: unreadChatRows } = useQuery({
     queryKey: ['nav', 'chat-unread', sk],
     queryFn: () => apiClient.get<{ unread_count: number }[]>(
-      `/v_branch_chat_list?select=unread_count&unread_count=gt.0`,
+      `/v_branch_chat_list?select=unread_count&unread_count=gt.0&limit=${NAV_COUNT_CAP + 1}`,
     ),
     enabled: canChat,
     refetchInterval: 60_000,

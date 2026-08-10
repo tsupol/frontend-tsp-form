@@ -82,7 +82,8 @@ export function ChatPage() {
   const selectedContractId = contractParam ? parseInt(contractParam, 10) : null;
 
   // Realtime: subscribe to branch channel so any new chat in the branch
-  // refreshes the inbox + unread badge without waiting for the 60s poll.
+  // refreshes the inbox + unread badge. This is now the primary freshness
+  // mechanism for the inbox, not a supplement to a poll.
   // ACL on the server filters this to the user's branch; CA/HA (no branch_id)
   // get nothing and that matches the doc's fan-out rule.
   //
@@ -102,8 +103,9 @@ export function ChatPage() {
   }, [user?.branch_id, queryClient]);
 
   // Refetch the inbox when the tab regains focus or the page becomes visible.
-  // The 60s poll + WS keep the list fresh while the tab is active; this covers
-  // the gap where the user was away and WS may have dropped events.
+  // WS keeps the list fresh while the tab is active; this covers the gap where
+  // the user was away and WS may have dropped events. With no poll behind it,
+  // this is the sole recovery path after a dropped socket — keep it.
   useEffect(() => {
     const refresh = () => {
       queryClient.invalidateQueries({ queryKey: ['chat-inbox'] });
@@ -160,6 +162,11 @@ export function ChatPage() {
     return `/v_branch_chat_list?${params.join('&')}`;
   }, [unreadOnly, statusFilter]);
 
+  // No refetchInterval: new messages arrive on `chat:contract:<id>` and status
+  // changes on `chat:branch:<id>`, both of which invalidate ['chat-inbox'], and
+  // the focus/visibility effect above covers events missed while the tab slept.
+  // A timer on top of that was a third poller on this same view (with ChatPage's
+  // own roster hook and the nav badge) — different query keys, so nothing deduped.
   const inbox = useQuery({
     queryKey: ['chat-inbox', unreadOnly, statusFilter, pageIndex, pageSize],
     queryFn: () => apiClient.getPaginated<ChatInboxRow>(
@@ -167,7 +174,6 @@ export function ChatPage() {
       { page: pageIndex + 1, pageSize },
     ),
     enabled: !isSearchMode,
-    refetchInterval: 60_000,
     placeholderData: keepPreviousData,
   });
 

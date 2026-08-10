@@ -64,7 +64,7 @@ import { getRoleLabel } from './lib/roleLabel';
 import { useTheme } from './contexts/ThemeContext';
 import { useNavGuard } from './contexts/NavGuardContext';
 import { isLocalDev } from './lib/devEnv';
-import { useNavCounts } from './hooks/useNavCounts';
+import { useNavCounts, NAV_COUNT_CAP } from './hooks/useNavCounts';
 import { useChatDock } from './contexts/ChatDockContext';
 import { NotificationMenuItem } from './components/NotificationMenu';
 
@@ -208,7 +208,7 @@ export const AppSideNav = () => {
   // - Collapsed: a small dot pinned to the top-right of the icon (returned via `icon` wrapper).
   const iconWithCount = (icon: React.ReactNode, count: number): { icon: React.ReactNode; badge?: React.ReactNode } => {
     if (count <= 0) return { icon };
-    const label = count > 99 ? '99+' : String(count);
+    const label = count > NAV_COUNT_CAP ? `${NAV_COUNT_CAP}+` : String(count);
     if (menuCollapsed && !isMobile) {
       return {
         icon: (

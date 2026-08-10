@@ -29,9 +29,10 @@ const RECENT_MS = 5_000;
  *
  * - Skips messages the current staff sent themselves.
  * - Skips when the URL is /admin/chat?contract=<that-id>.
- * - First message on a brand-new contract: caught by the 60s inbox poll —
- *   snackbar fires on the next message after that. Acceptable trade-off vs.
- *   a branch-wide subscription whose payload we can't currently rely on.
+ * - First message on a brand-new contract: the roster below has no channel for
+ *   it yet, so the snackbar fires on the next message, once an invalidation has
+ *   refreshed the roster. `chat:branch:<id>` carries status/note changes only,
+ *   not new messages, so it cannot close this gap on its own.
  */
 export function useChatRealtimeSnackbars() {
   const { isAuthenticated, user } = useAuth();
@@ -52,16 +53,24 @@ export function useChatRealtimeSnackbars() {
   const userIdRef = useRef(user?.user_id);
   userIdRef.current = user?.user_id;
 
-  // Fetch the inbox so we know which contract channels to subscribe to. Same
-  // query key as ChatPage → React Query dedupes.
+  // Fetch the inbox so we know which contract channels to subscribe to.
+  //
+  // This is a *subscription roster*, not a view of the data — nothing here is
+  // rendered. It only needs to change when a contract gains its first-ever
+  // thread, so it does not poll: `chat:branch:<id>` (ChatPage) and the WS
+  // handler below both invalidate `['chat-inbox']`, which refetches this too.
+  // It previously polled at 60s alongside ChatPage's inbox and the nav badge —
+  // three timers on one view, three query keys, so React Query deduped none of
+  // them. Threads older than 48h can't produce a *new* message without an event
+  // that refreshes this list first, so the window costs no coverage.
   const { data } = useQuery({
     queryKey: ['chat-inbox', 'global'],
     queryFn: () =>
       apiClient.get<ChatInboxRow[]>(
-        '/v_branch_chat_list?order=last_message_at.desc.nullslast&limit=200',
+        `/v_branch_chat_list?last_message_at=gte.${new Date(Date.now() - 48 * 3600_000).toISOString()}`
+        + '&order=last_message_at.desc&select=contract_id,customer_name,last_message_text&limit=100',
       ),
     enabled: isAuthenticated,
-    refetchInterval: 60_000,
     staleTime: 30_000,
   });
 
