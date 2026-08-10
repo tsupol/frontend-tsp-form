@@ -49,10 +49,20 @@ export function useNavCounts() {
   });
   const pendingSlips = slipsRows?.[0]?.pending_count ?? 0;
 
+  // Selects the superset DashboardPage needs, not just the two fields the badge
+  // reads. Both share this query key, so whichever mounted first used to win the
+  // cache — when it was this one, the dashboard's "overdue by N days / ฿X"
+  // subtitle silently vanished, because max_days_overdue came back undefined and
+  // the line is conditional on it being > 0. Same key must mean same shape.
   const { data: unclosedRows } = useQuery({
     queryKey: ['nav', 'unclosed-summary', sk],
-    queryFn: () => apiClient.get<{ unclosed_day_count: number; unclosed_branch_count: number }[]>(
-      `/v_dashboard_unclosed_summary?select=unclosed_day_count,unclosed_branch_count${sqr}`,
+    queryFn: () => apiClient.get<{
+      unclosed_day_count: number;
+      unclosed_branch_count: number;
+      unclosed_amount: number;
+      max_days_overdue: number;
+    }[]>(
+      `/v_dashboard_unclosed_summary?select=unclosed_day_count,unclosed_branch_count,unclosed_amount,max_days_overdue${sqr}`,
     ),
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
