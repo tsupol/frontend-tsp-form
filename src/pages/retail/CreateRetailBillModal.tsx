@@ -313,12 +313,16 @@ export function CreateRetailBillModal({ open, onClose, onSuccess }: CreateRetail
           );
         }
 
-        // A refused submit still answers `ok: true` — the envelope carries
-        // `{valid: false, preview: false, blockers}` and no bill_id rather than an
-        // error code (verified 2026-08-10 against a day-closed branch, where
-        // `blockers` came back null, so there is not always a reason to show).
-        // Without this it would read as a completed sale and show a receipt for
-        // a bill that was never created.
+        // TEMPORARY — remove once BE settles the refusal contract.
+        // Filed: nnf UI_FEEDBACK/2026-08-10_NOTICE_retail_submit_refusal_envelope.md
+        //
+        // Some refusals answer `ok: true` with `{valid: false, blockers}` and no
+        // bill_id instead of an error code, so they look identical to a success.
+        // Measured 2026-08-10: overpay and missing-bank-account throw a proper
+        // 400; underpay returns ok:true WITH blockers[]; out-of-stock and
+        // day-closed return ok:true with `blockers: null` — no reason at all.
+        // Without this check the last case reads as a completed sale and shows a
+        // receipt for a bill that was never created.
         if (res.valid === false || res.bill_id == null) {
           const reason = res.blockers?.map(pickMessage).filter(Boolean).join(' · ');
           // Re-preview so the guard that refused surfaces in the inline list.
