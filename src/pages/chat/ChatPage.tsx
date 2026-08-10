@@ -25,10 +25,6 @@ type StatusFilter = ChatStatus | 'NONE' | null;
 // wanted; a collector who doesn't see their contract types more characters.
 const SEARCH_FETCH_LIMIT = 100;
 
-// Inbox shows threads active within this window. Older threads stay reachable
-// through search (fn_contract_search), which this does not bound.
-const INBOX_WINDOW_HOURS = 48;
-
 /** The subset of fn_contract_search's contract shape this page needs. */
 interface ContractSearchHit {
   id: number;
@@ -156,15 +152,12 @@ export function ChatPage() {
   // Filtering the view directly is correct HERE and only here: no keyword means
   // no text matching, so the view's own columns + indexes do the work.
   //
-  // Bounded to a recent window: unfiltered, the count half of the paginated
-  // request evaluates the whole view (no WHERE, no LIMIT) — measured at
-  // 124-162ms against ~695 rows, more than the half that returns the rows the
-  // user sees. The window bounds both halves. Threads that fall out of it are
-  // still reachable by search, which goes through fn_contract_search and is not
-  // limited by this window at all.
-  //
-  // The window is deliberately NOT applied when a status filter is active: those
-  // chips exist to find stalled threads, which are old by definition.
+  // Ordered newest-first and paged, so the rail is already "the last N threads".
+  // No time window: a quiet branch would open chat to an empty inbox, which
+  // reads as data loss no matter how it is worded — and the branches with the
+  // least traffic are exactly the ones that can least afford to distrust it.
+  // The cost this bounds is the count half of the paginated request, and that
+  // is worth paying for a list that is never mysteriously empty.
   const queryUrl = useMemo(() => {
     const params: string[] = ['order=last_message_at.desc.nullslast'];
     if (unreadOnly) params.push('unread_count=gt.0');
@@ -172,10 +165,6 @@ export function ChatPage() {
       params.push('chat_status=is.null');
     } else if (statusFilter) {
       params.push(`chat_status=eq.${statusFilter}`);
-    }
-    if (!statusFilter && !unreadOnly) {
-      const since = new Date(Date.now() - INBOX_WINDOW_HOURS * 3600_000).toISOString();
-      params.push(`last_message_at=gte.${since}`);
     }
     return `/v_branch_chat_list?${params.join('&')}`;
   }, [unreadOnly, statusFilter]);
@@ -484,11 +473,6 @@ export function ChatPage() {
                 {rows.length === 0 ? (
                   <div className="p-8 text-center text-subtle text-sm">
                     {isSearchMode ? t('chat.searchEmpty') : t('chat.empty')}
-                    {!isSearchMode && !statusFilter && !unreadOnly && (
-                      <div className="mt-1 text-subtler text-xs">
-                        {t('chat.emptyWindowHint', { hours: INBOX_WINDOW_HOURS })}
-                      </div>
-                    )}
                   </div>
                 ) : (
                   <div className="flex flex-col">

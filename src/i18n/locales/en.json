@@ -6863,7 +6863,6 @@
     "title": "Chat",
     "searchPlaceholder": "Name, contract, phone, IMEI, serial",
     "searchEmpty": "Nothing matched that search",
-    "emptyWindowHint": "Showing the last {{hours}} hours. Search to find older conversations.",
     "noChatYet": "No chat yet",
     "startConversation": "Open to send the first message",
     "unread": "Unread",

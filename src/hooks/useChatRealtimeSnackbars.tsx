@@ -22,6 +22,10 @@ interface ChatWsPayload {
 
 const RECENT_MS = 5_000;
 
+// How many threads to hold WS subscriptions for. Was 200 full rows; the cap is
+// about how many channels are worth listening on, not how much data to show.
+const ROSTER_LIMIT = 200;
+
 /**
  * App-wide chat notifier. Subscribes to `chat:contract:<id>` for every contract
  * with a thread in `v_branch_chat_list`. When a new CUSTOMER message arrives
@@ -56,19 +60,24 @@ export function useChatRealtimeSnackbars() {
   // Fetch the inbox so we know which contract channels to subscribe to.
   //
   // This is a *subscription roster*, not a view of the data — nothing here is
-  // rendered. It only needs to change when a contract gains its first-ever
-  // thread, so it does not poll: `chat:branch:<id>` (ChatPage) and the WS
-  // handler below both invalidate `['chat-inbox']`, which refetches this too.
-  // It previously polled at 60s alongside ChatPage's inbox and the nav badge —
-  // three timers on one view, three query keys, so React Query deduped none of
-  // them. Threads older than 48h can't produce a *new* message without an event
-  // that refreshes this list first, so the window costs no coverage.
+  // rendered, so it takes the three columns the snackbar needs and the most
+  // recent ROSTER_LIMIT threads rather than 200 full rows.
+  //
+  // No time window here, unlike the rail: a customer can reply to a thread that
+  // has been quiet for a week, and a window would drop that contract off the
+  // roster so no snackbar ever fires for it. Recency is a fine way to cap the
+  // list; staleness is not a reason to stop listening.
+  //
+  // It does not poll: `chat:branch:<id>` (ChatPage) and the WS handler below
+  // both invalidate `['chat-inbox']`, which refetches this too. It previously
+  // polled at 60s alongside ChatPage's inbox and the nav badge — three timers on
+  // one view, three query keys, so React Query deduped none of them.
   const { data } = useQuery({
     queryKey: ['chat-inbox', 'global'],
     queryFn: () =>
       apiClient.get<ChatInboxRow[]>(
-        `/v_branch_chat_list?last_message_at=gte.${new Date(Date.now() - 48 * 3600_000).toISOString()}`
-        + '&order=last_message_at.desc&select=contract_id,customer_name,last_message_text&limit=100',
+        '/v_branch_chat_list?order=last_message_at.desc.nullslast'
+        + `&select=contract_id,customer_name,last_message_text&limit=${ROSTER_LIMIT}`,
       ),
     enabled: isAuthenticated,
     staleTime: 30_000,
