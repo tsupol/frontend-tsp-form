@@ -134,6 +134,7 @@ import { DevBillPrintPage } from './pages/dev/DevBillPrintPage';
 import { DevNotificationsPage } from './pages/dev/DevNotificationsPage';
 import { DevTokensPage } from './pages/dev/DevTokensPage';
 import { DevRemoveButtonsPage } from './pages/dev/DevRemoveButtonsPage';
+import { DevLoginPage } from './pages/dev/DevLoginPage';
 import { isLocalDev } from './lib/devEnv';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -206,6 +207,8 @@ function App() {
       {/* Public routes */}
       <Route path="/" element={<HomePage />} />
       <Route path="/login" element={<LoginPage />} />
+      {/* One-URL login for automation — localhost only, unauthenticated by design */}
+      {isLocalDev() && <Route path="/dev-login" element={<DevLoginPage />} />}
       <Route path="/enroll" element={<EnrollRedirectPage />} />
 
       {/* Dashboard */}
