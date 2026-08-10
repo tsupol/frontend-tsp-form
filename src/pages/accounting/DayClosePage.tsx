@@ -1215,13 +1215,13 @@ function TransferSplitRows({ front, slip }: { front: number; slip: number }) {
         <td className="py-0.5" />
       </tr>
       <tr className="text-xs text-subtle">
-        <td className="py-0.5 pl-6">
+        <td className="pt-0.5 pb-2 pl-6">
           <span className="text-subtler mr-1">└</span>
           {t('accounting.dayClose.transferSlip')}
         </td>
-        <td className="py-0.5 text-right tabular-nums">{fmtCurrency(slip)}</td>
-        <td className="py-0.5" />
-        <td className="py-0.5" />
+        <td className="pt-0.5 pb-2 text-right tabular-nums">{fmtCurrency(slip)}</td>
+        <td className="pt-0.5 pb-2" />
+        <td className="pt-0.5 pb-2" />
       </tr>
     </>
   );
