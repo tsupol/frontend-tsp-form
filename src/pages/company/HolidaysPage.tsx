@@ -17,6 +17,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { translateApiError } from '../../lib/apiErrors';
 import { toLocalDateStr, parseLocalDate, makeDatePickerFormat } from '../../lib/format';
 import { DateTime } from '../../components/DateTime';
+import { ModalErrorBand } from '../../components/ModalErrorBand';
+import { ActionDoneView } from '../contracts/ActionDoneView';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -104,14 +106,15 @@ function HolidayFormModal({ open, onClose, companies, holiday }: {
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { addSnackbar } = useSnackbarContext();
   const [errorMessage, setErrorMessage] = useState('');
-  const [errorKey, setErrorKey] = useState(0);
   const [isPending, setIsPending] = useState(false);
   const [dateTyping, setDateTyping] = useState(false);
+  const [view, setView] = useState<'form' | 'done'>('form');
+  const [result, setResult] = useState<HolidayForm | null>(null);
+  const [confirmClose, setConfirmClose] = useState(false);
   const isEdit = !!holiday;
 
-  const { register, handleSubmit, reset, control, formState: { errors } } = useForm<HolidayForm>({
+  const { register, handleSubmit, reset, control, formState: { errors, isDirty } } = useForm<HolidayForm>({
     defaultValues: {
       company_id: '',
       holiday_date: null,
@@ -131,8 +134,22 @@ function HolidayFormModal({ open, onClose, companies, holiday }: {
       reset({ company_id: '', holiday_date: null, description: '' });
     }
     setErrorMessage('');
+    setView('form');
+    setResult(null);
+    setConfirmClose(false);
   }
   prevOpen.current = open;
+
+  const forceClose = () => {
+    setConfirmClose(false);
+    onClose();
+  };
+
+  const handleClose = () => {
+    if (view === 'done') { forceClose(); return; }
+    if (isDirty) { setConfirmClose(true); return; }
+    forceClose();
+  };
 
   const onSubmit = async (data: HolidayForm) => {
     if (!user) return;
@@ -148,12 +165,9 @@ function HolidayFormModal({ open, onClose, companies, holiday }: {
         p_description: data.description,
         p_managed_by: user.user_id,
       });
-      addSnackbar({
-        message: <div className="alert alert-success"><CheckCircle size={16} /><span className="alert-description">{isEdit ? t('settings.holidays.updated') : t('settings.holidays.added')}</span></div>,
-        type: 'success',
-      });
       queryClient.invalidateQueries({ queryKey: ['company-holidays'] });
-      onClose();
+      setResult(data);
+      setView('done');
     } catch (err) {
       if (err instanceof ApiError) {
         const translated = translateApiError(err, t);
@@ -161,7 +175,6 @@ function HolidayFormModal({ open, onClose, companies, holiday }: {
       } else {
         setErrorMessage(t('common.error'));
       }
-      setErrorKey(k => k + 1);
     } finally {
       const elapsed = Date.now() - start;
       if (elapsed < 300) await new Promise(r => setTimeout(r, 300 - elapsed));
@@ -169,19 +182,29 @@ function HolidayFormModal({ open, onClose, companies, holiday }: {
     }
   };
 
+  const companyName = companies.find(c => String(c.company_id) === result?.company_id)?.company_name ?? '';
+
   return (
-    <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
-      <form className="flex flex-col overflow-hidden" onSubmit={handleSubmit(onSubmit)}>
-        <div className="modal-header">
-          <h2 className="modal-title">{isEdit ? t('settings.holidays.editHoliday') : t('settings.holidays.addHoliday')}</h2>
-        </div>
+    <>
+    <Modal open={open} onClose={handleClose} maxWidth="28rem" width="100%">
+      <div className="modal-header">
+        <h2 className="modal-title">{isEdit ? t('settings.holidays.editHoliday') : t('settings.holidays.addHoliday')}</h2>
+        <button type="button" className="modal-close-btn" onClick={handleClose}>&times;</button>
+      </div>
+
+      {view === 'done' && result ? (
+        <ActionDoneView
+          headline={isEdit ? t('settings.holidays.updated') : t('settings.holidays.added')}
+          contractCode={companyName}
+          detailRows={[
+            { label: t('settings.holidays.colDate'), value: <DateTime value={toLocalDateStr(result.holiday_date)} showTime={false} /> },
+            { label: t('settings.holidays.colDescription'), value: result.description, emphasis: true },
+          ]}
+          onClose={forceClose}
+        />
+      ) : (
+      <form className="flex flex-col overflow-hidden min-h-0" onSubmit={handleSubmit(onSubmit)}>
         <div className="modal-content">
-          {errorMessage && (
-            <div key={errorKey} className="alert alert-danger mb-4 animate-pop-in">
-              <XCircle size={18} />
-              <div><div className="alert-description">{errorMessage}</div></div>
-            </div>
-          )}
           <div className="form-grid">
             <div className="flex flex-col">
               <label className="form-label">{t('settings.holidays.company')}</label>
@@ -235,14 +258,26 @@ function HolidayFormModal({ open, onClose, companies, holiday }: {
             </div>
           </div>
         </div>
+        <ModalErrorBand message={errorMessage} onDismiss={() => setErrorMessage('')} />
         <div className="modal-footer">
-          <Button type="button" onClick={onClose}>{t('common.cancel')}</Button>
+          <Button type="button" onClick={handleClose}>{t('common.cancel')}</Button>
           <Button type="submit" color="primary" disabled={isPending}>
             {isPending ? t('common.saving') : isEdit ? t('common.save') : t('common.create')}
           </Button>
         </div>
       </form>
+      )}
     </Modal>
+
+    <Modal open={confirmClose} onClose={() => setConfirmClose(false)} maxWidth="24rem" width="100%">
+      <div className="modal-header"><h2 className="modal-title">{t('common.unsavedChanges')}</h2></div>
+      <div className="modal-content"><p className="text-sm">{t('common.unsavedChangesMessage')}</p></div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={() => setConfirmClose(false)}>{t('common.cancel')}</Button>
+        <Button color="danger" onClick={forceClose}>{t('common.discard')}</Button>
+      </div>
+    </Modal>
+    </>
   );
 }
 
