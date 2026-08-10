@@ -47,6 +47,7 @@ import {
 } from '../inventory/mdm/mdmApi';
 import { parseMdmError } from '../inventory/mdm/mdmApi';
 import { ActivationLockRevealModal } from './ActivationLockRevealModal';
+import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
 
 // Activation Lock codes can unlock a repossessed device for resale, so the
 // owner restricted reveal to company level on purpose — a branch must ask a
@@ -59,6 +60,18 @@ const MAY_REVEAL_ACTIVATION_LOCK = new Set(['COMPANY_ADMIN', 'SYSTEM_DEV']);
 type MdmFilter = 'not_enrolled' | 'enrolled' | 'all';
 const POLL_MS = 20_000;
 const PAGE_SIZE_OPTIONS = [50, 100, 200];
+
+// Is anything on the current page still moving? PENDING = enroll requested,
+// waiting on Apple; APPLYING = a lock template is being pushed. Those are the
+// only states that change without the user acting, so they are the only reason
+// to keep polling. READY is excluded on purpose — it sticks forever after a
+// successful enroll (see the header note), so treating it as "in progress"
+// would poll for good on almost every row.
+function hasPendingRow(rows: MdmDeviceListRow[] | undefined): boolean {
+  return (rows ?? []).some(
+    r => r.prepare_status === 'PENDING' || r.enforcement_badge === 'APPLYING',
+  );
+}
 
 // enforcement_badge → pill. NONE = not locked (default), LIGHT/ENFORCED = locked.
 const BADGE_STYLE: Record<MdmDeviceListBadge, { color: 'default' | 'success' | 'info'; }> = {
@@ -121,7 +134,13 @@ export function MdmDevicesPage() {
     queryKey: ['mdm-device-list', filter, branchId, search, pageIndex, pageSize],
     queryFn: () => apiClient.getPaginated<MdmDeviceListRow>(buildEndpoint(), { page: pageIndex + 1, pageSize }),
     placeholderData: keepPreviousData,
-    refetchInterval: POLL_MS,
+    // Poll only while something on screen is actually mid-transition. The 20s
+    // timer used to run forever on every page, and this view is expensive: it
+    // orders by the computed in_mdm, so PostgreSQL evaluates every device in the
+    // holding before it can page (measured 491ms for 232 rows; EXPLAIN shows
+    // loops=1399). A settled list has nothing to re-read — an enroll or lock
+    // calls refetch() directly, which is what re-arms this.
+    refetchInterval: (q) => (hasPendingRow(q.state.data?.data) ? POLL_MS : false),
     refetchIntervalInBackground: false,
     staleTime: 0,
   });
@@ -145,10 +164,15 @@ export function MdmDevicesPage() {
   // A branch-scoped user only sees their own branch → dropdown hides.
   const showBranchDropdown = branchOptions.length > 1 || branchId != null;
 
+  // Below SEARCH_MIN_CHARS the keyword is dropped rather than sent: a 1-2 char
+  // `search_key=like.*x*` matches most of the fleet, so the server evaluates the
+  // whole view to return a page of noise. Empty box = unfiltered list (the
+  // filter chips still work); partial keyword = hint, no request.
   const handleSearch = (value: string) => {
     setSearchInput(value);
     clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => { setSearch(value); setPageIndex(0); }, 300);
+    const next = isSearchable(value) ? value.trim() : '';
+    searchTimer.current = setTimeout(() => { setSearch(next); setPageIndex(0); }, 300);
   };
 
   const okSnack = (msg: string) => addSnackbar({
@@ -242,7 +266,13 @@ export function MdmDevicesPage() {
           <div className={`flex-1 min-h-0 flex flex-col ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
             <div className="flex-1 overflow-auto better-scroll pb-8">
               {rows.length === 0 ? (
-                <div className="p-8 text-center text-subtle">{t('mdmDevices.noResults')}</div>
+                <div className="p-8 text-center text-subtle">
+                  {/* "keep typing" and "nothing matched" must not look alike —
+                      staff read the latter as "the system has no such device". */}
+                  {isBelowSearchMin(searchInput)
+                    ? t('mdmDevices.searchMinHint', { min: SEARCH_MIN_CHARS })
+                    : t('mdmDevices.noResults')}
+                </div>
               ) : (
                 <div className="flex flex-col divide-y divide-line border-b border-line">
                   {rows.map((row) => (

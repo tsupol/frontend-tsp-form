@@ -6706,6 +6706,7 @@
     "searchPlaceholder": "สแกนหรือพิมพ์ — รหัสสินทรัพย์ สัญญา ซีเรียล IMEI ชื่อ",
     "allBranches": "ทุกสาขา",
     "noResults": "ไม่พบเครื่อง",
+    "searchMinHint": "พิมพ์หรือสแกนอย่างน้อย {{min}} ตัวอักษร",
     "inMdm": "อยู่ใน MDM",
     "notInMdm": "ยังไม่เข้า MDM",
     "enrollButton": "เตรียมเครื่อง",

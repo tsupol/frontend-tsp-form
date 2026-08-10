@@ -6714,6 +6714,7 @@
     "searchPlaceholder": "Scan or type — asset code, contract, serial, IMEI, name",
     "allBranches": "All branches",
     "noResults": "No devices",
+    "searchMinHint": "Type or scan at least {{min}} characters",
     "inMdm": "In MDM",
     "notInMdm": "Not in MDM",
     "enrollButton": "Enroll",
