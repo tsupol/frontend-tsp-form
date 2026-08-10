@@ -446,12 +446,12 @@ export function HolidaysPage() {
 
       <div className="page-content responsive-dvh-mobile-header">
         {/* Desktop header */}
-        <div className="flex items-center justify-between mb-4 flex-none max-md:hidden">
-          <div>
+        <div className="flex items-start justify-between gap-4 mb-4 flex-none max-md:hidden">
+          <div className="min-w-0">
             <h1 className="heading-2">{t('settings.holidays.title')}</h1>
             <p className="text-sm text-subtle mt-1">{t('settings.holidays.description')}</p>
           </div>
-          <Button color="primary" startIcon={<Plus size={16} />} onClick={() => setCreateOpen(true)}>
+          <Button color="primary" className="shrink-0 whitespace-nowrap" startIcon={<Plus size={16} />} onClick={() => setCreateOpen(true)}>
             {t('settings.holidays.addHoliday')}
           </Button>
         </div>
