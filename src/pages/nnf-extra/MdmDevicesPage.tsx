@@ -198,8 +198,13 @@ export function MdmDevicesPage() {
               value={searchInput}
               onChange={(e) => handleSearch(e.target.value)}
               size="sm"
-              className="w-full"
+              className="w-full search-min-hint"
               startIcon={<Search size={15} />}
+              endIcon={isBelowSearchMin(searchInput)
+                ? <span className="text-[11px] whitespace-nowrap">
+                    {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
+                  </span>
+                : undefined}
             />
           </div>
         </div>
@@ -216,18 +221,18 @@ export function MdmDevicesPage() {
             <div className="flex-1 overflow-auto better-scroll pb-8">
               {rows.length === 0 ? (
                 <div className="p-8 text-center text-subtle flex flex-col items-center gap-2">
-                  {/* Three DIFFERENT answers that must never look alike:
-                      empty box   → "scan or type to find a device" (resting state)
-                      1-2 chars   → "keep typing" (a search is pending)
-                      3+, no hits → "nothing matched" — staff read anything else
-                                    here as "this device isn't in the system". */}
+                  {/* Two DIFFERENT answers that must never look alike:
+                      not searching yet → "scan or type to find a device"
+                      3+, no hits       → "nothing matched" — staff read anything
+                                          else here as "it isn't in the system".
+                      The 1-2 char case is NOT repeated here: the input's own
+                      "at least 3 chars" end-icon already says it, right where
+                      the user is typing. */}
                   <Search size={28} className="text-subtler" />
                   <span>
-                    {searchInput.trim().length === 0
-                      ? t('mdmDevices.searchPrompt')
-                      : isBelowSearchMin(searchInput)
-                        ? t('mdmDevices.searchMinHint', { min: SEARCH_MIN_CHARS })
-                        : t('mdmDevices.noResults')}
+                    {isSearchable(searchInput)
+                      ? t('mdmDevices.noResults')
+                      : t('mdmDevices.searchPrompt')}
                   </span>
                 </div>
               ) : (
