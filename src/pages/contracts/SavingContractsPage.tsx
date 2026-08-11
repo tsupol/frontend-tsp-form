@@ -229,7 +229,10 @@ export function SavingContractsPage() {
                           </div>
                           <div className="text-xs text-subtle truncate">
                             {contract.customer_name ?? t('contract.noCustomer')}
-                            {contract.product_display_name && ` · ${contract.product_display_name}`}
+                            {/* "-" is the view's placeholder for "no model yet",
+                                not a name — skip it rather than print a dash. */}
+                            {contract.product_display_name && contract.product_display_name !== '-'
+                              && ` · ${contract.product_display_name}`}
                           </div>
                           {hasTarget && (
                             <div className="flex items-center gap-2">

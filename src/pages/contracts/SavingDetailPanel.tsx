@@ -6,7 +6,7 @@ import { Copy, Check, PiggyBank, Star } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency } from '../../lib/format';
-import { getStateColor, getStateLabel } from './contractUtils';
+import { getStateColor, getStateLabel, productName } from './contractUtils';
 import { ContractActionButtons } from './ContractActions';
 import { WalletsTab } from './wallet/WalletsTab';
 
@@ -218,6 +218,7 @@ export function SavingDetailPanel({ contractId, isMobile }: { contractId: number
 
 function SavingOverviewTab({ contract, t }: { contract: ContractDetail; t: ReturnType<typeof useTranslation>['t'] }) {
   const isFin2 = contract.commercial_model === 'FIN2';
+  const product = productName(contract.product_display_name);
   const balance = contract.saving_balance ?? 0;
   const target = contract.saving_target_amount ?? contract.down_payment ?? 0;
   const hasTarget = target > 0;
@@ -274,14 +275,14 @@ function SavingOverviewTab({ contract, t }: { contract: ContractDetail; t: Retur
       </div>
 
       {/* ── Product & Plan ────────────────────────────────────────────── */}
-      {(contract.product_display_name || contract.model_name) && (
+      {(product || contract.model_name) && (
         <div className="border border-line rounded-md px-4 py-3">
           <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-3">{t('contract.productPlan')}</h3>
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
               <div className="text-xs text-subtle">{t('contract.device')}</div>
-              <div className="text-sm font-medium">{contract.product_display_name ?? contract.model_name}</div>
-              {!contract.product_display_name && contract.variant_name && (
+              <div className="text-sm font-medium">{product ?? contract.model_name}</div>
+              {!product && contract.variant_name && (
                 <div className="text-xs text-subtle">{contract.variant_name}</div>
               )}
             </div>

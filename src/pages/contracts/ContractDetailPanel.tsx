@@ -20,7 +20,7 @@ import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { ColorSwatch } from '../../components/ColorAutocomplete';
 import { fmtCurrency } from '../../lib/format';
-import { getStateColor, getStateLabel } from './contractUtils';
+import { getStateColor, getStateLabel, productName } from './contractUtils';
 import { ContractActionButtons } from './ContractActions';
 import { WalletsTab } from './wallet/WalletsTab';
 import { DeviceTab } from './DeviceTab';
@@ -943,7 +943,7 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
                     )}
                   </span>
                 )}
-                <span className="truncate">{contract.product_display_name ?? contract.variant_name ?? contract.model_name ?? '—'}</span>
+                <span className="truncate">{productName(contract.product_display_name) ?? contract.variant_name ?? contract.model_name ?? '—'}</span>
               </div>
             </div>
             {/* Honest identifiers: IMEI and Serial are separate on the asset. Only

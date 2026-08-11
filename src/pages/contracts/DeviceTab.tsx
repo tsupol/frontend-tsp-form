@@ -8,6 +8,7 @@ import { apiClient, ApiError } from '../../lib/api';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { DateTime } from '../../components/DateTime';
 import { getBucketLabel, getBucketColor, codeDisplay } from '../inventory/inventoryUtils';
+import { productName } from './contractUtils';
 import { AssignIcloudModal, ReleaseIcloudModal, IcloudPasswordRow } from './IcloudModals';
 import { AssetScreenTimeSection } from '../../components/AssetScreenTimeSection';
 import { ColorSwatch } from '../../components/ColorAutocomplete';
@@ -236,7 +237,7 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
                         <ColorSwatch size="sm" hex={primaryAsset.master_color_hex} title={`${primaryAsset.physical_color}${primaryAsset.master_color_name_en ? ` · ${primaryAsset.master_color_name_en}` : ''}`} />
                       )}
                     </span>
-                    <span className="truncate">{contract.product_display_name ?? contract.variant_name ?? contract.model_name ?? '—'}</span>
+                    <span className="truncate">{productName(contract.product_display_name) ?? contract.variant_name ?? contract.model_name ?? '—'}</span>
                   </div>
                 </div>
                 {primaryAsset?.imei && (

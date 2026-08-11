@@ -53,3 +53,17 @@ export const STATE_VALUES = [
 export function stateOptions(t: TFunction) {
   return STATE_VALUES.map((v) => ({ value: v, label: getStateLabel(v, t) }));
 }
+
+// ── Product name ────────────────────────────────────────────────────────────
+
+/**
+ * The contract views send a literal `"-"` for `product_display_name` when the
+ * contract has no model picked yet — a placeholder, not a name. Rendering it
+ * raw puts a stray dash where a product should be (and, worse, makes empty
+ * sections look populated). Normalise it to null so the usual
+ * `?? variant_name ?? model_name` fallbacks work as intended.
+ */
+export function productName(value: string | null | undefined): string | null {
+  const v = value?.trim();
+  return v && v !== '-' ? v : null;
+}

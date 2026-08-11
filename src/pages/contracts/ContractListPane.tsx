@@ -10,7 +10,7 @@ import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency } from '../../lib/format';
 import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
-import { getStateColor, getStateLabel, stateOptions } from './contractUtils';
+import { getStateColor, getStateLabel, stateOptions, productName } from './contractUtils';
 import { ContractDetailPanel } from './ContractDetailPanel';
 import { ContractDetailSlot } from './ContractDetailSlot';
 import { OwnerBadge } from '../../components/OwnerBadge';
@@ -411,7 +411,7 @@ export function ContractListPane({
                         <div className="text-xs text-subtle truncate mt-0.5">
                           {contract.customer_name ?? t('contract.noCustomer')}
                           {(() => {
-                            const product = contract.product_display_name ?? contract.variant_name ?? contract.model_name;
+                            const product = productName(contract.product_display_name) ?? contract.variant_name ?? contract.model_name;
                             return product ? ` · ${product}` : '';
                           })()}
                         </div>

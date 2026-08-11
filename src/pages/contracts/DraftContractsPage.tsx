@@ -24,8 +24,9 @@ interface DraftContract {
   variant_id: number | null;
   model_name: string | null;
   variant_name: string | null;
-  // Delivered later on v_saving_contracts (brand+family+variant). Falls back to
-  // variant_name / model_name until the column lands — then upgrades for free.
+  // Brand + family + variant in one line ("Apple iPhone 15 128GB Blue"), which
+  // model_name alone is not ("Base 128GB"). Live on v_saving_contracts; the
+  // variant/model fallback stays for rows that predate it. "-" means no model.
   product_display_name: string | null;
   commission_owner_id: number | null;
   owner_name: string | null;
@@ -210,7 +211,10 @@ export function DraftContractsPage() {
                           <div className="text-xs text-subtle truncate">
                             {contract.customer_name ?? t('contract.noCustomer')}
                             {(() => {
-                              const product = contract.product_display_name ?? contract.variant_name ?? contract.model_name;
+                              // "-" is the view's placeholder for "no model yet",
+                              // not a name — skip it rather than print a dash.
+                              const full = contract.product_display_name === '-' ? null : contract.product_display_name;
+                              const product = full ?? contract.variant_name ?? contract.model_name;
                               return product ? ` · ${product}` : '';
                             })()}
                           </div>

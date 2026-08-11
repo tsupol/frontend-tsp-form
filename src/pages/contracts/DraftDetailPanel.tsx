@@ -6,7 +6,7 @@ import { Copy, Check, Star } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency } from '../../lib/format';
-import { getStateColor, getStateLabel } from './contractUtils';
+import { getStateColor, getStateLabel, productName } from './contractUtils';
 import { ContractActionButtons } from './ContractActions';
 
 interface ContractDetail {
@@ -28,6 +28,10 @@ interface ContractDetail {
   model_name: string | null;
   variant_id: number | null;
   variant_name: string | null;
+  /** Brand + family + variant in one line ("Apple iPhone 15 128GB Blue").
+   *  model_name alone is only the tail of that ("Base 128GB"), which doesn't
+   *  identify the product. The view sends "-" when there's no model yet. */
+  product_display_name: string | null;
   agreed_price: number | null;
   down_payment: number | null;
   insurance_deposit: number | null;
@@ -154,6 +158,7 @@ export function DraftDetailPanel({ contractId, isMobile }: { contractId: number;
 
 function DraftOverviewTab({ contract, t }: { contract: ContractDetail; t: ReturnType<typeof useTranslation>['t'] }) {
   const isFin2 = contract.commercial_model === 'FIN2';
+  const product = productName(contract.product_display_name);
 
   return (
     <div className="p-4 flex flex-col gap-4">
@@ -170,14 +175,18 @@ function DraftOverviewTab({ contract, t }: { contract: ContractDetail; t: Return
         </div>
       </div>
 
-      {contract.model_name && (
+      {(product || contract.model_name) && (
         <div className="border border-line rounded-md px-4 py-3">
           <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-3">{t('contract.productPlan')}</h3>
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
               <div className="text-xs text-subtle">{t('contract.device')}</div>
-              <div className="text-sm font-medium">{contract.model_name}</div>
-              {contract.variant_name && <div className="text-xs text-subtle">{contract.variant_name}</div>}
+              {/* Full product name when we have it; the variant sub-line is
+                  redundant then, since it's already part of that string. */}
+              <div className="text-sm font-medium">{product ?? contract.model_name}</div>
+              {!product && contract.variant_name && (
+                <div className="text-xs text-subtle">{contract.variant_name}</div>
+              )}
             </div>
             <InfoCell label={t('contract.agreedPrice')} value={fmtCurrency(contract.agreed_price)} />
             <InfoCell label={t('contract.downPayment')} value={fmtCurrency(contract.down_payment)} />
