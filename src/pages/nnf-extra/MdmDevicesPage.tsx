@@ -1,48 +1,63 @@
-// MDM Devices — branch-wide device list with the two safest MDM actions
-// (enroll + baseline lock). Spec: UI_FEEDBACK/2026-08-01_IMPLEMENT_mdm_device_list_screen.md.
+// MDM Devices — SEARCH-ONLY screen with the two safest MDM actions (enroll +
+// baseline lock). Spec: UI_FEEDBACK/2026-08-10_IMPLEMENT_mdm_device_search.md,
+// which superseded §7/§9 of the 2026-08-01 list spec. Everything else in the
+// older doc (columns, links, both buttons, auto-poll) still applies.
 //
 // This is the shortcut counterpart to the per-device tab-1 panel (NnfMdmPage):
-// "find the device that needs action → press the button", not "inspect one device".
-// Deep controls (wallpaper / lost mode / app control / pause) stay on tab-1.
+// "find the device in your hand → press the button", not "inspect one device"
+// and not "browse the fleet". Deep controls (wallpaper / lost mode / app control
+// / pause) stay on tab-1.
 //
-// Load-bearing rules from the spec:
-//  - ONE search box, matched against search_key (lowercased) — scan a barcode in.
+// WHY SEARCH-ONLY: staff hold one device and want it enrolled. Listing every
+// unenrolled device to serve that is paying 1,399× the real work — and the old
+// list ordered by the COMPUTED in_mdm column, so PostgreSQL evaluated the whole
+// holding before it could page (491ms, EXPLAIN loops=1399). The RPC is ~90ms and
+// its cost no longer grows with fleet size. There is deliberately no filter-chip
+// or branch dropdown: both only meant something over a full list, and keeping
+// them as client-side filters over a ≤50-row result would quietly answer a
+// different question than the one they appear to ask.
+//
+// Load-bearing rules:
+//  - ONE search box — contract code, asset code, customer name, serial, or IMEI
+//    (full or last 5). Scan a barcode straight in; no "search by" picker.
+//  - The 3-char floor is enforced in the DB, not just here. We still avoid firing
+//    early (UX), and the debounce is 300ms per the spec.
+//  - needs_keyword ≠ no results. "Keep typing" and "nothing matched" must never
+//    look alike — staff read the latter as "this device isn't in the system".
+//  - truncated = show the "narrow your search" hint. There is no pagination: the
+//    RPC caps at 50 and the answer to "too many" is a better keyword.
+//  - After an action the results STAY — no clearing the box, so the next device
+//    can be scanned immediately (owner's intent, carried over from the old spec).
+//  - Auto-poll (20s) only while a row is mid-transition; re-searches the current
+//    keyword, not the fleet.
 //  - Buttons render on every eligible row; the RPCs self-enforce permission, so we
-//    do NOT gate on a may_* column (none exist on this view). A denied lock just
-//    surfaces MDM.AUTH.PERMISSION_DENIED. enroll is safe on every row.
-//  - Lock button needs a p_preview dialog (shows what the device will get) before
-//    the real p_preview:false apply. enroll needs an "scanned into ABM?" reminder.
-//  - Auto-poll (20s): prepare_status / in_mdm change on their own; a stale screen
-//    made a branch think enroll succeeded when it never ran (2026-08-01).
-//  - A row leaves the "not enrolled" filter ONLY when in_mdm flips true — never on
-//    the intermediate PENDING/READY, or the staffer loses the row mid-task.
-//  - Decide lock state from enforcement_badge, never enforcement_level (raw/unreliable).
-//  - Do NOT render prepare_status on this list (owner, 2026-08-05): READY sticks
-//    forever after a successful enroll (105 of ~140 rows), so "profile ready —
-//    erase the device" showed on nearly every row and meant nothing. That advice
-//    only belongs on the per-device screen, and only while in_mdm = false.
-//  - last_seen_at / sim_info (mig 1004): null = not in MDM, render "—" not an
-//    error. sim_info is what the DEVICE reported, not the contract's tel — the
-//    two can differ and that difference is the useful part when chasing a customer.
+//    do NOT gate on a may_* column (none exist). A denied lock surfaces
+//    MDM.AUTH.PERMISSION_DENIED. enroll is safe on every row.
+//  - Lock needs a p_preview dialog before the real p_preview:false apply; enroll
+//    needs the "scanned into ABM?" reminder.
+//  - Decide lock state from enforcement_badge, never enforcement_level (raw).
+//  - Do NOT render prepare_status here (owner, 2026-08-05): READY sticks forever
+//    after a successful enroll, so it showed on nearly every row and meant nothing.
+//  - last_seen_at / sim_info (mig 1004, now on the RPC via mig 1058): null = not
+//    in MDM, render "—" not an error. sim_info is what the DEVICE reported, not
+//    the contract's tel — the difference is the useful part when chasing a customer.
 
-import { useState, useMemo, useRef, useCallback } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import {
-  Button, Input, Select, Badge, Modal, DataTableFooter, MobileHeader,
-  useSnackbarContext,
+  Button, Input, Badge, Modal, MobileHeader, useSnackbarContext,
 } from 'tsp-form';
 import {
   ArrowRightFromLine, Lock, Send, Loader2, CheckCircle, XCircle, AlertTriangle,
-  ExternalLink, KeyRound,
+  ExternalLink, KeyRound, Search,
 } from 'lucide-react';
-import { apiClient } from '../../lib/api';
 import { formatRelativeAgo } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { ColorSwatch } from '../../components/ColorAutocomplete';
 import {
-  prepareAsset, applyLightLock,
+  prepareAsset, applyLightLock, searchMdmDevices,
   type MdmDeviceListRow, type MdmDeviceListBadge, type ApplyTemplateResult,
 } from '../inventory/mdm/mdmApi';
 import { parseMdmError } from '../inventory/mdm/mdmApi';
@@ -57,11 +72,11 @@ import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/sear
 // it's UI visibility of an action, not data scoping.)
 const MAY_REVEAL_ACTIVATION_LOCK = new Set(['COMPANY_ADMIN', 'SYSTEM_DEV']);
 
-type MdmFilter = 'not_enrolled' | 'enrolled' | 'all';
 const POLL_MS = 20_000;
-const PAGE_SIZE_OPTIONS = [50, 100, 200];
+/** RPC default is 20, hard ceiling 50. Past this the answer is a better keyword. */
+const SEARCH_LIMIT = 20;
 
-// Is anything on the current page still moving? PENDING = enroll requested,
+// Is anything in the current result still moving? PENDING = enroll requested,
 // waiting on Apple; APPLYING = a lock template is being pushed. Those are the
 // only states that change without the user acting, so they are the only reason
 // to keep polling. READY is excluded on purpose — it sticks forever after a
@@ -108,71 +123,41 @@ export function MdmDevicesPage() {
   const actorId = user?.user_id ?? null;
   const { addSnackbar } = useSnackbarContext();
 
-  const [filter, setFilter] = useState<MdmFilter>('not_enrolled');
-  const [branchId, setBranchId] = useState<number | null>(null);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const [pageIndex, setPageIndex] = useState(0);
-  const [pageSize, setPageSize] = useState(50);
 
   const [enrollTarget, setEnrollTarget] = useState<MdmDeviceListRow | null>(null);
   const [lockTarget, setLockTarget] = useState<MdmDeviceListRow | null>(null);
   const [revealTarget, setRevealTarget] = useState<MdmDeviceListRow | null>(null);
   const mayRevealLock = MAY_REVEAL_ACTIVATION_LOCK.has(user?.role_code ?? '');
 
-  const buildEndpoint = useCallback(() => {
-    const params: string[] = ['order=in_mdm.asc,asset_id.asc'];
-    if (filter === 'not_enrolled') params.push('in_mdm=is.false');
-    else if (filter === 'enrolled') params.push('in_mdm=is.true');
-    if (branchId != null) params.push(`branch_id=eq.${branchId}`);
-    if (search.trim()) params.push(`search_key=like.*${encodeURIComponent(search.trim().toLowerCase())}*`);
-    return `/v_mdm_device_list?${params.join('&')}`;
-  }, [filter, branchId, search]);
-
+  // `enabled` keeps the screen silent until the keyword is long enough — the
+  // empty state is the resting state here, not an unfiltered list.
   const { data, isError, error, isFetching, refetch } = useQuery({
-    queryKey: ['mdm-device-list', filter, branchId, search, pageIndex, pageSize],
-    queryFn: () => apiClient.getPaginated<MdmDeviceListRow>(buildEndpoint(), { page: pageIndex + 1, pageSize }),
+    queryKey: ['mdm-device-search', search],
+    queryFn: () => searchMdmDevices(search, SEARCH_LIMIT),
+    enabled: isSearchable(search),
     placeholderData: keepPreviousData,
-    // Poll only while something on screen is actually mid-transition. The 20s
-    // timer used to run forever on every page, and this view is expensive: it
-    // orders by the computed in_mdm, so PostgreSQL evaluates every device in the
-    // holding before it can page (measured 491ms for 232 rows; EXPLAIN shows
-    // loops=1399). A settled list has nothing to re-read — an enroll or lock
-    // calls refetch() directly, which is what re-arms this.
-    refetchInterval: (q) => (hasPendingRow(q.state.data?.data) ? POLL_MS : false),
+    // Poll only while a row on screen is mid-transition (enroll awaiting Apple, or
+    // a lock being pushed). Re-runs the current keyword only — never the fleet.
+    // A settled result has nothing to re-read; enroll/lock call refetch() directly.
+    refetchInterval: (q) => (hasPendingRow(q.state.data?.devices) ? POLL_MS : false),
     refetchIntervalInBackground: false,
     staleTime: 0,
   });
 
-  const rows = data?.data ?? [];
-  const totalCount = data?.totalCount ?? 0;
+  const rows = data?.devices ?? [];
+  const truncated = data?.truncated === true;
 
-  // Branch dropdown comes from v_branches (RLS-scoped to what the user can see),
-  // NOT from the device rows. Deriving it from rows only listed branches that
-  // already had an MDM-known device — and only those on the current page — so a
-  // company user saw an incomplete branch list (2026-08-02 report).
-  const { data: branches } = useQuery({
-    queryKey: ['mdm-branches'],
-    queryFn: () => apiClient.get<{ id: number; name: string }[]>('/v_branches?is_active=is.true&order=name&select=id,name'),
-    staleTime: 5 * 60 * 1000,
-  });
-  const branchOptions = useMemo(
-    () => (branches ?? []).map((b) => ({ value: String(b.id), label: b.name })),
-    [branches],
-  );
-  // A branch-scoped user only sees their own branch → dropdown hides.
-  const showBranchDropdown = branchOptions.length > 1 || branchId != null;
-
-  // Below SEARCH_MIN_CHARS the keyword is dropped rather than sent: a 1-2 char
-  // `search_key=like.*x*` matches most of the fleet, so the server evaluates the
-  // whole view to return a page of noise. Empty box = unfiltered list (the
-  // filter chips still work); partial keyword = hint, no request.
+  // Below SEARCH_MIN_CHARS we don't fire at all: the RPC would return empty with
+  // needs_keyword anyway, so the request buys nothing. Clearing `search` also
+  // disables the query, which is what empties the screen when the box is cleared.
   const handleSearch = (value: string) => {
     setSearchInput(value);
     clearTimeout(searchTimer.current);
     const next = isSearchable(value) ? value.trim() : '';
-    searchTimer.current = setTimeout(() => { setSearch(next); setPageIndex(0); }, 300);
+    searchTimer.current = setTimeout(() => setSearch(next), 300);
   };
 
   const okSnack = (msg: string) => addSnackbar({
@@ -183,12 +168,6 @@ export function MdmDevicesPage() {
     message: <div className="alert alert-danger"><XCircle size={18} /><div><div className="alert-title">{msg}</div></div></div>,
     type: 'error', duration: 5000,
   });
-
-  const filterChips: { key: MdmFilter; label: string }[] = [
-    { key: 'not_enrolled', label: t('mdmDevices.filter.notEnrolled') },
-    { key: 'enrolled', label: t('mdmDevices.filter.enrolled') },
-    { key: 'all', label: t('mdmDevices.filter.all') },
-  ];
 
   return (
     <>
@@ -211,47 +190,17 @@ export function MdmDevicesPage() {
           <h1 className="heading-2">{t('mdmDevices.title')}</h1>
         </div>
 
-        {/* Filter chips + search + branch */}
-        <div className="flex-none pb-4 flex flex-col gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            {filterChips.map((chip) => (
-              <button
-                key={chip.key}
-                type="button"
-                onClick={() => { setFilter(chip.key); setPageIndex(0); }}
-                className={`px-3 py-1.5 rounded-md text-sm transition-colors cursor-pointer ${
-                  filter === chip.key
-                    ? 'bg-item-active-bg text-item-active-fg font-medium'
-                    : 'text-item-fg hover:bg-item-hover-bg'
-                }`}
-              >
-                {chip.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="flex-1 min-w-0 md:max-w-72">
-              <Input
-                placeholder={t('mdmDevices.searchPlaceholder')}
-                value={searchInput}
-                onChange={(e) => handleSearch(e.target.value)}
-                size="sm"
-                className="w-full"
-              />
-            </div>
-            {showBranchDropdown && (
-              <div style={{ width: '14rem' }}>
-                <Select
-                  options={branchOptions}
-                  value={branchId != null ? String(branchId) : null}
-                  onChange={(val) => { setBranchId(val ? Number(val) : null); setPageIndex(0); }}
-                  placeholder={t('mdmDevices.allBranches')}
-                  size="sm"
-                  showChevron
-                  clearable
-                />
-              </div>
-            )}
+        {/* One box. Scan or type — no filters, no scope picker (see header note). */}
+        <div className="flex-none pb-4">
+          <div className="max-w-lg">
+            <Input
+              placeholder={t('mdmDevices.searchPlaceholder')}
+              value={searchInput}
+              onChange={(e) => handleSearch(e.target.value)}
+              size="sm"
+              className="w-full"
+              startIcon={<Search size={15} />}
+            />
           </div>
         </div>
 
@@ -266,38 +215,45 @@ export function MdmDevicesPage() {
           <div className={`flex-1 min-h-0 flex flex-col ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
             <div className="flex-1 overflow-auto better-scroll pb-8">
               {rows.length === 0 ? (
-                <div className="p-8 text-center text-subtle">
-                  {/* "keep typing" and "nothing matched" must not look alike —
-                      staff read the latter as "the system has no such device". */}
-                  {isBelowSearchMin(searchInput)
-                    ? t('mdmDevices.searchMinHint', { min: SEARCH_MIN_CHARS })
-                    : t('mdmDevices.noResults')}
+                <div className="p-8 text-center text-subtle flex flex-col items-center gap-2">
+                  {/* Three DIFFERENT answers that must never look alike:
+                      empty box   → "scan or type to find a device" (resting state)
+                      1-2 chars   → "keep typing" (a search is pending)
+                      3+, no hits → "nothing matched" — staff read anything else
+                                    here as "this device isn't in the system". */}
+                  <Search size={28} className="text-subtler" />
+                  <span>
+                    {searchInput.trim().length === 0
+                      ? t('mdmDevices.searchPrompt')
+                      : isBelowSearchMin(searchInput)
+                        ? t('mdmDevices.searchMinHint', { min: SEARCH_MIN_CHARS })
+                        : t('mdmDevices.noResults')}
+                  </span>
                 </div>
               ) : (
-                <div className="flex flex-col divide-y divide-line border-b border-line">
-                  {rows.map((row) => (
-                    <DeviceRow
-                      key={row.asset_id}
-                      row={row}
-                      onOpenAsset={() => navigate(`/admin/inventory/assets/${row.asset_id}`)}
-                      onOpenContract={() => row.contract_id && navigate(`/admin/contracts/search/${row.contract_id}`)}
-                      onEnroll={() => setEnrollTarget(row)}
-                      onLock={() => setLockTarget(row)}
-                      onRevealLock={mayRevealLock ? () => setRevealTarget(row) : null}
-                    />
-                  ))}
-                </div>
+                <>
+                  <div className="flex flex-col divide-y divide-line border-b border-line">
+                    {rows.map((row) => (
+                      <DeviceRow
+                        key={row.asset_id}
+                        row={row}
+                        onOpenAsset={() => navigate(`/admin/inventory/assets/${row.asset_id}`)}
+                        onOpenContract={() => row.contract_id && navigate(`/admin/contracts/search/${row.contract_id}`)}
+                        onEnroll={() => setEnrollTarget(row)}
+                        onLock={() => setLockTarget(row)}
+                        onRevealLock={mayRevealLock ? () => setRevealTarget(row) : null}
+                      />
+                    ))}
+                  </div>
+                  {/* Capped, not paged — the fix for "too many" is a better keyword. */}
+                  {truncated && (
+                    <div className="pt-3 text-xs text-subtle text-center">
+                      {t('mdmDevices.truncatedHint', { count: rows.length })}
+                    </div>
+                  )}
+                </>
               )}
             </div>
-            <DataTableFooter
-              currentPage={pageIndex + 1}
-              totalPages={Math.max(1, Math.ceil(totalCount / pageSize))}
-              onPageChange={(p) => setPageIndex(p - 1)}
-              pageSize={pageSize}
-              pageSizeOptions={PAGE_SIZE_OPTIONS}
-              onPageSizeChange={(ps) => { setPageSize(ps); setPageIndex(0); }}
-              totalRows={totalCount}
-            />
           </div>
         )}
       </div>

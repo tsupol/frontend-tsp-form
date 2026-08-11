@@ -335,11 +335,20 @@ export function revealActivationLock(
   });
 }
 
-// ── MDM Devices list screen (v_mdm_device_list, mig 940; doc IMPLEMENT 2026-08-01) ──
-// A branch-wide "which device needs action?" list — the shortcut counterpart to the
-// per-device tab-1 panel. 27 columns, RLS-scoped by role, no permission columns
-// (the two RPCs — fn_mdm_prepare_asset / fn_mdm_apply_template — self-enforce).
+// ── MDM Devices search screen (fn_mdm_device_search, mig 1052 + 1058) ────────
+// Search-only: the screen loads nothing until 3+ characters are typed or scanned.
+// Replaced the old full-list read of v_mdm_device_list, which ordered by the
+// COMPUTED in_mdm column and so evaluated every device in the holding to return
+// one page (491ms / EXPLAIN loops=1399, vs ~90ms here).
+// Doc: UI_FEEDBACK/2026-08-10_IMPLEMENT_mdm_device_search.md.
+//
+// The row shape is the view's, unchanged — mig 1058 added last_seen_at + sim_info
+// so the RPC returns exactly what the view does. v_mdm_device_list still exists
+// and tab-1 / nnf-ops still read it; this screen must not.
+//
 // enforcement_badge here is COARSER than tab-1 (ENFORCED lumps MEDIUM/HARD/…).
+// The two action RPCs (fn_mdm_prepare_asset / fn_mdm_apply_template) self-enforce
+// permission, so there are no may_* columns to check.
 
 export type MdmDeviceListBadge = 'NOT_IN_MDM' | 'APPLYING' | 'NONE' | 'LIGHT' | 'ENFORCED';
 export type MdmPrepareStatus = 'PENDING' | 'READY' | 'NOT_ON_SERVER' | 'ERROR' | null;
@@ -379,6 +388,34 @@ export interface MdmDeviceListRow {
    *  tel. Already assembled by the DB (multi-SIM joined with `·`, a removed SIM
    *  tagged "(ถอดแล้ว)") — never join or compose it ourselves. */
   sim_info: string | null;
+}
+
+/** Hard floor enforced by the RPC itself, not just here — see SEARCH_MIN_CHARS. */
+export interface MdmDeviceSearchResult {
+  devices: MdmDeviceListRow[];
+  count: number;
+  /** True when the keyword was shorter than 3 chars. NOT an error, and NOT
+   *  "no results" — the two must read differently on screen. */
+  needs_keyword: boolean;
+  min_keyword_length?: number;
+  limit?: number;
+  /** More matched than `limit` — tell the user to narrow, don't paginate. */
+  truncated?: boolean;
+}
+
+/**
+ * Search devices by contract code / asset code / customer name / serial / IMEI
+ * (full or last 5). Barcode scans go straight in — no "search by" picker.
+ *
+ * Returns empty with `needs_keyword: true` below 3 characters no matter what the
+ * caller sends; the floor lives in the DB so a future screen can't reintroduce
+ * the full-fleet load. Callers should still avoid firing early (UX, not safety).
+ */
+export function searchMdmDevices(keyword: string, limit = 20): Promise<MdmDeviceSearchResult> {
+  return apiClient.rpc<MdmDeviceSearchResult>('fn_mdm_device_search', {
+    p_keyword: keyword,
+    p_limit: limit,
+  });
 }
 
 // enroll button — no p_actor_id, no preview; RPC dedupes + self-enforces.
