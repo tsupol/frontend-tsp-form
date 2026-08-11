@@ -338,6 +338,7 @@ function SilentTab({ rows, totalCount, loading, error, fetching, showBranch, pag
 
 function SilentCard({ row, showBranch }: { row: MdmSilentRow; showBranch: boolean }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
 
   return (
     <div className="rounded-lg border border-line bg-surface p-3.5">
@@ -346,6 +347,21 @@ function SilentCard({ row, showBranch }: { row: MdmSilentRow; showBranch: boolea
         <span className="shrink-0 text-sm tabular-nums">{t('nnfMdm.silentFor', { n: row.silent_days })}</span>
       </div>
       <div className="mt-2.5 pt-2.5 border-t border-line-subtle flex items-center gap-x-2.5 gap-y-1 flex-wrap text-xs text-subtle">
+        {/* Which contract this silent device belongs to — keyed on contract_id,
+            never the display code (IMPLEMENT 2026-08-11 §3). */}
+        {row.contract_id && row.contract_code && (
+          <button
+            type="button"
+            onClick={() => navigate(`/admin/contracts/search/${row.contract_id}`)}
+            className="text-xs font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer tabular-nums"
+          >
+            {row.contract_code}
+            <ExternalLink size={11} />
+          </button>
+        )}
+        {row.contract_state && (
+          <span>{t(`contract.state_${row.contract_state}`, { defaultValue: row.contract_state })}</span>
+        )}
         <Badge size="xs" color={getBucketColor(row.current_bucket)}>
           {getBucketLabel(row.current_bucket, t)}
         </Badge>

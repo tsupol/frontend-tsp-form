@@ -2870,6 +2870,39 @@
           }
         }
       },
+      "challenge": {
+        "serialLabel": "Device serial",
+        "waitHint": "Read the serial above and make sure it is the right device.",
+        "typeHint": "Type the code shown to confirm.",
+        "inputPlaceholder": "Confirmation code",
+        "expired": "This confirmation expired. Close and start again."
+      },
+      "danger": {
+        "heading": "Remove from enforcement",
+        "intro": "Company-level actions. Each one asks you to confirm the serial and retype a code.",
+        "noSerial": "This asset has no serial number, so these actions are unavailable.",
+        "nothingToRemove": "There is no enforcement profile on this device to remove.",
+        "wouldBrick": "Activation Lock is on and there is no bypass key on file — erasing would leave the device unusable. Get the unlock code first.",
+        "noChallenge": "The server did not return a confirmation for this action. Try again.",
+        "removeButton": "Remove enforcement",
+        "removeTitle": "Remove enforcement",
+        "removeBody": "This takes the lock profile off the device. If the contract is still overdue, dunning will re-apply it on the next pass.",
+        "removeConfirm": "Remove enforcement",
+        "removeDone": "Enforcement profile removed.",
+        "dryRunButton": "Test first (dry run)",
+        "dryRunTitle": "Test erase (dry run)",
+        "dryRunBody": "This checks that the erase command reaches the device. Nothing is wiped.",
+        "dryRunConfirm": "Run the test",
+        "dryRunDone": "Dry run passed. You can now erase the device for real.",
+        "dryRunFirstHint": "Run the test first — a real erase is only accepted within an hour of a passing test.",
+        "dryRunFreshUntil": "Test passed. Real erase available until",
+        "eraseButton": "Erase device",
+        "eraseTitle": "Erase this device",
+        "eraseBody": "This wipes the device. Everything on it is lost and this cannot be undone.",
+        "eraseConfirm": "Erase for real",
+        "eraseQueued": "Erase command sent to the device.",
+        "revealButton": "Activation Lock codes"
+      },
       "refreshAll": "Refresh all"
     },
     "icloud_appleOnly": "iCloud applies to Apple devices only.",
@@ -4728,6 +4761,7 @@
     "action_settlement_refund": "Holding refund",
     "settlementRefund_notePlaceholder": "Reason for the negotiated refund",
     "goToDeviceTabToUnbind": "Unbind the device first",
+    "goToRepairTicket": "Open repair ticket {{code}}",
     "action_resume": "Resume",
     "action_resume_success": "Contract resumed",
     "action_appointment_create": "Create Appointment",

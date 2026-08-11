@@ -8,6 +8,12 @@
 //   until <date>        → pause to an appointment
 //   indefinite          → legal hold; needs may_pause_indefinite
 //   one active pause per device — ALREADY_PAUSED points back to the existing row
+//
+// Below the pause block sits MdmDangerZone (IMPLEMENT 2026-08-11): removing
+// enforcement outright, erasing, and revealing the Activation Lock codes. Same
+// tab because this is the "take the device out from under enforcement" screen and
+// pause is only its temporary form. Those are company_admin-only and hide
+// themselves; everything above stays on the existing may_pause flags.
 // ============================================================================
 
 import { useState } from 'react';
@@ -23,6 +29,7 @@ import {
 } from './mdmApi';
 import { MDM_NO_CACHE } from './useMdmStatus';
 import { MdmErrorAlert } from './MdmSharedBits';
+import { MdmDangerZone } from './MdmDangerZone';
 
 export function SubTabPause({
   status,
@@ -203,6 +210,10 @@ export function SubTabPause({
           </div>
         </div>
       )}
+
+      {/* Renders nothing unless the user holds at least one of the three
+          company-level capabilities. */}
+      <MdmDangerZone status={status} onChanged={refresh} />
     </div>
   );
 }

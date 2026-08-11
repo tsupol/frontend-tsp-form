@@ -765,6 +765,131 @@ export function resumeEnforcement(pauseId: number, reason?: string): Promise<{ p
   return apiClient.rpc('fn_mdm_resume_enforcement', { p_pause_id: pauseId, p_reason: reason ?? null });
 }
 
+// ── Sub-tab 7, company_admin: remove enforcement + erase (migs 224–227) ──────
+// IMPLEMENT 2026-08-11_mdm_remove_enforcement_and_erase.md.
+//
+// Both are two-beat: preview=true mints a CHALLENGE, preview=false consumes it.
+// The 4-digit code is minted by the SERVER on preview and never by us — the UI
+// only displays it and compares typing to enable the button; the real check is
+// the server consuming the challenge. One use, 3-minute expiry, bound to
+// serial+action+caller. A commit fired inside the countdown gets
+// CHALLENGE_TOO_SOON, so the countdown is a courtesy, not the control.
+//
+// Permissions are COMPANY-scoped and resolve from the ASSET's holding/company,
+// so they survive the binding being gone (a repossessed / unbound device is
+// exactly when these get used). Hide by capability, not role — the RPC rejects
+// anyway, but a visible button nobody may press generates support calls.
+
+export interface MdmChallenge {
+  challenge_id: number;
+  /** Server-minted. Display it; never generate or guess one. */
+  confirm_code: string;
+  countdown_seconds: number;
+  earliest_confirm_at: string;
+  expires_at: string;
+}
+
+export interface MdmRemoveEnforcementPreview {
+  preview: true;
+  serial: string;
+  /** Profile identifiers that would come off. Empty/absent when nothing to do. */
+  would_remove?: string[];
+  /** true → no profile to strip; there is NO challenge and no dialog to open. */
+  nothing_to_remove?: boolean;
+  challenge?: MdmChallenge;
+  /** Dunning re-locks a still-overdue device on the next reconciler pass. Always
+   *  show this — the operator must know the unlock may not stick. */
+  reconciler_note?: string | null;
+}
+
+export interface MdmRemoveEnforcementResult {
+  preview: false;
+  serial: string;
+  result?: unknown;
+  reconciler_note?: string | null;
+}
+
+export function removeEnforcementPreview(
+  serial: string,
+  actorId: number,
+): Promise<MdmRemoveEnforcementPreview> {
+  return apiClient.rpc<MdmRemoveEnforcementPreview>('fn_mdm_remove_enforcement', {
+    p_serial: serial,
+    p_actor_id: actorId,
+    p_preview: true,
+  });
+}
+
+export function removeEnforcementCommit(
+  serial: string,
+  actorId: number,
+  challengeId: number,
+  confirmCode: string,
+): Promise<MdmRemoveEnforcementResult> {
+  return apiClient.rpc<MdmRemoveEnforcementResult>('fn_mdm_remove_enforcement', {
+    p_serial: serial,
+    p_actor_id: actorId,
+    p_preview: false,
+    p_challenge_id: challengeId,
+    p_confirm_code: confirmCode,
+  });
+}
+
+export interface MdmErasePreview {
+  preview: true;
+  serial: string;
+  wet: boolean;
+  /** Activation Lock on with no bypass key on file = erasing bricks the device.
+   *  The BE refuses with ERASE_WOULD_BRICK; these two let us say so up front. */
+  activation_lock: boolean;
+  has_bypass_key: boolean;
+  challenge?: MdmChallenge;
+  note?: string | null;
+}
+
+export interface MdmEraseResult {
+  preview: false;
+  serial: string;
+  wet: boolean;
+  intent_id?: number | null;
+  dry_run?: boolean;
+  note?: string | null;
+}
+
+/** `wet=false` is a DRY RUN — it exercises the chain and wipes nothing. The DB
+ *  requires a successful dry run within the last hour before it will accept a
+ *  wet erase (else ERASE_DRY_RUN_REQUIRED_FIRST), so both rounds are real calls
+ *  with their own challenge. */
+export function erasePreview(
+  serial: string,
+  actorId: number,
+  wet: boolean,
+): Promise<MdmErasePreview> {
+  return apiClient.rpc<MdmErasePreview>('fn_mdm_erase_device', {
+    p_serial: serial,
+    p_actor_id: actorId,
+    p_preview: true,
+    p_wet: wet,
+  });
+}
+
+export function eraseCommit(
+  serial: string,
+  actorId: number,
+  wet: boolean,
+  challengeId: number,
+  confirmCode: string,
+): Promise<MdmEraseResult> {
+  return apiClient.rpc<MdmEraseResult>('fn_mdm_erase_device', {
+    p_serial: serial,
+    p_actor_id: actorId,
+    p_preview: false,
+    p_wet: wet,
+    p_challenge_id: challengeId,
+    p_confirm_code: confirmCode,
+  });
+}
+
 // ============================================================================
 // Error normalisation (§11.4) — the one place MDM errors get decoded.
 //

@@ -1377,6 +1377,7 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
   ) => void;
 }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const invalidate = useContractInvalidate(contract.id);
 
   const [view, setView] = useState<'form' | 'done'>('form');
@@ -1390,6 +1391,10 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
   const [newOwnerId, setNewOwnerId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [errorCode, setErrorCode] = useState<string | null>(null);
+  /** Backend `error.params` — carries the ids a blocked action needs to link
+   *  onward (e.g. repair_id for DEVICE_IN_REPAIR). Kept beside errorCode
+   *  because the translated string alone can't be turned back into a route. */
+  const [errorParams, setErrorParams] = useState<Record<string, unknown> | null>(null);
   const [errorKey, setErrorKey] = useState(0);
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const config = action ? ACTION_CONFIGS[action] : null;
@@ -1409,6 +1414,7 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
       setNewOwnerId(null);
       setError('');
       setErrorCode(null);
+      setErrorParams(null);
       setResult(null);
     }
   }, [open, action]);
@@ -1576,9 +1582,11 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
         const translated = translateApiError(err, t);
         setError(translated || err.message);
         setErrorCode(err.code ?? err.messageKey ?? null);
+        setErrorParams(err.messageParams ?? null);
       } else {
         setError(String(err));
         setErrorCode(null);
+        setErrorParams(null);
       }
       setErrorKey(k => k + 1);
     },
@@ -1636,6 +1644,21 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
                       className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer self-start"
                     >
                       {t('contract.goToSigningTabToVoidAddendum', { defaultValue: 'Void the addendum in the Signing tab' })}
+                      <ExternalLink size={12} />
+                    </button>
+                  )}
+                  {/* Unbind blocked by an open repair ticket (mig 1061). The BE
+                      now answers 409 + repair_id/repair_code_display instead of a
+                      bare 500, so we can send the user straight to the ticket they
+                      have to close. Link keyed on repair_id — the display code
+                      isn't a lookup key. Not retryable: no "try again" button. */}
+                  {errorCode === 'SALE.STATE.DEVICE_IN_REPAIR' && errorParams?.repair_id != null && (
+                    <button
+                      type="button"
+                      onClick={() => { onClose(); navigate(`/admin/inventory/repairs/${errorParams.repair_id}`); }}
+                      className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer self-start"
+                    >
+                      {t('contract.goToRepairTicket', { code: String(errorParams.repair_code_display ?? '') })}
                       <ExternalLink size={12} />
                     </button>
                   )}

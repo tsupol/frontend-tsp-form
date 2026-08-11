@@ -30,8 +30,11 @@ import { parseMdmError, revealActivationLock } from '../inventory/mdm/mdmApi';
 import type { MdmActivationLockKey, MdmActivationLockReveal } from '../inventory/mdm/mdmApi';
 
 interface Props {
-  /** Null when closed. The modal stays mounted; `open` drives visibility. */
-  target: { asset_id: number; asset_code_display: string; serial_number: string | null } | null;
+  /** Null when closed. The modal stays mounted; `open` drives visibility.
+   *  `asset_code_display` is what we show BEFORE the reveal returns; callers
+   *  that don't have it (the asset MDM tab reads a status row without an asset
+   *  code) pass null and the line fills in from the RPC's own asset_code. */
+  target: { asset_id: number; asset_code_display?: string | null; serial_number: string | null } | null;
   onClose: () => void;
 }
 
@@ -116,7 +119,7 @@ export function ActivationLockRevealModal({ target, onClose }: Props) {
             {result?.serial_number ?? target?.serial_number ?? '—'}
             {result?.model && <span className="text-subtle font-normal"> · {result.model}</span>}
           </div>
-          <div className="text-xs text-subtle">{result?.asset_code ?? target?.asset_code_display}</div>
+          <div className="text-xs text-subtle">{result?.asset_code ?? target?.asset_code_display ?? ''}</div>
         </div>
 
         {!result ? (

@@ -2866,6 +2866,39 @@
           }
         }
       },
+      "challenge": {
+        "serialLabel": "ซีเรียลเครื่อง",
+        "waitHint": "อ่านซีเรียลด้านบนให้แน่ใจว่าเป็นเครื่องที่ต้องการ",
+        "typeHint": "พิมพ์เลขที่แสดงเพื่อยืนยัน",
+        "inputPlaceholder": "เลขยืนยัน",
+        "expired": "การยืนยันนี้หมดอายุแล้ว ปิดแล้วเริ่มใหม่"
+      },
+      "danger": {
+        "heading": "ถอดออกจากการบังคับใช้",
+        "intro": "เป็นคำสั่งระดับบริษัท ทุกปุ่มต้องยืนยันซีเรียลและพิมพ์เลขยืนยันซ้ำ",
+        "noSerial": "เครื่องนี้ไม่มีซีเรียล จึงใช้คำสั่งเหล่านี้ไม่ได้",
+        "nothingToRemove": "เครื่องนี้ไม่มีโปรไฟล์บังคับใช้ให้ถอด",
+        "wouldBrick": "เครื่องติด Activation Lock และไม่มีรหัสปลดในระบบ — ถ้าล้างจะใช้เครื่องต่อไม่ได้ ให้ดูรหัสปลดก่อน",
+        "noChallenge": "เซิร์ฟเวอร์ไม่ได้ส่งการยืนยันสำหรับคำสั่งนี้ ลองใหม่อีกครั้ง",
+        "removeButton": "ถอด enforcement",
+        "removeTitle": "ถอด enforcement",
+        "removeBody": "จะถอดโปรไฟล์ล็อกออกจากเครื่อง ถ้าสัญญายังค้างชำระ ระบบ dunning จะใส่ล็อกกลับในรอบถัดไป",
+        "removeConfirm": "ถอด enforcement",
+        "removeDone": "ถอดโปรไฟล์บังคับใช้แล้ว",
+        "dryRunButton": "ทดสอบก่อน (dry run)",
+        "dryRunTitle": "ทดสอบล้างเครื่อง (dry run)",
+        "dryRunBody": "เป็นการตรวจว่าคำสั่งล้างส่งถึงเครื่องหรือไม่ ไม่มีการล้างข้อมูลจริง",
+        "dryRunConfirm": "เริ่มทดสอบ",
+        "dryRunDone": "ทดสอบผ่านแล้ว ล้างเครื่องจริงได้",
+        "dryRunFirstHint": "ต้องทดสอบก่อน — ระบบรับคำสั่งล้างจริงเฉพาะภายใน 1 ชั่วโมงหลังทดสอบผ่าน",
+        "dryRunFreshUntil": "ทดสอบผ่านแล้ว ล้างจริงได้ถึง",
+        "eraseButton": "ล้างเครื่อง",
+        "eraseTitle": "ล้างเครื่องนี้",
+        "eraseBody": "จะล้างเครื่องทั้งหมด ข้อมูลในเครื่องหายถาวรและย้อนกลับไม่ได้",
+        "eraseConfirm": "ล้างจริง",
+        "eraseQueued": "ส่งคำสั่งล้างเครื่องแล้ว",
+        "revealButton": "รหัสปลด Activation Lock"
+      },
       "refreshAll": "รีเฟรชทั้งหมด"
     },
     "icloud_appleOnly": "iCloud ใช้ได้เฉพาะเครื่อง Apple เท่านั้น",
@@ -4722,6 +4755,7 @@
     "action_settlement_refund": "คืนเงินเจรจา",
     "settlementRefund_notePlaceholder": "เหตุผลการคืนเงินเจรจา",
     "goToDeviceTabToUnbind": "ถอดเครื่องออกจากสัญญาก่อน",
+    "goToRepairTicket": "เปิดใบซ่อม {{code}}",
     "action_resume": "เปิดสัญญาต่อ",
     "action_resume_success": "เปิดสัญญาต่อสำเร็จ",
     "action_appointment_create": "นัดชำระ",
