@@ -829,6 +829,8 @@
   "mdm.internal.escrow_retrieve_failed": "Couldn't retrieve the unlock code. Try again, then contact the systems team.",
   "MDM.NOT_FOUND.ASSET_FOR_SERIAL": "No device in the system matches this serial number.",
   "mdm.not_found.asset_for_serial": "No device in the system matches this serial number.",
+  "MDM.NOT_FOUND.DEVICE_SERIAL": "This serial isn't enrolled in MDM, so no command can be sent to it.",
+  "mdm.not_found.device_serial": "This serial isn't enrolled in MDM, so no command can be sent to it.",
   "MDM.VALIDATION.CHALLENGE_REQUIRED": "This action needs to be confirmed again — close and start over.",
   "mdm.validation.challenge_required": "This action needs to be confirmed again — close and start over.",
   "MDM.AUTH.CHALLENGE_INVALID": "That code is wrong, expired, or already used — close and start over.",
