@@ -1,254 +1,121 @@
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/api';
+import { wsClient } from '../lib/api/ws';
 import { useAuth } from '../contexts/AuthContext';
-import { defaultScopeFor, scopeQuery, scopeQueryRollup, scopeKey } from '../lib/scope';
+import { defaultScopeFor, scopeCounterParams, scopeCountersChannel, scopeKey } from '../lib/scope';
 
 // Shared count queries powering badges in both the global AppSideNav and the
 // per-section page sub-nav strips (ContractsLayout, etc.). Query keys match
 // across consumers so React Query dedupes to a single fetch.
 //
 // Side-menu badges always use the user's default scope (independent of any
-// dashboard scope picker). Backend RLS leaks on these views — must send the
-// explicit scope filter, see UI_FEEDBACK/2026-05-06_dashboard_endpoints.md.
+// dashboard scope picker).
+//
+// All 16 counters come from ONE RPC (`fn_branch_dashboard_counters`, mig 1067).
+// This replaced 15 separate `Prefer: count=exact` view queries — each of which
+// ran its view twice with no cap. Do not add a badge by fetching a view here;
+// ask BE to add a key to the RPC.
+// See UI_FEEDBACK/2026-08-11_DELIVERY_counters_rpc_confirmed_filters.md.
 
 // Badges render "99+" past this (AppSideNav.iconWithCount), so counts only need
-// to be exact below it. Keep in sync with that threshold.
+// to be exact below it. The RPC caps every value at 100 server-side ("≥100").
 export const NAV_COUNT_CAP = 99;
 
+// Rule 1 of the WS contract: an event says "something changed", never what. Wait
+// this long, drop events arriving mid-wait, then refetch once. This is the shield
+// against a busy branch hour turning every write into a request.
+const WS_REFETCH_DEBOUNCE_MS = 3_000;
+
+// Rule 4: the poll stays as a fallback, just slower. Some badges change with the
+// clock and not with any write (midnight rollover, deposit deadlines passing,
+// overnight dunning assignment) — no event can ever cover those.
+const FALLBACK_POLL_MS = 300_000;
+
+interface CountersResponse {
+  capped_at: number;
+  counters: Record<string, number>;
+}
+
 export function useNavCounts() {
-  const { user, can } = useAuth();
+  const { user } = useAuth();
   const role = user?.role_code ?? '';
-  const canApprove = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
   const isBranchUser = role === 'BRANCH_STAFF' || role === 'BRANCH_MANAGER';
-  const canChat = can('CONTRACT.CHAT');
 
   const scope = defaultScopeFor(user);
   const sk = scopeKey(scope);
-  const sqr = scopeQueryRollup(scope);
-  const sq = scopeQuery(scope);
+  const queryClient = useQueryClient();
+  const queryKey = ['nav', 'counters', sk];
 
-  const { data: approvalsRows } = useQuery({
-    queryKey: ['nav', 'pending-approvals-summary', sk],
-    queryFn: () => apiClient.get<{ pending_count: number }[]>(
-      `/v_dashboard_pending_approvals_summary?select=pending_count,pending_amount${sqr}`,
+  const { data } = useQuery({
+    queryKey,
+    queryFn: () => apiClient.rpc<CountersResponse>(
+      'fn_branch_dashboard_counters',
+      scopeCounterParams(scope),
     ),
-    enabled: canApprove,
-    refetchInterval: 60_000,
-    refetchOnWindowFocus: true,
-  });
-  const pendingApprovals = approvalsRows?.[0]?.pending_count ?? 0;
-
-  const { data: slipsRows } = useQuery({
-    queryKey: ['nav', 'pending-submissions-summary', sk],
-    queryFn: () => apiClient.get<{ pending_count: number }[]>(
-      `/v_dashboard_payment_submissions_summary?select=pending_count,pending_amount${sqr}`,
-    ),
-    refetchInterval: 60_000,
+    refetchInterval: FALLBACK_POLL_MS,
     refetchOnWindowFocus: true,
     retry: false,
   });
-  const pendingSlips = slipsRows?.[0]?.pending_count ?? 0;
 
-  // Selects the superset DashboardPage needs, not just the two fields the badge
-  // reads. Both share this query key, so whichever mounted first used to win the
-  // cache — when it was this one, the dashboard's "overdue by N days / ฿X"
-  // subtitle silently vanished, because max_days_overdue came back undefined and
-  // the line is conditional on it being > 0. Same key must mean same shape.
-  const { data: unclosedRows } = useQuery({
-    queryKey: ['nav', 'unclosed-summary', sk],
-    queryFn: () => apiClient.get<{
-      unclosed_day_count: number;
-      unclosed_branch_count: number;
-      unclosed_amount: number;
-      max_days_overdue: number;
-    }[]>(
-      `/v_dashboard_unclosed_summary?select=unclosed_day_count,unclosed_branch_count,unclosed_amount,max_days_overdue${sqr}`,
-    ),
-    refetchInterval: 60_000,
-    refetchOnWindowFocus: true,
-  });
-  const unclosedRow = unclosedRows?.[0];
-  const unclosedCount = isBranchUser
-    ? (unclosedRow?.unclosed_day_count ?? 0)
-    : (unclosedRow?.unclosed_branch_count ?? 0);
+  // WS-driven refetch. The channel matches the scope tier the user belongs to;
+  // SYSTEM_DEV unscoped has no channel and rides the fallback poll alone.
+  const channel = scopeCountersChannel(scope);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const { data: pairingCountData } = useQuery({
-    queryKey: ['nav', 'pending-pairing-count', sk],
-    queryFn: () => apiClient.getPaginated<{ contract_id: number }>(
-      `/v_branch_action_required?action_type=in.(PENDING_DEVICE_BIND,PENDING_DELIVERY)&select=contract_id${sq}`,
-      { page: 1, pageSize: 1 },
-    ),
-    refetchInterval: 60_000,
-    refetchOnWindowFocus: true,
-  });
-  const pendingPairingCount = pairingCountData?.totalCount ?? 0;
+  useEffect(() => {
+    if (!user) return;
 
-  const { data: pendingSignData } = useQuery({
-    queryKey: ['nav', 'pending-sign-count', sk],
-    queryFn: () => apiClient.getPaginated<{ contract_id: number }>(
-      `/v_branch_action_required?action_type=eq.PENDING_SIGN&select=contract_id${sq}`,
-      { page: 1, pageSize: 1 },
-    ),
-    refetchInterval: 60_000,
-    refetchOnWindowFocus: true,
-  });
-  const pendingSignCount = pendingSignData?.totalCount ?? 0;
+    const refetch = () => { void queryClient.invalidateQueries({ queryKey: ['nav', 'counters', sk] }); };
 
-  const { data: savingCountData } = useQuery({
-    queryKey: ['nav', 'saving-contracts-count', sk],
-    queryFn: () => apiClient.getPaginated<{ id: number }>(
-      `/v_saving_contracts?state=eq.SAVING&select=id${sq}`,
-      { page: 1, pageSize: 1 },
-    ),
-    refetchInterval: 60_000,
-    refetchOnWindowFocus: true,
-  });
-  const savingContractsCount = savingCountData?.totalCount ?? 0;
+    // Rule 1: coalesce a burst into one refetch. An event already pending means
+    // this one needs no timer of its own — the truth is in the RPC either way.
+    const onEvent = () => {
+      if (timerRef.current) return;
+      timerRef.current = setTimeout(() => {
+        timerRef.current = null;
+        refetch();
+      }, WS_REFETCH_DEBOUNCE_MS);
+    };
 
-  const { data: draftCountData } = useQuery({
-    queryKey: ['nav', 'draft-contracts-count', sk],
-    queryFn: () => apiClient.getPaginated<{ id: number }>(
-      `/v_saving_contracts?state=eq.DRAFT&select=id${sq}`,
-      { page: 1, pageSize: 1 },
-    ),
-    refetchInterval: 60_000,
-    refetchOnWindowFocus: true,
-  });
-  const draftContractsCount = draftCountData?.totalCount ?? 0;
+    // Rule 3: events fired while the socket was down are gone — nothing replays
+    // them. Refetch once on every reconnect to close the gap.
+    const unsubHello = wsClient.onHello(refetch);
+    const unsubEvent = channel ? wsClient.subscribe(channel, onEvent) : undefined;
 
-  const { data: pendingPaymentCountData } = useQuery({
-    queryKey: ['nav', 'pending-payment-count', sk],
-    queryFn: () => apiClient.getPaginated<{ id: number }>(
-      `/v_contract_detail?state=in.(PENDING_PAYMENT_AND_SIGN,PENDING_PAYMENT,PENDING_SIGN)&select=id${sq}`,
-      { page: 1, pageSize: 1 },
-    ),
-    refetchInterval: 60_000,
-    refetchOnWindowFocus: true,
-  });
-  const pendingPaymentCount = pendingPaymentCountData?.totalCount ?? 0;
+    return () => {
+      unsubHello();
+      unsubEvent?.();
+      if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+    };
+    // Rule 2 is a non-rule here by construction: we never read `reason` off the
+    // payload, so there is no way to refetch a subset by accident.
+  }, [user, channel, sk, queryClient]);
 
-  // Deposited devices past their pickup deadline — the actionable signal (staff
-  // may act; nothing auto-fires). Badge drops to zero once returns are handled.
-  const { data: depositOverdueData } = useQuery({
-    queryKey: ['nav', 'deposit-overdue-count', sk],
-    queryFn: () => apiClient.getPaginated<{ contract_id: number }>(
-      `/v_contracts_deposited?sub_state=eq.PICKUP_OVERDUE&select=contract_id${sq}`,
-      { page: 1, pageSize: 1 },
-    ),
-    refetchInterval: 60_000,
-    refetchOnWindowFocus: true,
-  });
-  const depositOverdueCount = depositOverdueData?.totalCount ?? 0;
+  const c = data?.counters;
+  const n = (key: string) => c?.[key] ?? 0;
 
-  // Paused contracts (device in for repair, debt clock frozen). The whole list is
-  // the worklist — staff track these until the customer collects + the resume
-  // schedule is signed. Badge drops to zero when none are paused.
-  const { data: pausedContractsData } = useQuery({
-    queryKey: ['nav', 'paused-contracts-count', sk],
-    queryFn: () => apiClient.getPaginated<{ id: number }>(
-      `/v_contracts_paused?select=id${sq}`,
-      { page: 1, pageSize: 1 },
-    ),
-    refetchInterval: 60_000,
-    refetchOnWindowFocus: true,
-  });
-  const pausedContractsCount = pausedContractsData?.totalCount ?? 0;
-
-  // Collections: contracts in the collector's own book that are actionable today
-  // and not already pulled into focus. RLS-scoped to the caller — the daily "new
-  // work" signal in the owner-per-contract model. Empty (no permission) for
-  // non-collectors, which is fine — badge just reads zero.
-  const { data: callsMineData } = useQuery({
-    queryKey: ['nav', 'call-center-mine', sk],
-    queryFn: () => apiClient.getPaginated<{ contract_id: number }>(
-      `/v_my_book?is_actionable=eq.true&on_focus=eq.false&select=contract_id`,
-      { page: 1, pageSize: 1 },
-    ),
-    refetchInterval: 60_000,
-    refetchOnWindowFocus: true,
-    retry: false,
-  });
-  const callCenterMineCount = callsMineData?.totalCount ?? 0;
-
-  // Manager badge: contracts past their assignable date with no collector in the
-  // branch — the actionable half of the unassigned pool (NOT_YET_DUE is normal
-  // and excluded). RLS-scoped; empty (no OPS.ASSIGN.MANAGE) → zero.
-  const { data: unassignedNoColData } = useQuery({
-    queryKey: ['nav', 'unassigned-no-collector', sk],
-    queryFn: () => apiClient.getPaginated<{ contract_id: number }>(
-      `/v_unassigned_contracts?pool_reason=eq.NO_COLLECTOR&select=contract_id`,
-      { page: 1, pageSize: 1 },
-    ),
-    refetchInterval: 60_000,
-    refetchOnWindowFocus: true,
-    retry: false,
-  });
-  const unassignedNoCollectorCount = unassignedNoColData?.totalCount ?? 0;
-
-  // Legal queue: contracts handed to the legal team (repo gave up). The whole
-  // WAIT_FOR_LEGAL slice of the repo pool is the worklist; drops to zero when
-  // legal finishes them. v_repo_pool is grant-filtered in the DB, so a user with
-  // no can_legal grant sees zero — correct, not an error.
-  const isRepoRole = ['COMPANY_REPO', 'HOLDING_REPO', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
-  const { data: legalWaitData } = useQuery({
-    queryKey: ['nav', 'repo-legal-wait', sk],
-    queryFn: () => apiClient.getPaginated<{ contract_id: number }>(
-      `/v_repo_pool?dunning_status=eq.WAIT_FOR_LEGAL&select=contract_id`,
-      { page: 1, pageSize: 1 },
-    ),
-    enabled: isRepoRole,
-    refetchInterval: 60_000,
-    refetchOnWindowFocus: true,
-    retry: false,
-  });
-  const legalWaitCount = legalWaitData?.totalCount ?? 0;
-
-  // Chat unread — sum unread_count from v_branch_chat_list (RLS-scoped to branch).
-  // Gated on the CONTRACT.CHAT capability, not role — any branch role with chat
-  // access (incl. BRANCH_COLLECTOR); the view returns empty for others.
-  // Unbounded before: every unread row came back just to be summed. The badge
-  // renders "99+" past NAV_COUNT_CAP, so stop once enough rows to exceed it are
-  // in hand — the sum only has to be *correct* below the cap.
-  const { data: unreadChatRows } = useQuery({
-    queryKey: ['nav', 'chat-unread', sk],
-    queryFn: () => apiClient.get<{ unread_count: number }[]>(
-      `/v_branch_chat_list?select=unread_count&unread_count=gt.0&limit=${NAV_COUNT_CAP + 1}`,
-    ),
-    enabled: canChat,
-    refetchInterval: 60_000,
-    refetchOnWindowFocus: true,
-    retry: false,
-  });
-  const unreadChatCount = (unreadChatRows ?? []).reduce((sum, r) => sum + (r.unread_count ?? 0), 0);
-
-  // Notification center — sum unread_count across categories from
-  // v_staff_notification_summary (JWT-scoped, security_invoker).
-  const { data: notifSummaryRows } = useQuery({
-    queryKey: ['nav', 'notif-unread-summary', sk],
-    queryFn: () => apiClient.get<{ unread_count: number }[]>(
-      `/v_staff_notification_summary?select=unread_count`,
-    ),
-    refetchInterval: 60_000,
-    refetchOnWindowFocus: true,
-    retry: false,
-  });
-  const unreadNotifCount = (notifSummaryRows ?? []).reduce((sum, r) => sum + (r.unread_count ?? 0), 0);
+  // `unclosed_days` was split into two keys (mig 1067) because one number can't
+  // serve both readings: branch users count their own unclosed DAYS, everyone
+  // above counts BRANCHES that have any. Reading the retired single key here
+  // would silently yield 0, not an error.
+  const unclosedCount = isBranchUser ? n('unclosed_day_count') : n('unclosed_branch_count');
 
   return {
-    pendingApprovals,
-    pendingSlips,
+    pendingApprovals: n('pending_approvals'),
+    pendingSlips: n('payment_submissions'),
     unclosedCount,
-    pendingPairingCount,
-    pendingSignCount,
-    savingContractsCount,
-    draftContractsCount,
-    pendingPaymentCount,
-    depositOverdueCount,
-    pausedContractsCount,
-    unreadChatCount,
-    callCenterMineCount,
-    unassignedNoCollectorCount,
-    legalWaitCount,
-    unreadNotifCount,
+    pendingPairingCount: n('device_bind_delivery'),
+    pendingSignCount: n('pending_sign'),
+    savingContractsCount: n('saving_active'),
+    draftContractsCount: n('saving_draft'),
+    pendingPaymentCount: n('contracts_pending_pay_sign'),
+    depositOverdueCount: n('deposited'),
+    pausedContractsCount: n('paused'),
+    unreadChatCount: n('chat_unread'),
+    callCenterMineCount: n('my_book'),
+    unassignedNoCollectorCount: n('unassigned'),
+    legalWaitCount: n('repo_pool'),
+    unreadNotifCount: n('notifications'),
   };
 }

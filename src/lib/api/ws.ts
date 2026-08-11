@@ -9,6 +9,8 @@ const RECONNECT_DELAYS_MS = [1000, 2000, 4000, 8000, 16000, 30000];
 const PONG_TIMEOUT_MS = 10_000;
 
 export type WsEventHandler = (data: unknown) => void;
+/** Fires on every successful (re)connect, i.e. each `hello` from the server. */
+export type WsHelloHandler = () => void;
 
 interface ChannelEvent {
   type: 'channel_event';
@@ -51,6 +53,7 @@ function currentRoleFromToken(): string {
 class WsClient {
   private ws: WebSocket | null = null;
   private subscribers = new Map<string, Set<WsEventHandler>>();
+  private helloHandlers = new Set<WsHelloHandler>();
   private reconnectAttempt = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private pongTimer: ReturnType<typeof setTimeout> | null = null;
@@ -72,6 +75,16 @@ class WsClient {
     this.connect();
 
     return () => this.unsubscribe(channel, handler);
+  }
+
+  /**
+   * Subscribe to reconnect events. Any feature whose freshness depends on
+   * events it may have missed while the socket was down must refetch here —
+   * events fired during the gap are gone, nothing replays them.
+   */
+  onHello(handler: WsHelloHandler): () => void {
+    this.helloHandlers.add(handler);
+    return () => { this.helloHandlers.delete(handler); };
   }
 
   private unsubscribe(channel: string, handler: WsEventHandler) {
@@ -120,6 +133,11 @@ class WsClient {
       switch (msg.type) {
         case 'channel_event':
           this.dispatch(msg.channel, msg.data);
+          break;
+        case 'hello':
+          this.helloHandlers.forEach(h => {
+            try { h(); } catch (e) { console.error('[ws] hello handler threw', e); }
+          });
           break;
         case 'ping':
           this.sendIfOpen({ type: 'pong' });

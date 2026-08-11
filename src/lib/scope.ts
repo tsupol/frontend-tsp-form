@@ -65,6 +65,36 @@ export function scopeQueryRollup(scope: Scope): string {
   }
 }
 
+/**
+ * Scope params for `fn_branch_dashboard_counters` — send exactly one, or none.
+ *
+ * The param does double duty: besides filtering, it picks the GROUPING SETS grain
+ * the `unclosed_*` counters are read at (branch > company > holding). Sending none
+ * means "whole scope the role can see", which the RPC reads at holding grain.
+ */
+export function scopeCounterParams(scope: Scope): Record<string, number> {
+  switch (scope.kind) {
+    case 'branch':  return { p_branch_id: scope.branchId };
+    case 'company': return { p_company_id: scope.companyId };
+    case 'holding': return { p_holding_id: scope.holdingId };
+    case 'all':     return {};
+  }
+}
+
+/**
+ * WS channel carrying `counters_changed` for this scope, or null when there is
+ * nothing to subscribe to (SYSTEM_DEV unscoped — no `counters:all` channel exists).
+ * Subscribe the tier you *are*; the server ACL refuses anything above it.
+ */
+export function scopeCountersChannel(scope: Scope): string | null {
+  switch (scope.kind) {
+    case 'branch':  return `counters:branch:${scope.branchId}`;
+    case 'company': return `counters:company:${scope.companyId}`;
+    case 'holding': return `counters:holding:${scope.holdingId}`;
+    case 'all':     return null;
+  }
+}
+
 /** Stable cache-key fragment for React Query. */
 export function scopeKey(scope: Scope): string {
   switch (scope.kind) {
