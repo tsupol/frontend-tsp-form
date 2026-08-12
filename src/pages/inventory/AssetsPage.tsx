@@ -17,6 +17,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { AssignIcloudModal, ReleaseIcloudModal, IcloudPasswordRow } from '../contracts/IcloudModals';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { AssetScreenTimeSection } from '../../components/AssetScreenTimeSection';
+import { AssetContractTimeline } from '../../components/AssetContractTimeline';
+import { getStateColor } from '../contracts/contractUtils';
 import { ImeiInput } from '../../components/ImeiInput';
 import { getBucketLabel, getBucketColor, getConditionLabel, getConditionTextColor, CONDITION_VALUES, codeDisplay } from './inventoryUtils';
 import { RegisterAssetModal } from './RegisterAssetModal';
@@ -82,6 +84,13 @@ interface Asset {
   custodian_user_id: number | null;
   icloud_account_id: number | null;
   icloud_apple_id: string | null;
+  // Current contract only — the one active right now (mig 1069). A device has at
+  // most one; void/cancelled/expired/draft contracts don't count, so null here
+  // means "free to bind", not "never been on a contract". Past bindings live in
+  // the timeline below.
+  contract_id: number | null;
+  contract_code: string | null;
+  contract_state: string | null;
   source_po_id: number | null;
   source_lot_id: number | null;
   created_by: number | null;
@@ -1267,6 +1276,28 @@ function AssetDetailPanel({
         </div>
       </div>
 
+      {/* Current contract (mig 1069) — hidden entirely when the device isn't on
+          one, since "no contract" is already told by the bucket badge. */}
+      {asset.contract_id != null && (
+        <div className="flex-none px-4 py-3 border-b border-line">
+          <div className="text-xs text-subtle">{t('asset.currentContract')}</div>
+          <div className="flex items-center gap-2 flex-wrap mt-0.5">
+            <Link
+              to={`/admin/contracts/search/${asset.contract_id}`}
+              className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1"
+            >
+              {asset.contract_code ?? `#${asset.contract_id}`}
+              <ExternalLink size={11} />
+            </Link>
+            {asset.contract_state && (
+              <Badge size="xs" color={getStateColor(asset.contract_state)}>
+                {t(`contract.state_${asset.contract_state}`, { defaultValue: asset.contract_state })}
+              </Badge>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* External reference (TPA legacy ticket ID) */}
       <ExternalRefRow asset={asset} onChanged={onRefresh} t={t} addSnackbar={addSnackbar} />
 
@@ -1397,6 +1428,11 @@ function AssetDetailPanel({
             </div>
           </div>
         )}
+
+        {/* Which contracts this device has been bound to / removed from. Sits
+            under the inventory txn history: that one is about buckets, this one
+            is about contracts. */}
+        <AssetContractTimeline assetId={asset.asset_id} />
       </div>
 
       </div>

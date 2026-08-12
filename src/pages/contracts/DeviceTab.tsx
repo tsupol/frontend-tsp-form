@@ -11,6 +11,7 @@ import { getBucketLabel, getBucketColor, codeDisplay } from '../inventory/invent
 import { productName } from './contractUtils';
 import { AssignIcloudModal, ReleaseIcloudModal, IcloudPasswordRow } from './IcloudModals';
 import { AssetScreenTimeSection } from '../../components/AssetScreenTimeSection';
+import { ContractDeviceTimeline } from '../../components/AssetContractTimeline';
 import { ColorSwatch } from '../../components/ColorAutocomplete';
 import { ImeiInput } from '../../components/ImeiInput';
 import { validateIMEI, validateiPhoneSerial } from '../../lib/validators';
@@ -594,6 +595,11 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
           </div>
         </section>
       )}
+
+      {/* Every device this contract has had — binds, swaps, loaners, removals.
+          Answers "which phone was on this contract in March" without digging
+          through the audit log. */}
+      <ContractDeviceTimeline contractId={contract.id} />
 
       {/* iCloud assign/release modals */}
       {primaryAsset && (
