@@ -223,7 +223,13 @@ export function SubTabEnroll({
   const isLocked = LOCKED_BADGES.has(status.enforcement_badge);
   const isApplying = status.enforcement_badge === 'APPLYING';
   const step7Done = isLocked;
-  const readyToHandOver = enrollComplete && step7Done;  // step 6 is informational, not a gate
+  // Handover needs BOTH keys, and the DB owns that rule (lock_ready) — never
+  // recompute it from has_pull_key/has_push_key. A device with the Apple key but
+  // no org key reads "safe" on every other field while a customer wipe would
+  // lose it outright; that is exactly what shipped a device on 2026-08-11.
+  // ⛔ lock_ready gates HANDOVER only. It must never reach the step-7 lock
+  //    button — see the comment there.
+  const readyToHandOver = enrollComplete && step7Done && status.lock_ready;
 
   // Step-7 apply flow (preview→confirm). The button gate is may_apply_light ALONE.
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -295,7 +301,9 @@ export function SubTabEnroll({
           </div>
           {!readyToHandOver && (
             <div className="alert-description">
-              {t('asset.mdm.readiness.remaining', { steps: remainingStepLabels(t, { enrollComplete, step7Done }) })}
+              {t('asset.mdm.readiness.remaining', {
+                steps: remainingStepLabels(t, { enrollComplete, step7Done, lockReady: status.lock_ready }),
+              })}
             </div>
           )}
         </div>
@@ -418,8 +426,10 @@ export function SubTabEnroll({
             );
           })}
 
-          {/* Step 6 — two AUTO-DETECTED status badges (NNF app + escrow key).
-              Not checkboxes: the system computes these, staff never sets them. */}
+          {/* Step 6 — AUTO-DETECTED status badges. Not checkboxes: the system
+              computes these, staff never sets them. The two keys are separate
+              lines on purpose — they protect against different things and one
+              without the other is not safety (IMPLEMENT 2026-08-12). */}
           <StepRow
             n={6}
             icon={Cloud}
@@ -430,14 +440,32 @@ export function SubTabEnroll({
               <StatusLine label={t('asset.mdm.step6.nnfAppLabel')}>
                 <NnfAppBadge status={status} />
               </StatusLine>
-              <StatusLine label={t('asset.mdm.step6.escrowLabel')}>
-                <EscrowBadge status={status} />
+              <StatusLine label={t('asset.mdm.step6.pullKeyLabel')}>
+                <PullKeyBadge status={status} />
               </StatusLine>
+              <StatusLine label={t('asset.mdm.step6.pushKeyLabel')}>
+                <PushKeyBadge status={status} />
+              </StatusLine>
+              {/* The verdict in words + what to do about it. Only worth showing
+                  once enrolled; before that both keys read "not enrolled". */}
+              {status.in_mdm && !status.lock_ready && status.lock_verdict_code && (
+                <div className="text-xs text-warning-fg inline-flex items-start gap-1">
+                  <AlertTriangle size={12} className="shrink-0 mt-0.5" />
+                  <span>{t(`asset.mdm.lockVerdict.${status.lock_verdict_code}`)}</span>
+                </div>
+              )}
             </div>
           </StepRow>
 
           {/* Step 7 — baseline lock. The "การล็อค" badge answers "locked yet?" from
-              enforcement_badge; the button shows/hides on may_apply_light alone. */}
+              enforcement_badge; the button shows/hides on may_apply_light alone.
+              ⛔ lock_ready must NEVER be added to this button's condition. A
+              device with no org key is the one that needs this lock MOST: without
+              the org key the system picks ENFORCEMENT_LIGHT, which closes the
+              iCloud menu so the customer cannot sign out — the only protection
+              such a device has. Disabling the button would strip it. Press it
+              early and often; the system upgrades to light_open by itself once
+              the org key lands. The gate belongs at handover, not here. */}
           <StepRow
             n={7}
             icon={Lock}
@@ -662,10 +690,12 @@ function NnfAppBadge({ status }: { status: EnrollStatus }) {
   );
 }
 
-/** Escrow (Activation-Lock bypass) key window. Order matters: check
- *  window_status==null FIRST (not enrolled), else has_code, else OK vs EXPIRED.
- *  has_code alone means nothing — an unenrolled device has has_code=false too. */
-function EscrowBadge({ status }: { status: EnrollStatus }) {
+/** 🍎 The APPLE key (pull) — unlocks the customer's iCloud when we repossess.
+ *  Pulled from Apple inside a 15-day window; miss it and a repossessed device
+ *  can never be unlocked. Order matters: window_status==null FIRST (not
+ *  enrolled), else has_code, else OK vs EXPIRED — has_code alone means nothing,
+ *  an unenrolled device also reports false. */
+function PullKeyBadge({ status }: { status: EnrollStatus }) {
   const { t } = useTranslation();
   if (status.escrow_window_status == null) {
     return <Badge color="default" startIcon={<HelpCircle size={12} />}>{t('asset.mdm.step6.escrowNotEnrolled')}</Badge>;
@@ -681,6 +711,32 @@ function EscrowBadge({ status }: { status: EnrollStatus }) {
     );
   }
   return <Badge color="danger" startIcon={<XCircle size={12} />}>{t('asset.mdm.step6.escrowMissed')}</Badge>;
+}
+
+/** 🏢 The ORG key (push) — generated by us and pushed into the device so a wipe
+ *  leaves it unusable without our code. THREE states, not two: having the key is
+ *  not the same as Apple having confirmed it landed (push_key_applied_at). Only
+ *  the third state protects the device.
+ *
+ *  It arrives 30s–6min after supervision (vs 1–3s for the Apple key), so a
+ *  freshly-enrolled device legitimately shows 🍎 green / 🏢 pending. That is not
+ *  a hang — but it is also NOT safe to hand over. */
+function PushKeyBadge({ status }: { status: EnrollStatus }) {
+  const { t } = useTranslation();
+  if (!status.in_mdm) {
+    return <Badge color="default" startIcon={<HelpCircle size={12} />}>{t('asset.mdm.step6.escrowNotEnrolled')}</Badge>;
+  }
+  if (!status.has_push_key) {
+    return <Badge color="danger" startIcon={<XCircle size={12} />}>{t('asset.mdm.step6.orgKeyMissing')}</Badge>;
+  }
+  if (!status.push_key_applied_at) {
+    return (
+      <Badge color="warning" startIcon={<CircleDashed size={12} className="animate-spin" />}>
+        {t('asset.mdm.step6.orgKeyInstalling')}
+      </Badge>
+    );
+  }
+  return <Badge color="success" startIcon={<ShieldCheck size={12} />}>{t('asset.mdm.step6.orgKeyOk')}</Badge>;
 }
 
 function DeviceInfo({ status }: { status: EnrollStatus }) {
@@ -708,13 +764,18 @@ function DeviceInfo({ status }: { status: EnrollStatus }) {
 }
 
 /** Comma-joined labels of the still-incomplete groups, for the summary line.
- *  Step 6 is informational (auto-detected badges) and never blocks handover. */
+ *  The org key is listed too: it blocks handover but is not something staff can
+ *  DO anything about (the system installs it), so it must be named or the banner
+ *  says "not ready" with no visible reason. */
 function remainingStepLabels(
   t: (k: string) => string,
-  { enrollComplete, step7Done }: { enrollComplete: boolean; step7Done: boolean },
+  { enrollComplete, step7Done, lockReady }: {
+    enrollComplete: boolean; step7Done: boolean; lockReady: boolean;
+  },
 ): string {
   const parts: string[] = [];
   if (!enrollComplete) parts.push(t('asset.mdm.readiness.stepEnroll'));
   if (!step7Done) parts.push(t('asset.mdm.readiness.step7'));
+  if (!lockReady) parts.push(t('asset.mdm.readiness.stepKeys'));
   return parts.join(', ');
 }

@@ -2471,7 +2471,15 @@
         "notReady": "Not ready to hand over yet",
         "remaining": "Still to do: {{steps}}",
         "stepEnroll": "finish enrollment (steps 1–5)",
-        "step7": "step 7 (baseline lock)"
+        "step7": "step 7 (baseline lock)",
+        "stepKeys": "both unlock keys in place"
+      },
+      "lockVerdict": {
+        "PROTECTED": "Both keys are in place — safe to hand over.",
+        "ORG_KEY_NOT_APPLIED": "The company key has been made but the device hasn't confirmed it yet. Wait a moment — the system does this on its own.",
+        "NO_ORG_LOCK_IN_ABM": "No company key yet. The system is making one — wait a moment.",
+        "NO_ORG_LOCK_OUT_OF_ABM": "No company key, and this device is no longer in ABM. It must be scanned back into ABM before it can be protected.",
+        "NOT_SUPERVISED": "This device isn't supervised yet, so no key can be installed."
       },
       "step6": {
         "title": "Device status (auto-detected)",
@@ -2479,11 +2487,15 @@
         "nnfInstalled": "Installed",
         "nnfNotInstalled": "Not installed",
         "nnfUnknown": "Not checked yet",
-        "escrowLabel": "Unlock key",
+        "pullKeyLabel": "Apple key (unlock iCloud)",
+        "pushKeyLabel": "Company key (survives a wipe)",
         "escrowNotEnrolled": "Not enrolled yet",
         "escrowHasKey": "Key secured",
         "escrowRacing": "No key yet · {{days}} days left",
-        "escrowMissed": "No key (window expired)"
+        "escrowMissed": "No key (window expired)",
+        "orgKeyMissing": "No key",
+        "orgKeyInstalling": "Installing…",
+        "orgKeyOk": "Lock active"
       },
       "step7": {
         "title": "Apply baseline lock",
