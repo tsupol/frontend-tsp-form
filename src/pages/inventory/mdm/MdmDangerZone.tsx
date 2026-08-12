@@ -15,12 +15,13 @@
 // the asset, so they hold even once the binding is gone — which is exactly when a
 // repossessed device gets wiped.)
 //
-// Erase is deliberately TWO buttons. The DB requires a dry run to have succeeded
-// within the last hour before it accepts a real wipe, and that rule is the safety
-// rail: firing the dry run invisibly would spend the operator's one confirmation
-// on an irreversible action and surface ERASE_WOULD_BRICK only after they had
-// already committed. Two buttons let the dry run report its own result, and keep
-// "ล้างจริง" dark until it has.
+// Erase is ONE button (CHANGE 2026-08-12, mig 229). It used to be two: a dry run
+// the operator had to pass before the real wipe would unlock, because the DB
+// refused a wet erase without a passing dry run in the last hour. That rule is
+// gone — dry run is a dev/owner test, not a step for staff, and the accident it
+// guarded against (a sender that ignored dry_run) was fixed at the source. The
+// remaining rails are unchanged: MDM.ERASE, the Activation-Lock brick check at
+// preview, and the 4-digit challenge.
 // ============================================================================
 
 import { useState } from 'react';
@@ -28,7 +29,6 @@ import { useTranslation } from 'react-i18next';
 import { Button } from 'tsp-form';
 import { ShieldOff, Trash2, KeyRound, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
-import { DateTime } from '../../../components/DateTime';
 import { ActivationLockRevealModal } from '../../nnf-extra/ActivationLockRevealModal';
 import { MdmChallengeDialog } from './MdmChallengeDialog';
 import {
@@ -38,12 +38,7 @@ import {
 } from './mdmApi';
 
 /** Which flow the one challenge dialog is currently serving. */
-type Flow = 'remove' | 'eraseDry' | 'eraseWet';
-
-/** The dry run's success is what unlocks the wet button. The DB honours it for
- *  an hour; we track the same window so the button can go back to sleep instead
- *  of failing with ERASE_DRY_RUN_REQUIRED_FIRST. */
-const DRY_RUN_VALID_MS = 60 * 60 * 1000;
+type Flow = 'remove' | 'erase';
 
 export function MdmDangerZone({ status, onChanged }: {
   status: AssetMdmStatus;
@@ -64,14 +59,11 @@ export function MdmDangerZone({ status, onChanged }: {
   const [pageError, setPageError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [reconcilerNote, setReconcilerNote] = useState<string | null>(null);
-  const [dryRunAt, setDryRunAt] = useState<number | null>(null);
   const [revealOpen, setRevealOpen] = useState(false);
 
   const actorId = user?.user_id ?? null;
   const serial = status.serial_number;
   const ready = actorId != null && !!serial;
-
-  const dryRunFresh = dryRunAt != null && Date.now() - dryRunAt < DRY_RUN_VALID_MS;
 
   if (!mayRemove && !mayErase && !mayReveal) return null;
 
@@ -92,8 +84,7 @@ export function MdmDangerZone({ status, onChanged }: {
         }
         setChallenge(res.challenge);
       } else {
-        const wet = next === 'eraseWet';
-        const res = await erasePreview(serial!, actorId!, wet);
+        const res = await erasePreview(serial!, actorId!);
         // Erasing a device whose Activation Lock is on with no key on file
         // leaves a brick. The BE refuses; warn before the dialog, not after.
         if (res.activation_lock && !res.has_bypass_key) {
@@ -123,13 +114,8 @@ export function MdmDangerZone({ status, onChanged }: {
         const res = await removeEnforcementCommit(serial!, actorId!, challenge.challenge_id, code);
         setReconcilerNote(res.reconciler_note ?? reconcilerNote);
         setNotice(t('asset.mdm.danger.removeDone'));
-      } else if (flow === 'eraseDry') {
-        await eraseCommit(serial!, actorId!, false, challenge.challenge_id, code);
-        setDryRunAt(Date.now());
-        setNotice(t('asset.mdm.danger.dryRunDone'));
       } else {
-        await eraseCommit(serial!, actorId!, true, challenge.challenge_id, code);
-        setDryRunAt(null);
+        await eraseCommit(serial!, actorId!, challenge.challenge_id, code);
         setNotice(t('asset.mdm.danger.eraseQueued'));
       }
       closeDialog();
@@ -150,13 +136,7 @@ export function MdmDangerZone({ status, onChanged }: {
       confirm: t('asset.mdm.danger.removeConfirm'),
       tone: 'warning',
     },
-    eraseDry: {
-      title: t('asset.mdm.danger.dryRunTitle'),
-      body: t('asset.mdm.danger.dryRunBody'),
-      confirm: t('asset.mdm.danger.dryRunConfirm'),
-      tone: 'warning',
-    },
-    eraseWet: {
+    erase: {
       title: t('asset.mdm.danger.eraseTitle'),
       body: t('asset.mdm.danger.eraseBody'),
       confirm: t('asset.mdm.danger.eraseConfirm'),
@@ -197,25 +177,14 @@ export function MdmDangerZone({ status, onChanged }: {
         )}
 
         {mayErase && (
-          <>
-            <Button
-              variant="outline" size="sm"
-              startIcon={<Trash2 size={15} />}
-              disabled={busy || !ready}
-              onClick={() => startFlow('eraseDry')}
-            >
-              {t('asset.mdm.danger.dryRunButton')}
-            </Button>
-            {/* Stays dark until a dry run has passed inside the DB's 1h window. */}
-            <Button
-              color="danger" size="sm"
-              startIcon={<Trash2 size={15} />}
-              disabled={busy || !ready || !dryRunFresh}
-              onClick={() => startFlow('eraseWet')}
-            >
-              {t('asset.mdm.danger.eraseButton')}
-            </Button>
-          </>
+          <Button
+            color="danger" size="sm"
+            startIcon={<Trash2 size={15} />}
+            disabled={busy || !ready}
+            onClick={() => startFlow('erase')}
+          >
+            {t('asset.mdm.danger.eraseButton')}
+          </Button>
         )}
 
         {mayReveal && (
@@ -230,13 +199,7 @@ export function MdmDangerZone({ status, onChanged }: {
         )}
       </div>
 
-      {mayErase && (
-        <p className="text-xs text-subtler">
-          {dryRunFresh && dryRunAt != null
-            ? <>{t('asset.mdm.danger.dryRunFreshUntil')} <DateTime value={new Date(dryRunAt + DRY_RUN_VALID_MS).toISOString()} showTime /></>
-            : t('asset.mdm.danger.dryRunFirstHint')}
-        </p>
-      )}
+      {mayErase && <p className="text-xs text-subtler">{t('asset.mdm.danger.eraseHint')}</p>}
 
       <MdmChallengeDialog
         challenge={challenge}

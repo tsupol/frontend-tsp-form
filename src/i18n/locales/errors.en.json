@@ -839,7 +839,6 @@
   "mdm.state.challenge_too_soon": "Wait for the countdown to finish before confirming.",
   "MDM.STATE.ERASE_WOULD_BRICK": "Activation Lock is on and no bypass key is on file — erasing would leave the device unusable.",
   "mdm.state.erase_would_brick": "Activation Lock is on and no bypass key is on file — erasing would leave the device unusable.",
-  "MDM.STATE.ERASE_DRY_RUN_REQUIRED_FIRST": "Run the test (dry run) first — a real erase is only accepted within an hour of a passing test.",
   "mdm.state.erase_dry_run_required_first": "Run the test (dry run) first — a real erase is only accepted within an hour of a passing test.",
   "CONTRACT.VALIDATION.NOT_ELIGIBLE_FOR_SNAPSHOT": "Contract is not ready for signing — fix the items below first",
   "CONTRACT.VALIDATION.CITIZEN_ID_MISSING": "Missing or invalid citizen ID — please update KYC",

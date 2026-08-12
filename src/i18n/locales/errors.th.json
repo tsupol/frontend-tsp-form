@@ -839,7 +839,6 @@
   "mdm.state.challenge_too_soon": "รอให้นับถอยหลังครบก่อนจึงจะยืนยันได้",
   "MDM.STATE.ERASE_WOULD_BRICK": "เครื่องติด Activation Lock และไม่มีรหัสปลดในระบบ — ถ้าล้างจะใช้เครื่องต่อไม่ได้",
   "mdm.state.erase_would_brick": "เครื่องติด Activation Lock และไม่มีรหัสปลดในระบบ — ถ้าล้างจะใช้เครื่องต่อไม่ได้",
-  "MDM.STATE.ERASE_DRY_RUN_REQUIRED_FIRST": "ต้องทดสอบ (dry run) ก่อน — ระบบรับคำสั่งล้างจริงเฉพาะภายใน 1 ชั่วโมงหลังทดสอบผ่าน",
   "mdm.state.erase_dry_run_required_first": "ต้องทดสอบ (dry run) ก่อน — ระบบรับคำสั่งล้างจริงเฉพาะภายใน 1 ชั่วโมงหลังทดสอบผ่าน",
   "CONTRACT.VALIDATION.NOT_ELIGIBLE_FOR_SNAPSHOT": "สัญญายังไม่พร้อมเซ็น — กรุณาแก้ไขรายการด้านล่างก่อน",
   "CONTRACT.VALIDATION.CITIZEN_ID_MISSING": "เลขบัตรประชาชนขาดหายหรือไม่ถูกต้อง — กรุณาปรับปรุงข้อมูล KYC",

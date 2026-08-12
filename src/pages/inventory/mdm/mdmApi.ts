@@ -856,27 +856,25 @@ export interface MdmEraseResult {
   note?: string | null;
 }
 
-/** `wet=false` is a DRY RUN — it exercises the chain and wipes nothing. The DB
- *  requires a successful dry run within the last hour before it will accept a
- *  wet erase (else ERASE_DRY_RUN_REQUIRED_FIRST), so both rounds are real calls
- *  with their own challenge. */
+/** Both rounds send `p_wet: true` — the RPC defaults it to false (a dry run that
+ *  wipes nothing), and dry runs are a dev/owner tool, not a step staff walk
+ *  through (CHANGE 2026-08-12, mig 229). Preview mints the challenge, commit
+ *  consumes it; the wipe only happens on the second call. */
 export function erasePreview(
   serial: string,
   actorId: number,
-  wet: boolean,
 ): Promise<MdmErasePreview> {
   return apiClient.rpc<MdmErasePreview>('fn_mdm_erase_device', {
     p_serial: serial,
     p_actor_id: actorId,
     p_preview: true,
-    p_wet: wet,
+    p_wet: true,
   });
 }
 
 export function eraseCommit(
   serial: string,
   actorId: number,
-  wet: boolean,
   challengeId: number,
   confirmCode: string,
 ): Promise<MdmEraseResult> {
@@ -884,7 +882,7 @@ export function eraseCommit(
     p_serial: serial,
     p_actor_id: actorId,
     p_preview: false,
-    p_wet: wet,
+    p_wet: true,
     p_challenge_id: challengeId,
     p_confirm_code: confirmCode,
   });
