@@ -67,6 +67,7 @@ import { isLocalDev } from './lib/devEnv';
 import { useNavCounts, NAV_COUNT_CAP } from './hooks/useNavCounts';
 import { useChatDock } from './contexts/ChatDockContext';
 import { NotificationMenuItem } from './components/NotificationMenu';
+import { SystemSignalSection } from './components/SystemSignalSection';
 
 const lgQuery = window.matchMedia('(min-width: 1024px)');
 const subscribeLg = (cb: () => void) => { lgQuery.addEventListener('change', cb); return () => lgQuery.removeEventListener('change', cb); };
@@ -156,6 +157,8 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
           label={t('help.title')}
           onClick={() => { navigate('/admin/help'); setOpen(false); }}
         />
+        <MenuSeparator />
+        <SystemSignalSection menuOpen={open} />
         <MenuSeparator />
         <MenuItem
           icon={<LogOut size={14} />}

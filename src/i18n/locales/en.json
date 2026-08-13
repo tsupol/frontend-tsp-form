@@ -7195,5 +7195,37 @@
     "branch": "By branch",
     "pool": "Pool",
     "my_book": "My book"
+  },
+  "systemSignal": {
+    "title": "System status",
+    "key": {
+      "PHOTO_UPLOAD": "Photo upload",
+      "AUX_SYSTEMS": "Auxiliary systems",
+      "INTERNAL_SERVICES": "Internal services"
+    },
+    "status": {
+      "OK": "Working normally",
+      "DOWN": "Not working",
+      "UNKNOWN": "Can't tell"
+    },
+    "meaning": {
+      "OK": "Working normally.",
+      "DOWN": "Something is wrong on our side. The system team has been notified.",
+      "UNKNOWN": "Nothing has used this recently, so there's nothing to judge from."
+    },
+    "down": {
+      "PHOTO_UPLOAD": "Photo uploads are failing system-wide right now — it is not your device. The system team has been notified.",
+      "AUX_SYSTEMS": "Push messages to customers' phones are down. Counter work carries on as normal.",
+      "INTERNAL_SERVICES": "Internal services are down. The system team has been notified."
+    },
+    "evidence": {
+      "PHOTO_UPLOAD": "Last {{mins}} min: {{granted}} attempted · {{landed}} succeeded",
+      "AUX_SYSTEMS": "Last {{mins}} min: {{sent}} sent · {{failed}} failed",
+      "INTERNAL_SERVICES": "{{jobs}} scheduled jobs · oldest heartbeat {{seconds}}s ago"
+    },
+    "checkedSecondsAgo": "Checked {{n}}s ago",
+    "checkedMinutesAgo": "Checked {{n}} min ago",
+    "noActionNeeded": "You don't need to do anything or report this — the system team is alerted automatically through a separate channel.",
+    "unavailable": "Could not read the system status right now."
   }
 }
