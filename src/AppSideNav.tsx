@@ -97,6 +97,9 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
 
   return (
     <>
+    {/* maxHeight: PopOver defaults to 300px, which clips this menu (settings →
+        theme/language → help → 3 signal rows → logout ≈ 350px) and pushes
+        logout behind a scroll. PopOver still clamps to the viewport itself. */}
     <PopOver
       isOpen={open}
       onClose={() => setOpen(false)}
@@ -107,6 +110,7 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
       triggerClassName="w-full"
       minWidth="calc(var(--spacing-side-menu) - 1rem)"
       maxWidth="calc(var(--spacing-side-menu) - 1rem)"
+      maxHeight="min(32rem, 70dvh)"
       trigger={
         <button
           className={clsx('flex items-center gap-3 py-2.5 transition-all text-item-fg hover:bg-item-hover-bg w-full cursor-pointer', collapsed ? 'px-1.5' : 'px-3')}
