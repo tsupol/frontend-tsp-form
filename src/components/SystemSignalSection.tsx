@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Modal, Button, Tooltip } from 'tsp-form';
@@ -13,7 +13,7 @@ import { apiClient } from '../lib/api';
 type SignalKey = 'PHOTO_UPLOAD' | 'AUX_SYSTEMS' | 'INTERNAL_SERVICES';
 type SignalStatus = 'OK' | 'DOWN' | 'UNKNOWN';
 
-type SignalRow = {
+export type SignalRow = {
   signal_key: SignalKey | string;
   status: SignalStatus | string;
   evidence: {
@@ -96,10 +96,12 @@ function meaningFor(
 type Props = {
   /** True while the profile menu is open — drives the one-shot fetch. */
   menuOpen: boolean;
+  /** Raise the clicked row so the host can show the dialog outside the menu. */
+  onSelect: (row: SignalRow) => void;
 };
 
 /**
- * Three system health lights in the profile menu.
+ * Three system health lights, rendered as a section inside the profile menu.
  *
  * Answers one question — "is the system broken, or is it just me?" — so a
  * branch staffer who can't upload a photo doesn't phone around to find out.
@@ -110,10 +112,11 @@ type Props = {
  * cache across opens (`gcTime: 0` + `staleTime: 0`), so reopening the menu is
  * always a fresh read. A failed or slow fetch shows three grey lights — the
  * section never hides itself and never guesses green.
+ *
+ * The detail dialog deliberately does NOT live here — see SystemSignalDialog.
  */
-export function SystemSignalSection({ menuOpen }: Props) {
+export function SystemSignalSection({ menuOpen, onSelect }: Props) {
   const { t } = useTranslation();
-  const [detail, setDetail] = useState<SignalRow | null>(null);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['system-signal'],
@@ -134,10 +137,6 @@ export function SystemSignalSection({ menuOpen }: Props) {
 
   const pending = isLoading && !isError;
 
-  // The dialog's data must outlive `open` — the row is nulled on close and the
-  // body would otherwise blank out mid-transition.
-  const shown = detail;
-
   return (
     <>
       <div className="px-3 pt-2 pb-1 text-[11px] font-medium text-subtler uppercase tracking-wide">
@@ -152,7 +151,7 @@ export function SystemSignalSection({ menuOpen }: Props) {
           <button
             type="button"
             className="w-full text-left px-3 py-1.5 flex items-center gap-2.5 hover:bg-item-hover-bg transition-colors cursor-pointer bg-transparent border-none"
-            onClick={() => setDetail(row)}
+            onClick={() => onSelect(row)}
           >
             <span
               className={clsx(
@@ -165,61 +164,84 @@ export function SystemSignalSection({ menuOpen }: Props) {
           </button>
         </Tooltip>
       ))}
+    </>
+  );
+}
 
-      <Modal
-        open={!!detail}
-        onClose={() => setDetail(null)}
-        maxWidth="24rem"
-        width="100%"
-        ariaLabel={t('systemSignal.title')}
-      >
-        <div className="modal-header">
-          <h2 className="modal-title">{t('systemSignal.title')}</h2>
-          <button type="button" className="modal-close-btn" onClick={() => setDetail(null)}>&times;</button>
-        </div>
-        <div className="modal-content">
-          <div className="flex flex-col gap-3 min-w-0">
-            <div className="px-3 py-2.5 rounded-md bg-surface border border-line flex items-center gap-2.5">
-              <span className={clsx('w-2.5 h-2.5 rounded-full shrink-0', dotClassFor(shown?.status ?? 'UNKNOWN'))} />
-              <div className="min-w-0">
-                <div className="font-medium text-sm truncate">
-                  {shown ? t(`systemSignal.key.${shown.signal_key}`) : ''}
-                </div>
-                <div className="text-xs text-subtle">
-                  {shown ? t(`systemSignal.status.${shown.status}`) : ''}
-                </div>
+/**
+ * Detail dialog for one signal row.
+ *
+ * Rendered by the host OUTSIDE the profile menu's PopOver, on purpose. Modal
+ * registers itself in tsp-form's shared modal stack and deregisters on close;
+ * the global backdrop stays up while that stack is non-empty. Living inside the
+ * PopOver meant closing the dialog also closed the menu, unmounting the Modal
+ * mid-exit — it never deregistered, so the backdrop stuck at full opacity with
+ * pointer-events on and the page sat behind a dead scrim. Keep this mounted at
+ * a level that outlives the menu.
+ */
+export function SystemSignalDialog({ row, onClose }: { row: SignalRow | null; onClose: () => void }) {
+  const { t } = useTranslation();
+
+  // The body must outlive `open`: the host nulls `row` in the same handler that
+  // closes, so rendering straight from the prop blanks the panel mid-animation.
+  const last = useRef<SignalRow | null>(null);
+  if (row) last.current = row;
+  const shown = row ?? last.current;
+
+  return (
+    <Modal
+      open={!!row}
+      onClose={onClose}
+      maxWidth="24rem"
+      width="100%"
+      ariaLabel={t('systemSignal.title')}
+    >
+      <div className="modal-header">
+        <h2 className="modal-title">{t('systemSignal.title')}</h2>
+        <button type="button" className="modal-close-btn" onClick={onClose}>&times;</button>
+      </div>
+      <div className="modal-content">
+        <div className="flex flex-col gap-3 min-w-0">
+          <div className="px-3 py-2.5 rounded-md bg-surface border border-line flex items-center gap-2.5">
+            <span className={clsx('w-2.5 h-2.5 rounded-full shrink-0', dotClassFor(shown?.status ?? 'UNKNOWN'))} />
+            <div className="min-w-0">
+              <div className="font-medium text-sm truncate">
+                {shown ? t(`systemSignal.key.${shown.signal_key}`) : ''}
+              </div>
+              <div className="text-xs text-subtle">
+                {shown ? t(`systemSignal.status.${shown.status}`) : ''}
               </div>
             </div>
-
-            <p className="text-sm leading-relaxed">
-              {shown ? meaningFor(t, shown.signal_key, shown.status) : ''}
-            </p>
-
-            {shown?.status === 'DOWN' && (
-              <p className="text-sm leading-relaxed text-subtle">
-                {t('systemSignal.noActionNeeded')}
-              </p>
-            )}
-
-            {shown && evidenceLine(t, shown) && (
-              <div className="text-xs text-subtle tabular-nums">
-                {evidenceLine(t, shown)}
-              </div>
-            )}
-            {shown?.checked_at && (
-              <div className="text-xs text-subtler tabular-nums">
-                {checkedAgoLabel(t, shown.checked_at)}
-              </div>
-            )}
-            {shown && !shown.checked_at && (
-              <div className="text-xs text-subtler">{t('systemSignal.unavailable')}</div>
-            )}
           </div>
+
+          <p className="text-sm leading-relaxed">
+            {shown ? meaningFor(t, shown.signal_key, shown.status) : ''}
+          </p>
+
+          {shown?.status === 'DOWN' && (
+            <p className="text-sm leading-relaxed text-subtle">
+              {t('systemSignal.noActionNeeded')}
+            </p>
+          )}
+
+          {shown && evidenceLine(t, shown) && (
+            <div className="text-xs text-subtle tabular-nums">
+              {evidenceLine(t, shown)}
+            </div>
+          )}
+          {shown?.checked_at && (
+            <div className="text-xs text-subtler tabular-nums">
+              {checkedAgoLabel(t, shown.checked_at)}
+            </div>
+          )}
+          {shown && !shown.checked_at && (
+            <div className="text-xs text-subtler">{t('systemSignal.unavailable')}</div>
+          )}
         </div>
-        <div className="modal-footer">
-          <Button variant="ghost" onClick={() => setDetail(null)}>{t('common.close')}</Button>
-        </div>
-      </Modal>
-    </>
+      </div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={onClose}>{t('common.close')}</Button>
+      </div>
+    </Modal>
   );
 }

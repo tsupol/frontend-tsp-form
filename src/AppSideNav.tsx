@@ -67,7 +67,7 @@ import { isLocalDev } from './lib/devEnv';
 import { useNavCounts, NAV_COUNT_CAP } from './hooks/useNavCounts';
 import { useChatDock } from './contexts/ChatDockContext';
 import { NotificationMenuItem } from './components/NotificationMenu';
-import { SystemSignalSection } from './components/SystemSignalSection';
+import { SystemSignalSection, SystemSignalDialog, type SignalRow } from './components/SystemSignalSection';
 
 const lgQuery = window.matchMedia('(min-width: 1024px)');
 const subscribeLg = (cb: () => void) => { lgQuery.addEventListener('change', cb); return () => lgQuery.removeEventListener('change', cb); };
@@ -76,6 +76,9 @@ const getIsLg = () => lgQuery.matches;
 // User menu component
 function UserMenu({ collapsed }: { collapsed: boolean }) {
   const [open, setOpen] = useState(false);
+  // Lives here, not in the menu: the dialog must outlive the PopOver (see
+  // SystemSignalDialog — unmounting it mid-close strands the modal backdrop).
+  const [signalDetail, setSignalDetail] = useState<SignalRow | null>(null);
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
@@ -93,6 +96,7 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
   const subtitle = user?.branch_name ? `${roleName} · ${user.branch_name}` : roleName;
 
   return (
+    <>
     <PopOver
       isOpen={open}
       onClose={() => setOpen(false)}
@@ -158,7 +162,10 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
           onClick={() => { navigate('/admin/help'); setOpen(false); }}
         />
         <MenuSeparator />
-        <SystemSignalSection menuOpen={open} />
+        <SystemSignalSection
+          menuOpen={open}
+          onSelect={(row) => { setSignalDetail(row); setOpen(false); }}
+        />
         <MenuSeparator />
         <MenuItem
           icon={<LogOut size={14} />}
@@ -168,6 +175,8 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
         />
       </div>
     </PopOver>
+    <SystemSignalDialog row={signalDetail} onClose={() => setSignalDetail(null)} />
+    </>
   );
 }
 
