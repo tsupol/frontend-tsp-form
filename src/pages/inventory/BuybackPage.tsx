@@ -3,8 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, Modal, TextArea, DataTable, PopOver, Tooltip, useSnackbarContext } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, RotateCcw, CheckCircle, XCircle, AlertTriangle, ImageOff, ChevronDown, Pencil, Search, SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, RotateCcw, CheckCircle, XCircle, AlertTriangle, ImageOff, ChevronDown, Pencil, SlidersHorizontal } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import { SearchInput } from '../../components/SearchInput';
 import { DateTime } from '../../components/DateTime';
 import { CopyButton } from '../../components/CopyButton';
 import { fmtCurrency } from '../../lib/format';
@@ -314,11 +315,6 @@ export function BuybackPage() {
 
   const extraFilterCount = (filterStatus ? 1 : 0) + (filterBranchId !== null ? 1 : 0);
 
-  useEffect(() => {
-    const tm = setTimeout(() => setDebouncedSearch(search.trim()), 300);
-    return () => clearTimeout(tm);
-  }, [search]);
-
   const { data: branches } = useQuery({
     queryKey: ['branches'],
     queryFn: () => apiClient.get<Branch[]>('/v_branches?order=name&is_active=is.true'),
@@ -402,12 +398,12 @@ export function BuybackPage() {
               <div className="flex-none p-2 border-b border-line">
                 <div className="flex items-center gap-2">
                   <div className="flex-1 min-w-0">
-                    <Input
+                    <SearchInput
                       value={search}
-                      onChange={(e) => setSearch(e.target.value)}
+                      onChange={setSearch}
+                      onDebouncedChange={setDebouncedSearch}
                       placeholder={t('common.search')}
                       size="sm"
-                      startIcon={<Search size={16} />}
                       className="w-full"
                     />
                   </div>

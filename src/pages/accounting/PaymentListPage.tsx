@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
-  MobileHeader, DataTable, Select, Badge, Input, Switch, Tooltip, InputDateRangePicker,
+  MobileHeader, DataTable, Select, Badge, Switch, Tooltip, InputDateRangePicker,
   PageNav, PageNavPanel,
 } from 'tsp-form';
 import {
@@ -18,6 +18,7 @@ import {
 } from '../../lib/format';
 import type { Branch, PaymentRow } from './accountingTypes';
 import { PaymentChannelCorrectModal } from './PaymentChannelCorrectModal';
+import { SearchInput } from '../../components/SearchInput';
 
 interface BankAccountOption {
   id: number;
@@ -94,6 +95,10 @@ export function PaymentListPage() {
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [isTypingRange, setIsTypingRange] = useState(false);
+
+  // Raw keyword the user is typing; ?q= (the `search` above) is the debounced,
+  // long-enough-to-search version that actually drives the query.
+  const [searchInput, setSearchInput] = useState(search);
 
   const pendingPatchRef = useRef<Record<string, string> | null>(null);
   const updateFilters = useCallback((patch: Partial<{ branch_id: string; from: string; to: string; method: string; type: string; bank_account_id: string; q: string; voided: string }>) => {
@@ -228,9 +233,10 @@ export function PaymentListPage() {
     />
   );
   const searchNode: ReactNode = (
-    <Input
-      value={search}
-      onChange={(e) => updateFilters({ q: e.target.value })}
+    <SearchInput
+      value={searchInput}
+      onChange={setSearchInput}
+      onDebouncedChange={(q) => updateFilters({ q })}
       placeholder={t('accounting.paymentList.searchPlaceholder')}
       startIcon={<Search size={14} />}
       size="sm"

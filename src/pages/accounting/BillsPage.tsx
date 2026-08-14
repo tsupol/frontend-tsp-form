@@ -26,6 +26,7 @@ import { CreditNoteReverseModal } from './CreditNoteReverseModal';
 import { CancelClosedDayModal } from './CancelClosedDayModal';
 import { useBillActions, type BillAction, type BillActionCode } from '../../hooks/useBillActions';
 import { useVoidReasons } from '../../hooks/useVoidReasons';
+import { SearchInput } from '../../components/SearchInput';
 import { BillReceipt } from '../contracts/workspace/BillReceipt';
 import { translateApiError } from '../../lib/apiErrors';
 
@@ -113,13 +114,11 @@ export function BillsPage() {
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(25);
 
-  // Debounced search box — local input mirrors ?q=, committed to the URL after a pause.
+  // Local input mirrors ?q=; SearchInput commits it to the URL once it clears the
+  // minimum length (and commits '' below it, which reads as unfiltered).
   const [searchInput, setSearchInput] = useState(searchQuery);
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const onSearchChange = useCallback((value: string) => {
-    setSearchInput(value);
-    clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => updateFilters({ q: value.trim() }), 300);
+  const onSearchCommit = useCallback((value: string) => {
+    updateFilters({ q: value });
   }, [updateFilters]);
 
   const queryClient = useQueryClient();
@@ -236,15 +235,24 @@ export function BillsPage() {
               <div className="flex-none p-2 border-b border-line">
                 <FilterBar
                   leading={
-                    <Input
+                    <SearchInput
                       value={searchInput}
-                      onChange={(e) => onSearchChange(e.target.value)}
+                      onChange={setSearchInput}
+                      onDebouncedChange={onSearchCommit}
                       placeholder={t('accounting.bills.searchPlaceholder')}
                       size="sm"
                       className="w-full"
                       startIcon={<Search size={14} />}
-                      endIcon={searchInput ? <X size={14} /> : undefined}
-                      onEndIconClick={searchInput ? () => onSearchChange('') : undefined}
+                      endIcon={searchInput ? (
+                        <button
+                          type="button"
+                          className="flex items-center cursor-pointer bg-transparent border-none p-0 text-current"
+                          aria-label={t('common.clear')}
+                          onClick={() => { setSearchInput(''); updateFilters({ q: '' }); }}
+                        >
+                          <X size={14} />
+                        </button>
+                      ) : undefined}
                     />
                   }
                   leadingMinWidth={180}

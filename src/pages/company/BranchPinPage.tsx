@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm, Controller } from 'react-hook-form';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
@@ -12,6 +12,7 @@ import { KeyRound, ArrowRightFromLine, XCircle, CheckCircle, SlidersHorizontal, 
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { translateApiError } from '../../lib/apiErrors';
+import { SearchInput } from '../../components/SearchInput';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -389,7 +390,6 @@ function UsageLogTab({ branches, permissionOptions }: { branches: Branch[]; perm
   const [pageSize, setPageSize] = useState(25);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [branchFilter, setBranchFilter] = useState<number | null>(null);
   const [permissionFilter, setPermissionFilter] = useState<string | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -419,14 +419,6 @@ function UsageLogTab({ branches, permissionOptions }: { branches: Branch[]; perm
   const totalCount = data?.totalCount ?? 0;
 
   useEffect(() => { setPageIndex(0); }, [search, branchFilter, permissionFilter, sorting]);
-
-  const handleSearch = (value: string) => {
-    setSearchInput(value);
-    clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => {
-      setSearch(value);
-    }, 300);
-  };
 
   const sortOptions = [
     { value: 'used_at', label: t('settings.pin.usedAt') },
@@ -473,10 +465,11 @@ function UsageLogTab({ branches, permissionOptions }: { branches: Branch[]; perm
       {/* Filter bar */}
       <div className="flex items-center gap-2 pb-4 flex-none">
         <div className="flex-1 min-w-0">
-          <Input
+          <SearchInput
             placeholder={t('settings.pin.searchPlaceholder')}
             value={searchInput}
-            onChange={(e) => handleSearch(e.target.value)}
+            onChange={setSearchInput}
+            onDebouncedChange={setSearch}
             size="sm"
             className="w-full"
           />

@@ -5,6 +5,7 @@ import { PageNav, PageNavPanel, MobileHeader, Input, Badge, MaskedInput, Button,
 import { ArrowLeft, ArrowRightFromLine, ScanBarcode, Calculator, Clock, Trash2, X, ArrowUp, Info, XCircle } from 'lucide-react';
 import { apiClient } from '../lib/api';
 import { useBarcodeScanner } from '../components/BarcodeScanner';
+import { SearchInput } from '../components/SearchInput';
 import { lookupBarcode } from '../lib/barcodeLookup';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -137,12 +138,6 @@ export function PriceCheckPage() {
   }, [addSnackbar, t]);
   const { open: openScanner, scannerEl } = useBarcodeScanner({ onScan: handleBarcodeScan });
 
-  // Debounce search
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
-    return () => clearTimeout(timer);
-  }, [search]);
-
   // Search models
   const { data: models, isFetching: modelsLoading } = useQuery({
     queryKey: ['price-check-models', debouncedSearch],
@@ -155,7 +150,9 @@ export function PriceCheckPage() {
       return apiClient.get<ProductModel[]>(url);
     },
     staleTime: 2 * 60 * 1000,
-    enabled: debouncedSearch.length >= 2,
+    // SearchInput only reports a keyword once it clears the shared minimum, so
+    // a non-empty value is already long enough to search.
+    enabled: !!debouncedSearch,
   });
 
   // Get quotes for selected model
@@ -186,7 +183,7 @@ export function PriceCheckPage() {
   }, []);
 
   // Refresh recent list from localStorage when search clears (recent list becomes visible)
-  const isSearching = debouncedSearch.length >= 2;
+  const isSearching = !!debouncedSearch;
   useEffect(() => {
     if (!isSearching) setRecentModels(getRecentModels());
   }, [isSearching]);
@@ -237,11 +234,14 @@ export function PriceCheckPage() {
                     aria-label={t('barcodeScanner.title', { defaultValue: 'Scan barcode' })}
                   />
                   <div className="input-group-divider" />
-                  <Input
+                  <SearchInput
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    onChange={setSearch}
+                    onDebouncedChange={setDebouncedSearch}
                     placeholder={t('priceCheck.searchPlaceholder')}
                     size="sm"
+                    // Scan button leads the input-group; no room for a magnifier.
+                    startIcon={null}
                     className="w-full"
                   />
                 </div>

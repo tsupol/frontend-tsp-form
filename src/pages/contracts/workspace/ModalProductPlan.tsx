@@ -9,6 +9,7 @@ import { fmtCurrency } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
 import type { ProductModel, Variant, Quote, QuoteResponse, BrandLookup, FamilyLookup } from './WorkspaceTypes';
 import { useBarcodeScanner } from '../../../components/BarcodeScanner';
+import { SearchInput } from '../../../components/SearchInput';
 import { lookupBarcode } from '../../../lib/barcodeLookup';
 
 interface Props {
@@ -55,12 +56,6 @@ export function ModalProductPlan({ open, onClose }: Props) {
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Debounce search
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
-    return () => clearTimeout(timer);
-  }, [search]);
-
   // Brand lookup
   const { data: brands = [] } = useQuery({
     queryKey: ['brand-lookup', holdingId],
@@ -90,8 +85,9 @@ export function ModalProductPlan({ open, onClose }: Props) {
     if (family && String(family.brand_id) !== filterBrand) setFilterFamily('');
   }, [filterBrand, filterFamily, families]);
 
-  // Search models
-  const shouldSearch = !!(debouncedSearch.length >= 2 || filterBrand || filterFamily);
+  // Search models. `debouncedSearch` is already '' below the shared minimum, so
+  // truthiness is the whole threshold check.
+  const shouldSearch = !!(debouncedSearch || filterBrand || filterFamily);
 
   const { data: models, isFetching: modelsLoading } = useQuery({
     queryKey: ['wizard-models', holdingId, debouncedSearch, filterBrand, filterFamily],
@@ -261,9 +257,11 @@ export function ModalProductPlan({ open, onClose }: Props) {
               aria-label={t('barcodeScanner.title', { defaultValue: 'Scan barcode' })}
             />
             <div className="input-group-divider" />
-            <Input
+            <SearchInput
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={setSearch}
+              onDebouncedChange={setDebouncedSearch}
+              startIcon={null}
               placeholder={t('wizard.searchProductPlaceholder')}
               className="w-full"
               size="sm"

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useSearchParams, useNavigate, type NavigateFunction } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { MobileHeader, Badge, Select, Input, Button, PopOver, MenuItem, LabeledCheckbox } from 'tsp-form';
+import { MobileHeader, Badge, Select, Button, PopOver, MenuItem, LabeledCheckbox } from 'tsp-form';
 import { Boxes, ScanBarcode, ArrowRightFromLine, ShoppingCart, Smartphone, MoreHorizontal, PackageMinus, Archive, Printer, FileSpreadsheet, ListChecks, ExternalLink } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { fmtCurrency } from '../../lib/format';
@@ -11,6 +11,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { fmtNum, getConditionLabel } from './inventoryUtils';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { useBarcodeScanner } from '../../components/BarcodeScanner';
+import { SearchInput } from '../../components/SearchInput';
 import { RetailWriteOffModal, type RetailWriteOffTarget } from './RetailWriteOffModal';
 import { printWithMarker } from '../../lib/printDoc';
 import { downloadXlsx, type XlsxColumn } from '../../lib/xlsx';
@@ -152,11 +153,6 @@ export function BranchStockPage() {
   const { open: openScanner, scannerEl } = useBarcodeScanner({
     onScan: (val) => { setSearch(val); setDebouncedSearch(val); },
   });
-
-  useEffect(() => {
-    const tm = setTimeout(() => setDebouncedSearch(search.trim()), 300);
-    return () => clearTimeout(tm);
-  }, [search]);
 
   // Sync from URL on every searchParams change (side-nav shortcut click,
   // browser back, etc.)
@@ -534,9 +530,11 @@ export function BranchStockPage() {
               aria-label={t('barcodeScanner.title', { defaultValue: 'Scan barcode' })}
             />
             <div className="input-group-divider" />
-            <Input
+            <SearchInput
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={setSearch}
+              onDebouncedChange={setDebouncedSearch}
+              startIcon={null}
               placeholder={tab === 'assetDetail'
                 ? t('branchStock.assetSearch', { defaultValue: 'Search by name, serial, IMEI, code' })
                 : t('branchStock.search', { defaultValue: 'Search by name, model, variant' })}

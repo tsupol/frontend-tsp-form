@@ -3,12 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import {
-  PageNav, PageNavPanel, MobileHeader, DataTable, Input, Select, Badge, Button,
+  PageNav, PageNavPanel, MobileHeader, DataTable, Select, Badge, Button,
   PopOver, InputDatePicker,
 } from 'tsp-form';
 import { ArrowRightFromLine, ArrowLeft, Search, SlidersHorizontal, Calendar, ExternalLink, ChevronsUpDown } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
+import { SearchInput } from '../../components/SearchInput';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -126,11 +127,6 @@ export function DunningTargetsPage() {
   const [pageSize, setPageSize] = useState(15);
   const [filterOpen, setFilterOpen] = useState(false);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
-    return () => clearTimeout(timer);
-  }, [search]);
-
   useEffect(() => { setPageIndex(0); }, [filterBucket, filterBranchId, debouncedSearch, dateFrom, dateTo, sortBy]);
 
   // Branch lookup
@@ -222,12 +218,12 @@ export function DunningTargetsPage() {
               <div className="flex-none p-2 border-b border-line">
                 <div className="flex items-center gap-2">
                   <div className="flex-1 min-w-0">
-                    <Input
+                    <SearchInput
                       value={search}
-                      onChange={(e) => setSearch(e.target.value)}
+                      onChange={setSearch}
+                      onDebouncedChange={setDebouncedSearch}
                       placeholder={t('legal.searchContract')}
                       size="sm"
-                      startIcon={<Search size={16} />}
                       className="w-full"
                     />
                   </div>

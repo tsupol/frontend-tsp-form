@@ -2,11 +2,11 @@
 // (v_my_book), right = 4-tab contract detail. Replaces the deprecated Call Ticket
 // queue (TicketQueuePage). No central queue — the collector works their own book.
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { PageNav, PageNavPanel, MobileHeader, DataTable, Badge, Input, Select, Button, Tooltip, useSnackbarContext } from 'tsp-form';
+import { PageNav, PageNavPanel, MobileHeader, DataTable, Badge, Select, Button, Tooltip, useSnackbarContext } from 'tsp-form';
 import { ArrowLeft, ArrowRightFromLine, XCircle, CheckCircle, Star, StarOff, Send, Copy, ArrowRightLeft } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
@@ -19,6 +19,7 @@ import { FlagPair, SkipReasonBadge, AppointmentBadge, DeviceContextBadges, Devic
 import { RowTransferModal } from './DunningActions';
 import { ContractDunningDetail } from './ContractDunningDetail';
 import { TransferView, TransferOfferDetail } from './TransferView';
+import { SearchInput } from '../../components/SearchInput';
 
 type View = 'focus' | 'book' | 'transfer';
 type SortKey =
@@ -51,18 +52,13 @@ export function CallCenterPage() {
   const [pageSize, setPageSize] = useState(25);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const selectedId = searchParams.get('contract') ? Number(searchParams.get('contract')) : null;
   const detailTab = (searchParams.get('tab') as 'overview' | 'installments' | 'contacts' | 'history' | null) ?? undefined;
 
   const { data: flagLevels } = useFlagLevels();
 
-  const handleSearch = (value: string) => {
-    setSearchInput(value);
-    clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => { setSearch(value); setPageIndex(0); }, 300);
-  };
+  const handleSearch = (value: string) => { setSearch(value); setPageIndex(0); };
 
   const selectContract = (id: number | null) => {
     setSearchParams(prev => {
@@ -317,7 +313,7 @@ export function CallCenterPage() {
               <div className="px-4 py-2 flex flex-col gap-2 border-b border-line">
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="flex-[2] min-w-0 basis-40">
-                    <Input className="w-full" placeholder={t('callCenter.search')} value={searchInput} onChange={(e) => handleSearch(e.target.value)} size="sm" />
+                    <SearchInput className="w-full" placeholder={t('callCenter.search')} value={searchInput} onChange={setSearchInput} onDebouncedChange={handleSearch} size="sm" />
                   </div>
                   <div className="min-w-0 basis-40 flex-1">
                     <Select

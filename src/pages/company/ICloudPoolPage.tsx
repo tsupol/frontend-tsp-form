@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm, Controller } from 'react-hook-form';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
@@ -16,6 +16,7 @@ import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { DateTime } from '../../components/DateTime';
 import { IcloudPasswordRow } from '../contracts/IcloudModals';
+import { SearchInput } from '../../components/SearchInput';
 import { translateApiError } from '../../lib/apiErrors';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -753,7 +754,6 @@ export function ICloudPoolPage() {
   const [pageSize, setPageSize] = useState(25);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [branchFilter, setBranchFilter] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -811,12 +811,6 @@ export function ICloudPoolPage() {
       setSelectedId(null);
     }
   }, [accounts, selectedId, isFetching]);
-
-  const handleSearch = (value: string) => {
-    setSearchInput(value);
-    clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => setSearch(value), 300);
-  };
 
   const selectedAccount = selectedId ? accounts.find(a => a.id === selectedId) ?? null : null;
 
@@ -887,10 +881,11 @@ export function ICloudPoolPage() {
               <div className="flex-none p-2 border-b border-line">
                 <div className="flex items-center gap-2">
                   <div className="flex-1 min-w-0">
-                    <Input
+                    <SearchInput
                       placeholder={t('settings.icloud.searchPlaceholder')}
                       value={searchInput}
-                      onChange={(e) => handleSearch(e.target.value)}
+                      onChange={setSearchInput}
+                      onDebouncedChange={setSearch}
                       size="sm"
                       className="w-full"
                     />

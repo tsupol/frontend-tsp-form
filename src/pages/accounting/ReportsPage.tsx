@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import {
   MobileHeader, Select, InputDateRangePicker, Button,
-  Input, Badge, DataTableFooter,
+  Badge, DataTableFooter,
 } from 'tsp-form';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -15,6 +15,7 @@ import {
 } from '../../lib/format';
 import { downloadXlsx, type XlsxCellType, type XlsxColumn } from '../../lib/xlsx';
 import { FilterBar } from '../../components/FilterBar';
+import { SearchInput } from '../../components/SearchInput';
 import { DateTime } from '../../components/DateTime';
 import { getConditionLabel, getConditionTextColor } from '../inventory/inventoryUtils';
 
@@ -80,11 +81,6 @@ export function ReportsPage() {
   const [exporting, setExporting] = useState(false);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(25);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
-    return () => clearTimeout(timer);
-  }, [search]);
 
   // Any filter/date/search/report change resets to the first page.
   useEffect(() => {
@@ -158,7 +154,7 @@ export function ReportsPage() {
     for (const [col, val] of Object.entries(enumFilters)) if (val) params.push(`${col}=eq.${val}`);
     for (const [col, val] of Object.entries(scopeFilters)) if (val) params.push(`${col}=eq.${val}`);
     for (const [col, val] of Object.entries(boolFilters)) if (val) params.push(`${col}=is.${val}`);
-    if (debouncedSearch.length >= 2 && report.search_cols.length > 0) {
+    if (debouncedSearch && report.search_cols.length > 0) {
       const term = debouncedSearch.replace(/[*,()]/g, '');
       const or = report.search_cols.map(c => `${c}.ilike.*${term}*`).join(',');
       params.push(`or=(${or})`);
@@ -267,7 +263,7 @@ export function ReportsPage() {
     Object.values(enumFilters).filter(Boolean).length +
     Object.values(scopeFilters).filter(Boolean).length +
     Object.values(boolFilters).filter(Boolean).length +
-    (debouncedSearch.length >= 2 ? 1 : 0);
+    (debouncedSearch ? 1 : 0);
 
   const filterItems = [
     ...scopeControls.map((node, i) => ({ key: `scope-${i}`, width: 176, node, priority: 40 })),
@@ -385,15 +381,24 @@ export function ReportsPage() {
         </div>
         <div className="flex items-center gap-2">
           <div className="flex-1 min-w-0 max-w-xs">
-            <Input
+            <SearchInput
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={setSearch}
+              onDebouncedChange={setDebouncedSearch}
               placeholder={t('reports.searchPlaceholder')}
               size="sm"
               className="w-full"
               startIcon={<Search size={14} />}
-              endIcon={search ? <X size={14} /> : undefined}
-              onEndIconClick={search ? () => setSearch('') : undefined}
+              endIcon={search ? (
+                <button
+                  type="button"
+                  className="flex items-center cursor-pointer bg-transparent border-none p-0 text-current"
+                  aria-label={t('common.clear')}
+                  onClick={() => setSearch('')}
+                >
+                  <X size={14} />
+                </button>
+              ) : undefined}
             />
           </div>
           <FilterBar

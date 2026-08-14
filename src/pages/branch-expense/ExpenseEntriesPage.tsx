@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   PageNav, PageNavPanel, MobileHeader, DataTable, Button, Select,
-  InputDateRangePicker, Input, MaskedInput, PopOver,
+  InputDateRangePicker, MaskedInput, PopOver,
 } from 'tsp-form';
 import {
   ArrowRightFromLine, ArrowLeft, Plus, Keyboard, Image as ImageIcon,
@@ -16,6 +16,7 @@ import { fmtCurrency, toLocalDateStr, parseLocalDate, makeDateRangePickerFormat 
 import { publicMediaUrl, normalizeKey } from '../../lib/mediaPath';
 import { CreateExpenseModal } from './CreateExpenseModal';
 import { ExpenseDetailPanel } from './ExpenseDetailPanel';
+import { SearchInput } from '../../components/SearchInput';
 import type { ExpenseCategory, ExpenseItem, ExpenseEntry } from './branchExpenseTypes';
 
 interface Branch {
@@ -55,14 +56,10 @@ export function ExpenseEntriesPage() {
   const [creating, setCreating] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
 
-  // Debounce search to keep PostgREST traffic sane.
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search.trim());
-      setPageIndex(0);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [search]);
+  const onSearchCommit = (value: string) => {
+    setDebouncedSearch(value);
+    setPageIndex(0);
+  };
 
   const { data: branches = [] } = useQuery({
     queryKey: ['branches-active'],
@@ -99,7 +96,7 @@ export function ExpenseEntriesPage() {
     if (amountMax) params.push(`amount=lte.${amountMax}`);
     // PostgREST OR across vendor + payee + note. Asterisks for substring; ilike is
     // case-insensitive. Strip parens/commas the user may have typed.
-    if (debouncedSearch.length >= 2) {
+    if (debouncedSearch) {
       const term = debouncedSearch.replace(/[*,()]/g, '');
       params.push(`or=(vendor.ilike.*${term}*,payee_name.ilike.*${term}*,note.ilike.*${term}*)`);
     }
@@ -126,7 +123,7 @@ export function ExpenseEntriesPage() {
     (statusFilter !== 'active' ? 1 : 0) +
     (amountMin ? 1 : 0) +
     (amountMax ? 1 : 0) +
-    (debouncedSearch.length >= 2 ? 1 : 0);
+    (debouncedSearch ? 1 : 0);
 
   const parseDate8 = (digits: string): Date | null => {
     if (digits.length !== 8) return null;
@@ -215,15 +212,24 @@ export function ExpenseEntriesPage() {
             <div className="flex-none p-2 border-b border-line">
               <div className="flex items-center gap-2">
                 <div className="flex-1 min-w-0">
-                  <Input
+                  <SearchInput
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    onChange={setSearch}
+                    onDebouncedChange={onSearchCommit}
                     placeholder={t('branchExpense.searchPlaceholder')}
                     size="sm"
                     className="w-full"
                     startIcon={<Search size={14} />}
-                    endIcon={search ? <X size={14} /> : undefined}
-                    onEndIconClick={search ? () => setSearch('') : undefined}
+                    endIcon={search ? (
+                      <button
+                        type="button"
+                        className="flex items-center cursor-pointer bg-transparent border-none p-0 text-current"
+                        aria-label={t('common.clear')}
+                        onClick={() => setSearch('')}
+                      >
+                        <X size={14} />
+                      </button>
+                    ) : undefined}
                   />
                 </div>
                 <div className="flex-1 min-w-0 hidden sm:block">

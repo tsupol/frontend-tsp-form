@@ -2,13 +2,14 @@ import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Modal, Input, TextArea, NumberSpinner, DataTable, PopOver, useSnackbarContext } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, ArrowLeftRight, CheckCircle, XCircle, Trash2, ExternalLink, Search, SlidersHorizontal, Plus, Smartphone, Package } from 'lucide-react';
+import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Modal, TextArea, NumberSpinner, DataTable, PopOver, useSnackbarContext } from 'tsp-form';
+import { ArrowLeft, ArrowRightFromLine, ArrowLeftRight, CheckCircle, XCircle, Trash2, ExternalLink, SlidersHorizontal, Plus, Smartphone, Package } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { DateTime } from '../../components/DateTime';
 import { CopyButton } from '../../components/CopyButton';
+import { SearchInput } from '../../components/SearchInput';
 import { fmtNum, assetSearchOrClause } from './inventoryUtils';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
@@ -220,10 +221,6 @@ export function TransfersPage() {
     (filterToBranch !== null ? 1 : 0) +
     (scopeApplied ? 1 : 0);
 
-  useEffect(() => {
-    const tm = setTimeout(() => setDebouncedSearch(search.trim()), 300);
-    return () => clearTimeout(tm);
-  }, [search]);
 
   const { data: branches } = useQuery({
     queryKey: ['branches'],
@@ -340,12 +337,12 @@ export function TransfersPage() {
               <div className="flex-none p-2 border-b border-line">
                 <div className="flex items-center gap-2">
                   <div className="flex-1 min-w-0">
-                    <Input
+                    <SearchInput
                       value={search}
-                      onChange={(e) => setSearch(e.target.value)}
+                      onChange={setSearch}
+                      onDebouncedChange={setDebouncedSearch}
                       placeholder={t('common.search')}
                       size="sm"
-                      startIcon={<Search size={16} />}
                       className="w-full"
                     />
                   </div>
@@ -907,10 +904,6 @@ function AddLineModal({
     if (open) { setSearch(''); setDebounced(''); setPickedId(null); setError(''); }
   }, [open, lineType]);
 
-  useEffect(() => {
-    const tm = setTimeout(() => setDebounced(search.trim()), 300);
-    return () => clearTimeout(tm);
-  }, [search]);
 
   // Asset / lot ids already on this transfer — exclude from the picker.
   const usedAssetIds = useMemo(
@@ -999,12 +992,12 @@ function AddLineModal({
             </div>
           )}
           <div className="mb-3">
-            <Input
+            <SearchInput
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={setSearch}
+              onDebouncedChange={setDebounced}
               placeholder={t('common.search')}
               size="sm"
-              startIcon={<Search size={16} />}
               className="w-full"
               autoFocus
             />

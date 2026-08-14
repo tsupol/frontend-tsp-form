@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import {
   MobileHeader, Select, InputDateRangePicker, Button, DataTable,
-  Input, PopOver,
+  PopOver,
 } from 'tsp-form';
 import {
   ArrowRightFromLine, Keyboard, Search, X, SlidersHorizontal,
@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { SearchInput } from '../../components/SearchInput';
 import {
   toLocalDateStr, parseLocalDate, makeDateRangePickerFormat, fmtCurrency,
 } from '../../lib/format';
@@ -49,11 +50,6 @@ export function ExpenseSummaryPage() {
   const [isTypingRange, setIsTypingRange] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
-    return () => clearTimeout(timer);
-  }, [search]);
-
   const { data: branches = [] } = useQuery({
     queryKey: ['branches-active'],
     queryFn: () => apiClient.get<Branch[]>('/v_branches?is_active=is.true&order=name'),
@@ -74,7 +70,7 @@ export function ExpenseSummaryPage() {
     if (toDate) params.push(`expense_month=lte.${toDate.slice(0, 8)}01`);
     if (branchId) params.push(`branch_id=eq.${branchId}`);
     if (categoryId) params.push(`category_id=eq.${categoryId}`);
-    if (debouncedSearch.length >= 2) {
+    if (debouncedSearch) {
       const term = debouncedSearch.replace(/[*,()]/g, '');
       params.push(`category_name_th=ilike.*${term}*`);
     }
@@ -99,7 +95,7 @@ export function ExpenseSummaryPage() {
   const activeFilterCount =
     (branchId ? 1 : 0) +
     (categoryId ? 1 : 0) +
-    (debouncedSearch.length >= 2 ? 1 : 0);
+    (debouncedSearch ? 1 : 0);
 
   const parseDate8 = (digits: string): Date | null => {
     if (digits.length !== 8) return null;
@@ -237,15 +233,24 @@ export function ExpenseSummaryPage() {
       <div className="flex-none p-2 border-b border-line">
         <div className="flex items-center gap-2">
           <div className="flex-1 min-w-0">
-            <Input
+            <SearchInput
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={setSearch}
+              onDebouncedChange={setDebouncedSearch}
               placeholder={t('branchExpense.searchCategoryPlaceholder')}
               size="sm"
               className="w-full"
               startIcon={<Search size={14} />}
-              endIcon={search ? <X size={14} /> : undefined}
-              onEndIconClick={search ? () => setSearch('') : undefined}
+              endIcon={search ? (
+                <button
+                  type="button"
+                  className="flex items-center cursor-pointer bg-transparent border-none p-0 text-current"
+                  aria-label={t('common.clear')}
+                  onClick={() => setSearch('')}
+                >
+                  <X size={14} />
+                </button>
+              ) : undefined}
             />
           </div>
           <div className="flex-1 min-w-0 hidden sm:block">

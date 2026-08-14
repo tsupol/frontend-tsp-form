@@ -3,12 +3,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import {
-  PageNav, PageNavPanel, MobileHeader, DataTable, Input, Select, Badge, Tooltip,
+  PageNav, PageNavPanel, MobileHeader, DataTable, Select, Badge, Tooltip,
 } from 'tsp-form';
 import {
   ArrowRightFromLine, ArrowLeft, Search, X, MapPin, Star, AlertTriangle, Clock,
 } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
+import { SearchInput } from '../../components/SearchInput';
 import { fmtCurrency } from '../../lib/format';
 import { fetchRepoPool, type RepoPoolRow, type DunningStatus } from './repoApi';
 import { RepoDetailPanel } from './RepoDetailPanel';
@@ -63,12 +64,6 @@ export function RepoPoolPage() {
     staleTime: 15_000,
   });
 
-  const onSearchChange = (v: string) => {
-    setSearchInput(v);
-    // debounce-light: commit on next tick via a timer would be ideal, but the
-    // list is capped at 100 and cached; commit directly for simplicity.
-    setSearch(v);
-  };
 
   const selectRow = (id: number, goTo?: (p: string) => void) => {
     navigate(`/admin/repo/pool/${id}`);
@@ -113,15 +108,16 @@ export function RepoPoolPage() {
             <PageNavPanel id="list" className={isMobile ? '' : 'w-1/2 xl:w-5/12 border-r border-line flex flex-col'}>
               {/* Filters */}
               <div className="flex-none p-2 border-b border-line flex items-center gap-2">
-                <Input
+                <SearchInput
                   value={searchInput}
-                  onChange={(e) => onSearchChange(e.target.value)}
+                  onChange={setSearchInput}
+                  onDebouncedChange={setSearch}
                   placeholder={t('repo.pool.searchPlaceholder')}
                   size="sm"
                   className="w-full flex-1 min-w-0"
                   startIcon={<Search size={14} />}
                   endIcon={searchInput ? <X size={14} /> : undefined}
-                  onEndIconClick={searchInput ? () => onSearchChange('') : undefined}
+                  onEndIconClick={searchInput ? () => { setSearchInput(''); setSearch(''); } : undefined}
                 />
                 <div style={{ width: '11rem' }} className="shrink-0">
                   <Select

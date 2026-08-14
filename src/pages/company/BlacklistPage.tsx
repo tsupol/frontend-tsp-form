@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
@@ -14,6 +14,7 @@ import {
 import { Link } from 'react-router-dom';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { SearchInput } from '../../components/SearchInput';
 import { translateApiError } from '../../lib/apiErrors';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -319,7 +320,6 @@ export function BlacklistPage() {
   const [pageSize, setPageSize] = useState(25);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [liftEntry, setLiftEntry] = useState<BlacklistEntry | null>(null);
@@ -342,12 +342,8 @@ export function BlacklistPage() {
   const totalCount = data?.totalCount ?? 0;
 
   const handleSearch = (value: string) => {
-    setSearchInput(value);
-    clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => {
-      setSearch(value);
-      setPageIndex(0);
-    }, 300);
+    setSearch(value);
+    setPageIndex(0);
   };
 
   const formatExpiry = (expires_at: string | null) => {
@@ -452,10 +448,10 @@ export function BlacklistPage() {
         <div className="flex-none pb-4">
           <div className="flex items-center gap-2">
             <div className="flex-1 min-w-0 md:max-w-56">
-              <Input
-                placeholder={t('common.search')}
+              <SearchInput
                 value={searchInput}
-                onChange={(e) => handleSearch(e.target.value)}
+                onChange={setSearchInput}
+                onDebouncedChange={handleSearch}
                 size="sm"
                 className="w-full"
               />

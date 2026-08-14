@@ -7,7 +7,7 @@ import {
   DataTable, PopOver, Tooltip, LabeledCheckbox, useSnackbarContext,
 } from 'tsp-form';
 import {
-  ArrowLeft, ArrowRight, ArrowRightFromLine, Boxes, Search, CheckCircle, XCircle, ChevronDown, Wrench, Plus, Trash2, ExternalLink, SlidersHorizontal, AlertCircle, ListChecks,
+  ArrowLeft, ArrowRight, ArrowRightFromLine, Boxes, CheckCircle, XCircle, ChevronDown, Wrench, Plus, Trash2, ExternalLink, SlidersHorizontal, AlertCircle, ListChecks,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
@@ -19,6 +19,7 @@ import { getBucketLabel, getBucketColor, fmtNum, codeDisplay } from './inventory
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { ColorAutocomplete, ColorMatchBadge } from '../../components/ColorAutocomplete';
 import { ImeiInput } from '../../components/ImeiInput';
+import { SearchInput } from '../../components/SearchInput';
 import { OwnerBadge } from '../../components/OwnerBadge';
 import type { OwnerType } from '../../lib/ownerTypes';
 import { translateApiError, prepareErrorParams, translateErrorCode } from '../../lib/apiErrors';
@@ -223,10 +224,6 @@ export function LotsPage() {
     showClosed,   // lives only in the popover at every breakpoint
   ].filter(Boolean).length;
 
-  useEffect(() => {
-    const tm = setTimeout(() => setDebouncedSearch(search.trim()), 300);
-    return () => clearTimeout(tm);
-  }, [search]);
 
   const { data: branches } = useQuery({
     queryKey: ['branches'],
@@ -334,12 +331,12 @@ export function LotsPage() {
               )}
               <div className="flex items-center gap-2 w-full">
                 <div className="flex-1 min-w-0">
-                  <Input
+                  <SearchInput
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    onChange={setSearch}
+                    onDebouncedChange={setDebouncedSearch}
                     placeholder={t('lot.search')}
                     size="sm"
-                    startIcon={<Search size={16} />}
                   />
                 </div>
                 <div className="flex-1 min-w-0 hidden sm:block">

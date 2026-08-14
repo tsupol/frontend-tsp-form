@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo, type MouseEvent } from 'react';
+import { useState, useEffect, useCallback, useMemo, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm, Controller } from 'react-hook-form';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
@@ -8,6 +8,7 @@ import { apiClient, ApiError } from '../lib/api';
 import { FormErrorMessage } from 'tsp-form';
 import { getRoleLabel } from '../lib/roleLabel';
 import { translateApiError } from '../lib/apiErrors';
+import { SearchInput } from '../components/SearchInput';
 
 interface VUser {
   id: number;
@@ -1315,7 +1316,6 @@ export function UsersPage() {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [filterHolding, setFilterHolding] = useState('');
   const [filterCompany, setFilterCompany] = useState('');
   const [filterBranch, setFilterBranch] = useState('');
@@ -1373,14 +1373,10 @@ export function UsersPage() {
   const selectedCount = Object.keys(rowSelection).length;
   const getSelectedUsers = () => Object.keys(rowSelection).map((i) => users[Number(i)]).filter(Boolean);
 
-  const handleSearch = (value: string) => {
-    setSearchInput(value);
-    clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => {
-      setSearch(value);
-      setPageIndex(0);
-      setRowSelection({});
-    }, 300);
+  const handleDebouncedSearch = (value: string) => {
+    setSearch(value);
+    setPageIndex(0);
+    setRowSelection({});
   };
 
   const resetFilters = () => {
@@ -1486,10 +1482,10 @@ export function UsersPage() {
           <div className="flex items-center gap-2">
             {/* Search — always visible */}
             <div className="flex-1 min-w-0">
-              <Input
-                placeholder={t('common.search')}
+              <SearchInput
                 value={searchInput}
-                onChange={(e) => handleSearch(e.target.value)}
+                onChange={setSearchInput}
+                onDebouncedChange={handleDebouncedSearch}
                 size="sm"
                 className="w-full"
               />

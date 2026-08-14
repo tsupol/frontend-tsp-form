@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Modal, Button, Input, NumberSpinner, Tooltip, Badge } from 'tsp-form';
+import { Modal, Button, NumberSpinner, Tooltip, Badge } from 'tsp-form';
 import { ScanBarcode, Barcode } from 'lucide-react';
 import { apiClient } from '../lib/api';
 import { fmtCurrency } from '../lib/format';
 import { useBarcodeScanner } from './BarcodeScanner';
+import { SearchInput } from './SearchInput';
 
 export interface SellableVariant {
   variant_id: number;
@@ -63,11 +64,6 @@ export function ProductPickerModal({
     }
   }, [open]);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(search.trim()), 250);
-    return () => clearTimeout(timer);
-  }, [search]);
-
   const { data: variants = [], isFetching } = useQuery({
     queryKey: ['sellable-variants', branchId, debounced],
     queryFn: () => {
@@ -111,11 +107,15 @@ export function ProductPickerModal({
               aria-label={t('barcodeScanner.title', { defaultValue: 'Scan barcode' })}
             />
             <div className="input-group-divider" />
-            <Input
+            <SearchInput
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={setSearch}
+              onDebouncedChange={setDebounced}
               placeholder={t('retail.create.searchProducts')}
               size="sm"
+              // The scan button already carries the magnifier's job here, and
+              // the input-group has no room for a second leading icon.
+              startIcon={null}
               className="w-full"
               autoFocus
             />

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, type MouseEvent } from 'react';
+import { useState, useEffect, useCallback, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm, Controller } from 'react-hook-form';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
@@ -15,6 +15,7 @@ import {
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { translateApiError } from '../../lib/apiErrors';
+import { SearchInput } from '../../components/SearchInput';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -857,7 +858,6 @@ function ManageOptionsModal({ attribute, open, onClose, holdingId }: {
 
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [optSorting, setOptSorting] = useState<SortingState>([]);
@@ -893,12 +893,8 @@ function ManageOptionsModal({ attribute, open, onClose, holdingId }: {
   const total = optData?.totalCount ?? 0;
 
   const handleSearch = (value: string) => {
-    setSearchInput(value);
-    clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => {
-      setSearch(value);
-      setPage(0);
-    }, 300);
+    setSearch(value);
+    setPage(0);
   };
 
   const handleToggleOption = async (opt: AttributeOption) => {
@@ -1015,13 +1011,15 @@ function ManageOptionsModal({ attribute, open, onClose, holdingId }: {
           </div>
           <div className="modal-content">
             <div className="flex items-center justify-between mb-3">
-              <Input
-                placeholder={t('common.search')}
-                value={searchInput}
-                onChange={(e) => handleSearch(e.target.value)}
-                size="sm"
-                style={{ width: '14rem' }}
-              />
+              <div style={{ width: '14rem' }}>
+                <SearchInput
+                  value={searchInput}
+                  onChange={setSearchInput}
+                  onDebouncedChange={handleSearch}
+                  size="sm"
+                  className="w-full"
+                />
+              </div>
               <Button color="primary" size="sm" startIcon={<Plus />} onClick={() => setCreateOptOpen(true)}>
                 {t('attributes.addOption')}
               </Button>
@@ -1076,7 +1074,6 @@ export function AttributesPage() {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [createAttrOpen, setCreateAttrOpen] = useState(false);
   const [editAttr, setEditAttr] = useState<ProductAttribute | null>(null);
   const [manageOptionsAttr, setManageOptionsAttr] = useState<ProductAttribute | null>(null);
@@ -1110,12 +1107,8 @@ export function AttributesPage() {
   const totalCount = data?.totalCount ?? 0;
 
   const handleSearch = (value: string) => {
-    setSearchInput(value);
-    clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => {
-      setSearch(value);
-      setPageIndex(0);
-    }, 300);
+    setSearch(value);
+    setPageIndex(0);
   };
 
   const handleToggleAttribute = async (attr: ProductAttribute) => {
@@ -1246,10 +1239,10 @@ export function AttributesPage() {
         <div className="flex-none pb-4">
           <div className="flex items-center gap-2">
             <div className="flex-1 min-w-0 md:max-w-56">
-              <Input
-                placeholder={t('common.search')}
+              <SearchInput
                 value={searchInput}
-                onChange={(e) => handleSearch(e.target.value)}
+                onChange={setSearchInput}
+                onDebouncedChange={handleSearch}
                 size="sm"
                 className="w-full"
               />

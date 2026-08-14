@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, Input, Select, Button, DataTableFooter, PopOver } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, Search, FilePlus, SlidersHorizontal } from 'lucide-react';
+import { PageNav, PageNavPanel, MobileHeader, Select, Button, DataTableFooter, PopOver } from 'tsp-form';
+import { ArrowLeft, ArrowRightFromLine, FilePlus, SlidersHorizontal } from 'lucide-react';
 import { apiClient } from '../../lib/api';
+import { SearchInput } from '../../components/SearchInput';
 import { useAuth } from '../../contexts/AuthContext';
 import { DraftDetailPanel } from './DraftDetailPanel';
 import { ContractDetailSlot } from './ContractDetailSlot';
@@ -59,11 +60,6 @@ export function DraftContractsPage() {
   const [filterOpen, setFilterOpen] = useState(false);
 
   const extraFilterCount = filterBranchId !== null ? 1 : 0;
-
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
-    return () => clearTimeout(timer);
-  }, [search]);
 
   useEffect(() => { setPageIndex(0); }, [debouncedSearch, filterBranchId]);
 
@@ -136,12 +132,12 @@ export function DraftContractsPage() {
               <div className="flex-none p-2 border-b border-line">
                 <div className="flex items-center gap-2">
                   <div className="flex-1 min-w-0">
-                    <Input
+                    <SearchInput
                       value={search}
-                      onChange={(e) => setSearch(e.target.value)}
+                      onChange={setSearch}
+                      onDebouncedChange={setDebouncedSearch}
                       placeholder={t('contract.searchPlaceholder')}
                       size="sm"
-                      startIcon={<Search size={16} />}
                       className="w-full"
                     />
                   </div>

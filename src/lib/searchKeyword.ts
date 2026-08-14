@@ -35,3 +35,45 @@ export function isBelowSearchMin(keyword: string | null | undefined): boolean {
   const len = (keyword ?? '').trim().length;
   return len > 0 && len < SEARCH_MIN_CHARS;
 }
+
+// ── Plain-ilike view filters ────────────────────────────────────────────────
+//
+// The floor above exists because the RPCs MISBEHAVE below it. A plain ilike on
+// a view has no such failure: 1 char genuinely filters, it just seq-scans and
+// matches broadly. So the floor here is a performance + consistency choice, and
+// it gets to bend where a blanket 3 would take away real searches.
+//
+// Thai reaches meaning in fewer characters than Latin script. "สม" is two
+// characters and an entirely ordinary name search — it matches สมศักดิ์, สมหญิง,
+// สมชาย, สมพร (verified against live customer data). A flat 3 would return
+// nothing for it and read as "no such customer". Latin two-letter keywords are
+// far weaker discriminators, so they keep the higher floor.
+const THAI_MIN_CHARS = 2;
+const THAI_CHAR = /[฀-๿]/;
+
+/**
+ * Minimum length for `keyword` on an ilike view.
+ *
+ * `floor` lets a screen opt into a lower bound when its own data is genuinely
+ * short. Brands are the live example: "RC" is a real brand, code and name both
+ * two characters, so a flat 3 makes it unreachable by search on a 12-row list
+ * where the scan cost is nil. Don't lower it on big name tables (customers,
+ * contracts) — there a 2-letter Latin stem matches half the table and the
+ * result is noise, not a search.
+ */
+export function searchMinFor(keyword: string | null | undefined, floor?: number): number {
+  if (THAI_CHAR.test(keyword ?? '')) return THAI_MIN_CHARS;
+  return floor ?? SEARCH_MIN_CHARS;
+}
+
+/** ilike-view counterpart of `isSearchable` — Thai-aware, floor overridable. */
+export function isSearchableLoose(keyword: string | null | undefined, floor?: number): boolean {
+  const trimmed = (keyword ?? '').trim();
+  return trimmed.length >= searchMinFor(trimmed, floor);
+}
+
+/** ilike-view counterpart of `isBelowSearchMin` — Thai-aware, floor overridable. */
+export function isBelowSearchMinLoose(keyword: string | null | undefined, floor?: number): boolean {
+  const trimmed = (keyword ?? '').trim();
+  return trimmed.length > 0 && trimmed.length < searchMinFor(trimmed, floor);
+}

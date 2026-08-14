@@ -2,9 +2,10 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, PopOver, DataTable } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, PauseCircle, Smartphone, Phone, Search, SlidersHorizontal } from 'lucide-react';
+import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, PopOver, DataTable } from 'tsp-form';
+import { ArrowLeft, ArrowRightFromLine, PauseCircle, Smartphone, Phone, SlidersHorizontal } from 'lucide-react';
 import { apiClient } from '../../lib/api';
+import { SearchInput } from '../../components/SearchInput';
 import { useAuth } from '../../contexts/AuthContext';
 import { defaultScopeFor, scopeQuery } from '../../lib/scope';
 import { DateTime } from '../../components/DateTime';
@@ -77,12 +78,6 @@ export function PausedContractsPage() {
   };
 
   useEffect(() => { setPageIndex(0); }, [filterBranchId, segment, debouncedKeyword]);
-
-  // Debounce keyword — matches contract code / customer name / phone.
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedKeyword(keyword.trim()), 300);
-    return () => clearTimeout(timer);
-  }, [keyword]);
 
   const { data: branches } = useQuery({
     queryKey: ['branches'],
@@ -174,12 +169,12 @@ export function PausedContractsPage() {
               <div className="flex-none p-2 border-b border-line">
                 <div className="flex items-center gap-2">
                   <div className="flex-1 min-w-0">
-                    <Input
+                    <SearchInput
                       value={keyword}
-                      onChange={(e) => setKeyword(e.target.value)}
+                      onChange={setKeyword}
+                      onDebouncedChange={setDebouncedKeyword}
                       placeholder={t('pausedList.searchPlaceholder')}
                       size="sm"
-                      startIcon={<Search size={16} />}
                       className="w-full"
                     />
                   </div>

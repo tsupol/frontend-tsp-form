@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { SearchInput } from '../../components/SearchInput';
 import { translateApiError } from '../../lib/apiErrors';
 import { toLocalDateStr, parseLocalDate, makeDatePickerFormat } from '../../lib/format';
 import { DateTime } from '../../components/DateTime';
@@ -371,7 +372,6 @@ export function HolidaysPage() {
   const [pageSize, setPageSize] = useState(15);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [companyFilter, setCompanyFilter] = useState<number | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
 
@@ -408,14 +408,6 @@ export function HolidaysPage() {
   const totalCount = data?.totalCount ?? 0;
 
   useEffect(() => { setPageIndex(0); }, [search, companyFilter, sorting]);
-
-  const handleSearch = (value: string) => {
-    setSearchInput(value);
-    clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => {
-      setSearch(value);
-    }, 300);
-  };
 
   const sortOptions = [
     { value: 'holiday_date', label: t('settings.holidays.colDate') },
@@ -495,10 +487,11 @@ export function HolidaysPage() {
         <div className="flex items-center gap-2 pb-4 flex-none">
           {/* Search — always visible */}
           <div className="flex-1 min-w-0 md:max-w-56">
-            <Input
+            <SearchInput
               placeholder={t('settings.holidays.searchPlaceholder')}
               value={searchInput}
-              onChange={(e) => handleSearch(e.target.value)}
+              onChange={setSearchInput}
+              onDebouncedChange={setSearch}
               size="sm"
               className="w-full"
             />
