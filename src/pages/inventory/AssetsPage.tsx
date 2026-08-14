@@ -30,6 +30,7 @@ import { OwnerBadge } from '../../components/OwnerBadge';
 import { ApiErrorAlert } from '../../components/ApiErrorAlert';
 import type { OwnerType } from '../../lib/ownerTypes';
 import { translateApiError } from '../../lib/apiErrors';
+import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
 
 // ============================================================================
 // Types (verified against live API 2026-03-25)
@@ -1845,9 +1846,13 @@ function CorrectModelModal({
     }
   }, [open]);
 
-  // Debounce the typeahead query.
+  // Debounce the typeahead query. A 1-char keyword makes fn_product_search
+  // ignore it and return recent models instead — indistinguishable from real
+  // matches, and staff would pick one. Drop anything under SEARCH_MIN_CHARS
+  // before the debounce; an empty box still browses the family.
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedQuery(modelQuery.trim()), 300);
+    const next = isSearchable(modelQuery) ? modelQuery.trim() : '';
+    const timer = setTimeout(() => setDebouncedQuery(next), 300);
     return () => clearTimeout(timer);
   }, [modelQuery]);
 
@@ -2012,10 +2017,16 @@ function CorrectModelModal({
                       searchable
                       showChevron
                     />
+                    {/* The typeahead lives inside Select's own dropdown, which
+                        has no end slot for the hint — so it rides on this
+                        helper line instead, replacing the scope text while the
+                        keyword is too short to actually search. */}
                     <div className="text-xs text-subtler">
-                      {scopeAllFamilies
-                        ? t('asset.correctModel.searchingAll', { defaultValue: 'Searching all models in this holding' })
-                        : t('asset.correctModel.scopedToFamily', { defaultValue: 'Showing {{family}} models', family: familyName ?? '' })}
+                      {isBelowSearchMin(modelQuery)
+                        ? t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })
+                        : scopeAllFamilies
+                          ? t('asset.correctModel.searchingAll', { defaultValue: 'Searching all models in this holding' })
+                          : t('asset.correctModel.scopedToFamily', { defaultValue: 'Showing {{family}} models', family: familyName ?? '' })}
                     </div>
                   </div>
 

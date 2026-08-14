@@ -10,6 +10,7 @@ import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useFormSnapshot } from '../../hooks/useFormSnapshot';
 import { ModelName } from '../../components/ModelName';
 import { translateApiError } from '../../lib/apiErrors';
+import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -611,12 +612,16 @@ export function Fin2RatesPage() {
     setPendingNav(null);
   };
 
-  // Search debounce
+  // Search debounce. A 1-char keyword makes fn_product_search ignore it and
+  // return recent models instead — they'd read as search hits. Drop anything
+  // under SEARCH_MIN_CHARS before the debounce so the page simply stays in
+  // browse mode until the keyword is long enough to actually search.
   const handleSearch = (value: string) => {
     setSearchInput(value);
     clearTimeout(searchTimer.current);
+    const next = isSearchable(value) ? value.trim() : '';
     searchTimer.current = setTimeout(() => {
-      setSearch(value);
+      setSearch(next);
       setPageIndex(0);
     }, 300);
   };
@@ -701,7 +706,9 @@ export function Fin2RatesPage() {
     return `/v_ref_product_models?${params.join('&')}`;
   }, [holdingId, filterBrand, filterFamily, filterBaseModel, sortBy]);
 
-  const hasSearch = search.trim().length > 0;
+  // `search` is already filtered by handleSearch, so this is only ever true for
+  // a keyword the RPC will honour — browse mode covers everything shorter.
+  const hasSearch = isSearchable(search);
 
   // Query 1a: Browse mode — no search term. Use the view directly so sort options work.
   const { data: browseData, isError: browseIsError, error: browseError, isFetching: browseFetching } = useQuery({
@@ -903,7 +910,14 @@ export function Fin2RatesPage() {
                       value={searchInput}
                       onChange={(e) => handleSearch(e.target.value)}
                       size="sm"
-                      className="w-full"
+                      // Hint rides inside the field, right-aligned, so the rows
+                      // below can't shift as the user types.
+                      endIcon={isBelowSearchMin(searchInput)
+                        ? <span className="text-[11px] whitespace-nowrap">
+                            {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
+                          </span>
+                        : undefined}
+                      className="w-full search-min-hint"
                     />
                   </div>
                   <div className="flex-1 min-w-0 hidden sm:block">

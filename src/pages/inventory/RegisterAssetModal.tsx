@@ -9,6 +9,7 @@ import { translateApiError } from '../../lib/apiErrors';
 import { makeDatePickerFormat, toLocalDateStr, fmtCurrency } from '../../lib/format';
 import { ImeiInput } from '../../components/ImeiInput';
 import { getConditionLabel, getBucketLabel, CONDITION_VALUES } from './inventoryUtils';
+import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
 
 // Direct device intake — fn_inv_asset_register. For our own shops (INTERNAL) and
 // company-owned consignment branches (EXTERNAL): the device lands straight in
@@ -115,8 +116,12 @@ export function RegisterAssetModal({
     }
   }, [open]);
 
+  // A 1-char keyword makes fn_product_search ignore it and return recent models
+  // instead — indistinguishable from real matches. Drop anything under
+  // SEARCH_MIN_CHARS before the debounce; an empty box still browses.
   useEffect(() => {
-    const tm = setTimeout(() => setDebounced(keyword.trim()), 300);
+    const next = isSearchable(keyword) ? keyword.trim() : '';
+    const tm = setTimeout(() => setDebounced(next), 300);
     return () => clearTimeout(tm);
   }, [keyword]);
 
@@ -321,8 +326,15 @@ export function RegisterAssetModal({
                       onChange={(e) => setKeyword(e.target.value)}
                       placeholder={t('asset.registerProductSearch', { defaultValue: 'Search model or brand...' })}
                       size="sm"
-                      className="w-full"
                       startIcon={<Search size={14} />}
+                      // Hint rides inside the field, right-aligned, so the model
+                      // list below can't shift as the user types.
+                      endIcon={isBelowSearchMin(keyword)
+                        ? <span className="text-[11px] whitespace-nowrap">
+                            {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
+                          </span>
+                        : undefined}
+                      className="w-full search-min-hint"
                     />
                     <div className="mt-2 max-h-44 overflow-auto better-scroll rounded-md border border-line divide-y divide-line">
                       {isFetching && models.length === 0 ? (

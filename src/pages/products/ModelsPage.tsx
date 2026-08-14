@@ -11,6 +11,7 @@ import { translateApiError } from '../../lib/apiErrors';
 import { useAuth } from '../../contexts/AuthContext';
 import { ColorAutocomplete, ColorMatchBadge, ColorSwatch, useMasterColorPreview } from '../../components/ColorAutocomplete';
 import { useBarcodeScanner } from '../../components/BarcodeScanner';
+import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -1624,22 +1625,27 @@ export function ModelsPage() {
     navigate(id != null ? `/admin/products/models/${id}` : '/admin/products/models');
   };
 
-  // Search debounce
+  // Search debounce. A 1-char keyword makes fn_product_search ignore it and
+  // return recent models instead — they'd read as search hits. Drop anything
+  // under SEARCH_MIN_CHARS before the debounce so `p_q` falls back to null and
+  // the list stays in plain browse mode until the keyword is long enough.
   const handleSearch = (value: string) => {
     setSearchInput(value);
     clearTimeout(searchTimer.current);
+    const next = isSearchable(value) ? value.trim() : '';
     searchTimer.current = setTimeout(() => {
-      setSearch(value);
+      setSearch(next);
       setPageIndex(0);
     }, 300);
   };
 
-  // Barcode scan → commit immediately, skip the debounce.
+  // Barcode scan → commit immediately, skip the debounce. Same length guard;
+  // a real barcode always clears it.
   const { open: openSearchScanner, scannerEl: searchScannerEl } = useBarcodeScanner({
     onScan: (val) => {
       clearTimeout(searchTimer.current);
       setSearchInput(val);
-      setSearch(val);
+      setSearch(isSearchable(val) ? val.trim() : '');
       setPageIndex(0);
     },
   });
@@ -1850,7 +1856,14 @@ export function ModelsPage() {
                         value={searchInput}
                         onChange={(e) => handleSearch(e.target.value)}
                         size="sm"
-                        className="w-full"
+                        // Hint rides inside the field, right-aligned, so the
+                        // rows below can't shift as the user types.
+                        endIcon={isBelowSearchMin(searchInput)
+                          ? <span className="text-[11px] whitespace-nowrap">
+                              {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
+                            </span>
+                          : undefined}
+                        className="w-full search-min-hint"
                       />
                     </div>
                   </div>

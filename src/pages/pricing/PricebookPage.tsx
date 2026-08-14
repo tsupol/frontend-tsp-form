@@ -10,6 +10,7 @@ import { useFormSnapshot } from '../../hooks/useFormSnapshot';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { ModelName } from '../../components/ModelName';
 import { translateApiError } from '../../lib/apiErrors';
+import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -741,12 +742,16 @@ export function PricebookPage() {
     setPendingNav(null);
   };
 
-  // Search debounce
+  // Search debounce. A 1-char keyword makes fn_product_search ignore it and
+  // return recent models instead — they'd read as search hits. Drop anything
+  // under SEARCH_MIN_CHARS before the debounce so `p_q` falls back to null and
+  // the list stays in plain browse mode until the keyword is long enough.
   const handleSearch = (value: string) => {
     setSearchInput(value);
     clearTimeout(searchTimer.current);
+    const next = isSearchable(value) ? value.trim() : '';
     searchTimer.current = setTimeout(() => {
-      setSearch(value);
+      setSearch(next);
       setPageIndex(0);
     }, 300);
   };
@@ -995,7 +1000,14 @@ export function PricebookPage() {
                       value={searchInput}
                       onChange={(e) => handleSearch(e.target.value)}
                       size="sm"
-                      className="w-full"
+                      // Hint rides inside the field, right-aligned, so the rows
+                      // below can't shift as the user types.
+                      endIcon={isBelowSearchMin(searchInput)
+                        ? <span className="text-[11px] whitespace-nowrap">
+                            {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
+                          </span>
+                        : undefined}
+                      className="w-full search-min-hint"
                     />
                   </div>
                   <div className="flex-1 min-w-0 hidden sm:block">

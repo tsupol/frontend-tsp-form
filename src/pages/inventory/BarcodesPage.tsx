@@ -18,6 +18,7 @@ import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { DateTime } from '../../components/DateTime';
 import { useBarcodeScanner } from '../../components/BarcodeScanner';
 import { translateApiError } from '../../lib/apiErrors';
+import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 // v_barcode_list columns (verified against the view DDL):
@@ -501,8 +502,12 @@ function RegisterBarcodeModal({ open, onClose, initialBarcode, onSuccess }: Regi
     }
   }, [open, initialBarcode]);
 
+  // A 1-char keyword makes fn_product_search ignore it and return recent models
+  // instead — indistinguishable from real matches. Drop anything under
+  // SEARCH_MIN_CHARS before the debounce; an empty box still browses.
   useEffect(() => {
-    const tm = setTimeout(() => setDebouncedModelQuery(modelQuery.trim()), 300);
+    const next = isSearchable(modelQuery) ? modelQuery.trim() : '';
+    const tm = setTimeout(() => setDebouncedModelQuery(next), 300);
     return () => clearTimeout(tm);
   }, [modelQuery]);
 
@@ -655,8 +660,15 @@ function RegisterBarcodeModal({ open, onClose, initialBarcode, onSuccess }: Regi
               value={modelQuery}
               onChange={(e) => setModelQuery(e.target.value)}
               placeholder={t('barcodes.search')}
-              className="w-full"
               startIcon={<Search size={16} />}
+              // Hint rides inside the field, right-aligned, so the model list
+              // below can't shift as the user types.
+              endIcon={isBelowSearchMin(modelQuery)
+                ? <span className="text-[11px] whitespace-nowrap">
+                    {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
+                  </span>
+                : undefined}
+              className="w-full search-min-hint"
             />
             <div className="mt-3 h-60 overflow-auto better-scroll border border-line rounded-md">
               {modelsFetching && models.length === 0 && (

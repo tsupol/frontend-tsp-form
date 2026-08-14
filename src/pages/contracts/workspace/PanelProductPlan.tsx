@@ -12,6 +12,7 @@ import { useBarcodeScanner } from '../../../components/BarcodeScanner';
 import { ColorSwatch } from '../../../components/ColorAutocomplete';
 import { lookupBarcode } from '../../../lib/barcodeLookup';
 import { translateApiError } from '../../../lib/apiErrors';
+import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../../lib/searchKeyword';
 
 /** Hard cap on installment term, mirroring the backend guard (mig 1030). */
 const TERM_MONTHS_MAX = 60;
@@ -166,13 +167,17 @@ export function PanelProductPlan(_props: Props) {
 
   // ── NEW: search debounce ────────────────────────────────────────────
 
+  // Anything under SEARCH_MIN_CHARS never reaches fn_product_search — at 1 char
+  // the RPC drops the keyword and hands back ~50 recent models that read as
+  // matches. Checked before the debounce so a short keyword never fires.
   const handleSearchInput = (value: string) => {
     setSearch(value);
     clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => setDebouncedSearch(value.trim()), 300);
+    const next = isSearchable(value) ? value.trim() : '';
+    searchTimer.current = setTimeout(() => setDebouncedSearch(next), 300);
   };
 
-  const shouldSearch = debouncedSearch.length >= 2;
+  const shouldSearch = isSearchable(debouncedSearch);
 
   // ── USED: search debounce ───────────────────────────────────────────
 
@@ -932,7 +937,21 @@ export function PanelProductPlan(_props: Props) {
                   aria-label={t('barcodeScanner.title', { defaultValue: 'Scan barcode' })}
                 />
                 <div className="input-group-divider" />
-                <Input ref={searchRef} value={search} onChange={(e) => handleSearchInput(e.target.value)} placeholder={t('wizard.searchProductPlaceholder')} className="w-full" size="sm" />
+                <Input
+                  ref={searchRef}
+                  value={search}
+                  onChange={(e) => handleSearchInput(e.target.value)}
+                  placeholder={t('wizard.searchProductPlaceholder')}
+                  size="sm"
+                  // Hint rides inside the field, right-aligned, so the result
+                  // list below can't shift as the user types.
+                  endIcon={isBelowSearchMin(search)
+                    ? <span className="text-[11px] whitespace-nowrap">
+                        {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
+                      </span>
+                    : undefined}
+                  className="w-full search-min-hint"
+                />
               </div>
               <div className="border border-line rounded-lg overflow-hidden h-48 data-table-content better-scroll">
                 {!shouldSearch ? (
