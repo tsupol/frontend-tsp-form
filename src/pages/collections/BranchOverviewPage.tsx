@@ -68,8 +68,11 @@ function BranchCard({ row }: { row: BranchDunningSummary }) {
         </span>
       </div>
 
-      {/* Unassigned split — never one number */}
-      <div className="grid grid-cols-2 gap-3">
+      {/* Unassigned split — never one number. Only the first asks for action;
+          the others are the system waiting on purpose. Holiday used to be
+          counted as "no collector", which lit this tile red every public
+          holiday and sent managers looking for staff who weren't missing. */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <StatTile
           label={t('collectionsManager.noCollector')}
           value={row.unassigned_no_collector}
@@ -81,6 +84,15 @@ function BranchCard({ row }: { row: BranchDunningSummary }) {
           value={row.unassigned_not_yet_due}
           sub={t('collectionsManager.notYetDueHint')}
         />
+        {/* Only worth a tile while it's non-zero — outside holidays it's 0 and
+            would just be a third empty box on every branch card. */}
+        {row.unassigned_holiday > 0 && (
+          <StatTile
+            label={t('collectionsManager.holiday')}
+            value={row.unassigned_holiday}
+            sub={t('collectionsManager.holidayHint')}
+          />
+        )}
       </div>
 
       {/* Core stats */}

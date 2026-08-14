@@ -1,6 +1,10 @@
 // Unassigned Contracts (สัญญาที่ยังไม่มีเจ้าของ) — contracts with no owner,
-// split by pool_reason. NO_COLLECTOR (needs action) vs NOT_YET_DUE (normal).
-// Reads v_unassigned_contracts. Requires OPS.ASSIGN.MANAGE.
+// split by pool_reason. Reads v_unassigned_contracts. Requires OPS.ASSIGN.MANAGE.
+//
+// Five reasons, never one total: only NO_COLLECTOR asks anyone to do something.
+// The rest are the system deliberately waiting — not yet due, a slip awaiting
+// review, the company on holiday, or the extra day right after one (mig 1082).
+// Merging them would have a manager chasing staff over a public holiday.
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -11,6 +15,15 @@ import { fmtCurrency } from '../../lib/format';
 import { DateTime } from '../../components/DateTime';
 import { useUnassignedContracts, type PoolReason } from './managerApi';
 
+/** Tab order: the one that needs action first, then the deliberate waits. */
+const REASONS: { key: PoolReason; label: string; hint: string; danger?: boolean }[] = [
+  { key: 'NO_COLLECTOR', label: 'collectionsManager.noCollector', hint: 'collectionsManager.noCollectorHint', danger: true },
+  { key: 'NOT_YET_DUE', label: 'collectionsManager.notYetDue', hint: 'collectionsManager.notYetDueHint' },
+  { key: 'SLIP_PENDING_REVIEW', label: 'collectionsManager.slipPending', hint: 'collectionsManager.slipPendingHint' },
+  { key: 'HOLIDAY', label: 'collectionsManager.holiday', hint: 'collectionsManager.holidayHint' },
+  { key: 'HOLIDAY_GRACE', label: 'collectionsManager.holidayGrace', hint: 'collectionsManager.holidayGraceHint' },
+];
+
 export function UnassignedContractsPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -18,6 +31,7 @@ export function UnassignedContractsPage() {
   const { data, isLoading, isError } = useUnassignedContracts(reason);
 
   const isNoCollector = reason === 'NO_COLLECTOR';
+  const active = REASONS.find(r => r.key === reason) ?? REASONS[0];
 
   return (
     <>
@@ -37,28 +51,22 @@ export function UnassignedContractsPage() {
       <div className="page-content flex flex-col gap-4 p-4">
         <h1 className="heading-2 hidden md:block">{t('collectionsManager.unassignedTitle')}</h1>
 
-        {/* Reason toggle — the two are entirely different situations */}
-        <div className="flex items-center gap-1">
-          <Button
-            variant={isNoCollector ? 'solid' : 'ghost'}
-            color="danger"
-            size="sm"
-            onClick={() => setReason('NO_COLLECTOR')}
-          >
-            {t('collectionsManager.noCollector')}
-          </Button>
-          <Button
-            variant={!isNoCollector ? 'solid' : 'ghost'}
-            color="primary"
-            size="sm"
-            onClick={() => setReason('NOT_YET_DUE')}
-          >
-            {t('collectionsManager.notYetDue')}
-          </Button>
+        {/* Reason picker — each is a different situation calling for a
+            different act, so they're separate lists, never one total. */}
+        <div className="flex flex-wrap items-center gap-1">
+          {REASONS.map(r => (
+            <Button
+              key={r.key}
+              variant={reason === r.key ? 'solid' : 'ghost'}
+              color={r.danger ? 'danger' : 'primary'}
+              size="sm"
+              onClick={() => setReason(r.key)}
+            >
+              {t(r.label)}
+            </Button>
+          ))}
         </div>
-        <div className="text-xs text-subtle">
-          {isNoCollector ? t('collectionsManager.noCollectorHint') : t('collectionsManager.notYetDueHint')}
-        </div>
+        <div className="text-xs text-subtle">{t(active.hint)}</div>
 
         {isLoading && <div className="text-subtle">{t('common.loading')}</div>}
         {isError && <div className="alert alert-danger"><AlertTriangle size={18} /><span>{t('common.error')}</span></div>}
@@ -88,9 +96,16 @@ export function UnassignedContractsPage() {
                     <Badge size="sm" color="danger">
                       {t('collectionsManager.daysWaiting')}: {c.days_waiting_for_owner}
                     </Badge>
-                  ) : (
+                  ) : reason === 'NOT_YET_DUE' ? (
                     <div className="text-subtle">
                       {t('collectionsManager.assignableFrom')} <DateTime value={c.assignable_from} showTime={false} />
+                    </div>
+                  ) : (
+                    /* Holiday / slip-pending: assignable_from is already past, so
+                       showing it would read as overdue. Days waiting is the honest
+                       number, and it isn't alarming here — the wait is intended. */
+                    <div className="text-subtle">
+                      {t('collectionsManager.daysWaiting')}: {c.days_waiting_for_owner}
                     </div>
                   )}
                 </div>

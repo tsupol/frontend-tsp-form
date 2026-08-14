@@ -21,6 +21,11 @@ export interface BranchDunningSummary {
   assigned_contracts: number;
   unassigned_not_yet_due: number;
   unassigned_no_collector: number;
+  /** Held back purely because the company is on holiday (mig 1082). These used
+   *  to land in unassigned_no_collector and read as "nobody is working these" —
+   *  a false alarm that had branch managers hunting for staff every holiday.
+   *  Opposite actions: this one means do nothing, that one means add people. */
+  unassigned_holiday: number;
   overdue_contracts: number;
   overdue_amount: number;
   outstanding_total: number;
@@ -54,7 +59,19 @@ export interface CollectorLoad {
   overdue_amount_orange: number;
 }
 
-export type PoolReason = 'NOT_YET_DUE' | 'NO_COLLECTOR' | string;
+/** Why a contract is sitting in the pool without an owner. Five values now, and
+ *  they must never be summed into one number — each calls for a different act.
+ *  Per-contract reasons win over branch-wide ones, in this order:
+ *    NOT_YET_DUE → SLIP_PENDING_REVIEW → HOLIDAY / HOLIDAY_GRACE → NO_COLLECTOR
+ *  so the HOLIDAY counts are contracts held back for that reason ALONE.
+ *  HOLIDAY_GRACE is the extra day after the holiday ends (mig 1082). */
+export type PoolReason =
+  | 'NOT_YET_DUE'
+  | 'SLIP_PENDING_REVIEW'
+  | 'HOLIDAY'
+  | 'HOLIDAY_GRACE'
+  | 'NO_COLLECTOR'
+  | string;
 
 export interface UnassignedContract {
   contract_id: number;
