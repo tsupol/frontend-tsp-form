@@ -1,8 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Modal, Button, Select, MaskedInput, NumberSpinner, PopOver } from 'tsp-form';
-import { Plus, Trash2, XCircle, AlertCircle, ChevronsRight, Loader2, CheckCircle, Gift, ShoppingBag, Pencil } from 'lucide-react';
+import { Plus, Trash2, XCircle, AlertCircle, ChevronsRight, Loader2, CheckCircle, Gift, ShoppingBag, Pencil, Wrench } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
@@ -62,6 +62,41 @@ interface AllowedMethodRow {
   is_active: boolean;
 }
 
+interface AddableChargeRow {
+  charge_type: string;
+  line_type: string;
+  name_th: string;
+  name_en: string;
+  is_user_addable: boolean;
+}
+
+/* Charge types the view returns for CONTRACT_ADDON that this modal deliberately
+   does NOT offer:
+
+     • the wallet ops (SAVING_*, INSURANCE_*, CREDIT_CASHOUT) each have a dedicated
+       Wallets-tab screen with balance validation this cart doesn't do — see
+       ACTION_PLACEMENT in ContractActions.tsx, which routes staff there on purpose.
+     • ACCESSORY_RETURN is a DISCOUNT line (negative); the payment/balance maths
+       here assumes every line is positive.
+
+   Everything else flows through from the view, so a future whitelist addition
+   (as SERVICE_CHARGE was on 2026-08-14) appears with no code change. */
+const EXCLUDED_CHARGE_TYPES = new Set([
+  'SAVING_DEPOSIT', 'SAVING_CASHOUT', 'INSURANCE_TOPUP', 'INSURANCE_CASHOUT',
+  'CREDIT_CASHOUT', 'ACCESSORY_RETURN',
+]);
+
+/** Charge types picked from the catalog (need a variant + stock). Anything else
+    the view offers is a free-form description + amount line. */
+const SELLABLE_CHARGE_TYPES = new Set(['ACCESSORY_SALE', 'GIFT_LATE']);
+
+/** Decorative only — an unmapped charge type falls back to a generic +. */
+const CHARGE_ICONS: Record<string, ReactNode> = {
+  ACCESSORY_SALE: <ShoppingBag size={14} />,
+  GIFT_LATE: <Gift size={14} />,
+  SERVICE_CHARGE: <Wrench size={14} />,
+};
+
 /** CONTRACT_ADDON allows CASH + TRANSFER only (v_purpose_allowed_methods, verified live). */
 type PaymentMethod = 'CASH' | 'TRANSFER';
 
@@ -76,18 +111,23 @@ const nextLineId = () => `addon-${++lineIdCounter}`;
 
 interface CartLine {
   id: string;
+  /** From v_bill_line_addable_by_purpose — never hardcoded at submit time. */
+  charge_type: string;
+  line_type: string;
   description: string;
   /** Unit price × qty for a sale. Gift lines carry 0 — the customer pays nothing. */
   amount: number;
   quantity: number;
-  variant_id: number;
+  /** Null for a free-form charge (e.g. SERVICE_CHARGE) — no catalog item behind it. */
+  variant_id: number | null;
   /** Add as ACCESSORY_SALE then convert to GIFT_LATE. */
   as_gift: boolean;
   /** Catalog total at pick time, so we can show a negotiated override struck through. */
   catalog_amount: number;
   /** Unit retail price — re-derives the catalog total when qty changes in the cart. */
   unit_price: number;
-  /** Branch stock at pick time; caps the cart's qty editor the same way the picker does. */
+  /** Branch stock at pick time; caps the cart's qty editor the same way the picker
+      does. Infinity for free-form lines, which no stock constrains. */
   stock: number;
 }
 
@@ -103,7 +143,7 @@ export function ContractAddonModal({ open, contract, onClose, onSuccess }: {
   onClose: () => void;
   onSuccess: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
 
   const [view, setView] = useState<'form' | 'done'>('form');
@@ -114,9 +154,14 @@ export function ContractAddonModal({ open, contract, onClose, onSuccess }: {
   const [result, setResult] = useState<{ billId: number; code: string } | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
 
-  // Add-line composer
+  // Add-line composer. `pickCharge` holds the catalog-backed charge type being
+  // picked (drives ProductPickerModal); `freeForm` holds the description+amount
+  // composer for charge types with no catalog item.
   const [addOpen, setAddOpen] = useState(false);
-  const [pickMode, setPickMode] = useState<'sale' | 'gift' | null>(null);
+  const [pickCharge, setPickCharge] = useState<AddableChargeRow | null>(null);
+  const [freeForm, setFreeForm] = useState<AddableChargeRow | null>(null);
+  const [freeFormDesc, setFreeFormDesc] = useState('');
+  const [freeFormAmount, setFreeFormAmount] = useState('');
   const [priceEdit, setPriceEdit] = useState<CartLine | null>(null);
   const [priceDraft, setPriceDraft] = useState('');
   const [qtyDraft, setQtyDraft] = useState(1);
@@ -130,7 +175,10 @@ export function ContractAddonModal({ open, contract, onClose, onSuccess }: {
     setResult(null);
     setConfirmClose(false);
     setAddOpen(false);
-    setPickMode(null);
+    setPickCharge(null);
+    setFreeForm(null);
+    setFreeFormDesc('');
+    setFreeFormAmount('');
     setPriceEdit(null);
     setPriceDraft('');
     setQtyDraft(1);
@@ -157,6 +205,27 @@ export function ContractAddonModal({ open, contract, onClose, onSuccess }: {
     [methodRows, t],
   );
 
+  // Addable charge types come from the DB whitelist per bill purpose — same view
+  // the Review & Pay cart and the fee modal read. Never hardcode the list: BE
+  // extends it (mig 1093 added SERVICE_CHARGE here) and a hardcoded menu silently
+  // misses every addition.
+  const { data: chargeRows = [] } = useQuery({
+    queryKey: ['bill-addable', 'CONTRACT_ADDON'],
+    queryFn: () => apiClient.get<AddableChargeRow[]>(
+      '/v_bill_line_addable_by_purpose?bill_purpose=eq.CONTRACT_ADDON&is_user_addable=eq.true&order=sort_order',
+    ),
+    enabled: open,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const chargeTypes = useMemo(
+    () => chargeRows.filter(r => !EXCLUDED_CHARGE_TYPES.has(r.charge_type)),
+    [chargeRows],
+  );
+
+  const chargeLabel = (row: AddableChargeRow) =>
+    (i18n.language === 'th' ? row.name_th : row.name_en) || row.charge_type;
+
   // ── Totals ──────────────────────────────────────────────────────────────
   // Gifts are free to the customer: they contribute 0 to what must be collected.
   const total = lines.reduce((s, l) => s + (l.as_gift ? 0 : l.amount), 0);
@@ -169,8 +238,8 @@ export function ContractAddonModal({ open, contract, onClose, onSuccess }: {
 
   // ── Add / remove lines ──────────────────────────────────────────────────
   const handlePick = (variant: SellableVariant, qty: number) => {
-    if (!pickMode) return;
-    const asGift = pickMode === 'gift';
+    if (!pickCharge) return;
+    const asGift = pickCharge.charge_type === 'GIFT_LATE';
     const catalogTotal = variant.retail_price * qty;
     // Dedupe by variant + gift-ness, matching BillCart: re-picking the same item
     // updates qty instead of stacking a duplicate line. A sale and a gift of the
@@ -192,6 +261,8 @@ export function ContractAddonModal({ open, contract, onClose, onSuccess }: {
     } else {
       setLines(prev => [...prev, {
         id: nextLineId(),
+        charge_type: pickCharge.charge_type,
+        line_type: pickCharge.line_type,
         description: variant.full_name,
         amount: asGift ? 0 : catalogTotal,
         quantity: qty,
@@ -202,7 +273,42 @@ export function ContractAddonModal({ open, contract, onClose, onSuccess }: {
         stock: variant.qty,
       }]);
     }
-    setPickMode(null);
+    setPickCharge(null);
+  };
+
+  // Free-form line: a charge type with no catalog item behind it (SERVICE_CHARGE
+  // and anything similar BE adds later). Always qty 1 — there is nothing to count.
+  const handlePickCharge = (row: AddableChargeRow) => {
+    setAddOpen(false);
+    if (SELLABLE_CHARGE_TYPES.has(row.charge_type)) {
+      setPickCharge(row);
+    } else {
+      setFreeForm(row);
+      setFreeFormDesc(chargeLabel(row));
+      setFreeFormAmount('');
+    }
+  };
+
+  const handleAddFreeForm = () => {
+    if (!freeForm) return;
+    const amount = parseFloat(freeFormAmount) || 0;
+    if (!freeFormDesc.trim() || amount <= 0) return;
+    setLines(prev => [...prev, {
+      id: nextLineId(),
+      charge_type: freeForm.charge_type,
+      line_type: freeForm.line_type,
+      description: freeFormDesc.trim(),
+      amount,
+      quantity: 1,
+      variant_id: null,
+      as_gift: false,
+      catalog_amount: amount,
+      unit_price: amount,
+      stock: Infinity,
+    }]);
+    setFreeForm(null);
+    setFreeFormDesc('');
+    setFreeFormAmount('');
   };
 
   const removeLine = (id: string) => setLines(prev => prev.filter(l => l.id !== id));
@@ -226,7 +332,10 @@ export function ContractAddonModal({ open, contract, onClose, onSuccess }: {
 
   const saveLineEdit = () => {
     if (!priceEdit) return;
-    const qty = Math.max(1, Math.min(qtyDraft, priceEdit.stock));
+    // A free-form line has no stock and no qty editor — it stays at 1.
+    const qty = priceEdit.variant_id == null
+      ? 1
+      : Math.max(1, Math.min(qtyDraft, priceEdit.stock));
     // A gift's price is server-owned (convert overwrites it with RETAIL_PRICE),
     // so only qty is editable there. For a sale we keep whatever the staff typed,
     // but re-scale the catalog reference to the new qty so the struck-through
@@ -246,11 +355,14 @@ export function ContractAddonModal({ open, contract, onClose, onSuccess }: {
   // existing items and switches its button to "Update".
   const cartQtys = useMemo(() => {
     const m: Record<number, number> = {};
+    const pickingGift = pickCharge?.charge_type === 'GIFT_LATE';
     for (const l of lines) {
-      if (l.as_gift === (pickMode === 'gift')) m[l.variant_id] = (m[l.variant_id] ?? 0) + l.quantity;
+      if (l.variant_id != null && l.as_gift === pickingGift) {
+        m[l.variant_id] = (m[l.variant_id] ?? 0) + l.quantity;
+      }
     }
     return m;
-  }, [lines, pickMode]);
+  }, [lines, pickCharge]);
 
   // ── Payments ────────────────────────────────────────────────────────────
   const updatePayment = (idx: number, patch: Partial<PaymentRow>) =>
@@ -296,7 +408,7 @@ export function ContractAddonModal({ open, contract, onClose, onSuccess }: {
         p_contract_id: contract.id,
         p_bill_purpose: 'CONTRACT_ADDON',
         p_line_items: lines.map(l => ({
-          charge_type: l.as_gift ? 'GIFT_LATE' : 'ACCESSORY_SALE',
+          charge_type: l.charge_type,
           description: l.description,
           // A gift bills at catalog retail (the server pairs it off to net 0);
           // a sale bills at whatever the staff agreed.
@@ -403,7 +515,7 @@ export function ContractAddonModal({ open, contract, onClose, onSuccess }: {
                               <td className="px-3 py-2">
                                 <div className="flex items-center gap-2 min-w-0">
                                   <span className="text-info shrink-0">
-                                    {line.as_gift ? <Gift size={14} /> : <ShoppingBag size={14} />}
+                                    {CHARGE_ICONS[line.charge_type] ?? <Plus size={14} />}
                                   </span>
                                   <span className="truncate">{line.description}</span>
                                   {line.quantity > 1 && (
@@ -442,7 +554,8 @@ export function ContractAddonModal({ open, contract, onClose, onSuccess }: {
                                       />
                                       <span className="tabular-nums">{fmtCurrency(line.amount)}</span>
                                     </div>
-                                    {line.amount !== line.catalog_amount && (
+                                    {/* Only a catalog line has a "was" price to strike through. */}
+                                    {line.variant_id != null && line.amount !== line.catalog_amount && (
                                       <span className="text-[10px] text-subtle line-through">
                                         {fmtCurrency(line.catalog_amount)}
                                       </span>
@@ -486,22 +599,19 @@ export function ContractAddonModal({ open, contract, onClose, onSuccess }: {
                     minWidth="16rem"
                   >
                     <div className="flex flex-col py-1">
-                      <button
-                        type="button"
-                        className="flex items-center gap-2 px-3 py-2 text-sm text-left bg-transparent border-none cursor-pointer hover:bg-surface-hover"
-                        onClick={() => { setAddOpen(false); setPickMode('sale'); }}
-                      >
-                        <span className="text-info shrink-0"><ShoppingBag size={14} /></span>
-                        <span>{t('contractAddon.addSale')}</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="flex items-center gap-2 px-3 py-2 text-sm text-left bg-transparent border-none cursor-pointer hover:bg-surface-hover"
-                        onClick={() => { setAddOpen(false); setPickMode('gift'); }}
-                      >
-                        <span className="text-info shrink-0"><Gift size={14} /></span>
-                        <span>{t('contractAddon.addGift')}</span>
-                      </button>
+                      {chargeTypes.map(row => (
+                        <button
+                          key={row.charge_type}
+                          type="button"
+                          className="flex items-center gap-2 px-3 py-2 text-sm text-left bg-transparent border-none cursor-pointer hover:bg-surface-hover"
+                          onClick={() => handlePickCharge(row)}
+                        >
+                          <span className="text-info shrink-0">
+                            {CHARGE_ICONS[row.charge_type] ?? <Plus size={14} />}
+                          </span>
+                          <span>{chargeLabel(row)}</span>
+                        </button>
+                      ))}
                     </div>
                   </PopOver>
 
@@ -634,21 +744,33 @@ export function ContractAddonModal({ open, contract, onClose, onSuccess }: {
           </div>
           <div className="modal-content">
             <div className="form-grid">
-              <div className="flex flex-col">
-                <label className="form-label">{priceEdit?.description ?? ''}</label>
-                <NumberSpinner
-                  value={qtyDraft}
-                  onChange={(val) => handleQtyDraftChange(Math.max(1, val === '' ? 1 : Number(val)))}
-                  min={1}
-                  max={priceEdit?.stock ?? 1}
-                  scale="sm"
-                />
-                {priceEdit && (
+              {/* Qty + stock only mean something for a catalog line. A free-form
+                  charge is a single amount with nothing to count. */}
+              {priceEdit?.variant_id != null ? (
+                <div className="flex flex-col">
+                  <label className="form-label">{priceEdit.description}</label>
+                  <NumberSpinner
+                    value={qtyDraft}
+                    onChange={(val) => handleQtyDraftChange(Math.max(1, val === '' ? 1 : Number(val)))}
+                    min={1}
+                    max={priceEdit.stock}
+                    scale="sm"
+                  />
                   <span className="text-xs text-subtle mt-1">
                     {t('retail.create.stock')}: {priceEdit.stock}
                   </span>
-                )}
-              </div>
+                </div>
+              ) : (
+                <div className="flex flex-col">
+                  <label className="form-label">{t('contractAddon.lineDescription')}</label>
+                  <MaskedInput
+                    value={priceEdit?.description ?? ''}
+                    onChange={(v) => setPriceEdit(prev => (prev ? { ...prev, description: v } : prev))}
+                    size="sm"
+                    className="w-full"
+                  />
+                </div>
+              )}
               {/* A gift's amount is set server-side from the catalog retail price,
                   so editing it here would be a lie — qty only. */}
               {priceEdit && !priceEdit.as_gift && (
@@ -662,14 +784,18 @@ export function ContractAddonModal({ open, contract, onClose, onSuccess }: {
                     size="sm"
                     className="w-full"
                     placeholder="0.00"
-                    endIcon={<ChevronsRight size={14} />}
-                    onEndIconClick={() => setPriceDraft(String(priceEdit.unit_price * qtyDraft))}
+                    endIcon={priceEdit.variant_id != null ? <ChevronsRight size={14} /> : undefined}
+                    onEndIconClick={priceEdit.variant_id != null
+                      ? () => setPriceDraft(String(priceEdit.unit_price * qtyDraft))
+                      : undefined}
                   />
-                  <span className="text-xs text-subtle mt-1">
-                    {t('contractAddon.catalogHint', {
-                      value: fmtCurrency(priceEdit.unit_price * qtyDraft),
-                    })}
-                  </span>
+                  {priceEdit.variant_id != null && (
+                    <span className="text-xs text-subtle mt-1">
+                      {t('contractAddon.catalogHint', {
+                        value: fmtCurrency(priceEdit.unit_price * qtyDraft),
+                      })}
+                    </span>
+                  )}
                 </div>
               )}
             </div>
@@ -689,13 +815,56 @@ export function ContractAddonModal({ open, contract, onClose, onSuccess }: {
 
       {/* Product picker — same component the wizard cart uses */}
       <ProductPickerModal
-        open={pickMode != null}
+        open={pickCharge != null}
         branchId={contract?.branch_id ?? null}
         cartQtys={cartQtys}
-        onClose={() => setPickMode(null)}
+        onClose={() => setPickCharge(null)}
         onPick={handlePick}
-        titleKey={pickMode === 'gift' ? 'workspace.cart_pickGift' : 'workspace.cart_pickAccessory'}
+        titleKey={pickCharge?.charge_type === 'GIFT_LATE' ? 'workspace.cart_pickGift' : 'workspace.cart_pickAccessory'}
       />
+
+      {/* Free-form line composer — charge types with no catalog item behind them */}
+      <Modal open={freeForm != null} onClose={() => setFreeForm(null)} maxWidth="22rem" width="100%">
+        <div className="modal-header">
+          <h2 className="modal-title">{freeForm ? chargeLabel(freeForm) : ''}</h2>
+          <button type="button" className="modal-close-btn" onClick={() => setFreeForm(null)} aria-label="Close">×</button>
+        </div>
+        <div className="modal-content">
+          <div className="form-grid">
+            <div className="flex flex-col">
+              <label className="form-label">{t('contractAddon.lineDescription')}</label>
+              <MaskedInput
+                value={freeFormDesc}
+                onChange={setFreeFormDesc}
+                size="sm"
+                className="w-full"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label className="form-label">{t('contract.amount')}</label>
+              <MaskedInput
+                mask="number"
+                decimalScale={2}
+                value={freeFormAmount}
+                onChange={setFreeFormAmount}
+                size="sm"
+                className="w-full"
+                placeholder="0.00"
+              />
+            </div>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <Button variant="outline" onClick={() => setFreeForm(null)}>{t('common.cancel')}</Button>
+          <Button
+            color="primary"
+            disabled={!freeFormDesc.trim() || !(parseFloat(freeFormAmount) > 0)}
+            onClick={handleAddFreeForm}
+          >
+            {t('common.add')}
+          </Button>
+        </div>
+      </Modal>
 
       {/* Discard-confirm sub-modal (always mounted) */}
       <Modal open={confirmClose} onClose={() => setConfirmClose(false)} maxWidth="24rem" width="100%">
