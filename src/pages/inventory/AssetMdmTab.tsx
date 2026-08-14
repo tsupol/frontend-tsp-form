@@ -160,7 +160,12 @@ export function AssetMdmTab({ assetId, onRefresh }: { assetId: number; onRefresh
         )}
 
         {effectiveActive === 'appControl' && (
-          <SubTabAppControl status={status} onAck={() => refetch()} onNotEnrolled={goToEnroll} />
+          <SubTabAppControl
+            status={status}
+            onAck={() => refetch()}
+            onNotEnrolled={goToEnroll}
+            onChanged={() => refetch()}
+          />
         )}
 
         {effectiveActive === 'lostMode' && (

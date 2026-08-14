@@ -500,6 +500,10 @@ export interface MdmDeviceApp {
   short_version: string | null;
   is_managed: boolean | null;
   is_user_app: boolean | null; // false = OS pseudo-app (poster/proxy) — filtered out (mig 905)
+  /** true = the DB forbids removing this one (the NNF app today). Show a lock
+   *  instead of a remove button. The rule is the DB's — never test the bundle id
+   *  here, or a future protected app silently gets a working delete button. */
+  is_protected: boolean | null;
   last_observed_at: string | null;
 }
 // Filter to real, launchable apps (is_user_app) — drops the OS poster/proxy
@@ -651,6 +655,146 @@ export function removeAppWhitelist(assetId: number, preview: boolean): Promise<R
   return apiClient.rpc<RemoveWhitelistResult>('fn_mdm_remove_app_whitelist', {
     p_asset_id: assetId,
     p_preview: preview,
+  });
+}
+
+// ── Remove ONE app from the device (IMPLEMENT 2026-08-13 remove_app_staff_ritual)
+//
+// Two beats, same RPC: preview mints the challenge, commit consumes it. The
+// challenge is bound to serial + actor + BUNDLE ID — app A's code cannot confirm
+// app B. Permission is MDM.APP_REMOVE (company_admin / branch_manager);
+// MDM.APP_CONTROL, which branch_staff holds, does NOT cover this.
+//
+// Removing an app takes its on-device data with it, unrecoverably — hence the
+// same ritual as erase. Rows with is_protected (the NNF app) have no button at
+// all; the DB owns that rule, so never hardcode the bundle id here.
+
+export interface MdmRemoveAppPreview {
+  preview: true;
+  serial: string;
+  identifier: string;
+  app_name: string | null;
+  /** false → the customer installed it themselves. Worth saying out loud. */
+  is_managed: boolean;
+  /** false → our app list may be stale; the app might already be gone. */
+  observed_on_device: boolean;
+  last_observed_at: string | null;
+  challenge?: MdmChallenge;
+}
+
+export interface MdmRemoveAppResult {
+  preview: false;
+  serial: string;
+  identifier: string;
+  intent_id?: number | null;
+  state?: string;
+}
+
+export function removeDeviceAppPreview(
+  serial: string,
+  actorId: number,
+  identifier: string,
+): Promise<MdmRemoveAppPreview> {
+  return apiClient.rpc<MdmRemoveAppPreview>('fn_mdm_remove_app_admin', {
+    p_serial: serial,
+    p_actor_id: actorId,
+    p_identifier: identifier,
+    p_preview: true,
+  });
+}
+
+export function removeDeviceAppCommit(
+  serial: string,
+  actorId: number,
+  identifier: string,
+  challengeId: number,
+  confirmCode: string,
+): Promise<MdmRemoveAppResult> {
+  return apiClient.rpc<MdmRemoveAppResult>('fn_mdm_remove_app_admin', {
+    p_serial: serial,
+    p_actor_id: actorId,
+    p_identifier: identifier,
+    p_preview: false,
+    p_challenge_id: challengeId,
+    p_confirm_code: confirmCode,
+  });
+}
+
+// ── Let the customer remove apps themselves, for a while (IMPLEMENT 2026-08-13
+//    mdm_app_removal_gate)
+//
+// The enforcement profile sets allowAppRemoval=false, and Apple has no per-app
+// version of that key — so the customer can't remove even their own LINE or
+// photos. This opens the door for 15/30/60 minutes, then the system closes it
+// and re-locks at whatever level is correct by then.
+//
+// Same OTP + 5s countdown as removing an app. CLOSING early needs neither — going
+// back to locked is always the safe direction.
+//
+// ⚠️ There is no status endpoint yet: nothing tells us on page load whether a
+// door is currently open. The only signal is MDM.STATE.GATE_ALREADY_OPEN coming
+// back from a preview. Asked BE to expose the one their ops console already has
+// (UI_FEEDBACK 2026-08-14) — wire the real countdown to it when it lands.
+
+export interface MdmAppGateOpenPreview {
+  preview: true;
+  serial: string;
+  preset_now: string;
+  gate_template: string;
+  minutes: number;
+  /** What's on the device right now — the customer could remove any of these. */
+  apps_now: string[];
+  challenge?: MdmChallenge;
+}
+
+export interface MdmAppGateOpenResult {
+  preview: false;
+  serial: string;
+  gate_id: number;
+  /** When the door shuts on its own. Drives the countdown. */
+  expires_at: string;
+}
+
+export interface MdmAppGateCloseResult {
+  serial: string;
+  gate_id?: number | null;
+  closed_at?: string | null;
+}
+
+export function appGateOpenPreview(
+  serial: string,
+  actorId: number,
+  minutes: number,
+): Promise<MdmAppGateOpenPreview> {
+  return apiClient.rpc<MdmAppGateOpenPreview>('fn_mdm_app_gate_open', {
+    p_serial: serial,
+    p_actor_id: actorId,
+    p_minutes: minutes,
+    p_preview: true,
+  });
+}
+
+export function appGateOpenCommit(
+  serial: string,
+  actorId: number,
+  minutes: number,
+  challengeId: number,
+  confirmCode: string,
+): Promise<MdmAppGateOpenResult> {
+  return apiClient.rpc<MdmAppGateOpenResult>('fn_mdm_app_gate_open', {
+    p_serial: serial,
+    p_actor_id: actorId,
+    p_minutes: minutes,
+    p_preview: false,
+    p_challenge_id: challengeId,
+    p_confirm_code: confirmCode,
+  });
+}
+
+export function appGateClose(serial: string, actorId: number): Promise<MdmAppGateCloseResult> {
+  return apiClient.rpc<MdmAppGateCloseResult>('fn_mdm_app_gate_close', {
+    p_serial: serial,
+    p_actor_id: actorId,
   });
 }
 
@@ -970,8 +1114,13 @@ export function parseMdmError(err: unknown, t: TFunction): ParsedMdmError {
   }
 
   const { code, detail } = splitCode(rawCode);
-  const isNotEnrolled = code === 'MDM.STATE.ASSET_NOT_ENROLLED';
-  const isPermissionDenied = code.startsWith('MDM.AUTH.');
+  // messageKey arrives lowercase ("mdm.auth.permission_denied") while a raw
+  // type-B code arrives upper. Classify off an uppercased copy so both land;
+  // `code` itself stays verbatim, since it's also the i18n lookup key and the
+  // catalogue carries both casings.
+  const upper = code.toUpperCase();
+  const isNotEnrolled = upper === 'MDM.STATE.ASSET_NOT_ENROLLED';
+  const isPermissionDenied = upper.startsWith('MDM.AUTH.');
 
   // Translate by code only. defaultValue:'' so a miss falls through to hint →
   // raw code (never a blank, never the English default leaking).

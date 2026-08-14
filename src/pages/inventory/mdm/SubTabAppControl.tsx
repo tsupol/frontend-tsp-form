@@ -1,12 +1,25 @@
 // ============================================================================
-// Sub-tab 5 — ควบคุมแอป (131 §7). Two halves:
+// Sub-tab 5 — ควบคุมแอป (131 §7). Everything about this device's apps, in the
+// order a person needs it:
 //
+//  GATE   — "ให้ลูกค้าลบแอปเอง" at the very top, because while it's open that is
+//           live state and must not be buried under sixty app rows (IMPLEMENT
+//           2026-08-13 mdm_app_removal_gate §1).
+//  LIST   — the installed apps the device reported, each with a remove button
+//           behind the OTP ritual (IMPLEMENT 2026-08-13 remove_app_staff_ritual).
+//           This list used to sit in sub-tab 2; it moved here so apps are one
+//           subject on one screen.
 //  APPLY  — pick a preset → preview (p_preview:true) → confirm → apply. The
 //           preview shows the resolved app_count + bundle list (with icons, §7.1).
 //           Only apply returns an intent_id (tracked in the queue).
 //  REMOVE — §7.0: the missing counterpart. "Remove app restriction" via
 //           fn_mdm_remove_app_whitelist (preview→confirm), gated on
 //           app_whitelist_active. Same permission as apply by design.
+//
+// The two removal features are different acts, not duplicates: the GATE lets the
+// customer remove their own apps and carry the responsibility; the LIST's button
+// has staff remove one on their behalf. Seeing both at once is how the operator
+// picks the right one.
 //
 // ⚠️ app_count > the preset's list is expected — the system always adds the
 // baseline apps (phone/messages/settings/NNF) so the device stays usable (§7).
@@ -26,15 +39,20 @@ import {
 import { useMdmCommand } from './useMdmCommand';
 import { MdmErrorAlert, CommandAckNote, AppIcon } from './MdmSharedBits';
 import { RelativeDateTime } from './RelativeDateTime';
+import { MdmAppGatePanel } from './MdmAppGatePanel';
+import { MdmDeviceAppsSection } from './MdmDeviceAppsSection';
 
 export function SubTabAppControl({
   status,
   onAck,
   onNotEnrolled,
+  onChanged,
 }: {
   status: AssetMdmStatus;
   onAck: (intentIds: number[]) => void;
   onNotEnrolled: () => void;
+  /** Re-read the status row — the gate changes the device's lock level. */
+  onChanged: () => void;
 }) {
   const { t } = useTranslation();
   const [presetKey, setPresetKey] = useState<string | null>(null);
@@ -76,6 +94,16 @@ export function SubTabAppControl({
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Live state first — see the file header on why this is at the top. */}
+      <MdmAppGatePanel serial={status.serial_number} onChanged={onChanged} />
+
+      {/* What's actually on the device, with the per-app remove button. */}
+      <MdmDeviceAppsSection
+        assetId={status.asset_id}
+        serial={status.serial_number}
+        onNotEnrolled={onNotEnrolled}
+      />
+
       <p className="text-sm text-subtle">{t('asset.mdm.appControl.intro')}</p>
 
       <MdmErrorAlert error={cmd.error ?? previewError} onGoToEnroll={onNotEnrolled} />

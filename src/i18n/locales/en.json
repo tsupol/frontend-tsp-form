@@ -1805,7 +1805,13 @@
       "BRANCH_NO_POOL": "Branch not in a team",
       "POOL_NO_USABLE_MEMBER": "Everyone on the team is paused"
     },
-    "fixResumeMember": "Resume a member"
+    "fixResumeMember": "Resume a member",
+    "slipPending": "Slip awaiting review",
+    "slipPendingHint": "A payment slip is waiting to be checked — held back on purpose.",
+    "holiday": "Company holiday",
+    "holidayHint": "Held back because the company is closed. Nothing to do.",
+    "holidayGrace": "Day after the holiday",
+    "holidayGraceHint": "The first working day back — assignment resumes the following night."
   },
   "collectionPools": {
     "title": "Collection Teams",
@@ -2909,7 +2915,35 @@
         "eraseQueued": "Erase command sent to the device.",
         "revealButton": "Activation Lock codes"
       },
-      "refreshAll": "Refresh all"
+      "refreshAll": "Refresh all",
+      "appRemove": {
+        "button": "Remove this app",
+        "title": "Remove this app from the device",
+        "body": "Everything {{app}} holds on this device will be deleted and cannot be recovered.",
+        "confirm": "Remove this app",
+        "unmanagedWarn": "The customer installed this app themselves.",
+        "staleWarn": "This list may be out of date — the app may already be gone from the device.",
+        "protectedHint": "The NNF app cannot be removed.",
+        "queued": "Removal of {{app}} has been sent to the device.",
+        "refreshNote": "The row disappears once the device reports back — about a minute. Pull to check.",
+        "noChallenge": "The server did not return a confirmation code. Try again."
+      },
+      "appGate": {
+        "title": "Let the customer remove apps",
+        "minutes": "{{count}} min",
+        "allowFor": "Allow for {{count}} min",
+        "openWithTime": "Allowed right now · {{minutes}} min left",
+        "openNoTime": "Allowed right now",
+        "until": "Until",
+        "autoCloses": "the system locks it back on its own",
+        "tellCustomer": "Tell the customer not to remove the NNF app — if they do, the system reinstalls it.",
+        "stopNow": "Stop allowing now",
+        "confirmTitle": "Let the customer remove apps for {{count}} minutes",
+        "confirmBody": "For the next {{count}} minutes the customer can remove any app on this device, including the NNF app.",
+        "confirmNote": "The system locks the device again when the time is up, at whatever level is correct by then, and reinstalls the NNF app if it was removed.",
+        "confirmButton": "Allow",
+        "noChallenge": "The server did not return a confirmation code. Try again."
+      }
     },
     "icloud_appleOnly": "iCloud applies to Apple devices only.",
     "icloud_account": "iCloud account",
