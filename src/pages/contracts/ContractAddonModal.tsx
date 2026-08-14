@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Modal, Button, Select, MaskedInput, NumberSpinner, PopOver } from 'tsp-form';
+import { Modal, Button, Select, MaskedInput, NumberSpinner, PopOver, TextArea } from 'tsp-form';
 import { Plus, Trash2, XCircle, AlertCircle, ChevronsRight, Loader2, CheckCircle, Gift, ShoppingBag, Pencil, Wrench } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { fmtCurrency } from '../../lib/format';
@@ -763,11 +763,10 @@ export function ContractAddonModal({ open, contract, onClose, onSuccess }: {
               ) : (
                 <div className="flex flex-col">
                   <label className="form-label">{t('contractAddon.lineDescription')}</label>
-                  <MaskedInput
+                  <TextArea
                     value={priceEdit?.description ?? ''}
-                    onChange={(v) => setPriceEdit(prev => (prev ? { ...prev, description: v } : prev))}
-                    size="sm"
-                    className="w-full"
+                    onChange={(e) => setPriceEdit(prev => (prev ? { ...prev, description: e.target.value } : prev))}
+                    rows={2}
                   />
                 </div>
               )}
@@ -833,11 +832,10 @@ export function ContractAddonModal({ open, contract, onClose, onSuccess }: {
           <div className="form-grid">
             <div className="flex flex-col">
               <label className="form-label">{t('contractAddon.lineDescription')}</label>
-              <MaskedInput
+              <TextArea
                 value={freeFormDesc}
-                onChange={setFreeFormDesc}
-                size="sm"
-                className="w-full"
+                onChange={(e) => setFreeFormDesc(e.target.value)}
+                rows={2}
               />
             </div>
             <div className="flex flex-col">
