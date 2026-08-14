@@ -267,11 +267,14 @@ function AppRow({
               <Lock size={15} />
             </span>
           ) : (
+            // Neutral button, danger-coloured icon — the project's convention
+            // for a destructive row action. A filled danger button per row
+            // turns a 60-app list into a wall of red and stops reading as a
+            // warning at all.
             <Button
               variant="outline"
               size="sm"
-              color="danger"
-              startIcon={<Trash2 size={15} />}
+              startIcon={<Trash2 size={15} className="text-danger" />}
               disabled={!canAct}
               onClick={onRemove}
               aria-label={t('asset.mdm.appRemove.button')}
