@@ -731,10 +731,10 @@ export function removeDeviceAppCommit(
 // Same OTP + 5s countdown as removing an app. CLOSING early needs neither — going
 // back to locked is always the safe direction.
 //
-// ⚠️ There is no status endpoint yet: nothing tells us on page load whether a
-// door is currently open. The only signal is MDM.STATE.GATE_ALREADY_OPEN coming
-// back from a preview. Asked BE to expose the one their ops console already has
-// (UI_FEEDBACK 2026-08-14) — wire the real countdown to it when it lands.
+// Status comes from fn_mdm_app_gate_status (mig 243). Read permission is
+// MDM.APP_CONTROL, deliberately wider than the MDM.APP_REMOVE needed to open or
+// close: an open door is live state that everyone looking at the device has to
+// see, even the staff who can't operate it.
 
 export interface MdmAppGateOpenPreview {
   preview: true;
@@ -796,6 +796,45 @@ export function appGateClose(serial: string, actorId: number): Promise<MdmAppGat
     p_serial: serial,
     p_actor_id: actorId,
   });
+}
+
+/** Why the door can't be opened right now. Same codes the open RPC would
+ *  return, handed over in advance so the panel can disable the button and say
+ *  why instead of making the operator press it to find out. */
+export type MdmAppGateBlockCode =
+  | 'MDM.STATE.GATE_ALREADY_OPEN'
+  | 'MDM.STATE.GATE_DEVICE_NOT_WITH_CUSTOMER'
+  | 'MDM.STATE.GATE_RUNG_NOT_ALLOWED'
+  | string;
+
+export interface MdmAppGateStatus {
+  serial: string;
+  /** Same definition the reconciler uses, so screen and system never disagree. */
+  open: boolean;
+  gate_id: number | null;
+  expires_at: string | null;
+  /** Seconds left as of the response. Run the clock off expires_at, not this. */
+  seconds_remaining: number | null;
+  opened_at: string | null;
+  opened_by: number | null;
+  opened_by_username: string | null;
+  /** Swapping the profile is async: EXECUTED means the device is actually
+   *  permissive. Anything else = open in our records, command still travelling
+   *  (device asleep, offline). */
+  open_apply_state: string | null;
+  can_open: boolean;
+  block_code: MdmAppGateBlockCode | null;
+  preset_now: string | null;
+  last_opened_at: string | null;
+  last_closed_at: string | null;
+  last_close_reason: 'TTL_EXPIRED' | 'STAFF_CLOSED' | null;
+  /** What the customer actually removed while the door was open, last time. */
+  last_removed_bundles: string[];
+  last_nnf_app_action: string | null;
+}
+
+export function fetchAppGateStatus(serial: string): Promise<MdmAppGateStatus> {
+  return apiClient.rpc<MdmAppGateStatus>('fn_mdm_app_gate_status', { p_serial: serial });
 }
 
 // ── Sub-tab 6: lost mode & location (§8) ────────────────────────────────────

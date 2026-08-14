@@ -1,6 +1,6 @@
 // ============================================================================
 // "ให้ลูกค้าลบแอปเอง" — let the customer remove apps themselves, for a while.
-// IMPLEMENT 2026-08-13 mdm_app_removal_gate.
+// IMPLEMENT 2026-08-13 mdm_app_removal_gate · status endpoint 2026-08-14 (mig 243).
 //
 // The enforcement profile carries allowAppRemoval=false, and Apple has no
 // per-app form of that key — it is all or nothing, so today the customer can't
@@ -12,7 +12,8 @@
 // This is deliberately NOT the same thing as the per-row remove button below it:
 // there, staff remove one app on the customer's behalf and the shop carries the
 // responsibility. Here the customer does it, on Apple's own dialog, and carries
-// it themselves. Both exist because they answer different requests.
+// it themselves. Both exist because they answer different requests, and seeing
+// both at once is how the operator picks the right one.
 //
 // Placement (doc §1): the TOP of the app tab, above the list. It's a
 // device-level action, not a row-level one, and while the door is open that is
@@ -28,32 +29,36 @@
 // presses the wrong one). The words ประตู / gate / profile / enforcement /
 // allowAppRemoval never reach the screen either; branch staff don't speak them.
 //
-// ⚠️ There is no status endpoint yet (doc §4). Nothing tells us on page load
-// whether a door is already open — the only signal is GATE_ALREADY_OPEN coming
-// back from a preview, which is what `knownOpen` below latches on. So after a
-// reload the panel reads as closed until someone presses the button. BE has the
-// read side on their ops console and we've asked them to expose it
-// (UI_FEEDBACK 2026-08-14); when it lands, feed `expiresAt` from it and the
-// countdown becomes real on every load.
+// Three things the status endpoint changed, all worth keeping:
+//   • Everyone who can see the tab can see the state, including branch staff who
+//     can't operate it (read is MDM.APP_CONTROL, open/close stay
+//     MDM.APP_REMOVE). An open door is live state, not a privilege.
+//   • `can_open` + `block_code` mean the button says WHY it's unavailable
+//     instead of making someone press it to find out.
+//   • `open_apply_state` distinguishes "open in our records" from "the device
+//     actually accepted it" — the profile swap is async, so a sleeping handset
+//     is open on paper and still locked in the customer's hand.
 // ============================================================================
 
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from 'tsp-form';
-import { Unlock, Lock } from 'lucide-react';
+import { Unlock, Lock, Loader2 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { DateTime } from '../../../components/DateTime';
 import { MdmChallengeDialog } from './MdmChallengeDialog';
+import { MDM_NO_CACHE } from './useMdmStatus';
 import {
-  appGateOpenPreview, appGateOpenCommit, appGateClose, parseMdmError,
-  type MdmChallenge,
+  appGateOpenPreview, appGateOpenCommit, appGateClose, fetchAppGateStatus,
+  parseMdmError, type MdmChallenge, type MdmAppGateStatus,
 } from './mdmApi';
 
 /** The doc suggests these three; the RPC itself accepts 5–120. */
 const MINUTE_CHOICES = [15, 30, 60] as const;
 
 /** Whole minutes left until `iso`, floored at 0. */
-function minutesUntil(iso: string | null): number {
+function minutesUntil(iso: string | null | undefined): number {
   if (!iso) return 0;
   const ms = new Date(iso).getTime() - Date.now();
   return ms <= 0 ? 0 : Math.ceil(ms / 60_000);
@@ -69,10 +74,11 @@ export function MdmAppGatePanel({
 }) {
   const { can } = useAuth();
 
-  // Same permission as the per-row remove button (doc §1). Without it the whole
-  // panel is absent — not disabled. Split in two so this early return doesn't
-  // sit above the body's hooks.
-  if (!can('MDM.APP_REMOVE')) return null;
+  // Reading the state needs only MDM.APP_CONTROL — the same permission that put
+  // this whole sub-tab on screen. The open/close buttons check APP_REMOVE
+  // separately below. Split in two components so this early return doesn't sit
+  // above the body's hooks.
+  if (!can('MDM.APP_CONTROL')) return null;
 
   return <GatePanelBody serial={serial} onChanged={onChanged} />;
 }
@@ -84,19 +90,26 @@ function GatePanelBody({
   onChanged: () => void;
 }) {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   const actorId = user?.user_id ?? null;
+  const mayOperate = can('MDM.APP_REMOVE');
+  const qc = useQueryClient();
+
+  const statusKey = ['mdm-app-gate-status', serial];
+  const { data: gate, isLoading } = useQuery<MdmAppGateStatus>({
+    queryKey: statusKey,
+    queryFn: () => fetchAppGateStatus(serial!),
+    enabled: !!serial,
+    ...MDM_NO_CACHE,
+  });
+  const reloadStatus = () => qc.invalidateQueries({ queryKey: statusKey });
+
   const [minutes, setMinutes] = useState<number>(60);
   const [challenge, setChallenge] = useState<MdmChallenge | null>(null);
   const [busy, setBusy] = useState(false);
   const [dialogError, setDialogError] = useState<string | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
-
-  /** When the door shuts. Known only from a commit we performed — see header. */
-  const [expiresAt, setExpiresAt] = useState<string | null>(null);
-  /** Open, but we don't know until when (learned from GATE_ALREADY_OPEN). */
-  const [knownOpen, setKnownOpen] = useState(false);
-  /** Re-render once a minute so the countdown ticks down. */
+  /** Re-render every half minute so the countdown ticks down. */
   const [, setTick] = useState(0);
 
   // Held in a ref so the ticker below doesn't restart every time the parent
@@ -104,24 +117,29 @@ function GatePanelBody({
   const onChangedRef = useRef(onChanged);
   onChangedRef.current = onChanged;
 
-  const isOpen = knownOpen || minutesUntil(expiresAt) > 0;
+  const isOpen = gate?.open === true;
+  const expiresAt = gate?.expires_at ?? null;
+  const remaining = minutesUntil(expiresAt);
 
-  // Tick the countdown down, and notice the moment it runs out — the system
-  // closes the door on its own, so the panel has to go back to idle without
-  // anyone pressing anything.
+  // Tick the countdown, and re-read the moment it runs out — the sweeper closes
+  // the door on its own, so the panel has to return to idle with nobody
+  // pressing anything. Re-reading (rather than assuming) also catches a close
+  // performed from the ops console or by another member of staff.
   useEffect(() => {
-    if (!expiresAt) return;
+    if (!isOpen) return;
     const id = setInterval(() => {
-      if (minutesUntil(expiresAt) === 0) {
-        setExpiresAt(null);
-        setKnownOpen(false);
+      if (expiresAt && minutesUntil(expiresAt) === 0) {
+        reloadStatus();
         onChangedRef.current();
       } else {
         setTick((n) => n + 1);
       }
     }, 30_000);
     return () => clearInterval(id);
-  }, [expiresAt]);
+    // reloadStatus closes over a stable queryKey; re-creating the interval on
+    // its identity would reset the clock every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, expiresAt]);
 
   const ready = actorId != null && !!serial;
 
@@ -136,17 +154,9 @@ function GatePanelBody({
       }
       setChallenge(res.challenge);
     } catch (e) {
-      const err = parseMdmError(e, t);
-      // The one way we currently learn a door is already open (doc §4). Switch
-      // to the open state so the operator gets the stop button, even though we
-      // can't say how long is left.
-      // Codes arrive lowercase via messageKey, upper when raw — compare folded.
-      if (err.code.toUpperCase() === 'MDM.STATE.GATE_ALREADY_OPEN') {
-        setKnownOpen(true);
-        onChanged();
-      } else {
-        setPageError(err.message);
-      }
+      setPageError(parseMdmError(e, t).message);
+      // Whatever refused us, the status row is the authority on why.
+      reloadStatus();
     } finally {
       setBusy(false);
     }
@@ -156,12 +166,13 @@ function GatePanelBody({
     if (!ready || !challenge) return;
     setBusy(true); setDialogError(null);
     try {
-      const res = await appGateOpenCommit(serial!, actorId!, minutes, challenge.challenge_id, code);
-      setExpiresAt(res.expires_at);
-      setKnownOpen(true);
+      await appGateOpenCommit(serial!, actorId!, minutes, challenge.challenge_id, code);
       setChallenge(null);
+      await reloadStatus();
       onChanged();
     } catch (e) {
+      // Stay in the dialog — CHALLENGE_INVALID / _TOO_SOON are recoverable by
+      // retyping or waiting, and closing throws the challenge away.
       setDialogError(parseMdmError(e, t).message);
     } finally {
       setBusy(false);
@@ -174,24 +185,28 @@ function GatePanelBody({
     setBusy(true); setPageError(null);
     try {
       await appGateClose(serial!, actorId!);
-      setExpiresAt(null);
-      setKnownOpen(false);
-      onChanged();
     } catch (e) {
       const err = parseMdmError(e, t);
-      // Nothing open after all (it expired, or another staffer closed it).
-      if (err.code.toUpperCase() === 'MDM.NOT_FOUND.GATE_OPEN') {
-        setExpiresAt(null);
-        setKnownOpen(false);
-      } else {
+      // Nothing open after all — it expired, or someone else closed it. The
+      // reload below puts the panel right, so this isn't worth an error band.
+      if (err.code.toUpperCase() !== 'MDM.NOT_FOUND.GATE_OPEN') {
         setPageError(err.message);
       }
     } finally {
       setBusy(false);
+      await reloadStatus();
+      onChanged();
     }
   };
 
-  const remaining = minutesUntil(expiresAt);
+  if (isLoading || !gate) {
+    return (
+      <div className="border border-line rounded-md px-3 py-2.5 flex items-center gap-2 text-sm text-subtle">
+        <Loader2 size={14} className="animate-spin" />
+        {t('asset.mdm.appGate.title')}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-2">
@@ -209,54 +224,105 @@ function GatePanelBody({
                 ? t('asset.mdm.appGate.openWithTime', { minutes: remaining })
                 : t('asset.mdm.appGate.openNoTime')}
             </div>
+
             {expiresAt && (
               <div className="text-xs">
                 {t('asset.mdm.appGate.until')} <DateTime value={expiresAt} showTime />
                 {' · '}{t('asset.mdm.appGate.autoCloses')}
               </div>
             )}
+
+            {/* Who opened it — so two people don't fight over one device. */}
+            {gate.opened_by_username && (
+              <div className="text-xs">
+                {t('asset.mdm.appGate.openedBy', { name: gate.opened_by_username })}
+                {gate.opened_at && <> · <DateTime value={gate.opened_at} showTime /></>}
+              </div>
+            )}
+
+            {/* Open in our records, but the profile swap hasn't reached the
+                handset yet — the customer still can't delete anything. Saying
+                so beats the operator telling them to try and being wrong. */}
+            {gate.open_apply_state != null && gate.open_apply_state !== 'EXECUTED' && (
+              <div className="text-xs inline-flex items-center gap-1">
+                <Loader2 size={12} className="animate-spin shrink-0" />
+                {t('asset.mdm.appGate.applying')}
+              </div>
+            )}
+
             <div className="text-xs">{t('asset.mdm.appGate.tellCustomer')}</div>
-            <div>
-              <Button
-                variant="outline"
-                size="sm"
-                startIcon={<Lock size={15} />}
-                disabled={busy || !ready}
-                onClick={closeNow}
-              >
-                {t('asset.mdm.appGate.stopNow')}
-              </Button>
-            </div>
+
+            {mayOperate && (
+              <div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  startIcon={<Lock size={15} />}
+                  disabled={busy || !ready}
+                  onClick={closeNow}
+                >
+                  {t('asset.mdm.appGate.stopNow')}
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       ) : (
         /* Idle — one compact line. Most visitors came to read the app list. */
-        <div className="border border-line rounded-md px-3 py-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
-          <span className="text-sm font-medium">{t('asset.mdm.appGate.title')}</span>
-          <div className="flex items-center gap-1">
-            {MINUTE_CHOICES.map((m) => (
-              <Button
-                key={m}
-                size="sm"
-                variant={minutes === m ? 'solid' : 'ghost'}
-                color={minutes === m ? 'primary' : undefined}
-                onClick={() => setMinutes(m)}
-              >
-                {t('asset.mdm.appGate.minutes', { count: m })}
-              </Button>
-            ))}
+        <div className="border border-line rounded-md px-3 py-2.5 flex flex-col gap-1.5">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <span className="text-sm font-medium">{t('asset.mdm.appGate.title')}</span>
+
+            {mayOperate && (
+              <>
+                <div className="flex items-center gap-1">
+                  {MINUTE_CHOICES.map((m) => (
+                    <Button
+                      key={m}
+                      size="sm"
+                      variant={minutes === m ? 'solid' : 'ghost'}
+                      color={minutes === m ? 'primary' : undefined}
+                      disabled={!gate.can_open}
+                      onClick={() => setMinutes(m)}
+                    >
+                      {t('asset.mdm.appGate.minutes', { count: m })}
+                    </Button>
+                  ))}
+                </div>
+                <div className="ml-auto">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    startIcon={<Unlock size={15} />}
+                    disabled={busy || !ready || !gate.can_open}
+                    onClick={startOpen}
+                  >
+                    {t('asset.mdm.appGate.allowFor', { count: minutes })}
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
-          <div className="ml-auto">
-            <Button
-              size="sm"
-              variant="outline"
-              startIcon={<Unlock size={15} />}
-              disabled={busy || !ready}
-              onClick={startOpen}
-            >
-              {t('asset.mdm.appGate.allowFor', { count: minutes })}
-            </Button>
-          </div>
+
+          {/* Why the button is dead, said up front rather than on press.
+              block_code is the same code the open RPC would have returned, so
+              it translates through the shared apiErrors catalogue. */}
+          {mayOperate && !gate.can_open && gate.block_code && (
+            <div className="text-xs text-subtle">
+              {t(gate.block_code, { ns: 'apiErrors', defaultValue: gate.block_code })}
+            </div>
+          )}
+
+          {/* What happened last time, when there is a last time. */}
+          {gate.last_closed_at && (
+            <div className="text-xs text-subtler">
+              {t('asset.mdm.appGate.lastTime')} <DateTime value={gate.last_closed_at} showTime />
+              {' · '}
+              {gate.last_removed_bundles.length > 0
+                ? t('asset.mdm.appGate.lastRemoved', { count: gate.last_removed_bundles.length })
+                : t('asset.mdm.appGate.lastRemovedNone')}
+            </div>
+          )}
         </div>
       )}
 

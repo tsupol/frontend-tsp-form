@@ -2942,7 +2942,12 @@
         "confirmBody": "For the next {{count}} minutes the customer can remove any app on this device, including the NNF app.",
         "confirmNote": "The system locks the device again when the time is up, at whatever level is correct by then, and reinstalls the NNF app if it was removed.",
         "confirmButton": "Allow",
-        "noChallenge": "The server did not return a confirmation code. Try again."
+        "noChallenge": "The server did not return a confirmation code. Try again.",
+        "openedBy": "Opened by {{name}}",
+        "applying": "Sending the change to the device — the customer cannot remove anything yet.",
+        "lastTime": "Last time:",
+        "lastRemoved": "the customer removed {{count}} app(s)",
+        "lastRemovedNone": "the customer removed nothing"
       }
     },
     "icloud_appleOnly": "iCloud applies to Apple devices only.",

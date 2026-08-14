@@ -214,7 +214,18 @@ function removeNote(
 ): string | null {
   if (!target) return null;
   const parts: string[] = [];
-  if (target.preview.is_managed === false) parts.push(t('asset.mdm.appRemove.unmanagedWarn'));
+  // is_managed=false means "not managed by MDM", which is equally true of an app
+  // Apple shipped with the phone — our fleet has almost no managed apps at all.
+  // Saying "the customer installed this themselves" over Safari is simply wrong,
+  // so Apple's own bundles don't get the line (BE ruling 2026-08-14: the boolean
+  // is correct and stays, the screen filters).
+  //
+  // ⛔ Not is_user_app — that flag only hides display noise (posters, proxy
+  // apps) and is not a "customer installed it" signal.
+  const isApple = target.app.bundle_id.startsWith('com.apple.');
+  if (target.preview.is_managed === false && !isApple) {
+    parts.push(t('asset.mdm.appRemove.unmanagedWarn'));
+  }
   if (target.preview.observed_on_device === false) parts.push(t('asset.mdm.appRemove.staleWarn'));
   return parts.length ? parts.join(' ') : null;
 }
