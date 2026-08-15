@@ -51,7 +51,7 @@ export function SearchInput({
   /** Only fires while the caller's endIcon is the one on screen, not the hint. */
   onEndIconClick?: () => void;
   /** Lower the Latin floor for a screen whose own data is legitimately short
-   *  (brand "RC"). Thai always uses its own lower floor regardless. */
+   *  (brand "RC") or a model generation ("16"/"17"). */
   minChars?: number;
   className?: string;
   disabled?: boolean;

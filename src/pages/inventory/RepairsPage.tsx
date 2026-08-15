@@ -46,7 +46,7 @@ export function RepairsPage() {
   // Short keywords never reach fn_repair_search. At 1 char the RPC drops the
   // keyword and browses every repair — rows that look like matches but were
   // never filtered. At 2 it searches correctly; the floor stays 3 here because
-  // this box also searches customer names. (Thai relaxes to 2 on its own.)
+  // this box also searches customer names.
   useEffect(() => {
     const next = isSearchable(keyword) ? keyword.trim() : '';
     const tm = setTimeout(() => setDebounced(next), 300);

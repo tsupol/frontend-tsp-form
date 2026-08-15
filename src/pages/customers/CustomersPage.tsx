@@ -197,9 +197,9 @@ export function CustomersPage() {
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
 
-  // Names keep the 3 floor: two Latin letters of a name matches half the table,
-  // which is noise rather than a result. (Thai relaxes to 2 on its own — "สม" is
-  // an ordinary name search.) The RPC's own floor is 2, below which it returns
+  // Names keep the 3 floor: two characters of a name is not a search. On live
+  // data "ปร" matches 933 of 17,176 customers and "so" matches 49 — the user is
+  // reading a list either way. The RPC's own floor is 2, below which it returns
   // empty rather than browsing, so this is a UI-quality choice, not a guard
   // against bad data. Filtered before the debounce so nothing fires and gets
   // discarded.

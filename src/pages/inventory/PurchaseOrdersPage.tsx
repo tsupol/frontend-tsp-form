@@ -205,8 +205,7 @@ export function PurchaseOrdersPage() {
   const [search, setSearch] = useState('');
   // Debounce + min-char floor both live in SearchInput below. Default floor (3)
   // rather than the identifier 2: this box also searches supplier_name, and two
-  // Latin letters of a supplier matches most of the list. Thai still relaxes to
-  // 2 on its own.
+  // characters of a supplier name matches most of the list.
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
   const navigate = useNavigate();
