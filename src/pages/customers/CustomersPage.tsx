@@ -3,15 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import {
-  PageNav, PageNavPanel, MobileHeader, DataTableFooter, Input, Select, Button, Badge,
-  Modal, LabeledCheckbox, FormErrorMessage, useSnackbarContext,
-} from 'tsp-form';
-import { ArrowRightFromLine, ArrowLeft, Search, Users, CheckCircle, XCircle, Trash2, Star, Plus, Pencil, MapPin, UserPlus, ExternalLink } from 'lucide-react';
+import { PageNav, PageNavPanel, MobileHeader, DataTableFooter, Input, Select, Button, Badge, Modal, LabeledCheckbox, FormErrorMessage, useSnackbarContext } from 'tsp-form';
+import { ArrowRightFromLine, ArrowLeft, Users, CheckCircle, XCircle, Trash2, Star, Plus, Pencil, MapPin, UserPlus, ExternalLink } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { toLocalDateStr, parseLocalDate, formatTel, formatCid } from '../../lib/format';
-import { SEARCH_MIN_CHARS_NAME_TABLE, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
+import { SEARCH_MIN_CHARS_NAME_TABLE, isSearchable } from '../../lib/searchKeyword';
 import { DateTime } from '../../components/DateTime';
 import { DatePicker } from '../../components/DatePicker';
 import { PhoneInput } from '../../components/PhoneInput';
@@ -20,6 +17,7 @@ import { CustomerLoginCard, useInvalidateLoginInfo } from '../../components/Cust
 import { EditIdentityModal } from '../../components/EditIdentityModal';
 import { ContractDetailPanel } from '../contracts/ContractDetailPanel';
 import { useAuth } from '../../contexts/AuthContext';
+import { SearchInput } from '../../components/SearchInput';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -197,17 +195,12 @@ export function CustomersPage() {
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
 
-  // Names keep the 3 floor: two characters of a name is not a search. On live
-  // data "ปร" matches 933 of 17,176 customers and "so" matches 49 — the user is
-  // reading a list either way. The RPC's own floor is 2, below which it returns
-  // empty rather than browsing, so this is a UI-quality choice, not a guard
-  // against bad data. Filtered before the debounce so nothing fires and gets
-  // discarded.
-  useEffect(() => {
-    const next = isSearchable(search, SEARCH_MIN_CHARS_NAME_TABLE) ? search.trim() : '';
-    const timer = setTimeout(() => { setDebouncedSearch(next); setPageIndex(0); }, 300);
-    return () => clearTimeout(timer);
-  }, [search]);
+  // Debounce + the floor both live in SearchInput below. This is the one screen
+  // that raises its floor to 3: two characters of a name is not a search here —
+  // on live data "ปร" matches 933 of 17,176 customers and "so" matches 49, so
+  // the user is reading a list either way. (The RPC's own floor is 2, below
+  // which it returns empty rather than browsing, so this is a UI-quality choice,
+  // not a guard against bad data.)
 
   // ── List query ──
   // No keyword → browse the raw view (full rows, ordered). With a keyword →
@@ -300,18 +293,14 @@ export function CustomersPage() {
               {/* ── List Panel ── */}
               <PageNavPanel id="list" className={isMobile ? '' : 'w-5/12 xl:w-4/12 border-r border-line flex flex-col'}>
                 <div className="flex-none p-2 border-b border-line">
-                  <Input
+                  <SearchInput
                     value={search}
-                    onChange={e => setSearch(e.target.value)}
+                    onChange={setSearch}
+                    onDebouncedChange={(next) => { setDebouncedSearch(next); setPageIndex(0); }}
                     placeholder={t('customer.search')}
                     size="sm"
-                    startIcon={<Search size={16} />}
-                    endIcon={isBelowSearchMin(search, SEARCH_MIN_CHARS_NAME_TABLE)
-                      ? <span className="text-[11px] whitespace-nowrap">
-                          {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS_NAME_TABLE })}
-                        </span>
-                      : undefined}
-                    className="w-full search-min-hint"
+                    minChars={SEARCH_MIN_CHARS_NAME_TABLE}
+                    className="w-full"
                   />
                 </div>
                 <div className={`data-table-content better-scroll ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>

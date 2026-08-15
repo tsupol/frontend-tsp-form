@@ -3,18 +3,18 @@ import type { ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, Badge, Input, Select, Button, DataTable, PopOver } from 'tsp-form';
+import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, DataTable, PopOver } from 'tsp-form';
 import { useAuth } from '../../contexts/AuthContext';
-import { ArrowLeft, ArrowRightFromLine, Search, SlidersHorizontal, Plus, Archive } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, SlidersHorizontal, Plus, Archive } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency } from '../../lib/format';
-import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
 import { getStateColor, getStateLabel, stateOptions, productName } from './contractUtils';
 import { ContractDetailPanel } from './ContractDetailPanel';
 import { ContractDetailSlot } from './ContractDetailSlot';
 import { OwnerBadge } from '../../components/OwnerBadge';
 import type { OwnerType } from '../../lib/ownerTypes';
+import { SearchInput } from '../../components/SearchInput';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -132,15 +132,9 @@ export function ContractListPane({
     else navigate(routePrefix, { replace: true });
   };
 
-  // Debounce keyword. Anything under SEARCH_MIN_CHARS never reaches the RPC —
-  // it would come back as "recent contracts" dressed up as search results.
-  // Checked before the debounce so a short keyword doesn't fire and get thrown
-  // away. Clearing the box drops back to the unfiltered list, as before.
-  useEffect(() => {
-    const next = isSearchable(keyword) ? keyword.trim() : '';
-    const timer = setTimeout(() => setDebouncedKeyword(next), 300);
-    return () => clearTimeout(timer);
-  }, [keyword]);
+  // Debounce + floor both live in SearchInput. A keyword under the floor never
+  // reaches the RPC — it would come back as "recent contracts" dressed up as
+  // search results. Clearing the box drops back to the unfiltered list.
 
   // Reset page on filter change
   useEffect(() => { setPage(1); }, [states, debouncedKeyword, filterState, filterBranchId]);
@@ -308,20 +302,13 @@ export function ContractListPane({
               <div className="flex-none p-2 border-b border-line">
                 <div className="flex items-center gap-2">
                   <div className="flex-1 min-w-0">
-                    <Input
+                    <SearchInput
                       value={keyword}
-                      onChange={(e) => setKeyword(e.target.value)}
+                      onChange={setKeyword}
+                      onDebouncedChange={setDebouncedKeyword}
                       placeholder={t('contract.searchPlaceholder')}
                       size="sm"
-                      startIcon={<Search size={16} />}
-                      // Hint rides inside the field, right-aligned, so it can't
-                      // shift the rows below it as the user types.
-                      endIcon={isBelowSearchMin(keyword)
-                        ? <span className="text-[11px] whitespace-nowrap">
-                            {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
-                          </span>
-                        : undefined}
-                      className="w-full search-min-hint"
+                      className="w-full"
                     />
                   </div>
                   <div className="shrink-0">

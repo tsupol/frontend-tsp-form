@@ -2,18 +2,16 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import {
-  PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Input, DataTable,
-} from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, Wrench, Search, Plus, CheckCircle2, CalendarClock } from 'lucide-react';
+import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, DataTable } from 'tsp-form';
+import { ArrowLeft, ArrowRightFromLine, Wrench, Plus, CheckCircle2, CalendarClock } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency } from '../../lib/format';
-import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
 import type { RepairOrder, RepairSearchResult, RepairStatus, RepairType } from './repairTypes';
 import { SUB_STATE_COLOR } from './repairTypes';
 import { RepairDetailPanel } from './repair/RepairDetailPanel';
 import { RepairCreateModal } from './repair/RepairCreateModal';
+import { SearchInput } from '../../components/SearchInput';
 
 const STATUS_VALUES: RepairStatus[] = ['DRAFT', 'IN_REPAIR', 'CLOSED', 'VOIDED'];
 const TYPE_VALUES: RepairType[] = ['WALK_IN', 'CUSTOMER_CONTRACT', 'SHOP_STOCK'];
@@ -43,15 +41,9 @@ export function RepairsPage() {
   const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
 
-  // Short keywords never reach fn_repair_search. At 1 char the RPC drops the
-  // keyword and browses every repair — rows that look like matches but were
-  // never filtered. At 2 it searches correctly; the floor stays 3 here because
-  // this box also searches customer names.
-  useEffect(() => {
-    const next = isSearchable(keyword) ? keyword.trim() : '';
-    const tm = setTimeout(() => setDebounced(next), 300);
-    return () => clearTimeout(tm);
-  }, [keyword]);
+  // Debounce + floor both live in SearchInput. A keyword under the floor never
+  // reaches fn_repair_search: at 1 char it drops the keyword and browses every
+  // repair — rows that look like matches but were never filtered.
 
   useEffect(() => { setPage(1); }, [statusFilter, typeFilter, debounced]);
 
@@ -134,18 +126,13 @@ export function RepairsPage() {
               {/* List rail */}
               <PageNavPanel id="list" className={isMobile ? '' : 'w-1/2 xl:w-5/12 border-r border-line flex flex-col'}>
                 <div className="flex-none flex flex-col gap-2 p-2 border-b border-line">
-                  <Input
+                  <SearchInput
                     value={keyword}
-                    onChange={(e) => setKeyword(e.target.value)}
+                    onChange={setKeyword}
+                    onDebouncedChange={setDebounced}
                     placeholder={t('repair.searchPlaceholder')}
                     size="sm"
-                    startIcon={<Search size={16} />}
-                    endIcon={isBelowSearchMin(keyword)
-                      ? <span className="text-[11px] whitespace-nowrap">
-                          {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
-                        </span>
-                      : undefined}
-                    className="w-full search-min-hint"
+                    className="w-full"
                   />
                   <div className="flex items-center gap-2">
                     <div className="flex-1 min-w-0">

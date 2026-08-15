@@ -2,14 +2,15 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Modal, Button, Input, MaskedInput, TextArea, Badge, FormErrorMessage } from 'tsp-form';
-import { XCircle, Search, User, Package, FileText } from 'lucide-react';
+import { XCircle, User, Package, FileText } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { validateiPhoneSerial } from '../../../lib/validators';
-import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../../lib/searchKeyword';
+import { isSearchable } from '../../../lib/searchKeyword';
 import { ActionDoneView } from '../../contracts/ActionDoneView';
 import { getStateColor } from '../../contracts/contractUtils';
 import type { RepairType } from '../repairTypes';
 import { translateApiError } from '../../../lib/apiErrors';
+import { SearchInput } from '../../../components/SearchInput';
 
 // Thai phone mask (mirrors the project convention in tsp-form-guide-here).
 const thaiPhoneMask = (digits: string) => {
@@ -101,13 +102,9 @@ export function RepairCreateModal({
     }
   }, [open]);
 
-  // Short keywords never reach fn_contract_search — it ignores them and returns
-  // recent contracts instead, which would look like picker results.
-  useEffect(() => {
-    const next = isSearchable(keyword) ? keyword.trim() : '';
-    const tm = setTimeout(() => setDebounced(next), 300);
-    return () => clearTimeout(tm);
-  }, [keyword]);
+  // Debounce + floor both live in SearchInput. Short keywords never reach
+  // fn_contract_search — it ignores them and returns recent contracts instead,
+  // which would look like picker results.
 
   // Contract search for the CUSTOMER_CONTRACT tab.
   const { data: contractHits, isFetching: searching } = useQuery({
@@ -200,17 +197,12 @@ export function RepairCreateModal({
 
             {tab === 'CUSTOMER_CONTRACT' && (
               <div className="mb-4">
-                <Input
+                <SearchInput
                   value={keyword}
-                  onChange={(e) => setKeyword(e.target.value)}
+                  onChange={setKeyword}
+                  onDebouncedChange={setDebounced}
                   placeholder={t('repair.searchContractPlaceholder')}
-                  startIcon={<Search size={16} />}
-                  endIcon={isBelowSearchMin(keyword)
-                    ? <span className="text-[11px] whitespace-nowrap">
-                        {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
-                      </span>
-                    : undefined}
-                  className="w-full search-min-hint"
+                  className="w-full"
                 />
                 {pickedContract ? (
                   <div className="mt-2 flex items-center justify-between gap-2 px-3 py-2 rounded-md border border-line bg-surface">

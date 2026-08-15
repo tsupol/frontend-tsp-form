@@ -47,7 +47,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import {
-  Button, Input, Badge, Modal, MobileHeader, useSnackbarContext,
+  Button, Badge, Modal, MobileHeader, useSnackbarContext,
 } from 'tsp-form';
 import {
   ArrowRightFromLine, Lock, Send, Loader2, CheckCircle, XCircle, AlertTriangle,
@@ -62,7 +62,8 @@ import {
 } from '../inventory/mdm/mdmApi';
 import { parseMdmError } from '../inventory/mdm/mdmApi';
 import { ActivationLockRevealModal } from './ActivationLockRevealModal';
-import { MDM_SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
+import { MDM_SEARCH_MIN_CHARS, isSearchable } from '../../lib/searchKeyword';
+import { SearchInput } from '../../components/SearchInput';
 
 // Activation Lock codes can unlock a repossessed device for resale, so the
 // owner restricted reveal to company level on purpose — a branch must ask a
@@ -125,7 +126,6 @@ export function MdmDevicesPage() {
 
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const [enrollTarget, setEnrollTarget] = useState<MdmDeviceListRow | null>(null);
   const [lockTarget, setLockTarget] = useState<MdmDeviceListRow | null>(null);
@@ -154,12 +154,6 @@ export function MdmDevicesPage() {
   // its own 3 server-side and returns needs_keyword below it, so a lower floor
   // here would only buy an empty round-trip. Clearing `search` also
   // disables the query, which is what empties the screen when the box is cleared.
-  const handleSearch = (value: string) => {
-    setSearchInput(value);
-    clearTimeout(searchTimer.current);
-    const next = isSearchable(value, MDM_SEARCH_MIN_CHARS) ? value.trim() : '';
-    searchTimer.current = setTimeout(() => setSearch(next), 300);
-  };
 
   const okSnack = (msg: string) => addSnackbar({
     message: <div className="alert alert-success"><CheckCircle size={18} /><div><div className="alert-title">{msg}</div></div></div>,
@@ -194,18 +188,14 @@ export function MdmDevicesPage() {
         {/* One box. Scan or type — no filters, no scope picker (see header note). */}
         <div className="flex-none pb-4">
           <div className="max-w-lg">
-            <Input
+            <SearchInput
               placeholder={t('mdmDevices.searchPlaceholder')}
               value={searchInput}
-              onChange={(e) => handleSearch(e.target.value)}
+              onChange={setSearchInput}
+              onDebouncedChange={setSearch}
               size="sm"
-              className="w-full search-min-hint"
-              startIcon={<Search size={15} />}
-              endIcon={isBelowSearchMin(searchInput, MDM_SEARCH_MIN_CHARS)
-                ? <span className="text-[11px] whitespace-nowrap">
-                    {t('common.searchMinCharsShort', { n: MDM_SEARCH_MIN_CHARS })}
-                  </span>
-                : undefined}
+              minChars={MDM_SEARCH_MIN_CHARS}
+              className="w-full"
             />
           </div>
         </div>

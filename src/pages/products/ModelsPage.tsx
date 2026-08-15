@@ -11,7 +11,8 @@ import { translateApiError } from '../../lib/apiErrors';
 import { useAuth } from '../../contexts/AuthContext';
 import { ColorAutocomplete, ColorMatchBadge, ColorSwatch, useMasterColorPreview } from '../../components/ColorAutocomplete';
 import { useBarcodeScanner } from '../../components/BarcodeScanner';
-import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
+import { isSearchable } from '../../lib/searchKeyword';
+import { SearchInput } from '../../components/SearchInput';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -1625,21 +1626,12 @@ export function ModelsPage() {
     navigate(id != null ? `/admin/products/models/${id}` : '/admin/products/models');
   };
 
-  // Search debounce. Floor is 2 so "16"/"17" reach fn_product_search, which
-  // matches model generations by design. A single character still doesn't fire:
-  // `p_q` falls back to null and the list stays in plain browse mode.
-  const handleSearch = (value: string) => {
-    setSearchInput(value);
-    clearTimeout(searchTimer.current);
-    const next = isSearchable(value) ? value.trim() : '';
-    searchTimer.current = setTimeout(() => {
-      setSearch(next);
-      setPageIndex(0);
-    }, 300);
-  };
+  // Typing debounce + the floor both live in SearchInput. "16"/"17" reach
+  // fn_product_search, which matches model generations by design.
 
-  // Barcode scan → commit immediately, skip the debounce. Same length guard;
-  // a real barcode always clears it.
+  // Barcode scan → commit immediately, skip the debounce. Sets both states
+  // directly rather than going through the input, so it bypasses the debounce
+  // entirely. Same length guard; a real barcode always clears it.
   const { open: openSearchScanner, scannerEl: searchScannerEl } = useBarcodeScanner({
     onScan: (val) => {
       clearTimeout(searchTimer.current);
@@ -1850,19 +1842,13 @@ export function ModelsPage() {
                         aria-label={t('barcodeScanner.title', { defaultValue: 'Scan barcode' })}
                       />
                       <div className="input-group-divider" />
-                      <Input
+                      <SearchInput
                         placeholder={t('common.search')}
                         value={searchInput}
-                        onChange={(e) => handleSearch(e.target.value)}
+                        onChange={setSearchInput}
+                        onDebouncedChange={(next) => { setSearch(next); setPageIndex(0); }}
                         size="sm"
-                        // Hint rides inside the field, right-aligned, so the
-                        // rows below can't shift as the user types.
-                        endIcon={isBelowSearchMin(searchInput)
-                          ? <span className="text-[11px] whitespace-nowrap">
-                              {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
-                            </span>
-                          : undefined}
-                        className="w-full search-min-hint"
+                        className="w-full"
                       />
                     </div>
                   </div>

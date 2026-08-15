@@ -1,17 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import {
-  MobileHeader,
-  Badge, Select, Input, Button, PopOver,
-  useSnackbarContext,
-} from 'tsp-form';
-import {
-  ArrowRightFromLine, CheckCircle, ChevronLeft, ChevronRight, Search, SlidersHorizontal,
-} from 'lucide-react';
+import { MobileHeader, Badge, Select, Button, PopOver, useSnackbarContext } from 'tsp-form';
+import { ArrowRightFromLine, CheckCircle, ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react';
 import { apiClient } from '../lib/api';
 import { fmtCurrency, formatRelativeAgo } from '../lib/format';
-import { SEARCH_MIN_CHARS, isBelowSearchMin, isSearchable } from '../lib/searchKeyword';
+import { isSearchable } from '../lib/searchKeyword';
 import { useAuth } from '../contexts/AuthContext';
 import { wsClient } from '../lib/api/ws';
 import {
@@ -20,6 +14,7 @@ import {
   type SubmissionRow,
   type SubmissionStatus,
 } from '../components/SubmissionReviewDrawer';
+import { SearchInput } from '../components/SearchInput';
 
 const COMPANY_TIER_ROLES = new Set([
   'COMPANY_ADMIN', 'COMPANY_ACCOUNTANT', 'COMPANY_COLLECTOR',
@@ -66,10 +61,7 @@ export function PaymentSubmissionsPage() {
 
   useEffect(() => { setPageIndex(0); }, [statusFilter, branchFilter, debouncedSearch]);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
-    return () => clearTimeout(timer);
-  }, [search]);
+  // Debounce + floor both live in SearchInput below.
 
   // Branch list for the picker — only fetched when the picker is visible.
   // Scope by the user's natural workspace; RLS enforces holding boundary.
@@ -335,20 +327,13 @@ export function PaymentSubmissionsPage() {
           return (
             <div className="flex items-center gap-2 pb-4 flex-none flex-wrap">
               <div className="w-64 max-w-full">
-                <Input
+                <SearchInput
                   value={search}
-                  onChange={e => setSearch(e.target.value)}
+                  onChange={setSearch}
+                  onDebouncedChange={setDebouncedSearch}
                   placeholder={t('paymentSubmissions.searchPlaceholder')}
                   size="sm"
-                  startIcon={<Search size={16} />}
-                  // Hint rides inside the field, right-aligned, so it can't
-                  // shift the rows below it as the user types.
-                  endIcon={isBelowSearchMin(search)
-                    ? <span className="text-[11px] whitespace-nowrap">
-                        {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
-                      </span>
-                    : undefined}
-                  className="w-full search-min-hint"
+                  className="w-full"
                 />
               </div>
               {/* Status pills — inline ≥md */}

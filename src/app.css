@@ -61,6 +61,14 @@
     .search-min-hint .form-control.form-control-sm.input-has-end-icon {
         padding-right: 7.5rem;
     }
+
+    /* The hint is 11px next to the field's 12px text. Their boxes centre
+       perfectly, but the smaller glyphs still read as sitting high against the
+       input's baseline — so nudge the text down to line the two up optically. */
+    .search-min-hint .input-icon-end span {
+        position: relative;
+        top: 1px;
+    }
 }
 
 /* Hide number input spinners */

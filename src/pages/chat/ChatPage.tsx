@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, keepPreviousData, useQueryClient } from '@tanstack/react-query';
 import {
   PageNav, PageNavPanel, MobileHeader, DataTableFooter,
-  Button, Input, PopOver, Select,
+  Button, PopOver, Select,
 } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, ChevronDown, CheckCircle2, Circle, PictureInPicture2, Search, SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, ChevronDown, CheckCircle2, Circle, PictureInPicture2, SlidersHorizontal } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { wsClient } from '../../lib/api/ws';
 import { useAuth } from '../../contexts/AuthContext';
@@ -16,7 +16,8 @@ import { ChatListRow } from './ChatListRow';
 import { useChatDock } from '../../contexts/ChatDockContext';
 import { CHAT_STATUS_VALUES, type ChatInboxRow, type ChatStatus } from './chatTypes';
 import { sortChatRowsByStatusThenRecency } from './chatStatus';
-import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
+import { isSearchable } from '../../lib/searchKeyword';
+import { SearchInput } from '../../components/SearchInput';
 
 type StatusFilter = ChatStatus | 'NONE' | null;
 
@@ -122,7 +123,6 @@ export function ChatPage() {
 
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(null);
   const [pageIndex, setPageIndex] = useState(0);
@@ -134,18 +134,10 @@ export function ChatPage() {
 
   useEffect(() => { setPageIndex(0); }, [search, unreadOnly, statusFilter]);
   useEffect(() => { setMobileDetailsOpen(false); }, [selectedContractId]);
-  useEffect(() => () => { if (searchTimer.current) clearTimeout(searchTimer.current); }, []);
-
-  // Only fire once the keyword can actually be searched — a 1-char keyword makes
-  // fn_contract_search return recent contracts instead of matches, which would
-  // render here as a perfectly normal-looking (and completely wrong) chat list.
-  const handleSearch = (value: string) => {
-    setSearchInput(value);
-    clearTimeout(searchTimer.current);
-    const next = isSearchable(value) ? value.trim() : '';
-    searchTimer.current = setTimeout(() => setSearch(next), 300);
-  };
-
+  // Debounce + floor both live in SearchInput. Only fire once the keyword can
+  // actually be searched — a keyword under the floor makes fn_contract_search
+  // return recent contracts instead of matches, which would render here as a
+  // perfectly normal-looking (and completely wrong) chat list.
   const isSearchMode = isSearchable(search);
 
   // ── Inbox mode (no keyword) ────────────────────────────────────────────────
@@ -379,24 +371,19 @@ export function ChatPage() {
           {(isRoot || !isMobile) && (
             <div className="flex-none p-2 border-b border-line flex items-center gap-2">
               <div className="flex-1 min-w-0 max-w-xs">
-                {/* The start icon is load-bearing, not decoration. Input renders a
-                    bare <input> when it has no icons and a wrapped one when it has
-                    any, so a field whose only icon is the conditional min-chars hint
-                    swaps DOM nodes on the 1st and 3rd keystroke. On iOS that drops
-                    focus and folds the keyboard away mid-word. A permanent icon keeps
-                    the same input node mounted throughout. */}
-                <Input
+                {/* SearchInput always renders a start icon, which matters here:
+                    Input renders a bare <input> with no icons and a wrapped one
+                    with any, so a field whose only icon is the conditional
+                    min-chars hint swaps DOM nodes on the 1st and 3rd keystroke.
+                    On iOS that drops focus and folds the keyboard away mid-word.
+                    The permanent magnifier keeps one input node mounted. */}
+                <SearchInput
                   size="sm"
-                  className="w-full search-min-hint"
+                  className="w-full"
                   placeholder={t('chat.searchPlaceholder')}
                   value={searchInput}
-                  onChange={e => handleSearch(e.target.value)}
-                  startIcon={<Search size={16} />}
-                  endIcon={isBelowSearchMin(searchInput)
-                    ? <span className="text-[11px] whitespace-nowrap">
-                        {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
-                      </span>
-                    : undefined}
+                  onChange={setSearchInput}
+                  onDebouncedChange={setSearch}
                 />
               </div>
               <Button

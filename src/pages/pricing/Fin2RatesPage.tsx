@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, DataTable, Input, Select, Button, PopOver, Modal, NumberSpinner, InputDatePicker, MaskedInput, useSnackbarContext } from 'tsp-form';
+import { PageNav, PageNavPanel, MobileHeader, DataTable, Select, Button, PopOver, Modal, NumberSpinner, InputDatePicker, MaskedInput, useSnackbarContext } from 'tsp-form';
 import { ArrowRightFromLine, ArrowLeft, SlidersHorizontal, ChevronsUpDown, CheckCircle, XCircle, Loader2, Plus, X, Keyboard } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { makeDatePickerFormat } from '../../lib/format';
@@ -10,7 +10,8 @@ import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useFormSnapshot } from '../../hooks/useFormSnapshot';
 import { ModelName } from '../../components/ModelName';
 import { translateApiError } from '../../lib/apiErrors';
-import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
+import { isSearchable } from '../../lib/searchKeyword';
+import { SearchInput } from '../../components/SearchInput';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -573,7 +574,6 @@ export function Fin2RatesPage() {
   const [pageSize, setPageSize] = useState(10);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // Filters & sort
   const [filterBrand, setFilterBrand] = useState<string>('');
@@ -612,18 +612,8 @@ export function Fin2RatesPage() {
     setPendingNav(null);
   };
 
-  // Search debounce. Floor is 2 so "16"/"17" reach fn_product_search, which
-  // matches model generations by design. A single character still doesn't fire —
-  // the page simply stays in browse mode.
-  const handleSearch = (value: string) => {
-    setSearchInput(value);
-    clearTimeout(searchTimer.current);
-    const next = isSearchable(value) ? value.trim() : '';
-    searchTimer.current = setTimeout(() => {
-      setSearch(next);
-      setPageIndex(0);
-    }, 300);
-  };
+  // Debounce + floor both live in SearchInput. "16"/"17" reach fn_product_search,
+  // which matches model generations by design.
 
   // Brand lookup
   const { data: brands = [] } = useQuery({
@@ -904,19 +894,13 @@ export function Fin2RatesPage() {
               <div className="flex-none p-2 border-b border-line">
                 <div className="flex items-center gap-2">
                   <div className="flex-1 min-w-0">
-                    <Input
+                    <SearchInput
                       placeholder={t('common.search')}
                       value={searchInput}
-                      onChange={(e) => handleSearch(e.target.value)}
+                      onChange={setSearchInput}
+                      onDebouncedChange={(next) => { setSearch(next); setPageIndex(0); }}
                       size="sm"
-                      // Hint rides inside the field, right-aligned, so the rows
-                      // below can't shift as the user types.
-                      endIcon={isBelowSearchMin(searchInput)
-                        ? <span className="text-[11px] whitespace-nowrap">
-                            {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
-                          </span>
-                        : undefined}
-                      className="w-full search-min-hint"
+                      className="w-full"
                     />
                   </div>
                   <div className="flex-1 min-w-0 hidden sm:block">
