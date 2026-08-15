@@ -81,6 +81,26 @@ type EnrollExtras = {
 };
 type EnrollStatus = AssetMdmStatus & EnrollExtras;
 
+// ── The waiting-for-a-wipe hint, escalating with age (134 §3) ────────────────
+// Polling can only reflect things that CHANGE. Some waits never change on their
+// own — the commonest being that the serial recorded on this asset isn't the
+// serial of the device in the staffer's hand, so the profile is bound elsewhere
+// and this asset will never report in, no matter how long anyone watches. The
+// only cure is a message that gets smarter as the wait lengthens.
+//
+// Advice, never an error: the 108-minute case (pressed at closing, wiped later)
+// completed perfectly normally, so nothing here may look like a failure.
+type WaitStage = 'FRESH' | 'PROBABLY_NOT_WIPED' | 'CHECK_SERIAL';
+
+function waitStage(requestedAt: string | null | undefined): WaitStage {
+  if (!requestedAt) return 'FRESH';
+  const ms = Date.now() - new Date(requestedAt).getTime();
+  if (!Number.isFinite(ms)) return 'FRESH';
+  if (ms > 60 * 60_000) return 'CHECK_SERIAL';        // > 1 hour
+  if (ms > 10 * 60_000) return 'PROBABLY_NOT_WIPED';  // 10 min – 1 hour
+  return 'FRESH';                                     // 11 of 12 land inside 10 min
+}
+
 function statusPresentation(s: AssetMdmStatus): { key: string; tone: BadgeTone; spin?: boolean } {
   switch (s.mdm_status) {
     case 'NO_SERIAL': return { key: 'NO_SERIAL', tone: 'neutral' };
@@ -210,6 +230,14 @@ export function SubTabEnroll({
       onRefetch();
     },
   });
+
+  // Waiting for a human to wipe the device: the profile is pushed and the device
+  // hasn't reported in. Deliberately NOT tied to justPrepared — the staffer who
+  // needs the "check the serial" hint is usually the one coming back an hour
+  // later, whose local "I just pressed it" state is long gone.
+  const awaitingErase = status.prepare_status === 'READY' && !status.in_mdm;
+  // Recompute on every poll tick, so the hint escalates while the tab sits open.
+  const stage = awaitingErase ? waitStage(status.prepare_requested_at) : 'FRESH';
 
   const presentation = useMemo(() => statusPresentation(status), [status]);
   const showPrepareButton = status.can_prepare && status.may_prepare;
@@ -350,6 +378,26 @@ export function SubTabEnroll({
             <div className="alert-title">{t('asset.mdm.reenrollReady.title')}</div>
             <div className="alert-description">{t('asset.mdm.reenrollReady.warn')}</div>
             <div className="alert-description">{t('asset.mdm.reenrollReady.next')}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Escalating wait hint (§3). Only once the wait is long enough to be worth
+          questioning — under 10 minutes it's just the normal wipe, and the boxes
+          above already say what to do. Info tone, not warning: a long wait is
+          still a valid wait, and the device may yet arrive on its own. */}
+      {stage !== 'FRESH' && (
+        <div className="alert alert-info">
+          <HelpCircle size={20} className="shrink-0" />
+          <div className="min-w-0">
+            <div className="alert-title">{t(`asset.mdm.waitHint.${stage}.title`)}</div>
+            <div className="alert-description">{t(`asset.mdm.waitHint.${stage}.body`)}</div>
+            {status.prepare_requested_at && (
+              <div className="alert-description">
+                {t('asset.mdm.waitHint.since')}{' '}
+                <RelativeDateTime value={status.prepare_requested_at} relClassName="" />
+              </div>
+            )}
           </div>
         </div>
       )}

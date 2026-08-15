@@ -37,6 +37,11 @@ export type MdmPauseMode = 'GRACE' | 'FREEZE';
 export type MdmReleaseCondition = 'CUSTOMER_PAYS' | 'STAFF_MUST_RELEASE' | 'AUTOMATION_WILL_REVERT';
 export type MdmCommandState = 'EXECUTED' | 'FAILED' | 'EXPIRED' | 'CANCELED';
 export type MdmActorKind = 'SYSTEM' | 'STAFF';
+// The enrollment request's own status (`mdm_prepare_requests.status`). Shared by
+// v_asset_mdm_status and v_mdm_device_list — same source column, same four values.
+// Read this RAW rather than mdm_status when pacing polling: it covers states
+// mdm_status folds away (134 §5.1).
+export type MdmPrepareStatus = 'PENDING' | 'READY' | 'NOT_ON_SERVER' | 'ERROR' | null;
 
 // Baseline-lock badge (mig 935) — the single answer to "ล็อคไปหรือยัง".
 // NONE / WALLPAPER_ONLY are NOT locked (button shows); LIGHT/MEDIUM/HARD are.
@@ -79,8 +84,15 @@ export interface AssetMdmStatus {
   // prepare_status/detail carry the post-press "erase the device" signal, since
   // mdm_status STAYS 'IN_MDM' (the view checks the binding before the request).
   prepare_is_reenroll: boolean;
-  prepare_status: 'PENDING' | 'READY' | 'ERROR' | null;
+  prepare_status: MdmPrepareStatus;
   prepare_detail: string | null;
+  // When the enrollment was last requested. Two jobs, both in 134 §5:
+  //   · it decays the 5s polling once the wait stops being urgent, and
+  //   · it ages the "have you wiped it yet?" hint (§3), which is the ONLY way to
+  //     surface a wait that will never end on its own (e.g. the serial on the
+  //     asset isn't the serial of the device in the staffer's hand).
+  // Pressing the button again moves it, so both reset by themselves.
+  prepare_requested_at: string | null;
 
   // §3 — enforcement pause. is_enforcement_paused → warning bar + disable
   // dunning buttons (else a queued dunning command gets CANCELED_MANUAL_PAUSE).
@@ -382,7 +394,6 @@ export function revealActivationLock(
 // permission, so there are no may_* columns to check.
 
 export type MdmDeviceListBadge = 'NOT_IN_MDM' | 'APPLYING' | 'NONE' | 'LIGHT' | 'ENFORCED';
-export type MdmPrepareStatus = 'PENDING' | 'READY' | 'NOT_ON_SERVER' | 'ERROR' | null;
 
 export interface MdmDeviceListRow {
   asset_id: number;

@@ -2597,6 +2597,17 @@
         "next": "Next: wipe the device after scanning, then wait until the Remote Management screen appears.",
         "note": "The status changes on its own once the device enrolls — nothing more to press. (Enrolling in MDM isn't the end of handover — the customer still needs to sign in to iCloud and install the NNF App.)"
       },
+      "waitHint": {
+        "since": "Enrollment sent",
+        "PROBABLY_NOT_WIPED": {
+          "title": "Has the device been wiped yet?",
+          "body": "The profile is ready and waiting. The device enrolls by itself as soon as the wipe finishes — Settings → General → Transfer or Reset → Erase All Content and Settings."
+        },
+        "CHECK_SERIAL": {
+          "title": "Wiped it already but it still hasn't enrolled?",
+          "body": "Check that the serial printed on the device or its box matches the serial on this asset. If they differ, the enrollment profile went to a different device and this one will never report in."
+        }
+      },
       "reenrollReady": {
         "title": "Enrollment profile is ready — now wipe this device",
         "warn": "This will erase everything on the device you're holding. Make sure it's the company device you meant to re-enroll, not a customer's — wiping the wrong one loses their data.",
