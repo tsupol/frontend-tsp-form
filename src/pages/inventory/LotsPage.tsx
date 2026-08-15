@@ -20,7 +20,6 @@ import { ActionDoneView } from '../contracts/ActionDoneView';
 import { ColorAutocomplete, ColorMatchBadge } from '../../components/ColorAutocomplete';
 import { ImeiInput } from '../../components/ImeiInput';
 import { SearchInput } from '../../components/SearchInput';
-import { PRODUCT_SEARCH_MIN_CHARS } from '../../lib/searchKeyword';
 import { OwnerBadge } from '../../components/OwnerBadge';
 import type { OwnerType } from '../../lib/ownerTypes';
 import { translateApiError, prepareErrorParams, translateErrorCode } from '../../lib/apiErrors';
@@ -337,7 +336,6 @@ export function LotsPage() {
                     onChange={setSearch}
                     onDebouncedChange={setDebouncedSearch}
                     placeholder={t('lot.search')}
-                    minChars={PRODUCT_SEARCH_MIN_CHARS}
                     size="sm"
                   />
                 </div>

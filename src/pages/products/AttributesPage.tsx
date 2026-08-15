@@ -16,7 +16,6 @@ import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { translateApiError } from '../../lib/apiErrors';
 import { SearchInput } from '../../components/SearchInput';
-import { PRODUCT_SEARCH_MIN_CHARS } from '../../lib/searchKeyword';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -1018,7 +1017,6 @@ function ManageOptionsModal({ attribute, open, onClose, holdingId }: {
                   onChange={setSearchInput}
                   onDebouncedChange={handleSearch}
                   size="sm"
-                  minChars={PRODUCT_SEARCH_MIN_CHARS}
                   className="w-full"
                 />
               </div>
@@ -1246,7 +1244,6 @@ export function AttributesPage() {
                 onChange={setSearchInput}
                 onDebouncedChange={handleSearch}
                 size="sm"
-                minChars={PRODUCT_SEARCH_MIN_CHARS}
                 className="w-full"
               />
             </div>

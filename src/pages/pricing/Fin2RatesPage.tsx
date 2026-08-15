@@ -10,7 +10,7 @@ import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useFormSnapshot } from '../../hooks/useFormSnapshot';
 import { ModelName } from '../../components/ModelName';
 import { translateApiError } from '../../lib/apiErrors';
-import { PRODUCT_SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
+import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -618,7 +618,7 @@ export function Fin2RatesPage() {
   const handleSearch = (value: string) => {
     setSearchInput(value);
     clearTimeout(searchTimer.current);
-    const next = isSearchable(value, PRODUCT_SEARCH_MIN_CHARS) ? value.trim() : '';
+    const next = isSearchable(value) ? value.trim() : '';
     searchTimer.current = setTimeout(() => {
       setSearch(next);
       setPageIndex(0);
@@ -707,7 +707,7 @@ export function Fin2RatesPage() {
 
   // `search` is already filtered by handleSearch, so this is only ever true for
   // a keyword the RPC will honour — browse mode covers everything shorter.
-  const hasSearch = isSearchable(search, PRODUCT_SEARCH_MIN_CHARS);
+  const hasSearch = isSearchable(search);
 
   // Query 1a: Browse mode — no search term. Use the view directly so sort options work.
   const { data: browseData, isError: browseIsError, error: browseError, isFetching: browseFetching } = useQuery({
@@ -911,9 +911,9 @@ export function Fin2RatesPage() {
                       size="sm"
                       // Hint rides inside the field, right-aligned, so the rows
                       // below can't shift as the user types.
-                      endIcon={isBelowSearchMin(searchInput, PRODUCT_SEARCH_MIN_CHARS)
+                      endIcon={isBelowSearchMin(searchInput)
                         ? <span className="text-[11px] whitespace-nowrap">
-                            {t('common.searchMinCharsShort', { n: PRODUCT_SEARCH_MIN_CHARS })}
+                            {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
                           </span>
                         : undefined}
                       className="w-full search-min-hint"

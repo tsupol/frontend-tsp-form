@@ -40,40 +40,35 @@
 // See UI_FEEDBACK/2026-08-15_ANSWER_search_min_chars_2_perf_confirmed.md
 
 /**
- * Default floor — names and free text.
+ * The default, and what almost every screen uses.
  *
- * Customers, contracts, bills, suppliers, notes. Two characters of a name is not
- * a search: on live data "ปร" matches 933 of 17,176 customers and "so" matches
- * 49. Either way the user is reading a list, not a result.
+ * Two is the rule because staff search by fragments of structured things —
+ * model generations ("16", "17"), the tail of a bill or contract code, a piece
+ * of a serial. Measured on production 2026-08-15, a real 2-char keyword lands
+ * in single-digit percentages of every table we checked:
+ *
+ *   Bills "46" → 29/1,353 (2%)      Contracts "57" → 21/1,020 (2%)
+ *   Assets "16" → 182/1,732 (11%)   Barcodes "16" → 48/261 (18%)
+ *   Receipts "16" → 33/288 (11%)    Models "16" → 32/469 (7%)
+ *
+ * Raising a screen above this needs a reason from ITS data, not a hunch about
+ * the field names — see SEARCH_MIN_CHARS_NAME_TABLE for the only one that has
+ * one. It also buys nothing in speed: BE measured 2 and 3 as identical on the
+ * OR-ILIKE list views (the scan is bounded by table size, not keyword length).
  */
-export const SEARCH_MIN_CHARS = 3;
+export const SEARCH_MIN_CHARS = 2;
 
 /**
- * Product / model floor.
+ * The one screen that earns a higher floor: Customers.
  *
- * Staff search phones by generation number — "16", "17", "15". Those are two
- * characters and they are the WHOLE keyword, not a prefix of a longer one. The
- * catalog is built for it: `fn_product_search` scores a standalone family token
- * at 95, and typing "17" returns the iPhone 17 variants tagged
- * `match_field: word_match`. A floor of 3 made an intentional backend feature
- * unreachable from the UI — this is the case the whole change exists for.
+ * 17,176 rows searched purely by name — 12× the next-biggest table, with no
+ * code or serial to anchor on. Real 2-char name stems drown it:
+ * "ปร" → 933 rows, "สม" → 531, where the same stems return 86 and 43 on Bills.
+ * That's a list to read, not a result.
  *
- * Use on catalog / stock / SKU / barcode searches.
+ * Don't reach for this on any other screen without measuring it first.
  */
-export const PRODUCT_SEARCH_MIN_CHARS = 2;
-
-/**
- * Identifier floor — asset codes, serials, IMEIs, barcodes.
- *
- * Structured strings, not prose: staff read a fragment off a device or a slip
- * and type it, so two characters of a serial genuinely narrows. Same number as
- * products on purpose — every scan-and-type screen shows one hint.
- *
- * One character is still refused, and that's a RESULT-QUALITY call, not a speed
- * one: on a 4-column OR it matches nearly every row, so the screen fills with a
- * list the user reads as results.
- */
-export const IDENTIFIER_SEARCH_MIN_CHARS = 2;
+export const SEARCH_MIN_CHARS_NAME_TABLE = 3;
 
 /**
  * MDM device floor. `fn_mdm_device_search` returns
@@ -94,8 +89,8 @@ export function searchMinFor(_keyword?: string | null, floor?: number): number {
 /**
  * True when `keyword` is long enough to search. Whitespace doesn't count.
  *
- * Pass the screen's floor: `PRODUCT_SEARCH_MIN_CHARS` for catalog/stock,
- * `IDENTIFIER_SEARCH_MIN_CHARS` for codes/serials, omit for names and free text.
+ * Omit `floor` — the default is right for every screen but two. Pass
+ * `SEARCH_MIN_CHARS_NAME_TABLE` on Customers, `MDM_SEARCH_MIN_CHARS` on MDM.
  */
 export function isSearchable(keyword: string | null | undefined, floor?: number): boolean {
   return (keyword ?? '').trim().length >= (floor ?? SEARCH_MIN_CHARS);

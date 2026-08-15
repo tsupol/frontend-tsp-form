@@ -521,9 +521,6 @@ export function BrandsPage() {
                 onChange={setSearchInput}
                 onDebouncedChange={handleSearch}
                 size="sm"
-                // "RC" is a real brand — code and name both two characters — and
-                // this list is short enough that the scan costs nothing.
-                minChars={2}
                 className="w-full"
               />
             </div>

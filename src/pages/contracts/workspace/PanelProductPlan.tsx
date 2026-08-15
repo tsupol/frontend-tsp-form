@@ -13,7 +13,7 @@ import { ColorSwatch } from '../../../components/ColorAutocomplete';
 import { lookupBarcode } from '../../../lib/barcodeLookup';
 import { translateApiError } from '../../../lib/apiErrors';
 import {
-  PRODUCT_SEARCH_MIN_CHARS, IDENTIFIER_SEARCH_MIN_CHARS,
+  SEARCH_MIN_CHARS,
   isSearchable, isBelowSearchMin, isSearchableLoose, isBelowSearchMinLoose,
 } from '../../../lib/searchKeyword';
 
@@ -177,11 +177,11 @@ export function PanelProductPlan(_props: Props) {
   const handleSearchInput = (value: string) => {
     setSearch(value);
     clearTimeout(searchTimer.current);
-    const next = isSearchable(value, PRODUCT_SEARCH_MIN_CHARS) ? value.trim() : '';
+    const next = isSearchable(value) ? value.trim() : '';
     searchTimer.current = setTimeout(() => setDebouncedSearch(next), 300);
   };
 
-  const shouldSearch = isSearchable(debouncedSearch, PRODUCT_SEARCH_MIN_CHARS);
+  const shouldSearch = isSearchable(debouncedSearch);
 
   // ── USED: search debounce ───────────────────────────────────────────
 
@@ -192,7 +192,7 @@ export function PanelProductPlan(_props: Props) {
   const handleAssetSearchInput = (value: string) => {
     setAssetSearch(value);
     clearTimeout(assetSearchTimer.current);
-    const next = isSearchableLoose(value, IDENTIFIER_SEARCH_MIN_CHARS) ? value.trim() : '';
+    const next = isSearchableLoose(value) ? value.trim() : '';
     assetSearchTimer.current = setTimeout(() => setDebouncedAssetSearch(next), 300);
   };
 
@@ -892,9 +892,9 @@ export function PanelProductPlan(_props: Props) {
                     onChange={(e) => handleAssetSearchInput(e.target.value)}
                     placeholder={t('wizard.searchAssetPlaceholder')}
                     startIcon={<Search size={16} />}
-                    endIcon={isBelowSearchMinLoose(assetSearch, IDENTIFIER_SEARCH_MIN_CHARS)
+                    endIcon={isBelowSearchMinLoose(assetSearch)
                       ? <span className="text-[11px] whitespace-nowrap">
-                          {t('common.searchMinCharsShort', { n: IDENTIFIER_SEARCH_MIN_CHARS })}
+                          {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
                         </span>
                       : undefined}
                     className="w-full search-min-hint"
@@ -969,9 +969,9 @@ export function PanelProductPlan(_props: Props) {
                   size="sm"
                   // Hint rides inside the field, right-aligned, so the result
                   // list below can't shift as the user types.
-                  endIcon={isBelowSearchMin(search, PRODUCT_SEARCH_MIN_CHARS)
+                  endIcon={isBelowSearchMin(search)
                     ? <span className="text-[11px] whitespace-nowrap">
-                        {t('common.searchMinCharsShort', { n: PRODUCT_SEARCH_MIN_CHARS })}
+                        {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
                       </span>
                     : undefined}
                   className="w-full search-min-hint"

@@ -30,7 +30,7 @@ import { OwnerBadge } from '../../components/OwnerBadge';
 import { ApiErrorAlert } from '../../components/ApiErrorAlert';
 import type { OwnerType } from '../../lib/ownerTypes';
 import { translateApiError } from '../../lib/apiErrors';
-import { PRODUCT_SEARCH_MIN_CHARS, IDENTIFIER_SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
+import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
 import { SearchInput } from '../../components/SearchInput';
 
 // ============================================================================
@@ -747,7 +747,6 @@ export function AssetsPage() {
                     onDebouncedChange={setDebouncedSearch}
                     placeholder={t('asset.search')}
                     size="sm"
-                    minChars={IDENTIFIER_SEARCH_MIN_CHARS}
                     className="w-full"
                   />
                 </div>
@@ -1853,7 +1852,7 @@ function CorrectModelModal({
   // character still doesn't fire — it matches most of the catalog and staff
   // would pick one of the wrong rows. An empty box browses the family.
   useEffect(() => {
-    const next = isSearchable(modelQuery, PRODUCT_SEARCH_MIN_CHARS) ? modelQuery.trim() : '';
+    const next = isSearchable(modelQuery) ? modelQuery.trim() : '';
     const timer = setTimeout(() => setDebouncedQuery(next), 300);
     return () => clearTimeout(timer);
   }, [modelQuery]);
@@ -2024,8 +2023,8 @@ function CorrectModelModal({
                         helper line instead, replacing the scope text while the
                         keyword is too short to actually search. */}
                     <div className="text-xs text-subtler">
-                      {isBelowSearchMin(modelQuery, PRODUCT_SEARCH_MIN_CHARS)
-                        ? t('common.searchMinCharsShort', { n: PRODUCT_SEARCH_MIN_CHARS })
+                      {isBelowSearchMin(modelQuery)
+                        ? t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })
                         : scopeAllFamilies
                           ? t('asset.correctModel.searchingAll', { defaultValue: 'Searching all models in this holding' })
                           : t('asset.correctModel.scopedToFamily', { defaultValue: 'Showing {{family}} models', family: familyName ?? '' })}

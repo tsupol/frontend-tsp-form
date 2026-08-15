@@ -19,7 +19,7 @@ import { DateTime } from '../../components/DateTime';
 import { useBarcodeScanner } from '../../components/BarcodeScanner';
 import { translateApiError } from '../../lib/apiErrors';
 import {
-  PRODUCT_SEARCH_MIN_CHARS, IDENTIFIER_SEARCH_MIN_CHARS,
+  SEARCH_MIN_CHARS,
   isSearchable, isBelowSearchMin, isSearchableLoose, isBelowSearchMinLoose,
 } from '../../lib/searchKeyword';
 
@@ -133,7 +133,7 @@ export function BarcodesPage() {
   // Below the floor we commit '' (plain browse) rather than a fake search.
   // Scanned barcodes bypass this by design: they're always long.
   const commitSearch = useCallback(() => {
-    const next = isSearchableLoose(searchInput, IDENTIFIER_SEARCH_MIN_CHARS)
+    const next = isSearchableLoose(searchInput)
       ? searchInput.trim()
       : '';
     setActiveSearch(next);
@@ -296,12 +296,12 @@ export function BarcodesPage() {
                 // the clear-X returns as soon as it's long enough to search.
                 // Same trade the shared SearchInput makes — at 1-2 chars there's
                 // nothing committed to clear, and Backspace still empties it.
-                endIcon={isBelowSearchMinLoose(searchInput, IDENTIFIER_SEARCH_MIN_CHARS)
+                endIcon={isBelowSearchMinLoose(searchInput)
                   ? <span className="text-[11px] whitespace-nowrap">
-                      {t('common.searchMinCharsShort', { n: IDENTIFIER_SEARCH_MIN_CHARS })}
+                      {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
                     </span>
                   : searchInput ? <X size={14} /> : undefined}
-                onEndIconClick={isBelowSearchMinLoose(searchInput, IDENTIFIER_SEARCH_MIN_CHARS)
+                onEndIconClick={isBelowSearchMinLoose(searchInput)
                   ? undefined
                   : searchInput ? clearSearch : undefined}
                 className="w-full search-min-hint"
@@ -526,7 +526,7 @@ function RegisterBarcodeModal({ open, onClose, initialBarcode, onSuccess }: Regi
   // generations by design. A single character still doesn't fire — it matches
   // most of the catalog. An empty box browses.
   useEffect(() => {
-    const next = isSearchable(modelQuery, PRODUCT_SEARCH_MIN_CHARS) ? modelQuery.trim() : '';
+    const next = isSearchable(modelQuery) ? modelQuery.trim() : '';
     const tm = setTimeout(() => setDebouncedModelQuery(next), 300);
     return () => clearTimeout(tm);
   }, [modelQuery]);
@@ -683,9 +683,9 @@ function RegisterBarcodeModal({ open, onClose, initialBarcode, onSuccess }: Regi
               startIcon={<Search size={16} />}
               // Hint rides inside the field, right-aligned, so the model list
               // below can't shift as the user types.
-              endIcon={isBelowSearchMin(modelQuery, PRODUCT_SEARCH_MIN_CHARS)
+              endIcon={isBelowSearchMin(modelQuery)
                 ? <span className="text-[11px] whitespace-nowrap">
-                    {t('common.searchMinCharsShort', { n: PRODUCT_SEARCH_MIN_CHARS })}
+                    {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
                   </span>
                 : undefined}
               className="w-full search-min-hint"

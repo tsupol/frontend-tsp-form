@@ -11,7 +11,7 @@ import { translateApiError } from '../../lib/apiErrors';
 import { useAuth } from '../../contexts/AuthContext';
 import { ColorAutocomplete, ColorMatchBadge, ColorSwatch, useMasterColorPreview } from '../../components/ColorAutocomplete';
 import { useBarcodeScanner } from '../../components/BarcodeScanner';
-import { PRODUCT_SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
+import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -1631,7 +1631,7 @@ export function ModelsPage() {
   const handleSearch = (value: string) => {
     setSearchInput(value);
     clearTimeout(searchTimer.current);
-    const next = isSearchable(value, PRODUCT_SEARCH_MIN_CHARS) ? value.trim() : '';
+    const next = isSearchable(value) ? value.trim() : '';
     searchTimer.current = setTimeout(() => {
       setSearch(next);
       setPageIndex(0);
@@ -1644,7 +1644,7 @@ export function ModelsPage() {
     onScan: (val) => {
       clearTimeout(searchTimer.current);
       setSearchInput(val);
-      setSearch(isSearchable(val, PRODUCT_SEARCH_MIN_CHARS) ? val.trim() : '');
+      setSearch(isSearchable(val) ? val.trim() : '');
       setPageIndex(0);
     },
   });
@@ -1857,9 +1857,9 @@ export function ModelsPage() {
                         size="sm"
                         // Hint rides inside the field, right-aligned, so the
                         // rows below can't shift as the user types.
-                        endIcon={isBelowSearchMin(searchInput, PRODUCT_SEARCH_MIN_CHARS)
+                        endIcon={isBelowSearchMin(searchInput)
                           ? <span className="text-[11px] whitespace-nowrap">
-                              {t('common.searchMinCharsShort', { n: PRODUCT_SEARCH_MIN_CHARS })}
+                              {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
                             </span>
                           : undefined}
                         className="w-full search-min-hint"

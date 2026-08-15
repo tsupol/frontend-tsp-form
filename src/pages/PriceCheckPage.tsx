@@ -6,7 +6,6 @@ import { ArrowLeft, ArrowRightFromLine, ScanBarcode, Calculator, Clock, Trash2, 
 import { apiClient } from '../lib/api';
 import { useBarcodeScanner } from '../components/BarcodeScanner';
 import { SearchInput } from '../components/SearchInput';
-import { PRODUCT_SEARCH_MIN_CHARS } from '../lib/searchKeyword';
 import { lookupBarcode } from '../lib/barcodeLookup';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -240,7 +239,6 @@ export function PriceCheckPage() {
                     onChange={setSearch}
                     onDebouncedChange={setDebouncedSearch}
                     placeholder={t('priceCheck.searchPlaceholder')}
-                    minChars={PRODUCT_SEARCH_MIN_CHARS}
                     size="sm"
                     // Scan button leads the input-group; no room for a magnifier.
                     startIcon={null}

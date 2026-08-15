@@ -50,8 +50,9 @@ export function SearchInput({
   endIcon?: ReactNode;
   /** Only fires while the caller's endIcon is the one on screen, not the hint. */
   onEndIconClick?: () => void;
-  /** Lower the Latin floor for a screen whose own data is legitimately short
-   *  (brand "RC") or a model generation ("16"/"17"). */
+  /** Almost never needed — the default (2) is right for every list in the app
+   *  but Customers, which passes SEARCH_MIN_CHARS_NAME_TABLE because 17k rows
+   *  of names drown a 2-char stem. Measure before raising a screen above 2. */
   minChars?: number;
   className?: string;
   disabled?: boolean;

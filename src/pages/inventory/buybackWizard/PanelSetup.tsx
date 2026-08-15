@@ -10,7 +10,7 @@ import type { BuybackDraft } from './types';
 import { useBarcodeScanner } from '../../../components/BarcodeScanner';
 import { lookupBarcode } from '../../../lib/barcodeLookup';
 import { translateApiError } from '../../../lib/apiErrors';
-import { PRODUCT_SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../../lib/searchKeyword';
+import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../../lib/searchKeyword';
 
 interface ProductSearchVariant { variant_id: number; sku_code: string; name: string; is_active: boolean }
 interface ProductSearchModel {
@@ -340,7 +340,7 @@ function ProductPickerModal({
   // generations by design. A single character still doesn't fire — it matches
   // most of the catalog. An empty box browses.
   useEffect(() => {
-    const next = isSearchable(keyword, PRODUCT_SEARCH_MIN_CHARS) ? keyword.trim() : '';
+    const next = isSearchable(keyword) ? keyword.trim() : '';
     const tm = setTimeout(() => setDebounced(next), 300);
     return () => clearTimeout(tm);
   }, [keyword]);
@@ -408,9 +408,9 @@ function ProductPickerModal({
               placeholder={t('buybackWizard.searchPlaceholder', { defaultValue: 'Search model (e.g. iPhone 16)' })}
               // Hint rides inside the field, right-aligned, so the model list
               // below can't shift as the user types.
-              endIcon={isBelowSearchMin(keyword, PRODUCT_SEARCH_MIN_CHARS)
+              endIcon={isBelowSearchMin(keyword)
                 ? <span className="text-[11px] whitespace-nowrap">
-                    {t('common.searchMinCharsShort', { n: PRODUCT_SEARCH_MIN_CHARS })}
+                    {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
                   </span>
                 : undefined}
               className="w-full search-min-hint"

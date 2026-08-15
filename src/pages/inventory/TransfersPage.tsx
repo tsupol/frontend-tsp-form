@@ -10,7 +10,6 @@ import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { DateTime } from '../../components/DateTime';
 import { CopyButton } from '../../components/CopyButton';
 import { SearchInput } from '../../components/SearchInput';
-import { PRODUCT_SEARCH_MIN_CHARS } from '../../lib/searchKeyword';
 import { fmtNum, assetSearchOrClause } from './inventoryUtils';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
@@ -999,7 +998,6 @@ function AddLineModal({
               onDebouncedChange={setDebounced}
               placeholder={t('common.search')}
               size="sm"
-              minChars={PRODUCT_SEARCH_MIN_CHARS}
               className="w-full"
               autoFocus
             />

@@ -15,7 +15,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { fmtNum, codeDisplay } from './inventoryUtils';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { translateApiError } from '../../lib/apiErrors';
-import { PRODUCT_SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
+import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
 import { SearchInput } from '../../components/SearchInput';
 
 // ============================================================================
@@ -1576,7 +1576,7 @@ function VariantPickerInline({
   // it matches most of the catalog, and the wrong SKU on a receipt is costly.
   // An empty box browses.
   useEffect(() => {
-    const next = isSearchable(keyword, PRODUCT_SEARCH_MIN_CHARS) ? keyword.trim() : '';
+    const next = isSearchable(keyword) ? keyword.trim() : '';
     const tm = setTimeout(() => setDebounced(next), 300);
     return () => clearTimeout(tm);
   }, [keyword]);
@@ -1609,9 +1609,9 @@ function VariantPickerInline({
           placeholder={t('receiving.searchProduct')}
           // Hint rides inside the field, right-aligned, so the result list
           // below can't shift as the user types.
-          endIcon={isBelowSearchMin(keyword, PRODUCT_SEARCH_MIN_CHARS)
+          endIcon={isBelowSearchMin(keyword)
             ? <span className="text-[11px] whitespace-nowrap">
-                {t('common.searchMinCharsShort', { n: PRODUCT_SEARCH_MIN_CHARS })}
+                {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
               </span>
             : undefined}
           className="w-full search-min-hint"

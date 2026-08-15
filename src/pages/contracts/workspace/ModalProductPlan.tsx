@@ -10,7 +10,6 @@ import { useWorkspace } from './WorkspaceContext';
 import type { ProductModel, Variant, Quote, QuoteResponse, BrandLookup, FamilyLookup } from './WorkspaceTypes';
 import { useBarcodeScanner } from '../../../components/BarcodeScanner';
 import { SearchInput } from '../../../components/SearchInput';
-import { PRODUCT_SEARCH_MIN_CHARS } from '../../../lib/searchKeyword';
 import { lookupBarcode } from '../../../lib/barcodeLookup';
 
 interface Props {
@@ -264,7 +263,6 @@ export function ModalProductPlan({ open, onClose }: Props) {
               onDebouncedChange={setDebouncedSearch}
               startIcon={null}
               placeholder={t('wizard.searchProductPlaceholder')}
-              minChars={PRODUCT_SEARCH_MIN_CHARS}
               className="w-full"
               size="sm"
             />

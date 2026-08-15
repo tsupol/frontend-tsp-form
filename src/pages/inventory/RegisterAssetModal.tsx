@@ -9,7 +9,7 @@ import { translateApiError } from '../../lib/apiErrors';
 import { makeDatePickerFormat, toLocalDateStr, fmtCurrency } from '../../lib/format';
 import { ImeiInput } from '../../components/ImeiInput';
 import { getConditionLabel, getBucketLabel, CONDITION_VALUES } from './inventoryUtils';
-import { PRODUCT_SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
+import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
 
 // Direct device intake — fn_inv_asset_register. For our own shops (INTERNAL) and
 // company-owned consignment branches (EXTERNAL): the device lands straight in
@@ -120,7 +120,7 @@ export function RegisterAssetModal({
   // generations by design. A single character still doesn't fire — it matches
   // most of the catalog. An empty box browses.
   useEffect(() => {
-    const next = isSearchable(keyword, PRODUCT_SEARCH_MIN_CHARS) ? keyword.trim() : '';
+    const next = isSearchable(keyword) ? keyword.trim() : '';
     const tm = setTimeout(() => setDebounced(next), 300);
     return () => clearTimeout(tm);
   }, [keyword]);
@@ -329,9 +329,9 @@ export function RegisterAssetModal({
                       startIcon={<Search size={14} />}
                       // Hint rides inside the field, right-aligned, so the model
                       // list below can't shift as the user types.
-                      endIcon={isBelowSearchMin(keyword, PRODUCT_SEARCH_MIN_CHARS)
+                      endIcon={isBelowSearchMin(keyword)
                         ? <span className="text-[11px] whitespace-nowrap">
-                            {t('common.searchMinCharsShort', { n: PRODUCT_SEARCH_MIN_CHARS })}
+                            {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
                           </span>
                         : undefined}
                       className="w-full search-min-hint"
