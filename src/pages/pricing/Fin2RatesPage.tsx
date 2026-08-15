@@ -10,7 +10,7 @@ import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useFormSnapshot } from '../../hooks/useFormSnapshot';
 import { ModelName } from '../../components/ModelName';
 import { translateApiError } from '../../lib/apiErrors';
-import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
+import { PRODUCT_SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -612,14 +612,13 @@ export function Fin2RatesPage() {
     setPendingNav(null);
   };
 
-  // Search debounce. A 1-char keyword makes fn_product_search ignore it and
-  // return recent models instead — they'd read as search hits. Drop anything
-  // under SEARCH_MIN_CHARS before the debounce so the page simply stays in
-  // browse mode until the keyword is long enough to actually search.
+  // Search debounce. Floor is 2 so "16"/"17" reach fn_product_search, which
+  // matches model generations by design. A single character still doesn't fire —
+  // the page simply stays in browse mode.
   const handleSearch = (value: string) => {
     setSearchInput(value);
     clearTimeout(searchTimer.current);
-    const next = isSearchable(value) ? value.trim() : '';
+    const next = isSearchable(value, PRODUCT_SEARCH_MIN_CHARS) ? value.trim() : '';
     searchTimer.current = setTimeout(() => {
       setSearch(next);
       setPageIndex(0);
@@ -708,7 +707,7 @@ export function Fin2RatesPage() {
 
   // `search` is already filtered by handleSearch, so this is only ever true for
   // a keyword the RPC will honour — browse mode covers everything shorter.
-  const hasSearch = isSearchable(search);
+  const hasSearch = isSearchable(search, PRODUCT_SEARCH_MIN_CHARS);
 
   // Query 1a: Browse mode — no search term. Use the view directly so sort options work.
   const { data: browseData, isError: browseIsError, error: browseError, isFetching: browseFetching } = useQuery({
@@ -912,9 +911,9 @@ export function Fin2RatesPage() {
                       size="sm"
                       // Hint rides inside the field, right-aligned, so the rows
                       // below can't shift as the user types.
-                      endIcon={isBelowSearchMin(searchInput)
+                      endIcon={isBelowSearchMin(searchInput, PRODUCT_SEARCH_MIN_CHARS)
                         ? <span className="text-[11px] whitespace-nowrap">
-                            {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
+                            {t('common.searchMinCharsShort', { n: PRODUCT_SEARCH_MIN_CHARS })}
                           </span>
                         : undefined}
                       className="w-full search-min-hint"

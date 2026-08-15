@@ -30,7 +30,7 @@ import { OwnerBadge } from '../../components/OwnerBadge';
 import { ApiErrorAlert } from '../../components/ApiErrorAlert';
 import type { OwnerType } from '../../lib/ownerTypes';
 import { translateApiError } from '../../lib/apiErrors';
-import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
+import { PRODUCT_SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
 
 // ============================================================================
 // Types (verified against live API 2026-03-25)
@@ -1846,12 +1846,12 @@ function CorrectModelModal({
     }
   }, [open]);
 
-  // Debounce the typeahead query. A 1-char keyword makes fn_product_search
-  // ignore it and return recent models instead — indistinguishable from real
-  // matches, and staff would pick one. Drop anything under SEARCH_MIN_CHARS
-  // before the debounce; an empty box still browses the family.
+  // Debounce the typeahead query. Floor is 2 so "16"/"17" reach
+  // fn_product_search, which matches model generations by design. A single
+  // character still doesn't fire — it matches most of the catalog and staff
+  // would pick one of the wrong rows. An empty box browses the family.
   useEffect(() => {
-    const next = isSearchable(modelQuery) ? modelQuery.trim() : '';
+    const next = isSearchable(modelQuery, PRODUCT_SEARCH_MIN_CHARS) ? modelQuery.trim() : '';
     const timer = setTimeout(() => setDebouncedQuery(next), 300);
     return () => clearTimeout(timer);
   }, [modelQuery]);
@@ -2022,8 +2022,8 @@ function CorrectModelModal({
                         helper line instead, replacing the scope text while the
                         keyword is too short to actually search. */}
                     <div className="text-xs text-subtler">
-                      {isBelowSearchMin(modelQuery)
-                        ? t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })
+                      {isBelowSearchMin(modelQuery, PRODUCT_SEARCH_MIN_CHARS)
+                        ? t('common.searchMinCharsShort', { n: PRODUCT_SEARCH_MIN_CHARS })
                         : scopeAllFamilies
                           ? t('asset.correctModel.searchingAll', { defaultValue: 'Searching all models in this holding' })
                           : t('asset.correctModel.scopedToFamily', { defaultValue: 'Showing {{family}} models', family: familyName ?? '' })}

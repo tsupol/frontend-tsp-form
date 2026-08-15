@@ -12,7 +12,7 @@ import { useBarcodeScanner } from '../../../components/BarcodeScanner';
 import { ColorSwatch } from '../../../components/ColorAutocomplete';
 import { lookupBarcode } from '../../../lib/barcodeLookup';
 import { translateApiError } from '../../../lib/apiErrors';
-import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../../lib/searchKeyword';
+import { PRODUCT_SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../../lib/searchKeyword';
 
 /** Hard cap on installment term, mirroring the backend guard (mig 1030). */
 const TERM_MONTHS_MAX = 60;
@@ -167,17 +167,18 @@ export function PanelProductPlan(_props: Props) {
 
   // ── NEW: search debounce ────────────────────────────────────────────
 
-  // Anything under SEARCH_MIN_CHARS never reaches fn_product_search — at 1 char
-  // the RPC drops the keyword and hands back ~50 recent models that read as
-  // matches. Checked before the debounce so a short keyword never fires.
+  // Floor is 2, not 3: staff search by generation number ("16", "17"), and
+  // fn_product_search scores a standalone family token at 95 precisely so that
+  // works. A single character is still dropped — it matches most of the
+  // catalog, so it's a scan, not a search.
   const handleSearchInput = (value: string) => {
     setSearch(value);
     clearTimeout(searchTimer.current);
-    const next = isSearchable(value) ? value.trim() : '';
+    const next = isSearchable(value, PRODUCT_SEARCH_MIN_CHARS) ? value.trim() : '';
     searchTimer.current = setTimeout(() => setDebouncedSearch(next), 300);
   };
 
-  const shouldSearch = isSearchable(debouncedSearch);
+  const shouldSearch = isSearchable(debouncedSearch, PRODUCT_SEARCH_MIN_CHARS);
 
   // ── USED: search debounce ───────────────────────────────────────────
 
@@ -945,9 +946,9 @@ export function PanelProductPlan(_props: Props) {
                   size="sm"
                   // Hint rides inside the field, right-aligned, so the result
                   // list below can't shift as the user types.
-                  endIcon={isBelowSearchMin(search)
+                  endIcon={isBelowSearchMin(search, PRODUCT_SEARCH_MIN_CHARS)
                     ? <span className="text-[11px] whitespace-nowrap">
-                        {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
+                        {t('common.searchMinCharsShort', { n: PRODUCT_SEARCH_MIN_CHARS })}
                       </span>
                     : undefined}
                   className="w-full search-min-hint"

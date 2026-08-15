@@ -18,7 +18,7 @@ import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { DateTime } from '../../components/DateTime';
 import { useBarcodeScanner } from '../../components/BarcodeScanner';
 import { translateApiError } from '../../lib/apiErrors';
-import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
+import { PRODUCT_SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 // v_barcode_list columns (verified against the view DDL):
@@ -502,11 +502,11 @@ function RegisterBarcodeModal({ open, onClose, initialBarcode, onSuccess }: Regi
     }
   }, [open, initialBarcode]);
 
-  // A 1-char keyword makes fn_product_search ignore it and return recent models
-  // instead — indistinguishable from real matches. Drop anything under
-  // SEARCH_MIN_CHARS before the debounce; an empty box still browses.
+  // Floor is 2 so "16"/"17" reach fn_product_search, which matches model
+  // generations by design. A single character still doesn't fire — it matches
+  // most of the catalog. An empty box browses.
   useEffect(() => {
-    const next = isSearchable(modelQuery) ? modelQuery.trim() : '';
+    const next = isSearchable(modelQuery, PRODUCT_SEARCH_MIN_CHARS) ? modelQuery.trim() : '';
     const tm = setTimeout(() => setDebouncedModelQuery(next), 300);
     return () => clearTimeout(tm);
   }, [modelQuery]);
@@ -663,9 +663,9 @@ function RegisterBarcodeModal({ open, onClose, initialBarcode, onSuccess }: Regi
               startIcon={<Search size={16} />}
               // Hint rides inside the field, right-aligned, so the model list
               // below can't shift as the user types.
-              endIcon={isBelowSearchMin(modelQuery)
+              endIcon={isBelowSearchMin(modelQuery, PRODUCT_SEARCH_MIN_CHARS)
                 ? <span className="text-[11px] whitespace-nowrap">
-                    {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
+                    {t('common.searchMinCharsShort', { n: PRODUCT_SEARCH_MIN_CHARS })}
                   </span>
                 : undefined}
               className="w-full search-min-hint"

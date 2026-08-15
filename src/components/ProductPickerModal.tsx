@@ -7,6 +7,7 @@ import { apiClient } from '../lib/api';
 import { fmtCurrency } from '../lib/format';
 import { useBarcodeScanner } from './BarcodeScanner';
 import { SearchInput } from './SearchInput';
+import { PRODUCT_SEARCH_MIN_CHARS } from '../lib/searchKeyword';
 
 export interface SellableVariant {
   variant_id: number;
@@ -112,6 +113,7 @@ export function ProductPickerModal({
               onChange={setSearch}
               onDebouncedChange={setDebounced}
               placeholder={t('retail.create.searchProducts')}
+              minChars={PRODUCT_SEARCH_MIN_CHARS}
               size="sm"
               // The scan button already carries the magnifier's job here, and
               // the input-group has no room for a second leading icon.

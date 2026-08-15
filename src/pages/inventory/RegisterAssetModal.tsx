@@ -9,7 +9,7 @@ import { translateApiError } from '../../lib/apiErrors';
 import { makeDatePickerFormat, toLocalDateStr, fmtCurrency } from '../../lib/format';
 import { ImeiInput } from '../../components/ImeiInput';
 import { getConditionLabel, getBucketLabel, CONDITION_VALUES } from './inventoryUtils';
-import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
+import { PRODUCT_SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
 
 // Direct device intake — fn_inv_asset_register. For our own shops (INTERNAL) and
 // company-owned consignment branches (EXTERNAL): the device lands straight in
@@ -116,11 +116,11 @@ export function RegisterAssetModal({
     }
   }, [open]);
 
-  // A 1-char keyword makes fn_product_search ignore it and return recent models
-  // instead — indistinguishable from real matches. Drop anything under
-  // SEARCH_MIN_CHARS before the debounce; an empty box still browses.
+  // Floor is 2 so "16"/"17" reach fn_product_search, which matches model
+  // generations by design. A single character still doesn't fire — it matches
+  // most of the catalog. An empty box browses.
   useEffect(() => {
-    const next = isSearchable(keyword) ? keyword.trim() : '';
+    const next = isSearchable(keyword, PRODUCT_SEARCH_MIN_CHARS) ? keyword.trim() : '';
     const tm = setTimeout(() => setDebounced(next), 300);
     return () => clearTimeout(tm);
   }, [keyword]);
@@ -329,9 +329,9 @@ export function RegisterAssetModal({
                       startIcon={<Search size={14} />}
                       // Hint rides inside the field, right-aligned, so the model
                       // list below can't shift as the user types.
-                      endIcon={isBelowSearchMin(keyword)
+                      endIcon={isBelowSearchMin(keyword, PRODUCT_SEARCH_MIN_CHARS)
                         ? <span className="text-[11px] whitespace-nowrap">
-                            {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
+                            {t('common.searchMinCharsShort', { n: PRODUCT_SEARCH_MIN_CHARS })}
                           </span>
                         : undefined}
                       className="w-full search-min-hint"

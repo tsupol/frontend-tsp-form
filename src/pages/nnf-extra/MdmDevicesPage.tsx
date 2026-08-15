@@ -62,7 +62,7 @@ import {
 } from '../inventory/mdm/mdmApi';
 import { parseMdmError } from '../inventory/mdm/mdmApi';
 import { ActivationLockRevealModal } from './ActivationLockRevealModal';
-import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
+import { MDM_SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
 
 // Activation Lock codes can unlock a repossessed device for resale, so the
 // owner restricted reveal to company level on purpose — a branch must ask a
@@ -137,7 +137,7 @@ export function MdmDevicesPage() {
   const { data, isError, error, isFetching, refetch } = useQuery({
     queryKey: ['mdm-device-search', search],
     queryFn: () => searchMdmDevices(search, SEARCH_LIMIT),
-    enabled: isSearchable(search),
+    enabled: isSearchable(search, MDM_SEARCH_MIN_CHARS),
     placeholderData: keepPreviousData,
     // Poll only while a row on screen is mid-transition (enroll awaiting Apple, or
     // a lock being pushed). Re-runs the current keyword only — never the fleet.
@@ -150,13 +150,14 @@ export function MdmDevicesPage() {
   const rows = data?.devices ?? [];
   const truncated = data?.truncated === true;
 
-  // Below SEARCH_MIN_CHARS we don't fire at all: the RPC would return empty with
-  // needs_keyword anyway, so the request buys nothing. Clearing `search` also
+  // Stays at 3 while product screens moved to 2: fn_mdm_device_search enforces
+  // its own 3 server-side and returns needs_keyword below it, so a lower floor
+  // here would only buy an empty round-trip. Clearing `search` also
   // disables the query, which is what empties the screen when the box is cleared.
   const handleSearch = (value: string) => {
     setSearchInput(value);
     clearTimeout(searchTimer.current);
-    const next = isSearchable(value) ? value.trim() : '';
+    const next = isSearchable(value, MDM_SEARCH_MIN_CHARS) ? value.trim() : '';
     searchTimer.current = setTimeout(() => setSearch(next), 300);
   };
 
@@ -200,9 +201,9 @@ export function MdmDevicesPage() {
               size="sm"
               className="w-full search-min-hint"
               startIcon={<Search size={15} />}
-              endIcon={isBelowSearchMin(searchInput)
+              endIcon={isBelowSearchMin(searchInput, MDM_SEARCH_MIN_CHARS)
                 ? <span className="text-[11px] whitespace-nowrap">
-                    {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
+                    {t('common.searchMinCharsShort', { n: MDM_SEARCH_MIN_CHARS })}
                   </span>
                 : undefined}
             />
@@ -230,7 +231,7 @@ export function MdmDevicesPage() {
                       the user is typing. */}
                   <Search size={28} className="text-subtler" />
                   <span>
-                    {isSearchable(searchInput)
+                    {isSearchable(searchInput, MDM_SEARCH_MIN_CHARS)
                       ? t('mdmDevices.noResults')
                       : t('mdmDevices.searchPrompt')}
                   </span>

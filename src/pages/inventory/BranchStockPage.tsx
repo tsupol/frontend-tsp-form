@@ -12,6 +12,7 @@ import { fmtNum, getConditionLabel } from './inventoryUtils';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { useBarcodeScanner } from '../../components/BarcodeScanner';
 import { SearchInput } from '../../components/SearchInput';
+import { PRODUCT_SEARCH_MIN_CHARS } from '../../lib/searchKeyword';
 import { RetailWriteOffModal, type RetailWriteOffTarget } from './RetailWriteOffModal';
 import { printWithMarker } from '../../lib/printDoc';
 import { downloadXlsx, type XlsxColumn } from '../../lib/xlsx';
@@ -539,6 +540,7 @@ export function BranchStockPage() {
                 ? t('branchStock.assetSearch', { defaultValue: 'Search by name, serial, IMEI, code' })
                 : t('branchStock.search', { defaultValue: 'Search by name, model, variant' })}
               size="sm"
+              minChars={PRODUCT_SEARCH_MIN_CHARS}
               className="w-full"
             />
           </div>

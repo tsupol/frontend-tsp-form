@@ -432,7 +432,7 @@ export interface MdmDeviceListRow {
   sim_info: string | null;
 }
 
-/** Hard floor enforced by the RPC itself, not just here — see SEARCH_MIN_CHARS. */
+/** Hard floor enforced by the RPC itself, not just here — see MDM_SEARCH_MIN_CHARS. */
 export interface MdmDeviceSearchResult {
   devices: MdmDeviceListRow[];
   count: number;

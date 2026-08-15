@@ -11,7 +11,7 @@ import { translateApiError } from '../../lib/apiErrors';
 import { useAuth } from '../../contexts/AuthContext';
 import { ColorAutocomplete, ColorMatchBadge, ColorSwatch, useMasterColorPreview } from '../../components/ColorAutocomplete';
 import { useBarcodeScanner } from '../../components/BarcodeScanner';
-import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
+import { PRODUCT_SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -1625,14 +1625,13 @@ export function ModelsPage() {
     navigate(id != null ? `/admin/products/models/${id}` : '/admin/products/models');
   };
 
-  // Search debounce. A 1-char keyword makes fn_product_search ignore it and
-  // return recent models instead — they'd read as search hits. Drop anything
-  // under SEARCH_MIN_CHARS before the debounce so `p_q` falls back to null and
-  // the list stays in plain browse mode until the keyword is long enough.
+  // Search debounce. Floor is 2 so "16"/"17" reach fn_product_search, which
+  // matches model generations by design. A single character still doesn't fire:
+  // `p_q` falls back to null and the list stays in plain browse mode.
   const handleSearch = (value: string) => {
     setSearchInput(value);
     clearTimeout(searchTimer.current);
-    const next = isSearchable(value) ? value.trim() : '';
+    const next = isSearchable(value, PRODUCT_SEARCH_MIN_CHARS) ? value.trim() : '';
     searchTimer.current = setTimeout(() => {
       setSearch(next);
       setPageIndex(0);
@@ -1645,7 +1644,7 @@ export function ModelsPage() {
     onScan: (val) => {
       clearTimeout(searchTimer.current);
       setSearchInput(val);
-      setSearch(isSearchable(val) ? val.trim() : '');
+      setSearch(isSearchable(val, PRODUCT_SEARCH_MIN_CHARS) ? val.trim() : '');
       setPageIndex(0);
     },
   });
@@ -1858,9 +1857,9 @@ export function ModelsPage() {
                         size="sm"
                         // Hint rides inside the field, right-aligned, so the
                         // rows below can't shift as the user types.
-                        endIcon={isBelowSearchMin(searchInput)
+                        endIcon={isBelowSearchMin(searchInput, PRODUCT_SEARCH_MIN_CHARS)
                           ? <span className="text-[11px] whitespace-nowrap">
-                              {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
+                              {t('common.searchMinCharsShort', { n: PRODUCT_SEARCH_MIN_CHARS })}
                             </span>
                           : undefined}
                         className="w-full search-min-hint"
