@@ -62,7 +62,7 @@ import {
 } from '../inventory/mdm/mdmApi';
 import { parseMdmError } from '../inventory/mdm/mdmApi';
 import { ActivationLockRevealModal } from './ActivationLockRevealModal';
-import { MDM_SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
+import { MDM_SEARCH_MIN_CHARS, HARD_FLOOR, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
 
 // Activation Lock codes can unlock a repossessed device for resale, so the
 // owner restricted reveal to company level on purpose — a branch must ask a
@@ -137,7 +137,7 @@ export function MdmDevicesPage() {
   const { data, isError, error, isFetching, refetch } = useQuery({
     queryKey: ['mdm-device-search', search],
     queryFn: () => searchMdmDevices(search, SEARCH_LIMIT),
-    enabled: isSearchable(search, MDM_SEARCH_MIN_CHARS),
+    enabled: isSearchable(search, MDM_SEARCH_MIN_CHARS, HARD_FLOOR),
     placeholderData: keepPreviousData,
     // Poll only while a row on screen is mid-transition (enroll awaiting Apple, or
     // a lock being pushed). Re-runs the current keyword only — never the fleet.
@@ -157,7 +157,7 @@ export function MdmDevicesPage() {
   const handleSearch = (value: string) => {
     setSearchInput(value);
     clearTimeout(searchTimer.current);
-    const next = isSearchable(value, MDM_SEARCH_MIN_CHARS) ? value.trim() : '';
+    const next = isSearchable(value, MDM_SEARCH_MIN_CHARS, HARD_FLOOR) ? value.trim() : '';
     searchTimer.current = setTimeout(() => setSearch(next), 300);
   };
 
@@ -201,7 +201,7 @@ export function MdmDevicesPage() {
               size="sm"
               className="w-full search-min-hint"
               startIcon={<Search size={15} />}
-              endIcon={isBelowSearchMin(searchInput, MDM_SEARCH_MIN_CHARS)
+              endIcon={isBelowSearchMin(searchInput, MDM_SEARCH_MIN_CHARS, HARD_FLOOR)
                 ? <span className="text-[11px] whitespace-nowrap">
                     {t('common.searchMinCharsShort', { n: MDM_SEARCH_MIN_CHARS })}
                   </span>
@@ -231,7 +231,7 @@ export function MdmDevicesPage() {
                       the user is typing. */}
                   <Search size={28} className="text-subtler" />
                   <span>
-                    {isSearchable(searchInput, MDM_SEARCH_MIN_CHARS)
+                    {isSearchable(searchInput, MDM_SEARCH_MIN_CHARS, HARD_FLOOR)
                       ? t('mdmDevices.noResults')
                       : t('mdmDevices.searchPrompt')}
                   </span>

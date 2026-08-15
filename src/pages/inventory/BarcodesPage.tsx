@@ -127,11 +127,11 @@ export function BarcodesPage() {
     }));
   }, []);
 
-  // Enter-to-commit, so there's no per-keystroke traffic to protect — but a
-  // 1-char commit still seq-scans six columns and comes back with most of the
-  // table, which reads as a result set. Below the floor we commit '' (plain
-  // browse) rather than a fake search. Scanned barcodes bypass this by design:
-  // they're always long.
+  // Enter-to-commit, so there's no per-keystroke traffic to protect — the floor
+  // is about the result, not the cost: a 1-char keyword matches across six
+  // columns and comes back with most of the table, which reads as a result set.
+  // Below the floor we commit '' (plain browse) rather than a fake search.
+  // Scanned barcodes bypass this by design: they're always long.
   const commitSearch = useCallback(() => {
     const next = isSearchableLoose(searchInput, IDENTIFIER_SEARCH_MIN_CHARS)
       ? searchInput.trim()

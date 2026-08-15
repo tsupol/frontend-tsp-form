@@ -14,10 +14,12 @@ import { isSearchableLoose, isBelowSearchMinLoose, searchMinFor } from '../lib/s
  * query key and never think about the threshold again. Clearing the box reports
  * '' immediately-ish (after the debounce), which every list treats as unfiltered.
  *
- * See `lib/searchKeyword.ts` for why the floor exists: the fn_*_search RPCs
- * silently switch to browse-recent below it and hand back rows that look like
- * matches. On plain-ilike views the floor is a consistency + seq-scan call
- * rather than a correctness one — same UI either way, so staff learn one rule.
+ * See `lib/searchKeyword.ts` for why the floor exists and why the number differs
+ * per screen. Short version: at ONE character three of the RPCs drop the keyword
+ * and hand back browse results that look like matches. On plain-ilike views
+ * nothing breaks — the floor there keeps the result set meaningful (a 1-char OR
+ * matches nearly every row), not to save time; BE measured 2 and 3 as equally
+ * cheap. Same UI either way, so staff learn one rule.
  */
 export function SearchInput({
   value,

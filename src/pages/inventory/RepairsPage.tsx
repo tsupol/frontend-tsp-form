@@ -43,8 +43,10 @@ export function RepairsPage() {
   const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
 
-  // Short keywords never reach fn_repair_search — under SEARCH_MIN_CHARS the
-  // RPC has no trigram to match on and silently degrades to a browse listing.
+  // Short keywords never reach fn_repair_search. At 1 char the RPC drops the
+  // keyword and browses every repair — rows that look like matches but were
+  // never filtered. At 2 it searches correctly; the floor stays 3 here because
+  // this box also searches customer names. (Thai relaxes to 2 on its own.)
   useEffect(() => {
     const next = isSearchable(keyword) ? keyword.trim() : '';
     const tm = setTimeout(() => setDebounced(next), 300);

@@ -197,9 +197,12 @@ export function CustomersPage() {
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
 
-  // Below SEARCH_MIN_CHARS we never reach the RPC — its trigram index doesn't
-  // exist for shorter strings, so results are either wrong or slow. Filtered
-  // before the debounce so nothing fires and gets discarded.
+  // Names keep the 3 floor: two Latin letters of a name matches half the table,
+  // which is noise rather than a result. (Thai relaxes to 2 on its own — "สม" is
+  // an ordinary name search.) The RPC's own floor is 2, below which it returns
+  // empty rather than browsing, so this is a UI-quality choice, not a guard
+  // against bad data. Filtered before the debounce so nothing fires and gets
+  // discarded.
   useEffect(() => {
     const next = isSearchable(search) ? search.trim() : '';
     const timer = setTimeout(() => { setDebouncedSearch(next); setPageIndex(0); }, 300);
