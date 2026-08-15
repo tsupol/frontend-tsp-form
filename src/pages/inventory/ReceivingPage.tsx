@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Modal, Input, NumberSpinner, DataTable, PopOver, LabeledCheckbox, useSnackbarContext } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, PackagePlus, CheckCircle, XCircle, Plus, Trash2, ScanBarcode, ExternalLink, Search, SlidersHorizontal, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, PackagePlus, CheckCircle, XCircle, Plus, Trash2, ScanBarcode, ExternalLink, SlidersHorizontal, AlertTriangle } from 'lucide-react';
 import { useBarcodeScanner } from '../../components/BarcodeScanner';
 import { CurrencyInput } from '../../components/CurrencyInput';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
@@ -16,6 +16,7 @@ import { fmtNum, codeDisplay } from './inventoryUtils';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { translateApiError } from '../../lib/apiErrors';
 import { PRODUCT_SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
+import { SearchInput } from '../../components/SearchInput';
 
 // ============================================================================
 // Types (verified against live API 2026-03-25)
@@ -133,10 +134,10 @@ export function ReceivingPage() {
 
   const extraFilterCount = (filterStatus ? 1 : 0) + (filterBranchId !== null ? 1 : 0);
 
-  useEffect(() => {
-    const tm = setTimeout(() => setDebouncedSearch(search.trim()), 300);
-    return () => clearTimeout(tm);
-  }, [search]);
+  // Debounce + min-char floor both live in SearchInput below. Default floor (3)
+  // rather than the identifier 2: this box also searches supplier_name, and two
+  // Latin letters of a supplier matches most of the list. Thai still relaxes to
+  // 2 on its own.
 
   const { data: branches } = useQuery({
     queryKey: ['branches'],
@@ -229,12 +230,12 @@ export function ReceivingPage() {
               <div className="flex-none p-2 border-b border-line">
                 <div className="flex items-center gap-2">
                   <div className="flex-1 min-w-0">
-                    <Input
+                    <SearchInput
                       value={search}
-                      onChange={(e) => setSearch(e.target.value)}
+                      onChange={setSearch}
+                      onDebouncedChange={setDebouncedSearch}
                       placeholder={t('common.search')}
                       size="sm"
-                      startIcon={<Search size={16} />}
                       className="w-full"
                     />
                   </div>

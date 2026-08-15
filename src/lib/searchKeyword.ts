@@ -42,6 +42,22 @@ export const SEARCH_MIN_CHARS = 3;
 export const PRODUCT_SEARCH_MIN_CHARS = 2;
 
 /**
+ * Identifier floor — asset codes, serials, IMEIs, barcodes, document numbers
+ * (receipt_no, po_no, transfer_no).
+ *
+ * Same 2 as products, for a different reason. These are structured strings, not
+ * prose: staff read a fragment off a device or a paper slip and type it. Two
+ * characters of a serial is a genuine narrowing (the tail digits of an IMEI,
+ * a "-1" suffix), where two letters of a customer name is not. Keeping the
+ * numbers equal is deliberate — the in-field hint says one thing across every
+ * scan-and-type screen.
+ *
+ * The single character is still refused: on a 4-column OR over the asset table
+ * it matches nearly everything and is a scan wearing a search's clothes.
+ */
+export const IDENTIFIER_SEARCH_MIN_CHARS = 2;
+
+/**
  * MDM device floor. `fn_mdm_device_search` returns
  * `{ needs_keyword: true, min_keyword_length: 3 }` below 3 by explicit owner
  * decision — that screen must never list every device. Lowering this only buys

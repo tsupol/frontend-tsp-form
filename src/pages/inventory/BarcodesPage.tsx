@@ -18,7 +18,10 @@ import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { DateTime } from '../../components/DateTime';
 import { useBarcodeScanner } from '../../components/BarcodeScanner';
 import { translateApiError } from '../../lib/apiErrors';
-import { PRODUCT_SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
+import {
+  PRODUCT_SEARCH_MIN_CHARS, IDENTIFIER_SEARCH_MIN_CHARS,
+  isSearchable, isBelowSearchMin, isSearchableLoose, isBelowSearchMinLoose,
+} from '../../lib/searchKeyword';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 // v_barcode_list columns (verified against the view DDL):
@@ -124,8 +127,15 @@ export function BarcodesPage() {
     }));
   }, []);
 
+  // Enter-to-commit, so there's no per-keystroke traffic to protect — but a
+  // 1-char commit still seq-scans six columns and comes back with most of the
+  // table, which reads as a result set. Below the floor we commit '' (plain
+  // browse) rather than a fake search. Scanned barcodes bypass this by design:
+  // they're always long.
   const commitSearch = useCallback(() => {
-    const next = searchInput.trim();
+    const next = isSearchableLoose(searchInput, IDENTIFIER_SEARCH_MIN_CHARS)
+      ? searchInput.trim()
+      : '';
     setActiveSearch(next);
     setPageIndex(0);
   }, [searchInput]);
@@ -282,9 +292,19 @@ export function BarcodesPage() {
                 onKeyDown={onSearchKey}
                 placeholder={t('barcodes.search')}
                 size="sm"
-                endIcon={searchInput ? <X size={14} /> : undefined}
-                onEndIconClick={searchInput ? clearSearch : undefined}
-                className="w-full"
+                // Hint takes the slot while the keyword is too short to commit;
+                // the clear-X returns as soon as it's long enough to search.
+                // Same trade the shared SearchInput makes — at 1-2 chars there's
+                // nothing committed to clear, and Backspace still empties it.
+                endIcon={isBelowSearchMinLoose(searchInput, IDENTIFIER_SEARCH_MIN_CHARS)
+                  ? <span className="text-[11px] whitespace-nowrap">
+                      {t('common.searchMinCharsShort', { n: IDENTIFIER_SEARCH_MIN_CHARS })}
+                    </span>
+                  : searchInput ? <X size={14} /> : undefined}
+                onEndIconClick={isBelowSearchMinLoose(searchInput, IDENTIFIER_SEARCH_MIN_CHARS)
+                  ? undefined
+                  : searchInput ? clearSearch : undefined}
+                className="w-full search-min-hint"
                 autoFocus={!isMobile}
               />
               <div className="input-group-divider" />

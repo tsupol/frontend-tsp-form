@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useSearchParams, useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, Modal, TextArea, DataTable, PopOver, Tooltip, Switch, MaskedInput, InputDatePicker, LabeledCheckbox, useSnackbarContext } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, Box, Search, SlidersHorizontal, XCircle, ChevronDown, ExternalLink, Wrench, Printer, Plus, CheckCircle, Pencil, Cloud, CloudOff, MoreVertical, Package, Keyboard, AlertTriangle, Lock } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, Box, SlidersHorizontal, XCircle, ChevronDown, ExternalLink, Wrench, Printer, Plus, CheckCircle, Pencil, Cloud, CloudOff, MoreVertical, Package, Keyboard, AlertTriangle, Lock } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
@@ -30,7 +30,8 @@ import { OwnerBadge } from '../../components/OwnerBadge';
 import { ApiErrorAlert } from '../../components/ApiErrorAlert';
 import type { OwnerType } from '../../lib/ownerTypes';
 import { translateApiError } from '../../lib/apiErrors';
-import { PRODUCT_SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
+import { PRODUCT_SEARCH_MIN_CHARS, IDENTIFIER_SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
+import { SearchInput } from '../../components/SearchInput';
 
 // ============================================================================
 // Types (verified against live API 2026-03-25)
@@ -462,11 +463,10 @@ export function AssetsPage() {
     else navigate(`/admin/inventory/assets${suffix}`, { replace: true });
   };
 
-  // Debounce search
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
-    return () => clearTimeout(timer);
-  }, [search]);
+  // Debounce + the min-char floor both live in SearchInput now. A single
+  // character matches nearly every row of the 4-column OR, so it browses the
+  // asset table rather than searching it; two is enough, since a fragment of a
+  // serial or IMEI is a real narrowing. An empty box still lists.
 
   const { data: branches } = useQuery({
     queryKey: ['branches'],
@@ -741,12 +741,14 @@ export function AssetsPage() {
               )}
               <div className="flex items-center gap-2 w-full">
                 <div className="flex-1 min-w-0">
-                  <Input
+                  <SearchInput
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    onChange={setSearch}
+                    onDebouncedChange={setDebouncedSearch}
                     placeholder={t('asset.search')}
                     size="sm"
-                    startIcon={<Search size={16} />}
+                    minChars={IDENTIFIER_SEARCH_MIN_CHARS}
+                    className="w-full"
                   />
                 </div>
                 <div className="flex-1 min-w-0 hidden sm:block">

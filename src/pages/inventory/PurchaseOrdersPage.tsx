@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
@@ -24,6 +24,7 @@ import { OwnerBadge } from '../../components/OwnerBadge';
 import type { OwnerType } from '../../lib/ownerTypes';
 import { translateApiError } from '../../lib/apiErrors';
 import { PRODUCT_SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
+import { SearchInput } from '../../components/SearchInput';
 
 // ============================================================================
 // Types — verified against live API 2026-05-02
@@ -202,12 +203,10 @@ export function PurchaseOrdersPage() {
   const [filterBranchId, setFilterBranchId] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const handleSearch = (value: string) => {
-    setSearchInput(value);
-    clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => setSearch(value.trim()), 300);
-  };
+  // Debounce + min-char floor both live in SearchInput below. Default floor (3)
+  // rather than the identifier 2: this box also searches supplier_name, and two
+  // Latin letters of a supplier matches most of the list. Thai still relaxes to
+  // 2 on its own.
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
   const navigate = useNavigate();
@@ -384,11 +383,11 @@ export function PurchaseOrdersPage() {
             <div className="flex-none p-2 border-b border-line">
               <div className="flex items-center gap-2">
                 <div className="flex-1 min-w-0">
-                  <Input
+                  <SearchInput
                     placeholder={t('common.search')}
                     value={searchInput}
-                    onChange={(e) => handleSearch(e.target.value)}
-                    startIcon={<Search size={14} />}
+                    onChange={setSearchInput}
+                    onDebouncedChange={setSearch}
                     size="sm"
                     className="w-full"
                   />

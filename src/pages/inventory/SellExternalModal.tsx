@@ -152,6 +152,11 @@ export function SellExternalModal({
   // ~100 partner branches, so search server-side by name (ILIKE) instead of
   // loading them all. Empty term loads a first batch; the selected option is
   // pinned so it stays visible after the results change.
+  //
+  // Deliberately has NO min-char floor, unlike every list search in the app.
+  // This is a Select narrowing ~100 rows behind limit=20, not a search over a
+  // real table: one character is a useful narrowing here, the scan is trivial,
+  // and a floor would make the first keystroke look broken with nothing gained.
   const handleBuyerSearch = useCallback((term: string) => {
     if (buyerDebounceRef.current) clearTimeout(buyerDebounceRef.current);
     buyerDebounceRef.current = setTimeout(() => setDebouncedBuyerSearch(term.trim()), 300);

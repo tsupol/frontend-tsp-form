@@ -12,7 +12,10 @@ import { useBarcodeScanner } from '../../../components/BarcodeScanner';
 import { ColorSwatch } from '../../../components/ColorAutocomplete';
 import { lookupBarcode } from '../../../lib/barcodeLookup';
 import { translateApiError } from '../../../lib/apiErrors';
-import { PRODUCT_SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../../lib/searchKeyword';
+import {
+  PRODUCT_SEARCH_MIN_CHARS, IDENTIFIER_SEARCH_MIN_CHARS,
+  isSearchable, isBelowSearchMin, isSearchableLoose, isBelowSearchMinLoose,
+} from '../../../lib/searchKeyword';
 
 /** Hard cap on installment term, mirroring the backend guard (mig 1030). */
 const TERM_MONTHS_MAX = 60;
@@ -182,10 +185,15 @@ export function PanelProductPlan(_props: Props) {
 
   // ── USED: search debounce ───────────────────────────────────────────
 
+  // A single character matches nearly every row of the OR below, so it browses
+  // the branch's stock rather than filtering it — dropped to '' before the
+  // debounce, which is the same thing an empty box does. Two is enough: a
+  // fragment of a serial or IMEI is a real narrowing.
   const handleAssetSearchInput = (value: string) => {
     setAssetSearch(value);
     clearTimeout(assetSearchTimer.current);
-    assetSearchTimer.current = setTimeout(() => setDebouncedAssetSearch(value.trim()), 300);
+    const next = isSearchableLoose(value, IDENTIFIER_SEARCH_MIN_CHARS) ? value.trim() : '';
+    assetSearchTimer.current = setTimeout(() => setDebouncedAssetSearch(next), 300);
   };
 
   const shouldAssetSearch = true; // always show — list all when empty, filter when typing
@@ -876,7 +884,22 @@ export function PanelProductPlan(_props: Props) {
             <>
               <div className="flex gap-2">
                 <div className="flex-1 min-w-0">
-                  <Input ref={assetSearchRef} value={assetSearch} onChange={(e) => handleAssetSearchInput(e.target.value)} placeholder={t('wizard.searchAssetPlaceholder')} startIcon={<Search size={16} />} className="w-full" size="sm" />
+                  {/* Not <SearchInput>: this box takes a ref so the scanner can
+                      refocus it. Hint rides inside the field the same way. */}
+                  <Input
+                    ref={assetSearchRef}
+                    value={assetSearch}
+                    onChange={(e) => handleAssetSearchInput(e.target.value)}
+                    placeholder={t('wizard.searchAssetPlaceholder')}
+                    startIcon={<Search size={16} />}
+                    endIcon={isBelowSearchMinLoose(assetSearch, IDENTIFIER_SEARCH_MIN_CHARS)
+                      ? <span className="text-[11px] whitespace-nowrap">
+                          {t('common.searchMinCharsShort', { n: IDENTIFIER_SEARCH_MIN_CHARS })}
+                        </span>
+                      : undefined}
+                    className="w-full search-min-hint"
+                    size="sm"
+                  />
                 </div>
                 <div style={{ width: '10rem' }} className="shrink-0">
                   <Select
