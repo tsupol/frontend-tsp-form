@@ -12,7 +12,6 @@ import { HomePage } from './pages/HomePage';
 import { DashboardPage } from './pages/DashboardPage';
 import { UserPage } from './pages/UserPage';
 import { EnrollRedirectPage } from './pages/EnrollRedirectPage';
-import { RemoteEnrollPage } from './pages/mdm-enroll/RemoteEnrollPage';
 import { HoldingSelectModal } from './components/HoldingSelectModal';
 import { ChatDockProvider } from './contexts/ChatDockContext';
 import { ChatDock } from './components/ChatDock';
@@ -135,7 +134,6 @@ import { DevBillPrintPage } from './pages/dev/DevBillPrintPage';
 import { DevNotificationsPage } from './pages/dev/DevNotificationsPage';
 import { DevTokensPage } from './pages/dev/DevTokensPage';
 import { DevRemoveButtonsPage } from './pages/dev/DevRemoveButtonsPage';
-import { DevEnrollPreviewPage } from './pages/dev/DevEnrollPreviewPage';
 import { DevLoginPage } from './pages/dev/DevLoginPage';
 import { isLocalDev } from './lib/devEnv';
 
@@ -212,11 +210,11 @@ function App() {
       {/* One-URL login for automation — localhost only, unauthenticated by design */}
       {isLocalDev() && <Route path="/dev-login" element={<DevLoginPage />} />}
       <Route path="/enroll" element={<EnrollRedirectPage />} />
-      {/* Delegated MDM enrollment — branch A issues a 3h token so branch B (who
-          may have no NNF login at all) can walk the device through the enroll
-          ritual. Public by design: the token IS the authorisation, and the BE
-          granted its two RPCs to PUBLIC accordingly. */}
-      <Route path="/mdm-enroll" element={<RemoteEnrollPage />} />
+      {/* /mdm-enroll is deliberately NOT a route here. Delegated enrollment is
+          its own Vite entry (enroll.html → src/enroll/), because it is opened
+          cold by someone outside the company on a phone, and this bundle is
+          ~1.3MB gzipped. Dev serves it via the rewrite in vite.config.ts;
+          production needs the matching nginx rule. */}
 
       {/* Dashboard */}
       <Route
@@ -776,16 +774,6 @@ function App() {
               <ProtectedRoute>
                 <AdminLayout>
                   <DevLayout><DevTokensPage /></DevLayout>
-                </AdminLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/dev/enroll-preview"
-            element={
-              <ProtectedRoute>
-                <AdminLayout>
-                  <DevLayout><DevEnrollPreviewPage /></DevLayout>
                 </AdminLayout>
               </ProtectedRoute>
             }

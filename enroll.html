@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/nnf-favicon.svg" />
+    <link rel="shortcut icon" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet" />
+    <title>นำเครื่องเข้าระบบ</title>
+    <style>@layer theme, base, components, utilities;</style>
+
+    <!-- SEPARATE ENTRY. This page does NOT load the admin bundle.
+         It is opened cold, once, by someone who is not our staff — usually on a
+         phone, on mobile data, from a QR code. The admin app is ~1.3MB gzipped
+         and every byte of it would be in front of a screen that shows a serial
+         number and a status line.
+
+         noindex: the URL carries a capability token. It must never be crawled. -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('theme');
+          var resolved = (!stored || stored === 'system')
+            ? (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
+            : stored;
+          document.documentElement.setAttribute('data-theme', resolved);
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+        window.__enrollBootAt = Date.now();
+      })();
+    </script>
+    <style>
+      /* Standalone values — the token stylesheet is in the bundle we are waiting
+         for. These match the two theme backgrounds. */
+      #enroll-boot {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1.25rem;
+        background: #0f1115;
+        color: #8b93a7;
+        font-family: 'Noto Sans Thai', system-ui, sans-serif;
+        z-index: 9999;
+        transition: opacity 300ms ease-out;
+      }
+      :root[data-theme='light'] #enroll-boot {
+        background: #f7f8fa;
+        color: #6b7280;
+      }
+      #enroll-boot.is-done { opacity: 0; pointer-events: none; }
+
+      /* A sweeping bar, not a spinner: a spinner says "waiting", a moving bar
+         says "loading, and it is getting somewhere". */
+      #enroll-boot .boot-track {
+        width: 168px; height: 3px;
+        border-radius: 999px;
+        background: rgba(139, 147, 167, 0.18);
+        overflow: hidden;
+      }
+      #enroll-boot .boot-fill {
+        display: block; width: 40%; height: 100%;
+        border-radius: inherit;
+        background: currentColor;
+        opacity: 0.65;
+        animation: enroll-boot-sweep 1.15s ease-in-out infinite;
+      }
+      @keyframes enroll-boot-sweep {
+        0%   { transform: translateX(-110%); }
+        100% { transform: translateX(360%); }
+      }
+      #enroll-boot .boot-mark {
+        width: 44px; height: 44px;
+        opacity: 0.9;
+        animation: enroll-boot-pulse 1.8s ease-in-out infinite;
+      }
+      @keyframes enroll-boot-pulse {
+        0%, 100% { opacity: 0.45; }
+        50%      { opacity: 0.95; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #enroll-boot .boot-fill { animation: none; width: 100%; }
+        #enroll-boot .boot-mark { animation: none; }
+        #enroll-boot { transition: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <div id="enroll-boot" role="status" aria-live="polite">
+      <img src="/nnf-favicon.svg" alt="" class="boot-mark" />
+      <div class="boot-track"><span class="boot-fill"></span></div>
+    </div>
+
+    <script type="module" src="/src/enroll/main.tsx"></script>
+  </body>
+</html>

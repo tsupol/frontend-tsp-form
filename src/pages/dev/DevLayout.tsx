@@ -12,7 +12,14 @@ const navItems = [
   { path: '/dev/notifications', label: 'Notifications', icon: Bell },
   { path: '/dev/tokens', label: 'Token Debug', icon: KeyRound },
   { path: '/dev/remove-buttons', label: 'Remove Buttons', icon: Trash2 },
-  { path: '/dev/enroll-preview', label: 'Enroll Page States', icon: QrCode },
+];
+
+// The enrollment page is a SEPARATE Vite entry, not a route in this app, so it
+// cannot be a NavLink — that would try to route within the SPA and 404. A plain
+// anchor does a real navigation to the other entry. `?mock` turns on its own
+// floating state picker.
+const externalItems = [
+  { href: '/mdm-enroll?mock', label: 'Enroll Page (states)', icon: QrCode },
 ];
 
 // The "you are exposing this" banner. Uses the same allowlist as the routes
@@ -46,6 +53,16 @@ export function DevLayout({ children }: { children: ReactNode }) {
             <Icon size={15} />
             {label}
           </NavLink>
+        ))}
+        {externalItems.map(({ href, label, icon: Icon }) => (
+          <a
+            key={href}
+            href={href}
+            className="flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors text-item-fg hover:bg-item-hover-bg hover:text-item-hover-fg"
+          >
+            <Icon size={15} />
+            {label}
+          </a>
         ))}
       </nav>
       <div className="flex-1 min-w-0 h-full better-scroll overflow-auto">

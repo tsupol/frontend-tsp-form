@@ -958,8 +958,19 @@ input[type="number"
     to   { opacity: 1; transform: none; }
 }
 
+/* Held until the boot splash starts lifting. The splash covers the page for its
+   minimum dwell, so a reveal that begins on mount plays entirely underneath it —
+   the curtain goes up on a page that has already finished arriving, which is
+   exactly the "it just shows" effect this animation exists to avoid.
+   `paused` by default; main sets .enroll-revealing once the splash is on its way
+   out, which starts every element together with its own stagger delay. */
 .enroll-reveal {
     animation: enroll-reveal-up 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-play-state: paused;
+}
+
+:root.enroll-revealing .enroll-reveal {
+    animation-play-state: running;
 }
 
 .enroll-reveal-1 { animation-delay: 60ms; }
