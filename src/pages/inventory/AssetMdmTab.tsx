@@ -17,8 +17,8 @@ import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { RefreshCw } from 'lucide-react';
-import { Button, Skeleton } from 'tsp-form';
+import { Loader2, RefreshCw } from 'lucide-react';
+import { Button } from 'tsp-form';
 import { OverflowTabs } from './mdm/OverflowTabs';
 import { useMdmStatus } from './mdm/useMdmStatus';
 import { EnforcementPausedBar } from './mdm/MdmSharedBits';
@@ -79,23 +79,10 @@ export function AssetMdmTab({ assetId, onRefresh }: { assetId: number; onRefresh
     ? active
     : (status?.in_mdm ? 'status' : 'enroll');
 
-  // A skeleton of the real tab, not a centred spinner. The layout it reserves is
-  // the layout that arrives, so the content fills in place instead of the whole
-  // panel jumping — which is what made a fast load still feel janky.
   if (isLoading) {
     return (
-      <div className="flex-1 flex flex-col gap-4 p-4 motion-safe:animate-fade-in">
-        {/* sub-tab strip */}
-        <div className="flex gap-2">
-          <Skeleton width="7rem" height="1.75rem" />
-          <Skeleton width="6rem" height="1.75rem" />
-          <Skeleton width="5rem" height="1.75rem" />
-        </div>
-        {/* readiness banner + status band */}
-        <Skeleton variant="rectangular" height="4.5rem" className="rounded-md" />
-        <Skeleton variant="rectangular" height="4.5rem" className="rounded-md" />
-        {/* the 7-step checklist box */}
-        <Skeleton variant="rectangular" height="18rem" className="rounded-md" />
+      <div className="flex-1 flex items-center justify-center text-subtler">
+        <Loader2 size={20} className="animate-spin" />
       </div>
     );
   }
@@ -111,11 +98,7 @@ export function AssetMdmTab({ assetId, onRefresh }: { assetId: number; onRefresh
   const goToEnroll = () => setActive('enroll');
 
   return (
-    // The reveal runs ONCE, on the first render that has data — keyed off the
-    // same flag the skeleton used. Binding it to isFetching instead would replay
-    // the animation on every 5s poll, which is exactly the twitchiness the
-    // skeleton was added to avoid.
-    <div className="flex-1 min-h-0 min-w-0 flex flex-col animate-reveal">
+    <div className="flex-1 min-h-0 min-w-0 flex flex-col">
       {tabs.length > 1 && (
         <OverflowTabs
           tabs={tabs}
