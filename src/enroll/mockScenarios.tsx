@@ -130,26 +130,42 @@ export interface MockState {
   select: (s: Scenario) => void;
 }
 
-/** `?mock` on a dev host turns the picker on. Absent → the page is fully real. */
+/**
+ * `?mock` on a dev host turns the picker on. Absent → the page is fully real.
+ *
+ * The chosen scenario lives in the URL (`?mock=wipe`), and selecting one does a
+ * real NAVIGATION rather than a setState. That is the point: swapping React
+ * state shows the destination but skips everything before it — the boot splash,
+ * its dwell, and the staggered reveal all happen once per page load. Reviewing
+ * a state means reviewing how it ARRIVES, so each pick reloads the page and
+ * plays the whole sequence exactly as branch B will see it.
+ */
 export function useMockScenario(): MockState {
-  const enabled = import.meta.env.DEV
-    && isLocalDev()
-    && new URLSearchParams(window.location.search).has('mock');
-
-  const [current, setCurrent] = useState<Scenario | null>(
-    enabled ? MOCK_SCENARIOS[0] : null,
-  );
+  const params = new URLSearchParams(window.location.search);
+  const enabled = import.meta.env.DEV && isLocalDev() && params.has('mock');
 
   if (!enabled) {
     return { active: false, status: null, dead: null, offline: false, current: null, select: () => {} };
   }
+
+  const requested = params.get('mock');
+  const current = MOCK_SCENARIOS.find((s) => s.key === requested) ?? MOCK_SCENARIOS[0];
+
+  const select = (s: Scenario) => {
+    const next = new URLSearchParams(window.location.search);
+    next.set('mock', s.key);
+    // assign(), not pushState: this must be a full document load so the inline
+    // splash in enroll.html runs again.
+    window.location.assign(`${window.location.pathname}?${next.toString()}`);
+  };
+
   return {
     active: true,
-    status: current?.status ?? null,
-    dead: current?.dead ?? null,
-    offline: current?.offline ?? false,
+    status: current.status ?? null,
+    dead: current.dead ?? null,
+    offline: current.offline ?? false,
     current,
-    select: setCurrent,
+    select,
   };
 }
 

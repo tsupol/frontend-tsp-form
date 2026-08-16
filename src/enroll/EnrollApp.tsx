@@ -235,9 +235,18 @@ function Shell({ children, controls }: { children: React.ReactNode; controls: Re
   return (
     // max-w-md, not 100vw: layout.css sets body{width:100vw}, which includes the
     // scrollbar and produces a horizontal gutter on some phones.
-    <div className="min-h-dvh flex justify-center px-4 py-6">
+    // pt-2 (not py-6): the controls are chrome and belong near the top edge,
+    // out of the way of the serial. The generous bottom padding stays so the
+    // last card never sits flush against the bottom of the screen.
+    // pt-[max(0.5rem,env(safe-area-inset-top)] keeps them clear of a notch.
+    <div
+      className="min-h-dvh flex justify-center px-4 pb-8"
+      style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top))' }}
+    >
       <div className="w-full max-w-md flex flex-col gap-4 min-w-0">
-        {controls}
+        {/* Tight to the controls: they are a toolbar, not a content block, so
+            the 1rem column gap below them would read as a gap in the content. */}
+        <div className="-mb-2">{controls}</div>
         {children}
       </div>
     </div>
