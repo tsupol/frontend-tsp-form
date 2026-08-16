@@ -544,10 +544,8 @@ export function ChatThreadPanel({
     });
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file || !enabled || contractId === null) return;
+  const uploadImage = async (file: File) => {
+    if (!enabled || contractId === null) return;
     if (!file.type.startsWith('image/')) {
       setSendError(t('chat.imageInvalid'));
       return;
@@ -586,7 +584,9 @@ export function ChatThreadPanel({
         p_access_level: 'CONFIDENTIAL',
         p_mime_type: mimeFromKey(lgResult.key),
         p_file_size_bytes: lgFile.size,
-        p_original_filename: file.name,
+        // Clipboard images arrive with no name at all — fall back so the
+        // record never carries an empty filename.
+        p_original_filename: file.name || lgFile.name,
         p_entity_type: 'CHAT_MESSAGE',
         p_entity_id: contractId,
         p_usage_type: 'CHAT_IMAGE',
@@ -602,6 +602,31 @@ export function ChatThreadPanel({
       // put the caret back once it is usable again.
       requestAnimationFrame(() => textareaRef.current?.focus());
     }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (file) void uploadImage(file);
+  };
+
+  /**
+   * Paste-to-send: screenshots land on the clipboard as an image item with no
+   * name. Text pastes carry no file item, so they fall through to the default
+   * textarea behaviour untouched.
+   */
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    if (sendMutation.isPending || uploading) return;
+    const item = Array.from(e.clipboardData.items).find(
+      i => i.kind === 'file' && i.type.startsWith('image/'),
+    );
+    if (!item) return;
+    const file = item.getAsFile();
+    if (!file) return;
+    // Only now claim the event — an image is going up, so the browser must not
+    // also drop its filename into the composer.
+    e.preventDefault();
+    void uploadImage(file);
   };
 
   /** Catch up to the newest message and resume following it. */
@@ -846,6 +871,7 @@ export function ChatThreadPanel({
             value={composer}
             onChange={e => setComposer(e.target.value)}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             placeholder={t('chat.composerPlaceholder')}
             disabled={sendMutation.isPending || uploading}
             className="w-full resize-none bg-transparent border-0 outline-0 px-3 pt-3 pb-1 text-xs md:text-sm leading-5 placeholder:text-subtle"
