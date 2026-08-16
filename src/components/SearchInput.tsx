@@ -80,6 +80,12 @@ export function SearchInput({
       autoFocus={autoFocus}
       aria-label={ariaLabel}
       startIcon={startIcon === null ? undefined : (startIcon ?? <Search size={16} />)}
+      // The hint is a CONDITIONAL icon, so on a box that opted out of the
+      // magnifier (startIcon={null}) the field would otherwise start with no
+      // icons at all — and the hint appearing on keystroke 1 would change the
+      // DOM shape and remount the input, dropping focus and flipping the iOS
+      // keyboard back to letters. This reserves the wrapper from first render.
+      reserveIconSlots
       // Hint rides inside the field, right-aligned, so the rows below can't
       // shift as the user types. A caller's own endIcon returns once the
       // keyword clears the floor.
