@@ -240,45 +240,56 @@ export function DevEnrollPreviewPage() {
           className="border border-line rounded-xl overflow-auto better-scroll bg-bg"
           style={{ width: 420, height: 780 }}
         >
+          {/* key={active.key} remounts on every scenario switch, so the entry
+              animation replays — that is the whole point of the preview. The
+              real page latches it after one run instead. */}
           {view && active.status ? (
-            <Shell>
-              <div className="pt-2">
+            <Shell key={active.key}>
+              <div className="pt-2 enroll-reveal">
                 <SerialHero serial={view.serial_number} />
               </div>
-              <div className="flex items-center justify-center gap-1.5 text-xs text-subtle">
+              <div className="flex items-center justify-center gap-1.5 text-xs text-subtle enroll-reveal enroll-reveal-1">
                 <Clock size={12} className="shrink-0" />
                 <span className="tabular-nums">{t('remoteEnroll.expiresInHm', { h: 2, m: 14 })}</span>
               </div>
-              <EnrollChecklist
-                view={view}
-                audience="remote"
-                onPrepare={() => {}}
-                hideKeyBanner
-              />
-              {view.in_mdm && <KeyBanner view={view} />}
+              <div className="enroll-reveal enroll-reveal-2">
+                <EnrollChecklist
+                  view={view}
+                  audience="remote"
+                  onPrepare={() => {}}
+                  hideKeyBanner
+                />
+              </div>
+              {view.in_mdm && (
+                <div className="enroll-reveal enroll-reveal-3">
+                  <KeyBanner view={view} />
+                </div>
+              )}
               <div className="flex items-center justify-center gap-2 text-xs text-subtle">
                 <span className="w-1.5 h-1.5 rounded-full bg-success-fg" aria-hidden />
                 <span>{t('remoteEnroll.updatedJustNow')}</span>
               </div>
             </Shell>
           ) : active.screen === 'finished' ? (
-            <Shell>
+            <Shell key={active.key}>
               <div className="flex flex-col items-center text-center gap-4 pt-10">
-                <div className="w-20 h-20 rounded-full bg-success-soft border border-success-border flex items-center justify-center">
+                <div className="w-20 h-20 rounded-full bg-success-soft border border-success-border flex items-center justify-center enroll-reveal">
                   <Checkmark className="w-10 h-10 text-success-fg remote-enroll-check" />
                 </div>
-                <h1 className="heading-2">{t('remoteEnroll.done.title')}</h1>
-                <p className="text-subtle">{t('remoteEnroll.done.body')}</p>
-                <div className="font-mono text-sm text-subtle tracking-widest">{SERIAL}</div>
-                <div className="alert alert-success mt-2 text-left">
+                <div className="flex flex-col items-center gap-2 enroll-reveal enroll-reveal-2">
+                  <h1 className="heading-2">{t('remoteEnroll.done.title')}</h1>
+                  <p className="text-subtle">{t('remoteEnroll.done.body')}</p>
+                  <div className="font-mono text-sm text-subtle tracking-widest">{SERIAL}</div>
+                </div>
+                <div className="alert alert-success mt-2 text-left enroll-reveal enroll-reveal-3">
                   <PartyPopper size={18} className="shrink-0" />
                   <span>{t('remoteEnroll.done.tellBranch')}</span>
                 </div>
               </div>
             </Shell>
           ) : active.screen === 'offline' ? (
-            <Shell>
-              <div className="flex flex-col items-center text-center gap-3 pt-10">
+            <Shell key={active.key}>
+              <div className="flex flex-col items-center text-center gap-3 pt-10 enroll-reveal">
                 <AlertCircle size={56} className="text-danger-fg" />
                 <h1 className="heading-2">{t('remoteEnroll.offline.title')}</h1>
                 <p className="text-subtle">{t('remoteEnroll.offline.body')}</p>
@@ -288,8 +299,8 @@ export function DevEnrollPreviewPage() {
               </div>
             </Shell>
           ) : (
-            <Shell>
-              <div className="flex flex-col items-center text-center gap-3 pt-10">
+            <Shell key={active.key}>
+              <div className="flex flex-col items-center text-center gap-3 pt-10 enroll-reveal">
                 <AlertCircle size={56} className="text-warning-fg" />
                 <h1 className="heading-2">
                   {t(`remoteEnroll.dead.${active.screen === 'expired' ? 'EXPIRED'

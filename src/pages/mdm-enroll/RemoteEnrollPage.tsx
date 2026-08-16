@@ -172,7 +172,7 @@ function DeadLink({ reason }: { reason: EnrollLinkInvalidReason }) {
   if (reason === 'COMPLETED') return <Finished />;
   return (
     <Shell>
-      <div className="flex flex-col items-center text-center gap-3 pt-10">
+      <div className="flex flex-col items-center text-center gap-3 pt-10 enroll-reveal">
         <AlertCircle size={56} className="text-warning-fg" />
         <h1 className="heading-2">{t(`remoteEnroll.dead.${reason}.title`)}</h1>
         <p className="text-subtle">{t(`remoteEnroll.dead.${reason}.body`)}</p>
@@ -191,15 +191,19 @@ function Finished({ serial }: { serial?: string | null }) {
   return (
     <Shell>
       <div className="flex flex-col items-center text-center gap-4 pt-10">
-        <div className="w-20 h-20 rounded-full bg-success-soft border border-success-border flex items-center justify-center">
+        {/* The badge rises first, so the checkmark draws itself once the circle
+            has landed rather than while it is still moving. */}
+        <div className="w-20 h-20 rounded-full bg-success-soft border border-success-border flex items-center justify-center enroll-reveal">
           <Checkmark className="w-10 h-10 text-success-fg remote-enroll-check" />
         </div>
-        <h1 className="heading-2">{t('remoteEnroll.done.title')}</h1>
-        <p className="text-subtle">{t('remoteEnroll.done.body')}</p>
-        {serial && (
-          <div className="font-mono text-sm text-subtle tracking-widest select-all">{serial}</div>
-        )}
-        <div className="alert alert-success mt-2 text-left">
+        <div className="flex flex-col items-center gap-2 enroll-reveal enroll-reveal-2">
+          <h1 className="heading-2">{t('remoteEnroll.done.title')}</h1>
+          <p className="text-subtle">{t('remoteEnroll.done.body')}</p>
+          {serial && (
+            <div className="font-mono text-sm text-subtle tracking-widest select-all">{serial}</div>
+          )}
+        </div>
+        <div className="alert alert-success mt-2 text-left enroll-reveal enroll-reveal-3">
           <PartyPopper size={18} className="shrink-0" />
           <span>{t('remoteEnroll.done.tellBranch')}</span>
         </div>
@@ -305,6 +309,8 @@ export function RemoteEnrollPage() {
   // flaky phone signal at branch B) must keep trying, so the two are split.
   const [deadReason, setDeadReason] = useState<EnrollLinkInvalidReason | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  // Latches once the entry animation has played, so it never replays on a poll.
+  const [revealed, setRevealed] = useState(false);
 
   const query = useEnrollPoll<RemoteEnrollStatus>({
     queryKey: ['remote-enroll', token],
@@ -341,6 +347,15 @@ export function RemoteEnrollPage() {
     [query.data],
   );
 
+  // Retire the entry animation once it has run. Longest delay (180ms) plus the
+  // 360ms duration, with a little slack.
+  const hasData = !!query.data;
+  useEffect(() => {
+    if (!hasData || revealed) return;
+    const id = setTimeout(() => setRevealed(true), 700);
+    return () => clearTimeout(id);
+  }, [hasData, revealed]);
+
   if (!token) return <DeadLink reason="NOT_FOUND" />;
   if (deadReason) return <DeadLink reason={deadReason} />;
 
@@ -370,19 +385,26 @@ export function RemoteEnrollPage() {
 
   if (query.data?.completed) return <Finished serial={view.serial_number} />;
 
+  // The reveal is for the ARRIVAL of the page, so it plays once. The className
+  // is dropped afterwards: leaving it on would replay the rise every time the
+  // 5s poll changes something, and a page that keeps re-animating under a
+  // waiting user reads as broken, not polished.
+  const reveal = revealed ? '' : 'enroll-reveal';
+
   return (
     <Shell>
       {/* Serial first and biggest — the link holder has nothing else on screen
-          to match against the box in their hand. */}
-      <div className="pt-2">
+          to match against the box in their hand. Revealed in three short steps
+          so the page composes itself rather than appearing as one block. */}
+      <div className={`pt-2 ${reveal}`}>
         <SerialHero serial={view.serial_number} />
       </div>
 
-      <ExpiryLine expiresAt={query.data?.link_expires_at ?? null} />
+      <div className={reveal ? `${reveal} enroll-reveal-1` : ''}>
+        <ExpiryLine expiresAt={query.data?.link_expires_at ?? null} />
+      </div>
 
-      {/* motion-safe fade so arriving data settles instead of snapping. The
-          skeleton above already reserved this geometry, so nothing shifts. */}
-      <div className="motion-safe:animate-fade-in">
+      <div className={reveal ? `${reveal} enroll-reveal-2` : ''}>
         <EnrollChecklist
           view={view}
           audience="remote"
@@ -395,7 +417,11 @@ export function RemoteEnrollPage() {
 
       {/* Handover readiness sits BELOW the steps here: it is the last thing that
           matters to a delegate, and only once the device is actually in. */}
-      {view.in_mdm && <KeyBanner view={view} />}
+      {view.in_mdm && (
+        <div className={reveal ? `${reveal} enroll-reveal-3` : ''}>
+          <KeyBanner view={view} />
+        </div>
+      )}
 
       <Heartbeat dataUpdatedAt={query.dataUpdatedAt} />
     </Shell>
