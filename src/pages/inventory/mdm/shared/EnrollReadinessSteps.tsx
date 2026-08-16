@@ -182,9 +182,15 @@ export function EnrollReadinessSteps({
   const locked = isLockedBadge(view.enforcement_badge);
   const isApplying = view.enforcement_badge === 'APPLYING';
 
-  // Step 6 is a status readout, not a checklist item — done once enrolled (its
-  // badges then carry the real state), current while enrolling.
-  const step6State: StepStatus = enrollComplete ? 'done' : 'current';
+  // Step 6 is a status readout, not a checklist item — done once enrolled, when
+  // its badges carry the real state.
+  //
+  // ⛔ NOT 'current' before that. It used to be, which painted step 6 the active
+  //    blue while steps 2–5 above it were still grey: the lowest highlighted row
+  //    on the page was the one nobody can act on, and the eye went there instead
+  //    of to the actual next action. Nothing detects the app or the keys until
+  //    the device is enrolled, so before then step 6 is genuinely pending.
+  const step6State: StepStatus = enrollComplete ? 'done' : 'todo';
   // Step 6 no longer gates step 7: once 1–5 are done and the lock isn't applied,
   // step 7 is the current action.
   const step7State: StepStatus = locked ? 'done' : (enrollComplete ? 'current' : 'todo');
